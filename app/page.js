@@ -1,5 +1,2 @@
-import DebattClient from "./client";
-
-export default function Page() {
-  return <DebattClient />;
-    }
+export const dynamic = 'force-dynamic';
+export { default } from './client';
