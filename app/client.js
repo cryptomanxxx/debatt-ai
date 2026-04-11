@@ -1,10 +1,11 @@
+
 "use client";
 import { useState, useEffect } from "react";
 
 const MIN_SCORE = 6;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtd3hmdG5pc3Rrb3FhemZ3bnVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODg2MjQsImV4cCI6MjA5MTE2NDYyNH0.2i76epCWDLfta3shdy_1woDLLJoTgVkZajmTNWJJ-7A";
+const SB_KEY = "KLISTRA_IN_DIN_ANON_KEY_HÄR";
 
 const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm artikeln på fyra kriterier (heltal 0-10):
 1. Argumentationsklarhet – Är argumenten tydliga och logiskt uppbyggda?
@@ -38,15 +39,14 @@ function sbHeaders() {
     "Prefer": "return=minimal",
   };
 }
+
 async function sbInsert(row) {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar`, {
     method: "POST",
     headers: sbHeaders(),
     body: JSON.stringify(row),
   });
-  const responseText = await res.text();
-  if (!res.ok) throw new Error("Status " + res.status + ": " + responseText);
-  return responseText;
+  if (!res.ok) throw new Error(await res.text());
 }
 
 async function sbSelect() {
@@ -163,6 +163,15 @@ export default function DebattClient() {
       });
       const data = await res.json();
       const raw = data.choices?.[0]?.message?.content || "";
+      const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      setResult(parsed);
+      setView("result");
+    } catch {
+      setError("Analysen misslyckades. Försök igen.");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   async function publish() {
     setSaving(true); setError(null);
