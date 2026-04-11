@@ -1,5 +1,6 @@
-import DebattClient from "./client";
+JavaScript
+"use client";
 
-export default function Page() {
-  return <DebattClient />;
-    }
+export default function DebattClient() {
+  return <div>Din UI här</div>;
+}
