@@ -45,8 +45,8 @@ async function sbInsert(row) {
     body: JSON.stringify(row),
   });
   const responseText = await res.text();
-  if (!res.ok) throw new Error(responseText);
-  alert("Supabase svar: " + res.status + " " + responseText);
+  if (!res.ok) throw new Error("Status " + res.status + ": " + responseText);
+  return responseText;
 }
 
 async function sbSelect() {
