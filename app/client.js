@@ -38,14 +38,15 @@ function sbHeaders() {
     "Prefer": "return=minimal",
   };
 }
-
 async function sbInsert(row) {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar`, {
     method: "POST",
     headers: sbHeaders(),
     body: JSON.stringify(row),
   });
-  if (!res.ok) throw new Error(await res.text());
+  const responseText = await res.text();
+  if (!res.ok) throw new Error(responseText);
+  alert("Supabase svar: " + res.status + " " + responseText);
 }
 
 async function sbSelect() {
