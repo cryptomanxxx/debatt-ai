@@ -1,11 +1,10 @@
-
 "use client";
 import { useState, useEffect } from "react";
 
 const MIN_SCORE = 6;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY = "KLISTRA_IN_DIN_ANON_KEY_HÄR";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtd3hmdG5pc3Rrb3FhemZ3bnVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODg2MjQsImV4cCI6MjA5MTE2NDYyNH0.2i76epCWDLfta3shdy_1woDLLJoTgVkZajmTNWJJ-7A";
 
 const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm artikeln på fyra kriterier (heltal 0-10):
 1. Argumentationsklarhet – Är argumenten tydliga och logiskt uppbyggda?
