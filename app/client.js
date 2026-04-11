@@ -154,27 +154,15 @@ export default function DebattClient() {
   async function analyze() {
     setAnalyzing(true); setError(null);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 600,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: `Rubrik: ${title}\nFörfattare: ${author}\n\n${text}` }],
+          messages: [{ role: "user", content: `${SYSTEM_PROMPT}\n\nRubrik: ${title}\nFörfattare: ${author}\n\n${text}` }],
         }),
       });
       const data = await res.json();
-      const raw = data.content?.map(b => b.text || "").join("") || "";
-      const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-      setResult(parsed);
-      setView("result");
-    } catch {
-      setError("Analysen misslyckades. Kontrollera att din ANTHROPIC_API_KEY är korrekt.");
-    } finally {
-      setAnalyzing(false);
-    }
-  }
+      const raw = data.choices?.[0]?.message?.content || "";
 
   async function publish() {
     setSaving(true); setError(null);
