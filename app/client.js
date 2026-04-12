@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 const MIN_SCORE = 6;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY = "KLISTRA_IN_DIN_ANON_KEY_HÄR";
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm artikeln på fyra kriterier (heltal 0-10):
 1. Argumentationsklarhet – Är argumenten tydliga och logiskt uppbyggda?
