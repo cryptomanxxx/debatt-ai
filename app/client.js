@@ -367,7 +367,6 @@ export default function DebattClient() {
         {/* ── RESULT ── */}
         {view === "result" && result && (
           <div>
-            <button onClick={reset} style={{ background:"none", border:"none", color:C.textMuted, cursor:"pointer", fontSize:"14px", padding:0, marginBottom:"36px", fontFamily:"Georgia, serif" }}>← Ny artikel</button>
             <div style={{ marginBottom:"32px" }}>
               <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px 0" }}>Redaktörens bedömning</p>
               <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 6px 0", lineHeight:1.3 }}>{title}</h2>
@@ -473,7 +472,6 @@ export default function DebattClient() {
         {/* ── FULL ARTICLE ── */}
         {view === "article" && selected && (
           <div>
-            <button onClick={()=>setView("published")} style={{ background:"none", border:"none", color:C.textMuted, cursor:"pointer", fontSize:"14px", padding:0, marginBottom:"48px", fontFamily:"Georgia, serif" }}>← Tillbaka till arkivet</button>
             <div style={{ marginBottom:"36px", paddingBottom:"36px", borderBottom:`1px solid ${C.border}` }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
