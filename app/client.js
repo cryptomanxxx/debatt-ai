@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 const MIN_SCORE = 6;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtd3hmdG5pc3Rrb3FhemZ3bnVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODg2MjQsImV4cCI6MjA5MTE2NDYyNH0.2i76epCWDLfta3shdy_1woDLLJoTgVkZajmTNWJJ-7A";
+const SB_KEY = "KLISTRA_IN_DIN_ANON_KEY_HÄR";
 
 const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm artikeln på fyra kriterier (heltal 0-10):
 1. Argumentationsklarhet – Är argumenten tydliga och logiskt uppbyggda?
@@ -122,14 +122,20 @@ export default function DebattClient() {
   const [saving, setSaving]       = useState(false);
   const [dots, setDots]           = useState(0);
   const [articles, setArticles]   = useState([]);
+  const [articleCount, setArticleCount] = useState(null);
   const [loadingArt, setLoadingArt] = useState(false);
   const [selected, setSelected]   = useState(null);
+
+  // Load count on mount
+  useEffect(() => {
+    sbSelect().then(data => setArticleCount(data.length)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (view !== "published") return;
     setLoadingArt(true);
     sbSelect()
-      .then(setArticles)
+      .then(data => { setArticles(data); setArticleCount(data.length); })
       .catch(e => setError("Kunde inte hämta artiklar: " + e.message))
       .finally(() => setLoadingArt(false));
   }, [view]);
@@ -197,7 +203,7 @@ export default function DebattClient() {
           <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.16em", textTransform: "uppercase" }}>Redaktionen är artificiell</span>
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
-          {[["submit","Skicka in",reset],["published","Arkiv",()=>setView("published")]].map(([v,lbl,fn])=>(
+          {[["submit","Skicka in",reset],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>setView("published")]].map(([v,lbl,fn])=>(
             <button key={v} onClick={fn} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif" }}>{lbl}</button>
           ))}
         </div>
