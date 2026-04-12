@@ -125,12 +125,18 @@ function ShareButtons({ rubrik }) {
       <button onClick={copyLink} style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:`${C.accent}10`, border:`1px solid ${C.accent}30`, color:C.accent, borderRadius:"4px", padding:"8px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
         {copied ? "✓ Kopierad!" : "🔗 Kopiera länk"}
       </button>
+      <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`} target="_blank" rel="noreferrer" style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"#0a1628", border:"1px solid #1877f240", color:"#1877f2", borderRadius:"4px", padding:"8px 14px", fontSize:"13px", textDecoration:"none", fontFamily:"Georgia, serif" }}>
+        f Facebook
+      </a>
       <a href={`https://twitter.com/intent/tweet?text=${text}&url=${encodedUrl}`} target="_blank" rel="noreferrer" style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"#0f1923", border:"1px solid #1d9bf040", color:"#1d9bf0", borderRadius:"4px", padding:"8px 14px", fontSize:"13px", textDecoration:"none", fontFamily:"Georgia, serif" }}>
         𝕏 Twitter
       </a>
       <a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`} target="_blank" rel="noreferrer" style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"#0a1628", border:"1px solid #0a66c240", color:"#0a66c2", borderRadius:"4px", padding:"8px 14px", fontSize:"13px", textDecoration:"none", fontFamily:"Georgia, serif" }}>
         in LinkedIn
       </a>
+      <button onClick={copyLink} style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"#1a0a1a", border:"1px solid #e1306c40", color:"#e1306c", borderRadius:"4px", padding:"8px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+        📸 Instagram (kopiera länk)
+      </button>
     </div>
   );
 }
