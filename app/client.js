@@ -219,8 +219,9 @@ export default function DebattClient() {
 
   function reset() {
     setView("submit"); setResult(null); setError(null); setSelected(null);
-    setTitle("");
-    setAuthor(""); setText("");
+    setTitle(""); setAuthor(""); setText("");
+    setTurnstileToken(null);
+    if (window.turnstile) window.turnstile.reset();
   }
 
   const ok = isEligible(result);
