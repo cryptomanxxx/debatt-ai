@@ -145,6 +145,8 @@ export default function DebattClient() {
   const [title, setTitle]   = useState("");
   const [author, setAuthor] = useState("");
   const [text, setText]     = useState("");
+  const [kategori, setKategori] = useState("Övrigt");
+  const [filterKategori, setFilterKategori] = useState("Alla");
   const [result, setResult] = useState(null);
   const [error, setError]   = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -226,6 +228,7 @@ export default function DebattClient() {
         forfattare: author,
         artikel: text,
         motivering: result.motivering,
+        kategori: kategori,
         arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
       });
       // Send email notification
@@ -248,8 +251,10 @@ export default function DebattClient() {
 
   function reset() {
     setView("submit"); setResult(null); setError(null); setSelected(null);
-    setTitle("");
-    setAuthor(""); setText("");
+    setTitle(""); setAuthor(""); setText("");
+    setKategori("Övrigt");
+    setTurnstileToken(null);
+    if (window.turnstile) window.turnstile.reset();
   }
 
   const ok = isEligible(result);
@@ -298,6 +303,14 @@ export default function DebattClient() {
             <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
               <div><Lbl>Rubrik</Lbl><input value={title} onChange={e=>setTitle(e.target.value)} style={inp} /></div>
               <div><Lbl>Författare & titel</Lbl><input value={author} onChange={e=>setAuthor(e.target.value)} style={inp} /></div>
+              <div>
+                <Lbl>Kategori</Lbl>
+                <select value={kategori} onChange={e=>setKategori(e.target.value)} style={{...inp, cursor:"pointer"}}>
+                  {["Ekonomi","Politik","Miljö","Samhälle","Juridik","Hälsa & medicin","Vetenskap & forskning","Teknik & IT","Utbildning","Kultur & konst","Sport & träning","Kost & mat","Hantverk & byggnad","Musik & underhållning","Internationellt","Energi & klimat","Näringsliv","Socialpolitik","Biologi & natur","Övrigt"].map(k=>(
+                    <option key={k} value={k}>{k}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <Lbl>Artikeltext</Lbl>
                 <textarea value={text} onChange={e=>setText(e.target.value)} rows={16} style={{...inp, resize:"vertical", lineHeight:1.8}} />
@@ -386,22 +399,32 @@ export default function DebattClient() {
         {/* ── ARCHIVE ── */}
         {view === "published" && (
           <div>
-            <div style={{ marginBottom:"40px" }}>
+            <div style={{ marginBottom:"32px" }}>
               <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 10px 0" }}>Arkiv</p>
               <h1 style={{ fontSize:"32px", fontWeight:400, margin:"0 0 8px 0" }}>Publicerade artiklar</h1>
-              <p style={{ color:C.textMuted, fontSize:"15px", margin:0 }}>Klicka på en artikel för att läsa hela texten.</p>
+              <p style={{ color:C.textMuted, fontSize:"15px", margin:"0 0 24px 0" }}>Klicka på en artikel för att läsa hela texten.</p>
+              {/* Category filters */}
+              <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
+                {["Alla", ...new Set(articles.map(a=>a.kategori||"Övrigt").filter(Boolean).sort())].map(k=>(
+                  <button key={k} onClick={()=>setFilterKategori(k)} style={{ background:filterKategori===k?C.accent:"transparent", color:filterKategori===k?"#0a0a0a":C.textMuted, border:`1px solid ${filterKategori===k?C.accent:C.border}`, borderRadius:"20px", padding:"6px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", transition:"all 0.2s" }}>
+                    {k}
+                  </button>
+                ))}
+              </div>
             </div>
             {loadingArt ? <p style={{ color:C.textMuted }}>Hämtar från databas…</p>
-              : articles.length === 0 ? (
+              : articles.filter(a => filterKategori === "Alla" || (a.kategori||"Övrigt") === filterKategori).length === 0 ? (
                 <div style={{ textAlign:"center", padding:"80px 0", color:C.textMuted }}>
                   <p style={{ fontSize:"40px", margin:"0 0 16px 0" }}>📭</p>
-                  <p style={{ fontSize:"16px" }}>Inga artiklar publicerade än.</p>
-                  <button onClick={reset} style={{ background:"none", border:`1px solid ${C.border}`, color:C.textMuted, padding:"12px 24px", borderRadius:"4px", cursor:"pointer", marginTop:"20px", fontFamily:"Georgia, serif", fontSize:"14px" }}>Skicka in en artikel</button>
+                  <p style={{ fontSize:"16px" }}>Inga artiklar i denna kategori.</p>
                 </div>
-              ) : articles.map((a,i)=>(
+              ) : articles.filter(a => filterKategori === "Alla" || (a.kategori||"Övrigt") === filterKategori).map((a,i)=>(
                 <div key={a.id||i} onClick={()=>{setSelected(a);setView("article");}} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"32px", marginBottom:"32px", cursor:"pointer", transition:"opacity 0.15s" }} onMouseEnter={e=>e.currentTarget.style.opacity="0.7"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px" }}>
-                    <Badge type="published" />
+                    <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                      <Badge type="published" />
+                      {a.kategori && <span style={{ fontSize:"11px", color:C.accentDim, background:`${C.accent}10`, border:`1px solid ${C.accent}20`, borderRadius:"20px", padding:"3px 10px", letterSpacing:"0.06em" }}>{a.kategori}</span>}
+                    </div>
                     <span style={{ fontSize:"13px", color:C.textMuted }}>{a.skapad?new Date(a.skapad).toLocaleDateString("sv-SE"):""}</span>
                   </div>
                   <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 8px 0", lineHeight:1.3, color:C.accent }}>{a.rubrik}</h2>
@@ -421,7 +444,10 @@ export default function DebattClient() {
             <button onClick={()=>setView("published")} style={{ background:"none", border:"none", color:C.textMuted, cursor:"pointer", fontSize:"14px", padding:0, marginBottom:"48px", fontFamily:"Georgia, serif" }}>← Tillbaka till arkivet</button>
             <div style={{ marginBottom:"36px", paddingBottom:"36px", borderBottom:`1px solid ${C.border}` }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
-                <Badge type="published" />
+                <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                  <Badge type="published" />
+                  {selected.kategori && <span style={{ fontSize:"11px", color:C.accentDim, background:`${C.accent}10`, border:`1px solid ${C.accent}20`, borderRadius:"20px", padding:"3px 10px", letterSpacing:"0.06em" }}>{selected.kategori}</span>}
+                </div>
                 <span style={{ fontSize:"13px", color:C.textMuted }}>{selected.skapad?new Date(selected.skapad).toLocaleDateString("sv-SE",{year:"numeric",month:"long",day:"numeric"}):""}</span>
               </div>
               <h1 style={{ fontSize:"30px", fontWeight:400, margin:"0 0 14px 0", lineHeight:1.25, color:C.accent }}>{selected.rubrik}</h1>
