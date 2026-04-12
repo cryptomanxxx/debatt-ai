@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 const MIN_SCORE = 6;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtd3hmdG5pc3Rrb3FhemZ3bnVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODg2MjQsImV4cCI6MjA5MTE2NDYyNH0.2i76epCWDLfta3shdy_1woDLLJoTgVkZajmTNWJJ-7A";
+const SB_KEY = "KLISTRA_IN_DIN_ANON_KEY_HÄR";
 
 const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm artikeln på fyra kriterier (heltal 0-10):
 1. Argumentationsklarhet – Är argumenten tydliga och logiskt uppbyggda?
@@ -18,16 +18,6 @@ Svara ENDAST med JSON (inga andra tecken):
 {"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1","förslag 2"],"styrkor":["styrka 1"],"rubrik":null}
 
 beslut är "publicera" om alla fyra >= ${MIN_SCORE}, annars "revidera" eller "avvisa".`;
-
-const EXAMPLE = `Sverige har en självbild som ett teknologiskt framstående land. Vi är stolta över vår digitalisering, vår välfärd och vår förmåga att anpassa oss. Men just nu blundar vi kollektivt för den mest omvälvande ekonomiska förändringen sedan industrialiseringen.
-
-Automatiseringen är inte längre en framtidsfråga. Den pågår just nu, i tysta serverhallar. Goldman Sachs beräknar att generativ AI kan automatisera upp till 300 miljoner heltidstjänster globalt. I Sverige visar SCB:s yrkesregister att drygt 800 000 tjänstemän arbetar med uppgifter som till mer än hälften består av text och databearbetning.
-
-Det handlar inte om lågkvalificerade jobb. Det handlar om medelklassens kärna – de utbildade, välbetalda positioner som en generation av unga har investerat studielån och tio år av karriär i.
-
-Politiken sover. Ingen av riksdagspartierna presenterar en trovärdig plan för vad som händer när strukturell övertalighet drabbar breda yrkesgrupper simultant.
-
-Lösningen är inte att bromsa AI-utvecklingen. Det är lika meningslöst som att försöka stoppa elektricitet. Precis som elektrifieringen krävde ny lagstiftning och nya socialförsäkringar, kräver AI-omvälvningen nya fördelningsmekanismer. Norge har gjort det med oljan. Vi kan göra det med algoritmerna.`;
 
 // ── Supabase REST helpers ─────────────────────────────────────────────────────
 function sbHeaders() {
@@ -123,9 +113,9 @@ function isEligible(r) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function DebattClient() {
   const [view, setView]     = useState("submit");
-  const [title, setTitle]   = useState("AI kommer att ta 40% av alla jobb inom tio år – och Sverige saknar en plan");
-  const [author, setAuthor] = useState("Anna Lindqvist, nationalekonom");
-  const [text, setText]     = useState(EXAMPLE);
+  const [title, setTitle]   = useState("");
+  const [author, setAuthor] = useState("");
+  const [text, setText]     = useState("");
   const [result, setResult] = useState(null);
   const [error, setError]   = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -191,8 +181,8 @@ export default function DebattClient() {
 
   function reset() {
     setView("submit"); setResult(null); setError(null); setSelected(null);
-    setTitle("AI kommer att ta 40% av alla jobb inom tio år – och Sverige saknar en plan");
-    setAuthor("Anna Lindqvist, nationalekonom"); setText(EXAMPLE);
+    setTitle("");
+    setAuthor(""); setText("");
   }
 
   const ok = isEligible(result);
