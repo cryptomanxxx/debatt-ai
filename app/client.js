@@ -106,6 +106,35 @@ function Badge({ type }) {
   );
 }
 
+function ShareButtons({ rubrik }) {
+  const [copied, setCopied] = useState(false);
+  const url = typeof window !== "undefined" ? window.location.href : "https://debatt-ai.vercel.app";
+  const text = encodeURIComponent(`"${rubrik}" – läs på DEBATT.AI`);
+  const encodedUrl = encodeURIComponent(url);
+
+  function copyLink() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:"12px", flexWrap:"wrap", padding:"20px 0", borderTop:`1px solid ${C.border}`, borderBottom:`1px solid ${C.border}` }}>
+      <span style={{ fontSize:"12px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase" }}>Dela:</span>
+      <button onClick={copyLink} style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:`${C.accent}10`, border:`1px solid ${C.accent}30`, color:C.accent, borderRadius:"4px", padding:"8px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+        {copied ? "✓ Kopierad!" : "🔗 Kopiera länk"}
+      </button>
+      <a href={`https://twitter.com/intent/tweet?text=${text}&url=${encodedUrl}`} target="_blank" rel="noreferrer" style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"#0f1923", border:"1px solid #1d9bf040", color:"#1d9bf0", borderRadius:"4px", padding:"8px 14px", fontSize:"13px", textDecoration:"none", fontFamily:"Georgia, serif" }}>
+        𝕏 Twitter
+      </a>
+      <a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`} target="_blank" rel="noreferrer" style={{ display:"inline-flex", alignItems:"center", gap:"6px", background:"#0a1628", border:"1px solid #0a66c240", color:"#0a66c2", borderRadius:"4px", padding:"8px 14px", fontSize:"13px", textDecoration:"none", fontFamily:"Georgia, serif" }}>
+        in LinkedIn
+      </a>
+    </div>
+  );
+}
+
 function isEligible(r) {
   return r && r.arg >= MIN_SCORE && r.ori >= MIN_SCORE && r.rel >= MIN_SCORE && r.tro >= MIN_SCORE;
 }
@@ -209,7 +238,7 @@ export default function DebattClient() {
           motivering: result.motivering,
           arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
         }),
-      }).then(r => r.json()).then(d => { if(d.error) setError("Mail-fel: " + JSON.stringify(d.error)); }).catch(e => setError("Mail-fel: " + e.message));
+      }).catch(() => {}); // fire and forget
       setView("published");
     } catch (e) {
       setError("Sparning misslyckades: " + e.message);
@@ -219,9 +248,8 @@ export default function DebattClient() {
 
   function reset() {
     setView("submit"); setResult(null); setError(null); setSelected(null);
-    setTitle(""); setAuthor(""); setText("");
-    setTurnstileToken(null);
-    if (window.turnstile) window.turnstile.reset();
+    setTitle("");
+    setAuthor(""); setText("");
   }
 
   const ok = isEligible(result);
@@ -278,12 +306,11 @@ export default function DebattClient() {
                 </p>
               </div>
               <div
-                 key={view}
-                 className="cf-turnstile"
-                 data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
-                 data-callback="onTurnstileVerified"
-                 data-theme="dark"
-                />
+                className="cf-turnstile"
+                data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                data-callback="onTurnstileVerified"
+                data-theme="dark"
+              />
               <button onClick={analyze} disabled={analyzing||!text.trim()||!title.trim()||!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300} style={{ background:analyzing?`${C.accent}20`:((!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300)?`${C.accent}40`:C.accent), color:analyzing?C.accentDim:"#0a0a0a", border:"none", borderRadius:"4px", padding:"15px 32px", fontSize:"14px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", cursor:(analyzing||!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300)?"default":"pointer", fontFamily:"Georgia, serif", alignSelf:"flex-start" }}>
                 {analyzing?`Redaktören läser${".".repeat(dots)}`:"Skicka till redaktionen →"}
               </button>
@@ -405,7 +432,11 @@ export default function DebattClient() {
                 <p key={i} style={{ fontSize:"18px", lineHeight:2, color:C.text, margin:"0 0 28px 0" }}>{p}</p>
               ))}
             </div>
-            <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"28px" }}>
+
+            {/* Share buttons */}
+            <ShareButtons rubrik={selected.rubrik} />
+
+            <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"28px", marginTop:"32px" }}>
               <p style={{ fontSize:"11px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 20px 0" }}>Redaktörens noteringar</p>
               {selected.motivering && <p style={{ color:C.textMuted, fontSize:"15px", lineHeight:1.8, fontStyle:"italic", margin:"0 0 24px 0" }}>"{selected.motivering}"</p>}
               <ScoreBar label="Argumentation" value={selected.arg} />
@@ -420,7 +451,7 @@ export default function DebattClient() {
 
       <footer style={{ borderTop:`1px solid ${C.border}`, padding:"28px 40px", textAlign:"center", marginTop:"60px" }}>
         <p style={{ color:C.textMuted, fontSize:"13px", margin:0, letterSpacing:"0.05em" }}>
-          DEBATT.AI · Publicering kräver minst {MIN_SCORE}/10 på alla kriterier · Ansvarig utgivare: Marcus Davidsson
+          DEBATT.AI · Publicering kräver minst {MIN_SCORE}/10 på alla kriterier · Ansvarig utgivare: Du
         </p>
       </footer>
     </div>
