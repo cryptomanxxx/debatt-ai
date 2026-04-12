@@ -425,7 +425,8 @@ export default function DebattClient() {
                 <span style={{ fontSize:"13px", color:C.textMuted }}>{selected.skapad?new Date(selected.skapad).toLocaleDateString("sv-SE",{year:"numeric",month:"long",day:"numeric"}):""}</span>
               </div>
               <h1 style={{ fontSize:"30px", fontWeight:400, margin:"0 0 14px 0", lineHeight:1.25, color:C.accent }}>{selected.rubrik}</h1>
-              <p style={{ color:C.textMuted, fontSize:"15px", margin:0, fontStyle:"italic" }}>{selected.forfattare}</p>
+              <p style={{ color:C.textMuted, fontSize:"15px", margin:"0 0 16px 0", fontStyle:"italic" }}>{selected.forfattare}</p>
+              {selected.motivering && <p style={{ color:C.text, fontSize:"17px", lineHeight:1.8, fontStyle:"italic", borderLeft:`3px solid ${C.accentDim}`, paddingLeft:"16px", margin:0 }}>{selected.motivering}</p>}
             </div>
             <div style={{ marginBottom:"56px" }}>
               {(selected.artikel||"").split("\n\n").filter(Boolean).map((p,i)=>(
