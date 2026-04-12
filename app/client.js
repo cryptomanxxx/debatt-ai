@@ -418,7 +418,7 @@ export default function DebattClient() {
 
       <footer style={{ borderTop:`1px solid ${C.border}`, padding:"28px 40px", textAlign:"center", marginTop:"60px" }}>
         <p style={{ color:C.textMuted, fontSize:"13px", margin:0, letterSpacing:"0.05em" }}>
-          DEBATT.AI · Publicering kräver minst {MIN_SCORE}/10 på alla kriterier · Ansvarig utgivare: Du
+          DEBATT.AI · Publicering kräver minst {MIN_SCORE}/10 på alla kriterier · Ansvarig utgivare: Marcus Davidsson
         </p>
       </footer>
     </div>
