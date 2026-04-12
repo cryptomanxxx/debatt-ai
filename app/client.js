@@ -46,6 +46,23 @@ async function sbSelect() {
   return res.json();
 }
 
+async function incrementVisitors() {
+  await fetch(`${SB_URL}/rest/v1/rpc/increment_visitors`, {
+    method: "POST",
+    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+}
+
+async function getVisitors() {
+  const res = await fetch(`${SB_URL}/rest/v1/besokare?select=antal`, {
+    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+  });
+  if (!res.ok) return 0;
+  const data = await res.json();
+  return data?.[0]?.antal || 0;
+}
+
 // ── Styles ────────────────────────────────────────────────────────────────────
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
@@ -163,6 +180,7 @@ export default function DebattClient() {
   const [loadingArt, setLoadingArt] = useState(false);
   const [selected, setSelected]   = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
+  const [visitors, setVisitors] = useState(null);
 
   // Load Turnstile script
   useEffect(() => {
@@ -185,6 +203,9 @@ export default function DebattClient() {
   // Load count on mount
   useEffect(() => {
     sbSelect().then(data => setArticleCount(data.length)).catch(() => {});
+    // Increment and fetch visitor count
+    incrementVisitors().catch(() => {});
+    getVisitors().then(n => setVisitors(n)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -274,7 +295,12 @@ export default function DebattClient() {
           <span style={{ fontFamily: "Times New Roman, serif", fontSize: "24px", fontWeight: 700, color: C.accent }}>DEBATT.AI</span>
           <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.16em", textTransform: "uppercase" }}>Redaktionen är artificiell</span>
         </div>
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {visitors !== null && (
+            <span style={{ fontSize: "12px", color: C.textMuted, letterSpacing: "0.06em" }}>
+              👁 {visitors.toLocaleString("sv-SE")} besök
+            </span>
+          )}
           {[["submit","Skicka in",reset],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>setView("published")]].map(([v,lbl,fn])=>(
             <button key={v} onClick={fn} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif" }}>{lbl}</button>
           ))}
@@ -457,7 +483,11 @@ export default function DebattClient() {
                 <span style={{ fontSize:"13px", color:C.textMuted }}>{selected.skapad?new Date(selected.skapad).toLocaleDateString("sv-SE",{year:"numeric",month:"long",day:"numeric"}):""}</span>
               </div>
               <h1 style={{ fontSize:"30px", fontWeight:400, margin:"0 0 14px 0", lineHeight:1.25, color:C.accent }}>{selected.rubrik}</h1>
-              <p style={{ color:C.textMuted, fontSize:"15px", margin:"0 0 16px 0", fontStyle:"italic" }}>{selected.forfattare}</p>
+              <div style={{ display:"flex", alignItems:"center", gap:"16px", margin:"0 0 16px 0" }}>
+                <p style={{ color:C.textMuted, fontSize:"15px", margin:0, fontStyle:"italic" }}>{selected.forfattare}</p>
+                <span style={{ color:C.textMuted, fontSize:"13px" }}>·</span>
+                <span style={{ color:C.textMuted, fontSize:"13px" }}>ca {Math.max(1, Math.round((selected.artikel||"").split(/\s+/).filter(Boolean).length / 200))} min läsning</span>
+              </div>
               {selected.motivering && <p style={{ color:C.text, fontSize:"17px", lineHeight:1.8, fontStyle:"italic", borderLeft:`3px solid ${C.accentDim}`, paddingLeft:"16px", margin:0 }}>{selected.motivering}</p>}
             </div>
             <div style={{ marginBottom:"56px" }}>
