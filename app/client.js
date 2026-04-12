@@ -278,11 +278,12 @@ export default function DebattClient() {
                 </p>
               </div>
               <div
-                className="cf-turnstile"
-                data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
-                data-callback="onTurnstileVerified"
-                data-theme="dark"
-              />
+                 key={view}
+                 className="cf-turnstile"
+                 data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                 data-callback="onTurnstileVerified"
+                 data-theme="dark"
+                />
               <button onClick={analyze} disabled={analyzing||!text.trim()||!title.trim()||!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300} style={{ background:analyzing?`${C.accent}20`:((!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300)?`${C.accent}40`:C.accent), color:analyzing?C.accentDim:"#0a0a0a", border:"none", borderRadius:"4px", padding:"15px 32px", fontSize:"14px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", cursor:(analyzing||!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300)?"default":"pointer", fontFamily:"Georgia, serif", alignSelf:"flex-start" }}>
                 {analyzing?`Redaktören läser${".".repeat(dots)}`:"Skicka till redaktionen →"}
               </button>
