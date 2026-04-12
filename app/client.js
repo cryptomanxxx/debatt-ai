@@ -258,14 +258,20 @@ export default function DebattClient() {
             <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
               <div><Lbl>Rubrik</Lbl><input value={title} onChange={e=>setTitle(e.target.value)} style={inp} /></div>
               <div><Lbl>Författare & titel</Lbl><input value={author} onChange={e=>setAuthor(e.target.value)} style={inp} /></div>
-              <div><Lbl>Artikeltext</Lbl><textarea value={text} onChange={e=>setText(e.target.value)} rows={16} style={{...inp, resize:"vertical", lineHeight:1.8}} /></div>
+              <div>
+                <Lbl>Artikeltext</Lbl>
+                <textarea value={text} onChange={e=>setText(e.target.value)} rows={16} style={{...inp, resize:"vertical", lineHeight:1.8}} />
+                <p style={{ fontSize:"12px", color: text.trim().split(/\s+/).filter(Boolean).length < 300 ? C.red : C.green, margin:"6px 0 0 0", fontFamily:"monospace" }}>
+                  {text.trim().split(/\s+/).filter(Boolean).length} ord {text.trim().split(/\s+/).filter(Boolean).length < 300 ? `– minst 300 ord krävs` : "✓"}
+                </p>
+              </div>
               <div
                 className="cf-turnstile"
                 data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
                 data-callback="onTurnstileVerified"
                 data-theme="dark"
               />
-              <button onClick={analyze} disabled={analyzing||!text.trim()||!title.trim()||!turnstileToken} style={{ background:analyzing?`${C.accent}20`:(!turnstileToken?`${C.accent}40`:C.accent), color:analyzing?C.accentDim:"#0a0a0a", border:"none", borderRadius:"4px", padding:"15px 32px", fontSize:"14px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", cursor:analyzing||!turnstileToken?"default":"pointer", fontFamily:"Georgia, serif", alignSelf:"flex-start" }}>
+              <button onClick={analyze} disabled={analyzing||!text.trim()||!title.trim()||!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300} style={{ background:analyzing?`${C.accent}20`:((!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300)?`${C.accent}40`:C.accent), color:analyzing?C.accentDim:"#0a0a0a", border:"none", borderRadius:"4px", padding:"15px 32px", fontSize:"14px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", cursor:(analyzing||!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300)?"default":"pointer", fontFamily:"Georgia, serif", alignSelf:"flex-start" }}>
                 {analyzing?`Redaktören läser${".".repeat(dots)}`:"Skicka till redaktionen →"}
               </button>
               {error && <p style={{ color:C.red, fontSize:"14px", margin:0 }}>{error}</p>}
@@ -315,9 +321,17 @@ export default function DebattClient() {
             {result.rubrik && result.rubrik !== "null" && (
               <div style={{ background:`${C.accent}08`, border:`1px solid ${C.accent}20`, borderRadius:"8px", padding:"20px", marginBottom:"28px" }}>
                 <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 10px 0" }}>Rubrikförslag</p>
-                <p style={{ color:C.accent, fontSize:"18px", fontStyle:"italic", margin:0 }}>"{result.rubrik}"</p>
+                <p style={{ color:C.accent, fontSize:"18px", fontStyle:"italic", margin:"0 0 12px 0" }}>"{result.rubrik}"</p>
+                <button onClick={()=>setTitle(result.rubrik)} style={{ background:`${C.accent}20`, border:`1px solid ${C.accent}40`, color:C.accent, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                  Använd detta rubrikförslag →
+                </button>
               </div>
             )}
+
+            <div style={{ marginBottom:"20px" }}>
+              <Lbl>Rubrik som publiceras</Lbl>
+              <input value={title} onChange={e=>setTitle(e.target.value)} style={inp} />
+            </div>
 
             <div style={{ display:"flex", alignItems:"center", gap:"16px", flexWrap:"wrap" }}>
               <button onClick={ok&&!saving?publish:undefined} disabled={!ok||saving} style={{ background:ok?(saving?`${C.green}60`:C.green):"#1a1a1a", color:ok?"#050f08":"#444", border:`2px solid ${ok?C.green:"#2a2a2a"}`, borderRadius:"4px", padding:"15px 32px", fontSize:"14px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", cursor:ok&&!saving?"pointer":"not-allowed", fontFamily:"Georgia, serif", transition:"all 0.3s", boxShadow:ok?`0 0 24px ${C.green}35`:"none" }}>
