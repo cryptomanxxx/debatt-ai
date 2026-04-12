@@ -290,24 +290,24 @@ export default function DebattClient() {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
 
       {/* Header */}
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 40px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "68px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "12px", cursor: "pointer" }} onClick={reset}>
-          <span style={{ fontFamily: "Times New Roman, serif", fontSize: "24px", fontWeight: 700, color: C.accent }}>DEBATT.AI</span>
-          <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.16em", textTransform: "uppercase" }}>Redaktionen är artificiell</span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "10px", cursor: "pointer" }} onClick={reset}>
+            <span style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent }}>DEBATT.AI</span>
+            <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>Redaktionen är artificiell</span>
+          </div>
           {visitors !== null && (
-            <span style={{ fontSize: "12px", color: C.textMuted, letterSpacing: "0.06em" }}>
-              👁 {visitors.toLocaleString("sv-SE")} besök
-            </span>
+            <span style={{ fontSize: "12px", color: C.textMuted }}>👁 {visitors.toLocaleString("sv-SE")}</span>
           )}
+        </div>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {[["submit","Skicka in",reset],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>setView("published")]].map(([v,lbl,fn])=>(
-            <button key={v} onClick={fn} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif" }}>{lbl}</button>
+            <button key={v} onClick={fn} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "6px 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>{lbl}</button>
           ))}
         </div>
       </header>
 
-      <main style={{ maxWidth: "800px", margin: "0 auto", padding: "56px 40px" }}>
+      <main style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px" }}>
 
         {/* ── SUBMIT ── */}
         {view === "submit" && (
