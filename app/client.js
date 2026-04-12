@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const MIN_SCORE = 6;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_KEY = "KLISTRA_IN_DIN_ANON_KEY_HÄR";
 
 const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm artikeln på fyra kriterier (heltal 0-10):
 1. Argumentationsklarhet – Är argumenten tydliga och logiskt uppbyggda?
@@ -125,6 +125,25 @@ export default function DebattClient() {
   const [articleCount, setArticleCount] = useState(null);
   const [loadingArt, setLoadingArt] = useState(false);
   const [selected, setSelected]   = useState(null);
+  const [turnstileToken, setTurnstileToken] = useState(null);
+
+  // Load Turnstile script
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    script.async = true;
+    document.head.appendChild(script);
+    return () => document.head.removeChild(script);
+  }, []);
+
+  const onTurnstileVerified = useCallback((token) => {
+    setTurnstileToken(token);
+  }, []);
+
+  useEffect(() => {
+    window.onTurnstileVerified = onTurnstileVerified;
+    return () => { delete window.onTurnstileVerified; };
+  }, [onTurnstileVerified]);
 
   // Load count on mount
   useEffect(() => {
@@ -147,6 +166,7 @@ export default function DebattClient() {
   }, [analyzing]);
 
   async function analyze() {
+    if (!turnstileToken) { setError("Vänligen slutför CAPTCHA-kontrollen nedan."); return; }
     setAnalyzing(true); setError(null);
     try {
       const res = await fetch("/api/analyze", {
@@ -154,6 +174,7 @@ export default function DebattClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: [{ role: "user", content: `${SYSTEM_PROMPT}\n\nRubrik: ${title}\nFörfattare: ${author}\n\n${text}` }],
+          turnstileToken,
         }),
       });
       const data = await res.json();
@@ -238,7 +259,13 @@ export default function DebattClient() {
               <div><Lbl>Rubrik</Lbl><input value={title} onChange={e=>setTitle(e.target.value)} style={inp} /></div>
               <div><Lbl>Författare & titel</Lbl><input value={author} onChange={e=>setAuthor(e.target.value)} style={inp} /></div>
               <div><Lbl>Artikeltext</Lbl><textarea value={text} onChange={e=>setText(e.target.value)} rows={16} style={{...inp, resize:"vertical", lineHeight:1.8}} /></div>
-              <button onClick={analyze} disabled={analyzing||!text.trim()||!title.trim()} style={{ background:analyzing?`${C.accent}20`:C.accent, color:analyzing?C.accentDim:"#0a0a0a", border:"none", borderRadius:"4px", padding:"15px 32px", fontSize:"14px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", cursor:analyzing?"default":"pointer", fontFamily:"Georgia, serif", alignSelf:"flex-start" }}>
+              <div
+                className="cf-turnstile"
+                data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                data-callback="onTurnstileVerified"
+                data-theme="dark"
+              />
+              <button onClick={analyze} disabled={analyzing||!text.trim()||!title.trim()||!turnstileToken} style={{ background:analyzing?`${C.accent}20`:(!turnstileToken?`${C.accent}40`:C.accent), color:analyzing?C.accentDim:"#0a0a0a", border:"none", borderRadius:"4px", padding:"15px 32px", fontSize:"14px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", cursor:analyzing||!turnstileToken?"default":"pointer", fontFamily:"Georgia, serif", alignSelf:"flex-start" }}>
                 {analyzing?`Redaktören läser${".".repeat(dots)}`:"Skicka till redaktionen →"}
               </button>
               {error && <p style={{ color:C.red, fontSize:"14px", margin:0 }}>{error}</p>}
