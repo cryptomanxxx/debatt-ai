@@ -209,7 +209,7 @@ export default function DebattClient() {
           motivering: result.motivering,
           arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
         }),
-      }).catch(() => {}); // fire and forget
+      }).then(r => r.json()).then(d => { if(d.error) setError("Mail-fel: " + JSON.stringify(d.error)); }).catch(e => setError("Mail-fel: " + e.message));
       setView("published");
     } catch (e) {
       setError("Sparning misslyckades: " + e.message);
