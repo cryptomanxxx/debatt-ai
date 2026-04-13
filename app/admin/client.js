@@ -37,15 +37,35 @@ async function updateStatus(id, status) {
   if (!res.ok) throw new Error(await res.text());
 }
 
-async function deleteInlamning(id) {
+async function deleteInlamning(id, rubrik) {
+  // Delete from inlamningar
   const res = await fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${id}`, {
     method: "DELETE",
     headers: sbHeaders(),
   });
   if (!res.ok) throw new Error(await res.text());
+  // Also delete from artiklar if exists
+  if (rubrik) {
+    await fetch(`${SB_URL}/rest/v1/artiklar?rubrik=eq.${encodeURIComponent(rubrik)}`, {
+      method: "DELETE",
+      headers: sbHeaders(),
+    });
+  }
+}
+
+async function checkDuplicate(rubrik) {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?rubrik=eq.${encodeURIComponent(rubrik)}&select=id`, {
+    headers: sbHeaders(),
+  });
+  if (!res.ok) return false;
+  const data = await res.json();
+  return data.length > 0;
 }
 
 async function publishToArtiklar(row) {
+  // Check for duplicate first
+  const isDuplicate = await checkDuplicate(row.rubrik);
+  if (isDuplicate) throw new Error("Artikeln finns redan publicerad i arkivet.");
   const res = await fetch(`${SB_URL}/rest/v1/artiklar`, {
     method: "POST",
     headers: { ...sbHeaders(), "Prefer": "return=minimal" },
@@ -139,11 +159,20 @@ export default function AdminClient() {
     setActionLoading(null);
   }
 
-  async function handleDelete(id) {
-    if (!confirm("Är du säker?")) return;
+  useEffect(() => {
+    if (!authed) return;
+    // Poll every 15 seconds for new submissions
+    const interval = setInterval(() => {
+      load();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [authed]);
+
+  async function handleDelete(id, rubrik) {
+    if (!confirm("Är du säker? Artikeln tas bort från både admin och arkivet.")) return;
     setActionLoading(id);
     try {
-      await deleteInlamning(id);
+      await deleteInlamning(id, rubrik);
       setArticles(prev => prev.filter(a => a.id !== id));
     } catch (e) {
       setError("Fel vid borttagning: " + e.message);
@@ -194,8 +223,9 @@ export default function AdminClient() {
           <span style={{ fontSize:"11px", color:C.textMuted, letterSpacing:"0.12em", textTransform:"uppercase", marginLeft:"12px" }}>Admin</span>
         </div>
         <div style={{ display:"flex", gap:"8px" }}>
+          <span style={{ fontSize:"11px", color:C.textMuted }}>↻ auto 15s</span>
           <a href="/" style={{ fontSize:"13px", color:C.textMuted, textDecoration:"none", padding:"6px 14px", border:`1px solid ${C.border}`, borderRadius:"4px" }}>← Sajten</a>
-          <button onClick={load} style={{ fontSize:"13px", color:C.accent, background:"transparent", border:`1px solid ${C.accentDim}`, borderRadius:"4px", padding:"6px 14px", cursor:"pointer", fontFamily:"Georgia, serif" }}>↻ Uppdatera</button>
+          <button onClick={load} style={{ fontSize:"13px", color:C.accent, background:"transparent", border:`1px solid ${C.accentDim}`, borderRadius:"4px", padding:"6px 14px", cursor:"pointer", fontFamily:"Georgia, serif" }}>↻ Nu</button>
         </div>
       </header>
 
@@ -269,7 +299,7 @@ export default function AdminClient() {
                   {actionLoading===a.id ? "…" : "↑ Publicera ändå"}
                 </button>
               )}
-              <button onClick={()=>handleDelete(a.id)} disabled={actionLoading===a.id} style={{ background:"transparent", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", marginLeft:"auto" }}>
+              <button onClick={()=>handleDelete(a.id, a.rubrik)} disabled={actionLoading===a.id} style={{ background:"transparent", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", marginLeft:"auto" }}>
                 {actionLoading===a.id ? "…" : "🗑 Ta bort"}
               </button>
             </div>
