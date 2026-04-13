@@ -446,11 +446,6 @@ export default function DebattClient() {
               </div>
             )}
 
-            <div style={{ marginBottom:"20px" }}>
-              <Lbl>Rubrik som publiceras</Lbl>
-              <input value={title} onChange={e=>setTitle(e.target.value)} style={inp} />
-            </div>
-
             <div style={{ display:"flex", alignItems:"center", gap:"16px", flexWrap:"wrap" }}>
               <button onClick={ok&&!saving?publish:undefined} disabled={!ok||saving} style={{ background:ok?(saving?`${C.green}60`:C.green):"#1a1a1a", color:ok?"#050f08":"#444", border:`2px solid ${ok?C.green:"#2a2a2a"}`, borderRadius:"4px", padding:"15px 32px", fontSize:"14px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", cursor:ok&&!saving?"pointer":"not-allowed", fontFamily:"Georgia, serif", transition:"all 0.3s", boxShadow:ok?`0 0 24px ${C.green}35`:"none" }}>
                 {saving?"Publicerar…":ok?"✓ Publicera →":`Publicering låst – kräver ${MIN_SCORE}+ på alla`}
