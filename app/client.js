@@ -38,6 +38,14 @@ async function sbInsert(row) {
   if (!res.ok) throw new Error(await res.text());
 }
 
+async function sbInsertInlamning(row) {
+  await fetch(`${SB_URL}/rest/v1/inlamningar`, {
+    method: "POST",
+    headers: sbHeaders(),
+    body: JSON.stringify(row),
+  });
+}
+
 async function sbSelect() {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
@@ -181,6 +189,7 @@ export default function DebattClient() {
   const [selected, setSelected]   = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
   const [visitors, setVisitors] = useState(null);
+  const [inlamningId, setInlamningId] = useState(null);
 
   // Load Turnstile script
   useEffect(() => {
@@ -238,6 +247,22 @@ export default function DebattClient() {
       const data = await res.json();
       const raw = data.choices?.[0]?.message?.content || "";
       const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
+      // Save to inlamningar regardless of decision
+      try {
+        const inlRes = await fetch(`${SB_URL}/rest/v1/inlamningar`, {
+          method: "POST",
+          headers: { ...sbHeaders(), "Prefer": "return=representation" },
+          body: JSON.stringify({
+            rubrik: title, forfattare: author, artikel: text,
+            kategori: kategori, motivering: parsed.motivering,
+            beslut: parsed.beslut,
+            arg: parsed.arg, ori: parsed.ori, rel: parsed.rel, tro: parsed.tro,
+            status: "inkorg",
+          }),
+        });
+        const inlData = await inlRes.json();
+        if (inlData?.[0]?.id) setInlamningId(inlData[0].id);
+      } catch {}
       setResult(parsed);
       setView("result");
     } catch {
@@ -258,6 +283,14 @@ export default function DebattClient() {
         kategori: kategori,
         arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
       });
+      // Update inlamning status to publicerad
+      if (inlamningId) {
+        fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${inlamningId}`, {
+          method: "PATCH",
+          headers: sbHeaders(),
+          body: JSON.stringify({ status: "publicerad" }),
+        }).catch(() => {});
+      }
       // Send email notification
       fetch("/api/notify", {
         method: "POST",
@@ -280,6 +313,7 @@ export default function DebattClient() {
     setView("submit"); setResult(null); setError(null); setSelected(null);
     setTitle(""); setAuthor(""); setText("");
     setKategori("Övrigt");
+    setInlamningId(null);
     setTurnstileToken(null);
     if (window.turnstile) window.turnstile.reset();
   }
