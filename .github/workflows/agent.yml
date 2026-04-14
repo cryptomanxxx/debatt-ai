@@ -1,0 +1,26 @@
+name: Debatt-agent
+
+on:
+  schedule:
+    - cron: "0 8 * * *"   # Kl 08:00 UTC (10:00 svensk tid) varje dag
+    - cron: "0 17 * * *"  # Kl 17:00 UTC (19:00 svensk tid) varje dag
+  workflow_dispatch:       # Kan också köras manuellt från GitHub
+
+jobs:
+  publicera:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install anthropic httpx
+
+      - name: Kör agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DEBATT_API_KEY: ${{ secrets.DEBATT_API_KEY }}
+        run: python agent.py
