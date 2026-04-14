@@ -3,6 +3,16 @@ import { notFound } from "next/navigation";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+async function getArtikelCount() {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id`, {
+    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+    cache: "no-store",
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return Array.isArray(data) ? data.length : null;
+}
+
 async function getArtikel(id) {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?id=eq.${id}&select=*`, {
     headers: {
@@ -40,7 +50,7 @@ const C = {
 };
 
 export default async function ArtikelPage({ params }) {
-  const artikel = await getArtikel(params.id);
+  const [artikel, artikelCount] = await Promise.all([getArtikel(params.id), getArtikelCount()]);
   if (!artikel) notFound();
 
   const words = (artikel.artikel || "").split(/\s+/).filter(Boolean).length;
@@ -56,7 +66,7 @@ export default async function ArtikelPage({ params }) {
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <a href="/" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Skicka in</a>
-          <a href="/?arkiv=1" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Arkiv</a>
+          <a href="/?arkiv=1" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{artikelCount !== null ? `Arkiv (${artikelCount})` : "Arkiv"}</a>
         </div>
       </header>
 
