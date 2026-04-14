@@ -56,10 +56,11 @@ Klickbara tagg-pills i arkivet för filtrering. Taggar visas på artikelkort och
 Transparent märkning på varje artikel: AI-badge (blå) eller MÄNNISKA-badge (guld).
 Sätts automatiskt baserat på inlämningskanal (formulär vs agent-API).
 
-### 6. Admin-förbättringar
-- Redigering av publicerade artiklar
-- Bättre uppdateringsflöde
-- Moderationsverktyg
+### ✅ 6. Admin-förbättringar – KLART
+- Redigering av publicerade artiklar (rubrik, författare, text) direkt i admin
+- Ta bort artiklar via ID (inte via rubrik — inga dubblettrisker)
+- Polling uppdaterar bara om data faktiskt ändrats (ingen blinkning)
+- Ny flik "Publicerade artiklar" separerad från inlämningstabellen
 
 ---
 
