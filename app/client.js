@@ -479,7 +479,7 @@ export default function DebattClient() {
                   <p style={{ fontSize:"16px" }}>Inga artiklar i denna kategori.</p>
                 </div>
               ) : articles.filter(a => filterKategori === "Alla" || (a.kategori||"Övrigt") === filterKategori).map((a,i)=>(
-                <div key={a.id||i} onClick={()=>{setSelected(a);setView("article");}} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"32px", marginBottom:"32px", cursor:"pointer", transition:"opacity 0.15s" }} onMouseEnter={e=>e.currentTarget.style.opacity="0.7"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                <div key={a.id||i} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"32px", marginBottom:"32px" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px" }}>
                     <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
                       <Badge type="published" />
@@ -487,59 +487,20 @@ export default function DebattClient() {
                     </div>
                     <span style={{ fontSize:"13px", color:C.textMuted }}>{a.skapad?new Date(a.skapad).toLocaleDateString("sv-SE"):""}</span>
                   </div>
-                  <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 8px 0", lineHeight:1.3, color:C.accent }}>{a.rubrik}</h2>
-                  <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 14px 0", fontStyle:"italic" }}>{a.forfattare}</p>
+                  <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 6px 0", lineHeight:1.3, color:C.accent }}>{a.rubrik}</h2>
+                  <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 12px 0", fontStyle:"italic" }}>{a.forfattare}</p>
                   <p style={{ color:C.textMuted, fontSize:"15px", lineHeight:1.7, margin:"0 0 14px 0" }}>{(a.artikel||"").slice(0,220)}…</p>
-                  <div style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"8px 16px", background:`${C.accent}10`, border:`1px solid ${C.accent}30`, borderRadius:"4px" }}>
+                  <a href={`/artikel/${a.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"8px 16px", background:`${C.accent}10`, border:`1px solid ${C.accent}30`, borderRadius:"4px", textDecoration:"none" }}>
                     <span style={{ fontSize:"14px", color:C.accent, fontWeight:600 }}>Läs hela artikeln →</span>
-                  </div>
+                  </a>
                 </div>
               ))}
-          </div>
-        )}
-
-        {/* ── FULL ARTICLE ── */}
-        {view === "article" && selected && (
-          <div>
-            <div style={{ marginBottom:"36px", paddingBottom:"36px", borderBottom:`1px solid ${C.border}` }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                  <Badge type="published" />
-                  {selected.kategori && <span style={{ fontSize:"11px", color:C.accentDim, background:`${C.accent}10`, border:`1px solid ${C.accent}20`, borderRadius:"20px", padding:"3px 10px", letterSpacing:"0.06em" }}>{selected.kategori}</span>}
-                </div>
-                <span style={{ fontSize:"13px", color:C.textMuted }}>{selected.skapad?new Date(selected.skapad).toLocaleDateString("sv-SE",{year:"numeric",month:"long",day:"numeric"}):""}</span>
-              </div>
-              <h1 style={{ fontSize:"30px", fontWeight:400, margin:"0 0 14px 0", lineHeight:1.25, color:C.accent }}>{selected.rubrik}</h1>
-              <div style={{ display:"flex", alignItems:"center", gap:"16px", margin:"0 0 16px 0" }}>
-                <p style={{ color:C.textMuted, fontSize:"15px", margin:0, fontStyle:"italic" }}>{selected.forfattare}</p>
-                <span style={{ color:C.textMuted, fontSize:"13px" }}>·</span>
-                <span style={{ color:C.textMuted, fontSize:"13px" }}>ca {Math.max(1, Math.round((selected.artikel||"").split(/\s+/).filter(Boolean).length / 200))} min läsning</span>
-              </div>
-              {selected.motivering && <p style={{ color:C.text, fontSize:"17px", lineHeight:1.8, fontStyle:"italic", borderLeft:`3px solid ${C.accentDim}`, paddingLeft:"16px", margin:0 }}>{selected.motivering}</p>}
-            </div>
-            <div style={{ marginBottom:"56px" }}>
-              {(selected.artikel||"").split("\n\n").filter(Boolean).map((p,i)=>(
-                <p key={i} style={{ fontSize:"18px", lineHeight:2, color:C.text, margin:"0 0 28px 0" }}>{p}</p>
-              ))}
-            </div>
-
-            {/* Share buttons */}
-            <ShareButtons rubrik={selected.rubrik} />
-
-            <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"28px", marginTop:"32px" }}>
-              <p style={{ fontSize:"11px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 20px 0" }}>Redaktörens noteringar</p>
-              {selected.motivering && <p style={{ color:C.textMuted, fontSize:"15px", lineHeight:1.8, fontStyle:"italic", margin:"0 0 24px 0" }}>"{selected.motivering}"</p>}
-              <ScoreBar label="Argumentation" value={selected.arg} />
-              <ScoreBar label="Originalitet"  value={selected.ori} />
-              <ScoreBar label="Relevans"       value={selected.rel} />
-              <ScoreBar label="Trovärdighet"   value={selected.tro} />
-            </div>
           </div>
         )}
 
       </main>
 
-      <footer style={{ borderTop:`1px solid ${C.border}`, padding:"28px 40px", textAlign:"center", marginTop:"60px" }}>
+      <footer style={{ borderTop:`1px solid ${C.border}`, padding:"28px 20px", textAlign:"center", marginTop:"60px" }}>
         <p style={{ color:C.textMuted, fontSize:"13px", margin:0, letterSpacing:"0.05em" }}>
           DEBATT.AI · Publicering kräver minst {MIN_SCORE}/10 på alla kriterier · Ansvarig utgivare: Marcus Davidsson
         </p>
