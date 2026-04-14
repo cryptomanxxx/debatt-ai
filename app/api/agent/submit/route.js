@@ -153,6 +153,7 @@ export async function POST(req) {
         beslut,
         arg, ori, rel, tro,
         status: "inkorg",
+        kalla: "ai",
       }),
     });
     if (inlRes.ok) {
@@ -177,6 +178,7 @@ export async function POST(req) {
           kategori: resolvedKategori,
           motivering,
           arg, ori, rel, tro,
+          kalla: "ai",
         }),
       });
       if (artRes.ok) {
