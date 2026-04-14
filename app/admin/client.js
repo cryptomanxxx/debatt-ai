@@ -124,6 +124,9 @@ export default function AdminClient() {
   const [pw, setPw]               = useState("");
   const [pwError, setPwError]     = useState("");
   const [mainTab, setMainTab]     = useState("inlamningar");
+  const [subCount, setSubCount]   = useState(null);
+  const [digestMsg, setDigestMsg] = useState("");
+  const [digestLoading, setDigestLoading] = useState(false);
 
   // Inlamningar state
   const [inlamningar, setInlamningar] = useState([]);
@@ -144,6 +147,7 @@ export default function AdminClient() {
     if (pw === ADMIN_PASSWORD) {
       setAuthed(true);
       loadInlamningar();
+      loadSubCount();
     } else {
       setPwError("Fel lösenord.");
     }
@@ -180,6 +184,30 @@ export default function AdminClient() {
     }
     if (!silent) setLoadingArt(false);
   }, []);
+
+  async function loadSubCount() {
+    try {
+      const res = await fetch(`${SB_URL}/rest/v1/prenumeranter?aktiv=eq.true&select=id`, {
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      });
+      const data = await res.json();
+      setSubCount(Array.isArray(data) ? data.length : 0);
+    } catch {}
+  }
+
+  async function sendDigest() {
+    setDigestLoading(true); setDigestMsg("");
+    try {
+      const res = await fetch("/api/digest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret: process.env.NEXT_PUBLIC_ADMIN_PASSWORD }),
+      });
+      const data = await res.json();
+      setDigestMsg(data.meddelande || data.fel || "Klart.");
+    } catch { setDigestMsg("Något gick fel."); }
+    setDigestLoading(false);
+  }
 
   // Poll silently — only re-renders if data actually changed (no blink)
   useEffect(() => {
@@ -301,7 +329,7 @@ export default function AdminClient() {
 
         {/* Main tabs */}
         <div style={{ display:"flex", gap:"8px", marginBottom:"32px" }}>
-          {[["inlamningar","Inlämningar"],["artiklar","Publicerade artiklar"]].map(([val,lbl]) => (
+          {[["inlamningar","Inlämningar"],["artiklar","Publicerade artiklar"],["nyhetsbrev","Nyhetsbrev" + (subCount !== null ? ` (${subCount})` : "")]].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
               {lbl}
             </button>
@@ -463,6 +491,32 @@ export default function AdminClient() {
               </div>
             ))}
           </>
+        )}
+
+        {/* ── NYHETSBREV ── */}
+        {mainTab === "nyhetsbrev" && (
+          <div>
+            <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"28px", marginBottom:"24px" }}>
+              <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 8px" }}>Prenumeranter</p>
+              <p style={{ fontSize:"36px", fontWeight:400, color:C.accent, margin:"0 0 4px", fontFamily:"monospace" }}>{subCount ?? "–"}</p>
+              <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 20px" }}>aktiva prenumeranter</p>
+              <button onClick={loadSubCount} style={{ background:"transparent", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>↻ Uppdatera</button>
+            </div>
+
+            <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"28px" }}>
+              <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 8px" }}>Skicka digest</p>
+              <p style={{ color:C.textMuted, fontSize:"14px", lineHeight:1.7, margin:"0 0 20px" }}>
+                Skickar ett nyhetsbrev med artiklar från de senaste 7 dagarna till alla aktiva prenumeranter.
+                GitHub Actions skickar också automatiskt varje måndag kl 10:00.
+              </p>
+              <div style={{ display:"flex", alignItems:"center", gap:"12px", flexWrap:"wrap" }}>
+                <button onClick={sendDigest} disabled={digestLoading} style={{ background:C.accent, color:"#0a0a0a", border:"none", borderRadius:"4px", padding:"12px 24px", fontSize:"14px", fontWeight:700, cursor:digestLoading?"default":"pointer", fontFamily:"Georgia, serif" }}>
+                  {digestLoading ? "Skickar…" : "✉ Skicka digest nu"}
+                </button>
+                {digestMsg && <p style={{ color:digestMsg.includes("Fel") || digestMsg.includes("fel") ? C.red : C.green, fontSize:"14px", margin:0 }}>{digestMsg}</p>}
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>

@@ -206,6 +206,10 @@ export default function DebattClient() {
   const [turnstileToken, setTurnstileToken] = useState(null);
   const [visitors, setVisitors] = useState(null);
   const [inlamningId, setInlamningId] = useState(null);
+  const [subEmail, setSubEmail]   = useState("");
+  const [subStatus, setSubStatus] = useState(null); // null | "ok" | "err"
+  const [subMsg, setSubMsg]       = useState("");
+  const [subLoading, setSubLoading] = useState(false);
 
   // Load Turnstile script
   useEffect(() => {
@@ -336,6 +340,22 @@ export default function DebattClient() {
     setInlamningId(null);
     setTurnstileToken(null);
     if (window.turnstile) window.turnstile.reset();
+  }
+
+  async function subscribe() {
+    if (!subEmail.trim()) return;
+    setSubLoading(true);
+    try {
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: subEmail.trim() }),
+      });
+      const data = await res.json();
+      if (data.fel) { setSubStatus("err"); setSubMsg(data.fel); }
+      else { setSubStatus("ok"); setSubMsg(data.meddelande); setSubEmail(""); }
+    } catch { setSubStatus("err"); setSubMsg("Något gick fel, försök igen."); }
+    setSubLoading(false);
   }
 
   const ok = isEligible(result);
@@ -534,8 +554,31 @@ export default function DebattClient() {
 
       </main>
 
-      <footer style={{ borderTop:`1px solid ${C.border}`, padding:"28px 20px", textAlign:"center", marginTop:"60px" }}>
-        <p style={{ color:C.textMuted, fontSize:"13px", margin:0, letterSpacing:"0.05em" }}>
+      <footer style={{ borderTop:`1px solid ${C.border}`, padding:"40px 20px 28px", marginTop:"60px" }}>
+        {/* Newsletter signup */}
+        <div style={{ maxWidth:"480px", margin:"0 auto 32px", textAlign:"center" }}>
+          <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 8px" }}>Nyhetsbrev</p>
+          <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 16px", lineHeight:1.6 }}>Få ett veckobrev med de senaste debattartiklarna.</p>
+          {subStatus === "ok" ? (
+            <p style={{ color:C.green, fontSize:"14px" }}>✓ {subMsg}</p>
+          ) : (
+            <div style={{ display:"flex", gap:"8px" }}>
+              <input
+                type="email"
+                value={subEmail}
+                onChange={e => { setSubEmail(e.target.value); setSubStatus(null); }}
+                onKeyDown={e => e.key === "Enter" && subscribe()}
+                placeholder="din@epost.se"
+                style={{ flex:1, background:"#0d0d0d", border:`1px solid ${C.border}`, borderRadius:"4px", color:C.text, fontFamily:"Georgia, serif", fontSize:"14px", padding:"10px 12px", outline:"none" }}
+              />
+              <button onClick={subscribe} disabled={subLoading || !subEmail.trim()} style={{ background:C.accent, color:"#0a0a0a", border:"none", borderRadius:"4px", padding:"10px 18px", fontSize:"13px", fontWeight:700, cursor:subLoading?"default":"pointer", fontFamily:"Georgia, serif", whiteSpace:"nowrap" }}>
+                {subLoading ? "…" : "Prenumerera"}
+              </button>
+            </div>
+          )}
+          {subStatus === "err" && <p style={{ color:C.red, fontSize:"13px", margin:"8px 0 0" }}>{subMsg}</p>}
+        </div>
+        <p style={{ color:C.textMuted, fontSize:"12px", margin:0, textAlign:"center", letterSpacing:"0.05em" }}>
           DEBATT.AI · Publicering kräver minst {MIN_SCORE}/10 på alla kriterier · Ansvarig utgivare: Marcus Davidsson
         </p>
       </footer>

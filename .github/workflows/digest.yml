@@ -1,0 +1,17 @@
+name: Veckans digest
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"  # Varje måndag kl 08:00 UTC (10:00 svensk tid)
+  workflow_dispatch:      # Kan också köras manuellt
+
+jobs:
+  skicka-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skicka nyhetsbrev
+        run: |
+          curl -s -X POST https://debatt-ai.vercel.app/api/digest \
+            -H "Content-Type: application/json" \
+            -d "{\"secret\":\"${{ secrets.NEXT_PUBLIC_ADMIN_PASSWORD }}\"}" \
+            | tee /dev/stderr | grep -q "prenumeranter\|Inga"
