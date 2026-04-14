@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -10,6 +10,12 @@ const C = {
   accent: "#e8d5a3", accentDim: "#b8a57a",
   text: "#f0ede6", textMuted: "#888880",
   green: "#4ade80", red: "#f87171", yellow: "#fbbf24",
+};
+
+const inp = {
+  background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px",
+  color: C.text, fontFamily: "Georgia, serif", fontSize: "14px",
+  padding: "10px 12px", width: "100%", boxSizing: "border-box", outline: "none",
 };
 
 function sbHeaders() {
@@ -28,6 +34,14 @@ async function fetchInlamningar() {
   return res.json();
 }
 
+async function fetchArtiklar() {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc`, {
+    headers: sbHeaders(),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 async function updateStatus(id, status) {
   const res = await fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${id}`, {
     method: "PATCH",
@@ -37,45 +51,45 @@ async function updateStatus(id, status) {
   if (!res.ok) throw new Error(await res.text());
 }
 
-async function deleteInlamning(id, rubrik) {
-  // Delete from inlamningar
+async function deleteInlamning(id) {
   const res = await fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${id}`, {
     method: "DELETE",
     headers: sbHeaders(),
   });
   if (!res.ok) throw new Error(await res.text());
-  // Also delete from artiklar if exists
-  if (rubrik) {
-    await fetch(`${SB_URL}/rest/v1/artiklar?rubrik=eq.${encodeURIComponent(rubrik)}`, {
-      method: "DELETE",
-      headers: sbHeaders(),
-    });
-  }
 }
 
-async function checkDuplicate(rubrik) {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?rubrik=eq.${encodeURIComponent(rubrik)}&select=id`, {
+async function deleteArtikelById(id) {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?id=eq.${id}`, {
+    method: "DELETE",
     headers: sbHeaders(),
   });
-  if (!res.ok) return false;
-  const data = await res.json();
-  return data.length > 0;
+  if (!res.ok) throw new Error(await res.text());
+}
+
+async function updateArtikel(id, changes) {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?id=eq.${id}`, {
+    method: "PATCH",
+    headers: { ...sbHeaders(), "Prefer": "return=minimal" },
+    body: JSON.stringify(changes),
+  });
+  if (!res.ok) throw new Error(await res.text());
 }
 
 async function publishToArtiklar(row) {
-  // Check for duplicate first
-  const isDuplicate = await checkDuplicate(row.rubrik);
-  if (isDuplicate) throw new Error("Artikeln finns redan publicerad i arkivet.");
+  const check = await fetch(`${SB_URL}/rest/v1/artiklar?rubrik=eq.${encodeURIComponent(row.rubrik)}&select=id`, {
+    headers: sbHeaders(),
+  });
+  const existing = await check.json();
+  if (existing.length > 0) throw new Error("Artikeln finns redan publicerad i arkivet.");
   const res = await fetch(`${SB_URL}/rest/v1/artiklar`, {
     method: "POST",
     headers: { ...sbHeaders(), "Prefer": "return=minimal" },
     body: JSON.stringify({
-      rubrik: row.rubrik,
-      forfattare: row.forfattare,
-      artikel: row.artikel,
-      kategori: row.kategori,
-      motivering: row.motivering,
+      rubrik: row.rubrik, forfattare: row.forfattare, artikel: row.artikel,
+      kategori: row.kategori, motivering: row.motivering,
       arg: row.arg, ori: row.ori, rel: row.rel, tro: row.tro,
+      kalla: row.kalla || "manniska",
     }),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -106,45 +120,89 @@ function ScoreBar({ label, value }) {
 }
 
 export default function AdminClient() {
-  const [authed, setAuthed] = useState(false);
-  const [pw, setPw] = useState("");
-  const [pwError, setPwError] = useState("");
-  const [articles, setArticles] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [filter, setFilter] = useState("alla");
-  const [expanded, setExpanded] = useState(null);
+  const [authed, setAuthed]       = useState(false);
+  const [pw, setPw]               = useState("");
+  const [pwError, setPwError]     = useState("");
+  const [mainTab, setMainTab]     = useState("inlamningar");
+
+  // Inlamningar state
+  const [inlamningar, setInlamningar] = useState([]);
+  const [loadingInl, setLoadingInl]   = useState(false);
+  const [filter, setFilter]           = useState("alla");
+  const [expanded, setExpanded]       = useState(null);
+
+  // Artiklar state
+  const [artiklar, setArtiklar]       = useState([]);
+  const [loadingArt, setLoadingArt]   = useState(false);
+  const [editingId, setEditingId]     = useState(null);
+  const [editData, setEditData]       = useState({});
+
   const [actionLoading, setActionLoading] = useState(null);
+  const [error, setError]               = useState("");
 
   function login() {
     if (pw === ADMIN_PASSWORD) {
       setAuthed(true);
-      load();
+      loadInlamningar();
     } else {
       setPwError("Fel lösenord.");
     }
   }
 
-  async function load() {
-    setLoading(true); setError("");
+  const loadInlamningar = useCallback(async (silent = false) => {
+    if (!silent) setLoadingInl(true);
+    setError("");
     try {
       const data = await fetchInlamningar();
-      setArticles(data);
+      setInlamningar(prev => {
+        const prevKey = prev.map(a => `${a.id}:${a.status}`).join(",");
+        const newKey  = data.map(a => `${a.id}:${a.status}`).join(",");
+        return prevKey === newKey ? prev : data;
+      });
     } catch (e) {
-      setError("Kunde inte hämta inlämningar: " + e.message);
+      if (!silent) setError("Kunde inte hämta inlämningar: " + e.message);
     }
-    setLoading(false);
-  }
+    if (!silent) setLoadingInl(false);
+  }, []);
+
+  const loadArtiklar = useCallback(async (silent = false) => {
+    if (!silent) setLoadingArt(true);
+    setError("");
+    try {
+      const data = await fetchArtiklar();
+      setArtiklar(prev => {
+        const prevKey = prev.map(a => `${a.id}`).join(",");
+        const newKey  = data.map(a => `${a.id}`).join(",");
+        return prevKey === newKey ? prev : data;
+      });
+    } catch (e) {
+      if (!silent) setError("Kunde inte hämta artiklar: " + e.message);
+    }
+    if (!silent) setLoadingArt(false);
+  }, []);
+
+  // Poll silently — only re-renders if data actually changed (no blink)
+  useEffect(() => {
+    if (!authed) return;
+    const iv = setInterval(() => {
+      if (mainTab === "inlamningar") loadInlamningar(true);
+      else loadArtiklar(true);
+    }, 30000);
+    return () => clearInterval(iv);
+  }, [authed, mainTab, loadInlamningar, loadArtiklar]);
+
+  useEffect(() => {
+    if (!authed) return;
+    if (mainTab === "artiklar" && artiklar.length === 0) loadArtiklar();
+  }, [mainTab, authed]);
 
   async function handlePublish(row) {
     setActionLoading(row.id);
     try {
       await publishToArtiklar(row);
       await updateStatus(row.id, "publicerad");
-      setArticles(prev => prev.map(a => a.id === row.id ? {...a, status:"publicerad"} : a));
-    } catch (e) {
-      setError("Fel vid publicering: " + e.message);
-    }
+      setInlamningar(prev => prev.map(a => a.id === row.id ? {...a, status:"publicerad"} : a));
+    } catch (e) { setError("Fel vid publicering: " + e.message); }
     setActionLoading(null);
   }
 
@@ -152,43 +210,54 @@ export default function AdminClient() {
     setActionLoading(id);
     try {
       await updateStatus(id, "avvisad");
-      setArticles(prev => prev.map(a => a.id === id ? {...a, status:"avvisad"} : a));
-    } catch (e) {
-      setError("Fel: " + e.message);
-    }
+      setInlamningar(prev => prev.map(a => a.id === id ? {...a, status:"avvisad"} : a));
+    } catch (e) { setError("Fel: " + e.message); }
     setActionLoading(null);
   }
 
-  useEffect(() => {
-    if (!authed) return;
-    // Poll every 15 seconds for new submissions
-    const interval = setInterval(() => {
-      load();
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [authed]);
-
-  async function handleDelete(id, rubrik) {
-    if (!confirm("Är du säker? Artikeln tas bort från både admin och arkivet.")) return;
+  async function handleDeleteInlamning(id) {
+    if (!confirm("Ta bort inlämningen?")) return;
     setActionLoading(id);
     try {
-      await deleteInlamning(id, rubrik);
-      setArticles(prev => prev.filter(a => a.id !== id));
-    } catch (e) {
-      setError("Fel vid borttagning: " + e.message);
-    }
+      await deleteInlamning(id);
+      setInlamningar(prev => prev.filter(a => a.id !== id));
+    } catch (e) { setError("Fel vid borttagning: " + e.message); }
     setActionLoading(null);
   }
 
-  const filtered = articles.filter(a =>
+  async function handleDeleteArtikel(id, rubrik) {
+    if (!confirm(`Ta bort "${rubrik}" från sajten?`)) return;
+    setActionLoading(id);
+    try {
+      await deleteArtikelById(id);
+      setArtiklar(prev => prev.filter(a => a.id !== id));
+    } catch (e) { setError("Fel vid borttagning: " + e.message); }
+    setActionLoading(null);
+  }
+
+  function startEdit(a) {
+    setEditingId(a.id);
+    setEditData({ rubrik: a.rubrik, forfattare: a.forfattare, artikel: a.artikel });
+  }
+
+  async function saveEdit(id) {
+    setActionLoading(id);
+    try {
+      await updateArtikel(id, editData);
+      setArtiklar(prev => prev.map(a => a.id === id ? {...a, ...editData} : a));
+      setEditingId(null);
+    } catch (e) { setError("Fel vid sparning: " + e.message); }
+    setActionLoading(null);
+  }
+
+  const filteredInl = inlamningar.filter(a =>
     filter === "alla" ? true : a.status === filter
   );
-
   const counts = {
-    alla: articles.length,
-    inkorg: articles.filter(a => a.status === "inkorg").length,
-    publicerad: articles.filter(a => a.status === "publicerad").length,
-    avvisad: articles.filter(a => a.status === "avvisad").length,
+    alla: inlamningar.length,
+    inkorg: inlamningar.filter(a => a.status === "inkorg").length,
+    publicerad: inlamningar.filter(a => a.status === "publicerad").length,
+    avvisad: inlamningar.filter(a => a.status === "avvisad").length,
   };
 
   if (!authed) {
@@ -199,11 +268,10 @@ export default function AdminClient() {
           <p style={{ color:C.textMuted, fontSize:"13px", margin:"0 0 28px 0", letterSpacing:"0.1em", textTransform:"uppercase" }}>Admin</p>
           <label style={{ display:"block", fontSize:"11px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>Lösenord</label>
           <input
-            type="password"
-            value={pw}
+            type="password" value={pw}
             onChange={e => setPw(e.target.value)}
             onKeyDown={e => e.key === "Enter" && login()}
-            style={{ background:"#0d0d0d", border:`1px solid ${C.border}`, borderRadius:"4px", color:C.text, fontFamily:"Georgia, serif", fontSize:"15px", padding:"12px 14px", width:"100%", boxSizing:"border-box", outline:"none", marginBottom:"12px" }}
+            style={{ ...inp, marginBottom:"12px" }}
             autoFocus
           />
           {pwError && <p style={{ color:C.red, fontSize:"13px", margin:"0 0 12px 0" }}>{pwError}</p>}
@@ -223,88 +291,179 @@ export default function AdminClient() {
           <span style={{ fontSize:"11px", color:C.textMuted, letterSpacing:"0.12em", textTransform:"uppercase", marginLeft:"12px" }}>Admin</span>
         </div>
         <div style={{ display:"flex", gap:"8px" }}>
-          <span style={{ fontSize:"11px", color:C.textMuted }}>↻ auto 15s</span>
           <a href="/" style={{ fontSize:"13px", color:C.textMuted, textDecoration:"none", padding:"6px 14px", border:`1px solid ${C.border}`, borderRadius:"4px" }}>← Sajten</a>
-          <button onClick={load} style={{ fontSize:"13px", color:C.accent, background:"transparent", border:`1px solid ${C.accentDim}`, borderRadius:"4px", padding:"6px 14px", cursor:"pointer", fontFamily:"Georgia, serif" }}>↻ Nu</button>
+          <button onClick={() => mainTab === "inlamningar" ? loadInlamningar() : loadArtiklar()} style={{ fontSize:"13px", color:C.accent, background:"transparent", border:`1px solid ${C.accentDim}`, borderRadius:"4px", padding:"6px 14px", cursor:"pointer", fontFamily:"Georgia, serif" }}>↻ Uppdatera</button>
         </div>
       </header>
 
       <main style={{ maxWidth:"900px", margin:"0 auto", padding:"32px 20px" }}>
-        <div style={{ marginBottom:"28px" }}>
-          <h1 style={{ fontSize:"26px", fontWeight:400, margin:"0 0 6px 0" }}>Inlämningar</h1>
-          <p style={{ color:C.textMuted, fontSize:"14px", margin:0 }}>Alla artiklar som skickats in.</p>
-        </div>
-
         {error && <p style={{ color:C.red, fontSize:"14px", marginBottom:"16px" }}>{error}</p>}
 
-        <div style={{ display:"flex", gap:"8px", marginBottom:"28px", flexWrap:"wrap" }}>
-          {[["alla","Alla"],["inkorg","Inkorg"],["publicerad","Publicerade"],["avvisad","Avvisade"]].map(([val,lbl])=>(
-            <button key={val} onClick={()=>setFilter(val)} style={{ background:filter===val?`${C.accent}15`:"transparent", border:`1px solid ${filter===val?C.accentDim:C.border}`, color:filter===val?C.accent:C.textMuted, padding:"6px 14px", borderRadius:"4px", cursor:"pointer", fontSize:"13px", fontFamily:"Georgia, serif" }}>
-              {lbl} ({counts[val]})
+        {/* Main tabs */}
+        <div style={{ display:"flex", gap:"8px", marginBottom:"32px" }}>
+          {[["inlamningar","Inlämningar"],["artiklar","Publicerade artiklar"]].map(([val,lbl]) => (
+            <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
+              {lbl}
             </button>
           ))}
         </div>
 
-        {loading ? <p style={{ color:C.textMuted }}>Laddar…</p>
-          : filtered.length === 0 ? <p style={{ color:C.textMuted }}>Inga inlämningar.</p>
-          : filtered.map(a => (
-          <div key={a.id} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"24px", marginBottom:"24px" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"12px", gap:"12px", flexWrap:"wrap" }}>
-              <div style={{ flex:1 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", flexWrap:"wrap" }}>
-                  <StatusBadge status={a.status} />
-                  {a.kategori && <span style={{ fontSize:"11px", color:C.accentDim, background:`${C.accent}10`, border:`1px solid ${C.accent}20`, borderRadius:"20px", padding:"2px 10px" }}>{a.kategori}</span>}
-                  <span style={{ fontSize:"12px", color:C.textMuted }}>{a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE", {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : ""}</span>
-                </div>
-                <h2 style={{ fontSize:"18px", fontWeight:400, margin:"0 0 4px 0", color:C.accent, lineHeight:1.3 }}>{a.rubrik}</h2>
-                <p style={{ color:C.textMuted, fontSize:"13px", margin:0, fontStyle:"italic" }}>{a.forfattare}</p>
-              </div>
-              <div style={{ minWidth:"150px" }}>
-                <ScoreBar label="Argumentation" value={a.arg} />
-                <ScoreBar label="Originalitet"  value={a.ori} />
-                <ScoreBar label="Relevans"       value={a.rel} />
-                <ScoreBar label="Trovärdighet"   value={a.tro} />
-              </div>
-            </div>
-
-            {a.motivering && (
-              <p style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic", margin:"0 0 12px 0", borderLeft:`3px solid ${C.accentDim}`, paddingLeft:"12px" }}>"{a.motivering}"</p>
-            )}
-
-            <button onClick={()=>setExpanded(expanded===a.id?null:a.id)} style={{ background:"none", border:"none", color:C.accentDim, cursor:"pointer", fontSize:"13px", padding:0, fontFamily:"Georgia, serif", marginBottom:"12px" }}>
-              {expanded===a.id ? "▲ Dölj text" : "▼ Visa artikeltext"}
-            </button>
-
-            {expanded===a.id && (
-              <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"6px", padding:"16px", marginBottom:"12px", maxHeight:"280px", overflowY:"auto" }}>
-                {(a.artikel||"").split("\n\n").filter(Boolean).map((p,i)=>(
-                  <p key={i} style={{ fontSize:"14px", lineHeight:1.8, color:C.text, margin:"0 0 14px 0" }}>{p}</p>
-                ))}
-              </div>
-            )}
-
-            <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
-              {a.status === "inkorg" && (
-                <>
-                  <button onClick={()=>handlePublish(a)} disabled={actionLoading===a.id} style={{ background:C.green, color:"#050f08", border:"none", borderRadius:"4px", padding:"8px 16px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"Georgia, serif" }}>
-                    {actionLoading===a.id ? "…" : "✓ Publicera"}
-                  </button>
-                  <button onClick={()=>handleAvvisa(a.id)} disabled={actionLoading===a.id} style={{ background:"transparent", color:C.red, border:`1px solid ${C.red}40`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
-                    {actionLoading===a.id ? "…" : "✗ Avvisa"}
-                  </button>
-                </>
-              )}
-              {a.status === "avvisad" && (
-                <button onClick={()=>handlePublish(a)} disabled={actionLoading===a.id} style={{ background:"transparent", color:C.green, border:`1px solid ${C.green}40`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
-                  {actionLoading===a.id ? "…" : "↑ Publicera ändå"}
+        {/* ── INLÄMNINGAR ── */}
+        {mainTab === "inlamningar" && (
+          <>
+            <div style={{ display:"flex", gap:"8px", marginBottom:"28px", flexWrap:"wrap" }}>
+              {[["alla","Alla"],["inkorg","Inkorg"],["publicerad","Publicerade"],["avvisad","Avvisade"]].map(([val,lbl]) => (
+                <button key={val} onClick={() => setFilter(val)} style={{ background:filter===val?`${C.accent}15`:"transparent", border:`1px solid ${filter===val?C.accentDim:C.border}`, color:filter===val?C.accent:C.textMuted, padding:"6px 14px", borderRadius:"4px", cursor:"pointer", fontSize:"13px", fontFamily:"Georgia, serif" }}>
+                  {lbl} ({counts[val]})
                 </button>
-              )}
-              <button onClick={()=>handleDelete(a.id, a.rubrik)} disabled={actionLoading===a.id} style={{ background:"transparent", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", marginLeft:"auto" }}>
-                {actionLoading===a.id ? "…" : "🗑 Ta bort"}
-              </button>
+              ))}
             </div>
-          </div>
-        ))}
+
+            {loadingInl ? <p style={{ color:C.textMuted }}>Laddar…</p>
+              : filteredInl.length === 0 ? <p style={{ color:C.textMuted }}>Inga inlämningar.</p>
+              : filteredInl.map(a => (
+              <div key={a.id} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"24px", marginBottom:"24px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"12px", gap:"12px", flexWrap:"wrap" }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", flexWrap:"wrap" }}>
+                      <StatusBadge status={a.status} />
+                      {a.kategori && <span style={{ fontSize:"11px", color:C.accentDim, background:`${C.accent}10`, border:`1px solid ${C.accent}20`, borderRadius:"20px", padding:"2px 10px" }}>{a.kategori}</span>}
+                      <span style={{ fontSize:"12px", color:C.textMuted }}>{a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE", {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : ""}</span>
+                    </div>
+                    <h2 style={{ fontSize:"18px", fontWeight:400, margin:"0 0 4px 0", color:C.accent, lineHeight:1.3 }}>{a.rubrik}</h2>
+                    <p style={{ color:C.textMuted, fontSize:"13px", margin:0, fontStyle:"italic" }}>{a.forfattare}</p>
+                  </div>
+                  <div style={{ minWidth:"150px" }}>
+                    <ScoreBar label="Argumentation" value={a.arg} />
+                    <ScoreBar label="Originalitet"  value={a.ori} />
+                    <ScoreBar label="Relevans"       value={a.rel} />
+                    <ScoreBar label="Trovärdighet"   value={a.tro} />
+                  </div>
+                </div>
+
+                {a.motivering && (
+                  <p style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic", margin:"0 0 12px 0", borderLeft:`3px solid ${C.accentDim}`, paddingLeft:"12px" }}>"{a.motivering}"</p>
+                )}
+
+                <button onClick={() => setExpanded(expanded===a.id?null:a.id)} style={{ background:"none", border:"none", color:C.accentDim, cursor:"pointer", fontSize:"13px", padding:0, fontFamily:"Georgia, serif", marginBottom:"12px" }}>
+                  {expanded===a.id ? "▲ Dölj text" : "▼ Visa artikeltext"}
+                </button>
+
+                {expanded===a.id && (
+                  <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"6px", padding:"16px", marginBottom:"12px", maxHeight:"280px", overflowY:"auto" }}>
+                    {(a.artikel||"").split("\n\n").filter(Boolean).map((p,i) => (
+                      <p key={i} style={{ fontSize:"14px", lineHeight:1.8, color:C.text, margin:"0 0 14px 0" }}>{p}</p>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
+                  {a.status === "inkorg" && (
+                    <>
+                      <button onClick={() => handlePublish(a)} disabled={actionLoading===a.id} style={{ background:C.green, color:"#050f08", border:"none", borderRadius:"4px", padding:"8px 16px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                        {actionLoading===a.id ? "…" : "✓ Publicera"}
+                      </button>
+                      <button onClick={() => handleAvvisa(a.id)} disabled={actionLoading===a.id} style={{ background:"transparent", color:C.red, border:`1px solid ${C.red}40`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                        {actionLoading===a.id ? "…" : "✗ Avvisa"}
+                      </button>
+                    </>
+                  )}
+                  {a.status === "avvisad" && (
+                    <button onClick={() => handlePublish(a)} disabled={actionLoading===a.id} style={{ background:"transparent", color:C.green, border:`1px solid ${C.green}40`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                      {actionLoading===a.id ? "…" : "↑ Publicera ändå"}
+                    </button>
+                  )}
+                  <button onClick={() => handleDeleteInlamning(a.id)} disabled={actionLoading===a.id} style={{ background:"transparent", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", marginLeft:"auto" }}>
+                    {actionLoading===a.id ? "…" : "🗑 Ta bort"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── PUBLICERADE ARTIKLAR ── */}
+        {mainTab === "artiklar" && (
+          <>
+            <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 24px 0" }}>{artiklar.length} publicerade artiklar. Redigering och borttagning sker direkt i databasen.</p>
+
+            {loadingArt ? <p style={{ color:C.textMuted }}>Laddar…</p>
+              : artiklar.length === 0 ? <p style={{ color:C.textMuted }}>Inga publicerade artiklar.</p>
+              : artiklar.map(a => (
+              <div key={a.id} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"24px", marginBottom:"24px" }}>
+                {editingId === a.id ? (
+                  /* ── Edit form ── */
+                  <div>
+                    <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 16px 0" }}>Redigerar artikel #{a.id}</p>
+                    <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+                      <div>
+                        <label style={{ display:"block", fontSize:"11px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>Rubrik</label>
+                        <input value={editData.rubrik} onChange={e => setEditData(d => ({...d, rubrik:e.target.value}))} style={inp} />
+                      </div>
+                      <div>
+                        <label style={{ display:"block", fontSize:"11px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>Författare</label>
+                        <input value={editData.forfattare} onChange={e => setEditData(d => ({...d, forfattare:e.target.value}))} style={inp} />
+                      </div>
+                      <div>
+                        <label style={{ display:"block", fontSize:"11px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>Artikeltext</label>
+                        <textarea value={editData.artikel} onChange={e => setEditData(d => ({...d, artikel:e.target.value}))} rows={12} style={{...inp, resize:"vertical", lineHeight:1.8}} />
+                      </div>
+                      <div style={{ display:"flex", gap:"8px" }}>
+                        <button onClick={() => saveEdit(a.id)} disabled={actionLoading===a.id} style={{ background:C.green, color:"#050f08", border:"none", borderRadius:"4px", padding:"10px 20px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                          {actionLoading===a.id ? "Sparar…" : "✓ Spara"}
+                        </button>
+                        <button onClick={() => setEditingId(null)} style={{ background:"transparent", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"4px", padding:"10px 20px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                          Avbryt
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Article view ── */
+                  <>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"8px", gap:"12px", flexWrap:"wrap" }}>
+                      <div style={{ flex:1 }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px", flexWrap:"wrap" }}>
+                          {a.kalla === "ai" && <span style={{ fontSize:"11px", color:"#4a9eff", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px", padding:"2px 10px", fontFamily:"monospace", fontWeight:700 }}>AI</span>}
+                          {a.kalla === "manniska" && <span style={{ fontSize:"11px", color:C.accent, background:"#0a0a05", border:`1px solid ${C.accent}40`, borderRadius:"20px", padding:"2px 10px", fontFamily:"monospace", fontWeight:700 }}>MÄNNISKA</span>}
+                          {a.kategori && <span style={{ fontSize:"11px", color:C.accentDim, background:`${C.accent}10`, border:`1px solid ${C.accent}20`, borderRadius:"20px", padding:"2px 10px" }}>{a.kategori}</span>}
+                          <span style={{ fontSize:"12px", color:C.textMuted }}>{a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE", {year:"numeric",month:"short",day:"numeric"}) : ""}</span>
+                        </div>
+                        <h2 style={{ fontSize:"18px", fontWeight:400, margin:"0 0 4px 0", color:C.accent, lineHeight:1.3 }}>{a.rubrik}</h2>
+                        <p style={{ color:C.textMuted, fontSize:"13px", margin:"0 0 4px 0", fontStyle:"italic" }}>{a.forfattare}</p>
+                        {(a.taggar||[]).length > 0 && (
+                          <div style={{ display:"flex", flexWrap:"wrap", gap:"4px", marginTop:"6px" }}>
+                            {(a.taggar||[]).map(t => <span key={t} style={{ fontSize:"11px", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"20px", padding:"1px 8px" }}>#{t}</span>)}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ minWidth:"150px" }}>
+                        <ScoreBar label="Arg" value={a.arg} />
+                        <ScoreBar label="Ori" value={a.ori} />
+                        <ScoreBar label="Rel" value={a.rel} />
+                        <ScoreBar label="Tro" value={a.tro} />
+                      </div>
+                    </div>
+
+                    <p style={{ color:C.textMuted, fontSize:"14px", lineHeight:1.7, margin:"0 0 14px 0" }}>{(a.artikel||"").slice(0,200)}…</p>
+
+                    <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
+                      <a href={`/artikel/${a.id}`} target="_blank" rel="noreferrer" style={{ fontSize:"13px", color:C.accentDim, textDecoration:"none", padding:"8px 16px", border:`1px solid ${C.border}`, borderRadius:"4px" }}>
+                        ↗ Visa
+                      </a>
+                      <button onClick={() => startEdit(a)} style={{ background:`${C.accent}15`, color:C.accent, border:`1px solid ${C.accentDim}`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                        ✎ Redigera
+                      </button>
+                      <button onClick={() => handleDeleteArtikel(a.id, a.rubrik)} disabled={actionLoading===a.id} style={{ background:"transparent", color:C.red, border:`1px solid ${C.red}30`, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", marginLeft:"auto" }}>
+                        {actionLoading===a.id ? "…" : "🗑 Ta bort"}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </>
+        )}
       </main>
     </div>
   );
