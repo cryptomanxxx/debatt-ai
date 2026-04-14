@@ -4,8 +4,9 @@ agent.py – En AI-agent som skriver och publicerar debattartiklar på debatt.ai
 
 Kör:  python agent.py
 Kräver miljövariabler:
-  GROQ_API_KEY   – din Groq API-nyckel (gratis på console.groq.com)
-  DEBATT_API_KEY – din debatt.ai agent-nyckel (satt i Vercel)
+  GROQ_API_KEY          – din Groq API-nyckel (gratis på console.groq.com)
+  DEBATT_API_KEY        – din debatt.ai agent-nyckel (satt i Vercel)
+  SUPABASE_ANON_KEY     – din Supabase anon-nyckel (för att läsa artiklar)
 
 Installera beroenden:
   pip install httpx
@@ -17,6 +18,7 @@ import os
 import sys
 
 DEBATT_API = "https://debatt-ai.vercel.app/api/agent/submit"
+SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 AGENTER = [
     {
@@ -132,6 +134,61 @@ def skriv_artikel(agent: dict, amne: str) -> str:
     return response.json()["choices"][0]["message"]["content"]
 
 
+def hamta_senaste_artiklar(sb_key: str) -> list:
+    """Hämta de 10 senaste publicerade artiklarna från Supabase."""
+    try:
+        response = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={"select": "id,rubrik,forfattare,artikel,kategori", "order": "skapad.desc", "limit": "10"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=15,
+        )
+        if response.status_code == 200:
+            return response.json()
+    except Exception:
+        pass
+    return []
+
+
+def skriv_replik(agent: dict, original: dict) -> str:
+    """Använd Groq för att skriva en replik på en befintlig artikel."""
+    response = httpx.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "max_tokens": 2000,
+            "temperature": 0.8,
+            "messages": [
+                {"role": "system", "content": agent["system"]},
+                {
+                    "role": "user",
+                    "content": (
+                        f'Du ska skriva en replik på följande debattartikel av {original["forfattare"]}.\n\n'
+                        f'ORIGINALETS RUBRIK: {original["rubrik"]}\n\n'
+                        f'ORIGINALETS TEXT:\n{original["artikel"]}\n\n'
+                        "---\n\n"
+                        "Skriv en replik som:\n"
+                        "- Minst 300 ord, gärna 400–500\n"
+                        "- Börja med att kort sammanfatta vad du svarar på\n"
+                        "- Identifiera och bemöt de svagaste punkterna i originalartikeln\n"
+                        "- Presentera minst tre egna argument med fakta, siffror eller exempel\n"
+                        "- Avsluta med en tydlig slutsats som kontrasterar mot originalets\n"
+                        "- Inga rubriker eller stycketitlar – löpande text\n"
+                        f"- Skriv i första person som {agent['namn']}\n\n"
+                        "Skriv ENBART repliktexten. Ingen inledning, inga kommentarer."
+                    ),
+                },
+            ],
+        },
+        timeout=60,
+    )
+    return response.json()["choices"][0]["message"]["content"]
+
+
 def skicka_artikel(api_key: str, amne: str, kategori: str, artikel: str) -> dict:
     """Skicka artikeln till debatt.ai API."""
     response = httpx.post(
@@ -157,19 +214,48 @@ def main():
         print("Fel: Sätt miljövariabeln GROQ_API_KEY")
         sys.exit(1)
 
-    # Välj agent och ämne slumpmässigt
-    agent = random.choice(AGENTER)
-    amne, kategori = random.choice(agent["amnen"])
+    sb_key = os.environ.get("SUPABASE_ANON_KEY")
 
-    print(f"\n{'═' * 60}")
-    print(f"  Agent:    {agent['namn']}")
-    print(f"  Ämne:     {amne}")
-    print(f"  Kategori: {kategori}")
-    print(f"{'═' * 60}\n")
+    # Avgör om vi ska skriva en replik eller en ny artikel (50/50)
+    original = None
+    if sb_key and random.random() < 0.5:
+        print("Letar efter artiklar att svara på...")
+        artiklar = hamta_senaste_artiklar(sb_key)
+        if artiklar:
+            original = random.choice(artiklar)
+            print(f"Hittade artikel att svara på: \"{original['rubrik']}\" av {original['forfattare']}\n")
 
-    # Skriv artikel med Groq
-    print("Skriver artikel med Groq (llama-3.3-70b)...")
-    artikel = skriv_artikel(agent, amne)
+    if original:
+        # Välj en agent som inte är samma som originalförfattaren
+        andra_agenter = [a for a in AGENTER if a["namn"] != original.get("forfattare")]
+        agent = random.choice(andra_agenter if andra_agenter else AGENTER)
+        amne = f"Replik: {original['rubrik']}"
+        kategori = original.get("kategori", "Övrigt")
+
+        print(f"\n{'═' * 60}")
+        print(f"  Läge:     REPLIK")
+        print(f"  Agent:    {agent['namn']}")
+        print(f"  Svarar på: {original['rubrik']}")
+        print(f"  Kategori: {kategori}")
+        print(f"{'═' * 60}\n")
+
+        print("Skriver replik med Groq (llama-3.3-70b)...")
+        artikel = skriv_replik(agent, original)
+    else:
+        # Välj agent och ämne slumpmässigt
+        agent = random.choice(AGENTER)
+        amne, kategori = random.choice(agent["amnen"])
+
+        print(f"\n{'═' * 60}")
+        print(f"  Läge:     NY ARTIKEL")
+        print(f"  Agent:    {agent['namn']}")
+        print(f"  Ämne:     {amne}")
+        print(f"  Kategori: {kategori}")
+        print(f"{'═' * 60}\n")
+
+        print("Skriver artikel med Groq (llama-3.3-70b)...")
+        artikel = skriv_artikel(agent, amne)
+
     ord_antal = len(artikel.split())
     print(f"Klar! ({ord_antal} ord)\n")
     print(f"Förhandsvisning:\n{artikel[:300]}...\n")
