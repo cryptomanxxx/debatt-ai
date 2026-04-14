@@ -15,9 +15,10 @@ const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm ar
 En artikel kan publiceras om ALLA fyra poäng är minst ${MIN_SCORE}/10.
 
 Svara ENDAST med JSON (inga andra tecken):
-{"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1","förslag 2"],"styrkor":["styrka 1"],"rubrik":null}
+{"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1","förslag 2"],"styrkor":["styrka 1"],"rubrik":null,"taggar":["tagg1","tagg2","tagg3"]}
 
-beslut är "publicera" om alla fyra >= ${MIN_SCORE}, annars "revidera" eller "avvisa".`;
+beslut är "publicera" om alla fyra >= ${MIN_SCORE}, annars "revidera" eller "avvisa".
+taggar: 3–5 specifika ämnestaggar på svenska (gemener, max tre ord per tagg, mer specifika än en bred kategori).`;
 
 // ── Supabase REST helpers ─────────────────────────────────────────────────────
 function sbHeaders() {
@@ -193,7 +194,7 @@ export default function DebattClient() {
   const [author, setAuthor] = useState("");
   const [text, setText]     = useState("");
   const [kategori, setKategori] = useState("Övrigt");
-  const [filterKategori, setFilterKategori] = useState("Alla");
+  const [filterTag, setFilterTag] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError]   = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -301,6 +302,7 @@ export default function DebattClient() {
         kategori: kategori,
         arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
         kalla: "manniska",
+        taggar: result.taggar || [],
       });
       // Update inlamning status to publicerad
       if (inlamningId) {
@@ -332,6 +334,7 @@ export default function DebattClient() {
     setView("submit"); setResult(null); setError(null); setSelected(null);
     setTitle(""); setAuthor(""); setText("");
     setKategori("Övrigt");
+    setFilterTag(null);
     setInlamningId(null);
     setTurnstileToken(null);
     if (window.turnstile) window.turnstile.reset();
@@ -482,22 +485,34 @@ export default function DebattClient() {
               <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 10px 0" }}>Arkiv</p>
               <h1 style={{ fontSize:"32px", fontWeight:400, margin:"0 0 8px 0" }}>Publicerade artiklar</h1>
               <p style={{ color:C.textMuted, fontSize:"15px", margin:"0 0 24px 0" }}>Klicka på en artikel för att läsa hela texten.</p>
-              {/* Category filters */}
-              <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
-                {["Alla", ...new Set(articles.map(a=>a.kategori||"Övrigt").filter(Boolean).sort())].map(k=>(
-                  <button key={k} onClick={()=>setFilterKategori(k)} style={{ background:filterKategori===k?C.accent:"transparent", color:filterKategori===k?"#0a0a0a":C.textMuted, border:`1px solid ${filterKategori===k?C.accent:C.border}`, borderRadius:"20px", padding:"6px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", transition:"all 0.2s" }}>
-                    {k}
-                  </button>
-                ))}
-              </div>
+              {/* Tag filters */}
+              {(() => {
+                const freq = {};
+                articles.forEach(a => (a.taggar || []).forEach(t => { freq[t] = (freq[t] || 0) + 1; }));
+                const topTags = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0,20).map(([t]) => t);
+                if (topTags.length === 0) return null;
+                return (
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
+                    <button onClick={()=>setFilterTag(null)} style={{ background:!filterTag?C.accent:"transparent", color:!filterTag?"#0a0a0a":C.textMuted, border:`1px solid ${!filterTag?C.accent:C.border}`, borderRadius:"20px", padding:"6px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", transition:"all 0.2s" }}>
+                      Alla
+                    </button>
+                    {topTags.map(t => (
+                      <button key={t} onClick={()=>setFilterTag(filterTag===t?null:t)} style={{ background:filterTag===t?C.accent:"transparent", color:filterTag===t?"#0a0a0a":C.textMuted, border:`1px solid ${filterTag===t?C.accent:C.border}`, borderRadius:"20px", padding:"6px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", transition:"all 0.2s" }}>
+                        #{t}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+
             </div>
             {loadingArt ? <p style={{ color:C.textMuted }}>Hämtar från databas…</p>
-              : articles.filter(a => filterKategori === "Alla" || (a.kategori||"Övrigt") === filterKategori).length === 0 ? (
+              : articles.filter(a => !filterTag || (a.taggar || []).includes(filterTag)).length === 0 ? (
                 <div style={{ textAlign:"center", padding:"80px 0", color:C.textMuted }}>
                   <p style={{ fontSize:"40px", margin:"0 0 16px 0" }}>📭</p>
-                  <p style={{ fontSize:"16px" }}>Inga artiklar i denna kategori.</p>
+                  <p style={{ fontSize:"16px" }}>Inga artiklar med denna tagg.</p>
                 </div>
-              ) : articles.filter(a => filterKategori === "Alla" || (a.kategori||"Övrigt") === filterKategori).map((a,i)=>(
+              ) : articles.filter(a => !filterTag || (a.taggar || []).includes(filterTag)).map((a,i)=>(
                 <div key={a.id||i} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"32px", marginBottom:"32px" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px" }}>
                     <div style={{ display:"flex", alignItems:"center", gap:"10px", flexWrap:"wrap" }}>
@@ -510,6 +525,15 @@ export default function DebattClient() {
                   <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 6px 0", lineHeight:1.3, color:C.accent }}>{a.rubrik}</h2>
                   <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 12px 0", fontStyle:"italic" }}>{a.forfattare}</p>
                   <p style={{ color:C.textMuted, fontSize:"15px", lineHeight:1.7, margin:"0 0 14px 0" }}>{(a.artikel||"").slice(0,220)}…</p>
+                  {(a.taggar||[]).length > 0 && (
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"14px" }}>
+                      {(a.taggar||[]).map(t => (
+                        <button key={t} onClick={()=>setFilterTag(filterTag===t?null:t)} style={{ background:filterTag===t?`${C.accent}25`:"transparent", color:filterTag===t?C.accent:C.textMuted, border:`1px solid ${filterTag===t?C.accent+"60":C.border}`, borderRadius:"20px", padding:"3px 10px", fontSize:"12px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                          #{t}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <a href={`/artikel/${a.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"8px 16px", background:`${C.accent}10`, border:`1px solid ${C.accent}30`, borderRadius:"4px", textDecoration:"none" }}>
                     <span style={{ fontSize:"14px", color:C.accent, fontWeight:600 }}>Läs hela artikeln →</span>
                   </a>

@@ -76,6 +76,9 @@ export default async function ArtikelPage({ params }) {
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
             <span style={{ fontSize: "11px", fontWeight: 700, color: C.green, background: "#052011", border: `1px solid ${C.green}40`, borderRadius: "4px", padding: "3px 10px", fontFamily: "monospace", letterSpacing: "0.08em" }}>PUBLICERAD</span>
             {artikel.kategori && <span style={{ fontSize: "11px", color: C.accentDim, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: "20px", padding: "3px 10px" }}>{artikel.kategori}</span>}
+            {(artikel.taggar || []).map(t => (
+              <a key={t} href={`/?arkiv=1`} style={{ fontSize: "11px", color: C.textMuted, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "20px", padding: "3px 10px", textDecoration: "none" }}>#{t}</a>
+            ))}
             {artikel.kalla === "ai" && (
               <span style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
                 <span style={{ width:"6px", height:"6px", borderRadius:"50%", background:"#4a9eff", display:"inline-block" }} />

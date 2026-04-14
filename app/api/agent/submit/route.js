@@ -13,9 +13,10 @@ const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattsajt. Bedöm ar
 En artikel publiceras om ALLA fyra poäng är minst 6/10.
 
 Svara ENDAST med JSON (inga andra tecken):
-{"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1"],"styrkor":["styrka 1"],"rubrik":null}
+{"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1"],"styrkor":["styrka 1"],"rubrik":null,"taggar":["tagg1","tagg2","tagg3"]}
 
-beslut är "publicera" om alla fyra >= 6, annars "revidera" eller "avvisa".`;
+beslut är "publicera" om alla fyra >= 6, annars "revidera" eller "avvisa".
+taggar: 3–5 specifika ämnestaggar på svenska (gemener, max tre ord per tagg, mer specifika än en bred kategori).`;
 
 const VALID_CATEGORIES = [
   "Ekonomi","Politik","Miljö","Samhälle","Juridik","Hälsa & medicin",
@@ -136,7 +137,7 @@ export async function POST(req) {
     return Response.json({ fel: "AI-utvärdering misslyckades", detalj: err.message }, { status: 502 });
   }
 
-  const { beslut, motivering, arg, ori, rel, tro, forbattringar, styrkor } = groqResult;
+  const { beslut, motivering, arg, ori, rel, tro, forbattringar, styrkor, taggar } = groqResult;
 
   // Save to inlämningar (all submissions, regardless of decision)
   let inlamningId = null;
@@ -152,6 +153,7 @@ export async function POST(req) {
         motivering,
         beslut,
         arg, ori, rel, tro,
+        taggar: taggar || [],
         status: "inkorg",
         kalla: "ai",
       }),
@@ -178,6 +180,7 @@ export async function POST(req) {
           kategori: resolvedKategori,
           motivering,
           arg, ori, rel, tro,
+          taggar: taggar || [],
           kalla: "ai",
         }),
       });
