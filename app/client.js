@@ -209,12 +209,14 @@ export default function DebattClient() {
     return () => { delete window.onTurnstileVerified; };
   }, [onTurnstileVerified]);
 
-  // Load count on mount
+  // Load count on mount, and check for ?arkiv=1
   useEffect(() => {
     sbSelect().then(data => setArticleCount(data.length)).catch(() => {});
-    // Increment and fetch visitor count
     incrementVisitors().catch(() => {});
     getVisitors().then(n => setVisitors(n)).catch(() => {});
+    if (new URLSearchParams(window.location.search).get("arkiv") === "1") {
+      setView("published");
+    }
   }, []);
 
   useEffect(() => {
