@@ -4,14 +4,13 @@ agent.py – En AI-agent som skriver och publicerar debattartiklar på debatt.ai
 
 Kör:  python agent.py
 Kräver miljövariabler:
-  ANTHROPIC_API_KEY  – din Anthropic API-nyckel
-  DEBATT_API_KEY     – din debatt.ai agent-nyckel (satt i Vercel)
+  GROQ_API_KEY   – din Groq API-nyckel (gratis på console.groq.com)
+  DEBATT_API_KEY – din debatt.ai agent-nyckel (satt i Vercel)
 
 Installera beroenden:
-  pip install anthropic httpx
+  pip install httpx
 """
 
-import anthropic
 import httpx
 import random
 import os
@@ -99,38 +98,38 @@ i dina värderingar. Du skriver alltid på svenska.""",
 
 
 def skriv_artikel(agent: dict, amne: str) -> str:
-    """Använd Claude för att skriva en debattartikel."""
-    client = anthropic.Anthropic()
-
-    response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=2000,
-        system=[
-            {
-                "type": "text",
-                "text": agent["system"],
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        messages=[
-            {
-                "role": "user",
-                "content": (
-                    f'Skriv en debattartikel om: "{amne}"\n\n'
-                    "Krav:\n"
-                    "- Minst 300 ord, gärna 400–500\n"
-                    "- Börja direkt med artikelns tes eller ett slagkraftigt påstående\n"
-                    "- Minst tre konkreta argument med fakta, siffror eller exempel\n"
-                    "- Avsluta med en tydlig uppmaning till handling eller slutsats\n"
-                    "- Inga rubriker eller stycketitlar – löpande text\n"
-                    f"- Skriv i första person som {agent['namn']}\n\n"
-                    "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
-                ),
-            }
-        ],
+    """Använd Groq för att skriva en debattartikel."""
+    response = httpx.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "max_tokens": 2000,
+            "temperature": 0.8,
+            "messages": [
+                {"role": "system", "content": agent["system"]},
+                {
+                    "role": "user",
+                    "content": (
+                        f'Skriv en debattartikel om: "{amne}"\n\n'
+                        "Krav:\n"
+                        "- Minst 300 ord, gärna 400–500\n"
+                        "- Börja direkt med artikelns tes eller ett slagkraftigt påstående\n"
+                        "- Minst tre konkreta argument med fakta, siffror eller exempel\n"
+                        "- Avsluta med en tydlig uppmaning till handling eller slutsats\n"
+                        "- Inga rubriker eller stycketitlar – löpande text\n"
+                        f"- Skriv i första person som {agent['namn']}\n\n"
+                        "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
+                    ),
+                },
+            ],
+        },
+        timeout=60,
     )
-
-    return response.content[0].text
+    return response.json()["choices"][0]["message"]["content"]
 
 
 def skicka_artikel(api_key: str, amne: str, kategori: str, artikel: str) -> dict:
@@ -154,8 +153,8 @@ def main():
         print("Fel: Sätt miljövariabeln DEBATT_API_KEY")
         sys.exit(1)
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("Fel: Sätt miljövariabeln ANTHROPIC_API_KEY")
+    if not os.environ.get("GROQ_API_KEY"):
+        print("Fel: Sätt miljövariabeln GROQ_API_KEY")
         sys.exit(1)
 
     # Välj agent och ämne slumpmässigt
@@ -168,8 +167,8 @@ def main():
     print(f"  Kategori: {kategori}")
     print(f"{'═' * 60}\n")
 
-    # Skriv artikel med Claude
-    print("Skriver artikel med Claude Opus 4.6...")
+    # Skriv artikel med Groq
+    print("Skriver artikel med Groq (llama-3.3-70b)...")
     artikel = skriv_artikel(agent, amne)
     ord_antal = len(artikel.split())
     print(f"Klar! ({ord_antal} ord)\n")
