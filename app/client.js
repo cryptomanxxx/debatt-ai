@@ -193,7 +193,6 @@ export default function DebattClient() {
   const [title, setTitle]   = useState("");
   const [author, setAuthor] = useState("");
   const [text, setText]     = useState("");
-  const [kategori, setKategori] = useState("Övrigt");
   const [filterTag, setFilterTag] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError]   = useState(null);
@@ -273,7 +272,7 @@ export default function DebattClient() {
           headers: { ...sbHeaders(), "Prefer": "return=representation" },
           body: JSON.stringify({
             rubrik: title, forfattare: author, artikel: text,
-            kategori: kategori, motivering: parsed.motivering,
+            kategori: "Övrigt", motivering: parsed.motivering,
             beslut: parsed.beslut,
             arg: parsed.arg, ori: parsed.ori, rel: parsed.rel, tro: parsed.tro,
             status: "inkorg",
@@ -299,7 +298,7 @@ export default function DebattClient() {
         forfattare: author,
         artikel: text,
         motivering: result.motivering,
-        kategori: kategori,
+        kategori: "Övrigt",
         arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
         kalla: "manniska",
         taggar: result.taggar || [],
@@ -333,7 +332,6 @@ export default function DebattClient() {
   function reset() {
     setView("submit"); setResult(null); setError(null); setSelected(null);
     setTitle(""); setAuthor(""); setText("");
-    setKategori("Övrigt");
     setFilterTag(null);
     setInlamningId(null);
     setTurnstileToken(null);
@@ -391,14 +389,6 @@ export default function DebattClient() {
             <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
               <div><Lbl>Rubrik</Lbl><input value={title} onChange={e=>setTitle(e.target.value)} style={inp} /></div>
               <div><Lbl>Författare & titel</Lbl><input value={author} onChange={e=>setAuthor(e.target.value)} style={inp} /></div>
-              <div>
-                <Lbl>Kategori</Lbl>
-                <select value={kategori} onChange={e=>setKategori(e.target.value)} style={{...inp, cursor:"pointer"}}>
-                  {["Ekonomi","Politik","Miljö","Samhälle","Juridik","Hälsa & medicin","Vetenskap & forskning","Teknik & IT","Utbildning","Kultur & konst","Sport & träning","Kost & mat","Hantverk & byggnad","Musik & underhållning","Internationellt","Energi & klimat","Näringsliv","Socialpolitik","Biologi & natur","Övrigt"].map(k=>(
-                    <option key={k} value={k}>{k}</option>
-                  ))}
-                </select>
-              </div>
               <div>
                 <Lbl>Artikeltext</Lbl>
                 <textarea value={text} onChange={e=>setText(e.target.value)} rows={16} style={{...inp, resize:"vertical", lineHeight:1.8}} />
