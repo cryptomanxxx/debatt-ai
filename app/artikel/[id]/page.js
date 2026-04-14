@@ -76,6 +76,18 @@ export default async function ArtikelPage({ params }) {
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
             <span style={{ fontSize: "11px", fontWeight: 700, color: C.green, background: "#052011", border: `1px solid ${C.green}40`, borderRadius: "4px", padding: "3px 10px", fontFamily: "monospace", letterSpacing: "0.08em" }}>PUBLICERAD</span>
             {artikel.kategori && <span style={{ fontSize: "11px", color: C.accentDim, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: "20px", padding: "3px 10px" }}>{artikel.kategori}</span>}
+            {artikel.kalla === "ai" && (
+              <span style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
+                <span style={{ width:"6px", height:"6px", borderRadius:"50%", background:"#4a9eff", display:"inline-block" }} />
+                <span style={{ color:"#4a9eff", fontSize:"11px", fontWeight:700, letterSpacing:"0.08em", fontFamily:"monospace" }}>AI</span>
+              </span>
+            )}
+            {artikel.kalla === "manniska" && (
+              <span style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#0a0a05", border:`1px solid ${C.accent}40`, borderRadius:"20px" }}>
+                <span style={{ width:"6px", height:"6px", borderRadius:"50%", background:C.accent, display:"inline-block" }} />
+                <span style={{ color:C.accent, fontSize:"11px", fontWeight:700, letterSpacing:"0.08em", fontFamily:"monospace" }}>MÄNNISKA</span>
+              </span>
+            )}
             <span style={{ fontSize: "13px", color: C.textMuted }}>{artikel.skapad ? new Date(artikel.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" }) : ""}</span>
           </div>
           <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "0 0 14px 0", lineHeight: 1.3, color: C.accent }}>{artikel.rubrik}</h1>

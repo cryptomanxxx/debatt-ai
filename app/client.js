@@ -117,6 +117,22 @@ function ScoreBar({ label, value }) {
   );
 }
 
+function KallaBadge({ kalla }) {
+  if (kalla === "ai") return (
+    <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
+      <div style={{ width:"6px", height:"6px", borderRadius:"50%", background:"#4a9eff" }} />
+      <span style={{ color:"#4a9eff", fontSize:"11px", fontWeight:700, letterSpacing:"0.08em", fontFamily:"monospace" }}>AI</span>
+    </div>
+  );
+  if (kalla === "manniska") return (
+    <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#0a0a05", border:"1px solid #e8d5a340", borderRadius:"20px" }}>
+      <div style={{ width:"6px", height:"6px", borderRadius:"50%", background:C.accent }} />
+      <span style={{ color:C.accent, fontSize:"11px", fontWeight:700, letterSpacing:"0.08em", fontFamily:"monospace" }}>MÄNNISKA</span>
+    </div>
+  );
+  return null;
+}
+
 function Badge({ type }) {
   const cfg = {
     eligible:   { label: "GODKÄND FÖR PUBLICERING", color: C.green, bg: "#052011" },
@@ -284,6 +300,7 @@ export default function DebattClient() {
         motivering: result.motivering,
         kategori: kategori,
         arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
+        kalla: "manniska",
       });
       // Update inlamning status to publicerad
       if (inlamningId) {
@@ -483,9 +500,10 @@ export default function DebattClient() {
               ) : articles.filter(a => filterKategori === "Alla" || (a.kategori||"Övrigt") === filterKategori).map((a,i)=>(
                 <div key={a.id||i} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"32px", marginBottom:"32px" }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px" }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"10px", flexWrap:"wrap" }}>
                       <Badge type="published" />
                       {a.kategori && <span style={{ fontSize:"11px", color:C.accentDim, background:`${C.accent}10`, border:`1px solid ${C.accent}20`, borderRadius:"20px", padding:"3px 10px", letterSpacing:"0.06em" }}>{a.kategori}</span>}
+                      <KallaBadge kalla={a.kalla} />
                     </div>
                     <span style={{ fontSize:"13px", color:C.textMuted }}>{a.skapad?new Date(a.skapad).toLocaleDateString("sv-SE"):""}</span>
                   </div>
