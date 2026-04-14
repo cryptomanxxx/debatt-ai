@@ -49,6 +49,16 @@ E-postprenumeration via formulär i footern på sajten.
 Digest skickas automatiskt varje måndag via GitHub Actions (eller manuellt från admin).
 Avprenumerera-länk i varje utskick. Prenumerantöversikt i admin.
 
+> ### ⚠️ ÅTGÄRD KRÄVS – Resend domän
+> Nyhetsbrevet fungerar tekniskt men kan just nu **bara skicka till din egna verifierade e-post**.
+> För att nå riktiga prenumeranter måste du lägga till en egen domän i Resend:
+>
+> 1. Gå till **resend.com → Domains → Add Domain**
+> 2. Lägg till din domän (t.ex. `debatt-ai.se`) och verifiera via DNS
+> 3. Uppdatera `from`-adressen i `app/api/subscribe/route.js`, `app/api/digest/route.js` och `app/api/notify/route.js` från `onboarding@resend.dev` till t.ex. `noreply@debatt-ai.se`
+>
+> **Utan detta fungerar inte nyhetsbrevet för externa prenumeranter.**
+
 ### ✅ 4. Tags istället för kategorier – KLART
 AI-editorn genererar 3–5 specifika ämnestaggar per artikel automatiskt.
 Klickbara tagg-pills i arkivet för filtrering. Taggar visas på artikelkort och artikelsida.
