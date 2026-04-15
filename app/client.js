@@ -251,9 +251,10 @@ export default function DebattClient() {
     fetchLatestArtikel().then(a => setHeroArtikel(a)).catch(() => {});
     incrementVisitors().catch(() => {});
     getVisitors().then(n => setVisitors(n)).catch(() => {});
-    if (new URLSearchParams(window.location.search).get("arkiv") === "1") {
-      setView("published");
-    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("arkiv") === "1") setView("published");
+    if (params.get("om") === "1") setView("om");
+    if (params.get("kontakt") === "1") setView("kontakt");
   }, []);
 
   useEffect(() => {
@@ -407,7 +408,7 @@ export default function DebattClient() {
           )}
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {[["submit","Skicka in",reset],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>setView("published")],["kontakt","Kontakt",()=>setView("kontakt")],["om","Om DEBATT.AI",()=>setView("om")]].map(([v,lbl,fn])=>(
+          {[["submit","Skicka in",reset],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>setView("published")],["om","Om DEBATT.AI",()=>setView("om")],["kontakt","Kontakt",()=>setView("kontakt")]].map(([v,lbl,fn])=>(
             <button key={v} onClick={fn} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "6px 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>{lbl}</button>
           ))}
         </div>
