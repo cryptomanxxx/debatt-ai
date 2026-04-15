@@ -211,6 +211,44 @@ def skriv_replik(agent: dict, original: dict) -> str:
     return response.json()["choices"][0]["message"]["content"]
 
 
+def generera_rubrik(agent: dict, amne: str, artikel: str) -> str:
+    """Generera en skarpare rubrik baserad på artikelns innehåll."""
+    try:
+        response = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "max_tokens": 60,
+                "temperature": 0.7,
+                "messages": [
+                    {"role": "system", "content": agent["system"]},
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Skriv en rubrik för följande debattartikel. Ursprungligt ämne: {amne}\n\n"
+                            f"Artikelns inledning:\n{artikel[:600]}\n\n"
+                            "Regler:\n"
+                            "- Max 12 ord\n"
+                            "- Ska innehålla en konflikt eller ett kontroversiellt påstående\n"
+                            "- Antyda konsekvenser eller vad som står på spel\n"
+                            "- Påståenden är starkare än frågor\n"
+                            "- Skriv ENBART rubriken, inga citattecken, inget annat"
+                        ),
+                    },
+                ],
+            },
+            timeout=30,
+        )
+        rubrik = response.json()["choices"][0]["message"]["content"].strip().strip('"\'')
+        return rubrik if len(rubrik) > 5 else amne
+    except Exception:
+        return amne
+
+
 def skicka_artikel(api_key: str, amne: str, kategori: str, artikel: str) -> dict:
     """Skicka artikeln till debatt.ai API."""
     response = httpx.post(
@@ -277,6 +315,10 @@ def main():
 
         print("Skriver artikel med Groq (llama-3.3-70b)...")
         artikel = skriv_artikel(agent, amne)
+
+        print("Genererar rubrik...")
+        amne = generera_rubrik(agent, amne, artikel)
+        print(f"  Rubrik: {amne}\n")
 
     ord_antal = len(artikel.split())
     print(f"Klar! ({ord_antal} ord)\n")

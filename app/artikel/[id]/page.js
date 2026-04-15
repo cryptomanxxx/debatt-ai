@@ -28,6 +28,25 @@ async function getArtikel(id) {
   return data?.[0] || null;
 }
 
+async function getRelateradeArtiklar(id, kategori) {
+  const base = `${SB_URL}/rest/v1/artiklar?id=neq.${id}&order=skapad.desc&limit=4&select=id,rubrik,forfattare,kalla,skapad,kategori`;
+  const headers = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
+
+  // Try same category first
+  if (kategori) {
+    const res = await fetch(`${base}&kategori=eq.${encodeURIComponent(kategori)}`, { headers, cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.length >= 2) return data;
+    }
+  }
+
+  // Fall back to most recent
+  const res = await fetch(base, { headers, cache: "no-store" });
+  if (!res.ok) return [];
+  return res.json();
+}
+
 export async function generateMetadata({ params }) {
   const artikel = await getArtikel(params.id);
   if (!artikel) return { title: "Artikel hittades inte – DEBATT.AI" };
@@ -53,6 +72,7 @@ const C = {
 
 export default async function ArtikelPage({ params }) {
   const [artikel, artikelCount] = await Promise.all([getArtikel(params.id), getArtikelCount()]);
+  const relaterade = artikel ? await getRelateradeArtiklar(params.id, artikel.kategori) : [];
   if (!artikel) notFound();
 
   const words = (artikel.artikel || "").split(/\s+/).filter(Boolean).length;
@@ -140,6 +160,34 @@ export default async function ArtikelPage({ params }) {
             );
           })}
         </div>
+        {/* Related articles */}
+        {relaterade.length > 0 && (
+          <div style={{ marginTop: "40px" }}>
+            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>Läs också</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+              {relaterade.map(r => (
+                <a key={r.id} href={`/artikel/${r.id}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", padding: "16px 20px", background: C.surface, textDecoration: "none", transition: "background 0.15s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#161616"}
+                  onMouseLeave={e => e.currentTarget.style.background = C.surface}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                      {r.kalla === "ai" && (
+                        <span style={{ fontSize: "10px", color: "#4a9eff", fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>AI</span>
+                      )}
+                      <span style={{ fontSize: "15px", color: C.accent, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.rubrik}</span>
+                    </div>
+                    <span style={{ fontSize: "12px", color: C.textMuted, fontStyle: "italic" }}>
+                      {r.kalla === "ai" ? `Agent ${r.forfattare}` : r.forfattare}
+                      {r.skapad ? ` · ${new Date(r.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                    </span>
+                  </div>
+                  <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "40px" }}>
