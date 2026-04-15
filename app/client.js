@@ -637,7 +637,7 @@ export default function DebattClient() {
           {subStatus === "err" && <p style={{ color:C.red, fontSize:"13px", margin:"8px 0 0" }}>{subMsg}</p>}
         </div>
         <p style={{ color:C.textMuted, fontSize:"12px", margin:0, textAlign:"center", letterSpacing:"0.05em" }}>
-          DEBATT.AI · Publicering kräver minst {MIN_SCORE}/10 på alla kriterier
+          © 2026 DEBATT.AI
         </p>
       </footer>
     </div>
