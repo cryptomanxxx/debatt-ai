@@ -55,6 +55,15 @@ async function sbSelect() {
   return res.json();
 }
 
+async function fetchLatestArtikel() {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc&limit=1`, {
+    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+  });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.[0] || null;
+}
+
 async function incrementVisitors() {
   await fetch(`${SB_URL}/rest/v1/rpc/increment_visitors`, {
     method: "POST",
@@ -206,6 +215,7 @@ export default function DebattClient() {
   const [turnstileToken, setTurnstileToken] = useState(null);
   const [visitors, setVisitors] = useState(null);
   const [inlamningId, setInlamningId] = useState(null);
+  const [heroArtikel, setHeroArtikel] = useState(null);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -238,6 +248,7 @@ export default function DebattClient() {
   // Load count on mount, and check for ?arkiv=1
   useEffect(() => {
     sbSelect().then(data => setArticleCount(data.length)).catch(() => {});
+    fetchLatestArtikel().then(a => setHeroArtikel(a)).catch(() => {});
     incrementVisitors().catch(() => {});
     getVisitors().then(n => setVisitors(n)).catch(() => {});
     if (new URLSearchParams(window.location.search).get("arkiv") === "1") {
@@ -407,6 +418,50 @@ export default function DebattClient() {
         {/* ── SUBMIT ── */}
         {view === "submit" && (
           <div>
+            {/* Hero – senaste artikel */}
+            {heroArtikel && (
+              <div style={{ marginBottom:"48px", background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"28px 28px 24px", position:"relative", overflow:"hidden" }}>
+                <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:`linear-gradient(90deg, ${C.accent}, ${C.accentDim}40)` }} />
+                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"16px", flexWrap:"wrap" }}>
+                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE DEBATTEN</span>
+                  {heroArtikel.kalla === "ai" && (
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
+                      <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#4a9eff", display:"inline-block" }} />
+                      <span style={{ color:"#4a9eff", fontSize:"11px", fontWeight:700, fontFamily:"monospace" }}>AI</span>
+                    </span>
+                  )}
+                  {heroArtikel.kalla === "manniska" && (
+                    <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#0a0a05", border:`1px solid ${C.accent}40`, borderRadius:"20px" }}>
+                      <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:C.accent, display:"inline-block" }} />
+                      <span style={{ color:C.accent, fontSize:"11px", fontWeight:700, fontFamily:"monospace" }}>MÄNNISKA</span>
+                    </span>
+                  )}
+                  {(heroArtikel.taggar||[]).slice(0,3).map(t => (
+                    <span key={t} style={{ fontSize:"11px", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
+                  ))}
+                </div>
+                <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 8px", lineHeight:1.3, color:C.accent }}>{heroArtikel.rubrik}</h2>
+                <p style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic", margin:"0 0 12px" }}>{heroArtikel.forfattare}</p>
+                <p style={{ color:C.text, fontSize:"15px", lineHeight:1.8, margin:"0 0 20px" }}>{(heroArtikel.artikel||"").slice(0,260)}…</p>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
+                  <div style={{ display:"flex", gap:"16px" }}>
+                    {[["Arg",heroArtikel.arg],["Ori",heroArtikel.ori],["Rel",heroArtikel.rel],["Tro",heroArtikel.tro]].map(([lbl,val]) => {
+                      const color = val >= 8 ? C.green : val >= 6 ? C.yellow : C.red;
+                      return (
+                        <div key={lbl} style={{ textAlign:"center" }}>
+                          <div style={{ fontSize:"11px", color:C.textMuted, marginBottom:"3px" }}>{lbl}</div>
+                          <div style={{ fontSize:"14px", fontWeight:700, color, fontFamily:"monospace" }}>{val}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <a href={`/artikel/${heroArtikel.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:`${C.accent}15`, border:`1px solid ${C.accent}40`, color:C.accent, borderRadius:"4px", padding:"10px 20px", fontSize:"14px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
+                    Läs hela artikeln →
+                  </a>
+                </div>
+              </div>
+            )}
+
             <div style={{ marginBottom: "40px" }}>
               <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px 0" }}>Artikelinlämning</p>
               <h1 style={{ fontSize: "32px", fontWeight: 400, margin: "0 0 20px 0", lineHeight: 1.2 }}>Skicka din debattartikel</h1>
