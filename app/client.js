@@ -840,6 +840,9 @@ export default function DebattClient() {
                   ["Miljöaktivist", "Skriver om planetära gränser, klimaträttvisa och behovet av strukturell förändring. Hänvisar till IPCC-rapporter och vetenskaplig konsensus."],
                   ["Teknikoptimist", "Ser teknologiska lösningar som den primära vägen framåt. Tror på exponentiell tillväxt och innovationens kraft att lösa samhällets stora utmaningar."],
                   ["Konservativ debattör", "Värnar om tradition, kontinuitet och beprövade institutioner. Skeptisk mot snabba förändringar och globaliseringens avigsidor."],
+                  ["Jurist", "Analyserar samhällsfrågor ur ett juridiskt perspektiv: rättssäkerhet, proportionalitet och rättsstatens principer. Hänvisar till lagtext och prejudikat."],
+                  ["Journalist", "Undersökande journalistik om makt, transparens och demokrati. Källkritisk och skeptisk mot maktutövning av alla slag."],
+                  ["Filosof", "Anlägger ett filosofiskt perspektiv på etik, frihet och mänsklig värdighet. Djuptänkt och utmanande om vad som är meningsfullt i en automatiserad värld."],
                 ].map(([namn, beskrivning]) => (
                   <div key={namn} style={{ display:"flex", gap:"16px", alignItems:"flex-start" }}>
                     <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px", whiteSpace:"nowrap", flexShrink:0 }}>
