@@ -207,9 +207,15 @@ export default function DebattClient() {
   const [visitors, setVisitors] = useState(null);
   const [inlamningId, setInlamningId] = useState(null);
   const [subEmail, setSubEmail]   = useState("");
-  const [subStatus, setSubStatus] = useState(null); // null | "ok" | "err"
+  const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
   const [subLoading, setSubLoading] = useState(false);
+  const [kontaktNamn, setKontaktNamn]       = useState("");
+  const [kontaktEmail, setKontaktEmail]     = useState("");
+  const [kontaktMsg, setKontaktMsg]         = useState("");
+  const [kontaktStatus, setKontaktStatus]   = useState(null);
+  const [kontaktSvar, setKontaktSvar]       = useState("");
+  const [kontaktLoading, setKontaktLoading] = useState(false);
 
   // Load Turnstile script
   useEffect(() => {
@@ -342,6 +348,21 @@ export default function DebattClient() {
     if (window.turnstile) window.turnstile.reset();
   }
 
+  async function skickaKontakt() {
+    setKontaktLoading(true);
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ namn: kontaktNamn, email: kontaktEmail, meddelande: kontaktMsg }),
+      });
+      const data = await res.json();
+      if (data.fel) { setKontaktStatus("err"); setKontaktSvar(data.fel); }
+      else { setKontaktStatus("ok"); setKontaktSvar(data.meddelande); setKontaktNamn(""); setKontaktEmail(""); setKontaktMsg(""); }
+    } catch { setKontaktStatus("err"); setKontaktSvar("Något gick fel, försök igen."); }
+    setKontaktLoading(false);
+  }
+
   async function subscribe() {
     if (!subEmail.trim()) return;
     setSubLoading(true);
@@ -368,14 +389,14 @@ export default function DebattClient() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "10px", cursor: "pointer" }} onClick={reset}>
             <span style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent }}>DEBATT.AI</span>
-            <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>Redaktionen är artificiell</span>
+            <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
           </div>
           {visitors !== null && (
             <span style={{ fontSize: "12px", color: C.textMuted }}>👁 {visitors.toLocaleString("sv-SE")}</span>
           )}
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {[["submit","Skicka in",reset],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>setView("published")]].map(([v,lbl,fn])=>(
+          {[["submit","Skicka in",reset],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>setView("published")],["kontakt","Kontakt",()=>setView("kontakt")]].map(([v,lbl,fn])=>(
             <button key={v} onClick={fn} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "6px 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>{lbl}</button>
           ))}
         </div>
@@ -552,6 +573,43 @@ export default function DebattClient() {
           </div>
         )}
 
+        {/* ── KONTAKT ── */}
+        {view === "kontakt" && (
+          <div style={{ maxWidth:"560px" }}>
+            <div style={{ marginBottom:"32px" }}>
+              <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 10px 0" }}>Kontakt</p>
+              <h1 style={{ fontSize:"28px", fontWeight:400, margin:"0 0 12px 0" }}>Skriv till oss</h1>
+              <p style={{ color:C.textMuted, fontSize:"15px", lineHeight:1.7, margin:0 }}>Frågor, samarbeten eller feedback — fyll i formuläret så hör vi av oss.</p>
+            </div>
+            {kontaktStatus === "ok" ? (
+              <div style={{ background:"#050f08", border:`1px solid ${C.green}30`, borderRadius:"8px", padding:"32px", textAlign:"center" }}>
+                <p style={{ fontSize:"28px", margin:"0 0 12px" }}>✓</p>
+                <p style={{ color:C.green, fontSize:"16px", margin:"0 0 20px" }}>{kontaktSvar}</p>
+                <button onClick={() => { setKontaktStatus(null); setKontaktSvar(""); }} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"10px 20px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>Skicka ett till</button>
+              </div>
+            ) : (
+              <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
+                <div>
+                  <label style={{ display:"block", fontSize:"11px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>Namn</label>
+                  <input value={kontaktNamn} onChange={e=>setKontaktNamn(e.target.value)} style={inp} />
+                </div>
+                <div>
+                  <label style={{ display:"block", fontSize:"11px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>E-post</label>
+                  <input type="email" value={kontaktEmail} onChange={e=>setKontaktEmail(e.target.value)} style={inp} />
+                </div>
+                <div>
+                  <label style={{ display:"block", fontSize:"11px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>Meddelande</label>
+                  <textarea value={kontaktMsg} onChange={e=>setKontaktMsg(e.target.value)} rows={6} style={{...inp, resize:"vertical", lineHeight:1.8}} />
+                </div>
+                {kontaktStatus === "err" && <p style={{ color:C.red, fontSize:"14px", margin:0 }}>{kontaktSvar}</p>}
+                <button onClick={skickaKontakt} disabled={kontaktLoading || !kontaktNamn.trim() || !kontaktEmail.trim() || !kontaktMsg.trim()} style={{ background:C.accent, color:"#0a0a0a", border:"none", borderRadius:"4px", padding:"14px 28px", fontSize:"14px", fontWeight:700, cursor:kontaktLoading?"default":"pointer", fontFamily:"Georgia, serif", alignSelf:"flex-start", opacity:(!kontaktNamn.trim()||!kontaktEmail.trim()||!kontaktMsg.trim())?0.5:1 }}>
+                  {kontaktLoading ? "Skickar…" : "Skicka meddelande →"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
       </main>
 
       <footer style={{ borderTop:`1px solid ${C.border}`, padding:"40px 20px 28px", marginTop:"60px" }}>
@@ -579,7 +637,7 @@ export default function DebattClient() {
           {subStatus === "err" && <p style={{ color:C.red, fontSize:"13px", margin:"8px 0 0" }}>{subMsg}</p>}
         </div>
         <p style={{ color:C.textMuted, fontSize:"12px", margin:0, textAlign:"center", letterSpacing:"0.05em" }}>
-          DEBATT.AI · Publicering kräver minst {MIN_SCORE}/10 på alla kriterier · Ansvarig utgivare: Marcus Davidsson
+          DEBATT.AI · Publicering kräver minst {MIN_SCORE}/10 på alla kriterier
         </p>
       </footer>
     </div>
