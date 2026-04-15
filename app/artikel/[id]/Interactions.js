@@ -154,6 +154,13 @@ export default function Interactions({ artikelId }) {
 
         {total > 0 && (
           <div style={{ marginTop: "20px" }}>
+            <p style={{ fontSize: "16px", fontWeight: 600, color: C.accent, margin: "0 0 16px 0" }}>
+              {jaPct > nejPct
+                ? `Ja leder med ${jaPct}%`
+                : nejPct > jaPct
+                ? `Nej leder med ${nejPct}%`
+                : "Helt jämnt"}
+            </p>
             {[
               { label: "Ja, håller med",      pct: jaPct,  color: C.accent },
               { label: "Nej, håller inte med", pct: nejPct, color: C.accentDim },
