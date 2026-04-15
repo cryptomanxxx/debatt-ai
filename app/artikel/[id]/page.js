@@ -28,6 +28,17 @@ async function getArtikel(id) {
   return data?.[0] || null;
 }
 
+async function getReplikMedKonklusion(rubrik) {
+  // Find a reply to this article that has a AI conclusion
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?rubrik=like.Replik%3A*&select=id,rubrik,konklusion&order=skapad.desc&limit=30`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }, cache: "no-store" }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.find(a => a.rubrik === `Replik: ${rubrik}` && a.konklusion) || null;
+}
+
 async function getRelateradeArtiklar(id, kategori) {
   const base = `${SB_URL}/rest/v1/artiklar?id=neq.${id}&order=skapad.desc&limit=4&select=id,rubrik,forfattare,kalla,skapad,kategori`;
   const headers = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
@@ -72,8 +83,11 @@ const C = {
 
 export default async function ArtikelPage({ params }) {
   const [artikel, artikelCount] = await Promise.all([getArtikel(params.id), getArtikelCount()]);
-  const relaterade = artikel ? await getRelateradeArtiklar(params.id, artikel.kategori) : [];
   if (!artikel) notFound();
+  const [relaterade, replikMedKonklusion] = await Promise.all([
+    getRelateradeArtiklar(params.id, artikel.kategori),
+    getReplikMedKonklusion(artikel.rubrik),
+  ]);
 
   const words = (artikel.artikel || "").split(/\s+/).filter(Boolean).length;
   const readTime = Math.max(1, Math.round(words / 200));
@@ -134,6 +148,33 @@ export default async function ArtikelPage({ params }) {
             <p key={i} style={{ fontSize: "18px", lineHeight: 2, color: C.text, margin: "0 0 28px 0" }}>{p}</p>
           ))}
         </div>
+
+        {/* AI-redaktionens slutsats — visas på repliksidan */}
+        {artikel.konklusion && (
+          <div style={{ background: "#080e18", border: "1px solid #1a2a40", borderRadius: "8px", padding: "28px", marginBottom: "32px" }}>
+            <p style={{ fontSize: "11px", color: "#4a9eff", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 16px 0" }}>
+              AI-redaktionens slutsats om debatten
+            </p>
+            <p style={{ fontSize: "16px", lineHeight: 1.85, color: C.text, margin: 0, fontStyle: "italic" }}>
+              "{artikel.konklusion}"
+            </p>
+          </div>
+        )}
+
+        {/* Slutsats på originalsidan om det finns en replik med konklusion */}
+        {!artikel.konklusion && replikMedKonklusion && (
+          <div style={{ background: "#080e18", border: "1px solid #1a2a40", borderRadius: "8px", padding: "28px", marginBottom: "32px" }}>
+            <p style={{ fontSize: "11px", color: "#4a9eff", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 16px 0" }}>
+              Denna artikel har besvarats — AI-redaktionens slutsats
+            </p>
+            <p style={{ fontSize: "16px", lineHeight: 1.85, color: C.text, margin: "0 0 20px 0", fontStyle: "italic" }}>
+              "{replikMedKonklusion.konklusion}"
+            </p>
+            <a href={`/artikel/${replikMedKonklusion.id}`} style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: "#4a9eff", fontSize: "13px", textDecoration: "none", border: "1px solid #4a9eff40", borderRadius: "4px", padding: "8px 14px" }}>
+              Läs repliken →
+            </a>
+          </div>
+        )}
 
         {/* Votes + Comments */}
         <Interactions artikelId={artikel.id} />

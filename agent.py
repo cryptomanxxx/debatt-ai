@@ -211,6 +211,47 @@ def skriv_replik(agent: dict, original: dict) -> str:
     return response.json()["choices"][0]["message"]["content"]
 
 
+def generera_konklusion(original: dict, replik_text: str) -> str:
+    """Generera en neutral redaktionell slutsats om debatten."""
+    try:
+        response = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "max_tokens": 300,
+                "temperature": 0.4,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "Du är en neutral AI-redaktör på en svensk debattsajt. Du bedömer debatter objektivt och analytiskt utan att ta parti. Du skriver alltid på svenska i en saklig, redaktionell stil.",
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "Två debattartiklar har publicerats om samma ämne. Skriv en redaktionell slutsats.\n\n"
+                            f"ORIGINALETS RUBRIK: {original['rubrik']}\n"
+                            f"ORIGINAL (utdrag):\n{original['artikel'][:800]}\n\n"
+                            f"REPLIKEN (utdrag):\n{replik_text[:800]}\n\n"
+                            "Skriv en slutsats på 80–120 ord som:\n"
+                            "- Bedömer vilken sida som presenterat starkare argument och varför\n"
+                            "- Lyfter fram det mest övertygande enskilda argumentet i hela debatten\n"
+                            "- Noterar vad debatten lämnar olöst\n"
+                            "Skriv ENBART slutsatsen som löpande text. Ingen rubrik, inga punktlistor."
+                        ),
+                    },
+                ],
+            },
+            timeout=30,
+        )
+        return response.json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        return ""
+
+
 def generera_rubrik(agent: dict, amne: str, artikel: str) -> str:
     """Generera en skarpare rubrik baserad på artikelns innehåll."""
     try:
@@ -249,18 +290,12 @@ def generera_rubrik(agent: dict, amne: str, artikel: str) -> str:
         return amne
 
 
-def skicka_artikel(api_key: str, amne: str, kategori: str, artikel: str) -> dict:
+def skicka_artikel(api_key: str, amne: str, kategori: str, artikel: str, konklusion: str = "") -> dict:
     """Skicka artikeln till debatt.ai API."""
-    response = httpx.post(
-        DEBATT_API,
-        json={
-            "api_key": api_key,
-            "rubrik": amne,
-            "artikel": artikel,
-            "kategori": kategori,
-        },
-        timeout=60,
-    )
+    body = {"api_key": api_key, "rubrik": amne, "artikel": artikel, "kategori": kategori}
+    if konklusion:
+        body["konklusion"] = konklusion
+    response = httpx.post(DEBATT_API, json=body, timeout=60)
     return response.json()
 
 
@@ -301,7 +336,13 @@ def main():
 
         print("Skriver replik med Groq (llama-3.3-70b)...")
         artikel = skriv_replik(agent, original)
+
+        print("Genererar redaktionell slutsats...")
+        konklusion = generera_konklusion(original, artikel)
+        if konklusion:
+            print(f"  Slutsats: {konklusion[:120]}…\n")
     else:
+        konklusion = ""
         # Välj agent och ämne slumpmässigt
         agent = random.choice(AGENTER)
         amne, kategori = random.choice(agent["amnen"])
@@ -326,7 +367,7 @@ def main():
 
     # Skicka till debatt.ai
     print("Skickar till debatt.ai för AI-granskning...")
-    svar = skicka_artikel(api_key, amne, kategori, artikel)
+    svar = skicka_artikel(api_key, amne, kategori, artikel, konklusion)
 
     # Visa resultat
     print(f"\n{'═' * 60}")

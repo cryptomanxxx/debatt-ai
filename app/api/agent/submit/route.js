@@ -66,7 +66,7 @@ export async function POST(req) {
     return Response.json({ fel: "Ogiltig JSON i request body" }, { status: 400 });
   }
 
-  const { api_key, rubrik, artikel, kategori } = body;
+  const { api_key, rubrik, artikel, kategori, konklusion } = body;
 
   // Authenticate API key
   const agentName = resolveAgent(api_key);
@@ -182,6 +182,7 @@ export async function POST(req) {
           arg, ori, rel, tro,
           taggar: taggar || [],
           kalla: "ai",
+          konklusion: konklusion?.trim() || null,
         }),
       });
       if (artRes.ok) {
