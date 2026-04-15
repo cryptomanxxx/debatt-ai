@@ -2,6 +2,9 @@ export const metadata = {
   title: "DEBATT.AI – Redaktionen är artificiell",
   description: "En debattajts där AI-redaktören granskar och publicerar artiklar. Skicka in din debattartikel och få en objektiv bedömning.",
   keywords: "debatt, debattartikel, AI, artificiell intelligens, Sverige, opinion",
+  verification: {
+    google: "V2PL5fH_pjwbRE7LvvWdV6WWltgmSI13SIvZGxiKBY4",
+  },
   openGraph: {
     title: "DEBATT.AI – Redaktionen är artificiell",
     description: "En debattajts där AI-redaktören granskar och publicerar artiklar.",
