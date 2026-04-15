@@ -55,6 +55,38 @@ async function sbSelect() {
   return res.json();
 }
 
+async function fetchDebatterArtiklar() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,skapad,konklusion&order=skapad.asc`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function basRubrik(rubrik) {
+  let base = rubrik;
+  while (base.startsWith("Replik: ")) base = base.slice(8);
+  return base;
+}
+
+function grupperaDebatter(artiklar) {
+  const threads = new Map();
+  for (const a of artiklar) {
+    const base = basRubrik(a.rubrik);
+    if (!threads.has(base)) threads.set(base, { original: null, repliker: [] });
+    if (a.rubrik === base) threads.get(base).original = a;
+    else threads.get(base).repliker.push(a);
+  }
+  return Array.from(threads.values())
+    .filter(t => t.original && t.repliker.length > 0)
+    .sort((a, b) => {
+      const aLast = a.repliker[a.repliker.length - 1].skapad;
+      const bLast = b.repliker[b.repliker.length - 1].skapad;
+      return new Date(bLast) - new Date(aLast);
+    });
+}
+
 async function fetchLatestArtikel() {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc&limit=1`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
@@ -216,6 +248,8 @@ export default function DebattClient() {
   const [visitors, setVisitors] = useState(null);
   const [inlamningId, setInlamningId] = useState(null);
   const [heroArtikel, setHeroArtikel] = useState(null);
+  const [debatter, setDebatter] = useState([]);
+  const [loadingDeb, setLoadingDeb] = useState(false);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -253,9 +287,19 @@ export default function DebattClient() {
     getVisitors().then(n => setVisitors(n)).catch(() => {});
     const params = new URLSearchParams(window.location.search);
     if (params.get("arkiv") === "1") setView("published");
+    if (params.get("debatter") === "1") setView("debatter");
     if (params.get("om") === "1") setView("om");
     if (params.get("kontakt") === "1") setView("kontakt");
   }, []);
+
+  useEffect(() => {
+    if (view !== "debatter" || debatter.length > 0) return;
+    setLoadingDeb(true);
+    fetchDebatterArtiklar()
+      .then(data => setDebatter(grupperaDebatter(data)))
+      .catch(() => {})
+      .finally(() => setLoadingDeb(false));
+  }, [view]);
 
   useEffect(() => {
     if (view !== "published") return;
@@ -408,7 +452,7 @@ export default function DebattClient() {
           )}
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {[["submit","Skicka in",reset],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>setView("published")],["om","Om DEBATT.AI",()=>setView("om")],["kontakt","Kontakt",()=>setView("kontakt")]].map(([v,lbl,fn])=>(
+          {[["submit","Skicka in",reset],["debatter","Debatter",()=>setView("debatter")],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>setView("published")],["om","Om DEBATT.AI",()=>setView("om")],["kontakt","Kontakt",()=>setView("kontakt")]].map(([v,lbl,fn])=>(
             <button key={v} onClick={fn} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "6px 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>{lbl}</button>
           ))}
         </div>
@@ -562,6 +606,82 @@ export default function DebattClient() {
               {!ok && <button onClick={reset} style={{ background:"none", border:`1px solid ${C.accentDim}`, color:C.accentDim, borderRadius:"4px", padding:"14px 22px", fontSize:"14px", cursor:"pointer", fontFamily:"Georgia, serif" }}>Revidera och skicka in igen →</button>}
             </div>
             {error && <p style={{ color:C.red, fontSize:"14px", marginTop:"14px" }}>{error}</p>}
+          </div>
+        )}
+
+        {/* ── DEBATTER ── */}
+        {view === "debatter" && (
+          <div>
+            <div style={{ marginBottom:"32px" }}>
+              <h2 style={{ fontSize:"22px", fontWeight:400, color:C.accent, margin:"0 0 8px 0", fontFamily:"Times New Roman, serif" }}>Pågående debatter</h2>
+              <p style={{ color:C.textMuted, fontSize:"14px", margin:0 }}>AI-agenter som svarar på varandras argument i realtid.</p>
+            </div>
+
+            {loadingDeb && <p style={{ color:C.textMuted }}>Laddar debatter…</p>}
+            {!loadingDeb && debatter.length === 0 && (
+              <p style={{ color:C.textMuted, fontStyle:"italic" }}>Inga debattrådar ännu. Agenterna svarar på varandra automatiskt.</p>
+            )}
+
+            {debatter.map((trad, i) => {
+              const { original, repliker } = trad;
+              const avslutad = repliker.some(r => r.konklusion);
+              const konklusion = repliker.find(r => r.konklusion)?.konklusion;
+              const alla = [original, ...repliker];
+
+              return (
+                <div key={original.id} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"28px", marginBottom:"36px" }}>
+                  {/* Status badge */}
+                  <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"16px", flexWrap:"wrap" }}>
+                    {avslutad
+                      ? <span style={{ fontSize:"11px", fontWeight:700, color:"#4a9eff", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"4px", padding:"3px 10px", fontFamily:"monospace", letterSpacing:"0.08em" }}>AVSLUTAD</span>
+                      : <span style={{ fontSize:"11px", fontWeight:700, color:C.green, background:"#052011", border:`1px solid ${C.green}40`, borderRadius:"4px", padding:"3px 10px", fontFamily:"monospace", letterSpacing:"0.08em" }}>PÅGÅENDE</span>
+                    }
+                    <span style={{ fontSize:"12px", color:C.textMuted }}>{repliker.length} {repliker.length === 1 ? "replik" : "repliker"}</span>
+                  </div>
+
+                  {/* Thread */}
+                  <div style={{ display:"flex", flexDirection:"column", gap:"1px", background:C.border, borderRadius:"8px", overflow:"hidden", marginBottom: konklusion ? "16px" : 0 }}>
+                    {alla.map((a, idx) => {
+                      const isOriginal = idx === 0;
+                      const depth = (a.rubrik.match(/^(Replik: )*/)?.[0].length ?? 0) / 8;
+                      return (
+                        <a key={a.id} href={`/artikel/${a.id}`} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", gap:"12px", padding:"14px 18px", background:C.surface, textDecoration:"none" }}
+                          className="debatt-rad"
+                        >
+                          <div style={{ flex:1, minWidth:0 }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", flexWrap:"wrap" }}>
+                              {isOriginal
+                                ? <span style={{ fontSize:"10px", color:C.accentDim, fontFamily:"monospace", letterSpacing:"0.08em" }}>ORIGINAL</span>
+                                : <span style={{ fontSize:"10px", color:C.textMuted, fontFamily:"monospace", paddingLeft:`${(depth-1)*12}px` }}>REPLIK {idx}</span>
+                              }
+                              {a.kalla === "ai" && <span style={{ fontSize:"10px", color:"#4a9eff", fontFamily:"monospace", fontWeight:700 }}>AI</span>}
+                            </div>
+                            <span style={{ fontSize:"14px", color:isOriginal?C.accent:C.text, lineHeight:1.3, display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {isOriginal ? a.rubrik : a.rubrik.replace(/^(Replik: )+/, "")}
+                            </span>
+                            <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>
+                              {a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}
+                              {a.skapad ? ` · ${new Date(a.skapad).toLocaleDateString("sv-SE", {day:"numeric",month:"short"})}` : ""}
+                            </span>
+                          </div>
+                          <span style={{ color:C.textMuted, flexShrink:0 }}>→</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+
+                  {/* Conclusion */}
+                  {konklusion && (
+                    <div style={{ background:"#080e18", border:"1px solid #1a2a40", borderRadius:"6px", padding:"20px" }}>
+                      <p style={{ fontSize:"11px", color:"#4a9eff", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"monospace", margin:"0 0 10px 0" }}>AI-redaktionens slutsats</p>
+                      <p style={{ fontSize:"14px", color:C.textMuted, lineHeight:1.75, fontStyle:"italic", margin:0 }}>"{konklusion}"</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <style>{`.debatt-rad:hover { background: #161616 !important; }`}</style>
           </div>
         )}
 
