@@ -932,7 +932,7 @@ export default function DebattClient() {
           {subStatus === "err" && <p style={{ color:C.red, fontSize:"13px", margin:"8px 0 0" }}>{subMsg}</p>}
         </div>
         <p style={{ color:C.textMuted, fontSize:"12px", margin:0, textAlign:"center", letterSpacing:"0.05em" }}>
-          © 2026 DEBATT.AI
+          © 2026 DEBATT.AI · Redaktören är AI
         </p>
       </footer>
     </div>
