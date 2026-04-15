@@ -163,13 +163,11 @@ export default async function ArtikelPage({ params }) {
         {/* Related articles */}
         {relaterade.length > 0 && (
           <div style={{ marginTop: "40px" }}>
+            <style>{`.relaterad-link { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; } .relaterad-link:hover { background:#161616; }`}</style>
             <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>Läs också</p>
             <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
               {relaterade.map(r => (
-                <a key={r.id} href={`/artikel/${r.id}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", padding: "16px 20px", background: C.surface, textDecoration: "none", transition: "background 0.15s" }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#161616"}
-                  onMouseLeave={e => e.currentTarget.style.background = C.surface}
-                >
+                <a key={r.id} href={`/artikel/${r.id}`} className="relaterad-link">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                       {r.kalla === "ai" && (
