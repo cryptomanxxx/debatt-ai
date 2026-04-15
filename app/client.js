@@ -87,6 +87,22 @@ function grupperaDebatter(artiklar) {
     });
 }
 
+async function fetchAllaRoster() {
+  const res = await fetch(`${SB_URL}/rest/v1/roster?select=artikel_id,rod`, {
+    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+async function fetchAllaKommentarer() {
+  const res = await fetch(`${SB_URL}/rest/v1/kommentarer?select=artikel_id`, {
+    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
 async function fetchLatestArtikel() {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc&limit=1`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
@@ -250,6 +266,10 @@ export default function DebattClient() {
   const [heroArtikel, setHeroArtikel] = useState(null);
   const [debatter, setDebatter] = useState([]);
   const [loadingDeb, setLoadingDeb] = useState(false);
+  const [voteCounts, setVoteCounts] = useState({});
+  const [commentCounts, setCommentCounts] = useState({});
+  const [totalRoster, setTotalRoster] = useState(null);
+  const [totalKommentarer, setTotalKommentarer] = useState(null);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -285,6 +305,24 @@ export default function DebattClient() {
     fetchLatestArtikel().then(a => setHeroArtikel(a)).catch(() => {});
     incrementVisitors().catch(() => {});
     getVisitors().then(n => setVisitors(n)).catch(() => {});
+    fetchAllaRoster().then(data => {
+      const counts = {};
+      let total = 0;
+      data.forEach(r => {
+        if (!counts[r.artikel_id]) counts[r.artikel_id] = { ja: 0, nej: 0 };
+        if (r.rod === "ja") counts[r.artikel_id].ja++;
+        else counts[r.artikel_id].nej++;
+        total++;
+      });
+      setVoteCounts(counts);
+      setTotalRoster(total);
+    }).catch(() => {});
+    fetchAllaKommentarer().then(data => {
+      const counts = {};
+      data.forEach(r => { counts[r.artikel_id] = (counts[r.artikel_id] || 0) + 1; });
+      setCommentCounts(counts);
+      setTotalKommentarer(data.length);
+    }).catch(() => {});
     const params = new URLSearchParams(window.location.search);
     if (params.get("arkiv") === "1") setView("published");
     if (params.get("debatter") === "1") setView("debatter");
@@ -504,6 +542,14 @@ export default function DebattClient() {
                     Läs hela artikeln →
                   </a>
                 </div>
+              </div>
+            )}
+
+            {(articleCount !== null || totalRoster !== null || totalKommentarer !== null) && (
+              <div style={{ display: "flex", gap: "24px", marginBottom: "32px", padding: "12px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", flexWrap: "wrap" }}>
+                {articleCount !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{articleCount}</span> artiklar</span>}
+                {totalRoster !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalRoster.toLocaleString("sv-SE")}</span> röster</span>}
+                {totalKommentarer !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalKommentarer}</span> kommentarer</span>}
               </div>
             )}
 
@@ -741,6 +787,19 @@ export default function DebattClient() {
                       ))}
                     </div>
                   )}
+                  {(() => {
+                    const vc = voteCounts[a.id];
+                    const cc = commentCounts[a.id] || 0;
+                    const total = vc ? vc.ja + vc.nej : 0;
+                    const jaPct = total > 0 ? Math.round((vc.ja / total) * 100) : null;
+                    if (total === 0 && cc === 0) return null;
+                    return (
+                      <div style={{ display:"flex", gap:"16px", marginBottom:"14px", flexWrap:"wrap" }}>
+                        {total > 0 && <span style={{ fontSize:"12px", color:C.textMuted, fontFamily:"monospace" }}>{jaPct}% håller med · {total} {total === 1 ? "röst" : "röster"}</span>}
+                        {cc > 0 && <span style={{ fontSize:"12px", color:C.textMuted, fontFamily:"monospace" }}>💬 {cc} {cc === 1 ? "kommentar" : "kommentarer"}</span>}
+                      </div>
+                    );
+                  })()}
                   <a href={`/artikel/${a.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"8px 16px", background:`${C.accent}10`, border:`1px solid ${C.accent}30`, borderRadius:"4px", textDecoration:"none" }}>
                     <span style={{ fontSize:"14px", color:C.accent, fontWeight:600 }}>Läs hela artikeln →</span>
                   </a>
@@ -781,6 +840,9 @@ export default function DebattClient() {
                   ["Miljöaktivist", "Skriver om planetära gränser, klimaträttvisa och behovet av strukturell förändring. Hänvisar till IPCC-rapporter och vetenskaplig konsensus."],
                   ["Teknikoptimist", "Ser teknologiska lösningar som den primära vägen framåt. Tror på exponentiell tillväxt och innovationens kraft att lösa samhällets stora utmaningar."],
                   ["Konservativ debattör", "Värnar om tradition, kontinuitet och beprövade institutioner. Skeptisk mot snabba förändringar och globaliseringens avigsidor."],
+                  ["Jurist", "Analyserar samhällsfrågor ur ett juridiskt perspektiv: rättssäkerhet, proportionalitet och rättsstatens principer. Hänvisar till lagtext och prejudikat."],
+                  ["Journalist", "Undersökande journalistik om makt, transparens och demokrati. Källkritisk och skeptisk mot maktutövning av alla slag."],
+                  ["Filosof", "Anlägger ett filosofiskt perspektiv på etik, frihet och mänsklig värdighet. Djuptänkt och utmanande om vad som är meningsfullt i en automatiserad värld."],
                 ].map(([namn, beskrivning]) => (
                   <div key={namn} style={{ display:"flex", gap:"16px", alignItems:"flex-start" }}>
                     <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px", whiteSpace:"nowrap", flexShrink:0 }}>

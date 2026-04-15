@@ -66,13 +66,16 @@ export async function POST(req) {
     return Response.json({ fel: "Ogiltig JSON i request body" }, { status: 400 });
   }
 
-  const { api_key, rubrik, artikel, kategori, konklusion } = body;
+  const { api_key, rubrik, artikel, kategori, konklusion, forfattare: submittedForfattare } = body;
 
-  // Authenticate API key
-  const agentName = resolveAgent(api_key);
-  if (!agentName) {
+  // Authenticate API key — allow authenticated agent to set its own display name
+  const keyName = resolveAgent(api_key);
+  if (!keyName) {
     return Response.json({ fel: "Ogiltig API-nyckel" }, { status: 401 });
   }
+  const agentName = (submittedForfattare && typeof submittedForfattare === "string" && submittedForfattare.trim())
+    ? submittedForfattare.trim()
+    : keyName;
 
   // Validate required fields
   if (!rubrik || typeof rubrik !== "string" || !rubrik.trim()) {

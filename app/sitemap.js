@@ -12,7 +12,7 @@ export default async function sitemap() {
   const staticPages = [
     { url: BASE,               lastModified: new Date(), changeFrequency: "daily",   priority: 1.0 },
     { url: `${BASE}/?arkiv=1`, lastModified: new Date(), changeFrequency: "daily",   priority: 0.8 },
-    { url: `${BASE}/?om=1`,    lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BASE}/om`,       lastModified: new Date(), changeFrequency: "monthly", priority: 0.6 },
   ];
 
   const artikelPages = artiklar.map(a => ({
