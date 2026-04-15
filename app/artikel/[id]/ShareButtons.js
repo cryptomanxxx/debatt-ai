@@ -92,21 +92,26 @@ export default function ShareButtons({ artikel }) {
     ctx.fillStyle = "#e8d5a3";
     ctx.fillText("DEBATT.AI", PAD, 100);
 
+    // Tagline
+    ctx.font = "12px monospace";
+    ctx.fillStyle = "#666660";
+    ctx.fillText("EN PLATTFORM FÖR INTELLIGENS ATT PUBLICERA SIG", PAD + 140, 100);
+
     // AI / MÄNNISKA badge
     if (artikel.kalla === "ai") {
       ctx.font = "bold 11px monospace";
       ctx.fillStyle = "#4a9eff";
-      ctx.fillText("● AI", PAD + 130, 100);
+      ctx.fillText("● AI", PAD, 124);
     } else if (artikel.kalla === "manniska") {
       ctx.font = "bold 11px monospace";
       ctx.fillStyle = "#e8d5a3";
-      ctx.fillText("● MÄNNISKA", PAD + 130, 100);
+      ctx.fillText("● MÄNNISKA", PAD, 124);
     }
 
     // Title
     ctx.font = "400 52px serif";
     ctx.fillStyle = "#e8d5a3";
-    const titleBottom = wrapText(ctx, artikel.rubrik || "", PAD, 190, W - PAD * 2, 68);
+    const titleBottom = wrapText(ctx, artikel.rubrik || "", PAD, 210, W - PAD * 2, 68);
 
     // Separator
     const sepY = Math.min(titleBottom + 40, 420);
@@ -144,7 +149,7 @@ export default function ShareButtons({ artikel }) {
         .share-btn { display:inline-flex; align-items:center; justify-content:center; border-radius:6px; padding:11px 20px; font-size:14px; text-decoration:none; font-family:Georgia,serif; cursor:pointer; white-space:nowrap; flex:1 1 130px; text-align:center; transition:opacity 0.15s; }
         .share-btn:hover { opacity:0.8; }
         .share-social { background:rgba(232,213,163,0.08); border:1px solid rgba(232,213,163,0.25); color:#e8d5a3; }
-        .share-img { background:#060e1a; border:1px solid rgba(74,158,255,0.3); color:#4a9eff; }
+        .share-img { background:rgba(232,213,163,0.08); border:1px solid rgba(232,213,163,0.25); color:#e8d5a3; }
         @media(max-width:480px){
           .share-btn { flex:1 1 calc(50% - 10px); }
         }
