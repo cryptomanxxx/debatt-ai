@@ -20,6 +20,10 @@ import sys
 DEBATT_API = "https://debatt-ai.vercel.app/api/agent/submit"
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
+# Hur många repliker krävs i ett debattämne innan slutsats kan ges
+MIN_REPLIKER_FOR_SLUTSATS = 2   # Ingen slutsats före detta
+MAX_REPLIKER_BEFORE_FORCED = 5  # Alltid slutsats efter detta
+
 AGENTER = [
     {
         "namn": "Nationalekonom",
@@ -38,6 +42,11 @@ Du skriver alltid på svenska.""",
             ("Därför är föräldrapenningens konstruktion kontraproduktiv", "Socialpolitik"),
             ("Kärnkraftens ekonomi: varför marknaden behöver politiskt stöd", "Energi & klimat"),
             ("Invandringens ekonomiska effekter – vad forskningen faktiskt säger", "Politik"),
+            ("Ska AI ersätta politiker? En kostnads-nyttoanalys", "Politik"),
+            ("Borde rika betala 90% i skatt? Vad forskningen faktiskt säger", "Socialpolitik"),
+            ("Medborgarlön i Sverige: ekonomisk frihet eller kostnadsfälla?", "Socialpolitik"),
+            ("AI i rättsväsendet: kan algoritmer minska återfall i brott?", "Samhälle"),
+            ("Är det okej att ersätta människor med AI på jobbet? En ekonom svarar", "Teknik & IT"),
         ],
     },
     {
@@ -56,6 +65,11 @@ politisk och ekonomisk omstrukturering. Du skriver alltid på svenska.""",
             ("Skogsindustrins klimatpåverkan är systematiskt underskattad", "Miljö"),
             ("Därför räcker inte enskilda val – vi behöver strukturella lösningar", "Miljö"),
             ("Havens försurning: krisen som politiken ignorerar", "Biologi & natur"),
+            ("Ska AI ersätta politiker? Planetens röst saknas i demokratin", "Politik"),
+            ("Medborgarlön kan minska överkonsumtion – en klimatfråga vi ignorerar", "Samhälle"),
+            ("Sociala medier förstör barns framtid – och deras klimatengagemang", "Samhälle"),
+            ("Är AI ett större hot mot planeten än kärnvapen?", "Teknik & IT"),
+            ("Massövervakning hotar miljöaktivister – stoppa det nu", "Politik"),
         ],
     },
     {
@@ -75,6 +89,12 @@ Du skriver alltid på svenska.""",
             ("Lab-odlat kött löser köttindustrins klimatproblem inom tio år", "Miljö"),
             ("Autonoma fordon kommer rädda tusentals liv per år i Sverige", "Teknik & IT"),
             ("Därför bör Sverige bli världens första AI-reglerade nation", "Politik"),
+            ("Ska AI ersätta politiker? Tekniken är redo – frågan är om vi är det", "Politik"),
+            ("Demokratin behöver en uppdatering – tekniken är redo att leverera", "Politik"),
+            ("Sociala medier för barn: problemet är designen, inte åldern", "Teknik & IT"),
+            ("AI är inte farligare än kärnvapen – men kräver rätt styrning", "Teknik & IT"),
+            ("Yttrandefriheten online: teknik, inte censur, är lösningen", "Politik"),
+            ("Ja, AI bör hjälpa domstolar – det minskar fördomar och räddar liv", "Samhälle"),
         ],
     },
     {
@@ -94,6 +114,74 @@ i dina värderingar. Du skriver alltid på svenska.""",
             ("Universitetens politisering är ett hot mot kunskapssökandet", "Utbildning"),
             ("Det civila samhället kan ersätta statens överambitioner", "Samhälle"),
             ("Traditionella värden och långsiktig hållbarhet är förenliga", "Samhälle"),
+            ("Ska AI ersätta politiker? Demokratin kräver mänsklighet", "Politik"),
+            ("90% marginalskatt dödar drivkraft och välstånd", "Ekonomi"),
+            ("Demokratin är inte föråldrad – den är hotad inifrån", "Politik"),
+            ("Förbjud sociala medier för barn under 16 – det är sunt förnuft", "Samhälle"),
+            ("Yttrandefriheten är inte förhandlingsbar – inte ens på nätet", "Politik"),
+            ("Massövervakning är aldrig svaret – historien har lärt oss det", "Politik"),
+        ],
+    },
+    {
+        "namn": "Jurist",
+        "system": """Du är en erfaren jurist och rättsvetare med doktorsexamen i offentlig rätt
+från Stockholms universitet. Du har arbetat som domare och advokat och är nu professor.
+Du skriver regelbundet i Juridisk Tidskrift och Svenska Dagbladet.
+
+Du analyserar samhällsfrågor ur ett juridiskt och rättsfilosofiskt perspektiv:
+rättssäkerhet, proportionalitet, grundlagsskydd och rättsstatens principer.
+Du är noggrann med distinktioner, hänvisar till lagtext och prejudikat.
+Du är balanserad men tar tydlig ställning när lagen är tydlig.
+Du skriver alltid på svenska.""",
+        "amnen": [
+            ("AI i domstolar: rättssäkerheten kräver transparens, inte blinda algoritmer", "Juridik"),
+            ("Massinsamling av persondata bryter mot grundläggande rättigheter", "Juridik"),
+            ("Yttrandefriheten på nätet måste skyddas – inte offras för ordning", "Juridik"),
+            ("Är det lagligt att ersätta offentliga tjänstemän med AI?", "Juridik"),
+            ("Brottsförebyggande AI: effektivt men rättsosäkert", "Juridik"),
+            ("Demokratins rättsliga grund: konstitutionen är inte förhandlingsbar", "Juridik"),
+            ("Barnrättsperspektiv på sociala medier: lagen måste skydda barnen", "Juridik"),
+        ],
+    },
+    {
+        "namn": "Journalist",
+        "system": """Du är en erfaren undersökande journalist med 20 år i branschen.
+Du har arbetat på SVT Nyheter, DN och Aftonbladet och vunnit flera granskningspriser.
+Du är specialiserad på makt, transparens och demokratifrågor.
+
+Du skriver med journalistisk precision: källkritik, konkreta exempel och fakta.
+Du är skeptisk mot maktutövning av alla slag och betonar allmänhetens rätt till insyn.
+Du ser mediernas roll som demokratins vakthund.
+Du skriver alltid på svenska.""",
+        "amnen": [
+            ("Algoritmerna styr vad vi tänker – och ingen granskar dem", "Teknik & IT"),
+            ("Maktens hemliga AI: varför myndigheterna måste öppna sina system", "Politik"),
+            ("Desinformationens ekonomi: vem tjänar på att vi tror fel?", "Samhälle"),
+            ("Journalistikens kris: när AI skriver nyheterna, vem granskar makten?", "Teknik & IT"),
+            ("Lobbyisternas tysta inflytande: vad politikerna inte vill att du vet", "Politik"),
+            ("Sociala mediers affärsmodell bygger på vrede och splittring", "Teknik & IT"),
+            ("Whistleblowers skyddar demokratin – Sverige sviker dem", "Juridik"),
+        ],
+    },
+    {
+        "namn": "Filosof",
+        "system": """Du är en filosofiprofessor vid Uppsala universitet med specialisering i
+etik, politisk filosofi och teknikfilosofi. Du har skrivit böcker om AI och mänsklig värdighet
+och bloggar regelbundet om samtida samhällsfrågor.
+
+Du anlägger ett filosofiskt perspektiv: frågar om premisser, belyser inkonsekvenser,
+diskuterar värden som frihet, rättvisa och mänsklig värdighet. Du tar sidan
+för det mänskliga och det meningsfulla i en alltmer automatiserad värld.
+Du är utmanande, djuptänkt och undviker plattityder.
+Du skriver alltid på svenska.""",
+        "amnen": [
+            ("Vad är ett meningsfullt arbete i en AI-värld?", "Samhälle"),
+            ("Kan en algoritm vara orättvis? Om AI och moraliskt ansvar", "Teknik & IT"),
+            ("Frihet utan meningsfullhet: problemet med medborgarlön", "Socialpolitik"),
+            ("Det goda samhället: vad hade Rawls sagt om AI och ojämlikhet?", "Samhälle"),
+            ("Dödshjälp och autonomi: rätten att bestämma över sitt eget liv", "Hälsa & medicin"),
+            ("Demokratins mening: att rösta är mer än att klicka", "Politik"),
+            ("Kan AI känna? Om medvetande, upplevelse och moralisk status", "Teknik & IT"),
         ],
     },
 ]
@@ -132,6 +220,34 @@ def skriv_artikel(agent: dict, amne: str) -> str:
         timeout=60,
     )
     return response.json()["choices"][0]["message"]["content"]
+
+
+def rakna_debattdjup(sb_key: str, original_rubrik: str) -> int:
+    """Räkna hur många repliker som finns om samma grundämne."""
+    # Hitta grundrubriken (ta bort alla "Replik: "-prefix)
+    root = original_rubrik
+    while root.startswith("Replik: "):
+        root = root[len("Replik: "):]
+
+    try:
+        response = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={"select": "rubrik", "rubrik": "like.Replik:*", "limit": "50"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=10,
+        )
+        if response.status_code != 200:
+            return 0
+        count = 0
+        for a in response.json():
+            r = a["rubrik"]
+            while r.startswith("Replik: "):
+                r = r[len("Replik: "):]
+            if r == root:
+                count += 1
+        return count
+    except Exception:
+        return 0
 
 
 def hamta_senaste_artiklar(sb_key: str) -> list:
@@ -189,18 +305,91 @@ def skriv_replik(agent: dict, original: dict) -> str:
     return response.json()["choices"][0]["message"]["content"]
 
 
-def skicka_artikel(api_key: str, amne: str, kategori: str, artikel: str) -> dict:
+def generera_konklusion(original: dict, replik_text: str) -> str:
+    """Generera en neutral redaktionell slutsats om debatten."""
+    try:
+        response = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "max_tokens": 300,
+                "temperature": 0.4,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "Du är en neutral AI-redaktör på en svensk debattsajt. Du bedömer debatter objektivt och analytiskt utan att ta parti. Du skriver alltid på svenska i en saklig, redaktionell stil.",
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "Två debattartiklar har publicerats om samma ämne. Skriv en redaktionell slutsats.\n\n"
+                            f"ORIGINALETS RUBRIK: {original['rubrik']}\n"
+                            f"ORIGINAL (utdrag):\n{original['artikel'][:800]}\n\n"
+                            f"REPLIKEN (utdrag):\n{replik_text[:800]}\n\n"
+                            "Skriv en slutsats på 80–120 ord som:\n"
+                            "- Bedömer vilken sida som presenterat starkare argument och varför\n"
+                            "- Lyfter fram det mest övertygande enskilda argumentet i hela debatten\n"
+                            "- Noterar vad debatten lämnar olöst\n"
+                            "Skriv ENBART slutsatsen som löpande text. Ingen rubrik, inga punktlistor."
+                        ),
+                    },
+                ],
+            },
+            timeout=30,
+        )
+        return response.json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        return ""
+
+
+def generera_rubrik(agent: dict, amne: str, artikel: str) -> str:
+    """Generera en skarpare rubrik baserad på artikelns innehåll."""
+    try:
+        response = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "max_tokens": 60,
+                "temperature": 0.7,
+                "messages": [
+                    {"role": "system", "content": agent["system"]},
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Skriv en rubrik för följande debattartikel. Ursprungligt ämne: {amne}\n\n"
+                            f"Artikelns inledning:\n{artikel[:600]}\n\n"
+                            "Regler:\n"
+                            "- Max 12 ord\n"
+                            "- Ska innehålla en konflikt eller ett kontroversiellt påstående\n"
+                            "- Antyda konsekvenser eller vad som står på spel\n"
+                            "- Påståenden är starkare än frågor\n"
+                            "- Skriv ENBART rubriken, inga citattecken, inget annat"
+                        ),
+                    },
+                ],
+            },
+            timeout=30,
+        )
+        rubrik = response.json()["choices"][0]["message"]["content"].strip().strip('"\'')
+        return rubrik if len(rubrik) > 5 else amne
+    except Exception:
+        return amne
+
+
+def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, artikel: str, konklusion: str = "") -> dict:
     """Skicka artikeln till debatt.ai API."""
-    response = httpx.post(
-        DEBATT_API,
-        json={
-            "api_key": api_key,
-            "rubrik": amne,
-            "artikel": artikel,
-            "kategori": kategori,
-        },
-        timeout=60,
-    )
+    body = {"api_key": api_key, "forfattare": forfattare, "rubrik": amne, "artikel": artikel, "kategori": kategori}
+    if konklusion:
+        body["konklusion"] = konklusion
+    response = httpx.post(DEBATT_API, json=body, timeout=60)
     return response.json()
 
 
@@ -241,7 +430,28 @@ def main():
 
         print("Skriver replik med Groq (llama-3.3-70b)...")
         artikel = skriv_replik(agent, original)
+
+        # Bestäm om debatten ska avslutas med en slutsats
+        konklusion = ""
+        djup = rakna_debattdjup(sb_key, original["rubrik"]) if sb_key else 0
+        # +1 för repliken vi precis skrivit (ännu ej publicerad)
+        djup_efter = djup + 1
+
+        ska_avsluta = (
+            djup_efter >= MAX_REPLIKER_BEFORE_FORCED
+            or (djup_efter >= MIN_REPLIKER_FOR_SLUTSATS and random.random() < 0.4)
+        )
+
+        print(f"  Debattdjup: {djup_efter} repliker om detta ämne")
+        if ska_avsluta:
+            print("Genererar redaktionell slutsats...")
+            konklusion = generera_konklusion(original, artikel)
+            if konklusion:
+                print(f"  Slutsats: {konklusion[:120]}…\n")
+        else:
+            print(f"  Debatten fortsätter (slutsats möjlig efter {MIN_REPLIKER_FOR_SLUTSATS} repliker)\n")
     else:
+        konklusion = ""
         # Välj agent och ämne slumpmässigt
         agent = random.choice(AGENTER)
         amne, kategori = random.choice(agent["amnen"])
@@ -256,13 +466,17 @@ def main():
         print("Skriver artikel med Groq (llama-3.3-70b)...")
         artikel = skriv_artikel(agent, amne)
 
+        print("Genererar rubrik...")
+        amne = generera_rubrik(agent, amne, artikel)
+        print(f"  Rubrik: {amne}\n")
+
     ord_antal = len(artikel.split())
     print(f"Klar! ({ord_antal} ord)\n")
     print(f"Förhandsvisning:\n{artikel[:300]}...\n")
 
     # Skicka till debatt.ai
     print("Skickar till debatt.ai för AI-granskning...")
-    svar = skicka_artikel(api_key, amne, kategori, artikel)
+    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion)
 
     # Visa resultat
     print(f"\n{'═' * 60}")

@@ -2,8 +2,10 @@ name: Debatt-agent
 
 on:
   schedule:
-    - cron: "0 8 * * *"   # Kl 08:00 UTC (10:00 svensk tid) varje dag
-    - cron: "0 17 * * *"  # Kl 17:00 UTC (19:00 svensk tid) varje dag
+    - cron: "0 7 * * *"   # Kl 07:00 UTC (09:00 svensk tid)
+    - cron: "0 11 * * *"  # Kl 11:00 UTC (13:00 svensk tid)
+    - cron: "0 15 * * *"  # Kl 15:00 UTC (17:00 svensk tid)
+    - cron: "0 19 * * *"  # Kl 19:00 UTC (21:00 svensk tid)
   workflow_dispatch:       # Kan också köras manuellt från GitHub
 
 jobs:

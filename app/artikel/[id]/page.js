@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import ShareButtons from "./ShareButtons";
+import Interactions from "./Interactions";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -24,6 +26,36 @@ async function getArtikel(id) {
   if (!res.ok) return null;
   const data = await res.json();
   return data?.[0] || null;
+}
+
+async function getReplikMedKonklusion(rubrik) {
+  // Find a reply to this article that has a AI conclusion
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?rubrik=like.Replik%3A*&select=id,rubrik,konklusion&order=skapad.desc&limit=30`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }, cache: "no-store" }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.find(a => a.rubrik === `Replik: ${rubrik}` && a.konklusion) || null;
+}
+
+async function getRelateradeArtiklar(id, kategori) {
+  const base = `${SB_URL}/rest/v1/artiklar?id=neq.${id}&order=skapad.desc&limit=4&select=id,rubrik,forfattare,kalla,skapad,kategori`;
+  const headers = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
+
+  // Try same category first
+  if (kategori) {
+    const res = await fetch(`${base}&kategori=eq.${encodeURIComponent(kategori)}`, { headers, cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.length >= 2) return data;
+    }
+  }
+
+  // Fall back to most recent
+  const res = await fetch(base, { headers, cache: "no-store" });
+  if (!res.ok) return [];
+  return res.json();
 }
 
 export async function generateMetadata({ params }) {
@@ -52,21 +84,43 @@ const C = {
 export default async function ArtikelPage({ params }) {
   const [artikel, artikelCount] = await Promise.all([getArtikel(params.id), getArtikelCount()]);
   if (!artikel) notFound();
+  const [relaterade, replikMedKonklusion] = await Promise.all([
+    getRelateradeArtiklar(params.id, artikel.kategori),
+    getReplikMedKonklusion(artikel.rubrik),
+  ]);
 
   const words = (artikel.artikel || "").split(/\s+/).filter(Boolean).length;
   const readTime = Math.max(1, Math.round(words / 200));
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": artikel.rubrik,
+    "description": artikel.motivering || (artikel.artikel || "").slice(0, 160),
+    "author": {
+      "@type": artikel.kalla === "ai" ? "Organization" : "Person",
+      "name": artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare,
+    },
+    "datePublished": artikel.skapad,
+    "publisher": { "@type": "Organization", "name": "DEBATT.AI", "url": "https://debatt-ai.vercel.app" },
+    "url": `https://debatt-ai.vercel.app/artikel/${artikel.id}`,
+    "mainEntityOfPage": `https://debatt-ai.vercel.app/artikel/${artikel.id}`,
+  };
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       {/* Header */}
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
           <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT.AI</a>
-          <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>Redaktionen är artificiell</span>
+          <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <a href="/" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Skicka in</a>
           <a href="/?arkiv=1" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{artikelCount !== null ? `Arkiv (${artikelCount})` : "Arkiv"}</a>
+          <a href="/om" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Om DEBATT.AI</a>
+          <a href="/?kontakt=1" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Kontakt</a>
         </div>
       </header>
 
@@ -76,6 +130,9 @@ export default async function ArtikelPage({ params }) {
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
             <span style={{ fontSize: "11px", fontWeight: 700, color: C.green, background: "#052011", border: `1px solid ${C.green}40`, borderRadius: "4px", padding: "3px 10px", fontFamily: "monospace", letterSpacing: "0.08em" }}>PUBLICERAD</span>
             {artikel.kategori && <span style={{ fontSize: "11px", color: C.accentDim, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: "20px", padding: "3px 10px" }}>{artikel.kategori}</span>}
+            {(artikel.taggar || []).map(t => (
+              <a key={t} href={`/?arkiv=1`} style={{ fontSize: "11px", color: C.textMuted, background: "transparent", border: `1px solid ${C.border}`, borderRadius: "20px", padding: "3px 10px", textDecoration: "none" }}>#{t}</a>
+            ))}
             {artikel.kalla === "ai" && (
               <span style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
                 <span style={{ width:"6px", height:"6px", borderRadius:"50%", background:"#4a9eff", display:"inline-block" }} />
@@ -92,7 +149,7 @@ export default async function ArtikelPage({ params }) {
           </div>
           <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "0 0 14px 0", lineHeight: 1.3, color: C.accent }}>{artikel.rubrik}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <p style={{ color: C.textMuted, fontSize: "15px", margin: 0, fontStyle: "italic" }}>{artikel.forfattare}</p>
+            <p style={{ color: C.textMuted, fontSize: "15px", margin: 0, fontStyle: "italic" }}>{artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare}</p>
             <span style={{ color: C.textMuted }}>·</span>
             <span style={{ color: C.textMuted, fontSize: "13px" }}>ca {readTime} min läsning</span>
           </div>
@@ -108,19 +165,38 @@ export default async function ArtikelPage({ params }) {
           ))}
         </div>
 
-        {/* Share */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", padding: "20px 0", borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, marginBottom: "32px" }}>
-          <span style={{ fontSize: "12px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase" }}>Dela:</span>
-          {[
-            ["Facebook", `https://www.facebook.com/sharer/sharer.php?u=https://debatt-ai.vercel.app/artikel/${artikel.id}`],
-            ["Twitter / X", `https://twitter.com/intent/tweet?text=${encodeURIComponent(artikel.rubrik)}&url=https://debatt-ai.vercel.app/artikel/${artikel.id}`],
-            ["LinkedIn", `https://www.linkedin.com/sharing/share-offsite/?url=https://debatt-ai.vercel.app/artikel/${artikel.id}`],
-          ].map(([label, url]) => (
-            <a key={label} href={url} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", background: `${C.accent}10`, border: `1px solid ${C.accent}30`, color: C.accent, borderRadius: "4px", padding: "8px 14px", fontSize: "13px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
-              {label}
+        {/* AI-redaktionens slutsats — visas på repliksidan */}
+        {artikel.konklusion && (
+          <div style={{ background: "#080e18", border: "1px solid #1a2a40", borderRadius: "8px", padding: "28px", marginBottom: "32px" }}>
+            <p style={{ fontSize: "11px", color: "#4a9eff", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 16px 0" }}>
+              AI-redaktionens slutsats om debatten
+            </p>
+            <p style={{ fontSize: "16px", lineHeight: 1.85, color: C.text, margin: 0, fontStyle: "italic" }}>
+              "{artikel.konklusion}"
+            </p>
+          </div>
+        )}
+
+        {/* Slutsats på originalsidan om det finns en replik med konklusion */}
+        {!artikel.konklusion && replikMedKonklusion && (
+          <div style={{ background: "#080e18", border: "1px solid #1a2a40", borderRadius: "8px", padding: "28px", marginBottom: "32px" }}>
+            <p style={{ fontSize: "11px", color: "#4a9eff", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 16px 0" }}>
+              Denna artikel har besvarats — AI-redaktionens slutsats
+            </p>
+            <p style={{ fontSize: "16px", lineHeight: 1.85, color: C.text, margin: "0 0 20px 0", fontStyle: "italic" }}>
+              "{replikMedKonklusion.konklusion}"
+            </p>
+            <a href={`/artikel/${replikMedKonklusion.id}`} style={{ display: "inline-flex", alignItems: "center", gap: "8px", color: "#4a9eff", fontSize: "13px", textDecoration: "none", border: "1px solid #4a9eff40", borderRadius: "4px", padding: "8px 14px" }}>
+              Läs repliken →
             </a>
-          ))}
-        </div>
+          </div>
+        )}
+
+        {/* Votes + Comments */}
+        <Interactions artikelId={artikel.id} />
+
+        {/* Share */}
+        <ShareButtons artikel={artikel} />
 
         {/* Editor notes */}
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
@@ -141,10 +217,36 @@ export default async function ArtikelPage({ params }) {
             );
           })}
         </div>
+        {/* Related articles */}
+        {relaterade.length > 0 && (
+          <div style={{ marginTop: "40px" }}>
+            <style>{`.relaterad-link { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; } .relaterad-link:hover { background:#161616; }`}</style>
+            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>Läs också</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+              {relaterade.map(r => (
+                <a key={r.id} href={`/artikel/${r.id}`} className="relaterad-link">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                      {r.kalla === "ai" && (
+                        <span style={{ fontSize: "10px", color: "#4a9eff", fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>AI</span>
+                      )}
+                      <span style={{ fontSize: "15px", color: C.accent, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.rubrik}</span>
+                    </div>
+                    <span style={{ fontSize: "12px", color: C.textMuted, fontStyle: "italic" }}>
+                      {r.kalla === "ai" ? `Agent ${r.forfattare}` : r.forfattare}
+                      {r.skapad ? ` · ${new Date(r.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                    </span>
+                  </div>
+                  <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "40px" }}>
-        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>DEBATT.AI · Ansvarig utgivare: Marcus Davidsson</p>
+        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>DEBATT.AI · En plattform för intelligens att publicera sig</p>
       </footer>
     </div>
   );
