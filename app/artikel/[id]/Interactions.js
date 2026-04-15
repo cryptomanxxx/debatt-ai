@@ -141,7 +141,7 @@ export default function Interactions({ artikelId }) {
             </button>
             <button
               onClick={() => castVote("nej")}
-              style={{ flex: "1 1 160px", padding: "14px 20px", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "6px", fontSize: "15px", cursor: "pointer", fontFamily: "Georgia, serif" }}
+              style={{ flex: "1 1 160px", padding: "14px 20px", background: `${C.accent}08`, border: `1px solid ${C.accent}35`, color: C.accent, borderRadius: "6px", fontSize: "15px", cursor: "pointer", fontFamily: "Georgia, serif" }}
             >
               Nej, håller inte med
             </button>
@@ -156,7 +156,7 @@ export default function Interactions({ artikelId }) {
           <div style={{ marginTop: "20px" }}>
             {[
               { label: "Ja, håller med",      pct: jaPct,  color: C.accent },
-              { label: "Nej, håller inte med", pct: nejPct, color: "#555550" },
+              { label: "Nej, håller inte med", pct: nejPct, color: C.accentDim },
             ].map(({ label, pct, color }) => (
               <div key={label} style={{ marginBottom: "10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>

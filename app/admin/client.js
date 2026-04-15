@@ -67,6 +67,22 @@ async function deleteArtikelById(id) {
   if (!res.ok) throw new Error(await res.text());
 }
 
+async function fetchKommentarer() {
+  const res = await fetch(`${SB_URL}/rest/v1/kommentarer?select=*&order=skapad.desc`, {
+    headers: sbHeaders(),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function deleteKommentar(id) {
+  const res = await fetch(`${SB_URL}/rest/v1/kommentarer?id=eq.${id}`, {
+    method: "DELETE",
+    headers: sbHeaders(),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 async function updateArtikel(id, changes) {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?id=eq.${id}`, {
     method: "PATCH",
@@ -140,6 +156,10 @@ export default function AdminClient() {
   const [editingId, setEditingId]     = useState(null);
   const [editData, setEditData]       = useState({});
 
+  // Kommentarer state
+  const [kommentarer, setKommentarer] = useState([]);
+  const [loadingKomm, setLoadingKomm] = useState(false);
+
   const [actionLoading, setActionLoading] = useState(null);
   const [error, setError]               = useState("");
 
@@ -185,6 +205,31 @@ export default function AdminClient() {
     if (!silent) setLoadingArt(false);
   }, []);
 
+  const loadKommentarer = useCallback(async (silent = false) => {
+    if (!silent) setLoadingKomm(true);
+    try {
+      const data = await fetchKommentarer();
+      setKommentarer(prev => {
+        const prevKey = prev.map(c => c.id).join(",");
+        const newKey  = data.map(c => c.id).join(",");
+        return prevKey === newKey ? prev : data;
+      });
+    } catch (e) {
+      if (!silent) setError("Kunde inte hämta kommentarer: " + e.message);
+    }
+    if (!silent) setLoadingKomm(false);
+  }, []);
+
+  async function handleDeleteKommentar(id, namn) {
+    if (!confirm(`Ta bort kommentar av ${namn}?`)) return;
+    setActionLoading(id);
+    try {
+      await deleteKommentar(id);
+      setKommentarer(prev => prev.filter(c => c.id !== id));
+    } catch (e) { setError("Fel vid borttagning: " + e.message); }
+    setActionLoading(null);
+  }
+
   async function loadSubCount() {
     try {
       const res = await fetch(`${SB_URL}/rest/v1/prenumeranter?aktiv=eq.true&select=id`, {
@@ -214,14 +259,16 @@ export default function AdminClient() {
     if (!authed) return;
     const iv = setInterval(() => {
       if (mainTab === "inlamningar") loadInlamningar(true);
-      else loadArtiklar(true);
+      else if (mainTab === "artiklar") loadArtiklar(true);
+      else if (mainTab === "kommentarer") loadKommentarer(true);
     }, 30000);
     return () => clearInterval(iv);
-  }, [authed, mainTab, loadInlamningar, loadArtiklar]);
+  }, [authed, mainTab, loadInlamningar, loadArtiklar, loadKommentarer]);
 
   useEffect(() => {
     if (!authed) return;
-    if (mainTab === "artiklar" && artiklar.length === 0) loadArtiklar();
+    if (mainTab === "artiklar"    && artiklar.length    === 0) loadArtiklar();
+    if (mainTab === "kommentarer" && kommentarer.length === 0) loadKommentarer();
   }, [mainTab, authed]);
 
   async function handlePublish(row) {
@@ -328,8 +375,13 @@ export default function AdminClient() {
         {error && <p style={{ color:C.red, fontSize:"14px", marginBottom:"16px" }}>{error}</p>}
 
         {/* Main tabs */}
-        <div style={{ display:"flex", gap:"8px", marginBottom:"32px" }}>
-          {[["inlamningar","Inlämningar"],["artiklar","Publicerade artiklar"],["nyhetsbrev","Nyhetsbrev" + (subCount !== null ? ` (${subCount})` : "")]].map(([val,lbl]) => (
+        <div style={{ display:"flex", gap:"8px", marginBottom:"32px", flexWrap:"wrap" }}>
+          {[
+            ["inlamningar","Inlämningar"],
+            ["artiklar","Publicerade artiklar"],
+            ["kommentarer", `Kommentarer${kommentarer.length > 0 ? ` (${kommentarer.length})` : ""}`],
+            ["nyhetsbrev","Nyhetsbrev" + (subCount !== null ? ` (${subCount})` : "")],
+          ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
               {lbl}
             </button>
@@ -488,6 +540,40 @@ export default function AdminClient() {
                     </div>
                   </>
                 )}
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* ── KOMMENTARER ── */}
+        {mainTab === "kommentarer" && (
+          <>
+            <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 24px 0" }}>{kommentarer.length} kommentarer.</p>
+            {loadingKomm ? <p style={{ color:C.textMuted }}>Laddar…</p>
+              : kommentarer.length === 0 ? <p style={{ color:C.textMuted }}>Inga kommentarer ännu.</p>
+              : kommentarer.map(c => (
+              <div key={c.id} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"20px", marginBottom:"20px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:"12px", flexWrap:"wrap", marginBottom:"10px" }}>
+                  <div>
+                    <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"6px", flexWrap:"wrap" }}>
+                      <span style={{ fontSize:"14px", color:C.accent, fontWeight:600 }}>{c.namn}</span>
+                      <span style={{ fontSize:"12px", color:C.textMuted }}>
+                        {c.skapad ? new Date(c.skapad).toLocaleDateString("sv-SE", {year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : ""}
+                      </span>
+                      <a href={`/artikel/${c.artikel_id}`} target="_blank" rel="noreferrer" style={{ fontSize:"12px", color:C.accentDim, textDecoration:"none", border:`1px solid ${C.border}`, borderRadius:"4px", padding:"2px 8px" }}>
+                        Artikel #{c.artikel_id} ↗
+                      </a>
+                    </div>
+                    <p style={{ fontSize:"14px", color:C.text, lineHeight:1.7, margin:0 }}>{c.text}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteKommentar(c.id, c.namn)}
+                    disabled={actionLoading === c.id}
+                    style={{ background:"transparent", color:C.red, border:`1px solid ${C.red}30`, borderRadius:"4px", padding:"8px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", flexShrink:0 }}
+                  >
+                    {actionLoading === c.id ? "…" : "🗑 Ta bort"}
+                  </button>
+                </div>
               </div>
             ))}
           </>
