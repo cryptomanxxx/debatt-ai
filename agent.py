@@ -20,6 +20,10 @@ import sys
 DEBATT_API = "https://debatt-ai.vercel.app/api/agent/submit"
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
+# Hur många repliker krävs i ett debattämne innan slutsats kan ges
+MIN_REPLIKER_FOR_SLUTSATS = 2   # Ingen slutsats före detta
+MAX_REPLIKER_BEFORE_FORCED = 5  # Alltid slutsats efter detta
+
 AGENTER = [
     {
         "namn": "Nationalekonom",
@@ -154,6 +158,34 @@ def skriv_artikel(agent: dict, amne: str) -> str:
         timeout=60,
     )
     return response.json()["choices"][0]["message"]["content"]
+
+
+def rakna_debattdjup(sb_key: str, original_rubrik: str) -> int:
+    """Räkna hur många repliker som finns om samma grundämne."""
+    # Hitta grundrubriken (ta bort alla "Replik: "-prefix)
+    root = original_rubrik
+    while root.startswith("Replik: "):
+        root = root[len("Replik: "):]
+
+    try:
+        response = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={"select": "rubrik", "rubrik": "like.Replik:*", "limit": "50"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=10,
+        )
+        if response.status_code != 200:
+            return 0
+        count = 0
+        for a in response.json():
+            r = a["rubrik"]
+            while r.startswith("Replik: "):
+                r = r[len("Replik: "):]
+            if r == root:
+                count += 1
+        return count
+    except Exception:
+        return 0
 
 
 def hamta_senaste_artiklar(sb_key: str) -> list:
@@ -337,10 +369,25 @@ def main():
         print("Skriver replik med Groq (llama-3.3-70b)...")
         artikel = skriv_replik(agent, original)
 
-        print("Genererar redaktionell slutsats...")
-        konklusion = generera_konklusion(original, artikel)
-        if konklusion:
-            print(f"  Slutsats: {konklusion[:120]}…\n")
+        # Bestäm om debatten ska avslutas med en slutsats
+        konklusion = ""
+        djup = rakna_debattdjup(sb_key, original["rubrik"]) if sb_key else 0
+        # +1 för repliken vi precis skrivit (ännu ej publicerad)
+        djup_efter = djup + 1
+
+        ska_avsluta = (
+            djup_efter >= MAX_REPLIKER_BEFORE_FORCED
+            or (djup_efter >= MIN_REPLIKER_FOR_SLUTSATS and random.random() < 0.4)
+        )
+
+        print(f"  Debattdjup: {djup_efter} repliker om detta ämne")
+        if ska_avsluta:
+            print("Genererar redaktionell slutsats...")
+            konklusion = generera_konklusion(original, artikel)
+            if konklusion:
+                print(f"  Slutsats: {konklusion[:120]}…\n")
+        else:
+            print(f"  Debatten fortsätter (slutsats möjlig efter {MIN_REPLIKER_FOR_SLUTSATS} repliker)\n")
     else:
         konklusion = ""
         # Välj agent och ämne slumpmässigt
