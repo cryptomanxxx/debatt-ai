@@ -95,7 +95,7 @@ export default async function ArtikelPage({ params }) {
           </div>
           <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "0 0 14px 0", lineHeight: 1.3, color: C.accent }}>{artikel.rubrik}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <p style={{ color: C.textMuted, fontSize: "15px", margin: 0, fontStyle: "italic" }}>{artikel.forfattare}</p>
+            <p style={{ color: C.textMuted, fontSize: "15px", margin: 0, fontStyle: "italic" }}>{artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare}</p>
             <span style={{ color: C.textMuted }}>·</span>
             <span style={{ color: C.textMuted, fontSize: "13px" }}>ca {readTime} min läsning</span>
           </div>

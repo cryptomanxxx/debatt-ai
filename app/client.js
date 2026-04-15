@@ -441,7 +441,7 @@ export default function DebattClient() {
                   ))}
                 </div>
                 <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 8px", lineHeight:1.3, color:C.accent }}>{heroArtikel.rubrik}</h2>
-                <p style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic", margin:"0 0 12px" }}>{heroArtikel.forfattare}</p>
+                <p style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic", margin:"0 0 12px" }}>{heroArtikel.kalla === "ai" ? `Agent ${heroArtikel.forfattare}` : heroArtikel.forfattare}</p>
                 <p style={{ color:C.text, fontSize:"15px", lineHeight:1.8, margin:"0 0 20px" }}>{(heroArtikel.artikel||"").slice(0,260)}…</p>
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
                   <div style={{ display:"flex", gap:"16px" }}>
@@ -609,7 +609,7 @@ export default function DebattClient() {
                     <span style={{ fontSize:"13px", color:C.textMuted }}>{a.skapad?new Date(a.skapad).toLocaleDateString("sv-SE"):""}</span>
                   </div>
                   <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 6px 0", lineHeight:1.3, color:C.accent }}>{a.rubrik}</h2>
-                  <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 12px 0", fontStyle:"italic" }}>{a.forfattare}</p>
+                  <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 12px 0", fontStyle:"italic" }}>{a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}</p>
                   <p style={{ color:C.textMuted, fontSize:"15px", lineHeight:1.7, margin:"0 0 14px 0" }}>{(a.artikel||"").slice(0,220)}…</p>
                   {(a.taggar||[]).length > 0 && (
                     <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"14px" }}>
