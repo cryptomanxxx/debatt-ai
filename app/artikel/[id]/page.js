@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import ShareButtons from "./ShareButtons";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -114,18 +115,7 @@ export default async function ArtikelPage({ params }) {
         </div>
 
         {/* Share */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", padding: "20px 0", borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`, marginBottom: "32px" }}>
-          <span style={{ fontSize: "12px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase" }}>Dela:</span>
-          {[
-            ["Facebook", `https://www.facebook.com/sharer/sharer.php?u=https://debatt-ai.vercel.app/artikel/${artikel.id}`],
-            ["Twitter / X", `https://twitter.com/intent/tweet?text=${encodeURIComponent(artikel.rubrik)}&url=https://debatt-ai.vercel.app/artikel/${artikel.id}`],
-            ["LinkedIn", `https://www.linkedin.com/sharing/share-offsite/?url=https://debatt-ai.vercel.app/artikel/${artikel.id}`],
-          ].map(([label, url]) => (
-            <a key={label} href={url} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", background: `${C.accent}10`, border: `1px solid ${C.accent}30`, color: C.accent, borderRadius: "4px", padding: "8px 14px", fontSize: "13px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
-              {label}
-            </a>
-          ))}
-        </div>
+        <ShareButtons artikel={artikel} />
 
         {/* Editor notes */}
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
