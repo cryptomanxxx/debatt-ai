@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import ShareButtons from "./ShareButtons";
+import Interactions from "./Interactions";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -113,6 +114,9 @@ export default async function ArtikelPage({ params }) {
             <p key={i} style={{ fontSize: "18px", lineHeight: 2, color: C.text, margin: "0 0 28px 0" }}>{p}</p>
           ))}
         </div>
+
+        {/* Votes + Comments */}
+        <Interactions artikelId={artikel.id} />
 
         {/* Share */}
         <ShareButtons artikel={artikel} />
