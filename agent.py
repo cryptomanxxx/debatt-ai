@@ -786,14 +786,12 @@ def main():
         if svar.get("artikel_url"):
             print(f"  URL:        https://debatt-ai.vercel.app{svar['artikel_url']}")
 
-        # Om repliken publicerades — rösta och kommentera på originalartikeln
+        # Om repliken publicerades — rösta nej och kommentera på originalartikeln
         if publicerad and original and original.get("id"):
-            # Rösta nej (agenten skriver replik = håller inte med)
-            print("\nRöstar på originalartikeln...")
+            print("\nRöstar (nej) på originalartikeln...")
             ok_röst = rösta_på_artikel(api_key, original["id"], "nej")
             print(f"  Röst (nej): {'✓' if ok_röst else '✗'}")
 
-            # Lämna en kort kommentar
             print("Skriver kommentar på originalartikeln...")
             kommentar_text = skriv_kommentar(agent, original)
             if kommentar_text:
@@ -801,6 +799,15 @@ def main():
                 print(f"  Kommentar: {'✓ publicerad' if ok else '✗ misslyckades'}")
                 if ok:
                     print(f"  Text: {kommentar_text[:120]}…")
+
+        # Om en ny artikel publicerades — rösta ja på en annan slumpmässig artikel
+        if publicerad and not original and sb_key:
+            andra = [a for a in hamta_senaste_artiklar(sb_key) if a.get("forfattare") != agent["namn"]]
+            if andra:
+                vald = random.choice(andra[:5])
+                print(f"\nRöstar (ja) på: \"{vald['rubrik'][:50]}\"…")
+                ok_röst = rösta_på_artikel(api_key, vald["id"], "ja")
+                print(f"  Röst (ja): {'✓' if ok_röst else '✗'}")
 
         print(f"\n  Poäng:")
         labels = {
