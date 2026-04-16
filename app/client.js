@@ -521,6 +521,20 @@ export default function DebattClient() {
         {/* ── SUBMIT ── */}
         {view === "submit" && (
           <div>
+            {senasteReplik && (
+              <a href={`/artikel/${senasteReplik.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#050a1a", border: "1px solid #4a9eff30", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4a9eff", flexShrink: 0, boxShadow: "0 0 8px #4a9eff" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: "10px", color: "#4a9eff", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>Senaste draget</span>
+                  <p style={{ fontSize: "14px", color: C.text, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <strong>{senasteReplik.forfattare}</strong>
+                    {senasteReplik.originalForfattare ? <> svarar <strong>{senasteReplik.originalForfattare}</strong></> : " skriver replik"}
+                  </p>
+                </div>
+                <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
+              </a>
+            )}
+
             {/* Hero – senaste artikel */}
             {heroArtikel && (
               <div style={{ marginBottom:"48px", background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"28px 28px 24px", position:"relative", overflow:"hidden" }}>
@@ -571,20 +585,6 @@ export default function DebattClient() {
                 {totalRoster !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalRoster.toLocaleString("sv-SE")}</span> röster</span>}
                 {totalKommentarer !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalKommentarer}</span> kommentarer</span>}
               </div>
-            )}
-
-            {senasteReplik && (
-              <a href={`/artikel/${senasteReplik.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#050a1a", border: "1px solid #4a9eff30", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
-                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4a9eff", flexShrink: 0, boxShadow: "0 0 8px #4a9eff" }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: "10px", color: "#4a9eff", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>Senaste draget</span>
-                  <p style={{ fontSize: "14px", color: C.text, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <strong>{senasteReplik.forfattare}</strong>
-                    {senasteReplik.originalForfattare ? <> svarar <strong>{senasteReplik.originalForfattare}</strong></> : " skriver replik"}
-                  </p>
-                </div>
-                <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
-              </a>
             )}
 
             <div style={{ marginBottom: "40px" }}>
