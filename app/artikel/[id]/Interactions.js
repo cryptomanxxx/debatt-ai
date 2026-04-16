@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -48,6 +48,24 @@ export default function Interactions({ artikelId }) {
   const [sending, setSending]   = useState(false);
   const [sent, setSent]         = useState(false);
   const [formError, setFormError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState(null);
+
+  const onTurnstileVerified = useCallback((token) => {
+    setTurnstileToken(token);
+  }, []);
+
+  useEffect(() => {
+    window.onCommentTurnstileVerified = onTurnstileVerified;
+    return () => { delete window.onCommentTurnstileVerified; };
+  }, [onTurnstileVerified]);
+
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    script.async = true;
+    document.head.appendChild(script);
+    return () => { if (document.head.contains(script)) document.head.removeChild(script); };
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem(`voted_${artikelId}`);
@@ -88,25 +106,32 @@ export default function Interactions({ artikelId }) {
       setFormError("Kommentaren måste vara minst 10 tecken.");
       return;
     }
+    if (!turnstileToken) {
+      setFormError("Vänligen slutför CAPTCHA-kontrollen.");
+      return;
+    }
     setSending(true);
     setFormError("");
-    const res = await fetch(`${SB_URL}/rest/v1/kommentarer`, {
+    const res = await fetch("/api/kommentar", {
       method: "POST",
-      headers: { ...SB_HEADERS, "Prefer": "return=representation" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         artikel_id: artikelId,
-        namn: namn.trim() || "Anonym",
+        namn: namn.trim(),
         text: text.trim(),
+        turnstileToken,
       }),
     });
     setSending(false);
     if (res.ok) {
       const data = await res.json();
-      setComments(prev => [...prev, data[0]]);
+      setComments(prev => [...prev, data.kommentar]);
       setNamn(""); setText(""); setSent(true);
+      setTurnstileToken(null);
       setTimeout(() => setSent(false), 4000);
     } else {
-      setFormError("Kunde inte skicka kommentaren. Försök igen.");
+      const err = await res.json().catch(() => ({}));
+      setFormError(err.fel || "Kunde inte skicka kommentaren. Försök igen.");
     }
   }
 
@@ -227,6 +252,13 @@ export default function Interactions({ artikelId }) {
               rows={4}
               style={{ ...inputStyle, marginBottom: "12px", resize: "vertical" }}
             />
+            <div
+              className="cf-turnstile"
+              data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+              data-callback="onCommentTurnstileVerified"
+              data-theme="dark"
+              style={{ marginBottom: "12px" }}
+            />
             {formError && (
               <p style={{ color: "#f87171", fontSize: "13px", margin: "0 0 10px 0" }}>{formError}</p>
             )}
@@ -238,8 +270,8 @@ export default function Interactions({ artikelId }) {
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 type="submit"
-                disabled={sending}
-                style={{ background: `${C.accent}12`, border: `1px solid ${C.accent}40`, color: C.accent, padding: "10px 24px", borderRadius: "4px", fontSize: "14px", cursor: sending ? "not-allowed" : "pointer", fontFamily: "Georgia, serif", opacity: sending ? 0.6 : 1 }}
+                disabled={sending || !turnstileToken}
+                style={{ background: `${C.accent}12`, border: `1px solid ${C.accent}40`, color: C.accent, padding: "10px 24px", borderRadius: "4px", fontSize: "14px", cursor: (sending || !turnstileToken) ? "not-allowed" : "pointer", fontFamily: "Georgia, serif", opacity: (sending || !turnstileToken) ? 0.5 : 1 }}
               >
                 {sending ? "Skickar…" : "Skicka kommentar"}
               </button>
