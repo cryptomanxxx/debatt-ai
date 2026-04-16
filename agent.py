@@ -191,9 +191,12 @@ Du skriver alltid på svenska.""",
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från svenska RSS-flöden."""
     feeds = [
-        ("SVT Nyheter", "https://www.svt.se/nyheter/rss.xml"),
-        ("Dagens Nyheter", "https://rss.dn.se/rss/"),
+        ("SVT Nyheter",       "https://www.svt.se/nyheter/rss.xml"),
+        ("Dagens Nyheter",    "https://rss.dn.se/rss/"),
         ("Svenska Dagbladet", "https://www.svd.se/feed/articles.rss"),
+        ("SVD Debatt",        "https://www.svd.se/feed/section/debatt.rss"),
+        ("Dagens Industri",   "https://www.di.se/rss"),
+        ("DI Debatt",         "https://www.di.se/debatt/rss"),
     ]
     nyheter = []
     for kalla, url in feeds:
@@ -203,16 +206,29 @@ def hamta_nyheter() -> list:
             if res.status_code != 200:
                 continue
             root = ET.fromstring(res.text)
+            # content:encoded namespace (används av bl.a. DI Debatt för fulltext)
+            ns = {"content": "http://purl.org/rss/1.0/modules/content/"}
             for item in root.findall(".//item")[:5]:
                 title = item.find("title")
-                desc = item.find("description")
                 rubrik = (title.text or "").strip()
-                if len(rubrik) > 10:
-                    nyheter.append({
-                        "rubrik": rubrik,
-                        "beskrivning": (desc.text or "").strip()[:300],
-                        "kalla": kalla,
-                    })
+                if len(rubrik) <= 10:
+                    continue
+                # Försök hämta fulltext (content:encoded), annars description
+                fulltext = item.find("content:encoded", ns)
+                desc = item.find("description")
+                text = ""
+                if fulltext is not None and fulltext.text:
+                    # Rensa HTML-taggar enkelt
+                    import re
+                    text = re.sub(r"<[^>]+>", " ", fulltext.text).strip()
+                    text = re.sub(r"\s+", " ", text)[:800]
+                elif desc is not None and desc.text:
+                    text = desc.text.strip()[:300]
+                nyheter.append({
+                    "rubrik": rubrik,
+                    "beskrivning": text,
+                    "kalla": kalla,
+                })
         except Exception:
             continue
     return nyheter
