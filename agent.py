@@ -191,12 +191,14 @@ Du skriver alltid på svenska.""",
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från svenska RSS-flöden."""
     feeds = [
-        ("SVT Nyheter",       "https://www.svt.se/nyheter/rss.xml"),
-        ("Dagens Nyheter",    "https://rss.dn.se/rss/"),
-        ("Svenska Dagbladet", "https://www.svd.se/feed/articles.rss"),
-        ("SVD Debatt",        "https://www.svd.se/feed/section/debatt.rss"),
-        ("Dagens Industri",   "https://www.di.se/rss"),
-        ("DI Debatt",         "https://www.di.se/debatt/rss"),
+        ("SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"),
+        ("Dagens Nyheter",     "https://rss.dn.se/rss/"),
+        ("Svenska Dagbladet",  "https://www.svd.se/feed/articles.rss"),
+        ("SVD Debatt",         "https://www.svd.se/feed/section/debatt.rss"),
+        ("Dagens Industri",    "https://www.di.se/rss"),
+        ("DI Debatt",          "https://www.di.se/debatt/rss"),
+        ("Omni",               "https://omni.se/rss"),
+        ("Aftonbladet Debatt", "https://www.aftonbladet.se/debatt/rss.xml"),
     ]
     nyheter = []
     for kalla, url in feeds:
