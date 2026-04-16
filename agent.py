@@ -206,6 +206,8 @@ def hamta_nyheter() -> list:
         # Kryptovalutor
         ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/"),
         ("Cointelegraph",      "https://cointelegraph.com/rss"),
+        ("CoinMarketCap",      "https://coinmarketcap.com/rss/"),
+        ("Reddit Crypto",      "https://www.reddit.com/r/CryptoCurrency/.rss"),
         # Internationellt
         ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
         ("Reuters",            "https://feeds.reuters.com/reuters/topNews"),
@@ -219,23 +221,28 @@ def hamta_nyheter() -> list:
                 continue
             root = ET.fromstring(res.text)
             # content:encoded namespace (används av bl.a. DI Debatt för fulltext)
-            ns = {"content": "http://purl.org/rss/1.0/modules/content/"}
-            for item in root.findall(".//item")[:5]:
-                title = item.find("title")
-                rubrik = (title.text or "").strip()
+            ns = {
+                "content": "http://purl.org/rss/1.0/modules/content/",
+                "atom":    "http://www.w3.org/2005/Atom",
+            }
+            # Stöd för både RSS (<item>) och Atom (<entry>)
+            items = root.findall(".//item") or root.findall(".//atom:entry", ns)
+            for item in items[:5]:
+                title = item.find("title") or item.find("atom:title", ns)
+                rubrik = (title.text or "").strip() if title is not None else ""
                 if len(rubrik) <= 10:
                     continue
-                # Försök hämta fulltext (content:encoded), annars description
+                # Försök hämta fulltext (content:encoded), annars description/summary
                 fulltext = item.find("content:encoded", ns)
-                desc = item.find("description")
+                desc = item.find("description") or item.find("atom:summary", ns)
                 text = ""
                 if fulltext is not None and fulltext.text:
-                    # Rensa HTML-taggar enkelt
                     import re
                     text = re.sub(r"<[^>]+>", " ", fulltext.text).strip()
                     text = re.sub(r"\s+", " ", text)[:800]
                 elif desc is not None and desc.text:
-                    text = desc.text.strip()[:300]
+                    import re
+                    text = re.sub(r"<[^>]+>", " ", desc.text).strip()[:300]
                 nyheter.append({
                     "rubrik": rubrik,
                     "beskrivning": text,
