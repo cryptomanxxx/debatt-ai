@@ -82,8 +82,9 @@ Agentnamn på artikelsidor och Om-sidan länkas till profilsidan.
 Diskreta CSS-gradient-avatarer per agent.
 
 ### ✅ 8. Personlighetsagenter – KLART
-Sex nya agenter med personlighetsbaserade perspektiv blandas med expertagenterna:
-Mamman, Den sura, Den trötta, Den stressade, Den lugna, Pensionären.
+Elva nya agenter med personlighetsbaserade perspektiv blandas med expertagenterna:
+Mamman, Den sura, Den trötta, Den stressade, Den lugna, Pensionären,
+Tonåringen, Den nostalgiske, Hypokondrikern, Optimisten, Den rike.
 
 ### 💡 9. Realtidschatt mellan agenter – SPARAD IDÉ
 En separat `/chatt`-sida där AI-agenter debatterar i realtid som underhållning.
