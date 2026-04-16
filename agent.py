@@ -16,6 +16,7 @@ import httpx
 import random
 import os
 import sys
+import xml.etree.ElementTree as ET
 
 DEBATT_API = "https://debatt-ai.vercel.app/api/agent/submit"
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
@@ -185,6 +186,76 @@ Du skriver alltid på svenska.""",
         ],
     },
 ]
+
+
+def hamta_nyheter() -> list:
+    """Hämta aktuella nyhetsrubriker från svenska RSS-flöden."""
+    feeds = [
+        ("SVT Nyheter", "https://www.svt.se/nyheter/rss.xml"),
+        ("Dagens Nyheter", "https://rss.dn.se/rss/"),
+        ("Svenska Dagbladet", "https://www.svd.se/feed/articles.rss"),
+    ]
+    nyheter = []
+    for kalla, url in feeds:
+        try:
+            res = httpx.get(url, timeout=10, follow_redirects=True,
+                            headers={"User-Agent": "debatt-ai/1.0"})
+            if res.status_code != 200:
+                continue
+            root = ET.fromstring(res.text)
+            for item in root.findall(".//item")[:5]:
+                title = item.find("title")
+                desc = item.find("description")
+                rubrik = (title.text or "").strip()
+                if len(rubrik) > 10:
+                    nyheter.append({
+                        "rubrik": rubrik,
+                        "beskrivning": (desc.text or "").strip()[:300],
+                        "kalla": kalla,
+                    })
+        except Exception:
+            continue
+    return nyheter
+
+
+def skriv_artikel_om_nyhet(agent: dict, nyhet: dict) -> str:
+    """Skriv en debattartikel som kommenterar en aktuell nyhet."""
+    response = httpx.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "max_tokens": 2000,
+            "temperature": 0.8,
+            "messages": [
+                {"role": "system", "content": agent["system"]},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Följande nyhet har precis publicerats i Sverige:\n\n"
+                        f"RUBRIK: {nyhet['rubrik']}\n"
+                        + (f"INGRESS: {nyhet['beskrivning']}\n" if nyhet["beskrivning"] else "")
+                        + f"KÄLLA: {nyhet['kalla']}\n\n"
+                        "Skriv en debattartikel som kommenterar och analyserar denna nyhet "
+                        "ur ditt perspektiv.\n\n"
+                        "Krav:\n"
+                        "- Minst 300 ord, gärna 400–500\n"
+                        "- Börja med att kort referera nyheten, gå sedan direkt till din analys\n"
+                        "- Minst tre konkreta argument med fakta, siffror eller exempel\n"
+                        "- Avsluta med en tydlig uppmaning till handling eller slutsats\n"
+                        "- Inga rubriker eller stycketitlar – löpande text\n"
+                        f"- Skriv i första person som {agent['namn']}\n\n"
+                        "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
+                    ),
+                },
+            ],
+        },
+        timeout=60,
+    )
+    return response.json()["choices"][0]["message"]["content"]
 
 
 def skriv_artikel(agent: dict, amne: str) -> str:
@@ -493,19 +564,37 @@ def main():
             print(f"  Debatten fortsätter (slutsats möjlig efter {MIN_REPLIKER_FOR_SLUTSATS} repliker)\n")
     else:
         konklusion = ""
-        # Välj agent och ämne slumpmässigt
         agent = random.choice(AGENTER)
-        amne, kategori = random.choice(agent["amnen"])
 
-        print(f"\n{'═' * 60}")
-        print(f"  Läge:     NY ARTIKEL")
-        print(f"  Agent:    {agent['namn']}")
-        print(f"  Ämne:     {amne}")
-        print(f"  Kategori: {kategori}")
-        print(f"{'═' * 60}\n")
+        # Försök hämta aktuella nyheter – 50% chans att kommentera en nyhet
+        nyhet = None
+        print("Hämtar aktuella nyheter från RSS...")
+        nyheter = hamta_nyheter()
+        if nyheter and random.random() < 0.5:
+            nyhet = random.choice(nyheter[:10])
 
-        print("Skriver artikel med Groq (llama-3.3-70b)...")
-        artikel = skriv_artikel(agent, amne)
+        if nyhet:
+            amne = nyhet["rubrik"]
+            kategori = "Samhälle"
+            print(f"\n{'═' * 60}")
+            print(f"  Läge:     NY ARTIKEL (AKTUELL NYHET)")
+            print(f"  Agent:    {agent['namn']}")
+            print(f"  Nyhet:    {nyhet['rubrik'][:60]}")
+            print(f"  Källa:    {nyhet['kalla']}")
+            print(f"  Kategori: {kategori}")
+            print(f"{'═' * 60}\n")
+            print("Skriver artikel om aktuell nyhet med Groq (llama-3.3-70b)...")
+            artikel = skriv_artikel_om_nyhet(agent, nyhet)
+        else:
+            amne, kategori = random.choice(agent["amnen"])
+            print(f"\n{'═' * 60}")
+            print(f"  Läge:     NY ARTIKEL")
+            print(f"  Agent:    {agent['namn']}")
+            print(f"  Ämne:     {amne}")
+            print(f"  Kategori: {kategori}")
+            print(f"{'═' * 60}\n")
+            print("Skriver artikel med Groq (llama-3.3-70b)...")
+            artikel = skriv_artikel(agent, amne)
 
         print("Genererar rubrik...")
         amne = generera_rubrik(agent, amne, artikel)
