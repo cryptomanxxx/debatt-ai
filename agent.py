@@ -21,7 +21,7 @@ DEBATT_API = "https://debatt-ai.vercel.app/api/agent/submit"
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 # Hur många repliker krävs i ett debattämne innan slutsats kan ges
-MIN_REPLIKER_FOR_SLUTSATS = 2   # Ingen slutsats före detta
+MIN_REPLIKER_FOR_SLUTSATS = 3   # Ingen slutsats före detta (var 2)
 MAX_REPLIKER_BEFORE_FORCED = 5  # Alltid slutsats efter detta
 
 AGENTER = [
@@ -255,7 +255,7 @@ def hamta_senaste_artiklar(sb_key: str) -> list:
     try:
         response = httpx.get(
             f"{SB_URL}/rest/v1/artiklar",
-            params={"select": "id,rubrik,forfattare,artikel,kategori", "order": "skapad.desc", "limit": "10"},
+            params={"select": "id,rubrik,forfattare,artikel,kategori,lasningar", "order": "skapad.desc", "limit": "10"},
             headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
             timeout=15,
         )
@@ -264,6 +264,38 @@ def hamta_senaste_artiklar(sb_key: str) -> list:
     except Exception:
         pass
     return []
+
+
+def hamta_engagemang(sb_key: str, artikel_ids: list) -> dict:
+    """Hämta röst- och kommentarantal för en lista artiklar (för viktad slump)."""
+    if not artikel_ids:
+        return {}
+    ids_str = ",".join(str(i) for i in artikel_ids)
+    eng = {i: {"roster": 0, "kommentarer": 0} for i in artikel_ids}
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/roster",
+            params={"select": "artikel_id", "artikel_id": f"in.({ids_str})"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=10,
+        )
+        if res.status_code == 200:
+            for r in res.json():
+                if r["artikel_id"] in eng:
+                    eng[r["artikel_id"]]["roster"] += 1
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/kommentarer",
+            params={"select": "artikel_id", "artikel_id": f"in.({ids_str})"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=10,
+        )
+        if res.status_code == 200:
+            for r in res.json():
+                if r["artikel_id"] in eng:
+                    eng[r["artikel_id"]]["kommentarer"] += 1
+    except Exception:
+        pass
+    return eng
 
 
 def skriv_replik(agent: dict, original: dict) -> str:
@@ -411,7 +443,16 @@ def main():
         print("Letar efter artiklar att svara på...")
         artiklar = hamta_senaste_artiklar(sb_key)
         if artiklar:
-            original = random.choice(artiklar)
+            # Viktad slump: engagerade debatter får större chans att få svar
+            artikel_ids = [a["id"] for a in artiklar]
+            eng = hamta_engagemang(sb_key, artikel_ids)
+            vikter = []
+            for a in artiklar:
+                e = eng.get(a["id"], {"roster": 0, "kommentarer": 0})
+                lasningar = a.get("lasningar") or 0
+                w = 1 + lasningar * 0.05 + e["roster"] * 2 + e["kommentarer"] * 3
+                vikter.append(w)
+            original = random.choices(artiklar, weights=vikter, k=1)[0]
             print(f"Hittade artikel att svara på: \"{original['rubrik']}\" av {original['forfattare']}\n")
 
     if original:
@@ -439,7 +480,7 @@ def main():
 
         ska_avsluta = (
             djup_efter >= MAX_REPLIKER_BEFORE_FORCED
-            or (djup_efter >= MIN_REPLIKER_FOR_SLUTSATS and random.random() < 0.4)
+            or (djup_efter >= MIN_REPLIKER_FOR_SLUTSATS and random.random() < 0.5)
         )
 
         print(f"  Debattdjup: {djup_efter} repliker om detta ämne")

@@ -103,6 +103,24 @@ async function fetchAllaKommentarer() {
   return res.json();
 }
 
+async function fetchSenasteReplik() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?rubrik=like.Replik%3A*&order=skapad.desc&limit=1&select=id,rubrik,forfattare,skapad`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data?.[0]) return null;
+  const replik = data[0];
+  const originalRubrik = replik.rubrik.replace(/^(Replik: )+/, "");
+  const res2 = await fetch(
+    `${SB_URL}/rest/v1/artiklar?rubrik=eq.${encodeURIComponent(originalRubrik)}&select=forfattare&limit=1`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  const orig = res2.ok ? await res2.json() : [];
+  return { ...replik, originalForfattare: orig[0]?.forfattare || null };
+}
+
 async function fetchLatestArtikel() {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc&limit=1`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
@@ -270,6 +288,7 @@ export default function DebattClient() {
   const [commentCounts, setCommentCounts] = useState({});
   const [totalRoster, setTotalRoster] = useState(null);
   const [totalKommentarer, setTotalKommentarer] = useState(null);
+  const [senasteReplik, setSenasteReplik] = useState(null);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -323,6 +342,7 @@ export default function DebattClient() {
       setCommentCounts(counts);
       setTotalKommentarer(data.length);
     }).catch(() => {});
+    fetchSenasteReplik().then(r => setSenasteReplik(r)).catch(() => {});
     const params = new URLSearchParams(window.location.search);
     if (params.get("arkiv") === "1") setView("published");
     if (params.get("debatter") === "1") setView("debatter");
@@ -551,6 +571,20 @@ export default function DebattClient() {
                 {totalRoster !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalRoster.toLocaleString("sv-SE")}</span> röster</span>}
                 {totalKommentarer !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalKommentarer}</span> kommentarer</span>}
               </div>
+            )}
+
+            {senasteReplik && (
+              <a href={`/artikel/${senasteReplik.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#050a1a", border: "1px solid #4a9eff30", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4a9eff", flexShrink: 0, boxShadow: "0 0 8px #4a9eff" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: "10px", color: "#4a9eff", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>Senaste draget</span>
+                  <p style={{ fontSize: "14px", color: C.text, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <strong>{senasteReplik.forfattare}</strong>
+                    {senasteReplik.originalForfattare ? <> svarar <strong>{senasteReplik.originalForfattare}</strong></> : " skriver replik"}
+                  </p>
+                </div>
+                <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
+              </a>
             )}
 
             <div style={{ marginBottom: "40px" }}>
