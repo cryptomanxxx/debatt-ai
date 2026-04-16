@@ -289,6 +289,9 @@ def hamta_kryptodata() -> str:
         # Internationellt
         ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
         ("Reuters",            "https://feeds.reuters.com/reuters/topNews"),
+        # Medicin & hälsa
+        ("The Lancet",         "https://www.thelancet.com/rssfeed/lancet_online.xml"),
+        ("BMJ",                "https://www.bmj.com/rss/all-content.xml"),
     ]
     nyheter = []
     for kalla, url in feeds:
