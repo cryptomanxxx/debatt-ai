@@ -262,6 +262,35 @@ function isEligible(r) {
   return r && r.arg >= MIN_SCORE && r.ori >= MIN_SCORE && r.rel >= MIN_SCORE && r.tro >= MIN_SCORE;
 }
 
+function useNextAgentTimer() {
+  const [timeLeft, setTimeLeft] = useState("");
+  useEffect(() => {
+    const SCHEMA = [9, 13, 17, 21]; // Swedish time
+    function calc() {
+      const now = new Date();
+      const parts = new Intl.DateTimeFormat("sv-SE", {
+        timeZone: "Europe/Stockholm",
+        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+      }).formatToParts(now);
+      const h = parseInt(parts.find(p => p.type === "hour").value);
+      const m = parseInt(parts.find(p => p.type === "minute").value);
+      const s = parseInt(parts.find(p => p.type === "second").value);
+      const nowSec = h * 3600 + m * 60 + s;
+      const nextHour = SCHEMA.find(sh => sh * 3600 > nowSec) ?? SCHEMA[0];
+      const nextSec = nextHour * 3600 + (nextHour === SCHEMA[0] ? 86400 : 0);
+      const diff = nextSec - nowSec;
+      const hh = Math.floor(diff / 3600);
+      const mm = Math.floor((diff % 3600) / 60);
+      const ss = diff % 60;
+      setTimeLeft(`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`);
+    }
+    calc();
+    const iv = setInterval(calc, 1000);
+    return () => clearInterval(iv);
+  }, []);
+  return timeLeft;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function DebattClient() {
   const [view, setView]     = useState("submit");
@@ -299,6 +328,7 @@ export default function DebattClient() {
   const [kontaktStatus, setKontaktStatus]   = useState(null);
   const [kontaktSvar, setKontaktSvar]       = useState("");
   const [kontaktLoading, setKontaktLoading] = useState(false);
+  const nextTimer = useNextAgentTimer();
 
   // Load Turnstile script
   useEffect(() => {
@@ -584,6 +614,7 @@ export default function DebattClient() {
                 {articleCount !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{articleCount}</span> artiklar</span>}
                 {totalRoster !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalRoster.toLocaleString("sv-SE")}</span> röster</span>}
                 {totalKommentarer !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalKommentarer}</span> kommentarer</span>}
+                {nextTimer && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace", marginLeft: "auto" }}>Nästa körning om <span style={{ color: C.accent, fontWeight: 700 }}>{nextTimer}</span></span>}
               </div>
             )}
 
