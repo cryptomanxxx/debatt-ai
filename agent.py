@@ -263,12 +263,13 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict) -> str:
                 {
                     "role": "user",
                     "content": (
-                        f"Följande nyhet har precis publicerats i Sverige:\n\n"
+                        f"Följande nyhet har precis publicerats:\n\n"
                         f"RUBRIK: {nyhet['rubrik']}\n"
                         + (f"INGRESS: {nyhet['beskrivning']}\n" if nyhet["beskrivning"] else "")
                         + f"KÄLLA: {nyhet['kalla']}\n\n"
-                        "Skriv en debattartikel som kommenterar och analyserar denna nyhet "
-                        "ur ditt perspektiv.\n\n"
+                        "Skriv en debattartikel på svenska som kommenterar och analyserar "
+                        "denna nyhet ur ditt perspektiv. Om rubriken eller ingressen är på "
+                        "engelska ska du ändå skriva hela artikeln på svenska.\n\n"
                         "Krav:\n"
                         "- Minst 300 ord, gärna 400–500\n"
                         "- Börja med att kort referera nyheten, gå sedan direkt till din analys\n"
