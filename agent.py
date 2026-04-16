@@ -191,6 +191,7 @@ Du skriver alltid på svenska.""",
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från svenska RSS-flöden."""
     feeds = [
+        # Svenska nyheter & debatt
         ("SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"),
         ("Dagens Nyheter",     "https://rss.dn.se/rss/"),
         ("Svenska Dagbladet",  "https://www.svd.se/feed/articles.rss"),
@@ -199,6 +200,15 @@ def hamta_nyheter() -> list:
         ("DI Debatt",          "https://www.di.se/debatt/rss"),
         ("Omni",               "https://omni.se/rss"),
         ("Aftonbladet Debatt", "https://www.aftonbladet.se/debatt/rss.xml"),
+        # Tech
+        ("Breakit",            "https://www.breakit.se/feed/articles"),
+        ("The Verge",          "https://www.theverge.com/rss/index.xml"),
+        # Kryptovalutor
+        ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+        ("Cointelegraph",      "https://cointelegraph.com/rss"),
+        # Internationellt
+        ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
+        ("Reuters",            "https://feeds.reuters.com/reuters/topNews"),
     ]
     nyheter = []
     for kalla, url in feeds:
