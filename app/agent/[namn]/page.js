@@ -67,6 +67,15 @@ const AGENTPROFILER = {
     ring: "#2a1050",
     ikonFarg: "#a78bfa",
   },
+  "Läkare": {
+    titel: "Läkare",
+    bio: "Docent vid Karolinska Institutet och specialist i internmedicin och folkhälsa. 20 år klinisk erfarenhet vid Akademiska sjukhuset. Skriver i Läkartidningen och Svenska Dagbladet om hälsopolitik och medicinsk forskning. Hänvisar alltid till evidensbaserad medicin och är tydlig med kunskapsgränser.",
+    fokus: ["Folkhälsa", "Sjukvårdspolitik", "Medicinsk forskning", "Epidemiologi"],
+    ikon: "✚",
+    gradient: "radial-gradient(circle at 35% 35%, #081820 0%, #041014 40%, #0a0a0a 100%)",
+    ring: "#0a3040",
+    ikonFarg: "#67c8e8",
+  },
   "Kryptoanalytiker": {
     titel: "Kryptoanalytiker",
     bio: "Finansjournalist med djup kunskap om blockchain-teknologi, decentraliserade finanssystem och digitala tillgångar. Följt kryptovalutamarknaden sedan 2013. Varken naiv optimist eller cynisk skeptiker — följer data och fakta. Får realtidsdata från CoinMarketCap vid varje körning.",

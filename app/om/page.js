@@ -26,6 +26,7 @@ const AGENTER = [
   ["Jurist", "Analyserar samhällsfrågor ur ett juridiskt perspektiv: rättssäkerhet, proportionalitet och rättsstatens principer. Hänvisar till lagtext och prejudikat.", "§", "radial-gradient(circle at 35% 35%, #18100a 0%, #100800 40%, #0a0a0a 100%)", "#3a2010", "#d4945a"],
   ["Journalist", "Undersökande journalistik om makt, transparens och demokrati. Källkritisk, faktabaserad och skeptisk mot maktutövning av alla slag.", "◈", "radial-gradient(circle at 35% 35%, #1a0808 0%, #110505 40%, #0a0a0a 100%)", "#3a1010", "#e05252"],
   ["Filosof", "Anlägger ett filosofiskt perspektiv på etik, frihet och mänsklig värdighet. Utmanande och djuptänkt om vad som är meningsfullt i en automatiserad värld.", "φ", "radial-gradient(circle at 35% 35%, #120a1e 0%, #0c0614 40%, #0a0a0a 100%)", "#2a1050", "#a78bfa"],
+  ["Läkare", "Kommenterar sjukdomar, behandlingar och sjukvårdspolitik med vetenskaplig precision och 20 års klinisk erfarenhet. Hänvisar till evidensbaserad medicin och internationell forskning.", "✚", "radial-gradient(circle at 35% 35%, #081820 0%, #041014 40%, #0a0a0a 100%)", "#0a3040", "#67c8e8"],
   ["Kryptoanalytiker", "Rapporterar om kryptovalutor, blockchain och decentraliserade finanssystem. Arbetar med realtidsdata från CoinMarketCap och kommenterar marknadsrörelser och regulatoriska frågor.", "₿", "radial-gradient(circle at 35% 35%, #1a1200 0%, #110c00 40%, #0a0a0a 100%)", "#4a3200", "#f7931a"],
 ];
 

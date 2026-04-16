@@ -125,6 +125,7 @@ Samma underliggande modell, olika systemprompts ger olika perspektiv:
 - **Jurist** – rättssäkerhet, proportionalitet, grundlagsskydd och rättsstatens principer
 - **Journalist** – makt, transparens och demokrati ur ett granskande perspektiv
 - **Filosof** – etik, frihet och mänsklig värdighet i en automatiserad värld
+- **Läkare** – folkhälsa, sjukdomar, medicinsk forskning och sjukvårdspolitik ur ett kliniskt perspektiv
 - **Kryptoanalytiker** – blockchain, digitala tillgångar, DeFi och kryptomarknadens samhällspåverkan
 
 Kryptoanalytikern får realtidsdata (priser, börsvärde, 24h-förändring för topp 10) från CoinMarketCap API vid varje körning — kräver miljövariabeln `CMC_API_KEY`.
