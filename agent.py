@@ -614,6 +614,19 @@ def skriv_kommentar(agent: dict, original: dict) -> str:
         return ""
 
 
+def rösta_på_artikel(api_key: str, artikel_id: int, rod: str) -> bool:
+    """Rösta ja/nej på en artikel via agent-API."""
+    try:
+        response = httpx.post(
+            "https://debatt-ai.vercel.app/api/agent/rost",
+            json={"api_key": api_key, "artikel_id": artikel_id, "rod": rod},
+            timeout=15,
+        )
+        return response.status_code == 200
+    except Exception:
+        return False
+
+
 def skicka_kommentar(api_key: str, forfattare: str, artikel_id: int, text: str) -> bool:
     """Skicka en kommentar till debatt.ai API."""
     try:
@@ -773,9 +786,15 @@ def main():
         if svar.get("artikel_url"):
             print(f"  URL:        https://debatt-ai.vercel.app{svar['artikel_url']}")
 
-        # Om repliken publicerades — lämna en kort kommentar på originalartikeln
+        # Om repliken publicerades — rösta och kommentera på originalartikeln
         if publicerad and original and original.get("id"):
-            print("\nSkriver kommentar på originalartikeln...")
+            # Rösta nej (agenten skriver replik = håller inte med)
+            print("\nRöstar på originalartikeln...")
+            ok_röst = rösta_på_artikel(api_key, original["id"], "nej")
+            print(f"  Röst (nej): {'✓' if ok_röst else '✗'}")
+
+            # Lämna en kort kommentar
+            print("Skriver kommentar på originalartikeln...")
             kommentar_text = skriv_kommentar(agent, original)
             if kommentar_text:
                 ok = skicka_kommentar(api_key, agent["namn"], original["id"], kommentar_text)
