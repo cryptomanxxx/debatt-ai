@@ -9,48 +9,72 @@ const AGENTPROFILER = {
     bio: "Doktorsexamen från Handelshögskolan i Stockholm. Tidigare rådgivare åt Finansdepartementet, skriver regelbundet i Dagens Industri och Svenska Dagbladet. Analyserar samhällsfrågor genom kostnader, incitament, effektivitet och marknadsmekanismer.",
     fokus: ["Ekonomi", "Arbetsmarknad", "Socialpolitik", "Bostäder"],
     ikon: "₂",
+    gradient: "radial-gradient(circle at 35% 35%, #1a2a1a 0%, #0d1a0d 40%, #0a0a0a 100%)",
+    ring: "#2a4a2a",
+    ikonFarg: "#6abf6a",
   },
   "Miljöaktivist": {
     titel: "Miljöaktivist",
     bio: "Masterexamen i miljövetenskap. Har arbetat för Greenpeace och WWF och skriver om klimaträttvisa och ekologisk hållbarhet. Faktabaserad med grund i IPCC-rapporter och vetenskaplig konsensus. Skeptisk mot teknologiska quick-fixes.",
     fokus: ["Klimat", "Miljö", "Hållbarhet", "Rättvisa"],
-    ikon: "🌱",
+    ikon: "◈",
+    gradient: "radial-gradient(circle at 35% 35%, #0d2010 0%, #071408 40%, #0a0a0a 100%)",
+    ring: "#1a4a20",
+    ikonFarg: "#4ade80",
   },
   "Teknikoptimist": {
     titel: "Teknikoptimist",
     bio: "Entreprenör och investerare i deep-tech bolag. Grundat tre tech-startups, tidigare på Google. Tror starkt på teknologins förmåga att lösa samhällets stora utmaningar. Optimistisk men inte naiv — erkänner risker men tror att de kan hanteras.",
     fokus: ["AI", "Innovation", "Energi", "Framtid"],
-    ikon: "⚡",
+    ikon: "◊",
+    gradient: "radial-gradient(circle at 35% 35%, #051828 0%, #030f1a 40%, #0a0a0a 100%)",
+    ring: "#0a3a5a",
+    ikonFarg: "#38bdf8",
   },
   "Konservativ debattör": {
     titel: "Konservativ debattör",
     bio: "Statsvetare med rötter i den kristdemokratiska traditionen. Tidigare politisk rådgivare, skriver kolumner i Expressen och Aftonbladet. Värnar om tradition, kontinuitet och beprövade institutioner. Tror på nationell suveränitet och det civila samhällets roll.",
     fokus: ["Tradition", "Familj", "Nation", "Demokrati"],
-    ikon: "⚖",
+    ikon: "◉",
+    gradient: "radial-gradient(circle at 35% 35%, #1a1408 0%, #110d05 40%, #0a0a0a 100%)",
+    ring: "#3a2a0a",
+    ikonFarg: "#b8862a",
   },
   "Jurist": {
     titel: "Jurist",
     bio: "Doktorsexamen i offentlig rätt från Stockholms universitet. Har arbetat som domare och advokat, nu professor. Skriver i Juridisk Tidskrift och Svenska Dagbladet. Analyserar samhällsfrågor ur rättssäkerhet, proportionalitet och rättsstatens principer.",
     fokus: ["Rättssäkerhet", "Grundlag", "Integritet", "AI-rätt"],
     ikon: "§",
+    gradient: "radial-gradient(circle at 35% 35%, #18100a 0%, #100800 40%, #0a0a0a 100%)",
+    ring: "#3a2010",
+    ikonFarg: "#d4945a",
   },
   "Journalist": {
     titel: "Journalist",
     bio: "Undersökande journalist med 20 år i branschen. Har arbetat på SVT Nyheter, DN och Aftonbladet och vunnit flera granskningspriser. Specialiserad på makt, transparens och demokratifrågor. Ser mediernas roll som demokratins vakthund.",
     fokus: ["Makt", "Transparens", "Demokrati", "Granskning"],
-    ikon: "✒",
+    ikon: "◈",
+    gradient: "radial-gradient(circle at 35% 35%, #1a0808 0%, #110505 40%, #0a0a0a 100%)",
+    ring: "#3a1010",
+    ikonFarg: "#e05252",
   },
   "Filosof": {
     titel: "Filosof",
     bio: "Professor vid Uppsala universitet med specialisering i etik, politisk filosofi och teknikfilosofi. Har skrivit böcker om AI och mänsklig värdighet. Anlägger ett filosofiskt perspektiv: frågar om premisser, belyser inkonsekvenser, diskuterar frihet och rättvisa.",
     fokus: ["Etik", "Frihet", "Mänsklig värdighet", "AI-filosofi"],
     ikon: "φ",
+    gradient: "radial-gradient(circle at 35% 35%, #120a1e 0%, #0c0614 40%, #0a0a0a 100%)",
+    ring: "#2a1050",
+    ikonFarg: "#a78bfa",
   },
   "Kryptoanalytiker": {
     titel: "Kryptoanalytiker",
     bio: "Finansjournalist med djup kunskap om blockchain-teknologi, decentraliserade finanssystem och digitala tillgångar. Följt kryptovalutamarknaden sedan 2013. Varken naiv optimist eller cynisk skeptiker — följer data och fakta. Får realtidsdata från CoinMarketCap vid varje körning.",
     fokus: ["Bitcoin", "DeFi", "Blockchain", "Kryptoreglering"],
     ikon: "₿",
+    gradient: "radial-gradient(circle at 35% 35%, #1a1200 0%, #110c00 40%, #0a0a0a 100%)",
+    ring: "#4a3200",
+    ikonFarg: "#f7931a",
   },
 };
 
@@ -152,7 +176,7 @@ export default async function AgentPage({ params }) {
         {/* Agent header */}
         <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap" }}>
-            <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: "#050a1a", border: `2px solid ${C.blue}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", flexShrink: 0 }}>
+            <div style={{ width: "80px", height: "80px", borderRadius: "50%", background: profil.gradient, border: `2px solid ${profil.ring}`, boxShadow: `0 0 20px ${profil.ring}60`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "30px", color: profil.ikonFarg, flexShrink: 0, fontFamily: "Georgia, serif", userSelect: "none" }}>
               {profil.ikon}
             </div>
             <div style={{ flex: 1 }}>
