@@ -322,11 +322,12 @@ export default function DebattClient() {
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
   const [subLoading, setSubLoading] = useState(false);
-  const [kontaktNamn, setKontaktNamn]       = useState("");
-  const [kontaktEmail, setKontaktEmail]     = useState("");
-  const [kontaktMsg, setKontaktMsg]         = useState("");
-  const [kontaktStatus, setKontaktStatus]   = useState(null);
-  const [kontaktSvar, setKontaktSvar]       = useState("");
+  const [kontaktNamn, setKontaktNamn]             = useState("");
+  const [kontaktEmail, setKontaktEmail]           = useState("");
+  const [kontaktMsg, setKontaktMsg]               = useState("");
+  const [kontaktStatus, setKontaktStatus]         = useState(null);
+  const [kontaktSvar, setKontaktSvar]             = useState("");
+  const [kontaktTurnstile, setKontaktTurnstile]   = useState(null);
   const [kontaktLoading, setKontaktLoading] = useState(false);
   const nextTimer = useNextAgentTimer();
 
@@ -351,7 +352,8 @@ export default function DebattClient() {
 
   useEffect(() => {
     window.onTurnstileVerified = onTurnstileVerified;
-    return () => { delete window.onTurnstileVerified; };
+    window.onKontaktTurnstileVerified = (token) => setKontaktTurnstile(token);
+    return () => { delete window.onTurnstileVerified; delete window.onKontaktTurnstileVerified; };
   }, [onTurnstileVerified]);
 
   // Load count on mount, and check for ?arkiv=1
@@ -505,7 +507,7 @@ export default function DebattClient() {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ namn: kontaktNamn, email: kontaktEmail, meddelande: kontaktMsg }),
+        body: JSON.stringify({ namn: kontaktNamn, email: kontaktEmail, meddelande: kontaktMsg, turnstileToken: kontaktTurnstile }),
       });
       const data = await res.json();
       if (data.fel) { setKontaktStatus("err"); setKontaktSvar(data.fel); }
@@ -910,8 +912,9 @@ export default function DebattClient() {
                   <label style={{ display:"block", fontSize:"11px", color:C.textMuted, letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>Meddelande</label>
                   <textarea value={kontaktMsg} onChange={e=>setKontaktMsg(e.target.value)} rows={6} style={{...inp, resize:"vertical", lineHeight:1.8}} />
                 </div>
+                <div className="cf-turnstile" data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} data-callback="onKontaktTurnstileVerified" data-theme="dark" />
                 {kontaktStatus === "err" && <p style={{ color:C.red, fontSize:"14px", margin:0 }}>{kontaktSvar}</p>}
-                <button onClick={skickaKontakt} disabled={kontaktLoading || !kontaktNamn.trim() || !kontaktEmail.trim() || !kontaktMsg.trim()} style={{ background:C.accent, color:"#0a0a0a", border:"none", borderRadius:"4px", padding:"14px 28px", fontSize:"14px", fontWeight:700, cursor:kontaktLoading?"default":"pointer", fontFamily:"Georgia, serif", alignSelf:"flex-start", opacity:(!kontaktNamn.trim()||!kontaktEmail.trim()||!kontaktMsg.trim())?0.5:1 }}>
+                <button onClick={skickaKontakt} disabled={kontaktLoading || !kontaktNamn.trim() || !kontaktEmail.trim() || !kontaktMsg.trim() || !kontaktTurnstile} style={{ background:C.accent, color:"#0a0a0a", border:"none", borderRadius:"4px", padding:"14px 28px", fontSize:"14px", fontWeight:700, cursor:(kontaktLoading||!kontaktTurnstile)?"default":"pointer", fontFamily:"Georgia, serif", alignSelf:"flex-start", opacity:(!kontaktNamn.trim()||!kontaktEmail.trim()||!kontaktMsg.trim()||!kontaktTurnstile)?0.5:1 }}>
                   {kontaktLoading ? "Skickar…" : "Skicka meddelande →"}
                 </button>
               </div>

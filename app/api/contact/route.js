@@ -5,12 +5,29 @@ export async function POST(req) {
   try { body = await req.json(); }
   catch { return Response.json({ fel: "Ogiltig JSON" }, { status: 400 }); }
 
-  const { namn, email, meddelande } = body;
+  const { namn, email, meddelande, turnstileToken } = body;
   if (!namn?.trim() || !email?.trim() || !meddelande?.trim()) {
     return Response.json({ fel: "Alla fält måste fyllas i." }, { status: 400 });
   }
   if (!email.includes("@")) {
     return Response.json({ fel: "Ogiltig e-postadress." }, { status: 400 });
+  }
+
+  // Verifiera Turnstile
+  if (!turnstileToken) {
+    return Response.json({ fel: "CAPTCHA saknas." }, { status: 400 });
+  }
+  const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      secret: process.env.TURNSTILE_SECRET_KEY,
+      response: turnstileToken,
+    }),
+  });
+  const verifyData = await verifyRes.json();
+  if (!verifyData.success) {
+    return Response.json({ fel: "CAPTCHA-verifiering misslyckades." }, { status: 403 });
   }
 
   if (!RESEND_KEY) {
