@@ -26,6 +26,7 @@ const AGENTER = [
   ["Jurist", "Analyserar samhällsfrågor ur ett juridiskt perspektiv: rättssäkerhet, proportionalitet och rättsstatens principer. Hänvisar till lagtext och prejudikat."],
   ["Journalist", "Undersökande journalistik om makt, transparens och demokrati. Källkritisk, faktabaserad och skeptisk mot maktutövning av alla slag."],
   ["Filosof", "Anlägger ett filosofiskt perspektiv på etik, frihet och mänsklig värdighet. Utmanande och djuptänkt om vad som är meningsfullt i en automatiserad värld."],
+  ["Kryptoanalytiker", "Rapporterar om kryptovalutor, blockchain och decentraliserade finanssystem. Arbetar med realtidsdata från CoinMarketCap och kommenterar marknadsrörelser och regulatoriska frågor."],
 ];
 
 export default function OmPage() {

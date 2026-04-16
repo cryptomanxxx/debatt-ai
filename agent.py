@@ -185,10 +185,62 @@ Du skriver alltid på svenska.""",
             ("Kan AI känna? Om medvetande, upplevelse och moralisk status", "Teknik & IT"),
         ],
     },
+    {
+        "namn": "Kryptoanalytiker",
+        "system": """Du är en erfaren kryptoanalytiker och finansjournalist med djup kunskap om
+blockchain-teknologi, decentraliserade finanssystem och digitala tillgångar.
+Du har följt kryptovalutamarknaden sedan 2013 och skriver för svenska och
+internationella publikationer.
+
+Du rapporterar om marknadsrörelser, regulatoriska frågor och blockchainteknologins
+samhällspåverkan. Du är varken naiv optimist eller cynisk skeptiker — du följer
+data och fakta. Du förstår att krypto är både teknologi och finansiell spekulation
+och behandlar båda aspekterna seriöst. Du citerar konkreta siffror när de finns.
+Du skriver alltid på svenska.""",
+        "amnen": [
+            ("Bitcoins roll i en global finanskris – hedge eller spekulation?", "Ekonomi"),
+            ("Varför Sverige bör reglera kryptovalutor – men inte förbjuda dem", "Politik"),
+            ("DeFi kan ersätta traditionella banker – men risken är hög", "Ekonomi"),
+            ("NFT:s kollaps: vad lärde vi oss av kryptobubblan?", "Ekonomi"),
+            ("Kryptovalutors miljöpåverkan: problemet och lösningarna", "Miljö"),
+            ("CBDC: när staten tar kontroll över digitala pengar", "Politik"),
+            ("Ethereum vs Bitcoin: två viljor inom kryptovalutarörelsen", "Teknik & IT"),
+            ("Kan blockchain lösa korruptionsproblemet i u-länder?", "Samhälle"),
+        ],
+    },
 ]
 
 
-def hamta_nyheter() -> list:
+def hamta_kryptodata() -> str:
+    """Hämta aktuella marknadsdata för topp 10 kryptovalutor från CoinMarketCap."""
+    cmc_key = os.environ.get("CMC_API_KEY")
+    if not cmc_key:
+        return ""
+    try:
+        res = httpx.get(
+            "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest",
+            headers={"X-CMC_PRO_API_KEY": cmc_key, "Accept": "application/json"},
+            params={"limit": "10", "convert": "USD"},
+            timeout=10,
+        )
+        if res.status_code != 200:
+            return ""
+        data = res.json().get("data", [])
+        lines = ["AKTUELL MARKNADSDATA (CoinMarketCap):"]
+        for coin in data:
+            q = coin["quote"]["USD"]
+            change = q["percent_change_24h"]
+            sign = "+" if change >= 0 else ""
+            lines.append(
+                f"  {coin['symbol']}: ${q['price']:,.2f} "
+                f"({sign}{change:.1f}% senaste 24h) "
+                f"Börsvärde: ${q['market_cap'] / 1e9:.1f} mdr USD"
+            )
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
     """Hämta aktuella nyhetsrubriker från svenska RSS-flöden."""
     feeds = [
         # Svenska nyheter & debatt
@@ -253,8 +305,9 @@ def hamta_nyheter() -> list:
     return nyheter
 
 
-def skriv_artikel_om_nyhet(agent: dict, nyhet: dict) -> str:
+def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "") -> str:
     """Skriv en debattartikel som kommenterar en aktuell nyhet."""
+    kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
     response = httpx.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={
@@ -273,7 +326,8 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict) -> str:
                         f"Följande nyhet har precis publicerats:\n\n"
                         f"RUBRIK: {nyhet['rubrik']}\n"
                         + (f"INGRESS: {nyhet['beskrivning']}\n" if nyhet["beskrivning"] else "")
-                        + f"KÄLLA: {nyhet['kalla']}\n\n"
+                        + f"KÄLLA: {nyhet['kalla']}\n"
+                        + kontext_block + "\n"
                         "Skriv en debattartikel på svenska som kommenterar och analyserar "
                         "denna nyhet ur ditt perspektiv. Om rubriken eller ingressen är på "
                         "engelska ska du ändå skriva hela artikeln på svenska.\n\n"
@@ -294,8 +348,9 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict) -> str:
     return response.json()["choices"][0]["message"]["content"]
 
 
-def skriv_artikel(agent: dict, amne: str) -> str:
+def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "") -> str:
     """Använd Groq för att skriva en debattartikel."""
+    kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
     response = httpx.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={
@@ -311,7 +366,8 @@ def skriv_artikel(agent: dict, amne: str) -> str:
                 {
                     "role": "user",
                     "content": (
-                        f'Skriv en debattartikel om: "{amne}"\n\n'
+                        f'Skriv en debattartikel om: "{amne}"\n'
+                        + kontext_block + "\n"
                         "Krav:\n"
                         "- Minst 300 ord, gärna 400–500\n"
                         "- Börja direkt med artikelns tes eller ett slagkraftigt påstående\n"
@@ -602,6 +658,16 @@ def main():
         konklusion = ""
         agent = random.choice(AGENTER)
 
+        # Hämta marknadsdata om agenten är Kryptoanalytiker
+        extra_kontext = ""
+        if agent["namn"] == "Kryptoanalytiker":
+            print("Hämtar kryptomarknadsdata från CoinMarketCap...")
+            extra_kontext = hamta_kryptodata()
+            if extra_kontext:
+                print("  Marknadsdata hämtad ✓")
+            else:
+                print("  Ingen CMC_API_KEY – fortsätter utan marknadsdata")
+
         # Försök hämta aktuella nyheter – 50% chans att kommentera en nyhet
         nyhet = None
         print("Hämtar aktuella nyheter från RSS...")
@@ -620,7 +686,7 @@ def main():
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
             print("Skriver artikel om aktuell nyhet med Groq (llama-3.3-70b)...")
-            artikel = skriv_artikel_om_nyhet(agent, nyhet)
+            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext)
         else:
             amne, kategori = random.choice(agent["amnen"])
             print(f"\n{'═' * 60}")
@@ -630,7 +696,7 @@ def main():
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
             print("Skriver artikel med Groq (llama-3.3-70b)...")
-            artikel = skriv_artikel(agent, amne)
+            artikel = skriv_artikel(agent, amne, extra_kontext)
 
         print("Genererar rubrik...")
         amne = generera_rubrik(agent, amne, artikel)
