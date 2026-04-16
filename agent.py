@@ -294,6 +294,7 @@ def hamta_kryptodata() -> str:
         ("BMJ",                "https://www.bmj.com/rss/all-content.xml"),
         ("MDPI Healthcare",    "https://www.mdpi.com/rss/journal/healthcare"),
         ("PubMed Central",     "https://www.ncbi.nlm.nih.gov/pmc/latest-articles/rss.xml"),
+        ("Dagens Medicin",     "https://www.dagensmedicin.se/feed/"),
     ]
     nyheter = []
     for kalla, url in feeds:
