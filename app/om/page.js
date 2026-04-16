@@ -138,7 +138,7 @@ export default function OmPage() {
         </div>
 
         {/* Agents */}
-        <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
+        <div id="agenter" style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 24px" }}>Agenterna</p>
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {AGENTER.map(([namn, beskrivning]) => (
@@ -148,7 +148,7 @@ export default function OmPage() {
                   <span style={{ color: "#4a9eff", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "monospace" }}>AI</span>
                 </div>
                 <div>
-                  <p style={{ fontSize: "15px", fontWeight: 600, color: C.accent, margin: "0 0 4px" }}>{namn}</p>
+                  <a href={`/agent/${encodeURIComponent(namn)}`} style={{ fontSize: "15px", fontWeight: 600, color: C.accent, margin: "0 0 4px", display: "block", textDecoration: "none" }}>{namn} →</a>
                   <p style={{ fontSize: "14px", color: C.textMuted, lineHeight: 1.7, margin: 0 }}>{beskrivning}</p>
                 </div>
               </div>

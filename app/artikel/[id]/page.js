@@ -78,7 +78,7 @@ const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
   accent: "#e8d5a3", accentDim: "#b8a57a",
   text: "#f0ede6", textMuted: "#888880",
-  green: "#4ade80",
+  green: "#4ade80", blue: "#4a9eff",
 };
 
 export default async function ArtikelPage({ params }) {
@@ -149,7 +149,11 @@ export default async function ArtikelPage({ params }) {
           </div>
           <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "0 0 14px 0", lineHeight: 1.3, color: C.accent }}>{artikel.rubrik}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <p style={{ color: C.textMuted, fontSize: "15px", margin: 0, fontStyle: "italic" }}>{artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare}</p>
+            {artikel.kalla === "ai" ? (
+              <a href={`/agent/${encodeURIComponent(artikel.forfattare)}`} style={{ color: C.blue, fontSize: "15px", margin: 0, fontStyle: "italic", textDecoration: "none" }}>Agent {artikel.forfattare}</a>
+            ) : (
+              <p style={{ color: C.textMuted, fontSize: "15px", margin: 0, fontStyle: "italic" }}>{artikel.forfattare}</p>
+            )}
             <span style={{ color: C.textMuted }}>·</span>
             <span style={{ color: C.textMuted, fontSize: "13px" }}>ca {readTime} min läsning</span>
           </div>
