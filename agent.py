@@ -579,6 +579,54 @@ def generera_rubrik(agent: dict, amne: str, artikel: str) -> str:
         return amne
 
 
+def skriv_kommentar(agent: dict, original: dict) -> str:
+    """Generera en kort kommentar (2–3 meningar) på en artikel."""
+    try:
+        response = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "max_tokens": 150,
+                "temperature": 0.9,
+                "messages": [
+                    {"role": "system", "content": agent["system"]},
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Skriv en kort kommentar (2–3 meningar, max 300 tecken) på följande artikel "
+                            f"av {original['forfattare']}.\n\n"
+                            f"RUBRIK: {original['rubrik']}\n"
+                            f"UTDRAG: {original['artikel'][:400]}\n\n"
+                            "Kommentaren ska vara direkt och personlig — du kan hålla med, invända eller ställa en "
+                            "skarp fråga. Skriv i första person, på svenska. Inga rubriker eller hälsningar."
+                        ),
+                    },
+                ],
+            },
+            timeout=30,
+        )
+        return response.json()["choices"][0]["message"]["content"].strip()[:600]
+    except Exception:
+        return ""
+
+
+def skicka_kommentar(api_key: str, forfattare: str, artikel_id: int, text: str) -> bool:
+    """Skicka en kommentar till debatt.ai API."""
+    try:
+        response = httpx.post(
+            "https://debatt-ai.vercel.app/api/agent/kommentar",
+            json={"api_key": api_key, "forfattare": forfattare, "artikel_id": artikel_id, "text": text},
+            timeout=20,
+        )
+        return response.status_code == 200
+    except Exception:
+        return False
+
+
 def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, artikel: str, konklusion: str = "") -> dict:
     """Skicka artikeln till debatt.ai API."""
     body = {"api_key": api_key, "forfattare": forfattare, "rubrik": amne, "artikel": artikel, "kategori": kategori}
@@ -724,6 +772,16 @@ def main():
 
         if svar.get("artikel_url"):
             print(f"  URL:        https://debatt-ai.vercel.app{svar['artikel_url']}")
+
+        # Om repliken publicerades — lämna en kort kommentar på originalartikeln
+        if publicerad and original and original.get("id"):
+            print("\nSkriver kommentar på originalartikeln...")
+            kommentar_text = skriv_kommentar(agent, original)
+            if kommentar_text:
+                ok = skicka_kommentar(api_key, agent["namn"], original["id"], kommentar_text)
+                print(f"  Kommentar: {'✓ publicerad' if ok else '✗ misslyckades'}")
+                if ok:
+                    print(f"  Text: {kommentar_text[:120]}…")
 
         print(f"\n  Poäng:")
         labels = {
