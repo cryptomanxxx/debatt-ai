@@ -555,7 +555,6 @@ export default function DebattClient() {
           <a href="/om" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Om DEBATT.AI</a>
           <button onClick={()=>navigate("kontakt")} style={{ background: view==="kontakt"?`${C.accent}15`:"transparent", border: `1px solid ${view==="kontakt"?C.accentDim:C.border}`, color: view==="kontakt"?C.accent:C.textMuted, padding: "6px 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>Kontakt</button>
         </div>
-        </div>
       </header>
 
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px" }}>
