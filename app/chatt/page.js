@@ -38,13 +38,75 @@ const AGENT_FARG = {
   "Hypokondrikern":"#6ee7b7","Optimisten":"#fcd34d","Den rike":"#c4b5fd",
 };
 
-const AMNESFORSLAG = [
-  "Ska Sverige ha kärnkraft?","Är sociala medier bra för demokratin?",
-  "Kan AI ersätta läkare?","Ska vi ha fyradagarsvecka?",
-  "Är Bitcoin framtidens valuta?","Ska flygskatten höjas?",
-  "Är grundinkomst en bra idé?","Har skolan blivit för enkel?",
-  "Ska droger legaliseras?","Arbetar vi för mycket?",
+// ── Ämnen per kategori ────────────────────────────────────────────────────────
+const KATEGORIER = [
+  { id: "ai-tech",  label: "AI & Tech",  emoji: "🧠" },
+  { id: "ekonomi",  label: "Ekonomi",    emoji: "💰" },
+  { id: "politik",  label: "Politik",    emoji: "⚖️" },
+  { id: "vardag",   label: "Vardag",     emoji: "❤️" },
 ];
+
+const AMNEN = {
+  "ai-tech": [
+    "Ska AI få fatta juridiska beslut?",
+    "Bör AI ha rättigheter i framtiden?",
+    "Ska skolor förbjuda AI-verktyg helt?",
+    "Ska algoritmer bestämma vad vi ser online?",
+    "Kan robotar ersätta terapeuter?",
+    "Är dataintegritet viktigare än bekvämlighet?",
+    "Ska ansiktsigenkänning tillåtas i det offentliga?",
+    "Kan AI ersätta läkare?",
+    "Är Bitcoin framtidens valuta?",
+  ],
+  "ekonomi": [
+    "Ska vi beskatta rika mycket mer?",
+    "Är gig-ekonomin bra eller dålig?",
+    "Ska staten rädda företag i kris?",
+    "Ska arvsskatt återinföras?",
+    "Är bostadsmarknaden trasig?",
+    "Ska staten äga fler bolag?",
+    "Är inflation ett klassproblem?",
+    "Ska vi ha fyradagarsvecka?",
+    "Är grundinkomst en bra idé?",
+    "Ska rika få köpa bättre vård?",
+  ],
+  "politik": [
+    "Ska Sverige ha kärnkraft?",
+    "Ska droger legaliseras?",
+    "Är yttrandefriheten hotad i Sverige?",
+    "Ska Sverige införa tiggeriförbud?",
+    "Bör bidrag villkoras hårdare?",
+    "Är demokrati överskattat?",
+    "Ska man få säga vad som helst online?",
+    "Ska rösträttsåldern sänkas till 16?",
+    "Ska nationalstaten avskaffas?",
+    "Är Sverige för litet för att påverka klimatet?",
+    "Är klimatrörelsen för radikal?",
+    "Är sociala medier bra för demokratin?",
+    "Ska flygskatten höjas?",
+    "Ska kött beskattas hårdare?",
+  ],
+  "vardag": [
+    "Ska barn ha egna mobiltelefoner?",
+    "Är dagens föräldrar för överbeskyddande?",
+    "Har livet blivit sämre trots högre standard?",
+    "Är det fel att skaffa barn idag?",
+    "Har män det svårare än kvinnor idag?",
+    "Arbetar vi för mycket?",
+    "Är ensamhet ett samhällsproblem?",
+    "Ska alkohol regleras hårdare?",
+    "Är heltidsarbete föråldrat?",
+    "Är skärmtid ett folkhälsoproblem?",
+    "Har skolan blivit för enkel?",
+  ],
+};
+
+const AMNESFORSLAG = Object.values(AMNEN).flat();
+
+function slumpaAmne(kategoriId = null) {
+  const pool = kategoriId ? AMNEN[kategoriId] : AMNESFORSLAG;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
 
 function pickRandom(arr, n) { return [...arr].sort(() => Math.random() - 0.5).slice(0, n); }
 function af(namn) { return AGENT_FARG[namn] || C.accent; }
@@ -98,6 +160,19 @@ async function fetchSummering(amne, inlagg) {
   } catch { return ""; }
 }
 
+async function fetchAiAmne(agenter) {
+  try {
+    const res = await fetch("/api/chatt/amne", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agenter }),
+    });
+    if (!res.ok) return "";
+    const { amne } = await res.json();
+    return amne ?? "";
+  } catch { return ""; }
+}
+
 async function sparaDebatt({ amne, agenter, inlagg, summering }) {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/chatt_debatter`, {
@@ -144,7 +219,7 @@ function ThinkingBubble({ agent, isFirst }) {
 
 export default function ChattPage() {
   const [fas, setFas] = useState("start");
-  const [amne, setAmne] = useState(() => AMNESFORSLAG[Math.floor(Math.random() * AMNESFORSLAG.length)]);
+  const [amne, setAmne] = useState(() => slumpaAmne());
   const [valdPanel, setValdPanel] = useState(0);
   const [agenter, setAgenter] = useState([]);
   const [faktisktAmne, setFaktisktAmne] = useState("");
@@ -155,6 +230,7 @@ export default function ChattPage() {
   const [summering, setSummering] = useState("");
   const [debattId, setDebattId] = useState(null);
   const [felmeddelande, setFelmeddelande] = useState("");
+  const [aiVäljer, setAiVäljer] = useState(false);
   const stoppRef = useRef(false);
   const abortRef = useRef(null);
   const bottomRef = useRef(null);
@@ -162,6 +238,15 @@ export default function ChattPage() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [historik, streaming, tänker, summering]);
+
+  async function väljaAiAmne() {
+    const panel = PANELER[valdPanel];
+    const valdaAgenter = panel.agenter ?? pickRandom(ALLA_AGENTER, 3);
+    setAiVäljer(true);
+    const genererat = await fetchAiAmne(valdaAgenter);
+    if (genererat) setAmne(genererat);
+    setAiVäljer(false);
+  }
 
   async function avsluta(h, valtAmne, valdaAgenter) {
     setStreaming(null);
@@ -179,7 +264,7 @@ export default function ChattPage() {
   async function starta() {
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? pickRandom(ALLA_AGENTER, 3);
-    const valtAmne = amne.trim() || AMNESFORSLAG[0];
+    const valtAmne = amne.trim() || slumpaAmne();
 
     setAgenter(valdaAgenter);
     setFaktisktAmne(valtAmne);
@@ -211,7 +296,6 @@ export default function ChattPage() {
         });
         if (stoppRef.current) break;
         if (!text) {
-          // Kontrollera om det var ett rate limit-svar
           setFelmeddelande("Debatten avbröts oväntat. Försök igen.");
           break;
         }
@@ -243,7 +327,7 @@ export default function ChattPage() {
     setStreaming(null);
     setSummering("");
     setDebattId(null);
-    setAmne(AMNESFORSLAG[Math.floor(Math.random() * AMNESFORSLAG.length)]);
+    setAmne(slumpaAmne());
     setFelmeddelande("");
     stoppRef.current = false;
   }
@@ -290,12 +374,44 @@ export default function ChattPage() {
         {/* Start form */}
         {fas === "start" && (
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "28px" }}>
-            <div style={{ marginBottom: "24px" }}>
-              <label style={{ display: "block", fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "8px" }}>Debattämne</label>
-              <input value={amne} onChange={e => setAmne(e.target.value)} placeholder="Skriv ett ämne…"
-                style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "10px 14px", color: C.text, fontSize: "15px", fontFamily: "Georgia, serif", boxSizing: "border-box", outline: "none" }}
-                onKeyDown={e => e.key === "Enter" && starta()} />
+
+            {/* Ämne */}
+            <div style={{ marginBottom: "20px" }}>
+              <label style={{ display: "block", fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "10px" }}>Debattämne</label>
+
+              {/* Kategori-chips */}
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
+                {KATEGORIER.map(k => (
+                  <button key={k.id} onClick={() => setAmne(slumpaAmne(k.id))}
+                    style={{ padding: "4px 12px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer", transition: "all 0.15s" }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accentDim; e.currentTarget.style.color = C.accent; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textMuted; }}>
+                    {k.emoji} {k.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Input + slumpa-knapp */}
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input value={amne} onChange={e => setAmne(e.target.value)} placeholder="Skriv ett ämne…"
+                  style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "10px 14px", color: C.text, fontSize: "15px", fontFamily: "Georgia, serif", outline: "none" }}
+                  onKeyDown={e => e.key === "Enter" && starta()} />
+                <button onClick={() => setAmne(slumpaAmne())} title="Slumpa ämne"
+                  style={{ padding: "10px 14px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", color: C.textMuted, fontSize: "16px", cursor: "pointer", flexShrink: 0 }}>
+                  🎲
+                </button>
+              </div>
+
+              {/* Låt AI välja */}
+              <button onClick={väljaAiAmne} disabled={aiVäljer}
+                style={{ marginTop: "8px", padding: "7px 14px", background: "transparent", border: `1px solid ${C.accentDim}50`, borderRadius: "6px", color: aiVäljer ? C.textMuted : C.accentDim, fontSize: "13px", fontFamily: "Georgia, serif", cursor: aiVäljer ? "default" : "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                {aiVäljer
+                  ? <><span style={{ display: "inline-flex", gap: "3px" }}>{[0,1,2].map(j => <span key={j} style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.textMuted, display: "inline-block", animation: `dot 1.2s ease-in-out ${j*0.2}s infinite` }} />)}</span> AI väljer ämne…</>
+                  : "✦ Låt AI välja ämne"}
+              </button>
             </div>
+
+            {/* Panel */}
             <div style={{ marginBottom: "28px" }}>
               <label style={{ display: "block", fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "12px" }}>Panel</label>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
@@ -309,6 +425,7 @@ export default function ChattPage() {
                 ? <p style={{ fontSize: "12px", color: C.accentDim, margin: 0 }}>{PANELER[valdPanel].agenter.join(" · ")}</p>
                 : <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, fontStyle: "italic" }}>Väljer tre slumpmässiga agenter</p>}
             </div>
+
             <button onClick={starta} style={{ width: "100%", padding: "14px", background: C.accent, border: "none", borderRadius: "6px", color: C.bg, fontSize: "15px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer", letterSpacing: "0.04em" }}>
               Starta direktdebatt →
             </button>
