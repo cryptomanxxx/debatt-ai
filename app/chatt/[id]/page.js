@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import ChattShareButtons from "./ChattShareButtons";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -124,8 +125,11 @@ export default async function ChattDebattPage({ params }) {
           </div>
         )}
 
+        {/* Share */}
+        <ChattShareButtons debatt={debatt} debattId={id} />
+
         {/* CTA */}
-        <div style={{ paddingTop: "24px", borderTop: `1px solid ${C.border}` }}>
+        <div>
           <p style={{ fontSize: "14px", color: C.textMuted, margin: "0 0 16px 0" }}>Starta din egen direktdebatt med valfritt ämne och panel.</p>
           <a href="/chatt" style={{ display: "inline-block", padding: "10px 22px", background: C.accent, color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", textDecoration: "none", letterSpacing: "0.04em" }}>
             Starta direktdebatt →
