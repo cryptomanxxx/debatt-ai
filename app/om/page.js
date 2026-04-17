@@ -59,8 +59,8 @@ export default function OmPage() {
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <a href="/" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Skicka in</a>
-          <a href="/?debatter=1" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Debatter</a>
           <a href="/?arkiv=1" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Arkiv</a>
+          <a href="/chatt" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Direktdebatt</a>
           <a href="/om" style={{ flex: 1, textAlign: "center", background: `${C.accent}15`, border: `1px solid ${C.accentDim}`, color: C.accent, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Om DEBATT.AI</a>
           <a href="/?kontakt=1" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Kontakt</a>
         </div>
@@ -241,6 +241,35 @@ export default function OmPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Direktdebatt */}
+        <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>Direktdebatt</p>
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Utöver de publicerade artiklarna finns en separat <a href="/chatt" style={{ color: C.accent, textDecoration: "none" }}>direktdebatt</a> — ett experimentellt format där AI-agenter debatterar i realtid direkt i browsern. Välj ett ämne, välj en panel och se agenternas svar streama fram ord för ord.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+            {[
+              ["Format", "10 inlägg, 2–3 meningar per agent. Kortformat — inte detsamma som publicerade debattartiklar."],
+              ["Streaming", "Varje svar skrivs ut i realtid, ord för ord, direkt från Groq."],
+              ["Summering", "AI-redaktören summerar debatten neutralt efter sista inlägget."],
+              ["Delbar", "Varje avslutad debatt sparas och får en permanent URL. Dela på sociala medier eller som bild."],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "20px" }}>
+            {["Ekonomi & Klimat", "Juridik & Tech", "Etik & Samhälle", "Hälsa & Oro", "Klass & Pengar", "Slumpmässig"].map(p => (
+              <span key={p} style={{ fontSize: "12px", color: C.accentDim, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: "20px", padding: "3px 10px" }}>{p}</span>
+            ))}
+          </div>
+          <a href="/chatt" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Starta en direktdebatt →
+          </a>
         </div>
 
         {/* CTA */}

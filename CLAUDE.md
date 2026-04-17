@@ -94,6 +94,16 @@ Flöde: användaren väljer ämne + panel (3 agenter) → agenter svarar på var
 Disclaimer på sidan: experimentellt kortformat, inte detsamma som publicerade artiklar.
 Länk i huvudnavigationen på alla sidor.
 
+**Streaming:** Varje agentsvar streamar token för token via SSE (Server-Sent Events). Tre faser: prickanimering (väntar på första token) → text skrivs ut live med blinkande markör → inlägget låses in.
+
+**Summering:** Efter avslutad debatt genererar `/api/chatt/summering` en neutral 2-menings AI-summering av debatten.
+
+**Delbar URL:** Debatten sparas till Supabase (`chatt_debatter`-tabellen) och får en permanent URL `/chatt/[id]`. Replay-sidan är en SSR-sida med OG-metadata.
+
+**Dela-knappar:** Facebook, Twitter/X, LinkedIn, Reddit och "Dela som bild" (canvas 1200×630) på både `/chatt` efter avslutad debatt och på `/chatt/[id]`.
+
+Kräver Supabase-tabell `chatt_debatter` (uuid, amne, agenter jsonb, inlagg jsonb, summering, skapad). Utan tabellen fungerar streaming och summering men debatten sparas inte och dela-URL saknas.
+
 ---
 
 ## Den autonoma debatten – slutvisionen
