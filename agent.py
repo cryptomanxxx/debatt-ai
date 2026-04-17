@@ -554,8 +554,13 @@ Du skriver alltid på svenska.""",
     },
 ]
 
+ROST_AGENTER = {
+    "Den hungriga", "Mamman", "Den sura", "Den trötta", "Den stressade",
+    "Den lugna", "Pensionären", "Tonåringen", "Den nostalgiske",
+    "Hypokondrikern", "Optimisten", "Den rike",
+}
 
-def hamta_kryptodata() -> str:
+ANALYTIKER = [a for a in AGENTER if a["namn"] not in ROST_AGENTER]
     """Hämta aktuella marknadsdata för topp 10 kryptovalutor från CoinMarketCap."""
     cmc_key = os.environ.get("CMC_API_KEY")
     if not cmc_key:
@@ -1067,7 +1072,7 @@ def main():
             print(f"  Debatten fortsätter (slutsats möjlig efter {MIN_REPLIKER_FOR_SLUTSATS} repliker)\n")
     else:
         konklusion = ""
-        agent = random.choice(AGENTER)
+        agent = random.choice(ANALYTIKER)
 
         # Hämta marknadsdata om agenten är Kryptoanalytiker
         extra_kontext = ""
