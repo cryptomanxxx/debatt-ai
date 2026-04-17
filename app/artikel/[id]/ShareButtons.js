@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 
 const C = {
   bg: "#0a0a0a", border: "#222222",
@@ -39,7 +40,15 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 }
 
 export default function ShareButtons({ artikel }) {
+  const [copied, setCopied] = useState(false);
   const articleUrl = `https://debatt-ai.vercel.app/artikel/${artikel.id}`;
+
+  function copyLink() {
+    navigator.clipboard.writeText(articleUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
   const author = artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare;
   const date = artikel.skapad
     ? new Date(artikel.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" })
@@ -156,6 +165,9 @@ export default function ShareButtons({ artikel }) {
       `}</style>
       <div className="share-wrap">
         <span className="share-label">Dela:</span>
+        <button onClick={copyLink} className="share-btn share-social">
+          {copied ? "✓ Kopierad!" : "🔗 Kopiera länk"}
+        </button>
         {shareLinks.map(({ label, url }) => (
           <a key={label} href={url} target="_blank" rel="noreferrer" className="share-btn share-social">
             {label}

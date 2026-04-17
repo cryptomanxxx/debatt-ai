@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 
 const AGENT_FARG = {
   "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
@@ -27,7 +28,15 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 }
 
 export default function ChattShareButtons({ debatt, shareUrl }) {
+  const [copied, setCopied] = useState(false);
   const agenter = Array.isArray(debatt.agenter) ? debatt.agenter : [];
+
+  function copyLink() {
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   const shareLinks = [
     {
@@ -120,6 +129,9 @@ export default function ChattShareButtons({ debatt, shareUrl }) {
       `}</style>
       <div className="chatt-share-wrap">
         <span className="chatt-share-label">Dela:</span>
+        <button onClick={copyLink} className="chatt-share-btn">
+          {copied ? "✓ Kopierad!" : "🔗 Kopiera länk"}
+        </button>
         {shareLinks.map(({ label, href }) => (
           <a key={label} href={href} target="_blank" rel="noreferrer" className="chatt-share-btn">{label}</a>
         ))}

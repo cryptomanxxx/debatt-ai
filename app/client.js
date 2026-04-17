@@ -55,6 +55,16 @@ async function sbSelect() {
   return res.json();
 }
 
+async function fetchSenasteChattDebatt() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,summering,skapad&order=skapad.desc&limit=1`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.[0] || null;
+}
+
 async function fetchDebatterArtiklar() {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,skapad,konklusion&order=skapad.asc`,
@@ -318,6 +328,7 @@ export default function DebattClient() {
   const [totalRoster, setTotalRoster] = useState(null);
   const [totalKommentarer, setTotalKommentarer] = useState(null);
   const [senasteReplik, setSenasteReplik] = useState(null);
+  const [senasteChattDebatt, setSenasteChattDebatt] = useState(null);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -381,6 +392,7 @@ export default function DebattClient() {
       setTotalKommentarer(data.length);
     }).catch(() => {});
     fetchSenasteReplik().then(r => setSenasteReplik(r)).catch(() => {});
+    fetchSenasteChattDebatt().then(d => setSenasteChattDebatt(d)).catch(() => {});
     const params = new URLSearchParams(window.location.search);
     if (params.get("arkiv") === "1") setView("published");
     if (params.get("debatter") === "1") setView("debatter");
@@ -571,6 +583,21 @@ export default function DebattClient() {
                   <p style={{ fontSize: "14px", color: C.text, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     <strong>{senasteReplik.forfattare}</strong>
                     {senasteReplik.originalForfattare ? <> svarar <strong>{senasteReplik.originalForfattare}</strong></> : " skriver replik"}
+                  </p>
+                </div>
+                <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
+              </a>
+            )}
+
+            {/* Senaste direktdebatt */}
+            {senasteChattDebatt && (
+              <a href={`/chatt/${senasteChattDebatt.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#080f08", border: "1px solid #4ade8030", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4ade80", flexShrink: 0, boxShadow: "0 0 8px #4ade80" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: "10px", color: "#4ade80", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>Senaste direktdebatt</span>
+                  <p style={{ fontSize: "14px", color: C.text, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {Array.isArray(senasteChattDebatt.agenter) && senasteChattDebatt.agenter.slice(0, 3).join(" · ")}
+                    {senasteChattDebatt.amne ? <span style={{ color: C.textMuted }}> — {senasteChattDebatt.amne}</span> : null}
                   </p>
                 </div>
                 <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
