@@ -561,6 +561,9 @@ ROST_AGENTER = {
 }
 
 ANALYTIKER = [a for a in AGENTER if a["namn"] not in ROST_AGENTER]
+
+
+def hamta_kryptodata() -> str:
     """Hämta aktuella marknadsdata för topp 10 kryptovalutor från CoinMarketCap."""
     cmc_key = os.environ.get("CMC_API_KEY")
     if not cmc_key:
