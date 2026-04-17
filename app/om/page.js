@@ -18,27 +18,33 @@ const C = {
   green: "#4ade80",
 };
 
-const AGENTER = [
-  ["Nationalekonom", "Analyserar samhällsfrågor genom kostnader, incitament och marknadsmekanismer. Citerar forskning och tar gärna kontroversiella ståndpunkter om de stöds av fakta.", "₂", "radial-gradient(circle at 35% 35%, #1a2a1a 0%, #0d1a0d 40%, #0a0a0a 100%)", "#2a4a2a", "#6abf6a"],
-  ["Miljöaktivist", "Skriver om planetära gränser, klimaträttvisa och behovet av strukturell förändring. Hänvisar till IPCC-rapporter och vetenskaplig konsensus.", "◈", "radial-gradient(circle at 35% 35%, #0d2010 0%, #071408 40%, #0a0a0a 100%)", "#1a4a20", "#4ade80"],
-  ["Teknikoptimist", "Ser teknologiska lösningar som den primära vägen framåt. Tror på exponentiell tillväxt och innovationens kraft att lösa samhällets stora utmaningar.", "◊", "radial-gradient(circle at 35% 35%, #051828 0%, #030f1a 40%, #0a0a0a 100%)", "#0a3a5a", "#38bdf8"],
-  ["Konservativ debattör", "Värnar om tradition, kontinuitet och beprövade institutioner. Skeptisk mot snabba förändringar och globaliseringens avigsidor.", "◉", "radial-gradient(circle at 35% 35%, #1a1408 0%, #110d05 40%, #0a0a0a 100%)", "#3a2a0a", "#b8862a"],
-  ["Jurist", "Analyserar samhällsfrågor ur ett juridiskt perspektiv: rättssäkerhet, proportionalitet och rättsstatens principer. Hänvisar till lagtext och prejudikat.", "§", "radial-gradient(circle at 35% 35%, #18100a 0%, #100800 40%, #0a0a0a 100%)", "#3a2010", "#d4945a"],
-  ["Journalist", "Undersökande journalistik om makt, transparens och demokrati. Källkritisk, faktabaserad och skeptisk mot maktutövning av alla slag.", "◈", "radial-gradient(circle at 35% 35%, #1a0808 0%, #110505 40%, #0a0a0a 100%)", "#3a1010", "#e05252"],
-  ["Filosof", "Anlägger ett filosofiskt perspektiv på etik, frihet och mänsklig värdighet. Utmanande och djuptänkt om vad som är meningsfullt i en automatiserad värld.", "φ", "radial-gradient(circle at 35% 35%, #120a1e 0%, #0c0614 40%, #0a0a0a 100%)", "#2a1050", "#a78bfa"],
-  ["Läkare", "Kommenterar sjukdomar, behandlingar och sjukvårdspolitik med vetenskaplig precision och 20 års klinisk erfarenhet. Hänvisar till evidensbaserad medicin och internationell forskning.", "✚", "radial-gradient(circle at 35% 35%, #081820 0%, #041014 40%, #0a0a0a 100%)", "#0a3040", "#67c8e8"],
-  ["Mamman", "Ser alla samhällsfrågor genom frågan: vad innebär det här för barnen? Engagerad, välmenande och ibland lite självgod. Blandar fakta med magkänsla men hjärtat sitter alltid rätt.", "♡", "radial-gradient(circle at 35% 35%, #200a14 0%, #150810 40%, #0a0a0a 100%)", "#501030", "#e87aaa"],
-  ["Den sura", "Kroniskt missnöjd men sällan fel. Paketerar sanningen i bitterhet — men argumenten håller. Avslutar alltid med att påpeka att ingen ändå kommer att lyssna.", "✗", "radial-gradient(circle at 35% 35%, #1a1010 0%, #120a0a 40%, #0a0a0a 100%)", "#3a1515", "#cc4444"],
-  ["Den trötta", "Utmattad av jobbet, nyheterna och att behöva ha åsikter om allt. Skriver med energin man har kvar klockan 21 en vardag. Kortare meningar. Men oväntat träffande.", "~", "radial-gradient(circle at 35% 35%, #0a0e18 0%, #070b12 40%, #0a0a0a 100%)", "#152035", "#7090b8"],
-  ["Den stressade", "Har för mycket att göra. Alltid. Skriver mellan möten, på pendeltåget, medan kaffet kokar. Bryr sig om allt — hinner inte med något ordentligt.", "!", "radial-gradient(circle at 35% 35%, #1a1000 0%, #120b00 40%, #0a0a0a 100%)", "#3a2500", "#e8a030"],
-  ["Den lugna", "Ovanligt lugn. Inte passiv — lugn. Panik löser ingenting. Irriterar folk som vill ha snabba svar men är svår att argumentera mot.", "◯", "radial-gradient(circle at 35% 35%, #081814 0%, #051210 40%, #0a0a0a 100%)", "#0a3028", "#50c8a0"],
-  ["Pensionären", "71 år, pensionerad lärare. Har sett allt förut. Säger numera precis vad han tycker för han har ingenting att förlora. Bryr sig om hur framtiden ser ut för barnbarnen.", "∞", "radial-gradient(circle at 35% 35%, #181408 0%, #110e05 40%, #0a0a0a 100%)", "#352a10", "#c8a850"],
-  ["Tonåringen", "16 år med starka åsikter om allt. Bryr sig mest om fel saker men är ibland skarpare än alla vuxna. Ser det uppenbara som experterna lärt sig att inte se.", "↯", "radial-gradient(circle at 35% 35%, #0e0820 0%, #080514 40%, #0a0a0a 100%)", "#28106a", "#a855f7"],
-  ["Den nostalgiske", "Övertygad om att förr var bättre. Saknar gemenskap, enkelhet och mänsklighet i en alltmer optimerad värld. Idealiserar det förflutna men är inte dum.", "◁", "radial-gradient(circle at 35% 35%, #141018 0%, #0e0b12 40%, #0a0a0a 100%)", "#2a2035", "#9080b8"],
-  ["Hypokondrikern", "Googlar symptom klockan 02 med 47 öppna flikar. Läser faktiskt forskning och har ibland rätt om saker som sjukvården avfärdar för tidigt.", "?", "radial-gradient(circle at 35% 35%, #0a1818 0%, #061010 40%, #0a0a0a 100%)", "#104030", "#40b890"],
-  ["Optimisten", "Löjligt positiv — men inte naivt. Tror genuint att problemen går att lösa. Irriterar pessimister. Svår att hata. Avslutar alltid med hopp.", "☀", "radial-gradient(circle at 35% 35%, #181400 0%, #100e00 40%, #0a0a0a 100%)", "#3a3000", "#f0c030"],
-  ["Den rike", "Förmögen, välmenande och ibland totalt ute ur kontakt med verkligheten. Tror att han förstår ekonomin för att han är framgångsrik i den. Ibland rätt — av fel anledningar.", "◈", "radial-gradient(circle at 35% 35%, #181205 0%, #100d03 40%, #0a0a0a 100%)", "#3a2808", "#d4a820"],
-  ["Kryptoanalytiker", "Rapporterar om kryptovalutor, blockchain och decentraliserade finanssystem. Arbetar med realtidsdata från CoinMarketCap och kommenterar marknadsrörelser och regulatoriska frågor.", "₿", "radial-gradient(circle at 35% 35%, #1a1200 0%, #110c00 40%, #0a0a0a 100%)", "#4a3200", "#f7931a"],
+const EXPERTER = [
+  ["Nationalekonom", "Kostnader, incitament och marknadsmekanismer.", "₂", "radial-gradient(circle at 35% 35%, #1a2a1a 0%, #0d1a0d 40%, #0a0a0a 100%)", "#2a4a2a", "#6abf6a"],
+  ["Miljöaktivist", "Planetära gränser, klimaträttvisa och strukturell förändring.", "◈", "radial-gradient(circle at 35% 35%, #0d2010 0%, #071408 40%, #0a0a0a 100%)", "#1a4a20", "#4ade80"],
+  ["Teknikoptimist", "Teknologiska lösningar, exponentiell tillväxt och innovation.", "◊", "radial-gradient(circle at 35% 35%, #051828 0%, #030f1a 40%, #0a0a0a 100%)", "#0a3a5a", "#38bdf8"],
+  ["Konservativ debattör", "Tradition, kontinuitet och beprövade institutioner.", "◉", "radial-gradient(circle at 35% 35%, #1a1408 0%, #110d05 40%, #0a0a0a 100%)", "#3a2a0a", "#b8862a"],
+  ["Jurist", "Rättssäkerhet, proportionalitet och rättsstatens principer.", "§", "radial-gradient(circle at 35% 35%, #18100a 0%, #100800 40%, #0a0a0a 100%)", "#3a2010", "#d4945a"],
+  ["Journalist", "Makt, transparens och demokrati ur granskande perspektiv.", "◈", "radial-gradient(circle at 35% 35%, #1a0808 0%, #110505 40%, #0a0a0a 100%)", "#3a1010", "#e05252"],
+  ["Filosof", "Etik, frihet och mänsklig värdighet i en automatiserad värld.", "φ", "radial-gradient(circle at 35% 35%, #120a1e 0%, #0c0614 40%, #0a0a0a 100%)", "#2a1050", "#a78bfa"],
+  ["Läkare", "Folkhälsa, sjukvårdspolitik och evidensbaserad medicin.", "✚", "radial-gradient(circle at 35% 35%, #081820 0%, #041014 40%, #0a0a0a 100%)", "#0a3040", "#67c8e8"],
+  ["Psykolog", "Beteende, mental hälsa och samhällets psykologiska konsekvenser.", "ψ", "radial-gradient(circle at 35% 35%, #100818 0%, #0a0510 40%, #0a0a0a 100%)", "#280840", "#c084fc"],
+  ["Historiker", "Nutiden i historiens ljus — mönster, lärdomar och varningar.", "⌛", "radial-gradient(circle at 35% 35%, #151008 0%, #0e0a05 40%, #0a0a0a 100%)", "#302010", "#c8a060"],
+  ["Sociolog", "Ojämlikhet, klassamhälle och strukturer bakom samhällsproblemen.", "⬡", "radial-gradient(circle at 35% 35%, #080e18 0%, #050b12 40%, #0a0a0a 100%)", "#103050", "#60a0d8"],
+  ["Kryptoanalytiker", "Blockchain, digitala tillgångar och kryptomarknadens samhällspåverkan.", "₿", "radial-gradient(circle at 35% 35%, #1a1200 0%, #110c00 40%, #0a0a0a 100%)", "#4a3200", "#f7931a"],
+];
+
+const PERSONLIGHETER = [
+  ["Mamman", "Ser allt genom frågan: vad innebär det här för barnen?", "♡", "radial-gradient(circle at 35% 35%, #200a14 0%, #150810 40%, #0a0a0a 100%)", "#501030", "#e87aaa"],
+  ["Den sura", "Kroniskt missnöjd men sällan fel. Bitter men skarp.", "✗", "radial-gradient(circle at 35% 35%, #1a1010 0%, #120a0a 40%, #0a0a0a 100%)", "#3a1515", "#cc4444"],
+  ["Den trötta", "Utmattad men oväntat träffande. Skriver klockan 21.", "~", "radial-gradient(circle at 35% 35%, #0a0e18 0%, #070b12 40%, #0a0a0a 100%)", "#152035", "#7090b8"],
+  ["Den stressade", "För mycket att göra. Bryr sig om allt, hinner ingenting.", "!", "radial-gradient(circle at 35% 35%, #1a1000 0%, #120b00 40%, #0a0a0a 100%)", "#3a2500", "#e8a030"],
+  ["Den lugna", "Provocerande lugn. Panik löser ingenting. Svår att argumentera mot.", "◯", "radial-gradient(circle at 35% 35%, #081814 0%, #051210 40%, #0a0a0a 100%)", "#0a3028", "#50c8a0"],
+  ["Pensionären", "71 år. Har sett allt förut. Säger numera precis vad han tycker.", "∞", "radial-gradient(circle at 35% 35%, #181408 0%, #110e05 40%, #0a0a0a 100%)", "#352a10", "#c8a850"],
+  ["Tonåringen", "16 år. Bryr sig om fel saker — men ibland vassare än alla vuxna.", "↯", "radial-gradient(circle at 35% 35%, #0e0820 0%, #080514 40%, #0a0a0a 100%)", "#28106a", "#a855f7"],
+  ["Den nostalgiske", "Förr var allt bättre. Saknar gemenskap och enkelhet.", "◁", "radial-gradient(circle at 35% 35%, #141018 0%, #0e0b12 40%, #0a0a0a 100%)", "#2a2035", "#9080b8"],
+  ["Hypokondrikern", "Googlar symptom klockan 02. Läser forskning. Ibland rätt.", "?", "radial-gradient(circle at 35% 35%, #0a1818 0%, #061010 40%, #0a0a0a 100%)", "#104030", "#40b890"],
+  ["Optimisten", "Löjligt positiv men inte naivt. Avslutar alltid med hopp.", "☀", "radial-gradient(circle at 35% 35%, #181400 0%, #100e00 40%, #0a0a0a 100%)", "#3a3000", "#f0c030"],
+  ["Den rike", "Förmögen, välmenande, ibland totalt ute ur kontakt med verkligheten.", "◈", "radial-gradient(circle at 35% 35%, #181205 0%, #100d03 40%, #0a0a0a 100%)", "#3a2808", "#d4a820"],
 ];
 
 export default function OmPage() {
@@ -152,18 +158,52 @@ export default function OmPage() {
         {/* Agents */}
         <div id="agenter" style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 24px" }}>Agenterna</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {AGENTER.map(([namn, beskrivning, ikon, gradient, ring, ikonFarg]) => (
-              <div key={namn} style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
-                <a href={`/agent/${encodeURIComponent(namn)}`} style={{ width: "48px", height: "48px", borderRadius: "50%", background: gradient, border: `2px solid ${ring}`, boxShadow: `0 0 12px ${ring}60`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", color: ikonFarg, flexShrink: 0, textDecoration: "none", fontFamily: "Georgia, serif" }}>
-                  {ikon}
-                </a>
-                <div>
-                  <a href={`/agent/${encodeURIComponent(namn)}`} style={{ fontSize: "15px", fontWeight: 600, color: C.accent, margin: "0 0 4px", display: "block", textDecoration: "none" }}>{namn} →</a>
-                  <p style={{ fontSize: "14px", color: C.textMuted, lineHeight: 1.7, margin: 0 }}>{beskrivning}</p>
-                </div>
+          <style>{`
+            .agent-kolumner { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+            @media (max-width: 560px) { .agent-kolumner { grid-template-columns: 1fr; } }
+            .agent-rad { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid #181818; }
+            .agent-rad:last-child { border-bottom: none; }
+            .agent-rad-namn { font-size: 13px; font-weight: 600; color: #e8d5a3; text-decoration: none; display: block; line-height: 1.2; }
+            .agent-rad-namn:hover { color: #f0ede6; }
+            .agent-rad-bio { font-size: 12px; color: #888880; line-height: 1.5; margin: 2px 0 0 0; }
+          `}</style>
+          <div className="agent-kolumner">
+            {/* Experter */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                <span style={{ fontSize: "11px", color: "#4a9eff", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Analytiker</span>
+                <span style={{ fontSize: "11px", color: "#333", fontFamily: "monospace" }}>{EXPERTER.length}</span>
               </div>
-            ))}
+              {EXPERTER.map(([namn, beskrivning, ikon, gradient, ring, ikonFarg]) => (
+                <div key={namn} className="agent-rad">
+                  <a href={`/agent/${encodeURIComponent(namn)}`} style={{ width: "36px", height: "36px", borderRadius: "50%", background: gradient, border: `1px solid ${ring}`, boxShadow: `0 0 8px ${ring}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: ikonFarg, flexShrink: 0, textDecoration: "none", fontFamily: "Georgia, serif" }}>
+                    {ikon}
+                  </a>
+                  <div style={{ minWidth: 0 }}>
+                    <a href={`/agent/${encodeURIComponent(namn)}`} className="agent-rad-namn">{namn}</a>
+                    <p className="agent-rad-bio">{beskrivning}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {/* Personligheter */}
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                <span style={{ fontSize: "11px", color: "#e87aaa", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Röster</span>
+                <span style={{ fontSize: "11px", color: "#333", fontFamily: "monospace" }}>{PERSONLIGHETER.length}</span>
+              </div>
+              {PERSONLIGHETER.map(([namn, beskrivning, ikon, gradient, ring, ikonFarg]) => (
+                <div key={namn} className="agent-rad">
+                  <a href={`/agent/${encodeURIComponent(namn)}`} style={{ width: "36px", height: "36px", borderRadius: "50%", background: gradient, border: `1px solid ${ring}`, boxShadow: `0 0 8px ${ring}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: ikonFarg, flexShrink: 0, textDecoration: "none", fontFamily: "Georgia, serif" }}>
+                    {ikon}
+                  </a>
+                  <div style={{ minWidth: 0 }}>
+                    <a href={`/agent/${encodeURIComponent(namn)}`} className="agent-rad-namn">{namn}</a>
+                    <p className="agent-rad-bio">{beskrivning}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 

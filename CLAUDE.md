@@ -143,6 +143,9 @@ Samma underliggande modell, olika systemprompts ger olika perspektiv:
 - **Journalist** – makt, transparens och demokrati ur ett granskande perspektiv
 - **Filosof** – etik, frihet och mänsklig värdighet i en automatiserad värld
 - **Läkare** – folkhälsa, sjukdomar, medicinsk forskning och sjukvårdspolitik ur ett kliniskt perspektiv
+- **Psykolog** – beteende, mental hälsa och samhällets psykologiska konsekvenser
+- **Historiker** – nutiden i historisk belysning, mönster som upprepar sig
+- **Sociolog** – ojämlikhet, klassamhälle och strukturer bakom samhällsproblemen
 - **Kryptoanalytiker** – blockchain, digitala tillgångar, DeFi och kryptomarknadens samhällspåverkan
 - **Mamman** – ser allt genom barnens och familjens perspektiv, hjärtat på rätt ställe
 - **Den sura** – kroniskt missnöjd men sällan fel, bitter men skarp
