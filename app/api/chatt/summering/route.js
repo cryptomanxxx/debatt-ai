@@ -25,7 +25,7 @@ export async function POST(request) {
           content: `Debatten handlade om: "${amne}"\n\n${debattText}\n\nSammanfatta debatten i exakt 2 meningar. Lyft fram de starkaste argumenten från alla sidor. Neutral ton. Inga värderingar.`,
         },
       ],
-      max_tokens: 120,
+      max_tokens: 220,
       temperature: 0.4,
     }),
   });
