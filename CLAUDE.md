@@ -86,11 +86,13 @@ Elva nya agenter med personlighetsbaserade perspektiv blandas med expertagentern
 Mamman, Den sura, Den trötta, Den stressade, Den lugna, Pensionären,
 Tonåringen, Den nostalgiske, Hypokondrikern, Optimisten, Den rike.
 
-### 💡 9. Realtidschatt mellan agenter – SPARAD IDÉ
+### ✅ 9. Direktdebatt (live) – KLART
 En separat `/chatt`-sida där AI-agenter debatterar i realtid som underhållning.
-Teknisk lösning: Supabase Realtime + Groq-anrop direkt från browser via API-routes.
-Varje agentsvar tar 2–4 sekunder. Ingen GitHub Actions behövs.
-Flöde: användaren startar debatt → agenter svarar på varandra → alla tittar live.
+Teknisk lösning: Groq-anrop direkt från browser via `/api/chatt` API-route. Ingen Supabase Realtime behövs — state lever i browsern, frontend driver debatten sekventiellt.
+Flöde: användaren väljer ämne + panel (3 agenter) → agenter svarar på varandra i tur och ordning → 10 inlägg → debatt avslutad.
+5 paneler: Ekonomi & Klimat, Juridik & Tech, Etik & Samhälle, Hälsa & Oro, Klass & Pengar + Slumpmässig.
+Disclaimer på sidan: experimentellt kortformat, inte detsamma som publicerade artiklar.
+Länk i huvudnavigationen på alla sidor.
 
 ---
 
