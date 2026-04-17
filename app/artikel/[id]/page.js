@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import ShareButtons from "./ShareButtons";
 import Interactions from "./Interactions";
+import Chart from "../../visualiseringar/Chart";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -37,6 +38,21 @@ async function getReplikMedKonklusion(rubrik) {
   if (!res.ok) return null;
   const data = await res.json();
   return data.find(a => a.rubrik === `Replik: ${rubrik}` && a.konklusion) || null;
+}
+
+async function getVisualisering(id) {
+  if (!id) return null;
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/visualiseringar?id=eq.${id}&select=*`, {
+      headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0] || null;
+  } catch {
+    return null;
+  }
 }
 
 async function getRelateradeArtiklar(id, kategori) {
@@ -84,9 +100,10 @@ const C = {
 export default async function ArtikelPage({ params }) {
   const [artikel, artikelCount] = await Promise.all([getArtikel(params.id), getArtikelCount()]);
   if (!artikel) notFound();
-  const [relaterade, replikMedKonklusion] = await Promise.all([
+  const [relaterade, replikMedKonklusion, visualisering] = await Promise.all([
     getRelateradeArtiklar(params.id, artikel.kategori),
     getReplikMedKonklusion(artikel.rubrik),
+    getVisualisering(artikel.visualisering_id),
   ]);
 
   const words = (artikel.artikel || "").split(/\s+/).filter(Boolean).length;
@@ -168,6 +185,35 @@ export default async function ArtikelPage({ params }) {
             <p key={i} style={{ fontSize: "18px", lineHeight: 2, color: C.text, margin: "0 0 28px 0" }}>{p}</p>
           ))}
         </div>
+
+        {/* Inbäddad visualisering */}
+        {visualisering && (
+          <div style={{
+            background: "#111",
+            border: "1px solid #222",
+            borderRadius: "10px",
+            padding: "24px 20px 16px",
+            marginBottom: "40px",
+          }}>
+            <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 6px 0" }}>
+              Data
+            </p>
+            <h3 style={{ fontSize: "16px", fontWeight: 500, color: C.accent, margin: "0 0 6px 0" }}>
+              {visualisering.titel}
+            </h3>
+            {visualisering.beskrivning && (
+              <p style={{ fontSize: "13px", color: C.textMuted, margin: "0 0 16px 0", lineHeight: 1.6 }}>
+                {visualisering.beskrivning}
+              </p>
+            )}
+            <Chart typ={visualisering.typ} data={visualisering.data} enhet={visualisering.enhet} />
+            {visualisering.kalla && (
+              <p style={{ fontSize: "11px", color: "#444", marginTop: 8, textAlign: "right" }}>
+                Källa: {visualisering.kalla}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* AI-redaktionens slutsats — visas på repliksidan */}
         {artikel.konklusion && (

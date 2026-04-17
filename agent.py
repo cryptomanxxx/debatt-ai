@@ -1041,11 +1041,36 @@ def skicka_kommentar(api_key: str, forfattare: str, artikel_id: int, text: str) 
         return False
 
 
-def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, artikel: str, konklusion: str = "") -> dict:
+def hamta_senaste_visualisering(sb_key: str, kategori_hints: list[str] | None = None) -> dict | None:
+    """Hämtar en relevant visualisering från Supabase att bifoga till artikeln."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/visualiseringar?select=id,nyckel,titel&order=skapad.desc&limit=20",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=10,
+        )
+        vizs = res.json() if res.is_success else []
+        if not vizs:
+            return None
+        # Försök matcha mot kategori-hints (t.ex. "ekonomi", "klimat")
+        if kategori_hints:
+            for hint in kategori_hints:
+                for v in vizs:
+                    if hint.lower() in v.get("nyckel", "").lower():
+                        return v
+        return random.choice(vizs[:5])
+    except Exception:
+        return None
+
+
+def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, artikel: str,
+                   konklusion: str = "", visualisering_id: str | None = None) -> dict:
     """Skicka artikeln till debatt.ai API."""
     body = {"api_key": api_key, "forfattare": forfattare, "rubrik": amne, "artikel": artikel, "kategori": kategori}
     if konklusion:
         body["konklusion"] = konklusion
+    if visualisering_id:
+        body["visualisering_id"] = visualisering_id
     response = httpx.post(DEBATT_API, json=body, timeout=60)
     return response.json()
 
@@ -1276,9 +1301,24 @@ def main():
     print(f"Klar! ({ord_antal} ord)\n")
     print(f"Förhandsvisning:\n{artikel[:300]}...\n")
 
+    # Bifoga visualisering till nya artiklar (inte repliker) med 40% chans
+    viz_id = None
+    if not original and sb_key and random.random() < 0.4:
+        KATEGORI_NYCKELORD = {
+            "ekonomi":       ["bnp", "inflation", "export", "styrränta", "kpif"],
+            "arbetsmarknad": ["arbetslöshet", "ungdomsarbetslöshet", "sysselsattning"],
+            "klimat":        ["co2", "fornybar", "skogstäckning"],
+            "valfard":       ["utbildning", "halsa", "livslangd", "gini"],
+        }
+        hints = KATEGORI_NYCKELORD.get(kategori.lower(), [])
+        viz = hamta_senaste_visualisering(sb_key, hints or None)
+        if viz:
+            viz_id = viz["id"]
+            print(f"Bifogar visualisering: \"{viz['titel']}\" ({viz['nyckel']})\n")
+
     # Skicka till debatt.ai
     print("Skickar till debatt.ai för AI-granskning...")
-    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion)
+    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id)
 
     # Visa resultat
     print(f"\n{'═' * 60}")
