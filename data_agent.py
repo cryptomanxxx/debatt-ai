@@ -48,11 +48,13 @@ WB_INDIKATORER = [
 ]
 
 # ── Riksbanken-indikatorer ────────────────────────────────────────────────────
-# Hämtar via Riksbankens öppna CSV-endpoint (SWEA API är opålitligt)
-# Format: (nyckel, namn, kategori, enhet, serie_id_swea)
+# Kandidat-ID:n provas i ordning tills ett fungerar
+# Format: (nyckel, namn, kategori, enhet, [kandidat_id, ...])
 RB_INDIKATORER = [
-    ("styrränta",   "Styrränta",    "ekonomi", "%", "SECBREPOEFF"),
-    ("kpif",        "KPIF",         "ekonomi", "%", "SECPIFXFE"),
+    ("styrränta", "Styrränta", "ekonomi", "%",
+     ["SECBREPOEFF", "SECBREPO", "SEREPMIN", "REPORATE", "SE.CB.PR"]),
+    ("kpif", "KPIF", "ekonomi", "%",
+     ["SEKPIF", "SECPIFXFE", "SEKPIFEXT", "CPIFSE"]),
 ]
 
 
@@ -91,29 +93,39 @@ def hamta_world_bank(indicator: str, country: str = "SE", n: int = 10) -> list[d
         return []
 
 
-def hamta_riksbanken(series_id: str) -> list[dict]:
-    """Hämtar de senaste värdena för en Riksbanken-serie."""
-    url = f"https://api.riksbank.se/swea/v1/Observations/{series_id}/latest/24"
-    try:
-        res = httpx.get(url, timeout=15, follow_redirects=True,
-                        headers={"Accept": "application/json"})
-        res.raise_for_status()
-        data = res.json()
-        punkter = []
-        for row in data:
-            period = row.get("date", "")[:7]  # YYYY-MM
-            varde = row.get("value")
-            if period and varde is not None:
-                punkter.append({"period": period, "varde": round(float(varde), 3)})
-        # Deduplicera per period (ta senaste)
-        seen = {}
-        for p in punkter:
-            seen[p["period"]] = p["varde"]
-        punkter = [{"period": k, "varde": v} for k, v in sorted(seen.items())]
-        return punkter[-24:]
-    except Exception as e:
-        print(f"  Riksbanken fel ({series_id}): {e}", file=sys.stderr)
-        return []
+def hamta_riksbanken(kandidater: list[str]) -> tuple[list[dict], str]:
+    """Provar kandidat-ID:n i ordning och returnerar (historik, fungerande_id)."""
+    for series_id in kandidater:
+        for url_mall in [
+            f"https://api.riksbank.se/swea/v1/Observations/{series_id}/latest/36",
+            f"https://api.riksbank.se/swea/v1/Observations?seriesid={series_id}&latest=36",
+        ]:
+            try:
+                res = httpx.get(url_mall, timeout=15, follow_redirects=True,
+                                headers={"Accept": "application/json"})
+                if not res.is_success:
+                    continue
+                data = res.json()
+                if not isinstance(data, list) or not data:
+                    continue
+                punkter = []
+                for row in data:
+                    period = (row.get("date") or row.get("period") or "")[:7]
+                    varde = row.get("value") or row.get("val")
+                    if period and varde is not None:
+                        punkter.append({"period": period, "varde": round(float(varde), 3)})
+                if not punkter:
+                    continue
+                seen = {}
+                for p in punkter:
+                    seen[p["period"]] = p["varde"]
+                historik = [{"period": k, "varde": v} for k, v in sorted(seen.items())]
+                print(f"  Riksbanken: hittade serie {series_id}")
+                return historik[-36:], series_id
+            except Exception:
+                continue
+    print(f"  Riksbanken: inget av {kandidater} fungerade", file=sys.stderr)
+    return [], ""
 
 
 def spara_statistik(nyckel: str, namn: str, kategori: str, enhet: str,
@@ -171,9 +183,9 @@ def main():
 
     # Riksbanken
     print("\n── Riksbanken ──")
-    for nyckel, namn, kategori, enhet, series_id in RB_INDIKATORER:
-        historik = hamta_riksbanken(series_id)
-        url = f"https://www.riksbank.se/sv/statistik/sok-rantor--valutakurser/?s={series_id}"
+    for nyckel, namn, kategori, enhet, kandidater in RB_INDIKATORER:
+        historik, funnet_id = hamta_riksbanken(kandidater)
+        url = f"https://www.riksbank.se/sv/statistik/sok-rantor--valutakurser/?s={funnet_id}"
         if spara_statistik(nyckel, namn, kategori, enhet, "Riksbanken", url, historik):
             ok += 1
         else:
