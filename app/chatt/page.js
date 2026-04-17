@@ -352,6 +352,7 @@ export default function ChattPage() {
           {navLink("/?debatter=1","Debatter",false)}
           {navLink("/?arkiv=1","Arkiv",false)}
           {navLink("/chatt","Direktdebatt",true)}
+          {navLink("/visualiseringar","Visualiseringar",false)}
           {navLink("/om","Om DEBATT.AI",false)}
           {navLink("/?kontakt=1","Kontakt",false)}
         </div>

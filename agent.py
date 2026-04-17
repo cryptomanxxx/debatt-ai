@@ -13,6 +13,7 @@ Installera beroenden:
 """
 
 import httpx
+import json
 import random
 import os
 import sys
@@ -1049,6 +1050,93 @@ def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, arti
     return response.json()
 
 
+def hamta_all_statistik(sb_key: str) -> list[dict]:
+    """Hämtar alla rader från statistik-tabellen."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/statistik?select=nyckel,namn,kategori,senaste_varde,enhet,period,historik,kalla",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=10,
+        )
+        return res.json() if res.is_success else []
+    except Exception:
+        return []
+
+
+def valj_visualisering(statistik_data: list[dict]) -> dict | None:
+    """Låter Groq välja vilken statistik som ska visualiseras och hur."""
+    stats_text = "\n".join([
+        f"- nyckel={r['nyckel']} | {r['namn']} ({r['kategori']}): "
+        f"{r['senaste_varde']} {r['enhet']} ({r['period']})"
+        for r in statistik_data if r.get("senaste_varde") is not None
+    ])
+    prompt = f"""Du är en dataanalytiker på en svensk debattajt. Välj EN indikator att visualisera.
+
+Tillgänglig statistik:
+{stats_text}
+
+Returnera ENDAST JSON (inga andra tecken):
+{{
+  "nyckel": "statistikens nyckel exakt som den är listad ovan",
+  "typ": "line",
+  "titel": "En skarp journalistisk rubrik (max 60 tecken)",
+  "beskrivning": "2-3 meningar som analyserar och kontextualiserar datan ur ett samhällsperspektiv. Konkret och debattrelevant."
+}}
+
+Välj den indikator som just nu är mest politiskt relevant. typ ska vara 'line' för trender över tid, 'bar' för jämförelser."""
+
+    try:
+        response = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}", "Content-Type": "application/json"},
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 250,
+                "temperature": 0.7,
+            },
+            timeout=30,
+        )
+        raw = response.json()["choices"][0]["message"]["content"].strip()
+        raw = raw[raw.find("{"):raw.rfind("}")+1]
+        return json.loads(raw)
+    except Exception as e:
+        print(f"  Fel i valj_visualisering: {e}", file=sys.stderr)
+        return None
+
+
+def publicera_visualisering(sb_key: str, viz: dict, statistik_rad: dict) -> bool:
+    """Sparar visualiseringen till Supabase visualiseringar-tabellen."""
+    historik = statistik_rad.get("historik") or []
+    if not historik:
+        return False
+    row = {
+        "nyckel":      viz["nyckel"],
+        "typ":         viz.get("typ", "line"),
+        "titel":       viz["titel"],
+        "beskrivning": viz.get("beskrivning", ""),
+        "data":        historik,
+        "enhet":       statistik_rad.get("enhet", ""),
+        "kalla":       statistik_rad.get("kalla", "World Bank"),
+        "agent_namn":  "Dataanalytiker",
+    }
+    try:
+        res = httpx.post(
+            f"{SB_URL}/rest/v1/visualiseringar",
+            json=row,
+            headers={
+                "apikey": sb_key,
+                "Authorization": f"Bearer {sb_key}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+            timeout=15,
+        )
+        return res.status_code in (200, 201, 204)
+    except Exception:
+        return False
+
+
 def main():
     api_key = os.environ.get("DEBATT_API_KEY")
     if not api_key:
@@ -1256,6 +1344,27 @@ def main():
                 print(f"    – {f}")
 
     print(f"{'═' * 60}\n")
+
+    # Visual agent: med 25% sannolikhet genereras en visualisering
+    if sb_key and random.random() < 0.25:
+        print("\n── Visual Agent ──")
+        statistik_data = hamta_all_statistik(sb_key)
+        if statistik_data:
+            print(f"  Hämtade {len(statistik_data)} indikatorer")
+            viz = valj_visualisering(statistik_data)
+            if viz:
+                nyckel = viz.get("nyckel", "")
+                statistik_rad = next((r for r in statistik_data if r["nyckel"] == nyckel), None)
+                if statistik_rad:
+                    ok = publicera_visualisering(sb_key, viz, statistik_rad)
+                    if ok:
+                        print(f"  ✓ Visualisering sparad: \"{viz['titel']}\" ({viz['typ']})")
+                    else:
+                        print("  ✗ Kunde inte spara visualisering", file=sys.stderr)
+                else:
+                    print(f"  ✗ Nyckel '{nyckel}' hittades inte i statistik", file=sys.stderr)
+        else:
+            print("  Ingen statistik ännu – hoppar över")
 
 
 if __name__ == "__main__":

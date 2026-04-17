@@ -2,5 +2,5 @@
   "name": "debatt-ai",
   "private": true,
   "scripts": { "dev": "next dev", "build": "next build", "start": "next start" },
-  "dependencies": { "next": "15.3.8", "react": "^19", "react-dom": "^19" }
+  "dependencies": { "next": "15.3.8", "react": "^19", "react-dom": "^19", "recharts": "^2" }
 }
