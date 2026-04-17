@@ -137,13 +137,14 @@ def spara_statistik(nyckel: str, namn: str, kategori: str, enhet: str,
         "uppdaterad":     datetime.now(timezone.utc).isoformat(),
     }
 
-    url = f"{SB_URL}/rest/v1/statistik?nyckel=eq.{nyckel}"
-    # Försök PATCH (uppdatera befintlig)
-    res = httpx.patch(url, json=row, headers=sb_headers(), timeout=15)
-    if res.status_code == 404 or (res.status_code == 200 and "0 rows" in res.text):
-        # Rad finns inte – skapa ny
-        res = httpx.post(f"{SB_URL}/rest/v1/statistik", json=row,
-                         headers=sb_headers(), timeout=15)
+    # Upsert: INSERT med ON CONFLICT UPDATE baserat på unique-kolonnen nyckel
+    headers = {
+        "apikey": SB_KEY,
+        "Authorization": f"Bearer {SB_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    res = httpx.post(f"{SB_URL}/rest/v1/statistik", json=row, headers=headers, timeout=15)
 
     if res.status_code in (200, 201, 204):
         print(f"  ✓ {namn}: {senaste['varde']} {enhet} ({senaste['period']})")
