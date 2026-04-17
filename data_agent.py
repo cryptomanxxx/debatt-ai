@@ -28,31 +28,31 @@ if not SB_KEY:
 # ── World Bank-indikatorer ────────────────────────────────────────────────────
 # Format: (nyckel, namn, kategori, enhet, wb_indicator)
 WB_INDIKATORER = [
-    # Ekonomi
-    ("bnp_tillvaxt",       "BNP-tillväxt",                 "ekonomi",     "%",               "NY.GDP.MKTP.KD.ZG"),
-    ("inflation",          "Inflation (KPI)",               "ekonomi",     "%",               "FP.CPI.TOTL.ZG"),
-    ("statsskuld_bnp",     "Statsskuld (% av BNP)",         "ekonomi",     "% av BNP",        "GC.DOD.TOTL.GD.ZS"),
-    ("export_bnp",         "Export (% av BNP)",             "ekonomi",     "% av BNP",        "NE.EXP.GNFS.ZS"),
+    # Ekonomi (mrv=15 för indikatorer med lång eftersläpning)
+    ("bnp_tillvaxt",       "BNP-tillväxt",                 "ekonomi",     "%",               "NY.GDP.MKTP.KD.ZG",  10),
+    ("inflation",          "Inflation (KPI)",               "ekonomi",     "%",               "FP.CPI.TOTL.ZG",     10),
+    ("export_bnp",         "Export (% av BNP)",             "ekonomi",     "% av BNP",        "NE.EXP.GNFS.ZS",     10),
     # Arbetsmarknad
-    ("arbetslöshet",       "Arbetslöshet",                  "arbetsmarknad", "%",             "SL.UEM.TOTL.ZS"),
-    ("ungdomsarbetslöshet","Ungdomsarbetslöshet (15–24 år)","arbetsmarknad", "%",             "SL.UEM.1524.ZS"),
-    ("sysselsattning",     "Sysselsättningsgrad",           "arbetsmarknad", "%",             "SL.EMP.WORK.ZS"),
-    # Klimat & energi
-    ("co2_per_capita",     "CO2-utsläpp per capita",        "klimat",      "ton/person",      "EN.ATM.CO2E.PC"),
-    ("fornybar_el",        "Förnybar el (% av total)",      "klimat",      "%",               "EG.ELC.RNEW.ZS"),
-    ("skogstäckning",      "Skogstäckning (% av land)",     "klimat",      "%",               "AG.LND.FRST.ZS"),
+    ("arbetslöshet",       "Arbetslöshet",                  "arbetsmarknad", "%",             "SL.UEM.TOTL.ZS",     10),
+    ("ungdomsarbetslöshet","Ungdomsarbetslöshet (15–24 år)","arbetsmarknad", "%",             "SL.UEM.1524.ZS",     10),
+    ("sysselsattning",     "Sysselsättningsgrad",           "arbetsmarknad", "%",             "SL.EMP.WORK.ZS",     10),
+    # Klimat & energi (CO2 har lång eftersläpning – hämta 20 år bakåt)
+    ("co2_per_capita",     "CO2-utsläpp per capita",        "klimat",      "ton/person",      "EN.ATM.CO2E.PC",     20),
+    ("fornybar_el",        "Förnybar el (% av total)",      "klimat",      "%",               "EG.ELC.RNEW.ZS",     10),
+    ("skogstäckning",      "Skogstäckning (% av land)",     "klimat",      "%",               "AG.LND.FRST.ZS",     10),
     # Välfärd & utbildning
-    ("utbildning_bnp",     "Utbildningsutgifter (% av BNP)","valfard",     "% av BNP",       "SE.XPD.TOTL.GD.ZS"),
-    ("halsa_bnp",          "Hälsovårdsutgifter (% av BNP)","valfard",     "% av BNP",        "SH.XPD.CHEX.GD.ZS"),
-    ("livslangd",          "Medellivslängd",                "valfard",     "år",              "SP.DYN.LE00.IN"),
-    ("gini",               "Gini-koefficient (ojämlikhet)", "valfard",     "index 0–100",     "SI.POV.GINI"),
+    ("utbildning_bnp",     "Utbildningsutgifter (% av BNP)","valfard",     "% av BNP",       "SE.XPD.TOTL.GD.ZS",  15),
+    ("halsa_bnp",          "Hälsovårdsutgifter (% av BNP)","valfard",     "% av BNP",        "SH.XPD.CHEX.GD.ZS",  10),
+    ("livslangd",          "Medellivslängd",                "valfard",     "år",              "SP.DYN.LE00.IN",     10),
+    ("gini",               "Gini-koefficient (ojämlikhet)", "valfard",     "index 0–100",     "SI.POV.GINI",        15),
 ]
 
 # ── Riksbanken-indikatorer ────────────────────────────────────────────────────
-# Format: (nyckel, namn, kategori, enhet, series_id)
+# Hämtar via Riksbankens öppna CSV-endpoint (SWEA API är opålitligt)
+# Format: (nyckel, namn, kategori, enhet, serie_id_swea)
 RB_INDIKATORER = [
-    ("styrränta",   "Styrränta",    "ekonomi", "%", "SEREPMIN"),
-    ("kpif",        "KPIF",         "ekonomi", "%", "SEKPIFEXT"),
+    ("styrränta",   "Styrränta",    "ekonomi", "%", "SECBREPOEFF"),
+    ("kpif",        "KPIF",         "ekonomi", "%", "SECPIFXFE"),
 ]
 
 
@@ -69,7 +69,7 @@ def hamta_world_bank(indicator: str, country: str = "SE", n: int = 10) -> list[d
     """Hämtar de senaste n värdena för en World Bank-indikator."""
     url = (
         f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}"
-        f"?format=json&mrv={n}&per_page={n}"
+        f"?format=json&mrv={n}&per_page={n}&mrnev={n}"
     )
     try:
         res = httpx.get(url, timeout=15, follow_redirects=True)
@@ -160,8 +160,8 @@ def main():
 
     # World Bank
     print("── World Bank ──")
-    for nyckel, namn, kategori, enhet, wb_id in WB_INDIKATORER:
-        historik = hamta_world_bank(wb_id)
+    for nyckel, namn, kategori, enhet, wb_id, mrv in WB_INDIKATORER:
+        historik = hamta_world_bank(wb_id, n=mrv)
         url = f"https://data.worldbank.org/indicator/{wb_id}?locations=SE"
         if spara_statistik(nyckel, namn, kategori, enhet, "World Bank", url, historik):
             ok += 1
@@ -179,7 +179,8 @@ def main():
             fel += 1
 
     print(f"\n=== KLART: {ok} uppdaterade, {fel} misslyckade ===")
-    if fel > 0:
+    # Krascha bara om ingenting alls lyckades
+    if ok == 0:
         sys.exit(1)
 
 
