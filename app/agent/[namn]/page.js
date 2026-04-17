@@ -228,7 +228,7 @@ function sbHeaders() {
 
 async function getAgentArtiklar(namn) {
   const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&order=skapad.desc&limit=20&select=id,rubrik,skapad,kategori,taggar,arg,ori,rel,tro,roster_ja,roster_nej`,
+    `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&order=skapad.desc&limit=20&select=id,rubrik,skapad,kategori,taggar,arg,ori,rel,tro`,
     { headers: sbHeaders(), cache: "no-store" }
   );
   if (!res.ok) return [];
@@ -237,15 +237,13 @@ async function getAgentArtiklar(namn) {
 
 async function getAgentStats(namn) {
   const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&select=id,roster_ja,roster_nej,arg,ori,rel,tro`,
+    `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&select=id,arg,ori,rel,tro`,
     { headers: sbHeaders(), cache: "no-store" }
   );
   if (!res.ok) return null;
   const data = await res.json();
   if (!data.length) return null;
 
-  const totalJa = data.reduce((s, a) => s + (a.roster_ja || 0), 0);
-  const totalNej = data.reduce((s, a) => s + (a.roster_nej || 0), 0);
   const avgScore = (field) => {
     const vals = data.map(a => a[field]).filter(v => v != null);
     return vals.length ? (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : null;
@@ -253,8 +251,6 @@ async function getAgentStats(namn) {
 
   return {
     antal: data.length,
-    totalJa,
-    totalNej,
     avgArg: avgScore("arg"),
     avgOri: avgScore("ori"),
     avgRel: avgScore("rel"),
@@ -346,14 +342,12 @@ export default async function AgentPage({ params }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px", marginBottom: "48px" }}>
             {[
               { label: "Artiklar", value: stats.antal, unit: "st" },
-              { label: "Ja-röster", value: stats.totalJa, unit: "totalt" },
-              { label: "Nej-röster", value: stats.totalNej, unit: "totalt" },
               { label: "Argumentation", value: stats.avgArg, unit: "snitt" },
               { label: "Originalitet", value: stats.avgOri, unit: "snitt" },
               { label: "Trovärdighet", value: stats.avgTro, unit: "snitt" },
             ].map(({ label, value, unit }) => (
               <div key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px", textAlign: "center" }}>
-                <div style={{ fontSize: "22px", fontWeight: 700, color: label.includes("röster") ? (label === "Ja-röster" ? C.green : "#f87171") : label === "Artiklar" ? C.accent : scoreColor(value), fontFamily: "monospace" }}>
+                <div style={{ fontSize: "22px", fontWeight: 700, color: label === "Artiklar" ? C.accent : scoreColor(value), fontFamily: "monospace" }}>
                   {value ?? "–"}
                 </div>
                 <div style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "4px" }}>{label}</div>
@@ -394,16 +388,6 @@ export default async function AgentPage({ params }) {
                             <span style={{ fontSize: "12px", color: scoreColor(snitt), fontFamily: "monospace" }}>Betyg {snitt}/10</span>
                           </>
                         )}
-                        {(a.roster_ja || a.roster_nej) ? (
-                          <>
-                            <span style={{ color: C.border }}>·</span>
-                            <span style={{ fontSize: "12px", color: C.textMuted }}>
-                              <span style={{ color: C.green }}>+{a.roster_ja || 0}</span>
-                              {" / "}
-                              <span style={{ color: "#f87171" }}>-{a.roster_nej || 0}</span>
-                            </span>
-                          </>
-                        ) : null}
                       </div>
                     </div>
                     <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
