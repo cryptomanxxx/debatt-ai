@@ -592,7 +592,7 @@ def hamta_kryptodata() -> str:
     except Exception:
         return ""
 
-
+def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från svenska RSS-flöden."""
     feeds = [
         # Svenska nyheter & debatt
