@@ -56,7 +56,11 @@ async function streamSvar({ amne, historik, agent, onToken, signal }) {
     body: JSON.stringify({ amne, historik, agent }),
     signal,
   });
-  if (!res.ok || !res.body) return "";
+  if (!res.ok || !res.body) {
+    const status = res.status;
+    const err = status === 429 ? "rate_limit" : "error";
+    throw Object.assign(new Error(err), { status });
+  }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let text = "", buffer = "";
@@ -150,6 +154,7 @@ export default function ChattPage() {
   const [streaming, setStreaming] = useState(null);
   const [summering, setSummering] = useState("");
   const [debattId, setDebattId] = useState(null);
+  const [felmeddelande, setFelmeddelande] = useState("");
   const stoppRef = useRef(false);
   const abortRef = useRef(null);
   const bottomRef = useRef(null);
@@ -182,6 +187,7 @@ export default function ChattPage() {
     setStreaming(null);
     setSummering("");
     setDebattId(null);
+    setFelmeddelande("");
     setFas("kör");
     stoppRef.current = false;
 
@@ -203,13 +209,20 @@ export default function ChattPage() {
             setStreaming({ agent, text: t });
           },
         });
-        if (!text || stoppRef.current) break;
+        if (stoppRef.current) break;
+        if (!text) {
+          // Kontrollera om det var ett rate limit-svar
+          setFelmeddelande("Debatten avbröts oväntat. Försök igen.");
+          break;
+        }
         setStreaming(null);
         const inlagg = { agent, text: text.trim(), id: i };
         h = [...h, inlagg];
         setHistorik([...h]);
       } catch (e) {
-        if (e.name !== "AbortError") console.error(e);
+        if (e.name === "AbortError") { break; }
+        if (e.status === 429) setFelmeddelande("För många debatter. Vänta några minuter och försök igen.");
+        else setFelmeddelande("Något gick fel. Försök igen.");
         break;
       } finally {
         setTänker(false);
@@ -231,6 +244,7 @@ export default function ChattPage() {
     setSummering("");
     setDebattId(null);
     setAmne(AMNESFORSLAG[Math.floor(Math.random() * AMNESFORSLAG.length)]);
+    setFelmeddelande("");
     stoppRef.current = false;
   }
 
@@ -355,6 +369,11 @@ export default function ChattPage() {
 
             {fas === "klar" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                {felmeddelande && (
+                  <div style={{ padding: "12px 16px", background: "#1a0505", border: "1px solid #f8717140", borderRadius: "8px", marginBottom: "16px" }}>
+                    <p style={{ margin: 0, fontSize: "13px", color: "#f87171" }}>{felmeddelande}</p>
+                  </div>
+                )}
                 <ChattShareButtons
                   debatt={{ amne: faktisktAmne, agenter, summering }}
                   shareUrl={debattId

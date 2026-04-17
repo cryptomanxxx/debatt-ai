@@ -1,3 +1,13 @@
+import { headers } from "next/headers";
+
+const AGENTER = new Set([
+  "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
+  "Jurist","Journalist","Filosof","Läkare","Psykolog","Historiker",
+  "Sociolog","Kryptoanalytiker","Den hungriga","Mamman","Den sura",
+  "Den trötta","Den stressade","Den lugna","Pensionären","Tonåringen",
+  "Den nostalgiske","Hypokondrikern","Optimisten","Den rike",
+]);
+
 const PERSONLIGHETER = {
   "Nationalekonom": "nationalekonom med doktorsexamen. Analyserar alltid ur kostnads- och incitamentsperspektiv. Konkret och lite kylig i tonen.",
   "Miljöaktivist": "passionerad miljöaktivist. Sätter alltid planetens gränser och klimaträttvisa i centrum. Kan bli upprörd men faktabaserad.",
@@ -25,11 +35,55 @@ const PERSONLIGHETER = {
   "Den rike": "mycket förmögen, välmenande, ibland totalt ute ur kontakt med verkligheten.",
 };
 
-export async function POST(request) {
-  const { amne, historik, agent } = await request.json();
+// In-memory rate limiter — 5 debatter per IP per 10 minuter
+const rateLimitStore = new Map();
+const LIMIT = 5;
+const WINDOW_MS = 10 * 60 * 1000;
 
-  if (!agent || !PERSONLIGHETER[agent]) {
+function checkRateLimit(ip) {
+  const now = Date.now();
+  // Rensa gamla poster för att hålla minnet i schack
+  if (rateLimitStore.size > 2000) {
+    for (const [key, val] of rateLimitStore) {
+      if (now - val.start > WINDOW_MS) rateLimitStore.delete(key);
+    }
+  }
+  const entry = rateLimitStore.get(ip);
+  if (!entry || now - entry.start > WINDOW_MS) {
+    rateLimitStore.set(ip, { count: 1, start: now });
+    return true;
+  }
+  if (entry.count >= LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
+export async function POST(request) {
+  // Rate limiting
+  const hdrs = await headers();
+  const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!checkRateLimit(ip)) {
+    return Response.json({ error: "För många debatter. Vänta några minuter och försök igen." }, { status: 429 });
+  }
+
+  const body = await request.json().catch(() => null);
+  if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
+
+  const { amne, historik, agent } = body;
+
+  // Validera agent mot strikt whitelist
+  if (!agent || !AGENTER.has(agent)) {
     return Response.json({ error: "Okänd agent" }, { status: 400 });
+  }
+
+  // Begränsa ämneslängd
+  if (typeof amne !== "string" || amne.length > 200) {
+    return Response.json({ error: "Ämnet är för långt (max 200 tecken)" }, { status: 400 });
+  }
+
+  // Begränsa historikstorlek
+  if (!Array.isArray(historik) || historik.length > 10) {
+    return Response.json({ error: "Ogiltig historik" }, { status: 400 });
   }
 
   const kontext = historik.length > 0
@@ -38,7 +92,7 @@ export async function POST(request) {
 
   const systemPrompt = `Du är ${PERSONLIGHETER[agent]}
 
-Du deltar i en snabbdebatt om: "${amne}"
+Du deltar i en snabbdebatt om: "${amne.slice(0, 200)}"
 
 REGLER — viktiga:
 - Svara med EXAKT 2–3 meningar. Aldrig mer.
@@ -50,7 +104,7 @@ REGLER — viktiga:
 
   const userMessage = kontext
     ? `Vad de andra just sagt:\n${kontext}\n\nNu är det din tur. Svara kort och direkt.`
-    : `Öppna debatten om "${amne}". Var skarp och kortfattad.`;
+    : `Öppna debatten om "${amne.slice(0, 200)}". Var skarp och kortfattad.`;
 
   const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
