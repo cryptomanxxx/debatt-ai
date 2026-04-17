@@ -149,14 +149,15 @@ def spara_statistik(nyckel: str, namn: str, kategori: str, enhet: str,
         "uppdaterad":     datetime.now(timezone.utc).isoformat(),
     }
 
-    # Upsert: INSERT med ON CONFLICT UPDATE baserat på unique-kolonnen nyckel
+    # Upsert på nyckel-kolumnen (on_conflict krävs för att Supabase ska välja rätt unique key)
     headers = {
         "apikey": SB_KEY,
         "Authorization": f"Bearer {SB_KEY}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates,return=minimal",
     }
-    res = httpx.post(f"{SB_URL}/rest/v1/statistik", json=row, headers=headers, timeout=15)
+    res = httpx.post(f"{SB_URL}/rest/v1/statistik?on_conflict=nyckel",
+                     json=row, headers=headers, timeout=15)
 
     if res.status_code in (200, 201, 204):
         print(f"  ✓ {namn}: {senaste['varde']} {enhet} ({senaste['period']})")
@@ -181,15 +182,9 @@ def main():
         else:
             fel += 1
 
-    # Riksbanken
-    print("\n── Riksbanken ──")
-    for nyckel, namn, kategori, enhet, kandidater in RB_INDIKATORER:
-        historik, funnet_id = hamta_riksbanken(kandidater)
-        url = f"https://www.riksbank.se/sv/statistik/sok-rantor--valutakurser/?s={funnet_id}"
-        if spara_statistik(nyckel, namn, kategori, enhet, "Riksbanken", url, historik):
-            ok += 1
-        else:
-            fel += 1
+    # Riksbanken (pausad – SWEA API kräver verifiering av rätt serie-ID)
+    # print("\n── Riksbanken ──")
+    # TODO: hitta fungerande serie-ID för styrränta och KPIF
 
     print(f"\n=== KLART: {ok} uppdaterade, {fel} misslyckade ===")
     # Krascha bara om ingenting alls lyckades
