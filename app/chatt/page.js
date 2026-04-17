@@ -9,7 +9,6 @@ const C = {
   textMuted: "#555",
   accent: "#c8b89a",
   accentDim: "#8a7a6a",
-  blue: "#4a9eff",
 };
 
 const PANELER = [
@@ -30,51 +29,98 @@ const ALLA_AGENTER = [
 ];
 
 const AGENT_FARG = {
-  "Nationalekonom": "#6abf6a",
-  "Miljöaktivist": "#4ade80",
-  "Teknikoptimist": "#38bdf8",
-  "Konservativ debattör": "#b8862a",
-  "Jurist": "#d4945a",
-  "Journalist": "#a78bfa",
-  "Filosof": "#e879f9",
-  "Läkare": "#f87171",
-  "Psykolog": "#fb923c",
-  "Historiker": "#fbbf24",
-  "Sociolog": "#34d399",
-  "Kryptoanalytiker": "#f59e0b",
-  "Den hungriga": "#86efac",
-  "Mamman": "#f9a8d4",
-  "Den sura": "#94a3b8",
-  "Den trötta": "#7dd3fc",
-  "Den stressade": "#fca5a5",
-  "Den lugna": "#a7f3d0",
-  "Pensionären": "#d8b4fe",
-  "Tonåringen": "#fdba74",
-  "Den nostalgiske": "#fde68a",
-  "Hypokondrikern": "#6ee7b7",
-  "Optimisten": "#fcd34d",
-  "Den rike": "#c4b5fd",
+  "Nationalekonom": "#6abf6a", "Miljöaktivist": "#4ade80", "Teknikoptimist": "#38bdf8",
+  "Konservativ debattör": "#b8862a", "Jurist": "#d4945a", "Journalist": "#a78bfa",
+  "Filosof": "#e879f9", "Läkare": "#f87171", "Psykolog": "#fb923c",
+  "Historiker": "#fbbf24", "Sociolog": "#34d399", "Kryptoanalytiker": "#f59e0b",
+  "Den hungriga": "#86efac", "Mamman": "#f9a8d4", "Den sura": "#94a3b8",
+  "Den trötta": "#7dd3fc", "Den stressade": "#fca5a5", "Den lugna": "#a7f3d0",
+  "Pensionären": "#d8b4fe", "Tonåringen": "#fdba74", "Den nostalgiske": "#fde68a",
+  "Hypokondrikern": "#6ee7b7", "Optimisten": "#fcd34d", "Den rike": "#c4b5fd",
 };
 
 const AMNESFORSLAG = [
-  "Ska Sverige ha kärnkraft?",
-  "Är sociala medier bra för demokratin?",
-  "Kan AI ersätta läkare?",
-  "Ska vi ha fyradagarsvecka?",
-  "Är Bitcoin framtidens valuta?",
-  "Ska flygskatten höjas?",
-  "Är grundinkomst en bra idé?",
-  "Har skolan blivit för enkel?",
-  "Ska droger legaliseras?",
-  "Arbetar vi för mycket?",
+  "Ska Sverige ha kärnkraft?", "Är sociala medier bra för demokratin?",
+  "Kan AI ersätta läkare?", "Ska vi ha fyradagarsvecka?",
+  "Är Bitcoin framtidens valuta?", "Ska flygskatten höjas?",
+  "Är grundinkomst en bra idé?", "Har skolan blivit för enkel?",
+  "Ska droger legaliseras?", "Arbetar vi för mycket?",
 ];
 
 function pickRandom(arr, n) {
   return [...arr].sort(() => Math.random() - 0.5).slice(0, n);
 }
 
-function agentFarg(namn) {
-  return AGENT_FARG[namn] || C.accent;
+function af(namn) { return AGENT_FARG[namn] || C.accent; }
+
+async function streamSvar({ amne, historik, agent, onToken, signal }) {
+  const res = await fetch("/api/chatt", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amne, historik, agent }),
+    signal,
+  });
+  if (!res.ok || !res.body) return "";
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (raw === "[DONE]") return text;
+        try {
+          const token = JSON.parse(raw).choices?.[0]?.delta?.content ?? "";
+          if (token) { text += token; onToken(text); }
+        } catch { /* ignore malformed chunks */ }
+      }
+    }
+  } catch (e) {
+    if (e.name !== "AbortError") throw e;
+  }
+  return text;
+}
+
+function Bubble({ h, isFirst, isLast, isStreaming }) {
+  const farg = af(h.agent);
+  const radius = isFirst && isLast ? "8px" : isFirst ? "8px 8px 0 0" : isLast ? "0 0 8px 8px" : "0";
+  return (
+    <div style={{ padding: "16px 20px", background: C.surface, borderLeft: `3px solid ${farg}${isStreaming ? "90" : ""}`, borderRadius: radius }}>
+      <div style={{ fontSize: "11px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px", fontWeight: 700 }}>
+        {h.agent.toUpperCase()}
+      </div>
+      <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.75, color: isStreaming ? `${C.text}cc` : C.text }}>
+        {h.text}
+        {isStreaming && <span style={{ display: "inline-block", width: "2px", height: "14px", background: farg, marginLeft: "2px", verticalAlign: "text-bottom", animation: "blink 0.8s step-end infinite" }} />}
+      </p>
+    </div>
+  );
+}
+
+function ThinkingBubble({ agent, isFirst }) {
+  const farg = af(agent);
+  const radius = isFirst ? "8px" : "0 0 8px 8px";
+  return (
+    <div style={{ padding: "16px 20px", background: C.surface, borderLeft: `3px solid ${farg}40`, borderRadius: radius, opacity: 0.5 }}>
+      <div style={{ fontSize: "11px", color: `${farg}80`, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px", fontWeight: 700 }}>
+        {agent.toUpperCase()}
+      </div>
+      <span style={{ display: "inline-flex", gap: "4px", alignItems: "center" }}>
+        {[0, 1, 2].map(j => (
+          <span key={j} style={{ width: "5px", height: "5px", borderRadius: "50%", background: C.textMuted, display: "inline-block", animation: `dot 1.2s ease-in-out ${j * 0.2}s infinite` }} />
+        ))}
+      </span>
+    </div>
+  );
 }
 
 export default function ChattPage() {
@@ -87,12 +133,14 @@ export default function ChattPage() {
   const [historik, setHistorik] = useState([]);
   const [tänker, setTänker] = useState(false);
   const [tänkande, setTänkande] = useState("");
+  const [streaming, setStreaming] = useState(null); // { agent, text }
   const stoppRef = useRef(false);
+  const abortRef = useRef(null);
   const bottomRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [historik, tänker]);
+  }, [historik, streaming, tänker]);
 
   async function starta() {
     const panel = PANELER[valdPanel];
@@ -102,6 +150,8 @@ export default function ChattPage() {
     setAgenter(valdaAgenter);
     setFaktisktAmne(valtAmne);
     setHistorik([]);
+    setStreaming(null);
+    setTänker(false);
     setFas("kör");
     stoppRef.current = false;
 
@@ -112,36 +162,50 @@ export default function ChattPage() {
       const agent = valdaAgenter[i % valdaAgenter.length];
       setTänkande(agent);
       setTänker(true);
+      setStreaming(null);
+
+      const abort = new AbortController();
+      abortRef.current = abort;
 
       try {
-        const res = await fetch("/api/chatt", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amne: valtAmne, historik: h, agent }),
+        let gotFirst = false;
+        const text = await streamSvar({
+          amne: valtAmne, historik: h, agent,
+          signal: abort.signal,
+          onToken: (t) => {
+            if (!gotFirst) { gotFirst = true; setTänker(false); }
+            setStreaming({ agent, text: t });
+          },
         });
-        if (!res.ok) break;
-        const { text } = await res.json();
-        if (!text) break;
 
-        const inlagg = { agent, text, id: i };
+        if (!text || stoppRef.current) break;
+        setStreaming(null);
+        const inlagg = { agent, text: text.trim(), id: i };
         h = [...h, inlagg];
         setHistorik([...h]);
-      } catch {
+      } catch (e) {
+        if (e.name !== "AbortError") console.error(e);
         break;
       } finally {
         setTänker(false);
       }
 
       if (!stoppRef.current && i < 9) {
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 300));
       }
     }
 
-    if (!stoppRef.current) setFas("klar");
+    if (!stoppRef.current) {
+      setStreaming(null);
+      setTänker(false);
+      setFas("klar");
+    }
   }
 
   function stoppa() {
     stoppRef.current = true;
+    abortRef.current?.abort();
+    setStreaming(null);
     setTänker(false);
     setFas("klar");
   }
@@ -149,20 +213,14 @@ export default function ChattPage() {
   function nyDebatt() {
     setFas("start");
     setHistorik([]);
+    setStreaming(null);
     setAmne("");
     stoppRef.current = false;
   }
 
+  const hasLive = streaming || tänker;
   const navLink = (href, label, active) => (
-    <a href={href} style={{
-      flex: 1, textAlign: "center",
-      background: active ? `${C.accent}15` : "transparent",
-      border: `1px solid ${active ? C.accent + "50" : C.border}`,
-      color: active ? C.accent : C.textMuted,
-      padding: "6px 14px", borderRadius: "4px",
-      fontSize: "13px", letterSpacing: "0.05em",
-      fontFamily: "Georgia, serif", textDecoration: "none",
-    }}>{label}</a>
+    <a href={href} style={{ flex: 1, textAlign: "center", background: active ? `${C.accent}15` : "transparent", border: `1px solid ${active ? C.accent + "50" : C.border}`, color: active ? C.accent : C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{label}</a>
   );
 
   return (
@@ -194,8 +252,7 @@ export default function ChattPage() {
             </span>
           </div>
           <p style={{ color: C.textMuted, fontSize: "14px", margin: 0, lineHeight: 1.7, maxWidth: "560px" }}>
-            AI-agenter debatterar i realtid. Experimentellt kortformat — 10 inlägg, 2–3 meningar var.
-            Inte detsamma som publicerade debattartiklar.
+            AI-agenter debatterar i realtid. Experimentellt kortformat — 10 inlägg, 2–3 meningar var. Inte detsamma som publicerade debattartiklar.
           </p>
         </div>
 
@@ -218,36 +275,18 @@ export default function ChattPage() {
               <label style={{ display: "block", fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "12px" }}>Panel</label>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
                 {PANELER.map((p, i) => (
-                  <button
-                    key={p.namn}
-                    onClick={() => setValdPanel(i)}
-                    style={{
-                      padding: "7px 14px", borderRadius: "20px",
-                      border: `1px solid ${valdPanel === i ? C.accent + "80" : C.border}`,
-                      background: valdPanel === i ? `${C.accent}12` : "transparent",
-                      color: valdPanel === i ? C.accent : C.textMuted,
-                      fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer",
-                    }}
-                  >
+                  <button key={p.namn} onClick={() => setValdPanel(i)} style={{ padding: "7px 14px", borderRadius: "20px", border: `1px solid ${valdPanel === i ? C.accent + "80" : C.border}`, background: valdPanel === i ? `${C.accent}12` : "transparent", color: valdPanel === i ? C.accent : C.textMuted, fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
                     {p.namn}
                   </button>
                 ))}
               </div>
-              {PANELER[valdPanel].agenter ? (
-                <p style={{ fontSize: "12px", color: C.accentDim, margin: 0 }}>
-                  {PANELER[valdPanel].agenter.join(" · ")}
-                </p>
-              ) : (
-                <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, fontStyle: "italic" }}>
-                  Väljer tre slumpmässiga agenter
-                </p>
-              )}
+              {PANELER[valdPanel].agenter
+                ? <p style={{ fontSize: "12px", color: C.accentDim, margin: 0 }}>{PANELER[valdPanel].agenter.join(" · ")}</p>
+                : <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, fontStyle: "italic" }}>Väljer tre slumpmässiga agenter</p>
+              }
             </div>
 
-            <button
-              onClick={starta}
-              style={{ width: "100%", padding: "14px", background: C.accent, border: "none", borderRadius: "6px", color: C.bg, fontSize: "15px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer", letterSpacing: "0.04em" }}
-            >
+            <button onClick={starta} style={{ width: "100%", padding: "14px", background: C.accent, border: "none", borderRadius: "6px", color: C.bg, fontSize: "15px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer", letterSpacing: "0.04em" }}>
               Starta direktdebatt →
             </button>
           </div>
@@ -256,75 +295,47 @@ export default function ChattPage() {
         {/* Active / finished debate */}
         {(fas === "kör" || fas === "klar") && (
           <div>
-            {/* Topic + agent chips */}
             <div style={{ marginBottom: "24px" }}>
               <p style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px 0" }}>Ämne</p>
               <p style={{ fontSize: "17px", color: C.accent, margin: "0 0 16px 0", lineHeight: 1.4 }}>{faktisktAmne}</p>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
                 {agenter.map(a => (
-                  <span key={a} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", background: `${agentFarg(a)}12`, border: `1px solid ${agentFarg(a)}35`, borderRadius: "20px" }}>
-                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: agentFarg(a), flexShrink: 0 }} />
-                    <span style={{ fontSize: "12px", color: agentFarg(a), fontFamily: "monospace" }}>{a}</span>
+                  <span key={a} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", background: `${af(a)}12`, border: `1px solid ${af(a)}35`, borderRadius: "20px" }}>
+                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: af(a), flexShrink: 0 }} />
+                    <span style={{ fontSize: "12px", color: af(a), fontFamily: "monospace" }}>{a}</span>
                   </span>
                 ))}
-                <span style={{ fontSize: "12px", color: C.textMuted, marginLeft: "4px" }}>
-                  {historik.length}/10
-                </span>
+                <span style={{ fontSize: "12px", color: C.textMuted, marginLeft: "4px" }}>{historik.length}/10</span>
               </div>
             </div>
 
             {/* Message feed */}
             <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginBottom: "24px" }}>
-              {historik.map((h, i) => {
-                const farg = agentFarg(h.agent);
-                const isFirst = i === 0;
-                const isLast = i === historik.length - 1 && !tänker;
-                return (
-                  <div
-                    key={h.id}
-                    style={{
-                      padding: "16px 20px",
-                      background: C.surface,
-                      borderLeft: `3px solid ${farg}`,
-                      borderRadius: isFirst && isLast ? "8px" : isFirst ? "8px 8px 0 0" : isLast ? "0 0 8px 8px" : "0",
-                    }}
-                  >
-                    <div style={{ fontSize: "11px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px", fontWeight: 700 }}>
-                      {h.agent.toUpperCase()}
-                    </div>
-                    <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.75, color: C.text }}>{h.text}</p>
-                  </div>
-                );
-              })}
-
-              {/* Thinking */}
+              {historik.map((h, i) => (
+                <Bubble
+                  key={h.id}
+                  h={h}
+                  isFirst={i === 0}
+                  isLast={i === historik.length - 1 && !hasLive}
+                />
+              ))}
+              {streaming && (
+                <Bubble
+                  h={streaming}
+                  isFirst={historik.length === 0}
+                  isLast
+                  isStreaming
+                />
+              )}
               {tänker && (
-                <div style={{
-                  padding: "16px 20px",
-                  background: C.surface,
-                  borderLeft: `3px solid ${agentFarg(tänkande)}50`,
-                  borderRadius: historik.length === 0 ? "8px" : "0 0 8px 8px",
-                  opacity: 0.55,
-                }}>
-                  <div style={{ fontSize: "11px", color: `${agentFarg(tänkande)}90`, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px", fontWeight: 700 }}>
-                    {tänkande.toUpperCase()}
-                  </div>
-                  <span style={{ display: "inline-flex", gap: "4px", alignItems: "center" }}>
-                    {[0, 1, 2].map(j => (
-                      <span key={j} style={{ width: "5px", height: "5px", borderRadius: "50%", background: C.textMuted, display: "inline-block", animation: `dot 1.2s ease-in-out ${j * 0.2}s infinite` }} />
-                    ))}
-                  </span>
-                </div>
+                <ThinkingBubble agent={tänkande} isFirst={historik.length === 0} />
               )}
             </div>
 
             <div ref={bottomRef} />
 
             {fas === "kör" && (
-              <button
-                onClick={stoppa}
-                style={{ padding: "9px 18px", background: "transparent", border: `1px solid #f8717150`, color: "#f87171", borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer" }}
-              >
+              <button onClick={stoppa} style={{ padding: "9px 18px", background: "transparent", border: `1px solid #f8717150`, color: "#f87171", borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
                 Avsluta
               </button>
             )}
@@ -332,14 +343,9 @@ export default function ChattPage() {
             {fas === "klar" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "flex-start" }}>
                 <div style={{ padding: "10px 16px", background: `${C.accent}08`, border: `1px solid ${C.accent}20`, borderRadius: "8px" }}>
-                  <p style={{ margin: 0, fontSize: "13px", color: C.accentDim }}>
-                    Direktdebatten avslutad · {historik.length} inlägg
-                  </p>
+                  <p style={{ margin: 0, fontSize: "13px", color: C.accentDim }}>Direktdebatten avslutad · {historik.length} inlägg</p>
                 </div>
-                <button
-                  onClick={nyDebatt}
-                  style={{ padding: "10px 22px", background: C.accent, border: "none", color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer" }}
-                >
+                <button onClick={nyDebatt} style={{ padding: "10px 22px", background: C.accent, border: "none", color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer" }}>
                   Ny direktdebatt →
                 </button>
               </div>
@@ -349,14 +355,9 @@ export default function ChattPage() {
       </main>
 
       <style>{`
-        @keyframes livepulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.35; transform: scale(0.85); }
-        }
-        @keyframes dot {
-          0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
-          40% { opacity: 1; transform: scale(1); }
-        }
+        @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.35;transform:scale(.85)} }
+        @keyframes dot { 0%,80%,100%{opacity:.2;transform:scale(.8)} 40%{opacity:1;transform:scale(1)} }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
       `}</style>
 
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "60px" }}>

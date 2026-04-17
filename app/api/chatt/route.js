@@ -52,7 +52,7 @@ REGLER — viktiga:
     ? `Vad de andra just sagt:\n${kontext}\n\nNu är det din tur. Svara kort och direkt.`
     : `Öppna debatten om "${amne}". Var skarp och kortfattad.`;
 
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+  const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -66,14 +66,19 @@ REGLER — viktiga:
       ],
       max_tokens: 130,
       temperature: 0.88,
+      stream: true,
     }),
   });
 
-  if (!res.ok) {
+  if (!groqRes.ok) {
     return Response.json({ error: "Groq-anrop misslyckades" }, { status: 502 });
   }
 
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content?.trim() ?? "";
-  return Response.json({ text });
+  return new Response(groqRes.body, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
