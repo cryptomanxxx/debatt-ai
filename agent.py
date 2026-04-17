@@ -592,6 +592,48 @@ def hamta_kryptodata() -> str:
     except Exception:
         return ""
 
+def hamta_statistik(kategorier: list[str] | None = None) -> str:
+    """Hämtar aktuell statistik från Supabase statistik-tabellen.
+
+    Returnerar en formaterad textsträng redo att injiceras i agentens systemprompt.
+    kategorier: lista som ['ekonomi','klimat'] – None hämtar alla.
+    """
+    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    if not sb_key:
+        return ""
+    try:
+        url = f"{SB_URL}/rest/v1/statistik?select=namn,kategori,senaste_varde,enhet,period,kalla"
+        if kategorier:
+            kat_filter = ",".join(kategorier)
+            url += f"&kategori=in.({kat_filter})"
+        url += "&order=kategori.asc,namn.asc"
+        res = httpx.get(url, timeout=10,
+                        headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"})
+        if not res.is_success or not res.json():
+            return ""
+        rader = res.json()
+        grupper: dict[str, list[str]] = {}
+        for r in rader:
+            kat = r.get("kategori", "övrigt").capitalize()
+            varde = r.get("senaste_varde")
+            enhet = r.get("enhet", "")
+            period = r.get("period", "")
+            namn = r.get("namn", "")
+            if varde is None:
+                continue
+            rad = f"  {namn}: {varde} {enhet} ({period})"
+            grupper.setdefault(kat, []).append(rad)
+        if not grupper:
+            return ""
+        block = ["AKTUELL STATISTIK (källa: World Bank / Riksbanken):"]
+        for kat, rader_i_kat in grupper.items():
+            block.append(f"{kat}:")
+            block.extend(rader_i_kat)
+        return "\n".join(block)
+    except Exception:
+        return ""
+
+
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från svenska RSS-flöden."""
     feeds = [
@@ -1086,6 +1128,27 @@ def main():
                 print("  Marknadsdata hämtad ✓")
             else:
                 print("  Ingen CMC_API_KEY – fortsätter utan marknadsdata")
+
+        # Hämta statistik från Supabase för relevanta agenter
+        STATISTIK_AGENTER = {
+            "Nationalekonom":       ["ekonomi", "arbetsmarknad"],
+            "Miljöaktivist":        ["klimat"],
+            "Teknikoptimist":       ["ekonomi"],
+            "Konservativ debattör": ["ekonomi", "valfard"],
+            "Jurist":               ["valfard"],
+            "Läkare":               ["valfard"],
+            "Psykolog":             ["valfard"],
+            "Sociolog":             ["arbetsmarknad", "valfard"],
+            "Historiker":           ["ekonomi"],
+        }
+        if agent["namn"] in STATISTIK_AGENTER and not extra_kontext:
+            kats = STATISTIK_AGENTER[agent["namn"]]
+            print(f"Hämtar statistik ({', '.join(kats)}) från Supabase...")
+            extra_kontext = hamta_statistik(kats)
+            if extra_kontext:
+                print("  Statistik hämtad ✓")
+            else:
+                print("  Ingen statistik i Supabase ännu – fortsätter utan")
 
         # Försök hämta aktuella nyheter – 50% chans att kommentera en nyhet
         nyhet = None

@@ -1,0 +1,24 @@
+name: Data Agent
+
+on:
+  schedule:
+    - cron: "0 4 * * *"   # Kl 04:00 UTC (06:00 svensk tid) – innan agenterna kör
+  workflow_dispatch:       # Kan köras manuellt
+
+jobs:
+  hamta-data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Kör data agent
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python data_agent.py
