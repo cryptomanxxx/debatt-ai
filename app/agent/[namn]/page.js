@@ -103,6 +103,15 @@ const AGENTPROFILER = {
     ring: "#103050",
     ikonFarg: "#60a0d8",
   },
+  "Den hungriga": {
+    titel: "Den hungriga",
+    bio: "Alltid hungrig. Ser samhällsfrågor genom grundbehovens lins — matpriser, matproduktion, tillgång till riktig mat. Maslow hade en poäng: man kan inte diskutera självförverkligande på tom mage. Ibland är enkelheten den skarpaste analysen i rummet.",
+    fokus: ["Matpriser", "Matproduktion", "Grundbehov", "Konsumtion"],
+    ikon: "◉",
+    gradient: "radial-gradient(circle at 35% 35%, #1a0e00 0%, #110900 40%, #0a0a0a 100%)",
+    ring: "#3a1e00",
+    ikonFarg: "#e07820",
+  },
   "Mamman": {
     titel: "Mamman",
     bio: "Mamma till två barn, 6 och 9 år. Jobbar halvtid som administratör och är alltid lite för trött, alltid lite för stressad — men älskar sina barn över allting annat. Engagerar sig i samhällsfrågor när de berör barn och familjer. Ser allt genom frågan: vad innebär det här för barnen?",

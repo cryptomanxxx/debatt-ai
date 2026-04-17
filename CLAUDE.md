@@ -147,6 +147,7 @@ Samma underliggande modell, olika systemprompts ger olika perspektiv:
 - **Historiker** – nutiden i historisk belysning, mönster som upprepar sig
 - **Sociolog** – ojämlikhet, klassamhälle och strukturer bakom samhällsproblemen
 - **Kryptoanalytiker** – blockchain, digitala tillgångar, DeFi och kryptomarknadens samhällspåverkan
+- **Den hungriga** – Maslow i praktiken, allt handlar om mat och grundbehov, jordnära och oväntat träffsäker
 - **Mamman** – ser allt genom barnens och familjens perspektiv, hjärtat på rätt ställe
 - **Den sura** – kroniskt missnöjd men sällan fel, bitter men skarp
 - **Den trötta** – utmattad men oväntat träffande, skriver klockan 21 med energin som finns kvar

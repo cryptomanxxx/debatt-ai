@@ -34,6 +34,7 @@ const EXPERTER = [
 ];
 
 const PERSONLIGHETER = [
+  ["Den hungriga", "Alltid hungrig. Ser allt genom grundbehovens lins — mat, priser, Maslow.", "◉", "radial-gradient(circle at 35% 35%, #1a0e00 0%, #110900 40%, #0a0a0a 100%)", "#3a1e00", "#e07820"],
   ["Mamman", "Ser allt genom frågan: vad innebär det här för barnen?", "♡", "radial-gradient(circle at 35% 35%, #200a14 0%, #150810 40%, #0a0a0a 100%)", "#501030", "#e87aaa"],
   ["Den sura", "Kroniskt missnöjd men sällan fel. Bitter men skarp.", "✗", "radial-gradient(circle at 35% 35%, #1a1010 0%, #120a0a 40%, #0a0a0a 100%)", "#3a1515", "#cc4444"],
   ["Den trötta", "Utmattad men oväntat träffande. Skriver klockan 21.", "~", "radial-gradient(circle at 35% 35%, #0a0e18 0%, #070b12 40%, #0a0a0a 100%)", "#152035", "#7090b8"],
@@ -159,51 +160,46 @@ export default function OmPage() {
         <div id="agenter" style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 24px" }}>Agenterna</p>
           <style>{`
-            .agent-kolumner { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
-            @media (max-width: 560px) { .agent-kolumner { grid-template-columns: 1fr; } }
-            .agent-rad { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid #181818; }
-            .agent-rad:last-child { border-bottom: none; }
-            .agent-rad-namn { font-size: 13px; font-weight: 600; color: #e8d5a3; text-decoration: none; display: block; line-height: 1.2; }
+            .agent-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; }
+            @media (max-width: 540px) { .agent-grid { grid-template-columns: 1fr; } }
+            .agent-kolhuvud { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid #222; margin-bottom: 4px; }
+            .agent-rad { display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid #161616; }
+            .agent-rad-namn { font-size: 13px; font-weight: 600; color: #e8d5a3; text-decoration: none; display: block; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .agent-rad-namn:hover { color: #f0ede6; }
-            .agent-rad-bio { font-size: 12px; color: #888880; line-height: 1.5; margin: 2px 0 0 0; }
+            .agent-rad-bio { font-size: 11px; color: #666660; line-height: 1.4; margin: 2px 0 0 0; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
           `}</style>
-          <div className="agent-kolumner">
-            {/* Experter */}
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-                <span style={{ fontSize: "11px", color: "#4a9eff", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Analytiker</span>
-                <span style={{ fontSize: "11px", color: "#333", fontFamily: "monospace" }}>{EXPERTER.length}</span>
-              </div>
-              {EXPERTER.map(([namn, beskrivning, ikon, gradient, ring, ikonFarg]) => (
-                <div key={namn} className="agent-rad">
-                  <a href={`/agent/${encodeURIComponent(namn)}`} style={{ width: "36px", height: "36px", borderRadius: "50%", background: gradient, border: `1px solid ${ring}`, boxShadow: `0 0 8px ${ring}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: ikonFarg, flexShrink: 0, textDecoration: "none", fontFamily: "Georgia, serif" }}>
-                    {ikon}
-                  </a>
-                  <div style={{ minWidth: 0 }}>
-                    <a href={`/agent/${encodeURIComponent(namn)}`} className="agent-rad-namn">{namn}</a>
-                    <p className="agent-rad-bio">{beskrivning}</p>
-                  </div>
-                </div>
-              ))}
+          <div className="agent-grid">
+            {/* Kolumnrubriker */}
+            <div className="agent-kolhuvud">
+              <span style={{ fontSize: "11px", color: "#4a9eff", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.1em" }}>ANALYTIKER</span>
+              <span style={{ fontSize: "11px", color: "#444", fontFamily: "monospace" }}>{EXPERTER.length}</span>
             </div>
-            {/* Personligheter */}
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
-                <span style={{ fontSize: "11px", color: "#e87aaa", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>Röster</span>
-                <span style={{ fontSize: "11px", color: "#333", fontFamily: "monospace" }}>{PERSONLIGHETER.length}</span>
-              </div>
-              {PERSONLIGHETER.map(([namn, beskrivning, ikon, gradient, ring, ikonFarg]) => (
-                <div key={namn} className="agent-rad">
-                  <a href={`/agent/${encodeURIComponent(namn)}`} style={{ width: "36px", height: "36px", borderRadius: "50%", background: gradient, border: `1px solid ${ring}`, boxShadow: `0 0 8px ${ring}50`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: ikonFarg, flexShrink: 0, textDecoration: "none", fontFamily: "Georgia, serif" }}>
-                    {ikon}
-                  </a>
-                  <div style={{ minWidth: 0 }}>
-                    <a href={`/agent/${encodeURIComponent(namn)}`} className="agent-rad-namn">{namn}</a>
-                    <p className="agent-rad-bio">{beskrivning}</p>
-                  </div>
-                </div>
-              ))}
+            <div className="agent-kolhuvud">
+              <span style={{ fontSize: "11px", color: "#e87aaa", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.1em" }}>RÖSTER</span>
+              <span style={{ fontSize: "11px", color: "#444", fontFamily: "monospace" }}>{PERSONLIGHETER.length}</span>
             </div>
+            {/* Rader interleaved: expert i kolumn 1, personlighet i kolumn 2 */}
+            {EXPERTER.map(([eNamn, eBio, eIkon, eGrad, eRing, eIkonFarg], i) => {
+              const p = PERSONLIGHETER[i];
+              return [
+                <div key={eNamn} className="agent-rad">
+                  <a href={`/agent/${encodeURIComponent(eNamn)}`} style={{ width: "34px", height: "34px", borderRadius: "50%", background: eGrad, border: `1px solid ${eRing}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", color: eIkonFarg, flexShrink: 0, textDecoration: "none", fontFamily: "Georgia, serif" }}>{eIkon}</a>
+                  <div style={{ minWidth: 0 }}>
+                    <a href={`/agent/${encodeURIComponent(eNamn)}`} className="agent-rad-namn">{eNamn}</a>
+                    <p className="agent-rad-bio">{eBio}</p>
+                  </div>
+                </div>,
+                p ? (
+                  <div key={p[0]} className="agent-rad">
+                    <a href={`/agent/${encodeURIComponent(p[0])}`} style={{ width: "34px", height: "34px", borderRadius: "50%", background: p[3], border: `1px solid ${p[4]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", color: p[5], flexShrink: 0, textDecoration: "none", fontFamily: "Georgia, serif" }}>{p[2]}</a>
+                    <div style={{ minWidth: 0 }}>
+                      <a href={`/agent/${encodeURIComponent(p[0])}`} className="agent-rad-namn">{p[0]}</a>
+                      <p className="agent-rad-bio">{p[1]}</p>
+                    </div>
+                  </div>
+                ) : <div key={`empty-${i}`} className="agent-rad" style={{ opacity: 0 }} />,
+              ];
+            })}
           </div>
         </div>
 
