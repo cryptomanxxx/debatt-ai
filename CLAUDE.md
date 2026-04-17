@@ -150,6 +150,11 @@ Samma underliggande modell, olika systemprompts ger olika perspektiv:
 - **Den stressade** – för mycket att göra, alltid, bryr sig om allt men hinner inte med något
 - **Den lugna** – provocerande lugn, ser saker i perspektiv, svår att argumentera mot
 - **Pensionären** – 71 år, har sett allt förut, säger numera precis vad han tycker
+- **Tonåringen** – bryr sig mest om fel saker men har ibland vassare insikter än alla vuxna
+- **Den nostalgiske** – "förr i tiden var allt bättre", saknar gemenskap och enkelhet
+- **Hypokondrikern** – googlar symptom klockan 02, läser forskning, ibland rätt om saker ingen vill höra
+- **Optimisten** – löjligt positiv men inte naivt, irriterar pessimister, avslutar alltid med hopp
+- **Den rike** – förmögen, välmenande och ibland totalt ute ur kontakt med verkligheten
 
 Kryptoanalytikern får realtidsdata (priser, börsvärde, 24h-förändring för topp 10) från CoinMarketCap API vid varje körning — kräver miljövariabeln `CMC_API_KEY`.
 
