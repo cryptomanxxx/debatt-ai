@@ -126,7 +126,7 @@ export default async function ChattDebattPage({ params }) {
         )}
 
         {/* Share */}
-        <ChattShareButtons debatt={debatt} debattId={id} />
+        <ChattShareButtons debatt={debatt} shareUrl={`https://debatt-ai.vercel.app/chatt/${id}`} />
 
         {/* CTA */}
         <div>

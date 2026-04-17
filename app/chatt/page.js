@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import ChattShareButtons from "./[id]/ChattShareButtons";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -139,8 +140,7 @@ function ThinkingBubble({ agent, isFirst }) {
 
 export default function ChattPage() {
   const [fas, setFas] = useState("start");
-  const [amne, setAmne] = useState("");
-  const [amnesPlaceholder] = useState(() => AMNESFORSLAG[Math.floor(Math.random() * AMNESFORSLAG.length)]);
+  const [amne, setAmne] = useState(() => AMNESFORSLAG[Math.floor(Math.random() * AMNESFORSLAG.length)]);
   const [valdPanel, setValdPanel] = useState(0);
   const [agenter, setAgenter] = useState([]);
   const [faktisktAmne, setFaktisktAmne] = useState("");
@@ -150,7 +150,6 @@ export default function ChattPage() {
   const [streaming, setStreaming] = useState(null);
   const [summering, setSummering] = useState("");
   const [debattId, setDebattId] = useState(null);
-  const [kopierad, setKopierad] = useState(false);
   const stoppRef = useRef(false);
   const abortRef = useRef(null);
   const bottomRef = useRef(null);
@@ -175,7 +174,7 @@ export default function ChattPage() {
   async function starta() {
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? pickRandom(ALLA_AGENTER, 3);
-    const valtAmne = amne.trim() || amnesPlaceholder;
+    const valtAmne = amne.trim() || AMNESFORSLAG[0];
 
     setAgenter(valdaAgenter);
     setFaktisktAmne(valtAmne);
@@ -231,15 +230,8 @@ export default function ChattPage() {
     setStreaming(null);
     setSummering("");
     setDebattId(null);
-    setAmne("");
+    setAmne(AMNESFORSLAG[Math.floor(Math.random() * AMNESFORSLAG.length)]);
     stoppRef.current = false;
-  }
-
-  function kopieraLank() {
-    if (!debattId) return;
-    navigator.clipboard.writeText(`${window.location.origin}/chatt/${debattId}`);
-    setKopierad(true);
-    setTimeout(() => setKopierad(false), 2500);
   }
 
   const hasLive = streaming || tänker;
@@ -285,10 +277,9 @@ export default function ChattPage() {
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "28px" }}>
             <div style={{ marginBottom: "24px" }}>
               <label style={{ display: "block", fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "8px" }}>Debattämne</label>
-              <input value={amne} onChange={e => setAmne(e.target.value)} placeholder={amnesPlaceholder}
+              <input value={amne} onChange={e => setAmne(e.target.value)} placeholder="Skriv ett ämne…"
                 style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "10px 14px", color: C.text, fontSize: "15px", fontFamily: "Georgia, serif", boxSizing: "border-box", outline: "none" }}
                 onKeyDown={e => e.key === "Enter" && starta()} />
-              <p style={{ fontSize: "12px", color: C.textMuted, margin: "6px 0 0 0" }}>Lämna tomt för ett slumpmässigt ämne</p>
             </div>
             <div style={{ marginBottom: "28px" }}>
               <label style={{ display: "block", fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "12px" }}>Panel</label>
@@ -363,13 +354,14 @@ export default function ChattPage() {
             )}
 
             {fas === "klar" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", alignItems: "flex-start" }}>
-                {debattId && (
-                  <button onClick={kopieraLank} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", background: kopierad ? `${C.accent}20` : "transparent", border: `1px solid ${C.accent}60`, color: C.accent, borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer", transition: "all 0.2s" }}>
-                    {kopierad ? "✓ Länk kopierad!" : "Dela direktdebatt →"}
-                  </button>
-                )}
-                <button onClick={nyDebatt} style={{ padding: "10px 22px", background: C.accent, border: "none", color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                <ChattShareButtons
+                  debatt={{ amne: faktisktAmne, agenter, summering }}
+                  shareUrl={debattId
+                    ? `https://debatt-ai.vercel.app/chatt/${debattId}`
+                    : `https://debatt-ai.vercel.app/chatt`}
+                />
+                <button onClick={nyDebatt} style={{ alignSelf: "flex-start", padding: "10px 22px", background: C.accent, border: "none", color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer" }}>
                   Ny direktdebatt →
                 </button>
               </div>
