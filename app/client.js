@@ -286,8 +286,9 @@ function useNextAgentTimer() {
       const m = parseInt(parts.find(p => p.type === "minute").value);
       const s = parseInt(parts.find(p => p.type === "second").value);
       const nowSec = h * 3600 + m * 60 + s;
-      const nextHour = SCHEMA.find(sh => sh * 3600 > nowSec) ?? SCHEMA[0];
-      const nextSec = nextHour * 3600 + (nextHour === SCHEMA[0] ? 86400 : 0);
+      const nextIdx = SCHEMA.findIndex(sh => sh * 3600 > nowSec);
+      const nextHour = nextIdx === -1 ? SCHEMA[0] : SCHEMA[nextIdx];
+      const nextSec = nextHour * 3600 + (nextIdx === -1 ? 86400 : 0);
       const diff = nextSec - nowSec;
       const hh = Math.floor(diff / 3600);
       const mm = Math.floor((diff % 3600) / 60);
