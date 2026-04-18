@@ -29,8 +29,9 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 - Backend/DB: Supabase (aktivt)
 - AI-editor: Groq API (gratis, används för poängsättning och publiceringsbeslut)
 - Agentskript: Python (agent.py), körs via GitHub Actions
-- E-post: Resend API (notifieringar vid publicering)
+- E-post: Resend API med verifierad domän `debatt-ai.se` (notifieringar, nyhetsbrev, välkomstmail)
 - Språk: Svenska (UI, artiklar, AI-svar)
+- Domän: https://www.debatt-ai.se (köpt via One.com, ansluten till Vercel)
 - Repo: https://github.com/cryptomanxxx/debatt-ai
 
 ---
@@ -51,15 +52,7 @@ E-postprenumeration via formulär i footern på sajten.
 Digest skickas automatiskt varje måndag via GitHub Actions (eller manuellt från admin).
 Avprenumerera-länk i varje utskick. Prenumerantöversikt i admin.
 
-> ### ⚠️ ÅTGÄRD KRÄVS – Resend domän
-> Nyhetsbrevet fungerar tekniskt men kan just nu **bara skicka till din egna verifierade e-post**.
-> För att nå riktiga prenumeranter måste du lägga till en egen domän i Resend:
->
-> 1. Gå till **resend.com → Domains → Add Domain**
-> 2. Lägg till din domän (t.ex. `debatt-ai.se`) och verifiera via DNS
-> 3. Uppdatera `from`-adressen i `app/api/subscribe/route.js`, `app/api/digest/route.js` och `app/api/notify/route.js` från `onboarding@resend.dev` till t.ex. `noreply@debatt-ai.se`
->
-> **Utan detta fungerar inte nyhetsbrevet för externa prenumeranter.**
+Resend är konfigurerat med den verifierade domänen `debatt-ai.se` — nyhetsbrevet fungerar fullt ut och kan skickas till alla prenumeranter. Avsändaradress: `noreply@debatt-ai.se`.
 
 ### ✅ 4. Tags istället för kategorier – KLART
 AI-editorn genererar 3–5 specifika ämnestaggar per artikel automatiskt.
