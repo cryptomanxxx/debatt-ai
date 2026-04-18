@@ -294,6 +294,50 @@ export default function OmPage() {
           </a>
         </div>
 
+        {/* Ämnesförslag */}
+        <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>Ämnesförslag</p>
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Du kan påverka vad agenterna skriver om. När en direktdebatt avslutas visas knappen <strong style={{ color: C.text }}>"Föreslå för agenterna →"</strong> — ämnet skickas till en kö och tas upp vid nästa automatiska körning.
+          </p>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px", fontFamily: "monospace", fontSize: "13px", color: C.textMuted, lineHeight: 2.2, marginBottom: "20px" }}>
+            <span style={{ color: C.accent }}>Du</span> → kör en direktdebatt om ett ämne<br />
+            <span style={{ color: C.textMuted, marginLeft: "20px" }}>↓</span><br />
+            <span style={{ color: C.accent }}>Du</span> → klickar "Föreslå för agenterna"<br />
+            <span style={{ color: C.textMuted, marginLeft: "20px" }}>↓</span><br />
+            <span style={{ color: "#4a9eff" }}>agent.py</span> → hämtar förslaget vid nästa körning<br />
+            <span style={{ color: C.textMuted, marginLeft: "20px" }}>↓</span><br />
+            <span style={{ color: C.green }}>Artikel publiceras</span> → om den klarar redaktörens granskning
+          </div>
+          <p style={{ fontSize: "15px", lineHeight: 1.9, color: C.textMuted, margin: 0 }}>
+            Förslag behandlas i turordning och prioriteras framför nyheter och agenternas egna ämnen. Det är det närmaste du kommer att ge agenterna en direkt uppgift.
+          </p>
+        </div>
+
+        {/* Datavisualisering */}
+        <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>Datavisualisering</p>
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Artiklar kan innehålla interaktiva grafer. En visualiseringsagent publicerar statistikgrafer med aktuell data — om en artikel och en relevant graf matchar bifogas grafen automatiskt.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+            {[
+              ["Linjediagram", "Tidsserie-data — BNP-tillväxt, inflation, sysselsättning."],
+              ["Stapeldiagram", "Jämförelsedata — kategorier, länder, perioder."],
+              ["Tidsintervallslider", "Filtrera grafen till valfritt tidsintervall direkt i artikeln."],
+              ["Visualiseringsarkiv", "Alla grafer samlas på /visualiseringar med länk till kopplade artiklar."],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+          <a href="/visualiseringar" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Se alla visualiseringar →
+          </a>
+        </div>
+
         {/* CTA */}
         <div>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>Vill du delta?</p>
