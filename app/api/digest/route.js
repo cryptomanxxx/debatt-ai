@@ -2,28 +2,11 @@ const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const BASE_URL = "https://www.debatt-ai.se";
 
-async function sendBrevo(to, subject, htmlContent) {
-  return fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "api-key": process.env.BREVO_API_KEY,
-    },
-    body: JSON.stringify({
-      sender: { name: "DEBATT.AI", email: process.env.BREVO_SENDER_EMAIL || "xx8031126@outlook.com" },
-      to: [{ email: to }],
-      subject,
-      htmlContent,
-    }),
-  });
-}
-
 export async function POST(req) {
   let body;
   try { body = await req.json(); }
   catch { return Response.json({ fel: "Ogiltig JSON" }, { status: 400 }); }
 
-  // Authenticate with admin password
   if (body.secret !== process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
     return Response.json({ fel: "Unauthorized" }, { status: 401 });
   }
@@ -31,7 +14,6 @@ export async function POST(req) {
   const days = body.days || 7;
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  // Fetch recent articles
   const artRes = await fetch(
     `${SB_URL}/rest/v1/artiklar?skapad=gte.${since}&select=id,rubrik,forfattare,motivering,kalla,skapad,taggar&order=skapad.desc`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
@@ -42,7 +24,6 @@ export async function POST(req) {
     return Response.json({ meddelande: "Inga nya artiklar de senaste " + days + " dagarna." });
   }
 
-  // Fetch active subscribers
   const subRes = await fetch(
     `${SB_URL}/rest/v1/prenumeranter?aktiv=eq.true&select=email,token`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
@@ -53,7 +34,6 @@ export async function POST(req) {
     return Response.json({ meddelande: "Inga aktiva prenumeranter." });
   }
 
-  // Build article HTML
   const articlesHtml = articles.map(a => {
     const kallaBadge = a.kalla === "ai"
       ? `<span style="font-size:11px;color:#4a9eff;font-family:monospace;font-weight:bold;background:#050a1a;border:1px solid #4a9eff40;border-radius:20px;padding:2px 10px">AI</span>`
@@ -74,26 +54,30 @@ export async function POST(req) {
       </div>`;
   }).join("");
 
-  // Send to each subscriber
   let sent = 0;
   for (const sub of subscribers) {
-    const res = await sendBrevo(
-      sub.email,
-      `DEBATT.AI – ${articles.length} ${articles.length === 1 ? "ny artikel" : "nya artiklar"}`,
-      `<div style="font-family:Georgia,serif;background:#0a0a0a;color:#f0ede6;padding:40px;max-width:580px">
-        <p style="font-size:24px;color:#e8d5a3;font-weight:bold;margin:0 0 4px">DEBATT.AI</p>
-        <p style="color:#888880;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 4px">Redaktionen är artificiell</p>
-        <p style="color:#555;font-size:13px;margin:0 0 28px">Veckans debatt – ${articles.length} ${articles.length === 1 ? "ny artikel" : "nya artiklar"}</p>
-        ${articlesHtml}
-        <div style="border-top:1px solid #222;padding-top:20px;margin-top:8px">
-          <a href="${BASE_URL}" style="display:inline-block;background:#e8d5a3;color:#0a0a0a;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold">Läs alla artiklar →</a>
-        </div>
-        <p style="font-size:11px;color:#333;margin-top:24px">
-          Du får detta brev för att du prenumererar på DEBATT.AI.
-          <a href="${BASE_URL}/avprenumerera?token=${sub.token}" style="color:#444">Avprenumerera</a>.
-        </p>
-      </div>`
-    );
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+      body: JSON.stringify({
+        from: "DEBATT.AI <noreply@debatt-ai.se>",
+        to: sub.email,
+        subject: `DEBATT.AI – ${articles.length} ${articles.length === 1 ? "ny artikel" : "nya artiklar"}`,
+        html: `<div style="font-family:Georgia,serif;background:#0a0a0a;color:#f0ede6;padding:40px;max-width:580px">
+          <p style="font-size:24px;color:#e8d5a3;font-weight:bold;margin:0 0 4px">DEBATT.AI</p>
+          <p style="color:#888880;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 4px">Redaktionen är artificiell</p>
+          <p style="color:#555;font-size:13px;margin:0 0 28px">Veckans debatt – ${articles.length} ${articles.length === 1 ? "ny artikel" : "nya artiklar"}</p>
+          ${articlesHtml}
+          <div style="border-top:1px solid #222;padding-top:20px;margin-top:8px">
+            <a href="${BASE_URL}" style="display:inline-block;background:#e8d5a3;color:#0a0a0a;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold">Läs alla artiklar →</a>
+          </div>
+          <p style="font-size:11px;color:#333;margin-top:24px">
+            Du får detta brev för att du prenumererar på DEBATT.AI.
+            <a href="${BASE_URL}/avprenumerera?token=${sub.token}" style="color:#444">Avprenumerera</a>.
+          </p>
+        </div>`,
+      }),
+    });
     if (res.ok) sent++;
   }
 
