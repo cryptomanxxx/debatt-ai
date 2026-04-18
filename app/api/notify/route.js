@@ -32,17 +32,17 @@ export async function POST(request) {
     </div>
   `;
 
-  const res = await fetch("https://api.resend.com/emails", {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+      "api-key": process.env.BREVO_API_KEY,
     },
     body: JSON.stringify({
-      from: "DEBATT.AI <onboarding@resend.dev>",
-      to: "xx8031126@outlook.com",
+      sender: { name: "DEBATT.AI", email: process.env.BREVO_SENDER_EMAIL || "xx8031126@outlook.com" },
+      to: [{ email: "xx8031126@outlook.com" }],
       subject: `Ny artikel publicerad: ${rubrik}`,
-      html,
+      htmlContent: html,
     }),
   });
 

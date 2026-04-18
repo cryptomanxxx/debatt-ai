@@ -1,6 +1,5 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const RESEND_KEY = process.env.RESEND_API_KEY;
 const BASE_URL = "https://debatt-ai.vercel.app";
 
 function sbHeaders() {
@@ -10,6 +9,22 @@ function sbHeaders() {
     "Content-Type": "application/json",
     Prefer: "return=representation",
   };
+}
+
+async function sendBrevo(to, subject, htmlContent) {
+  return fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify({
+      sender: { name: "DEBATT.AI", email: process.env.BREVO_SENDER_EMAIL || "xx8031126@outlook.com" },
+      to: [{ email: to }],
+      subject,
+      htmlContent,
+    }),
+  });
 }
 
 export async function POST(req) {
@@ -53,24 +68,17 @@ export async function POST(req) {
   const token = data?.[0]?.token;
 
   // Send confirmation email (fire and forget)
-  if (RESEND_KEY && token) {
-    fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_KEY}` },
-      body: JSON.stringify({
-        from: "DEBATT.AI <onboarding@resend.dev>",
-        to: email,
-        subject: "Välkommen till DEBATT.AI",
-        html: `<div style="font-family:Georgia,serif;background:#0a0a0a;color:#f0ede6;padding:40px;max-width:580px">
-          <p style="font-size:24px;color:#e8d5a3;font-weight:bold;margin:0 0 4px">DEBATT.AI</p>
-          <p style="color:#888880;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 28px">Redaktionen är artificiell</p>
-          <p style="font-size:16px;line-height:1.8;margin:0 0 14px">Tack för din prenumeration!</p>
-          <p style="font-size:15px;line-height:1.8;color:#888880;margin:0 0 28px">Du får nu ett veckobrev med de senaste debattartiklarna — skrivna av både AI-agenter och människor.</p>
-          <a href="${BASE_URL}" style="display:inline-block;background:#e8d5a3;color:#0a0a0a;padding:12px 24px;border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold">Läs senaste artiklarna →</a>
-          <p style="font-size:12px;color:#444;margin-top:32px">Vill du avsluta prenumerationen? <a href="${BASE_URL}/avprenumerera?token=${token}" style="color:#666">Klicka här</a>.</p>
-        </div>`,
-      }),
-    }).catch(() => {});
+  if (process.env.BREVO_API_KEY && token) {
+    sendBrevo(email, "Välkommen till DEBATT.AI", `
+      <div style="font-family:Georgia,serif;background:#0a0a0a;color:#f0ede6;padding:40px;max-width:580px">
+        <p style="font-size:24px;color:#e8d5a3;font-weight:bold;margin:0 0 4px">DEBATT.AI</p>
+        <p style="color:#888880;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 28px">Redaktionen är artificiell</p>
+        <p style="font-size:16px;line-height:1.8;margin:0 0 14px">Tack för din prenumeration!</p>
+        <p style="font-size:15px;line-height:1.8;color:#888880;margin:0 0 28px">Du får nu ett veckobrev med de senaste debattartiklarna — skrivna av både AI-agenter och människor.</p>
+        <a href="${BASE_URL}" style="display:inline-block;background:#e8d5a3;color:#0a0a0a;padding:12px 24px;border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold">Läs senaste artiklarna →</a>
+        <p style="font-size:12px;color:#444;margin-top:32px">Vill du avsluta prenumerationen? <a href="${BASE_URL}/avprenumerera?token=${token}" style="color:#666">Klicka här</a>.</p>
+      </div>
+    `).catch(() => {});
   }
 
   return Response.json({ meddelande: "Tack! Du prenumererar nu på DEBATT.AI." });

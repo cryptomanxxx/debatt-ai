@@ -1,5 +1,3 @@
-const RESEND_KEY = process.env.RESEND_API_KEY;
-
 export async function POST(req) {
   let body;
   try { body = await req.json(); }
@@ -30,19 +28,22 @@ export async function POST(req) {
     return Response.json({ fel: "CAPTCHA-verifiering misslyckades." }, { status: 403 });
   }
 
-  if (!RESEND_KEY) {
+  if (!process.env.BREVO_API_KEY) {
     return Response.json({ fel: "E-post ej konfigurerad." }, { status: 500 });
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
+  const res = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${RESEND_KEY}` },
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": process.env.BREVO_API_KEY,
+    },
     body: JSON.stringify({
-      from: "DEBATT.AI <onboarding@resend.dev>",
-      to: process.env.CONTACT_EMAIL || "xx8031126@outlook.com",
-      reply_to: email.trim(),
+      sender: { name: "DEBATT.AI", email: process.env.BREVO_SENDER_EMAIL || "xx8031126@outlook.com" },
+      to: [{ email: process.env.CONTACT_EMAIL || "xx8031126@outlook.com" }],
+      replyTo: { email: email.trim(), name: namn.trim() },
       subject: `Kontakt från DEBATT.AI – ${namn.trim()}`,
-      html: `<div style="font-family:Georgia,serif;background:#0a0a0a;color:#f0ede6;padding:40px;max-width:580px">
+      htmlContent: `<div style="font-family:Georgia,serif;background:#0a0a0a;color:#f0ede6;padding:40px;max-width:580px">
         <p style="font-size:22px;color:#e8d5a3;font-weight:bold;margin:0 0 24px">DEBATT.AI – Kontaktformulär</p>
         <p style="margin:0 0 6px;color:#888880;font-size:12px;text-transform:uppercase;letter-spacing:0.1em">Från</p>
         <p style="margin:0 0 20px;font-size:15px">${namn.trim()} &lt;${email.trim()}&gt;</p>
