@@ -1,20 +1,34 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
 import Chart from "../Chart";
+import { notFound } from "next/navigation";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const revalidate = 3600;
 
+const C = {
+  bg: "#0a0a0a", surface: "#111111", border: "#222222",
+  accent: "#e8d5a3", accentDim: "#b8a57a",
+  text: "#f0ede6", textMuted: "#888880",
+};
+
+const NAV_LINK = (href, label, active = false) => (
+  <a key={href} href={href} style={{
+    flex: 1, textAlign: "center",
+    background: active ? `${C.accent}15` : "transparent",
+    border: `1px solid ${active ? C.accentDim : C.border}`,
+    color: active ? C.accent : C.textMuted,
+    padding: "6px 14px", borderRadius: "4px",
+    fontSize: "13px", letterSpacing: "0.05em",
+    fontFamily: "Georgia, serif", textDecoration: "none",
+  }}>{label}</a>
+);
+
 async function hamtaVisualisering(id) {
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/visualiseringar?id=eq.${id}&select=*`,
-      {
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-        next: { revalidate: 3600 },
-      }
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 3600 } }
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -26,23 +40,11 @@ async function hamtaVisualisering(id) {
 
 export async function generateMetadata({ params }) {
   const v = await hamtaVisualisering(params.id);
-  if (!v) return { title: "Visualisering – debatt.ai" };
+  if (!v) return { title: "Visualisering – DEBATT.AI" };
   return {
-    title: `${v.titel} – debatt.ai`,
+    title: `${v.titel} – DEBATT.AI`,
     description: v.beskrivning || "Datavisualisering från debatt.ai",
   };
-}
-
-function navLink(href, label) {
-  return (
-    <Link
-      key={href}
-      href={href}
-      style={{ color: "#a1a1aa", textDecoration: "none", fontSize: 14, whiteSpace: "nowrap" }}
-    >
-      {label}
-    </Link>
-  );
 }
 
 export default async function VisualiseringPage({ params }) {
@@ -50,93 +52,66 @@ export default async function VisualiseringPage({ params }) {
   if (!v) notFound();
 
   return (
-    <div style={{ background: "#09090b", minHeight: "100vh", color: "#fafafa" }}>
-      <nav style={{
-        borderBottom: "1px solid #27272a",
-        padding: "16px 24px",
-        display: "flex",
-        alignItems: "center",
-        gap: 24,
-        flexWrap: "wrap",
-      }}>
-        <Link href="/" style={{ textDecoration: "none" }}>
-          <span style={{ fontSize: 18, fontWeight: 700, color: "#fafafa" }}>debatt.ai</span>
-        </Link>
-        {navLink("/skicka-in", "Skicka in")}
-        {navLink("/?debatter=1", "Debatter")}
-        {navLink("/arkiv", "Arkiv")}
-        {navLink("/chatt", "Direktdebatt")}
-        {navLink("/visualiseringar", "Visualiseringar")}
-        {navLink("/om", "Om")}
-      </nav>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
+      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
+          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT.AI</a>
+          <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
+        </div>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {NAV_LINK("/", "Skicka in")}
+          {NAV_LINK("/?debatter=1", "Debatter")}
+          {NAV_LINK("/?arkiv=1", "Arkiv")}
+          {NAV_LINK("/chatt", "Direktdebatt")}
+          {NAV_LINK("/visualiseringar", "Visualiseringar", true)}
+          {NAV_LINK("/om", "Om DEBATT.AI")}
+          {NAV_LINK("/?kontakt=1", "Kontakt")}
+        </div>
+      </header>
 
-      <main style={{ maxWidth: 800, margin: "0 auto", padding: "40px 24px" }}>
-        <Link
-          href="/visualiseringar"
-          style={{ color: "#6366f1", textDecoration: "none", fontSize: 14 }}
-        >
+      <main style={{ maxWidth: "760px", margin: "0 auto", padding: "48px 20px" }}>
+        <a href="/visualiseringar" style={{ color: C.accentDim, textDecoration: "none", fontSize: "13px" }}>
           ← Alla visualiseringar
-        </Link>
+        </a>
 
-        <div style={{ marginTop: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div style={{ marginTop: "28px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
             <span style={{
-              fontSize: 11,
-              fontWeight: 600,
-              textTransform: "uppercase",
-              letterSpacing: 1,
-              color: "#6366f1",
-              background: "#1e1b4b",
-              padding: "2px 8px",
-              borderRadius: 99,
+              fontSize: "11px", fontWeight: 600, textTransform: "uppercase",
+              letterSpacing: "0.1em", color: C.accentDim,
+              border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: "4px",
             }}>
               {v.typ === "bar" ? "Stapeldiagram" : "Linjediagram"}
             </span>
-            {v.kalla && <span style={{ fontSize: 12, color: "#52525b" }}>Källa: {v.kalla}</span>}
+            {v.kalla && <span style={{ fontSize: "12px", color: C.textMuted }}>Källa: {v.kalla}</span>}
           </div>
 
-          <h1 style={{ fontSize: 26, fontWeight: 700, margin: "8px 0 16px", lineHeight: 1.3 }}>
+          <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "8px 0 16px", lineHeight: 1.3, color: C.accent }}>
             {v.titel}
           </h1>
 
           {v.beskrivning && (
             <p style={{
-              fontSize: 15,
-              color: "#a1a1aa",
-              lineHeight: 1.6,
-              marginBottom: 32,
-              borderLeft: "3px solid #6366f1",
-              paddingLeft: 16,
+              fontSize: "17px", lineHeight: 1.85, color: C.text,
+              borderLeft: `3px solid ${C.accentDim}`, paddingLeft: "16px",
+              marginBottom: "32px", fontStyle: "italic",
             }}>
               {v.beskrivning}
             </p>
           )}
 
-          <div style={{
-            background: "#18181b",
-            borderRadius: 12,
-            border: "1px solid #27272a",
-            padding: "24px 16px 16px",
-          }}>
+          <div style={{ background: C.surface, borderRadius: "8px", border: `1px solid ${C.border}`, padding: "24px 16px 16px" }}>
             <Chart typ={v.typ} data={v.data} enhet={v.enhet} />
             {v.enhet && (
-              <p style={{ fontSize: 11, color: "#52525b", textAlign: "right", marginTop: 8 }}>
+              <p style={{ fontSize: "11px", color: C.textMuted, textAlign: "right", marginTop: "8px" }}>
                 Enhet: {v.enhet}
               </p>
             )}
           </div>
 
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginTop: 16,
-            fontSize: 12,
-            color: "#52525b",
-          }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16px", fontSize: "12px", color: C.textMuted }}>
             {v.agent_namn && <span>Genererad av {v.agent_namn}</span>}
-            <span>{new Date(v.skapad).toLocaleDateString("sv-SE", {
-              year: "numeric", month: "long", day: "numeric"
-            })}</span>
+            <span>{new Date(v.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" })}</span>
           </div>
         </div>
       </main>
