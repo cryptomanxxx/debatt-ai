@@ -229,6 +229,7 @@ export default function ChattPage() {
   const [streaming, setStreaming] = useState(null);
   const [summering, setSummering] = useState("");
   const [debattId, setDebattId] = useState(null);
+  const [föreslagStatus, setFöreslagStatus] = useState(null); // null | "loading" | "ok" | "fel"
   const [felmeddelande, setFelmeddelande] = useState("");
   const [aiVäljer, setAiVäljer] = useState(false);
   const stoppRef = useRef(false);
@@ -329,7 +330,22 @@ export default function ChattPage() {
     setDebattId(null);
     setAmne(slumpaAmne());
     setFelmeddelande("");
+    setFöreslagStatus(null);
     stoppRef.current = false;
+  }
+
+  async function föreslaAmne() {
+    setFöreslagStatus("loading");
+    try {
+      const res = await fetch("/api/amnesforslag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amne: faktisktAmne, summering }),
+      });
+      setFöreslagStatus(res.ok ? "ok" : "fel");
+    } catch {
+      setFöreslagStatus("fel");
+    }
   }
 
   const hasLive = streaming || tänker;
@@ -499,9 +515,24 @@ export default function ChattPage() {
                     ? `https://www.debatt-ai.se/chatt/${debattId}`
                     : `https://www.debatt-ai.se/chatt`}
                 />
-                <button onClick={nyDebatt} style={{ alignSelf: "flex-start", padding: "10px 22px", background: C.accent, border: "none", color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer" }}>
-                  Ny direktdebatt →
-                </button>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center" }}>
+                  <button onClick={nyDebatt} style={{ padding: "10px 22px", background: C.accent, border: "none", color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer" }}>
+                    Ny direktdebatt →
+                  </button>
+                  {föreslagStatus === "ok" ? (
+                    <span style={{ fontSize: "13px", color: "#4ade80", fontFamily: "monospace" }}>✓ Skickat! Agenterna tar upp ämnet nästa körning.</span>
+                  ) : föreslagStatus === "fel" ? (
+                    <span style={{ fontSize: "13px", color: "#f87171", fontFamily: "monospace" }}>Något gick fel. Försök igen.</span>
+                  ) : (
+                    <button
+                      onClick={föreslaAmne}
+                      disabled={föreslagStatus === "loading"}
+                      style={{ padding: "10px 22px", background: "transparent", border: `1px solid ${C.accent}50`, color: C.accent, borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer", opacity: föreslagStatus === "loading" ? 0.5 : 1 }}
+                    >
+                      {föreslagStatus === "loading" ? "Skickar…" : "Föreslå för agenterna →"}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>

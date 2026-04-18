@@ -863,6 +863,37 @@ def hamta_engagemang(sb_key: str, artikel_ids: list) -> dict:
     return eng
 
 
+def hamta_amnesforslag(sb_key: str) -> dict | None:
+    """Hämtar ett obehandlat ämnesförslag från direktdebatten, eller None."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/amnesforslag",
+            params={"select": "id,amne,summering", "behandlad": "eq.false", "order": "skapad.asc", "limit": "1"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=10,
+        )
+        if res.status_code == 200:
+            data = res.json()
+            return data[0] if data else None
+    except Exception:
+        pass
+    return None
+
+
+def markera_forslag_behandlat(sb_key: str, forslag_id: str) -> None:
+    """Markerar ett ämnesförslag som behandlat."""
+    try:
+        httpx.patch(
+            f"{SB_URL}/rest/v1/amnesforslag",
+            params={"id": f"eq.{forslag_id}"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json"},
+            json={"behandlad": True},
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
 def hamta_trendande_amnen(sb_key: str) -> str:
     """Hämtar de 3 mest engagerande ämnena senaste 7 dagarna och returnerar en kontextsträng."""
     try:
@@ -1274,6 +1305,16 @@ def main():
         konklusion = ""
         agent = random.choice(ANALYTIKER)
 
+        # Kolla ämnesförslag från direktdebatten
+        forslag_amne = None
+        forslag_id = None
+        if sb_key:
+            forslag = hamta_amnesforslag(sb_key)
+            if forslag:
+                forslag_amne = forslag["amne"]
+                forslag_id = forslag["id"]
+                print(f"Hittade ämnesförslag från direktdebatt: \"{forslag_amne[:60]}\"")
+
         # Hämta marknadsdata om agenten är Kryptoanalytiker
         extra_kontext = ""
         if agent["namn"] == "Kryptoanalytiker":
@@ -1319,7 +1360,20 @@ def main():
         if nyheter and random.random() < 0.5:
             nyhet = random.choice(nyheter[:10])
 
-        if nyhet:
+        if forslag_amne:
+            amne = forslag_amne
+            kategori = "Samhälle"
+            print(f"\n{'═' * 60}")
+            print(f"  Läge:     NY ARTIKEL (ÄMNESFÖRSLAG FRÅN DIREKTDEBATT)")
+            print(f"  Agent:    {agent['namn']}")
+            print(f"  Ämne:     {amne[:60]}")
+            print(f"  Kategori: {kategori}")
+            print(f"{'═' * 60}\n")
+            print("Skriver artikel med Groq (llama-3.3-70b)...")
+            artikel = skriv_artikel(agent, amne, extra_kontext)
+            markera_forslag_behandlat(sb_key, forslag_id)
+            print("  Förslag markerat som behandlat ✓")
+        elif nyhet:
             amne = nyhet["rubrik"]
             kategori = "Samhälle"
             print(f"\n{'═' * 60}")
