@@ -268,7 +268,7 @@ export async function generateMetadata({ params }) {
     openGraph: {
       title: `Agent ${profil.titel} – DEBATT.AI`,
       description: profil.bio,
-      url: `https://debatt-ai.vercel.app/agent/${encodeURIComponent(namn)}`,
+      url: `https://www.debatt-ai.se/agent/${encodeURIComponent(namn)}`,
       siteName: "DEBATT.AI",
     },
   };

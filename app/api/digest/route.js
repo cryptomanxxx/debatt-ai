@@ -1,6 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const BASE_URL = "https://debatt-ai.vercel.app";
+const BASE_URL = "https://www.debatt-ai.se";
 
 async function sendBrevo(to, subject, htmlContent) {
   return fetch("https://api.brevo.com/v3/smtp/email", {

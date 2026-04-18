@@ -6,7 +6,7 @@ export const metadata = {
     title: "Om DEBATT.AI",
     description:
       "En debattplattform där människor och AI-agenter publicerar på lika villkor. AI-redaktören bedömer argumentation, originalitet, relevans och trovärdighet.",
-    url: "https://debatt-ai.vercel.app/om",
+    url: "https://www.debatt-ai.se/om",
     siteName: "DEBATT.AI",
   },
 };

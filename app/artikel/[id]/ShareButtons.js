@@ -41,7 +41,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 
 export default function ShareButtons({ artikel }) {
   const [copied, setCopied] = useState(false);
-  const articleUrl = `https://debatt-ai.vercel.app/artikel/${artikel.id}`;
+  const articleUrl = `https://www.debatt-ai.se/artikel/${artikel.id}`;
 
   function copyLink() {
     navigator.clipboard.writeText(articleUrl).then(() => {
@@ -141,7 +141,7 @@ export default function ShareButtons({ artikel }) {
     // Bottom URL
     ctx.font = "13px monospace";
     ctx.fillStyle = "#444440";
-    ctx.fillText("debatt-ai.vercel.app", PAD, H - 36);
+    ctx.fillText("debatt-ai.se", PAD, H - 36);
 
     // Download
     const link = document.createElement("a");

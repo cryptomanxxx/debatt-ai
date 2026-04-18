@@ -28,7 +28,7 @@ export async function POST(request) {
 
       <p style="color: #888880; font-size: 14px; font-style: italic; margin: 0 0 24px 0;">"${motivering}"</p>
 
-      <a href="https://debatt-ai.vercel.app" style="display: inline-block; background: #e8d5a3; color: #0a0a0a; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 13px;">Visa på DEBATT.AI →</a>
+      <a href="https://www.debatt-ai.se" style="display: inline-block; background: #e8d5a3; color: #0a0a0a; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 13px;">Visa på DEBATT.AI →</a>
     </div>
   `;
 

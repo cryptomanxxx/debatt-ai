@@ -7,6 +7,6 @@ export default function robots() {
       allow: "/",
       disallow: "/admin/",
     },
-    sitemap: "https://debatt-ai.vercel.app/sitemap.xml",
+    sitemap: "https://www.debatt-ai.se/sitemap.xml",
   };
 }

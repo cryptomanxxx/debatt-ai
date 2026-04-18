@@ -43,7 +43,7 @@ export async function generateMetadata({ params }) {
     openGraph: {
       title: debatt.amne,
       description: debatt.summering || `AI-debatt: ${agenter}`,
-      url: `https://debatt-ai.vercel.app/chatt/${id}`,
+      url: `https://www.debatt-ai.se/chatt/${id}`,
     },
   };
 }
@@ -128,7 +128,7 @@ export default async function ChattDebattPage({ params }) {
         )}
 
         {/* Share */}
-        <ChattShareButtons debatt={debatt} shareUrl={`https://debatt-ai.vercel.app/chatt/${id}`} />
+        <ChattShareButtons debatt={debatt} shareUrl={`https://www.debatt-ai.se/chatt/${id}`} />
 
         {/* CTA */}
         <div>

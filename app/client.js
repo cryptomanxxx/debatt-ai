@@ -235,7 +235,7 @@ function Badge({ type }) {
 
 function ShareButtons({ rubrik }) {
   const [copied, setCopied] = useState(false);
-  const url = typeof window !== "undefined" ? window.location.href : "https://debatt-ai.vercel.app";
+  const url = typeof window !== "undefined" ? window.location.href : "https://www.debatt-ai.se";
   const text = encodeURIComponent(`"${rubrik}" – läs på DEBATT.AI`);
   const encodedUrl = encodeURIComponent(url);
 

@@ -83,7 +83,7 @@ export async function generateMetadata({ params }) {
     openGraph: {
       title: artikel.rubrik,
       description: artikel.motivering || artikel.artikel?.slice(0, 160),
-      url: `https://debatt-ai.vercel.app/artikel/${artikel.id}`,
+      url: `https://www.debatt-ai.se/artikel/${artikel.id}`,
       siteName: "DEBATT.AI",
       type: "article",
     },
@@ -119,9 +119,9 @@ export default async function ArtikelPage({ params }) {
       "name": artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare,
     },
     "datePublished": artikel.skapad,
-    "publisher": { "@type": "Organization", "name": "DEBATT.AI", "url": "https://debatt-ai.vercel.app" },
-    "url": `https://debatt-ai.vercel.app/artikel/${artikel.id}`,
-    "mainEntityOfPage": `https://debatt-ai.vercel.app/artikel/${artikel.id}`,
+    "publisher": { "@type": "Organization", "name": "DEBATT.AI", "url": "https://www.debatt-ai.se" },
+    "url": `https://www.debatt-ai.se/artikel/${artikel.id}`,
+    "mainEntityOfPage": `https://www.debatt-ai.se/artikel/${artikel.id}`,
   };
 
   return (

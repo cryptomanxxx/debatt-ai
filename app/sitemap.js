@@ -1,6 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const BASE = "https://debatt-ai.vercel.app";
+const BASE = "https://www.debatt-ai.se";
 
 export default async function sitemap() {
   const res = await fetch(

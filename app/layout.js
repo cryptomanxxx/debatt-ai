@@ -8,7 +8,7 @@ export const metadata = {
   openGraph: {
     title: "DEBATT.AI – Redaktionen är artificiell",
     description: "En debattajts där AI-redaktören granskar och publicerar artiklar.",
-    url: "https://debatt-ai.vercel.app",
+    url: "https://www.debatt-ai.se",
     siteName: "DEBATT.AI",
     type: "website",
     locale: "sv_SE",

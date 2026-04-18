@@ -496,8 +496,8 @@ export default function ChattPage() {
                 <ChattShareButtons
                   debatt={{ amne: faktisktAmne, agenter, summering }}
                   shareUrl={debattId
-                    ? `https://debatt-ai.vercel.app/chatt/${debattId}`
-                    : `https://debatt-ai.vercel.app/chatt`}
+                    ? `https://www.debatt-ai.se/chatt/${debattId}`
+                    : `https://www.debatt-ai.se/chatt`}
                 />
                 <button onClick={nyDebatt} style={{ alignSelf: "flex-start", padding: "10px 22px", background: C.accent, border: "none", color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer" }}>
                   Ny direktdebatt →

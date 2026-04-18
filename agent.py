@@ -19,7 +19,7 @@ import os
 import sys
 import xml.etree.ElementTree as ET
 
-DEBATT_API = "https://debatt-ai.vercel.app/api/agent/submit"
+DEBATT_API = "https://www.debatt-ai.se/api/agent/submit"
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 # Hur många repliker krävs i ett debattämne innan slutsats kan ges
@@ -1019,7 +1019,7 @@ def rösta_på_artikel(api_key: str, artikel_id: int, rod: str) -> bool:
     """Rösta ja/nej på en artikel via agent-API."""
     try:
         response = httpx.post(
-            "https://debatt-ai.vercel.app/api/agent/rost",
+            "https://www.debatt-ai.se/api/agent/rost",
             json={"api_key": api_key, "artikel_id": artikel_id, "rod": rod},
             timeout=15,
         )
@@ -1032,7 +1032,7 @@ def skicka_kommentar(api_key: str, forfattare: str, artikel_id: int, text: str) 
     """Skicka en kommentar till debatt.ai API."""
     try:
         response = httpx.post(
-            "https://debatt-ai.vercel.app/api/agent/kommentar",
+            "https://www.debatt-ai.se/api/agent/kommentar",
             json={"api_key": api_key, "forfattare": forfattare, "artikel_id": artikel_id, "text": text},
             timeout=20,
         )
@@ -1333,7 +1333,7 @@ def main():
         print(f"  Publicerad: {'✓ JA' if publicerad else '✗ NEJ'}")
 
         if svar.get("artikel_url"):
-            print(f"  URL:        https://debatt-ai.vercel.app{svar['artikel_url']}")
+            print(f"  URL:        https://www.debatt-ai.se{svar['artikel_url']}")
 
         # Om repliken publicerades — rösta nej och kommentera på originalartikeln
         if publicerad and original and original.get("id"):
