@@ -66,7 +66,7 @@ export async function POST(req) {
     return Response.json({ fel: "Ogiltig JSON i request body" }, { status: 400 });
   }
 
-  const { api_key, rubrik, artikel, kategori, konklusion, visualisering_id, forfattare: submittedForfattare } = body;
+  const { api_key, rubrik, artikel, kategori, konklusion, visualisering_id, forfattare: submittedForfattare, forslag } = body;
 
   // Authenticate API key — allow authenticated agent to set its own display name
   const keyName = resolveAgent(api_key);
@@ -187,6 +187,7 @@ export async function POST(req) {
           kalla: "ai",
           konklusion: konklusion?.trim() || null,
           visualisering_id: visualisering_id || null,
+          forslag: forslag === true,
         }),
       });
       if (artRes.ok) {

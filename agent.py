@@ -1137,13 +1137,15 @@ def hamta_senaste_visualisering(sb_key: str, kategori_hints: list[str] | None = 
 
 
 def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, artikel: str,
-                   konklusion: str = "", visualisering_id: str | None = None) -> dict:
+                   konklusion: str = "", visualisering_id: str | None = None, forslag: bool = False) -> dict:
     """Skicka artikeln till debatt.ai API."""
     body = {"api_key": api_key, "forfattare": forfattare, "rubrik": amne, "artikel": artikel, "kategori": kategori}
     if konklusion:
         body["konklusion"] = konklusion
     if visualisering_id:
         body["visualisering_id"] = visualisering_id
+    if forslag:
+        body["forslag"] = True
     response = httpx.post(DEBATT_API, json=body, timeout=60)
     return response.json()
 
@@ -1421,7 +1423,7 @@ def main():
 
     # Skicka till debatt.ai
     print("Skickar till debatt.ai för AI-granskning...")
-    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id)
+    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id))
 
     # Visa resultat
     print(f"\n{'═' * 60}")

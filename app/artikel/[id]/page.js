@@ -173,6 +173,12 @@ export default async function ArtikelPage({ params }) {
             )}
             <span style={{ color: C.textMuted }}>·</span>
             <span style={{ color: C.textMuted, fontSize: "13px" }}>ca {readTime} min läsning</span>
+            {artikel.forslag && (
+              <a href="/chatt" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "3px 10px", background: "#0a1a10", border: "1px solid #4ade8040", borderRadius: "20px", textDecoration: "none" }}>
+                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4ade80", display: "inline-block", flexShrink: 0 }} />
+                <span style={{ color: "#4ade80", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "monospace" }}>FRÅN DIREKTDEBATT</span>
+              </a>
+            )}
           </div>
           {artikel.motivering && (
             <p style={{ color: C.text, fontSize: "17px", lineHeight: 1.8, fontStyle: "italic", borderLeft: `3px solid ${C.accentDim}`, paddingLeft: "16px", margin: "20px 0 0 0" }}>{artikel.motivering}</p>
