@@ -18,6 +18,7 @@ import random
 import os
 import sys
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone, timedelta
 
 DEBATT_API = "https://www.debatt-ai.se/api/agent/submit"
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
@@ -862,6 +863,47 @@ def hamta_engagemang(sb_key: str, artikel_ids: list) -> dict:
     return eng
 
 
+def hamta_trendande_amnen(sb_key: str) -> str:
+    """Hämtar de 3 mest engagerande ämnena senaste 7 dagarna och returnerar en kontextsträng."""
+    try:
+        since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={"select": "id,rubrik,taggar,lasningar,skapad", "skapad": f"gte.{since}", "order": "skapad.desc", "limit": "30"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=15,
+        )
+        if res.status_code != 200:
+            return ""
+        artiklar = res.json()
+        if not artiklar:
+            return ""
+        artikel_ids = [a["id"] for a in artiklar]
+        eng = hamta_engagemang(sb_key, artikel_ids)
+        scorade = []
+        for a in artiklar:
+            e = eng.get(a["id"], {"roster": 0, "kommentarer": 0})
+            lasningar = a.get("lasningar") or 0
+            score = lasningar * 0.05 + e["roster"] * 2 + e["kommentarer"] * 3
+            scorade.append((a, score, e))
+        scorade.sort(key=lambda x: x[1], reverse=True)
+        topp3 = scorade[:3]
+        if not topp3 or all(s == 0 for _, s, _ in topp3):
+            return ""
+        rader = []
+        for a, _, e in topp3:
+            taggar = a.get("taggar") or []
+            tagg_str = " ".join(f"#{t}" for t in taggar[:3])
+            rader.append(f'- "{a["rubrik"]}"' + (f" [{tagg_str}]" if tagg_str else "") + f" — {e['roster']} röster, {e['kommentarer']} kommentarer")
+        return (
+            "TRENDANDE PÅ DEBATT.AI – de tre mest engagerande ämnena senaste veckan:\n"
+            + "\n".join(rader)
+            + "\nAnvänd detta som bakgrund — skriv gärna om aktuella, debatterade ämnen.\n"
+        )
+    except Exception:
+        return ""
+
+
 def skriv_replik(agent: dict, original: dict) -> str:
     """Använd Groq för att skriva en replik på en befintlig artikel."""
     response = httpx.post(
@@ -1262,6 +1304,13 @@ def main():
                 print("  Statistik hämtad ✓")
             else:
                 print("  Ingen statistik i Supabase ännu – fortsätter utan")
+
+        # Återkoppling: lägg till trendande ämnen som bakgrundskontext
+        if sb_key:
+            trender = hamta_trendande_amnen(sb_key)
+            if trender:
+                extra_kontext = (extra_kontext + "\n\n" + trender).strip()
+                print("Trendande ämnen hämtade ✓")
 
         # Försök hämta aktuella nyheter – 50% chans att kommentera en nyhet
         nyhet = None
