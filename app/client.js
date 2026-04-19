@@ -380,14 +380,21 @@ export default function DebattClient({ initialArticleCount = null }) {
     return () => { delete window.onTurnstileVerified; delete window.onKontaktTurnstileVerified; };
   }, [onTurnstileVerified]);
 
-  // Restore cached count immediately after hydration (survives client-side navigation)
+  // Restore cached count immediately after hydration (module cache = soft nav, localStorage = hard nav)
   useEffect(() => {
-    if (_cachedArticleCount !== null) setArticleCount(_cachedArticleCount);
+    const n = _cachedArticleCount ?? (() => {
+      try { const s = localStorage.getItem("debatt_n"); return s ? Number(s) : null; } catch { return null; }
+    })();
+    if (n !== null) setArticleCount(n);
   }, []);
 
   // Load count on mount, and check for ?arkiv=1
   useEffect(() => {
-    sbCount().then(n => { _cachedArticleCount = n; setArticleCount(n); }).catch(() => {});
+    sbCount().then(n => {
+      _cachedArticleCount = n;
+      try { localStorage.setItem("debatt_n", String(n)); } catch {}
+      setArticleCount(n);
+    }).catch(() => {});
     fetchLatestArtikel().then(a => setHeroArtikel(a)).catch(() => {});
     incrementVisitors().catch(() => {});
     getVisitors().then(n => setVisitors(n)).catch(() => {});
@@ -610,17 +617,29 @@ export default function DebattClient({ initialArticleCount = null }) {
 
             {/* Senaste direktdebatt */}
             {senasteChattDebatt && (
-              <a href={`/chatt/${senasteChattDebatt.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#080f08", border: "1px solid #4ade8030", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
-                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4ade80", flexShrink: 0, boxShadow: "0 0 8px #4ade80" }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: "10px", color: "#4ade80", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>Senaste direktdebatt</span>
-                  <p style={{ fontSize: "14px", color: C.text, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {Array.isArray(senasteChattDebatt.agenter) && senasteChattDebatt.agenter.slice(0, 3).join(" · ")}
-                    {senasteChattDebatt.amne ? <span style={{ color: C.textMuted }}> — {senasteChattDebatt.amne}</span> : null}
-                  </p>
-                </div>
-                <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
-              </a>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "24px" }}>
+                <a href={`/chatt/${senasteChattDebatt.id}`} style={{ flex: 1, display: "flex", alignItems: "center", gap: "12px", padding: "12px 18px", background: "#080f08", border: "1px solid #4ade8030", borderRadius: "6px", textDecoration: "none", color: "inherit", minWidth: 0 }}>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4ade80", flexShrink: 0, boxShadow: "0 0 8px #4ade80" }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: "10px", color: "#4ade80", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>Senaste direktdebatt</span>
+                    <p style={{ fontSize: "14px", color: C.text, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {Array.isArray(senasteChattDebatt.agenter) && senasteChattDebatt.agenter.slice(0, 3).join(" · ")}
+                      {senasteChattDebatt.amne ? <span style={{ color: C.textMuted }}> — {senasteChattDebatt.amne}</span> : null}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
+                </a>
+                {senasteChattDebatt.summering && (
+                  <button onClick={() => {
+                    if (window.speechSynthesis?.speaking) { window.speechSynthesis.cancel(); return; }
+                    const u = new SpeechSynthesisUtterance(senasteChattDebatt.summering);
+                    u.lang = "sv-SE"; u.rate = 0.9;
+                    window.speechSynthesis?.speak(u);
+                  }} title="Lyssna på summering" style={{ flexShrink: 0, padding: "10px 12px", background: "transparent", border: "1px solid #4ade8030", borderRadius: "6px", color: "#4ade80", fontSize: "16px", cursor: "pointer" }}>
+                    🎧
+                  </button>
+                )}
+              </div>
             )}
 
             {/* Hero – senaste artikel */}
