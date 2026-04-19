@@ -324,9 +324,7 @@ export default function DebattClient() {
   const [saving, setSaving]       = useState(false);
   const [dots, setDots]           = useState(0);
   const [articles, setArticles]   = useState([]);
-  const [articleCount, setArticleCount] = useState(() => {
-    try { const n = sessionStorage.getItem("debatt_article_count"); return n ? Number(n) : null; } catch { return null; }
-  });
+  const [articleCount, setArticleCount] = useState(null);
   const [loadingArt, setLoadingArt] = useState(false);
   const [selected, setSelected]   = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
@@ -378,6 +376,11 @@ export default function DebattClient() {
     window.onKontaktTurnstileVerified = (token) => setKontaktTurnstile(token);
     return () => { delete window.onTurnstileVerified; delete window.onKontaktTurnstileVerified; };
   }, [onTurnstileVerified]);
+
+  // Läs cachat antal omedelbart efter hydration (undviker SSR-mismatch)
+  useEffect(() => {
+    try { const n = sessionStorage.getItem("debatt_article_count"); if (n) setArticleCount(Number(n)); } catch {}
+  }, []);
 
   // Load count on mount, and check for ?arkiv=1
   useEffect(() => {
