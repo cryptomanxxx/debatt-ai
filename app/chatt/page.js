@@ -228,6 +228,7 @@ export default function ChattPage() {
   const [fas, setFas] = useState("start");
   const [amne, setAmne] = useState(() => slumpaAmne());
   const [valdPanel, setValdPanel] = useState(0);
+  const [slumpAgenter, setSlumpAgenter] = useState(() => pickRandom(ALLA_AGENTER, 3));
   const [agenter, setAgenter] = useState([]);
   const [faktisktAmne, setFaktisktAmne] = useState("");
   const [historik, setHistorik] = useState([]);
@@ -251,7 +252,7 @@ export default function ChattPage() {
 
   async function väljaAiAmne() {
     const panel = PANELER[valdPanel];
-    const valdaAgenter = panel.agenter ?? pickRandom(ALLA_AGENTER, 3);
+    const valdaAgenter = panel.agenter ?? slumpAgenter;
     setAiVäljer(true);
     const genererat = await fetchAiAmne(valdaAgenter);
     if (genererat) setAmne(genererat);
@@ -273,7 +274,7 @@ export default function ChattPage() {
 
   async function starta() {
     const panel = PANELER[valdPanel];
-    const valdaAgenter = panel.agenter ?? pickRandom(ALLA_AGENTER, 3);
+    const valdaAgenter = panel.agenter ?? slumpAgenter;
     const valtAmne = amne.trim() || slumpaAmne();
 
     setAgenter(valdaAgenter);
@@ -452,14 +453,14 @@ export default function ChattPage() {
               <label style={{ display: "block", fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "12px" }}>Panel</label>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
                 {PANELER.map((p, i) => (
-                  <button key={p.namn} onClick={() => setValdPanel(i)} style={{ padding: "7px 14px", borderRadius: "20px", border: `1px solid ${valdPanel===i ? C.accent+"80" : C.border}`, background: valdPanel===i ? `${C.accent}12` : "transparent", color: valdPanel===i ? C.accent : C.textMuted, fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
+                  <button key={p.namn} onClick={() => { setValdPanel(i); if (!p.agenter) setSlumpAgenter(pickRandom(ALLA_AGENTER, 3)); }} style={{ padding: "7px 14px", borderRadius: "20px", border: `1px solid ${valdPanel===i ? C.accent+"80" : C.border}`, background: valdPanel===i ? `${C.accent}12` : "transparent", color: valdPanel===i ? C.accent : C.textMuted, fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
                     {p.namn}
                   </button>
                 ))}
               </div>
-              {PANELER[valdPanel].agenter
-                ? <p style={{ fontSize: "12px", color: C.accentDim, margin: 0 }}>{PANELER[valdPanel].agenter.join(" · ")}</p>
-                : <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, fontStyle: "italic" }}>Väljer tre slumpmässiga agenter</p>}
+              <p style={{ fontSize: "12px", color: C.accentDim, margin: 0 }}>
+                {(PANELER[valdPanel].agenter ?? slumpAgenter).join(" · ")}
+              </p>
             </div>
 
             <button onClick={starta} style={{ width: "100%", padding: "14px", background: C.accent, border: "none", borderRadius: "6px", color: C.bg, fontSize: "15px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer", letterSpacing: "0.04em" }}>
