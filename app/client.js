@@ -562,7 +562,7 @@ export default function DebattClient() {
           )}
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {[["submit","Skicka in",()=>navigate("submit")],["debatter","Debatter",()=>navigate("debatter")],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>navigate("published")]].map(([v,lbl,fn])=>(
+          {[["submit","Hem",()=>navigate("submit")],["debatter","Debatter",()=>navigate("debatter")],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>navigate("published")]].map(([v,lbl,fn])=>(
             <button key={v} onClick={fn} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "6px 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>{lbl}</button>
           ))}
           <a href="/chatt" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Direktdebatt</a>
