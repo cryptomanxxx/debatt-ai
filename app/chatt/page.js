@@ -38,6 +38,33 @@ const AGENT_FARG = {
   "Hypokondrikern":"#6ee7b7","Optimisten":"#fcd34d","Den rike":"#c4b5fd",
 };
 
+const AGENT_RÖST = {
+  "Nationalekonom":       { pitch: 1.0,  rate: 0.90 },
+  "Miljöaktivist":        { pitch: 1.1,  rate: 1.05 },
+  "Teknikoptimist":       { pitch: 1.1,  rate: 1.10 },
+  "Konservativ debattör": { pitch: 0.90, rate: 0.85 },
+  "Jurist":               { pitch: 0.95, rate: 0.90 },
+  "Journalist":           { pitch: 1.0,  rate: 1.10 },
+  "Filosof":              { pitch: 0.90, rate: 0.80 },
+  "Läkare":               { pitch: 1.0,  rate: 0.95 },
+  "Psykolog":             { pitch: 1.05, rate: 0.85 },
+  "Historiker":           { pitch: 0.95, rate: 0.90 },
+  "Sociolog":             { pitch: 1.0,  rate: 1.00 },
+  "Kryptoanalytiker":     { pitch: 1.05, rate: 1.10 },
+  "Den hungriga":         { pitch: 0.95, rate: 0.90 },
+  "Mamman":               { pitch: 1.10, rate: 0.95 },
+  "Den sura":             { pitch: 0.90, rate: 1.05 },
+  "Den trötta":           { pitch: 0.88, rate: 0.75 },
+  "Den stressade":        { pitch: 1.05, rate: 1.20 },
+  "Den lugna":            { pitch: 1.0,  rate: 0.78 },
+  "Pensionären":          { pitch: 0.85, rate: 0.82 },
+  "Tonåringen":           { pitch: 1.10, rate: 1.15 },
+  "Den nostalgiske":      { pitch: 0.95, rate: 0.85 },
+  "Hypokondrikern":       { pitch: 1.05, rate: 1.05 },
+  "Optimisten":           { pitch: 1.10, rate: 1.05 },
+  "Den rike":             { pitch: 0.95, rate: 0.88 },
+};
+
 // ── Ämnen per kategori ────────────────────────────────────────────────────────
 const KATEGORIER = [
   { id: "ai-tech",  label: "AI & Tech",  emoji: "🧠" },
@@ -198,12 +225,15 @@ async function sparaDebatt({ amne, agenter, inlagg, summering }) {
   } catch { return null; }
 }
 
-function Bubble({ h, isFirst, isLast, isStreaming }) {
+function Bubble({ h, isFirst, isLast, isStreaming, isPlaying }) {
   const farg = af(h.agent);
   const r = isFirst && isLast ? "8px" : isFirst ? "8px 8px 0 0" : isLast ? "0 0 8px 8px" : "0";
   return (
-    <div style={{ padding: "16px 20px", background: C.surface, borderLeft: `3px solid ${farg}${isStreaming ? "80" : ""}`, borderRadius: r }}>
-      <div style={{ fontSize: "11px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px", fontWeight: 700 }}>{h.agent.toUpperCase()}</div>
+    <div style={{ padding: "16px 20px", background: isPlaying ? `${farg}12` : C.surface, borderLeft: `3px solid ${farg}${isStreaming ? "80" : isPlaying ? "" : ""}`, borderRadius: r, transition: "background 0.3s" }}>
+      <div style={{ fontSize: "11px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}>
+        {h.agent.toUpperCase()}
+        {isPlaying && <span style={{ display: "inline-flex", gap: "3px" }}>{[0,1,2].map(j => <span key={j} style={{ width: "4px", height: "4px", borderRadius: "50%", background: farg, display: "inline-block", animation: `dot 1.2s ease-in-out ${j*0.2}s infinite` }} />)}</span>}
+      </div>
       <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.75, color: isStreaming ? `${C.text}bb` : C.text }}>
         {h.text}
         {isStreaming && <span style={{ display: "inline-block", width: "2px", height: "14px", background: farg, marginLeft: "2px", verticalAlign: "text-bottom", animation: "blink 0.8s step-end infinite" }} />}
@@ -242,6 +272,8 @@ export default function ChattPage() {
   const [rateLimitInfo, setRateLimitInfo] = useState(null); // { remaining, resetAt } | null
   const [felmeddelande, setFelmeddelande] = useState("");
   const [aiVäljer, setAiVäljer] = useState(false);
+  const [spelar, setSpelar] = useState(false);
+  const [spelandeIndex, setSpelandeIndex] = useState(null);
   const stoppRef = useRef(false);
   const abortRef = useRef(null);
   const bottomRef = useRef(null);
@@ -335,7 +367,35 @@ export default function ChattPage() {
     abortRef.current?.abort();
   }
 
+  function lyssna() {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    setSpelar(true);
+    let idx = 0;
+    function spelaNext() {
+      if (idx >= historik.length) { setSpelar(false); setSpelandeIndex(null); return; }
+      const inlagg = historik[idx];
+      setSpelandeIndex(idx);
+      const utt = new SpeechSynthesisUtterance(inlagg.text);
+      utt.lang = "sv-SE";
+      const röst = AGENT_RÖST[inlagg.agent] || { pitch: 1.0, rate: 1.0 };
+      utt.pitch = röst.pitch;
+      utt.rate = röst.rate;
+      utt.onend = () => { idx++; setTimeout(spelaNext, 450); };
+      utt.onerror = () => { setSpelar(false); setSpelandeIndex(null); };
+      window.speechSynthesis.speak(utt);
+    }
+    spelaNext();
+  }
+
+  function stoppLyssna() {
+    window.speechSynthesis?.cancel();
+    setSpelar(false);
+    setSpelandeIndex(null);
+  }
+
   function nyDebatt() {
+    stoppLyssna();
     setFas("start");
     setHistorik([]);
     setStreaming(null);
@@ -492,7 +552,7 @@ export default function ChattPage() {
             {/* Messages */}
             <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginBottom: "24px" }}>
               {historik.map((h, i) => (
-                <Bubble key={h.id} h={h} isFirst={i===0} isLast={i===historik.length-1 && !hasLive} />
+                <Bubble key={h.id} h={h} isFirst={i===0} isLast={i===historik.length-1 && !hasLive} isPlaying={spelandeIndex === i} />
               ))}
               {streaming && <Bubble h={streaming} isFirst={historik.length===0} isLast isStreaming />}
               {tänker && <ThinkingBubble agent={tänkande} isFirst={historik.length===0} />}
@@ -545,6 +605,18 @@ export default function ChattPage() {
                     }
                   </div>
                 )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center", marginBottom: "10px" }}>
+                  {spelar ? (
+                    <button onClick={stoppLyssna} style={{ padding: "10px 22px", background: "transparent", border: `1px solid ${C.accent}60`, color: C.accent, borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ display: "inline-flex", gap: "3px" }}>{[0,1,2].map(j => <span key={j} style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.accent, display: "inline-block", animation: `dot 1.2s ease-in-out ${j*0.2}s infinite` }} />)}</span>
+                      Stoppa uppläsning
+                    </button>
+                  ) : (
+                    <button onClick={lyssna} style={{ padding: "10px 22px", background: "transparent", border: `1px solid ${C.accent}60`, color: C.accent, borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
+                      🎧 Lyssna på debatten
+                    </button>
+                  )}
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center" }}>
                   <button onClick={nyDebatt} style={{ padding: "10px 22px", background: C.accent, border: "none", color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer" }}>
                     Ny direktdebatt →
