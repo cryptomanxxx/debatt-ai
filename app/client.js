@@ -324,7 +324,9 @@ export default function DebattClient() {
   const [saving, setSaving]       = useState(false);
   const [dots, setDots]           = useState(0);
   const [articles, setArticles]   = useState([]);
-  const [articleCount, setArticleCount] = useState(null);
+  const [articleCount, setArticleCount] = useState(() => {
+    try { const n = sessionStorage.getItem("debatt_article_count"); return n ? Number(n) : null; } catch { return null; }
+  });
   const [loadingArt, setLoadingArt] = useState(false);
   const [selected, setSelected]   = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
@@ -379,7 +381,7 @@ export default function DebattClient() {
 
   // Load count on mount, and check for ?arkiv=1
   useEffect(() => {
-    sbCount().then(n => setArticleCount(n)).catch(() => {});
+    sbCount().then(n => { setArticleCount(n); try { sessionStorage.setItem("debatt_article_count", String(n)); } catch {} }).catch(() => {});
     fetchLatestArtikel().then(a => setHeroArtikel(a)).catch(() => {});
     incrementVisitors().catch(() => {});
     getVisitors().then(n => setVisitors(n)).catch(() => {});
@@ -423,7 +425,7 @@ export default function DebattClient() {
     if (view !== "published") return;
     setLoadingArt(true);
     sbSelect()
-      .then(data => { setArticles(data); setArticleCount(data.length); })
+      .then(data => { setArticles(data); setArticleCount(data.length); try { sessionStorage.setItem("debatt_article_count", String(data.length)); } catch {} })
       .catch(e => setError("Kunde inte hämta artiklar: " + e.message))
       .finally(() => setLoadingArt(false));
   }, [view]);
