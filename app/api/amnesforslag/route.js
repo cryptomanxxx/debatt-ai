@@ -7,7 +7,7 @@ export async function POST(req) {
   catch { return Response.json({ fel: "Ogiltig JSON" }, { status: 400 }); }
 
   const amne = (body.amne || "").trim();
-  if (!amne || amne.length < 5) {
+  if (!amne || amne.length < 2) {
     return Response.json({ fel: "Ämnet är för kort." }, { status: 400 });
   }
 
