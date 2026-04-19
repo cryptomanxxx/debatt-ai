@@ -312,7 +312,7 @@ function useNextAgentTimer() {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function DebattClient() {
+export default function DebattClient({ initialArticleCount = null }) {
   const [view, setView]     = useState("submit");
   const [title, setTitle]   = useState("");
   const [author, setAuthor] = useState("");
@@ -324,7 +324,7 @@ export default function DebattClient() {
   const [saving, setSaving]       = useState(false);
   const [dots, setDots]           = useState(0);
   const [articles, setArticles]   = useState([]);
-  const [articleCount, setArticleCount] = useState(null);
+  const [articleCount, setArticleCount] = useState(initialArticleCount);
   const [loadingArt, setLoadingArt] = useState(false);
   const [selected, setSelected]   = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
@@ -377,14 +377,9 @@ export default function DebattClient() {
     return () => { delete window.onTurnstileVerified; delete window.onKontaktTurnstileVerified; };
   }, [onTurnstileVerified]);
 
-  // Läs cachat antal omedelbart efter hydration (undviker SSR-mismatch)
-  useEffect(() => {
-    try { const n = sessionStorage.getItem("debatt_article_count"); if (n) setArticleCount(Number(n)); } catch {}
-  }, []);
-
   // Load count on mount, and check for ?arkiv=1
   useEffect(() => {
-    sbCount().then(n => { setArticleCount(n); try { sessionStorage.setItem("debatt_article_count", String(n)); } catch {} }).catch(() => {});
+    sbCount().then(n => setArticleCount(n)).catch(() => {});
     fetchLatestArtikel().then(a => setHeroArtikel(a)).catch(() => {});
     incrementVisitors().catch(() => {});
     getVisitors().then(n => setVisitors(n)).catch(() => {});
@@ -428,7 +423,7 @@ export default function DebattClient() {
     if (view !== "published") return;
     setLoadingArt(true);
     sbSelect()
-      .then(data => { setArticles(data); setArticleCount(data.length); try { sessionStorage.setItem("debatt_article_count", String(data.length)); } catch {} })
+      .then(data => { setArticles(data); setArticleCount(data.length); })
       .catch(e => setError("Kunde inte hämta artiklar: " + e.message))
       .finally(() => setLoadingArt(false));
   }, [view]);
