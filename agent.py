@@ -1114,8 +1114,10 @@ def skicka_kommentar(api_key: str, forfattare: str, artikel_id: int, text: str) 
         return False
 
 
-def hamta_senaste_visualisering(sb_key: str, kategori_hints: list[str] | None = None) -> dict | None:
-    """Hämtar en relevant visualisering från Supabase att bifoga till artikeln."""
+def hamta_senaste_visualisering(sb_key: str, kategori_hints: list[str]) -> dict | None:
+    """Hämtar en matchande visualisering från Supabase. Returnerar None om ingen match hittas."""
+    if not kategori_hints:
+        return None
     try:
         res = httpx.get(
             f"{SB_URL}/rest/v1/visualiseringar?select=id,nyckel,titel&order=skapad.desc&limit=20",
@@ -1123,17 +1125,13 @@ def hamta_senaste_visualisering(sb_key: str, kategori_hints: list[str] | None = 
             timeout=10,
         )
         vizs = res.json() if res.is_success else []
-        if not vizs:
-            return None
-        # Försök matcha mot kategori-hints (t.ex. "ekonomi", "klimat")
-        if kategori_hints:
-            for hint in kategori_hints:
-                for v in vizs:
-                    if hint.lower() in v.get("nyckel", "").lower():
-                        return v
-        return random.choice(vizs[:5])
+        for hint in kategori_hints:
+            for v in vizs:
+                if hint.lower() in v.get("nyckel", "").lower():
+                    return v
     except Exception:
-        return None
+        pass
+    return None
 
 
 def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, artikel: str,
@@ -1416,7 +1414,7 @@ def main():
             "valfard":       ["utbildning", "halsa", "livslangd", "gini"],
         }
         hints = KATEGORI_NYCKELORD.get(kategori.lower(), [])
-        viz = hamta_senaste_visualisering(sb_key, hints or None)
+        viz = hamta_senaste_visualisering(sb_key, hints)
         if viz:
             viz_id = viz["id"]
             print(f"Bifogar visualisering: \"{viz['titel']}\" ({viz['nyckel']})\n")
