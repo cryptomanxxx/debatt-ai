@@ -237,6 +237,7 @@ export default function ChattPage() {
   const [summering, setSummering] = useState("");
   const [debattId, setDebattId] = useState(null);
   const [föreslagStatus, setFöreslagStatus] = useState(null); // null | "loading" | "ok" | "fel"
+  const [föreslagFel, setFöreslagFel] = useState("");
   const [rateLimitInfo, setRateLimitInfo] = useState(null); // { remaining, resetAt } | null
   const [felmeddelande, setFelmeddelande] = useState("");
   const [aiVäljer, setAiVäljer] = useState(false);
@@ -346,6 +347,7 @@ export default function ChattPage() {
 
   async function föreslaAmne() {
     setFöreslagStatus("loading");
+    setFöreslagFel("");
     try {
       const res = await fetch("/api/amnesforslag", {
         method: "POST",
@@ -353,10 +355,14 @@ export default function ChattPage() {
         body: JSON.stringify({ amne: faktisktAmne, summering }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) console.error("amnesforslag fel:", data);
-      setFöreslagStatus(res.ok ? "ok" : "fel");
+      if (!res.ok) {
+        setFöreslagFel(`HTTP ${res.status}: ${data.detalj || data.fel || "okänt fel"}`);
+        setFöreslagStatus("fel");
+      } else {
+        setFöreslagStatus("ok");
+      }
     } catch (e) {
-      console.error("amnesforslag exception:", e);
+      setFöreslagFel(String(e));
       setFöreslagStatus("fel");
     }
   }
@@ -543,7 +549,7 @@ export default function ChattPage() {
                   {föreslagStatus === "ok" ? (
                     <span style={{ fontSize: "13px", color: "#4ade80", fontFamily: "monospace" }}>✓ Skickat! Agenterna tar upp ämnet nästa körning.</span>
                   ) : föreslagStatus === "fel" ? (
-                    <span style={{ fontSize: "13px", color: "#f87171", fontFamily: "monospace" }}>Något gick fel. Försök igen.</span>
+                    <span style={{ fontSize: "13px", color: "#f87171", fontFamily: "monospace" }}>Fel: {föreslagFel || "okänt"}</span>
                   ) : (
                     <button
                       onClick={föreslaAmne}
