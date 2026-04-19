@@ -135,6 +135,120 @@ function ScoreBar({ label, value }) {
   );
 }
 
+function pct(a, b) {
+  if (!b) return "–";
+  return (a / b * 100).toFixed(1) + "%";
+}
+
+function MetricCard({ label, value, sub, color }) {
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+      <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 8px", fontFamily: "monospace" }}>{label}</p>
+      <p style={{ fontSize: "36px", fontWeight: 400, color: color || C.accent, margin: "0 0 4px", fontFamily: "monospace" }}>{value}</p>
+      {sub && <p style={{ color: C.textMuted, fontSize: "13px", margin: 0 }}>{sub}</p>}
+    </div>
+  );
+}
+
+function MatningTab() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+      const [evAll, ev7, forslag, artiklar] = await Promise.all([
+        fetch(`${SB_URL}/rest/v1/debatt_events?select=event_type,amne,skapad&order=skapad.desc&limit=2000`, { headers: h }).then(r => r.json()),
+        fetch(`${SB_URL}/rest/v1/debatt_events?select=event_type,amne&skapad=gte.${since7}`, { headers: h }).then(r => r.json()),
+        fetch(`${SB_URL}/rest/v1/amnesforslag?select=skapad`, { headers: h }).then(r => r.json()),
+        fetch(`${SB_URL}/rest/v1/artiklar?select=lasningar,rubrik,taggar,kalla&order=lasningar.desc.nullslast&limit=10`, { headers: h }).then(r => r.json()),
+      ]);
+      const countType = (arr, type) => arr.filter(e => e.event_type === type).length;
+      const topAmnen = Object.entries(
+        evAll.filter(e => e.event_type === "start" && e.amne)
+          .reduce((acc, e) => { acc[e.amne] = (acc[e.amne] || 0) + 1; return acc; }, {})
+      ).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      setData({
+        allStart: countType(evAll, "start"), allKlar: countType(evAll, "klar"),
+        weekStart: countType(ev7, "start"), weekKlar: countType(ev7, "klar"),
+        forslagTotal: Array.isArray(forslag) ? forslag.length : 0,
+        topAmnen, artiklar: Array.isArray(artiklar) ? artiklar : [],
+      });
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  if (loading) return <p style={{ color: C.textMuted }}>Laddar…</p>;
+  if (!data) return <p style={{ color: C.red }}>Kunde inte ladda data.</p>;
+
+  const { allStart, allKlar, weekStart, weekKlar, forslagTotal, topAmnen, artiklar } = data;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      <p style={{ color: C.textMuted, fontSize: "13px", margin: 0 }}>Senaste 7 dagarna visas i parentes.</p>
+
+      {/* De 3 nyckeltalen */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+        <MetricCard
+          label="Debatter startade"
+          value={allStart}
+          sub={`${weekStart} senaste 7 dagarna`}
+        />
+        <MetricCard
+          label="Completion rate"
+          value={pct(allKlar, allStart)}
+          sub={`${allKlar} av ${allStart} fullföljda · ${pct(weekKlar, weekStart)} denna vecka`}
+          color={allStart && allKlar / allStart > 0.5 ? C.green : C.yellow}
+        />
+        <MetricCard
+          label="Send-to-agents rate"
+          value={pct(forslagTotal, allKlar)}
+          sub={`${forslagTotal} förslag av ${allKlar} avslutade debatter`}
+          color={allKlar && forslagTotal / allKlar > 0.15 ? C.green : C.yellow}
+        />
+      </div>
+
+      {/* Populäraste ämnen */}
+      {topAmnen.length > 0 && (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Populäraste debattämnen (totalt)</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {topAmnen.map(([amne, count], i) => (
+              <div key={amne} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ color: C.textMuted, fontSize: "11px", fontFamily: "monospace", width: "16px" }}>{i + 1}</span>
+                <div style={{ flex: 1, background: C.border, borderRadius: "4px", height: "6px" }}>
+                  <div style={{ width: `${(count / topAmnen[0][1]) * 100}%`, background: C.accent, height: "6px", borderRadius: "4px" }} />
+                </div>
+                <span style={{ color: C.text, fontSize: "13px", flex: 3 }}>{amne}</span>
+                <span style={{ color: C.textMuted, fontSize: "12px", fontFamily: "monospace" }}>{count}×</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Mest lästa artiklar */}
+      {artiklar.length > 0 && (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Mest lästa artiklar</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {artiklar.map((a, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ color: C.textMuted, fontSize: "11px", fontFamily: "monospace", width: "16px" }}>{i + 1}</span>
+                <span style={{ color: a.kalla === "ai" ? "#4a9eff" : C.accent, fontSize: "10px", fontFamily: "monospace", width: "60px" }}>{a.kalla === "ai" ? "AI" : "MÄNNISKA"}</span>
+                <span style={{ color: C.text, fontSize: "13px", flex: 1 }}>{a.rubrik}</span>
+                <span style={{ color: C.textMuted, fontSize: "12px", fontFamily: "monospace" }}>{a.lasningar ?? 0} läsn.</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminClient() {
   const [authed, setAuthed]       = useState(false);
   const [pw, setPw]               = useState("");
@@ -381,6 +495,7 @@ export default function AdminClient() {
             ["artiklar","Publicerade artiklar"],
             ["kommentarer", `Kommentarer${kommentarer.length > 0 ? ` (${kommentarer.length})` : ""}`],
             ["nyhetsbrev","Nyhetsbrev" + (subCount !== null ? ` (${subCount})` : "")],
+            ["matning","Mätning"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
               {lbl}
@@ -578,6 +693,9 @@ export default function AdminClient() {
             ))}
           </>
         )}
+
+        {/* ── MÄTNING ── */}
+        {mainTab === "matning" && <MatningTab />}
 
         {/* ── NYHETSBREV ── */}
         {mainTab === "nyhetsbrev" && (

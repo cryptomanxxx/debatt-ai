@@ -269,6 +269,7 @@ export default function ChattPage() {
       const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum });
       setDebattId(id);
     }
+    fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event_type: "klar", amne: valtAmne }) }).catch(() => {});
     setFas("klar");
   }
 
@@ -286,6 +287,7 @@ export default function ChattPage() {
     setFelmeddelande("");
     setFas("kör");
     stoppRef.current = false;
+    fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event_type: "start", amne: valtAmne }) }).catch(() => {});
 
     let h = [];
     for (let i = 0; i < 10; i++) {
