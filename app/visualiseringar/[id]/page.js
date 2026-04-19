@@ -59,7 +59,7 @@ export default async function VisualiseringPage({ params }) {
           <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {NAV_LINK("/", "Skicka in")}
+          {NAV_LINK("/", "Hem")}
           {NAV_LINK("/?debatter=1", "Debatter")}
           {NAV_LINK("/?arkiv=1", "Arkiv")}
           {NAV_LINK("/chatt", "Direktdebatt")}

@@ -71,7 +71,7 @@ export default async function ChattDebattPage({ params }) {
           <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {navLink("/","Skicka in",false)}
+          {navLink("/","Hem",false)}
           {navLink("/?debatter=1","Debatter",false)}
           {navLink("/?arkiv=1","Arkiv",false)}
           {navLink("/chatt","Direktdebatt",true)}
