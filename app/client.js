@@ -8,9 +8,6 @@ const MIN_SCORE = 6;
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Persists across component re-mounts within the same browser session
-let _cachedArticleCount = null;
-
 const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm artikeln på fyra kriterier (heltal 0-10):
 1. Argumentationsklarhet – Är argumenten tydliga och logiskt uppbyggda?
 2. Originalitet – Tillför artikeln något nytt till debatten?
@@ -322,15 +319,12 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [title, setTitle]   = useState("");
   const [author, setAuthor] = useState("");
   const [text, setText]     = useState("");
-  const [filterTag, setFilterTag] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError]   = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving]       = useState(false);
   const [dots, setDots]           = useState(0);
-  const [articles, setArticles]   = useState([]);
   const [articleCount, setArticleCount] = useState(initialArticleCount);
-  const [loadingArt, setLoadingArt] = useState(false);
   const [selected, setSelected]   = useState(null);
   const [turnstileToken, setTurnstileToken] = useState(null);
   const [visitors, setVisitors] = useState(null);
@@ -358,7 +352,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const nextTimer = useNextAgentTimer();
 
   function navigate(newView) {
-    const urls = { submit: "/", published: "/?arkiv=1", debatter: "/?debatter=1", kontakt: "/?kontakt=1" };
+    const urls = { submit: "/", debatter: "/?debatter=1", kontakt: "/?kontakt=1" };
     setView(newView);
     window.history.pushState(null, "", urls[newView] || "/");
   }
@@ -382,21 +376,16 @@ export default function DebattClient({ initialArticleCount = null }) {
     return () => { delete window.onTurnstileVerified; delete window.onKontaktTurnstileVerified; };
   }, [onTurnstileVerified]);
 
-  // Restore cached count before first paint — no flash of "Arkiv" without number
+  // Set view from URL params before first paint — no flash of wrong view
   useIsomorphicLayoutEffect(() => {
-    const n = _cachedArticleCount ?? (() => {
-      try { const s = localStorage.getItem("debatt_n"); return s ? Number(s) : null; } catch { return null; }
-    })();
-    if (n !== null) setArticleCount(n);
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("debatter") === "1") setView("debatter");
+    else if (p.get("kontakt") === "1") setView("kontakt");
   }, []);
 
-  // Load count on mount, and check for ?arkiv=1
+  // Load data on mount
   useEffect(() => {
-    sbCount().then(n => {
-      _cachedArticleCount = n;
-      try { localStorage.setItem("debatt_n", String(n)); } catch {}
-      setArticleCount(n);
-    }).catch(() => {});
+    sbCount().then(n => setArticleCount(n)).catch(() => {});
     fetchLatestArtikel().then(a => setHeroArtikel(a)).catch(() => {});
     incrementVisitors().catch(() => {});
     getVisitors().then(n => setVisitors(n)).catch(() => {});
@@ -420,11 +409,6 @@ export default function DebattClient({ initialArticleCount = null }) {
     }).catch(() => {});
     fetchSenasteReplik().then(r => setSenasteReplik(r)).catch(() => {});
     fetchSenasteChattDebatt().then(d => setSenasteChattDebatt(d)).catch(() => {});
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("arkiv") === "1") setView("published");
-    if (params.get("debatter") === "1") setView("debatter");
-    if (params.get("om") === "1") setView("om");
-    if (params.get("kontakt") === "1") setView("kontakt");
   }, []);
 
   useEffect(() => {
@@ -434,15 +418,6 @@ export default function DebattClient({ initialArticleCount = null }) {
       .then(data => setDebatter(grupperaDebatter(data)))
       .catch(() => {})
       .finally(() => setLoadingDeb(false));
-  }, [view]);
-
-  useEffect(() => {
-    if (view !== "published") return;
-    setLoadingArt(true);
-    sbSelect()
-      .then(data => { _cachedArticleCount = data.length; setArticles(data); setArticleCount(data.length); })
-      .catch(e => setError("Kunde inte hämta artiklar: " + e.message))
-      .finally(() => setLoadingArt(false));
   }, [view]);
 
   useEffect(() => {
@@ -523,7 +498,7 @@ export default function DebattClient({ initialArticleCount = null }) {
           arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
         }),
       }).catch(() => {}); // fire and forget
-      setView("published");
+      window.location.href = "/arkiv";
     } catch (e) {
       setError("Sparning misslyckades: " + e.message);
     }
@@ -533,7 +508,6 @@ export default function DebattClient({ initialArticleCount = null }) {
   function reset() {
     setView("submit"); setResult(null); setError(null); setSelected(null);
     setTitle(""); setAuthor(""); setText("");
-    setFilterTag(null);
     window.history.pushState(null, "", "/");
     setInlamningId(null);
     setTurnstileToken(null);
@@ -588,9 +562,10 @@ export default function DebattClient({ initialArticleCount = null }) {
           )}
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {[["submit","Hem",()=>navigate("submit")],["debatter","Debatter",()=>navigate("debatter")],["published", articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv", ()=>navigate("published")]].map(([v,lbl,fn])=>(
-            <button key={v} onClick={fn} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "6px 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>{lbl}</button>
+          {[["submit","Hem"],["debatter","Debatter"]].map(([v,lbl])=>(
+            <button key={v} onClick={()=>navigate(v)} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "6px 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>{lbl}</button>
           ))}
+          <a href="/arkiv" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>{articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv"}</a>
           <a href="/chatt" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Direktdebatt</a>
           <a href="/visualiseringar" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Visualiseringar</a>
           <a href="/om" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Om DEBATT.AI</a>
@@ -863,84 +838,7 @@ export default function DebattClient({ initialArticleCount = null }) {
           </div>
         )}
 
-        {/* ── ARCHIVE ── */}
-        {view === "published" && (
-          <div>
-            <div style={{ marginBottom:"32px" }}>
-              <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 10px 0" }}>Arkiv</p>
-              <h1 style={{ fontSize:"32px", fontWeight:400, margin:"0 0 8px 0" }}>Publicerade artiklar</h1>
-              <p style={{ color:C.textMuted, fontSize:"15px", margin:"0 0 24px 0" }}>Klicka på en artikel för att läsa hela texten.</p>
-              {/* Tag filters */}
-              {(() => {
-                const freq = {};
-                articles.forEach(a => (a.taggar || []).forEach(t => { freq[t] = (freq[t] || 0) + 1; }));
-                const topTags = Object.entries(freq).sort((a,b) => b[1]-a[1]).slice(0,20).map(([t]) => t);
-                if (topTags.length === 0) return null;
-                return (
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
-                    <button onClick={()=>setFilterTag(null)} style={{ background:!filterTag?C.accent:"transparent", color:!filterTag?"#0a0a0a":C.textMuted, border:`1px solid ${!filterTag?C.accent:C.border}`, borderRadius:"20px", padding:"6px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", transition:"all 0.2s" }}>
-                      Alla
-                    </button>
-                    {topTags.map(t => (
-                      <button key={t} onClick={()=>setFilterTag(filterTag===t?null:t)} style={{ background:filterTag===t?C.accent:"transparent", color:filterTag===t?"#0a0a0a":C.textMuted, border:`1px solid ${filterTag===t?C.accent:C.border}`, borderRadius:"20px", padding:"6px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif", transition:"all 0.2s" }}>
-                        #{t}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })()}
-
-            </div>
-            {loadingArt ? <p style={{ color:C.textMuted }}>Hämtar från databas…</p>
-              : articles.filter(a => !filterTag || (a.taggar || []).includes(filterTag)).length === 0 ? (
-                <div style={{ textAlign:"center", padding:"80px 0", color:C.textMuted }}>
-                  <p style={{ fontSize:"40px", margin:"0 0 16px 0" }}>📭</p>
-                  <p style={{ fontSize:"16px" }}>Inga artiklar med denna tagg.</p>
-                </div>
-              ) : articles.filter(a => !filterTag || (a.taggar || []).includes(filterTag)).map((a,i)=>(
-                <div key={a.id||i} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"32px", marginBottom:"32px" }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"14px" }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:"10px", flexWrap:"wrap" }}>
-                      <Badge type="published" />
-                      {a.kategori && <span style={{ fontSize:"11px", color:C.accentDim, background:`${C.accent}10`, border:`1px solid ${C.accent}20`, borderRadius:"20px", padding:"3px 10px", letterSpacing:"0.06em" }}>{a.kategori}</span>}
-                      <KallaBadge kalla={a.kalla} />
-                    </div>
-                    <span style={{ fontSize:"13px", color:C.textMuted }}>{a.skapad?new Date(a.skapad).toLocaleDateString("sv-SE"):""}</span>
-                  </div>
-                  <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 6px 0", lineHeight:1.3, color:C.accent }}>{a.rubrik}</h2>
-                  <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 12px 0", fontStyle:"italic" }}>{a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}</p>
-                  <p style={{ color:C.textMuted, fontSize:"15px", lineHeight:1.7, margin:"0 0 14px 0" }}>{(a.artikel||"").slice(0,220)}…</p>
-                  {(a.taggar||[]).length > 0 && (
-                    <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"14px" }}>
-                      {(a.taggar||[]).map(t => (
-                        <button key={t} onClick={()=>setFilterTag(filterTag===t?null:t)} style={{ background:filterTag===t?`${C.accent}25`:"transparent", color:filterTag===t?C.accent:C.textMuted, border:`1px solid ${filterTag===t?C.accent+"60":C.border}`, borderRadius:"20px", padding:"3px 10px", fontSize:"12px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
-                          #{t}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {(() => {
-                    const vc = voteCounts[a.id];
-                    const cc = commentCounts[a.id] || 0;
-                    const total = vc ? vc.ja + vc.nej : 0;
-                    const jaPct = total > 0 ? Math.round((vc.ja / total) * 100) : null;
-                    if (total === 0 && cc === 0) return null;
-                    return (
-                      <div style={{ display:"flex", gap:"16px", marginBottom:"14px", flexWrap:"wrap" }}>
-                        {total > 0 && <span style={{ fontSize:"12px", color:C.textMuted, fontFamily:"monospace" }}>{jaPct}% håller med · {total} {total === 1 ? "röst" : "röster"}</span>}
-                        {cc > 0 && <span style={{ fontSize:"12px", color:C.textMuted, fontFamily:"monospace" }}>💬 {cc} {cc === 1 ? "kommentar" : "kommentarer"}</span>}
-                      </div>
-                    );
-                  })()}
-                  <a href={`/artikel/${a.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", padding:"8px 16px", background:`${C.accent}10`, border:`1px solid ${C.accent}30`, borderRadius:"4px", textDecoration:"none" }}>
-                    <span style={{ fontSize:"14px", color:C.accent, fontWeight:600 }}>Läs hela artikeln →</span>
-                  </a>
-                </div>
-              ))}
-          </div>
-        )}
-
-        {/* ── OM DEBATT.AI ── */}
+        {/* ── KONTAKT ── */}
         {/* ── KONTAKT ── */}
         {view === "kontakt" && (
           <div style={{ maxWidth:"560px" }}>

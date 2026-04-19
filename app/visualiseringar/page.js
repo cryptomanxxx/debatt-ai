@@ -54,7 +54,7 @@ export default async function VisualiseringarPage() {
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {NAV_LINK("/", "Hem")}
           {NAV_LINK("/?debatter=1", "Debatter")}
-          {NAV_LINK("/?arkiv=1", "Arkiv")}
+          {NAV_LINK("/arkiv", "Arkiv")}
           {NAV_LINK("/chatt", "Direktdebatt")}
           {NAV_LINK("/visualiseringar", "Visualiseringar", true)}
           {NAV_LINK("/om", "Om DEBATT.AI")}

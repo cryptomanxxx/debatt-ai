@@ -73,7 +73,7 @@ export default async function ChattDebattPage({ params }) {
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {navLink("/","Hem",false)}
           {navLink("/?debatter=1","Debatter",false)}
-          {navLink("/?arkiv=1","Arkiv",false)}
+          {navLink("/arkiv","Arkiv",false)}
           {navLink("/chatt","Direktdebatt",true)}
           {navLink("/visualiseringar","Visualiseringar",false)}
           {navLink("/om","Om DEBATT.AI",false)}
