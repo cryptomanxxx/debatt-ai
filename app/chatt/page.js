@@ -16,7 +16,7 @@ const PANELER = [
   { namn: "Etik & Samhälle", agenter: ["Filosof", "Journalist", "Tonåringen"] },
   { namn: "Hälsa & Oro",     agenter: ["Läkare", "Psykolog", "Hypokondrikern"] },
   { namn: "Klass & Pengar",  agenter: ["Nationalekonom", "Sociolog", "Den rike"] },
-  { namn: "Slumpmässig",     agenter: null },
+  { namn: "Slumpmässiga agenter", agenter: null },
 ];
 
 const ALLA_AGENTER = [

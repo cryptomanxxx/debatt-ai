@@ -285,7 +285,7 @@ export default function OmPage() {
             ))}
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "20px" }}>
-            {["Ekonomi & Klimat", "Juridik & Tech", "Etik & Samhälle", "Hälsa & Oro", "Klass & Pengar", "Slumpmässig"].map(p => (
+            {["Ekonomi & Klimat", "Juridik & Tech", "Etik & Samhälle", "Hälsa & Oro", "Klass & Pengar", "Slumpmässiga agenter"].map(p => (
               <span key={p} style={{ fontSize: "12px", color: C.accentDim, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: "20px", padding: "3px 10px" }}>{p}</span>
             ))}
           </div>
