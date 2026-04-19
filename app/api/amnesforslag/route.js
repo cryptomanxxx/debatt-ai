@@ -26,6 +26,10 @@ export async function POST(req) {
     }),
   });
 
-  if (!res.ok) return Response.json({ fel: "Kunde inte spara förslaget." }, { status: 500 });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Supabase amnesforslag fel:", res.status, errText);
+    return Response.json({ fel: "Kunde inte spara förslaget.", detalj: errText }, { status: 500 });
+  }
   return Response.json({ ok: true });
 }

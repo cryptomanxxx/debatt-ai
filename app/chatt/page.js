@@ -352,8 +352,11 @@ export default function ChattPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amne: faktisktAmne, summering }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) console.error("amnesforslag fel:", data);
       setFöreslagStatus(res.ok ? "ok" : "fel");
-    } catch {
+    } catch (e) {
+      console.error("amnesforslag exception:", e);
       setFöreslagStatus("fel");
     }
   }
