@@ -6,6 +6,9 @@ const MIN_SCORE = 6;
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// Persists across component re-mounts within the same browser session
+let _cachedArticleCount = null;
+
 const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm artikeln på fyra kriterier (heltal 0-10):
 1. Argumentationsklarhet – Är argumenten tydliga och logiskt uppbyggda?
 2. Originalitet – Tillför artikeln något nytt till debatten?
@@ -377,9 +380,14 @@ export default function DebattClient({ initialArticleCount = null }) {
     return () => { delete window.onTurnstileVerified; delete window.onKontaktTurnstileVerified; };
   }, [onTurnstileVerified]);
 
+  // Restore cached count immediately after hydration (survives client-side navigation)
+  useEffect(() => {
+    if (_cachedArticleCount !== null) setArticleCount(_cachedArticleCount);
+  }, []);
+
   // Load count on mount, and check for ?arkiv=1
   useEffect(() => {
-    sbCount().then(n => setArticleCount(n)).catch(() => {});
+    sbCount().then(n => { _cachedArticleCount = n; setArticleCount(n); }).catch(() => {});
     fetchLatestArtikel().then(a => setHeroArtikel(a)).catch(() => {});
     incrementVisitors().catch(() => {});
     getVisitors().then(n => setVisitors(n)).catch(() => {});
@@ -423,7 +431,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     if (view !== "published") return;
     setLoadingArt(true);
     sbSelect()
-      .then(data => { setArticles(data); setArticleCount(data.length); })
+      .then(data => { _cachedArticleCount = data.length; setArticles(data); setArticleCount(data.length); })
       .catch(e => setError("Kunde inte hämta artiklar: " + e.message))
       .finally(() => setLoadingArt(false));
   }, [view]);
