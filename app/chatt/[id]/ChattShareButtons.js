@@ -54,7 +54,7 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   return currentY;
 }
 
-export default function ChattShareButtons({ debatt, shareUrl, inlagg }) {
+export default function ChattShareButtons({ debatt, shareUrl, inlagg, hideListen = false }) {
   const [copied, setCopied] = useState(false);
   const [spelar, setSpelar] = useState(false);
   const agenter = Array.isArray(debatt.agenter) ? debatt.agenter : [];
@@ -145,9 +145,11 @@ export default function ChattShareButtons({ debatt, shareUrl, inlagg }) {
       `}</style>
       <div className="chatt-share-wrap">
         <span className="chatt-share-label">Dela:</span>
-        <button onClick={spelar ? stoppLyssna : lyssna} className="chatt-share-btn">
-          {spelar ? "⏹ Stoppa" : "🎧 Lyssna"}
-        </button>
+        {!hideListen && (
+          <button onClick={spelar ? stoppLyssna : lyssna} className="chatt-share-btn">
+            {spelar ? "⏹ Stoppa" : "🎧 Lyssna"}
+          </button>
+        )}
         <button onClick={copyLink} className="chatt-share-btn">
           {copied ? "✓ Kopierad!" : "🔗 Kopiera länk"}
         </button>
