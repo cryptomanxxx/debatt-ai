@@ -158,22 +158,34 @@ function MatningTab() {
     async function load() {
       const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
-      const [evAll, ev7, forslag, artiklar] = await Promise.all([
+      const since14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+      const [evAll, ev7, forslag, artiklar, visits7, visits14] = await Promise.all([
         fetch(`${SB_URL}/rest/v1/debatt_events?select=event_type,amne,skapad&order=skapad.desc&limit=2000`, { headers: h }).then(r => r.json()),
         fetch(`${SB_URL}/rest/v1/debatt_events?select=event_type,amne&skapad=gte.${since7}`, { headers: h }).then(r => r.json()),
         fetch(`${SB_URL}/rest/v1/amnesforslag?select=skapad`, { headers: h }).then(r => r.json()),
         fetch(`${SB_URL}/rest/v1/artiklar?select=lasningar,rubrik,taggar,kalla&order=lasningar.desc.nullslast&limit=10`, { headers: h }).then(r => r.json()),
+        fetch(`${SB_URL}/rest/v1/visitor_sessions?select=visitor_id&skapad=gte.${since7}`, { headers: h }).then(r => r.json()),
+        fetch(`${SB_URL}/rest/v1/visitor_sessions?select=visitor_id,skapad&skapad=gte.${since14}`, { headers: h }).then(r => r.json()),
       ]);
       const countType = (arr, type) => arr.filter(e => e.event_type === type).length;
       const topAmnen = Object.entries(
         evAll.filter(e => e.event_type === "start" && e.amne)
           .reduce((acc, e) => { acc[e.amne] = (acc[e.amne] || 0) + 1; return acc; }, {})
       ).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      // Retention: besökare från dag -14 till -7 som också besökt senaste 7 dagarna
+      const recent = new Set((Array.isArray(visits7) ? visits7 : []).map(v => v.visitor_id));
+      const cohort = new Set((Array.isArray(visits14) ? visits14 : [])
+        .filter(v => new Date(v.skapad) < new Date(since7))
+        .map(v => v.visitor_id));
+      const returning = [...cohort].filter(id => recent.has(id)).length;
+
       setData({
         allStart: countType(evAll, "start"), allKlar: countType(evAll, "klar"),
         weekStart: countType(ev7, "start"), weekKlar: countType(ev7, "klar"),
         forslagTotal: Array.isArray(forslag) ? forslag.length : 0,
         topAmnen, artiklar: Array.isArray(artiklar) ? artiklar : [],
+        cohortSize: cohort.size, returning,
+        uniqueVisitors7: recent.size,
       });
       setLoading(false);
     }
@@ -183,7 +195,7 @@ function MatningTab() {
   if (loading) return <p style={{ color: C.textMuted }}>Laddar…</p>;
   if (!data) return <p style={{ color: C.red }}>Kunde inte ladda data.</p>;
 
-  const { allStart, allKlar, weekStart, weekKlar, forslagTotal, topAmnen, artiklar } = data;
+  const { allStart, allKlar, weekStart, weekKlar, forslagTotal, topAmnen, artiklar, cohortSize, returning, uniqueVisitors7 } = data;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -192,9 +204,10 @@ function MatningTab() {
       {/* De 3 nyckeltalen */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
         <MetricCard
-          label="Debatter startade"
-          value={allStart}
-          sub={`${weekStart} senaste 7 dagarna`}
+          label="7-dagars retention"
+          value={pct(returning, cohortSize)}
+          sub={`${returning} av ${cohortSize} återvände · ${uniqueVisitors7} unika besökare denna vecka`}
+          color={cohortSize && returning / cohortSize > 0.15 ? C.green : C.yellow}
         />
         <MetricCard
           label="Completion rate"
