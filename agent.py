@@ -1249,9 +1249,14 @@ def main():
 
     sb_key = os.environ.get("SUPABASE_ANON_KEY")
 
+    # De två första körningarna på dagen (07:00 och 11:00 UTC) garanterar en nyhetsartikel
+    utc_hour = datetime.now(timezone.utc).hour
+    force_nyhet = utc_hour in (7, 11)
+
     # Avgör om vi ska skriva en replik eller en ny artikel (50/50)
+    # Vid force_nyhet skips repliker — vi skriver alltid en ny nyhetsartikel
     original = None
-    if sb_key and random.random() < 0.5:
+    if not force_nyhet and sb_key and random.random() < 0.5:
         print("Letar efter artiklar att svara på...")
         artiklar = hamta_senaste_artiklar(sb_key)
         if artiklar:
@@ -1359,7 +1364,7 @@ def main():
         nyhet = None
         print("Hämtar aktuella nyheter från RSS...")
         nyheter = hamta_nyheter()
-        if nyheter and random.random() < 0.75:
+        if nyheter and (force_nyhet or random.random() < 0.75):
             nyhet = random.choice(nyheter[:10])
 
         if forslag_amne:
