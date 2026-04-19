@@ -55,6 +55,15 @@ async function sbSelect() {
   return res.json();
 }
 
+async function sbCount() {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id`, {
+    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.length;
+}
+
 async function fetchSenasteChattDebatt() {
   const res = await fetch(
     `${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,summering,skapad&order=skapad.desc&limit=1`,
@@ -370,7 +379,7 @@ export default function DebattClient() {
 
   // Load count on mount, and check for ?arkiv=1
   useEffect(() => {
-    sbSelect().then(data => setArticleCount(data.length)).catch(() => {});
+    sbCount().then(n => setArticleCount(n)).catch(() => {});
     fetchLatestArtikel().then(a => setHeroArtikel(a)).catch(() => {});
     incrementVisitors().catch(() => {});
     getVisitors().then(n => setVisitors(n)).catch(() => {});
