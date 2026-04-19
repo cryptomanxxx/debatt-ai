@@ -111,7 +111,7 @@ function slumpaAmne(kategoriId = null) {
 function pickRandom(arr, n) { return [...arr].sort(() => Math.random() - 0.5).slice(0, n); }
 function af(namn) { return AGENT_FARG[namn] || C.accent; }
 
-async function streamSvar({ amne, historik, agent, onToken, signal }) {
+async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -120,9 +120,16 @@ async function streamSvar({ amne, historik, agent, onToken, signal }) {
   });
   if (!res.ok || !res.body) {
     const status = res.status;
-    const err = status === 429 ? "rate_limit" : "error";
-    throw Object.assign(new Error(err), { status });
+    if (status === 429) {
+      const data = await res.json().catch(() => ({}));
+      onRateLimit?.({ remaining: 0, resetAt: data.resetAt, minutesLeft: data.minutesLeft });
+      throw Object.assign(new Error("rate_limit"), { status });
+    }
+    throw Object.assign(new Error("error"), { status });
   }
+  const remaining = res.headers.get("X-RateLimit-Remaining");
+  const resetAt = res.headers.get("X-RateLimit-Reset");
+  if (remaining !== null) onRateLimit?.({ remaining: Number(remaining), resetAt: resetAt ? Number(resetAt) : null });
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let text = "", buffer = "";
@@ -230,6 +237,7 @@ export default function ChattPage() {
   const [summering, setSummering] = useState("");
   const [debattId, setDebattId] = useState(null);
   const [föreslagStatus, setFöreslagStatus] = useState(null); // null | "loading" | "ok" | "fel"
+  const [rateLimitInfo, setRateLimitInfo] = useState(null); // { remaining, resetAt } | null
   const [felmeddelande, setFelmeddelande] = useState("");
   const [aiVäljer, setAiVäljer] = useState(false);
   const stoppRef = useRef(false);
@@ -294,6 +302,7 @@ export default function ChattPage() {
             if (!gotFirst) { gotFirst = true; setTänker(false); }
             setStreaming({ agent, text: t });
           },
+          onRateLimit: (info) => setRateLimitInfo(info),
         });
         if (stoppRef.current) break;
         if (!text) {
@@ -331,6 +340,7 @@ export default function ChattPage() {
     setAmne(slumpaAmne());
     setFelmeddelande("");
     setFöreslagStatus(null);
+    setRateLimitInfo(null);
     stoppRef.current = false;
   }
 
@@ -515,6 +525,14 @@ export default function ChattPage() {
                     ? `https://www.debatt-ai.se/chatt/${debattId}`
                     : `https://www.debatt-ai.se/chatt`}
                 />
+                {rateLimitInfo && (
+                  <div style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", padding: "8px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", marginBottom: "10px" }}>
+                    {rateLimitInfo.remaining > 0
+                      ? <span><span style={{ color: C.accent }}>{rateLimitInfo.remaining}</span> av 5 debatter kvar{rateLimitInfo.resetAt ? <span> · Återställs {new Date(rateLimitInfo.resetAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}</span> : ""}</span>
+                      : <span style={{ color: "#f87171" }}>Gränsen nådd (5/5){rateLimitInfo.minutesLeft ? ` · Återställs om ${rateLimitInfo.minutesLeft} min` : ""}</span>
+                    }
+                  </div>
+                )}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center" }}>
                   <button onClick={nyDebatt} style={{ padding: "10px 22px", background: C.accent, border: "none", color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer" }}>
                     Ny direktdebatt →

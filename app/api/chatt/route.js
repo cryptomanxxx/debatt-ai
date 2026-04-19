@@ -35,41 +35,50 @@ const PERSONLIGHETER = {
   "Den rike": "mycket förmögen, välmenande, ibland totalt ute ur kontakt med verkligheten.",
 };
 
-// In-memory rate limiter — 5 debatter per IP per 10 minuter
+// In-memory rate limiter — 5 debatter per IP per 10 minuter (räknar bara debattstart)
 const rateLimitStore = new Map();
 const LIMIT = 5;
 const WINDOW_MS = 10 * 60 * 1000;
 
-function checkRateLimit(ip) {
+function getRateLimitInfo(ip) {
   const now = Date.now();
-  // Rensa gamla poster för att hålla minnet i schack
-  if (rateLimitStore.size > 2000) {
-    for (const [key, val] of rateLimitStore) {
-      if (now - val.start > WINDOW_MS) rateLimitStore.delete(key);
-    }
+  const entry = rateLimitStore.get(ip);
+  if (!entry || now - entry.start > WINDOW_MS) {
+    return { remaining: LIMIT, resetAt: null };
   }
+  return { remaining: Math.max(0, LIMIT - entry.count), resetAt: entry.start + WINDOW_MS };
+}
+
+function consumeRateLimit(ip) {
+  const now = Date.now();
   const entry = rateLimitStore.get(ip);
   if (!entry || now - entry.start > WINDOW_MS) {
     rateLimitStore.set(ip, { count: 1, start: now });
-    return true;
+  } else {
+    entry.count++;
   }
-  if (entry.count >= LIMIT) return false;
-  entry.count++;
-  return true;
 }
 
 export async function POST(request) {
   // Rate limiting
   const hdrs = await headers();
   const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  if (!checkRateLimit(ip)) {
-    return Response.json({ error: "För många debatter. Vänta några minuter och försök igen." }, { status: 429 });
-  }
 
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
   const { amne, historik, agent } = body;
+
+  // Räkna bara debattstart (historik tom = första anropet)
+  const isFirstCall = !Array.isArray(historik) || historik.length === 0;
+  if (isFirstCall) {
+    const info = getRateLimitInfo(ip);
+    if (info.remaining <= 0) {
+      const minutesLeft = info.resetAt ? Math.ceil((info.resetAt - Date.now()) / 60000) : 10;
+      return Response.json({ error: "rate_limit", remaining: 0, resetAt: info.resetAt, minutesLeft }, { status: 429 });
+    }
+    consumeRateLimit(ip);
+  }
 
   // Validera agent mot strikt whitelist
   if (!agent || !AGENTER.has(agent)) {
@@ -128,11 +137,15 @@ REGLER — viktiga:
     return Response.json({ error: "Groq-anrop misslyckades" }, { status: 502 });
   }
 
+  const info = getRateLimitInfo(ip);
   return new Response(groqRes.body, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       "X-Accel-Buffering": "no",
+      "X-RateLimit-Remaining": String(info.remaining),
+      "X-RateLimit-Reset": info.resetAt ? String(info.resetAt) : "",
+      "X-RateLimit-Limit": String(LIMIT),
     },
   });
 }
