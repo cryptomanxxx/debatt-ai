@@ -648,6 +648,8 @@ def hamta_nyheter() -> list:
         ("DI Debatt",          "https://www.di.se/debatt/rss"),
         ("Omni",               "https://omni.se/rss"),
         ("Aftonbladet Debatt", "https://www.aftonbladet.se/debatt/rss.xml"),
+        ("Dagens PS",          "https://www.dagensps.se/feed/"),
+        ("Realtid",            "https://www.realtid.se/feed/"),
         # Tech
         ("Breakit",            "https://www.breakit.se/feed/articles"),
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
