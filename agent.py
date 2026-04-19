@@ -1364,7 +1364,7 @@ def main():
         nyhet = None
         print("Hämtar aktuella nyheter från RSS...")
         nyheter = hamta_nyheter()
-        if nyheter and (force_nyhet or random.random() < 0.75):
+        if nyheter and (force_nyhet or random.random() < 0.5):
             nyhet = random.choice(nyheter[:10])
 
         if forslag_amne:
