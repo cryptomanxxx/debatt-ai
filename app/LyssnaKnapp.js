@@ -1,56 +1,50 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
-function splitToChunks(text, maxLen = 180) {
-  const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
+function splitToChunks(text, maxLen = 150) {
+  const sentences = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
   const chunks = [];
-  let current = "";
   for (const s of sentences) {
-    if (current.length + s.length > maxLen && current) {
-      chunks.push(current.trim());
-      current = s;
+    const t = s.trim();
+    if (!t) continue;
+    if (t.length <= maxLen) {
+      chunks.push(t);
     } else {
-      current += s;
+      // Break long sentences at commas or word boundaries
+      const parts = t.match(new RegExp(`.{1,${maxLen}}(?:[,\\s]|$)`, "g")) || [t];
+      chunks.push(...parts.map(p => p.trim()).filter(Boolean));
     }
   }
-  if (current.trim()) chunks.push(current.trim());
   return chunks;
 }
 
 export default function LyssnaKnapp({ text, style }) {
   const [spelar, setSpelar] = useState(false);
+  const stopRef = useRef(false);
+  const audioRef = useRef(null);
 
-  function lyssna() {
-    const synth = window.speechSynthesis;
-    if (!synth) return;
-    synth.cancel();
-
-    const chunks = splitToChunks(text);
-    let idx = 0;
-
-    function spelaNext() {
-      if (idx >= chunks.length) { setSpelar(false); return; }
-      const utt = new SpeechSynthesisUtterance(chunks[idx]);
-      utt.lang = "sv-SE";
-      utt.rate = 0.95;
-      utt.onend = () => { idx++; spelaNext(); };
-      utt.onerror = () => setSpelar(false);
-      synth.speak(utt);
-    }
-
+  async function lyssna() {
+    stopRef.current = false;
     setSpelar(true);
+    const chunks = splitToChunks(text);
 
-    const voices = synth.getVoices();
-    if (voices.length > 0) {
-      spelaNext();
-    } else {
-      synth.onvoiceschanged = () => { synth.onvoiceschanged = null; spelaNext(); };
-      setTimeout(spelaNext, 500);
+    for (const chunk of chunks) {
+      if (stopRef.current) break;
+      await new Promise((resolve) => {
+        const audio = new Audio(`/api/tts?text=${encodeURIComponent(chunk)}`);
+        audioRef.current = audio;
+        audio.onended = resolve;
+        audio.onerror = resolve;
+        audio.play().catch(resolve);
+      });
     }
+
+    if (!stopRef.current) setSpelar(false);
   }
 
   function stoppa() {
-    window.speechSynthesis?.cancel();
+    stopRef.current = true;
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     setSpelar(false);
   }
 
