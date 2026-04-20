@@ -43,9 +43,13 @@ export async function POST(req) {
   const res = await fetch(`${SB_URL}/rest/v1/prenumeranter`, {
     method: "POST",
     headers: sbHeaders(),
-    body: JSON.stringify({ email, token }),
+    body: JSON.stringify({ email, token, aktiv: true }),
   });
-  if (!res.ok) return Response.json({ fel: "Kunde inte spara prenumeration." }, { status: 500 });
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error("Supabase prenumerant insert failed:", res.status, errText);
+    return Response.json({ fel: "Kunde inte spara prenumeration." }, { status: 500 });
+  }
 
   if (process.env.RESEND_API_KEY && token) {
     fetch("https://api.resend.com/emails", {
