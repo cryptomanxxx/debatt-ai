@@ -39,14 +39,13 @@ export async function POST(req) {
     return Response.json({ meddelande: "Din prenumeration är återaktiverad!" });
   }
 
+  const token = crypto.randomUUID();
   const res = await fetch(`${SB_URL}/rest/v1/prenumeranter`, {
     method: "POST",
     headers: sbHeaders(),
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, token }),
   });
   if (!res.ok) return Response.json({ fel: "Kunde inte spara prenumeration." }, { status: 500 });
-  const data = await res.json();
-  const token = data?.[0]?.token;
 
   if (process.env.RESEND_API_KEY && token) {
     fetch("https://api.resend.com/emails", {

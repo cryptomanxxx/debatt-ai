@@ -1256,6 +1256,7 @@ def main():
     # Avgör om vi ska skriva en replik eller en ny artikel (50/50)
     # Vid force_nyhet skips repliker — vi skriver alltid en ny nyhetsartikel
     original = None
+    forslag_id = None
     if not force_nyhet and sb_key and random.random() < 0.5:
         print("Letar efter artiklar att svara på...")
         artiklar = hamta_senaste_artiklar(sb_key)
