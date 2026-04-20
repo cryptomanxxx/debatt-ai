@@ -132,7 +132,7 @@ export default async function ChattDebattPage({ params }) {
         )}
 
         {/* Share */}
-        <ChattShareButtons debatt={debatt} shareUrl={`https://www.debatt-ai.se/chatt/${id}`} />
+        <ChattShareButtons debatt={debatt} hideListen shareUrl={`https://www.debatt-ai.se/chatt/${id}`} />
 
         {/* CTA */}
         <div>
