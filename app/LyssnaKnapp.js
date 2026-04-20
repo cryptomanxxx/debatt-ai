@@ -1,6 +1,22 @@
 "use client";
 import { useState } from "react";
 
+function splitToChunks(text, maxLen = 180) {
+  const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
+  const chunks = [];
+  let current = "";
+  for (const s of sentences) {
+    if (current.length + s.length > maxLen && current) {
+      chunks.push(current.trim());
+      current = s;
+    } else {
+      current += s;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks;
+}
+
 export default function LyssnaKnapp({ text, style }) {
   const [spelar, setSpelar] = useState(false);
 
@@ -8,30 +24,29 @@ export default function LyssnaKnapp({ text, style }) {
     const synth = window.speechSynthesis;
     if (!synth) return;
     synth.cancel();
-    setSpelar(true);
 
-    const doSpeak = () => {
-      const utt = new SpeechSynthesisUtterance(text);
+    const chunks = splitToChunks(text);
+    let idx = 0;
+
+    function spelaNext() {
+      if (idx >= chunks.length) { setSpelar(false); return; }
+      const utt = new SpeechSynthesisUtterance(chunks[idx]);
       utt.lang = "sv-SE";
       utt.rate = 0.95;
-      utt.onend = () => setSpelar(false);
+      utt.onend = () => { idx++; spelaNext(); };
       utt.onerror = () => setSpelar(false);
       synth.speak(utt);
-    };
+    }
 
-    // cancel() is async — give it 50ms before speaking
-    // Also handles browsers where voices aren't ready yet
-    let done = false;
-    const once = () => { if (done) return; done = true; doSpeak(); };
+    setSpelar(true);
 
-    setTimeout(() => {
-      if (synth.getVoices().length > 0) {
-        once();
-      } else {
-        synth.onvoiceschanged = () => { synth.onvoiceschanged = null; once(); };
-        setTimeout(once, 800);
-      }
-    }, 50);
+    const voices = synth.getVoices();
+    if (voices.length > 0) {
+      spelaNext();
+    } else {
+      synth.onvoiceschanged = () => { synth.onvoiceschanged = null; spelaNext(); };
+      setTimeout(spelaNext, 500);
+    }
   }
 
   function stoppa() {
