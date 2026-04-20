@@ -1,58 +1,37 @@
 "use client";
 import { useState } from "react";
 
-function getSwedishVoice() {
-  const voices = window.speechSynthesis.getVoices();
-  return (
-    voices.find(v => v.lang === "sv-SE") ||
-    voices.find(v => v.lang.startsWith("sv")) ||
-    null
-  );
-}
-
-function speak(text, onEnd) {
-  const synth = window.speechSynthesis;
-  synth.cancel();
-
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.rate = 0.95;
-  utt.onend = onEnd;
-  utt.onerror = onEnd;
-
-  const voice = getSwedishVoice();
-  if (voice) {
-    utt.voice = voice;
-    utt.lang = voice.lang;
-  } else {
-    utt.lang = "sv-SE";
-  }
-
-  synth.speak(utt);
-}
-
 export default function LyssnaKnapp({ text, style }) {
   const [spelar, setSpelar] = useState(false);
 
   function lyssna() {
-    if (!window.speechSynthesis) return;
     const synth = window.speechSynthesis;
-    const start = () => speak(text, () => setSpelar(false));
+    if (!synth) return;
+    synth.cancel();
+    setSpelar(true);
 
-    // Voices may not be loaded yet — wait if needed
-    if (synth.getVoices().length > 0) {
-      setSpelar(true);
-      start();
-    } else {
-      synth.onvoiceschanged = () => {
-        synth.onvoiceschanged = null;
-        setSpelar(true);
-        start();
-      };
-      // Fallback: some browsers never fire onvoiceschanged
-      setTimeout(() => {
-        if (!spelar) { setSpelar(true); start(); }
-      }, 500);
-    }
+    const doSpeak = () => {
+      const utt = new SpeechSynthesisUtterance(text);
+      utt.lang = "sv-SE";
+      utt.rate = 0.95;
+      utt.onend = () => setSpelar(false);
+      utt.onerror = () => setSpelar(false);
+      synth.speak(utt);
+    };
+
+    // cancel() is async — give it 50ms before speaking
+    // Also handles browsers where voices aren't ready yet
+    let done = false;
+    const once = () => { if (done) return; done = true; doSpeak(); };
+
+    setTimeout(() => {
+      if (synth.getVoices().length > 0) {
+        once();
+      } else {
+        synth.onvoiceschanged = () => { synth.onvoiceschanged = null; once(); };
+        setTimeout(once, 800);
+      }
+    }, 50);
   }
 
   function stoppa() {
