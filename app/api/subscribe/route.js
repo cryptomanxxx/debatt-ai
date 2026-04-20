@@ -1,11 +1,16 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_ANON_KEY;
 const BASE_URL = "https://www.debatt-ai.se";
 
-function sbHeaders() {
+function sbAnonHeaders() {
+  return { apikey: SB_ANON_KEY, Authorization: `Bearer ${SB_ANON_KEY}` };
+}
+
+function sbServiceHeaders() {
   return {
-    apikey: SB_KEY,
-    Authorization: `Bearer ${SB_KEY}`,
+    apikey: SB_SERVICE_KEY,
+    Authorization: `Bearer ${SB_SERVICE_KEY}`,
     "Content-Type": "application/json",
     Prefer: "return=representation",
   };
@@ -23,7 +28,7 @@ export async function POST(req) {
 
   const check = await fetch(
     `${SB_URL}/rest/v1/prenumeranter?email=eq.${encodeURIComponent(email)}&select=id,aktiv`,
-    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    { headers: sbAnonHeaders() }
   );
   const existing = await check.json();
 
@@ -33,7 +38,7 @@ export async function POST(req) {
     }
     await fetch(`${SB_URL}/rest/v1/prenumeranter?id=eq.${existing[0].id}`, {
       method: "PATCH",
-      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+      headers: { ...sbServiceHeaders(), Prefer: undefined },
       body: JSON.stringify({ aktiv: true }),
     });
     return Response.json({ meddelande: "Din prenumeration är återaktiverad!" });
@@ -42,7 +47,7 @@ export async function POST(req) {
   const token = crypto.randomUUID();
   const res = await fetch(`${SB_URL}/rest/v1/prenumeranter`, {
     method: "POST",
-    headers: sbHeaders(),
+    headers: sbServiceHeaders(),
     body: JSON.stringify({ email, token, aktiv: true }),
   });
   if (!res.ok) {
