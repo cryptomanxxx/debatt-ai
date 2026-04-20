@@ -271,10 +271,17 @@ export default function ChattPage() {
   const [rateLimitInfo, setRateLimitInfo] = useState(null); // { remaining, resetAt } | null
   const [felmeddelande, setFelmeddelande] = useState("");
   const [spelar, setSpelar] = useState(false);
+  const [arkivAntal, setArkivAntal] = useState(null);
   const [aiVäljer, setAiVäljer] = useState(false);
   const stoppRef = useRef(false);
   const abortRef = useRef(null);
   const bottomRef = useRef(null);
+
+  useEffect(() => {
+    fetch(`${SB_URL}/rest/v1/artiklar?select=id`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    }).then(r => r.json()).then(d => setArkivAntal(d.length)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -449,7 +456,7 @@ export default function ChattPage() {
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {navLink("/","Hem",false)}
           {navLink("/?debatter=1","Debatter",false)}
-          {navLink("/arkiv","Arkiv",false)}
+          {navLink("/arkiv", arkivAntal !== null ? `Arkiv (${arkivAntal})` : "Arkiv", false)}
           {navLink("/chatt","Direktdebatt",true)}
           {navLink("/visualiseringar","Visualiseringar",false)}
           {navLink("/om","Om DEBATT.AI",false)}

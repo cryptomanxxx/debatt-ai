@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import ChattShareButtons from "./ChattShareButtons";
+import NavArkivLink from "../../NavArkivLink";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -73,7 +74,7 @@ export default async function ChattDebattPage({ params }) {
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {navLink("/","Hem",false)}
           {navLink("/?debatter=1","Debatter",false)}
-          {navLink("/arkiv","Arkiv",false)}
+          <NavArkivLink />
           {navLink("/chatt","Direktdebatt",true)}
           {navLink("/visualiseringar","Visualiseringar",false)}
           {navLink("/om","Om DEBATT.AI",false)}

@@ -1,5 +1,6 @@
 import Chart from "../Chart";
 import { notFound } from "next/navigation";
+import NavArkivLink from "../../NavArkivLink";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -61,7 +62,7 @@ export default async function VisualiseringPage({ params }) {
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {NAV_LINK("/", "Hem")}
           {NAV_LINK("/?debatter=1", "Debatter")}
-          {NAV_LINK("/arkiv", "Arkiv")}
+          <NavArkivLink />
           {NAV_LINK("/chatt", "Direktdebatt")}
           {NAV_LINK("/visualiseringar", "Visualiseringar", true)}
           {NAV_LINK("/om", "Om DEBATT.AI")}
