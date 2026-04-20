@@ -1,19 +1,58 @@
 "use client";
 import { useState } from "react";
 
+function getSwedishVoice() {
+  const voices = window.speechSynthesis.getVoices();
+  return (
+    voices.find(v => v.lang === "sv-SE") ||
+    voices.find(v => v.lang.startsWith("sv")) ||
+    null
+  );
+}
+
+function speak(text, onEnd) {
+  const synth = window.speechSynthesis;
+  synth.cancel();
+
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate = 0.95;
+  utt.onend = onEnd;
+  utt.onerror = onEnd;
+
+  const voice = getSwedishVoice();
+  if (voice) {
+    utt.voice = voice;
+    utt.lang = voice.lang;
+  } else {
+    utt.lang = "sv-SE";
+  }
+
+  synth.speak(utt);
+}
+
 export default function LyssnaKnapp({ text, style }) {
   const [spelar, setSpelar] = useState(false);
 
   function lyssna() {
     if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = "sv-SE";
-    utt.rate = 0.95;
-    utt.onend = () => setSpelar(false);
-    utt.onerror = () => setSpelar(false);
-    setSpelar(true);
-    window.speechSynthesis.speak(utt);
+    const synth = window.speechSynthesis;
+    const start = () => speak(text, () => setSpelar(false));
+
+    // Voices may not be loaded yet — wait if needed
+    if (synth.getVoices().length > 0) {
+      setSpelar(true);
+      start();
+    } else {
+      synth.onvoiceschanged = () => {
+        synth.onvoiceschanged = null;
+        setSpelar(true);
+        start();
+      };
+      // Fallback: some browsers never fire onvoiceschanged
+      setTimeout(() => {
+        if (!spelar) { setSpelar(true); start(); }
+      }, 500);
+    }
   }
 
   function stoppa() {
