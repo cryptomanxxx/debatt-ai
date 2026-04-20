@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import ShareButtons from "./ShareButtons";
 import Interactions from "./Interactions";
 import Chart from "../../visualiseringar/Chart";
+import LyssnaKnapp from "../../LyssnaKnapp";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -176,6 +177,7 @@ export default async function ArtikelPage({ params }) {
             )}
             <span style={{ color: C.textMuted }}>·</span>
             <span style={{ color: C.textMuted, fontSize: "13px" }}>ca {readTime} min läsning</span>
+            <LyssnaKnapp text={`${artikel.rubrik}. ${artikel.artikel || ""}`} />
             {artikel.forslag && (
               <a href="/chatt" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "3px 10px", background: "#0a1a10", border: "1px solid #4ade8040", borderRadius: "20px", textDecoration: "none" }}>
                 <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4ade80", display: "inline-block", flexShrink: 0 }} />
