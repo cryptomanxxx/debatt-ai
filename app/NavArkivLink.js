@@ -4,7 +4,18 @@ import { useState, useEffect } from "react";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export default function NavArkivLink({ style, activeStyle }) {
+const DEFAULT_STYLE = {
+  flex: 1, textAlign: "center",
+  background: "transparent",
+  border: "1px solid #222222",
+  color: "#888880",
+  padding: "6px 14px", borderRadius: "4px",
+  fontSize: "13px", letterSpacing: "0.05em",
+  fontFamily: "Georgia, serif", textDecoration: "none",
+  display: "block",
+};
+
+export default function NavArkivLink({ style }) {
   const [count, setCount] = useState(null);
 
   useEffect(() => {
@@ -17,7 +28,7 @@ export default function NavArkivLink({ style, activeStyle }) {
   }, []);
 
   return (
-    <a href="/arkiv" style={style}>
+    <a href="/arkiv" style={style ?? DEFAULT_STYLE}>
       {count !== null ? `Arkiv (${count})` : "Arkiv"}
     </a>
   );
