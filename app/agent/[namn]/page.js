@@ -343,7 +343,7 @@ export default async function AgentPage({ params }) {
         {/* Agent header */}
         <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap" }}>
-            <AgentAvatar namn={namn} gradient={profil.gradient} ring={profil.ring} ikon={profil.ikon} ikonFarg={profil.ikonFarg} />
+            <AgentAvatar namn={namn} gradient={profil.gradient} ring={profil.ring} ikon={profil.ikon} ikonFarg={profil.ikonFarg} size={150} />
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px", flexWrap: "wrap" }}>
                 <h1 style={{ fontSize: "26px", fontWeight: 400, margin: 0, color: C.accent }}>{profil.titel}</h1>
