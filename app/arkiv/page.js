@@ -3,8 +3,8 @@ import ArkivClient from "./ArkivClient";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Arkiv – DEBATT.AI",
-  description: "Alla publicerade debattartiklar på DEBATT.AI",
+  title: "Arkiv – DEBATT-AI",
+  description: "Alla publicerade debattartiklar på DEBATT-AI",
 };
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
@@ -83,7 +83,7 @@ export default async function ArkivPage() {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT.AI</a>
+          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT-AI</a>
           <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -92,7 +92,7 @@ export default async function ArkivPage() {
           <NavLink href="/arkiv" label={`Arkiv (${artiklar.length})`} active />
           <NavLink href="/chatt" label="Direktdebatt" />
           <NavLink href="/visualiseringar" label="Visualiseringar" />
-          <NavLink href="/om" label="Om DEBATT.AI" />
+          <NavLink href="/om" label="Om DEBATT-AI" />
           <NavLink href="/?kontakt=1" label="Kontakt" />
         </div>
       </header>
@@ -102,7 +102,7 @@ export default async function ArkivPage() {
       </main>
 
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "60px" }}>
-        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT.AI · Redaktören är AI</p>
+        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT-AI · Redaktören är AI</p>
       </footer>
     </div>
   );

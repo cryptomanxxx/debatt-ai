@@ -96,10 +96,10 @@ export default function ShareButtons({ artikel }) {
     ctx.fillStyle = grad;
     ctx.fillRect(PAD, 44, W - PAD * 2, 3);
 
-    // DEBATT.AI logotype
+    // DEBATT-AI logotype
     ctx.font = "bold 22px serif";
     ctx.fillStyle = "#e8d5a3";
-    ctx.fillText("DEBATT.AI", PAD, 100);
+    ctx.fillText("DEBATT-AI", PAD, 100);
 
     // Tagline
     ctx.font = "12px monospace";

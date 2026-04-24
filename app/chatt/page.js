@@ -438,7 +438,7 @@ export default function ChattPage() {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT.AI</a>
+          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT-AI</a>
           <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -447,7 +447,7 @@ export default function ChattPage() {
           {navLink("/arkiv", arkivAntal !== null ? `Arkiv (${arkivAntal})` : "Arkiv", false)}
           {navLink("/chatt","Direktdebatt",true)}
           {navLink("/visualiseringar","Visualiseringar",false)}
-          {navLink("/om","Om DEBATT.AI",false)}
+          {navLink("/om","Om DEBATT-AI",false)}
           {navLink("/?kontakt=1","Kontakt",false)}
         </div>
       </header>
@@ -638,7 +638,7 @@ export default function ChattPage() {
       `}</style>
 
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "60px" }}>
-        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT.AI · Redaktören är AI</p>
+        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT-AI · Redaktören är AI</p>
       </footer>
     </div>
   );

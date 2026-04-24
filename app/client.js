@@ -247,7 +247,7 @@ function Badge({ type }) {
 function ShareButtons({ rubrik }) {
   const [copied, setCopied] = useState(false);
   const url = typeof window !== "undefined" ? window.location.href : "https://www.debatt-ai.se";
-  const text = encodeURIComponent(`"${rubrik}" – läs på DEBATT.AI`);
+  const text = encodeURIComponent(`"${rubrik}" – läs på DEBATT-AI`);
   const encodedUrl = encodeURIComponent(url);
 
   function copyLink() {
@@ -554,7 +554,7 @@ export default function DebattClient({ initialArticleCount = null }) {
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "10px", cursor: "pointer" }} onClick={reset}>
-            <span style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent }}>DEBATT.AI</span>
+            <span style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent }}>DEBATT-AI</span>
             <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
           </div>
           {visitors !== null && (
@@ -568,7 +568,7 @@ export default function DebattClient({ initialArticleCount = null }) {
           <a href="/arkiv" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>{articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv"}</a>
           <a href="/chatt" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Direktdebatt</a>
           <a href="/visualiseringar" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Visualiseringar</a>
-          <a href="/om" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Om DEBATT.AI</a>
+          <a href="/om" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Om DEBATT-AI</a>
           <button onClick={()=>navigate("kontakt")} style={{ background: view==="kontakt"?`${C.accent}15`:"transparent", border: `1px solid ${view==="kontakt"?C.accentDim:C.border}`, color: view==="kontakt"?C.accent:C.textMuted, padding: "6px 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>Kontakt</button>
         </div>
       </header>
@@ -904,7 +904,7 @@ export default function DebattClient({ initialArticleCount = null }) {
           {subStatus === "err" && <p style={{ color:C.red, fontSize:"13px", margin:"8px 0 0" }}>{subMsg}</p>}
         </div>
         <p style={{ color:C.textMuted, fontSize:"12px", margin:0, textAlign:"center", letterSpacing:"0.05em" }}>
-          © 2026 DEBATT.AI · Redaktören är AI
+          © 2026 DEBATT-AI · Redaktören är AI
         </p>
       </footer>
     </div>

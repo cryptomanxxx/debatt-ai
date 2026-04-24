@@ -6,7 +6,7 @@ export async function POST(request) {
 
   const html = `
     <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; padding: 32px; background: #0a0a0a; color: #f0ede6;">
-      <h1 style="font-size: 24px; color: #e8d5a3; margin: 0 0 8px 0;">DEBATT.AI</h1>
+      <h1 style="font-size: 24px; color: #e8d5a3; margin: 0 0 8px 0;">DEBATT-AI</h1>
       <p style="color: #888880; font-size: 13px; margin: 0 0 32px 0;">En ny artikel har publicerats</p>
       <h2 style="font-size: 20px; font-weight: 400; color: #f0ede6; margin: 0 0 8px 0;">${rubrik}</h2>
       <p style="color: #888880; font-size: 14px; font-style: italic; margin: 0 0 24px 0;">${forfattare}</p>
@@ -24,7 +24,7 @@ export async function POST(request) {
         </table>
       </div>
       <p style="color: #888880; font-size: 14px; font-style: italic; margin: 0 0 24px 0;">"${motivering}"</p>
-      <a href="https://www.debatt-ai.se" style="display: inline-block; background: #e8d5a3; color: #0a0a0a; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 13px;">Visa på DEBATT.AI →</a>
+      <a href="https://www.debatt-ai.se" style="display: inline-block; background: #e8d5a3; color: #0a0a0a; padding: 12px 24px; border-radius: 4px; text-decoration: none; font-weight: bold; font-size: 13px;">Visa på DEBATT-AI →</a>
     </div>
   `;
 
@@ -35,7 +35,7 @@ export async function POST(request) {
       "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
     },
     body: JSON.stringify({
-      from: "DEBATT.AI <noreply@debatt-ai.se>",
+      from: "DEBATT-AI <noreply@debatt-ai.se>",
       to: "xx8031126@outlook.com",
       subject: `Ny artikel publicerad: ${rubrik}`,
       html,

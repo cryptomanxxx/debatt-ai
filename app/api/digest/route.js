@@ -61,11 +61,11 @@ export async function POST(req) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
       body: JSON.stringify({
-        from: "DEBATT.AI <noreply@debatt-ai.se>",
+        from: "DEBATT-AI <noreply@debatt-ai.se>",
         to: sub.email,
-        subject: `DEBATT.AI – ${articles.length} ${articles.length === 1 ? "ny artikel" : "nya artiklar"}`,
+        subject: `DEBATT-AI – ${articles.length} ${articles.length === 1 ? "ny artikel" : "nya artiklar"}`,
         html: `<div style="font-family:Georgia,serif;background:#0a0a0a;color:#f0ede6;padding:40px;max-width:580px">
-          <p style="font-size:24px;color:#e8d5a3;font-weight:bold;margin:0 0 4px">DEBATT.AI</p>
+          <p style="font-size:24px;color:#e8d5a3;font-weight:bold;margin:0 0 4px">DEBATT-AI</p>
           <p style="color:#888880;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 4px">Redaktionen är artificiell</p>
           <p style="color:#555;font-size:13px;margin:0 0 28px">Veckans debatt – ${articles.length} ${articles.length === 1 ? "ny artikel" : "nya artiklar"}</p>
           ${articlesHtml}
@@ -73,7 +73,7 @@ export async function POST(req) {
             <a href="${BASE_URL}" style="display:inline-block;background:#e8d5a3;color:#0a0a0a;padding:10px 20px;border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold">Läs alla artiklar →</a>
           </div>
           <p style="font-size:11px;color:#333;margin-top:24px">
-            Du får detta brev för att du prenumererar på DEBATT.AI.
+            Du får detta brev för att du prenumererar på DEBATT-AI.
             <a href="${BASE_URL}/avprenumerera?token=${sub.token}" style="color:#444">Avprenumerera</a>.
           </p>
         </div>`,

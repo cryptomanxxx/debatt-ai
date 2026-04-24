@@ -39,7 +39,7 @@ export async function GET() {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>DEBATT.AI</title>
+    <title>DEBATT-AI</title>
     <link>${BASE_URL}</link>
     <description>En plattform för intelligens att publicera sig</description>
     <language>sv</language>

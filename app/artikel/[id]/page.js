@@ -78,15 +78,15 @@ async function getRelateradeArtiklar(id, kategori) {
 
 export async function generateMetadata({ params }) {
   const artikel = await getArtikel(params.id);
-  if (!artikel) return { title: "Artikel hittades inte – DEBATT.AI" };
+  if (!artikel) return { title: "Artikel hittades inte – DEBATT-AI" };
   return {
-    title: `${artikel.rubrik} – DEBATT.AI`,
+    title: `${artikel.rubrik} – DEBATT-AI`,
     description: artikel.motivering || artikel.artikel?.slice(0, 160),
     openGraph: {
       title: artikel.rubrik,
       description: artikel.motivering || artikel.artikel?.slice(0, 160),
       url: `https://www.debatt-ai.se/artikel/${artikel.id}`,
-      siteName: "DEBATT.AI",
+      siteName: "DEBATT-AI",
       type: "article",
     },
   };
@@ -121,7 +121,7 @@ export default async function ArtikelPage({ params }) {
       "name": artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare,
     },
     "datePublished": artikel.skapad,
-    "publisher": { "@type": "Organization", "name": "DEBATT.AI", "url": "https://www.debatt-ai.se" },
+    "publisher": { "@type": "Organization", "name": "DEBATT-AI", "url": "https://www.debatt-ai.se" },
     "url": `https://www.debatt-ai.se/artikel/${artikel.id}`,
     "mainEntityOfPage": `https://www.debatt-ai.se/artikel/${artikel.id}`,
   };
@@ -133,7 +133,7 @@ export default async function ArtikelPage({ params }) {
       {/* Header */}
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT.AI</a>
+          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT-AI</a>
           <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -142,7 +142,7 @@ export default async function ArtikelPage({ params }) {
           <a href="/arkiv" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{artikelCount !== null ? `Arkiv (${artikelCount})` : "Arkiv"}</a>
           <a href="/chatt" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Direktdebatt</a>
           <a href="/visualiseringar" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Visualiseringar</a>
-          <a href="/om" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Om DEBATT.AI</a>
+          <a href="/om" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Om DEBATT-AI</a>
           <a href="/?kontakt=1" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Kontakt</a>
         </div>
       </header>
@@ -309,7 +309,7 @@ export default async function ArtikelPage({ params }) {
       </main>
 
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "40px" }}>
-        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT.AI · Redaktören är AI</p>
+        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT-AI · Redaktören är AI</p>
       </footer>
     </div>
   );

@@ -7,7 +7,7 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export const revalidate = 3600;
 
 export const metadata = {
-  title: "Visualiseringar – DEBATT.AI",
+  title: "Visualiseringar – DEBATT-AI",
   description: "Datadrivna visualiseringar av svensk samhällsstatistik",
 };
 
@@ -49,7 +49,7 @@ export default async function VisualiseringarPage() {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT.AI</a>
+          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT-AI</a>
           <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
@@ -58,7 +58,7 @@ export default async function VisualiseringarPage() {
           <NavArkivLink />
           {NAV_LINK("/chatt", "Direktdebatt")}
           {NAV_LINK("/visualiseringar", "Visualiseringar", true)}
-          {NAV_LINK("/om", "Om DEBATT.AI")}
+          {NAV_LINK("/om", "Om DEBATT-AI")}
           {NAV_LINK("/?kontakt=1", "Kontakt")}
         </div>
       </header>

@@ -112,7 +112,7 @@ export default function ChattShareButtons({ debatt, shareUrl, inlagg, hideListen
     const grad = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
     grad.addColorStop(0, "#c8b89a"); grad.addColorStop(1, "#8a7a6a");
     ctx.fillStyle = grad; ctx.fillRect(PAD, 44, W - PAD * 2, 3);
-    ctx.font = "bold 22px serif"; ctx.fillStyle = "#c8b89a"; ctx.fillText("DEBATT.AI", PAD, 100);
+    ctx.font = "bold 22px serif"; ctx.fillStyle = "#c8b89a"; ctx.fillText("DEBATT-AI", PAD, 100);
     ctx.font = "12px monospace"; ctx.fillStyle = "#555"; ctx.fillText("DIREKTDEBATT", PAD + 140, 100);
     let agentX = PAD; ctx.font = "bold 11px monospace";
     agenter.forEach((a, i) => {

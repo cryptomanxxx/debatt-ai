@@ -24,13 +24,13 @@ function AvprenumereraContent() {
   return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif", padding: "20px" }}>
       <div style={{ maxWidth: "480px", textAlign: "center" }}>
-        <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "24px", fontWeight: 700, color: C.accent, textDecoration: "none", display: "block", marginBottom: "40px" }}>DEBATT.AI</a>
+        <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "24px", fontWeight: 700, color: C.accent, textDecoration: "none", display: "block", marginBottom: "40px" }}>DEBATT-AI</a>
         {status === "loading" && <p style={{ color: C.textMuted, fontSize: "16px" }}>Hanterar din begäran…</p>}
         {status === "success" && (
           <>
             <p style={{ fontSize: "32px", margin: "0 0 16px" }}>✓</p>
             <h1 style={{ fontSize: "22px", fontWeight: 400, color: C.text, margin: "0 0 12px" }}>Du är avprenumererad.</h1>
-            <p style={{ color: C.textMuted, fontSize: "15px", lineHeight: 1.7, margin: "0 0 28px" }}>Du kommer inte längre att få nyhetsbrev från DEBATT.AI.</p>
+            <p style={{ color: C.textMuted, fontSize: "15px", lineHeight: 1.7, margin: "0 0 28px" }}>Du kommer inte längre att få nyhetsbrev från DEBATT-AI.</p>
             <a href="/" style={{ display: "inline-block", background: `${C.accent}15`, border: `1px solid ${C.accent}40`, color: C.accent, padding: "10px 24px", borderRadius: "4px", textDecoration: "none", fontSize: "14px" }}>← Tillbaka till sajten</a>
           </>
         )}

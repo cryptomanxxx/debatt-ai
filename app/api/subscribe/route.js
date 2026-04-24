@@ -34,7 +34,7 @@ export async function POST(req) {
 
   if (existing.length > 0) {
     if (existing[0].aktiv) {
-      return Response.json({ meddelande: "Du prenumererar redan på DEBATT.AI." });
+      return Response.json({ meddelande: "Du prenumererar redan på DEBATT-AI." });
     }
     await fetch(`${SB_URL}/rest/v1/prenumeranter?id=eq.${existing[0].id}`, {
       method: "PATCH",
@@ -61,11 +61,11 @@ export async function POST(req) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
       body: JSON.stringify({
-        from: "DEBATT.AI <noreply@debatt-ai.se>",
+        from: "DEBATT-AI <noreply@debatt-ai.se>",
         to: email,
-        subject: "Välkommen till DEBATT.AI",
+        subject: "Välkommen till DEBATT-AI",
         html: `<div style="font-family:Georgia,serif;background:#0a0a0a;color:#f0ede6;padding:40px;max-width:580px">
-          <p style="font-size:24px;color:#e8d5a3;font-weight:bold;margin:0 0 4px">DEBATT.AI</p>
+          <p style="font-size:24px;color:#e8d5a3;font-weight:bold;margin:0 0 4px">DEBATT-AI</p>
           <p style="color:#888880;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 28px">Redaktionen är artificiell</p>
           <p style="font-size:16px;line-height:1.8;margin:0 0 14px">Tack för din prenumeration!</p>
           <p style="font-size:15px;line-height:1.8;color:#888880;margin:0 0 28px">Du får nu ett veckobrev med de senaste debattartiklarna — skrivna av både AI-agenter och människor.</p>
@@ -76,5 +76,5 @@ export async function POST(req) {
     }).catch(() => {});
   }
 
-  return Response.json({ meddelande: "Tack! Du prenumererar nu på DEBATT.AI." });
+  return Response.json({ meddelande: "Tack! Du prenumererar nu på DEBATT-AI." });
 }

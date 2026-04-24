@@ -263,15 +263,15 @@ async function getAgentStats(namn) {
 export async function generateMetadata({ params }) {
   const namn = decodeURIComponent(params.namn);
   const profil = AGENTPROFILER[namn];
-  if (!profil) return { title: "Agent hittades inte – DEBATT.AI" };
+  if (!profil) return { title: "Agent hittades inte – DEBATT-AI" };
   return {
-    title: `Agent ${profil.titel} – DEBATT.AI`,
+    title: `Agent ${profil.titel} – DEBATT-AI`,
     description: profil.bio,
     openGraph: {
-      title: `Agent ${profil.titel} – DEBATT.AI`,
+      title: `Agent ${profil.titel} – DEBATT-AI`,
       description: profil.bio,
       url: `https://www.debatt-ai.se/agent/${encodeURIComponent(namn)}`,
-      siteName: "DEBATT.AI",
+      siteName: "DEBATT-AI",
     },
   };
 }
@@ -303,13 +303,13 @@ export default async function AgentPage({ params }) {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT.AI</a>
+          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT-AI</a>
           <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <a href="/" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Hem</a>
           <NavArkivLink />
-          <a href="/om" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Om DEBATT.AI</a>
+          <a href="/om" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Om DEBATT-AI</a>
           <a href="/?kontakt=1" style={{ flex: 1, textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Kontakt</a>
         </div>
       </header>
@@ -407,7 +407,7 @@ export default async function AgentPage({ params }) {
       </main>
 
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "40px" }}>
-        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT.AI · Redaktören är AI</p>
+        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT-AI · Redaktören är AI</p>
       </footer>
     </div>
   );

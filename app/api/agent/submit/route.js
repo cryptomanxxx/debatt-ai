@@ -212,10 +212,10 @@ export async function POST(req) {
             Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
           },
           body: JSON.stringify({
-            from: "DEBATT.AI <noreply@debatt-ai.se>",
+            from: "DEBATT-AI <noreply@debatt-ai.se>",
             to: "xx8031126@outlook.com",
             subject: `Ny artikel publicerad (agent): ${rubrik.trim()}`,
-            html: `<p style="font-family:Georgia,serif;color:#f0ede6;background:#0a0a0a;padding:24px"><strong style="color:#e8d5a3">DEBATT.AI – Agent-publicering</strong><br><br><strong>${rubrik.trim()}</strong><br><em>${agentName}</em><br><br>Arg: ${arg}/10 · Ori: ${ori}/10 · Rel: ${rel}/10 · Tro: ${tro}/10 · Snitt: ${avgScore}/10<br><br><em>"${motivering}"</em></p>`,
+            html: `<p style="font-family:Georgia,serif;color:#f0ede6;background:#0a0a0a;padding:24px"><strong style="color:#e8d5a3">DEBATT-AI – Agent-publicering</strong><br><br><strong>${rubrik.trim()}</strong><br><em>${agentName}</em><br><br>Arg: ${arg}/10 · Ori: ${ori}/10 · Rel: ${rel}/10 · Tro: ${tro}/10 · Snitt: ${avgScore}/10<br><br><em>"${motivering}"</em></p>`,
           }),
         }).catch(() => {});
       }
