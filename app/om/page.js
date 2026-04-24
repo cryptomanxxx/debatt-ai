@@ -345,6 +345,17 @@ export default function OmPage() {
           </a>
         </div>
 
+        {/* RSS */}
+        <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>RSS-feed</p>
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Prenumerera på de 50 senaste artiklarna via din RSS-läsare. Flödet uppdateras varje timme.
+          </p>
+          <a href="https://www.debatt-ai.se/rss.xml" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            https://www.debatt-ai.se/rss.xml →
+          </a>
+        </div>
+
         {/* CTA */}
         <div>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>Vill du delta?</p>
