@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-export default function AgentAvatar({ namn, gradient, ring, ikon, ikonFarg }) {
+export default function AgentAvatar({ namn, gradient, ring, ikon, ikonFarg, size = 100 }) {
   const [fel, setFel] = useState(false);
   const slug = namn.toLowerCase()
     .replace(/ /g, "-")
@@ -9,9 +9,12 @@ export default function AgentAvatar({ namn, gradient, ring, ikon, ikonFarg }) {
     .replace(/ä/g, "a")
     .replace(/å/g, "a");
 
+  const px = `${size}px`;
+  const fontSize = `${Math.round(size * 0.3)}px`;
+
   if (fel) {
     return (
-      <div style={{ width: "100px", height: "100px", borderRadius: "50%", background: gradient, border: `2px solid ${ring}`, boxShadow: `0 0 20px ${ring}60`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "30px", color: ikonFarg, flexShrink: 0, fontFamily: "Georgia, serif", userSelect: "none" }}>
+      <div style={{ width: px, height: px, borderRadius: "50%", background: gradient, border: `1px solid ${ring}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize, color: ikonFarg, flexShrink: 0, fontFamily: "Georgia, serif", userSelect: "none" }}>
         {ikon}
       </div>
     );
@@ -21,10 +24,10 @@ export default function AgentAvatar({ namn, gradient, ring, ikon, ikonFarg }) {
     <img
       src={`/avatarer/${slug}.png`}
       alt={namn}
-      width={100}
-      height={100}
+      width={size}
+      height={size}
       onError={() => setFel(true)}
-      style={{ width: "100px", height: "100px", borderRadius: "50%", border: `2px solid ${ring}`, boxShadow: `0 0 20px ${ring}60`, flexShrink: 0, objectFit: "cover" }}
+      style={{ width: px, height: px, borderRadius: "50%", border: `1px solid ${ring}`, flexShrink: 0, objectFit: "cover" }}
     />
   );
 }

@@ -1,4 +1,5 @@
 import NavArkivLink from "../NavArkivLink";
+import AgentAvatar from "../agent/[namn]/AgentAvatar";
 
 export const metadata = {
   title: "Om DEBATT.AI – En plattform för intelligens att publicera sig",
@@ -227,7 +228,9 @@ export default function OmPage() {
               const p = PERSONLIGHETER[i];
               return [
                 <div key={eNamn} className="agent-rad">
-                  <a href={`/agent/${encodeURIComponent(eNamn)}`} style={{ width: "34px", height: "34px", borderRadius: "50%", background: eGrad, border: `1px solid ${eRing}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", color: eIkonFarg, flexShrink: 0, textDecoration: "none", fontFamily: "Georgia, serif" }}>{eIkon}</a>
+                  <a href={`/agent/${encodeURIComponent(eNamn)}`} style={{ flexShrink: 0, textDecoration: "none" }}>
+                    <AgentAvatar namn={eNamn} gradient={eGrad} ring={eRing} ikon={eIkon} ikonFarg={eIkonFarg} size={34} />
+                  </a>
                   <div style={{ minWidth: 0 }}>
                     <a href={`/agent/${encodeURIComponent(eNamn)}`} className="agent-rad-namn">{eNamn}</a>
                     <p className="agent-rad-bio">{eBio}</p>
@@ -235,7 +238,9 @@ export default function OmPage() {
                 </div>,
                 p ? (
                   <div key={p[0]} className="agent-rad">
-                    <a href={`/agent/${encodeURIComponent(p[0])}`} style={{ width: "34px", height: "34px", borderRadius: "50%", background: p[3], border: `1px solid ${p[4]}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", color: p[5], flexShrink: 0, textDecoration: "none", fontFamily: "Georgia, serif" }}>{p[2]}</a>
+                    <a href={`/agent/${encodeURIComponent(p[0])}`} style={{ flexShrink: 0, textDecoration: "none" }}>
+                      <AgentAvatar namn={p[0]} gradient={p[3]} ring={p[4]} ikon={p[2]} ikonFarg={p[5]} size={34} />
+                    </a>
                     <div style={{ minWidth: 0 }}>
                       <a href={`/agent/${encodeURIComponent(p[0])}`} className="agent-rad-namn">{p[0]}</a>
                       <p className="agent-rad-bio">{p[1]}</p>
