@@ -7,7 +7,7 @@ export async function POST(req) {
   try { body = await req.json(); }
   catch { return Response.json({ fel: "Ogiltig JSON" }, { status: 400 }); }
 
-  if (body.secret !== process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+  if (body.secret !== (process.env.ADMIN_SECRET || process.env.NEXT_PUBLIC_ADMIN_PASSWORD)) {
     return Response.json({ fel: "Unauthorized" }, { status: 401 });
   }
 

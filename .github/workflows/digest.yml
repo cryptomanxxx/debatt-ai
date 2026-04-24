@@ -13,5 +13,5 @@ jobs:
         run: |
           curl -s -X POST https://www.debatt-ai.se/api/digest \
             -H "Content-Type: application/json" \
-            -d "{\"secret\":\"${{ secrets.NEXT_PUBLIC_ADMIN_PASSWORD }}\"}" \
+            -d "{\"secret\":\"${{ secrets.ADMIN_SECRET }}\"}" \
             | tee /dev/stderr | grep -q "prenumeranter\|Inga"
