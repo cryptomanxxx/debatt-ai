@@ -292,6 +292,7 @@ export default function ChattPage() {
       setSummering(sum);
       const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores });
       setDebattId(id);
+      setFelmeddelande(""); // debate saved — clear any mid-stream error
     }
     fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event_type: "klar", amne: valtAmne }) }).catch(() => {});
     setFas("klar");
