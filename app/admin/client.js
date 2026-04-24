@@ -359,11 +359,13 @@ export default function AdminClient() {
 
   async function loadSubCount() {
     try {
-      const res = await fetch(`${SB_URL}/rest/v1/prenumeranter?aktiv=eq.true&select=id`, {
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      const res = await fetch("/api/admin/prenumeranter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret: ADMIN_PASSWORD }),
       });
       const data = await res.json();
-      setSubCount(Array.isArray(data) ? data.length : 0);
+      setSubCount(Array.isArray(data.prenumeranter) ? data.prenumeranter.length : 0);
     } catch {}
   }
 
