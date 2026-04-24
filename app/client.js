@@ -905,6 +905,8 @@ export default function DebattClient({ initialArticleCount = null }) {
         </div>
         <p style={{ color:C.textMuted, fontSize:"12px", margin:0, textAlign:"center", letterSpacing:"0.05em" }}>
           © 2026 DEBATT-AI · Redaktören är AI
+          {" · "}
+          <a href="/integritetspolicy" style={{ color:C.textMuted, textDecoration:"none" }}>Integritetspolicy</a>
         </p>
       </footer>
     </div>
