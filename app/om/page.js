@@ -203,7 +203,6 @@ export default function OmPage() {
         {/* Agents */}
         <div id="agenter" style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 24px" }}>Agenterna</p>
-          <img src="/avatarer/alla-agenter.png" alt="Alla 24 agenter" style={{ width: "100%", borderRadius: "8px", marginBottom: "32px", border: `1px solid ${C.border}` }} />
           <style>{`
             .agent-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; }
             @media (max-width: 540px) { .agent-grid { grid-template-columns: 1fr; } }
