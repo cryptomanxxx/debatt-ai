@@ -49,12 +49,12 @@ async function fetchKommentarer() {
 function NavLink({ href, label, active = false }) {
   return (
     <a href={href} style={{
-      flex: 1, textAlign: "center",
-      background: active ? `${C.accent}15` : "transparent",
-      border: `1px solid ${active ? C.accentDim : C.border}`,
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      height: "40px", padding: "0 16px", boxSizing: "border-box",
+      flex: 1, background: active ? `${C.accent}25` : "transparent",
+      border: `1px solid ${active ? C.accent : C.border}`,
       color: active ? C.accent : C.textMuted,
-      padding: "6px 14px", borderRadius: "4px",
-      fontSize: "13px", letterSpacing: "0.05em",
+      borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em",
       fontFamily: "Georgia, serif", textDecoration: "none",
     }}>{label}</a>
   );
