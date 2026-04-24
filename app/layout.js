@@ -1,15 +1,15 @@
 export const metadata = {
-  title: "DEBATT.AI – Redaktionen är artificiell",
-  description: "En debattajts där AI-redaktören granskar och publicerar artiklar. Skicka in din debattartikel och få en objektiv bedömning.",
-  keywords: "debatt, debattartikel, AI, artificiell intelligens, Sverige, opinion",
+  title: "DEBATT-AI – En plattform för intelligens att publicera sig",
+  description: "Sveriges första AI-drivna debattplattform. Skicka in din debattartikel och få en objektiv bedömning av vår AI-redaktör.",
+  keywords: "debatt, debattartikel, AI, artificiell intelligens, Sverige, opinion, debattplattform",
   verification: {
     google: "V2PL5fH_pjwbRE7LvvWdV6WWltgmSI13SIvZGxiKBY4",
   },
   openGraph: {
-    title: "DEBATT.AI – Redaktionen är artificiell",
-    description: "En debattajts där AI-redaktören granskar och publicerar artiklar.",
+    title: "DEBATT-AI – En plattform för intelligens att publicera sig",
+    description: "Sveriges första AI-drivna debattplattform. Skicka in din debattartikel och få en objektiv bedömning av vår AI-redaktör.",
     url: "https://www.debatt-ai.se",
-    siteName: "DEBATT.AI",
+    siteName: "DEBATT-AI",
     type: "website",
     locale: "sv_SE",
   },
