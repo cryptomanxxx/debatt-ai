@@ -479,7 +479,7 @@ export default function ChattPage() {
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
                 {KATEGORIER.map(k => (
                   <button key={k.id} onClick={() => setAmne(slumpaAmne(k.id))}
-                    style={{ padding: "4px 12px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer", transition: "all 0.15s" }}
+                    style={{ padding: "8px 16px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: "14px", fontFamily: "Georgia, serif", cursor: "pointer", transition: "all 0.15s" }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = C.accentDim; e.currentTarget.style.color = C.accent; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textMuted; }}>
                     {k.emoji} {k.label}
@@ -500,7 +500,7 @@ export default function ChattPage() {
 
               {/* Låt AI välja */}
               <button onClick={väljaAiAmne} disabled={aiVäljer}
-                style={{ marginTop: "8px", padding: "7px 14px", background: "transparent", border: `1px solid ${C.accentDim}50`, borderRadius: "6px", color: aiVäljer ? C.textMuted : C.accentDim, fontSize: "13px", fontFamily: "Georgia, serif", cursor: aiVäljer ? "default" : "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+                style={{ marginTop: "10px", padding: "10px 16px", background: "transparent", border: `1px solid ${C.accentDim}50`, borderRadius: "6px", color: aiVäljer ? C.textMuted : C.accentDim, fontSize: "14px", fontFamily: "Georgia, serif", cursor: aiVäljer ? "default" : "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
                 {aiVäljer
                   ? <><span style={{ display: "inline-flex", gap: "3px" }}>{[0,1,2].map(j => <span key={j} style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.textMuted, display: "inline-block", animation: `dot 1.2s ease-in-out ${j*0.2}s infinite` }} />)}</span> AI väljer ämne…</>
                   : "✦ Låt AI välja ämne"}
@@ -512,7 +512,7 @@ export default function ChattPage() {
               <label style={{ display: "block", fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "12px" }}>Panel</label>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
                 {PANELER.map((p, i) => (
-                  <button key={p.namn} onClick={() => { setValdPanel(i); if (!p.agenter) setSlumpAgenter(pickRandom(ALLA_AGENTER, 3)); }} style={{ padding: "7px 14px", borderRadius: "20px", border: `1px solid ${valdPanel===i ? C.accent+"80" : C.border}`, background: valdPanel===i ? `${C.accent}12` : "transparent", color: valdPanel===i ? C.accent : C.textMuted, fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
+                  <button key={p.namn} onClick={() => { setValdPanel(i); if (!p.agenter) setSlumpAgenter(pickRandom(ALLA_AGENTER, 3)); }} style={{ padding: "9px 16px", borderRadius: "20px", border: `1px solid ${valdPanel===i ? C.accent+"80" : C.border}`, background: valdPanel===i ? `${C.accent}12` : "transparent", color: valdPanel===i ? C.accent : C.textMuted, fontSize: "14px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
                     {p.namn}
                   </button>
                 ))}
