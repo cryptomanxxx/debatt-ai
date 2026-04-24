@@ -162,10 +162,10 @@ async function fetchSummering(amne, inlagg) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amne, inlagg }),
     });
-    if (!res.ok) return "";
-    const { summering } = await res.json();
-    return summering ?? "";
-  } catch { return ""; }
+    if (!res.ok) return { summering: "", scores: null };
+    const data = await res.json();
+    return { summering: data.summering ?? "", scores: data.scores ?? null };
+  } catch { return { summering: "", scores: null }; }
 }
 
 async function fetchAiAmne(agenter) {
@@ -181,7 +181,7 @@ async function fetchAiAmne(agenter) {
   } catch { return ""; }
 }
 
-async function sparaDebatt({ amne, agenter, inlagg, summering }) {
+async function sparaDebatt({ amne, agenter, inlagg, summering, scores }) {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/chatt_debatter`, {
       method: "POST",
@@ -191,7 +191,7 @@ async function sparaDebatt({ amne, agenter, inlagg, summering }) {
         "Content-Type": "application/json",
         "Prefer": "return=representation",
       },
-      body: JSON.stringify({ amne, agenter, inlagg, summering }),
+      body: JSON.stringify({ amne, agenter, inlagg, summering, scores: scores ?? null }),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -277,9 +277,9 @@ export default function ChattPage() {
     setTänker(false);
     if (h.length >= 3) {
       setFas("summering");
-      const sum = await fetchSummering(valtAmne, h);
+      const { summering: sum, scores } = await fetchSummering(valtAmne, h);
       setSummering(sum);
-      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum });
+      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores });
       setDebattId(id);
     }
     fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event_type: "klar", amne: valtAmne }) }).catch(() => {});
@@ -447,6 +447,7 @@ export default function ChattPage() {
           {navLink("/arkiv", arkivAntal !== null ? `Arkiv (${arkivAntal})` : "Arkiv", false)}
           {navLink("/chatt","Direktdebatt",true)}
           {navLink("/chatt/historik","Debatthistorik",false)}
+          {navLink("/leaderboard","Leaderboard",false)}
           {navLink("/om","Om DEBATT-AI",false)}
           {navLink("/?kontakt=1","Kontakt",false)}
         </div>
