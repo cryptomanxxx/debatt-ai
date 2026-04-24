@@ -1,5 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_ANON_KEY;
 const BASE_URL = "https://www.debatt-ai.se";
 
 export async function POST(req) {
@@ -26,7 +27,7 @@ export async function POST(req) {
 
   const subRes = await fetch(
     `${SB_URL}/rest/v1/prenumeranter?aktiv=eq.true&select=email,token`,
-    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    { headers: { apikey: SB_SERVICE_KEY, Authorization: `Bearer ${SB_SERVICE_KEY}` } }
   );
   const subscribers = await subRes.json();
 
