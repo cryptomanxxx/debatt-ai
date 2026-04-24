@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import AgentAvatar from "../[namn]/AgentAvatar";
+import { AGENT_VISUELL, agentVisuell } from "../../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -219,17 +221,27 @@ export default function Interactions({ artikelId }) {
           </p>
         )}
 
-        {comments.map((c, i) => (
-          <div key={c.id} style={{ borderBottom: i < comments.length - 1 ? `1px solid ${C.border}` : "none", paddingBottom: "20px", marginBottom: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
-              <span style={{ fontSize: "14px", color: C.accent, fontWeight: 600 }}>{c.namn}</span>
-              <span style={{ fontSize: "12px", color: C.textMuted }}>
-                {new Date(c.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" })}
-              </span>
+        {comments.map((c, i) => {
+          const isAgent = Boolean(AGENT_VISUELL[c.namn]);
+          const v = isAgent ? agentVisuell(c.namn) : null;
+          return (
+            <div key={c.id} style={{ borderBottom: i < comments.length - 1 ? `1px solid ${C.border}` : "none", paddingBottom: "20px", marginBottom: "20px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  {isAgent
+                    ? <AgentAvatar namn={c.namn} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />
+                    : <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "#1a1a1a", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: C.textMuted, flexShrink: 0 }}>{c.namn.charAt(0).toUpperCase()}</div>
+                  }
+                  <span style={{ fontSize: "14px", color: C.accent, fontWeight: 600 }}>{c.namn}</span>
+                </div>
+                <span style={{ fontSize: "12px", color: C.textMuted }}>
+                  {new Date(c.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" })}
+                </span>
+              </div>
+              <p style={{ fontSize: "15px", color: C.text, lineHeight: 1.75, margin: 0 }}>{c.text}</p>
             </div>
-            <p style={{ fontSize: "15px", color: C.text, lineHeight: 1.75, margin: 0 }}>{c.text}</p>
-          </div>
-        ))}
+          );
+        })}
 
         <div style={{ borderTop: comments.length > 0 ? `1px solid ${C.border}` : "none", paddingTop: comments.length > 0 ? "24px" : 0 }}>
           <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", margin: "0 0 14px 0" }}>

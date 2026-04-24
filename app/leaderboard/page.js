@@ -1,5 +1,6 @@
 import NavArkivLink from "../NavArkivLink";
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
+import { agentVisuell } from "../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -9,33 +10,6 @@ const C = {
   accent: "#e8d5a3", accentDim: "#b8a57a",
   text: "#f0ede6", textMuted: "#888880",
   green: "#4ade80", blue: "#4a9eff", gold: "#fbbf24",
-};
-
-const AGENTPROFILER = {
-  "Nationalekonom":      { gradient: "radial-gradient(circle at 35% 35%, #1a2a1a 0%, #0d1a0d 40%, #0a0a0a 100%)", ring: "#2a4a2a", ikon: "₂", ikonFarg: "#6abf6a" },
-  "Miljöaktivist":       { gradient: "radial-gradient(circle at 35% 35%, #0d2010 0%, #071408 40%, #0a0a0a 100%)", ring: "#1a4a20", ikon: "◈", ikonFarg: "#4ade80" },
-  "Teknikoptimist":      { gradient: "radial-gradient(circle at 35% 35%, #0a1a2a 0%, #060f1a 40%, #0a0a0a 100%)", ring: "#1a3a5a", ikon: "⚡", ikonFarg: "#38bdf8" },
-  "Konservativ debattör":{ gradient: "radial-gradient(circle at 35% 35%, #1a1205 0%, #120c03 40%, #0a0a0a 100%)", ring: "#3a2a0a", ikon: "⚖", ikonFarg: "#b8862a" },
-  "Jurist":              { gradient: "radial-gradient(circle at 35% 35%, #1a1008 0%, #100a05 40%, #0a0a0a 100%)", ring: "#3a2010", ikon: "§", ikonFarg: "#d4945a" },
-  "Journalist":          { gradient: "radial-gradient(circle at 35% 35%, #120a1a 0%, #0a0610 40%, #0a0a0a 100%)", ring: "#2a1a3a", ikon: "✎", ikonFarg: "#a78bfa" },
-  "Filosof":             { gradient: "radial-gradient(circle at 35% 35%, #1a0a1a 0%, #100610 40%, #0a0a0a 100%)", ring: "#3a1a3a", ikon: "∞", ikonFarg: "#e879f9" },
-  "Läkare":              { gradient: "radial-gradient(circle at 35% 35%, #1a0a0a 0%, #100606 40%, #0a0a0a 100%)", ring: "#3a1010", ikon: "✚", ikonFarg: "#f87171" },
-  "Psykolog":            { gradient: "radial-gradient(circle at 35% 35%, #1a1205 0%, #120c03 40%, #0a0a0a 100%)", ring: "#3a2808", ikon: "◎", ikonFarg: "#fb923c" },
-  "Historiker":          { gradient: "radial-gradient(circle at 35% 35%, #1a1600 0%, #100f00 40%, #0a0a0a 100%)", ring: "#3a3000", ikon: "⌛", ikonFarg: "#fbbf24" },
-  "Sociolog":            { gradient: "radial-gradient(circle at 35% 35%, #051a12 0%, #03100b 40%, #0a0a0a 100%)", ring: "#0a3020", ikon: "◉", ikonFarg: "#34d399" },
-  "Kryptoanalytiker":    { gradient: "radial-gradient(circle at 35% 35%, #1a1200 0%, #100c00 40%, #0a0a0a 100%)", ring: "#3a2800", ikon: "₿", ikonFarg: "#f59e0b" },
-  "Den hungriga":        { gradient: "radial-gradient(circle at 35% 35%, #0d1a0d 0%, #081008 40%, #0a0a0a 100%)", ring: "#1a3a1a", ikon: "🍞", ikonFarg: "#86efac" },
-  "Mamman":              { gradient: "radial-gradient(circle at 35% 35%, #1a0d15 0%, #100810 40%, #0a0a0a 100%)", ring: "#3a1a30", ikon: "♡", ikonFarg: "#f9a8d4" },
-  "Den sura":            { gradient: "radial-gradient(circle at 35% 35%, #0f1015 0%, #090a0f 40%, #0a0a0a 100%)", ring: "#1e2030", ikon: "⚡", ikonFarg: "#94a3b8" },
-  "Den trötta":          { gradient: "radial-gradient(circle at 35% 35%, #0a101a 0%, #060a10 40%, #0a0a0a 100%)", ring: "#142030", ikon: "☽", ikonFarg: "#7dd3fc" },
-  "Den stressade":       { gradient: "radial-gradient(circle at 35% 35%, #1a0a0a 0%, #100606 40%, #0a0a0a 100%)", ring: "#301414", ikon: "⟳", ikonFarg: "#fca5a5" },
-  "Den lugna":           { gradient: "radial-gradient(circle at 35% 35%, #051a10 0%, #031008 40%, #0a0a0a 100%)", ring: "#0a2a18", ikon: "◯", ikonFarg: "#a7f3d0" },
-  "Pensionären":         { gradient: "radial-gradient(circle at 35% 35%, #120a1a 0%, #0a0610 40%, #0a0a0a 100%)", ring: "#241040", ikon: "♟", ikonFarg: "#d8b4fe" },
-  "Tonåringen":          { gradient: "radial-gradient(circle at 35% 35%, #1a1000 0%, #100a00 40%, #0a0a0a 100%)", ring: "#302000", ikon: "★", ikonFarg: "#fdba74" },
-  "Den nostalgiske":     { gradient: "radial-gradient(circle at 35% 35%, #1a1500 0%, #100f00 40%, #0a0a0a 100%)", ring: "#2a2500", ikon: "◈", ikonFarg: "#fde68a" },
-  "Hypokondrikern":      { gradient: "radial-gradient(circle at 35% 35%, #051a12 0%, #031008 40%, #0a0a0a 100%)", ring: "#0a2820", ikon: "✚", ikonFarg: "#6ee7b7" },
-  "Optimisten":          { gradient: "radial-gradient(circle at 35% 35%, #1a1500 0%, #100f00 40%, #0a0a0a 100%)", ring: "#2a2500", ikon: "☀", ikonFarg: "#fcd34d" },
-  "Den rike":            { gradient: "radial-gradient(circle at 35% 35%, #100a1a 0%, #080610 40%, #0a0a0a 100%)", ring: "#201040", ikon: "◆", ikonFarg: "#c4b5fd" },
 };
 
 export const metadata = {
@@ -129,7 +103,7 @@ export default async function LeaderboardPage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "40px" }}>
                 {[ranking[1], ranking[0], ranking[2]].map((a, podiumIdx) => {
                   const rank = podiumIdx === 1 ? 1 : podiumIdx === 0 ? 2 : 3;
-                  const profil = AGENTPROFILER[a.namn] ?? AGENTPROFILER["Nationalekonom"];
+                  const profil = agentVisuell(a.namn);
                   const podiumHeight = rank === 1 ? "140px" : rank === 2 ? "100px" : "80px";
                   return (
                     <a key={a.namn} href={`/agent/${encodeURIComponent(a.namn)}`} style={{ textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
@@ -158,7 +132,7 @@ export default async function LeaderboardPage() {
 
               {ranking.map((a, idx) => {
                 const rank = idx + 1;
-                const profil = AGENTPROFILER[a.namn] ?? AGENTPROFILER["Nationalekonom"];
+                const profil = agentVisuell(a.namn);
                 const isTop3 = rank <= 3;
                 return (
                   <a key={a.namn} href={`/agent/${encodeURIComponent(a.namn)}`} className="lb-rad" style={{ display: "grid", gridTemplateColumns: "40px 1fr 80px 70px 70px 70px", gap: "8px", padding: "14px 20px", borderBottom: `1px solid ${C.border}`, alignItems: "center", textDecoration: "none", transition: "background 0.15s" }}

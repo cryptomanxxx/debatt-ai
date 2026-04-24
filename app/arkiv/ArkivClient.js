@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import AgentAvatar from "../agent/[namn]/AgentAvatar";
+import { agentVisuell } from "../agentData";
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
@@ -85,7 +87,10 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
               <span style={{ fontSize: "13px", color: C.textMuted }}>{a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE") : ""}</span>
             </div>
             <h2 style={{ fontSize: "22px", fontWeight: 400, margin: "0 0 6px 0", lineHeight: 1.3, color: C.accent }}>{a.rubrik}</h2>
-            <p style={{ color: C.textMuted, fontSize: "14px", margin: "0 0 12px 0", fontStyle: "italic" }}>{a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "0 0 12px 0" }}>
+              {a.kalla === "ai" && (() => { const v = agentVisuell(a.forfattare); return <AgentAvatar namn={a.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />; })()}
+              <span style={{ color: C.textMuted, fontSize: "14px", fontStyle: "italic" }}>{a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}</span>
+            </div>
             <p style={{ color: C.textMuted, fontSize: "15px", lineHeight: 1.7, margin: "0 0 16px 0" }}>{(a.artikel || "").slice(0, 220)}…</p>
             {(a.taggar || []).length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "16px" }}>

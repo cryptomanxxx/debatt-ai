@@ -1,6 +1,8 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import ChattShareButtons from "./[id]/ChattShareButtons";
+import AgentAvatar from "../agent/[namn]/AgentAvatar";
+import { agentVisuell } from "../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -201,11 +203,13 @@ async function sparaDebatt({ amne, agenter, inlagg, summering, scores }) {
 
 function Bubble({ h, isFirst, isLast, isStreaming }) {
   const farg = af(h.agent);
+  const v = agentVisuell(h.agent);
   const r = isFirst && isLast ? "8px" : isFirst ? "8px 8px 0 0" : isLast ? "0 0 8px 8px" : "0";
   return (
     <div style={{ padding: "16px 20px", background: C.surface, borderLeft: `3px solid ${farg}${isStreaming ? "80" : ""}`, borderRadius: r }}>
-      <div style={{ fontSize: "11px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px", fontWeight: 700 }}>
-        {h.agent.toUpperCase()}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+        <AgentAvatar namn={h.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />
+        <span style={{ fontSize: "11px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", fontWeight: 700 }}>{h.agent.toUpperCase()}</span>
       </div>
       <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.75, color: isStreaming ? `${C.text}bb` : C.text }}>
         {h.text}
@@ -217,9 +221,13 @@ function Bubble({ h, isFirst, isLast, isStreaming }) {
 
 function ThinkingBubble({ agent, isFirst }) {
   const farg = af(agent);
+  const v = agentVisuell(agent);
   return (
     <div style={{ padding: "16px 20px", background: C.surface, borderLeft: `3px solid ${farg}40`, borderRadius: isFirst ? "8px" : "0 0 8px 8px", opacity: 0.5 }}>
-      <div style={{ fontSize: "11px", color: `${farg}80`, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px", fontWeight: 700 }}>{agent.toUpperCase()}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+        <AgentAvatar namn={agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />
+        <span style={{ fontSize: "11px", color: `${farg}80`, fontFamily: "monospace", letterSpacing: "0.1em", fontWeight: 700 }}>{agent.toUpperCase()}</span>
+      </div>
       <span style={{ display: "inline-flex", gap: "4px" }}>
         {[0,1,2].map(j => <span key={j} style={{ width: "5px", height: "5px", borderRadius: "50%", background: C.textMuted, display: "inline-block", animation: `dot 1.2s ease-in-out ${j*0.2}s infinite` }} />)}
       </span>

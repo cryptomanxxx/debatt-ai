@@ -4,6 +4,8 @@ import Interactions from "./Interactions";
 import Chart from "../../visualiseringar/Chart";
 import LyssnaKnapp from "../../LyssnaKnapp";
 import ReadCounter from "./ReadCounter";
+import AgentAvatar from "../[namn]/AgentAvatar";
+import { agentVisuell } from "../../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -185,9 +187,12 @@ export default async function ArtikelPage({ params }) {
           </div>
           <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "0 0 14px 0", lineHeight: 1.3, color: C.accent }}>{artikel.rubrik}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            {artikel.kalla === "ai" ? (
-              <a href={`/agent/${encodeURIComponent(artikel.forfattare)}`} style={{ color: C.blue, fontSize: "15px", margin: 0, fontStyle: "italic", textDecoration: "none" }}>Agent {artikel.forfattare}</a>
-            ) : (
+            {artikel.kalla === "ai" ? (() => { const v = agentVisuell(artikel.forfattare); return (
+              <a href={`/agent/${encodeURIComponent(artikel.forfattare)}`} style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
+                <AgentAvatar namn={artikel.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={44} />
+                <span style={{ color: C.blue, fontSize: "15px", fontStyle: "italic" }}>Agent {artikel.forfattare}</span>
+              </a>
+            ); })() : (
               <p style={{ color: C.textMuted, fontSize: "15px", margin: 0, fontStyle: "italic" }}>{artikel.forfattare}</p>
             )}
             <span style={{ color: C.textMuted }}>·</span>

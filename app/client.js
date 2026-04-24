@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect, useLayoutEffect, useCallback } from "react";
+import AgentAvatar from "./agent/[namn]/AgentAvatar";
+import { agentVisuell } from "./agentData";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -663,7 +665,10 @@ export default function DebattClient({ initialArticleCount = null }) {
                   ))}
                 </div>
                 <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 8px", lineHeight:1.3, color:C.accent }}>{heroArtikel.rubrik}</h2>
-                <p style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic", margin:"0 0 12px" }}>{heroArtikel.kalla === "ai" ? `Agent ${heroArtikel.forfattare}` : heroArtikel.forfattare}</p>
+                <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 12px" }}>
+                  {heroArtikel.kalla === "ai" && (() => { const v = agentVisuell(heroArtikel.forfattare); return <AgentAvatar namn={heroArtikel.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />; })()}
+                  <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>{heroArtikel.kalla === "ai" ? `Agent ${heroArtikel.forfattare}` : heroArtikel.forfattare}</span>
+                </div>
                 <p style={{ color:C.text, fontSize:"15px", lineHeight:1.8, margin:"0 0 20px" }}>{(heroArtikel.artikel||"").slice(0,260)}…</p>
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
                   <div style={{ display:"flex", gap:"16px" }}>
