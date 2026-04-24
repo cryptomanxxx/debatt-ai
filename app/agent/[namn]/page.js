@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import NavArkivLink from "../../NavArkivLink";
+import AgentAvatar from "./AgentAvatar";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -317,17 +318,7 @@ export default async function AgentPage({ params }) {
         {/* Agent header */}
         <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap" }}>
-            <img
-              src={`/avatarer/${encodeURIComponent(namn.toLowerCase().replace(/ /g,"-").replace(/ö/g,"o").replace(/ä/g,"a").replace(/å/g,"a"))}.png`}
-              alt={namn}
-              width={100}
-              height={100}
-              style={{ width: "100px", height: "100px", borderRadius: "50%", border: `2px solid ${profil.ring}`, boxShadow: `0 0 20px ${profil.ring}60`, flexShrink: 0, objectFit: "cover" }}
-              onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="flex"; }}
-            />
-            <div style={{ width: "100px", height: "100px", borderRadius: "50%", background: profil.gradient, border: `2px solid ${profil.ring}`, boxShadow: `0 0 20px ${profil.ring}60`, display: "none", alignItems: "center", justifyContent: "center", fontSize: "30px", color: profil.ikonFarg, flexShrink: 0, fontFamily: "Georgia, serif", userSelect: "none" }}>
-              {profil.ikon}
-            </div>
+            <AgentAvatar namn={namn} gradient={profil.gradient} ring={profil.ring} ikon={profil.ikon} ikonFarg={profil.ikonFarg} />
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px", flexWrap: "wrap" }}>
                 <h1 style={{ fontSize: "26px", fontWeight: 400, margin: 0, color: C.accent }}>{profil.titel}</h1>
