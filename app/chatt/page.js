@@ -446,7 +446,7 @@ export default function ChattPage() {
           {navLink("/?debatter=1","Debatter",false)}
           {navLink("/arkiv", arkivAntal !== null ? `Arkiv (${arkivAntal})` : "Arkiv", false)}
           {navLink("/chatt","Direktdebatt",true)}
-          {navLink("/visualiseringar","Visualiseringar",false)}
+          {navLink("/chatt/historik","Debatthistorik",false)}
           {navLink("/om","Om DEBATT-AI",false)}
           {navLink("/?kontakt=1","Kontakt",false)}
         </div>
