@@ -576,7 +576,40 @@ export default function DebattClient({ initialArticleCount = null }) {
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px" }}>
 
         {/* ── SUBMIT ── */}
-        {view === "submit" && (
+        {view === "submit" && analyzing && (
+          <div style={{ padding: "48px 24px", textAlign: "center" }}>
+            <style>{`
+              @keyframes kriteriePuls {
+                0%, 100% { opacity: 0.3; }
+                50% { opacity: 1; }
+              }
+              .kriterieRad { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-radius: 6px; margin-bottom: 8px; background: #111; border: 1px solid #222; }
+              .kriterieRad.aktiv { border-color: #b8a57a40; }
+              .dots span { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #b8a57a; margin: 0 2px; animation: kriteriePuls 1.2s ease-in-out infinite; }
+              .dots span:nth-child(2) { animation-delay: 0.2s; }
+              .dots span:nth-child(3) { animation-delay: 0.4s; }
+            `}</style>
+            <p style={{ fontSize: "11px", color: "#b8a57a", letterSpacing: "0.16em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 32px", fontWeight: 700 }}>AI-redaktören bedömer</p>
+            {[
+              { label: "Argumentation", delay: "0s" },
+              { label: "Originalitet",  delay: "0.4s" },
+              { label: "Relevans",      delay: "0.8s" },
+              { label: "Trovärdighet",  delay: "1.2s" },
+            ].map(({ label, delay }) => (
+              <div key={label} className="kriterieRad aktiv">
+                <span style={{ fontSize: "15px", color: "#e8e0d0", fontFamily: "Georgia, serif" }}>{label}</span>
+                <span className="dots" style={{ animationDelay: delay }}>
+                  <span style={{ animationDelay: delay }} />
+                  <span style={{ animationDelay: `calc(${delay} + 0.2s)` }} />
+                  <span style={{ animationDelay: `calc(${delay} + 0.4s)` }} />
+                </span>
+              </div>
+            ))}
+            <p style={{ fontSize: "13px", color: "#555", margin: "24px 0 0", fontStyle: "italic" }}>Vanligtvis 5–15 sekunder</p>
+          </div>
+        )}
+
+        {view === "submit" && !analyzing && (
           <div>
             {senasteReplik && (
               <a href={`/artikel/${senasteReplik.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#050a1a", border: "1px solid #4a9eff30", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
