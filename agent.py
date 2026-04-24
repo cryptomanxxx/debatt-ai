@@ -699,10 +699,25 @@ def hamta_nyheter() -> list:
                 elif desc is not None and desc.text:
                     import re
                     text = re.sub(r"<[^>]+>", " ", desc.text).strip()[:300]
+                # Link
+                link_el = item.find("link") or item.find("atom:link", ns)
+                url = ""
+                if link_el is not None:
+                    if link_el.text and link_el.text.strip():
+                        url = link_el.text.strip()
+                    elif link_el.get("href"):
+                        url = link_el.get("href", "")
+                # PubDate
+                pub_el = item.find("pubDate") or item.find("atom:published", ns) or item.find("published")
+                publicerad = ""
+                if pub_el is not None and pub_el.text:
+                    publicerad = pub_el.text.strip()
                 nyheter.append({
                     "rubrik": rubrik,
                     "beskrivning": text,
                     "kalla": kalla,
+                    "url": url,
+                    "publicerad": publicerad,
                 })
         except Exception:
             continue
@@ -1137,7 +1152,8 @@ def hamta_senaste_visualisering(sb_key: str, kategori_hints: list[str]) -> dict 
 
 
 def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, artikel: str,
-                   konklusion: str = "", visualisering_id: str | None = None, forslag: bool = False) -> dict:
+                   konklusion: str = "", visualisering_id: str | None = None, forslag: bool = False,
+                   nyhetskalla: dict | None = None) -> dict:
     """Skicka artikeln till debatt.ai API."""
     body = {"api_key": api_key, "forfattare": forfattare, "rubrik": amne, "artikel": artikel, "kategori": kategori}
     if konklusion:
@@ -1146,6 +1162,8 @@ def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, arti
         body["visualisering_id"] = visualisering_id
     if forslag:
         body["forslag"] = True
+    if nyhetskalla:
+        body["nyhetskalla"] = nyhetskalla
     response = httpx.post(DEBATT_API, json=body, timeout=60)
     return response.json()
 
@@ -1368,6 +1386,8 @@ def main():
         if nyheter and (force_nyhet or random.random() < 0.5):
             nyhet = random.choice(nyheter[:10])
 
+        nyhetskalla = None
+
         if forslag_amne:
             amne = forslag_amne
             kategori = "Samhälle"
@@ -1384,11 +1404,20 @@ def main():
         elif nyhet:
             amne = nyhet["rubrik"]
             kategori = "Samhälle"
+            nyhetskalla = {
+                "namn": nyhet["kalla"],
+                "url": nyhet.get("url", ""),
+                "publicerad": nyhet.get("publicerad", ""),
+                "antal_utvärderade": len(nyheter),
+            }
             print(f"\n{'═' * 60}")
             print(f"  Läge:     NY ARTIKEL (AKTUELL NYHET)")
             print(f"  Agent:    {agent['namn']}")
             print(f"  Nyhet:    {nyhet['rubrik'][:60]}")
             print(f"  Källa:    {nyhet['kalla']}")
+            print(f"  URL:      {nyhet.get('url', '')[:60]}")
+            print(f"  Publicerad: {nyhet.get('publicerad', '')[:40]}")
+            print(f"  Antal utvärderade: {len(nyheter)}")
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
             print("Skriver artikel om aktuell nyhet med Groq (llama-3.3-70b)...")
@@ -1429,7 +1458,7 @@ def main():
 
     # Skicka till debatt.ai
     print("Skickar till debatt.ai för AI-granskning...")
-    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id))
+    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id), nyhetskalla=nyhetskalla if not original else None)
 
     # Visa resultat
     print(f"\n{'═' * 60}")

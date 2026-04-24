@@ -193,11 +193,36 @@ export default async function ArtikelPage({ params }) {
         </div>
 
         {/* Article body */}
-        <div style={{ marginBottom: "48px" }}>
+        <div style={{ marginBottom: artikel.nyhetskalla ? "32px" : "48px" }}>
           {(artikel.artikel || "").split("\n\n").filter(Boolean).map((p, i) => (
             <p key={i} style={{ fontSize: "18px", lineHeight: 2, color: C.text, margin: "0 0 28px 0" }}>{p}</p>
           ))}
         </div>
+
+        {/* Nyhetskälla */}
+        {artikel.nyhetskalla && (() => {
+          const k = artikel.nyhetskalla;
+          let pubStr = "";
+          if (k.publicerad) {
+            try {
+              pubStr = new Date(k.publicerad).toLocaleDateString("sv-SE", { day: "numeric", month: "long", year: "numeric" });
+            } catch {
+              pubStr = k.publicerad;
+            }
+          }
+          return (
+            <div style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px 20px", marginBottom: "48px", display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "6px 18px" }}>
+              <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace", flexShrink: 0 }}>Grundad på nyhet</span>
+              {k.url ? (
+                <a href={k.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "13px", color: C.accentDim, textDecoration: "none", borderBottom: `1px solid ${C.accentDim}40` }}>{k.namn}</a>
+              ) : (
+                <span style={{ fontSize: "13px", color: C.accentDim }}>{k.namn}</span>
+              )}
+              {pubStr && <span style={{ fontSize: "12px", color: C.textMuted }}>publicerad {pubStr}</span>}
+              {k.antal_utvärderade > 0 && <span style={{ fontSize: "12px", color: C.textMuted }}>{k.antal_utvärderade} nyheter utvärderades</span>}
+            </div>
+          );
+        })()}
 
         {/* Inbäddad visualisering */}
         {visualisering && (
