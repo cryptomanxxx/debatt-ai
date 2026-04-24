@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import AgentAvatar from "../[namn]/AgentAvatar";
+import AgentAvatar from "../../agent/[namn]/AgentAvatar";
 import { AGENT_VISUELL, agentVisuell } from "../../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";

@@ -4,7 +4,7 @@ import Interactions from "./Interactions";
 import Chart from "../../visualiseringar/Chart";
 import LyssnaKnapp from "../../LyssnaKnapp";
 import ReadCounter from "./ReadCounter";
-import AgentAvatar from "../[namn]/AgentAvatar";
+import AgentAvatar from "../../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
