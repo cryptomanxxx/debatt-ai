@@ -13,11 +13,14 @@ const C = {
 };
 
 const PANELER = [
-  { namn: "Ekonomi & Klimat", agenter: ["Nationalekonom", "Miljöaktivist", "Den sura"] },
-  { namn: "Juridik & Tech",   agenter: ["Jurist", "Teknikoptimist", "Pensionären"] },
-  { namn: "Etik & Samhälle", agenter: ["Filosof", "Journalist", "Tonåringen"] },
-  { namn: "Hälsa & Oro",     agenter: ["Läkare", "Psykolog", "Hypokondrikern"] },
-  { namn: "Klass & Pengar",  agenter: ["Nationalekonom", "Sociolog", "Den rike"] },
+  { namn: "Ekonomi & Klimat",    agenter: ["Nationalekonom", "Miljöaktivist", "Kryptoanalytiker"] },
+  { namn: "Juridik & Media",     agenter: ["Jurist", "Konservativ debattör", "Journalist"] },
+  { namn: "Vetenskap & Filosofi",agenter: ["Teknikoptimist", "Historiker", "Filosof"] },
+  { namn: "Hälsa & Psyke",      agenter: ["Läkare", "Psykolog", "Hypokondrikern"] },
+  { namn: "Klass & Pengar",      agenter: ["Sociolog", "Den rike", "Den hungriga"] },
+  { namn: "Vardag & Familj",     agenter: ["Mamman", "Pensionären", "Den lugna"] },
+  { namn: "Frustration & Trötthet", agenter: ["Den trötta", "Den stressade", "Den sura"] },
+  { namn: "Tidens röster",       agenter: ["Tonåringen", "Den nostalgiske", "Optimisten"] },
   { namn: "Slumpmässiga agenter", agenter: null },
 ];
 
