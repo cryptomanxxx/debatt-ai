@@ -72,7 +72,10 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
         const total = vc ? vc.ja + vc.nej : 0;
         const jaPct = total > 0 ? Math.round((vc.ja / total) * 100) : null;
         return (
-          <div key={a.id || i} style={{ borderTop: `1px solid ${C.border}`, paddingTop: "32px", marginBottom: "32px" }}>
+          <div key={a.id || i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "24px 24px 20px", marginBottom: "16px", transition: "border-color 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = "#3a3a3a"}
+            onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+          >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                 <Badge />
@@ -83,9 +86,9 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
             </div>
             <h2 style={{ fontSize: "22px", fontWeight: 400, margin: "0 0 6px 0", lineHeight: 1.3, color: C.accent }}>{a.rubrik}</h2>
             <p style={{ color: C.textMuted, fontSize: "14px", margin: "0 0 12px 0", fontStyle: "italic" }}>{a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}</p>
-            <p style={{ color: C.textMuted, fontSize: "15px", lineHeight: 1.7, margin: "0 0 14px 0" }}>{(a.artikel || "").slice(0, 220)}…</p>
+            <p style={{ color: C.textMuted, fontSize: "15px", lineHeight: 1.7, margin: "0 0 16px 0" }}>{(a.artikel || "").slice(0, 220)}…</p>
             {(a.taggar || []).length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "14px" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "16px" }}>
                 {(a.taggar || []).map(t => (
                   <button key={t} onClick={() => setFilterTag(filterTag === t ? null : t)} style={{ background: filterTag === t ? `${C.accent}25` : "transparent", color: filterTag === t ? C.accent : C.textMuted, border: `1px solid ${filterTag === t ? C.accent + "60" : C.border}`, borderRadius: "20px", padding: "3px 10px", fontSize: "12px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
                     #{t}
@@ -93,15 +96,15 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
                 ))}
               </div>
             )}
-            {(total > 0 || cc > 0) && (
-              <div style={{ display: "flex", gap: "16px", marginBottom: "14px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+              <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
                 {total > 0 && <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace" }}>{jaPct}% håller med · {total} {total === 1 ? "röst" : "röster"}</span>}
                 {cc > 0 && <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace" }}>💬 {cc} {cc === 1 ? "kommentar" : "kommentarer"}</span>}
               </div>
-            )}
-            <a href={`/artikel/${a.id}`} style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", background: `${C.accent}10`, border: `1px solid ${C.accent}30`, borderRadius: "4px", textDecoration: "none" }}>
-              <span style={{ fontSize: "14px", color: C.accent, fontWeight: 600 }}>Läs hela artikeln →</span>
-            </a>
+              <a href={`/artikel/${a.id}`} style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", background: `${C.accent}10`, border: `1px solid ${C.accent}30`, borderRadius: "4px", textDecoration: "none" }}>
+                <span style={{ fontSize: "14px", color: C.accent, fontWeight: 600 }}>Läs hela artikeln →</span>
+              </a>
+            </div>
           </div>
         );
       })}
