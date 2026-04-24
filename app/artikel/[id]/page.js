@@ -3,6 +3,7 @@ import ShareButtons from "./ShareButtons";
 import Interactions from "./Interactions";
 import Chart from "../../visualiseringar/Chart";
 import LyssnaKnapp from "../../LyssnaKnapp";
+import ReadCounter from "./ReadCounter";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -128,6 +129,7 @@ export default async function ArtikelPage({ params }) {
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <ReadCounter artikelId={artikel.id} />
       {/* Header */}
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>

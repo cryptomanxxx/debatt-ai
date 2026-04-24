@@ -27,32 +27,6 @@ const ALLA_AGENTER = [
   "Den nostalgiske","Hypokondrikern","Optimisten","Den rike",
 ];
 
-const AGENT_RÖST = {
-  "Nationalekonom":       { pitch: 1.0,  rate: 0.90 },
-  "Miljöaktivist":        { pitch: 1.1,  rate: 1.05 },
-  "Teknikoptimist":       { pitch: 1.1,  rate: 1.10 },
-  "Konservativ debattör": { pitch: 0.90, rate: 0.85 },
-  "Jurist":               { pitch: 0.95, rate: 0.90 },
-  "Journalist":           { pitch: 1.0,  rate: 1.10 },
-  "Filosof":              { pitch: 0.90, rate: 0.80 },
-  "Läkare":               { pitch: 1.0,  rate: 0.95 },
-  "Psykolog":             { pitch: 1.05, rate: 0.85 },
-  "Historiker":           { pitch: 0.95, rate: 0.90 },
-  "Sociolog":             { pitch: 1.0,  rate: 1.00 },
-  "Kryptoanalytiker":     { pitch: 1.05, rate: 1.10 },
-  "Den hungriga":         { pitch: 0.95, rate: 0.90 },
-  "Mamman":               { pitch: 1.10, rate: 0.95 },
-  "Den sura":             { pitch: 0.90, rate: 1.05 },
-  "Den trötta":           { pitch: 0.88, rate: 0.75 },
-  "Den stressade":        { pitch: 1.05, rate: 1.20 },
-  "Den lugna":            { pitch: 1.0,  rate: 0.78 },
-  "Pensionären":          { pitch: 0.85, rate: 0.82 },
-  "Tonåringen":           { pitch: 1.10, rate: 1.15 },
-  "Den nostalgiske":      { pitch: 0.95, rate: 0.85 },
-  "Hypokondrikern":       { pitch: 1.05, rate: 1.05 },
-  "Optimisten":           { pitch: 1.10, rate: 1.05 },
-  "Den rike":             { pitch: 0.95, rate: 0.88 },
-};
 
 const AGENT_FARG = {
   "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
@@ -275,6 +249,8 @@ export default function ChattPage() {
   const [aiVäljer, setAiVäljer] = useState(false);
   const stoppRef = useRef(false);
   const abortRef = useRef(null);
+  const audioRef = useRef(null);
+  const lyssnaStoppRef = useRef(false);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -372,37 +348,49 @@ export default function ChattPage() {
     abortRef.current?.abort();
   }
 
-  function lyssna() {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
+  async function lyssna() {
     const entries = historik.length > 0
       ? historik
       : summering ? [{ agent: null, text: summering }] : [];
     if (!entries.length) return;
+
+    lyssnaStoppRef.current = false;
     setSpelar(true);
-    let idx = 0;
-    function spelaNext() {
-      if (idx >= entries.length) { setSpelar(false); return; }
-      const e = entries[idx];
-      const utt = new SpeechSynthesisUtterance(e.text);
-      utt.lang = "sv-SE";
-      const röst = e.agent ? (AGENT_RÖST[e.agent] || { pitch: 1.0, rate: 1.0 }) : { pitch: 1.0, rate: 0.9 };
-      utt.pitch = röst.pitch;
-      utt.rate = röst.rate;
-      utt.onend = () => { idx++; setTimeout(spelaNext, 400); };
-      utt.onerror = () => setSpelar(false);
-      window.speechSynthesis.speak(utt);
+
+    const chunks = entries.flatMap(e => {
+      const sentences = e.text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [e.text];
+      const result = [];
+      let cur = "";
+      for (const s of sentences) {
+        if (cur.length + s.length > 150 && cur) { result.push(cur.trim()); cur = s; }
+        else cur += s;
+      }
+      if (cur.trim()) result.push(cur.trim());
+      return result;
+    });
+
+    for (const chunk of chunks) {
+      if (lyssnaStoppRef.current) break;
+      await new Promise((resolve) => {
+        const audio = new Audio(`/api/tts?text=${encodeURIComponent(chunk)}`);
+        audioRef.current = audio;
+        audio.onended = resolve;
+        audio.onerror = resolve;
+        audio.play().catch(resolve);
+      });
     }
-    spelaNext();
+    if (!lyssnaStoppRef.current) setSpelar(false);
   }
 
   function stoppLyssna() {
-    window.speechSynthesis?.cancel();
+    lyssnaStoppRef.current = true;
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     setSpelar(false);
   }
 
   function nyDebatt() {
-    window.speechSynthesis?.cancel();
+    lyssnaStoppRef.current = true;
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     setSpelar(false);
     setFas("start");
     setHistorik([]);
