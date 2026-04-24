@@ -633,7 +633,7 @@ export default function ChattPage() {
                       disabled={föreslagStatus === "loading"}
                       style={{ padding: "10px 22px", background: "transparent", border: `1px solid ${C.accent}50`, color: C.accent, borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer", opacity: föreslagStatus === "loading" ? 0.5 : 1 }}
                     >
-                      {föreslagStatus === "loading" ? "Skickar…" : "Föreslå för agenterna →"}
+                      {föreslagStatus === "loading" ? "Skickar…" : "Tipsa agenterna om detta ämne →"}
                     </button>
                   )}
                 </div>
