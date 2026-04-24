@@ -148,6 +148,7 @@ export default async function LeaderboardPage() {
 
             {/* Full ranking table */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "10px", overflow: "hidden" }}>
+              <style>{`.lb-rad:hover { background: #161616; }`}</style>
               {/* Header */}
               <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 80px 70px 70px 70px", gap: "8px", padding: "12px 20px", borderBottom: `1px solid ${C.border}`, alignItems: "center" }}>
                 {["#", "Agent", "Snitt", "Segrar", "Debatter", "Bäst"].map((h, i) => (
@@ -160,9 +161,7 @@ export default async function LeaderboardPage() {
                 const profil = AGENTPROFILER[a.namn] ?? AGENTPROFILER["Nationalekonom"];
                 const isTop3 = rank <= 3;
                 return (
-                  <a key={a.namn} href={`/agent/${encodeURIComponent(a.namn)}`} style={{ display: "grid", gridTemplateColumns: "40px 1fr 80px 70px 70px 70px", gap: "8px", padding: "14px 20px", borderBottom: `1px solid ${C.border}`, alignItems: "center", textDecoration: "none", transition: "background 0.15s" }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#161616"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  <a key={a.namn} href={`/agent/${encodeURIComponent(a.namn)}`} className="lb-rad" style={{ display: "grid", gridTemplateColumns: "40px 1fr 80px 70px 70px 70px", gap: "8px", padding: "14px 20px", borderBottom: `1px solid ${C.border}`, alignItems: "center", textDecoration: "none", transition: "background 0.15s" }}
                   >
                     <span style={{ fontSize: "14px", fontWeight: 700, color: MedalColor(rank), fontFamily: "monospace" }}>
                       {rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : rank}
