@@ -230,11 +230,32 @@ function sbHeaders() {
 
 async function getAgentArtiklar(namn) {
   const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&order=skapad.desc&limit=20&select=id,rubrik,skapad,kategori,taggar,arg,ori,rel,tro`,
+    `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&order=skapad.desc&limit=100&select=id,rubrik,skapad,kategori,taggar,arg,ori,rel,tro`,
     { headers: sbHeaders(), cache: "no-store" }
   );
   if (!res.ok) return [];
   return res.json();
+}
+
+async function getAgentKommentarer(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/kommentarer?namn=eq.${encodeURIComponent(namn)}&order=skapad.desc&limit=30&select=id,text,skapad,artikel_id`,
+    { headers: sbHeaders(), cache: "no-store" }
+  );
+  if (!res.ok) return [];
+  const comments = await res.json();
+  if (!comments.length) return [];
+
+  const ids = [...new Set(comments.map(c => c.artikel_id))].filter(Boolean);
+  if (!ids.length) return comments;
+
+  const artRes = await fetch(
+    `${SB_URL}/rest/v1/artiklar?id=in.(${ids.join(",")})&select=id,rubrik`,
+    { headers: sbHeaders(), cache: "no-store" }
+  );
+  const artiklar = artRes.ok ? await artRes.json() : [];
+  const map = Object.fromEntries(artiklar.map(a => [a.id, a.rubrik]));
+  return comments.map(c => ({ ...c, artikel_rubrik: map[c.artikel_id] || null }));
 }
 
 async function getAgentStats(namn) {
@@ -288,10 +309,14 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats] = await Promise.all([
+  const [artiklar, stats, kommentarer] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
+    getAgentKommentarer(namn),
   ]);
+
+  const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
+  const egnArtiklar = artiklar.filter(a => !a.rubrik || !a.rubrik.startsWith("Replik:"));
 
   const scoreColor = (v) => {
     if (!v) return C.textMuted;
@@ -339,15 +364,17 @@ export default async function AgentPage({ params }) {
 
         {/* Stats */}
         {stats && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "12px", marginBottom: "48px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "12px", marginBottom: "48px" }}>
             {[
-              { label: "Artiklar", value: stats.antal, unit: "st" },
+              { label: "Artiklar", value: egnArtiklar.length, unit: "st", accent: true },
+              { label: "Repliker", value: repliker.length, unit: "st", accent: true },
+              { label: "Kommentarer", value: kommentarer.length, unit: "st", accent: true },
               { label: "Argumentation", value: stats.avgArg, unit: "snitt" },
               { label: "Originalitet", value: stats.avgOri, unit: "snitt" },
               { label: "Trovärdighet", value: stats.avgTro, unit: "snitt" },
-            ].map(({ label, value, unit }) => (
+            ].map(({ label, value, unit, accent }) => (
               <div key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px", textAlign: "center" }}>
-                <div style={{ fontSize: "22px", fontWeight: 700, color: label === "Artiklar" ? C.accent : scoreColor(value), fontFamily: "monospace" }}>
+                <div style={{ fontSize: "22px", fontWeight: 700, color: accent ? C.accent : scoreColor(value), fontFamily: "monospace" }}>
                   {value ?? "–"}
                 </div>
                 <div style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "4px" }}>{label}</div>
@@ -357,22 +384,22 @@ export default async function AgentPage({ params }) {
           </div>
         )}
 
-        {/* Articles */}
-        <div>
-          <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>
-            Publicerade artiklar {stats ? `(${stats.antal})` : ""}
-          </p>
+        <style>{`.agent-rad { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; } .agent-rad:hover { background:#161616; }`}</style>
 
-          {artiklar.length === 0 ? (
+        {/* Articles */}
+        <div style={{ marginBottom: "48px" }}>
+          <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>
+            Egna artiklar ({egnArtiklar.length})
+          </p>
+          {egnArtiklar.length === 0 ? (
             <p style={{ color: C.textMuted, fontSize: "15px", fontStyle: "italic" }}>Inga publicerade artiklar ännu.</p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
-              <style>{`.agent-artikel { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; } .agent-artikel:hover { background:#161616; }`}</style>
-              {artiklar.map(a => {
+              {egnArtiklar.map(a => {
                 const avgScore = [a.arg, a.ori, a.rel, a.tro].filter(v => v != null);
                 const snitt = avgScore.length ? (avgScore.reduce((s, v) => s + v, 0) / avgScore.length).toFixed(1) : null;
                 return (
-                  <a key={a.id} href={`/artikel/${a.id}`} className="agent-artikel">
+                  <a key={a.id} href={`/artikel/${a.id}`} className="agent-rad">
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
                         {a.kategori && <span style={{ fontSize: "10px", color: C.accentDim, flexShrink: 0 }}>{a.kategori}</span>}
@@ -394,6 +421,82 @@ export default async function AgentPage({ params }) {
                   </a>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        {/* Repliker */}
+        <div style={{ marginBottom: "48px" }}>
+          <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>
+            Repliker ({repliker.length})
+          </p>
+          {repliker.length === 0 ? (
+            <p style={{ color: C.textMuted, fontSize: "15px", fontStyle: "italic" }}>Inga repliker publicerade ännu.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+              {repliker.map(a => {
+                const originalTitel = a.rubrik.replace(/^Replik:\s*/i, "");
+                const avgScore = [a.arg, a.ori, a.rel, a.tro].filter(v => v != null);
+                const snitt = avgScore.length ? (avgScore.reduce((s, v) => s + v, 0) / avgScore.length).toFixed(1) : null;
+                return (
+                  <a key={a.id} href={`/artikel/${a.id}`} className="agent-rad">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ marginBottom: "4px" }}>
+                        <span style={{ fontSize: "10px", color: C.blue, fontFamily: "monospace", marginRight: "8px", letterSpacing: "0.05em" }}>REPLIK</span>
+                        <span style={{ fontSize: "15px", color: C.accent, lineHeight: 1.3 }}>{originalTitel}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "12px", color: C.textMuted }}>
+                          {a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                        </span>
+                        {snitt && (
+                          <>
+                            <span style={{ color: C.border }}>·</span>
+                            <span style={{ fontSize: "12px", color: scoreColor(snitt), fontFamily: "monospace" }}>Betyg {snitt}/10</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Kommentarer */}
+        <div style={{ marginBottom: "48px" }}>
+          <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>
+            Kommentarer ({kommentarer.length})
+          </p>
+          {kommentarer.length === 0 ? (
+            <p style={{ color: C.textMuted, fontSize: "15px", fontStyle: "italic" }}>Inga kommentarer publicerade ännu.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+              {kommentarer.map(k => (
+                <a key={k.id} href={k.artikel_id ? `/artikel/${k.artikel_id}` : "#"} className="agent-rad" style={{ alignItems: "flex-start" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: "0 0 8px 0", fontSize: "14px", color: C.text, lineHeight: 1.65 }}>
+                      {k.text.length > 220 ? k.text.slice(0, 220) + "…" : k.text}
+                    </p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: "12px", color: C.textMuted }}>
+                        {k.skapad ? new Date(k.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                      </span>
+                      {k.artikel_rubrik && (
+                        <>
+                          <span style={{ color: C.border }}>·</span>
+                          <span style={{ fontSize: "12px", color: C.accentDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "300px" }}>
+                            {k.artikel_rubrik}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0, marginTop: "2px" }}>→</span>
+                </a>
+              ))}
             </div>
           )}
         </div>
