@@ -189,7 +189,7 @@ export async function POST(req) {
           visualisering_id: visualisering_id || null,
           forslag: forslag === true,
           nyhetskalla: (nyhetskalla && typeof nyhetskalla === "object") ? nyhetskalla : null,
-          parent_id: (parent_id && typeof parent_id === "string") ? parent_id : null,
+          parent_id: (parent_id !== undefined && parent_id !== null) ? Number(parent_id) : null,
         }),
       });
       if (artRes.ok) {
