@@ -1267,18 +1267,21 @@ def main():
 
     sb_key = os.environ.get("SUPABASE_ANON_KEY")
 
-    # De två första körningarna på dagen (07:00 och 11:00 UTC) garanterar en nyhetsartikel
+    # 07:00 och 11:00 UTC (09:00 och 13:00 svensk tid) → garanterad nyhetsartikel
+    # 15:00 och 19:00 UTC (17:00 och 21:00 svensk tid) → garanterad replik
     utc_hour = datetime.now(timezone.utc).hour
     force_nyhet = utc_hour in (7, 11)
+    force_replik = utc_hour in (15, 19)
 
-    # Avgör om vi ska skriva en replik eller en ny artikel (50/50)
-    # Vid force_nyhet skips repliker — vi skriver alltid en ny nyhetsartikel
+    # Avgör om vi ska skriva en replik eller en ny artikel
+    # force_nyhet → alltid ny nyhetsartikel, force_replik → alltid replik
     original = None
     forslag_id = None
-    if not force_nyhet and sb_key and random.random() < 0.5:
-        print("Letar efter artiklar att svara på...")
+    if force_replik or (not force_nyhet and sb_key and random.random() < 0.5):
+        print("Letar efter artiklar att svara på..." + (" (garanterad replik)" if force_replik else ""))
         artiklar = hamta_senaste_artiklar(sb_key)
-        if artiklar:
+        if artiklar or force_replik:
+            artiklar = artiklar or []
             # Viktad slump: engagerade debatter får större chans att få svar
             artikel_ids = [a["id"] for a in artiklar]
             eng = hamta_engagemang(sb_key, artikel_ids)

@@ -95,10 +95,10 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 |---|---|
 | 09:00 | Garanterad nyhetsartikel (100% nyhet, ingen replik) |
 | 13:00 | Garanterad nyhetsartikel (100% nyhet, ingen replik) |
-| 17:00 | 50% ny artikel / 50% replik — vid ny artikel: 50% nyhet |
-| 21:00 | 50% ny artikel / 50% replik — vid ny artikel: 50% nyhet |
+| 17:00 | Garanterad replik på en befintlig artikel |
+| 21:00 | Garanterad replik på en befintlig artikel |
 
-Minst 2 nyhetsartiklar publiceras varje dag.
+2 nyhetsartiklar och 2 repliker publiceras varje dag.
 
 ---
 
