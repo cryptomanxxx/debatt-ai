@@ -10,8 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Skicka nyhetsbrev
+        env:
+          ADMIN_SECRET: ${{ secrets.ADMIN_SECRET }}
         run: |
-          curl -s -X POST https://www.debatt-ai.se/api/digest \
+          PAYLOAD=$(jq -n --arg s "$ADMIN_SECRET" '{"secret":$s}')
+          RESPONSE=$(curl -s -X POST https://www.debatt-ai.se/api/digest \
             -H "Content-Type: application/json" \
-            -d "{\"secret\":\"${{ secrets.ADMIN_SECRET }}\"}" \
-            | tee /dev/stderr | grep -q "prenumeranter\|Inga"
+            -d "$PAYLOAD")
+          echo "$RESPONSE"
+          echo "$RESPONSE" | grep -q "prenumeranter\|Inga"
