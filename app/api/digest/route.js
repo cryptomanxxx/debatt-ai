@@ -17,7 +17,7 @@ export async function POST(req) {
 
   const artRes = await fetch(
     `${SB_URL}/rest/v1/artiklar?skapad=gte.${since}&select=id,rubrik,forfattare,motivering,kalla,skapad,taggar&order=skapad.desc`,
-    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    { headers: { apikey: SB_ANON_KEY, Authorization: `Bearer ${SB_ANON_KEY}` } }
   );
   const articles = await artRes.json();
 
