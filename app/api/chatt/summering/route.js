@@ -28,11 +28,17 @@ export async function POST(request) {
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: "Du är en neutral retorisk domare. Svara ALLTID med giltig JSON och ingenting annat." },
-          { role: "user", content: `Debatten handlade om: "${amne}"\n\nDeltagare: ${agenter.join(", ")}\n\n${debattText}\n\nBedöm varje deltagares retoriska förmåga på en skala 1–10. Beakta: argumentstyrka, originalitet och övertygande förmåga.\n\nSvara med EXAKT denna JSON (inga kommentarer, ingen text utanför JSON):\n${JSON.stringify(Object.fromEntries(agenter.map(a => [a, 0])))}` },
+          {
+            role: "system",
+            content: `Du är en retorisk domare. Svara ENDAST med ett JSON-objekt. Inga förklaringar, ingen text utanför JSON.`,
+          },
+          {
+            role: "user",
+            content: `Debatten handlade om: "${amne}"\n\n${debattText}\n\nGe varje deltagare ett heltalspoäng 1-10 för retorisk förmåga (argumentstyrka, originalitet, övertygande förmåga).\n\nDeltagarna är: ${agenter.map((a, i) => `${i + 1}. ${a}`).join(", ")}\n\nSvara med EXAKT detta format (ersätt talen med dina betyg):\n{"${agenter.join('": X, "')}: X}`,
+          },
         ],
-        max_tokens: 120,
-        temperature: 0.2,
+        max_tokens: 80,
+        temperature: 0.1,
         response_format: { type: "json_object" },
       }),
     }),
@@ -49,10 +55,12 @@ export async function POST(request) {
     try {
       const data = await scoreRes.json();
       const raw = JSON.parse(data.choices?.[0]?.message?.content ?? "{}");
+      // Case-insensitive matching to handle model formatting variations
+      const rawLower = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k.toLowerCase(), v]));
       scores = {};
       for (const agent of agenter) {
-        const v = Number(raw[agent]);
-        if (v >= 1 && v <= 10) scores[agent] = v;
+        const v = Number(raw[agent] ?? rawLower[agent.toLowerCase()]);
+        if (Number.isInteger(v) && v >= 1 && v <= 10) scores[agent] = v;
       }
       if (Object.keys(scores).length === 0) scores = null;
     } catch {
