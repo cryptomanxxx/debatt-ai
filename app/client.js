@@ -563,17 +563,17 @@ export default function DebattClient({ initialArticleCount = null }) {
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {[["submit","Hem"],["debatter","Debatter"]].map(([v,lbl])=>(
-            <button key={v} onClick={()=>navigate(v)} style={{ background: view===v?`${C.accent}15`:"transparent", border: `1px solid ${view===v?C.accentDim:C.border}`, color: view===v?C.accent:C.textMuted, padding: "8px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>{lbl}</button>
+            <button key={v} onClick={()=>navigate(v)} style={{ background: view===v?`${C.accent}25`:"transparent", border: `1px solid ${view===v?C.accent:C.border}`, color: view===v?C.accent:C.textMuted, padding: "8px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>{lbl}</button>
           ))}
           <a href="/arkiv" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "8px 16px", borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>{articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv"}</a>
           <a href="/chatt" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "8px 16px", borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Direktdebatt</a>
           <a href="/visualiseringar" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "8px 16px", borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Visualiseringar</a>
           <a href="/om" style={{ flex: "1", textAlign: "center", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, padding: "8px 16px", borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", display: "block" }}>Om DEBATT-AI</a>
-          <button onClick={()=>navigate("kontakt")} style={{ background: view==="kontakt"?`${C.accent}15`:"transparent", border: `1px solid ${view==="kontakt"?C.accentDim:C.border}`, color: view==="kontakt"?C.accent:C.textMuted, padding: "8px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>Kontakt</button>
+          <button onClick={()=>navigate("kontakt")} style={{ background: view==="kontakt"?`${C.accent}25`:"transparent", border: `1px solid ${view==="kontakt"?C.accent:C.border}`, color: view==="kontakt"?C.accent:C.textMuted, padding: "8px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1" }}>Kontakt</button>
         </div>
       </header>
 
-      <main style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px" }}>
+      <main style={{ maxWidth: "800px", margin: "0 auto", padding: "48px 20px" }}>
 
         {/* ── SUBMIT ── */}
         {view === "submit" && analyzing && (

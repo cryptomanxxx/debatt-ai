@@ -206,7 +206,7 @@ export default async function ArtikelPage({ params }) {
         </div>
 
         {/* Article body */}
-        <div style={{ marginBottom: artikel.nyhetskalla ? "32px" : "48px" }}>
+        <div style={{ marginBottom: artikel.nyhetskalla ? "32px" : "48px", maxWidth: "660px" }}>
           {(artikel.artikel || "").split("\n\n").filter(Boolean).map((p, i) => (
             <p key={i} style={{ fontSize: "18px", lineHeight: 2, color: C.text, margin: "0 0 28px 0" }}>{p}</p>
           ))}
