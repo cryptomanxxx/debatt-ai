@@ -27,7 +27,7 @@ export default function AgentAvatar({ namn, gradient, ring, ikon, ikonFarg, size
       width={size}
       height={size}
       onError={() => setFel(true)}
-      style={{ width: px, height: px, borderRadius: "50%", border: `1px solid ${ring}`, flexShrink: 0, objectFit: "cover" }}
+      style={{ width: px, height: px, borderRadius: "50%", flexShrink: 0, objectFit: "cover" }}
     />
   );
 }
