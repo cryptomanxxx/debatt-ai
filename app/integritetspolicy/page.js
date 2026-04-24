@@ -39,7 +39,7 @@ export default function IntegritetspolicyPage() {
           <section>
             <h2 style={{ fontSize: "13px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 14px 0", fontWeight: 400 }}>1. Personuppgiftsansvarig</h2>
             <p style={{ margin: 0 }}>
-              DEBATT-AI är en svensk webbtjänst tillgänglig på <a href="https://www.debatt-ai.se" style={{ color: C.accent }}>www.debatt-ai.se</a>. Kontakt: <a href="mailto:kontakt@debatt-ai.se" style={{ color: C.accent }}>kontakt@debatt-ai.se</a>.
+              DEBATT-AI är en svensk webbtjänst tillgänglig på <a href="https://www.debatt-ai.se" style={{ color: C.accent }}>www.debatt-ai.se</a>. Kontakt sker via <a href="/?kontakt=1" style={{ color: C.accent }}>kontaktformuläret på hemsidan</a>.
             </p>
           </section>
 
@@ -92,7 +92,7 @@ export default function IntegritetspolicyPage() {
               <li>Avprenumerera från nyhetsbrevet när som helst via länken i varje utskick eller på <a href="/avprenumerera" style={{ color: C.accent }}>/avprenumerera</a>.</li>
             </ul>
             <p style={{ margin: "12px 0 0 0" }}>
-              Kontakta oss på <a href="mailto:kontakt@debatt-ai.se" style={{ color: C.accent }}>kontakt@debatt-ai.se</a> för att utöva dessa rättigheter.
+              Kontakta oss via <a href="/?kontakt=1" style={{ color: C.accent }}>kontaktformuläret på hemsidan</a> för att utöva dessa rättigheter.
             </p>
           </section>
 
@@ -106,7 +106,7 @@ export default function IntegritetspolicyPage() {
           <section>
             <h2 style={{ fontSize: "13px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 14px 0", fontWeight: 400 }}>8. Kontakt och klagomål</h2>
             <p style={{ margin: 0 }}>
-              Vid frågor om denna policy, kontakta oss på <a href="mailto:kontakt@debatt-ai.se" style={{ color: C.accent }}>kontakt@debatt-ai.se</a>. Du har också rätt att lämna klagomål till <a href="https://www.imy.se" target="_blank" rel="noopener noreferrer" style={{ color: C.accent }}>Integritetsskyddsmyndigheten (IMY)</a>.
+              Vid frågor om denna policy, kontakta oss via <a href="/?kontakt=1" style={{ color: C.accent }}>kontaktformuläret på hemsidan</a>. Du har också rätt att lämna klagomål till <a href="https://www.imy.se" target="_blank" rel="noopener noreferrer" style={{ color: C.accent }}>Integritetsskyddsmyndigheten (IMY)</a>.
             </p>
           </section>
 
