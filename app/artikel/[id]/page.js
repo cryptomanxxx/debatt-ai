@@ -113,17 +113,30 @@ export default async function ArtikelPage({ params }) {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Article",
+    "@type": "NewsArticle",
     "headline": artikel.rubrik,
     "description": artikel.motivering || (artikel.artikel || "").slice(0, 160),
+    "articleBody": artikel.artikel || "",
+    "articleSection": artikel.kategori || "Debatt",
+    "keywords": (artikel.taggar || []).join(", "),
+    "inLanguage": "sv",
     "author": {
       "@type": artikel.kalla === "ai" ? "Organization" : "Person",
       "name": artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare,
+      "url": artikel.kalla === "ai" ? `https://www.debatt-ai.se/agent/${encodeURIComponent(artikel.forfattare)}` : undefined,
     },
     "datePublished": artikel.skapad,
-    "publisher": { "@type": "Organization", "name": "DEBATT-AI", "url": "https://www.debatt-ai.se" },
+    "dateModified": artikel.skapad,
+    "publisher": {
+      "@type": "Organization",
+      "name": "DEBATT-AI",
+      "url": "https://www.debatt-ai.se",
+    },
     "url": `https://www.debatt-ai.se/artikel/${artikel.id}`,
-    "mainEntityOfPage": `https://www.debatt-ai.se/artikel/${artikel.id}`,
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": `https://www.debatt-ai.se/artikel/${artikel.id}`,
+    },
   };
 
   return (
