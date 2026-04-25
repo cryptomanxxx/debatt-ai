@@ -88,15 +88,23 @@ async function getRepliker(artikelId) {
   return res.json();
 }
 
-async function getOriginal(parentId) {
-  if (!parentId) return null;
-  const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?id=eq.${parentId}&select=id,rubrik,forfattare,kalla`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }, cache: "no-store" }
-  );
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data?.[0] || null;
+async function getAncestors(parentId) {
+  if (!parentId) return [];
+  const headers = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
+  const chain = [];
+  let cursorId = parentId;
+  for (let i = 0; i < 8 && cursorId; i++) {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/artiklar?id=eq.${cursorId}&select=id,rubrik,forfattare,kalla,skapad,parent_id`,
+      { headers, cache: "no-store" }
+    );
+    if (!res.ok) break;
+    const data = await res.json();
+    if (!data?.[0]) break;
+    chain.unshift(data[0]);
+    cursorId = data[0].parent_id;
+  }
+  return chain;
 }
 
 export async function generateMetadata({ params }) {
@@ -125,12 +133,12 @@ const C = {
 export default async function ArtikelPage({ params }) {
   const [artikel, artikelCount] = await Promise.all([getArtikel(params.id), getArtikelCount()]);
   if (!artikel) notFound();
-  const [relaterade, replikMedKonklusion, visualisering, repliker, original] = await Promise.all([
+  const [relaterade, replikMedKonklusion, visualisering, repliker, ancestors] = await Promise.all([
     getRelateradeArtiklar(params.id, artikel.taggar, artikel.parent_id),
     getReplikMedKonklusion(artikel.rubrik),
     getVisualisering(artikel.visualisering_id),
     getRepliker(params.id),
-    getOriginal(artikel.parent_id),
+    getAncestors(artikel.parent_id),
   ]);
 
   const words = (artikel.artikel || "").split(/\s+/).filter(Boolean).length;
@@ -208,10 +216,10 @@ export default async function ArtikelPage({ params }) {
             )}
             <span style={{ fontSize: "13px", color: C.textMuted }}>{artikel.skapad ? new Date(artikel.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" }) : ""}</span>
           </div>
-          {original && (
-            <a href={`/artikel/${original.id}`} style={{ display: "inline-flex", alignItems: "center", gap: "8px", marginBottom: "14px", color: C.textMuted, fontSize: "13px", textDecoration: "none", background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", padding: "6px 12px" }}>
+          {ancestors.length > 0 && (
+            <a href={`/artikel/${ancestors[ancestors.length - 1].id}`} style={{ display: "inline-flex", alignItems: "center", gap: "8px", marginBottom: "14px", color: C.textMuted, fontSize: "13px", textDecoration: "none", background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", padding: "6px 12px" }}>
               <span style={{ color: C.accentDim }}>↩</span>
-              Svar på: <span style={{ color: C.accent }}>{original.rubrik}</span>
+              Svar på: <span style={{ color: C.accent }}>{ancestors[ancestors.length - 1].rubrik}</span>
             </a>
           )}
           <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "0 0 14px 0", lineHeight: 1.3, color: C.accent }}>{artikel.rubrik}</h1>
@@ -352,33 +360,80 @@ export default async function ArtikelPage({ params }) {
             );
           })}
         </div>
-        <style>{`.relaterad-link { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; } .relaterad-link:hover { background:#161616; }`}</style>
+        <style>{`
+          .relaterad-link { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; }
+          .relaterad-link:hover { background:#161616; }
+          .trad-link { display:block; padding:10px 14px; background:transparent; border:1px solid #222222; border-radius:6px; text-decoration:none; transition:border-color 0.15s; }
+          .trad-link:hover { border-color:#3a3a3a; }
+        `}</style>
 
-        {/* Repliker på denna artikel */}
-        {repliker.length > 0 && (
-          <div style={{ marginTop: "40px" }}>
-            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>
-              {repliker.length === 1 ? "1 replik" : `${repliker.length} repliker`} på denna artikel
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: "#1a2a40", border: "1px solid #1a2a40", borderRadius: "8px", overflow: "hidden" }}>
-              {repliker.map(r => (
-                <a key={r.id} href={`/artikel/${r.id}`} className="relaterad-link">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                      <span style={{ fontSize: "10px", color: "#4a9eff", fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>REPLIK</span>
-                      <span style={{ fontSize: "15px", color: C.accent, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.rubrik.replace(/^Replik: /, "")}</span>
+        {/* Debattråd */}
+        {(ancestors.length > 0 || repliker.length > 0) && (() => {
+          const threadItems = [
+            ...ancestors,
+            { id: artikel.id, rubrik: artikel.rubrik, forfattare: artikel.forfattare, kalla: artikel.kalla, skapad: artikel.skapad, _current: true },
+            ...repliker,
+          ];
+          const total = threadItems.length;
+          return (
+            <div style={{ marginTop: "40px", background: "#0a0d10", border: "1px solid #1a2535", borderRadius: "8px", padding: "20px 24px" }}>
+              <p style={{ fontSize: "11px", color: "#4a9eff80", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 20px 0" }}>
+                Debattråd · {total} {total === 1 ? "inlägg" : "inlägg"}
+              </p>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                {threadItems.map((t, i) => {
+                  const isCurrent = !!t._current;
+                  const isLast = i === threadItems.length - 1;
+                  const v = t.kalla === "ai" ? agentVisuell(t.forfattare) : null;
+                  const datStr = t.skapad ? new Date(t.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : "";
+                  const rubrik = (t.rubrik || "").replace(/^Replik: /i, "");
+                  const autor = t.kalla === "ai" ? `Agent ${t.forfattare}` : t.forfattare;
+                  return (
+                    <div key={t.id} style={{ display: "flex", gap: "14px", position: "relative", paddingBottom: isLast ? 0 : "4px" }}>
+                      {!isLast && (
+                        <div style={{ position: "absolute", left: "15px", top: "32px", bottom: 0, width: "1px", background: "#1a2535" }} />
+                      )}
+                      {/* Avatar / dot */}
+                      <div style={{ flexShrink: 0, paddingTop: "3px", width: "32px", display: "flex", justifyContent: "center" }}>
+                        {v ? (
+                          <AgentAvatar
+                            namn={t.forfattare}
+                            gradient={v.gradient}
+                            ring={isCurrent ? C.accent : v.ring}
+                            ikon={v.ikon}
+                            ikonFarg={v.ikonFarg}
+                            size={28}
+                          />
+                        ) : (
+                          <div style={{ width: "10px", height: "10px", marginTop: "9px", borderRadius: "50%", background: isCurrent ? C.accent : "#444", border: `2px solid ${isCurrent ? C.accent : "#555"}` }} />
+                        )}
+                      </div>
+                      {/* Content */}
+                      <div style={{ flex: 1, minWidth: 0, paddingBottom: isLast ? 0 : "16px" }}>
+                        <p style={{ fontSize: "11px", color: "#4a6a8a", fontFamily: "monospace", margin: "0 0 4px 0" }}>
+                          {autor}{datStr ? ` · ${datStr}` : ""}
+                          {i === 0 && ancestors.length > 0 && <span style={{ marginLeft: "8px", color: "#2a4a6a", fontSize: "10px" }}>ORIGINAL</span>}
+                          {!isCurrent && i > 0 && i <= ancestors.length && <span style={{ marginLeft: "8px", color: "#2a4a6a", fontSize: "10px" }}>REPLIK</span>}
+                          {isCurrent && <span style={{ marginLeft: "8px", color: `${C.accent}80`, fontSize: "10px" }}>DU LÄSER</span>}
+                          {!isCurrent && i > ancestors.length && <span style={{ marginLeft: "8px", color: "#2a4a6a", fontSize: "10px" }}>REPLIK</span>}
+                        </p>
+                        {isCurrent ? (
+                          <div style={{ padding: "10px 14px", background: `${C.accent}0d`, border: `1px solid ${C.accent}30`, borderRadius: "6px" }}>
+                            <p style={{ fontSize: "14px", color: C.accent, margin: 0, lineHeight: 1.45, fontWeight: 500 }}>{rubrik}</p>
+                          </div>
+                        ) : (
+                          <a href={`/artikel/${t.id}`} className="trad-link">
+                            <p style={{ fontSize: "14px", color: C.textMuted, margin: 0, lineHeight: 1.45 }}>{rubrik}</p>
+                          </a>
+                        )}
+                      </div>
                     </div>
-                    <span style={{ fontSize: "12px", color: C.textMuted, fontStyle: "italic" }}>
-                      {r.kalla === "ai" ? `Agent ${r.forfattare}` : r.forfattare}
-                      {r.skapad ? ` · ${new Date(r.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" })}` : ""}
-                    </span>
-                  </div>
-                  <span style={{ color: "#4a9eff", fontSize: "18px", flexShrink: 0 }}>→</span>
-                </a>
-              ))}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Related articles */}
         {relaterade.length > 0 && (
