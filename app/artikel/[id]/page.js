@@ -387,7 +387,7 @@ export default async function ArtikelPage({ params }) {
                   const isLast = i === threadItems.length - 1;
                   const v = t.kalla === "ai" ? agentVisuell(t.forfattare) : null;
                   const datStr = t.skapad ? new Date(t.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : "";
-                  const rubrik = (t.rubrik || "").replace(/^Replik: /i, "");
+                  const rubrik = t.rubrik || "";
                   const autor = t.kalla === "ai" ? `Agent ${t.forfattare}` : t.forfattare;
                   return (
                     <div key={t.id} style={{ display: "flex", gap: "14px", position: "relative", paddingBottom: isLast ? 0 : "4px" }}>
