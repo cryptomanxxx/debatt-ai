@@ -1,5 +1,3 @@
-import { headers } from "next/headers";
-
 export const runtime = "edge";
 
 const AGENTER = new Set([
@@ -63,8 +61,7 @@ function consumeRateLimit(ip) {
 
 export async function POST(request) {
   // Rate limiting
-  const hdrs = await headers();
-  const ip = hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
