@@ -158,7 +158,8 @@ async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit,
       onRateLimit?.({ remaining: 0, minutesLeft: data.minutesLeft });
       throw Object.assign(new Error("rate_limit"), { status });
     }
-    throw Object.assign(new Error("error"), { status });
+    const body = await res.text().catch(() => "");
+    throw Object.assign(new Error(`HTTP ${status}: ${body.slice(0, 120)}`), { status });
   }
   onProvider?.(res.headers.get("X-Provider") ?? "groq");
   const reader = res.body.getReader();
@@ -401,7 +402,7 @@ export default function ChattPage() {
       } catch (e) {
         if (e.name === "AbortError") { break; }
         if (e.status === 429) setFelmeddelande("För många debatter. Vänta några minuter och försök igen.");
-        else setFelmeddelande("Något gick fel. Försök igen.");
+        else setFelmeddelande(`Något gick fel. Försök igen. (${e.message || "okänt fel"})`);
         break;
       } finally {
         setTänker(false);

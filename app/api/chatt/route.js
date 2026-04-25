@@ -60,6 +60,14 @@ function consumeRateLimit(ip) {
 }
 
 export async function POST(request) {
+  try {
+    return await handlePost(request);
+  } catch (e) {
+    return Response.json({ error: `Internt fel: ${e?.message ?? e}` }, { status: 500 });
+  }
+}
+
+async function handlePost(request) {
   // Rate limiting
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
