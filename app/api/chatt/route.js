@@ -67,7 +67,7 @@ export async function POST(request) {
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
-  const { amne, historik, agent } = body;
+  const { amne, historik, agent, useGemini } = body;
 
   // Räkna bara debattstart (historik tom = första anropet)
   const isFirstCall = !Array.isArray(historik) || historik.length === 0;
@@ -115,6 +115,8 @@ REGLER — viktiga:
     ? `Vad de andra just sagt:\n${kontext}\n\nNu är det din tur. Svara kort och direkt.`
     : `Öppna debatten om "${amne.slice(0, 200)}". Var skarp och kortfattad.`;
 
+  // useGemini=true means client is retrying after a Groq failure — skip straight to Gemini
+  if (!useGemini) {
   const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -146,8 +148,9 @@ REGLER — viktiga:
   if (groqRes.ok) {
     return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
   }
+  } // end if (!useGemini)
 
-  // Groq failed — fall back to Gemini Flash
+  // Groq failed (or skipped) — fall back to Gemini Flash
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!geminiKey) {
     return Response.json({ error: "Groq-anrop misslyckades" }, { status: 502 });

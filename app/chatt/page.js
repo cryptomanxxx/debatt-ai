@@ -144,11 +144,11 @@ function peekLocalRL() {
   return { remaining: Math.max(0, RL_LIMIT - count), resetAt: windowStart + RL_WINDOW };
 }
 
-async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit, onProvider }) {
+async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit, onProvider, useGemini }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amne, historik, agent }),
+    body: JSON.stringify({ amne, historik, agent, ...(useGemini ? { useGemini: true } : {}) }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -373,6 +373,7 @@ export default function ChattPage() {
           try {
             text = await streamSvar({
               amne: valtAmne, historik: h, agent, signal: abort.signal,
+              useGemini: attempt > 0,
               onToken: (t) => {
                 if (!gotFirst) { gotFirst = true; setTänker(false); }
                 setStreaming({ agent, text: t });
@@ -385,7 +386,7 @@ export default function ChattPage() {
             if (e.name === "AbortError" || e.status === 429 || attempt === 1) throw e;
             setStreaming(null);
             setTänker(true);
-            await new Promise(r => setTimeout(r, 1500));
+            await new Promise(r => setTimeout(r, 800));
           }
         }
         if (stoppRef.current) break;
