@@ -360,14 +360,25 @@ export default function ChattPage() {
       abortRef.current = abort;
       try {
         let gotFirst = false;
-        const text = await streamSvar({
-          amne: valtAmne, historik: h, agent, signal: abort.signal,
-          onToken: (t) => {
-            if (!gotFirst) { gotFirst = true; setTänker(false); }
-            setStreaming({ agent, text: t });
-          },
-          onRateLimit: (info) => setRateLimitInfo(info),
-        });
+        let text = null;
+        for (let attempt = 0; attempt <= 1; attempt++) {
+          try {
+            text = await streamSvar({
+              amne: valtAmne, historik: h, agent, signal: abort.signal,
+              onToken: (t) => {
+                if (!gotFirst) { gotFirst = true; setTänker(false); }
+                setStreaming({ agent, text: t });
+              },
+              onRateLimit: (info) => setRateLimitInfo(info),
+            });
+            break;
+          } catch (e) {
+            if (e.name === "AbortError" || e.status === 429 || attempt === 1) throw e;
+            setStreaming(null);
+            setTänker(true);
+            await new Promise(r => setTimeout(r, 1500));
+          }
+        }
         if (stoppRef.current) break;
         if (!text) {
           setFelmeddelande("Debatten avbröts oväntat. Försök igen.");
