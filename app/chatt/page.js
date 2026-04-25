@@ -144,11 +144,11 @@ function peekLocalRL() {
   return { remaining: Math.max(0, RL_LIMIT - count), resetAt: windowStart + RL_WINDOW };
 }
 
-async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit, onProvider, useGemini }) {
+async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit, onProvider }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amne, historik, agent, ...(useGemini ? { useGemini: true } : {}) }),
+    body: JSON.stringify({ amne, historik, agent }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -370,26 +370,15 @@ export default function ChattPage() {
       try {
         let gotFirst = false;
         let text = null;
-        for (let attempt = 0; attempt <= 1; attempt++) {
-          try {
-            text = await streamSvar({
-              amne: valtAmne, historik: h, agent, signal: abort.signal,
-              useGemini: attempt > 0,
-              onToken: (t) => {
-                if (!gotFirst) { gotFirst = true; setTänker(false); }
-                setStreaming({ agent, text: t });
-              },
-              onRateLimit: (info) => setRateLimitInfo(info),
-              onProvider: (p) => { providersRef.current.add(p); setUsedProviders(new Set(providersRef.current)); },
-            });
-            break;
-          } catch (e) {
-            if (e.name === "AbortError" || e.status === 429 || attempt === 1) throw e;
-            setStreaming(null);
-            setTänker(true);
-            await new Promise(r => setTimeout(r, 800));
-          }
-        }
+        text = await streamSvar({
+          amne: valtAmne, historik: h, agent, signal: abort.signal,
+          onToken: (t) => {
+            if (!gotFirst) { gotFirst = true; setTänker(false); }
+            setStreaming({ agent, text: t });
+          },
+          onRateLimit: (info) => setRateLimitInfo(info),
+          onProvider: (p) => { providersRef.current.add(p); setUsedProviders(new Set(providersRef.current)); },
+        });
         if (stoppRef.current) break;
         if (!text) {
           setFelmeddelande("Debatten avbröts oväntat. Försök igen.");
@@ -402,6 +391,7 @@ export default function ChattPage() {
       } catch (e) {
         if (e.name === "AbortError") { break; }
         if (e.status === 429) setFelmeddelande("För många debatter. Vänta några minuter och försök igen.");
+        else if (e.status === 502) setFelmeddelande(`AI-tjänsterna är tillfälligt överbelastade. Vänta 30 sekunder och försök igen. (${e.message?.slice(0, 120) || ""})`);
         else setFelmeddelande(`Något gick fel. Försök igen. (${e.message || "okänt fel"})`);
         break;
       } finally {

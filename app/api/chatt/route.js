@@ -74,7 +74,7 @@ async function handlePost(request) {
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
-  const { amne, historik, agent, useGemini } = body;
+  const { amne, historik, agent } = body;
 
   // Räkna bara debattstart (historik tom = första anropet)
   const isFirstCall = !Array.isArray(historik) || historik.length === 0;
@@ -132,39 +132,37 @@ REGLER — viktiga:
     "X-RateLimit-Limit": String(LIMIT),
   };
 
-  // Try Groq first (unless client signals to skip it after a prior failure)
+  // Try Groq first, fall back to Gemini
   let groqFailReason = "";
-  if (!useGemini) {
-    if (!process.env.GROQ_API_KEY) {
-      groqFailReason = "GROQ_API_KEY ej satt i Vercel";
-    } else {
-      const groqAbort = new AbortController();
-      const groqTimeout = setTimeout(() => groqAbort.abort(), 5000);
-      try {
-        const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-          signal: groqAbort.signal,
-          body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userMessage },
-            ],
-            max_tokens: 100,
-            temperature: 0.88,
-            stream: true,
-          }),
-        });
-        clearTimeout(groqTimeout);
-        if (groqRes.ok) {
-          return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
-        }
-        groqFailReason = `Groq HTTP ${groqRes.status}`;
-      } catch (e) {
-        clearTimeout(groqTimeout);
-        groqFailReason = e.name === "AbortError" ? "Groq timeout (5s)" : `Groq fel: ${e.message}`;
+  if (!process.env.GROQ_API_KEY) {
+    groqFailReason = "GROQ_API_KEY ej satt i Vercel";
+  } else {
+    const groqAbort = new AbortController();
+    const groqTimeout = setTimeout(() => groqAbort.abort(), 5000);
+    try {
+      const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+        signal: groqAbort.signal,
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userMessage },
+          ],
+          max_tokens: 100,
+          temperature: 0.88,
+          stream: true,
+        }),
+      });
+      clearTimeout(groqTimeout);
+      if (groqRes.ok) {
+        return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
       }
+      groqFailReason = `Groq HTTP ${groqRes.status}`;
+    } catch (e) {
+      clearTimeout(groqTimeout);
+      groqFailReason = e.name === "AbortError" ? "Groq timeout (5s)" : `Groq fel: ${e.message}`;
     }
   }
 
