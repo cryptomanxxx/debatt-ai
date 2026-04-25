@@ -43,6 +43,33 @@ def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
         r.raise_for_status()
         return r
     raise Exception(f"Groq rate-limit kvarstår efter 3 försök. Svar: {last_r.text[:200] if last_r else 'okänt'}")
+
+
+def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, timeout: int = 60) -> str:
+    """Gemini generateContent — fallback när Groq är otillgänglig. Returnerar textsvar."""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise Exception("GEMINI_API_KEY saknas")
+    models = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]
+    payload = {
+        "contents": [{"role": "user", "parts": [{"text": user_message}]}],
+        "systemInstruction": {"parts": [{"text": system_prompt}]},
+        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8},
+    }
+    last_err = ""
+    for model in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        r = httpx.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=timeout)
+        if r.is_success:
+            text = r.json().get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+            if text:
+                return text
+        last_err = f"{model}:{r.status_code} "
+        if r.status_code in (400, 403) or "API_KEY" in r.text:
+            break
+    raise Exception(f"Gemini misslyckades: {last_err}")
+
+
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 # Hur många repliker krävs i ett debattämne innan slutsats kan ges
@@ -749,65 +776,69 @@ def hamta_nyheter() -> list:
 def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "") -> str:
     """Skriv en debattartikel som kommenterar en aktuell nyhet."""
     kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
-    response = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 2000,
-            "temperature": 0.8,
-            "messages": [
-                {"role": "system", "content": agent["system"]},
-                {
-                    "role": "user",
-                    "content": (
-                        f"Följande nyhet har precis publicerats:\n\n"
-                        f"RUBRIK: {nyhet['rubrik']}\n"
-                        + (f"INGRESS: {nyhet['beskrivning']}\n" if nyhet["beskrivning"] else "")
-                        + f"KÄLLA: {nyhet['kalla']}\n"
-                        + kontext_block + "\n"
-                        "Skriv en debattartikel på svenska som kommenterar och analyserar "
-                        "denna nyhet ur ditt perspektiv. Om rubriken eller ingressen är på "
-                        "engelska ska du ändå skriva hela artikeln på svenska.\n\n"
-                        "Krav:\n"
-                        "- Minst 300 ord, gärna 400–500\n"
-                        "- Börja med att kort referera nyheten, gå sedan direkt till din analys\n"
-                        "- Minst tre konkreta argument med fakta, siffror eller exempel\n"
-                        "- Avsluta med en tydlig uppmaning till handling eller slutsats\n"
-                        "- Inga rubriker eller stycketitlar – löpande text\n"
-                        f"- Skriv i första person som {agent['namn']}\n\n"
-                        "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
-                    ),
-                },
-            ],
-        })
-    return response.json()["choices"][0]["message"]["content"]
+    user_msg = (
+        f"Följande nyhet har precis publicerats:\n\n"
+        f"RUBRIK: {nyhet['rubrik']}\n"
+        + (f"INGRESS: {nyhet['beskrivning']}\n" if nyhet["beskrivning"] else "")
+        + f"KÄLLA: {nyhet['kalla']}\n"
+        + kontext_block + "\n"
+        "Skriv en debattartikel på svenska som kommenterar och analyserar "
+        "denna nyhet ur ditt perspektiv. Om rubriken eller ingressen är på "
+        "engelska ska du ändå skriva hela artikeln på svenska.\n\n"
+        "Krav:\n"
+        "- Minst 300 ord, gärna 400–500\n"
+        "- Börja med att kort referera nyheten, gå sedan direkt till din analys\n"
+        "- Minst tre konkreta argument med fakta, siffror eller exempel\n"
+        "- Avsluta med en tydlig uppmaning till handling eller slutsats\n"
+        "- Inga rubriker eller stycketitlar – löpande text\n"
+        f"- Skriv i första person som {agent['namn']}\n\n"
+        "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
+    )
+    try:
+        response = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "max_tokens": 2000,
+                "temperature": 0.8,
+                "messages": [
+                    {"role": "system", "content": agent["system"]},
+                    {"role": "user", "content": user_msg},
+                ],
+            })
+        return response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"  Groq misslyckades ({e}) — försöker Gemini...")
+        return gemini_post(agent["system"], user_msg, max_tokens=2000)
 
 
 def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "") -> str:
-    """Använd Groq för att skriva en debattartikel."""
+    """Använd Groq (med Gemini-fallback) för att skriva en debattartikel."""
     kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
-    response = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 2000,
-            "temperature": 0.8,
-            "messages": [
-                {"role": "system", "content": agent["system"]},
-                {
-                    "role": "user",
-                    "content": (
-                        f'Skriv en debattartikel om: "{amne}"\n'
-                        + kontext_block + "\n"
-                        "Krav:\n"
-                        "- Minst 300 ord, gärna 400–500\n"
-                        "- Börja direkt med artikelns tes eller ett slagkraftigt påstående\n"
-                        "- Minst tre konkreta argument med fakta, siffror eller exempel\n"
-                        "- Avsluta med en tydlig uppmaning till handling eller slutsats\n"
-                        "- Inga rubriker eller stycketitlar – löpande text\n"
-                        f"- Skriv i första person som {agent['namn']}\n\n"
-                        "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
-                    ),
-                },
-            ],
-        })
-    return response.json()["choices"][0]["message"]["content"]
+    user_msg = (
+        f'Skriv en debattartikel om: "{amne}"\n'
+        + kontext_block + "\n"
+        "Krav:\n"
+        "- Minst 300 ord, gärna 400–500\n"
+        "- Börja direkt med artikelns tes eller ett slagkraftigt påstående\n"
+        "- Minst tre konkreta argument med fakta, siffror eller exempel\n"
+        "- Avsluta med en tydlig uppmaning till handling eller slutsats\n"
+        "- Inga rubriker eller stycketitlar – löpande text\n"
+        f"- Skriv i första person som {agent['namn']}\n\n"
+        "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
+    )
+    try:
+        response = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "max_tokens": 2000,
+                "temperature": 0.8,
+                "messages": [
+                    {"role": "system", "content": agent["system"]},
+                    {"role": "user", "content": user_msg},
+                ],
+            })
+        return response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"  Groq misslyckades ({e}) — försöker Gemini...")
+        return gemini_post(agent["system"], user_msg, max_tokens=2000)
 
 
 def rakna_debattdjup(sb_key: str, original_rubrik: str) -> int:
@@ -959,34 +990,36 @@ def hamta_trendande_amnen(sb_key: str) -> str:
 
 
 def skriv_replik(agent: dict, original: dict) -> str:
-    """Använd Groq för att skriva en replik på en befintlig artikel."""
-    response = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 2000,
-            "temperature": 0.8,
-            "messages": [
-                {"role": "system", "content": agent["system"]},
-                {
-                    "role": "user",
-                    "content": (
-                        f'Du ska skriva en replik på följande debattartikel av {original["forfattare"]}.\n\n'
-                        f'ORIGINALETS RUBRIK: {original["rubrik"]}\n\n'
-                        f'ORIGINALETS TEXT:\n{original["artikel"]}\n\n'
-                        "---\n\n"
-                        "Skriv en replik som:\n"
-                        "- Minst 300 ord, gärna 400–500\n"
-                        "- Börja med att kort sammanfatta vad du svarar på\n"
-                        "- Identifiera och bemöt de svagaste punkterna i originalartikeln\n"
-                        "- Presentera minst tre egna argument med fakta, siffror eller exempel\n"
-                        "- Avsluta med en tydlig slutsats som kontrasterar mot originalets\n"
-                        "- Inga rubriker eller stycketitlar – löpande text\n"
-                        f"- Skriv i första person som {agent['namn']}\n\n"
-                        "Skriv ENBART repliktexten. Ingen inledning, inga kommentarer."
-                    ),
-                },
-            ],
-        })
-    return response.json()["choices"][0]["message"]["content"]
+    """Använd Groq (med Gemini-fallback) för att skriva en replik på en befintlig artikel."""
+    user_msg = (
+        f'Du ska skriva en replik på följande debattartikel av {original["forfattare"]}.\n\n'
+        f'ORIGINALETS RUBRIK: {original["rubrik"]}\n\n'
+        f'ORIGINALETS TEXT:\n{original["artikel"]}\n\n'
+        "---\n\n"
+        "Skriv en replik som:\n"
+        "- Minst 300 ord, gärna 400–500\n"
+        "- Börja med att kort sammanfatta vad du svarar på\n"
+        "- Identifiera och bemöt de svagaste punkterna i originalartikeln\n"
+        "- Presentera minst tre egna argument med fakta, siffror eller exempel\n"
+        "- Avsluta med en tydlig slutsats som kontrasterar mot originalets\n"
+        "- Inga rubriker eller stycketitlar – löpande text\n"
+        f"- Skriv i första person som {agent['namn']}\n\n"
+        "Skriv ENBART repliktexten. Ingen inledning, inga kommentarer."
+    )
+    try:
+        response = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "max_tokens": 2000,
+                "temperature": 0.8,
+                "messages": [
+                    {"role": "system", "content": agent["system"]},
+                    {"role": "user", "content": user_msg},
+                ],
+            })
+        return response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"  Groq misslyckades ({e}) — försöker Gemini...")
+        return gemini_post(agent["system"], user_msg, max_tokens=2000)
 
 
 def generera_konklusion(original: dict, replik_text: str) -> str:
@@ -1232,9 +1265,11 @@ def main():
         print("Fel: Sätt miljövariabeln DEBATT_API_KEY")
         sys.exit(1)
 
-    if not os.environ.get("GROQ_API_KEY"):
-        print("Fel: Sätt miljövariabeln GROQ_API_KEY")
+    if not os.environ.get("GROQ_API_KEY") and not os.environ.get("GEMINI_API_KEY"):
+        print("Fel: Sätt GROQ_API_KEY eller GEMINI_API_KEY (eller båda)")
         sys.exit(1)
+    if not os.environ.get("GROQ_API_KEY"):
+        print("Varning: GROQ_API_KEY saknas — använder Gemini som primär AI")
 
     sb_key = os.environ.get("SUPABASE_ANON_KEY")
 
@@ -1279,7 +1314,7 @@ def main():
         print(f"  Kategori: {kategori}")
         print(f"{'═' * 60}\n")
 
-        print("Skriver replik med Groq (llama-3.3-70b)...")
+        print("Skriver replik (Groq med Gemini-fallback)...")
         artikel = skriv_replik(agent, original)
 
         # Bestäm om debatten ska avslutas med en slutsats
@@ -1371,7 +1406,7 @@ def main():
             print(f"  Ämne:     {amne[:60]}")
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
-            print("Skriver artikel med Groq (llama-3.3-70b)...")
+            print("Skriver artikel (Groq med Gemini-fallback)...")
             artikel = skriv_artikel(agent, amne, extra_kontext)
             markera_forslag_behandlat(sb_key, forslag_id)
             print("  Förslag markerat som behandlat ✓")
@@ -1394,7 +1429,7 @@ def main():
             print(f"  Antal utvärderade: {len(nyheter)}")
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
-            print("Skriver artikel om aktuell nyhet med Groq (llama-3.3-70b)...")
+            print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
             artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext)
         else:
             amne, kategori = random.choice(agent["amnen"])
@@ -1404,7 +1439,7 @@ def main():
             print(f"  Ämne:     {amne}")
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
-            print("Skriver artikel med Groq (llama-3.3-70b)...")
+            print("Skriver artikel (Groq med Gemini-fallback)...")
             artikel = skriv_artikel(agent, amne, extra_kontext)
 
         print("Genererar rubrik...")
