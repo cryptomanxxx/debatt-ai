@@ -93,6 +93,13 @@ export default async function ChattDebattPage({ params }) {
               <span style={{ color: "#3a7a3a", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", fontFamily: "monospace" }}>DIREKTDEBATT</span>
             </span>
             {datum && <span style={{ fontSize: "12px", color: C.textMuted }}>{datum}</span>}
+          {debatt.provider && (
+            <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "2px 8px" }}>
+              {debatt.provider === "groq" ? "Groq · Llama 3.3"
+                : debatt.provider === "gemini" ? "Gemini · Flash"
+                : "Groq + Gemini"}
+            </span>
+          )}
           </div>
           <h1 style={{ fontSize: "26px", fontWeight: 400, color: C.accent, margin: "0 0 20px 0", lineHeight: 1.3 }}>{debatt.amne}</h1>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>

@@ -144,7 +144,7 @@ REGLER — viktiga:
   };
 
   if (groqRes.ok) {
-    return new Response(groqRes.body, { headers: rlHeaders });
+    return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
   }
 
   // Groq failed — fall back to Gemini Flash
@@ -206,5 +206,5 @@ REGLER — viktiga:
     }
   })();
 
-  return new Response(readable, { headers: rlHeaders });
+  return new Response(readable, { headers: { ...rlHeaders, "X-Provider": "gemini" } });
 }

@@ -144,7 +144,7 @@ function peekLocalRL() {
   return { remaining: Math.max(0, RL_LIMIT - count), resetAt: windowStart + RL_WINDOW };
 }
 
-async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit }) {
+async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit, onProvider }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -160,6 +160,7 @@ async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit 
     }
     throw Object.assign(new Error("error"), { status });
   }
+  onProvider?.(res.headers.get("X-Provider") ?? "groq");
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let text = "", buffer = "";
@@ -210,7 +211,7 @@ async function fetchAiAmne(agenter) {
   } catch { return ""; }
 }
 
-async function sparaDebatt({ amne, agenter, inlagg, summering, scores }) {
+async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider }) {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/chatt_debatter`, {
       method: "POST",
@@ -220,7 +221,7 @@ async function sparaDebatt({ amne, agenter, inlagg, summering, scores }) {
         "Content-Type": "application/json",
         "Prefer": "return=representation",
       },
-      body: JSON.stringify({ amne, agenter, inlagg, summering, scores: scores ?? null }),
+      body: JSON.stringify({ amne, agenter, inlagg, summering, scores: scores ?? null, provider: provider ?? null }),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -278,6 +279,7 @@ export default function ChattPage() {
   const [föreslagStatus, setFöreslagStatus] = useState(null); // null | "loading" | "ok" | "fel"
   const [föreslagFel, setFöreslagFel] = useState("");
   const [rateLimitInfo, setRateLimitInfo] = useState({ remaining: RL_LIMIT, resetAt: null });
+  const [usedProviders, setUsedProviders] = useState(new Set());
   const [felmeddelande, setFelmeddelande] = useState("");
   const [spelar, setSpelar] = useState(false);
   const [arkivAntal, setArkivAntal] = useState(null);
@@ -287,6 +289,7 @@ export default function ChattPage() {
   const audioRef = useRef(null);
   const lyssnaStoppRef = useRef(false);
   const bottomRef = useRef(null);
+  const providersRef = useRef(new Set());
 
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
@@ -315,7 +318,10 @@ export default function ChattPage() {
       setFas("summering");
       const { summering: sum, scores } = await fetchSummering(valtAmne, h);
       setSummering(sum);
-      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores });
+      const ps = providersRef.current;
+      const provider = ps.has("groq") && ps.has("gemini") ? "groq+gemini"
+        : ps.has("gemini") ? "gemini" : "groq";
+      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider });
       setDebattId(id);
       setFelmeddelande(""); // debate saved — clear any mid-stream error
     }
@@ -345,6 +351,8 @@ export default function ChattPage() {
     setSummering("");
     setDebattId(null);
     setFelmeddelande("");
+    setUsedProviders(new Set());
+    providersRef.current = new Set();
     setFas("kör");
     stoppRef.current = false;
     fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ event_type: "start", amne: valtAmne }) }).catch(() => {});
@@ -370,6 +378,7 @@ export default function ChattPage() {
                 setStreaming({ agent, text: t });
               },
               onRateLimit: (info) => setRateLimitInfo(info),
+              onProvider: (p) => { providersRef.current.add(p); setUsedProviders(new Set(providersRef.current)); },
             });
             break;
           } catch (e) {
