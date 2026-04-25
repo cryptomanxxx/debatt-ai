@@ -79,6 +79,7 @@ export default async function ChattDebattPage({ params }) {
           <NavArkivLink />
           {navLink("/chatt","Direktdebatt",true)}
           {navLink("/visualiseringar","Visualiseringar",false)}
+          {navLink("/rivaliteter","Rivaliteter",false)}
           {navLink("/om","Om DEBATT-AI",false)}
           {navLink("/?kontakt=1","Kontakt",false)}
         </div>

@@ -65,6 +65,7 @@ export default async function VisualiseringPage({ params }) {
           <NavArkivLink />
           {NAV_LINK("/chatt", "Direktdebatt")}
           {NAV_LINK("/visualiseringar", "Visualiseringar", true)}
+          {NAV_LINK("/rivaliteter", "Rivaliteter")}
           {NAV_LINK("/om", "Om DEBATT-AI")}
           {NAV_LINK("/?kontakt=1", "Kontakt")}
         </div>

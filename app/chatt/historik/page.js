@@ -57,6 +57,7 @@ export default async function HistorikPage() {
           <NavArkivLink />
           <NavLink href="/chatt">Direktdebatt</NavLink>
           <NavLink href="/chatt/historik" active>Debatthistorik</NavLink>
+          <NavLink href="/rivaliteter">Rivaliteter</NavLink>
           <NavLink href="/om">Om DEBATT-AI</NavLink>
           <NavLink href="/?kontakt=1">Kontakt</NavLink>
         </div>
