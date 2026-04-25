@@ -168,21 +168,27 @@ REGLER — viktiga:
     return Response.json({ error: "Groq-anrop misslyckades" }, { status: 502 });
   }
 
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:streamGenerateContent?alt=sse&key=${geminiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: userMessage }] }],
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        generationConfig: { maxOutputTokens: 130, temperature: 0.88 },
-      }),
-    }
-  );
+  const geminiBody = JSON.stringify({
+    contents: [{ role: "user", parts: [{ text: userMessage }] }],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    generationConfig: { maxOutputTokens: 130, temperature: 0.88 },
+  });
 
-  if (!geminiRes.ok) {
-    return Response.json({ error: "Alla AI-tjänster är otillgängliga just nu" }, { status: 502 });
+  // Try gemini-2.0-flash-lite first, fall back to gemini-1.5-flash
+  const geminiModels = ["gemini-2.0-flash-lite", "gemini-1.5-flash"];
+  let geminiRes = null;
+  let geminiErr = "";
+  for (const model of geminiModels) {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${geminiKey}`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: geminiBody }
+    );
+    if (r.ok) { geminiRes = r; break; }
+    geminiErr = `${model}: ${r.status} ${await r.text().catch(() => "")}`.slice(0, 200);
+  }
+
+  if (!geminiRes) {
+    return Response.json({ error: `Alla AI-tjänster är otillgängliga just nu. ${geminiErr}` }, { status: 502 });
   }
 
   // Transform Gemini SSE → OpenAI SSE so the client needs no changes
