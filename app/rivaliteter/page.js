@@ -102,7 +102,7 @@ function RivalitetKort({ r, rank }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>
         <span style={{ fontSize: "11px", color: C.textMuted }}>Senast {senaste}</span>
         <a
-          href={`/arkiv?q=${encodeURIComponent(a)}&q2=${encodeURIComponent(b)}`}
+          href={`/arkiv?q=${encodeURIComponent(a)}`}
           style={{ fontSize: "12px", color: C.blue, textDecoration: "none", border: `1px solid ${C.blue}40`, borderRadius: "4px", padding: "4px 10px" }}
         >
           Se debatter →
