@@ -72,6 +72,57 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
+# Innehållsmallar — styr artikelns form och perspektiv
+ARTIKELFORMAT = [
+    {
+        "namn": "standard",
+        "vikt": 5,
+        "instruktion": (
+            "- Börja direkt med artikelns tes eller ett slagkraftigt påstående\n"
+            "- Minst tre konkreta argument med fakta, siffror eller exempel\n"
+            "- Avsluta med en tydlig uppmaning till handling eller slutsats"
+        ),
+        "rubrik_tips": "Ska innehålla en konflikt eller ett kontroversiellt påstående",
+    },
+    {
+        "namn": "förutsägelse",
+        "vikt": 2,
+        "instruktion": (
+            "- Börja med en konkret, djärv förutsägelse: 'Om X år kommer...' eller 'Inom X år är...' \n"
+            "- Ge minst tre specifika skäl varför du tror detta\n"
+            "- Erkänn risken att ha fel — det stärker trovärdigheten\n"
+            "- Avsluta med vad som krävs för att det ska bli annorlunda"
+        ),
+        "rubrik_tips": "Ska vara en konkret förutsägelse, gärna med tidsangivelse",
+    },
+    {
+        "namn": "kontra",
+        "vikt": 2,
+        "instruktion": (
+            "- Börja med att nämna den vanliga uppfattningen du avvisar\n"
+            "- Förklara direkt och utan omsvep varför majoriteten har fel\n"
+            "- Ge minst tre argument som stöder din avvikande syn\n"
+            "- Avsluta med konsekvenserna av att fortsätta tro fel"
+        ),
+        "rubrik_tips": "Ska signalera att du utmanar en rådande uppfattning",
+    },
+    {
+        "namn": "råd",
+        "vikt": 1,
+        "instruktion": (
+            "- Börja med ett problem läsaren troligen känner igen\n"
+            "- Ge 3–4 konkreta, handlingsbara råd förankrade i fakta eller din expertis\n"
+            "- Skriv direkt till läsaren — 'du bör', 'undvik att', 'tänk på att'\n"
+            "- Avsluta med en skarp uppmaning"
+        ),
+        "rubrik_tips": "Ska vara ett direkt råd eller en uppmaning, gärna med 'du'",
+    },
+]
+
+def valj_format() -> dict:
+    vikter = [f["vikt"] for f in ARTIKELFORMAT]
+    return random.choices(ARTIKELFORMAT, weights=vikter, k=1)[0]
+
 # Hur många repliker krävs i ett debattämne innan slutsats kan ges
 MIN_REPLIKER_FOR_SLUTSATS = 3   # Ingen slutsats före detta (var 2)
 MAX_REPLIKER_BEFORE_FORCED = 5  # Alltid slutsats efter detta
@@ -773,8 +824,10 @@ def hamta_nyheter() -> list:
     return nyheter
 
 
-def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "") -> str:
+def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fmt: dict | None = None) -> str:
     """Skriv en debattartikel som kommenterar en aktuell nyhet."""
+    if fmt is None:
+        fmt = ARTIKELFORMAT[0]
     kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
     user_msg = (
         f"Följande nyhet har precis publicerats:\n\n"
@@ -785,11 +838,10 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "") ->
         "Skriv en debattartikel på svenska som kommenterar och analyserar "
         "denna nyhet ur ditt perspektiv. Om rubriken eller ingressen är på "
         "engelska ska du ändå skriva hela artikeln på svenska.\n\n"
+        f"Artikelformat: {fmt['namn'].upper()}\n"
         "Krav:\n"
         "- Minst 300 ord, gärna 400–500\n"
-        "- Börja med att kort referera nyheten, gå sedan direkt till din analys\n"
-        "- Minst tre konkreta argument med fakta, siffror eller exempel\n"
-        "- Avsluta med en tydlig uppmaning till handling eller slutsats\n"
+        f"{fmt['instruktion']}\n"
         "- Inga rubriker eller stycketitlar – löpande text\n"
         f"- Skriv i första person som {agent['namn']}\n\n"
         "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
@@ -810,17 +862,18 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "") ->
         return gemini_post(agent["system"], user_msg, max_tokens=2000)
 
 
-def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "") -> str:
+def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | None = None) -> str:
     """Använd Groq (med Gemini-fallback) för att skriva en debattartikel."""
+    if fmt is None:
+        fmt = ARTIKELFORMAT[0]
     kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
     user_msg = (
         f'Skriv en debattartikel om: "{amne}"\n'
         + kontext_block + "\n"
+        f"Artikelformat: {fmt['namn'].upper()}\n"
         "Krav:\n"
         "- Minst 300 ord, gärna 400–500\n"
-        "- Börja direkt med artikelns tes eller ett slagkraftigt påstående\n"
-        "- Minst tre konkreta argument med fakta, siffror eller exempel\n"
-        "- Avsluta med en tydlig uppmaning till handling eller slutsats\n"
+        f"{fmt['instruktion']}\n"
         "- Inga rubriker eller stycketitlar – löpande text\n"
         f"- Skriv i första person som {agent['namn']}\n\n"
         "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
@@ -1055,8 +1108,9 @@ def generera_konklusion(original: dict, replik_text: str) -> str:
         return ""
 
 
-def generera_rubrik(agent: dict, amne: str, artikel: str) -> str:
+def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = None) -> str:
     """Generera en skarpare rubrik baserad på artikelns innehåll."""
+    rubrik_tips = fmt["rubrik_tips"] if fmt else "Ska innehålla en konflikt eller ett kontroversiellt påstående"
     try:
         response = groq_post({
                 "model": "llama-3.3-70b-versatile",
@@ -1071,7 +1125,7 @@ def generera_rubrik(agent: dict, amne: str, artikel: str) -> str:
                             f"Artikelns inledning:\n{artikel[:600]}\n\n"
                             "Regler:\n"
                             "- Max 12 ord\n"
-                            "- Ska innehålla en konflikt eller ett kontroversiellt påstående\n"
+                            f"- {rubrik_tips}\n"
                             "- Antyda konsekvenser eller vad som står på spel\n"
                             "- Påståenden är starkare än frågor\n"
                             "- Skriv ENBART rubriken, inga citattecken, inget annat"
@@ -1396,6 +1450,7 @@ def main():
             nyhet = random.choice(nyheter[:10])
 
         nyhetskalla = None
+        artikelfmt = valj_format()
 
         if forslag_amne:
             amne = forslag_amne
@@ -1404,10 +1459,11 @@ def main():
             print(f"  Läge:     NY ARTIKEL (ÄMNESFÖRSLAG FRÅN DIREKTDEBATT)")
             print(f"  Agent:    {agent['namn']}")
             print(f"  Ämne:     {amne[:60]}")
+            print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt)
             markera_forslag_behandlat(sb_key, forslag_id)
             print("  Förslag markerat som behandlat ✓")
         elif nyhet:
@@ -1427,23 +1483,25 @@ def main():
             print(f"  URL:      {nyhet.get('url', '')[:60]}")
             print(f"  Publicerad: {nyhet.get('publicerad', '')[:40]}")
             print(f"  Antal utvärderade: {len(nyheter)}")
+            print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext)
+            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt)
         else:
             amne, kategori = random.choice(agent["amnen"])
             print(f"\n{'═' * 60}")
             print(f"  Läge:     NY ARTIKEL")
             print(f"  Agent:    {agent['namn']}")
             print(f"  Ämne:     {amne}")
+            print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt)
 
         print("Genererar rubrik...")
-        amne = generera_rubrik(agent, amne, artikel)
+        amne = generera_rubrik(agent, amne, artikel, fmt=artikelfmt)
         print(f"  Rubrik: {amne}\n")
 
     ord_antal = len(artikel.split())
