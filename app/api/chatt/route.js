@@ -133,19 +133,78 @@ REGLER — viktiga:
     }),
   });
 
-  if (!groqRes.ok) {
+  const info = getRateLimitInfo(ip);
+  const rlHeaders = {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+    "X-RateLimit-Remaining": String(info.remaining),
+    "X-RateLimit-Reset": info.resetAt ? String(info.resetAt) : "",
+    "X-RateLimit-Limit": String(LIMIT),
+  };
+
+  if (groqRes.ok) {
+    return new Response(groqRes.body, { headers: rlHeaders });
+  }
+
+  // Groq failed — fall back to Gemini Flash
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
     return Response.json({ error: "Groq-anrop misslyckades" }, { status: 502 });
   }
 
-  const info = getRateLimitInfo(ip);
-  return new Response(groqRes.body, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "X-Accel-Buffering": "no",
-      "X-RateLimit-Remaining": String(info.remaining),
-      "X-RateLimit-Reset": info.resetAt ? String(info.resetAt) : "",
-      "X-RateLimit-Limit": String(LIMIT),
-    },
-  });
+  const geminiRes = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:streamGenerateContent?alt=sse&key=${geminiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: userMessage }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: { maxOutputTokens: 130, temperature: 0.88 },
+      }),
+    }
+  );
+
+  if (!geminiRes.ok) {
+    return Response.json({ error: "Alla AI-tjänster är otillgängliga just nu" }, { status: 502 });
+  }
+
+  // Transform Gemini SSE → OpenAI SSE so the client needs no changes
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+  const reader = geminiRes.body.getReader();
+
+  (async () => {
+    let buffer = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+          try {
+            const data = JSON.parse(raw);
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+            if (text) {
+              const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
+              await writer.write(encoder.encode(`data: ${chunk}\n\n`));
+            }
+          } catch { /* ignore malformed chunks */ }
+        }
+      }
+    } finally {
+      await writer.write(encoder.encode("data: [DONE]\n\n"));
+      await writer.close().catch(() => {});
+    }
+  })();
+
+  return new Response(readable, { headers: rlHeaders });
 }
