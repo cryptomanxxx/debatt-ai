@@ -133,99 +133,83 @@ REGLER — viktiga:
   };
 
   // Try Groq first (unless client signals to skip it after a prior failure)
+  let groqFailReason = "";
   if (!useGemini) {
-    const groqAbort = new AbortController();
-    const groqTimeout = setTimeout(() => groqAbort.abort(), 5000);
-    try {
-      const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-        signal: groqAbort.signal,
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
-          ],
-          max_tokens: 100,
-          temperature: 0.88,
-          stream: true,
-        }),
-      });
-      clearTimeout(groqTimeout);
-      if (groqRes.ok) {
-        return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
+    if (!process.env.GROQ_API_KEY) {
+      groqFailReason = "GROQ_API_KEY ej satt i Vercel";
+    } else {
+      const groqAbort = new AbortController();
+      const groqTimeout = setTimeout(() => groqAbort.abort(), 5000);
+      try {
+        const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+          signal: groqAbort.signal,
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userMessage },
+            ],
+            max_tokens: 100,
+            temperature: 0.88,
+            stream: true,
+          }),
+        });
+        clearTimeout(groqTimeout);
+        if (groqRes.ok) {
+          return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
+        }
+        groqFailReason = `Groq HTTP ${groqRes.status}`;
+      } catch (e) {
+        clearTimeout(groqTimeout);
+        groqFailReason = e.name === "AbortError" ? "Groq timeout (5s)" : `Groq fel: ${e.message}`;
       }
-    } catch {
-      clearTimeout(groqTimeout);
-      // Groq timed out or errored — fall through to Gemini
     }
   }
 
-  // Groq failed or skipped — fall back to Gemini Flash
+  // Groq failed or skipped — fall back to Gemini
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!geminiKey) {
-    return Response.json({ error: "Groq-anrop misslyckades" }, { status: 502 });
+    return Response.json({ error: `GEMINI_API_KEY ej satt i Vercel. ${groqFailReason}` }, { status: 502 });
   }
 
-  const geminiBody = JSON.stringify({
+  const geminiPayload = JSON.stringify({
     contents: [{ role: "user", parts: [{ text: userMessage }] }],
     systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: { maxOutputTokens: 130, temperature: 0.88 },
+    generationConfig: { maxOutputTokens: 150, temperature: 0.88 },
   });
 
-  // Try gemini-2.0-flash-lite first, fall back to gemini-1.5-flash
-  const geminiModels = ["gemini-2.0-flash-lite", "gemini-1.5-flash"];
-  let geminiRes = null;
+  // Try several models — non-streaming generateContent avoids SSE endpoint issues
+  const geminiModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-1.5-flash-latest"];
+  let geminiText = "";
   let geminiErr = "";
   for (const model of geminiModels) {
     const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${geminiKey}`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: geminiBody }
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: geminiPayload }
     );
-    if (r.ok) { geminiRes = r; break; }
-    geminiErr = `${model}: ${r.status} ${await r.text().catch(() => "")}`.slice(0, 200);
-  }
-
-  if (!geminiRes) {
-    return Response.json({ error: `Alla AI-tjänster är otillgängliga just nu. ${geminiErr}` }, { status: 502 });
-  }
-
-  // Transform Gemini SSE → OpenAI SSE so the client needs no changes
-  const { readable, writable } = new TransformStream();
-  const writer = writable.getWriter();
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  const reader = geminiRes.body.getReader();
-
-  (async () => {
-    let buffer = "";
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const raw = line.slice(6).trim();
-          if (!raw) continue;
-          try {
-            const data = JSON.parse(raw);
-            const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-            if (text) {
-              const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
-              await writer.write(encoder.encode(`data: ${chunk}\n\n`));
-            }
-          } catch { /* ignore malformed chunks */ }
-        }
+    if (r.ok) {
+      const data = await r.json().catch(() => null);
+      const t = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      if (t) { geminiText = t; break; }
+    } else {
+      const errBody = await r.text().catch(() => "");
+      geminiErr += `${model}:${r.status} `;
+      if (errBody.includes("API_KEY") || r.status === 400 || r.status === 403) {
+        geminiErr += errBody.slice(0, 100);
+        break; // key issue — no point trying other models
       }
-    } finally {
-      await writer.write(encoder.encode("data: [DONE]\n\n"));
-      await writer.close().catch(() => {});
     }
-  })();
+  }
 
-  return new Response(readable, { headers: { ...rlHeaders, "X-Provider": "gemini" } });
+  if (!geminiText) {
+    return Response.json({ error: `Alla AI-tjänster är otillgängliga. ${groqFailReason} | Gemini: ${geminiErr}` }, { status: 502 });
+  }
+
+  // Return Gemini response as fake SSE so client parsing is unchanged
+  const encoder = new TextEncoder();
+  const chunk = JSON.stringify({ choices: [{ delta: { content: geminiText } }] });
+  const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
+  return new Response(encoder.encode(sseBody), { headers: { ...rlHeaders, "X-Provider": "gemini" } });
 }
