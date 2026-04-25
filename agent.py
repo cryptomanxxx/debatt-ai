@@ -31,14 +31,18 @@ def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
         "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
         "Content-Type": "application/json",
     }
+    last_r = None
     for attempt in range(3):
         r = httpx.post(url, headers=headers, json=json_payload, timeout=timeout)
-        if r.status_code != 429:
-            return r
-        wait = min(int(r.headers.get("retry-after", 20)) + 2, 60)
-        print(f"  Groq rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
-        time.sleep(wait)
-    return r
+        last_r = r
+        if r.status_code == 429:
+            wait = min(int(r.headers.get("retry-after", 20)) + 2, 60)
+            print(f"  Groq rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
+            time.sleep(wait)
+            continue
+        r.raise_for_status()
+        return r
+    raise Exception(f"Groq rate-limit kvarstår efter 3 försök. Svar: {last_r.text[:200] if last_r else 'okänt'}")
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 # Hur många repliker krävs i ett debattämne innan slutsats kan ges
