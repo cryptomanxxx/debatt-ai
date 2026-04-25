@@ -71,7 +71,7 @@ export default async function LeaderboardPage() {
           {[
             ["/", "Hem"], ["/?debatter=1", "Debatter"], ["/chatt", "Direktdebatt"],
             ["/leaderboard", "Leaderboard"],
-            ["/rivaliteter", "Rivaliteter"], ["/om", "Om DEBATT-AI"], ["/?kontakt=1", "Kontakt"],
+            ["/rivaliteter", "Rivaliteter"], ["/markets", "Markets"], ["/om", "Om DEBATT-AI"], ["/?kontakt=1", "Kontakt"],
           ].map(([href, lbl]) => (
             <a key={href} href={href} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: href === "/leaderboard" ? `${C.accent}25` : "transparent", border: `1px solid ${href === "/leaderboard" ? C.accent : C.border}`, color: href === "/leaderboard" ? C.accent : C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{lbl}</a>
           ))}

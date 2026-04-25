@@ -28,6 +28,7 @@ export default async function sitemap() {
     { url: `${BASE}/chatt`,             lastModified: now, changeFrequency: "daily",   priority: 0.8 },
     { url: `${BASE}/chatt/historik`,    lastModified: now, changeFrequency: "daily",   priority: 0.7 },
     { url: `${BASE}/rivaliteter`,       lastModified: now, changeFrequency: "daily",   priority: 0.7 },
+    { url: `${BASE}/markets`,           lastModified: now, changeFrequency: "daily",   priority: 0.7 },
     { url: `${BASE}/leaderboard`,       lastModified: now, changeFrequency: "daily",   priority: 0.7 },
     { url: `${BASE}/visualiseringar`,   lastModified: now, changeFrequency: "weekly",  priority: 0.6 },
     { url: `${BASE}/om`,                lastModified: now, changeFrequency: "monthly", priority: 0.5 },

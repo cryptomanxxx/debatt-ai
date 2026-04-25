@@ -1336,6 +1336,103 @@ def publicera_visualisering(sb_key: str, viz: dict, statistik_rad: dict) -> bool
         return False
 
 
+# Vilka agenter bettar på vilka market-kategorier
+MARKET_AGENTER = {
+    "krypto": ["Kryptoanalytikern"],
+    "makro":  ["Nationalekonom", "Historiker", "Sociolog"],
+    "politik": ["Journalist", "Jurist", "Konservativ debattör"],
+    "tech":   ["Teknikoptimist", "Journalist"],
+    "övrigt": ["Filosof", "Psykolog", "Optimisten"],
+}
+
+def hamta_oppna_markets(sb_key: str) -> list[dict]:
+    """Hämtar öppna prediction markets från Supabase."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/markets?status=eq.öppen&select=id,titel,beskrivning,deadline,resolution_kalla,kategori&order=deadline.asc",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=10,
+        )
+        return res.json() if res.is_success else []
+    except Exception:
+        return []
+
+
+def hamta_existerande_bets(sb_key: str, market_id: int) -> list[str]:
+    """Returnerar agentnamn som redan bettats på ett givet market."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_bets?market_id=eq.{market_id}&select=agent",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=10,
+        )
+        return [row["agent"] for row in res.json()] if res.is_success else []
+    except Exception:
+        return []
+
+
+def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "") -> tuple[int, str]:
+    """Låter agenten uppskatta sannolikheten (0-100) + ge en kort motivering."""
+    deadline_str = market.get("deadline", "")[:10]
+    system = agent["system"]
+    user_msg = (
+        f"Du ska göra en sannolikhetsbedömning som {agent['namn']}.\n\n"
+        f"Fråga: {market['titel']}\n"
+        f"Beskrivning: {market.get('beskrivning') or ''}\n"
+        f"Avgörs via: {market.get('resolution_kalla') or ''}\n"
+        f"Deadline: {deadline_str}\n"
+    )
+    if extra_data:
+        user_msg += f"\nAktuell marknadsdata:\n{extra_data}\n"
+    user_msg += (
+        "\nSvara EXAKT i detta JSON-format (inget annat):\n"
+        '{"sannolikhet": <heltal 0-100>, "motivering": "<1-2 meningar>"}'
+    )
+    try:
+        text = groq_post({
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
+            "max_tokens": 120,
+            "temperature": 0.4,
+        }).json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        try:
+            text = gemini_post(system, user_msg, max_tokens=120)
+        except Exception:
+            return 50, "Ingen analys tillgänglig."
+
+    import json as _json
+    # Extrahera JSON från svaret
+    start = text.find("{")
+    end = text.rfind("}") + 1
+    if start == -1 or end == 0:
+        return 50, text[:150]
+    try:
+        data = _json.loads(text[start:end])
+        s = max(0, min(100, int(data.get("sannolikhet", 50))))
+        m = str(data.get("motivering", ""))[:300]
+        return s, m
+    except Exception:
+        return 50, text[:150]
+
+
+def spara_bet(sb_key: str, market_id: int, agent_namn: str, sannolikhet: int, motivering: str) -> bool:
+    """Sparar ett agent-bet i Supabase. Ignorerar om bet redan finns (unique constraint)."""
+    try:
+        res = httpx.post(
+            f"{SB_URL}/rest/v1/agent_bets",
+            json={"market_id": market_id, "agent": agent_namn, "sannolikhet": sannolikhet, "motivering": motivering},
+            headers={
+                "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                "Content-Type": "application/json", "Prefer": "return=minimal",
+            },
+            timeout=15,
+        )
+        return res.status_code in (200, 201)
+    except Exception:
+        return False
+
+
 def main():
     api_key = os.environ.get("DEBATT_API_KEY")
     if not api_key:
@@ -1621,6 +1718,30 @@ def main():
                 print(f"    – {f}")
 
     print(f"{'═' * 60}\n")
+
+    # Prediction markets: agenten bettar på öppna markets i sin domän
+    if sb_key:
+        print("\n── Prediction Markets ──")
+        markets = hamta_oppna_markets(sb_key)
+        if not markets:
+            print("  Inga öppna markets")
+        else:
+            relevanta_kat = [kat for kat, agenter in MARKET_AGENTER.items() if agent["namn"] in agenter]
+            relevanta = [m for m in markets if m["kategori"] in relevanta_kat]
+            if not relevanta:
+                print(f"  Inga relevanta markets för {agent['namn']}")
+            else:
+                krypto_data = hamta_kryptodata() if "krypto" in relevanta_kat else ""
+                for market in relevanta:
+                    existerande = hamta_existerande_bets(sb_key, market["id"])
+                    if agent["namn"] in existerande:
+                        print(f"  Redan bettad: \"{market['titel'][:50]}\"")
+                        continue
+                    print(f"  Analyserar: \"{market['titel'][:60]}\"…")
+                    sannolikhet, motivering = estimera_sannolikhet(agent, market, krypto_data)
+                    ok = spara_bet(sb_key, market["id"], agent["namn"], sannolikhet, motivering)
+                    status = "✓" if ok else "✗"
+                    print(f"  {status} {agent['namn']}: {sannolikhet}% — {motivering[:80]}")
 
     # Visual agent: med 25% sannolikhet genereras en visualisering
     if sb_key and random.random() < 0.25:

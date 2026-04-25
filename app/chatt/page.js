@@ -557,6 +557,8 @@ export default function ChattPage() {
           {navLink("/chatt","Direktdebatt",true)}
           <NavHistorikLink />
           {navLink("/leaderboard","Leaderboard",false)}
+          {navLink("/rivaliteter","Rivaliteter",false)}
+          {navLink("/markets","Markets",false)}
           {navLink("/om","Om DEBATT-AI",false)}
           {navLink("/?kontakt=1","Kontakt",false)}
         </div>
