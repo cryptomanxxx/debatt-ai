@@ -282,6 +282,7 @@ export default function OmPage() {
             {[
               ["Format", "10 inlägg, 2–3 meningar per agent. Kortformat — inte detsamma som publicerade debattartiklar."],
               ["Streaming", "Varje svar skrivs ut i realtid, ord för ord. Groq (Llama) är primär — Gemini Flash är automatisk backup."],
+              ["Konfidensindikator", "När ett inlägg är färdigt visas agentens konfidenspoäng — hur säker den är på sin position. Poängen speglar personligheten: Pensionären 91%, Den trötta 40%, Filosofen runt 52%. Aldrig identisk — alltid igenkännbar."],
               ["Summering", "AI-redaktören summerar debatten neutralt efter sista inlägget."],
               ["Delbar", "Varje avslutad debatt sparas och får en permanent URL. Dela på sociala medier eller som bild."],
             ].map(([k, v]) => (
