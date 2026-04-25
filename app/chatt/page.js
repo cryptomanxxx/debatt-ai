@@ -44,6 +44,40 @@ const AGENT_FARG = {
   "Hypokondrikern":"#6ee7b7","Optimisten":"#fcd34d","Den rike":"#c4b5fd",
 };
 
+// Konfidenspoäng — bas + spridning per agent (speglar personlighet)
+const KONFIDENSPROFILE = {
+  "Nationalekonom":       { base: 78, spread: 8 },
+  "Miljöaktivist":        { base: 85, spread: 10 },
+  "Teknikoptimist":       { base: 84, spread: 8 },
+  "Konservativ debattör": { base: 76, spread: 7 },
+  "Jurist":               { base: 83, spread: 5 },
+  "Journalist":           { base: 72, spread: 14 },
+  "Filosof":              { base: 52, spread: 22 },  // tvivlar alltid lite
+  "Läkare":               { base: 80, spread: 6 },
+  "Psykolog":             { base: 70, spread: 16 },
+  "Historiker":           { base: 74, spread: 10 },
+  "Sociolog":             { base: 77, spread: 10 },
+  "Kryptoanalytiker":     { base: 89, spread: 8 },   // övertygad troende
+  "Den hungriga":         { base: 93, spread: 4 },   // grundbehov = inga tvivel
+  "Mamman":               { base: 86, spread: 7 },
+  "Den sura":             { base: 90, spread: 6 },   // alltid säker på saken
+  "Den trötta":           { base: 40, spread: 20 },  // orkar knappt bry sig
+  "Den stressade":        { base: 63, spread: 22 },  // varierar vilt
+  "Den lugna":            { base: 57, spread: 12 },  // lugnt ifrågasättande
+  "Pensionären":          { base: 91, spread: 5 },   // "har sett allt förut"
+  "Tonåringen":           { base: 60, spread: 24 },  // ibland skarp, ibland lost
+  "Den nostalgiske":      { base: 82, spread: 8 },
+  "Hypokondrikern":       { base: 70, spread: 20 },  // googlar och oroar sig
+  "Optimisten":           { base: 83, spread: 9 },
+  "Den rike":             { base: 86, spread: 7 },
+};
+
+function genereraKonfidensPoang(agent) {
+  const p = KONFIDENSPROFILE[agent] ?? { base: 70, spread: 15 };
+  const raw = p.base + (Math.random() * p.spread * 2) - p.spread;
+  return Math.round(Math.min(99, Math.max(28, raw)));
+}
+
 // ── Ämnen per kategori ────────────────────────────────────────────────────────
 const KATEGORIER = [
   { id: "ai-tech",  label: "AI & Tech",  emoji: "🧠" },
@@ -230,15 +264,30 @@ async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider 
   } catch { return null; }
 }
 
+function KonfidensBar({ poang, farg }) {
+  const color = poang >= 75 ? farg : poang >= 50 ? "#fbbf24" : "#94a3b8";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", marginLeft: "10px" }}>
+      <span style={{ display: "inline-flex", gap: "2px" }}>
+        {[...Array(10)].map((_, i) => (
+          <span key={i} style={{ width: "4px", height: "8px", borderRadius: "1px", background: i < Math.round(poang / 10) ? `${color}cc` : "#2a2a2a" }} />
+        ))}
+      </span>
+      <span style={{ fontSize: "10px", color, fontFamily: "monospace", fontWeight: 700 }}>{poang}%</span>
+    </span>
+  );
+}
+
 function Bubble({ h, isFirst, isLast, isStreaming }) {
   const farg = af(h.agent);
   const v = agentVisuell(h.agent);
   const r = isFirst && isLast ? "8px" : isFirst ? "8px 8px 0 0" : isLast ? "0 0 8px 8px" : "0";
   return (
     <div style={{ padding: "16px 20px", background: C.surface, borderLeft: `3px solid ${farg}${isStreaming ? "80" : ""}`, borderRadius: r }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
         <AgentAvatar namn={h.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />
         <span style={{ fontSize: "11px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", fontWeight: 700 }}>{h.agent.toUpperCase()}</span>
+        {!isStreaming && h.konfidensPoang != null && <KonfidensBar poang={h.konfidensPoang} farg={farg} />}
       </div>
       <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.75, color: isStreaming ? `${C.text}bb` : C.text }}>
         {h.text}
@@ -385,7 +434,7 @@ export default function ChattPage() {
           break;
         }
         setStreaming(null);
-        const inlagg = { agent, text: text.trim(), id: i };
+        const inlagg = { agent, text: text.trim(), id: i, konfidensPoang: genereraKonfidensPoang(agent) };
         h = [...h, inlagg];
         setHistorik([...h]);
       } catch (e) {
