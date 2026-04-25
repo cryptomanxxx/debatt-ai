@@ -1,4 +1,5 @@
 import NavArkivLink from "../../NavArkivLink";
+import NavHistorikLink from "../../NavHistorikLink";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -56,7 +57,7 @@ export default async function HistorikPage() {
           <NavLink href="/">Hem</NavLink>
           <NavArkivLink />
           <NavLink href="/chatt">Direktdebatt</NavLink>
-          <NavLink href="/chatt/historik" active>Debatthistorik</NavLink>
+          <NavHistorikLink active />
           <NavLink href="/rivaliteter">Rivaliteter</NavLink>
           <NavLink href="/om">Om DEBATT-AI</NavLink>
           <NavLink href="/?kontakt=1">Kontakt</NavLink>

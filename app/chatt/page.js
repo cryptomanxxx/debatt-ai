@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import ChattShareButtons from "./[id]/ChattShareButtons";
+import NavHistorikLink from "../NavHistorikLink";
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
 
@@ -554,7 +555,7 @@ export default function ChattPage() {
           {navLink("/?debatter=1","Debatter",false)}
           {navLink("/arkiv", arkivAntal !== null ? `Arkiv (${arkivAntal})` : "Arkiv", false)}
           {navLink("/chatt","Direktdebatt",true)}
-          {navLink("/chatt/historik","Debatthistorik",false)}
+          <NavHistorikLink />
           {navLink("/leaderboard","Leaderboard",false)}
           {navLink("/om","Om DEBATT-AI",false)}
           {navLink("/?kontakt=1","Kontakt",false)}
