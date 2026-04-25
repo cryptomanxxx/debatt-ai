@@ -59,23 +59,44 @@ async function getVisualisering(id) {
   }
 }
 
-async function getRelateradeArtiklar(id, kategori) {
-  const base = `${SB_URL}/rest/v1/artiklar?id=neq.${id}&order=skapad.desc&limit=4&select=id,rubrik,forfattare,kalla,skapad,kategori`;
+async function getRelateradeArtiklar(id, taggar, parentId) {
   const headers = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
+  // Fetch a pool of recent articles, then rank by tag overlap in JS
+  const exclude = [id, parentId].filter(Boolean).join(",");
+  const excludeParam = exclude ? `&id=not.in.(${exclude})` : `&id=neq.${id}`;
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,skapad,taggar${excludeParam}&order=skapad.desc&limit=30`,
+    { headers, cache: "no-store" }
+  );
+  if (!res.ok) return [];
+  const pool = await res.json();
+  const myTags = new Set(taggar || []);
+  const scored = pool.map(a => {
+    const overlap = (a.taggar || []).filter(t => myTags.has(t)).length;
+    return { ...a, _score: overlap };
+  });
+  scored.sort((a, b) => b._score - a._score);
+  return scored.slice(0, 4);
+}
 
-  // Try same category first
-  if (kategori) {
-    const res = await fetch(`${base}&kategori=eq.${encodeURIComponent(kategori)}`, { headers, cache: "no-store" });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.length >= 2) return data;
-    }
-  }
-
-  // Fall back to most recent
-  const res = await fetch(base, { headers, cache: "no-store" });
+async function getRepliker(artikelId) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?parent_id=eq.${artikelId}&select=id,rubrik,forfattare,kalla,skapad&order=skapad.asc`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }, cache: "no-store" }
+  );
   if (!res.ok) return [];
   return res.json();
+}
+
+async function getOriginal(parentId) {
+  if (!parentId) return null;
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?id=eq.${parentId}&select=id,rubrik,forfattare,kalla`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }, cache: "no-store" }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.[0] || null;
 }
 
 export async function generateMetadata({ params }) {
@@ -104,10 +125,12 @@ const C = {
 export default async function ArtikelPage({ params }) {
   const [artikel, artikelCount] = await Promise.all([getArtikel(params.id), getArtikelCount()]);
   if (!artikel) notFound();
-  const [relaterade, replikMedKonklusion, visualisering] = await Promise.all([
-    getRelateradeArtiklar(params.id, artikel.kategori),
+  const [relaterade, replikMedKonklusion, visualisering, repliker, original] = await Promise.all([
+    getRelateradeArtiklar(params.id, artikel.taggar, artikel.parent_id),
     getReplikMedKonklusion(artikel.rubrik),
     getVisualisering(artikel.visualisering_id),
+    getRepliker(params.id),
+    getOriginal(artikel.parent_id),
   ]);
 
   const words = (artikel.artikel || "").split(/\s+/).filter(Boolean).length;
@@ -185,6 +208,12 @@ export default async function ArtikelPage({ params }) {
             )}
             <span style={{ fontSize: "13px", color: C.textMuted }}>{artikel.skapad ? new Date(artikel.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" }) : ""}</span>
           </div>
+          {original && (
+            <a href={`/artikel/${original.id}`} style={{ display: "inline-flex", alignItems: "center", gap: "8px", marginBottom: "14px", color: C.textMuted, fontSize: "13px", textDecoration: "none", background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", padding: "6px 12px" }}>
+              <span style={{ color: C.accentDim }}>↩</span>
+              Svar på: <span style={{ color: C.accent }}>{original.rubrik}</span>
+            </a>
+          )}
           <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "0 0 14px 0", lineHeight: 1.3, color: C.accent }}>{artikel.rubrik}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             {artikel.kalla === "ai" ? (() => { const v = agentVisuell(artikel.forfattare); return (
@@ -323,10 +352,37 @@ export default async function ArtikelPage({ params }) {
             );
           })}
         </div>
+        <style>{`.relaterad-link { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; } .relaterad-link:hover { background:#161616; }`}</style>
+
+        {/* Repliker på denna artikel */}
+        {repliker.length > 0 && (
+          <div style={{ marginTop: "40px" }}>
+            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>
+              {repliker.length === 1 ? "1 replik" : `${repliker.length} repliker`} på denna artikel
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: "#1a2a40", border: "1px solid #1a2a40", borderRadius: "8px", overflow: "hidden" }}>
+              {repliker.map(r => (
+                <a key={r.id} href={`/artikel/${r.id}`} className="relaterad-link">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                      <span style={{ fontSize: "10px", color: "#4a9eff", fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>REPLIK</span>
+                      <span style={{ fontSize: "15px", color: C.accent, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.rubrik.replace(/^Replik: /, "")}</span>
+                    </div>
+                    <span style={{ fontSize: "12px", color: C.textMuted, fontStyle: "italic" }}>
+                      {r.kalla === "ai" ? `Agent ${r.forfattare}` : r.forfattare}
+                      {r.skapad ? ` · ${new Date(r.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                    </span>
+                  </div>
+                  <span style={{ color: "#4a9eff", fontSize: "18px", flexShrink: 0 }}>→</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Related articles */}
         {relaterade.length > 0 && (
           <div style={{ marginTop: "40px" }}>
-            <style>{`.relaterad-link { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; } .relaterad-link:hover { background:#161616; }`}</style>
             <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>Läs också</p>
             <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
               {relaterade.map(r => (
