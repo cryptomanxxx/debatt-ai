@@ -117,6 +117,33 @@ function slumpaAmne(kategoriId = null) {
 function pickRandom(arr, n) { return [...arr].sort(() => Math.random() - 0.5).slice(0, n); }
 function af(namn) { return AGENT_FARG[namn] || C.accent; }
 
+// Client-side rate limiting via localStorage (server-side Map is unreliable on Vercel serverless)
+const RL_KEY = "chatt_ratelimit";
+const RL_LIMIT = 5;
+const RL_WINDOW = 10 * 60 * 1000;
+
+function getLocalRL() {
+  try {
+    const raw = localStorage.getItem(RL_KEY);
+    if (!raw) return { count: 0, windowStart: Date.now() };
+    const { count, windowStart } = JSON.parse(raw);
+    if (Date.now() - windowStart > RL_WINDOW) return { count: 0, windowStart: Date.now() };
+    return { count, windowStart };
+  } catch { return { count: 0, windowStart: Date.now() }; }
+}
+
+function consumeLocalRL() {
+  const rl = getLocalRL();
+  rl.count = Math.min(rl.count + 1, RL_LIMIT);
+  localStorage.setItem(RL_KEY, JSON.stringify(rl));
+  return { remaining: Math.max(0, RL_LIMIT - rl.count), resetAt: rl.windowStart + RL_WINDOW };
+}
+
+function peekLocalRL() {
+  const { count, windowStart } = getLocalRL();
+  return { remaining: Math.max(0, RL_LIMIT - count), resetAt: windowStart + RL_WINDOW };
+}
+
 async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
@@ -128,14 +155,11 @@ async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit 
     const status = res.status;
     if (status === 429) {
       const data = await res.json().catch(() => ({}));
-      onRateLimit?.({ remaining: 0, resetAt: data.resetAt, minutesLeft: data.minutesLeft });
+      onRateLimit?.({ remaining: 0, minutesLeft: data.minutesLeft });
       throw Object.assign(new Error("rate_limit"), { status });
     }
     throw Object.assign(new Error("error"), { status });
   }
-  const remaining = res.headers.get("X-RateLimit-Remaining");
-  const resetAt = res.headers.get("X-RateLimit-Reset");
-  if (remaining !== null) onRateLimit?.({ remaining: Number(remaining), resetAt: resetAt ? Number(resetAt) : null });
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let text = "", buffer = "";
@@ -253,7 +277,7 @@ export default function ChattPage() {
   const [debattId, setDebattId] = useState(null);
   const [föreslagStatus, setFöreslagStatus] = useState(null); // null | "loading" | "ok" | "fel"
   const [föreslagFel, setFöreslagFel] = useState("");
-  const [rateLimitInfo, setRateLimitInfo] = useState(null); // { remaining, resetAt } | null
+  const [rateLimitInfo, setRateLimitInfo] = useState({ remaining: RL_LIMIT, resetAt: null });
   const [felmeddelande, setFelmeddelande] = useState("");
   const [spelar, setSpelar] = useState(false);
   const [arkivAntal, setArkivAntal] = useState(null);
@@ -265,6 +289,7 @@ export default function ChattPage() {
   const bottomRef = useRef(null);
 
   useEffect(() => {
+    setRateLimitInfo(peekLocalRL());
     fetch(`${SB_URL}/rest/v1/artiklar?select=id`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
     }).then(r => r.json()).then(d => setArkivAntal(d.length)).catch(() => {});
@@ -299,9 +324,19 @@ export default function ChattPage() {
   }
 
   async function starta() {
+    const rl = peekLocalRL();
+    if (rl.remaining <= 0) {
+      const min = Math.ceil((rl.resetAt - Date.now()) / 60000);
+      setFelmeddelande(`Gränsen nådd (${RL_LIMIT} debatter/10 min). Försök igen om ${min} minut${min === 1 ? "" : "er"}.`);
+      return;
+    }
+
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? slumpAgenter;
     const valtAmne = amne.trim() || slumpaAmne();
+
+    const afterConsume = consumeLocalRL();
+    setRateLimitInfo(afterConsume);
 
     setAgenter(valdaAgenter);
     setFaktisktAmne(valtAmne);
@@ -412,7 +447,7 @@ export default function ChattPage() {
     setAmne(slumpaAmne());
     setFelmeddelande("");
     setFöreslagStatus(null);
-    setRateLimitInfo(null);
+    setRateLimitInfo(peekLocalRL());
     stoppRef.current = false;
   }
 
@@ -612,14 +647,12 @@ export default function ChattPage() {
                     ? `https://www.debatt-ai.se/chatt/${debattId}`
                     : `https://www.debatt-ai.se/chatt`}
                 />
-                {rateLimitInfo && (
-                  <div style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", padding: "8px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", marginBottom: "10px" }}>
-                    {rateLimitInfo.remaining > 0
-                      ? <span><span style={{ color: C.accent }}>{rateLimitInfo.remaining}</span> av 5 debatter kvar{rateLimitInfo.resetAt ? <span> · Återställs {new Date(rateLimitInfo.resetAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}</span> : ""}</span>
-                      : <span style={{ color: "#f87171" }}>Gränsen nådd (5/5){rateLimitInfo.minutesLeft ? ` · Återställs om ${rateLimitInfo.minutesLeft} min` : ""}</span>
-                    }
-                  </div>
-                )}
+                <div style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", padding: "8px 12px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", marginBottom: "10px" }}>
+                  {rateLimitInfo.remaining > 0
+                    ? <span><span style={{ color: C.accent }}>{rateLimitInfo.remaining}</span> av {RL_LIMIT} debatter kvar · Fönster återställs {new Date(rateLimitInfo.resetAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}</span>
+                    : <span style={{ color: "#f87171" }}>Gränsen nådd ({RL_LIMIT}/{RL_LIMIT}) · Återställs {new Date(rateLimitInfo.resetAt).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}</span>
+                  }
+                </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "center" }}>
                   <button onClick={nyDebatt} style={{ padding: "10px 22px", background: C.accent, border: "none", color: C.bg, borderRadius: "6px", fontSize: "13px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer" }}>
                     Ny direktdebatt →
