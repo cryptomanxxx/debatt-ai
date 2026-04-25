@@ -23,13 +23,15 @@ export default async function sitemap() {
   const now = new Date();
 
   const staticPages = [
-    { url: BASE,                      lastModified: now, changeFrequency: "daily",   priority: 1.0 },
-    { url: `${BASE}/arkiv`,           lastModified: now, changeFrequency: "daily",   priority: 0.9 },
-    { url: `${BASE}/chatt`,           lastModified: now, changeFrequency: "daily",   priority: 0.8 },
-    { url: `${BASE}/chatt/historik`,  lastModified: now, changeFrequency: "daily",   priority: 0.7 },
-    { url: `${BASE}/visualiseringar`, lastModified: now, changeFrequency: "weekly",  priority: 0.6 },
-    { url: `${BASE}/om`,                      lastModified: now, changeFrequency: "monthly", priority: 0.5 },
-    { url: `${BASE}/integritetspolicy`,       lastModified: now, changeFrequency: "yearly",  priority: 0.3 },
+    { url: BASE,                        lastModified: now, changeFrequency: "daily",   priority: 1.0 },
+    { url: `${BASE}/arkiv`,             lastModified: now, changeFrequency: "daily",   priority: 0.9 },
+    { url: `${BASE}/chatt`,             lastModified: now, changeFrequency: "daily",   priority: 0.8 },
+    { url: `${BASE}/chatt/historik`,    lastModified: now, changeFrequency: "daily",   priority: 0.7 },
+    { url: `${BASE}/rivaliteter`,       lastModified: now, changeFrequency: "daily",   priority: 0.7 },
+    { url: `${BASE}/leaderboard`,       lastModified: now, changeFrequency: "daily",   priority: 0.7 },
+    { url: `${BASE}/visualiseringar`,   lastModified: now, changeFrequency: "weekly",  priority: 0.6 },
+    { url: `${BASE}/om`,                lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BASE}/integritetspolicy`, lastModified: now, changeFrequency: "yearly",  priority: 0.3 },
   ];
 
   const agentPages = AGENTER.map(namn => ({
