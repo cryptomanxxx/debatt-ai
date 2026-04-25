@@ -35,7 +35,7 @@ const PERSONLIGHETER = {
   "Den rike": "mycket förmögen, välmenande, ibland totalt ute ur kontakt med verkligheten.",
 };
 
-// In-memory rate limiter — 5 debatter per IP per 10 minuter (räknar bara debattstart)
+// ── Debatt rate limiter (per IP, 5/10 min) ────────────────────────────────────
 const rateLimitStore = new Map();
 const LIMIT = 5;
 const WINDOW_MS = 10 * 60 * 1000;
@@ -43,20 +43,37 @@ const WINDOW_MS = 10 * 60 * 1000;
 function getRateLimitInfo(ip) {
   const now = Date.now();
   const entry = rateLimitStore.get(ip);
-  if (!entry || now - entry.start > WINDOW_MS) {
-    return { remaining: LIMIT, resetAt: null };
-  }
+  if (!entry || now - entry.start > WINDOW_MS) return { remaining: LIMIT, resetAt: null };
   return { remaining: Math.max(0, LIMIT - entry.count), resetAt: entry.start + WINDOW_MS };
 }
 
 function consumeRateLimit(ip) {
   const now = Date.now();
   const entry = rateLimitStore.get(ip);
-  if (!entry || now - entry.start > WINDOW_MS) {
-    rateLimitStore.set(ip, { count: 1, start: now });
-  } else {
-    entry.count++;
-  }
+  if (!entry || now - entry.start > WINDOW_MS) rateLimitStore.set(ip, { count: 1, start: now });
+  else entry.count++;
+}
+
+// ── Provider health state (per Edge isolate, best-effort) ────────────────────
+// Tracks rate limit info from API response headers to enable proactive switching
+const ps = {
+  groq:   { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
+  gemini: { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
+};
+
+function groqReady() {
+  if (ps.groq.status !== "limited") return true;
+  // Reset time passed → assume ready again
+  return !!(ps.groq.resetAt && Date.now() > new Date(ps.groq.resetAt).getTime());
+}
+
+// GET /api/chatt — returns provider health for the admin dashboard
+export async function GET() {
+  return Response.json({
+    groq:   { ...ps.groq,   keySet: !!process.env.GROQ_API_KEY },
+    gemini: { ...ps.gemini, keySet: !!process.env.GEMINI_API_KEY },
+    ts: Date.now(),
+  });
 }
 
 export async function POST(request) {
@@ -68,7 +85,6 @@ export async function POST(request) {
 }
 
 async function handlePost(request) {
-  // Rate limiting
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
   const body = await request.json().catch(() => null);
@@ -76,7 +92,6 @@ async function handlePost(request) {
 
   const { amne, historik, agent } = body;
 
-  // Räkna bara debattstart (historik tom = första anropet)
   const isFirstCall = !Array.isArray(historik) || historik.length === 0;
   if (isFirstCall) {
     const info = getRateLimitInfo(ip);
@@ -87,24 +102,15 @@ async function handlePost(request) {
     consumeRateLimit(ip);
   }
 
-  // Validera agent mot strikt whitelist
-  if (!agent || !AGENTER.has(agent)) {
+  if (!agent || !AGENTER.has(agent))
     return Response.json({ error: "Okänd agent" }, { status: 400 });
-  }
-
-  // Begränsa ämneslängd
-  if (typeof amne !== "string" || amne.length > 200) {
+  if (typeof amne !== "string" || amne.length > 200)
     return Response.json({ error: "Ämnet är för långt (max 200 tecken)" }, { status: 400 });
-  }
-
-  // Begränsa historikstorlek
-  if (!Array.isArray(historik) || historik.length > 10) {
+  if (!Array.isArray(historik) || historik.length > 10)
     return Response.json({ error: "Ogiltig historik" }, { status: 400 });
-  }
 
   const kontext = historik.length > 0
-    ? historik.map(h => `${h.agent}: ${h.text}`).join("\n")
-    : null;
+    ? historik.map(h => `${h.agent}: ${h.text}`).join("\n") : null;
 
   const systemPrompt = `Du är ${PERSONLIGHETER[agent]}
 
@@ -132,10 +138,13 @@ REGLER — viktiga:
     "X-RateLimit-Limit": String(LIMIT),
   };
 
-  // Try Groq first, fall back to Gemini
+  // ── Try Groq first ───────────────────────────────────────────────────────
   let groqFailReason = "";
   if (!process.env.GROQ_API_KEY) {
-    groqFailReason = "GROQ_API_KEY ej satt i Vercel";
+    groqFailReason = "GROQ_API_KEY saknas";
+  } else if (!groqReady()) {
+    // Proactively skip — we know it's rate-limited, no point wasting a request
+    groqFailReason = `Groq rate-limited (reset: ${ps.groq.resetAt ?? "okänt"})`;
   } else {
     const groqAbort = new AbortController();
     const groqTimeout = setTimeout(() => groqAbort.abort(), 5000);
@@ -146,18 +155,23 @@ REGLER — viktiga:
         signal: groqAbort.signal,
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userMessage },
-          ],
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
           max_tokens: 100,
           temperature: 0.88,
           stream: true,
         }),
       });
       clearTimeout(groqTimeout);
+
+      // Update health from response headers regardless of success/failure
+      const rem = parseInt(groqRes.headers.get("x-ratelimit-remaining-requests") ?? "-1");
+      const rst = groqRes.headers.get("x-ratelimit-reset-requests");
       if (groqRes.ok) {
+        ps.groq = { remaining: rem >= 0 ? rem : ps.groq.remaining, limit: 30, resetAt: rst, ts: Date.now(), status: rem <= 5 ? "warn" : "ok" };
         return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
+      }
+      if (groqRes.status === 429) {
+        ps.groq = { remaining: 0, limit: 30, resetAt: rst, ts: Date.now(), status: "limited" };
       }
       groqFailReason = `Groq HTTP ${groqRes.status}`;
     } catch (e) {
@@ -166,10 +180,10 @@ REGLER — viktiga:
     }
   }
 
-  // Groq failed or skipped — fall back to Gemini
+  // ── Fall back to Gemini ──────────────────────────────────────────────────
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!geminiKey) {
-    return Response.json({ error: `GEMINI_API_KEY ej satt i Vercel. ${groqFailReason}` }, { status: 502 });
+    return Response.json({ error: `GEMINI_API_KEY saknas. ${groqFailReason}` }, { status: 502 });
   }
 
   const geminiPayload = JSON.stringify({
@@ -178,7 +192,6 @@ REGLER — viktiga:
     generationConfig: { maxOutputTokens: 150, temperature: 0.88 },
   });
 
-  // Try several models — non-streaming generateContent avoids SSE endpoint issues
   const geminiModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-1.5-flash-latest"];
   let geminiText = "";
   let geminiErr = "";
@@ -188,15 +201,17 @@ REGLER — viktiga:
       { method: "POST", headers: { "Content-Type": "application/json" }, body: geminiPayload }
     );
     if (r.ok) {
+      ps.gemini = { remaining: null, limit: 15, resetAt: null, ts: Date.now(), status: "ok" };
       const data = await r.json().catch(() => null);
       const t = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
       if (t) { geminiText = t; break; }
     } else {
+      if (r.status === 429) ps.gemini = { ...ps.gemini, ts: Date.now(), status: "limited" };
       const errBody = await r.text().catch(() => "");
       geminiErr += `${model}:${r.status} `;
       if (errBody.includes("API_KEY") || r.status === 400 || r.status === 403) {
         geminiErr += errBody.slice(0, 100);
-        break; // key issue — no point trying other models
+        break;
       }
     }
   }
@@ -205,7 +220,6 @@ REGLER — viktiga:
     return Response.json({ error: `Alla AI-tjänster är otillgängliga. ${groqFailReason} | Gemini: ${geminiErr}` }, { status: 502 });
   }
 
-  // Return Gemini response as fake SSE so client parsing is unchanged
   const encoder = new TextEncoder();
   const chunk = JSON.stringify({ choices: [{ delta: { content: geminiText } }] });
   const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;

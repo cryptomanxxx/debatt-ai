@@ -111,6 +111,92 @@ async function publishToArtiklar(row) {
   if (!res.ok) throw new Error(await res.text());
 }
 
+function ApiStatusTab() {
+  const [health, setHealth] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [lastFetch, setLastFetch] = useState(null);
+
+  async function fetchHealth() {
+    try {
+      const res = await fetch("/api/chatt");
+      if (res.ok) { setHealth(await res.json()); setLastFetch(Date.now()); }
+    } catch {}
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    fetchHealth();
+    const id = setInterval(fetchHealth, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  function ProviderCard({ name, model, p }) {
+    const colors = { ok: C.green, warn: C.yellow, limited: C.red, unknown: C.textMuted };
+    const labels = { ok: "OK", warn: "LÅGT", limited: "STOPP", unknown: "OKÄND" };
+    const s = p?.status ?? "unknown";
+    const col = colors[s];
+    const pct = (p?.remaining != null && p?.limit) ? Math.round(p.remaining / p.limit * 100) : null;
+    const resetIn = p?.resetAt ? Math.max(0, Math.ceil((new Date(p.resetAt).getTime() - Date.now()) / 1000)) : null;
+    return (
+      <div style={{ background: C.surface, border: `1px solid ${s === "limited" ? C.red + "60" : s === "warn" ? C.yellow + "40" : C.border}`, borderRadius: "8px", padding: "20px", marginBottom: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+          <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: col, display: "inline-block", flexShrink: 0 }} />
+          <span style={{ fontSize: "15px", color: C.text }}>{name}</span>
+          <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>{model}</span>
+          <span style={{ marginLeft: "auto", fontSize: "11px", fontWeight: 700, color: col, fontFamily: "monospace", letterSpacing: "0.08em" }}>{labels[s]}</span>
+        </div>
+        {p?.keySet === false && (
+          <p style={{ fontSize: "12px", color: C.red, margin: "0 0 8px", fontFamily: "monospace" }}>⚠ API-nyckel saknas i Vercel</p>
+        )}
+        {pct !== null && (
+          <div style={{ marginBottom: "8px" }}>
+            <div style={{ height: "4px", background: C.border, borderRadius: "2px", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: pct > 50 ? C.green : pct > 20 ? C.yellow : C.red, transition: "width 0.3s" }} />
+            </div>
+            <p style={{ fontSize: "12px", color: C.textMuted, margin: "4px 0 0", fontFamily: "monospace" }}>
+              {p.remaining} / {p.limit} req/min kvar
+            </p>
+          </div>
+        )}
+        {pct === null && p?.status !== "unknown" && (
+          <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, fontFamily: "monospace" }}>Antal kvar: ingen data ännu (uppdateras efter nästa anrop)</p>
+        )}
+        {s === "limited" && resetIn !== null && (
+          <p style={{ fontSize: "12px", color: C.red, margin: "4px 0 0", fontFamily: "monospace" }}>Rate-limit · reset om ~{resetIn}s</p>
+        )}
+        {p?.ts ? <p style={{ fontSize: "11px", color: C.textMuted, margin: "8px 0 0", fontFamily: "monospace" }}>Senast sedd: {new Date(p.ts).toLocaleTimeString("sv-SE")}</p> : null}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
+        <h2 style={{ fontSize: "18px", fontWeight: 400, color: C.accent, margin: 0 }}>AI-leverantörer</h2>
+        <button onClick={fetchHealth} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.textMuted, padding: "4px 12px", fontSize: "12px", cursor: "pointer", fontFamily: "Georgia, serif" }}>↻ Uppdatera</button>
+        {lastFetch && <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>Auto-refresh var 10s · {new Date(lastFetch).toLocaleTimeString("sv-SE")}</span>}
+      </div>
+
+      {loading ? <p style={{ color: C.textMuted }}>Hämtar status…</p> : (
+        <>
+          <ProviderCard name="Groq" model="llama-3.3-70b-versatile · 30 req/min" p={health?.groq} />
+          <ProviderCard name="Gemini" model="2.0 Flash / 1.5 Flash · 15 req/min" p={health?.gemini} />
+
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginTop: "8px" }}>
+            <p style={{ fontSize: "11px", color: C.accentDim, textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px", fontFamily: "monospace" }}>Tips</p>
+            <ul style={{ margin: 0, paddingLeft: "20px", color: C.textMuted, fontSize: "13px", lineHeight: 1.8 }}>
+              <li>Siffrorna gäller direktdebatt-anrop. AI-redaktören (agent.py + artikelbedömning) delar samma Groq-nyckel.</li>
+              <li>Skapa en <b style={{ color: C.text }}>separat Groq-nyckel</b> för agent.py (GitHub Actions) för att isolera trafiken.</li>
+              <li>Vid "STOPP" byter systemet automatiskt till Gemini utan att du behöver göra något.</li>
+              <li>Status uppdateras bara när en riktig debatt körs — inte vid polling.</li>
+            </ul>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function StatusBadge({ status }) {
   const cfg = {
     inkorg:     { label: "INKORG",     color: C.yellow, bg: "#1a1200" },
@@ -511,6 +597,7 @@ export default function AdminClient() {
             ["kommentarer", `Kommentarer${kommentarer.length > 0 ? ` (${kommentarer.length})` : ""}`],
             ["nyhetsbrev","Nyhetsbrev" + (subCount !== null ? ` (${subCount})` : "")],
             ["matning","Mätning"],
+            ["api-status","API-status"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
               {lbl}
@@ -711,6 +798,9 @@ export default function AdminClient() {
 
         {/* ── MÄTNING ── */}
         {mainTab === "matning" && <MatningTab />}
+
+        {/* ── API-STATUS ── */}
+        {mainTab === "api-status" && <ApiStatusTab />}
 
         {/* ── NYHETSBREV ── */}
         {mainTab === "nyhetsbrev" && (
