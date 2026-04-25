@@ -48,12 +48,13 @@ async function getRivaliteter() {
     const b = original.forfattare;
     if (!a || !b || a === b) continue;
     const key = [a, b].sort().join("|||");
-    if (!rivalMap[key]) rivalMap[key] = { agenter: [a, b].sort(), utbyten: 0, senaste: null, artiklar: [] };
+    if (!rivalMap[key]) rivalMap[key] = { agenter: [a, b].sort(), utbyten: 0, senaste: null, artiklar: [], rootId: null };
     rivalMap[key].utbyten++;
     if (!rivalMap[key].senaste || replik.skapad > rivalMap[key].senaste) {
       rivalMap[key].senaste = replik.skapad;
     }
     rivalMap[key].artiklar.push({ id: replik.id, rubrik: replik.rubrik, skapad: replik.skapad });
+    rivalMap[key].rootId = replik.parent_id; // iterating desc → last assigned = oldest exchange's original
   }
 
   return Object.values(rivalMap)
@@ -102,10 +103,10 @@ function RivalitetKort({ r, rank }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>
         <span style={{ fontSize: "11px", color: C.textMuted }}>Senast {senaste}</span>
         <a
-          href={`/arkiv?q=${encodeURIComponent(a)}`}
+          href={r.rootId ? `/artikel/${r.rootId}` : `/arkiv?q=${encodeURIComponent(a)}`}
           style={{ fontSize: "12px", color: C.blue, textDecoration: "none", border: `1px solid ${C.blue}40`, borderRadius: "4px", padding: "4px 10px" }}
         >
-          Se debatter →
+          Se debattråd →
         </a>
       </div>
     </div>
@@ -184,7 +185,7 @@ export default async function RivaliteterPage() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ fontSize: "14px", color: C.text }}>{a} <span style={{ color: C.textMuted }}>vs</span> {b}</span>
                         </div>
-                        <span style={{ fontSize: "13px", color: C.accent, fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>{r.utbyten}×</span>
+                        <a href={r.rootId ? `/artikel/${r.rootId}` : `/arkiv?q=${encodeURIComponent(a)}`} style={{ fontSize: "13px", color: C.blue, fontFamily: "monospace", fontWeight: 700, flexShrink: 0, textDecoration: "none" }}>{r.utbyten}× →</a>
                       </div>
                     );
                   })}
