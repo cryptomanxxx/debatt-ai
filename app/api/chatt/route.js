@@ -1,5 +1,7 @@
 import { headers } from "next/headers";
 
+export const runtime = "edge";
+
 const AGENTER = new Set([
   "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
   "Jurist","Journalist","Filosof","Läkare","Psykolog","Historiker",
@@ -125,24 +127,33 @@ REGLER — viktiga:
     "X-RateLimit-Limit": String(LIMIT),
   };
 
-  // useGemini=true means client is retrying after a Groq failure — skip straight to Gemini
+  // Try Groq first (unless client signals to skip it after a prior failure)
   if (!useGemini) {
-    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
-        ],
-        max_tokens: 130,
-        temperature: 0.88,
-        stream: true,
-      }),
-    });
-    if (groqRes.ok) {
-      return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
+    const groqAbort = new AbortController();
+    const groqTimeout = setTimeout(() => groqAbort.abort(), 5000);
+    try {
+      const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+        signal: groqAbort.signal,
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userMessage },
+          ],
+          max_tokens: 100,
+          temperature: 0.88,
+          stream: true,
+        }),
+      });
+      clearTimeout(groqTimeout);
+      if (groqRes.ok) {
+        return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
+      }
+    } catch {
+      clearTimeout(groqTimeout);
+      // Groq timed out or errored — fall through to Gemini
     }
   }
 
