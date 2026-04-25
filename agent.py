@@ -17,10 +17,28 @@ import json
 import random
 import os
 import sys
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
 DEBATT_API = "https://www.debatt-ai.se/api/agent/submit"
+
+
+def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
+    """Groq API-anrop med automatisk retry vid rate limit (429)."""
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
+        "Content-Type": "application/json",
+    }
+    for attempt in range(3):
+        r = httpx.post(url, headers=headers, json=json_payload, timeout=timeout)
+        if r.status_code != 429:
+            return r
+        wait = min(int(r.headers.get("retry-after", 20)) + 2, 60)
+        print(f"  Groq rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
+        time.sleep(wait)
+    return r
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 # Hur många repliker krävs i ett debattämne innan slutsats kan ges
@@ -727,13 +745,7 @@ def hamta_nyheter() -> list:
 def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "") -> str:
     """Skriv en debattartikel som kommenterar en aktuell nyhet."""
     kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
-    response = httpx.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
-            "Content-Type": "application/json",
-        },
-        json={
+    response = groq_post({
             "model": "llama-3.3-70b-versatile",
             "max_tokens": 2000,
             "temperature": 0.8,
@@ -761,22 +773,14 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "") ->
                     ),
                 },
             ],
-        },
-        timeout=60,
-    )
+        })
     return response.json()["choices"][0]["message"]["content"]
 
 
 def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "") -> str:
     """Använd Groq för att skriva en debattartikel."""
     kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
-    response = httpx.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
-            "Content-Type": "application/json",
-        },
-        json={
+    response = groq_post({
             "model": "llama-3.3-70b-versatile",
             "max_tokens": 2000,
             "temperature": 0.8,
@@ -798,9 +802,7 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "") -> str:
                     ),
                 },
             ],
-        },
-        timeout=60,
-    )
+        })
     return response.json()["choices"][0]["message"]["content"]
 
 
@@ -954,13 +956,7 @@ def hamta_trendande_amnen(sb_key: str) -> str:
 
 def skriv_replik(agent: dict, original: dict) -> str:
     """Använd Groq för att skriva en replik på en befintlig artikel."""
-    response = httpx.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
-            "Content-Type": "application/json",
-        },
-        json={
+    response = groq_post({
             "model": "llama-3.3-70b-versatile",
             "max_tokens": 2000,
             "temperature": 0.8,
@@ -985,22 +981,14 @@ def skriv_replik(agent: dict, original: dict) -> str:
                     ),
                 },
             ],
-        },
-        timeout=60,
-    )
+        })
     return response.json()["choices"][0]["message"]["content"]
 
 
 def generera_konklusion(original: dict, replik_text: str) -> str:
     """Generera en neutral redaktionell slutsats om debatten."""
     try:
-        response = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
-                "Content-Type": "application/json",
-            },
-            json={
+        response = groq_post({
                 "model": "llama-3.3-70b-versatile",
                 "max_tokens": 300,
                 "temperature": 0.4,
@@ -1024,9 +1012,7 @@ def generera_konklusion(original: dict, replik_text: str) -> str:
                         ),
                     },
                 ],
-            },
-            timeout=30,
-        )
+            }, timeout=30)
         return response.json()["choices"][0]["message"]["content"].strip()
     except Exception:
         return ""
@@ -1035,13 +1021,7 @@ def generera_konklusion(original: dict, replik_text: str) -> str:
 def generera_rubrik(agent: dict, amne: str, artikel: str) -> str:
     """Generera en skarpare rubrik baserad på artikelns innehåll."""
     try:
-        response = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
-                "Content-Type": "application/json",
-            },
-            json={
+        response = groq_post({
                 "model": "llama-3.3-70b-versatile",
                 "max_tokens": 60,
                 "temperature": 0.7,
@@ -1061,9 +1041,7 @@ def generera_rubrik(agent: dict, amne: str, artikel: str) -> str:
                         ),
                     },
                 ],
-            },
-            timeout=30,
-        )
+            }, timeout=30)
         rubrik = response.json()["choices"][0]["message"]["content"].strip().strip('"\'')
         return rubrik if len(rubrik) > 5 else amne
     except Exception:
@@ -1073,13 +1051,7 @@ def generera_rubrik(agent: dict, amne: str, artikel: str) -> str:
 def skriv_kommentar(agent: dict, original: dict) -> str:
     """Generera en kort kommentar (2–3 meningar) på en artikel."""
     try:
-        response = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
-                "Content-Type": "application/json",
-            },
-            json={
+        response = groq_post({
                 "model": "llama-3.3-70b-versatile",
                 "max_tokens": 150,
                 "temperature": 0.9,
@@ -1097,9 +1069,7 @@ def skriv_kommentar(agent: dict, original: dict) -> str:
                         ),
                     },
                 ],
-            },
-            timeout=30,
-        )
+            }, timeout=30)
         return response.json()["choices"][0]["message"]["content"].strip()[:600]
     except Exception:
         return ""
@@ -1206,17 +1176,12 @@ Returnera ENDAST JSON (inga andra tecken):
 Välj den indikator som just nu är mest politiskt relevant. typ ska vara 'line' för trender över tid, 'bar' för jämförelser."""
 
     try:
-        response = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {os.environ['GROQ_API_KEY']}", "Content-Type": "application/json"},
-            json={
+        response = groq_post({
                 "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 250,
                 "temperature": 0.7,
-            },
-            timeout=30,
-        )
+            }, timeout=30)
         raw = response.json()["choices"][0]["message"]["content"].strip()
         raw = raw[raw.find("{"):raw.rfind("}")+1]
         return json.loads(raw)
