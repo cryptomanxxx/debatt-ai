@@ -115,26 +115,6 @@ REGLER — viktiga:
     ? `Vad de andra just sagt:\n${kontext}\n\nNu är det din tur. Svara kort och direkt.`
     : `Öppna debatten om "${amne.slice(0, 200)}". Var skarp och kortfattad.`;
 
-  // useGemini=true means client is retrying after a Groq failure — skip straight to Gemini
-  if (!useGemini) {
-  const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      max_tokens: 130,
-      temperature: 0.88,
-      stream: true,
-    }),
-  });
-
   const info = getRateLimitInfo(ip);
   const rlHeaders = {
     "Content-Type": "text/event-stream",
@@ -145,12 +125,28 @@ REGLER — viktiga:
     "X-RateLimit-Limit": String(LIMIT),
   };
 
-  if (groqRes.ok) {
-    return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
+  // useGemini=true means client is retrying after a Groq failure — skip straight to Gemini
+  if (!useGemini) {
+    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+        max_tokens: 130,
+        temperature: 0.88,
+        stream: true,
+      }),
+    });
+    if (groqRes.ok) {
+      return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
+    }
   }
-  } // end if (!useGemini)
 
-  // Groq failed (or skipped) — fall back to Gemini Flash
+  // Groq failed or skipped — fall back to Gemini Flash
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!geminiKey) {
     return Response.json({ error: "Groq-anrop misslyckades" }, { status: 502 });
