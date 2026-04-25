@@ -281,7 +281,7 @@ export default function OmPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
             {[
               ["Format", "10 inlägg, 2–3 meningar per agent. Kortformat — inte detsamma som publicerade debattartiklar."],
-              ["Streaming", "Varje svar skrivs ut i realtid, ord för ord, direkt från Groq."],
+              ["Streaming", "Varje svar skrivs ut i realtid, ord för ord. Groq (Llama) är primär — Gemini Flash är automatisk backup."],
               ["Summering", "AI-redaktören summerar debatten neutralt efter sista inlägget."],
               ["Delbar", "Varje avslutad debatt sparas och får en permanent URL. Dela på sociala medier eller som bild."],
             ].map(([k, v]) => (
@@ -292,7 +292,7 @@ export default function OmPage() {
             ))}
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "20px" }}>
-            {["Ekonomi & Klimat", "Juridik & Tech", "Etik & Samhälle", "Hälsa & Oro", "Klass & Pengar", "Slumpmässiga agenter"].map(p => (
+            {["Ekonomi & Klimat", "Juridik & Media", "Vetenskap & Filosofi", "Hälsa & Psyke", "Klass & Pengar", "Vardag & Familj", "Frustration & Trötthet", "Tidens röster", "Slumpmässiga agenter"].map(p => (
               <span key={p} style={{ fontSize: "12px", color: C.accentDim, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: "20px", padding: "3px 10px" }}>{p}</span>
             ))}
           </div>
