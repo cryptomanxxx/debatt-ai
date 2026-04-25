@@ -970,6 +970,29 @@ def hamta_engagemang(sb_key: str, artikel_ids: list) -> dict:
     return eng
 
 
+def hamta_agent_historik(sb_key: str, agent_namn: str, limit: int = 3) -> str:
+    """Hämta agentens senaste artikelrubriker för att undvika upprepning."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={"select": "rubrik", "forfattare": f"eq.{agent_namn}", "order": "skapad.desc", "limit": str(limit)},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=10,
+        )
+        if res.status_code != 200:
+            return ""
+        data = res.json()
+        if not data:
+            return ""
+        rubriker = [f'"{a["rubrik"]}"' for a in data]
+        return (
+            f"Du har nyligen skrivit om: {', '.join(rubriker)}. "
+            "Undvik att upprepa samma argument eller vinkel — hitta ett nytt perspektiv."
+        )
+    except Exception:
+        return ""
+
+
 def hamta_amnesforslag(sb_key: str) -> dict | None:
     """Hämtar ett obehandlat ämnesförslag från direktdebatten, eller None."""
     try:
@@ -1434,6 +1457,13 @@ def main():
                 print("  Statistik hämtad ✓")
             else:
                 print("  Ingen statistik i Supabase ännu – fortsätter utan")
+
+        # Agentens egna senaste rubriker — undvik upprepning
+        if sb_key:
+            historik = hamta_agent_historik(sb_key, agent["namn"])
+            if historik:
+                extra_kontext = (extra_kontext + "\n\n" + historik).strip()
+                print("Agenthistorik hämtad ✓")
 
         # Återkoppling: lägg till trendande ämnen som bakgrundskontext
         if sb_key:
