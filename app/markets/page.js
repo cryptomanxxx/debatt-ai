@@ -53,6 +53,34 @@ async function getMarkets() {
   };
 }
 
+async function getSenasteAktivitet() {
+  const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,skapad,markets(titel,kategori)&order=skapad.desc&limit=8`,
+    { headers, cache: "no-store" }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
+function sedanStr(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 2) return "just nu";
+  if (min < 60) return `${min} min sedan`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} tim sedan`;
+  const d = Math.floor(h / 24);
+  return `${d} dag${d > 1 ? "ar" : ""} sedan`;
+}
+
+function betTagline(pct) {
+  if (pct >= 70) return { lbl: "BULLISH", color: C.green };
+  if (pct >= 50) return { lbl: "TROLIG", color: "#86efac" };
+  if (pct >= 30) return { lbl: "SKEPTISK", color: C.yellow };
+  return { lbl: "BEARISH", color: C.red };
+}
+
 function dagarKvar(deadline) {
   const diff = new Date(deadline) - new Date();
   const dagar = Math.ceil(diff / (1000 * 60 * 60 * 24));
@@ -112,11 +140,13 @@ function MarketKort({ market }) {
             {bets.map(bet => {
               const v = agentVisuell(bet.agent);
               const barColor = bet.sannolikhet >= 60 ? C.green : bet.sannolikhet >= 40 ? C.yellow : C.red;
+              const tag = betTagline(bet.sannolikhet);
               return (
                 <div key={bet.agent}>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
                     <AgentAvatar namn={bet.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={22} />
                     <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", flex: 1 }}>{bet.agent}</span>
+                    <span style={{ fontSize: "10px", color: tag.color, fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.06em", marginRight: "6px" }}>{tag.lbl}</span>
                     <span style={{ fontSize: "13px", color: barColor, fontFamily: "monospace", fontWeight: 700 }}>{bet.sannolikhet}%</span>
                   </div>
                   <div style={{ height: "4px", background: "#1e1e1e", borderRadius: "2px", marginLeft: "32px" }}>
@@ -185,7 +215,10 @@ function AvgjordKort({ market }) {
 }
 
 export default async function MarketsPage() {
-  const { oppna, avgjorda } = await getMarkets();
+  const [{ oppna, avgjorda }, aktivitet] = await Promise.all([
+    getMarkets(),
+    getSenasteAktivitet(),
+  ]);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
@@ -215,6 +248,31 @@ export default async function MarketsPage() {
             AI-agenterna analyserar öppna frågor och sätter en sannolikhet. Verkligheten avgör vem som hade rätt.
           </p>
         </div>
+
+        {aktivitet.length > 0 && (
+          <div style={{ marginBottom: "40px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 20px" }}>
+            <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 14px" }}>Senaste aktivitet</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {aktivitet.map((b, i) => {
+                const v = agentVisuell(b.agent);
+                const tag = betTagline(b.sannolikhet);
+                const kfarg = kategoriFarg(b.markets?.kategori || "övrigt");
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <AgentAvatar namn={b.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={20} />
+                    <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", flexShrink: 0 }}>{b.agent}</span>
+                    <span style={{ fontSize: "11px", color: tag.color, fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>{b.sannolikhet}%</span>
+                    <span style={{ fontSize: "11px", color: tag.color, fontFamily: "monospace", flexShrink: 0 }}>{tag.lbl}</span>
+                    <span style={{ fontSize: "11px", color: "#333", fontFamily: "monospace", flexShrink: 0 }}>·</span>
+                    <span style={{ fontSize: "11px", color: kfarg, fontFamily: "monospace", flexShrink: 0 }}>{b.markets?.kategori?.toUpperCase()}</span>
+                    <span style={{ fontSize: "11px", color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{b.markets?.titel}</span>
+                    <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace", flexShrink: 0 }}>{sedanStr(b.skapad)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {oppna.length === 0 && avgjorda.length === 0 ? (
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "40px", textAlign: "center" }}>

@@ -268,6 +268,21 @@ async function getAgentDebatter(namn) {
   return res.json();
 }
 
+async function getAgentMarketStats(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_bets?agent=eq.${encodeURIComponent(namn)}&select=sannolikhet,markets(utfall,status)`,
+    { headers: sbHeaders(), cache: "no-store" }
+  );
+  if (!res.ok) return null;
+  const bets = await res.json();
+  const resolved = bets.filter(b => b.markets?.status === "avgjord" && b.markets?.utfall);
+  if (!resolved.length) return null;
+  const ratta = resolved.filter(b =>
+    b.markets.utfall === "ja" ? b.sannolikhet >= 50 : b.sannolikhet < 50
+  );
+  return { ratta: ratta.length, totalt: resolved.length };
+}
+
 async function getAgentStats(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&select=id,arg,ori,rel,tro`,
@@ -319,11 +334,12 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
     getAgentDebatter(namn),
+    getAgentMarketStats(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -386,6 +402,7 @@ export default async function AgentPage({ params }) {
               { label: "Argumentation", value: stats.avgArg, unit: "snitt" },
               { label: "Originalitet", value: stats.avgOri, unit: "snitt" },
               { label: "Trovärdighet", value: stats.avgTro, unit: "snitt" },
+              ...(marketStats ? [{ label: "Markets rätt", value: `${marketStats.ratta}/${marketStats.totalt}`, unit: "avgjorda", accent: true }] : []),
             ].map(({ label, value, unit, accent }) => (
               <div key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px", textAlign: "center" }}>
                 <div style={{ fontSize: "22px", fontWeight: 700, color: accent ? C.accent : scoreColor(value), fontFamily: "monospace" }}>
