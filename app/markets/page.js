@@ -63,6 +63,28 @@ async function getSenasteAktivitet() {
   return res.json();
 }
 
+async function getPrediktionsRankning() {
+  const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,markets(utfall,status)`,
+    { headers, cache: "no-store" }
+  );
+  if (!res.ok) return [];
+  const bets = await res.json();
+  const resolved = bets.filter(b => b.markets?.status === "avgjord" && b.markets?.utfall);
+  if (!resolved.length) return [];
+  const map = {};
+  for (const bet of resolved) {
+    if (!map[bet.agent]) map[bet.agent] = { ratta: 0, totalt: 0 };
+    map[bet.agent].totalt++;
+    const ratt = bet.markets.utfall === "ja" ? bet.sannolikhet >= 50 : bet.sannolikhet < 50;
+    if (ratt) map[bet.agent].ratta++;
+  }
+  return Object.entries(map)
+    .map(([agent, s]) => ({ agent, ...s, pct: Math.round(s.ratta / s.totalt * 100) }))
+    .sort((a, b) => b.pct - a.pct || b.totalt - a.totalt);
+}
+
 function sedanStr(iso) {
   const diff = Date.now() - new Date(iso).getTime();
   const min = Math.floor(diff / 60000);
@@ -211,11 +233,11 @@ function AvgjordKort({ market }) {
 function AktivitetsFeed({ aktivitet }) {
   if (!aktivitet.length) return null;
   return (
-    <div style={{ position: "sticky", top: "80px" }}>
+    <div>
       <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 12px" }}>
         Senaste aktivitet
       </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "calc(100vh - 160px)", overflowY: "auto" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "50vh", overflowY: "auto" }}>
         {aktivitet.map((b, i) => {
           const v = agentVisuell(b.agent);
           const tag = betTagline(b.sannolikhet);
@@ -263,10 +285,49 @@ function AktivitetsFeed({ aktivitet }) {
   );
 }
 
+function PrediktionsRankning({ rankning }) {
+  return (
+    <div style={{ marginTop: "28px" }}>
+      <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 12px" }}>
+        Bästa prediktorer
+      </p>
+      {rankning.length === 0 ? (
+        <p style={{ fontSize: "12px", color: "#444", fontStyle: "italic", margin: 0, lineHeight: 1.6 }}>
+          Syns när markets avgörs.
+        </p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          {rankning.slice(0, 8).map((r, i) => {
+            const v = agentVisuell(r.agent);
+            const medalColor = i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#b87333" : C.textMuted;
+            const pctColor = r.pct >= 60 ? C.green : r.pct >= 40 ? C.yellow : C.red;
+            return (
+              <a key={r.agent} href={`/agent/${encodeURIComponent(r.agent)}`} style={{
+                display: "flex", alignItems: "center", gap: "8px", textDecoration: "none",
+                padding: "8px 10px",
+                background: i < 3 ? `${medalColor}08` : "transparent",
+                border: `1px solid ${i < 3 ? medalColor + "30" : C.border}`,
+                borderRadius: "6px",
+              }}>
+                <span style={{ fontSize: "11px", color: medalColor, fontFamily: "monospace", fontWeight: 700, width: "18px", flexShrink: 0 }}>#{i + 1}</span>
+                <AgentAvatar namn={r.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={20} />
+                <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.agent}</span>
+                <span style={{ fontSize: "13px", color: pctColor, fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>{r.pct}%</span>
+                <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace", flexShrink: 0 }}>{r.ratta}/{r.totalt}</span>
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default async function MarketsPage() {
-  const [{ oppna, avgjorda }, aktivitet] = await Promise.all([
+  const [{ oppna, avgjorda }, aktivitet, rankning] = await Promise.all([
     getMarkets(),
     getSenasteAktivitet(),
+    getPrediktionsRankning(),
   ]);
 
   return (
@@ -329,12 +390,13 @@ export default async function MarketsPage() {
           )}
         </div>
 
-        {/* Höger: aktivitetsfeed */}
-        {aktivitet.length > 0 && (
-          <div style={{ width: "300px", flexShrink: 0 }}>
+        {/* Höger: aktivitetsfeed + rankning */}
+        <div style={{ width: "300px", flexShrink: 0 }}>
+          <div style={{ position: "sticky", top: "80px" }}>
             <AktivitetsFeed aktivitet={aktivitet} />
+            <PrediktionsRankning rankning={rankning} />
           </div>
-        )}
+        </div>
       </main>
 
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "40px" }}>
