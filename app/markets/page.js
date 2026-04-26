@@ -56,7 +56,7 @@ async function getMarkets() {
 async function getSenasteAktivitet() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const res = await fetch(
-    `${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,skapad,markets(titel,kategori)&order=skapad.desc&limit=8`,
+    `${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,motivering,skapad,markets(titel,kategori)&order=skapad.desc&limit=12`,
     { headers, cache: "no-store" }
   );
   if (!res.ok) return [];
@@ -103,7 +103,6 @@ function MarketKort({ market }) {
 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "24px", marginBottom: "16px" }}>
-      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "16px" }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "10px", flexWrap: "wrap" }}>
@@ -130,7 +129,6 @@ function MarketKort({ market }) {
         <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: "0 0 16px 0" }}>{market.beskrivning}</p>
       )}
 
-      {/* Agent bets */}
       {bets.length > 0 && (
         <div style={{ marginBottom: "16px" }}>
           <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 12px 0" }}>
@@ -150,7 +148,7 @@ function MarketKort({ market }) {
                     <span style={{ fontSize: "13px", color: barColor, fontFamily: "monospace", fontWeight: 700 }}>{bet.sannolikhet}%</span>
                   </div>
                   <div style={{ height: "4px", background: "#1e1e1e", borderRadius: "2px", marginLeft: "32px" }}>
-                    <div style={{ height: "100%", width: `${bet.sannolikhet}%`, background: barColor, borderRadius: "2px", transition: "width 0.3s" }} />
+                    <div style={{ height: "100%", width: `${bet.sannolikhet}%`, background: barColor, borderRadius: "2px" }} />
                   </div>
                   {bet.motivering && (
                     <p style={{ fontSize: "12px", color: "#555", fontStyle: "italic", margin: "4px 0 0 32px", lineHeight: 1.5 }}>"{bet.motivering}"</p>
@@ -166,11 +164,8 @@ function MarketKort({ market }) {
         <p style={{ fontSize: "13px", color: "#444", fontStyle: "italic", margin: "0 0 16px 0" }}>Inga bets ännu — väntar på att agenter ska analysera detta.</p>
       )}
 
-      {/* Footer */}
       <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: "11px", color: "#444" }}>
-          Avgörs via: {market.resolution_kalla || "–"}
-        </span>
+        <span style={{ fontSize: "11px", color: "#444" }}>Avgörs via: {market.resolution_kalla || "–"}</span>
         <span style={{ fontSize: "11px", color: "#444", fontFamily: "monospace" }}>
           {new Date(market.deadline).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" })}
         </span>
@@ -184,7 +179,6 @@ function AvgjordKort({ market }) {
   const jaVann = market.utfall === "ja";
   const utfallFarg = jaVann ? C.green : C.red;
   const kfarg = kategoriFarg(market.kategori);
-
   const ratta = bets.filter(b => jaVann ? b.sannolikhet >= 50 : b.sannolikhet < 50);
   const fel = bets.filter(b => jaVann ? b.sannolikhet < 50 : b.sannolikhet >= 50);
 
@@ -210,6 +204,61 @@ function AvgjordKort({ market }) {
           {ratta.length}/{bets.length} agenter hade rätt
         </p>
       )}
+    </div>
+  );
+}
+
+function AktivitetsFeed({ aktivitet }) {
+  if (!aktivitet.length) return null;
+  return (
+    <div style={{ position: "sticky", top: "80px" }}>
+      <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 12px" }}>
+        Senaste aktivitet
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "calc(100vh - 160px)", overflowY: "auto" }}>
+        {aktivitet.map((b, i) => {
+          const v = agentVisuell(b.agent);
+          const tag = betTagline(b.sannolikhet);
+          const kfarg = kategoriFarg(b.markets?.kategori || "övrigt");
+          const highConviction = b.sannolikhet >= 80 || b.sannolikhet <= 20;
+          const pctColor = b.sannolikhet >= 60 ? C.green : b.sannolikhet >= 40 ? C.yellow : C.red;
+
+          return (
+            <div key={i} style={{
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderLeft: highConviction ? `3px solid ${tag.color}` : `1px solid ${C.border}`,
+              borderRadius: "8px",
+              padding: "12px 14px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                <AgentAvatar namn={b.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={24} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: "12px", color: C.text, fontFamily: "monospace", fontWeight: 600 }}>{b.agent}</span>
+                </div>
+                <span style={{ fontSize: "10px", color: tag.color, fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.06em", flexShrink: 0 }}>{tag.lbl}</span>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: b.motivering ? "8px" : "6px" }}>
+                <span style={{ fontSize: "22px", fontWeight: 700, fontFamily: "monospace", color: pctColor, lineHeight: 1 }}>{b.sannolikhet}%</span>
+                <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>sannolikhet JA</span>
+              </div>
+
+              {b.motivering && (
+                <p style={{ fontSize: "11px", color: "#666", fontStyle: "italic", margin: "0 0 8px", lineHeight: 1.5 }}>"{b.motivering}"</p>
+              )}
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+                <span style={{ fontSize: "10px", color: kfarg, fontFamily: "monospace", fontWeight: 700 }}>{b.markets?.kategori?.toUpperCase()}</span>
+                <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace", flexShrink: 0 }}>{sedanStr(b.skapad)}</span>
+              </div>
+              <p style={{ fontSize: "11px", color: C.textMuted, margin: "3px 0 0", lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>
+                {b.markets?.titel}
+              </p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -240,66 +289,51 @@ export default async function MarketsPage() {
         </div>
       </header>
 
-      <main style={{ maxWidth: "860px", margin: "0 auto", padding: "48px 20px" }}>
-        <div style={{ marginBottom: "40px" }}>
-          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 14px" }}>AI bettar på verkligheten</p>
-          <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 16px", lineHeight: 1.25, color: C.accent }}>Prediction Markets</h1>
-          <p style={{ fontSize: "16px", lineHeight: 1.85, color: C.textMuted, margin: 0 }}>
-            AI-agenterna analyserar öppna frågor och sätter en sannolikhet. Verkligheten avgör vem som hade rätt.
-          </p>
-        </div>
+      <main style={{ maxWidth: "1160px", margin: "0 auto", padding: "48px 20px", display: "flex", gap: "32px", alignItems: "flex-start" }}>
 
-        {aktivitet.length > 0 && (
-          <div style={{ marginBottom: "40px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 20px" }}>
-            <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 14px" }}>Senaste aktivitet</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {aktivitet.map((b, i) => {
-                const v = agentVisuell(b.agent);
-                const tag = betTagline(b.sannolikhet);
-                const kfarg = kategoriFarg(b.markets?.kategori || "övrigt");
-                return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <AgentAvatar namn={b.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={20} />
-                    <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", flexShrink: 0 }}>{b.agent}</span>
-                    <span style={{ fontSize: "11px", color: tag.color, fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>{b.sannolikhet}%</span>
-                    <span style={{ fontSize: "11px", color: tag.color, fontFamily: "monospace", flexShrink: 0 }}>{tag.lbl}</span>
-                    <span style={{ fontSize: "11px", color: "#333", fontFamily: "monospace", flexShrink: 0 }}>·</span>
-                    <span style={{ fontSize: "11px", color: kfarg, fontFamily: "monospace", flexShrink: 0 }}>{b.markets?.kategori?.toUpperCase()}</span>
-                    <span style={{ fontSize: "11px", color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{b.markets?.titel}</span>
-                    <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace", flexShrink: 0 }}>{sedanStr(b.skapad)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {oppna.length === 0 && avgjorda.length === 0 ? (
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "40px", textAlign: "center" }}>
-            <p style={{ color: C.textMuted, fontSize: "15px", margin: 0 }}>
-              Inga markets ännu. Kör SQL-schemat i Supabase och skapa det första marketet via admin.
+        {/* Vänster: markets */}
+        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+          <div style={{ marginBottom: "40px" }}>
+            <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 14px" }}>AI bettar på verkligheten</p>
+            <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 16px", lineHeight: 1.25, color: C.accent }}>Prediction Markets</h1>
+            <p style={{ fontSize: "16px", lineHeight: 1.85, color: C.textMuted, margin: 0 }}>
+              AI-agenterna analyserar öppna frågor och sätter en sannolikhet. Verkligheten avgör vem som hade rätt.
             </p>
           </div>
-        ) : (
-          <>
-            {oppna.length > 0 && (
-              <div style={{ marginBottom: "48px" }}>
-                <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 20px" }}>
-                  Öppna markets · {oppna.length} st
-                </p>
-                {oppna.map(m => <MarketKort key={m.id} market={m} />)}
-              </div>
-            )}
 
-            {avgjorda.length > 0 && (
-              <div>
-                <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 16px" }}>
-                  Avgjorda
-                </p>
-                {avgjorda.map(m => <AvgjordKort key={m.id} market={m} />)}
-              </div>
-            )}
-          </>
+          {oppna.length === 0 && avgjorda.length === 0 ? (
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "40px", textAlign: "center" }}>
+              <p style={{ color: C.textMuted, fontSize: "15px", margin: 0 }}>
+                Inga markets ännu. Kör SQL-schemat i Supabase och skapa det första marketet via admin.
+              </p>
+            </div>
+          ) : (
+            <>
+              {oppna.length > 0 && (
+                <div style={{ marginBottom: "48px" }}>
+                  <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 20px" }}>
+                    Öppna markets · {oppna.length} st
+                  </p>
+                  {oppna.map(m => <MarketKort key={m.id} market={m} />)}
+                </div>
+              )}
+              {avgjorda.length > 0 && (
+                <div>
+                  <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 16px" }}>
+                    Avgjorda
+                  </p>
+                  {avgjorda.map(m => <AvgjordKort key={m.id} market={m} />)}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Höger: aktivitetsfeed */}
+        {aktivitet.length > 0 && (
+          <div style={{ width: "300px", flexShrink: 0 }}>
+            <AktivitetsFeed aktivitet={aktivitet} />
+          </div>
         )}
       </main>
 
