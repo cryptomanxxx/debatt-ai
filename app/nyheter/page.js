@@ -59,10 +59,7 @@ function ArtikelKort({ artikel }) {
       <article style={{
         background: C.surface, border: `1px solid ${C.border}`,
         borderRadius: "8px", padding: "20px 24px", marginBottom: "16px",
-        transition: "border-color 0.15s",
       }}
-        onMouseEnter={e => e.currentTarget.style.borderColor = C.accentDim}
-        onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
       >
         {/* Källetikett */}
         {k && (
