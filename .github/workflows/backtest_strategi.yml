@@ -1,12 +1,10 @@
-name: Backtest (fetch + strategi)
+name: Backtest (bara strategi)
 
 on:
-  schedule:
-    - cron: "0 5 * * 1"   # Varje måndag kl 05:00 UTC (07:00 svensk tid)
-  workflow_dispatch:       # Kan köras manuellt
+  workflow_dispatch:   # Körs bara manuellt
 
 jobs:
-  run-backtest:
+  run-strategi:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -18,12 +16,7 @@ jobs:
           python-version: "3.12"
 
       - name: Installera beroenden
-        run: pip install httpx yfinance
-
-      - name: Hämta prisdata från Yahoo Finance → ohlcv_cache
-        env:
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: python backtest_fetch.py
+        run: pip install httpx
 
       - name: Kör strategioptimering → backtest_resultat
         env:

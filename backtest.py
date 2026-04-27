@@ -16,19 +16,16 @@ Parameterrutnät:
 
 Totalt: 3×3×3×2×2×2 = 216 kombinationer per mynt × 5 mynt = 1 080 rader
 
-Datakälla: Yahoo Finance (yfinance)
+Datakälla: Supabase ohlcv_cache (populeras av backtest_fetch.py)
 Resultat:  Supabase backtest_resultat
 """
 
 import httpx
 import os
 import sys
-import time
 import statistics
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from itertools import product
-
-import yfinance as yf
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
@@ -38,13 +35,12 @@ if not SB_KEY:
     sys.exit(1)
 
 COINS = [
-    ("BTC", "BTC-USD", "Bitcoin"),
-    ("ETH", "ETH-USD", "Ethereum"),
-    ("SOL", "SOL-USD", "Solana"),
-    ("XRP", "XRP-USD", "XRP"),
-    ("BNB", "BNB-USD", "BNB"),
+    ("BTC", "Bitcoin"),
+    ("ETH", "Ethereum"),
+    ("SOL", "Solana"),
+    ("XRP", "XRP"),
+    ("BNB", "BNB"),
 ]
-DAYS = 730
 
 EXITS          = [1, 3, 7]
 VOL_THRESHOLDS = [1.0, 1.5, 2.0]
@@ -57,36 +53,34 @@ PARAM_GRID = list(product(EXITS, VOL_THRESHOLDS, LOOKBACKS,
                           STOP_LOSSES, TRANS_COSTS, REGIME_FILTERS))
 
 
-def hamta_yahoo(ticker: str) -> list[dict]:
-    """Hämtar daglig OHLCV-data från Yahoo Finance."""
-    try:
-        df = yf.download(ticker, period=f"{DAYS}d", interval="1d",
-                         progress=False, auto_adjust=True)
-        if df is None or df.empty:
-            return []
-        result = []
-        for datum, row in df.iterrows():
-            close = row["Close"]
-            vol   = row["Volume"]
-            if hasattr(close, "iloc"):
-                close = float(close.iloc[0])
-                vol   = float(vol.iloc[0])
-            else:
-                close = float(close)
-                vol   = float(vol)
-            if close > 0:
-                result.append({"datum": datum.date(), "pris": close, "vol": vol})
-        return sorted(result, key=lambda x: x["datum"])
-    except Exception as e:
-        print(f"  Yahoo fel ({ticker}): {e}", file=sys.stderr)
+def hamta_ohlcv(symbol: str) -> list[dict]:
+    """Hämtar cachad OHLCV-data från Supabase ohlcv_cache."""
+    headers = {
+        "apikey":        SB_KEY,
+        "Authorization": f"Bearer {SB_KEY}",
+    }
+    r = httpx.get(
+        f"{SB_URL}/rest/v1/ohlcv_cache"
+        f"?symbol=eq.{symbol}&order=datum.asc&select=datum,pris,vol&limit=1000",
+        headers=headers, timeout=15,
+    )
+    if r.status_code != 200:
+        print(f"  ✗ Hämtfel {symbol}: {r.status_code} {r.text[:80]}", file=sys.stderr)
         return []
+    rows = r.json()
+    return [
+        {"datum": date.fromisoformat(row["datum"]),
+         "pris":  float(row["pris"]),
+         "vol":   float(row["vol"])}
+        for row in rows
+    ]
 
 
 def strategi_id(exit_days, vol_threshold, lookback, stoploss, tc, regime):
-    sl = f"sl{int(stoploss)}" if stoploss else "sl0"
+    sl   = f"sl{int(stoploss)}" if stoploss else "sl0"
     tc_s = f"tc{str(tc).replace('.', '')}"
-    rf = "rf1" if regime else "rf0"
-    vt = str(vol_threshold).replace(".", "")
+    rf   = "rf1" if regime else "rf0"
+    vt   = str(vol_threshold).replace(".", "")
     return f"l{lookback}_v{vt}x_e{exit_days}d_{sl}_{tc_s}_{rf}"
 
 
@@ -118,7 +112,6 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
 
         if dag["pris"] > avg_pris and dag["vol"] > vol_threshold * avg_vol:
             kop_pris  = dag["pris"] * (1 + tc_pct / 100)
-            salj_idx  = i + exit_days
             salj_pris = None
 
             # Stop-loss: kolla varje dag fram till exit
@@ -127,16 +120,15 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
                 for j in range(i + 1, min(i + exit_days + 1, len(data))):
                     if data[j]["pris"] <= sl_trigger:
                         salj_pris = data[j]["pris"] * (1 - tc_pct / 100)
-                        salj_idx  = j
+                        i_exit    = j
                         break
 
             if salj_pris is None:
-                salj_idx  = min(i + exit_days, len(data) - 1)
-                salj_pris = data[salj_idx]["pris"] * (1 - tc_pct / 100)
+                i_exit    = min(i + exit_days, len(data) - 1)
+                salj_pris = data[i_exit]["pris"] * (1 - tc_pct / 100)
 
             avk = (salj_pris - kop_pris) / kop_pris * 100
             trades.append(avk)
-            i_exit = salj_idx
 
     period_start = data[lookback]["datum"].isoformat()
     period_slut  = data[-1]["datum"].isoformat()
@@ -165,7 +157,7 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
         if std > 0:
             sharpe = avg_avk / std
 
-    # Strategins max drawdown: beräknas på egenkapitalkurvan (trade för trade)
+    # Max drawdown på egenkapitalkurvan (trade för trade)
     peak_k = 1.0
     max_dd = 0.0
     for k in kapital_kurva:
@@ -242,12 +234,14 @@ def main():
     print(f"{len(PARAM_GRID)} kombinationer × {len(COINS)} mynt = "
           f"{len(PARAM_GRID) * len(COINS)} totalt\n")
 
-    # BTC-data för regimfilter
-    print("Hämtar BTC-data för regimfilter…")
-    btc_raw = hamta_yahoo("BTC-USD")
+    # BTC-data för regimfilter (läses från cache)
+    print("Läser BTC-data för regimfilter från cache…")
+    btc_raw = hamta_ohlcv("BTC")
+    if not btc_raw:
+        print("FEL: Ingen BTC-data i cache. Kör backtest_fetch.py först.", file=sys.stderr)
+        sys.exit(1)
     btc_by_date = {r["datum"]: r["pris"] for r in btc_raw}
 
-    # Förberäkna BTC-upptrend per (datum, lookback) — görs inline per lookback
     def btc_uptrend_for(lb):
         dates = sorted(btc_by_date.keys())
         result = {}
@@ -259,11 +253,11 @@ def main():
 
     btc_trends = {lb: btc_uptrend_for(lb) for lb in LOOKBACKS}
 
-    for symbol, ticker, namn in COINS:
+    for symbol, namn in COINS:
         print(f"\n── {namn} ({symbol}) ──")
-        data = btc_raw if symbol == "BTC" else hamta_yahoo(ticker)
+        data = btc_raw if symbol == "BTC" else hamta_ohlcv(symbol)
         if not data:
-            print("  Ingen data — hoppar")
+            print("  Ingen data i cache — hoppar (kör backtest_fetch.py)")
             continue
         print(f"  {len(data)} dagar ({data[0]['datum']} → {data[-1]['datum']})")
         print(f"  Kör {len(PARAM_GRID)} kombinationer…")
@@ -273,9 +267,9 @@ def main():
         sparade        = 0
 
         for exit_d, vol_t, lb, sl, tc, rf in PARAM_GRID:
-            sid      = strategi_id(exit_d, vol_t, lb, sl, tc, rf)
-            uptrend  = btc_trends[lb] if rf else {}
-            res      = backtesta(data, uptrend, exit_d, vol_t, lb, sl, tc, rf)
+            sid     = strategi_id(exit_d, vol_t, lb, sl, tc, rf)
+            uptrend = btc_trends[lb] if rf else {}
+            res     = backtesta(data, uptrend, exit_d, vol_t, lb, sl, tc, rf)
             if res is None:
                 continue
             spara(symbol, sid, res, vol_t, lb, sl, tc, rf)
@@ -290,9 +284,6 @@ def main():
 
         print(f"  ✓ {sparade} sparade — "
               f"bästa alpha: {basta_strategi} ({basta_alpha:+.0f}pp vs B&H)")
-
-        if symbol != "BTC":
-            time.sleep(2)
 
     print("\n=== KLART ===")
 
