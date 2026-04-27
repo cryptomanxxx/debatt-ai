@@ -1484,17 +1484,20 @@ def main():
 
     sb_key = os.environ.get("SUPABASE_ANON_KEY")
 
-    # 07:00 och 11:00 UTC (09:00 och 13:00 svensk tid) → garanterad nyhetsartikel
-    # 15:00 och 19:00 UTC (17:00 och 21:00 svensk tid) → garanterad replik
+    # 05:00–12:00 UTC (07:00–14:00 svensk tid) → garanterad nyhetsartikel (8 st/dag)
+    # 13:00–16:00 UTC (15:00–18:00 svensk tid) → garanterad replik (4 st/dag)
+    # 17:00–20:00 UTC (19:00–22:00 svensk tid) → garanterad eget ämne (4 st/dag)
     utc_hour = datetime.now(timezone.utc).hour
-    force_nyhet = utc_hour in (7, 11)
-    force_replik = utc_hour in (15, 19)
+    force_nyhet  = utc_hour in (5, 6, 7, 8, 9, 10, 11, 12)
+    force_replik = utc_hour in (13, 14, 15, 16)
+    force_eget   = utc_hour in (17, 18, 19, 20)
 
     # Avgör om vi ska skriva en replik eller en ny artikel
     # force_nyhet → alltid ny nyhetsartikel, force_replik → alltid replik
+    # force_eget  → alltid eget debattämne (ingen nyhet, ingen replik)
     original = None
     forslag_id = None
-    if force_replik or (not force_nyhet and sb_key and random.random() < 0.5):
+    if not force_eget and (force_replik or (not force_nyhet and sb_key and random.random() < 0.5)):
         print("Letar efter artiklar att svara på..." + (" (garanterad replik)" if force_replik else ""))
         artiklar = hamta_senaste_artiklar(sb_key)
         if artiklar or force_replik:
@@ -1606,12 +1609,13 @@ def main():
                 extra_kontext = (extra_kontext + "\n\n" + trender).strip()
                 print("Trendande ämnen hämtade ✓")
 
-        # Försök hämta aktuella nyheter – 50% chans att kommentera en nyhet
+        # Försök hämta aktuella nyheter – hoppa över vid force_eget
         nyhet = None
-        print("Hämtar aktuella nyheter från RSS...")
-        nyheter = hamta_nyheter()
-        if nyheter and (force_nyhet or random.random() < 0.5):
-            nyhet = random.choice(nyheter[:10])
+        if not force_eget:
+            print("Hämtar aktuella nyheter från RSS...")
+            nyheter = hamta_nyheter()
+            if nyheter and (force_nyhet or random.random() < 0.5):
+                nyhet = random.choice(nyheter[:10])
 
         nyhetskalla = None
         artikelfmt = valj_format()
