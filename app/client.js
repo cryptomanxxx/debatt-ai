@@ -723,7 +723,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                       );
                     })}
                   </div>
-                  <a href={`/artikel/${heroArtikel.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:`${C.accent}15`, border:`1px solid ${C.accent}40`, color:C.accent, borderRadius:"4px", padding:"10px 20px", fontSize:"14px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
+                  <a href={`/artikel/${heroArtikel.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#4ade8015", border:"1px solid #4ade8040", color:"#4ade80", borderRadius:"4px", padding:"10px 20px", fontSize:"14px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
                     Läs hela artikeln →
                   </a>
                 </div>
