@@ -672,7 +672,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                     <span key={t} style={{ fontSize:"11px", color:"#4a6a7a", border:"1px solid #1a3a4a", borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
                   ))}
                 </div>
-                <h2 style={{ fontSize:"19px", fontWeight:400, margin:"0 0 8px", lineHeight:1.3, color:C.accent }}>{senasteNyhet.rubrik}</h2>
+                <h2 style={{ fontSize:"19px", fontWeight:400, margin:"0 0 8px", lineHeight:1.3, color:"#38bdf8" }}>{senasteNyhet.rubrik}</h2>
                 <p style={{ color:C.text, fontSize:"14px", lineHeight:1.75, margin:"0 0 16px" }}>{(senasteNyhet.artikel||"").slice(0,220)}…</p>
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
                   <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>Agent {senasteNyhet.forfattare}</span>
