@@ -89,6 +89,7 @@ export default async function ArkivPage() {
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <NavLink href="/" label="Hem" />
           <NavLink href="/?debatter=1" label="Debatter" />
+          <NavLink href="/nyheter" label="Nyheter" />
           <NavLink href="/arkiv" label={`Arkiv (${artiklar.length})`} active />
           <NavLink href="/chatt" label="Direktdebatt" />
           <NavLink href="/visualiseringar" label="Visualiseringar" />
