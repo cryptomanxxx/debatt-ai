@@ -858,6 +858,7 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
         f"RUBRIK: {nyhet['rubrik']}\n"
         + (f"INGRESS: {nyhet['beskrivning']}\n" if nyhet["beskrivning"] else "")
         + f"KÄLLA: {nyhet['kalla']}\n"
+        + (f"URL: {nyhet['url']}\n" if nyhet.get("url") else "")
         + kontext_block + "\n"
         "Skriv en debattartikel på svenska som kommenterar och analyserar "
         "denna nyhet ur ditt perspektiv. Om rubriken eller ingressen är på "
@@ -867,7 +868,12 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
         "- Minst 300 ord, gärna 400–500\n"
         f"{fmt['instruktion']}\n"
         "- Inga rubriker eller stycketitlar – löpande text\n"
-        f"- Skriv i första person som {agent['namn']}\n\n"
+        f"- Skriv i första person som {agent['namn']}\n"
+        "- VIKTIGT om källhänvisningar: Du har fått EN primär källa (nyheten ovan). "
+        "Hänvisa INTE till specifika rapporter, studier eller organisationer vid namn "
+        "om de inte nämns i den givna nyheten. Generella formuleringar som "
+        "'forskning visar' eller 'experter menar' är ok — men 'Enligt en rapport från X' "
+        "kräver att X faktiskt nämns i nyheten du fick.\n\n"
         "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
     )
     try:
@@ -1103,7 +1109,11 @@ def skriv_replik(agent: dict, original: dict) -> str:
         "- Presentera minst tre egna argument med fakta, siffror eller exempel\n"
         "- Avsluta med en tydlig slutsats som kontrasterar mot originalets\n"
         "- Inga rubriker eller stycketitlar – löpande text\n"
-        f"- Skriv i första person som {agent['namn']}\n\n"
+        f"- Skriv i första person som {agent['namn']}\n"
+        "- VIKTIGT om källhänvisningar: Hänvisa INTE till specifika rapporter, "
+        "studier eller organisationer vid namn om de inte nämns i originalartikeln. "
+        "Generella formuleringar som 'forskning visar' är ok — men 'Enligt en rapport "
+        "från X' kräver att X faktiskt förekommer i texten du svarar på.\n\n"
         "Skriv ENBART repliktexten. Ingen inledning, inga kommentarer."
     )
     try:
@@ -1679,7 +1689,14 @@ def main():
 
     # Skicka till debatt.ai
     print("Skickar till debatt.ai för AI-granskning...")
-    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id), nyhetskalla=nyhetskalla if not original else None, parent_id=original["id"] if original else None)
+    replik_kalla = {
+        "namn": original["rubrik"][:120],
+        "url": f"https://www.debatt-ai.se/artikel/{original['id']}",
+        "publicerad": original.get("skapad", ""),
+        "antal_utvärderade": 0,
+        "typ": "replik",
+    } if original else None
+    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id), nyhetskalla=nyhetskalla if not original else replik_kalla, parent_id=original["id"] if original else None)
 
     # Visa resultat
     print(f"\n{'═' * 60}")
