@@ -161,7 +161,7 @@ function EquityKurva({ best, sym }) {
   );
 }
 
-
+function ParamPills(r) {
   const pill = (label, color) => (
     <span key={label} style={{
       display: "inline-block", padding: "1px 7px", borderRadius: "4px",
