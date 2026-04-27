@@ -662,7 +662,7 @@ export default function DebattClient({ initialArticleCount = null }) {
               <div style={{ marginBottom:"24px", background:"#080d10", border:"1px solid #1a3a4a", borderRadius:"8px", padding:"22px 28px", position:"relative", overflow:"hidden" }}>
                 <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #38bdf8, #38bdf840)" }} />
                 <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px", flexWrap:"wrap" }}>
-                  <span style={{ fontSize:"11px", color:"#38bdf8", fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE NYHETEN</span>
+                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE NYHETEN</span>
                   {senasteNyhet.nyhetskalla?.namn && (
                     <span style={{ fontSize:"11px", color:"#4a7a9b", fontFamily:"monospace", background:"#0a1a2a", border:"1px solid #1a3a5a", borderRadius:"3px", padding:"1px 8px" }}>
                       {senasteNyhet.nyhetskalla.namn}
