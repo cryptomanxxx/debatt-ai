@@ -75,14 +75,15 @@ async function getPrediktionsRankning() {
   if (!resolved.length) return [];
   const map = {};
   for (const bet of resolved) {
-    if (!map[bet.agent]) map[bet.agent] = { ratta: 0, totalt: 0 };
+    if (!map[bet.agent]) map[bet.agent] = { totalScore: 0, totalt: 0 };
+    const utfallNum = bet.markets.utfall === "ja" ? 100 : 0;
+    const score = 100 - Math.abs(bet.sannolikhet - utfallNum);
+    map[bet.agent].totalScore += score;
     map[bet.agent].totalt++;
-    const ratt = bet.markets.utfall === "ja" ? bet.sannolikhet >= 50 : bet.sannolikhet < 50;
-    if (ratt) map[bet.agent].ratta++;
   }
   return Object.entries(map)
-    .map(([agent, s]) => ({ agent, ...s, pct: Math.round(s.ratta / s.totalt * 100) }))
-    .sort((a, b) => b.pct - a.pct || b.totalt - a.totalt);
+    .map(([agent, s]) => ({ agent, totalt: s.totalt, avgScore: Math.round(s.totalScore / s.totalt) }))
+    .sort((a, b) => b.avgScore - a.avgScore || b.totalt - a.totalt);
 }
 
 function sedanStr(iso) {
@@ -153,9 +154,22 @@ function MarketKort({ market }) {
 
       {bets.length > 0 && (
         <div style={{ marginBottom: "16px" }}>
-          <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 12px 0" }}>
-            {bets.length} {bets.length === 1 ? "agent" : "agenter"} har bettats
-          </p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
+            <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: 0 }}>
+              {bets.length} {bets.length === 1 ? "agent" : "agenter"} har analyserat
+            </p>
+            {bets.length >= 2 && (() => {
+              const min = Math.min(...bets.map(b => b.sannolikhet));
+              const max = Math.max(...bets.map(b => b.sannolikhet));
+              const spread = max - min;
+              const spreadColor = spread >= 40 ? C.yellow : spread >= 20 ? C.accentDim : C.textMuted;
+              return (
+                <span style={{ fontSize: "10px", color: spreadColor, fontFamily: "monospace", letterSpacing: "0.06em" }}>
+                  OENIGHET {min}%–{max}% <span style={{ color: "#444" }}>({spread}pp)</span>
+                </span>
+              );
+            })()}
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {bets.map(bet => {
               const v = agentVisuell(bet.agent);
@@ -300,7 +314,7 @@ function PrediktionsRankning({ rankning }) {
           {rankning.slice(0, 8).map((r, i) => {
             const v = agentVisuell(r.agent);
             const medalColor = i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#b87333" : C.textMuted;
-            const pctColor = r.pct >= 60 ? C.green : r.pct >= 40 ? C.yellow : C.red;
+            const scoreColor = r.avgScore >= 65 ? C.green : r.avgScore >= 45 ? C.yellow : C.red;
             return (
               <a key={r.agent} href={`/agent/${encodeURIComponent(r.agent)}`} style={{
                 display: "flex", alignItems: "center", gap: "8px", textDecoration: "none",
@@ -312,8 +326,8 @@ function PrediktionsRankning({ rankning }) {
                 <span style={{ fontSize: "11px", color: medalColor, fontFamily: "monospace", fontWeight: 700, width: "18px", flexShrink: 0 }}>#{i + 1}</span>
                 <AgentAvatar namn={r.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={20} />
                 <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.agent}</span>
-                <span style={{ fontSize: "13px", color: pctColor, fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>{r.pct}%</span>
-                <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace", flexShrink: 0 }}>{r.ratta}/{r.totalt}</span>
+                <span style={{ fontSize: "13px", color: scoreColor, fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>{r.avgScore}</span>
+                <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace", flexShrink: 0 }}>{r.totalt}m</span>
               </a>
             );
           })}
