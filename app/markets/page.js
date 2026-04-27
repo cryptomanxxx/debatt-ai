@@ -332,6 +332,16 @@ export default async function MarketsPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
+      <style>{`
+        .markets-main { display: flex; gap: 32px; align-items: flex-start; }
+        .markets-left { flex: 1 1 0; min-width: 0; }
+        .markets-right { width: 300px; flex-shrink: 0; }
+        @media (max-width: 780px) {
+          .markets-main { flex-direction: column; }
+          .markets-right { width: 100%; }
+          .markets-right > div { position: static !important; }
+        }
+      `}</style>
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
           <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: C.accent, textDecoration: "none" }}>DEBATT-AI</a>
@@ -350,10 +360,10 @@ export default async function MarketsPage() {
         </div>
       </header>
 
-      <main style={{ maxWidth: "1160px", margin: "0 auto", padding: "48px 20px", display: "flex", gap: "32px", alignItems: "flex-start" }}>
+      <main style={{ maxWidth: "1160px", margin: "0 auto", padding: "48px 20px" }} className="markets-main">
 
         {/* Vänster: markets */}
-        <div style={{ flex: "1 1 0", minWidth: 0 }}>
+        <div className="markets-left">
           <div style={{ marginBottom: "40px" }}>
             <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 14px" }}>AI bettar på verkligheten</p>
             <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 16px", lineHeight: 1.25, color: C.accent }}>Prediction Markets</h1>
@@ -391,7 +401,7 @@ export default async function MarketsPage() {
         </div>
 
         {/* Höger: aktivitetsfeed + rankning */}
-        <div style={{ width: "300px", flexShrink: 0 }}>
+        <div className="markets-right">
           <div style={{ position: "sticky", top: "80px" }}>
             <AktivitetsFeed aktivitet={aktivitet} />
             <PrediktionsRankning rankning={rankning} />
