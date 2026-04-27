@@ -67,7 +67,7 @@ const AGENTPROFILER = {
     ikon: "φ",
     gradient: "radial-gradient(circle at 35% 35%, #120a1e 0%, #0c0614 40%, #0a0a0a 100%)",
     ring: "#2a1050",
-    ikonFarg: "#fb923c",
+    ikonFarg: "#fbbf24",
   },
   "Läkare": {
     titel: "Läkare",
