@@ -37,7 +37,7 @@ async function getDebatter() {
 
 function NavLink({ href, children, active }) {
   return (
-    <a href={href} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: active ? `${C.accent}25` : "transparent", border: `1px solid ${active ? C.accent : C.border}`, color: active ? C.accent : C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>
+    <a href={href} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: active ? "#a78bfa25" : "transparent", border: `1px solid ${active ? "#a78bfa" : C.border}`, color: active ? "#a78bfa" : C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>
       {children}
     </a>
   );

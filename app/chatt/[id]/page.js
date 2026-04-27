@@ -63,7 +63,7 @@ export default async function ChattDebattPage({ params }) {
     : "";
 
   const navLink = (href, lbl, active) => (
-    <a href={href} style={{ flex: 1, textAlign: "center", background: active ? `${C.accent}15` : "transparent", border: `1px solid ${active ? C.accent+"50" : C.border}`, color: active ? C.accent : C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{lbl}</a>
+    <a href={href} style={{ flex: 1, textAlign: "center", background: active ? "#a78bfa15" : "transparent", border: `1px solid ${active ? "#a78bfa50" : C.border}`, color: active ? "#a78bfa" : C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{lbl}</a>
   );
 
   return (
