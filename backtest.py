@@ -163,12 +163,18 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
         if std > 0:
             sharpe = avg_avk / std
 
-    peak   = data[lookback]["pris"]
+    # Strategins max drawdown: beräknas på egenkapitalkurvan (trade för trade)
+    kapital_kurva = [1.0]
+    k = 1.0
+    for a in trades:
+        k *= (1 + a / 100)
+        kapital_kurva.append(k)
+    peak_k = 1.0
     max_dd = 0.0
-    for row in data[lookback:]:
-        if row["pris"] > peak:
-            peak = row["pris"]
-        dd = (peak - row["pris"]) / peak * 100
+    for k in kapital_kurva:
+        if k > peak_k:
+            peak_k = k
+        dd = (peak_k - k) / peak_k * 100
         if dd > max_dd:
             max_dd = dd
 

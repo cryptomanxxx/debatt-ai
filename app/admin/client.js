@@ -256,9 +256,15 @@ function BacktestTab() {
               Positivt alpha betyder att aktiv handel slog passivt innehav.
             </p>
             <p style={{ margin: "0 0 6px", color: C.text, fontWeight: 600 }}>Tolkning av Sharpe</p>
-            <p style={{ margin: "0 0 12px" }}>
+            <p style={{ margin: "0 0 8px" }}>
               Sharpe &gt; 1 = utmärkt, 0.5–1 = bra, 0–0.5 = svagt, &lt; 0 = sämre än riskfri ränta.
               Beräknas per trade (inte annualiserat).
+            </p>
+            <p style={{ margin: "0 0 6px", color: C.text, fontWeight: 600 }}>Max drawdown (strategin)</p>
+            <p style={{ margin: "0 0 12px" }}>
+              Beräknas på egenkapitalkurvan trade för trade — hur mycket strategins kapital föll
+              från sin högsta punkt. Mäter strategins faktiska risk, inte marknadens rörelse.
+              Grön &lt; 10%, gul &lt; 25%, röd ≥ 25%.
             </p>
             <p style={{ margin: "0 0 6px", color: C.text, fontWeight: 600 }}>Kelly-kriteriet</p>
             <p style={{ margin: "0 0 6px" }}>
@@ -373,7 +379,7 @@ function BacktestTab() {
                     <span style={{ fontSize: "12px", fontFamily: "monospace", color: (r.sharpe ?? 0) >= 0.5 ? C.green : (r.sharpe ?? 0) >= 0 ? C.yellow : C.red }}>
                       {r.sharpe != null ? r.sharpe : "–"}
                     </span>
-                    <span style={{ fontSize: "12px", fontFamily: "monospace", color: (r.max_drawdown ?? 100) < 20 ? C.green : (r.max_drawdown ?? 100) < 50 ? C.yellow : C.red }}>
+                    <span style={{ fontSize: "12px", fontFamily: "monospace", color: (r.max_drawdown ?? 100) < 10 ? C.green : (r.max_drawdown ?? 100) < 25 ? C.yellow : C.red }}>
                       {r.max_drawdown != null ? `-${r.max_drawdown}%` : "–"}
                     </span>
                     <span style={{ fontSize: "12px", fontFamily: "monospace", color: kellyColor }}>
