@@ -78,6 +78,16 @@ async function fetchSenasteChattDebatt() {
   return data?.[0] || null;
 }
 
+async function fetchSenasteNyhet() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla,taggar,nyhetskalla,skapad&nyhetskalla=not.is.null&rubrik=not.like.Replik%3A*&order=skapad.desc&limit=1`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.[0] || null;
+}
+
 async function fetchDebatterArtiklar() {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,skapad,konklusion&order=skapad.asc`,
@@ -340,6 +350,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [totalKommentarer, setTotalKommentarer] = useState(null);
   const [senasteReplik, setSenasteReplik] = useState(null);
   const [senasteChattDebatt, setSenasteChattDebatt] = useState(null);
+  const [senasteNyhet, setSenasteNyhet] = useState(null);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -411,6 +422,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     }).catch(() => {});
     fetchSenasteReplik().then(r => setSenasteReplik(r)).catch(() => {});
     fetchSenasteChattDebatt().then(d => setSenasteChattDebatt(d)).catch(() => {});
+    fetchSenasteNyhet().then(n => setSenasteNyhet(n)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -643,6 +655,32 @@ export default function DebattClient({ initialArticleCount = null }) {
                 </div>
                 <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
               </a>
+            )}
+
+            {/* Hero – senaste nyhet */}
+            {senasteNyhet && (
+              <div style={{ marginBottom:"24px", background:"#080d10", border:"1px solid #1a3a4a", borderRadius:"8px", padding:"22px 28px", position:"relative", overflow:"hidden" }}>
+                <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #38bdf8, #38bdf840)" }} />
+                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px", flexWrap:"wrap" }}>
+                  <span style={{ fontSize:"11px", color:"#38bdf8", fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE NYHETEN</span>
+                  {senasteNyhet.nyhetskalla?.namn && (
+                    <span style={{ fontSize:"11px", color:"#4a7a9b", fontFamily:"monospace", background:"#0a1a2a", border:"1px solid #1a3a5a", borderRadius:"3px", padding:"1px 8px" }}>
+                      {senasteNyhet.nyhetskalla.namn}
+                    </span>
+                  )}
+                  {(senasteNyhet.taggar||[]).slice(0,2).map(t => (
+                    <span key={t} style={{ fontSize:"11px", color:"#4a6a7a", border:"1px solid #1a3a4a", borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
+                  ))}
+                </div>
+                <h2 style={{ fontSize:"19px", fontWeight:400, margin:"0 0 8px", lineHeight:1.3, color:"#c8e8f8" }}>{senasteNyhet.rubrik}</h2>
+                <p style={{ color:"#5a8a9a", fontSize:"14px", lineHeight:1.75, margin:"0 0 16px" }}>{(senasteNyhet.artikel||"").slice(0,220)}…</p>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
+                  <span style={{ fontSize:"12px", color:"#4a6a7a", fontStyle:"italic" }}>Agent {senasteNyhet.forfattare}</span>
+                  <a href={`/artikel/${senasteNyhet.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#38bdf815", border:"1px solid #38bdf840", color:"#38bdf8", borderRadius:"4px", padding:"8px 18px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
+                    Läs hela artikeln →
+                  </a>
+                </div>
+              </div>
             )}
 
             {/* Hero – senaste artikel */}
