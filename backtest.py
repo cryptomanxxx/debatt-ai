@@ -5,7 +5,7 @@ backtest.py – Backtesta volym+pris-momentumstrategi på historisk kryptodata.
 Signal: Köp när priset > N-dagars medelvärde OCH volymen > N-dagars medelvärde.
 Exit:   Sälj efter M dagar (testas för M = 1, 3, 7).
 
-Datakälla: Binance public API (ingen API-nyckel krävs)
+Datakälla: Yahoo Finance via yfinance (ingen API-nyckel krävs)
 Resultat:  Sparas i Supabase-tabellen backtest_resultat
 
 Kör: python backtest.py
@@ -18,6 +18,8 @@ import time
 import statistics
 from datetime import datetime, timezone
 
+import yfinance as yf
+
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
@@ -26,11 +28,11 @@ if not SB_KEY:
     sys.exit(1)
 
 COINS = [
-    ("BTC", "BTCUSDT", "Bitcoin"),
-    ("ETH", "ETHUSDT", "Ethereum"),
-    ("SOL", "SOLUSDT", "Solana"),
-    ("XRP", "XRPUSDT", "XRP"),
-    ("BNB", "BNBUSDT", "BNB"),
+    ("BTC", "BTC-USD", "Bitcoin"),
+    ("ETH", "ETH-USD", "Ethereum"),
+    ("SOL", "SOL-USD", "Solana"),
+    ("XRP", "XRP-USD", "XRP"),
+    ("BNB", "BNB-USD", "BNB"),
 ]
 
 LOOKBACK = 10       # dagar för rullande medelvärde
@@ -38,40 +40,23 @@ EXITS    = [1, 3, 7]
 DAYS     = 730      # 2 år historik
 
 
-def hamta_binance(symbol: str) -> list[dict]:
-    """Hämtar daglig OHLCV-data från Binance (ingen API-nyckel krävs)."""
-    url = "https://api.binance.com/api/v3/klines"
-    params = {"symbol": symbol, "interval": "1d", "limit": DAYS}
-
-    for attempt in range(3):
-        try:
-            res = httpx.get(url, params=params, timeout=30)
-            if res.status_code == 429:
-                wait = 60 * (attempt + 1)
-                print(f"  Rate limit — väntar {wait}s", file=sys.stderr)
-                time.sleep(wait)
-                continue
-            res.raise_for_status()
-            rows = res.json()
-            if not rows:
-                return []
-
-            result = []
-            for row in rows:
-                # [open_time, open, high, low, close, vol_base, close_time, vol_quote, ...]
-                ts      = int(row[0])
-                pris    = float(row[4])   # close-pris
-                vol     = float(row[7])   # quote asset volume (USD)
-                datum   = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).date()
-                result.append({"datum": datum, "pris": pris, "vol": vol})
-
-            return sorted(result, key=lambda x: x["datum"])
-
-        except Exception as e:
-            print(f"  Binance fel ({symbol}, försök {attempt+1}): {e}", file=sys.stderr)
-            if attempt < 2:
-                time.sleep(5)
-    return []
+def hamta_yahoo(ticker: str) -> list[dict]:
+    """Hämtar daglig OHLCV-data från Yahoo Finance (ingen API-nyckel krävs)."""
+    try:
+        df = yf.download(ticker, period=f"{DAYS}d", interval="1d",
+                         progress=False, auto_adjust=True)
+        if df is None or df.empty:
+            return []
+        result = []
+        for datum, row in df.iterrows():
+            pris = float(row["Close"].iloc[0] if hasattr(row["Close"], "iloc") else row["Close"])
+            vol  = float(row["Volume"].iloc[0] if hasattr(row["Volume"], "iloc") else row["Volume"])
+            if pris > 0 and vol >= 0:
+                result.append({"datum": datum.date(), "pris": pris, "vol": vol})
+        return sorted(result, key=lambda x: x["datum"])
+    except Exception as e:
+        print(f"  Yahoo Finance fel ({ticker}): {e}", file=sys.stderr)
+        return []
 
 
 def backtesta(data: list[dict], exit_days: int) -> dict | None:
@@ -192,9 +177,9 @@ def main():
     print(f"Signal: pris > {LOOKBACK}d avg  OCH  vol > {LOOKBACK}d avg")
     print(f"Exit-perioder: {EXITS} dagar  |  Historik: {DAYS} dagar\n")
 
-    for symbol, binance_symbol, namn in COINS:
+    for symbol, ticker, namn in COINS:
         print(f"── {namn} ({symbol}) ──")
-        data = hamta_binance(binance_symbol)
+        data = hamta_yahoo(ticker)
         if not data:
             print("  Ingen data — hoppar")
             continue

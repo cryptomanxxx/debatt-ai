@@ -18,7 +18,7 @@ jobs:
           python-version: "3.12"
 
       - name: Installera beroenden
-        run: pip install httpx
+        run: pip install httpx yfinance
 
       - name: Kör backtest
         env:
