@@ -5,7 +5,7 @@ backtest.py – Backtesta volym+pris-momentumstrategi på historisk kryptodata.
 Signal: Köp när priset > N-dagars medelvärde OCH volymen > N-dagars medelvärde.
 Exit:   Sälj efter M dagar (testas för M = 1, 3, 7).
 
-Datakälla: CoinGecko public API (ingen API-nyckel krävs)
+Datakälla: Binance public API (ingen API-nyckel krävs)
 Resultat:  Sparas i Supabase-tabellen backtest_resultat
 
 Kör: python backtest.py
@@ -26,11 +26,11 @@ if not SB_KEY:
     sys.exit(1)
 
 COINS = [
-    ("BTC", "bitcoin",     "Bitcoin"),
-    ("ETH", "ethereum",    "Ethereum"),
-    ("SOL", "solana",      "Solana"),
-    ("XRP", "ripple",      "XRP"),
-    ("BNB", "binancecoin", "BNB"),
+    ("BTC", "BTCUSDT", "Bitcoin"),
+    ("ETH", "ETHUSDT", "Ethereum"),
+    ("SOL", "SOLUSDT", "Solana"),
+    ("XRP", "XRPUSDT", "XRP"),
+    ("BNB", "BNBUSDT", "BNB"),
 ]
 
 LOOKBACK = 10       # dagar för rullande medelvärde
@@ -38,39 +38,39 @@ EXITS    = [1, 3, 7]
 DAYS     = 730      # 2 år historik
 
 
-def hamta_coingecko(coin_id: str) -> list[dict]:
-    """Hämtar daglig pris- och volymdata från CoinGecko (2 år bakåt)."""
-    url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
-    params = {"vs_currency": "usd", "days": DAYS, "interval": "daily"}
+def hamta_binance(symbol: str) -> list[dict]:
+    """Hämtar daglig OHLCV-data från Binance (ingen API-nyckel krävs)."""
+    url = "https://api.binance.com/api/v3/klines"
+    params = {"symbol": symbol, "interval": "1d", "limit": DAYS}
 
     for attempt in range(3):
         try:
-            res = httpx.get(url, params=params, timeout=30,
-                            headers={"Accept": "application/json"})
+            res = httpx.get(url, params=params, timeout=30)
             if res.status_code == 429:
                 wait = 60 * (attempt + 1)
                 print(f"  Rate limit — väntar {wait}s", file=sys.stderr)
                 time.sleep(wait)
                 continue
             res.raise_for_status()
-            raw = res.json()
-
-            prices  = raw.get("prices", [])
-            volumes = raw.get("total_volumes", [])
-            if not prices or not volumes:
+            rows = res.json()
+            if not rows:
                 return []
 
-            by_date = {}
-            for (ts, pris), (_, vol) in zip(prices, volumes):
-                d = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).date()
-                by_date[d] = {"datum": d, "pris": pris, "vol": vol}
+            result = []
+            for row in rows:
+                # [open_time, open, high, low, close, vol_base, close_time, vol_quote, ...]
+                ts      = int(row[0])
+                pris    = float(row[4])   # close-pris
+                vol     = float(row[7])   # quote asset volume (USD)
+                datum   = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).date()
+                result.append({"datum": datum, "pris": pris, "vol": vol})
 
-            return sorted(by_date.values(), key=lambda x: x["datum"])
+            return sorted(result, key=lambda x: x["datum"])
 
         except Exception as e:
-            print(f"  CoinGecko fel ({coin_id}, försök {attempt+1}): {e}", file=sys.stderr)
+            print(f"  Binance fel ({symbol}, försök {attempt+1}): {e}", file=sys.stderr)
             if attempt < 2:
-                time.sleep(10)
+                time.sleep(5)
     return []
 
 
@@ -192,9 +192,9 @@ def main():
     print(f"Signal: pris > {LOOKBACK}d avg  OCH  vol > {LOOKBACK}d avg")
     print(f"Exit-perioder: {EXITS} dagar  |  Historik: {DAYS} dagar\n")
 
-    for symbol, coin_id, namn in COINS:
+    for symbol, binance_symbol, namn in COINS:
         print(f"── {namn} ({symbol}) ──")
-        data = hamta_coingecko(coin_id)
+        data = hamta_binance(binance_symbol)
         if not data:
             print("  Ingen data — hoppar")
             continue
