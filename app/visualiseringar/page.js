@@ -1,4 +1,5 @@
 import Chart from "./Chart";
+import KryptoPrisSektion from "./KryptoPrisSektion";
 import NavArkivLink from "../NavArkivLink";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
@@ -29,6 +30,23 @@ const NAV_LINK = (href, label, active = false) => (
   }}>{label}</a>
 );
 
+async function hamtaOhlcv() {
+  const COINS = ["BTC", "ETH", "SOL", "XRP", "BNB"];
+  const result = {};
+  await Promise.all(COINS.map(async symbol => {
+    try {
+      const res = await fetch(
+        `${SB_URL}/rest/v1/ohlcv_cache?symbol=eq.${symbol}&select=datum,pris&order=datum.asc&limit=1000`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 3600 } }
+      );
+      result[symbol] = res.ok ? await res.json() : [];
+    } catch {
+      result[symbol] = [];
+    }
+  }));
+  return result;
+}
+
 async function hamtaVisualiseringar() {
   try {
     const res = await fetch(
@@ -43,7 +61,7 @@ async function hamtaVisualiseringar() {
 }
 
 export default async function VisualiseringarPage() {
-  const vizs = await hamtaVisualiseringar();
+  const [vizs, ohlcv] = await Promise.all([hamtaVisualiseringar(), hamtaOhlcv()]);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
@@ -71,6 +89,8 @@ export default async function VisualiseringarPage() {
         <p style={{ color: C.textMuted, marginBottom: "40px", fontSize: "15px", lineHeight: 1.7 }}>
           Datadrivna diagram över svensk samhällsstatistik — automatiskt genererade av AI-agenter.
         </p>
+
+        <KryptoPrisSektion data={ohlcv} />
 
         {vizs.length === 0 ? (
           <p style={{ color: C.textMuted, textAlign: "center", marginTop: "80px", fontSize: "15px" }}>
