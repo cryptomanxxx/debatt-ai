@@ -111,25 +111,53 @@ async function publishToArtiklar(row) {
   if (!res.ok) throw new Error(await res.text());
 }
 
+function ParamPills({ r }) {
+  const pill = (label, color) => (
+    <span key={label} style={{
+      display: "inline-block", padding: "1px 7px", borderRadius: "4px",
+      fontSize: "10px", fontFamily: "monospace", fontWeight: 600,
+      background: color + "22", color: color, border: `1px solid ${color}44`,
+      marginRight: "4px", marginBottom: "2px",
+    }}>{label}</span>
+  );
+  const pills = [];
+  if (r.lookback)           pills.push(pill(`L${r.lookback}`, C.accentDim));
+  if (r.vol_multiplikator)  pills.push(pill(`V${r.vol_multiplikator}×`, C.accent));
+  const ex = r.strategi?.match(/e(\d+)d/)?.[1];
+  if (ex)                   pills.push(pill(`E${ex}d`, C.text));
+  if (r.stoploss_pct)       pills.push(pill(`SL${r.stoploss_pct}%`, C.red));
+  if (r.transaktionskostnad_pct > 0) pills.push(pill(`TC${r.transaktionskostnad_pct}%`, C.yellow));
+  if (r.regim_filter)       pills.push(pill("BTC↑", C.green));
+  return <span>{pills}</span>;
+}
+
 function BacktestTab() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
+  const [showAll, setShowAll] = useState({});
 
   useEffect(() => {
     async function load() {
       try {
         const res = await fetch(
-          `${SB_URL}/rest/v1/backtest_resultat?select=*&order=symbol.asc,strategi.asc`,
+          `${SB_URL}/rest/v1/backtest_resultat?select=*&order=symbol.asc`,
           { headers: sbHeaders() }
         );
         if (!res.ok) throw new Error(await res.text());
         const rows = await res.json();
-        // Gruppera per symbol
         const grouped = {};
         for (const r of rows) {
           if (!grouped[r.symbol]) grouped[r.symbol] = [];
           grouped[r.symbol].push(r);
+        }
+        // Sortera per symbol efter alpha (total - buyhold) desc
+        for (const sym of Object.keys(grouped)) {
+          grouped[sym].sort((a, b) => {
+            const alphaA = (a.total_avkastning ?? -999) - (a.buyhold_avkastning ?? 0);
+            const alphaB = (b.total_avkastning ?? -999) - (b.buyhold_avkastning ?? 0);
+            return alphaB - alphaA;
+          });
         }
         setData(grouped);
       } catch (e) { setError(e.message); }
@@ -137,15 +165,6 @@ function BacktestTab() {
     }
     load();
   }, []);
-
-  const exitLabel = s => s?.match(/exit(\d+)d/)?.[1] ? `Exit ${s.match(/exit(\d+)d/)[1]}d` : s;
-
-  const avkFarg = (tot, bh) => {
-    if (tot == null) return C.textMuted;
-    if (tot > bh) return C.green;
-    if (tot > 0)  return C.yellow;
-    return C.red;
-  };
 
   if (loading) return <p style={{ color: C.textMuted }}>Laddar backtestdata…</p>;
   if (error)   return <p style={{ color: C.red }}>Fel: {error}</p>;
@@ -156,91 +175,118 @@ function BacktestTab() {
       </p>
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
         <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px", fontFamily: "monospace" }}>Strategi</p>
-        <p style={{ color: C.textMuted, fontSize: "14px", lineHeight: 1.8, margin: 0 }}>
-          <strong style={{ color: C.text }}>Signal:</strong> Köp när priset är högre än 10-dagars medelpris OCH volymen är högre än 10-dagars medelvolym.<br />
-          <strong style={{ color: C.text }}>Exit:</strong> Sälj efter 1, 3 eller 7 dagar.<br />
-          <strong style={{ color: C.text }}>Jämförelse:</strong> Strategi vs buy &amp; hold för samma period.<br />
-          <strong style={{ color: C.text }}>Data:</strong> CoinGecko — 2 år historik för BTC, ETH, SOL, XRP, BNB.
+        <p style={{ color: C.textMuted, fontSize: "13px", lineHeight: 1.8, margin: 0 }}>
+          <strong style={{ color: C.text }}>Signal:</strong> Köp när pris &gt; lookback-dagars avg OCH volym &gt; threshold × lookback-dagars avg.<br />
+          <strong style={{ color: C.text }}>Exit:</strong> Sälj efter 1, 3 eller 7 dagar (eller vid stop-loss).<br />
+          <strong style={{ color: C.text }}>Grid:</strong> 216 kombinationer per mynt (lookback, vol-threshold, exit, SL, TC, regimfilter).<br />
+          <strong style={{ color: C.text }}>Data:</strong> Yahoo Finance — 2 år historik för BTC, ETH, SOL, XRP, BNB.
         </p>
       </div>
     </div>
   );
 
+  // Summering: bästa strategi per mynt
+  const summering = Object.entries(data).map(([sym, rader]) => {
+    const best = rader[0];
+    const alpha = best ? ((best.total_avkastning ?? 0) - (best.buyhold_avkastning ?? 0)) : 0;
+    return { sym, best, alpha };
+  });
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+      {/* Summering */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px" }}>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "monospace" }}>Strategi</p>
-        <p style={{ color: C.textMuted, fontSize: "13px", lineHeight: 1.7, margin: 0 }}>
-          Köp när pris &gt; 10d avg <strong style={{ color: C.text }}>OCH</strong> volym &gt; 10d avg. Sälj efter N dagar.
-          Sammansatt avkastning jämförs mot buy &amp; hold. Inga transaktionskostnader.
-          Överlappande positioner tillåts ej — ny signal ignoreras om position redan är öppen.
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>
+          Bästa strategi per mynt (alpha vs B&amp;H)
         </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+          {summering.map(({ sym, best, alpha }) => (
+            <div key={sym} style={{
+              background: "#0a0a0a", border: `1px solid ${alpha > 0 ? C.green : C.red}44`,
+              borderRadius: "6px", padding: "12px 16px", minWidth: "160px",
+            }}>
+              <p style={{ margin: "0 0 6px", fontSize: "12px", color: C.accent, fontFamily: "monospace", fontWeight: 700 }}>{sym}</p>
+              {best && <ParamPills r={best} />}
+              <p style={{ margin: "6px 0 0", fontSize: "13px", fontFamily: "monospace", color: alpha > 0 ? C.green : C.red, fontWeight: 700 }}>
+                {alpha > 0 ? "+" : ""}{Math.round(alpha)}pp alpha
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
+      {/* Per mynt */}
       {Object.entries(data).map(([symbol, rader]) => {
-        const senaste = rader[0];
+        const expanded = showAll[symbol];
+        const visade   = expanded ? rader : rader.slice(0, 10);
+        const senaste  = rader[0];
         return (
           <div key={symbol}>
             <p style={{ fontSize: "13px", color: C.accent, fontFamily: "monospace", fontWeight: 700, margin: "0 0 12px", letterSpacing: "0.08em" }}>
               {symbol} &nbsp;<span style={{ color: C.textMuted, fontWeight: 400, fontSize: "11px" }}>
-                {senaste?.period_start} → {senaste?.period_slut}
+                {senaste?.period_start} → {senaste?.period_slut} &nbsp;·&nbsp; {rader.length} kombinationer
               </span>
             </p>
 
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", fontFamily: "monospace" }}>
-                <thead>
-                  <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                    {["Exit", "Trades", "Vinstrate", "Avg/trade", "Strategi total", "Buy & Hold", "Sharpe", "Max DD"].map(h => (
-                      <th key={h} style={{ textAlign: "left", padding: "6px 12px", color: C.textMuted, fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 400 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rader.map(r => {
-                    const tot = r.total_avkastning;
-                    const bh  = r.buyhold_avkastning;
-                    const fc  = avkFarg(tot, bh);
-                    const diff = tot != null && bh != null ? tot - bh : null;
-                    return (
-                      <tr key={r.strategi} style={{ borderBottom: `1px solid ${C.border}20` }}>
-                        <td style={{ padding: "10px 12px", color: C.text }}>{exitLabel(r.strategi)}</td>
-                        <td style={{ padding: "10px 12px", color: C.textMuted }}>{r.antal_trades ?? "–"}</td>
-                        <td style={{ padding: "10px 12px", color: r.vinstrate >= 50 ? C.green : C.red }}>
-                          {r.vinstrate != null ? `${r.vinstrate}%` : "–"}
-                        </td>
-                        <td style={{ padding: "10px 12px", color: r.avg_avkastning >= 0 ? C.green : C.red }}>
-                          {r.avg_avkastning != null ? `${r.avg_avkastning > 0 ? "+" : ""}${r.avg_avkastning}%` : "–"}
-                        </td>
-                        <td style={{ padding: "10px 12px", color: fc, fontWeight: 700 }}>
-                          {tot != null ? `${tot > 0 ? "+" : ""}${tot}%` : "–"}
-                          {diff != null && (
-                            <span style={{ fontSize: "10px", color: diff > 0 ? C.green : C.red, marginLeft: "6px" }}>
-                              ({diff > 0 ? "+" : ""}{Math.round(diff)}pp)
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ padding: "10px 12px", color: bh >= 0 ? C.green : C.red }}>
-                          {bh != null ? `${bh > 0 ? "+" : ""}${bh}%` : "–"}
-                        </td>
-                        <td style={{ padding: "10px 12px", color: r.sharpe >= 0.5 ? C.green : r.sharpe >= 0 ? C.yellow : C.red }}>
-                          {r.sharpe != null ? r.sharpe : "–"}
-                        </td>
-                        <td style={{ padding: "10px 12px", color: r.max_drawdown < 20 ? C.green : r.max_drawdown < 50 ? C.yellow : C.red }}>
-                          {r.max_drawdown != null ? `-${r.max_drawdown}%` : "–"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+              {/* Header */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 50px 60px 70px 80px 80px 55px 60px", gap: "4px 12px", padding: "4px 8px", borderBottom: `1px solid ${C.border}` }}>
+                {["Parametrar", "Trade", "Win%", "Avg/tr", "Total", "B&H", "Sharpe", "MaxDD"].map(h => (
+                  <span key={h} style={{ fontSize: "9px", color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "monospace" }}>{h}</span>
+                ))}
+              </div>
+
+              {visade.map(r => {
+                const tot   = r.total_avkastning;
+                const bh    = r.buyhold_avkastning;
+                const alpha = tot != null && bh != null ? tot - bh : null;
+                return (
+                  <div key={r.strategi} style={{
+                    display: "grid", gridTemplateColumns: "1fr 50px 60px 70px 80px 80px 55px 60px",
+                    gap: "4px 12px", padding: "8px 8px",
+                    borderBottom: `1px solid ${C.border}18`,
+                    background: alpha > 0 ? `${C.green}08` : "transparent",
+                  }}>
+                    <span><ParamPills r={r} /></span>
+                    <span style={{ fontSize: "12px", fontFamily: "monospace", color: C.textMuted }}>{r.antal_trades ?? "–"}</span>
+                    <span style={{ fontSize: "12px", fontFamily: "monospace", color: (r.vinstrate ?? 0) >= 50 ? C.green : C.red }}>
+                      {r.vinstrate != null ? `${r.vinstrate}%` : "–"}
+                    </span>
+                    <span style={{ fontSize: "12px", fontFamily: "monospace", color: (r.avg_avkastning ?? 0) >= 0 ? C.green : C.red }}>
+                      {r.avg_avkastning != null ? `${r.avg_avkastning > 0 ? "+" : ""}${r.avg_avkastning}%` : "–"}
+                    </span>
+                    <span style={{ fontSize: "12px", fontFamily: "monospace", color: alpha > 0 ? C.green : alpha < 0 ? C.red : C.yellow, fontWeight: 700 }}>
+                      {tot != null ? `${tot > 0 ? "+" : ""}${tot}%` : "–"}
+                      {alpha != null && <span style={{ fontSize: "9px", display: "block", color: alpha > 0 ? C.green : C.red }}>({alpha > 0 ? "+" : ""}{Math.round(alpha)}pp)</span>}
+                    </span>
+                    <span style={{ fontSize: "12px", fontFamily: "monospace", color: (bh ?? 0) >= 0 ? C.green : C.red }}>
+                      {bh != null ? `${bh > 0 ? "+" : ""}${bh}%` : "–"}
+                    </span>
+                    <span style={{ fontSize: "12px", fontFamily: "monospace", color: (r.sharpe ?? 0) >= 0.5 ? C.green : (r.sharpe ?? 0) >= 0 ? C.yellow : C.red }}>
+                      {r.sharpe != null ? r.sharpe : "–"}
+                    </span>
+                    <span style={{ fontSize: "12px", fontFamily: "monospace", color: (r.max_drawdown ?? 100) < 20 ? C.green : (r.max_drawdown ?? 100) < 50 ? C.yellow : C.red }}>
+                      {r.max_drawdown != null ? `-${r.max_drawdown}%` : "–"}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
+
+            {rader.length > 10 && (
+              <button
+                onClick={() => setShowAll(s => ({ ...s, [symbol]: !s[symbol] }))}
+                style={{ marginTop: "10px", background: "none", border: `1px solid ${C.border}`, color: C.textMuted, fontSize: "11px", fontFamily: "monospace", padding: "4px 12px", borderRadius: "4px", cursor: "pointer" }}
+              >
+                {expanded ? `Visa färre ▲` : `Visa alla ${rader.length} ▼`}
+              </button>
+            )}
           </div>
         );
       })}
 
       <p style={{ fontSize: "11px", color: "#444", margin: 0 }}>
-        Uppdateras automatiskt varje måndag via GitHub Actions → Backtest.
+        Uppdateras automatiskt varje måndag via GitHub Actions → Backtest. 216 kombinationer × 5 mynt = 1 080 rader.
       </p>
     </div>
   );
