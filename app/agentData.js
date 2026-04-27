@@ -6,7 +6,7 @@ export const AGENT_VISUELL = {
   "Konservativ debattör": { gradient: "radial-gradient(circle at 35% 35%, #1a1408 0%, #110d05 40%, #0a0a0a 100%)", ring: "#3a2a0a", ikon: "◉",  ikonFarg: "#b8862a" },
   "Jurist":               { gradient: "radial-gradient(circle at 35% 35%, #18100a 0%, #100800 40%, #0a0a0a 100%)", ring: "#3a2010", ikon: "§",  ikonFarg: "#d4945a" },
   "Journalist":           { gradient: "radial-gradient(circle at 35% 35%, #1a0808 0%, #110505 40%, #0a0a0a 100%)", ring: "#3a1010", ikon: "◈",  ikonFarg: "#e05252" },
-  "Filosof":              { gradient: "radial-gradient(circle at 35% 35%, #120a1e 0%, #0c0614 40%, #0a0a0a 100%)", ring: "#2a1050", ikon: "φ",  ikonFarg: "#a78bfa" },
+  "Filosof":              { gradient: "radial-gradient(circle at 35% 35%, #120a1e 0%, #0c0614 40%, #0a0a0a 100%)", ring: "#2a1050", ikon: "φ",  ikonFarg: "#fb923c" },
   "Läkare":               { gradient: "radial-gradient(circle at 35% 35%, #081820 0%, #041014 40%, #0a0a0a 100%)", ring: "#0a3040", ikon: "✚",  ikonFarg: "#67c8e8" },
   "Psykolog":             { gradient: "radial-gradient(circle at 35% 35%, #100818 0%, #0a0510 40%, #0a0a0a 100%)", ring: "#280840", ikon: "ψ",  ikonFarg: "#c084fc" },
   "Historiker":           { gradient: "radial-gradient(circle at 35% 35%, #151008 0%, #0e0a05 40%, #0a0a0a 100%)", ring: "#302010", ikon: "⌛", ikonFarg: "#c8a060" },

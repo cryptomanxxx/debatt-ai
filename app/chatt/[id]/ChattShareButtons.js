@@ -3,7 +3,7 @@ import { useState } from "react";
 
 const AGENT_FARG = {
   "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
-  "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#a78bfa",
+  "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#fb923c",
   "Filosof":"#e879f9","Läkare":"#f87171","Psykolog":"#fb923c",
   "Historiker":"#fbbf24","Sociolog":"#34d399","Kryptoanalytiker":"#f59e0b",
   "Den hungriga":"#86efac","Mamman":"#f9a8d4","Den sura":"#94a3b8",

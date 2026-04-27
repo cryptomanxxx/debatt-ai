@@ -13,7 +13,7 @@ const C = {
 
 const AGENT_FARG = {
   "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
-  "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#a78bfa",
+  "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#fb923c",
   "Filosof":"#e879f9","Läkare":"#f87171","Psykolog":"#fb923c",
   "Historiker":"#fbbf24","Sociolog":"#34d399","Kryptoanalytiker":"#f59e0b",
   "Den hungriga":"#86efac","Mamman":"#f9a8d4","Den sura":"#94a3b8",
@@ -63,7 +63,7 @@ export default async function ChattDebattPage({ params }) {
     : "";
 
   const navLink = (href, lbl, active) => (
-    <a href={href} style={{ flex: 1, textAlign: "center", background: active ? "#a78bfa15" : "transparent", border: `1px solid ${active ? "#a78bfa50" : C.border}`, color: active ? "#a78bfa" : C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{lbl}</a>
+    <a href={href} style={{ flex: 1, textAlign: "center", background: active ? "#fb923c15" : "transparent", border: `1px solid ${active ? "#fb923c50" : C.border}`, color: active ? "#fb923c" : C.textMuted, padding: "6px 14px", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{lbl}</a>
   );
 
   return (

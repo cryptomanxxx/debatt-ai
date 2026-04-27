@@ -22,9 +22,9 @@ const NAV = (href, lbl, active) => (
   <a key={href} href={href} style={{
     display: "inline-flex", alignItems: "center", justifyContent: "center",
     height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1,
-    background: active ? "#a78bfa25" : "transparent",
-    border: `1px solid ${active ? "#a78bfa" : C.border}`,
-    color: active ? "#a78bfa" : C.textMuted,
+    background: active ? "#fb923c25" : "transparent",
+    border: `1px solid ${active ? "#fb923c" : C.border}`,
+    color: active ? "#fb923c" : C.textMuted,
     borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em",
     fontFamily: "Georgia, serif", textDecoration: "none",
   }}>{lbl}</a>
@@ -114,7 +114,7 @@ function dagarKvar(deadline) {
 }
 
 function kategoriFarg(kat) {
-  return { krypto: "#f7931a", makro: C.blue, politik: "#a78bfa", tech: "#34d399", övrigt: C.textMuted }[kat] || C.textMuted;
+  return { krypto: "#f7931a", makro: C.blue, politik: "#fb923c", tech: "#34d399", övrigt: C.textMuted }[kat] || C.textMuted;
 }
 
 function MarketKort({ market }) {
