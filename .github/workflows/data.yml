@@ -23,4 +23,5 @@ jobs:
       - name: Kör data agent
         env:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CMC_API_KEY: ${{ secrets.CMC_API_KEY }}
         run: python data_agent.py
