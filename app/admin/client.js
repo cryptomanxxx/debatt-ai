@@ -240,9 +240,25 @@ function BacktestTab() {
               Positivt alpha betyder att aktiv handel slog passivt innehav.
             </p>
             <p style={{ margin: "0 0 6px", color: C.text, fontWeight: 600 }}>Tolkning av Sharpe</p>
-            <p style={{ margin: 0 }}>
+            <p style={{ margin: "0 0 12px" }}>
               Sharpe &gt; 1 = utmärkt, 0.5–1 = bra, 0–0.5 = svagt, &lt; 0 = sämre än riskfri ränta.
               Beräknas per trade (inte annualiserat).
+            </p>
+            <p style={{ margin: "0 0 6px", color: C.text, fontWeight: 600 }}>Kelly-kriteriet</p>
+            <p style={{ margin: "0 0 6px" }}>
+              Beräknar den optimala andelen av kapitalet att satsa per trade för att maximera
+              långsiktig tillväxt utan att riskera utplåning.
+            </p>
+            <p style={{ margin: "0 0 6px", fontFamily: "monospace", fontSize: "12px", color: C.accent, background: "#0a0a0a", padding: "6px 10px", borderRadius: "4px", display: "inline-block" }}>
+              f* = (b × p − q) / b
+            </p>
+            <p style={{ margin: "4px 0 6px" }}>
+              p = win rate, q = 1 − p, b = genomsnittlig vinst / genomsnittlig förlust
+            </p>
+            <p style={{ margin: 0, color: C.yellow }}>
+              I praktiken används <strong>Half Kelly</strong> (f* ÷ 2) för att minska volatilitet
+              och risken för stora drawdowns. Full Kelly är matematiskt optimalt men aggressivt —
+              en förlustsvit kan halvera kapitalet snabbt.
             </p>
           </div>
         </div>
@@ -288,19 +304,22 @@ function BacktestTab() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
               {/* Header */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 50px 60px 70px 80px 80px 55px 60px", gap: "4px 12px", padding: "4px 8px", borderBottom: `1px solid ${C.border}` }}>
-                {["Parametrar", "Trade", "Win%", "Avg/tr", "Total", "B&H", "Sharpe", "MaxDD"].map(h => (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 50px 60px 70px 80px 80px 55px 60px 65px", gap: "4px 12px", padding: "4px 8px", borderBottom: `1px solid ${C.border}` }}>
+                {["Parametrar", "Trade", "Win%", "Avg/tr", "Total", "B&H", "Sharpe", "MaxDD", "Kelly"].map(h => (
                   <span key={h} style={{ fontSize: "9px", color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "monospace" }}>{h}</span>
                 ))}
               </div>
 
               {visade.map(r => {
-                const tot   = r.total_avkastning;
-                const bh    = r.buyhold_avkastning;
-                const alpha = tot != null && bh != null ? tot - bh : null;
+                const tot      = r.total_avkastning;
+                const bh       = r.buyhold_avkastning;
+                const alpha    = tot != null && bh != null ? tot - bh : null;
+                const kelly    = r.kelly_fraction;
+                const halfKelly = kelly != null ? Math.round(kelly / 2) : null;
+                const kellyColor = kelly == null ? C.textMuted : kelly >= 20 ? C.green : kelly >= 8 ? C.yellow : C.red;
                 return (
                   <div key={r.strategi} style={{
-                    display: "grid", gridTemplateColumns: "1fr 50px 60px 70px 80px 80px 55px 60px",
+                    display: "grid", gridTemplateColumns: "1fr 50px 60px 70px 80px 80px 55px 60px 65px",
                     gap: "4px 12px", padding: "8px 8px",
                     borderBottom: `1px solid ${C.border}18`,
                     background: alpha > 0 ? `${C.green}08` : "transparent",
@@ -325,6 +344,10 @@ function BacktestTab() {
                     </span>
                     <span style={{ fontSize: "12px", fontFamily: "monospace", color: (r.max_drawdown ?? 100) < 20 ? C.green : (r.max_drawdown ?? 100) < 50 ? C.yellow : C.red }}>
                       {r.max_drawdown != null ? `-${r.max_drawdown}%` : "–"}
+                    </span>
+                    <span style={{ fontSize: "12px", fontFamily: "monospace", color: kellyColor }}>
+                      {kelly != null ? `${Math.round(kelly)}%` : "–"}
+                      {halfKelly != null && <span style={{ fontSize: "9px", display: "block", color: C.textMuted }}>½K {halfKelly}%</span>}
                     </span>
                   </div>
                 );

@@ -172,6 +172,16 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
         if dd > max_dd:
             max_dd = dd
 
+    wins   = [a for a in trades if a > 0]
+    losses = [abs(a) for a in trades if a < 0]
+    kelly  = 0.0
+    if wins and losses:
+        avg_win  = sum(wins) / len(wins)
+        avg_loss = sum(losses) / len(losses)
+        b = avg_win / avg_loss
+        p = vinstrate / 100
+        kelly = max(0.0, (b * p - (1 - p)) / b * 100)
+
     return {
         "antal_trades":       len(trades),
         "vinstrate":          round(vinstrate, 1),
@@ -180,6 +190,7 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
         "buyhold_avkastning": round(buyhold, 1),
         "sharpe":             round(sharpe, 2),
         "max_drawdown":       round(max_dd, 1),
+        "kelly_fraction":     round(kelly, 1),
         "period_start":       period_start,
         "period_slut":        period_slut,
     }
@@ -199,6 +210,7 @@ def spara(symbol, strategi, res, vol_threshold, lookback,
         "buyhold_avkastning":      res.get("buyhold_avkastning"),
         "sharpe":                  res.get("sharpe"),
         "max_drawdown":            res.get("max_drawdown"),
+        "kelly_fraction":          res.get("kelly_fraction"),
         "vol_multiplikator":       vol_threshold,
         "lookback":                lookback,
         "stoploss_pct":            stoploss_pct,
