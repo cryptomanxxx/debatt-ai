@@ -1552,6 +1552,8 @@ def main():
     # force_eget  → alltid eget debattämne (ingen nyhet, ingen replik)
     original = None
     forslag_id = None
+    nyhet   = None
+    nyheter = []
     if not force_eget and (force_replik or (not force_nyhet and sb_key and random.random() < 0.5)):
         print("Letar efter artiklar att svara på..." + (" (garanterad replik)" if force_replik else ""))
         artiklar = hamta_senaste_artiklar(sb_key)
@@ -1665,8 +1667,6 @@ def main():
                 print("Trendande ämnen hämtade ✓")
 
         # Försök hämta aktuella nyheter – hoppa över vid force_eget
-        nyhet   = None
-        nyheter = []
         if not force_eget:
             print("Hämtar aktuella nyheter från RSS...")
             nyheter = hamta_nyheter()
