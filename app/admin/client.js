@@ -194,6 +194,64 @@ function BacktestTab() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+      {/* Strategibeskrivning */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px" }}>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>
+          Hur strategin fungerar
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 32px", fontSize: "13px", color: C.textMuted, lineHeight: 1.7 }}>
+          <div>
+            <p style={{ margin: "0 0 6px", color: C.text, fontWeight: 600 }}>Signal (köp)</p>
+            <p style={{ margin: 0 }}>
+              Köp när <span style={{ color: C.accent }}>pris &gt; lookback-dagars medelpris</span> OCH{" "}
+              <span style={{ color: C.accent }}>volym &gt; threshold × lookback-dagars medelvolym</span>.
+              Signalen kräver alltså att både momentum och volym bekräftar rörelsen.
+            </p>
+          </div>
+          <div>
+            <p style={{ margin: "0 0 6px", color: C.text, fontWeight: 600 }}>Exit (sälj)</p>
+            <p style={{ margin: 0 }}>
+              Sälj efter ett fast antal dagar (1d / 3d / 7d) — eller tidigare om stop-loss triggas.
+              Positioner överlappar aldrig: ny signal ignoreras om en position redan är öppen.
+            </p>
+          </div>
+          <div>
+            <p style={{ margin: "0 0 6px", color: C.text, fontWeight: 600 }}>Parametrar</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "12px" }}>
+              {[
+                ["L (lookback)", "Antal dagar för glidande medelvärde: 5, 10 eller 20"],
+                ["V (vol-threshold)", "Volym måste vara X× normalvolymen: 1×, 1.5× eller 2×"],
+                ["E (exit)", "Håll position i 1, 3 eller 7 dagar"],
+                ["SL (stop-loss)", "Sälj om priset faller 5% under köpkurs (aktivt eller av)"],
+                ["TC (transakt.kostnad)", "0% eller 0.1% per handel (tur + retur = 2×)"],
+                ["BTC↑ (regimfilter)", "Handla bara när BTC är i upptrend vs eget medelvärde"],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: "flex", gap: "8px" }}>
+                  <span style={{ color: C.accent, fontFamily: "monospace", minWidth: "140px" }}>{k}</span>
+                  <span>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p style={{ margin: "0 0 6px", color: C.text, fontWeight: 600 }}>Jämförelse &amp; alpha</p>
+            <p style={{ margin: "0 0 8px" }}>
+              Alpha = strategins totala avkastning minus buy &amp; hold för samma period.
+              Positivt alpha betyder att aktiv handel slog passivt innehav.
+            </p>
+            <p style={{ margin: "0 0 6px", color: C.text, fontWeight: 600 }}>Tolkning av Sharpe</p>
+            <p style={{ margin: 0 }}>
+              Sharpe &gt; 1 = utmärkt, 0.5–1 = bra, 0–0.5 = svagt, &lt; 0 = sämre än riskfri ränta.
+              Beräknas per trade (inte annualiserat).
+            </p>
+          </div>
+        </div>
+        <p style={{ margin: "14px 0 0", fontSize: "11px", color: "#444" }}>
+          216 kombinationer per mynt (3 lookbacks × 3 vol-trösklar × 3 exit × 2 SL × 2 TC × 2 regimfilter) × 5 mynt = 1 080 rader.
+          Uppdateras varje måndag via GitHub Actions → Backtest.
+        </p>
+      </div>
+
       {/* Summering */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px" }}>
         <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>
