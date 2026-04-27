@@ -16,7 +16,7 @@ import httpx
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
@@ -25,6 +25,15 @@ CMC_API_KEY = os.environ.get("CMC_API_KEY", "")
 if not SB_KEY:
     print("FEL: SUPABASE_ANON_KEY saknas", file=sys.stderr)
     sys.exit(1)
+
+# ── Krypto-coins för veckomarkets ────────────────────────────────────────────
+KRYPTO_COINS = [
+    ("Bitcoin",  "BTC"),
+    ("Ethereum", "ETH"),
+    ("Solana",   "SOL"),
+    ("XRP",      "XRP"),
+    ("BNB",      "BNB"),
+]
 
 # ── World Bank-indikatorer ────────────────────────────────────────────────────
 # Format: (nyckel, namn, kategori, enhet, wb_indicator)
@@ -229,6 +238,127 @@ def spara_krypto_historik() -> int:
         return 0
 
 
+def skapa_krypto_markets():
+    """Skapar veckomarkets för topp-5 coins om inga öppna markets finns för dem."""
+    hdrs = {
+        "apikey": SB_KEY,
+        "Authorization": f"Bearer {SB_KEY}",
+        "Content-Type": "application/json",
+    }
+    today = datetime.now(timezone.utc).date()
+    deadline_iso = f"{(today + timedelta(days=7)).isoformat()}T23:59:00+00:00"
+
+    for namn, symbol in KRYPTO_COINS:
+        kalla = f"krypto_historik:{symbol}"
+
+        # Hoppa om öppet market redan finns
+        chk = httpx.get(
+            f"{SB_URL}/rest/v1/markets",
+            params={"select": "id", "resolution_kalla": f"eq.{kalla}", "status": "eq.öppen"},
+            headers=hdrs, timeout=10,
+        )
+        if chk.status_code == 200 and chk.json():
+            print(f"  Market för {namn} finns redan — hoppar")
+            continue
+
+        # Hämta dagens startpris från krypto_historik
+        pr = httpx.get(
+            f"{SB_URL}/rest/v1/krypto_historik",
+            params={"select": "pris_usd", "symbol": f"eq.{symbol}",
+                    "datum": f"eq.{today.isoformat()}", "limit": "1"},
+            headers=hdrs, timeout=10,
+        )
+        if pr.status_code != 200 or not pr.json():
+            print(f"  Inget pris för {symbol} idag — hoppar", file=sys.stderr)
+            continue
+
+        start_pris = float(pr.json()[0]["pris_usd"])
+        row = {
+            "titel":            f"Är priset på {namn} högre om en vecka än idag?",
+            "beskrivning":      json.dumps({
+                "symbol":      symbol,
+                "start_pris":  start_pris,
+                "start_datum": today.isoformat(),
+            }),
+            "deadline":         deadline_iso,
+            "resolution_kalla": kalla,
+            "status":           "öppen",
+            "kategori":         "krypto",
+        }
+        ins = httpx.post(
+            f"{SB_URL}/rest/v1/markets",
+            json=row, headers={**hdrs, "Prefer": "return=minimal"}, timeout=10,
+        )
+        if ins.status_code in (200, 201, 204):
+            print(f"  ✓ Market skapat: {namn} @ {start_pris:,.0f} USD")
+        else:
+            print(f"  ✗ Market fel {namn}: {ins.status_code} {ins.text[:100]}", file=sys.stderr)
+
+
+def lös_krypto_markets():
+    """Löser utgångna krypto-markets genom att jämföra priser i krypto_historik."""
+    hdrs = {
+        "apikey": SB_KEY,
+        "Authorization": f"Bearer {SB_KEY}",
+        "Content-Type": "application/json",
+    }
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    res = httpx.get(
+        f"{SB_URL}/rest/v1/markets",
+        params={
+            "select": "id,titel,beskrivning,deadline",
+            "resolution_kalla": "like.krypto_historik:*",
+            "status": "eq.öppen",
+            "deadline": f"lt.{now_iso}",
+        },
+        headers=hdrs, timeout=10,
+    )
+    if res.status_code != 200:
+        print(f"  Fel vid hämtning av markets: {res.status_code}", file=sys.stderr)
+        return
+
+    utgångna = res.json()
+    if not utgångna:
+        print("  Inga krypto-markets att lösa")
+        return
+
+    for m in utgångna:
+        try:
+            info = json.loads(m["beskrivning"])
+            symbol = info["symbol"]
+            start_pris = float(info["start_pris"])
+            deadline_date = m["deadline"][:10]
+        except Exception as e:
+            print(f"  Market {m['id']}: parse-fel – {e}", file=sys.stderr)
+            continue
+
+        # Hämta priset vid eller närmast efter deadline
+        pr = httpx.get(
+            f"{SB_URL}/rest/v1/krypto_historik",
+            params={"select": "pris_usd,datum", "symbol": f"eq.{symbol}",
+                    "datum": f"gte.{deadline_date}", "order": "datum.asc", "limit": "1"},
+            headers=hdrs, timeout=10,
+        )
+        if pr.status_code != 200 or not pr.json():
+            print(f"  Market {m['id']} ({symbol}): inget pris vid deadline — väntar")
+            continue
+
+        slut_pris = float(pr.json()[0]["pris_usd"])
+        utfall = "ja" if slut_pris > start_pris else "nej"
+
+        upd = httpx.patch(
+            f"{SB_URL}/rest/v1/markets?id=eq.{m['id']}",
+            json={"utfall": utfall, "status": "avgjord"},
+            headers={**hdrs, "Prefer": "return=minimal"}, timeout=10,
+        )
+        if upd.status_code in (200, 201, 204):
+            riktning = "↑ högre" if utfall == "ja" else "↓ lägre"
+            print(f"  ✓ Löst: {symbol} {start_pris:,.0f} → {slut_pris:,.0f} USD = {riktning}")
+        else:
+            print(f"  ✗ Uppdatering misslyckades: {upd.status_code} {upd.text[:100]}", file=sys.stderr)
+
+
 def main():
     print(f"\n=== DATA AGENT {datetime.now().strftime('%Y-%m-%d %H:%M')} ===\n")
     ok = 0
@@ -251,6 +381,11 @@ def main():
     # CoinMarketCap – daglig kryptodata
     print("\n── CoinMarketCap ──")
     spara_krypto_historik()
+
+    # Krypto-markets: lös utgångna, skapa nya
+    print("\n── Krypto-markets ──")
+    lös_krypto_markets()
+    skapa_krypto_markets()
 
     print(f"\n=== KLART: {ok} uppdaterade, {fel} misslyckade ===")
     # Krascha bara om ingenting alls lyckades
