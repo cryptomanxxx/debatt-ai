@@ -136,6 +136,22 @@ function BacktestTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
   const [showAll, setShowAll] = useState({});
+  const [copied, setCopied]   = useState(false);
+
+  function exportCSV(grouped) {
+    const cols = ["symbol","strategi","lookback","vol_multiplikator","stoploss_pct",
+                  "transaktionskostnad_pct","regim_filter","antal_trades","vinstrate",
+                  "avg_avkastning","total_avkastning","buyhold_avkastning","sharpe",
+                  "max_drawdown","kelly_fraction","period_start","period_slut"];
+    const rows = Object.values(grouped).flat();
+    const csv  = [cols.join(","),
+      ...rows.map(r => cols.map(c => r[c] ?? "").join(","))
+    ].join("\n");
+    navigator.clipboard.writeText(csv).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   useEffect(() => {
     async function load() {
@@ -270,9 +286,24 @@ function BacktestTab() {
 
       {/* Summering */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px" }}>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>
-          Bästa strategi per mynt (alpha vs B&amp;H)
-        </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, fontFamily: "monospace" }}>
+            Bästa strategi per mynt (alpha vs B&amp;H)
+          </p>
+          <button
+            onClick={() => exportCSV(data)}
+            style={{
+              background: copied ? `${C.green}22` : "none",
+              border: `1px solid ${copied ? C.green : C.border}`,
+              color: copied ? C.green : C.textMuted,
+              fontSize: "11px", fontFamily: "monospace",
+              padding: "4px 14px", borderRadius: "4px", cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+          >
+            {copied ? "✓ Kopierat" : "Kopiera CSV"}
+          </button>
+        </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
           {summering.map(({ sym, best, alpha }) => (
             <div key={sym} style={{
