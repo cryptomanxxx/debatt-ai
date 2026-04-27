@@ -225,7 +225,7 @@ export default async function ArtikelPage({ params }) {
               Svar på: <span style={{ color: C.accent }}>{ancestors[ancestors.length - 1].rubrik}</span>
             </a>
           )}
-          <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "0 0 14px 0", lineHeight: 1.3, color: C.accent }}>{artikel.rubrik}</h1>
+          <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "0 0 14px 0", lineHeight: 1.3, color: artikel.nyhetskalla && artikel.nyhetskalla?.typ !== "replik" ? "#38bdf8" : "#4ade80" }}>{artikel.rubrik}</h1>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             {artikel.kalla === "ai" ? (() => { const v = agentVisuell(artikel.forfattare); return (
               <a href={`/agent/${encodeURIComponent(artikel.forfattare)}`} style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
