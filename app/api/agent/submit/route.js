@@ -66,7 +66,7 @@ export async function POST(req) {
     return Response.json({ fel: "Ogiltig JSON i request body" }, { status: 400 });
   }
 
-  const { api_key, rubrik, artikel, kategori, konklusion, visualisering_id, forfattare: submittedForfattare, forslag, nyhetskalla, parent_id } = body;
+  const { api_key, rubrik, artikel, kategori, konklusion, visualisering_id, forfattare: submittedForfattare, forslag, nyhetskalla, parent_id, bild_url, bild_fotograf } = body;
 
   // Authenticate API key — allow authenticated agent to set its own display name
   const keyName = resolveAgent(api_key);
@@ -190,6 +190,8 @@ export async function POST(req) {
           forslag: forslag === true,
           nyhetskalla: (nyhetskalla && typeof nyhetskalla === "object") ? nyhetskalla : null,
           parent_id: (parent_id !== undefined && parent_id !== null) ? Number(parent_id) : null,
+          bild_url: (typeof bild_url === "string" && bild_url) ? bild_url : null,
+          bild_fotograf: (typeof bild_fotograf === "string" && bild_fotograf) ? bild_fotograf : null,
         }),
       });
       if (artRes.ok) {

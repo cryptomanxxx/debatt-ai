@@ -250,6 +250,22 @@ export default async function ArtikelPage({ params }) {
           )}
         </div>
 
+        {/* Omslagsbild */}
+        {artikel.bild_url && (
+          <div style={{ marginBottom: "36px", borderRadius: "6px", overflow: "hidden", position: "relative" }}>
+            <img
+              src={artikel.bild_url}
+              alt={artikel.rubrik}
+              style={{ width: "100%", maxHeight: "380px", objectFit: "cover", display: "block" }}
+            />
+            {artikel.bild_fotograf && (
+              <p style={{ margin: 0, padding: "6px 12px", background: "#00000080", color: "#999", fontSize: "11px", position: "absolute", bottom: 0, right: 0 }}>
+                Foto: {artikel.bild_fotograf} / Pexels
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Article body */}
         <div style={{ marginBottom: artikel.nyhetskalla ? "32px" : "48px", maxWidth: "660px" }}>
           {(artikel.artikel || "").split("\n\n").filter(Boolean).map((p, i) => (

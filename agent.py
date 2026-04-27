@@ -22,6 +22,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
 DEBATT_API = "https://www.debatt-ai.se/api/agent/submit"
+PEXELS_API = "https://api.pexels.com/v1/search"
 
 
 def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
@@ -1269,9 +1270,35 @@ def hamta_senaste_visualisering(sb_key: str, kategori_hints: list[str]) -> dict 
     return None
 
 
+def hamta_pexels_bild(sokterm: str) -> tuple[str | None, str | None]:
+    """Söker ett foto på Pexels. Returnerar (url, fotograf) eller (None, None)."""
+    pexels_key = os.environ.get("PEXELS_API_KEY", "")
+    if not pexels_key:
+        return None, None
+    try:
+        res = httpx.get(
+            PEXELS_API,
+            params={"query": sokterm, "per_page": 5, "orientation": "landscape"},
+            headers={"Authorization": pexels_key},
+            timeout=10,
+        )
+        if not res.is_success:
+            return None, None
+        foton = res.json().get("photos", [])
+        if not foton:
+            return None, None
+        foto = random.choice(foton)
+        url = foto.get("src", {}).get("large2x") or foto.get("src", {}).get("large")
+        fotograf = foto.get("photographer", "")
+        return url, fotograf
+    except Exception:
+        return None, None
+
+
 def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, artikel: str,
                    konklusion: str = "", visualisering_id: str | None = None, forslag: bool = False,
-                   nyhetskalla: dict | None = None, parent_id: str | None = None) -> dict:
+                   nyhetskalla: dict | None = None, parent_id: str | None = None,
+                   bild_url: str | None = None, bild_fotograf: str | None = None) -> dict:
     """Skicka artikeln till debatt.ai API."""
     body = {"api_key": api_key, "forfattare": forfattare, "rubrik": amne, "artikel": artikel, "kategori": kategori}
     if konklusion:
@@ -1284,6 +1311,10 @@ def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, arti
         body["nyhetskalla"] = nyhetskalla
     if parent_id:
         body["parent_id"] = parent_id
+    if bild_url:
+        body["bild_url"] = bild_url
+    if bild_fotograf:
+        body["bild_fotograf"] = bild_fotograf
     response = httpx.post(DEBATT_API, json=body, timeout=60)
     return response.json()
 
@@ -1716,6 +1747,16 @@ def main():
             viz_id = viz["id"]
             print(f"Bifogar visualisering: \"{viz['titel']}\" ({viz['nyckel']})\n")
 
+    # Hämta omslagsbild från Pexels (bara för nya artiklar, inte repliker)
+    bild_url, bild_fotograf = None, None
+    if not original:
+        sokterm = " ".join(amne.split()[:5])
+        bild_url, bild_fotograf = hamta_pexels_bild(sokterm)
+        if bild_url:
+            print(f"Pexels-bild hittad: {bild_fotograf}")
+        else:
+            print("Ingen Pexels-bild (API-nyckel saknas eller inga träffar)")
+
     # Skicka till debatt.ai
     print("Skickar till debatt.ai för AI-granskning...")
     replik_kalla = {
@@ -1725,7 +1766,7 @@ def main():
         "antal_utvärderade": 0,
         "typ": "replik",
     } if original else None
-    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id), nyhetskalla=nyhetskalla if not original else replik_kalla, parent_id=original["id"] if original else None)
+    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id), nyhetskalla=nyhetskalla if not original else replik_kalla, parent_id=original["id"] if original else None, bild_url=bild_url, bild_fotograf=bild_fotograf)
 
     # Spara nyhetslogg om agenten använde en nyhet
     if nyhet and sb_key:
