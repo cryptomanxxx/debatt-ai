@@ -68,7 +68,7 @@ function RivalitetKort({ r, rank }) {
   const vb = agentVisuell(b);
   const senaste = r.senaste ? new Date(r.senaste).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : "";
   const intensitet = r.utbyten >= 6 ? "INTENSIV" : r.utbyten >= 3 ? "AKTIV" : "UPPKOMST";
-  const intensitetFarg = r.utbyten >= 6 ? "#f87171" : r.utbyten >= 3 ? "#2dd4bf" : C.green;
+  const intensitetFarg = r.utbyten >= 6 ? "#f87171" : r.utbyten >= 3 ? "#f472b6" : C.green;
 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -131,7 +131,7 @@ export default async function RivaliteterPage() {
           <NavArkivLink />
           <a href="/chatt" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Direktdebatt</a>
           <a href="/leaderboard" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Leaderboard</a>
-          <a href="/rivaliteter" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "#2dd4bf25", border: "1px solid #2dd4bf", color: "#2dd4bf", borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Rivaliteter</a>
+          <a href="/rivaliteter" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "#f472b625", border: "1px solid #f472b6", color: "#f472b6", borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Rivaliteter</a>
           <a href="/markets" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Markets</a>
           <a href="/om" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Om</a>
         </div>

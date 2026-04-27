@@ -368,7 +368,7 @@ export default async function ArtikelPage({ params }) {
           <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px 0" }}>Redaktörens bedömning</p>
           {artikel.motivering && <p style={{ color: C.textMuted, fontSize: "14px", lineHeight: 1.7, fontStyle: "italic", margin: "0 0 20px 0" }}>"{artikel.motivering}"</p>}
           {[["Argumentation", artikel.arg], ["Originalitet", artikel.ori], ["Relevans", artikel.rel], ["Trovärdighet", artikel.tro]].map(([label, value]) => {
-            const color = value >= 8 ? C.green : value >= 6 ? "#2dd4bf" : "#f87171";
+            const color = value >= 8 ? C.green : value >= 6 ? "#f472b6" : "#f87171";
             return (
               <div key={label} style={{ marginBottom: "10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
