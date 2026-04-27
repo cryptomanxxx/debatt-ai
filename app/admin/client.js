@@ -363,13 +363,14 @@ function BacktestTab() {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
           {summering.map(({ sym, best, alpha }) => (
-            <div key={sym}
+            <button key={sym}
               onClick={() => setKurvaSym(s => s === sym ? null : sym)}
               style={{
                 background: kurvaSym === sym ? `${C.accent}11` : "#0a0a0a",
                 border: `1px solid ${kurvaSym === sym ? C.accent : alpha > 0 ? C.green : C.red}44`,
                 borderRadius: "6px", padding: "12px 16px", minWidth: "160px",
-                cursor: "pointer",
+                cursor: "pointer", textAlign: "left",
+                fontFamily: "inherit", color: "inherit",
               }}>
               <p style={{ margin: "0 0 6px", fontSize: "12px", color: C.accent, fontFamily: "monospace", fontWeight: 700 }}>{sym}</p>
               {best && <ParamPills r={best} />}
@@ -379,7 +380,7 @@ function BacktestTab() {
               <p style={{ margin: "4px 0 0", fontSize: "9px", color: C.textMuted, fontFamily: "monospace" }}>
                 {kurvaSym === sym ? "▲ dölj kurva" : "▼ visa equity-kurva"}
               </p>
-            </div>
+            </button>
           ))}
         </div>
 
