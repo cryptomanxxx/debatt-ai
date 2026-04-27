@@ -31,9 +31,9 @@ export default function NavHistorikLink({ active, style }) {
   return (
     <a href="/chatt/historik" style={style ?? {
       ...DEFAULT_STYLE,
-      background: active ? "rgba(250,204,21,0.15)" : "transparent",
-      border: `1px solid ${active ? "#facc15" : "#222222"}`,
-      color: active ? "#facc15" : "#888880",
+      background: active ? "rgba(45,212,191,0.15)" : "transparent",
+      border: `1px solid ${active ? "#2dd4bf" : "#222222"}`,
+      color: active ? "#2dd4bf" : "#888880",
     }}>
       {label}
     </a>

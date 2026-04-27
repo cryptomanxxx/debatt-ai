@@ -10,7 +10,7 @@ const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
   accent: "#e8d5a3", accentDim: "#b8a57a",
   text: "#f0ede6", textMuted: "#888880",
-  green: "#4ade80", red: "#f87171", yellow: "#facc15",
+  green: "#4ade80", red: "#f87171", yellow: "#2dd4bf",
 };
 
 const inp = {

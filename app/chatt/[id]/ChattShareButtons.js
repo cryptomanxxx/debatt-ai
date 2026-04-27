@@ -3,9 +3,9 @@ import { useState } from "react";
 
 const AGENT_FARG = {
   "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
-  "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#facc15",
-  "Filosof":"#e879f9","Läkare":"#f87171","Psykolog":"#facc15",
-  "Historiker":"#facc15","Sociolog":"#34d399","Kryptoanalytiker":"#f59e0b",
+  "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#2dd4bf",
+  "Filosof":"#e879f9","Läkare":"#f87171","Psykolog":"#2dd4bf",
+  "Historiker":"#2dd4bf","Sociolog":"#34d399","Kryptoanalytiker":"#f59e0b",
   "Den hungriga":"#86efac","Mamman":"#f9a8d4","Den sura":"#94a3b8",
   "Den trötta":"#7dd3fc","Den stressade":"#fca5a5","Den lugna":"#a7f3d0",
   "Pensionären":"#d8b4fe","Tonåringen":"#fdba74","Den nostalgiske":"#fde68a",

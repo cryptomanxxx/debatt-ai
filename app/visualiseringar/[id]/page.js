@@ -16,9 +16,9 @@ const C = {
 const NAV_LINK = (href, label, active = false) => (
   <a key={href} href={href} style={{
     flex: 1, textAlign: "center",
-    background: active ? "#facc1515" : "transparent",
-    border: `1px solid ${active ? "#facc15" : C.border}`,
-    color: active ? "#facc15" : C.textMuted,
+    background: active ? "#2dd4bf15" : "transparent",
+    border: `1px solid ${active ? "#2dd4bf" : C.border}`,
+    color: active ? "#2dd4bf" : C.textMuted,
     padding: "6px 14px", borderRadius: "4px",
     fontSize: "13px", letterSpacing: "0.05em",
     fontFamily: "Georgia, serif", textDecoration: "none",
