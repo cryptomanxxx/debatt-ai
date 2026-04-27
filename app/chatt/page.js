@@ -36,9 +36,9 @@ const ALLA_AGENTER = [
 
 const AGENT_FARG = {
   "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
-  "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#f472b6",
-  "Filosof":"#e879f9","Läkare":"#f87171","Psykolog":"#f472b6",
-  "Historiker":"#f472b6","Sociolog":"#34d399","Kryptoanalytiker":"#f59e0b",
+  "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#f8fafc",
+  "Filosof":"#e879f9","Läkare":"#f87171","Psykolog":"#f8fafc",
+  "Historiker":"#f8fafc","Sociolog":"#34d399","Kryptoanalytiker":"#f59e0b",
   "Den hungriga":"#86efac","Mamman":"#f9a8d4","Den sura":"#94a3b8",
   "Den trötta":"#7dd3fc","Den stressade":"#fca5a5","Den lugna":"#a7f3d0",
   "Pensionären":"#d8b4fe","Tonåringen":"#fdba74","Den nostalgiske":"#fde68a",
@@ -266,7 +266,7 @@ async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider 
 }
 
 function KonfidensBar({ poang, farg }) {
-  const color = poang >= 75 ? farg : poang >= 50 ? "#f472b6" : "#94a3b8";
+  const color = poang >= 75 ? farg : poang >= 50 ? "#f8fafc" : "#94a3b8";
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", marginLeft: "10px" }}>
       <span style={{ display: "inline-flex", gap: "2px" }}>
@@ -537,7 +537,7 @@ export default function ChattPage() {
 
   const hasLive = streaming || tänker;
   const navLink = (href, lbl, active) => (
-    <a href={href} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: active ? "#f472b625" : "transparent", border: `1px solid ${active ? "#f472b6" : C.border}`, color: active ? "#f472b6" : C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{lbl}</a>
+    <a href={href} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: active ? "#f8fafc25" : "transparent", border: `1px solid ${active ? "#f8fafc" : C.border}`, color: active ? "#f8fafc" : C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{lbl}</a>
   );
 
   const liveLabel = fas === "kör" ? "LIVE" : fas === "summering" ? "SUMMERAR" : fas === "klar" ? "AVSLUTAD" : "REDO";

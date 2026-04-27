@@ -22,9 +22,9 @@ const NAV_LINK = (href, label, active = false) => (
   <a key={href} href={href} style={{
     display: "inline-flex", alignItems: "center", justifyContent: "center",
     height: "40px", padding: "0 16px", boxSizing: "border-box",
-    flex: 1, background: active ? "#f472b625" : "transparent",
-    border: `1px solid ${active ? "#f472b6" : C.border}`,
-    color: active ? "#f472b6" : C.textMuted,
+    flex: 1, background: active ? "#f8fafc25" : "transparent",
+    border: `1px solid ${active ? "#f8fafc" : C.border}`,
+    color: active ? "#f8fafc" : C.textMuted,
     borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em",
     fontFamily: "Georgia, serif", textDecoration: "none",
   }}>{label}</a>
