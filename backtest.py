@@ -149,8 +149,10 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
     avg_avk   = sum(trades) / len(trades)
 
     kapital = 1.0
+    kapital_kurva = [1.0]
     for a in trades:
         kapital *= (1 + a / 100)
+        kapital_kurva.append(round(kapital, 4))
     total_avk = (kapital - 1) * 100
 
     # Buy & hold (med TC en gång in + en gång ut)
@@ -164,11 +166,6 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
             sharpe = avg_avk / std
 
     # Strategins max drawdown: beräknas på egenkapitalkurvan (trade för trade)
-    kapital_kurva = [1.0]
-    k = 1.0
-    for a in trades:
-        k *= (1 + a / 100)
-        kapital_kurva.append(k)
     peak_k = 1.0
     max_dd = 0.0
     for k in kapital_kurva:
@@ -197,6 +194,7 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
         "sharpe":             round(sharpe, 2),
         "max_drawdown":       round(max_dd, 1),
         "kelly_fraction":     round(kelly, 1),
+        "equity_kurva":       kapital_kurva,
         "period_start":       period_start,
         "period_slut":        period_slut,
     }
@@ -217,6 +215,7 @@ def spara(symbol, strategi, res, vol_threshold, lookback,
         "sharpe":                  res.get("sharpe"),
         "max_drawdown":            res.get("max_drawdown"),
         "kelly_fraction":          res.get("kelly_fraction"),
+        "equity_kurva":            res.get("equity_kurva"),
         "vol_multiplikator":       vol_threshold,
         "lookback":                lookback,
         "stoploss_pct":            stoploss_pct,

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -135,8 +136,9 @@ function BacktestTab() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
-  const [showAll, setShowAll] = useState({});
-  const [copied, setCopied]   = useState(false);
+  const [showAll, setShowAll]   = useState({});
+  const [copied, setCopied]     = useState(false);
+  const [kurvaSym, setKurvaSym] = useState(null);
 
   function exportCSV(grouped) {
     const cols = ["symbol","strategi","lookback","vol_multiplikator","stoploss_pct",
@@ -312,18 +314,63 @@ function BacktestTab() {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
           {summering.map(({ sym, best, alpha }) => (
-            <div key={sym} style={{
-              background: "#0a0a0a", border: `1px solid ${alpha > 0 ? C.green : C.red}44`,
-              borderRadius: "6px", padding: "12px 16px", minWidth: "160px",
-            }}>
+            <div key={sym}
+              onClick={() => setKurvaSym(s => s === sym ? null : sym)}
+              style={{
+                background: kurvaSym === sym ? `${C.accent}11` : "#0a0a0a",
+                border: `1px solid ${kurvaSym === sym ? C.accent : alpha > 0 ? C.green : C.red}44`,
+                borderRadius: "6px", padding: "12px 16px", minWidth: "160px",
+                cursor: "pointer",
+              }}>
               <p style={{ margin: "0 0 6px", fontSize: "12px", color: C.accent, fontFamily: "monospace", fontWeight: 700 }}>{sym}</p>
               {best && <ParamPills r={best} />}
               <p style={{ margin: "6px 0 0", fontSize: "13px", fontFamily: "monospace", color: alpha > 0 ? C.green : C.red, fontWeight: 700 }}>
                 {alpha > 0 ? "+" : ""}{Math.round(alpha)}pp alpha
               </p>
+              <p style={{ margin: "4px 0 0", fontSize: "9px", color: C.textMuted, fontFamily: "monospace" }}>
+                {kurvaSym === sym ? "▲ dölj kurva" : "▼ visa equity-kurva"}
+              </p>
             </div>
           ))}
         </div>
+
+        {/* Equity-kurva för valt mynt */}
+        {kurvaSym && (() => {
+          const best = data[kurvaSym]?.[0];
+          const kurva = best?.equity_kurva;
+          if (!kurva || kurva.length < 2) return (
+            <p style={{ marginTop: "16px", fontSize: "12px", color: C.textMuted }}>
+              Ingen kurva — kör backtestet igen för att generera data.
+            </p>
+          );
+          const chartData = kurva.map((k, i) => ({ trade: i, kapital: +(k * 100).toFixed(2) }));
+          const slutKapital = kurva[kurva.length - 1];
+          const bh = (best.buyhold_avkastning ?? 0) / 100 + 1;
+          return (
+            <div style={{ marginTop: "20px" }}>
+              <p style={{ margin: "0 0 4px", fontSize: "11px", color: C.accentDim, letterSpacing: "0.08em", textTransform: "uppercase", fontFamily: "monospace" }}>
+                {kurvaSym} equity-kurva — {best.strategi}
+              </p>
+              <p style={{ margin: "0 0 12px", fontSize: "11px", color: C.textMuted }}>
+                Startar 100 kr · slutar {(slutKapital * 100).toFixed(0)} kr · B&H {(bh * 100).toFixed(0)} kr
+              </p>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+                  <XAxis dataKey="trade" tick={{ fill: C.textMuted, fontSize: 10 }} label={{ value: "Trade #", position: "insideBottomRight", fill: C.textMuted, fontSize: 10, offset: -4 }} />
+                  <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} tickFormatter={v => `${v}`} domain={["auto", "auto"]} />
+                  <Tooltip
+                    contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", fontSize: "11px" }}
+                    labelFormatter={l => `Trade ${l}`}
+                    formatter={v => [`${v} kr`, "Kapital"]}
+                  />
+                  <ReferenceLine y={100} stroke={C.border} strokeDasharray="3 3" />
+                  <ReferenceLine y={+(bh * 100).toFixed(2)} stroke={C.accentDim} strokeDasharray="3 3" label={{ value: "B&H", fill: C.accentDim, fontSize: 9, position: "right" }} />
+                  <Line type="monotone" dataKey="kapital" stroke={slutKapital >= 1 ? C.green : C.red} strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Per mynt */}
