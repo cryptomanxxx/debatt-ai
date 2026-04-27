@@ -58,7 +58,7 @@ def hamta_yahoo(ticker: str) -> list[dict]:
         return []
 
 
-def spara_ohlcv(symbol: str, rows: list[dict]):
+def spara_ohlcv(symbol: str, rows: list[dict]) -> bool:
     headers = {
         "apikey":        SB_KEY,
         "Authorization": f"Bearer {SB_KEY}",
@@ -67,7 +67,7 @@ def spara_ohlcv(symbol: str, rows: list[dict]):
     }
     data = [{"symbol": symbol, "datum": r["datum"],
              "pris": r["pris"], "vol": r["vol"]} for r in rows]
-    # Batch-insert i grupper om 500 (under PostgREST-gränsen)
+    ok = True
     for i in range(0, len(data), 500):
         batch = data[i:i + 500]
         r = httpx.post(
@@ -75,20 +75,29 @@ def spara_ohlcv(symbol: str, rows: list[dict]):
             json=batch, headers=headers, timeout=30,
         )
         if r.status_code not in (200, 201, 204):
-            print(f"  ✗ Sparfel batch {i}: {r.status_code} {r.text[:80]}", file=sys.stderr)
+            print(f"  ✗ Sparfel batch {i}: {r.status_code} {r.text[:120]}", file=sys.stderr)
+            ok = False
+    return ok
 
 
 def main():
     print(f"\n=== FETCH {datetime.now().strftime('%Y-%m-%d %H:%M')} ===")
+    fel = False
     for symbol, ticker in COINS:
         print(f"  {symbol} ({ticker})…", end=" ", flush=True)
         rows = hamta_yahoo(ticker)
         if not rows:
             print("ingen data")
+            fel = True
             continue
-        spara_ohlcv(symbol, rows)
-        print(f"{len(rows)} dagar ({rows[0]['datum']} → {rows[-1]['datum']})")
+        if spara_ohlcv(symbol, rows):
+            print(f"{len(rows)} dagar ({rows[0]['datum']} → {rows[-1]['datum']})")
+        else:
+            print("FEL vid sparande — se stderr ovan")
+            fel = True
     print("=== KLART ===\n")
+    if fel:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
