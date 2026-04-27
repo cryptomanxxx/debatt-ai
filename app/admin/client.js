@@ -472,6 +472,117 @@ function BacktestTab() {
   );
 }
 
+function NyhetsloggTab() {
+  const [logg, setLogg]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState({});
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch(
+          `${SB_URL}/rest/v1/nyhetslog?order=skapad.desc&limit=200`,
+          { headers: sbHeaders() }
+        );
+        setLogg(res.ok ? await res.json() : []);
+      } catch { setLogg([]); }
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  if (loading) return <p style={{ color: C.textMuted }}>Laddar nyhetslogg…</p>;
+  if (!logg?.length) return (
+    <p style={{ color: C.textMuted, fontSize: "14px" }}>
+      Ingen logg ännu. Loggas automatiskt nästa gång en agent väljer en nyhet.
+    </p>
+  );
+
+  // Gruppera per dag
+  const dagGrupper = {};
+  for (const rad of logg) {
+    const dag = rad.skapad?.slice(0, 10) || "okänt";
+    if (!dagGrupper[dag]) dagGrupper[dag] = [];
+    dagGrupper[dag].push(rad);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+      {Object.entries(dagGrupper).map(([dag, rader]) => (
+        <div key={dag}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 12px" }}>
+            {dag} &nbsp;·&nbsp; {rader.length} körningar
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {rader.map(rad => {
+              const v = rad.vald || {};
+              const tid = rad.skapad ? new Date(rad.skapad).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" }) : "";
+              const open = expanded[rad.id];
+              return (
+                <div key={rad.id} style={{ background: "#0d0d0d", border: `1px solid ${rad.publicerad ? C.green + "33" : C.border}`, borderRadius: "6px", padding: "14px 16px" }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>{tid}</span>
+                    <span style={{ fontSize: "12px", color: C.accent, fontFamily: "monospace" }}>{rad.agent}</span>
+                    <span style={{ fontSize: "10px", color: rad.publicerad ? C.green : C.red, border: `1px solid currentColor`, borderRadius: "3px", padding: "1px 5px", fontFamily: "monospace" }}>
+                      {rad.publicerad ? "PUBLICERAD" : "EJ PUBLICERAD"}
+                    </span>
+                  </div>
+
+                  {/* Vald nyhet */}
+                  <div style={{ marginBottom: "8px" }}>
+                    <span style={{ fontSize: "10px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "monospace" }}>Vald nyhet: </span>
+                    {v.url ? (
+                      <a href={v.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "13px", color: C.accentDim, textDecoration: "none", borderBottom: `1px solid ${C.accentDim}40` }}>
+                        {v.rubrik}
+                      </a>
+                    ) : (
+                      <span style={{ fontSize: "13px", color: C.accentDim }}>{v.rubrik}</span>
+                    )}
+                    {v.kalla && <span style={{ fontSize: "11px", color: "#555", marginLeft: "8px" }}>{v.kalla}</span>}
+                  </div>
+
+                  {/* Länk till publicerad artikel */}
+                  {rad.artikel_id && (
+                    <div style={{ marginBottom: "8px" }}>
+                      <a href={`/artikel/${rad.artikel_id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: "12px", color: C.green, textDecoration: "none" }}>
+                        → Se artikel #{rad.artikel_id}
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Expandera alla utvärderade */}
+                  <button
+                    onClick={() => setExpanded(e => ({ ...e, [rad.id]: !open }))}
+                    style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "11px", padding: "0", fontFamily: "monospace" }}
+                  >
+                    {open ? "▲ dölj" : `▼ visa alla ${rad.antal || 0} utvärderade nyheter`}
+                  </button>
+
+                  {open && Array.isArray(rad.utvärderade) && (
+                    <div style={{ marginTop: "10px", borderTop: `1px solid ${C.border}`, paddingTop: "10px", display: "flex", flexDirection: "column", gap: "5px" }}>
+                      {rad.utvärderade.map((n, i) => (
+                        <div key={i} style={{ fontSize: "12px", display: "flex", gap: "8px", alignItems: "baseline" }}>
+                          <span style={{ color: "#444", fontFamily: "monospace", minWidth: "18px" }}>{i + 1}.</span>
+                          {n.url ? (
+                            <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ color: C.textMuted, textDecoration: "none" }}>{n.rubrik}</a>
+                          ) : (
+                            <span style={{ color: C.textMuted }}>{n.rubrik}</span>
+                          )}
+                          <span style={{ color: "#444", fontSize: "11px", flexShrink: 0 }}>{n.kalla}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ApiStatusTab() {
   const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -959,6 +1070,7 @@ export default function AdminClient() {
             ["nyhetsbrev","Nyhetsbrev" + (subCount !== null ? ` (${subCount})` : "")],
             ["matning","Mätning"],
             ["backtest","Backtest"],
+            ["nyhetslogg","Nyhetslogg"],
             ["api-status","API-status"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
@@ -1163,6 +1275,7 @@ export default function AdminClient() {
 
         {/* ── BACKTEST ── */}
         {mainTab === "backtest" && <BacktestTab />}
+        {mainTab === "nyhetslogg" && <NyhetsloggTab />}
 
         {/* ── API-STATUS ── */}
         {mainTab === "api-status" && <ApiStatusTab />}

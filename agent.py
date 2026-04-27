@@ -1288,6 +1288,30 @@ def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, arti
     return response.json()
 
 
+def spara_nyhetslog(sb_key: str, agent_namn: str, vald: dict,
+                    alla: list, artikel_id: int | None, publicerad: bool):
+    """Loggar vilka nyheter som utvärderades och vilken som valdes."""
+    try:
+        row = {
+            "agent":       agent_namn,
+            "vald":        {"rubrik": vald["rubrik"], "url": vald.get("url", ""), "kalla": vald["kalla"], "publicerad": vald.get("publicerad", "")},
+            "utvärderade": [{"rubrik": n["rubrik"], "url": n.get("url", ""), "kalla": n["kalla"]} for n in alla[:60]],
+            "antal":       len(alla),
+            "artikel_id":  artikel_id,
+            "publicerad":  publicerad,
+        }
+        r = httpx.post(
+            f"{SB_URL}/rest/v1/nyhetslog",
+            json=row,
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json", "Prefer": "return=minimal"},
+            timeout=10,
+        )
+        if r.status_code not in (200, 201, 204):
+            print(f"  Nyhetslog-sparfel: {r.status_code}", file=sys.stderr)
+    except Exception as e:
+        print(f"  Nyhetslog-fel: {e}", file=sys.stderr)
+
+
 def hamta_all_statistik(sb_key: str) -> list[dict]:
     """Hämtar alla rader från statistik-tabellen."""
     try:
@@ -1610,7 +1634,8 @@ def main():
                 print("Trendande ämnen hämtade ✓")
 
         # Försök hämta aktuella nyheter – hoppa över vid force_eget
-        nyhet = None
+        nyhet   = None
+        nyheter = []
         if not force_eget:
             print("Hämtar aktuella nyheter från RSS...")
             nyheter = hamta_nyheter()
@@ -1701,6 +1726,15 @@ def main():
         "typ": "replik",
     } if original else None
     svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id), nyhetskalla=nyhetskalla if not original else replik_kalla, parent_id=original["id"] if original else None)
+
+    # Spara nyhetslogg om agenten använde en nyhet
+    if nyhet and sb_key:
+        try:
+            artikel_id_num = int(svar.get("artikel_url", "").split("/")[-1])
+        except (ValueError, IndexError, AttributeError):
+            artikel_id_num = None
+        spara_nyhetslog(sb_key, agent["namn"], nyhet, nyheter, artikel_id_num, svar.get("publicerad", False))
+        print("  Nyhetslogg sparad ✓")
 
     # Visa resultat
     print(f"\n{'═' * 60}")
