@@ -1,0 +1,26 @@
+name: Backtest
+
+on:
+  schedule:
+    - cron: "0 5 * * 1"   # Varje måndag kl 05:00 UTC (07:00 svensk tid)
+  workflow_dispatch:       # Kan köras manuellt
+
+jobs:
+  kör-backtest:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Kör backtest
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python backtest.py

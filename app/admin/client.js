@@ -111,6 +111,141 @@ async function publishToArtiklar(row) {
   if (!res.ok) throw new Error(await res.text());
 }
 
+function BacktestTab() {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState("");
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch(
+          `${SB_URL}/rest/v1/backtest_resultat?select=*&order=symbol.asc,strategi.asc`,
+          { headers: sbHeaders() }
+        );
+        if (!res.ok) throw new Error(await res.text());
+        const rows = await res.json();
+        // Gruppera per symbol
+        const grouped = {};
+        for (const r of rows) {
+          if (!grouped[r.symbol]) grouped[r.symbol] = [];
+          grouped[r.symbol].push(r);
+        }
+        setData(grouped);
+      } catch (e) { setError(e.message); }
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const exitLabel = s => s?.match(/exit(\d+)d/)?.[1] ? `Exit ${s.match(/exit(\d+)d/)[1]}d` : s;
+
+  const avkFarg = (tot, bh) => {
+    if (tot == null) return C.textMuted;
+    if (tot > bh) return C.green;
+    if (tot > 0)  return C.yellow;
+    return C.red;
+  };
+
+  if (loading) return <p style={{ color: C.textMuted }}>Laddar backtestdata…</p>;
+  if (error)   return <p style={{ color: C.red }}>Fel: {error}</p>;
+  if (!data || Object.keys(data).length === 0) return (
+    <div>
+      <p style={{ color: C.textMuted, fontSize: "14px", marginBottom: "16px" }}>
+        Ingen backtest-data ännu. Kör SQL-schemat i Supabase och sedan GitHub Actions → <strong style={{ color: C.accent }}>Backtest → Run workflow</strong>.
+      </p>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px", fontFamily: "monospace" }}>Strategi</p>
+        <p style={{ color: C.textMuted, fontSize: "14px", lineHeight: 1.8, margin: 0 }}>
+          <strong style={{ color: C.text }}>Signal:</strong> Köp när priset är högre än 10-dagars medelpris OCH volymen är högre än 10-dagars medelvolym.<br />
+          <strong style={{ color: C.text }}>Exit:</strong> Sälj efter 1, 3 eller 7 dagar.<br />
+          <strong style={{ color: C.text }}>Jämförelse:</strong> Strategi vs buy &amp; hold för samma period.<br />
+          <strong style={{ color: C.text }}>Data:</strong> CoinGecko — 2 år historik för BTC, ETH, SOL, XRP, BNB.
+        </p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px" }}>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "monospace" }}>Strategi</p>
+        <p style={{ color: C.textMuted, fontSize: "13px", lineHeight: 1.7, margin: 0 }}>
+          Köp när pris &gt; 10d avg <strong style={{ color: C.text }}>OCH</strong> volym &gt; 10d avg. Sälj efter N dagar.
+          Sammansatt avkastning jämförs mot buy &amp; hold. Inga transaktionskostnader.
+          Överlappande positioner tillåts ej — ny signal ignoreras om position redan är öppen.
+        </p>
+      </div>
+
+      {Object.entries(data).map(([symbol, rader]) => {
+        const senaste = rader[0];
+        return (
+          <div key={symbol}>
+            <p style={{ fontSize: "13px", color: C.accent, fontFamily: "monospace", fontWeight: 700, margin: "0 0 12px", letterSpacing: "0.08em" }}>
+              {symbol} &nbsp;<span style={{ color: C.textMuted, fontWeight: 400, fontSize: "11px" }}>
+                {senaste?.period_start} → {senaste?.period_slut}
+              </span>
+            </p>
+
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", fontFamily: "monospace" }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                    {["Exit", "Trades", "Vinstrate", "Avg/trade", "Strategi total", "Buy & Hold", "Sharpe", "Max DD"].map(h => (
+                      <th key={h} style={{ textAlign: "left", padding: "6px 12px", color: C.textMuted, fontSize: "10px", letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 400 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rader.map(r => {
+                    const tot = r.total_avkastning;
+                    const bh  = r.buyhold_avkastning;
+                    const fc  = avkFarg(tot, bh);
+                    const diff = tot != null && bh != null ? tot - bh : null;
+                    return (
+                      <tr key={r.strategi} style={{ borderBottom: `1px solid ${C.border}20` }}>
+                        <td style={{ padding: "10px 12px", color: C.text }}>{exitLabel(r.strategi)}</td>
+                        <td style={{ padding: "10px 12px", color: C.textMuted }}>{r.antal_trades ?? "–"}</td>
+                        <td style={{ padding: "10px 12px", color: r.vinstrate >= 50 ? C.green : C.red }}>
+                          {r.vinstrate != null ? `${r.vinstrate}%` : "–"}
+                        </td>
+                        <td style={{ padding: "10px 12px", color: r.avg_avkastning >= 0 ? C.green : C.red }}>
+                          {r.avg_avkastning != null ? `${r.avg_avkastning > 0 ? "+" : ""}${r.avg_avkastning}%` : "–"}
+                        </td>
+                        <td style={{ padding: "10px 12px", color: fc, fontWeight: 700 }}>
+                          {tot != null ? `${tot > 0 ? "+" : ""}${tot}%` : "–"}
+                          {diff != null && (
+                            <span style={{ fontSize: "10px", color: diff > 0 ? C.green : C.red, marginLeft: "6px" }}>
+                              ({diff > 0 ? "+" : ""}{Math.round(diff)}pp)
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 12px", color: bh >= 0 ? C.green : C.red }}>
+                          {bh != null ? `${bh > 0 ? "+" : ""}${bh}%` : "–"}
+                        </td>
+                        <td style={{ padding: "10px 12px", color: r.sharpe >= 0.5 ? C.green : r.sharpe >= 0 ? C.yellow : C.red }}>
+                          {r.sharpe != null ? r.sharpe : "–"}
+                        </td>
+                        <td style={{ padding: "10px 12px", color: r.max_drawdown < 20 ? C.green : r.max_drawdown < 50 ? C.yellow : C.red }}>
+                          {r.max_drawdown != null ? `-${r.max_drawdown}%` : "–"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+
+      <p style={{ fontSize: "11px", color: "#444", margin: 0 }}>
+        Uppdateras automatiskt varje måndag via GitHub Actions → Backtest.
+      </p>
+    </div>
+  );
+}
+
 function ApiStatusTab() {
   const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -597,6 +732,7 @@ export default function AdminClient() {
             ["kommentarer", `Kommentarer${kommentarer.length > 0 ? ` (${kommentarer.length})` : ""}`],
             ["nyhetsbrev","Nyhetsbrev" + (subCount !== null ? ` (${subCount})` : "")],
             ["matning","Mätning"],
+            ["backtest","Backtest"],
             ["api-status","API-status"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
@@ -798,6 +934,9 @@ export default function AdminClient() {
 
         {/* ── MÄTNING ── */}
         {mainTab === "matning" && <MatningTab />}
+
+        {/* ── BACKTEST ── */}
+        {mainTab === "backtest" && <BacktestTab />}
 
         {/* ── API-STATUS ── */}
         {mainTab === "api-status" && <ApiStatusTab />}
