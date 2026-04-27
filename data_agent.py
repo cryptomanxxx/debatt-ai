@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+CMC_API_KEY = os.environ.get("CMC_API_KEY", "")
 
 if not SB_KEY:
     print("FEL: SUPABASE_ANON_KEY saknas", file=sys.stderr)
@@ -167,6 +168,67 @@ def spara_statistik(nyckel: str, namn: str, kategori: str, enhet: str,
         return False
 
 
+def spara_krypto_historik() -> int:
+    """Hämtar topp 50 kryptovalutor från CoinMarketCap och sparar daglig snapshot."""
+    if not CMC_API_KEY:
+        print("  Hoppar CoinMarketCap: CMC_API_KEY saknas", file=sys.stderr)
+        return 0
+
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    try:
+        res = httpx.get(
+            "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest",
+            params={"start": 1, "limit": 50, "convert": "USD"},
+            headers={"X-CMC_PRO_API_KEY": CMC_API_KEY, "Accept": "application/json"},
+            timeout=20,
+        )
+        res.raise_for_status()
+        coins = res.json().get("data", [])
+    except Exception as e:
+        print(f"  CoinMarketCap fel: {e}", file=sys.stderr)
+        return 0
+
+    if not coins:
+        print("  CoinMarketCap: tom respons", file=sys.stderr)
+        return 0
+
+    rows = []
+    for coin in coins:
+        q = coin.get("quote", {}).get("USD", {})
+        rows.append({
+            "datum":          today,
+            "symbol":         coin["symbol"],
+            "namn":           coin["name"],
+            "rank":           coin["cmc_rank"],
+            "pris_usd":       q.get("price"),
+            "marknadsvarde":  q.get("market_cap"),
+            "volym_24h":      q.get("volume_24h"),
+            "forandring_1h":  q.get("percent_change_1h"),
+            "forandring_24h": q.get("percent_change_24h"),
+            "forandring_7d":  q.get("percent_change_7d"),
+            "cirkulation":    coin.get("circulating_supply"),
+        })
+
+    headers = {
+        "apikey": SB_KEY,
+        "Authorization": f"Bearer {SB_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    upsert = httpx.post(
+        f"{SB_URL}/rest/v1/krypto_historik?on_conflict=datum,symbol",
+        json=rows, headers=headers, timeout=30,
+    )
+
+    if upsert.status_code in (200, 201, 204):
+        print(f"  ✓ CoinMarketCap: {len(rows)} mynt sparade ({today})")
+        return len(rows)
+    else:
+        print(f"  ✗ CoinMarketCap: HTTP {upsert.status_code} – {upsert.text[:200]}", file=sys.stderr)
+        return 0
+
+
 def main():
     print(f"\n=== DATA AGENT {datetime.now().strftime('%Y-%m-%d %H:%M')} ===\n")
     ok = 0
@@ -185,6 +247,10 @@ def main():
     # Riksbanken (pausad – SWEA API kräver verifiering av rätt serie-ID)
     # print("\n── Riksbanken ──")
     # TODO: hitta fungerande serie-ID för styrränta och KPIF
+
+    # CoinMarketCap – daglig kryptodata
+    print("\n── CoinMarketCap ──")
+    spara_krypto_historik()
 
     print(f"\n=== KLART: {ok} uppdaterade, {fel} misslyckade ===")
     # Krascha bara om ingenting alls lyckades
