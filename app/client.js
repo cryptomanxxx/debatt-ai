@@ -705,7 +705,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                     <span key={t} style={{ fontSize:"11px", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
                   ))}
                 </div>
-                <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 8px", lineHeight:1.3, color:C.accent }}>{heroArtikel.rubrik}</h2>
+                <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 8px", lineHeight:1.3, color:"#4ade80" }}>{heroArtikel.rubrik}</h2>
                 <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 12px" }}>
                   {heroArtikel.kalla === "ai" && (() => { const v = agentVisuell(heroArtikel.forfattare); return <AgentAvatar namn={heroArtikel.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />; })()}
                   <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>{heroArtikel.kalla === "ai" ? `Agent ${heroArtikel.forfattare}` : heroArtikel.forfattare}</span>
