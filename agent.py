@@ -808,7 +808,7 @@ def hamta_nyheter() -> list:
             }
             # Stöd för både RSS (<item>) och Atom (<entry>)
             items = root.findall(".//item") or root.findall(".//atom:entry", ns)
-            for item in items[:5]:
+            for item in items[:10]:
                 title = item.find("title") or item.find("atom:title", ns)
                 rubrik = (title.text or "").strip() if title is not None else ""
                 if len(rubrik) <= 10:
