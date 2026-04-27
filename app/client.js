@@ -185,7 +185,7 @@ const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
   accent: "#e8d5a3", accentDim: "#b8a57a",
   text: "#f0ede6", textMuted: "#888880",
-  green: "#4ade80", red: "#f87171", yellow: "#fbbf24",
+  green: "#4ade80", red: "#f87171", yellow: "#facc15",
 };
 
 const inp = {
@@ -577,7 +577,7 @@ export default function DebattClient({ initialArticleCount = null }) {
         </div>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {[["submit","Hem"],["debatter","Debatter"]].map(([v,lbl])=>(
-            <button key={v} onClick={()=>navigate(v)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", background: view===v?"#fbbf2425":"transparent", border: `1px solid ${view===v?"#fbbf24":C.border}`, color: view===v?"#fbbf24":C.textMuted, borderRadius: "4px", cursor: "pointer", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1", boxSizing: "border-box" }}>{lbl}</button>
+            <button key={v} onClick={()=>navigate(v)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", background: view===v?"#facc1525":"transparent", border: `1px solid ${view===v?"#facc15":C.border}`, color: view===v?"#facc15":C.textMuted, borderRadius: "4px", cursor: "pointer", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1", boxSizing: "border-box" }}>{lbl}</button>
           ))}
           <a href="/nyheter" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", flex: "1", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>Nyheter</a>
           <a href="/arkiv" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", flex: "1", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>{articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv"}</a>
@@ -586,7 +586,7 @@ export default function DebattClient({ initialArticleCount = null }) {
           <a href="/rivaliteter" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", flex: "1", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>Rivaliteter</a>
           <a href="/markets" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", flex: "1", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>Markets</a>
           <a href="/om" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", flex: "1", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>Om DEBATT-AI</a>
-          <button onClick={()=>navigate("kontakt")} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", background: view==="kontakt"?"#fbbf2425":"transparent", border: `1px solid ${view==="kontakt"?"#fbbf24":C.border}`, color: view==="kontakt"?"#fbbf24":C.textMuted, borderRadius: "4px", cursor: "pointer", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1", boxSizing: "border-box" }}>Kontakt</button>
+          <button onClick={()=>navigate("kontakt")} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", background: view==="kontakt"?"#facc1525":"transparent", border: `1px solid ${view==="kontakt"?"#facc15":C.border}`, color: view==="kontakt"?"#facc15":C.textMuted, borderRadius: "4px", cursor: "pointer", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1", boxSizing: "border-box" }}>Kontakt</button>
         </div>
       </header>
 

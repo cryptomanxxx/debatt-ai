@@ -67,7 +67,7 @@ const AGENTPROFILER = {
     ikon: "φ",
     gradient: "radial-gradient(circle at 35% 35%, #120a1e 0%, #0c0614 40%, #0a0a0a 100%)",
     ring: "#2a1050",
-    ikonFarg: "#fbbf24",
+    ikonFarg: "#facc15",
   },
   "Läkare": {
     titel: "Läkare",
@@ -348,7 +348,7 @@ export default async function AgentPage({ params }) {
   const scoreColor = (v) => {
     if (!v) return C.textMuted;
     const n = parseFloat(v);
-    return n >= 8 ? C.green : n >= 6 ? "#fbbf24" : "#f87171";
+    return n >= 8 ? C.green : n >= 6 ? "#facc15" : "#f87171";
   };
 
   return (

@@ -15,16 +15,16 @@ const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
   accent: "#e8d5a3", accentDim: "#b8a57a",
   text: "#f0ede6", textMuted: "#888880",
-  green: "#4ade80", blue: "#4a9eff", red: "#f87171", yellow: "#fbbf24",
+  green: "#4ade80", blue: "#4a9eff", red: "#f87171", yellow: "#facc15",
 };
 
 const NAV = (href, lbl, active) => (
   <a key={href} href={href} style={{
     display: "inline-flex", alignItems: "center", justifyContent: "center",
     height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1,
-    background: active ? "#fbbf2425" : "transparent",
-    border: `1px solid ${active ? "#fbbf24" : C.border}`,
-    color: active ? "#fbbf24" : C.textMuted,
+    background: active ? "#facc1525" : "transparent",
+    border: `1px solid ${active ? "#facc15" : C.border}`,
+    color: active ? "#facc15" : C.textMuted,
     borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em",
     fontFamily: "Georgia, serif", textDecoration: "none",
   }}>{lbl}</a>
@@ -114,7 +114,7 @@ function dagarKvar(deadline) {
 }
 
 function kategoriFarg(kat) {
-  return { krypto: "#f7931a", makro: C.blue, politik: "#fbbf24", tech: "#34d399", övrigt: C.textMuted }[kat] || C.textMuted;
+  return { krypto: "#f7931a", makro: C.blue, politik: "#facc15", tech: "#34d399", övrigt: C.textMuted }[kat] || C.textMuted;
 }
 
 function MarketKort({ market }) {
@@ -313,7 +313,7 @@ function PrediktionsRankning({ rankning }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           {rankning.slice(0, 8).map((r, i) => {
             const v = agentVisuell(r.agent);
-            const medalColor = i === 0 ? "#fbbf24" : i === 1 ? "#94a3b8" : i === 2 ? "#b87333" : C.textMuted;
+            const medalColor = i === 0 ? "#facc15" : i === 1 ? "#94a3b8" : i === 2 ? "#b87333" : C.textMuted;
             const scoreColor = r.avgScore >= 65 ? C.green : r.avgScore >= 45 ? C.yellow : C.red;
             return (
               <a key={r.agent} href={`/agent/${encodeURIComponent(r.agent)}`} style={{
