@@ -16,7 +16,7 @@ export const metadata = {
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
-  accent: "#e8d5a3", accentDim: "#b8a57a",
+  accent: "#f8fafc", accentDim: "#aaaaaa",
   text: "#f0ede6", textMuted: "#888880",
   green: "#4ade80",
 };
@@ -211,7 +211,7 @@ export default function OmPage() {
             @media (max-width: 540px) { .agent-grid { grid-template-columns: 1fr; } }
             .agent-kolhuvud { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid #222; margin-bottom: 4px; }
             .agent-rad { display: flex; gap: 14px; align-items: center; padding: 12px 0; border-bottom: 1px solid #161616; }
-            .agent-rad-namn { font-size: 13px; font-weight: 600; color: #e8d5a3; text-decoration: none; display: block; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .agent-rad-namn { font-size: 13px; font-weight: 600; color: #f8fafc; text-decoration: none; display: block; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .agent-rad-namn:hover { color: #f0ede6; }
             .agent-rad-bio { font-size: 11px; color: #666660; line-height: 1.4; margin: 4px 0 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
           `}</style>

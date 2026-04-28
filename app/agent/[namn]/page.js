@@ -324,7 +324,7 @@ export async function generateMetadata({ params }) {
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
-  accent: "#e8d5a3", accentDim: "#b8a57a",
+  accent: "#f8fafc", accentDim: "#aaaaaa",
   text: "#f0ede6", textMuted: "#888880",
   green: "#4ade80", blue: "#4a9eff",
 };

@@ -183,7 +183,7 @@ async function getVisitors() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
-  accent: "#e8d5a3", accentDim: "#b8a57a",
+  accent: "#f8fafc", accentDim: "#aaaaaa",
   text: "#f0ede6", textMuted: "#888880",
   green: "#4ade80", red: "#f87171", yellow: "#f8fafc",
 };
@@ -234,7 +234,7 @@ function KallaBadge({ kalla }) {
     </div>
   );
   if (kalla === "manniska") return (
-    <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#0a0a05", border:"1px solid #e8d5a340", borderRadius:"20px" }}>
+    <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#0a0a05", border:"1px solid #f8fafc20", borderRadius:"20px" }}>
       <div style={{ width:"6px", height:"6px", borderRadius:"50%", background:C.accent }} />
       <span style={{ color:C.accent, fontSize:"11px", fontWeight:700, letterSpacing:"0.08em", fontFamily:"monospace" }}>MÄNNISKA</span>
     </div>
@@ -601,12 +601,12 @@ export default function DebattClient({ initialArticleCount = null }) {
                 50% { opacity: 1; }
               }
               .kriterieRad { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-radius: 6px; margin-bottom: 8px; background: #111; border: 1px solid #222; }
-              .kriterieRad.aktiv { border-color: #b8a57a40; }
-              .dots span { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #b8a57a; margin: 0 2px; animation: kriteriePuls 1.2s ease-in-out infinite; }
+              .kriterieRad.aktiv { border-color: #aaaaaa40; }
+              .dots span { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #aaaaaa; margin: 0 2px; animation: kriteriePuls 1.2s ease-in-out infinite; }
               .dots span:nth-child(2) { animation-delay: 0.2s; }
               .dots span:nth-child(3) { animation-delay: 0.4s; }
             `}</style>
-            <p style={{ fontSize: "11px", color: "#b8a57a", letterSpacing: "0.16em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 32px", fontWeight: 700 }}>AI-redaktören bedömer</p>
+            <p style={{ fontSize: "11px", color: "#aaaaaa", letterSpacing: "0.16em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 32px", fontWeight: 700 }}>AI-redaktören bedömer</p>
             {[
               { label: "Argumentation", delay: "0s" },
               { label: "Originalitet",  delay: "0.4s" },

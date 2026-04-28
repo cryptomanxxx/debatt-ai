@@ -12,7 +12,7 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const C = {
   bg: "#0a0a0a", border: "#222222",
-  accent: "#e8d5a3", accentDim: "#b8a57a",
+  accent: "#f8fafc", accentDim: "#aaaaaa",
   text: "#f0ede6", textMuted: "#888880",
 };
 

@@ -2,7 +2,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
-const C = { bg: "#0a0a0a", accent: "#e8d5a3", text: "#f0ede6", textMuted: "#888880", green: "#4ade80", red: "#f87171" };
+const C = { bg: "#0a0a0a", accent: "#f8fafc", text: "#f0ede6", textMuted: "#888880", green: "#4ade80", red: "#f87171" };
 
 function AvprenumereraContent() {
   const searchParams = useSearchParams();

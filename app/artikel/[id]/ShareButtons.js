@@ -3,7 +3,7 @@ import { useState } from "react";
 
 const C = {
   bg: "#0a0a0a", border: "#222222",
-  accent: "#e8d5a3", textMuted: "#888880",
+  accent: "#f8fafc", textMuted: "#888880",
 };
 
 const BTN = {
@@ -91,14 +91,14 @@ export default function ShareButtons({ artikel }) {
 
     // Top gradient bar
     const grad = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
-    grad.addColorStop(0, "#e8d5a3");
-    grad.addColorStop(1, "#b8a57a");
+    grad.addColorStop(0, "#f8fafc");
+    grad.addColorStop(1, "#aaaaaa");
     ctx.fillStyle = grad;
     ctx.fillRect(PAD, 44, W - PAD * 2, 3);
 
     // DEBATT-AI logotype
     ctx.font = "bold 22px serif";
-    ctx.fillStyle = "#e8d5a3";
+    ctx.fillStyle = "#f8fafc";
     ctx.fillText("DEBATT-AI", PAD, 100);
 
     // Tagline
@@ -113,13 +113,13 @@ export default function ShareButtons({ artikel }) {
       ctx.fillText("● AI", PAD, 124);
     } else if (artikel.kalla === "manniska") {
       ctx.font = "bold 11px monospace";
-      ctx.fillStyle = "#e8d5a3";
+      ctx.fillStyle = "#f8fafc";
       ctx.fillText("● MÄNNISKA", PAD, 124);
     }
 
     // Title
     ctx.font = "400 52px serif";
-    ctx.fillStyle = "#e8d5a3";
+    ctx.fillStyle = "#f8fafc";
     const titleBottom = wrapText(ctx, artikel.rubrik || "", PAD, 210, W - PAD * 2, 68);
 
     // Separator
@@ -157,8 +157,8 @@ export default function ShareButtons({ artikel }) {
         .share-label { font-size:12px; color:#888880; letter-spacing:0.1em; text-transform:uppercase; flex-shrink:0; margin-right:4px; }
         .share-btn { display:inline-flex; align-items:center; justify-content:center; border-radius:6px; padding:11px 20px; font-size:14px; text-decoration:none; font-family:Georgia,serif; cursor:pointer; white-space:nowrap; flex:1 1 130px; text-align:center; transition:opacity 0.15s; }
         .share-btn:hover { opacity:0.8; }
-        .share-social { background:rgba(232,213,163,0.08); border:1px solid rgba(232,213,163,0.25); color:#e8d5a3; }
-        .share-img { background:rgba(232,213,163,0.08); border:1px solid rgba(232,213,163,0.25); color:#e8d5a3; }
+        .share-social { background:rgba(248,250,252,0.08); border:1px solid rgba(248,250,252,0.25); color:#f8fafc; }
+        .share-img { background:rgba(248,250,252,0.08); border:1px solid rgba(248,250,252,0.25); color:#f8fafc; }
         @media(max-width:480px){
           .share-btn { flex:1 1 calc(50% - 10px); }
         }
