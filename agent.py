@@ -798,6 +798,7 @@ def hamta_nyheter() -> list:
         ("PubMed Central",     "https://www.ncbi.nlm.nih.gov/pmc/latest-articles/rss.xml"),
     ]
     nyheter = []
+    rss_stats = []  # [{"kalla": str, "ok": bool, "antal": int, "fel": str}]
     lyckade = []
     misslyckade = []
     for kalla, url in feeds:
@@ -807,6 +808,7 @@ def hamta_nyheter() -> list:
                             headers={"User-Agent": "debatt-ai/1.0"})
             if res.status_code != 200:
                 misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
+                rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
                 continue
             root = ET.fromstring(res.text)
             # content:encoded namespace (används av bl.a. DI Debatt för fulltext)
@@ -854,8 +856,10 @@ def hamta_nyheter() -> list:
                 })
             antal = len(nyheter) - fore
             lyckade.append(f"  ✓ {kalla} ({antal} artiklar)")
+            rss_stats.append({"kalla": kalla, "ok": True, "antal": antal, "fel": ""})
         except Exception as e:
             misslyckade.append(f"  ✗ {kalla} ({type(e).__name__})")
+            rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": type(e).__name__})
             continue
     print(f"\nRSS-resultat ({len(nyheter)} artiklar totalt):")
     for rad in lyckade:
@@ -863,7 +867,7 @@ def hamta_nyheter() -> list:
     for rad in misslyckade:
         print(rad)
     print()
-    return nyheter
+    return nyheter, rss_stats
 
 
 def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fmt: dict | None = None) -> str:
@@ -1337,16 +1341,18 @@ def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, arti
 
 
 def spara_nyhetslog(sb_key: str, agent_namn: str, vald: dict,
-                    alla: list, artikel_id: int | None, publicerad: bool):
+                    alla: list, artikel_id: int | None, publicerad: bool,
+                    rss_stats: list | None = None):
     """Loggar vilka nyheter som utvärderades och vilken som valdes."""
     try:
         row = {
-            "agent":       agent_namn,
-            "vald":        {"rubrik": vald["rubrik"], "url": vald.get("url", ""), "kalla": vald["kalla"], "publicerad": vald.get("publicerad", "")},
-            "utvärderade": [{"rubrik": n["rubrik"], "url": n.get("url", ""), "kalla": n["kalla"]} for n in alla[:60]],
-            "antal":       len(alla),
-            "artikel_id":  artikel_id,
-            "publicerad":  publicerad,
+            "agent":        agent_namn,
+            "vald":         {"rubrik": vald["rubrik"], "url": vald.get("url", ""), "kalla": vald["kalla"], "publicerad": vald.get("publicerad", "")},
+            "utvärderade":  [{"rubrik": n["rubrik"], "url": n.get("url", ""), "kalla": n["kalla"]} for n in alla[:60]],
+            "antal":        len(alla),
+            "artikel_id":   artikel_id,
+            "publicerad":   publicerad,
+            "rss_resultat": rss_stats or [],
         }
         r = httpx.post(
             f"{SB_URL}/rest/v1/nyhetslog",
@@ -1684,9 +1690,10 @@ def main():
                 print("Trendande ämnen hämtade ✓")
 
         # Försök hämta aktuella nyheter – hoppa över vid force_eget
+        rss_stats = []
         if not force_eget:
             print("Hämtar aktuella nyheter från RSS...")
-            nyheter = hamta_nyheter()
+            nyheter, rss_stats = hamta_nyheter()
             random.shuffle(nyheter)
             if nyheter and (force_nyhet or random.random() < 0.5):
                 nyhet = random.choice(nyheter[:30])
@@ -1792,7 +1799,7 @@ def main():
             artikel_id_num = int(svar.get("artikel_url", "").split("/")[-1])
         except (ValueError, IndexError, AttributeError):
             artikel_id_num = None
-        spara_nyhetslog(sb_key, agent["namn"], nyhet, nyheter, artikel_id_num, svar.get("publicerad", False))
+        spara_nyhetslog(sb_key, agent["namn"], nyhet, nyheter, artikel_id_num, svar.get("publicerad", False), rss_stats)
         print("  Nyhetslogg sparad ✓")
 
     # Visa resultat

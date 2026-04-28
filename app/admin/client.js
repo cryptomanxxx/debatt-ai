@@ -550,6 +550,32 @@ function NyhetsloggTab() {
                     </div>
                   )}
 
+                  {/* RSS-källstatus */}
+                  {Array.isArray(rad.rss_resultat) && rad.rss_resultat.length > 0 && (
+                    <div style={{ marginBottom: "10px" }}>
+                      <button
+                        onClick={() => setExpanded(e => ({ ...e, [`rss_${rad.id}`]: !e[`rss_${rad.id}`] }))}
+                        style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "11px", padding: "0", fontFamily: "monospace" }}
+                      >
+                        {expanded[`rss_${rad.id}`] ? "▲ dölj RSS-källor" : `▼ visa RSS-källor (${rad.rss_resultat.filter(r => r.ok).length}/${rad.rss_resultat.length} lyckades)`}
+                      </button>
+                      {expanded[`rss_${rad.id}`] && (
+                        <div style={{ marginTop: "8px", display: "flex", flexDirection: "column", gap: "3px" }}>
+                          {rad.rss_resultat.map((r, i) => (
+                            <div key={i} style={{ fontSize: "11px", display: "flex", gap: "8px", alignItems: "baseline", fontFamily: "monospace" }}>
+                              <span style={{ color: r.ok ? C.green : C.red, minWidth: "12px" }}>{r.ok ? "✓" : "✗"}</span>
+                              <span style={{ color: r.ok ? C.textMuted : "#555", minWidth: "180px" }}>{r.kalla}</span>
+                              {r.ok
+                                ? <span style={{ color: "#555" }}>{r.antal} artiklar</span>
+                                : <span style={{ color: "#553333" }}>{r.fel}</span>
+                              }
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Expandera alla utvärderade */}
                   <button
                     onClick={() => setExpanded(e => ({ ...e, [rad.id]: !open }))}
