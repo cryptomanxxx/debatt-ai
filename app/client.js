@@ -785,7 +785,7 @@ export default function DebattClient({ initialArticleCount = null }) {
             {senasteNyhet.length > 0 && (
               <div style={{ marginBottom:"24px" }}>
                 <div style={{ display:"flex", alignItems:"center", marginBottom:"12px" }}>
-                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE NYHETER</span>
+                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE NYHETERNA</span>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                   {senasteNyhet.map(nyhet => (
@@ -819,7 +819,7 @@ export default function DebattClient({ initialArticleCount = null }) {
             {heroArtikel.length > 0 && (
               <div style={{ marginBottom:"48px" }}>
                 <div style={{ display:"flex", alignItems:"center", marginBottom:"12px" }}>
-                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE DEBATTER</span>
+                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE DEBATTERNA</span>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                   {heroArtikel.map(artikel => (

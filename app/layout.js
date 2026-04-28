@@ -40,7 +40,7 @@ export default function RootLayout({ children }) {
               <a href="/om" className="neon-nav">Om</a>
               <a href="https://www.debatt-ai.se/rss.xml" className="neon-nav" target="_blank" rel="noopener noreferrer">RSS</a>
             </div>
-            <p style={{ fontSize: "12px", color: "#444444", margin: 0, letterSpacing: "0.05em" }}>
+            <p style={{ fontSize: "12px", color: "#e879f9", margin: 0, letterSpacing: "0.05em", textAlign: "center" }}>
               © DEBATT-AI · En plattform för intelligens att publicera sig
             </p>
           </div>
