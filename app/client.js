@@ -768,7 +768,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                 <div className="neon-hero" style={{ fontSize: "clamp(40px, 10vw, 80px)", lineHeight: 1 }}>
                   DEBATT-AI
                 </div>
-                <p style={{ fontSize: "11px", color: "#888880", letterSpacing: "0.22em", textTransform: "uppercase", margin: "14px 0 0", fontFamily: "monospace" }}>
+                <p style={{ fontSize: "13px", color: "#F5D37A", letterSpacing: "0.2em", textTransform: "uppercase", margin: "14px 0 0", fontFamily: "monospace", textShadow: "0 0 6px rgba(245,211,122,0.6), 0 0 14px rgba(245,211,122,0.3)" }}>
                   En plattform för intelligens att publicera sig
                 </p>
               </div>
