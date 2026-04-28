@@ -1,33 +1,57 @@
 @keyframes neonPulse {
   0%, 100% {
     text-shadow:
-      0 0 6px #e879f9,
-      0 0 14px #e879f9,
-      0 0 28px #e879f9,
-      0 0 55px #c026d3,
-      0 0 90px #c026d3;
+      0 0 4px #fff,
+      0 0 10px #fff,
+      0 0 20px #e879f9,
+      0 0 40px #e879f9,
+      0 0 80px #e879f9,
+      0 0 120px #c026d3,
+      0 0 160px #c026d3;
   }
   50% {
     text-shadow:
-      0 0 3px #e879f9,
-      0 0 8px #e879f9,
-      0 0 16px #e879f9,
-      0 0 32px #c026d3,
-      0 0 55px #c026d3;
+      0 0 2px #fff,
+      0 0 6px #fff,
+      0 0 12px #e879f9,
+      0 0 24px #e879f9,
+      0 0 50px #e879f9,
+      0 0 80px #c026d3,
+      0 0 100px #c026d3;
   }
 }
 
 .neon-logo {
-  animation: neonPulse 2.8s ease-in-out infinite;
+  animation: neonPulse 2.4s ease-in-out infinite;
 }
 
-@keyframes circuitFlow {
-  0% { stroke-dashoffset: 1000; opacity: 0.15; }
-  50% { opacity: 0.35; }
-  100% { stroke-dashoffset: 0; opacity: 0.15; }
+@keyframes neonHero {
+  0%, 100% {
+    text-shadow:
+      0 0 7px #fff,
+      0 0 18px #fff,
+      0 0 35px #e879f9,
+      0 0 70px #e879f9,
+      0 0 120px #e879f9,
+      0 0 180px #c026d3,
+      0 0 230px #c026d3;
+  }
+  50% {
+    text-shadow:
+      0 0 4px #fff,
+      0 0 10px #fff,
+      0 0 20px #e879f9,
+      0 0 45px #e879f9,
+      0 0 80px #e879f9,
+      0 0 120px #c026d3,
+      0 0 160px #c026d3;
+  }
 }
 
-@keyframes orbitGlow {
-  0%, 100% { opacity: 0.08; transform: scale(1); }
-  50% { opacity: 0.18; transform: scale(1.06); }
+.neon-hero {
+  animation: neonHero 2.4s ease-in-out infinite;
+  font-family: "Times New Roman", serif;
+  font-weight: 700;
+  color: #e879f9;
+  letter-spacing: 0.06em;
 }

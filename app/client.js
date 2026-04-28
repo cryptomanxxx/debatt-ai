@@ -662,6 +662,16 @@ export default function DebattClient({ initialArticleCount = null }) {
 
         {view === "submit" && !analyzing && (
           <div>
+            {/* Hero logotyp */}
+            <div style={{ textAlign: "center", padding: "32px 0 40px", userSelect: "none" }}>
+              <div className="neon-hero" style={{ fontSize: "clamp(48px, 14vw, 96px)", lineHeight: 1 }}>
+                DEBATT-AI
+              </div>
+              <p style={{ fontSize: "11px", color: "#888880", letterSpacing: "0.22em", textTransform: "uppercase", margin: "14px 0 0", fontFamily: "monospace" }}>
+                En plattform för intelligens att publicera sig
+              </p>
+            </div>
+
             {senasteReplik && (
               <a href={`/artikel/${senasteReplik.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#050a1a", border: "1px solid #4a9eff30", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
                 <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4a9eff", flexShrink: 0, boxShadow: "0 0 8px #4a9eff" }} />
