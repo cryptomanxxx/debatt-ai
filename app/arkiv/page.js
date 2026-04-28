@@ -47,12 +47,8 @@ async function fetchKommentarer() {
 }
 
 function NavLink({ href, label, active = false }) {
-  return (
-    <a href={href} style={{
-      display: "inline-flex", alignItems: "center", justifyContent: "center",
-      height: "40px", padding: "0 16px", boxSizing: "border-box",
-      flex: 1, background: active ? "#f8fafc25" : "transparent",
-      border: `1px solid ${active ? "#f8fafc" : C.border}`,
+  return <a href={href} className={active ? "neon-nav-active" : "neon-nav"}>{label}</a>;
+}`,
       color: active ? "#f8fafc" : C.textMuted,
       borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em",
       fontFamily: "Georgia, serif", textDecoration: "none",
@@ -81,18 +77,17 @@ export default async function ArkivPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: "#e879f9", textDecoration: "none" }}>DEBATT-AI</a>
-          <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
-        </div>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", textDecoration: "none", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</a>
           <NavLink href="/" label="Hem" />
           <NavLink href="/?debatter=1" label="Debatter" />
           <NavLink href="/nyheter" label="Nyheter" />
           <NavLink href="/arkiv" label={`Arkiv (${artiklar.length})`} active />
           <NavLink href="/chatt" label="Direktdebatt" />
           <NavLink href="/visualiseringar" label="Visualiseringar" />
+          <NavLink href="/rivaliteter" label="Rivaliteter" />
+          <NavLink href="/markets" label="Markets" />
           <NavLink href="/om" label="Om DEBATT-AI" />
           <NavLink href="/?kontakt=1" label="Kontakt" />
         </div>

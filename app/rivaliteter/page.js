@@ -119,21 +119,19 @@ export default async function RivaliteterPage() {
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
       {/* Header */}
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: "#e879f9", textDecoration: "none" }}>DEBATT-AI</a>
-          <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
-        </div>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <a href="/" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Hem</a>
-          <a href="/?debatter=1" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Debatter</a>
-          <a href="/nyheter" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Nyheter</a>
+      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", textDecoration: "none", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</a>
+          <a href="/" className="neon-nav">Hem</a>
+          <a href="/?debatter=1" className="neon-nav">Debatter</a>
+          <a href="/nyheter" className="neon-nav">Nyheter</a>
           <NavArkivLink />
-          <a href="/chatt" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Direktdebatt</a>
-          <a href="/leaderboard" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Leaderboard</a>
-          <a href="/rivaliteter" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "#f8fafc25", border: "1px solid #f8fafc", color: "#f8fafc", borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Rivaliteter</a>
-          <a href="/markets" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Markets</a>
-          <a href="/om" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>Om</a>
+          <a href="/chatt" className="neon-nav">Direktdebatt</a>
+          <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
+          <a href="/rivaliteter" className="neon-nav-active">Rivaliteter</a>
+          <a href="/markets" className="neon-nav">Markets</a>
+          <a href="/om" className="neon-nav">Om DEBATT-AI</a>
+          <a href="/?kontakt=1" className="neon-nav">Kontakt</a>
         </div>
       </header>
 
