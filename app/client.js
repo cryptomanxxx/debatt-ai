@@ -751,27 +751,28 @@ export default function DebattClient({ initialArticleCount = null }) {
         {view === "submit" && !analyzing && (
           <div>
             {/* Hero */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "clamp(8px, 2vw, 20px)", padding: "24px 0 40px", userSelect: "none", flexWrap: "nowrap", overflow: "hidden" }}>
+            <div style={{ textAlign: "center", padding: "24px 0 40px", userSelect: "none" }}>
               <img
                 src="/ai-head.jpg"
                 alt=""
                 aria-hidden="true"
                 style={{
-                  height: "clamp(60px, 11vw, 110px)",
+                  height: "clamp(140px, 22vw, 220px)",
                   width: "auto",
-                  flexShrink: 0,
-                  filter: "drop-shadow(0 0 12px rgba(232,121,249,0.5)) drop-shadow(0 0 28px rgba(192,38,211,0.3))",
-                  borderRadius: "6px",
+                  filter: "drop-shadow(0 0 14px rgba(232,121,249,0.6)) drop-shadow(0 0 32px rgba(192,38,211,0.35))",
+                  borderRadius: "8px",
+                  display: "block",
+                  margin: "0 auto 20px",
                 }}
               />
               <img
                 src="/debatt-ai-banner.png"
                 alt="DEBATT-AI – En plattform för intelligens att publicera sig"
                 style={{
-                  height: "clamp(60px, 11vw, 110px)",
-                  width: "auto",
-                  flexShrink: 0,
+                  width: "100%",
+                  height: "auto",
                   filter: "drop-shadow(0 0 8px rgba(232,121,249,0.3))",
+                  display: "block",
                 }}
               />
             </div>
