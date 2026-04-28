@@ -798,11 +798,15 @@ def hamta_nyheter() -> list:
         ("PubMed Central",     "https://www.ncbi.nlm.nih.gov/pmc/latest-articles/rss.xml"),
     ]
     nyheter = []
+    lyckade = []
+    misslyckade = []
     for kalla, url in feeds:
+        fore = len(nyheter)
         try:
             res = httpx.get(url, timeout=10, follow_redirects=True,
                             headers={"User-Agent": "debatt-ai/1.0"})
             if res.status_code != 200:
+                misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
                 continue
             root = ET.fromstring(res.text)
             # content:encoded namespace (används av bl.a. DI Debatt för fulltext)
@@ -848,8 +852,17 @@ def hamta_nyheter() -> list:
                     "url": url,
                     "publicerad": publicerad,
                 })
-        except Exception:
+            antal = len(nyheter) - fore
+            lyckade.append(f"  ✓ {kalla} ({antal} artiklar)")
+        except Exception as e:
+            misslyckade.append(f"  ✗ {kalla} ({type(e).__name__})")
             continue
+    print(f"\nRSS-resultat ({len(nyheter)} artiklar totalt):")
+    for rad in lyckade:
+        print(rad)
+    for rad in misslyckade:
+        print(rad)
+    print()
     return nyheter
 
 
