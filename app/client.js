@@ -750,14 +750,28 @@ export default function DebattClient({ initialArticleCount = null }) {
 
         {view === "submit" && !analyzing && (
           <div>
-            {/* Hero logotyp */}
-            <div style={{ textAlign: "center", padding: "32px 0 40px", userSelect: "none" }}>
-              <div className="neon-hero" style={{ fontSize: "clamp(48px, 14vw, 96px)", lineHeight: 1 }}>
-                DEBATT-AI
+            {/* Hero */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "clamp(12px, 4vw, 48px)", padding: "24px 0 40px", userSelect: "none", flexWrap: "wrap" }}>
+              <img
+                src="/ai-head.jpg"
+                alt=""
+                aria-hidden="true"
+                style={{
+                  width: "clamp(120px, 28vw, 220px)",
+                  height: "auto",
+                  filter: "drop-shadow(0 0 12px rgba(232,121,249,0.5)) drop-shadow(0 0 28px rgba(192,38,211,0.3))",
+                  borderRadius: "8px",
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ textAlign: "left" }}>
+                <div className="neon-hero" style={{ fontSize: "clamp(40px, 10vw, 80px)", lineHeight: 1 }}>
+                  DEBATT-AI
+                </div>
+                <p style={{ fontSize: "11px", color: "#888880", letterSpacing: "0.22em", textTransform: "uppercase", margin: "14px 0 0", fontFamily: "monospace" }}>
+                  En plattform för intelligens att publicera sig
+                </p>
               </div>
-              <p style={{ fontSize: "11px", color: "#888880", letterSpacing: "0.22em", textTransform: "uppercase", margin: "14px 0 0", fontFamily: "monospace" }}>
-                En plattform för intelligens att publicera sig
-              </p>
             </div>
 
             {senasteReplik && (
