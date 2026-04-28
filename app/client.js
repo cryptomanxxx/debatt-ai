@@ -96,6 +96,19 @@ async function fetchDebatterArtiklar() {
   return res.json();
 }
 
+function relativTid(iso) {
+  if (!iso) return "";
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 2) return "just nu";
+  if (min < 60) return `${min} min sedan`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} tim sedan`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "igår";
+  return `${d} dagar sedan`;
+}
+
 function basRubrik(rubrik) {
   let base = rubrik;
   while (base.startsWith("Replik: ")) base = base.slice(8);
@@ -159,6 +172,25 @@ async function fetchLatestArtikel() {
   });
   if (!res.ok) return [];
   return await res.json();
+}
+
+async function fetchTrending() {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,lasningar,nyhetskalla&skapad=gte.${since}&lasningar=gte.1&order=lasningar.desc&limit=5`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
+async function fetchSenasteKommentarer() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,forfattare,text,skapad,artiklar(id,rubrik)&order=skapad.desc&limit=5`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return [];
+  return res.json();
 }
 
 async function incrementVisitors() {
@@ -469,6 +501,8 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [senasteReplik, setSenasteReplik] = useState(null);
   const [senasteChattDebatt, setSenasteChattDebatt] = useState(null);
   const [senasteNyhet, setSenasteNyhet] = useState([]);
+  const [trending, setTrending] = useState([]);
+  const [senasteKommentarer, setSenasteKommentarer] = useState([]);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -541,6 +575,8 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteReplik().then(r => setSenasteReplik(r)).catch(() => {});
     fetchSenasteChattDebatt().then(d => setSenasteChattDebatt(d)).catch(() => {});
     fetchSenasteNyhet().then(n => setSenasteNyhet(n)).catch(() => {});
+    fetchTrending().then(d => setTrending(d)).catch(() => {});
+    fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -876,6 +912,60 @@ export default function DebattClient({ initialArticleCount = null }) {
                 {totalRoster !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalRoster.toLocaleString("sv-SE")}</span> röster</span>}
                 {totalKommentarer !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalKommentarer}</span> kommentarer</span>}
                 {nextTimer && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace", marginLeft: "auto" }}>Nästa körning om <span style={{ color: C.accent, fontWeight: 700 }}>{nextTimer}</span></span>}
+              </div>
+            )}
+
+            {/* Trending */}
+            {trending.length > 0 && (
+              <div style={{ marginBottom:"28px" }}>
+                <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px", fontFamily:"Georgia, serif" }}>
+                  Trendande denna vecka
+                </p>
+                <div style={{ display:"flex", flexDirection:"column", gap:"1px", background:C.border, borderRadius:"8px", overflow:"hidden", border:`1px solid ${C.border}` }}>
+                  {trending.map((a, i) => (
+                    <a key={a.id} href={`/artikel/${a.id}`} className="debatt-rad" style={{ display:"flex", alignItems:"center", gap:"14px", padding:"14px 18px", background:C.surface, textDecoration:"none" }}>
+                      <span style={{ fontSize:"16px", fontWeight:700, color:"#333", fontFamily:"monospace", flexShrink:0, width:"18px", textAlign:"right" }}>{i + 1}</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <p style={{ margin:"0 0 3px", fontSize:"15px", color:a.nyhetskalla ? "#38bdf8" : "#4ade80", lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {a.rubrik}
+                        </p>
+                        <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>
+                          {a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}
+                        </span>
+                      </div>
+                      <span style={{ fontSize:"11px", color:"#555", fontFamily:"monospace", flexShrink:0 }}>{a.lasningar} läsn.</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Senaste kommentarerna */}
+            {senasteKommentarer.length > 0 && (
+              <div style={{ marginBottom:"32px" }}>
+                <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px", fontFamily:"Georgia, serif" }}>
+                  Senaste kommentarerna
+                </p>
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                  {senasteKommentarer.map(k => (
+                    <a key={k.id} href={`/artikel/${k.artikel_id}`} style={{ display:"block", padding:"14px 18px", background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", textDecoration:"none", transition:"border-color 0.15s" }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = "#3a3a3a"}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+                    >
+                      <div style={{ display:"flex", alignItems:"baseline", gap:"6px", marginBottom:"6px", flexWrap:"wrap" }}>
+                        <span style={{ fontSize:"13px", color:C.accent, fontWeight:600 }}>{k.forfattare}</span>
+                        <span style={{ fontSize:"11px", color:C.textMuted }}>om</span>
+                        <span style={{ fontSize:"12px", color:C.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"260px" }}>
+                          {k.artiklar?.rubrik || ""}
+                        </span>
+                        <span style={{ fontSize:"11px", color:"#444", marginLeft:"auto", flexShrink:0 }}>{relativTid(k.skapad)}</span>
+                      </div>
+                      <p style={{ margin:0, fontSize:"13px", color:"#666", lineHeight:1.6, fontStyle:"italic" }}>
+                        "{(k.text || "").slice(0, 120)}{(k.text || "").length > 120 ? "…" : ""}"
+                      </p>
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
 
