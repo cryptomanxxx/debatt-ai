@@ -768,7 +768,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                 src="/debatt-ai-banner.png"
                 alt="DEBATT-AI – En plattform för intelligens att publicera sig"
                 style={{
-                  width: "clamp(280px, 65vw, 700px)",
+                  width: "clamp(220px, 50vw, 560px)",
                   height: "auto",
                   filter: "drop-shadow(0 0 8px rgba(232,121,249,0.3))",
                   flexShrink: 0,
