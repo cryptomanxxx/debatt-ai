@@ -2,7 +2,7 @@ name: Backtest (fetch + strategi)
 
 on:
   schedule:
-    - cron: "0 5 * * 1"   # Varje måndag kl 05:00 UTC (07:00 svensk tid)
+    - cron: "0 5 * * *"   # Varje dag kl 05:00 UTC (07:00 svensk tid)
   workflow_dispatch:       # Kan köras manuellt
 
 jobs:
