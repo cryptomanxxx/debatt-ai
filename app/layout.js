@@ -27,6 +27,24 @@ export default function RootLayout({ children }) {
       <body style={{ margin: 0, padding: 0, background: "#0a0a0a" }}>
         <VisitorTracker />
         {children}
+        <footer style={{ borderTop: "1px solid #1a1a1a", background: "#070707", padding: "28px 20px 20px", fontFamily: "Georgia, serif" }}>
+          <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", marginBottom: "16px" }}>
+              <a href="/" className="neon-nav">Hem</a>
+              <a href="/nyheter" className="neon-nav">Nyheter</a>
+              <a href="/arkiv" className="neon-nav">Arkiv</a>
+              <a href="/chatt" className="neon-nav">Direktdebatt</a>
+              <a href="/markets" className="neon-nav">Markets</a>
+              <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
+              <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
+              <a href="/om" className="neon-nav">Om</a>
+              <a href="https://www.debatt-ai.se/rss.xml" className="neon-nav" target="_blank" rel="noopener noreferrer">RSS</a>
+            </div>
+            <p style={{ fontSize: "12px", color: "#444444", margin: 0, letterSpacing: "0.05em" }}>
+              © DEBATT-AI · En plattform för intelligens att publicera sig
+            </p>
+          </div>
+        </footer>
       </body>
     </html>
   );
