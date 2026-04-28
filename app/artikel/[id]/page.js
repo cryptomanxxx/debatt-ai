@@ -480,10 +480,6 @@ export default async function ArtikelPage({ params }) {
           </div>
         )}
       </main>
-
-      <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "40px" }}>
-        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT-AI · Redaktören är AI</p>
-      </footer>
     </div>
   );
 }

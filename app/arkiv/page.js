@@ -90,10 +90,6 @@ export default async function ArkivPage() {
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px" }}>
         <ArkivClient artiklar={artiklar} voteCounts={voteCounts} commentCounts={commentCounts} />
       </main>
-
-      <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "60px" }}>
-        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT-AI · Redaktören är AI</p>
-      </footer>
     </div>
   );
 }

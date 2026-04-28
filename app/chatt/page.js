@@ -744,10 +744,6 @@ export default function ChattPage() {
         @keyframes dot{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
         @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
       `}</style>
-
-      <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 20px", textAlign: "center", marginTop: "60px" }}>
-        <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>© 2026 DEBATT-AI · Redaktören är AI</p>
-      </footer>
     </div>
   );
 }

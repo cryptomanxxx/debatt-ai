@@ -1098,9 +1098,9 @@ export default function DebattClient({ initialArticleCount = null }) {
 
       </main>
 
-      <footer style={{ borderTop:`1px solid ${C.border}`, padding:"40px 20px 28px", marginTop:"60px" }}>
+      <section style={{ borderTop:`1px solid ${C.border}`, padding:"40px 20px 28px", marginTop:"60px" }}>
         {/* Newsletter signup */}
-        <div style={{ maxWidth:"480px", margin:"0 auto 32px", textAlign:"center" }}>
+        <div style={{ maxWidth:"480px", margin:"0 auto" }}>
           <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 8px" }}>Nyhetsbrev</p>
           <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 16px", lineHeight:1.6 }}>Få ett veckobrev med de senaste debattartiklarna.</p>
           {subStatus === "ok" ? (
@@ -1122,12 +1122,7 @@ export default function DebattClient({ initialArticleCount = null }) {
           )}
           {subStatus === "err" && <p style={{ color:C.red, fontSize:"13px", margin:"8px 0 0" }}>{subMsg}</p>}
         </div>
-        <p style={{ color:C.textMuted, fontSize:"12px", margin:0, textAlign:"center", letterSpacing:"0.05em" }}>
-          © 2026 DEBATT-AI · Redaktören är AI
-          {" · "}
-          <a href="/integritetspolicy" style={{ color:C.textMuted, textDecoration:"none" }}>Integritetspolicy</a>
-        </p>
-      </footer>
+      </section>
     </div>
     </>
   );
