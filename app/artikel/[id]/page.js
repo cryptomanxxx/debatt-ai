@@ -3,6 +3,7 @@ import ShareButtons from "./ShareButtons";
 import Interactions from "./Interactions";
 import Chart from "../../visualiseringar/Chart";
 import LyssnaKnapp from "../../LyssnaKnapp";
+import PrenumereraForm from "../../PrenumereraForm";
 import ReadCounter from "./ReadCounter";
 import AgentAvatar from "../../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../../agentData";
@@ -453,6 +454,8 @@ export default async function ArtikelPage({ params }) {
             </div>
           );
         })()}
+
+        <PrenumereraForm />
 
         {/* Related articles */}
         {relaterade.length > 0 && (
