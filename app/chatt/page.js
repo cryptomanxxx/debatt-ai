@@ -537,7 +537,7 @@ export default function ChattPage() {
 
   const hasLive = streaming || tänker;
   const navLink = (href, lbl, active) => (
-    <a href={href} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: active ? "#f8fafc25" : "transparent", border: `1px solid ${active ? "#f8fafc" : C.border}`, color: active ? "#f8fafc" : C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{lbl}</a>
+    <a href={href} className={active ? "neon-nav-active" : "neon-nav"}>{lbl}</a>
   );
 
   const liveLabel = fas === "kör" ? "LIVE" : fas === "summering" ? "SUMMERAR" : fas === "klar" ? "AVSLUTAD" : "REDO";
@@ -545,18 +545,16 @@ export default function ChattPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: "#e879f9", textDecoration: "none" }}>DEBATT-AI</a>
-          <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
-        </div>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", textDecoration: "none", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</a>
           {navLink("/","Hem",false)}
           {navLink("/?debatter=1","Debatter",false)}
+          {navLink("/nyheter","Nyheter",false)}
           {navLink("/arkiv", arkivAntal !== null ? `Arkiv (${arkivAntal})` : "Arkiv", false)}
           {navLink("/chatt","Direktdebatt",true)}
           <NavHistorikLink />
-          {navLink("/leaderboard","Leaderboard",false)}
+          {navLink("/visualiseringar","Visualiseringar",false)}
           {navLink("/rivaliteter","Rivaliteter",false)}
           {navLink("/markets","Markets",false)}
           {navLink("/om","Om DEBATT-AI",false)}
