@@ -771,8 +771,8 @@ export default function DebattClient({ initialArticleCount = null }) {
                   style={{
                     width: "100%",
                     height: "100%",
-                    objectFit: "cover",
-                    objectPosition: "center",
+                    objectFit: "contain",
+                    objectPosition: "left center",
                     filter: "drop-shadow(0 0 8px rgba(232,121,249,0.3))",
                   }}
                 />
