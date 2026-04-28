@@ -169,4 +169,11 @@
   box-shadow: 0 0 6px #e879f9;
 }
 
+.artikel-kort {
+  transition: border-color 0.15s;
+}
+.artikel-kort:hover {
+  border-color: #3a3a3a !important;
+}
+
 

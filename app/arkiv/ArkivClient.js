@@ -144,7 +144,7 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
         const total = vc ? vc.ja + vc.nej : 0;
         const jaPct = total > 0 ? Math.round((vc.ja / total) * 100) : null;
         return (
-          <div key={a.id || i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "24px 24px 20px", marginBottom: "16px", transition: "border-color 0.15s" }}
+          <div key={a.id || i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px 24px", marginBottom: "16px", transition: "border-color 0.15s" }}
             onMouseEnter={e => e.currentTarget.style.borderColor = "#3a3a3a"}
             onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
           >
@@ -156,7 +156,7 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
               </div>
               <span style={{ fontSize: "13px", color: C.textMuted }}>{a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE") : ""}</span>
             </div>
-            <h2 style={{ fontSize: "22px", fontWeight: 400, margin: "0 0 6px 0", lineHeight: 1.3, color: a.nyhetskalla ? "#38bdf8" : "#4ade80" }}>
+            <h2 style={{ fontSize: "19px", fontWeight: 500, margin: "0 0 6px 0", lineHeight: 1.35, color: a.nyhetskalla ? "#38bdf8" : "#4ade80" }}>
               {term ? highlight(a.rubrik, term) : a.rubrik}
             </h2>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "0 0 12px 0" }}>
@@ -165,7 +165,7 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
                 {term ? highlight(a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare, term) : (a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare)}
               </span>
             </div>
-            <p style={{ color: C.textMuted, fontSize: "15px", lineHeight: 1.7, margin: "0 0 16px 0" }}>{(a.artikel || "").slice(0, 220)}…</p>
+            <p style={{ color: C.textMuted, fontSize: "14px", lineHeight: 1.65, margin: "0 0 16px 0" }}>{(a.artikel || "").slice(0, 220)}…</p>
             {(a.taggar || []).length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "16px" }}>
                 {(a.taggar || []).map(t => (

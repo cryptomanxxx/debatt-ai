@@ -46,7 +46,7 @@ function ArtikelKort({ artikel }) {
 
   return (
     <a href={`/artikel/${artikel.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-      <article style={{
+      <article className="artikel-kort" style={{
         background: C.surface, border: `1px solid ${C.border}`,
         borderRadius: "8px", padding: "20px 24px", marginBottom: "16px",
       }}
@@ -68,7 +68,7 @@ function ArtikelKort({ artikel }) {
           </div>
         )}
 
-        <h2 style={{ margin: "0 0 8px", fontSize: "18px", fontWeight: 600, color: "#38bdf8", lineHeight: 1.35, fontFamily: "Georgia, serif" }}>
+        <h2 style={{ margin: "0 0 8px", fontSize: "19px", fontWeight: 500, color: "#38bdf8", lineHeight: 1.35, fontFamily: "Georgia, serif" }}>
           {artikel.rubrik}
         </h2>
 
