@@ -343,16 +343,55 @@ function StarField() {
   }, []);
 
   return (
-    <svg aria-hidden="true" style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} xmlns="http://www.w3.org/2000/svg">
+    <svg aria-hidden="true" style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="0.4" result="blur" />
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      {/* Stars */}
       {stars.map((s, i) => (
-        <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="white">
+        <circle key={i} cx={s.x} cy={s.y} r={s.r * 0.08} fill="white">
           <animate attributeName="opacity" values={s.op} dur={`${s.dur}s`} begin={`${s.delay}s`} repeatCount="indefinite" />
         </circle>
       ))}
-      <circle cx="15%" cy="13%" r="1.4" fill="#b3d4ff"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="4s" repeatCount="indefinite" /></circle>
-      <circle cx="79%" cy="9%" r="1.6" fill="#ffd6aa"><animate attributeName="opacity" values="0.3;0.9;0.3" dur="3.5s" begin="1s" repeatCount="indefinite" /></circle>
-      <circle cx="6%" cy="47%" r="1.2" fill="#c8b4ff"><animate attributeName="opacity" values="0.2;0.7;0.2" dur="5s" begin="2s" repeatCount="indefinite" /></circle>
-      <circle cx="92%" cy="33%" r="1.4" fill="#aaffee"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="4.5s" begin="0.5s" repeatCount="indefinite" /></circle>
+      <circle cx="15%" cy="13%" r="0.12" fill="#b3d4ff"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="4s" repeatCount="indefinite" /></circle>
+      <circle cx="79%" cy="9%" r="0.14" fill="#ffd6aa"><animate attributeName="opacity" values="0.3;0.9;0.3" dur="3.5s" begin="1s" repeatCount="indefinite" /></circle>
+      <circle cx="6%" cy="47%" r="0.10" fill="#c8b4ff"><animate attributeName="opacity" values="0.2;0.7;0.2" dur="5s" begin="2s" repeatCount="indefinite" /></circle>
+      <circle cx="92%" cy="33%" r="0.12" fill="#aaffee"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="4.5s" begin="0.5s" repeatCount="indefinite" /></circle>
+
+      {/* Circuit lines – radiating from center */}
+      {[0,30,60,90,120,150,180,210,240,270,300,330].map((deg, i) => {
+        const rad = deg * Math.PI / 180;
+        const x2 = (50 + Math.cos(rad) * 55).toFixed(1);
+        const y2 = (50 + Math.sin(rad) * 55).toFixed(1);
+        return (
+          <line key={`r${i}`} x1="50" y1="50" x2={x2} y2={y2} stroke="#e879f9" strokeWidth="0.08" filter="url(#glow)">
+            <animate attributeName="opacity" values="0;0.35;0" dur={`${4 + (i % 5)}s`} begin={`${i * 0.4}s`} repeatCount="indefinite" />
+          </line>
+        );
+      })}
+
+      {/* Concentric rings */}
+      {[12, 22, 35, 48].map((r, i) => (
+        <circle key={`ring${i}`} cx="50" cy="50" r={r} fill="none" stroke="#e879f9" strokeWidth="0.06" filter="url(#glow)">
+          <animate attributeName="opacity" values="0.05;0.25;0.05" dur={`${6 + i * 2}s`} begin={`${i * 1.2}s`} repeatCount="indefinite" />
+        </circle>
+      ))}
+
+      {/* Nodes at circuit intersections */}
+      {[12, 22, 35].map(r => [0, 60, 120, 180, 240, 300].map((deg, j) => {
+        const rad = deg * Math.PI / 180;
+        const cx = (50 + Math.cos(rad) * r).toFixed(1);
+        const cy = (50 + Math.sin(rad) * r).toFixed(1);
+        return (
+          <circle key={`n${r}${j}`} cx={cx} cy={cy} r="0.35" fill="#e879f9" filter="url(#glow)">
+            <animate attributeName="opacity" values="0.1;0.8;0.1" dur={`${2 + (r + j) % 4}s`} begin={`${(r * j % 7) * 0.3}s`} repeatCount="indefinite" />
+          </circle>
+        );
+      }))}
     </svg>
   );
 }
