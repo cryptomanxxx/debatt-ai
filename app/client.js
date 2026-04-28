@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useLayoutEffect, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import AgentAvatar from "./agent/[namn]/AgentAvatar";
 import { agentVisuell } from "./agentData";
 
@@ -325,6 +325,72 @@ function useNextAgentTimer() {
   return timeLeft;
 }
 
+// ── Starfield ─────────────────────────────────────────────────────────────────
+function StarField() {
+  const stars = useMemo(() => {
+    const s = [];
+    for (let i = 0; i < 180; i++) {
+      const x = ((Math.sin(i * 127.1) * 0.5 + 0.5) * 1200).toFixed(1);
+      const y = ((Math.cos(i * 311.7) * 0.5 + 0.5) * 900).toFixed(1);
+      const big = i % 17 === 0;
+      const medium = i % 7 === 0;
+      const r = big ? 2.2 : medium ? 1.4 : 0.8;
+      const dur = 2.5 + (i % 7) * 0.8;
+      const delay = (i * 0.23) % 5;
+      const minOp = big ? 0.4 : 0.1;
+      const maxOp = big ? 1 : medium ? 0.75 : 0.55;
+      s.push({ x, y, r, dur, delay, minOp, maxOp });
+    }
+    return s;
+  }, []);
+
+  return (
+    <svg aria-hidden="true" style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="skyGrad" cx="50%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#0d0d1a" />
+          <stop offset="100%" stopColor="#0a0a0a" />
+        </radialGradient>
+        <radialGradient id="nebulaGlow" cx="50%" cy="40%" r="45%">
+          <stop offset="0%" stopColor="#1a0a2e" stopOpacity="0.6" />
+          <stop offset="100%" stopColor="#0a0a0a" stopOpacity="0" />
+        </radialGradient>
+        <filter id="starBlur">
+          <feGaussianBlur stdDeviation="0.6" />
+        </filter>
+      </defs>
+
+      {/* Sky gradient */}
+      <rect width="1200" height="900" fill="url(#skyGrad)" />
+      {/* Subtle nebula */}
+      <ellipse cx="600" cy="360" rx="500" ry="300" fill="url(#nebulaGlow)">
+        <animate attributeName="opacity" values="0.7;1;0.7" dur="12s" repeatCount="indefinite" />
+      </ellipse>
+
+      {/* Stars */}
+      {stars.map((s, i) => (
+        <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="white" filter={s.r < 1 ? "url(#starBlur)" : undefined}>
+          <animate attributeName="opacity" values={`${s.minOp};${s.maxOp};${s.minOp}`} dur={`${s.dur}s`} begin={`${s.delay}s`} repeatCount="indefinite" />
+        </circle>
+      ))}
+
+      {/* A few colored stars for variety */}
+      <circle cx="180" cy="120" r="1.5" fill="#b3d4ff">
+        <animate attributeName="opacity" values="0.3;0.9;0.3" dur="4s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="950" cy="80" r="1.8" fill="#ffd6aa">
+        <animate attributeName="opacity" values="0.4;1;0.4" dur="3.5s" begin="1s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="70" cy="420" r="1.4" fill="#c8b4ff">
+        <animate attributeName="opacity" values="0.2;0.8;0.2" dur="5s" begin="2s" repeatCount="indefinite" />
+      </circle>
+      <circle cx="1100" cy="300" r="1.6" fill="#aaffee">
+        <animate attributeName="opacity" values="0.3;0.85;0.3" dur="4.5s" begin="0.5s" repeatCount="indefinite" />
+      </circle>
+    </svg>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function DebattClient({ initialArticleCount = null }) {
   const [view, setView]     = useState("submit");
@@ -564,53 +630,8 @@ export default function DebattClient({ initialArticleCount = null }) {
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif", position: "relative", overflow: "hidden" }}>
 
-      {/* Circuit / wave background */}
-      <svg aria-hidden="true" style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0, opacity: 0.22 }} viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
-        <defs>
-          <radialGradient id="glowCenter" cx="50%" cy="45%" r="50%">
-            <stop offset="0%" stopColor="#e879f9" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#e879f9" stopOpacity="0" />
-          </radialGradient>
-          <filter id="blur2">
-            <feGaussianBlur stdDeviation="2" />
-          </filter>
-        </defs>
-
-        {/* Central glow orb */}
-        <ellipse cx="600" cy="360" rx="320" ry="220" fill="url(#glowCenter)">
-          <animate attributeName="rx" values="320;360;320" dur="5s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="1;0.6;1" dur="5s" repeatCount="indefinite" />
-        </ellipse>
-
-        {/* Horizontal circuit lines */}
-        {[180,260,340,420,480,540,600,660,720,780,840,900].map((y, i) => (
-          <line key={`h${i}`} x1="0" y1={y} x2="1200" y2={y} stroke="#e879f9" strokeWidth="0.5" filter="url(#blur2)">
-            <animate attributeName="opacity" values="0.1;0.5;0.1" dur={`${3 + (i % 4)}s`} begin={`${i * 0.3}s`} repeatCount="indefinite" />
-          </line>
-        ))}
-
-        {/* Vertical circuit lines */}
-        {[120,240,360,480,600,720,840,960,1080].map((x, i) => (
-          <line key={`v${i}`} x1={x} y1="0" x2={x} y2="800" stroke="#e879f9" strokeWidth="0.5" filter="url(#blur2)">
-            <animate attributeName="opacity" values="0.1;0.45;0.1" dur={`${4 + (i % 3)}s`} begin={`${i * 0.4}s`} repeatCount="indefinite" />
-          </line>
-        ))}
-
-        {/* Circuit nodes at intersections */}
-        {[240,480,720,960].map(x => [260,420,540,660,780].map(y => (
-          <circle key={`n${x}${y}`} cx={x} cy={y} r="2.5" fill="#e879f9" opacity="0.3">
-            <animate attributeName="opacity" values="0.1;0.7;0.1" dur={`${2 + ((x+y) % 3)}s`} begin={`${((x+y) % 7) * 0.2}s`} repeatCount="indefinite" />
-          </circle>
-        )))}
-
-        {/* Diagonal accent lines */}
-        <line x1="0" y1="0" x2="600" y2="800" stroke="#e879f9" strokeWidth="0.4" filter="url(#blur2)">
-          <animate attributeName="opacity" values="0.05;0.25;0.05" dur="6s" repeatCount="indefinite" />
-        </line>
-        <line x1="1200" y1="0" x2="600" y2="800" stroke="#e879f9" strokeWidth="0.4" filter="url(#blur2)">
-          <animate attributeName="opacity" values="0.05;0.25;0.05" dur="6s" begin="1s" repeatCount="indefinite" />
-        </line>
-      </svg>
+      {/* Starfield background */}
+      <StarField />
 
       {/* Header */}
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
