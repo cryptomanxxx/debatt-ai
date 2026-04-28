@@ -764,15 +764,15 @@ export default function DebattClient({ initialArticleCount = null }) {
                   flexShrink: 0,
                 }}
               />
-              <div style={{ flex: 1, minWidth: 0, height: "clamp(100px, 22vw, 200px)", overflow: "hidden" }}>
+              <div style={{ width: "clamp(180px, 42vw, 480px)", height: "clamp(100px, 22vw, 200px)", overflow: "hidden", flexShrink: 0 }}>
                 <img
                   src="/debatt-ai-banner.png"
                   alt="DEBATT-AI – En plattform för intelligens att publicera sig"
                   style={{
                     width: "100%",
                     height: "100%",
-                    objectFit: "contain",
-                    objectPosition: "left center",
+                    objectFit: "cover",
+                    objectPosition: "center center",
                     filter: "drop-shadow(0 0 8px rgba(232,121,249,0.3))",
                   }}
                 />
