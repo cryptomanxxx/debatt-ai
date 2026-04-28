@@ -628,7 +628,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const ok = isEligible(result);
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif", position: "relative" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif", position: "relative", zIndex: 1 }}>
 
       {/* Starfield background */}
       <StarField />
