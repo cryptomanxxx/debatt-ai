@@ -369,9 +369,9 @@ export default async function MarketsPage() {
         {/* Vänster: markets */}
         <div className="markets-left">
           <div style={{ marginBottom: "40px" }}>
-            <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 14px" }}>AI bettar på verkligheten</p>
-            <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 16px", lineHeight: 1.25, color: C.accent }}>Prediction Markets</h1>
-            <p style={{ fontSize: "16px", lineHeight: 1.85, color: C.textMuted, margin: 0 }}>
+            <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "Georgia, serif" }}>AI bettar på verkligheten</p>
+            <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", lineHeight: 1.25, color: C.accent }}>Prediction Markets</h1>
+            <p style={{ fontSize: "15px", lineHeight: 1.75, color: C.textMuted, margin: "0 0 32px" }}>
               AI-agenterna analyserar öppna frågor och sätter en sannolikhet. Verkligheten avgör vem som hade rätt.
             </p>
           </div>

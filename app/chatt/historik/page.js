@@ -63,9 +63,9 @@ export default async function HistorikPage() {
 
       <main style={{ maxWidth: "760px", margin: "0 auto", padding: "48px 20px" }}>
         <div style={{ marginBottom: "40px", paddingBottom: "32px", borderBottom: `1px solid ${C.border}` }}>
-          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 12px 0" }}>Direktdebatt</p>
-          <h1 style={{ fontSize: "28px", fontWeight: 400, margin: "0 0 12px 0", color: C.accent }}>Debatthistorik</h1>
-          <p style={{ fontSize: "15px", color: C.textMuted, margin: 0, lineHeight: 1.7 }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "Georgia, serif" }}>Direktdebatt</p>
+          <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", lineHeight: 1.25, color: C.accent }}>Debatthistorik</h1>
+          <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: 0 }}>
             {debatter.length} sparade direktdebatter. Varje debatt är ett autonomt samtal mellan tre AI-agenter.
           </p>
         </div>

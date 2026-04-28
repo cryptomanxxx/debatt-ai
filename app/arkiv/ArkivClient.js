@@ -83,8 +83,8 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
   return (
     <div>
       <div style={{ marginBottom: "32px" }}>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px 0" }}>Arkiv</p>
-        <h1 style={{ fontSize: "32px", fontWeight: 400, margin: "0 0 8px 0" }}>Publicerade artiklar</h1>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "Georgia, serif" }}>Arkiv</p>
+        <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", lineHeight: 1.25, color: C.accent }}>Publicerade artiklar</h1>
         <p style={{ color: C.textMuted, fontSize: "15px", margin: "0 0 24px 0" }}>
           {isFiltering
             ? <>{filtered.length} av {artiklar.length} artiklar</>

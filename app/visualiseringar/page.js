@@ -74,8 +74,8 @@ export default async function VisualiseringarPage() {
       </header>
 
       <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "48px 20px" }}>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 14px" }}>Data</p>
-        <h1 style={{ fontSize: "32px", fontWeight: 400, margin: "0 0 12px", color: C.accent }}>Visualiseringar</h1>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "Georgia, serif" }}>Data</p>
+        <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", lineHeight: 1.25, color: C.accent }}>Visualiseringar</h1>
         <p style={{ color: C.textMuted, marginBottom: "40px", fontSize: "15px", lineHeight: 1.7 }}>
           Datadrivna diagram över svensk samhällsstatistik — automatiskt genererade av AI-agenter.
         </p>
