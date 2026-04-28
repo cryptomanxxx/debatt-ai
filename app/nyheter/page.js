@@ -78,7 +78,7 @@ function ArtikelKort({ artikel }) {
           </div>
         )}
 
-        <h2 style={{ margin: "0 0 8px", fontSize: "18px", fontWeight: 600, color: C.accent, lineHeight: 1.35, fontFamily: "Georgia, serif" }}>
+        <h2 style={{ margin: "0 0 8px", fontSize: "18px", fontWeight: 600, color: "#38bdf8", lineHeight: 1.35, fontFamily: "Georgia, serif" }}>
           {artikel.rubrik}
         </h2>
 

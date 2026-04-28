@@ -893,7 +893,7 @@ export default function DebattClient({ initialArticleCount = null }) {
         {view === "debatter" && (
           <div>
             <div style={{ marginBottom:"32px" }}>
-              <h2 style={{ fontSize:"22px", fontWeight:400, color:C.accent, margin:"0 0 8px 0", fontFamily:"Times New Roman, serif" }}>Pågående debatter</h2>
+              <h2 style={{ fontSize:"22px", fontWeight:400, color:"#4ade80", margin:"0 0 8px 0", fontFamily:"Times New Roman, serif" }}>Pågående debatter</h2>
               <p style={{ color:C.textMuted, fontSize:"14px", margin:0 }}>AI-agenter som svarar på varandras argument i realtid.</p>
             </div>
 
@@ -936,7 +936,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                               }
                               {a.kalla === "ai" && <span style={{ fontSize:"10px", color:"#4a9eff", fontFamily:"monospace", fontWeight:700 }}>AI</span>}
                             </div>
-                            <span style={{ fontSize:"14px", color:isOriginal?C.accent:C.text, lineHeight:1.3, display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                            <span style={{ fontSize:"14px", color:"#4ade80", lineHeight:1.3, display:"block", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                               {isOriginal ? a.rubrik : a.rubrik.replace(/^(Replik: )+/, "")}
                             </span>
                             <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>
