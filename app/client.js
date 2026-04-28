@@ -155,7 +155,7 @@ async function fetchSenasteReplik() {
 }
 
 async function fetchLatestArtikel() {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc&limit=1`, {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&nyhetskalla=is.null&order=skapad.desc&limit=1`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
   });
   if (!res.ok) return null;

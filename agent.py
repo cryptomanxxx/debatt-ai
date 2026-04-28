@@ -763,35 +763,39 @@ def hamta_statistik(kategorier: list[str] | None = None) -> str:
 
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från svenska RSS-flöden."""
+    GN = "https://news.google.com/rss/search?hl=sv&gl=SE&ceid=SE:sv&q="
     feeds = [
-        # Svenska nyheter & debatt
-        ("SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"),
-        ("Dagens Nyheter",     "https://rss.dn.se/rss/"),
-        ("Svenska Dagbladet",  "https://www.svd.se/feed/articles.rss"),
-        ("SVD Debatt",         "https://www.svd.se/feed/section/debatt.rss"),
-        ("Dagens Industri",    "https://www.di.se/rss"),
-        ("DI Debatt",          "https://www.di.se/debatt/rss"),
-        ("Omni",               "https://omni.se/rss"),
-        ("Aftonbladet Debatt", "https://www.aftonbladet.se/debatt/rss.xml"),
-        ("Dagens PS",          "https://news.google.com/rss/search?q=site:dagensps.se&hl=sv&gl=SE&ceid=SE:sv"),
-        ("Realtid",            "http://realtid.se/rss/senaste"),
+        # Svenska nyheter via Google News (fungerar från alla IP-adresser)
+        ("SVT Nyheter",        GN + "site:svt.se"),
+        ("Dagens Nyheter",     GN + "site:dn.se"),
+        ("Svenska Dagbladet",  GN + "site:svd.se"),
+        ("Dagens Industri",    GN + "site:di.se"),
+        ("Aftonbladet",        GN + "site:aftonbladet.se"),
+        ("Omni",               GN + "site:omni.se"),
+        ("Breakit",            GN + "site:breakit.se"),
+        ("Dagens Medicin",     GN + "site:dagensmedicin.se"),
+        # Svenska ämnen via Google News
+        ("Sverige Politik",    GN + "sverige+politik"),
+        ("Sverige Ekonomi",    GN + "sverige+ekonomi"),
+        ("Sverige Klimat",     GN + "sverige+klimat+miljo"),
+        ("Sverige Samhälle",   GN + "sverige+samhalle+debatt"),
+        ("Sverige Sjukvård",   GN + "sverige+sjukvard+halsa"),
+        ("Sverige Bostäder",   GN + "sverige+bostader+bostad"),
         # Tech
-        ("Breakit",            "https://www.breakit.se/feed/articles"),
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
+        ("Hacker News",        "https://hnrss.org/frontpage"),
         # Kryptovalutor
         ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/"),
         ("Cointelegraph",      "https://cointelegraph.com/rss"),
-        ("CoinMarketCap",      "https://coinmarketcap.com/rss/"),
         ("Reddit Crypto",      "https://www.reddit.com/r/CryptoCurrency/.rss"),
         # Internationellt
         ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
         ("Reuters",            "https://feeds.reuters.com/reuters/topNews"),
-        # Medicin & hälsa
+        ("Al Jazeera",         "https://www.aljazeera.com/xml/rss/all.xml"),
+        # Medicin & forskning
         ("The Lancet",         "https://www.thelancet.com/rssfeed/lancet_online.xml"),
-        ("BMJ",                "https://www.bmj.com/rss/all-content.xml"),
         ("MDPI Healthcare",    "https://www.mdpi.com/rss/journal/healthcare"),
         ("PubMed Central",     "https://www.ncbi.nlm.nih.gov/pmc/latest-articles/rss.xml"),
-        ("Dagens Medicin",     "https://www.dagensmedicin.se/feed/"),
     ]
     nyheter = []
     for kalla, url in feeds:
@@ -1670,8 +1674,9 @@ def main():
         if not force_eget:
             print("Hämtar aktuella nyheter från RSS...")
             nyheter = hamta_nyheter()
+            random.shuffle(nyheter)
             if nyheter and (force_nyhet or random.random() < 0.5):
-                nyhet = random.choice(nyheter[:10])
+                nyhet = random.choice(nyheter[:30])
 
         nyhetskalla = None
         artikelfmt = valj_format()
