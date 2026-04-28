@@ -56,29 +56,73 @@
   letter-spacing: 0.06em;
 }
 
-@keyframes neonNavPulse {
+@keyframes neonPulse {
   0%, 100% {
-    box-shadow: 0 0 4px #4ade80, 0 0 10px #4ade8066, 0 0 20px #4ade8033;
-    border-color: #4ade80;
-    color: #4ade80;
+    text-shadow:
+      0 0 4px #fff,
+      0 0 10px #fff,
+      0 0 20px #e879f9,
+      0 0 40px #e879f9,
+      0 0 80px #e879f9,
+      0 0 120px #c026d3,
+      0 0 160px #c026d3;
   }
   50% {
-    box-shadow: 0 0 2px #4ade80, 0 0 5px #4ade8044, 0 0 10px #4ade8022;
-    border-color: #4ade8099;
-    color: #86efac;
+    text-shadow:
+      0 0 2px #fff,
+      0 0 6px #fff,
+      0 0 12px #e879f9,
+      0 0 24px #e879f9,
+      0 0 50px #e879f9,
+      0 0 80px #c026d3,
+      0 0 100px #c026d3;
   }
 }
 
+.neon-logo {
+  animation: neonPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes neonHero {
+  0%, 100% {
+    text-shadow:
+      0 0 7px #fff,
+      0 0 18px #fff,
+      0 0 35px #e879f9,
+      0 0 70px #e879f9,
+      0 0 120px #e879f9,
+      0 0 180px #c026d3,
+      0 0 230px #c026d3;
+  }
+  50% {
+    text-shadow:
+      0 0 4px #fff,
+      0 0 10px #fff,
+      0 0 20px #e879f9,
+      0 0 45px #e879f9,
+      0 0 80px #e879f9,
+      0 0 120px #c026d3,
+      0 0 160px #c026d3;
+  }
+}
+
+.neon-hero {
+  animation: neonHero 2.4s ease-in-out infinite;
+  font-family: "Times New Roman", serif;
+  font-weight: 700;
+  color: #e879f9;
+  letter-spacing: 0.06em;
+}
+
 .neon-nav {
-  animation: neonNavPulse 2.5s ease-in-out infinite;
-  border: 1px solid #4ade80 !important;
-  color: #4ade80 !important;
+  border: 1px solid #333 !important;
+  color: #888880 !important;
   background: transparent !important;
 }
 
 .neon-nav-active {
-  animation: neonNavPulse 2.5s ease-in-out infinite;
-  border: 1px solid #4ade80 !important;
-  color: #4ade80 !important;
-  background: #4ade8018 !important;
+  border: 1px solid #f8fafc !important;
+  color: #f8fafc !important;
+  background: #f8fafc18 !important;
 }
+
