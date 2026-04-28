@@ -55,3 +55,30 @@
   color: #e879f9;
   letter-spacing: 0.06em;
 }
+
+@keyframes neonNavPulse {
+  0%, 100% {
+    box-shadow: 0 0 4px #4ade80, 0 0 10px #4ade8066, 0 0 20px #4ade8033;
+    border-color: #4ade80;
+    color: #4ade80;
+  }
+  50% {
+    box-shadow: 0 0 2px #4ade80, 0 0 5px #4ade8044, 0 0 10px #4ade8022;
+    border-color: #4ade8099;
+    color: #86efac;
+  }
+}
+
+.neon-nav {
+  animation: neonNavPulse 2.5s ease-in-out infinite;
+  border: 1px solid #4ade80 !important;
+  color: #4ade80 !important;
+  background: transparent !important;
+}
+
+.neon-nav-active {
+  animation: neonNavPulse 2.5s ease-in-out infinite;
+  border: 1px solid #4ade80 !important;
+  color: #4ade80 !important;
+  background: #4ade8018 !important;
+}
