@@ -691,7 +691,6 @@ export default function DebattClient({ initialArticleCount = null }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "10px", cursor: "pointer" }} onClick={reset}>
             <span className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: "#e879f9" }}>DEBATT-AI</span>
-            <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
           </div>
           {visitors !== null && (
             <span style={{ fontSize: "12px", color: C.textMuted }}>👁 {visitors.toLocaleString("sv-SE")}</span>
