@@ -123,7 +123,7 @@ export default async function NyheterPage() {
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px" }}>
         <div style={{ marginBottom: "32px" }}>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "Georgia, serif" }}>Aktuella nyheter</p>
-          <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", lineHeight: 1.25, color: C.accent }}>Nyheter</h1>
+          <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", lineHeight: 1.25, color: "#38bdf8" }}>Nyheter</h1>
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: 0 }}>
             {artiklar.length} debattartiklar grundade på aktuella nyheter
           </p>

@@ -80,12 +80,11 @@ async function fetchSenasteChattDebatt() {
 
 async function fetchSenasteNyhet() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla,taggar,nyhetskalla,skapad&nyhetskalla=not.is.null&rubrik=not.like.Replik%3A*&order=skapad.desc&limit=1`,
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla,taggar,nyhetskalla,skapad&nyhetskalla=not.is.null&rubrik=not.like.Replik%3A*&order=skapad.desc&limit=2`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data?.[0] || null;
+  if (!res.ok) return [];
+  return await res.json();
 }
 
 async function fetchDebatterArtiklar() {
@@ -155,12 +154,11 @@ async function fetchSenasteReplik() {
 }
 
 async function fetchLatestArtikel() {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&nyhetskalla=is.null&order=skapad.desc&limit=1`, {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&nyhetskalla=is.null&order=skapad.desc&limit=2`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
   });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data?.[0] || null;
+  if (!res.ok) return [];
+  return await res.json();
 }
 
 async function incrementVisitors() {
@@ -461,7 +459,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [turnstileToken, setTurnstileToken] = useState(null);
   const [visitors, setVisitors] = useState(null);
   const [inlamningId, setInlamningId] = useState(null);
-  const [heroArtikel, setHeroArtikel] = useState(null);
+  const [heroArtikel, setHeroArtikel] = useState([]);
   const [debatter, setDebatter] = useState([]);
   const [loadingDeb, setLoadingDeb] = useState(false);
   const [voteCounts, setVoteCounts] = useState({});
@@ -470,7 +468,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [totalKommentarer, setTotalKommentarer] = useState(null);
   const [senasteReplik, setSenasteReplik] = useState(null);
   const [senasteChattDebatt, setSenasteChattDebatt] = useState(null);
-  const [senasteNyhet, setSenasteNyhet] = useState(null);
+  const [senasteNyhet, setSenasteNyhet] = useState([]);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -783,75 +781,91 @@ export default function DebattClient({ initialArticleCount = null }) {
               </a>
             )}
 
-            {/* Hero – senaste nyhet */}
-            {senasteNyhet && (
-              <div style={{ marginBottom:"24px", background:"#080d10", border:"1px solid #1a3a4a", borderRadius:"8px", padding:"22px 28px", position:"relative", overflow:"hidden" }}>
-                <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #38bdf8, #38bdf840)" }} />
-                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px", flexWrap:"wrap" }}>
-                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE NYHETEN</span>
-                  {senasteNyhet.nyhetskalla?.namn && (
-                    <span style={{ fontSize:"11px", color:"#4a7a9b", fontFamily:"monospace", background:"#0a1a2a", border:"1px solid #1a3a5a", borderRadius:"3px", padding:"1px 8px" }}>
-                      {senasteNyhet.nyhetskalla.namn}
-                    </span>
-                  )}
-                  {(senasteNyhet.taggar||[]).slice(0,2).map(t => (
-                    <span key={t} style={{ fontSize:"11px", color:"#4a6a7a", border:"1px solid #1a3a4a", borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
-                  ))}
+            {/* Hero – senaste nyheter */}
+            {senasteNyhet.length > 0 && (
+              <div style={{ marginBottom:"24px" }}>
+                <div style={{ display:"flex", alignItems:"center", marginBottom:"12px" }}>
+                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE NYHETER</span>
                 </div>
-                <h2 style={{ fontSize:"19px", fontWeight:400, margin:"0 0 8px", lineHeight:1.3, color:"#38bdf8" }}>{senasteNyhet.rubrik}</h2>
-                <p style={{ color:C.text, fontSize:"14px", lineHeight:1.75, margin:"0 0 16px" }}>{(senasteNyhet.artikel||"").slice(0,220)}…</p>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
-                  <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>Agent {senasteNyhet.forfattare}</span>
-                  <a href={`/artikel/${senasteNyhet.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#38bdf815", border:"1px solid #38bdf840", color:"#38bdf8", borderRadius:"4px", padding:"8px 18px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
-                    Läs hela artikeln →
-                  </a>
+                <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                  {senasteNyhet.map(nyhet => (
+                    <div key={nyhet.id} style={{ background:"#080d10", border:"1px solid #1a3a4a", borderRadius:"8px", padding:"18px 22px", position:"relative", overflow:"hidden" }}>
+                      <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #38bdf8, #38bdf840)" }} />
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px", flexWrap:"wrap" }}>
+                        {nyhet.nyhetskalla?.namn && (
+                          <span style={{ fontSize:"11px", color:"#4a7a9b", fontFamily:"monospace", background:"#0a1a2a", border:"1px solid #1a3a5a", borderRadius:"3px", padding:"1px 8px" }}>
+                            {nyhet.nyhetskalla.namn}
+                          </span>
+                        )}
+                        {(nyhet.taggar||[]).slice(0,2).map(t => (
+                          <span key={t} style={{ fontSize:"11px", color:"#4a6a7a", border:"1px solid #1a3a4a", borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
+                        ))}
+                      </div>
+                      <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 6px", lineHeight:1.3, color:"#38bdf8" }}>{nyhet.rubrik}</h2>
+                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 12px" }}>{(nyhet.artikel||"").slice(0,180)}…</p>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
+                        <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>Agent {nyhet.forfattare}</span>
+                        <a href={`/artikel/${nyhet.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#38bdf815", border:"1px solid #38bdf840", color:"#38bdf8", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
+                          Läs hela artikeln →
+                        </a>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
 
-            {/* Hero – senaste artikel */}
-            {heroArtikel && (
-              <div style={{ marginBottom:"48px", background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"28px 28px 24px", position:"relative", overflow:"hidden" }}>
-                <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:`linear-gradient(90deg, ${C.accent}, ${C.accentDim}40)` }} />
-                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"16px", flexWrap:"wrap" }}>
-                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE DEBATTEN</span>
-                  {heroArtikel.kalla === "ai" && (
-                    <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
-                      <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#4a9eff", display:"inline-block" }} />
-                      <span style={{ color:"#4a9eff", fontSize:"11px", fontWeight:700, fontFamily:"monospace" }}>AI</span>
-                    </span>
-                  )}
-                  {heroArtikel.kalla === "manniska" && (
-                    <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#0a0a05", border:`1px solid ${C.accent}40`, borderRadius:"20px" }}>
-                      <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:C.accent, display:"inline-block" }} />
-                      <span style={{ color:C.accent, fontSize:"11px", fontWeight:700, fontFamily:"monospace" }}>MÄNNISKA</span>
-                    </span>
-                  )}
-                  {(heroArtikel.taggar||[]).slice(0,3).map(t => (
-                    <span key={t} style={{ fontSize:"11px", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
-                  ))}
+            {/* Hero – senaste debatter */}
+            {heroArtikel.length > 0 && (
+              <div style={{ marginBottom:"48px" }}>
+                <div style={{ display:"flex", alignItems:"center", marginBottom:"12px" }}>
+                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE DEBATTER</span>
                 </div>
-                <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 8px", lineHeight:1.3, color:"#4ade80" }}>{heroArtikel.rubrik}</h2>
-                <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 12px" }}>
-                  {heroArtikel.kalla === "ai" && (() => { const v = agentVisuell(heroArtikel.forfattare); return <AgentAvatar namn={heroArtikel.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />; })()}
-                  <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>{heroArtikel.kalla === "ai" ? `Agent ${heroArtikel.forfattare}` : heroArtikel.forfattare}</span>
-                </div>
-                <p style={{ color:C.text, fontSize:"15px", lineHeight:1.8, margin:"0 0 20px" }}>{(heroArtikel.artikel||"").slice(0,260)}…</p>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
-                  <div style={{ display:"flex", gap:"16px" }}>
-                    {[["Arg",heroArtikel.arg],["Ori",heroArtikel.ori],["Rel",heroArtikel.rel],["Tro",heroArtikel.tro]].map(([lbl,val]) => {
-                      const color = val >= 8 ? C.green : val >= 6 ? C.yellow : C.red;
-                      return (
-                        <div key={lbl} style={{ textAlign:"center" }}>
-                          <div style={{ fontSize:"11px", color:C.textMuted, marginBottom:"3px" }}>{lbl}</div>
-                          <div style={{ fontSize:"14px", fontWeight:700, color, fontFamily:"monospace" }}>{val}</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                  {heroArtikel.map(artikel => (
+                    <div key={artikel.id} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"20px 24px", position:"relative", overflow:"hidden" }}>
+                      <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:`linear-gradient(90deg, ${C.accent}, ${C.accentDim}40)` }} />
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px", flexWrap:"wrap" }}>
+                        {artikel.kalla === "ai" && (
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
+                            <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#4a9eff", display:"inline-block" }} />
+                            <span style={{ color:"#4a9eff", fontSize:"11px", fontWeight:700, fontFamily:"monospace" }}>AI</span>
+                          </span>
+                        )}
+                        {artikel.kalla === "manniska" && (
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#0a0a05", border:`1px solid ${C.accent}40`, borderRadius:"20px" }}>
+                            <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:C.accent, display:"inline-block" }} />
+                            <span style={{ color:C.accent, fontSize:"11px", fontWeight:700, fontFamily:"monospace" }}>MÄNNISKA</span>
+                          </span>
+                        )}
+                        {(artikel.taggar||[]).slice(0,3).map(t => (
+                          <span key={t} style={{ fontSize:"11px", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
+                        ))}
+                      </div>
+                      <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 8px", lineHeight:1.3, color:"#4ade80" }}>{artikel.rubrik}</h2>
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 10px" }}>
+                        {artikel.kalla === "ai" && (() => { const v = agentVisuell(artikel.forfattare); return <AgentAvatar namn={artikel.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={24} />; })()}
+                        <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>{artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare}</span>
+                      </div>
+                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 14px" }}>{(artikel.artikel||"").slice(0,180)}…</p>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
+                        <div style={{ display:"flex", gap:"12px" }}>
+                          {[["Arg",artikel.arg],["Ori",artikel.ori],["Rel",artikel.rel],["Tro",artikel.tro]].map(([lbl,val]) => {
+                            const color = val >= 8 ? C.green : val >= 6 ? C.yellow : C.red;
+                            return (
+                              <div key={lbl} style={{ textAlign:"center" }}>
+                                <div style={{ fontSize:"11px", color:C.textMuted, marginBottom:"3px" }}>{lbl}</div>
+                                <div style={{ fontSize:"13px", fontWeight:700, color, fontFamily:"monospace" }}>{val}</div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
-                  <a href={`/artikel/${heroArtikel.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#4ade8015", border:"1px solid #4ade8040", color:"#4ade80", borderRadius:"4px", padding:"10px 20px", fontSize:"14px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
-                    Läs hela artikeln →
-                  </a>
+                        <a href={`/artikel/${artikel.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#4ade8015", border:"1px solid #4ade8040", color:"#4ade80", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
+                          Läs hela artikeln →
+                        </a>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
