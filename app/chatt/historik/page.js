@@ -37,10 +37,6 @@ async function getDebatter() {
 
 function NavLink({ href, label, active = false }) {
   return <a href={href} className={active ? "neon-nav-active" : "neon-nav"}>{label}</a>;
-}`, color: active ? "#f8fafc" : C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>
-      {children}
-    </a>
-  );
 }
 
 export default async function HistorikPage() {
