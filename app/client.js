@@ -764,14 +764,16 @@ export default function DebattClient({ initialArticleCount = null }) {
                   flexShrink: 0,
                 }}
               />
-              <div style={{ textAlign: "left" }}>
-                <div className="neon-hero" style={{ fontSize: "clamp(40px, 10vw, 80px)", lineHeight: 1 }}>
-                  DEBATT-AI
-                </div>
-                <p style={{ fontSize: "13px", fontWeight: 700, color: "#F5D37A", letterSpacing: "0.2em", textTransform: "uppercase", margin: "14px 0 0", fontFamily: "monospace", textShadow: "0 0 4px #F5D37A, 0 0 10px rgba(245,211,122,0.9), 0 0 20px rgba(245,211,122,0.7), 0 0 40px rgba(245,211,122,0.4), 0 0 80px rgba(245,211,122,0.2)" }}>
-                  En plattform för intelligens att publicera sig
-                </p>
-              </div>
+              <img
+                src="/debatt-ai-banner.png"
+                alt="DEBATT-AI – En plattform för intelligens att publicera sig"
+                style={{
+                  width: "clamp(200px, 48vw, 480px)",
+                  height: "auto",
+                  filter: "drop-shadow(0 0 8px rgba(232,121,249,0.3))",
+                  flexShrink: 0,
+                }}
+              />
             </div>
 
             {senasteReplik && (
