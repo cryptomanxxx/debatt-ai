@@ -562,13 +562,61 @@ export default function DebattClient({ initialArticleCount = null }) {
   const ok = isEligible(result);
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif", position: "relative", overflow: "hidden" }}>
+
+      {/* Circuit / wave background */}
+      <svg aria-hidden="true" style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0, opacity: 0.22 }} viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <radialGradient id="glowCenter" cx="50%" cy="45%" r="50%">
+            <stop offset="0%" stopColor="#e879f9" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#e879f9" stopOpacity="0" />
+          </radialGradient>
+          <filter id="blur2">
+            <feGaussianBlur stdDeviation="2" />
+          </filter>
+        </defs>
+
+        {/* Central glow orb */}
+        <ellipse cx="600" cy="360" rx="320" ry="220" fill="url(#glowCenter)">
+          <animate attributeName="rx" values="320;360;320" dur="5s" repeatCount="indefinite" />
+          <animate attributeName="opacity" values="1;0.6;1" dur="5s" repeatCount="indefinite" />
+        </ellipse>
+
+        {/* Horizontal circuit lines */}
+        {[180,260,340,420,480,540,600,660,720,780,840,900].map((y, i) => (
+          <line key={`h${i}`} x1="0" y1={y} x2="1200" y2={y} stroke="#e879f9" strokeWidth="0.5" filter="url(#blur2)">
+            <animate attributeName="opacity" values="0.1;0.5;0.1" dur={`${3 + (i % 4)}s`} begin={`${i * 0.3}s`} repeatCount="indefinite" />
+          </line>
+        ))}
+
+        {/* Vertical circuit lines */}
+        {[120,240,360,480,600,720,840,960,1080].map((x, i) => (
+          <line key={`v${i}`} x1={x} y1="0" x2={x} y2="800" stroke="#e879f9" strokeWidth="0.5" filter="url(#blur2)">
+            <animate attributeName="opacity" values="0.1;0.45;0.1" dur={`${4 + (i % 3)}s`} begin={`${i * 0.4}s`} repeatCount="indefinite" />
+          </line>
+        ))}
+
+        {/* Circuit nodes at intersections */}
+        {[240,480,720,960].map(x => [260,420,540,660,780].map(y => (
+          <circle key={`n${x}${y}`} cx={x} cy={y} r="2.5" fill="#e879f9" opacity="0.3">
+            <animate attributeName="opacity" values="0.1;0.7;0.1" dur={`${2 + ((x+y) % 3)}s`} begin={`${((x+y) % 7) * 0.2}s`} repeatCount="indefinite" />
+          </circle>
+        )))}
+
+        {/* Diagonal accent lines */}
+        <line x1="0" y1="0" x2="600" y2="800" stroke="#e879f9" strokeWidth="0.4" filter="url(#blur2)">
+          <animate attributeName="opacity" values="0.05;0.25;0.05" dur="6s" repeatCount="indefinite" />
+        </line>
+        <line x1="1200" y1="0" x2="600" y2="800" stroke="#e879f9" strokeWidth="0.4" filter="url(#blur2)">
+          <animate attributeName="opacity" values="0.05;0.25;0.05" dur="6s" begin="1s" repeatCount="indefinite" />
+        </line>
+      </svg>
 
       {/* Header */}
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: "10px", cursor: "pointer" }} onClick={reset}>
-            <span style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: "#e879f9" }}>DEBATT-AI</span>
+            <span className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: "#e879f9" }}>DEBATT-AI</span>
             <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
           </div>
           {visitors !== null && (

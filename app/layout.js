@@ -15,6 +15,7 @@ export const metadata = {
   },
 };
 
+import "./globals.css";
 import VisitorTracker from "./VisitorTracker";
 
 export default function RootLayout({ children }) {

@@ -1,0 +1,33 @@
+@keyframes neonPulse {
+  0%, 100% {
+    text-shadow:
+      0 0 6px #e879f9,
+      0 0 14px #e879f9,
+      0 0 28px #e879f9,
+      0 0 55px #c026d3,
+      0 0 90px #c026d3;
+  }
+  50% {
+    text-shadow:
+      0 0 3px #e879f9,
+      0 0 8px #e879f9,
+      0 0 16px #e879f9,
+      0 0 32px #c026d3,
+      0 0 55px #c026d3;
+  }
+}
+
+.neon-logo {
+  animation: neonPulse 2.8s ease-in-out infinite;
+}
+
+@keyframes circuitFlow {
+  0% { stroke-dashoffset: 1000; opacity: 0.15; }
+  50% { opacity: 0.35; }
+  100% { stroke-dashoffset: 0; opacity: 0.15; }
+}
+
+@keyframes orbitGlow {
+  0%, 100% { opacity: 0.08; transform: scale(1); }
+  50% { opacity: 0.18; transform: scale(1.06); }
+}

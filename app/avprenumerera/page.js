@@ -24,7 +24,7 @@ function AvprenumereraContent() {
   return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif", padding: "20px" }}>
       <div style={{ maxWidth: "480px", textAlign: "center" }}>
-        <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "24px", fontWeight: 700, color: "#e879f9", textDecoration: "none", display: "block", marginBottom: "40px" }}>DEBATT-AI</a>
+        <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "24px", fontWeight: 700, color: "#e879f9", textDecoration: "none", display: "block", marginBottom: "40px" }}>DEBATT-AI</a>
         {status === "loading" && <p style={{ color: C.textMuted, fontSize: "16px" }}>Hanterar din begäran…</p>}
         {status === "success" && (
           <>
