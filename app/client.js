@@ -329,64 +329,30 @@ function useNextAgentTimer() {
 function StarField() {
   const stars = useMemo(() => {
     const s = [];
-    for (let i = 0; i < 180; i++) {
-      const x = ((Math.sin(i * 127.1) * 0.5 + 0.5) * 1200).toFixed(1);
-      const y = ((Math.cos(i * 311.7) * 0.5 + 0.5) * 900).toFixed(1);
-      const big = i % 17 === 0;
-      const medium = i % 7 === 0;
-      const r = big ? 2.2 : medium ? 1.4 : 0.8;
-      const dur = 2.5 + (i % 7) * 0.8;
-      const delay = (i * 0.23) % 5;
-      const minOp = big ? 0.4 : 0.1;
-      const maxOp = big ? 1 : medium ? 0.75 : 0.55;
-      s.push({ x, y, r, dur, delay, minOp, maxOp });
+    for (let i = 0; i < 160; i++) {
+      s.push({
+        x: ((Math.sin(i * 127.1) * 0.5 + 0.5) * 100).toFixed(2) + "%",
+        y: ((Math.cos(i * 311.7) * 0.5 + 0.5) * 100).toFixed(2) + "%",
+        r: i % 17 === 0 ? 2 : i % 7 === 0 ? 1.3 : 0.7,
+        dur: (2.5 + (i % 7) * 0.8).toFixed(1),
+        delay: ((i * 0.23) % 5).toFixed(1),
+        op: i % 17 === 0 ? "0.4;1;0.4" : i % 7 === 0 ? "0.15;0.75;0.15" : "0.1;0.5;0.1",
+      });
     }
     return s;
   }, []);
 
   return (
-    <svg aria-hidden="true" style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <radialGradient id="skyGrad" cx="50%" cy="30%" r="70%">
-          <stop offset="0%" stopColor="#0d0d1a" />
-          <stop offset="100%" stopColor="#0a0a0a" />
-        </radialGradient>
-        <radialGradient id="nebulaGlow" cx="50%" cy="40%" r="45%">
-          <stop offset="0%" stopColor="#1a0a2e" stopOpacity="0.6" />
-          <stop offset="100%" stopColor="#0a0a0a" stopOpacity="0" />
-        </radialGradient>
-        <filter id="starBlur">
-          <feGaussianBlur stdDeviation="0.6" />
-        </filter>
-      </defs>
-
-      {/* Sky gradient */}
-      <rect width="1200" height="900" fill="url(#skyGrad)" />
-      {/* Subtle nebula */}
-      <ellipse cx="600" cy="360" rx="500" ry="300" fill="url(#nebulaGlow)">
-        <animate attributeName="opacity" values="0.7;1;0.7" dur="12s" repeatCount="indefinite" />
-      </ellipse>
-
-      {/* Stars */}
+    <svg aria-hidden="true" style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 0 }} xmlns="http://www.w3.org/2000/svg">
       {stars.map((s, i) => (
-        <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="white" filter={s.r < 1 ? "url(#starBlur)" : undefined}>
-          <animate attributeName="opacity" values={`${s.minOp};${s.maxOp};${s.minOp}`} dur={`${s.dur}s`} begin={`${s.delay}s`} repeatCount="indefinite" />
+        <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="white">
+          <animate attributeName="opacity" values={s.op} dur={`${s.dur}s`} begin={`${s.delay}s`} repeatCount="indefinite" />
         </circle>
       ))}
-
-      {/* A few colored stars for variety */}
-      <circle cx="180" cy="120" r="1.5" fill="#b3d4ff">
-        <animate attributeName="opacity" values="0.3;0.9;0.3" dur="4s" repeatCount="indefinite" />
-      </circle>
-      <circle cx="950" cy="80" r="1.8" fill="#ffd6aa">
-        <animate attributeName="opacity" values="0.4;1;0.4" dur="3.5s" begin="1s" repeatCount="indefinite" />
-      </circle>
-      <circle cx="70" cy="420" r="1.4" fill="#c8b4ff">
-        <animate attributeName="opacity" values="0.2;0.8;0.2" dur="5s" begin="2s" repeatCount="indefinite" />
-      </circle>
-      <circle cx="1100" cy="300" r="1.6" fill="#aaffee">
-        <animate attributeName="opacity" values="0.3;0.85;0.3" dur="4.5s" begin="0.5s" repeatCount="indefinite" />
-      </circle>
+      <circle cx="15%" cy="13%" r="1.4" fill="#b3d4ff"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="4s" repeatCount="indefinite" /></circle>
+      <circle cx="79%" cy="9%" r="1.6" fill="#ffd6aa"><animate attributeName="opacity" values="0.3;0.9;0.3" dur="3.5s" begin="1s" repeatCount="indefinite" /></circle>
+      <circle cx="6%" cy="47%" r="1.2" fill="#c8b4ff"><animate attributeName="opacity" values="0.2;0.7;0.2" dur="5s" begin="2s" repeatCount="indefinite" /></circle>
+      <circle cx="92%" cy="33%" r="1.4" fill="#aaffee"><animate attributeName="opacity" values="0.2;0.8;0.2" dur="4.5s" begin="0.5s" repeatCount="indefinite" /></circle>
     </svg>
   );
 }
@@ -628,10 +594,9 @@ export default function DebattClient({ initialArticleCount = null }) {
   const ok = isEligible(result);
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif", position: "relative", zIndex: 1 }}>
-
-      {/* Starfield background */}
-      <StarField />
+    <>
+    <StarField />
+    <div style={{ minHeight: "100vh", background: "transparent", color: C.text, fontFamily: "Georgia, serif", position: "relative", zIndex: 1 }}>
 
       {/* Header */}
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
@@ -1058,5 +1023,6 @@ export default function DebattClient({ initialArticleCount = null }) {
         </p>
       </footer>
     </div>
+    </>
   );
 }
