@@ -687,21 +687,22 @@ export default function DebattClient({ initialArticleCount = null }) {
     <div style={{ minHeight: "100vh", background: "transparent", color: C.text, fontFamily: "Georgia, serif", position: "relative", zIndex: 1 }}>
 
       {/* Header */}
-      <header style={{ borderBottom: "1px solid #4ade8022", padding: "10px 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0" }}>
+          <span className="neon-logo" onClick={reset} style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", cursor: "pointer", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</span>
           {[["submit","Hem"],["debatter","Debatter"]].map(([v,lbl])=>(
-            <button key={v} onClick={()=>navigate(v)} className={view===v ? "neon-nav-active" : "neon-nav"} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "38px", padding: "0 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1", boxSizing: "border-box" }}>{lbl}</button>
+            <button key={v} onClick={()=>navigate(v)} className={view===v ? "neon-nav-active" : "neon-nav"}>{lbl}</button>
           ))}
-          <a href="/nyheter" className="neon-nav" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "38px", padding: "0 14px", flex: "1", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>Nyheter</a>
-          <a href="/arkiv" className="neon-nav" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "38px", padding: "0 14px", flex: "1", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>{articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv"}</a>
-          <a href="/chatt" className="neon-nav" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "38px", padding: "0 14px", flex: "1", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>Direktdebatt</a>
-          <a href="/visualiseringar" className="neon-nav" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "38px", padding: "0 14px", flex: "1", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>Visualiseringar</a>
-          <a href="/rivaliteter" className="neon-nav" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "38px", padding: "0 14px", flex: "1", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>Rivaliteter</a>
-          <a href="/markets" className="neon-nav" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "38px", padding: "0 14px", flex: "1", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>Markets</a>
-          <a href="/om" className="neon-nav" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "38px", padding: "0 14px", flex: "1", borderRadius: "4px", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none", boxSizing: "border-box" }}>Om DEBATT-AI</a>
-          <button onClick={()=>navigate("kontakt")} className={view==="kontakt" ? "neon-nav-active" : "neon-nav"} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "38px", padding: "0 14px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", flex: "1", boxSizing: "border-box" }}>Kontakt</button>
+          <a href="/nyheter" className="neon-nav">Nyheter</a>
+          <a href="/arkiv" className="neon-nav">{articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv"}</a>
+          <a href="/chatt" className="neon-nav">Direktdebatt</a>
+          <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
+          <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
+          <a href="/markets" className="neon-nav">Markets</a>
+          <a href="/om" className="neon-nav">Om DEBATT-AI</a>
+          <button onClick={()=>navigate("kontakt")} className={view==="kontakt" ? "neon-nav-active" : "neon-nav"}>Kontakt</button>
           {visitors !== null && (
-            <span style={{ fontSize: "12px", color: C.textMuted, paddingLeft: "4px", flexShrink: 0 }}>👁 {visitors.toLocaleString("sv-SE")}</span>
+            <span style={{ fontSize: "12px", color: C.textMuted, marginLeft: "auto", paddingLeft: "12px", flexShrink: 0 }}>👁 {visitors.toLocaleString("sv-SE")}</span>
           )}
         </div>
       </header>
