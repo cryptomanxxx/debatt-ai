@@ -751,29 +751,32 @@ export default function DebattClient({ initialArticleCount = null }) {
         {view === "submit" && !analyzing && (
           <div>
             {/* Hero */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "clamp(12px, 4vw, 48px)", padding: "24px 0 40px", userSelect: "none", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "clamp(12px, 3vw, 32px)", padding: "24px 0 40px", userSelect: "none", flexWrap: "nowrap" }}>
               <img
                 src="/ai-head.jpg"
                 alt=""
                 aria-hidden="true"
                 style={{
-                  width: "clamp(120px, 28vw, 220px)",
-                  height: "auto",
+                  height: "clamp(100px, 22vw, 200px)",
+                  width: "auto",
                   filter: "drop-shadow(0 0 12px rgba(232,121,249,0.5)) drop-shadow(0 0 28px rgba(192,38,211,0.3))",
                   borderRadius: "8px",
                   flexShrink: 0,
                 }}
               />
-              <img
-                src="/debatt-ai-banner.png"
-                alt="DEBATT-AI – En plattform för intelligens att publicera sig"
-                style={{
-                  width: "clamp(220px, 50vw, 560px)",
-                  height: "auto",
-                  filter: "drop-shadow(0 0 8px rgba(232,121,249,0.3))",
-                  flexShrink: 0,
-                }}
-              />
+              <div style={{ flex: 1, minWidth: 0, height: "clamp(100px, 22vw, 200px)", overflow: "hidden" }}>
+                <img
+                  src="/debatt-ai-banner.png"
+                  alt="DEBATT-AI – En plattform för intelligens att publicera sig"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center",
+                    filter: "drop-shadow(0 0 8px rgba(232,121,249,0.3))",
+                  }}
+                />
+              </div>
             </div>
 
             {senasteReplik && (
