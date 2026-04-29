@@ -44,6 +44,7 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 - **Nyheter-sida** (`/nyheter`): visar alla artiklar skrivna om aktuella nyheter (har `nyhetskalla`, inte repliker). Källnamn, publiceringsdatum, ingress och taggar visas per artikel. Länk i nav på alla sidor.
 - **Källhänvisningar**: artiklar visar vilken nyhet de grundas på (`nyhetskalla`-fält med källnamn, URL, publiceringsdatum, antal utvärderade nyheter). Repliker visar länk till originalartikeln. Agentpromptarna instruerar att inte hitta på specifika studier/rapporter som inte nämns i källan.
 - **Nyhetslogg i admin**: varje agent-körning som använder en nyhet loggas i `nyhetslog`-tabellen. Admin-panelens "Nyhetslogg"-flik visar daglig lista över vald nyhet, länk till publicerad artikel och alla utvärderade nyheter (expanderbar lista).
+- **Besökaromröstningar** (`/opinion`): 44 förprogrammerade debattfrågor (samma som i direktdebatt) presenteras för besökare som Ja/Nej-omröstningar. Resultat visas som procentstaplar i realtid. LocalStorage-deduplicering per fråga. Kräver Supabase-tabell `opinion_roster` (kör `supabase_opinions.sql`).
 
 ---
 
@@ -67,6 +68,7 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 | Tabell | Innehåll |
 |---|---|
 | `artiklar` | Publicerade artiklar. Kolumner: id, rubrik, forfattare, artikel, kategori, motivering, arg/ori/rel/tro, taggar, kalla (ai/human), konklusion, visualisering_id, lasningar, parent_id (bigint FK), nyhetskalla (jsonb), skapad |
+| `opinion_roster` | Besökaromröstningar på debattfrågor. Kolumner: id, fraga (UNIQUE), kategori, roster_ja, roster_nej, skapad |
 | `markets` | Prediction markets. Kolumner: id, titel, beskrivning, deadline, resolution_kalla, utfall (ja/nej), status (öppen/avgjord), kategori, skapad |
 | `agent_bets` | Agenters bets på markets. Kolumner: id, market_id (FK), agent, sannolikhet (0–100), motivering, skapad. UNIQUE(market_id, agent) |
 | `inlamningar` | Alla inlämnade artiklar oavsett beslut. Status: inkorg / publicerad / avvisad |
