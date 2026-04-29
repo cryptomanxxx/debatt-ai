@@ -762,40 +762,39 @@ def hamta_statistik(kategorier: list[str] | None = None) -> str:
 
 
 def hamta_nyheter() -> list:
-    """Hämta aktuella nyhetsrubriker från svenska RSS-flöden."""
-    GN = "https://news.google.com/rss/search?hl=sv&gl=SE&ceid=SE:sv&q="
+    """Hämta aktuella nyhetsrubriker från RSS-flöden."""
     feeds = [
-        # Svenska nyheter via Google News (fungerar från alla IP-adresser)
-        ("SVT Nyheter",        GN + "site:svt.se"),
-        ("Dagens Nyheter",     GN + "site:dn.se"),
-        ("Svenska Dagbladet",  GN + "site:svd.se"),
-        ("Dagens Industri",    GN + "site:di.se"),
-        ("Aftonbladet",        GN + "site:aftonbladet.se"),
-        ("Omni",               GN + "site:omni.se"),
-        ("Breakit",            GN + "site:breakit.se"),
-        ("Dagens Medicin",     GN + "site:dagensmedicin.se"),
-        # Svenska ämnen via Google News
-        ("Sverige Politik",    GN + "sverige+politik"),
-        ("Sverige Ekonomi",    GN + "sverige+ekonomi"),
-        ("Sverige Klimat",     GN + "sverige+klimat+miljo"),
-        ("Sverige Samhälle",   GN + "sverige+samhalle+debatt"),
-        ("Sverige Sjukvård",   GN + "sverige+sjukvard+halsa"),
-        ("Sverige Bostäder",   GN + "sverige+bostader+bostad"),
+        # Svenska nyheter – direkta RSS-flöden
+        ("SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"),
+        ("Aftonbladet",        "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"),
+        ("Omni",               "https://omni.se/a/rss"),
+        ("Breakit",            "https://www.breakit.se/feed/articles"),
+        ("Dagens Medicin",     "https://www.dagensmedicin.se/rss"),
+        # Svenska ämnen – Reddit
+        ("Reddit Sverige",     "https://www.reddit.com/r/sweden/.rss"),
+        ("Reddit Ekonomi",     "https://www.reddit.com/r/Economics/.rss"),
+        ("Reddit Klimat",      "https://www.reddit.com/r/environment/.rss"),
+        ("Reddit Samhälle",    "https://www.reddit.com/r/europe/.rss"),
+        ("Reddit Sjukvård",    "https://www.reddit.com/r/medicine/.rss"),
+        ("Reddit Bostäder",    "https://www.reddit.com/r/urbanplanning/.rss"),
         # Tech
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
+        ("Ars Technica",       "https://feeds.arstechnica.com/arstechnica/index"),
         ("Hacker News",        "https://hnrss.org/frontpage"),
         # Kryptovalutor
         ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/"),
         ("Cointelegraph",      "https://cointelegraph.com/rss"),
         ("Reddit Crypto",      "https://www.reddit.com/r/CryptoCurrency/.rss"),
+        ("Reddit Bitcoin",     "https://www.reddit.com/r/Bitcoin/.rss"),
         # Internationellt
         ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
         ("Associated Press",   "https://feeds.apnews.com/rss/apf-topnews"),
         ("Al Jazeera",         "https://www.aljazeera.com/xml/rss/all.xml"),
+        ("Reddit World News",  "https://www.reddit.com/r/worldnews/.rss"),
         # Medicin & forskning
         ("The Lancet",         "https://www.thelancet.com/rssfeed/lancet_online.xml"),
         ("MDPI Healthcare",    "https://www.mdpi.com/rss/journal/healthcare"),
-        ("PubMed Central",     "https://pubmed.ncbi.nlm.nih.gov/rss/search/?term=health+medicine&limit=20&format=rss"),
+        ("Reddit Science",     "https://www.reddit.com/r/science/.rss"),
     ]
     nyheter = []
     rss_stats = []  # [{"kalla": str, "ok": bool, "antal": int, "fel": str}]
@@ -805,7 +804,7 @@ def hamta_nyheter() -> list:
         fore = len(nyheter)
         try:
             res = httpx.get(url, timeout=10, follow_redirects=True,
-                            headers={"User-Agent": "debatt-ai/1.0"})
+                            headers={"User-Agent": "Mozilla/5.0 (compatible; RSS-reader/2.0)"})
             if res.status_code != 200:
                 misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
                 rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
