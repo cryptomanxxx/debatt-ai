@@ -790,12 +790,12 @@ def hamta_nyheter() -> list:
         ("Reddit Crypto",      "https://www.reddit.com/r/CryptoCurrency/.rss"),
         # Internationellt
         ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
-        ("Reuters",            "https://feeds.reuters.com/reuters/topNews"),
+        ("Associated Press",   "https://feeds.apnews.com/rss/apf-topnews"),
         ("Al Jazeera",         "https://www.aljazeera.com/xml/rss/all.xml"),
         # Medicin & forskning
         ("The Lancet",         "https://www.thelancet.com/rssfeed/lancet_online.xml"),
         ("MDPI Healthcare",    "https://www.mdpi.com/rss/journal/healthcare"),
-        ("PubMed Central",     "https://www.ncbi.nlm.nih.gov/pmc/latest-articles/rss.xml"),
+        ("PubMed Central",     "https://pubmed.ncbi.nlm.nih.gov/rss/search/?term=health+medicine&limit=20&format=rss"),
     ]
     nyheter = []
     rss_stats = []  # [{"kalla": str, "ok": bool, "antal": int, "fel": str}]
