@@ -764,13 +764,10 @@ def hamta_statistik(kategorier: list[str] | None = None) -> str:
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från RSS-flöden."""
     feeds = [
-        # Svenska nyheter – direkta RSS-flöden
+        # Svenska nyheter – direkta RSS-flöden (SVT/Aftonbladet ger 0 men blockeras inte)
         ("SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"),
         ("Aftonbladet",        "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"),
-        ("Omni",               "https://omni.se/a/rss"),
-        ("Breakit",            "https://www.breakit.se/feed/articles"),
-        ("Dagens Medicin",     "https://www.dagensmedicin.se/rss"),
-        # Svenska ämnen – Reddit
+        # Svenska ämnen – Reddit (stabila, 10 artiklar/körning vardera)
         ("Reddit Sverige",     "https://www.reddit.com/r/sweden/.rss"),
         ("Reddit Ekonomi",     "https://www.reddit.com/r/Economics/.rss"),
         ("Reddit Klimat",      "https://www.reddit.com/r/environment/.rss"),
@@ -788,7 +785,6 @@ def hamta_nyheter() -> list:
         ("Reddit Bitcoin",     "https://www.reddit.com/r/Bitcoin/.rss"),
         # Internationellt
         ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
-        ("Associated Press",   "https://feeds.apnews.com/rss/apf-topnews"),
         ("Al Jazeera",         "https://www.aljazeera.com/xml/rss/all.xml"),
         ("Reddit World News",  "https://www.reddit.com/r/worldnews/.rss"),
         # Medicin & forskning
