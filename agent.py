@@ -868,6 +868,74 @@ def hamta_nyheter() -> list:
     return nyheter, rss_stats
 
 
+# Mönster som indikerar tabloid/skvaller-innehåll utan samhällsvärde
+_TABLOID_MONSTER = [
+    # Kungafamiljen
+    "kungafamilj", "kungaparet", "kungen och", "drottning silvia",
+    "prins carl", "prinsessan victoria", "prinsessan sofia", "prinsessan madeleine",
+    "prins oscar", "prins nicolas", "prinsessan estelle", "kronprinsessan",
+    # Kändisskvaller
+    "dejtar", "gör slut med", "separerar från", "försonas med",
+    "kändispar", "kändisbröllop", "kändisbaby",
+    # Mode/livsstil utan samhällsrelevans
+    "klänningsvalet", "bäst klädda", "stilsäkra", "outfiten",
+    # Sport-skvaller (ej sportpolitik)
+    "tränar med", "lämnar klubben", "skriver på för",
+]
+
+
+def filtrera_nyheter(nyheter: list) -> list:
+    """Tar bort tabloid/skvaller-artiklar baserat på rubrik + ingress."""
+    rena = []
+    for n in nyheter:
+        text = (n["rubrik"] + " " + n.get("beskrivning", "")).lower()
+        if any(monster in text for monster in _TABLOID_MONSTER):
+            print(f"  [filter] Skippar: {n['rubrik'][:80]}")
+            continue
+        rena.append(n)
+    borttagna = len(nyheter) - len(rena)
+    if borttagna:
+        print(f"  [filter] {borttagna} tabloid-artiklar filtrerade bort")
+    return rena
+
+
+def valj_nyhet_med_groq(nyheter: list, agent: dict) -> dict:
+    """Låter Groq välja den mest debattvärdiga nyheten för agentens profil."""
+    if not nyheter:
+        return {}
+    kandidater = nyheter[:20]
+    lista = "\n".join(
+        f"{i+1}. [{n['kalla']}] {n['rubrik']}"
+        for i, n in enumerate(kandidater)
+    )
+    prompt = (
+        f"Du är redaktör för en svensk debattplattform. Nedan är {len(kandidater)} aktuella nyheter.\n"
+        f"Din uppgift: välj den nyhet som bäst lämpar sig för en debattartikel skriven av '{agent['namn']}' "
+        f"med perspektivet: {agent.get('systemprompt', '')[:200]}\n\n"
+        f"Kriterier för ett bra val:\n"
+        f"- Samhällelig relevans (politik, ekonomi, klimat, teknik, hälsa, rättvisa)\n"
+        f"- Ger utrymme för argumentation och olika ståndpunkter\n"
+        f"- UNDVIK: kändisskvaller, kungafamiljen, sport-skvaller, mode, livsstil utan samhällsvärde\n\n"
+        f"Nyheter:\n{lista}\n\n"
+        f"Svara ENBART med numret (t.ex. '4'). Inget annat."
+    )
+    try:
+        r = groq_post({
+            "model": "llama-3.3-70b-versatile",
+            "max_tokens": 5,
+            "temperature": 0.2,
+            "messages": [{"role": "user", "content": prompt}],
+        })
+        svar = r.json()["choices"][0]["message"]["content"].strip()
+        idx = int(svar) - 1
+        if 0 <= idx < len(kandidater):
+            print(f"  [groq-urval] Vald nyhet #{idx+1}: {kandidater[idx]['rubrik'][:60]}")
+            return kandidater[idx]
+    except Exception as e:
+        print(f"  [groq-urval] Fel, faller tillbaka på slump: {e}", file=sys.stderr)
+    return random.choice(kandidater)
+
+
 def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fmt: dict | None = None) -> str:
     """Skriv en debattartikel som kommenterar en aktuell nyhet."""
     if fmt is None:
@@ -1692,9 +1760,10 @@ def main():
         if not force_eget:
             print("Hämtar aktuella nyheter från RSS...")
             nyheter, rss_stats = hamta_nyheter()
+            nyheter = filtrera_nyheter(nyheter)
             random.shuffle(nyheter)
             if nyheter and (force_nyhet or random.random() < 0.5):
-                nyhet = random.choice(nyheter[:30])
+                nyhet = valj_nyhet_med_groq(nyheter, agent)
 
         nyhetskalla = None
         artikelfmt = valj_format()
