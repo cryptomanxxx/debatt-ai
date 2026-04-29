@@ -40,6 +40,48 @@ function datumStr(iso) {
   } catch { return iso; }
 }
 
+function grupperaEfterNyhet(artiklar) {
+  const groups = new Map();
+  const order = [];
+  for (const a of artiklar) {
+    const key = a.nyhetskalla?.url || `__solo__${a.id}`;
+    if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+    groups.get(key).push(a);
+  }
+  return order.map(k => groups.get(k));
+}
+
+function GrupperadNyhetsKort({ artiklar }) {
+  const k = artiklar[0].nyhetskalla;
+  return (
+    <div style={{ marginBottom: "16px", border: "1px solid #1a3a4a", borderRadius: "8px", overflow: "hidden", position: "relative" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #38bdf8, #38bdf840)" }} />
+      <div style={{ background: "#080d10", padding: "14px 20px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "10px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace" }}>Nyhet</span>
+        <span style={{ fontSize: "11px", color: "#4a7a9b", fontFamily: "monospace" }}>{k.namn}</span>
+        {k.publicerad && <span style={{ fontSize: "11px", color: "#555" }}>· {datumStr(k.publicerad)}</span>}
+        <span style={{ marginLeft: "auto", fontSize: "11px", color: "#38bdf8", fontFamily: "monospace", fontWeight: 700 }}>
+          {artiklar.length} agenter
+        </span>
+      </div>
+      {artiklar.map((a, i) => (
+        <a key={a.id} href={`/artikel/${a.id}`} className="nyhet-rad" style={{
+          display: "block", padding: "16px 20px", textDecoration: "none",
+          borderTop: "1px solid #1a3a4a",
+        }}>
+          <p style={{ margin: "0 0 5px", fontSize: "17px", color: "#38bdf8", lineHeight: 1.3, fontFamily: "Georgia, serif", fontWeight: 400 }}>
+            {a.rubrik}
+          </p>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "12px", color: C.textMuted, fontStyle: "italic" }}>{a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}</span>
+            <span style={{ fontSize: "11px", color: "#444" }}>{datumStr(a.skapad)}</span>
+          </div>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 function ArtikelKort({ artikel }) {
   const k = artikel.nyhetskalla;
   const ingress = artikel.artikel?.slice(0, 220).replace(/\s+\S*$/, "") + "…";
@@ -132,7 +174,11 @@ export default async function NyheterPage() {
         {artiklar.length === 0 ? (
           <p style={{ color: C.textMuted }}>Inga nyhetsartiklar ännu.</p>
         ) : (
-          artiklar.map(a => <ArtikelKort key={a.id} artikel={a} />)
+          grupperaEfterNyhet(artiklar).map(grupp =>
+            grupp.length > 1
+              ? <GrupperadNyhetsKort key={grupp[0].id} artiklar={grupp} />
+              : <ArtikelKort key={grupp[0].id} artikel={grupp[0]} />
+          )
         )}
       </main>
     </div>

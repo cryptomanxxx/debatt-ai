@@ -176,4 +176,13 @@
   border-color: #3a3a3a !important;
 }
 
+.nyhet-rad {
+  background: #0a1117;
+  transition: background 0.15s;
+  color: inherit;
+}
+.nyhet-rad:hover {
+  background: #0f1820;
+}
+
 

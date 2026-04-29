@@ -1050,7 +1050,7 @@ def hamta_amnesforslag(sb_key: str) -> dict | None:
     try:
         res = httpx.get(
             f"{SB_URL}/rest/v1/amnesforslag",
-            params={"select": "id,amne,summering", "behandlad": "eq.false", "order": "skapad.asc", "limit": "1"},
+            params={"select": "id,amne,summering", "behandlad": "eq.false", "order": "roster.desc,skapad.asc", "limit": "1"},
             headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
             timeout=10,
         )

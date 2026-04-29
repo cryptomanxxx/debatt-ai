@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import ChattShareButtons from "./[id]/ChattShareButtons";
+import ForsladsLadan from "../ForsladsLadan";
 import NavHistorikLink from "../NavHistorikLink";
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
@@ -737,6 +738,8 @@ export default function ChattPage() {
             )}
           </div>
         )}
+
+        <ForsladsLadan />
       </main>
 
       <style>{`
