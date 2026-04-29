@@ -239,7 +239,7 @@ export default async function ArtikelPage({ params }) {
             {artikel.forslag && (
               <a href="/chatt" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "3px 10px", background: "#0a1a10", border: "1px solid #4ade8040", borderRadius: "20px", textDecoration: "none" }}>
                 <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4ade80", display: "inline-block", flexShrink: 0 }} />
-                <span style={{ color: "#4ade80", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "monospace" }}>FRÅN DIREKTDEBATT</span>
+                <span style={{ color: "#4ade80", fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "monospace" }}>RÖSTAT FRAM AV BESÖKARE</span>
               </a>
             )}
           </div>
