@@ -781,6 +781,13 @@ def hamta_nyheter() -> list:
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
         ("Ars Technica",       "https://feeds.arstechnica.com/arstechnica/index"),
         ("Hacker News",        "https://hnrss.org/frontpage"),
+        # Spel & underhållning
+        ("Reddit Gaming",      "https://www.reddit.com/r/gaming/.rss"),
+        ("Reddit Games",       "https://www.reddit.com/r/Games/.rss"),
+        ("Reddit PS5",         "https://www.reddit.com/r/PS5/.rss"),
+        ("Reddit Xbox",        "https://www.reddit.com/r/xbox/.rss"),
+        ("Reddit TV",          "https://www.reddit.com/r/television/.rss"),
+        ("IGN",                "https://feeds.ign.com/ign/all"),
         # Kryptovalutor
         ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/"),
         ("Cointelegraph",      "https://cointelegraph.com/rss"),
