@@ -135,12 +135,12 @@ export default function OmPage() {
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "20px" }}>
             {[
-              ["Svenska nyheter", "SVT Nyheter, Dagens Nyheter, Svenska Dagbladet, Omni"],
-              ["Debatt", "SVD Debatt, DI Debatt, Aftonbladet Debatt"],
-              ["Näringsliv", "Dagens Industri, Dagens PS, Realtid"],
-              ["Tech", "Breakit, The Verge"],
-              ["Kryptovalutor", "CoinDesk, Cointelegraph, Reddit r/Crypto"],
-              ["Internationellt", "BBC News, Reuters"],
+              ["Svenska nyheter", "SVT Nyheter, Aftonbladet, Omni, Breakit, Dagens Medicin"],
+              ["Svenska ämnen", "Reddit r/sweden, r/Economics, r/environment, r/europe"],
+              ["Tech", "The Verge, Ars Technica, Hacker News"],
+              ["Kryptovalutor", "CoinDesk, Cointelegraph, Reddit r/CryptoCurrency, r/Bitcoin"],
+              ["Internationellt", "BBC News, Associated Press, Al Jazeera, Reddit r/worldnews"],
+              ["Medicin & forskning", "The Lancet, MDPI Healthcare, Reddit r/science"],
             ].map(([kat, kallor]) => (
               <div key={kat} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "14px" }}>
                 <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 4px", fontFamily: "monospace" }}>{kat}</p>
