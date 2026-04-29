@@ -764,9 +764,12 @@ def hamta_statistik(kategorier: list[str] | None = None) -> str:
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från RSS-flöden."""
     feeds = [
-        # Svenska nyheter – direkta RSS-flöden (SVT/Aftonbladet ger 0 men blockeras inte)
+        # Svenska nyheter – direkta RSS-flöden
         ("SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"),
+        ("SVT Nyheter (alt)",  "https://www.svt.se/rss.xml"),
         ("Aftonbladet",        "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"),
+        ("Expressen",          "https://feeds.expressen.se/nyheter/"),
+        ("Dagens Arena",       "https://www.dagensarena.se/feed/"),
         # Svenska ämnen – Reddit (stabila, 10 artiklar/körning vardera)
         ("Reddit Sverige",     "https://www.reddit.com/r/sweden/.rss"),
         ("Reddit Ekonomi",     "https://www.reddit.com/r/Economics/.rss"),
