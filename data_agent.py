@@ -81,7 +81,7 @@ def hamta_world_bank(indicator: str, country: str = "SE", n: int = 10) -> list[d
     """Hämtar de senaste n värdena för en World Bank-indikator."""
     url = (
         f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}"
-        f"?format=json&mrv={n}&per_page={n}&mrnev={n}"
+        f"?format=json&mrv={n}&per_page={n}"
     )
     try:
         res = httpx.get(url, timeout=15, follow_redirects=True)
