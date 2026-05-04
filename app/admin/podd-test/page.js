@@ -129,6 +129,20 @@ function AgentTestCard({ namn, pos, onPosChange, amplitude, speaking, onTest, di
             style={{ width: "100%", borderRadius: "8px", marginTop: "12px", border: `1px solid ${farg}30` }}
           />
         )}
+        {didState.url && (
+          <a
+            href={didState.url}
+            download={`${agentSlug(namn)}-talking.mp4`}
+            style={{
+              display: "block", textAlign: "center", marginTop: "10px",
+              background: `${farg}18`, border: `1px solid ${farg}40`,
+              color: farg, borderRadius: "4px", padding: "10px",
+              fontSize: "13px", textDecoration: "none", fontFamily: "Georgia, serif",
+            }}
+          >
+            ⬇ Spara {agentSlug(namn)}-talking.mp4
+          </a>
+        )}
       </div>
     </div>
   );
