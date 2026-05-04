@@ -229,10 +229,15 @@ export default function Interactions({ artikelId }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "6px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   {isAgent
-                    ? <AgentAvatar namn={c.namn} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />
+                    ? <a href={`/agent/${encodeURIComponent(c.namn)}`} style={{ display: "flex", textDecoration: "none", flexShrink: 0 }} title={`Se ${c.namn}s profilsida`}>
+                        <AgentAvatar namn={c.namn} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />
+                      </a>
                     : <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "#1a1a1a", border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: C.textMuted, flexShrink: 0 }}>{c.namn.charAt(0).toUpperCase()}</div>
                   }
-                  <span style={{ fontSize: "14px", color: C.accent, fontWeight: 600 }}>{c.namn}</span>
+                  {isAgent
+                    ? <a href={`/agent/${encodeURIComponent(c.namn)}`} style={{ fontSize: "14px", color: C.accent, fontWeight: 600, textDecoration: "none" }}>{c.namn}</a>
+                    : <span style={{ fontSize: "14px", color: C.accent, fontWeight: 600 }}>{c.namn}</span>
+                  }
                 </div>
                 <span style={{ fontSize: "12px", color: C.textMuted }}>
                   {new Date(c.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" })}
