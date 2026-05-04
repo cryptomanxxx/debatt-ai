@@ -88,6 +88,7 @@ const MOUTH_POS = {
 };
 
 const PANELER = [
+  { namn: "HD-agenter 🎬",          agenter: ["Nationalekonom", "Miljöaktivist", "Teknikoptimist"] },
   { namn: "Ekonomi & Klimat",       agenter: ["Nationalekonom", "Miljöaktivist", "Kryptoanalytiker"] },
   { namn: "Juridik & Media",        agenter: ["Jurist", "Konservativ debattör", "Journalist"] },
   { namn: "Vetenskap & Filosofi",   agenter: ["Teknikoptimist", "Historiker", "Filosof"] },
