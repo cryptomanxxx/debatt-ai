@@ -458,29 +458,17 @@ export default function ChattPage() {
     abortRef.current?.abort();
   }
 
-  async function lyssna() {
-    const entries = historik.length > 0
-      ? historik
-      : summering ? [{ agent: null, text: summering }] : [];
-    if (!entries.length) return;
-
-    lyssnaStoppRef.current = false;
-    setSpelar(true);
-
-    const chunks = entries.flatMap(e => {
-      const sentences = e.text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [e.text];
-      const result = [];
-      let cur = "";
-      for (const s of sentences) {
-        if (cur.length + s.length > 150 && cur) { result.push(cur.trim()); cur = s; }
-        else cur += s;
-      }
-      if (cur.trim()) result.push(cur.trim());
-      return result;
-    });
-
+  async function spelaUppText(text) {
+    const sentences = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
+    const chunks = [];
+    let cur = "";
+    for (const s of sentences) {
+      if (cur.length + s.length > 150 && cur) { chunks.push(cur.trim()); cur = s; }
+      else cur += s;
+    }
+    if (cur.trim()) chunks.push(cur.trim());
     for (const chunk of chunks) {
-      if (lyssnaStoppRef.current) break;
+      if (lyssnaStoppRef.current) return;
       await new Promise((resolve) => {
         const audio = new Audio(`/api/tts?text=${encodeURIComponent(chunk)}`);
         audioRef.current = audio;
@@ -488,6 +476,21 @@ export default function ChattPage() {
         audio.onerror = resolve;
         audio.play().catch(resolve);
       });
+    }
+  }
+
+  async function lyssna() {
+    const entries = historik.length > 0
+      ? historik
+      : summering ? [{ agent: null, text: summering }] : [];
+    if (!entries.length) return;
+    lyssnaStoppRef.current = false;
+    setSpelar(true);
+    for (const e of entries) {
+      if (lyssnaStoppRef.current) break;
+      if (e.agent) await spelaUppText(`${e.agent} säger:`);
+      if (lyssnaStoppRef.current) break;
+      await spelaUppText(e.text);
     }
     if (!lyssnaStoppRef.current) setSpelar(false);
   }
@@ -698,6 +701,15 @@ export default function ChattPage() {
 
             {fas === "klar" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                {/* Podcast-spelare */}
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 18px", background: "#0a0d10", border: "1px solid #4a9eff30", borderRadius: "8px", marginBottom: "16px" }}>
+                  <button onClick={spelar ? stoppLyssna : lyssna} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "9px 18px", background: spelar ? "transparent" : "#4a9eff18", border: `1px solid ${spelar ? "#f8717150" : "#4a9eff50"}`, borderRadius: "6px", color: spelar ? "#f87171" : "#4a9eff", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer", flexShrink: 0 }}>
+                    {spelar ? "⏹ Stoppa" : "▶ Lyssna på debatten"}
+                  </button>
+                  <span style={{ fontSize: "12px", color: C.textMuted }}>
+                    {spelar ? "Spelar upp…" : `${historik.length} inlägg · varje agent annonseras`}
+                  </span>
+                </div>
                 {felmeddelande && (
                   <div style={{ padding: "12px 16px", background: "#1a0505", border: "1px solid #f8717140", borderRadius: "8px", marginBottom: "16px" }}>
                     <p style={{ margin: 0, fontSize: "13px", color: "#f87171" }}>{felmeddelande}</p>
