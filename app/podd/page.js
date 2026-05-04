@@ -9,12 +9,13 @@ const C = {
   text: "#e8e0d0", textMuted: "#555", accent: "#c8b89a",
 };
 
-function avatarSrc(namn) {
-  const slug = namn.toLowerCase()
+function agentSlug(namn) {
+  return namn.toLowerCase()
     .replace(/ä/g, "a").replace(/å/g, "a").replace(/ö/g, "o")
     .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  return `/avatarer/${slug}.png`;
 }
+function avatarSrc(namn) { return `/avatarer/podd/${agentSlug(namn)}.png`; }
+function avatarFallback(namn) { return `/avatarer/${agentSlug(namn)}.png`; }
 
 const AGENT_FARG = {
   "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
@@ -232,7 +233,7 @@ function AgentCard({ namn, speaking, done, amplitude = 0 }) {
         transition: "transform 0.07s ease-out, border-color 0.3s ease",
       }}>
         <img src={src} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          onError={e => { e.target.style.display = "none"; }} />
+          onError={e => { if (!e.target.dataset.fallback) { e.target.dataset.fallback = "1"; e.target.src = avatarFallback(namn); } }} />
         {speaking && <MouthOverlay namn={namn} amplitude={amplitude} />}
         {speaking && (
           <div style={{ position: "absolute", bottom: "6px", right: "6px", width: "20px", height: "20px", borderRadius: "50%", background: farg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>
