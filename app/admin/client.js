@@ -734,6 +734,82 @@ function MetricCard({ label, value, sub, color }) {
   );
 }
 
+function MarketsTab() {
+  const [markets, setMarkets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`${SB_URL}/rest/v1/markets?status=eq.f%C3%B6reslagen&order=skapad.desc`, {
+      headers: sbHeaders(),
+    });
+    setMarkets(res.ok ? await res.json() : []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function godkann(id) {
+    setMsg("");
+    const res = await fetch(`${SB_URL}/rest/v1/markets?id=eq.${id}`, {
+      method: "PATCH",
+      headers: { ...sbHeaders(), "Prefer": "return=minimal" },
+      body: JSON.stringify({ status: "öppen" }),
+    });
+    setMsg(res.ok ? "✓ Market godkänt och publicerat." : "✗ Fel vid godkännande.");
+    load();
+  }
+
+  async function avvisa(id) {
+    if (!window.confirm("Ta bort detta market-förslag?")) return;
+    setMsg("");
+    const res = await fetch(`${SB_URL}/rest/v1/markets?id=eq.${id}`, {
+      method: "DELETE",
+      headers: sbHeaders(),
+    });
+    setMsg(res.ok ? "✓ Förslag borttaget." : "✗ Fel vid borttagning.");
+    load();
+  }
+
+  return (
+    <div>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
+        <p style={{ color:C.textMuted, fontSize:"14px", margin:0 }}>
+          Agenter föreslår prediction markets automatiskt. Godkänn för att publicera på /markets.
+        </p>
+        <button onClick={load} style={{ background:"transparent", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"4px", padding:"6px 14px", cursor:"pointer", fontFamily:"Georgia, serif", fontSize:"13px" }}>↻</button>
+      </div>
+      {msg && <p style={{ color: msg.startsWith("✓") ? C.green : C.red, fontSize:"14px", marginBottom:"16px" }}>{msg}</p>}
+      {loading && <p style={{ color:C.textMuted }}>Laddar…</p>}
+      {!loading && markets.length === 0 && (
+        <p style={{ color:C.textMuted, fontSize:"14px", fontStyle:"italic" }}>Inga föreslagna markets just nu.</p>
+      )}
+      {markets.map(m => (
+        <div key={m.id} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"20px", marginBottom:"16px" }}>
+          <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 8px 0" }}>
+            {m.kategori} · Deadline {m.deadline}
+          </p>
+          <p style={{ fontSize:"18px", color:C.accent, margin:"0 0 8px 0", fontWeight:400 }}>{m.titel}</p>
+          {m.beskrivning && <p style={{ color:C.textMuted, fontSize:"14px", lineHeight:1.6, margin:"0 0 8px 0" }}>{m.beskrivning}</p>}
+          {m.resolution_kalla && <p style={{ color:C.textMuted, fontSize:"13px", margin:"0 0 12px 0" }}>Källa: {m.resolution_kalla}</p>}
+          <p style={{ color:C.textMuted, fontSize:"12px", fontFamily:"monospace", margin:"0 0 16px 0" }}>
+            Föreslagen {new Date(m.skapad).toLocaleDateString("sv-SE")}
+          </p>
+          <div style={{ display:"flex", gap:"10px" }}>
+            <button onClick={() => godkann(m.id)} style={{ background:"#052011", border:`1px solid ${C.green}50`, color:C.green, borderRadius:"4px", padding:"8px 18px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+              ✓ Godkänn
+            </button>
+            <button onClick={() => avvisa(m.id)} style={{ background:"#200505", border:`1px solid ${C.red}50`, color:C.red, borderRadius:"4px", padding:"8px 18px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+              ✗ Avvisa
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function MatningTab() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1097,6 +1173,7 @@ export default function AdminClient() {
             ["matning","Mätning"],
             ["backtest","Backtest"],
             ["nyhetslogg","Nyhetslogg"],
+            ["markets","Markets"],
             ["api-status","API-status"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
@@ -1302,6 +1379,7 @@ export default function AdminClient() {
         {/* ── BACKTEST ── */}
         {mainTab === "backtest" && <BacktestTab />}
         {mainTab === "nyhetslogg" && <NyhetsloggTab />}
+        {mainTab === "markets" && <MarketsTab />}
 
         {/* ── API-STATUS ── */}
         {mainTab === "api-status" && <ApiStatusTab />}

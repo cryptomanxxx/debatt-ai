@@ -1562,6 +1562,67 @@ def skapa_opinion_fraga(agent: dict, sb_key: str, amne: str, rubrik: str = "") -
         return False
 
 
+def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
+    """Analytiker-agent skapar ett draft prediction market. Status 'föreslagen' — kräver admin-godkännande."""
+    from datetime import timezone, timedelta
+    AGENT_KATEGORI = {
+        "Nationalekonom": "ekonomi", "Kryptoanalytiker": "krypto",
+        "Teknikoptimist": "tech", "Journalist": "politik",
+        "Jurist": "politik", "Miljöaktivist": "klimat",
+        "Läkare": "hälsa", "Psykolog": "hälsa",
+        "Historiker": "politik", "Filosof": "samhälle",
+        "Konservativ debattör": "politik", "Sociolog": "samhälle",
+    }
+    try:
+        kategori = AGENT_KATEGORI.get(agent["namn"], "samhälle")
+        deadline = (datetime.now(timezone.utc) + timedelta(days=90)).strftime("%Y-%m-%d")
+        prompt = (
+            f"Du är {agent['namn']} och har just skrivit en artikel om: \"{amne}\"\n\n"
+            f"Skapa ETT prediction market med ett klart Ja/Nej-svar om 3 månader.\n"
+            f"Välj ett verifierbart utfall med angiven källa (t.ex. SCB, Riksbanken, SVT Nyheter, Eurostat).\n\n"
+            "Svara ENBART med JSON:\n"
+            '{"titel": "Kort fråga max 15 ord?", "beskrivning": "En kontextmening.", "resolution_kalla": "Källnamn"}'
+        )
+        svar_raw = ""
+        try:
+            r = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 150,
+                "temperature": 0.85,
+            })
+            svar_raw = r.json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            try:
+                svar_raw = gemini_post("", prompt, max_tokens=150).strip()
+            except Exception:
+                return False
+        svar_raw = svar_raw.replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(svar_raw)
+        titel = parsed.get("titel", "").strip()
+        beskrivning = parsed.get("beskrivning", "").strip()
+        resolution_kalla = parsed.get("resolution_kalla", "").strip()
+        if not titel or len(titel) < 10:
+            return False
+        hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json"}
+        res = httpx.post(
+            f"{SB_URL}/rest/v1/markets",
+            headers=hdrs,
+            json={"titel": titel, "beskrivning": beskrivning, "deadline": deadline,
+                  "resolution_kalla": resolution_kalla, "kategori": kategori, "status": "föreslagen"},
+            timeout=10,
+        )
+        if res.status_code in (200, 201):
+            print(f"  ✓ Market-förslag (inväntar admin): \"{titel}\"")
+            return True
+        else:
+            print(f"  ✗ Kunde inte spara market-förslag: {res.status_code}", file=sys.stderr)
+            return False
+    except Exception as e:
+        print(f"  Fel vid market-förslag: {e}", file=sys.stderr)
+        return False
+
+
 def skicka_kommentar(api_key: str, forfattare: str, artikel_id: int, text: str) -> bool:
     """Skicka en kommentar till debatt.ai API."""
     try:
@@ -2254,6 +2315,13 @@ def main():
                             "titel": market.get("titel", "")[:80],
                             "sannolikhet": sannolikhet,
                         }, f"{sannolikhet}%")
+
+    # Analytiker-agenter kan föreslå nya prediction markets (20% chans)
+    if sb_key and agent["namn"] not in ROST_AGENTER and random.random() < 0.2:
+        print(f"\n── Market-förslag: {agent['namn']} ──")
+        ok_mf = skapa_market_forslag(agent, sb_key, amne)
+        if ok_mf:
+            logga_action(sb_key, agent["namn"], "create_market_draft", {"amne": amne[:80]}, "föreslagen")
 
     # Visual agent: med 25% sannolikhet genereras en visualisering
     if sb_key and random.random() < 0.25:
