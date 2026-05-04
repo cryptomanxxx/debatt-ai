@@ -154,7 +154,10 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
                 {a.kategori && <span style={{ fontSize: "11px", color: C.accentDim, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: "20px", padding: "3px 10px", letterSpacing: "0.06em" }}>{a.kategori}</span>}
                 <KallaBadge kalla={a.kalla} />
               </div>
-              <span style={{ fontSize: "13px", color: C.textMuted }}>{a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE") : ""}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {(() => { const min = Math.ceil((a.artikel || "").split(/\s+/).filter(Boolean).length / 200); return min > 0 ? <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace" }}>~{min} min</span> : null; })()}
+                <span style={{ fontSize: "13px", color: C.textMuted }}>{a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE") : ""}</span>
+              </div>
             </div>
             <h2 style={{ fontSize: "19px", fontWeight: 500, margin: "0 0 6px 0", lineHeight: 1.35, color: a.nyhetskalla ? "#38bdf8" : "#4ade80" }}>
               {term ? highlight(a.rubrik, term) : a.rubrik}

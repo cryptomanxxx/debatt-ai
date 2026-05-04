@@ -56,64 +56,6 @@
   letter-spacing: 0.06em;
 }
 
-@keyframes neonPulse {
-  0%, 100% {
-    text-shadow:
-      0 0 4px #fff,
-      0 0 10px #fff,
-      0 0 20px #e879f9,
-      0 0 40px #e879f9,
-      0 0 80px #e879f9,
-      0 0 120px #c026d3,
-      0 0 160px #c026d3;
-  }
-  50% {
-    text-shadow:
-      0 0 2px #fff,
-      0 0 6px #fff,
-      0 0 12px #e879f9,
-      0 0 24px #e879f9,
-      0 0 50px #e879f9,
-      0 0 80px #c026d3,
-      0 0 100px #c026d3;
-  }
-}
-
-.neon-logo {
-  animation: neonPulse 2.4s ease-in-out infinite;
-}
-
-@keyframes neonHero {
-  0%, 100% {
-    text-shadow:
-      0 0 7px #fff,
-      0 0 18px #fff,
-      0 0 35px #e879f9,
-      0 0 70px #e879f9,
-      0 0 120px #e879f9,
-      0 0 180px #c026d3,
-      0 0 230px #c026d3;
-  }
-  50% {
-    text-shadow:
-      0 0 4px #fff,
-      0 0 10px #fff,
-      0 0 20px #e879f9,
-      0 0 45px #e879f9,
-      0 0 80px #e879f9,
-      0 0 120px #c026d3,
-      0 0 160px #c026d3;
-  }
-}
-
-.neon-hero {
-  animation: neonHero 2.4s ease-in-out infinite;
-  font-family: "Times New Roman", serif;
-  font-weight: 700;
-  color: #e879f9;
-  letter-spacing: 0.06em;
-}
-
 .neon-nav {
   color: #aaaaaa;
   position: relative;
@@ -174,6 +116,48 @@
 }
 .artikel-kort:hover {
   border-color: #3a3a3a !important;
+}
+
+/* ── Hamburgermeny (mobil) ─────────────────────────────────── */
+.hamburger-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 10px 8px;
+  color: #aaaaaa;
+  font-size: 22px;
+  margin-left: auto;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+@media (max-width: 720px) {
+  .hamburger-btn { display: block; }
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    background: rgba(10,10,10,0.97);
+    border-bottom: 1px solid #222;
+    padding: 8px 0 12px;
+    backdrop-filter: blur(12px);
+    z-index: 99;
+  }
+  .nav-links.open { display: flex; }
+  .nav-links .neon-nav,
+  .nav-links .neon-nav-active { padding: 10px 20px; width: 100%; box-sizing: border-box; }
 }
 
 .nyhet-rad {

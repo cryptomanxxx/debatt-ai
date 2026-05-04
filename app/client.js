@@ -184,6 +184,31 @@ async function fetchTrending() {
   return res.json();
 }
 
+async function fetchTopDebattrad() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,parent_id&order=skapad.desc&limit=100&parent_id=not.is.null`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return null;
+  const repliker = await res.json();
+  if (!repliker.length) return null;
+  const counts = {};
+  repliker.forEach(r => {
+    const root = r.parent_id;
+    counts[root] = (counts[root] || 0) + 1;
+  });
+  const topId = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (!topId) return null;
+  const res2 = await fetch(
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare&id=eq.${topId}`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res2.ok) return null;
+  const [art] = await res2.json();
+  if (!art) return null;
+  return { ...art, antalRepliker: counts[topId] };
+}
+
 async function fetchSenasteKommentarer() {
   const res = await fetch(
     `${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,forfattare,text,skapad,artiklar(id,rubrik)&order=skapad.desc&limit=5`,
@@ -503,6 +528,8 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [senasteNyhet, setSenasteNyhet] = useState([]);
   const [trending, setTrending] = useState([]);
   const [senasteKommentarer, setSenasteKommentarer] = useState([]);
+  const [topDebattrad, setTopDebattrad] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [opinionWidget, setOpinionWidget] = useState({ fragor: [], rosterData: {} });
   const [opinionVoted, setOpinionVoted] = useState({});
   const [subEmail, setSubEmail]   = useState("");
@@ -579,6 +606,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteNyhet().then(n => setSenasteNyhet(n)).catch(() => {});
     fetchTrending().then(d => setTrending(d)).catch(() => {});
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
+    fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
     // Opinion-widget: hämta röstdata och välj 3 slumpvisa frågor
     const WIDGET_FRAGOR = [
       { fraga: "Ska AI få fatta juridiska beslut?", kategori: "ai-tech" },
@@ -752,24 +780,29 @@ export default function DebattClient({ initialArticleCount = null }) {
 
       {/* Header */}
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0" }}>
-          <span className="neon-logo" onClick={reset} style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", cursor: "pointer", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</span>
-          {[["submit","Hem"],["debatter","Debatter"]].map(([v,lbl])=>(
-            <button key={v} onClick={()=>navigate(v)} className={view===v ? "neon-nav-active" : "neon-nav"}>{lbl}</button>
-          ))}
-          <a href="/nyheter" className="neon-nav">Nyheter</a>
-          <a href="/arkiv" className="neon-nav">{articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv"}</a>
-          <a href="/chatt" className="neon-nav">Direktdebatt</a>
-          <a href="/opinion" className="neon-nav">Vad tycker du?</a>
-          <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
-          <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
-          <a href="/markets" className="neon-nav">Markets</a>
-          <a href="/leaderboard" className="neon-nav">Leaderboard</a>
-          <a href="/om" className="neon-nav">Om DEBATT-AI</a>
-          <button onClick={()=>navigate("kontakt")} className={view==="kontakt" ? "neon-nav-active" : "neon-nav"}>Kontakt</button>
-          {visitors !== null && (
-            <span style={{ fontSize: "12px", color: C.textMuted, marginLeft: "auto", paddingLeft: "12px", flexShrink: 0 }}>👁 {visitors.toLocaleString("sv-SE")}</span>
-          )}
+        <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+          <span className="neon-logo" onClick={() => { reset(); setMenuOpen(false); }} style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", cursor: "pointer", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</span>
+          <div className={`nav-links${menuOpen ? " open" : ""}`}>
+            {[["submit","Hem"],["debatter","Debatter"]].map(([v,lbl])=>(
+              <button key={v} onClick={()=>{ navigate(v); setMenuOpen(false); }} className={view===v ? "neon-nav-active" : "neon-nav"}>{lbl}</button>
+            ))}
+            <a href="/nyheter" className="neon-nav">Nyheter</a>
+            <a href="/arkiv" className="neon-nav">{articleCount !== null ? `Arkiv (${articleCount})` : "Arkiv"}</a>
+            <a href="/chatt" className="neon-nav">Direktdebatt</a>
+            <a href="/opinion" className="neon-nav">Vad tycker du?</a>
+            <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
+            <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
+            <a href="/markets" className="neon-nav">Markets</a>
+            <a href="/leaderboard" className="neon-nav">Leaderboard</a>
+            <a href="/om" className="neon-nav">Om DEBATT-AI</a>
+            <button onClick={()=>{ navigate("kontakt"); setMenuOpen(false); }} className={view==="kontakt" ? "neon-nav-active" : "neon-nav"}>Kontakt</button>
+            {visitors !== null && (
+              <span style={{ fontSize: "12px", color: C.textMuted, marginLeft: "auto", paddingLeft: "12px", flexShrink: 0 }}>👁 {visitors.toLocaleString("sv-SE")}</span>
+            )}
+          </div>
+          <button className="hamburger-btn" onClick={() => setMenuOpen(m => !m)} aria-label="Öppna meny">
+            {menuOpen ? "✕" : "☰"}
+          </button>
         </div>
       </header>
 
@@ -829,6 +862,18 @@ export default function DebattClient({ initialArticleCount = null }) {
                     <strong>{senasteReplik.forfattare}</strong>
                     {senasteReplik.originalForfattare ? <> svarar <strong>{senasteReplik.originalForfattare}</strong></> : " skriver replik"}
                   </p>
+                </div>
+                <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
+              </a>
+            )}
+
+            {/* Hetaste debattråden */}
+            {topDebattrad && (
+              <a href={`/artikel/${topDebattrad.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#0d0a00", border: "1px solid #f59e0b30", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
+                <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b", flexShrink: 0, boxShadow: "0 0 8px #f59e0b" }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: "10px", color: "#f59e0b", letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "monospace", fontWeight: 700 }}>Hetaste debattråden · {topDebattrad.antalRepliker} repliker</span>
+                  <p style={{ fontSize: "14px", color: C.text, margin: "2px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topDebattrad.rubrik}</p>
                 </div>
                 <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
               </a>
