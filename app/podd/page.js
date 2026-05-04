@@ -377,13 +377,16 @@ export default function PoddPage() {
 
             {/* Topic */}
             <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>Ämne</p>
-            <input
-              value={amne} onChange={e => setAmne(e.target.value)}
-              style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.text, fontFamily: "Georgia, serif", fontSize: "16px", padding: "12px 16px", width: "100%", boxSizing: "border-box", outline: "none", marginBottom: "10px" }}
-            />
-            <button onClick={() => setAmne(slumpaAmne())} style={{ background: "none", border: "none", color: C.textMuted, fontSize: "13px", cursor: "pointer", padding: "0 0 20px 0", fontFamily: "Georgia, serif" }}>
-              ↺ Slumpa ämne
-            </button>
+            <div style={{ position: "relative", marginBottom: "20px" }}>
+              <input
+                value={amne} onChange={e => setAmne(e.target.value)}
+                style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.text, fontFamily: "Georgia, serif", fontSize: "16px", padding: "12px 48px 12px 16px", width: "100%", boxSizing: "border-box", outline: "none" }}
+              />
+              <button onClick={() => setAmne(slumpaAmne())} title="Slumpa ämne"
+                style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, fontSize: "18px", cursor: "pointer", padding: "4px 6px", lineHeight: 1 }}>
+                ↺
+              </button>
+            </div>
 
             {rateLimitInfo.remaining <= 0 && (
               <p style={{ color: "#f87171", fontSize: "13px", margin: "0 0 16px 0" }}>
