@@ -225,7 +225,7 @@ function AgentCard({ namn, speaking, done, amplitude = 0 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
       <div style={{
-        position: "relative", width: "120px", height: "120px", flexShrink: 0,
+        position: "relative", width: "var(--podd-av)", height: "var(--podd-av)", flexShrink: 0,
         borderRadius: "50%", overflow: "hidden",
         border: `3px solid ${speaking ? farg : done ? farg + "40" : "#1a1a1a"}`,
         boxShadow: speaking ? `0 0 ${glow}px ${farg}70, 0 0 ${glow * 2}px ${farg}25` : "none",
@@ -236,7 +236,7 @@ function AgentCard({ namn, speaking, done, amplitude = 0 }) {
           onError={e => { if (!e.target.dataset.fallback) { e.target.dataset.fallback = "1"; e.target.src = avatarFallback(namn); } }} />
         {speaking && <MouthOverlay namn={namn} amplitude={amplitude} />}
         {speaking && (
-          <div style={{ position: "absolute", bottom: "6px", right: "6px", width: "20px", height: "20px", borderRadius: "50%", background: farg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>
+          <div style={{ position: "absolute", bottom: "8px", right: "8px", width: "24px", height: "24px", borderRadius: "50%", background: farg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }}>
             🎙
           </div>
         )}
@@ -498,7 +498,11 @@ export default function PoddPage() {
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "Georgia, serif" }}>
-      <style>{`@keyframes dot { 0%,80%,100% { opacity:0.2; } 40% { opacity:1; } }`}</style>
+      <style>{`
+        @keyframes dot { 0%,80%,100% { opacity:0.2; } 40% { opacity:1; } }
+        :root { --podd-av: 160px; }
+        @media (max-width: 500px) { :root { --podd-av: 110px; } }
+      `}</style>
 
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", background: `${C.bg}f0`, backdropFilter: "blur(12px)", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "4px", maxWidth: "900px", margin: "0 auto", flexWrap: "wrap" }}>
