@@ -58,32 +58,32 @@ const AGENT_ROST = {
 };
 
 // Munposition per agent (cx/cy i procent av 100×100 viewBox)
-// Anpassad per avatarbild — kan finjusteras visuellt
+// Justerade för nya realistiska bilder — halvkroppsbilder har ansiktet högre upp
 const MOUTH_POS = {
-  "Nationalekonom":       { cx: 50, cy: 70 },
-  "Miljöaktivist":        { cx: 50, cy: 67 },
-  "Teknikoptimist":       { cx: 50, cy: 70 },
-  "Konservativ debattör": { cx: 50, cy: 71 },
-  "Jurist":               { cx: 50, cy: 69 },
-  "Journalist":           { cx: 50, cy: 68 },
-  "Filosof":              { cx: 50, cy: 71 },
-  "Läkare":               { cx: 50, cy: 69 },
-  "Psykolog":             { cx: 50, cy: 68 },
-  "Historiker":           { cx: 50, cy: 72 },
-  "Sociolog":             { cx: 50, cy: 70 },
-  "Kryptoanalytiker":     { cx: 50, cy: 69 },
-  "Den hungriga":         { cx: 50, cy: 70 },
-  "Mamman":               { cx: 50, cy: 68 },
-  "Den sura":             { cx: 50, cy: 71 },
-  "Den trötta":           { cx: 50, cy: 72 },
-  "Den stressade":        { cx: 50, cy: 68 },
-  "Den lugna":            { cx: 50, cy: 69 },
-  "Pensionären":          { cx: 50, cy: 73 },
-  "Tonåringen":           { cx: 50, cy: 67 },
-  "Den nostalgiske":      { cx: 50, cy: 71 },
-  "Hypokondrikern":       { cx: 50, cy: 69 },
-  "Optimisten":           { cx: 50, cy: 68 },
-  "Den rike":             { cx: 50, cy: 70 },
+  "Nationalekonom":       { cx: 50, cy: 63 }, // porträtt/headshot — ansikte fyller ramen
+  "Miljöaktivist":        { cx: 50, cy: 42 }, // halvkropp — ansikte i övre tredjedel
+  "Teknikoptimist":       { cx: 50, cy: 40 }, // halvkropp — ansikte i övre tredjedel
+  "Konservativ debattör": { cx: 50, cy: 68 },
+  "Jurist":               { cx: 50, cy: 67 },
+  "Journalist":           { cx: 50, cy: 66 },
+  "Filosof":              { cx: 50, cy: 68 },
+  "Läkare":               { cx: 50, cy: 67 },
+  "Psykolog":             { cx: 50, cy: 66 },
+  "Historiker":           { cx: 50, cy: 69 },
+  "Sociolog":             { cx: 50, cy: 67 },
+  "Kryptoanalytiker":     { cx: 50, cy: 66 },
+  "Den hungriga":         { cx: 50, cy: 67 },
+  "Mamman":               { cx: 50, cy: 65 },
+  "Den sura":             { cx: 50, cy: 68 },
+  "Den trötta":           { cx: 50, cy: 69 },
+  "Den stressade":        { cx: 50, cy: 65 },
+  "Den lugna":            { cx: 50, cy: 66 },
+  "Pensionären":          { cx: 50, cy: 70 },
+  "Tonåringen":           { cx: 50, cy: 64 },
+  "Den nostalgiske":      { cx: 50, cy: 68 },
+  "Hypokondrikern":       { cx: 50, cy: 66 },
+  "Optimisten":           { cx: 50, cy: 65 },
+  "Den rike":             { cx: 50, cy: 67 },
 };
 
 const PANELER = [
@@ -268,6 +268,8 @@ export default function PoddPage() {
   const autoplayRef = useRef(true);
   const transcriptRef = useRef(null);
   const svVoiceRef = useRef(null);
+  const audioCtxRef = useRef(null);
+  const audioSrcRef = useRef(null);
 
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
@@ -292,60 +294,104 @@ export default function PoddPage() {
   async function spelaUppText(text, agent) {
     if (!autoplayRef.current) return;
     setSpeakerAgent(agent);
-    const meningar = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
     const vp = AGENT_ROST[agent] || { pitch: 1.0, rate: 1.0 };
 
-    for (const mening of meningar) {
-      if (!autoplayRef.current || stoppRef.current) break;
-      await new Promise((resolve) => {
-        const utt = new SpeechSynthesisUtterance(mening.trim());
-        utt.lang = "sv-SE";
-        if (svVoiceRef.current) utt.voice = svVoiceRef.current;
-        utt.pitch = vp.pitch;
-        utt.rate = vp.rate;
-        utt.volume = 1;
+    const harSvRost = Boolean(
+      typeof speechSynthesis !== "undefined" &&
+      svVoiceRef.current?.lang?.startsWith("sv")
+    );
 
-        let boundaryFired = false;
-        let fallbackTimer = null;
+    if (harSvRost) {
+      // ── speechSynthesis-väg (svensk röst tillgänglig) ──
+      const meningar = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
+      for (const mening of meningar) {
+        if (!autoplayRef.current || stoppRef.current) break;
+        await new Promise((resolve) => {
+          const utt = new SpeechSynthesisUtterance(mening.trim());
+          utt.lang = "sv-SE";
+          utt.voice = svVoiceRef.current;
+          utt.pitch = vp.pitch;
+          utt.rate = vp.rate;
+          utt.volume = 1;
 
-        // Ordgränser → realistisk munrörelse
-        utt.onboundary = (e) => {
-          if (e.name !== "word") return;
-          boundaryFired = true;
-          const amp = 0.45 + Math.random() * 0.55;
-          setAmplitude(amp);
-          setTimeout(() => setAmplitude(0.08 + Math.random() * 0.12), 110 + Math.random() * 80);
-        };
+          let boundaryFired = false;
+          let fallbackTimer = null;
 
-        // Fallback om onboundary ej stöds (vissa Android-webbläsare)
-        fallbackTimer = setTimeout(() => {
-          if (!boundaryFired) {
-            const iv = setInterval(() => {
-              if (!autoplayRef.current) { clearInterval(iv); return; }
-              const t = Date.now();
-              const amp = Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014)));
-              setAmplitude(amp);
-            }, 70);
-            utt._fallbackIv = iv;
-          }
-        }, 300);
+          utt.onboundary = (e) => {
+            if (e.name !== "word") return;
+            boundaryFired = true;
+            const amp = 0.45 + Math.random() * 0.55;
+            setAmplitude(amp);
+            setTimeout(() => setAmplitude(0.08 + Math.random() * 0.12), 110 + Math.random() * 80);
+          };
 
-        utt.onend = () => {
-          clearTimeout(fallbackTimer);
-          if (utt._fallbackIv) clearInterval(utt._fallbackIv);
-          setAmplitude(0);
-          resolve();
-        };
-        utt.onerror = () => {
-          clearTimeout(fallbackTimer);
-          if (utt._fallbackIv) clearInterval(utt._fallbackIv);
-          setAmplitude(0);
-          resolve();
-        };
+          fallbackTimer = setTimeout(() => {
+            if (!boundaryFired) {
+              const iv = setInterval(() => {
+                if (!autoplayRef.current) { clearInterval(iv); return; }
+                const t = Date.now();
+                setAmplitude(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
+              }, 70);
+              utt._fallbackIv = iv;
+            }
+          }, 300);
 
-        speechSynthesis.speak(utt);
-      });
+          utt.onend = () => { clearTimeout(fallbackTimer); if (utt._fallbackIv) clearInterval(utt._fallbackIv); setAmplitude(0); resolve(); };
+          utt.onerror = () => { clearTimeout(fallbackTimer); if (utt._fallbackIv) clearInterval(utt._fallbackIv); setAmplitude(0); resolve(); };
+          speechSynthesis.speak(utt);
+        });
+      }
+    } else {
+      // ── /api/tts-väg (ingen svensk TTS-röst på enheten) ──
+      try {
+        const resp = await fetch(`/api/tts?text=${encodeURIComponent(text.slice(0, 200))}`);
+        if (!resp.ok) throw new Error("tts");
+        const buf = await resp.arrayBuffer();
+        if (stoppRef.current || !autoplayRef.current) { if (autoplayRef.current) { setSpeakerAgent(null); setAmplitude(0); } return; }
+
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        audioCtxRef.current = ctx;
+        const audioBuf = await ctx.decodeAudioData(buf);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        const src = ctx.createBufferSource();
+        audioSrcRef.current = src;
+        src.buffer = audioBuf;
+        src.connect(analyser);
+        analyser.connect(ctx.destination);
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        let rafId;
+
+        function tick() {
+          if (!autoplayRef.current) { cancelAnimationFrame(rafId); setAmplitude(0); return; }
+          analyser.getByteTimeDomainData(data);
+          let sum = 0;
+          for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128; sum += v * v; }
+          setAmplitude(Math.min(1, Math.sqrt(sum / data.length) * 8));
+          rafId = requestAnimationFrame(tick);
+        }
+
+        await new Promise((resolve) => {
+          const cleanup = () => { cancelAnimationFrame(rafId); try { ctx.close(); } catch {} setAmplitude(0); resolve(); };
+          src.onended = cleanup;
+          src.start(0);
+          tick();
+          setTimeout(cleanup, audioBuf.duration * 1000 + 1500);
+        });
+      } catch {
+        // Sista fallback: sinusanimation utan ljud
+        const ms = Math.max(2000, text.length * 55);
+        await new Promise(resolve => {
+          const iv = setInterval(() => {
+            if (!autoplayRef.current) { clearInterval(iv); resolve(); return; }
+            const t = Date.now();
+            setAmplitude(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
+          }, 70);
+          setTimeout(() => { clearInterval(iv); setAmplitude(0); resolve(); }, ms);
+        });
+      }
     }
+
     if (autoplayRef.current) { setSpeakerAgent(null); setAmplitude(0); }
   }
 
@@ -428,6 +474,8 @@ export default function PoddPage() {
     stoppRef.current = true;
     autoplayRef.current = false;
     speechSynthesis.cancel();
+    try { audioSrcRef.current?.stop(); } catch {}
+    try { audioCtxRef.current?.close(); } catch {}
     abortRef.current?.abort();
     setSpeakerAgent(null);
     setAmplitude(0);
