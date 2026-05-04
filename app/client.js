@@ -80,7 +80,7 @@ async function fetchSenasteChattDebatt() {
 
 async function fetchSenasteNyhet() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla,taggar,nyhetskalla,skapad&nyhetskalla=not.is.null&rubrik=not.like.Replik%3A*&order=skapad.desc&limit=2`,
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla,taggar,nyhetskalla,skapad&nyhetskalla=not.is.null&rubrik=not.like.Replik%3A*&order=skapad.desc&limit=4`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
   if (!res.ok) return [];
@@ -167,7 +167,7 @@ async function fetchSenasteReplik() {
 }
 
 async function fetchLatestArtikel() {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&nyhetskalla=is.null&order=skapad.desc&limit=2`, {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&nyhetskalla=is.null&order=skapad.desc&limit=4`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
   });
   if (!res.ok) return [];
@@ -1064,46 +1064,15 @@ export default function DebattClient({ initialArticleCount = null }) {
               </div>
             )}
 
-            <div style={{ marginBottom: "40px" }}>
-              <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px 0" }}>Artikelinlämning</p>
-              <h1 style={{ fontSize: "32px", fontWeight: 400, margin: "0 0 20px 0", lineHeight: 1.2 }}>Skicka din debattartikel</h1>
-              <div style={{ background: "#0d0f0a", border: `1px solid ${C.green}30`, borderRadius: "8px", padding: "24px" }}>
-                <p style={{ fontSize: "12px", color: C.green, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px 0", fontWeight: 700 }}>Publiceringsregler</p>
-                <p style={{ color: C.text, fontSize: "15px", lineHeight: 1.7, margin: "0 0 16px 0" }}>
-                  Artikeln bedöms av vår AI-redaktör på fyra kriterier. Alla måste uppnå <strong style={{ color: C.green }}>minst {MIN_SCORE} av 10</strong> för att publicering ska vara möjlig:
-                </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "16px" }}>
-                  {["Argumentationsklarhet","Originalitet","Samhällsrelevans","Trovärdighet"].map(k=>(
-                    <div key={k} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, flexShrink: 0 }} />
-                      <span style={{ fontSize: "14px", color: C.textMuted }}>{k}</span>
-                    </div>
-                  ))}
-                </div>
-                <p style={{ color: C.textMuted, fontSize: "13px", lineHeight: 1.6, margin: 0 }}>Artiklar som inte uppfyller kraven får detaljerade förbättringsförslag och kan skickas in på nytt.</p>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-              <div><Lbl>Rubrik</Lbl><input value={title} onChange={e=>setTitle(e.target.value)} style={inp} /></div>
-              <div><Lbl>Författare & titel</Lbl><input value={author} onChange={e=>setAuthor(e.target.value)} style={inp} /></div>
-              <div>
-                <Lbl>Artikeltext</Lbl>
-                <textarea value={text} onChange={e=>setText(e.target.value)} rows={16} style={{...inp, resize:"vertical", lineHeight:1.8}} />
-                <p style={{ fontSize:"12px", color: text.trim().split(/\s+/).filter(Boolean).length < 300 ? C.red : C.green, margin:"6px 0 0 0", fontFamily:"monospace" }}>
-                  {text.trim().split(/\s+/).filter(Boolean).length} ord {text.trim().split(/\s+/).filter(Boolean).length < 300 ? `– minst 300 ord krävs` : "✓"}
-                </p>
-              </div>
-              <div
-                className="cf-turnstile"
-                data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
-                data-callback="onTurnstileVerified"
-                data-theme="dark"
-              />
-              <button onClick={analyze} disabled={analyzing||!text.trim()||!title.trim()||!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300} style={{ background:analyzing?`${C.accent}20`:((!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300)?`${C.accent}40`:C.accent), color:analyzing?C.accentDim:"#0a0a0a", border:"none", borderRadius:"4px", padding:"15px 32px", fontSize:"14px", fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", cursor:(analyzing||!turnstileToken||text.trim().split(/\s+/).filter(Boolean).length < 300)?"default":"pointer", fontFamily:"Georgia, serif", alignSelf:"flex-start" }}>
-                {analyzing?`Redaktören läser${".".repeat(dots)}`:"Skicka till redaktionen →"}
-              </button>
-              {error && <p style={{ color:C.red, fontSize:"14px", margin:0 }}>{error}</p>}
+            <div style={{ background: "#0d0f0a", border: `1px solid ${C.green}30`, borderRadius: "8px", padding: "28px 32px", marginBottom: "40px" }}>
+              <p style={{ fontSize: "11px", color: C.green, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 10px 0", fontWeight: 700 }}>Artikelinlämning</p>
+              <h2 style={{ fontSize: "24px", fontWeight: 400, margin: "0 0 12px 0", color: C.text }}>Skicka din debattartikel</h2>
+              <p style={{ color: C.textMuted, fontSize: "14px", lineHeight: 1.7, margin: "0 0 20px 0" }}>
+                Artikeln bedöms av AI-redaktören på fyra kriterier: argumentation, originalitet, samhällsrelevans och trovärdighet. Alla måste uppnå minst {MIN_SCORE}/10 för publicering.
+              </p>
+              <a href="/skicka-in" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: C.green, color: "#050f08", borderRadius: "4px", padding: "13px 28px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.08em", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+                Skicka in artikel →
+              </a>
             </div>
           </div>
         )}

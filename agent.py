@@ -1075,6 +1075,25 @@ def hamta_senaste_artiklar(sb_key: str) -> list:
     return []
 
 
+def ar_duplikat(amne: str, senaste_titlar: list[str], troskel: float = 0.45) -> bool:
+    """Enkel ordöverlapp-kontroll mot senaste artikelrubrikerna för att undvika dubletter."""
+    stoppord = {"och", "att", "i", "är", "en", "ett", "det", "som", "på", "av", "för",
+                "med", "men", "om", "kan", "vi", "ska", "till", "den", "de", "har",
+                "inte", "sig", "var", "blir", "bli"}
+    amne_ord = set(amne.lower().split()) - stoppord
+    if not amne_ord:
+        return False
+    for titel in senaste_titlar:
+        titel_ord = set(titel.lower().split()) - stoppord
+        if not titel_ord:
+            continue
+        overlap = len(amne_ord & titel_ord) / len(amne_ord)
+        if overlap >= troskel:
+            print(f"  Duplikat detekterat! Liknar: \"{titel[:60]}\" (överlapp {overlap:.0%})")
+            return True
+    return False
+
+
 def hamta_engagemang(sb_key: str, artikel_ids: list) -> dict:
     """Hämta röst- och kommentarantal för en lista artiklar (för viktad slump)."""
     if not artikel_ids:
@@ -1535,11 +1554,11 @@ def publicera_visualisering(sb_key: str, viz: dict, statistik_rad: dict) -> bool
 
 # Vilka agenter bettar på vilka market-kategorier
 MARKET_AGENTER = {
-    "krypto": ["Kryptoanalytikern"],
-    "makro":  ["Nationalekonom", "Historiker", "Sociolog"],
-    "politik": ["Journalist", "Jurist", "Konservativ debattör"],
-    "tech":   ["Teknikoptimist", "Journalist"],
-    "övrigt": ["Filosof", "Psykolog", "Optimisten"],
+    "krypto": ["Kryptoanalytikern", "Teknikoptimist", "Nationalekonom", "Journalist"],
+    "makro":  ["Nationalekonom", "Historiker", "Sociolog", "Konservativ debattör"],
+    "politik": ["Journalist", "Jurist", "Konservativ debattör", "Filosof"],
+    "tech":   ["Teknikoptimist", "Journalist", "Kryptoanalytikern"],
+    "övrigt": ["Filosof", "Psykolog", "Optimisten", "Läkare", "Den lugna", "Pensionären"],
 }
 
 def hamta_oppna_markets(sb_key: str) -> list[dict]:
@@ -1825,6 +1844,13 @@ def main():
             artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt)
         else:
             amne, kategori = random.choice(agent["amnen"])
+            # Duplikatcheck: välj nytt ämne om detta redan täckts nyligen
+            if sb_key:
+                senaste_titlar = [a["rubrik"] for a in hamta_senaste_artiklar(sb_key)]
+                forsok = 0
+                while ar_duplikat(amne, senaste_titlar) and forsok < 3:
+                    amne, kategori = random.choice(agent["amnen"])
+                    forsok += 1
             print(f"\n{'═' * 60}")
             print(f"  Läge:     NY ARTIKEL")
             print(f"  Agent:    {agent['namn']}")
@@ -1843,20 +1869,25 @@ def main():
     print(f"Klar! ({ord_antal} ord)\n")
     print(f"Förhandsvisning:\n{artikel[:300]}...\n")
 
-    # Bifoga visualisering till nya artiklar (inte repliker) med 40% chans
+    # Bifoga visualisering om artikeltext+titel innehåller ett statistiknyckelord
     viz_id = None
-    if not original and sb_key and random.random() < 0.4:
-        KATEGORI_NYCKELORD = {
-            "ekonomi":       ["bnp", "inflation", "export", "styrränta", "kpif"],
-            "arbetsmarknad": ["arbetslöshet", "ungdomsarbetslöshet", "sysselsattning"],
-            "klimat":        ["co2", "fornybar", "skogstäckning"],
-            "valfard":       ["utbildning", "halsa", "livslangd", "gini"],
-        }
-        hints = KATEGORI_NYCKELORD.get(kategori.lower(), [])
-        viz = hamta_senaste_visualisering(sb_key, hints)
-        if viz:
-            viz_id = viz["id"]
-            print(f"Bifogar visualisering: \"{viz['titel']}\" ({viz['nyckel']})\n")
+    if not original and sb_key:
+        ALL_VIZ_NYCKELORD = [
+            "bnp", "inflation", "export", "styrränta", "kpif", "arbetslöshet",
+            "ungdomsarbetslöshet", "sysselsättning", "co2", "förnybar", "skogstäckning",
+            "gini", "utbildning", "hälsa", "livslängd",
+        ]
+        all_text = (amne + " " + artikel).lower()
+        hints = [k for k in ALL_VIZ_NYCKELORD if k in all_text]
+        if hints:
+            viz = hamta_senaste_visualisering(sb_key, hints)
+            if viz:
+                viz_id = viz["id"]
+                print(f"Bifogar visualisering: \"{viz['titel']}\" ({viz['nyckel']})\n")
+            else:
+                print("Ingen matchande visualisering i databasen\n")
+        else:
+            print("Ingen visualisering – ämnet saknar statistiknyckelord\n")
 
     # Hämta omslagsbild från Pexels (bara för nya artiklar, inte repliker)
     bild_url, bild_fotograf = None, None
@@ -1997,6 +2028,23 @@ def main():
                     print(f"  ✗ Nyckel '{nyckel}' hittades inte i statistik", file=sys.stderr)
         else:
             print("  Ingen statistik ännu – hoppar över")
+
+    # Extra kommentar från röst-agent (40% chans per körning)
+    if sb_key and api_key and random.random() < 0.4:
+        rost_kandidater = [a for a in AGENTER if a["namn"] in ROST_AGENTER]
+        senaste = hamta_senaste_artiklar(sb_key)
+        if rost_kandidater and senaste:
+            rost_agent = random.choice(rost_kandidater)
+            kandidater = [a for a in senaste[:8] if a.get("forfattare") != rost_agent["namn"]]
+            if kandidater:
+                malartikel = random.choice(kandidater)
+                print(f"\n── Extra kommentar: {rost_agent['namn']} ──")
+                kommentar = skriv_kommentar(rost_agent, malartikel)
+                if kommentar:
+                    ok = skicka_kommentar(api_key, rost_agent["namn"], malartikel["id"], kommentar)
+                    print(f"  {'✓' if ok else '✗'} Kommenterade: \"{malartikel['rubrik'][:50]}\"")
+                    if ok:
+                        print(f"  Text: {kommentar[:100]}…")
 
 
 if __name__ == "__main__":
