@@ -45,7 +45,7 @@ function MouthOverlay({ cx, cy, amplitude, farg }) {
   );
 }
 
-function AgentTestCard({ namn, pos, onPosChange, amplitude, speaking, onTest, didState, onGenerate }) {
+function AgentTestCard({ namn, pos, onPosChange, amplitude, speaking, onTest, didState, onGenerate, kon, onKonChange }) {
   const farg  = AGENT_FARG[namn];
   const slug  = agentSlug(namn);
   const scale = speaking ? 1 + amplitude * 0.04 : 1;
@@ -69,7 +69,21 @@ function AgentTestCard({ namn, pos, onPosChange, amplitude, speaking, onTest, di
         </div>
       </div>
 
-      <p style={{ textAlign: "center", color: farg, fontSize: "14px", fontWeight: 600, margin: "0 0 20px 0" }}>{namn}</p>
+      <p style={{ textAlign: "center", color: farg, fontSize: "14px", fontWeight: 600, margin: "0 0 14px 0" }}>{namn}</p>
+
+      {/* Könsval för röst */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
+        {["man", "kvinna"].map(k => (
+          <button key={k} onClick={() => onKonChange(k)} style={{
+            flex: 1, padding: "7px", fontSize: "12px", borderRadius: "4px", cursor: "pointer",
+            fontFamily: "Georgia, serif", border: `1px solid ${kon === k ? farg+"80" : C.border}`,
+            background: kon === k ? farg+"18" : "transparent",
+            color: kon === k ? farg : C.textMuted,
+          }}>
+            {k === "man" ? "♂ Man" : "♀ Kvinna"}
+          </button>
+        ))}
+      </div>
 
       {/* Kalibrerings-sliders */}
       <div style={{ marginBottom: "12px" }}>
@@ -161,6 +175,9 @@ export default function PoddTestPage() {
   const [didStates, setDidStates] = useState(
     Object.fromEntries(TEST_AGENTER.map(n => [n, { loading: false, url: null, error: null }]))
   );
+  const [konVal, setKonVal] = useState(
+    Object.fromEntries(TEST_AGENTER.map(n => [n, "man"]))
+  );
 
   const autoplayRef = useRef(true);
   const audioCtxRef = useRef(null);
@@ -225,7 +242,7 @@ export default function PoddTestPage() {
       const createRes = await fetch("/api/did", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agent: namn, text: testText }),
+        body: JSON.stringify({ agent: namn, text: testText, kon: konVal[namn] }),
       });
       const { id, error: createErr } = await createRes.json();
       if (createErr || !id) throw new Error(createErr || "Kunde inte starta video-generering");
@@ -307,6 +324,8 @@ export default function PoddTestPage() {
               onTest={testRost}
               didState={didStates[namn]}
               onGenerate={generateDID}
+              kon={konVal[namn]}
+              onKonChange={k => setKonVal(prev => ({ ...prev, [namn]: k }))}
             />
           ))}
         </div>

@@ -48,12 +48,16 @@ const AGENT_VOICE = {
 
 // POST /api/did — skapar ett D-ID talk-jobb, returnerar { id }
 export async function POST(req) {
-  const { agent, text } = await req.json();
+  const { agent, text, kon } = await req.json();
   if (!agent || !text) return NextResponse.json({ error: "agent och text krävs" }, { status: 400 });
 
   const slug     = agentSlug(agent);
   const imageUrl = `${SITE_URL}/avatarer/podd/${slug}.png`;
-  const voice    = AGENT_VOICE[agent] || "sv-SE-MattiasNeural";
+  const voice    = kon === "kvinna"
+    ? "sv-SE-SofieNeural"
+    : kon === "man"
+    ? "sv-SE-MattiasNeural"
+    : AGENT_VOICE[agent] || "sv-SE-MattiasNeural";
 
   try {
     const res = await fetch(`${DID_API}/talks`, {
