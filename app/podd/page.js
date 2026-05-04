@@ -141,18 +141,20 @@ async function sparaDebatt({ amne, agenter, inlagg, summering }) {
 }
 
 // Agent avatar card component
-function AgentCard({ namn, speaking, done }) {
+function AgentCard({ namn, speaking, done, amplitude = 0 }) {
   const farg = AGENT_FARG[namn] || C.accent;
   const src = avatarSrc(namn);
+  const scale = speaking ? 1 + amplitude * 0.05 : 1;
+  const glow = speaking ? 12 + amplitude * 28 : 0;
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
       <div style={{
         position: "relative", width: "120px", height: "120px", flexShrink: 0,
         borderRadius: "50%", overflow: "hidden",
         border: `3px solid ${speaking ? farg : done ? farg + "40" : "#1a1a1a"}`,
-        boxShadow: speaking ? `0 0 24px ${farg}60, 0 0 48px ${farg}20` : "none",
-        transition: "border-color 0.3s ease, box-shadow 0.3s ease",
-        animation: speaking ? "speakPulse 1.5s ease-in-out infinite" : "none",
+        boxShadow: speaking ? `0 0 ${glow}px ${farg}70, 0 0 ${glow * 2}px ${farg}25` : "none",
+        transform: `scale(${scale})`,
+        transition: "transform 0.06s ease-out, border-color 0.3s ease",
       }}>
         <img src={src} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover" }}
           onError={e => { e.target.style.display = "none"; }} />
@@ -162,7 +164,7 @@ function AgentCard({ namn, speaking, done }) {
           </div>
         )}
       </div>
-      <span style={{ fontSize: "13px", color: speaking ? farg : done ? C.textMuted : C.textMuted, textAlign: "center", fontWeight: speaking ? 600 : 400, transition: "color 0.3s ease", lineHeight: 1.3 }}>
+      <span style={{ fontSize: "13px", color: speaking ? farg : C.textMuted, textAlign: "center", fontWeight: speaking ? 600 : 400, transition: "color 0.3s ease", lineHeight: 1.3 }}>
         {namn}
       </span>
     </div>
@@ -181,6 +183,7 @@ export default function PoddPage() {
   const [tänkande, setTänkande] = useState("");
   const [summering, setSummering] = useState("");
   const [speakerAgent, setSpeakerAgent] = useState(null);
+  const [amplitude, setAmplitude] = useState(0);
   const [rateLimitInfo, setRateLimitInfo] = useState({ remaining: RL_LIMIT, resetAt: null });
   const [fel, setFel] = useState("");
   const [debattId, setDebattId] = useState(null);
@@ -189,6 +192,7 @@ export default function PoddPage() {
   const audioRef = useRef(null);
   const autoplayRef = useRef(true);
   const transcriptRef = useRef(null);
+  const amplitudeRef = useRef(0);
 
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
@@ -215,12 +219,46 @@ export default function PoddPage() {
       await new Promise((resolve) => {
         const audio = new Audio(`/api/tts?text=${encodeURIComponent(chunk)}`);
         audioRef.current = audio;
-        audio.onended = resolve;
-        audio.onerror = resolve;
-        audio.play().catch(resolve);
+        let animFrame = null;
+        let ctx = null;
+
+        function cleanup() {
+          if (animFrame) cancelAnimationFrame(animFrame);
+          amplitudeRef.current = 0;
+          setAmplitude(0);
+          ctx?.close().catch(() => {});
+        }
+
+        audio.addEventListener("canplay", () => {
+          try {
+            ctx = new AudioContext();
+            ctx.resume().catch(() => {});
+            const source = ctx.createMediaElementSource(audio);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.6;
+            source.connect(analyser);
+            analyser.connect(ctx.destination);
+            const data = new Uint8Array(analyser.frequencyBinCount);
+            function tick() {
+              analyser.getByteFrequencyData(data);
+              // Average of low-mid frequencies (speech range)
+              const avg = data.slice(2, 20).reduce((a, b) => a + b, 0) / 18;
+              const amp = Math.min(1, avg / 90);
+              amplitudeRef.current = amp;
+              setAmplitude(amp);
+              animFrame = requestAnimationFrame(tick);
+            }
+            tick();
+          } catch { /* AudioContext unavailable — animate without */ }
+        }, { once: true });
+
+        audio.onended = () => { cleanup(); resolve(); };
+        audio.onerror = () => { cleanup(); resolve(); };
+        audio.play().catch(() => { cleanup(); resolve(); });
       });
     }
-    if (autoplayRef.current) setSpeakerAgent(null);
+    if (autoplayRef.current) { setSpeakerAgent(null); setAmplitude(0); }
   }
 
   async function avsluta(h, valtAmne, valdaAgenter) {
@@ -322,10 +360,6 @@ export default function PoddPage() {
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "Georgia, serif" }}>
       <style>{`
-        @keyframes speakPulse {
-          0%, 100% { box-shadow: 0 0 16px var(--farg, #c8b89a)40, 0 0 32px var(--farg, #c8b89a)10; }
-          50% { box-shadow: 0 0 32px var(--farg, #c8b89a)80, 0 0 64px var(--farg, #c8b89a)30; }
-        }
         @keyframes dot { 0%,80%,100% { opacity:0.2; } 40% { opacity:1; } }
       `}</style>
 
@@ -371,7 +405,7 @@ export default function PoddPage() {
             {/* Preview avatars */}
             <div style={{ display: "flex", gap: "20px", justifyContent: "center", marginBottom: "28px" }}>
               {valdaAgenter.map(a => (
-                <AgentCard key={a} namn={a} speaking={false} done={false} />
+                <AgentCard key={a} namn={a} speaking={false} done={false} amplitude={0} />
               ))}
             </div>
 
@@ -411,7 +445,7 @@ export default function PoddPage() {
             {/* Agent avatars — live stage */}
             <div style={{ display: "flex", gap: "16px", justifyContent: "center", marginBottom: "28px", padding: "28px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px" }}>
               {agenter.map(a => (
-                <AgentCard key={a} namn={a} speaking={speakerAgent === a} done={false} />
+                <AgentCard key={a} namn={a} speaking={speakerAgent === a} done={false} amplitude={speakerAgent === a ? amplitude : 0} />
               ))}
             </div>
 
@@ -467,7 +501,7 @@ export default function PoddPage() {
             {/* Done stage — avatars */}
             <div style={{ display: "flex", gap: "16px", justifyContent: "center", marginBottom: "20px", padding: "24px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px" }}>
               {agenter.map(a => (
-                <AgentCard key={a} namn={a} speaking={false} done={true} />
+                <AgentCard key={a} namn={a} speaking={false} done={true} amplitude={0} />
               ))}
             </div>
 
