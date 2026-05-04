@@ -2188,6 +2188,7 @@ def main():
     svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id), nyhetskalla=nyhetskalla if not original else replik_kalla, parent_id=original["id"] if original else None, bild_url=bild_url, bild_fotograf=bild_fotograf)
 
     # Spara nyhetslogg om agenten använde en nyhet
+    artikel_id_num = None
     if nyhet and sb_key:
         try:
             artikel_id_num = int(svar.get("artikel_url", "").split("/")[-1])
