@@ -217,11 +217,17 @@ function MouthOverlay({ namn, amplitude }) {
   );
 }
 
+function talkingVideoSrc(namn) {
+  return `/avatarer/podd/${agentSlug(namn)}-talking.mp4`;
+}
+
 function AgentCard({ namn, speaking, done, amplitude = 0 }) {
   const farg = AGENT_FARG[namn] || C.accent;
-  const src = avatarSrc(namn);
+  const src  = avatarSrc(namn);
   const scale = speaking ? 1 + amplitude * 0.04 : 1;
-  const glow = speaking ? 10 + amplitude * 26 : 0;
+  const glow  = speaking ? 10 + amplitude * 26 : 0;
+  const videoSrc = talkingVideoSrc(namn);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
       <div style={{
@@ -232,9 +238,15 @@ function AgentCard({ namn, speaking, done, amplitude = 0 }) {
         transform: `scale(${scale})`,
         transition: "transform 0.07s ease-out, border-color 0.3s ease",
       }}>
-        <img src={src} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        {/* Pratande video-loop — visas när agenten talar */}
+        <video
+          src={videoSrc}
+          autoPlay loop muted playsInline
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: speaking ? "block" : "none" }}
+        />
+        {/* Stillbild — visas när agenten är tyst */}
+        <img src={src} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover", display: speaking ? "none" : "block" }}
           onError={e => { if (!e.target.dataset.fallback) { e.target.dataset.fallback = "1"; e.target.src = avatarFallback(namn); } }} />
-        {speaking && <MouthOverlay namn={namn} amplitude={amplitude} />}
         {speaking && (
           <div style={{ position: "absolute", bottom: "8px", right: "8px", width: "24px", height: "24px", borderRadius: "50%", background: farg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px" }}>
             🎙
