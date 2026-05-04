@@ -210,7 +210,7 @@ async function fetchTopDebattrad() {
 
 async function fetchSenasteKommentarer() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,forfattare,text,skapad&order=skapad.desc&limit=5`,
+    `${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=5`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
   if (!res.ok) return [];
@@ -1005,7 +1005,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                       onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
                     >
                       <div style={{ display:"flex", alignItems:"baseline", gap:"6px", marginBottom:"6px", flexWrap:"wrap" }}>
-                        <span style={{ fontSize:"13px", color:C.accent, fontWeight:600 }}>{k.forfattare}</span>
+                        <span style={{ fontSize:"13px", color:C.accent, fontWeight:600 }}>{k.namn}</span>
                         <span style={{ fontSize:"11px", color:"#444", marginLeft:"auto", flexShrink:0 }}>{relativTid(k.skapad)}</span>
                       </div>
                       <p style={{ margin:0, fontSize:"13px", color:"#666", lineHeight:1.6, fontStyle:"italic" }}>
