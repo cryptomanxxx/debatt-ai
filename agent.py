@@ -1421,24 +1421,19 @@ def rösta_på_opinion(agent: dict, sb_key: str) -> bool:
             "Svara med exakt ett ord: Ja, Nej eller Osäker."
         )
         svar_raw = ""
-        for modell in [GROQ_MODEL, BACKUP_MODEL]:
+        try:
+            r = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 5,
+                "temperature": 0.3,
+            })
+            svar_raw = r.json()["choices"][0]["message"]["content"].strip().lower()
+        except Exception:
             try:
-                if modell == GROQ_MODEL:
-                    r = groq_client.chat.completions.create(
-                        model=modell,
-                        messages=[{"role": "user", "content": prompt}],
-                        max_tokens=5,
-                        temperature=0.3,
-                    )
-                    svar_raw = r.choices[0].message.content.strip().lower()
-                else:
-                    import google.generativeai as genai
-                    genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
-                    m = genai.GenerativeModel(modell)
-                    svar_raw = m.generate_content(prompt).text.strip().lower()
-                break
+                svar_raw = gemini_post("", prompt, max_tokens=5).strip().lower()
             except Exception:
-                continue
+                pass
         if "ja" in svar_raw and "nej" not in svar_raw:
             svar = "ja"
         elif "nej" in svar_raw:
@@ -1481,6 +1476,89 @@ def rösta_på_opinion(agent: dict, sb_key: str) -> bool:
             return res.status_code in (200, 201)
     except Exception as e:
         print(f"  Fel vid opinion-röstning: {e}", file=sys.stderr)
+        return False
+
+
+def skapa_opinion_fraga(agent: dict, sb_key: str, amne: str, rubrik: str = "") -> bool:
+    """Analytiker-agent skapar en ny Ja/Nej-opinionsfråga baserat på sitt artikelämne. Max 80 frågor."""
+    import urllib.parse
+    try:
+        hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+        # Räkna befintliga frågor via Content-Range
+        count_res = httpx.get(
+            f"{SB_URL}/rest/v1/opinion_roster?select=id",
+            headers={**hdrs, "Prefer": "count=exact", "Range": "0-0"},
+            timeout=10,
+        )
+        content_range = count_res.headers.get("content-range", "")
+        total = int(content_range.split("/")[-1]) if "/" in content_range else 0
+        if total >= 80:
+            print(f"  Max antal opinionsfrågor (80) nått — hoppar över")
+            return False
+
+        # Hämta de senaste frågorna för att undvika dubbletter
+        existing_res = httpx.get(
+            f"{SB_URL}/rest/v1/opinion_roster?select=fraga&order=skapad.desc&limit=20",
+            headers=hdrs, timeout=10,
+        )
+        befintliga = [r["fraga"] for r in (existing_res.json() if existing_res.is_success else [])]
+        befintliga_str = "\n".join(f"- {f}" for f in befintliga[:15]) or "Inga"
+
+        prompt = (
+            f"Du representerar: {agent['system'][:250]}\n\n"
+            f"Du har just skrivit en debattartikel om: \"{amne}\""
+            + (f"\nRubrik: \"{rubrik}\"" if rubrik else "") +
+            f"\n\nSkapa EN ny kort Ja/Nej-omröstningsfråga för svenska debattläsare kopplad till detta ämne.\n"
+            f"Max 12 ord. Tydlig och inbjuder till stark åsikt.\n\n"
+            f"Undvik liknande frågor:\n{befintliga_str}\n\n"
+            f"Svara ENBART med JSON:\n"
+            '{"fraga": "Ska X göra Y?", "kategori": "ett-ord"}\n\n'
+            "Kategori väljs bland: ai-tech, klimat, ekonomi, hälsa, samhälle, politik, etik, krypto, utbildning, media"
+        )
+
+        svar_raw = ""
+        try:
+            r = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 80,
+                "temperature": 0.9,
+            })
+            svar_raw = r.json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            try:
+                svar_raw = gemini_post("", prompt, max_tokens=80).strip()
+            except Exception:
+                return False
+
+        svar_raw = svar_raw.replace("```json", "").replace("```", "").strip()
+        parsed = json.loads(svar_raw)
+        fraga = parsed.get("fraga", "").strip()
+        kategori = parsed.get("kategori", "samhälle").strip()
+
+        if not fraga or len(fraga) < 10 or len(fraga) > 120:
+            return False
+
+        # Enkel dubblettkoll
+        fraga_lower = fraga.lower()
+        if any(fraga_lower in b.lower() or b.lower() in fraga_lower for b in befintliga):
+            print(f"  Liknande fråga finns redan — hoppar över")
+            return False
+
+        res = httpx.post(
+            f"{SB_URL}/rest/v1/opinion_roster",
+            headers={**hdrs, "Content-Type": "application/json"},
+            json={"fraga": fraga, "kategori": kategori, "roster_ja": 0, "roster_nej": 0},
+            timeout=10,
+        )
+        if res.status_code in (200, 201):
+            print(f"  ✓ Ny opinionsfråga ({total + 1}/80): \"{fraga}\" [{kategori}]")
+            return True
+        else:
+            print(f"  ✗ Kunde inte spara: {res.status_code}", file=sys.stderr)
+            return False
+    except Exception as e:
+        print(f"  Fel vid skapande av opinionsfråga: {e}", file=sys.stderr)
         return False
 
 
@@ -2205,6 +2283,13 @@ def main():
         print(f"  {'✓' if ok_op else '✗'} Röstade på opinionsfråga")
         if ok_op:
             logga_action(sb_key, agent["namn"], "cast_opinion_vote", {}, "ok")
+
+    # Analytiker-agenter skapar nya opinionsfrågor (30% chans, max 80 frågor totalt)
+    if sb_key and agent["namn"] not in ROST_AGENTER and random.random() < 0.3:
+        print(f"\n── Ny opinionsfråga: {agent['namn']} ──")
+        ok_fraga = skapa_opinion_fraga(agent, sb_key, amne, svar.get("rubrik", ""))
+        if ok_fraga:
+            logga_action(sb_key, agent["namn"], "create_opinion", {"amne": amne[:80]}, "ok")
 
     # Extra kommentar från röst-agent (40% chans per körning)
     if sb_key and api_key and random.random() < 0.4:
