@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const MIN_SCORE = 6;
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
@@ -85,6 +85,14 @@ function Badge({ type }) {
   );
 }
 
+const RÖST_STEG = [
+  { id: "tes",   fråga: "Vad är din huvudtes — vad vill du säga?",              fält: null },
+  { id: "arg1",  fråga: "Ge ditt starkaste argument för det.",                  fält: null },
+  { id: "arg2",  fråga: "Ge ytterligare ett argument eller ett konkret exempel.", fält: null },
+  { id: "mot",   fråga: "Vad brukar motståndare invända — och hur svarar du?",   fält: null },
+  { id: "avslut",fråga: "Avsluta med din uppmaning: vad vill du att folk gör eller tänker?", fält: null },
+];
+
 export default function SkickaInClient() {
   const [view, setView] = useState("form");
   const [title, setTitle] = useState("");
@@ -97,6 +105,13 @@ export default function SkickaInClient() {
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [inlamningId, setInlamningId] = useState(null);
+  const [röstView, setRöstView] = useState(false);
+  const [röstSteg, setRöstSteg] = useState(0);
+  const [röstLyssnar, setRöstLyssnar] = useState(false);
+  const [röstSvar, setRöstSvar] = useState([]);
+  const [röstFel, setRöstFel] = useState("");
+  const [röstStöds, setRöstStöds] = useState(true);
+  const recognitionRef = useRef(null);
 
   useEffect(() => {
     window.onTurnstileVerified = (token) => setTurnstileToken(token);
@@ -112,6 +127,59 @@ export default function SkickaInClient() {
     const iv = setInterval(() => setDots(d => (d + 1) % 4), 400);
     return () => clearInterval(iv);
   }, [analyzing]);
+
+  useEffect(() => {
+    setRöstStöds(!!(window.SpeechRecognition || window.webkitSpeechRecognition));
+  }, []);
+
+  function startaLyssning() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setRöstFel("Din webbläsare stöder inte röstinmatning. Prova Chrome."); return; }
+    setRöstFel("");
+    const rec = new SR();
+    rec.lang = "sv-SE";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    recognitionRef.current = rec;
+    setRöstLyssnar(true);
+    rec.onresult = (e) => {
+      const transkript = e.results[0][0].transcript;
+      setRöstLyssnar(false);
+      const nyaSvar = [...röstSvar, transkript];
+      setRöstSvar(nyaSvar);
+      if (röstSteg < RÖST_STEG.length - 1) {
+        setRöstSteg(s => s + 1);
+      } else {
+        // Alla svar klara — sätt ihop texten
+        const ihopsatt = [
+          "Min tes: " + nyaSvar[0],
+          "\nArgument 1: " + nyaSvar[1],
+          "\nArgument 2 / Exempel: " + nyaSvar[2],
+          "\nMotargument och svar: " + nyaSvar[3],
+          "\nAvslutning: " + nyaSvar[4],
+        ].join("\n");
+        setText(ihopsatt);
+        setRöstView(false);
+        setRöstSteg(0);
+        setRöstSvar([]);
+      }
+    };
+    rec.onerror = (e) => {
+      setRöstLyssnar(false);
+      setRöstFel(e.error === "no-speech" ? "Ingen röst uppfångades. Försök igen." : `Fel: ${e.error}`);
+    };
+    rec.onend = () => setRöstLyssnar(false);
+    rec.start();
+  }
+
+  function avbrytRöst() {
+    recognitionRef.current?.abort();
+    setRöstLyssnar(false);
+    setRöstView(false);
+    setRöstSteg(0);
+    setRöstSvar([]);
+    setRöstFel("");
+  }
 
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   const ok = result && ["arg", "ori", "rel", "tro"].every(k => result[k] >= MIN_SCORE);
@@ -233,9 +301,20 @@ export default function SkickaInClient() {
               <div>
                 <Lbl>Artikeltext</Lbl>
                 <textarea value={text} onChange={e => setText(e.target.value)} rows={16} style={{ ...inp, resize: "vertical", lineHeight: 1.8 }} />
-                <p style={{ fontSize: "12px", color: wordCount < 300 ? C.red : C.green, margin: "6px 0 0 0", fontFamily: "monospace" }}>
-                  {wordCount} ord {wordCount < 300 ? "– minst 300 ord krävs" : "✓"}
-                </p>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginTop: "6px" }}>
+                  <p style={{ fontSize: "12px", color: wordCount < 300 ? C.red : C.green, margin: 0, fontFamily: "monospace" }}>
+                    {wordCount} ord {wordCount < 300 ? "– minst 300 ord krävs" : "✓"}
+                  </p>
+                  {röstStöds && (
+                    <button
+                      type="button"
+                      onClick={() => { setRöstView(true); setRöstSteg(0); setRöstSvar([]); setRöstFel(""); }}
+                      style={{ display: "inline-flex", alignItems: "center", gap: "7px", background: "none", border: `1px solid ${C.accent}30`, color: C.accent, borderRadius: "4px", padding: "7px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}
+                    >
+                      🎙 Prata in din artikel
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="cf-turnstile" data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} data-callback="onTurnstileVerified" data-theme="dark" />
               <button onClick={analyze} disabled={analyzing || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || !turnstileToken || wordCount < 300) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
@@ -310,6 +389,53 @@ export default function SkickaInClient() {
           </div>
         )}
       </main>
+
+      {röstView && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+          <div style={{ background: "#111", border: `1px solid ${C.border}`, borderRadius: "12px", padding: "32px", maxWidth: "520px", width: "100%" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: 0 }}>
+                Röstinmatning · Steg {röstSteg + 1} av {RÖST_STEG.length}
+              </p>
+              <button onClick={avbrytRöst} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "18px", padding: "0 4px", lineHeight: 1 }}>✕</button>
+            </div>
+            <div style={{ height: "3px", background: "#222", borderRadius: "2px", marginBottom: "28px" }}>
+              <div style={{ height: "100%", width: `${((röstSteg + 1) / RÖST_STEG.length) * 100}%`, background: C.accent, borderRadius: "2px", transition: "width 0.3s ease" }} />
+            </div>
+            <p style={{ fontSize: "20px", color: C.text, lineHeight: 1.5, margin: "0 0 24px 0", fontWeight: 400 }}>
+              {RÖST_STEG[röstSteg].fråga}
+            </p>
+            {röstSvar.length > 0 && (
+              <div style={{ marginBottom: "20px", borderLeft: `2px solid ${C.border}`, paddingLeft: "14px" }}>
+                {röstSvar.map((s, i) => (
+                  <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "8px" }}>
+                    <span style={{ color: C.accent, fontSize: "12px", fontFamily: "monospace", minWidth: "16px", opacity: 0.6 }}>{i + 1}.</span>
+                    <span style={{ color: C.textMuted, fontSize: "14px", lineHeight: 1.5, fontStyle: "italic" }}>{s}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {röstFel && <p style={{ color: C.red, fontSize: "14px", margin: "0 0 16px 0" }}>{röstFel}</p>}
+            {röstLyssnar ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", padding: "16px 20px", background: "#0d0d0d", border: `1px solid ${C.accent}40`, borderRadius: "8px" }}>
+                <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: C.accent, animation: "neonPulse 1s ease-in-out infinite", flexShrink: 0 }} />
+                <span style={{ color: C.accent, fontSize: "15px" }}>Lyssnar… prata nu</span>
+              </div>
+            ) : (
+              <button
+                onClick={startaLyssning}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", background: `${C.accent}18`, border: `1px solid ${C.accent}50`, color: C.accent, borderRadius: "8px", padding: "16px 24px", fontSize: "16px", cursor: "pointer", fontFamily: "Georgia, serif", width: "100%" }}
+              >
+                <span style={{ fontSize: "22px" }}>🎙</span>
+                <span>{röstSvar.length === 0 ? "Börja prata" : "Svara på nästa fråga"}</span>
+              </button>
+            )}
+            <button onClick={avbrytRöst} style={{ display: "block", width: "100%", marginTop: "12px", background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "13px", padding: "8px", fontFamily: "Georgia, serif" }}>
+              Avbryt
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
