@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -9,13 +9,10 @@ const C = {
   text: "#e8e0d0", textMuted: "#555", accent: "#c8b89a",
 };
 
-// Avatar filename mapping
 function avatarSrc(namn) {
-  const slug = namn
-    .toLowerCase()
+  const slug = namn.toLowerCase()
     .replace(/ä/g, "a").replace(/å/g, "a").replace(/ö/g, "o")
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
+    .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
   return `/avatarer/${slug}.png`;
 }
 
@@ -28,6 +25,65 @@ const AGENT_FARG = {
   "Den trötta":"#7dd3fc","Den stressade":"#fca5a5","Den lugna":"#a7f3d0",
   "Pensionären":"#d8b4fe","Tonåringen":"#fdba74","Den nostalgiske":"#fde68a",
   "Hypokondrikern":"#6ee7b7","Optimisten":"#fcd34d","Den rike":"#c4b5fd",
+};
+
+// Röstprofil per agent — pitch (0.5-2.0) och rate (0.5-1.5)
+// pitch: lågt = djup röst, högt = ljus röst
+// rate:  lågt = långsam, högt = snabb
+const AGENT_ROST = {
+  "Nationalekonom":       { pitch: 0.85, rate: 0.88 }, // lugn, analytisk
+  "Miljöaktivist":        { pitch: 1.10, rate: 1.06 }, // engagerad, lätt upprörd
+  "Teknikoptimist":       { pitch: 1.00, rate: 1.12 }, // energisk, snabb
+  "Konservativ debattör": { pitch: 0.78, rate: 0.86 }, // tung, auktoritär
+  "Jurist":               { pitch: 0.88, rate: 0.84 }, // precis, avmätt
+  "Journalist":           { pitch: 1.00, rate: 1.04 }, // tydlig, professionell
+  "Filosof":              { pitch: 0.92, rate: 0.76 }, // eftertänksam, långsam
+  "Läkare":               { pitch: 0.90, rate: 0.88 }, // klinisk, lugn
+  "Psykolog":             { pitch: 1.06, rate: 0.86 }, // varm, omtänksam
+  "Historiker":           { pitch: 0.82, rate: 0.84 }, // lärdomsrik, sävlig
+  "Sociolog":             { pitch: 0.98, rate: 0.92 }, // analytisk
+  "Kryptoanalytiker":     { pitch: 1.02, rate: 1.14 }, // entusiastisk, snabb
+  "Den hungriga":         { pitch: 0.96, rate: 1.00 }, // rak, jordnära
+  "Mamman":               { pitch: 1.18, rate: 0.98 }, // varm, hög röst
+  "Den sura":             { pitch: 0.78, rate: 0.94 }, // grym, låg
+  "Den trötta":           { pitch: 0.68, rate: 0.73 }, // utmattad, mycket långsam
+  "Den stressade":        { pitch: 1.12, rate: 1.24 }, // stressad, mycket snabb
+  "Den lugna":            { pitch: 0.88, rate: 0.80 }, // fridfullt långsam
+  "Pensionären":          { pitch: 0.72, rate: 0.82 }, // ålderstigen, sävlig
+  "Tonåringen":           { pitch: 1.24, rate: 1.18 }, // ung, pigg
+  "Den nostalgiske":      { pitch: 0.84, rate: 0.86 }, // vemodigt långsam
+  "Hypokondrikern":       { pitch: 1.06, rate: 0.98 }, // orolig, lite kvävd
+  "Optimisten":           { pitch: 1.12, rate: 1.06 }, // glad, uppåt
+  "Den rike":             { pitch: 0.88, rate: 0.88 }, // lugn, säker
+};
+
+// Munposition per agent (cx/cy i procent av 100×100 viewBox)
+// Anpassad per avatarbild — kan finjusteras visuellt
+const MOUTH_POS = {
+  "Nationalekonom":       { cx: 50, cy: 70 },
+  "Miljöaktivist":        { cx: 50, cy: 67 },
+  "Teknikoptimist":       { cx: 50, cy: 70 },
+  "Konservativ debattör": { cx: 50, cy: 71 },
+  "Jurist":               { cx: 50, cy: 69 },
+  "Journalist":           { cx: 50, cy: 68 },
+  "Filosof":              { cx: 50, cy: 71 },
+  "Läkare":               { cx: 50, cy: 69 },
+  "Psykolog":             { cx: 50, cy: 68 },
+  "Historiker":           { cx: 50, cy: 72 },
+  "Sociolog":             { cx: 50, cy: 70 },
+  "Kryptoanalytiker":     { cx: 50, cy: 69 },
+  "Den hungriga":         { cx: 50, cy: 70 },
+  "Mamman":               { cx: 50, cy: 68 },
+  "Den sura":             { cx: 50, cy: 71 },
+  "Den trötta":           { cx: 50, cy: 72 },
+  "Den stressade":        { cx: 50, cy: 68 },
+  "Den lugna":            { cx: 50, cy: 69 },
+  "Pensionären":          { cx: 50, cy: 73 },
+  "Tonåringen":           { cx: 50, cy: 67 },
+  "Den nostalgiske":      { cx: 50, cy: 71 },
+  "Hypokondrikern":       { cx: 50, cy: 69 },
+  "Optimisten":           { cx: 50, cy: 68 },
+  "Den rike":             { cx: 50, cy: 70 },
 };
 
 const PANELER = [
@@ -43,7 +99,6 @@ const PANELER = [
 ];
 
 const ALLA_AGENTER = Object.keys(AGENT_FARG);
-
 const AMNEN = [
   "Ska AI få fatta juridiska beslut?", "Bör AI ha rättigheter i framtiden?",
   "Ska skolor förbjuda AI-verktyg?", "Ska vi beskatta rika mycket mer?",
@@ -89,10 +144,7 @@ async function streamSvar({ amne, historik, agent, onToken, signal }) {
     body: JSON.stringify({ amne, historik, agent }),
     signal,
   });
-  if (!res.ok) {
-    const status = res.status;
-    throw Object.assign(new Error(`HTTP ${status}`), { status });
-  }
+  if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let text = "", buffer = "";
@@ -140,12 +192,35 @@ async function sparaDebatt({ amne, agenter, inlagg, summering }) {
   } catch { return null; }
 }
 
-// Agent avatar card component
+// SVG-mun som öppnas/stängs med amplituden
+function MouthOverlay({ namn, amplitude }) {
+  const pos = MOUTH_POS[namn] || { cx: 50, cy: 70 };
+  const farg = AGENT_FARG[namn] || C.accent;
+  const ry = 1.2 + amplitude * 7;  // 1.2 (stängd) → 8.2 (vidöppen)
+  const rx = 9;
+  return (
+    <svg viewBox="0 0 100 100" style={{ position: "absolute", left: 0, top: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+      {/* Mungipa-skugga */}
+      <ellipse cx={pos.cx - rx * 0.85} cy={pos.cy} rx={1.4} ry={ry * 0.5 + 0.5} fill="#00000066" />
+      <ellipse cx={pos.cx + rx * 0.85} cy={pos.cy} rx={1.4} ry={ry * 0.5 + 0.5} fill="#00000066" />
+      {/* Mun — mörkt inre */}
+      <ellipse cx={pos.cx} cy={pos.cy} rx={rx} ry={ry} fill="#0d0305" />
+      {/* Tunga — syns vid >40% amplitud */}
+      {amplitude > 0.4 && (
+        <ellipse cx={pos.cx} cy={pos.cy + ry * 0.5} rx={rx * 0.55} ry={ry * 0.38} fill="#c0404080" />
+      )}
+      {/* Överlapp — läppfärg */}
+      <ellipse cx={pos.cx} cy={pos.cy - ry + 1} rx={rx * 1.05} ry={1.6} fill={farg + "99"} />
+      <ellipse cx={pos.cx} cy={pos.cy + ry - 1} rx={rx * 0.95} ry={1.2} fill={farg + "66"} />
+    </svg>
+  );
+}
+
 function AgentCard({ namn, speaking, done, amplitude = 0 }) {
   const farg = AGENT_FARG[namn] || C.accent;
   const src = avatarSrc(namn);
-  const scale = speaking ? 1 + amplitude * 0.05 : 1;
-  const glow = speaking ? 12 + amplitude * 28 : 0;
+  const scale = speaking ? 1 + amplitude * 0.04 : 1;
+  const glow = speaking ? 10 + amplitude * 26 : 0;
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
       <div style={{
@@ -154,10 +229,11 @@ function AgentCard({ namn, speaking, done, amplitude = 0 }) {
         border: `3px solid ${speaking ? farg : done ? farg + "40" : "#1a1a1a"}`,
         boxShadow: speaking ? `0 0 ${glow}px ${farg}70, 0 0 ${glow * 2}px ${farg}25` : "none",
         transform: `scale(${scale})`,
-        transition: "transform 0.06s ease-out, border-color 0.3s ease",
+        transition: "transform 0.07s ease-out, border-color 0.3s ease",
       }}>
         <img src={src} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover" }}
           onError={e => { e.target.style.display = "none"; }} />
+        {speaking && <MouthOverlay namn={namn} amplitude={amplitude} />}
         {speaking && (
           <div style={{ position: "absolute", bottom: "6px", right: "6px", width: "20px", height: "20px", borderRadius: "50%", background: farg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>
             🎙
@@ -189,14 +265,24 @@ export default function PoddPage() {
   const [debattId, setDebattId] = useState(null);
   const stoppRef = useRef(false);
   const abortRef = useRef(null);
-  const audioRef = useRef(null);
   const autoplayRef = useRef(true);
   const transcriptRef = useRef(null);
-  const amplitudeRef = useRef(0);
+  const svVoiceRef = useRef(null);
 
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
-    return () => { autoplayRef.current = false; };
+    // Hämta svenska röster — getVoices() kan vara asynkront
+    function laddaRoster() {
+      const voices = speechSynthesis.getVoices();
+      const sv = voices.find(v => v.lang.startsWith("sv")) || voices[0] || null;
+      svVoiceRef.current = sv;
+    }
+    laddaRoster();
+    speechSynthesis.onvoiceschanged = laddaRoster;
+    return () => {
+      autoplayRef.current = false;
+      speechSynthesis.cancel();
+    };
   }, []);
 
   useEffect(() => {
@@ -206,56 +292,58 @@ export default function PoddPage() {
   async function spelaUppText(text, agent) {
     if (!autoplayRef.current) return;
     setSpeakerAgent(agent);
-    const sentences = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
-    const chunks = [];
-    let cur = "";
-    for (const s of sentences) {
-      if (cur.length + s.length > 150 && cur) { chunks.push(cur.trim()); cur = s; }
-      else cur += s;
-    }
-    if (cur.trim()) chunks.push(cur.trim());
-    for (const chunk of chunks) {
+    const meningar = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
+    const vp = AGENT_ROST[agent] || { pitch: 1.0, rate: 1.0 };
+
+    for (const mening of meningar) {
       if (!autoplayRef.current || stoppRef.current) break;
       await new Promise((resolve) => {
-        const audio = new Audio(`/api/tts?text=${encodeURIComponent(chunk)}`);
-        audioRef.current = audio;
-        let animFrame = null;
-        let ctx = null;
+        const utt = new SpeechSynthesisUtterance(mening.trim());
+        utt.lang = "sv-SE";
+        if (svVoiceRef.current) utt.voice = svVoiceRef.current;
+        utt.pitch = vp.pitch;
+        utt.rate = vp.rate;
+        utt.volume = 1;
 
-        function cleanup() {
-          if (animFrame) cancelAnimationFrame(animFrame);
-          amplitudeRef.current = 0;
-          setAmplitude(0);
-          ctx?.close().catch(() => {});
-        }
+        let boundaryFired = false;
+        let fallbackTimer = null;
 
-        audio.addEventListener("canplay", () => {
-          try {
-            ctx = new AudioContext();
-            ctx.resume().catch(() => {});
-            const source = ctx.createMediaElementSource(audio);
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.6;
-            source.connect(analyser);
-            analyser.connect(ctx.destination);
-            const data = new Uint8Array(analyser.frequencyBinCount);
-            function tick() {
-              analyser.getByteFrequencyData(data);
-              // Average of low-mid frequencies (speech range)
-              const avg = data.slice(2, 20).reduce((a, b) => a + b, 0) / 18;
-              const amp = Math.min(1, avg / 90);
-              amplitudeRef.current = amp;
+        // Ordgränser → realistisk munrörelse
+        utt.onboundary = (e) => {
+          if (e.name !== "word") return;
+          boundaryFired = true;
+          const amp = 0.45 + Math.random() * 0.55;
+          setAmplitude(amp);
+          setTimeout(() => setAmplitude(0.08 + Math.random() * 0.12), 110 + Math.random() * 80);
+        };
+
+        // Fallback om onboundary ej stöds (vissa Android-webbläsare)
+        fallbackTimer = setTimeout(() => {
+          if (!boundaryFired) {
+            const iv = setInterval(() => {
+              if (!autoplayRef.current) { clearInterval(iv); return; }
+              const t = Date.now();
+              const amp = Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014)));
               setAmplitude(amp);
-              animFrame = requestAnimationFrame(tick);
-            }
-            tick();
-          } catch { /* AudioContext unavailable — animate without */ }
-        }, { once: true });
+            }, 70);
+            utt._fallbackIv = iv;
+          }
+        }, 300);
 
-        audio.onended = () => { cleanup(); resolve(); };
-        audio.onerror = () => { cleanup(); resolve(); };
-        audio.play().catch(() => { cleanup(); resolve(); });
+        utt.onend = () => {
+          clearTimeout(fallbackTimer);
+          if (utt._fallbackIv) clearInterval(utt._fallbackIv);
+          setAmplitude(0);
+          resolve();
+        };
+        utt.onerror = () => {
+          clearTimeout(fallbackTimer);
+          if (utt._fallbackIv) clearInterval(utt._fallbackIv);
+          setAmplitude(0);
+          resolve();
+        };
+
+        speechSynthesis.speak(utt);
       });
     }
     if (autoplayRef.current) { setSpeakerAgent(null); setAmplitude(0); }
@@ -265,6 +353,7 @@ export default function PoddPage() {
     setStreaming(null);
     setTänkande("");
     setSpeakerAgent(null);
+    setAmplitude(0);
     if (h.length >= 3) {
       const { summering: sum } = await fetchSummering(valtAmne, h);
       setSummering(sum);
@@ -294,6 +383,7 @@ export default function PoddPage() {
     setDebattId(null);
     setFel("");
     setSpeakerAgent(null);
+    setAmplitude(0);
     autoplayRef.current = true;
     setFas("kör");
     stoppRef.current = false;
@@ -321,7 +411,6 @@ export default function PoddPage() {
         const inlagg = { agent, text: text.trim(), id: i };
         h = [...h, inlagg];
         setHistorik([...h]);
-        // Auto-play TTS för detta inlägg
         await spelaUppText(text.trim(), agent);
       } catch (e) {
         if (e.name === "AbortError") break;
@@ -330,7 +419,7 @@ export default function PoddPage() {
       } finally {
         setTänkande("");
       }
-      if (!stoppRef.current && i < 9) await new Promise(r => setTimeout(r, 200));
+      if (!stoppRef.current && i < 9) await new Promise(r => setTimeout(r, 150));
     }
     await avsluta(h, valtAmne, valdaAgenter);
   }
@@ -338,9 +427,10 @@ export default function PoddPage() {
   function stoppa() {
     stoppRef.current = true;
     autoplayRef.current = false;
-    audioRef.current?.pause();
+    speechSynthesis.cancel();
     abortRef.current?.abort();
     setSpeakerAgent(null);
+    setAmplitude(0);
   }
 
   function nyDebatt() {
@@ -359,9 +449,7 @@ export default function PoddPage() {
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "Georgia, serif" }}>
-      <style>{`
-        @keyframes dot { 0%,80%,100% { opacity:0.2; } 40% { opacity:1; } }
-      `}</style>
+      <style>{`@keyframes dot { 0%,80%,100% { opacity:0.2; } 40% { opacity:1; } }`}</style>
 
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", background: `${C.bg}f0`, backdropFilter: "blur(12px)", position: "sticky", top: 0, zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "4px", maxWidth: "900px", margin: "0 auto", flexWrap: "wrap" }}>
@@ -374,24 +462,17 @@ export default function PoddPage() {
       </header>
 
       <main style={{ maxWidth: "760px", margin: "0 auto", padding: "40px 20px" }}>
-
-        {/* Hero */}
         <div style={{ marginBottom: "36px" }}>
-          <p style={{ fontSize: "11px", color: "#888", letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 10px 0" }}>
-            🎙 AI VIDEOPODDEN
-          </p>
-          <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 10px 0", lineHeight: 1.25 }}>
-            Live-debatt med AI-agenter
-          </h1>
+          <p style={{ fontSize: "11px", color: "#888", letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 10px 0" }}>🎙 AI VIDEOPODDEN</p>
+          <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 10px 0", lineHeight: 1.25 }}>Live-debatt med AI-agenter</h1>
           <p style={{ color: C.textMuted, fontSize: "15px", lineHeight: 1.7, margin: 0 }}>
-            Välj panel och ämne — agenterna debatterar live med automatisk uppläsning.
+            Varje agent har sin egen röst och munnen rör sig när de pratar.
           </p>
         </div>
 
         {/* ── START ── */}
         {fas === "start" && (
           <div>
-            {/* Panel selection */}
             <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "12px" }}>Panel</p>
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "24px" }}>
               {PANELER.map((p, i) => (
@@ -401,25 +482,16 @@ export default function PoddPage() {
                 </button>
               ))}
             </div>
-
-            {/* Preview avatars */}
             <div style={{ display: "flex", gap: "20px", justifyContent: "center", marginBottom: "28px" }}>
-              {valdaAgenter.map(a => (
-                <AgentCard key={a} namn={a} speaking={false} done={false} amplitude={0} />
-              ))}
+              {valdaAgenter.map(a => <AgentCard key={a} namn={a} speaking={false} done={false} amplitude={0} />)}
             </div>
 
-            {/* Topic */}
             <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>Ämne</p>
             <div style={{ position: "relative", marginBottom: "20px" }}>
-              <input
-                value={amne} onChange={e => setAmne(e.target.value)}
-                style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.text, fontFamily: "Georgia, serif", fontSize: "16px", padding: "12px 48px 12px 16px", width: "100%", boxSizing: "border-box", outline: "none" }}
-              />
+              <input value={amne} onChange={e => setAmne(e.target.value)}
+                style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.text, fontFamily: "Georgia, serif", fontSize: "16px", padding: "12px 48px 12px 16px", width: "100%", boxSizing: "border-box", outline: "none" }} />
               <button onClick={() => setAmne(slumpaAmne())} title="Slumpa ämne"
-                style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, fontSize: "18px", cursor: "pointer", padding: "4px 6px", lineHeight: 1 }}>
-                ↺
-              </button>
+                style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, fontSize: "18px", cursor: "pointer", padding: "4px 6px", lineHeight: 1 }}>↺</button>
             </div>
 
             {rateLimitInfo.remaining <= 0 && (
@@ -434,7 +506,7 @@ export default function PoddPage() {
               ▶ Starta podden
             </button>
             <p style={{ color: C.textMuted, fontSize: "12px", marginTop: "10px" }}>
-              Ljudet spelas automatiskt · {rateLimitInfo.remaining}/{RL_LIMIT} debatter kvar
+              Varje agent har unik röst · munnen rör sig med talet · {rateLimitInfo.remaining}/{RL_LIMIT} kvar
             </p>
           </div>
         )}
@@ -442,19 +514,11 @@ export default function PoddPage() {
         {/* ── KÖR ── */}
         {(fas === "kör" || fas === "summering") && agenter.length > 0 && (
           <div>
-            {/* Agent avatars — live stage */}
             <div style={{ display: "flex", gap: "16px", justifyContent: "center", marginBottom: "28px", padding: "28px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px" }}>
-              {agenter.map(a => (
-                <AgentCard key={a} namn={a} speaking={speakerAgent === a} done={false} amplitude={speakerAgent === a ? amplitude : 0} />
-              ))}
+              {agenter.map(a => <AgentCard key={a} namn={a} speaking={speakerAgent === a} done={false} amplitude={speakerAgent === a ? amplitude : 0} />)}
             </div>
+            <p style={{ fontSize: "13px", color: C.textMuted, textAlign: "center", marginBottom: "20px", fontStyle: "italic" }}>{faktisktAmne}</p>
 
-            {/* Topic */}
-            <p style={{ fontSize: "13px", color: C.textMuted, textAlign: "center", marginBottom: "20px", fontStyle: "italic" }}>
-              {faktisktAmne}
-            </p>
-
-            {/* Current streaming / thinking */}
             {tänkande && !streaming && (
               <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", marginBottom: "16px" }}>
                 <span style={{ fontSize: "13px", color: C.textMuted }}>{tänkande} tänker</span>
@@ -470,12 +534,9 @@ export default function PoddPage() {
               </div>
             )}
 
-            {/* Transcript */}
             {historik.length > 0 && (
               <div style={{ marginBottom: "20px" }}>
-                <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px 0" }}>
-                  Transkript ({historik.length}/10)
-                </p>
+                <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px 0" }}>Transkript ({historik.length}/10)</p>
                 {historik.map((e, i) => (
                   <div key={i} style={{ display: "flex", gap: "12px", marginBottom: "14px", opacity: speakerAgent && speakerAgent !== e.agent ? 0.5 : 1, transition: "opacity 0.3s" }}>
                     <div style={{ width: "3px", borderRadius: "2px", background: AGENT_FARG[e.agent] || C.accent, flexShrink: 0, alignSelf: "stretch" }} />
@@ -498,13 +559,9 @@ export default function PoddPage() {
         {/* ── KLAR ── */}
         {fas === "klar" && (
           <div>
-            {/* Done stage — avatars */}
             <div style={{ display: "flex", gap: "16px", justifyContent: "center", marginBottom: "20px", padding: "24px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px" }}>
-              {agenter.map(a => (
-                <AgentCard key={a} namn={a} speaking={false} done={true} amplitude={0} />
-              ))}
+              {agenter.map(a => <AgentCard key={a} namn={a} speaking={false} done={true} amplitude={0} />)}
             </div>
-
             <p style={{ fontSize: "13px", color: C.textMuted, textAlign: "center", marginBottom: "20px", fontStyle: "italic" }}>{faktisktAmne}</p>
 
             {summering && (
@@ -514,7 +571,6 @@ export default function PoddPage() {
               </div>
             )}
 
-            {/* Transcript */}
             <div style={{ marginBottom: "24px" }}>
               <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px 0" }}>Transkript</p>
               {historik.map((e, i) => (
