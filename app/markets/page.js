@@ -140,9 +140,17 @@ function MarketKort({ market }) {
         )}
       </div>
 
-      {market.beskrivning && (
-        <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: "0 0 16px 0" }}>{market.beskrivning}</p>
-      )}
+      {market.beskrivning && (() => {
+        let text = market.beskrivning;
+        try {
+          const p = JSON.parse(market.beskrivning);
+          if (p.symbol && p.start_pris != null) {
+            const pris = Number(p.start_pris).toLocaleString("sv-SE", { maximumFractionDigits: 2 });
+            text = `Startkurs ${p.symbol}: $${pris}${p.start_datum ? ` (${p.start_datum})` : ""}`;
+          }
+        } catch (_) {}
+        return <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: "0 0 16px 0" }}>{text}</p>;
+      })()}
 
       {bets.length > 0 && (
         <div style={{ marginBottom: "16px" }}>
@@ -340,14 +348,14 @@ const KRYPTO_START = [
 async function getKryptoPriser() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const res = await fetch(
-    `${SB_URL}/rest/v1/ohlcv_cache?select=symbol,datum,close&order=datum.desc&limit=25`,
+    `${SB_URL}/rest/v1/ohlcv_cache?select=symbol,datum,pris&order=datum.desc&limit=25`,
     { headers, cache: "no-store" }
   );
   if (!res.ok) return {};
   const rows = await res.json();
   const latest = {};
   for (const r of rows) {
-    if (!latest[r.symbol]) latest[r.symbol] = r.close;
+    if (!latest[r.symbol]) latest[r.symbol] = Number(r.pris);
   }
   return latest;
 }
