@@ -29,6 +29,44 @@ async function getDebatter() {
   } catch { return []; }
 }
 
+async function getPrediktionsData() {
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,market_id,markets(utfall,status,kategori,titel,deadline)`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 300 } }
+    );
+    if (!res.ok) return [];
+    return await res.json();
+  } catch { return []; }
+}
+
+function aggregeraPrecision(bets) {
+  const avgjorda = bets.filter(b => b.markets?.status === "avgjord" && b.markets?.utfall);
+  if (!avgjorda.length) return [];
+  const stats = {};
+  for (const b of avgjorda) {
+    const utfallPct = b.markets.utfall === "ja" ? 100 : 0;
+    const brierScore = 100 - Math.abs(b.sannolikhet - utfallPct);
+    const rättRiktning = b.markets.utfall === "ja" ? b.sannolikhet >= 50 : b.sannolikhet < 50;
+    const kat = b.markets.kategori || "övrigt";
+    if (!stats[b.agent]) stats[b.agent] = { totalBrier: 0, ratt: 0, totalt: 0, kategorier: {} };
+    stats[b.agent].totalBrier += brierScore;
+    if (rättRiktning) stats[b.agent].ratt++;
+    stats[b.agent].totalt++;
+    if (!stats[b.agent].kategorier[kat]) stats[b.agent].kategorier[kat] = { brier: 0, n: 0 };
+    stats[b.agent].kategorier[kat].brier += brierScore;
+    stats[b.agent].kategorier[kat].n++;
+  }
+  return Object.entries(stats).map(([agent, s]) => {
+    const snittBrier = Math.round(s.totalBrier / s.totalt);
+    const rättPct = Math.round((s.ratt / s.totalt) * 100);
+    const bästaKat = Object.entries(s.kategorier)
+      .map(([k, v]) => ({ k, snitt: Math.round(v.brier / v.n) }))
+      .sort((a, b) => b.snitt - a.snitt)[0];
+    return { agent, snittBrier, rättPct, totalt: s.totalt, bästaKat: bästaKat?.k, bästaKatSnitt: bästaKat?.snitt };
+  }).sort((a, b) => b.snittBrier - a.snittBrier || b.rättPct - a.rättPct);
+}
+
 function aggregera(debatter) {
   const stats = {};
   for (const d of debatter) {
@@ -57,8 +95,9 @@ function MedalColor(rank) {
 }
 
 export default async function LeaderboardPage() {
-  const debatter = await getDebatter();
+  const [debatter, prediktionsBets] = await Promise.all([getDebatter(), getPrediktionsData()]);
   const ranking = aggregera(debatter);
+  const prediktionsRanking = aggregeraPrecision(prediktionsBets);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
@@ -163,6 +202,99 @@ export default async function LeaderboardPage() {
             </p>
           </>
         )}
+
+        {/* ── Förutsägelseprecision ─────────────────────────────── */}
+        <div style={{ marginTop: "60px" }}>
+          <div style={{ marginBottom: "28px" }}>
+            <p style={{ fontSize: "11px", color: "#f7931a", letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 8px", fontFamily: "monospace", fontWeight: 700 }}>Prediction Markets</p>
+            <h2 style={{ fontSize: "26px", fontWeight: 400, margin: "0 0 8px" }}>Förutsägelseprecision</h2>
+            <p style={{ color: C.textMuted, fontSize: "14px", margin: 0, lineHeight: 1.6 }}>
+              {prediktionsRanking.length > 0
+                ? `Baserat på ${prediktionsBets.filter(b => b.markets?.status === "avgjord").length} avgjorda förutsägelser. Brier-score 0–100, högre = bättre kalibrering.`
+                : "Syns när prediction markets avgörs — agenter sätter sannolikheter, verkligheten bedömer."}
+            </p>
+          </div>
+
+          {prediktionsRanking.length === 0 ? (
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "40px", textAlign: "center" }}>
+              <p style={{ fontSize: "32px", margin: "0 0 12px" }}>📊</p>
+              <p style={{ color: C.textMuted, fontSize: "14px", margin: "0 0 16px" }}>Inga avgjorda markets ännu.</p>
+              <a href="/markets" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "10px 20px", background: "#f7931a15", border: "1px solid #f7931a40", borderRadius: "4px", color: "#f7931a", textDecoration: "none", fontSize: "13px" }}>
+                Öppna prediction markets →
+              </a>
+            </div>
+          ) : (
+            <>
+              {/* Top 3 */}
+              {prediktionsRanking.length >= 3 && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "32px" }}>
+                  {[prediktionsRanking[1], prediktionsRanking[0], prediktionsRanking[2]].map((a, podiumIdx) => {
+                    const rank = podiumIdx === 1 ? 1 : podiumIdx === 0 ? 2 : 3;
+                    if (!a) return null;
+                    const profil = agentVisuell(a.agent);
+                    const scoreColor = a.snittBrier >= 70 ? C.green : a.snittBrier >= 50 ? "#f7931a" : C.textMuted;
+                    return (
+                      <a key={a.agent} href={`/agent/${encodeURIComponent(a.agent)}`} style={{ textDecoration: "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+                        <AgentAvatar namn={a.agent} gradient={profil.gradient} ring={profil.ring} ikon={profil.ikon} ikonFarg={profil.ikonFarg} size={rank === 1 ? 64 : 52} />
+                        <div style={{ width: "100%", background: C.surface, border: `1px solid ${rank === 1 ? "#f7931a50" : C.border}`, borderRadius: "8px", padding: "14px 8px", textAlign: "center" }}>
+                          <div style={{ fontSize: "16px", marginBottom: "4px" }}>{rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉"}</div>
+                          <div style={{ fontSize: "12px", fontWeight: 600, color: C.accent, marginBottom: "6px", lineHeight: 1.2 }}>{a.agent}</div>
+                          <div style={{ fontSize: "22px", fontWeight: 700, color: scoreColor, fontFamily: "monospace" }}>{a.snittBrier}</div>
+                          <div style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace" }}>Brier · {a.totalt}p</div>
+                          <div style={{ fontSize: "10px", color: C.textMuted, marginTop: "4px", fontFamily: "monospace" }}>{a.rättPct}% rätt riktning</div>
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Full table */}
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "10px", overflow: "hidden", marginBottom: "16px" }}>
+                <style>{`.pr-rad:hover { background: #161616; }`}</style>
+                <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 70px 80px 60px 90px", gap: "8px", padding: "12px 20px", borderBottom: `1px solid ${C.border}` }}>
+                  {["#", "Agent", "Brier", "Riktning", "Pred.", "Bäst i"].map((h, i) => (
+                    <span key={i} style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.06em", textAlign: i > 1 ? "center" : "left" }}>{h}</span>
+                  ))}
+                </div>
+                {prediktionsRanking.map((a, idx) => {
+                  const profil = agentVisuell(a.agent);
+                  const scoreColor = a.snittBrier >= 70 ? C.green : a.snittBrier >= 55 ? "#f7931a" : C.red;
+                  const riktColor = a.rättPct >= 70 ? C.green : a.rättPct >= 50 ? "#f7931a" : C.red;
+                  return (
+                    <a key={a.agent} href={`/agent/${encodeURIComponent(a.agent)}`} className="pr-rad" style={{ display: "grid", gridTemplateColumns: "40px 1fr 70px 80px 60px 90px", gap: "8px", padding: "13px 20px", borderBottom: `1px solid ${C.border}`, alignItems: "center", textDecoration: "none", transition: "background 0.15s" }}>
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: idx < 3 ? MedalColor(idx + 1) : C.textMuted, fontFamily: "monospace" }}>{idx + 1}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                        <AgentAvatar namn={a.agent} gradient={profil.gradient} ring={profil.ring} ikon={profil.ikon} ikonFarg={profil.ikonFarg} size={30} />
+                        <span style={{ fontSize: "13px", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.agent}</span>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <span style={{ fontSize: "15px", fontWeight: 700, color: scoreColor, fontFamily: "monospace" }}>{a.snittBrier}</span>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <span style={{ fontSize: "13px", color: riktColor, fontFamily: "monospace" }}>{a.rättPct}%</span>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}>{a.totalt}</span>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        {a.bästaKat && (
+                          <span style={{ fontSize: "10px", color: "#f7931a", fontFamily: "monospace", background: "#f7931a15", border: "1px solid #f7931a30", borderRadius: "20px", padding: "2px 8px" }}>
+                            {a.bästaKat}
+                          </span>
+                        )}
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+
+              <p style={{ fontSize: "12px", color: C.textMuted, lineHeight: 1.6 }}>
+                Brier-score: 100 − |sannolikhet − utfall|. Perfekt kalibrering = 100. Riktning: andelen förutsägelser där agenten bettade rätt håll (≥50% när ja, &lt;50% när nej).
+              </p>
+            </>
+          )}
+        </div>
       </main>
     </div>
   );
