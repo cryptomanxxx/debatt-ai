@@ -503,6 +503,8 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [senasteNyhet, setSenasteNyhet] = useState([]);
   const [trending, setTrending] = useState([]);
   const [senasteKommentarer, setSenasteKommentarer] = useState([]);
+  const [opinionWidget, setOpinionWidget] = useState({ fragor: [], rosterData: {} });
+  const [opinionVoted, setOpinionVoted] = useState({});
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -577,6 +579,34 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteNyhet().then(n => setSenasteNyhet(n)).catch(() => {});
     fetchTrending().then(d => setTrending(d)).catch(() => {});
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
+    // Opinion-widget: hämta röstdata och välj 3 slumpvisa frågor
+    const WIDGET_FRAGOR = [
+      { fraga: "Ska AI få fatta juridiska beslut?", kategori: "ai-tech" },
+      { fraga: "Är Bitcoin framtidens valuta?", kategori: "ai-tech" },
+      { fraga: "Ska vi beskatta rika mycket mer?", kategori: "ekonomi" },
+      { fraga: "Är grundinkomst en bra idé?", kategori: "ekonomi" },
+      { fraga: "Ska Sverige ha kärnkraft?", kategori: "politik" },
+      { fraga: "Är demokrati överskattat?", kategori: "politik" },
+      { fraga: "Arbetar vi för mycket?", kategori: "vardag" },
+      { fraga: "Är ensamhet ett samhällsproblem?", kategori: "vardag" },
+      { fraga: "Kan robotar ersätta terapeuter?", kategori: "ai-tech" },
+      { fraga: "Är klimatrörelsen för radikal?", kategori: "politik" },
+    ];
+    const shuffled = [...WIDGET_FRAGOR].sort(() => Math.random() - 0.5).slice(0, 3);
+    fetch("/api/opinion")
+      .then(r => r.json())
+      .then(rows => {
+        const map = {};
+        for (const r of rows) map[r.fraga] = r;
+        setOpinionWidget({ fragor: shuffled, rosterData: map });
+        const voted = {};
+        for (const { fraga } of shuffled) {
+          const v = localStorage.getItem(`opinion_${fraga}`);
+          if (v) voted[fraga] = v;
+        }
+        setOpinionVoted(voted);
+      })
+      .catch(() => setOpinionWidget({ fragor: shuffled, rosterData: {} }));
   }, []);
 
   useEffect(() => {
@@ -908,6 +938,98 @@ export default function DebattClient({ initialArticleCount = null }) {
               </div>
             )}
 
+            {/* Senaste kommentarerna */}
+            {senasteKommentarer.length > 0 && (
+              <div style={{ marginBottom:"32px" }}>
+                <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px", fontFamily:"Georgia, serif" }}>
+                  Senaste kommentarerna
+                </p>
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                  {senasteKommentarer.map(k => (
+                    <a key={k.id} href={`/artikel/${k.artikel_id}`} style={{ display:"block", padding:"14px 18px", background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", textDecoration:"none", transition:"border-color 0.15s" }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = "#3a3a3a"}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+                    >
+                      <div style={{ display:"flex", alignItems:"baseline", gap:"6px", marginBottom:"6px", flexWrap:"wrap" }}>
+                        <span style={{ fontSize:"13px", color:C.accent, fontWeight:600 }}>{k.forfattare}</span>
+                        <span style={{ fontSize:"11px", color:C.textMuted }}>om</span>
+                        <span style={{ fontSize:"12px", color:C.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"260px" }}>
+                          {k.artiklar?.rubrik || ""}
+                        </span>
+                        <span style={{ fontSize:"11px", color:"#444", marginLeft:"auto", flexShrink:0 }}>{relativTid(k.skapad)}</span>
+                      </div>
+                      <p style={{ margin:0, fontSize:"13px", color:"#666", lineHeight:1.6, fontStyle:"italic" }}>
+                        "{(k.text || "").slice(0, 120)}{(k.text || "").length > 120 ? "…" : ""}"
+                      </p>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Opinion-widget */}
+            {opinionWidget.fragor.length > 0 && (
+              <div style={{ marginBottom:"32px" }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"14px" }}>
+                  <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:0, fontFamily:"Georgia, serif" }}>
+                    Vad tycker du?
+                  </p>
+                  <a href="/opinion" style={{ fontSize:"11px", color:C.textMuted, textDecoration:"none", fontFamily:"monospace" }}>Alla frågor →</a>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                  {opinionWidget.fragor.map(({ fraga, kategori }) => {
+                    const d = opinionWidget.rosterData[fraga] ?? { roster_ja: 0, roster_nej: 0, roster_osaker: 0 };
+                    const voted = opinionVoted[fraga];
+                    const total = d.roster_ja + d.roster_nej + (d.roster_osaker || 0);
+                    return (
+                      <div key={fraga} style={{ background:C.surface, border:`1px solid ${voted ? "#3a3a3a" : C.border}`, borderRadius:"8px", padding:"16px 20px" }}>
+                        <p style={{ margin:"0 0 12px", fontSize:"15px", color:C.text, lineHeight:1.4, fontFamily:"Georgia, serif" }}>{fraga}</p>
+                        {!voted ? (
+                          <div style={{ display:"flex", gap:"8px", marginBottom:"10px" }}>
+                            {[["ja","Ja",C.green],["osaker","Osäker","#facc15"],["nej","Nej",C.red]].map(([svar,lbl,color]) => (
+                              <button key={svar} onClick={async () => {
+                                setOpinionVoted(p => ({ ...p, [fraga]: svar }));
+                                localStorage.setItem(`opinion_${fraga}`, svar);
+                                setOpinionWidget(p => ({
+                                  ...p,
+                                  rosterData: {
+                                    ...p.rosterData,
+                                    [fraga]: {
+                                      ...d,
+                                      roster_ja: d.roster_ja + (svar === "ja" ? 1 : 0),
+                                      roster_nej: d.roster_nej + (svar === "nej" ? 1 : 0),
+                                      roster_osaker: (d.roster_osaker || 0) + (svar === "osaker" ? 1 : 0),
+                                    }
+                                  }
+                                }));
+                                await fetch("/api/opinion", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ fraga, kategori, svar }) }).catch(() => {});
+                              }} style={{ flex:1, padding:"8px 4px", borderRadius:"6px", border:`1px solid ${color}44`, background:"transparent", color, fontSize:"13px", fontFamily:"Georgia, serif", cursor:"pointer" }}>
+                                {lbl}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ fontSize:"11px", color: voted === "ja" ? C.green : voted === "nej" ? C.red : "#facc15", fontFamily:"monospace", margin:"0 0 8px" }}>
+                            Du röstade: {voted === "ja" ? "Ja ✓" : voted === "nej" ? "Nej ✓" : "Osäker ✓"}
+                          </p>
+                        )}
+                        {total > 0 && (
+                          <div>
+                            <div style={{ display:"flex", height:"4px", borderRadius:"2px", overflow:"hidden", marginBottom:"4px" }}>
+                              <div style={{ width:`${Math.round((d.roster_ja/total)*100)}%`, background:C.green }} />
+                              <div style={{ width:`${Math.round(((d.roster_osaker||0)/total)*100)}%`, background:"#facc15" }} />
+                              <div style={{ width:`${Math.round((d.roster_nej/total)*100)}%`, background:C.red }} />
+                            </div>
+                            <span style={{ fontSize:"10px", color:C.textMuted, fontFamily:"monospace" }}>{total} röster</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {(articleCount !== null || totalRoster !== null || totalKommentarer !== null) && (
               <div style={{ display: "flex", gap: "24px", marginBottom: "32px", padding: "12px 18px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", flexWrap: "wrap" }}>
                 {articleCount !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{articleCount}</span> artiklar</span>}
@@ -936,35 +1058,6 @@ export default function DebattClient({ initialArticleCount = null }) {
                         </span>
                       </div>
                       <span style={{ fontSize:"11px", color:"#555", fontFamily:"monospace", flexShrink:0 }}>{a.lasningar} läsn.</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Senaste kommentarerna */}
-            {senasteKommentarer.length > 0 && (
-              <div style={{ marginBottom:"32px" }}>
-                <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px", fontFamily:"Georgia, serif" }}>
-                  Senaste kommentarerna
-                </p>
-                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
-                  {senasteKommentarer.map(k => (
-                    <a key={k.id} href={`/artikel/${k.artikel_id}`} style={{ display:"block", padding:"14px 18px", background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", textDecoration:"none", transition:"border-color 0.15s" }}
-                      onMouseEnter={e => e.currentTarget.style.borderColor = "#3a3a3a"}
-                      onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
-                    >
-                      <div style={{ display:"flex", alignItems:"baseline", gap:"6px", marginBottom:"6px", flexWrap:"wrap" }}>
-                        <span style={{ fontSize:"13px", color:C.accent, fontWeight:600 }}>{k.forfattare}</span>
-                        <span style={{ fontSize:"11px", color:C.textMuted }}>om</span>
-                        <span style={{ fontSize:"12px", color:C.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"260px" }}>
-                          {k.artiklar?.rubrik || ""}
-                        </span>
-                        <span style={{ fontSize:"11px", color:"#444", marginLeft:"auto", flexShrink:0 }}>{relativTid(k.skapad)}</span>
-                      </div>
-                      <p style={{ margin:0, fontSize:"13px", color:"#666", lineHeight:1.6, fontStyle:"italic" }}>
-                        "{(k.text || "").slice(0, 120)}{(k.text || "").length > 120 ? "…" : ""}"
-                      </p>
                     </a>
                   ))}
                 </div>

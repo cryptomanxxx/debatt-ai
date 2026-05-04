@@ -11,23 +11,24 @@ const headers = () => ({
 export async function POST(req) {
   try {
     const { fraga, kategori, svar } = await req.json();
-    if (!fraga || !["ja", "nej"].includes(svar)) {
+    if (!fraga || !["ja", "nej", "osaker"].includes(svar)) {
       return Response.json({ error: "Ogiltiga parametrar" }, { status: 400 });
     }
 
     // Hämta aktuella värden
     const getRes = await fetch(
-      `${SB_URL}/rest/v1/opinion_roster?fraga=eq.${encodeURIComponent(fraga)}&select=roster_ja,roster_nej`,
+      `${SB_URL}/rest/v1/opinion_roster?fraga=eq.${encodeURIComponent(fraga)}&select=roster_ja,roster_nej,roster_osaker`,
       { headers: headers() }
     );
     const rows = getRes.ok ? await getRes.json() : [];
-    const current = rows[0] ?? { roster_ja: 0, roster_nej: 0 };
+    const current = rows[0] ?? { roster_ja: 0, roster_nej: 0, roster_osaker: 0 };
 
     const upd = {
       fraga,
       kategori: kategori ?? "övrigt",
       roster_ja: current.roster_ja + (svar === "ja" ? 1 : 0),
       roster_nej: current.roster_nej + (svar === "nej" ? 1 : 0),
+      roster_osaker: (current.roster_osaker || 0) + (svar === "osaker" ? 1 : 0),
     };
 
     const upsertRes = await fetch(

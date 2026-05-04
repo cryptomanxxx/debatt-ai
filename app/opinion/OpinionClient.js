@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
   text: "#f0ede6", textMuted: "#888880", accentDim: "#aaaaaa",
-  green: "#4ade80", red: "#f87171", accent: "#e879f9",
+  green: "#4ade80", red: "#f87171", yellow: "#facc15", accent: "#e879f9",
 };
 
 const KATEGORIER = [
@@ -74,23 +74,26 @@ const ALLA_FRAGOR = Object.entries(AMNEN).flatMap(([kat, fragor]) =>
   fragor.map(f => ({ fraga: f, kategori: kat }))
 );
 
-function RostatBar({ ja, nej }) {
-  const total = ja + nej;
+function RostatBar({ ja, nej, osaker }) {
+  const total = ja + nej + (osaker || 0);
   if (total === 0) return (
     <p style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", margin: 0 }}>
       Ingen har röstat ännu — bli först!
     </p>
   );
   const jaPct = Math.round((ja / total) * 100);
-  const nejPct = 100 - jaPct;
+  const osakPct = Math.round(((osaker || 0) / total) * 100);
+  const nejPct = 100 - jaPct - osakPct;
   return (
     <div>
       <div style={{ display: "flex", height: "6px", borderRadius: "3px", overflow: "hidden", marginBottom: "6px" }}>
         <div style={{ width: `${jaPct}%`, background: C.green, transition: "width 0.4s ease" }} />
+        <div style={{ width: `${osakPct}%`, background: C.yellow, transition: "width 0.4s ease" }} />
         <div style={{ width: `${nejPct}%`, background: C.red, transition: "width 0.4s ease" }} />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <span style={{ fontSize: "11px", color: C.green, fontFamily: "monospace" }}>Ja {jaPct}%</span>
+        <span style={{ fontSize: "11px", color: C.yellow, fontFamily: "monospace" }}>{osakPct}% Osäker</span>
         <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>{total} röster</span>
         <span style={{ fontSize: "11px", color: C.red, fontFamily: "monospace" }}>{nejPct}% Nej</span>
       </div>
@@ -108,9 +111,10 @@ function FragaKort({ fraga, kategori, rosterData, onVote }) {
     if (sparat) setRostat(sparat);
   }, [key]);
 
-  const dbData = rosterData[fraga] ?? { roster_ja: 0, roster_nej: 0 };
+  const dbData = rosterData[fraga] ?? { roster_ja: 0, roster_nej: 0, roster_osaker: 0 };
   const visaJa = dbData.roster_ja;
   const visaNej = dbData.roster_nej;
+  const visaOsaker = dbData.roster_osaker || 0;
 
   async function rosta(svar) {
     if (rostat || loading) return;
@@ -142,34 +146,26 @@ function FragaKort({ fraga, kategori, rosterData, onVote }) {
 
       {!rostat ? (
         <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
-          <button onClick={() => rosta("ja")} disabled={loading} style={{
-            flex: 1, padding: "10px", borderRadius: "6px", border: `1px solid ${C.green}44`,
-            background: "transparent", color: C.green, fontSize: "14px", fontFamily: "Georgia, serif",
-            cursor: "pointer", transition: "background 0.15s",
-          }}
-            onMouseEnter={e => e.target.style.background = C.green + "15"}
-            onMouseLeave={e => e.target.style.background = "transparent"}
-          >
-            Ja
-          </button>
-          <button onClick={() => rosta("nej")} disabled={loading} style={{
-            flex: 1, padding: "10px", borderRadius: "6px", border: `1px solid ${C.red}44`,
-            background: "transparent", color: C.red, fontSize: "14px", fontFamily: "Georgia, serif",
-            cursor: "pointer", transition: "background 0.15s",
-          }}
-            onMouseEnter={e => e.target.style.background = C.red + "15"}
-            onMouseLeave={e => e.target.style.background = "transparent"}
-          >
-            Nej
-          </button>
+          {[["ja","Ja",C.green],["osaker","Osäker",C.yellow],["nej","Nej",C.red]].map(([svar,lbl,color]) => (
+            <button key={svar} onClick={() => rosta(svar)} disabled={loading} style={{
+              flex: 1, padding: "10px", borderRadius: "6px", border: `1px solid ${color}44`,
+              background: "transparent", color, fontSize: "14px", fontFamily: "Georgia, serif",
+              cursor: "pointer", transition: "background 0.15s",
+            }}
+              onMouseEnter={e => e.target.style.background = color + "15"}
+              onMouseLeave={e => e.target.style.background = "transparent"}
+            >
+              {lbl}
+            </button>
+          ))}
         </div>
       ) : (
-        <div style={{ marginBottom: "10px", fontSize: "11px", color: rostat === "ja" ? C.green : C.red, fontFamily: "monospace" }}>
-          Du röstade: {rostat === "ja" ? "Ja ✓" : "Nej ✓"}
+        <div style={{ marginBottom: "10px", fontSize: "11px", color: rostat === "ja" ? C.green : rostat === "nej" ? C.red : C.yellow, fontFamily: "monospace" }}>
+          Du röstade: {rostat === "ja" ? "Ja ✓" : rostat === "nej" ? "Nej ✓" : "Osäker ✓"}
         </div>
       )}
 
-      <RostatBar ja={visaJa} nej={visaNej} />
+      <RostatBar ja={visaJa} nej={visaNej} osaker={visaOsaker} />
     </div>
   );
 }
@@ -191,13 +187,14 @@ export default function OpinionClient() {
 
   function onVote(fraga, kategori, svar) {
     setRosterData(prev => {
-      const current = prev[fraga] ?? { roster_ja: 0, roster_nej: 0, fraga, kategori };
+      const current = prev[fraga] ?? { roster_ja: 0, roster_nej: 0, roster_osaker: 0, fraga, kategori };
       return {
         ...prev,
         [fraga]: {
           ...current,
           roster_ja: current.roster_ja + (svar === "ja" ? 1 : 0),
           roster_nej: current.roster_nej + (svar === "nej" ? 1 : 0),
+          roster_osaker: (current.roster_osaker || 0) + (svar === "osaker" ? 1 : 0),
         },
       };
     });
