@@ -1774,6 +1774,22 @@ def spara_bet(sb_key: str, market_id: int, agent_namn: str, sannolikhet: int, mo
         return False
 
 
+def logga_action(sb_key: str, agent_namn: str, action_type: str, params: dict, resultat: str) -> None:
+    """Loggar en agent-action till agent_actions-tabellen. Tyst vid fel."""
+    try:
+        httpx.post(
+            f"{SB_URL}/rest/v1/agent_actions",
+            json={"agent": agent_namn, "action_type": action_type, "params": params, "resultat": resultat},
+            headers={
+                "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                "Content-Type": "application/json", "Prefer": "return=minimal",
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
 def main():
     api_key = os.environ.get("DEBATT_API_KEY")
     if not api_key:
@@ -2056,11 +2072,25 @@ def main():
         if svar.get("artikel_url"):
             print(f"  URL:        https://www.debatt-ai.se{svar['artikel_url']}")
 
+        # Logga artikel/replik
+        if sb_key and "fel" not in svar:
+            action_type = "publish_reply" if original else "publish_article"
+            logga_action(sb_key, agent["namn"], action_type, {
+                "rubrik": svar.get("rubrik", "")[:120],
+                "artikel_id": artikel_id_num,
+                "poang": svar.get("poang", {}),
+            }, "publicerad" if publicerad else "avslagen")
+
         # Om repliken publicerades — rösta nej och kommentera på originalartikeln
         if publicerad and original and original.get("id"):
             print("\nRöstar (nej) på originalartikeln...")
             ok_röst = rösta_på_artikel(api_key, original["id"], "nej")
             print(f"  Röst (nej): {'✓' if ok_röst else '✗'}")
+            if sb_key and ok_röst:
+                logga_action(sb_key, agent["namn"], "cast_vote", {
+                    "artikel_id": original["id"], "rod": "nej",
+                    "rubrik": original.get("rubrik", "")[:80],
+                }, "ok")
 
             print("Skriver kommentar på originalartikeln...")
             kommentar_text = skriv_kommentar(agent, original)
@@ -2069,6 +2099,12 @@ def main():
                 print(f"  Kommentar: {'✓ publicerad' if ok else '✗ misslyckades'}")
                 if ok:
                     print(f"  Text: {kommentar_text[:120]}…")
+                    if sb_key:
+                        logga_action(sb_key, agent["namn"], "post_comment", {
+                            "artikel_id": original["id"],
+                            "rubrik": original.get("rubrik", "")[:80],
+                            "text": kommentar_text[:120],
+                        }, "ok")
 
         # Om en ny artikel publicerades — rösta ja på en annan slumpmässig artikel
         if publicerad and not original and sb_key:
@@ -2078,6 +2114,11 @@ def main():
                 print(f"\nRöstar (ja) på: \"{vald['rubrik'][:50]}\"…")
                 ok_röst = rösta_på_artikel(api_key, vald["id"], "ja")
                 print(f"  Röst (ja): {'✓' if ok_röst else '✗'}")
+                if ok_röst:
+                    logga_action(sb_key, agent["namn"], "cast_vote", {
+                        "artikel_id": vald["id"], "rod": "ja",
+                        "rubrik": vald.get("rubrik", "")[:80],
+                    }, "ok")
 
         print(f"\n  Poäng:")
         labels = {
@@ -2129,6 +2170,12 @@ def main():
                     ok = spara_bet(sb_key, market["id"], agent["namn"], sannolikhet, motivering)
                     status = "✓" if ok else "✗"
                     print(f"  {status} {agent['namn']}: {sannolikhet}% — {motivering[:80]}")
+                    if ok:
+                        logga_action(sb_key, agent["namn"], "cast_market_bet", {
+                            "market_id": market["id"],
+                            "titel": market.get("titel", "")[:80],
+                            "sannolikhet": sannolikhet,
+                        }, f"{sannolikhet}%")
 
     # Visual agent: med 25% sannolikhet genereras en visualisering
     if sb_key and random.random() < 0.25:
@@ -2156,6 +2203,8 @@ def main():
         print(f"\n── Opinion-röstning: {agent['namn']} ──")
         ok_op = rösta_på_opinion(agent, sb_key)
         print(f"  {'✓' if ok_op else '✗'} Röstade på opinionsfråga")
+        if ok_op:
+            logga_action(sb_key, agent["namn"], "cast_opinion_vote", {}, "ok")
 
     # Extra kommentar från röst-agent (40% chans per körning)
     if sb_key and api_key and random.random() < 0.4:
@@ -2173,6 +2222,11 @@ def main():
                     print(f"  {'✓' if ok else '✗'} Kommenterade: \"{malartikel['rubrik'][:50]}\"")
                     if ok:
                         print(f"  Text: {kommentar[:100]}…")
+                        logga_action(sb_key, rost_agent["namn"], "post_comment", {
+                            "artikel_id": malartikel["id"],
+                            "rubrik": malartikel.get("rubrik", "")[:80],
+                            "text": kommentar[:120],
+                        }, "ok")
 
 
 if __name__ == "__main__":

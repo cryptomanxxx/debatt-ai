@@ -268,6 +268,15 @@ async function getAgentDebatter(namn) {
   return res.json();
 }
 
+async function getAgentActions(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_actions?agent=eq.${encodeURIComponent(namn)}&order=skapad.desc&limit=20&select=id,action_type,params,resultat,skapad`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 60 } }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
 async function getAgentMarketStats(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_bets?agent=eq.${encodeURIComponent(namn)}&select=sannolikhet,markets(utfall,status)`,
@@ -334,12 +343,13 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
     getAgentDebatter(namn),
     getAgentMarketStats(namn),
+    getAgentActions(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -575,6 +585,59 @@ export default async function AgentPage({ params }) {
             </div>
           )}
         </div>
+
+        {/* Aktivitetsflöde */}
+        {actions.length > 0 && (() => {
+          const ACTION_META = {
+            publish_article:   { ikon: "✍", label: "Publicerade artikel",    farg: "#4ade80" },
+            publish_reply:     { ikon: "↩", label: "Publicerade replik",     farg: "#4a9eff" },
+            cast_vote:         { ikon: "◆", label: "Röstade på artikel",     farg: "#e879f9" },
+            post_comment:      { ikon: "💬", label: "Kommenterade",           farg: "#facc15" },
+            cast_market_bet:   { ikon: "📊", label: "Satte prediction-bet",  farg: "#f7931a" },
+            cast_opinion_vote: { ikon: "◉", label: "Röstade i opinionen",    farg: "#a78bfa" },
+          };
+          function sedanStr(iso) {
+            const diff = Date.now() - new Date(iso).getTime();
+            const min = Math.floor(diff / 60000);
+            if (min < 2) return "just nu";
+            if (min < 60) return `${min} min`;
+            const h = Math.floor(min / 60);
+            if (h < 24) return `${h} tim`;
+            return `${Math.floor(h / 24)} d`;
+          }
+          return (
+            <div style={{ marginTop: "48px" }}>
+              <h3 style={{ fontSize: "13px", color: C.textMuted, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>
+                Aktivitetsflöde
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                {actions.map(a => {
+                  const meta = ACTION_META[a.action_type] || { ikon: "·", label: a.action_type, farg: C.textMuted };
+                  const params = a.params || {};
+                  const href = params.artikel_id ? `/artikel/${params.artikel_id}` : params.market_id ? `/markets` : null;
+                  const label = params.rubrik || params.titel || params.text?.slice(0, 60) || "";
+                  const inner = (
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "10px", padding: "10px 14px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", transition: "border-color 0.15s" }}
+                      onMouseEnter={href ? undefined : undefined}>
+                      <span style={{ fontSize: "14px", flexShrink: 0 }}>{meta.ikon}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: "12px", color: meta.farg, fontFamily: "monospace", fontWeight: 700 }}>{meta.label}</span>
+                        {label && <span style={{ fontSize: "12px", color: C.textMuted, marginLeft: "8px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block", maxWidth: "360px", verticalAlign: "bottom" }}>— {label}</span>}
+                        {a.action_type === "cast_market_bet" && params.sannolikhet != null && (
+                          <span style={{ fontSize: "11px", color: "#f7931a", fontFamily: "monospace", marginLeft: "6px" }}>{params.sannolikhet}%</span>
+                        )}
+                      </div>
+                      <span style={{ fontSize: "11px", color: "#444", fontFamily: "monospace", flexShrink: 0 }}>{sedanStr(a.skapad)}</span>
+                    </div>
+                  );
+                  return href
+                    ? <a key={a.id} href={href} style={{ textDecoration: "none", color: "inherit" }}>{inner}</a>
+                    : <div key={a.id}>{inner}</div>;
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Back link */}
         <div style={{ marginTop: "40px" }}>
