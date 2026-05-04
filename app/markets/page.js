@@ -329,11 +329,63 @@ function PrediktionsRankning({ rankning }) {
   );
 }
 
+const KRYPTO_START = [
+  { symbol: "BTC", startPris: 77724.16, datum: "2026-04-27" },
+  { symbol: "ETH", startPris: 2322.56, datum: "2026-04-27" },
+  { symbol: "SOL", startPris: 85.86, datum: "2026-04-27" },
+  { symbol: "XRP", startPris: 1.419, datum: "2026-04-27" },
+  { symbol: "BNB", startPris: 628.52, datum: "2026-04-27" },
+];
+
+async function getKryptoPriser() {
+  const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+  const res = await fetch(
+    `${SB_URL}/rest/v1/ohlcv_cache?select=symbol,datum,close&order=datum.desc&limit=25`,
+    { headers, cache: "no-store" }
+  );
+  if (!res.ok) return {};
+  const rows = await res.json();
+  const latest = {};
+  for (const r of rows) {
+    if (!latest[r.symbol]) latest[r.symbol] = r.close;
+  }
+  return latest;
+}
+
+function KryptoPriser({ priser }) {
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px", marginBottom: "16px" }}>
+      <p style={{ fontSize: "10px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 14px", fontWeight: 700 }}>
+        Krypto sedan {KRYPTO_START[0].datum}
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {KRYPTO_START.map(({ symbol, startPris }) => {
+          const nu = priser[symbol];
+          const pct = nu != null ? ((nu - startPris) / startPris * 100) : null;
+          const color = pct == null ? C.textMuted : pct >= 0 ? C.green : C.red;
+          return (
+            <div key={symbol} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace", fontWeight: 700 }}>{symbol}</span>
+              <div style={{ textAlign: "right" }}>
+                {nu != null && <div style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace" }}>${nu.toLocaleString("sv-SE", { maximumFractionDigits: 2 })}</div>}
+                <div style={{ fontSize: "13px", color, fontFamily: "monospace", fontWeight: 700 }}>
+                  {pct == null ? "–" : `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default async function MarketsPage() {
-  const [{ oppna, avgjorda }, aktivitet, rankning] = await Promise.all([
+  const [{ oppna, avgjorda }, aktivitet, rankning, kryptoPriser] = await Promise.all([
     getMarkets(),
     getSenasteAktivitet(),
     getPrediktionsRankning(),
+    getKryptoPriser(),
   ]);
 
   return (
@@ -407,6 +459,7 @@ export default async function MarketsPage() {
         {/* Höger: aktivitetsfeed + rankning */}
         <div className="markets-right">
           <div style={{ position: "sticky", top: "80px" }}>
+            <KryptoPriser priser={kryptoPriser} />
             <AktivitetsFeed aktivitet={aktivitet} />
             <PrediktionsRankning rankning={rankning} />
           </div>

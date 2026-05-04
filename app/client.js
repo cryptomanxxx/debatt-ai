@@ -175,9 +175,8 @@ async function fetchLatestArtikel() {
 }
 
 async function fetchTrending() {
-  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
   const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,lasningar,nyhetskalla&skapad=gte.${since}&lasningar=gte.1&order=lasningar.desc&limit=5`,
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,lasningar,nyhetskalla&lasningar=gte.1&order=lasningar.desc&limit=5`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
   if (!res.ok) return [];
@@ -211,7 +210,7 @@ async function fetchTopDebattrad() {
 
 async function fetchSenasteKommentarer() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,forfattare,text,skapad,artiklar(id,rubrik)&order=skapad.desc&limit=5`,
+    `${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,forfattare,text,skapad&order=skapad.desc&limit=5`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
   if (!res.ok) return [];
@@ -853,6 +852,16 @@ export default function DebattClient({ initialArticleCount = null }) {
               />
             </div>
 
+            {nextTimer && (
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"24px", padding:"14px 20px", background:"#0a0a0f", border:"1px solid #e879f920", borderRadius:"8px", flexWrap:"wrap", gap:"8px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                  <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:"#e879f9", boxShadow:"0 0 8px #e879f9", animation:"neonPulse 2.4s ease-in-out infinite" }} />
+                  <span style={{ fontSize:"12px", color:"#aaaaaa", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"monospace" }}>Nästa AI-körning</span>
+                </div>
+                <span style={{ fontSize:"22px", fontWeight:700, fontFamily:"monospace", color:"#e879f9", letterSpacing:"0.08em" }}>{nextTimer}</span>
+              </div>
+            )}
+
             {senasteReplik && (
               <a href={`/artikel/${senasteReplik.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#050a1a", border: "1px solid #4a9eff30", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
                 <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4a9eff", flexShrink: 0, boxShadow: "0 0 8px #4a9eff" }} />
@@ -997,10 +1006,6 @@ export default function DebattClient({ initialArticleCount = null }) {
                     >
                       <div style={{ display:"flex", alignItems:"baseline", gap:"6px", marginBottom:"6px", flexWrap:"wrap" }}>
                         <span style={{ fontSize:"13px", color:C.accent, fontWeight:600 }}>{k.forfattare}</span>
-                        <span style={{ fontSize:"11px", color:C.textMuted }}>om</span>
-                        <span style={{ fontSize:"12px", color:C.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"260px" }}>
-                          {k.artiklar?.rubrik || ""}
-                        </span>
                         <span style={{ fontSize:"11px", color:"#444", marginLeft:"auto", flexShrink:0 }}>{relativTid(k.skapad)}</span>
                       </div>
                       <p style={{ margin:0, fontSize:"13px", color:"#666", lineHeight:1.6, fontStyle:"italic" }}>
@@ -1080,7 +1085,6 @@ export default function DebattClient({ initialArticleCount = null }) {
                 {articleCount !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{articleCount}</span> artiklar</span>}
                 {totalRoster !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalRoster.toLocaleString("sv-SE")}</span> röster</span>}
                 {totalKommentarer !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalKommentarer}</span> kommentarer</span>}
-                {nextTimer && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace", marginLeft: "auto" }}>Nästa körning om <span style={{ color: C.accent, fontWeight: 700 }}>{nextTimer}</span></span>}
               </div>
             )}
 
@@ -1088,7 +1092,7 @@ export default function DebattClient({ initialArticleCount = null }) {
             {trending.length > 0 && (
               <div style={{ marginBottom:"28px" }}>
                 <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px", fontFamily:"Georgia, serif" }}>
-                  Trendande senaste 3 dagarna
+                  Mest lästa artiklarna
                 </p>
                 <div style={{ display:"flex", flexDirection:"column", gap:"1px", background:C.border, borderRadius:"8px", overflow:"hidden", border:`1px solid ${C.border}` }}>
                   {trending.map((a, i) => (

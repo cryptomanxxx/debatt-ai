@@ -73,6 +73,54 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
+# Förprogrammerade opinionsfrågor (samma som på /opinion-sidan)
+OPINION_FRAGOR = [
+    ("Ska AI få fatta juridiska beslut?", "ai-tech"),
+    ("Bör AI ha rättigheter i framtiden?", "ai-tech"),
+    ("Ska skolor förbjuda AI-verktyg helt?", "ai-tech"),
+    ("Ska algoritmer bestämma vad vi ser online?", "ai-tech"),
+    ("Kan robotar ersätta terapeuter?", "ai-tech"),
+    ("Är dataintegritet viktigare än bekvämlighet?", "ai-tech"),
+    ("Ska ansiktsigenkänning tillåtas i det offentliga?", "ai-tech"),
+    ("Kan AI ersätta läkare?", "ai-tech"),
+    ("Är Bitcoin framtidens valuta?", "ai-tech"),
+    ("Ska vi beskatta rika mycket mer?", "ekonomi"),
+    ("Är gig-ekonomin bra eller dålig?", "ekonomi"),
+    ("Ska staten rädda företag i kris?", "ekonomi"),
+    ("Ska arvsskatt återinföras?", "ekonomi"),
+    ("Är bostadsmarknaden trasig?", "ekonomi"),
+    ("Ska staten äga fler bolag?", "ekonomi"),
+    ("Är inflation ett klassproblem?", "ekonomi"),
+    ("Ska vi ha fyradagarsvecka?", "ekonomi"),
+    ("Är grundinkomst en bra idé?", "ekonomi"),
+    ("Ska rika få köpa bättre vård?", "ekonomi"),
+    ("Ska Sverige ha kärnkraft?", "politik"),
+    ("Ska droger legaliseras?", "politik"),
+    ("Är yttrandefriheten hotad i Sverige?", "politik"),
+    ("Ska Sverige införa tiggeriförbud?", "politik"),
+    ("Bör bidrag villkoras hårdare?", "politik"),
+    ("Är demokrati överskattat?", "politik"),
+    ("Ska man få säga vad som helst online?", "politik"),
+    ("Ska rösträttsåldern sänkas till 16?", "politik"),
+    ("Ska nationalstaten avskaffas?", "politik"),
+    ("Är Sverige för litet för att påverka klimatet?", "politik"),
+    ("Är klimatrörelsen för radikal?", "politik"),
+    ("Är sociala medier bra för demokratin?", "politik"),
+    ("Ska flygskatten höjas?", "politik"),
+    ("Ska kött beskattas hårdare?", "politik"),
+    ("Ska barn ha egna mobiltelefoner?", "vardag"),
+    ("Är dagens föräldrar för överbeskyddande?", "vardag"),
+    ("Har livet blivit sämre trots högre standard?", "vardag"),
+    ("Är det fel att skaffa barn idag?", "vardag"),
+    ("Har män det svårare än kvinnor idag?", "vardag"),
+    ("Arbetar vi för mycket?", "vardag"),
+    ("Är ensamhet ett samhällsproblem?", "vardag"),
+    ("Ska alkohol regleras hårdare?", "vardag"),
+    ("Är heltidsarbete föråldrat?", "vardag"),
+    ("Är skärmtid ett folkhälsoproblem?", "vardag"),
+    ("Har skolan blivit för enkel?", "vardag"),
+]
+
 # Innehållsmallar — styr artikelns form och perspektiv
 ARTIKELFORMAT = [
     {
@@ -1362,6 +1410,80 @@ def rösta_på_artikel(api_key: str, artikel_id: int, rod: str) -> bool:
         return False
 
 
+def rösta_på_opinion(agent: dict, sb_key: str) -> bool:
+    """Låt agenten rösta på en slumpmässig opinionsfråga."""
+    import urllib.parse
+    try:
+        fraga, kategori = random.choice(OPINION_FRAGOR)
+        prompt = (
+            f"Du representerar följande perspektiv:\n{agent['system'][:400]}\n\n"
+            f"Fråga: \"{fraga}\"\n"
+            "Svara med exakt ett ord: Ja, Nej eller Osäker."
+        )
+        svar_raw = ""
+        for modell in [GROQ_MODEL, BACKUP_MODEL]:
+            try:
+                if modell == GROQ_MODEL:
+                    r = groq_client.chat.completions.create(
+                        model=modell,
+                        messages=[{"role": "user", "content": prompt}],
+                        max_tokens=5,
+                        temperature=0.3,
+                    )
+                    svar_raw = r.choices[0].message.content.strip().lower()
+                else:
+                    import google.generativeai as genai
+                    genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
+                    m = genai.GenerativeModel(modell)
+                    svar_raw = m.generate_content(prompt).text.strip().lower()
+                break
+            except Exception:
+                continue
+        if "ja" in svar_raw and "nej" not in svar_raw:
+            svar = "ja"
+        elif "nej" in svar_raw:
+            svar = "nej"
+        else:
+            svar = "osaker"
+        print(f"  Fråga: \"{fraga[:60]}\" → {svar}")
+        fraga_enc = urllib.parse.quote(fraga)
+        hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+        get_res = httpx.get(
+            f"{SB_URL}/rest/v1/opinion_roster?fraga=eq.{fraga_enc}&select=roster_ja,roster_nej,roster_osaker",
+            headers=hdrs, timeout=10,
+        )
+        rows = get_res.json() if get_res.is_success else []
+        if rows:
+            cur = rows[0]
+            patch_payload = {
+                "roster_ja": cur.get("roster_ja", 0) + (1 if svar == "ja" else 0),
+                "roster_nej": cur.get("roster_nej", 0) + (1 if svar == "nej" else 0),
+                "roster_osaker": cur.get("roster_osaker", 0) + (1 if svar == "osaker" else 0),
+            }
+            res = httpx.patch(
+                f"{SB_URL}/rest/v1/opinion_roster?fraga=eq.{fraga_enc}",
+                headers={**hdrs, "Content-Type": "application/json"},
+                json=patch_payload, timeout=10,
+            )
+            return res.status_code in (200, 204)
+        else:
+            post_payload = {
+                "fraga": fraga, "kategori": kategori,
+                "roster_ja": 1 if svar == "ja" else 0,
+                "roster_nej": 1 if svar == "nej" else 0,
+                "roster_osaker": 1 if svar == "osaker" else 0,
+            }
+            res = httpx.post(
+                f"{SB_URL}/rest/v1/opinion_roster",
+                headers={**hdrs, "Content-Type": "application/json"},
+                json=post_payload, timeout=10,
+            )
+            return res.status_code in (200, 201)
+    except Exception as e:
+        print(f"  Fel vid opinion-röstning: {e}", file=sys.stderr)
+        return False
+
+
 def skicka_kommentar(api_key: str, forfattare: str, artikel_id: int, text: str) -> bool:
     """Skicka en kommentar till debatt.ai API."""
     try:
@@ -2028,6 +2150,12 @@ def main():
                     print(f"  ✗ Nyckel '{nyckel}' hittades inte i statistik", file=sys.stderr)
         else:
             print("  Ingen statistik ännu – hoppar över")
+
+    # Opinion-röstning (60% chans per körning)
+    if sb_key and random.random() < 0.6:
+        print(f"\n── Opinion-röstning: {agent['namn']} ──")
+        ok_op = rösta_på_opinion(agent, sb_key)
+        print(f"  {'✓' if ok_op else '✗'} Röstade på opinionsfråga")
 
     # Extra kommentar från röst-agent (40% chans per körning)
     if sb_key and api_key and random.random() < 0.4:
