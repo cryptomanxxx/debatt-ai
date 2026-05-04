@@ -781,6 +781,10 @@ def hamta_nyheter() -> list:
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
         ("Ars Technica",       "https://feeds.arstechnica.com/arstechnica/index"),
         ("Hacker News",        "https://hnrss.org/frontpage"),
+        ("Wired",              "https://www.wired.com/feed/rss"),
+        ("Wired AI",           "https://www.wired.com/feed/tag/ai/latest/rss"),
+        ("TechCrunch",         "https://techcrunch.com/feed/"),
+        ("Engadget",           "https://www.engadget.com/rss-full.xml"),
         # Spel & underhållning
         ("Reddit Gaming",      "https://www.reddit.com/r/gaming/.rss"),
         ("Reddit Games",       "https://www.reddit.com/r/Games/.rss"),
@@ -801,6 +805,14 @@ def hamta_nyheter() -> list:
         ("The Lancet",         "https://www.thelancet.com/rssfeed/lancet_online.xml"),
         ("MDPI Healthcare",    "https://www.mdpi.com/rss/journal/healthcare"),
         ("Reddit Science",     "https://www.reddit.com/r/science/.rss"),
+        ("Nature",             "https://www.nature.com/nature.rss"),
+        ("Science Alert",      "https://www.sciencealert.com/rss"),
+        ("Quanta Magazine",    "https://www.quantamagazine.org/feed/"),
+        # AI & forskning
+        ("Reddit ML",          "https://www.reddit.com/r/MachineLearning/.rss"),
+        ("Google Research",    "https://googleresearch.blogspot.com/atom.xml"),
+        ("Amazon Science",     "https://www.amazon.science/index.rss"),
+        ("Big Think",          "https://bigthink.com/feed/all/"),
     ]
     nyheter = []
     rss_stats = []  # [{"kalla": str, "ok": bool, "antal": int, "fel": str}]
@@ -1635,11 +1647,11 @@ def main():
 
     sb_key = os.environ.get("SUPABASE_ANON_KEY")
 
-    # 05:00–12:00 UTC (07:00–14:00 svensk tid) → garanterad nyhetsartikel (8 st/dag)
+    # 05:00–08:00 UTC (07:00–10:00 svensk tid) → garanterad nyhetsartikel (4 st/dag)
     # 13:00–16:00 UTC (15:00–18:00 svensk tid) → garanterad replik (4 st/dag)
     # 17:00–20:00 UTC (19:00–22:00 svensk tid) → garanterad eget ämne (4 st/dag)
     utc_hour = datetime.now(timezone.utc).hour
-    force_nyhet  = utc_hour in (5, 6, 7, 8, 9, 10, 11, 12)
+    force_nyhet  = utc_hour in (5, 6, 7, 8)
     force_replik = utc_hour in (13, 14, 15, 16)
     force_eget   = utc_hour in (17, 18, 19, 20)
 

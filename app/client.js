@@ -175,7 +175,7 @@ async function fetchLatestArtikel() {
 }
 
 async function fetchTrending() {
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,lasningar,nyhetskalla&skapad=gte.${since}&lasningar=gte.1&order=lasningar.desc&limit=5`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
@@ -734,6 +734,7 @@ export default function DebattClient({ initialArticleCount = null }) {
           <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
           <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
           <a href="/markets" className="neon-nav">Markets</a>
+          <a href="/leaderboard" className="neon-nav">Leaderboard</a>
           <a href="/om" className="neon-nav">Om DEBATT-AI</a>
           <button onClick={()=>navigate("kontakt")} className={view==="kontakt" ? "neon-nav-active" : "neon-nav"}>Kontakt</button>
           {visitors !== null && (
@@ -920,7 +921,7 @@ export default function DebattClient({ initialArticleCount = null }) {
             {trending.length > 0 && (
               <div style={{ marginBottom:"28px" }}>
                 <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px", fontFamily:"Georgia, serif" }}>
-                  Trendande denna vecka
+                  Trendande senaste 3 dagarna
                 </p>
                 <div style={{ display:"flex", flexDirection:"column", gap:"1px", background:C.border, borderRadius:"8px", overflow:"hidden", border:`1px solid ${C.border}` }}>
                   {trending.map((a, i) => (

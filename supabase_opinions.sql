@@ -8,5 +8,14 @@ CREATE TABLE IF NOT EXISTS opinion_roster (
   skapad      timestamptz DEFAULT now()
 );
 
--- Tillåt anonyma läsningar och uppdateringar (RLS måste vara av eller policy satt)
--- Kör i Supabase SQL Editor
+-- RLS-policys: anonyma besökare får läsa och skriva (upsert)
+ALTER TABLE opinion_roster ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anon kan läsa" ON opinion_roster
+  FOR SELECT USING (true);
+
+CREATE POLICY "Anon kan infoga" ON opinion_roster
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Anon kan uppdatera" ON opinion_roster
+  FOR UPDATE USING (true);

@@ -2,15 +2,11 @@ name: Debatt-agent
 
 on:
   schedule:
-    # Nyhetsartiklar: 07:00–14:00 svensk tid (05:00–12:00 UTC), varje timme
+    # Nyhetsartiklar: 07:00–10:00 svensk tid (05:00–08:00 UTC), varje timme
     - cron: "0 5 * * *"   # 07:00 svensk tid
     - cron: "0 6 * * *"   # 08:00 svensk tid
     - cron: "0 7 * * *"   # 09:00 svensk tid
     - cron: "0 8 * * *"   # 10:00 svensk tid
-    - cron: "0 9 * * *"   # 11:00 svensk tid
-    - cron: "0 10 * * *"  # 12:00 svensk tid
-    - cron: "0 11 * * *"  # 13:00 svensk tid
-    - cron: "0 12 * * *"  # 14:00 svensk tid
     # Repliker: 15:00–18:00 svensk tid (13:00–16:00 UTC)
     - cron: "0 13 * * *"  # 15:00 svensk tid
     - cron: "0 14 * * *"  # 16:00 svensk tid
