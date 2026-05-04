@@ -61,7 +61,7 @@ const AGENT_ROST = {
 // Munposition per agent (cx/cy i procent av 100×100 viewBox)
 // Justerade för nya realistiska bilder — halvkroppsbilder har ansiktet högre upp
 const MOUTH_POS = {
-  "Nationalekonom":       { cx: 50, cy: 63 }, // porträtt/headshot — ansikte fyller ramen
+  "Nationalekonom":       { cx: 48, cy: 55 },
   "Miljöaktivist":        { cx: 50, cy: 42 }, // halvkropp — ansikte i övre tredjedel
   "Teknikoptimist":       { cx: 50, cy: 40 }, // halvkropp — ansikte i övre tredjedel
   "Konservativ debattör": { cx: 50, cy: 68 },
