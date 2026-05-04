@@ -98,10 +98,9 @@ function RostatBar({ ja, nej }) {
   );
 }
 
-function FragaKort({ fraga, kategori, rosterData }) {
+function FragaKort({ fraga, kategori, rosterData, onVote }) {
   const key = `opinion_${fraga}`;
   const [rostat, setRostat] = useState(null);
-  const [lokalt, setLokalt] = useState({ ja: 0, nej: 0 });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -110,16 +109,15 @@ function FragaKort({ fraga, kategori, rosterData }) {
   }, [key]);
 
   const dbData = rosterData[fraga] ?? { roster_ja: 0, roster_nej: 0 };
-  const visaJa = dbData.roster_ja + lokalt.ja;
-  const visaNej = dbData.roster_nej + lokalt.nej;
+  const visaJa = dbData.roster_ja;
+  const visaNej = dbData.roster_nej;
 
   async function rosta(svar) {
     if (rostat || loading) return;
     setLoading(true);
-    // Optimistisk uppdatering
-    setLokalt(prev => ({ ...prev, [svar === "ja" ? "ja" : "nej"]: prev[svar === "ja" ? "ja" : "nej"] + 1 }));
     setRostat(svar);
     localStorage.setItem(key, svar);
+    onVote(fraga, kategori, svar);
     try {
       await fetch("/api/opinion", {
         method: "POST",
@@ -191,6 +189,20 @@ export default function OpinionClient() {
       .catch(() => {});
   }, []);
 
+  function onVote(fraga, kategori, svar) {
+    setRosterData(prev => {
+      const current = prev[fraga] ?? { roster_ja: 0, roster_nej: 0, fraga, kategori };
+      return {
+        ...prev,
+        [fraga]: {
+          ...current,
+          roster_ja: current.roster_ja + (svar === "ja" ? 1 : 0),
+          roster_nej: current.roster_nej + (svar === "nej" ? 1 : 0),
+        },
+      };
+    });
+  }
+
   const fragor = aktivKat === "alla"
     ? ALLA_FRAGOR
     : ALLA_FRAGOR.filter(f => f.kategori === aktivKat);
@@ -230,7 +242,7 @@ export default function OpinionClient() {
 
       {/* Frågor */}
       {fragor.map(({ fraga, kategori }) => (
-        <FragaKort key={fraga} fraga={fraga} kategori={kategori} rosterData={rosterData} />
+        <FragaKort key={fraga} fraga={fraga} kategori={kategori} rosterData={rosterData} onVote={onVote} />
       ))}
     </div>
   );
