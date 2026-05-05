@@ -154,8 +154,8 @@ export default function PoddTestPage() {
   );
 
   const autoplayRef = useRef(true);
-  const audioCtxRef = useRef(null);
-  const audioSrcRef = useRef(null);
+  const audioCtxRef = useRef(null); // används av recordLocalVideo
+  const audioSrcRef = useRef(null); // används av recordLocalVideo
 
   function login() {
     if (pw === ADMIN_PASSWORD) { setAuthed(true); setPwError(""); }
@@ -163,39 +163,29 @@ export default function PoddTestPage() {
   }
 
   function stopAudio() {
+    try { window.responsiveVoice?.cancel(); } catch {}
     autoplayRef.current = false;
     try { audioSrcRef.current?.stop(); } catch {}
     try { audioCtxRef.current?.close(); } catch {}
     setSpeaking(null); setAmplitude(0);
   }
 
-  async function testRost(namn) {
+  function testRost(namn) {
     if (speaking) { stopAudio(); return; }
-    setSpeaking(namn); autoplayRef.current = true;
-    try {
-      const resp = await fetch(`/api/tts?text=${encodeURIComponent(testText.slice(0, 200))}`);
-      if (!resp.ok) throw new Error("tts");
-      const buf = await resp.arrayBuffer();
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      audioCtxRef.current = ctx;
-      const audioBuf = await ctx.decodeAudioData(buf);
-      const analyser = ctx.createAnalyser(); analyser.fftSize = 256;
-      const src = ctx.createBufferSource(); audioSrcRef.current = src;
-      src.buffer = audioBuf; src.connect(analyser); analyser.connect(ctx.destination);
-      const data = new Uint8Array(analyser.frequencyBinCount); let rafId;
-      const tick = () => {
-        if (!autoplayRef.current) { cancelAnimationFrame(rafId); setAmplitude(0); return; }
-        analyser.getByteTimeDomainData(data);
-        let sum = 0; for (let i = 0; i < data.length; i++) { const v = (data[i]-128)/128; sum += v*v; }
-        setAmplitude(Math.min(1, Math.sqrt(sum/data.length)*8)); rafId = requestAnimationFrame(tick);
-      };
-      await new Promise(resolve => {
-        const cleanup = () => { cancelAnimationFrame(rafId); try { ctx.close(); } catch {} setAmplitude(0); resolve(); };
-        src.onended = cleanup; src.start(0); tick();
-        setTimeout(cleanup, audioBuf.duration * 1000 + 1000);
-      });
-    } catch { setAmplitude(0); }
-    setSpeaking(null);
+    if (!window.responsiveVoice) { alert("ResponsiveVoice laddar, försök igen om ett ögonblick."); return; }
+    setSpeaking(namn);
+    const voice = konVal[namn] === "kvinna" ? "Swedish Female" : "Swedish Male";
+    let iv;
+    window.responsiveVoice.speak(testText, voice, {
+      onstart: () => {
+        iv = setInterval(() => {
+          const t = Date.now();
+          setAmplitude(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
+        }, 70);
+      },
+      onend: () => { clearInterval(iv); setAmplitude(0); setSpeaking(null); },
+      onerror: () => { clearInterval(iv); setAmplitude(0); setSpeaking(null); },
+    });
   }
 
   async function recordLocalVideo(namn) {
