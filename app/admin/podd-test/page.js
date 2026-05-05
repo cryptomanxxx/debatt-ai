@@ -116,8 +116,20 @@ function AgentTestCard({ namn, pos, onPosChange, amplitude, speaking, onTest, di
         {speaking ? "⏸ Spelar..." : "▶ Testa TTS-röst"}
       </button>
 
+      {/* Sparad loop-video */}
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "16px", marginBottom: "0" }}>
+        <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 10px 0" }}>
+          Sparad loop-video
+        </p>
+        <video
+          src={`/avatarer/podd/${slug}-talking.mp4`}
+          loop playsInline controls
+          style={{ width: "100%", borderRadius: "8px", border: `1px solid ${farg}30`, background: "#000" }}
+        />
+      </div>
+
       {/* D-ID video-generering */}
-      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "16px" }}>
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "16px", marginTop: "16px" }}>
         <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 10px 0" }}>
           D-ID · Realistisk lip-sync
         </p>
