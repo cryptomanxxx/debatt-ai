@@ -26,7 +26,7 @@ export default function RootLayout({ children }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body style={{ margin: 0, padding: 0, background: "#0a0a0a" }}>
-        <Script src="https://code.responsivevoice.org/responsivevoice.js?key=nQnR2SiW" strategy="lazyOnload" />
+        <Script src="https://code.responsivevoice.org/responsivevoice.js?key=nQnR2SiW" strategy="afterInteractive" />
         <VisitorTracker />
         {children}
         <footer style={{ borderTop: "1px solid #1a1a1a", background: "#070707", padding: "28px 20px 20px", fontFamily: "Georgia, serif" }}>
