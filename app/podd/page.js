@@ -206,24 +206,20 @@ function Waveform({ amplitude, farg }) {
 
 function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
   const farg = AGENT_FARG[namn] || C.accent;
-  const slug = agentSlug(namn);
-  const [hasVideo, setHasVideo] = useState(true);
   const isTänkande = tänkande === namn;
+  const glow = speaking ? 18 + amplitude * 40 : 0;
+  const scale = speaking ? 1 + amplitude * 0.012 : 1;
 
   return (
     <div style={{ position: "relative", width: "100%", paddingTop: "75%", background: "#000", flexShrink: 0 }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
 
-        {/* D-ID talking video (muted — TTS hanterar ljud) */}
-        {hasVideo && (
-          <video src={talkingVideoSrc(namn)} autoPlay loop muted playsInline
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: speaking ? "block" : "none" }}
-            onError={() => setHasVideo(false)} />
-        )}
-
-        {/* Stillbild */}
+        {/* HD-stillbild — alltid synlig */}
         <img src={avatarSrc(namn)} alt={namn}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: (speaking && hasVideo) ? "none" : "block" }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block",
+            transform: `scale(${scale})`, transition: "transform 0.08s ease-out",
+            filter: speaking ? `drop-shadow(0 0 ${glow}px ${farg}66)` : "none",
+          }}
           onError={e => { if (!e.target.dataset.fb) { e.target.dataset.fb = "1"; e.target.src = avatarFallback(namn); } }} />
 
         {/* Tänker-overlay */}
@@ -250,6 +246,11 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
             {speaking && <Waveform amplitude={amplitude} farg={farg} />}
           </div>
         </div>
+
+        {/* Glödram när agenten talar */}
+        {speaking && (
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", boxShadow: `inset 0 0 ${glow * 1.5}px ${farg}33`, border: `2px solid ${farg}55`, transition: "box-shadow 0.08s ease" }} />
+        )}
       </div>
     </div>
   );
