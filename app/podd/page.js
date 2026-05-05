@@ -219,35 +219,19 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
   const farg = AGENT_FARG[namn] || C.accent;
   const isTänkande = tänkande === namn;
   const glow = speaking ? 18 + amplitude * 40 : 0;
-  const videoRef = useRef(null);
-  const hasLoop = ["Nationalekonom","Miljöaktivist","Teknikoptimist"].includes(namn);
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (speaking) { v.currentTime = 0; v.play().catch(() => {}); }
-    else v.pause();
-  }, [speaking]);
+  const scale = speaking ? 1 + amplitude * 0.008 : 1;
 
   return (
     <div style={{ position: "relative", width: "100%", paddingTop: "75%", background: "#000", flexShrink: 0 }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
 
-        {/* HD-stillbild — visas när agenten inte talar */}
+        {/* HD-stillbild */}
         <img src={avatarSrc(namn)} alt={namn}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block",
-            opacity: (speaking && hasLoop) ? 0 : 1, transition: "opacity 0.3s ease",
+          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block",
+            transform: `scale(${scale})`, transition: "transform 0.1s ease-out",
+            filter: speaking ? `drop-shadow(0 0 ${glow}px ${farg}88)` : "none",
           }}
           onError={e => { if (!e.target.dataset.fb) { e.target.dataset.fb = "1"; e.target.src = avatarFallback(namn); } }} />
-
-        {/* Loop-video — visas och loopas när agenten talar */}
-        {hasLoop && (
-          <video ref={videoRef} src={talkingVideoSrc(namn)} muted loop playsInline
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover",
-              opacity: speaking ? 1 : 0, transition: "opacity 0.3s ease",
-              filter: speaking ? `drop-shadow(0 0 ${glow}px ${farg}55)` : "none",
-            }} />
-        )}
 
         {/* Tänker-overlay */}
         {isTänkande && !speaking && (
