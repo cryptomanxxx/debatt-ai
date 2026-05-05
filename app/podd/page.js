@@ -1,6 +1,5 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import Script from "next/script";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -535,8 +534,6 @@ export default function PoddPage() {
   const currentDisplay = displayAgent || (agenter.length > 0 ? agenter[0] : null);
 
   return (
-    <>
-    <Script src="https://code.responsivevoice.org/responsivevoice.js?key=nQnR2SiW" strategy="lazyOnload" />
     <div style={{ background: C.bg, height: fas === "kör" ? "100dvh" : "auto", minHeight: fas === "kör" ? "unset" : "100vh", overflow: fas === "kör" ? "hidden" : "visible", color: C.text, fontFamily: "Georgia, serif", display: "flex", flexDirection: "column" }}>
       <style>{`
         @keyframes dot { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
@@ -730,6 +727,5 @@ export default function PoddPage() {
         </main>
       )}
     </div>
-    </>
   );
 }
