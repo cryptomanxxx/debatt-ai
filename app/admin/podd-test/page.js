@@ -250,13 +250,16 @@ export default function PoddTestPage() {
       drawFrame(0);
       recorder.start(100);
 
-      // Spela upp text mening för mening
+      // Spela upp text mening för mening med röstval
+      const azureVoice = konVal[namn] === "kvinna" ? "sv-SE-SofieNeural" : "sv-SE-MattiasNeural";
       const sentences = testText.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [testText];
       for (const sentence of sentences) {
-        const trimmed = sentence.trim().slice(0, 200);
+        const trimmed = sentence.trim().slice(0, 500);
         if (!trimmed) continue;
         try {
-          const resp = await fetch(`/api/tts?text=${encodeURIComponent(trimmed)}`);
+          // Försök Azure TTS (stöder röstval), fallback till Google TTS
+          let resp = await fetch(`/api/azure-tts?text=${encodeURIComponent(trimmed)}&voice=${azureVoice}`);
+          if (!resp.ok) resp = await fetch(`/api/tts?text=${encodeURIComponent(trimmed.slice(0, 200))}`);
           if (!resp.ok) continue;
           const buf = await resp.arrayBuffer();
           const audioBuf = await audioCtx.decodeAudioData(buf);
