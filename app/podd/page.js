@@ -262,15 +262,16 @@ function InfoPanel({ namn, streaming, historik }) {
   const transcriptRef = useRef(null);
 
   useEffect(() => {
-    transcriptRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [historik, streaming]);
+    transcriptRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [historik]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflowY: "auto" }}>
-      <div style={{ padding: "24px 20px 0" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {/* Fixed top: agent info + live text */}
+      <div style={{ flexShrink: 0, padding: "24px 20px 16px", borderBottom: historik.length > 0 ? `1px solid ${C.border}` : "none" }}>
         <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 14px 0" }}>Om agenten</p>
         <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.text, margin: "0 0 4px 0", fontFamily: "Times New Roman, serif" }}>{namn}</h2>
-        <p style={{ fontSize: "11px", color: farg, margin: "0 0 22px 0", letterSpacing: "0.05em" }}>{info.tags}</p>
+        <p style={{ fontSize: "11px", color: farg, margin: "0 0 16px 0", letterSpacing: "0.05em" }}>{info.tags}</p>
 
         {[
           { label: "Röst",     value: info.rost     },
@@ -278,30 +279,30 @@ function InfoPanel({ namn, streaming, historik }) {
           { label: "Styrka",   value: info.styrka   },
           { label: "Utmaning", value: info.utmaning },
         ].map(({ label, value }) => value ? (
-          <div key={label} style={{ marginBottom: "14px" }}>
+          <div key={label} style={{ marginBottom: "10px" }}>
             <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 3px 0" }}>{label}</p>
             <p style={{ fontSize: "13px", color: C.text, margin: 0, lineHeight: 1.55 }}>{value}</p>
           </div>
         ) : null)}
+
+        {/* Streaming text */}
+        {streaming && (
+          <div style={{ marginTop: "12px", padding: "12px", background: C.bg, border: `1px solid ${farg}30`, borderRadius: "6px" }}>
+            <p style={{ fontSize: "10px", color: farg, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 6px 0" }}>Talar nu</p>
+            <p style={{ fontSize: "13px", color: C.text, lineHeight: 1.7, margin: 0 }}>
+              {streaming.text}
+              <span style={{ display: "inline-block", width: "2px", height: "1em", background: farg, marginLeft: "2px", verticalAlign: "text-bottom", animation: "dot 0.8s step-end infinite" }} />
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Streaming text */}
-      {streaming && (
-        <div style={{ margin: "16px 20px 0", padding: "14px", background: C.bg, border: `1px solid ${farg}30`, borderRadius: "6px" }}>
-          <p style={{ fontSize: "10px", color: farg, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 8px 0" }}>Talar nu</p>
-          <p style={{ fontSize: "13px", color: C.text, lineHeight: 1.7, margin: 0 }}>
-            {streaming.text}
-            <span style={{ display: "inline-block", width: "2px", height: "1em", background: farg, marginLeft: "2px", verticalAlign: "text-bottom", animation: "dot 0.8s step-end infinite" }} />
-          </p>
-        </div>
-      )}
-
-      {/* Transkript */}
+      {/* Scrollable transcript — newest first, scrolls independently */}
       {historik.length > 0 && (
-        <div style={{ padding: "16px 20px", marginTop: "8px", borderTop: `1px solid ${C.border}` }}>
+        <div ref={transcriptRef} style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
           <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px 0" }}>Transkript ({historik.length}/10)</p>
-          {historik.map((e, i) => (
-            <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
+          {[...historik].reverse().map((e, i) => (
+            <div key={e.id ?? i} style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
               <div style={{ width: "3px", borderRadius: "2px", background: AGENT_FARG[e.agent] || C.accent, flexShrink: 0, alignSelf: "stretch" }} />
               <div>
                 <p style={{ fontSize: "10px", color: AGENT_FARG[e.agent] || C.accent, margin: "0 0 3px 0", letterSpacing: "0.06em" }}>{e.agent}</p>
@@ -309,7 +310,6 @@ function InfoPanel({ namn, streaming, historik }) {
               </div>
             </div>
           ))}
-          <div ref={transcriptRef} />
         </div>
       )}
     </div>
@@ -527,7 +527,7 @@ export default function PoddPage() {
   const currentDisplay = displayAgent || (agenter.length > 0 ? agenter[0] : null);
 
   return (
-    <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "Georgia, serif", display: "flex", flexDirection: "column" }}>
+    <div style={{ background: C.bg, height: fas === "kör" ? "100dvh" : "auto", minHeight: fas === "kör" ? "unset" : "100vh", overflow: fas === "kör" ? "hidden" : "visible", color: C.text, fontFamily: "Georgia, serif", display: "flex", flexDirection: "column" }}>
       <style>{`
         @keyframes dot { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
         .podd-layout { display:flex; flex:1; overflow:hidden; }
