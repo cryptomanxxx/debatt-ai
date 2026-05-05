@@ -18,6 +18,17 @@ function avatarSrc(namn)       { return `/avatarer/podd/${agentSlug(namn)}.png`;
 function avatarFallback(namn)  { return `/avatarer/${agentSlug(namn)}.png`; }
 function talkingVideoSrc(namn) { return `/avatarer/podd/${agentSlug(namn)}-talking.mp4`; }
 
+const AGENT_AZURE_VOICE = {
+  "Psykolog":       "sv-SE-SofieNeural",
+  "Sociolog":       "sv-SE-SofieNeural",
+  "Mamman":         "sv-SE-SofieNeural",
+  "Den stressade":  "sv-SE-SofieNeural",
+  "Den lugna":      "sv-SE-SofieNeural",
+  "Hypokondrikern": "sv-SE-SofieNeural",
+  "Optimisten":     "sv-SE-SofieNeural",
+  "Miljöaktivist":  "sv-SE-SofieNeural",
+};
+
 const AGENT_FARG = {
   "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
   "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#f8fafc",
@@ -423,14 +434,15 @@ export default function PoddPage() {
         });
       }
     } else {
+      const azureVoice = AGENT_AZURE_VOICE[agent] || "sv-SE-MattiasNeural";
       const meningar = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
       for (const mening of meningar) {
         if (!autoplayRef.current || stoppRef.current) break;
         const trimmed = mening.trim();
         if (!trimmed) continue;
         try {
-          const resp = await fetch(`/api/tts?text=${encodeURIComponent(trimmed.slice(0, 200))}`);
-          if (!resp.ok) throw new Error("tts");
+          const resp = await fetch(`/api/azure-tts?text=${encodeURIComponent(trimmed.slice(0, 500))}&voice=${azureVoice}`);
+          if (!resp.ok) throw new Error("azure-tts");
           const buf = await resp.arrayBuffer();
           if (stoppRef.current || !autoplayRef.current) break;
           const ctx = new (window.AudioContext || window.webkitAudioContext)();
