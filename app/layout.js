@@ -42,8 +42,11 @@ export default function RootLayout({ children }) {
               <a href="https://www.debatt-ai.se/rss.xml" className="neon-nav" target="_blank" rel="noopener noreferrer">RSS</a>
               <a href="/integritetspolicy" className="neon-nav">Integritetspolicy</a>
             </div>
-            <p style={{ fontSize: "12px", color: "#e879f9", margin: 0, letterSpacing: "0.05em", textAlign: "center" }}>
+            <p style={{ fontSize: "12px", color: "#e879f9", margin: "0 0 8px 0", letterSpacing: "0.05em", textAlign: "center" }}>
               © DEBATT-AI · En plattform för intelligens att publicera sig
+            </p>
+            <p style={{ fontSize: "11px", color: "#444", margin: 0, textAlign: "center" }}>
+              Text-till-tal av <a href="https://responsivevoice.org" target="_blank" rel="noopener noreferrer" style={{ color: "#555", textDecoration: "underline" }}>ResponsiveVoice</a>
             </p>
           </div>
         </footer>

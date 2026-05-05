@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import Script from "next/script";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -434,47 +435,25 @@ export default function PoddPage() {
         });
       }
     } else {
-      const azureVoice = AGENT_AZURE_VOICE[agent] || "sv-SE-MattiasNeural";
-      const meningar = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
-      for (const mening of meningar) {
-        if (!autoplayRef.current || stoppRef.current) break;
-        const trimmed = mening.trim();
-        if (!trimmed) continue;
-        try {
-          const resp = await fetch(`/api/azure-tts?text=${encodeURIComponent(trimmed.slice(0, 500))}&voice=${azureVoice}`);
-          if (!resp.ok) throw new Error("azure-tts");
-          const buf = await resp.arrayBuffer();
-          if (stoppRef.current || !autoplayRef.current) break;
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          audioCtxRef.current = ctx;
-          const audioBuf = await ctx.decodeAudioData(buf);
-          const analyser = ctx.createAnalyser(); analyser.fftSize = 256;
-          const src = ctx.createBufferSource(); audioSrcRef.current = src;
-          src.buffer = audioBuf; src.connect(analyser); analyser.connect(ctx.destination);
-          const data = new Uint8Array(analyser.frequencyBinCount); let rafId;
-          const tick = () => {
-            if (!autoplayRef.current) { cancelAnimationFrame(rafId); setAmplitude(0); return; }
-            analyser.getByteTimeDomainData(data);
-            let sum = 0; for (let i = 0; i < data.length; i++) { const v = (data[i]-128)/128; sum += v*v; }
-            setAmplitude(Math.min(1, Math.sqrt(sum/data.length)*8)); rafId = requestAnimationFrame(tick);
-          };
-          await new Promise(resolve => {
-            const cleanup = () => { cancelAnimationFrame(rafId); try { ctx.close(); } catch {} setAmplitude(0); resolve(); };
-            src.onended = cleanup; src.start(0); tick();
-            setTimeout(cleanup, audioBuf.duration * 1000 + 1500);
-          });
-        } catch {
-          const ms = Math.max(800, trimmed.length * 55);
-          await new Promise(resolve => {
-            const iv = setInterval(() => {
-              if (!autoplayRef.current) { clearInterval(iv); resolve(); return; }
-              const t = Date.now();
-              setAmplitude(Math.max(0.05, 0.35 + 0.55 * Math.sin(t*0.009) * Math.abs(Math.cos(t*0.014))));
-            }, 70);
-            setTimeout(() => { clearInterval(iv); setAmplitude(0); resolve(); }, ms);
-          });
-        }
-      }
+      const rvVoice = AGENT_AZURE_VOICE[agent] === "sv-SE-SofieNeural" ? "Swedish Female" : "Swedish Male";
+      await new Promise(resolve => {
+        if (!autoplayRef.current || stoppRef.current) { resolve(); return; }
+        let iv;
+        const startAnim = () => {
+          iv = setInterval(() => {
+            if (!autoplayRef.current) { clearInterval(iv); return; }
+            const t = Date.now();
+            setAmplitude(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
+          }, 70);
+        };
+        const stopAnim = () => { clearInterval(iv); setAmplitude(0); resolve(); };
+        const timeout = setTimeout(stopAnim, text.length * 80 + 4000);
+        window.responsiveVoice.speak(text, rvVoice, {
+          onstart: startAnim,
+          onend:   () => { clearTimeout(timeout); stopAnim(); },
+          onerror: () => { clearTimeout(timeout); stopAnim(); },
+        });
+      });
     }
     if (autoplayRef.current) { setSpeakerAgent(null); setAmplitude(0); }
   }
@@ -538,6 +517,7 @@ export default function PoddPage() {
   function stoppa() {
     stoppRef.current = true; autoplayRef.current = false;
     speechSynthesis.cancel();
+    try { window.responsiveVoice?.cancel(); } catch {}
     try { audioSrcRef.current?.stop(); } catch {}
     try { audioCtxRef.current?.close(); } catch {}
     abortRef.current?.abort();
@@ -555,6 +535,8 @@ export default function PoddPage() {
   const currentDisplay = displayAgent || (agenter.length > 0 ? agenter[0] : null);
 
   return (
+    <>
+    <Script src="https://code.responsivevoice.org/responsivevoice.js?key=nQnR2SiW" strategy="lazyOnload" />
     <div style={{ background: C.bg, height: fas === "kör" ? "100dvh" : "auto", minHeight: fas === "kör" ? "unset" : "100vh", overflow: fas === "kör" ? "hidden" : "visible", color: C.text, fontFamily: "Georgia, serif", display: "flex", flexDirection: "column" }}>
       <style>{`
         @keyframes dot { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
@@ -748,5 +730,6 @@ export default function PoddPage() {
         </main>
       )}
     </div>
+    </>
   );
 }
