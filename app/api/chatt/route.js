@@ -156,7 +156,7 @@ REGLER — viktiga:
         body: JSON.stringify({
           model: "llama-3.3-70b-versatile",
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
-          max_tokens: 100,
+          max_tokens: 250,
           temperature: 0.88,
           stream: true,
         }),
@@ -189,7 +189,7 @@ REGLER — viktiga:
   const geminiPayload = JSON.stringify({
     contents: [{ role: "user", parts: [{ text: userMessage }] }],
     systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: { maxOutputTokens: 150, temperature: 0.88 },
+    generationConfig: { maxOutputTokens: 250, temperature: 0.88 },
   });
 
   const geminiModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-1.5-flash-latest"];
