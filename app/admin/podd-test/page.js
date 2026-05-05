@@ -22,7 +22,7 @@ function agentSlug(namn) {
     .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
 
-function AgentTestCard({ namn, amplitude, speaking, onTest, didState, onGenerate, kon, onKonChange }) {
+function AgentTestCard({ namn, amplitude, speaking, onTest, onRecord, localState, didState, onGenerate, kon, onKonChange }) {
   const farg = AGENT_FARG[namn];
   const slug = agentSlug(namn);
   const scale = speaking ? 1 + amplitude * 0.04 : 1;
@@ -47,7 +47,7 @@ function AgentTestCard({ namn, amplitude, speaking, onTest, didState, onGenerate
 
       <p style={{ textAlign: "center", color: farg, fontSize: "14px", fontWeight: 600, margin: "0 0 14px 0" }}>{namn}</p>
 
-      {/* Könsval för röst */}
+      {/* Könsval */}
       <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
         {["man", "kvinna"].map(k => (
           <button key={k} onClick={() => onKonChange(k)} style={{
@@ -61,9 +61,9 @@ function AgentTestCard({ namn, amplitude, speaking, onTest, didState, onGenerate
         ))}
       </div>
 
-      {/* TTS-test */}
+      {/* Lyssna */}
       <button onClick={() => onTest(namn)} style={{
-        width: "100%", marginBottom: "16px",
+        width: "100%", marginBottom: "10px",
         background: speaking ? farg+"22" : "transparent",
         border: `1px solid ${farg}50`, color: farg,
         borderRadius: "4px", padding: "10px", fontSize: "13px",
@@ -72,35 +72,61 @@ function AgentTestCard({ namn, amplitude, speaking, onTest, didState, onGenerate
         {speaking ? "⏸ Spelar..." : "▶ Lyssna"}
       </button>
 
-      {/* D-ID video-generering */}
+      {/* Spela in video (utan D-ID) */}
+      <button onClick={() => onRecord(namn)} disabled={localState.recording} style={{
+        width: "100%", marginBottom: "16px",
+        background: localState.recording ? farg+"11" : `${farg}28`,
+        border: `1px solid ${farg}60`, color: localState.recording ? C.textMuted : farg,
+        borderRadius: "4px", padding: "10px", fontSize: "13px",
+        cursor: localState.recording ? "not-allowed" : "pointer",
+        fontFamily: "Georgia, serif", fontWeight: 600,
+      }}>
+        {localState.recording ? "⏺ Spelar in..." : "🎬 Spela in video"}
+      </button>
+
+      {localState.error && (
+        <p style={{ color: "#f87171", fontSize: "12px", margin: "-8px 0 12px 0" }}>{localState.error}</p>
+      )}
+
+      {localState.url && (
+        <div style={{ marginBottom: "16px" }}>
+          <video src={localState.url} controls playsInline
+            style={{ width: "100%", borderRadius: "8px", border: `1px solid ${farg}30` }} />
+          <a href={localState.url} download={`${slug}-video.webm`} style={{
+            display: "block", textAlign: "center", marginTop: "10px",
+            background: `${farg}18`, border: `1px solid ${farg}40`,
+            color: farg, borderRadius: "4px", padding: "10px",
+            fontSize: "13px", textDecoration: "none", fontFamily: "Georgia, serif",
+          }}>
+            ⬇ Spara video
+          </a>
+        </div>
+      )}
+
+      {/* D-ID (om krediter finns) */}
       <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "16px" }}>
+        <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 8px 0" }}>D-ID lip-sync (kräver krediter)</p>
         <button onClick={() => onGenerate(namn)} disabled={didState.loading} style={{
           width: "100%",
-          background: didState.loading ? farg+"11" : `${farg}18`,
-          border: `1px solid ${farg}40`, color: didState.loading ? C.textMuted : farg,
-          borderRadius: "4px", padding: "10px", fontSize: "13px",
+          background: "transparent",
+          border: `1px solid ${C.border}`, color: C.textMuted,
+          borderRadius: "4px", padding: "8px", fontSize: "12px",
           cursor: didState.loading ? "not-allowed" : "pointer",
           fontFamily: "Georgia, serif",
         }}>
-          {didState.loading ? "⏳ Genererar (~15 sek)..." : didState.url ? "↺ Generera ny video" : "🎬 Generera video"}
+          {didState.loading ? "⏳ Genererar..." : didState.url ? "↺ Ny D-ID video" : "🎬 Generera D-ID video"}
         </button>
-
-        {didState.error && (
-          <p style={{ color: "#f87171", fontSize: "12px", margin: "8px 0 0 0" }}>{didState.error}</p>
-        )}
-
+        {didState.error && <p style={{ color: "#f87171", fontSize: "11px", margin: "6px 0 0 0" }}>{didState.error}</p>}
         {didState.url && (
           <>
             <video src={didState.url} controls autoPlay loop playsInline
-              style={{ width: "100%", borderRadius: "8px", marginTop: "12px", border: `1px solid ${farg}30` }} />
-            <a href={didState.url} download={`${slug}-video.mp4`} style={{
-              display: "block", textAlign: "center", marginTop: "10px",
+              style={{ width: "100%", borderRadius: "8px", marginTop: "10px", border: `1px solid ${farg}30` }} />
+            <a href={didState.url} download={`${slug}-did.mp4`} style={{
+              display: "block", textAlign: "center", marginTop: "8px",
               background: `${farg}18`, border: `1px solid ${farg}40`,
-              color: farg, borderRadius: "4px", padding: "10px",
-              fontSize: "13px", textDecoration: "none", fontFamily: "Georgia, serif",
-            }}>
-              ⬇ Spara video
-            </a>
+              color: farg, borderRadius: "4px", padding: "8px",
+              fontSize: "12px", textDecoration: "none", fontFamily: "Georgia, serif",
+            }}>⬇ Spara D-ID video</a>
           </>
         )}
       </div>
@@ -109,16 +135,19 @@ function AgentTestCard({ namn, amplitude, speaking, onTest, didState, onGenerate
 }
 
 export default function PoddTestPage() {
-  const [authed, setAuthed]     = useState(false);
-  const [pw, setPw]             = useState("");
-  const [pwError, setPwError]   = useState("");
+  const [authed, setAuthed]       = useState(false);
+  const [pw, setPw]               = useState("");
+  const [pwError, setPwError]     = useState("");
   const [amplitude, setAmplitude] = useState(0);
-  const [speaking, setSpeaking] = useState(null);
-  const [testText, setTestText] = useState(
+  const [speaking, setSpeaking]   = useState(null);
+  const [testText, setTestText]   = useState(
     "Det finns tydliga samband som vi inte kan ignorera. Frågan är om vi är beredda att ta konsekvenserna av det vi vet."
   );
   const [didStates, setDidStates] = useState(
     Object.fromEntries(TEST_AGENTER.map(n => [n, { loading: false, url: null, error: null }]))
+  );
+  const [localStates, setLocalStates] = useState(
+    Object.fromEntries(TEST_AGENTER.map(n => [n, { recording: false, url: null, error: null }]))
   );
   const [konVal, setKonVal] = useState(
     Object.fromEntries(TEST_AGENTER.map(n => [n, "man"]))
@@ -137,14 +166,12 @@ export default function PoddTestPage() {
     autoplayRef.current = false;
     try { audioSrcRef.current?.stop(); } catch {}
     try { audioCtxRef.current?.close(); } catch {}
-    setSpeaking(null);
-    setAmplitude(0);
+    setSpeaking(null); setAmplitude(0);
   }
 
   async function testRost(namn) {
     if (speaking) { stopAudio(); return; }
-    setSpeaking(namn);
-    autoplayRef.current = true;
+    setSpeaking(namn); autoplayRef.current = true;
     try {
       const resp = await fetch(`/api/tts?text=${encodeURIComponent(testText.slice(0, 200))}`);
       if (!resp.ok) throw new Error("tts");
@@ -171,17 +198,122 @@ export default function PoddTestPage() {
     setSpeaking(null);
   }
 
+  async function recordLocalVideo(namn) {
+    const slug = agentSlug(namn);
+    const farg = AGENT_FARG[namn];
+    setLocalStates(prev => ({ ...prev, [namn]: { recording: true, url: null, error: null } }));
+
+    try {
+      // Ladda agent-bild
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve; img.onerror = reject;
+        img.src = `/avatarer/podd/${slug}.png`;
+      });
+
+      // Canvas 512×512
+      const canvas = document.createElement("canvas");
+      canvas.width = 512; canvas.height = 512;
+      const ctx2d = canvas.getContext("2d");
+
+      // AudioContext
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const mixDest = audioCtx.createMediaStreamDestination();
+
+      // MediaRecorder
+      const videoStream = canvas.captureStream(25);
+      const combined = new MediaStream([
+        ...videoStream.getVideoTracks(),
+        ...mixDest.stream.getAudioTracks(),
+      ]);
+      const mimeType = ["video/webm;codecs=vp9,opus","video/webm;codecs=vp8,opus","video/webm"]
+        .find(t => MediaRecorder.isTypeSupported(t)) || "video/webm";
+      const recorder = new MediaRecorder(combined, { mimeType });
+      const chunks = [];
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+
+      // Rita bakgrund
+      const drawFrame = (amp = 0) => {
+        ctx2d.fillStyle = "#080808";
+        ctx2d.fillRect(0, 0, 512, 512);
+        const s = 1 + amp * 0.025;
+        const off = (512 * s - 512) / 2;
+        ctx2d.drawImage(img, -off, -off, 512 * s, 512 * s);
+        // Glöd-ram
+        if (amp > 0.05) {
+          ctx2d.save();
+          ctx2d.shadowColor = farg;
+          ctx2d.shadowBlur = 20 + amp * 40;
+          ctx2d.strokeStyle = farg + "99";
+          ctx2d.lineWidth = 3;
+          ctx2d.strokeRect(2, 2, 508, 508);
+          ctx2d.restore();
+        }
+        // Agentnamn
+        ctx2d.fillStyle = "#ffffffcc";
+        ctx2d.font = "bold 22px Georgia, serif";
+        ctx2d.textAlign = "center";
+        ctx2d.fillText(namn, 256, 496);
+      };
+
+      // Starta inspelning
+      drawFrame(0);
+      recorder.start(100);
+
+      // Spela upp text mening för mening
+      const sentences = testText.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [testText];
+      for (const sentence of sentences) {
+        const trimmed = sentence.trim().slice(0, 200);
+        if (!trimmed) continue;
+        try {
+          const resp = await fetch(`/api/tts?text=${encodeURIComponent(trimmed)}`);
+          if (!resp.ok) continue;
+          const buf = await resp.arrayBuffer();
+          const audioBuf = await audioCtx.decodeAudioData(buf);
+          const analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
+          const src = audioCtx.createBufferSource();
+          src.buffer = audioBuf;
+          src.connect(analyser);
+          analyser.connect(mixDest);
+          analyser.connect(audioCtx.destination);
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          let rafId;
+          const animate = () => {
+            analyser.getByteTimeDomainData(data);
+            let sum = 0; for (let i = 0; i < data.length; i++) { const v = (data[i]-128)/128; sum += v*v; }
+            drawFrame(Math.min(1, Math.sqrt(sum/data.length)*8));
+            rafId = requestAnimationFrame(animate);
+          };
+          await new Promise(resolve => {
+            src.onended = () => { cancelAnimationFrame(rafId); drawFrame(0); resolve(); };
+            src.start(0); animate();
+            setTimeout(resolve, audioBuf.duration * 1000 + 800);
+          });
+        } catch { /* hoppa över mening */ }
+      }
+
+      // Avsluta
+      recorder.stop();
+      await new Promise(resolve => { recorder.onstop = resolve; });
+      await audioCtx.close();
+
+      const blob = new Blob(chunks, { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      setLocalStates(prev => ({ ...prev, [namn]: { recording: false, url, error: null } }));
+    } catch (e) {
+      setLocalStates(prev => ({ ...prev, [namn]: { recording: false, url: null, error: e.message } }));
+    }
+  }
+
   async function generateDID(namn) {
     setDidStates(prev => ({ ...prev, [namn]: { loading: true, url: null, error: null } }));
     try {
       const createRes = await fetch("/api/did", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ agent: namn, text: testText, kon: konVal[namn] }),
       });
       const { id, error: createErr } = await createRes.json();
-      if (createErr || !id) throw new Error(createErr || "Kunde inte starta video-generering");
-
+      if (createErr || !id) throw new Error(createErr || "Kunde inte starta");
       for (let i = 0; i < 30; i++) {
         await new Promise(r => setTimeout(r, 2000));
         const pollRes = await fetch(`/api/did?id=${id}`);
@@ -204,11 +336,9 @@ export default function PoddTestPage() {
       <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Georgia, serif" }}>
         <div style={{ width: "320px", padding: "40px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px" }}>
           <h1 style={{ fontSize: "22px", fontWeight: 400, color: C.accent, margin: "0 0 6px 0", fontFamily: "Times New Roman, serif" }}>DEBATT-AI</h1>
-          <p style={{ color: C.textMuted, fontSize: "13px", margin: "0 0 28px 0", letterSpacing: "0.1em", textTransform: "uppercase" }}>Podd-test</p>
-          <input type="password" value={pw}
-            onChange={e => setPw(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && login()}
-            placeholder="Lösenord"
+          <p style={{ color: C.textMuted, fontSize: "13px", margin: "0 0 28px 0", letterSpacing: "0.1em", textTransform: "uppercase" }}>AI Video</p>
+          <input type="password" value={pw} onChange={e => setPw(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && login()} placeholder="Lösenord"
             style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.text, fontFamily: "Georgia, serif", fontSize: "14px", padding: "10px 12px", width: "100%", boxSizing: "border-box", outline: "none", marginBottom: "12px" }}
             autoFocus />
           {pwError && <p style={{ color: "#f87171", fontSize: "13px", margin: "0 0 12px 0" }}>{pwError}</p>}
@@ -228,14 +358,14 @@ export default function PoddTestPage() {
           <div>
             <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 6px 0" }}>Admin</p>
             <h1 style={{ fontSize: "26px", fontWeight: 400, margin: "0 0 6px 0" }}>AI Video</h1>
-            <p style={{ color: C.textMuted, fontSize: "13px", margin: 0 }}>Klistra in text, lyssna och generera video</p>
+            <p style={{ color: C.textMuted, fontSize: "13px", margin: 0 }}>Klistra in text, lyssna och spela in video</p>
           </div>
           <a href="/admin" style={{ marginLeft: "auto", color: C.textMuted, fontSize: "13px", textDecoration: "none", whiteSpace: "nowrap", paddingTop: "4px" }}>← Admin</a>
         </div>
 
         <div style={{ marginBottom: "28px" }}>
           <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 8px 0" }}>Text</p>
-          <textarea value={testText} onChange={e => setTestText(e.target.value)} rows={4}
+          <textarea value={testText} onChange={e => setTestText(e.target.value)} rows={5}
             style={{ width: "100%", boxSizing: "border-box", background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.text, fontFamily: "Georgia, serif", fontSize: "14px", padding: "10px 12px", resize: "vertical", outline: "none" }} />
         </div>
 
@@ -246,6 +376,8 @@ export default function PoddTestPage() {
               amplitude={speaking === namn ? amplitude : 0}
               speaking={speaking === namn}
               onTest={testRost}
+              onRecord={recordLocalVideo}
+              localState={localStates[namn]}
               didState={didStates[namn]}
               onGenerate={generateDID}
               kon={konVal[namn]}
