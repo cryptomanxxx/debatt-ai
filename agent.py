@@ -812,19 +812,12 @@ def hamta_statistik(kategorier: list[str] | None = None) -> str:
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från RSS-flöden."""
     feeds = [
-        # Svenska nyheter – direkta RSS-flöden
+        # Svenska nyheter
         ("SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"),
         ("SVT Nyheter (alt)",  "https://www.svt.se/rss.xml"),
         ("Aftonbladet",        "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"),
         ("Expressen",          "https://feeds.expressen.se/nyheter/"),
         ("Dagens Arena",       "https://www.dagensarena.se/feed/"),
-        # Svenska ämnen – Reddit (stabila, 10 artiklar/körning vardera)
-        ("Reddit Sverige",     "https://www.reddit.com/r/sweden/.rss"),
-        ("Reddit Ekonomi",     "https://www.reddit.com/r/Economics/.rss"),
-        ("Reddit Klimat",      "https://www.reddit.com/r/environment/.rss"),
-        ("Reddit Samhälle",    "https://www.reddit.com/r/europe/.rss"),
-        ("Reddit Sjukvård",    "https://www.reddit.com/r/medicine/.rss"),
-        ("Reddit Bostäder",    "https://www.reddit.com/r/urbanplanning/.rss"),
         # Tech
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
         ("Ars Technica",       "https://feeds.arstechnica.com/arstechnica/index"),
@@ -834,33 +827,23 @@ def hamta_nyheter() -> list:
         ("TechCrunch",         "https://techcrunch.com/feed/"),
         ("Engadget",           "https://www.engadget.com/rss-full.xml"),
         # Spel & underhållning
-        ("Reddit Gaming",      "https://www.reddit.com/r/gaming/.rss"),
-        ("Reddit Games",       "https://www.reddit.com/r/Games/.rss"),
-        ("Reddit PS5",         "https://www.reddit.com/r/PS5/.rss"),
-        ("Reddit Xbox",        "https://www.reddit.com/r/xbox/.rss"),
-        ("Reddit TV",          "https://www.reddit.com/r/television/.rss"),
-        ("IGN",                "https://feeds.ign.com/ign/all"),
+        ("IGN",                "https://ign.com/rss/v2/articles/feed"),
         # Kryptovalutor
         ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/"),
         ("Cointelegraph",      "https://cointelegraph.com/rss"),
-        ("Reddit Crypto",      "https://www.reddit.com/r/CryptoCurrency/.rss"),
-        ("Reddit Bitcoin",     "https://www.reddit.com/r/Bitcoin/.rss"),
         # Internationellt
         ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
         ("Al Jazeera",         "https://www.aljazeera.com/xml/rss/all.xml"),
-        ("Reddit World News",  "https://www.reddit.com/r/worldnews/.rss"),
         # Medicin & forskning
         ("The Lancet",         "https://www.thelancet.com/rssfeed/lancet_online.xml"),
         ("MDPI Healthcare",    "https://www.mdpi.com/rss/journal/healthcare"),
-        ("Reddit Science",     "https://www.reddit.com/r/science/.rss"),
         ("Nature",             "https://www.nature.com/nature.rss"),
         ("Science Alert",      "https://www.sciencealert.com/rss"),
         ("Quanta Magazine",    "https://www.quantamagazine.org/feed/"),
         # AI & forskning
-        ("Reddit ML",          "https://www.reddit.com/r/MachineLearning/.rss"),
-        ("Google Research",    "https://googleresearch.blogspot.com/atom.xml"),
+        ("Google Research",    "https://research.google/blog/rss/"),
         ("Amazon Science",     "https://www.amazon.science/index.rss"),
-        ("Big Think",          "https://bigthink.com/feed/all/"),
+        ("Big Think",          "https://bigthink.com/feeds/feed.rss"),
     ]
     nyheter = []
     rss_stats = []  # [{"kalla": str, "ok": bool, "antal": int, "fel": str}]
