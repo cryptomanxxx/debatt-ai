@@ -6,6 +6,12 @@ import NavHistorikLink from "../NavHistorikLink";
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
 
+const KVINNLIGA_AGENTER = new Set([
+  "Psykolog", "Sociolog", "Mamman", "Den stressade",
+  "Den lugna", "Hypokondrikern", "Optimisten", "Miljöaktivist",
+]);
+const agentRost = namn => KVINNLIGA_AGENTER.has(namn) ? "Swedish Female" : "Swedish Male";
+
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -338,7 +344,6 @@ export default function ChattPage() {
   const [aiVäljer, setAiVäljer] = useState(false);
   const stoppRef = useRef(false);
   const abortRef = useRef(null);
-  const audioRef = useRef(null);
   const lyssnaStoppRef = useRef(false);
   const bottomRef = useRef(null);
   const providersRef = useRef(new Set());
@@ -458,28 +463,19 @@ export default function ChattPage() {
     abortRef.current?.abort();
   }
 
-  async function spelaUppText(text) {
-    const sentences = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
-    const chunks = [];
-    let cur = "";
-    for (const s of sentences) {
-      if (cur.length + s.length > 150 && cur) { chunks.push(cur.trim()); cur = s; }
-      else cur += s;
-    }
-    if (cur.trim()) chunks.push(cur.trim());
-    for (const chunk of chunks) {
-      if (lyssnaStoppRef.current) return;
-      await new Promise((resolve) => {
-        const audio = new Audio(`/api/tts?text=${encodeURIComponent(chunk)}`);
-        audioRef.current = audio;
-        audio.onended = resolve;
-        audio.onerror = resolve;
-        audio.play().catch(resolve);
+  function spelaUppText(text, agent) {
+    return new Promise(resolve => {
+      if (lyssnaStoppRef.current) { resolve(); return; }
+      const rost = agent ? agentRost(agent) : "Swedish Male";
+      window.responsiveVoice.speak(text, rost, {
+        onend:  resolve,
+        onerror:resolve,
       });
-    }
+    });
   }
 
   async function lyssna() {
+    if (!window.responsiveVoice) return;
     const entries = historik.length > 0
       ? historik
       : summering ? [{ agent: null, text: summering }] : [];
@@ -488,22 +484,20 @@ export default function ChattPage() {
     setSpelar(true);
     for (const e of entries) {
       if (lyssnaStoppRef.current) break;
-      if (e.agent) await spelaUppText(`${e.agent} säger:`);
-      if (lyssnaStoppRef.current) break;
-      await spelaUppText(e.text);
+      await spelaUppText(e.text, e.agent);
     }
     if (!lyssnaStoppRef.current) setSpelar(false);
   }
 
   function stoppLyssna() {
     lyssnaStoppRef.current = true;
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    window.responsiveVoice?.cancel();
     setSpelar(false);
   }
 
   function nyDebatt() {
     lyssnaStoppRef.current = true;
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    window.responsiveVoice?.cancel();
     setSpelar(false);
     setFas("start");
     setHistorik([]);
