@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import ChattShareButtons from "./ChattShareButtons";
 import NavArkivLink from "../../NavArkivLink";
-import LyssnaKnapp from "../../LyssnaKnapp";
+import ChattLyssna from "./ChattLyssna";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -57,7 +57,7 @@ export default async function ChattDebattPage({ params }) {
 
   const inlagg = Array.isArray(debatt.inlagg) ? debatt.inlagg : [];
   const agenter = Array.isArray(debatt.agenter) ? debatt.agenter : [];
-  const lyssnaText = `${debatt.amne}. ${inlagg.map(h => `${h.agent}: ${h.text}`).join(". ")}`;
+
   const datum = debatt.skapad
     ? new Date(debatt.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "long", year: "numeric" })
     : "";
@@ -112,7 +112,7 @@ export default async function ChattDebattPage({ params }) {
               </span>
             ))}
             <span style={{ fontSize: "12px", color: C.textMuted, alignSelf: "center", marginLeft: "4px" }}>{inlagg.length} inlägg</span>
-            <LyssnaKnapp text={lyssnaText} />
+            <ChattLyssna amne={debatt.amne} inlagg={inlagg} />
           </div>
         </div>
 
