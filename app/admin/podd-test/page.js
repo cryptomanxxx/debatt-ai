@@ -206,16 +206,9 @@ export default function PoddTestPage() {
       canvas.width = 512; canvas.height = 512;
       const ctx2d = canvas.getContext("2d");
 
-      // Silent audio track keeps the audio stream alive in the WebM container.
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       await audioCtx.resume();
       const mixDest = audioCtx.createMediaStreamDestination();
-      const silentGain = audioCtx.createGain();
-      silentGain.gain.value = 0;
-      const silentOsc = audioCtx.createOscillator();
-      silentOsc.connect(silentGain);
-      silentGain.connect(mixDest);
-      silentOsc.start();
 
       const videoStream = canvas.captureStream(25);
       const combined = new MediaStream([
@@ -252,33 +245,42 @@ export default function PoddTestPage() {
       drawFrame(0);
       recorder.start(100);
 
-      // RV plays the correct voice through speakers while animation is recorded.
+      // Fetch audio server-side (no CORS) and decode into AudioContext.
       const sentences = testText.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [testText];
+      const gender = konVal[namn];
 
       for (const sentence of sentences) {
-        const trimmed = sentence.trim();
+        const trimmed = sentence.trim().slice(0, 500);
         if (!trimmed) continue;
-
-        await new Promise(resolve => {
-          let iv;
-          const cleanup = () => { clearInterval(iv); drawFrame(0); };
-
-          window.responsiveVoice.speak(trimmed, rvVoice, {
-            onstart: () => {
-              iv = setInterval(() => {
-                const t = Date.now();
-                drawFrame(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
-              }, 70);
-            },
-            onend:  () => { cleanup(); resolve(); },
-            onerror:() => { cleanup(); resolve(); },
+        try {
+          const resp = await fetch(`/api/rv-tts?text=${encodeURIComponent(trimmed)}&gender=${gender}`);
+          if (!resp.ok) continue;
+          const buf = await resp.arrayBuffer();
+          const audioBuf = await audioCtx.decodeAudioData(buf);
+          const analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
+          const src = audioCtx.createBufferSource();
+          src.buffer = audioBuf;
+          src.connect(analyser);
+          analyser.connect(mixDest);
+          analyser.connect(audioCtx.destination);
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          let rafId;
+          const animate = () => {
+            analyser.getByteTimeDomainData(data);
+            let sum = 0;
+            for (let i = 0; i < data.length; i++) { const v = (data[i] - 128) / 128; sum += v * v; }
+            drawFrame(Math.min(1, Math.sqrt(sum / data.length) * 8));
+            rafId = requestAnimationFrame(animate);
+          };
+          await new Promise(resolve => {
+            src.onended = () => { cancelAnimationFrame(rafId); drawFrame(0); resolve(); };
+            src.start(0);
+            animate();
+            setTimeout(resolve, audioBuf.duration * 1000 + 800);
           });
-
-          setTimeout(resolve, trimmed.length * 100 + 5000);
-        });
+        } catch { /* hoppa över mening */ }
       }
 
-      silentOsc.stop();
       recorder.stop();
       await new Promise(resolve => { recorder.onstop = resolve; });
       await audioCtx.close();
@@ -288,8 +290,6 @@ export default function PoddTestPage() {
       setLocalStates(prev => ({ ...prev, [namn]: { recording: false, url, error: null } }));
     } catch (e) {
       setLocalStates(prev => ({ ...prev, [namn]: { recording: false, url: null, error: e.message } }));
-    } finally {
-      window.responsiveVoice?.cancel();
     }
   }
 
