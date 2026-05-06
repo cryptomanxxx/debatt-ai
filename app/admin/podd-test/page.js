@@ -191,26 +191,34 @@ export default function PoddTestPage() {
   async function recordLocalVideo(namn) {
     const slug = agentSlug(namn);
     const farg = AGENT_FARG[namn];
+    const rvVoice = konVal[namn] === "kvinna" ? "Swedish Female" : "Swedish Male";
+
     setLocalStates(prev => ({ ...prev, [namn]: { recording: true, url: null, error: null } }));
 
+    // Patch Audio constructor so any new element gets crossOrigin=anonymous,
+    // which lets createMediaElementSource connect to it without CORS errors.
+    const OrigAudio = window.Audio;
+    window.Audio = function(...args) {
+      const el = new OrigAudio(...args);
+      el.crossOrigin = "anonymous";
+      return el;
+    };
+    window.Audio.prototype = OrigAudio.prototype;
+
     try {
-      // Ladda agent-bild
       const img = new Image();
       await new Promise((resolve, reject) => {
         img.onload = resolve; img.onerror = reject;
         img.src = `/avatarer/podd/${slug}.png`;
       });
 
-      // Canvas 512×512
       const canvas = document.createElement("canvas");
       canvas.width = 512; canvas.height = 512;
       const ctx2d = canvas.getContext("2d");
 
-      // AudioContext
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       const mixDest = audioCtx.createMediaStreamDestination();
 
-      // MediaRecorder
       const videoStream = canvas.captureStream(25);
       const combined = new MediaStream([
         ...videoStream.getVideoTracks(),
@@ -222,14 +230,12 @@ export default function PoddTestPage() {
       const chunks = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
 
-      // Rita bakgrund
       const drawFrame = (amp = 0) => {
         ctx2d.fillStyle = "#080808";
         ctx2d.fillRect(0, 0, 512, 512);
         const s = 1 + amp * 0.025;
         const off = (512 * s - 512) / 2;
         ctx2d.drawImage(img, -off, -off, 512 * s, 512 * s);
-        // Glöd-ram
         if (amp > 0.05) {
           ctx2d.save();
           ctx2d.shadowColor = farg;
@@ -239,53 +245,54 @@ export default function PoddTestPage() {
           ctx2d.strokeRect(2, 2, 508, 508);
           ctx2d.restore();
         }
-        // Agentnamn
         ctx2d.fillStyle = "#ffffffcc";
         ctx2d.font = "bold 22px Georgia, serif";
         ctx2d.textAlign = "center";
         ctx2d.fillText(namn, 256, 496);
       };
 
-      // Starta inspelning
       drawFrame(0);
       recorder.start(100);
 
-      // Spela upp text mening för mening med röstval
-      const azureVoice = konVal[namn] === "kvinna" ? "sv-SE-SofieNeural" : "sv-SE-MattiasNeural";
       const sentences = testText.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [testText];
+      const capturedEls = new Set();
+
       for (const sentence of sentences) {
-        const trimmed = sentence.trim().slice(0, 500);
+        const trimmed = sentence.trim();
         if (!trimmed) continue;
-        try {
-          // Försök Azure TTS (stöder röstval), fallback till Google TTS
-          let resp = await fetch(`/api/azure-tts?text=${encodeURIComponent(trimmed)}&voice=${azureVoice}`);
-          if (!resp.ok) resp = await fetch(`/api/tts?text=${encodeURIComponent(trimmed.slice(0, 200))}`);
-          if (!resp.ok) continue;
-          const buf = await resp.arrayBuffer();
-          const audioBuf = await audioCtx.decodeAudioData(buf);
-          const analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
-          const src = audioCtx.createBufferSource();
-          src.buffer = audioBuf;
-          src.connect(analyser);
-          analyser.connect(mixDest);
-          analyser.connect(audioCtx.destination);
-          const data = new Uint8Array(analyser.frequencyBinCount);
-          let rafId;
-          const animate = () => {
-            analyser.getByteTimeDomainData(data);
-            let sum = 0; for (let i = 0; i < data.length; i++) { const v = (data[i]-128)/128; sum += v*v; }
-            drawFrame(Math.min(1, Math.sqrt(sum/data.length)*8));
-            rafId = requestAnimationFrame(animate);
-          };
-          await new Promise(resolve => {
-            src.onended = () => { cancelAnimationFrame(rafId); drawFrame(0); resolve(); };
-            src.start(0); animate();
-            setTimeout(resolve, audioBuf.duration * 1000 + 800);
+
+        await new Promise(resolve => {
+          let iv;
+          const cleanup = () => { clearInterval(iv); drawFrame(0); };
+
+          window.responsiveVoice.speak(trimmed, rvVoice, {
+            onstart: () => {
+              // Try to route RV's audio element through AudioContext for capture.
+              // If CORS blocks this, audio still plays via browser default output.
+              const audioEls = Array.from(document.querySelectorAll("audio"));
+              for (const el of audioEls) {
+                if (!el.paused && !capturedEls.has(el)) {
+                  try {
+                    const src = audioCtx.createMediaElementSource(el);
+                    src.connect(mixDest);
+                    src.connect(audioCtx.destination);
+                    capturedEls.add(el);
+                  } catch {}
+                }
+              }
+              iv = setInterval(() => {
+                const t = Date.now();
+                drawFrame(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
+              }, 70);
+            },
+            onend:  () => { cleanup(); resolve(); },
+            onerror:() => { cleanup(); resolve(); },
           });
-        } catch { /* hoppa över mening */ }
+
+          setTimeout(resolve, trimmed.length * 100 + 5000);
+        });
       }
 
-      // Avsluta
       recorder.stop();
       await new Promise(resolve => { recorder.onstop = resolve; });
       await audioCtx.close();
@@ -295,6 +302,9 @@ export default function PoddTestPage() {
       setLocalStates(prev => ({ ...prev, [namn]: { recording: false, url, error: null } }));
     } catch (e) {
       setLocalStates(prev => ({ ...prev, [namn]: { recording: false, url: null, error: e.message } }));
+    } finally {
+      window.Audio = OrigAudio;
+      window.responsiveVoice?.cancel();
     }
   }
 
