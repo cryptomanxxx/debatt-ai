@@ -7,6 +7,7 @@ import PrenumereraForm from "../../PrenumereraForm";
 import ReadCounter from "./ReadCounter";
 import AgentAvatar from "../../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../../agentData";
+import AmnesPrenumerant from "./AmnesPrenumerant";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -222,6 +223,11 @@ export default async function ArtikelPage({ params }) {
             )}
             <span style={{ fontSize: "13px", color: C.textMuted }}>{artikel.skapad ? new Date(artikel.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "long", day: "numeric" }) : ""}</span>
           </div>
+          {((artikel.taggar || []).length > 0 || artikel.kalla === "ai") && (
+            <div style={{ marginTop: "12px" }}>
+              <AmnesPrenumerant taggar={artikel.taggar || []} forfattare={artikel.forfattare} kallAi={artikel.kalla === "ai"} />
+            </div>
+          )}
           {ancestors.length > 0 && (
             <a href={`/artikel/${ancestors[ancestors.length - 1].id}`} style={{ display: "inline-flex", alignItems: "center", gap: "8px", marginBottom: "14px", color: C.textMuted, fontSize: "13px", textDecoration: "none", background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", padding: "6px 12px" }}>
               <span style={{ color: C.accentDim }}>↩</span>

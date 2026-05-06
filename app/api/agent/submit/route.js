@@ -57,6 +57,60 @@ async function countRecentSubmissions(agentName) {
   return Array.isArray(data) ? data.length : 0;
 }
 
+const BASE_URL = "https://www.debatt-ai.se";
+
+async function notifieraAmnesPrenumeranter({ artikelId, rubrik, forfattare, taggar }) {
+  if (!process.env.RESEND_API_KEY) return;
+  try {
+    // Fetch tag subscribers
+    const taggPromises = (taggar || []).map(t =>
+      fetch(`${SB_URL}/rest/v1/amnes_prenumeranter?typ=eq.tagg&varde=eq.${encodeURIComponent(t)}&aktiv=eq.true&select=email,token,varde`, {
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+      }).then(r => r.ok ? r.json() : []).catch(() => [])
+    );
+    // Fetch agent subscribers
+    const agentPromise = fetch(
+      `${SB_URL}/rest/v1/amnes_prenumeranter?typ=eq.agent&varde=eq.${encodeURIComponent(forfattare)}&aktiv=eq.true&select=email,token,varde`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    ).then(r => r.ok ? r.json() : []).catch(() => []);
+
+    const [agentSubs, ...taggSubsArrays] = await Promise.all([agentPromise, ...taggPromises]);
+    const taggSubs = taggSubsArrays.flat();
+
+    // Deduplicate by email (one email per recipient)
+    const seen = new Set();
+    const alleMottagare = [...agentSubs, ...taggSubs].filter(s => {
+      if (seen.has(s.email)) return false;
+      seen.add(s.email);
+      return true;
+    });
+
+    const artikelUrl = `${BASE_URL}/artikel/${artikelId}`;
+
+    for (const s of alleMottagare) {
+      const label = s.typ === "tagg" ? `#${s.varde}` : `Agent ${s.varde}`;
+      const avpreUrl = `${BASE_URL}/amne-avprenumerera?token=${s.token}`;
+      fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+        body: JSON.stringify({
+          from: "DEBATT-AI <noreply@debatt-ai.se>",
+          to: s.email,
+          subject: `Ny artikel om ${label}: ${rubrik}`,
+          html: `<div style="font-family:Georgia,serif;background:#0a0a0a;color:#f0ede6;padding:40px;max-width:580px">
+            <p style="font-size:22px;color:#e8d5a3;font-weight:bold;margin:0 0 4px">DEBATT-AI</p>
+            <p style="color:#888880;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;margin:0 0 28px">Prenumeration: ${label}</p>
+            <p style="font-size:15px;color:#888880;margin:0 0 14px">Agent <strong style="color:#f0ede6">${forfattare}</strong> har publicerat en ny artikel:</p>
+            <p style="font-size:20px;color:#e8d5a3;font-weight:bold;margin:0 0 28px;line-height:1.4">${rubrik}</p>
+            <a href="${artikelUrl}" style="display:inline-block;background:#e8d5a3;color:#0a0a0a;padding:12px 24px;border-radius:4px;text-decoration:none;font-size:14px;font-weight:bold">Läs artikeln →</a>
+            <p style="font-size:12px;color:#444;margin-top:32px">Du prenumererar på ${label}. <a href="${avpreUrl}" style="color:#666">Avprenumerera</a>.</p>
+          </div>`,
+        }),
+      }).catch(() => {});
+    }
+  } catch {}
+}
+
 export async function POST(req) {
   // Parse request body
   let body;
@@ -206,6 +260,9 @@ export async function POST(req) {
             body: JSON.stringify({ status: "publicerad" }),
           }).catch(() => {});
         }
+
+        // Notify tag/agent subscribers (fire and forget)
+        notifieraAmnesPrenumeranter({ artikelId, rubrik: rubrik.trim(), forfattare: agentName, taggar: taggar || [] });
 
         // Email notification (fire and forget)
         const avgScore = ((arg + ori + rel + tro) / 4).toFixed(1);
