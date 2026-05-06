@@ -260,6 +260,7 @@ export default function PoddTestPage() {
           const analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
           const src = audioCtx.createBufferSource();
           src.buffer = audioBuf;
+          src.playbackRate.value = 0.75; // match RV browser playback speed
           src.connect(analyser);
           analyser.connect(mixDest);
           analyser.connect(audioCtx.destination);
