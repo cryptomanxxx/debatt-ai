@@ -1592,7 +1592,7 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
             f"{SB_URL}/rest/v1/markets",
             headers=hdrs,
             json={"titel": titel, "beskrivning": beskrivning, "deadline": deadline,
-                  "resolution_kalla": resolution_kalla, "kategori": kategori, "status": "föreslagen"},
+                  "resolution_kalla": resolution_kalla, "kategori": kategori, "status": "öppen"},
             timeout=10,
         )
         if res.status_code in (200, 201):
