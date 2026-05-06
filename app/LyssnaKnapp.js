@@ -1,50 +1,20 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState } from "react";
 
-function splitToChunks(text, maxLen = 150) {
-  const sentences = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
-  const chunks = [];
-  for (const s of sentences) {
-    const t = s.trim();
-    if (!t) continue;
-    if (t.length <= maxLen) {
-      chunks.push(t);
-    } else {
-      // Break long sentences at commas or word boundaries
-      const parts = t.match(new RegExp(`.{1,${maxLen}}(?:[,\\s]|$)`, "g")) || [t];
-      chunks.push(...parts.map(p => p.trim()).filter(Boolean));
-    }
-  }
-  return chunks;
-}
-
-export default function LyssnaKnapp({ text, style }) {
+export default function LyssnaKnapp({ text, rost = "Swedish Male", style }) {
   const [spelar, setSpelar] = useState(false);
-  const stopRef = useRef(false);
-  const audioRef = useRef(null);
 
-  async function lyssna() {
-    stopRef.current = false;
+  function lyssna() {
+    if (!window.responsiveVoice) return;
     setSpelar(true);
-    const chunks = splitToChunks(text);
-
-    for (const chunk of chunks) {
-      if (stopRef.current) break;
-      await new Promise((resolve) => {
-        const audio = new Audio(`/api/tts?text=${encodeURIComponent(chunk)}`);
-        audioRef.current = audio;
-        audio.onended = resolve;
-        audio.onerror = resolve;
-        audio.play().catch(resolve);
-      });
-    }
-
-    if (!stopRef.current) setSpelar(false);
+    window.responsiveVoice.speak(text, rost, {
+      onend:  () => setSpelar(false),
+      onerror:() => setSpelar(false),
+    });
   }
 
   function stoppa() {
-    stopRef.current = true;
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    window.responsiveVoice?.cancel();
     setSpelar(false);
   }
 
