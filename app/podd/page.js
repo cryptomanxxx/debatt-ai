@@ -360,10 +360,14 @@ export default function PoddPage() {
   const [fel, setFel]               = useState("");
   const [debattId, setDebattId]     = useState(null);
   const [ärrRepris, setÄrRepris]    = useState(false);
+  const [spelarIn, setSpelarIn]     = useState(false);
+  const [videoBlob, setVideoBlob]   = useState(null);
 
   const stoppRef    = useRef(false);
   const abortRef    = useRef(null);
   const autoplayRef = useRef(true);
+  const recorderRef = useRef(null);
+  const chunksRef   = useRef([]);
 
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
@@ -449,7 +453,37 @@ export default function PoddPage() {
       const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum });
       setDebattId(id);
     }
+    stoppaInspelning();
     setFas("klar");
+  }
+
+  async function startaInspelning() {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30 },
+        audio: true,
+        preferCurrentTab: true,
+      });
+      chunksRef.current = [];
+      const mimeType = ["video/webm;codecs=vp9,opus","video/webm","video/mp4"].find(t => MediaRecorder.isTypeSupported(t)) || "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
+        setVideoBlob(blob);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      recorder.start(1000);
+      recorderRef.current = recorder;
+      return true;
+    } catch { return false; }
+  }
+
+  function stoppaInspelning() {
+    if (recorderRef.current?.state === "recording") {
+      recorderRef.current.stop();
+      recorderRef.current = null;
+    }
   }
 
   async function starta() {
@@ -462,6 +496,10 @@ export default function PoddPage() {
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? slumpAgenter;
     const valtAmne = amne.trim() || slumpaAmne();
+    if (spelarIn) {
+      const ok = await startaInspelning();
+      if (!ok) return;
+    }
     const cached = await sokCachadDebatt(valtAmne, valdaAgenter);
     if (cached) { await replay(cached); return; }
     await startaNy(valdaAgenter, valtAmne);
@@ -508,13 +546,14 @@ export default function PoddPage() {
     stoppRef.current = true; autoplayRef.current = false;
     try { window.responsiveVoice?.cancel(); } catch {}
     abortRef.current?.abort();
+    stoppaInspelning();
     setSpeakerAgent(null); setAmplitude(0);
   }
 
   function nyDebatt() {
     stoppa(); autoplayRef.current = true;
     setFas("start"); setHistorik([]); setSummering(""); setDebattId(null);
-    setFel(""); setÄrRepris(false);
+    setFel(""); setÄrRepris(false); setVideoBlob(null);
     setAmne(slumpaAmne()); setSlumpAgenter(pickRandom(ALLA_AGENTER, 3));
     setDisplayAgent(null);
   }
@@ -607,11 +646,18 @@ export default function PoddPage() {
           )}
           {fel && <p style={{ color: "#f87171", fontSize: "14px", margin: "0 0 16px 0" }}>{fel}</p>}
 
-          <button onClick={starta} disabled={rateLimitInfo.remaining <= 0}
-            style={{ background: C.accent, color: "#080808", border: "none", borderRadius: "4px", padding: "14px 36px", fontSize: "15px", fontWeight: 700, letterSpacing: "0.08em", cursor: rateLimitInfo.remaining > 0 ? "pointer" : "not-allowed", fontFamily: "Georgia, serif" }}>
-            ▶ Starta podden
-          </button>
-          <p style={{ color: C.textMuted, fontSize: "12px", marginTop: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+            <button onClick={starta} disabled={rateLimitInfo.remaining <= 0}
+              style={{ background: C.accent, color: "#080808", border: "none", borderRadius: "4px", padding: "14px 36px", fontSize: "15px", fontWeight: 700, letterSpacing: "0.08em", cursor: rateLimitInfo.remaining > 0 ? "pointer" : "not-allowed", fontFamily: "Georgia, serif" }}>
+              ▶ Starta podden
+            </button>
+            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+              <input type="checkbox" checked={spelarIn} onChange={e => setSpelarIn(e.target.checked)}
+                style={{ width: "16px", height: "16px", accentColor: C.accent, cursor: "pointer" }} />
+              <span style={{ fontSize: "13px", color: C.textMuted }}>Spela in video</span>
+            </label>
+          </div>
+          <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>
             {rateLimitInfo.remaining}/{RL_LIMIT} debatter kvar denna period
           </p>
         </main>
@@ -712,6 +758,15 @@ export default function PoddPage() {
             <button onClick={nyDebatt} style={{ background: C.accent, color: C.bg, border: "none", borderRadius: "4px", padding: "12px 28px", fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "Georgia, serif" }}>
               ▶ Ny debatt
             </button>
+            {videoBlob && (
+              <a
+                href={URL.createObjectURL(videoBlob)}
+                download={`debatt-${faktisktAmne.slice(0, 40).replace(/[^a-zåäöA-ZÅÄÖ0-9 ]/g, "").trim()}.webm`}
+                style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "none", border: `1px solid ${C.accent}60`, color: C.accent, borderRadius: "4px", padding: "12px 24px", fontSize: "14px", textDecoration: "none" }}
+              >
+                ⬇ Ladda ned video
+              </a>
+            )}
             {debattId && (
               <a href={`/chatt/${debattId}`} style={{ display: "inline-flex", alignItems: "center", background: "none", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "12px 24px", fontSize: "14px", textDecoration: "none" }}>
                 Dela debatten →
