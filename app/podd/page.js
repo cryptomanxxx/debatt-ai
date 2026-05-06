@@ -14,8 +14,12 @@ function agentSlug(namn) {
     .replace(/ä/g, "a").replace(/å/g, "a").replace(/ö/g, "o")
     .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
-function avatarSrc(namn)       { return `/avatarer/podd/${agentSlug(namn)}.png`; }
-function avatarFallback(namn)  { return `/avatarer/${agentSlug(namn)}.png`; }
+const PODD_AVATARER = new Set(["Nationalekonom", "Miljöaktivist", "Teknikoptimist"]);
+function avatarSrc(namn) {
+  return PODD_AVATARER.has(namn)
+    ? `/avatarer/podd/${agentSlug(namn)}.png`
+    : `/avatarer/${agentSlug(namn)}.png`;
+}
 function talkingVideoSrc(namn) { return `/avatarer/podd/${agentSlug(namn)}-talking.mp4`; }
 
 const AGENT_AZURE_VOICE = {
@@ -231,7 +235,7 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
             transform: `scale(${scale})`, transition: "transform 0.1s ease-out",
             filter: speaking ? `drop-shadow(0 0 ${glow}px ${farg}88)` : "none",
           }}
-          onError={e => { if (!e.target.dataset.fb) { e.target.dataset.fb = "1"; e.target.src = avatarFallback(namn); } }} />
+ />
 
         {/* Tänker-overlay */}
         {isTänkande && !speaking && (
@@ -332,7 +336,7 @@ function AgentThumb({ namn, active }) {
   return (
     <div style={{ width: "44px", height: "44px", borderRadius: "50%", overflow: "hidden", flexShrink: 0, border: `2px solid ${active ? farg : C.border}`, boxShadow: active ? `0 0 14px ${farg}55` : "none", transition: "border-color 0.3s, box-shadow 0.3s" }}>
       <img src={avatarSrc(namn)} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        onError={e => { if (!e.target.dataset.fb) { e.target.dataset.fb = "1"; e.target.src = avatarFallback(namn); } }} />
+ />
     </div>
   );
 }
@@ -573,7 +577,7 @@ export default function PoddPage() {
                 <div key={a} style={{ flex: 1, maxWidth: "180px", textAlign: "center" }}>
                   <div style={{ borderRadius: "8px", overflow: "hidden", aspectRatio: "1", border: `2px solid ${C.border}`, marginBottom: "8px" }}>
                     <img src={avatarSrc(a)} alt={a} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                      onError={e => { if (!e.target.dataset.fb) { e.target.dataset.fb = "1"; e.target.src = avatarFallback(a); } }} />
+ />
                   </div>
                   <p style={{ fontSize: "12px", color: farg, margin: 0, fontWeight: 600 }}>{a}</p>
                 </div>
@@ -669,7 +673,7 @@ export default function PoddPage() {
               <div key={a} style={{ flex: 1, maxWidth: "200px", textAlign: "center" }}>
                 <div style={{ borderRadius: "8px", overflow: "hidden", aspectRatio: "1", border: `2px solid ${(AGENT_FARG[a]||C.accent)+"40"}`, marginBottom: "8px" }}>
                   <img src={avatarSrc(a)} alt={a} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    onError={e => { if (!e.target.dataset.fb) { e.target.dataset.fb = "1"; e.target.src = avatarFallback(a); } }} />
+ />
                 </div>
                 <p style={{ fontSize: "12px", color: AGENT_FARG[a]||C.accent, margin: 0, fontWeight: 600 }}>{a}</p>
               </div>
