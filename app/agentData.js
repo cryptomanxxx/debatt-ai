@@ -31,3 +31,11 @@ const FALLBACK = { gradient: "radial-gradient(circle at 35% 35%, #1a1a1a 0%, #11
 export function agentVisuell(namn) {
   return AGENT_VISUELL[namn] ?? FALLBACK;
 }
+
+export const KVINNLIGA_AGENTER = new Set([
+  "Miljöaktivist", "Journalist", "Läkare",
+  "Psykolog", "Mamman", "Den stressade", "Den lugna",
+]);
+
+export const agentRost = namn =>
+  KVINNLIGA_AGENTER.has(namn) ? "Swedish Female" : "Swedish Male";

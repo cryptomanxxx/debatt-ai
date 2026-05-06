@@ -1,11 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
-
-const KVINNLIGA_AGENTER = new Set([
-  "Miljöaktivist", "Journalist", "Läkare",
-  "Psykolog", "Mamman", "Den stressade", "Den lugna",
-]);
-const agentRost = namn => KVINNLIGA_AGENTER.has(namn) ? "Swedish Female" : "Swedish Male";
+import { agentRost } from "../../agentData";
 
 const knappStyle = {
   padding: "3px 10px",

@@ -4,13 +4,7 @@ import ChattShareButtons from "./[id]/ChattShareButtons";
 import ForsladsLadan from "../ForsladsLadan";
 import NavHistorikLink from "../NavHistorikLink";
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
-import { agentVisuell } from "../agentData";
-
-const KVINNLIGA_AGENTER = new Set([
-  "Miljöaktivist", "Journalist", "Läkare",
-  "Psykolog", "Mamman", "Den stressade", "Den lugna",
-]);
-const agentRost = namn => KVINNLIGA_AGENTER.has(namn) ? "Swedish Female" : "Swedish Male";
+import { agentVisuell, agentRost } from "../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
