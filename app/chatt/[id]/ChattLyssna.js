@@ -7,8 +7,20 @@ const KVINNLIGA_AGENTER = new Set([
 ]);
 const agentRost = namn => KVINNLIGA_AGENTER.has(namn) ? "Swedish Female" : "Swedish Male";
 
-export default function ChattLyssna({ amne, inlagg }) {
-  const [spelar, setSpelar] = useState(false);
+const knappStyle = {
+  padding: "3px 10px",
+  background: "transparent",
+  border: "1px solid #222222",
+  borderRadius: "20px",
+  color: "#888880",
+  fontSize: "12px",
+  fontFamily: "Georgia, serif",
+  cursor: "pointer",
+  letterSpacing: "0.03em",
+};
+
+export default function ChattLyssna({ inlagg }) {
+  const [fas, setFas] = useState("idle"); // idle | spelar | pausad
   const stoppRef = useRef(false);
 
   function speak(text, agent) {
@@ -24,36 +36,40 @@ export default function ChattLyssna({ amne, inlagg }) {
   async function lyssna() {
     if (!window.responsiveVoice) return;
     stoppRef.current = false;
-    setSpelar(true);
+    setFas("spelar");
     for (const e of inlagg) {
       if (stoppRef.current) break;
       await speak(e.text, e.agent);
     }
-    if (!stoppRef.current) setSpelar(false);
+    if (!stoppRef.current) setFas("idle");
+  }
+
+  function pausa() {
+    window.responsiveVoice?.pause();
+    setFas("pausad");
+  }
+
+  function fortsatt() {
+    window.responsiveVoice?.resume();
+    setFas("spelar");
   }
 
   function stoppa() {
     stoppRef.current = true;
     window.responsiveVoice?.cancel();
-    setSpelar(false);
+    setFas("idle");
+  }
+
+  if (fas === "idle") {
+    return <button onClick={lyssna} style={knappStyle}>🎧 Lyssna</button>;
   }
 
   return (
-    <button
-      onClick={spelar ? stoppa : lyssna}
-      style={{
-        padding: "3px 10px",
-        background: "transparent",
-        border: "1px solid #222222",
-        borderRadius: "20px",
-        color: "#888880",
-        fontSize: "12px",
-        fontFamily: "Georgia, serif",
-        cursor: "pointer",
-        letterSpacing: "0.03em",
-      }}
-    >
-      {spelar ? "⏹ Stoppa" : "🎧 Lyssna"}
-    </button>
+    <span style={{ display: "inline-flex", gap: "6px" }}>
+      <button onClick={fas === "spelar" ? pausa : fortsatt} style={knappStyle}>
+        {fas === "spelar" ? "⏸ Paus" : "▶ Fortsätt"}
+      </button>
+      <button onClick={stoppa} style={knappStyle}>⏹</button>
+    </span>
   );
 }
