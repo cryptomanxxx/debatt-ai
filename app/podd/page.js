@@ -460,9 +460,10 @@ export default function PoddPage() {
   async function startaInspelning() {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 30 },
-        audio: true,
+        video: { displaySurface: "browser", frameRate: 30 },
+        audio: { suppressLocalAudioPlayback: false },
         preferCurrentTab: true,
+        selfBrowserSurface: "include",
       });
       chunksRef.current = [];
       const mimeType = ["video/webm;codecs=vp9,opus","video/webm","video/mp4"].find(t => MediaRecorder.isTypeSupported(t)) || "";
