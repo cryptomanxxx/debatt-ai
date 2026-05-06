@@ -54,6 +54,12 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   return currentY;
 }
 
+function agentSlug(namn) {
+  return namn.toLowerCase()
+    .replace(/ä/g, "a").replace(/å/g, "a").replace(/ö/g, "o")
+    .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+}
+
 export default function ChattShareButtons({ debatt, shareUrl, inlagg, hideListen = false }) {
   const [copied, setCopied] = useState(false);
   const [spelar, setSpelar] = useState(false);
@@ -102,27 +108,57 @@ export default function ChattShareButtons({ debatt, shareUrl, inlagg, hideListen
     { label: "Reddit", href: `https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(`AI-debatt: ${debatt.amne}`)}` },
   ];
 
-  function generateImage() {
+  async function generateImage() {
     const W = 1200, H = 630, PAD = 64;
     const canvas = document.createElement("canvas");
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext("2d");
+
+    // Ladda avatarer
+    function loadImg(src) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = src;
+      });
+    }
+    const avatarer = await Promise.all(agenter.map(a => loadImg(`/avatarer/${agentSlug(a)}.png`)));
+
+    // Bakgrund + ram
     ctx.fillStyle = "#0a0a0a"; ctx.fillRect(0, 0, W, H);
     ctx.strokeStyle = "#1e1e1e"; ctx.lineWidth = 1; ctx.strokeRect(20, 20, W - 40, H - 40);
     const grad = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
     grad.addColorStop(0, "#c8b89a"); grad.addColorStop(1, "#8a7a6a");
     ctx.fillStyle = grad; ctx.fillRect(PAD, 44, W - PAD * 2, 3);
+
+    // Logo
     ctx.font = "bold 22px serif"; ctx.fillStyle = "#c8b89a"; ctx.fillText("DEBATT-AI", PAD, 100);
     ctx.font = "12px monospace"; ctx.fillStyle = "#555"; ctx.fillText("DIREKTDEBATT", PAD + 140, 100);
-    let agentX = PAD; ctx.font = "bold 11px monospace";
+
+    // Avatarer som cirklar med namn under
+    const AVS = 72, GAP = 24;
     agenter.forEach((a, i) => {
-      const farg = AGENT_FARG[a] || "#c8b89a"; ctx.fillStyle = farg;
-      const label = i === 0 ? a : `  ·  ${a}`; ctx.fillText(label, agentX, 132);
-      agentX += ctx.measureText(label).width;
+      const farg = AGENT_FARG[a] || "#c8b89a";
+      const cx = PAD + i * (AVS + GAP) + AVS / 2;
+      const cy = 130 + AVS / 2;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, AVS / 2, 0, Math.PI * 2); ctx.clip();
+      if (avatarer[i]) ctx.drawImage(avatarer[i], cx - AVS / 2, cy - AVS / 2, AVS, AVS);
+      else { ctx.fillStyle = "#1a1a1a"; ctx.fillRect(cx - AVS / 2, cy - AVS / 2, AVS, AVS); }
+      ctx.restore();
+      ctx.strokeStyle = farg; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, cy, AVS / 2, 0, Math.PI * 2); ctx.stroke();
+      ctx.font = "bold 12px monospace"; ctx.fillStyle = farg; ctx.textAlign = "center";
+      ctx.fillText(a, cx, cy + AVS / 2 + 18);
     });
+    ctx.textAlign = "left";
+
+    // Titel
     ctx.font = "400 52px serif"; ctx.fillStyle = "#c8b89a";
-    const titleBottom = wrapText(ctx, debatt.amne || "", PAD, 220, W - PAD * 2, 68);
-    const sepY = Math.min(titleBottom + 40, 420);
+    const titleBottom = wrapText(ctx, debatt.amne || "", PAD, 280, W - PAD * 2, 68);
+    const sepY = Math.min(titleBottom + 40, 460);
     ctx.fillStyle = "#2a2a2a"; ctx.fillRect(PAD, sepY, W - PAD * 2, 1);
     if (debatt.summering) {
       ctx.font = "italic 17px serif"; ctx.fillStyle = "#a0a09a";
@@ -130,8 +166,9 @@ export default function ChattShareButtons({ debatt, shareUrl, inlagg, hideListen
     }
     ctx.font = "13px monospace"; ctx.fillStyle = "#444";
     ctx.fillText(shareUrl.replace("https://", ""), PAD, H - 36);
+
     const link = document.createElement("a");
-    link.download = `debatt-ai-chatt.png`; link.href = canvas.toDataURL("image/png"); link.click();
+    link.download = "debatt-ai-chatt.png"; link.href = canvas.toDataURL("image/png"); link.click();
   }
 
   return (
