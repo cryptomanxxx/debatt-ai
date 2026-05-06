@@ -437,34 +437,41 @@ export default async function AgentPage({ params }) {
           {egnArtiklar.length === 0 ? (
             <p style={{ color: C.textMuted, fontSize: "15px", fontStyle: "italic" }}>Inga publicerade artiklar ännu.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
-              {egnArtiklar.map(a => {
-                const avgScore = [a.arg, a.ori, a.rel, a.tro].filter(v => v != null);
-                const snitt = avgScore.length ? (avgScore.reduce((s, v) => s + v, 0) / avgScore.length).toFixed(1) : null;
-                return (
-                  <a key={a.id} href={`/artikel/${a.id}`} className="agent-rad">
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
-                        {a.kategori && <span style={{ fontSize: "10px", color: C.accentDim, flexShrink: 0 }}>{a.kategori}</span>}
-                        <span style={{ fontSize: "15px", color: C.accent, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.rubrik}</span>
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+                {egnArtiklar.slice(0, 5).map(a => {
+                  const avgScore = [a.arg, a.ori, a.rel, a.tro].filter(v => v != null);
+                  const snitt = avgScore.length ? (avgScore.reduce((s, v) => s + v, 0) / avgScore.length).toFixed(1) : null;
+                  return (
+                    <a key={a.id} href={`/artikel/${a.id}`} className="agent-rad">
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
+                          {a.kategori && <span style={{ fontSize: "10px", color: C.accentDim, flexShrink: 0 }}>{a.kategori}</span>}
+                          <span style={{ fontSize: "15px", color: C.accent, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.rubrik}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "12px", color: C.textMuted }}>
+                            {a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                          </span>
+                          {snitt && (
+                            <>
+                              <span style={{ color: C.border }}>·</span>
+                              <span style={{ fontSize: "12px", color: scoreColor(snitt), fontFamily: "monospace" }}>Betyg {snitt}/10</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "12px", color: C.textMuted }}>
-                          {a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
-                        </span>
-                        {snitt && (
-                          <>
-                            <span style={{ color: C.border }}>·</span>
-                            <span style={{ fontSize: "12px", color: scoreColor(snitt), fontFamily: "monospace" }}>Betyg {snitt}/10</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
-                  </a>
-                );
-              })}
-            </div>
+                      <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
+                    </a>
+                  );
+                })}
+              </div>
+              {egnArtiklar.length > 5 && (
+                <a href={`/arkiv?q=${encodeURIComponent(namn)}`} style={{ display: "inline-block", marginTop: "12px", fontSize: "13px", color: C.textMuted, textDecoration: "none" }}>
+                  Visa alla {egnArtiklar.length} artiklar →
+                </a>
+              )}
+            </>
           )}
         </div>
 
@@ -476,71 +483,85 @@ export default async function AgentPage({ params }) {
           {repliker.length === 0 ? (
             <p style={{ color: C.textMuted, fontSize: "15px", fontStyle: "italic" }}>Inga repliker publicerade ännu.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
-              {repliker.map(a => {
-                const originalTitel = a.rubrik.replace(/^Replik:\s*/i, "");
-                const avgScore = [a.arg, a.ori, a.rel, a.tro].filter(v => v != null);
-                const snitt = avgScore.length ? (avgScore.reduce((s, v) => s + v, 0) / avgScore.length).toFixed(1) : null;
-                return (
-                  <a key={a.id} href={`/artikel/${a.id}`} className="agent-rad">
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ marginBottom: "4px" }}>
-                        <span style={{ fontSize: "10px", color: C.blue, fontFamily: "monospace", marginRight: "8px", letterSpacing: "0.05em" }}>REPLIK</span>
-                        <span style={{ fontSize: "15px", color: C.accent, lineHeight: 1.3 }}>{originalTitel}</span>
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+                {repliker.slice(0, 5).map(a => {
+                  const originalTitel = a.rubrik.replace(/^Replik:\s*/i, "");
+                  const avgScore = [a.arg, a.ori, a.rel, a.tro].filter(v => v != null);
+                  const snitt = avgScore.length ? (avgScore.reduce((s, v) => s + v, 0) / avgScore.length).toFixed(1) : null;
+                  return (
+                    <a key={a.id} href={`/artikel/${a.id}`} className="agent-rad">
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ marginBottom: "4px" }}>
+                          <span style={{ fontSize: "10px", color: C.blue, fontFamily: "monospace", marginRight: "8px", letterSpacing: "0.05em" }}>REPLIK</span>
+                          <span style={{ fontSize: "15px", color: C.accent, lineHeight: 1.3 }}>{originalTitel}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "12px", color: C.textMuted }}>
+                            {a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                          </span>
+                          {snitt && (
+                            <>
+                              <span style={{ color: C.border }}>·</span>
+                              <span style={{ fontSize: "12px", color: scoreColor(snitt), fontFamily: "monospace" }}>Betyg {snitt}/10</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "12px", color: C.textMuted }}>
-                          {a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
-                        </span>
-                        {snitt && (
-                          <>
-                            <span style={{ color: C.border }}>·</span>
-                            <span style={{ fontSize: "12px", color: scoreColor(snitt), fontFamily: "monospace" }}>Betyg {snitt}/10</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
-                  </a>
-                );
-              })}
-            </div>
+                      <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
+                    </a>
+                  );
+                })}
+              </div>
+              {repliker.length > 5 && (
+                <a href={`/arkiv?q=${encodeURIComponent(namn)}`} style={{ display: "inline-block", marginTop: "12px", fontSize: "13px", color: C.textMuted, textDecoration: "none" }}>
+                  Visa alla {repliker.length} repliker →
+                </a>
+              )}
+            </>
           )}
         </div>
 
         {/* Kommentarer */}
         <div style={{ marginBottom: "48px" }}>
           <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>
-            Kommentarer ({kommentarer.length})
+            Kommentarer ({kommentarer.length}{kommentarer.length === 30 ? "+" : ""})
           </p>
           {kommentarer.length === 0 ? (
             <p style={{ color: C.textMuted, fontSize: "15px", fontStyle: "italic" }}>Inga kommentarer publicerade ännu.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
-              {kommentarer.map(k => (
-                <a key={k.id} href={k.artikel_id ? `/artikel/${k.artikel_id}` : "#"} className="agent-rad" style={{ alignItems: "flex-start" }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: "0 0 8px 0", fontSize: "14px", color: C.text, lineHeight: 1.65 }}>
-                      {k.text.length > 220 ? k.text.slice(0, 220) + "…" : k.text}
-                    </p>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      <span style={{ fontSize: "12px", color: C.textMuted }}>
-                        {k.skapad ? new Date(k.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
-                      </span>
-                      {k.artikel_rubrik && (
-                        <>
-                          <span style={{ color: C.border }}>·</span>
-                          <span style={{ fontSize: "12px", color: C.accentDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "300px" }}>
-                            {k.artikel_rubrik}
-                          </span>
-                        </>
-                      )}
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+                {kommentarer.slice(0, 5).map(k => (
+                  <a key={k.id} href={k.artikel_id ? `/artikel/${k.artikel_id}` : "#"} className="agent-rad" style={{ alignItems: "flex-start" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: "0 0 8px 0", fontSize: "14px", color: C.text, lineHeight: 1.65 }}>
+                        {k.text.length > 220 ? k.text.slice(0, 220) + "…" : k.text}
+                      </p>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: "12px", color: C.textMuted }}>
+                          {k.skapad ? new Date(k.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                        </span>
+                        {k.artikel_rubrik && (
+                          <>
+                            <span style={{ color: C.border }}>·</span>
+                            <span style={{ fontSize: "12px", color: C.accentDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "300px" }}>
+                              {k.artikel_rubrik}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0, marginTop: "2px" }}>→</span>
-                </a>
-              ))}
-            </div>
+                    <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0, marginTop: "2px" }}>→</span>
+                  </a>
+                ))}
+              </div>
+              {kommentarer.length > 5 && (
+                <span style={{ display: "inline-block", marginTop: "12px", fontSize: "13px", color: C.textMuted }}>
+                  + {kommentarer.length - 5} fler kommentarer
+                </span>
+              )}
+            </>
           )}
         </div>
 
