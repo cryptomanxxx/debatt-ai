@@ -15,7 +15,7 @@ export async function GET(req) {
   url.searchParams.set("lang", "sv-SE");
   url.searchParams.set("name", name);
   url.searchParams.set("pitch", "0.5");
-  url.searchParams.set("rate", "0.35");
+  url.searchParams.set("rate", "0.25");
   url.searchParams.set("key", "nQnR2SiW");
   url.searchParams.set("referrer", "debatt-ai.se");
 
