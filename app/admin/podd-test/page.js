@@ -195,16 +195,6 @@ export default function PoddTestPage() {
 
     setLocalStates(prev => ({ ...prev, [namn]: { recording: true, url: null, error: null } }));
 
-    // Patch Audio constructor so any new element gets crossOrigin=anonymous,
-    // which lets createMediaElementSource connect to it without CORS errors.
-    const OrigAudio = window.Audio;
-    window.Audio = function(...args) {
-      const el = new OrigAudio(...args);
-      el.crossOrigin = "anonymous";
-      return el;
-    };
-    window.Audio.prototype = OrigAudio.prototype;
-
     try {
       const img = new Image();
       await new Promise((resolve, reject) => {
@@ -216,8 +206,16 @@ export default function PoddTestPage() {
       canvas.width = 512; canvas.height = 512;
       const ctx2d = canvas.getContext("2d");
 
+      // Silent audio track keeps the audio stream alive in the WebM container.
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      await audioCtx.resume();
       const mixDest = audioCtx.createMediaStreamDestination();
+      const silentGain = audioCtx.createGain();
+      silentGain.gain.value = 0;
+      const silentOsc = audioCtx.createOscillator();
+      silentOsc.connect(silentGain);
+      silentGain.connect(mixDest);
+      silentOsc.start();
 
       const videoStream = canvas.captureStream(25);
       const combined = new MediaStream([
@@ -254,8 +252,8 @@ export default function PoddTestPage() {
       drawFrame(0);
       recorder.start(100);
 
+      // RV plays the correct voice through speakers while animation is recorded.
       const sentences = testText.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [testText];
-      const capturedEls = new Set();
 
       for (const sentence of sentences) {
         const trimmed = sentence.trim();
@@ -267,19 +265,6 @@ export default function PoddTestPage() {
 
           window.responsiveVoice.speak(trimmed, rvVoice, {
             onstart: () => {
-              // Try to route RV's audio element through AudioContext for capture.
-              // If CORS blocks this, audio still plays via browser default output.
-              const audioEls = Array.from(document.querySelectorAll("audio"));
-              for (const el of audioEls) {
-                if (!el.paused && !capturedEls.has(el)) {
-                  try {
-                    const src = audioCtx.createMediaElementSource(el);
-                    src.connect(mixDest);
-                    src.connect(audioCtx.destination);
-                    capturedEls.add(el);
-                  } catch {}
-                }
-              }
               iv = setInterval(() => {
                 const t = Date.now();
                 drawFrame(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
@@ -293,6 +278,7 @@ export default function PoddTestPage() {
         });
       }
 
+      silentOsc.stop();
       recorder.stop();
       await new Promise(resolve => { recorder.onstop = resolve; });
       await audioCtx.close();
@@ -303,7 +289,6 @@ export default function PoddTestPage() {
     } catch (e) {
       setLocalStates(prev => ({ ...prev, [namn]: { recording: false, url: null, error: e.message } }));
     } finally {
-      window.Audio = OrigAudio;
       window.responsiveVoice?.cancel();
     }
   }
