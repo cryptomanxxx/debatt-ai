@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import NavArkivLink from "../../NavArkivLink";
 import AgentAvatar from "./AgentAvatar";
+import AmnesPrenumerant from "../../artikel/[id]/AmnesPrenumerant";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -392,11 +393,12 @@ export default async function AgentPage({ params }) {
                 </span>
               </div>
               <p style={{ color: C.text, fontSize: "15px", lineHeight: 1.75, margin: "0 0 16px 0" }}>{profil.bio}</p>
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
                 {profil.fokus.map(f => (
                   <span key={f} style={{ fontSize: "12px", color: C.accentDim, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: "20px", padding: "3px 10px" }}>{f}</span>
                 ))}
               </div>
+              <AmnesPrenumerant taggar={[]} forfattare={namn} kallAi={true} />
             </div>
           </div>
         </div>
