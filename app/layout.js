@@ -24,6 +24,7 @@ export default function RootLayout({ children }) {
     <html lang="sv">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#0a0a0a" />
         {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script src="https://code.responsivevoice.org/responsivevoice.js?key=nQnR2SiW" />
       </head>
