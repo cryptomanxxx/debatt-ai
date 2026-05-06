@@ -369,6 +369,9 @@ export default function PoddPage() {
   const recorderRef = useRef(null);
   const chunksRef   = useRef([]);
 
+  const stöderInspelning = typeof navigator !== "undefined" &&
+    typeof navigator.mediaDevices?.getDisplayMedia === "function";
+
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
     return () => { autoplayRef.current = false; };
@@ -477,7 +480,10 @@ export default function PoddPage() {
       recorder.start(1000);
       recorderRef.current = recorder;
       return true;
-    } catch { return false; }
+    } catch (e) {
+      if (e.name !== "NotAllowedError") setFel("Skärminspelning misslyckades. Prova en annan webbläsare.");
+      return false;
+    }
   }
 
   function stoppaInspelning() {
@@ -652,11 +658,13 @@ export default function PoddPage() {
               style={{ background: C.accent, color: "#080808", border: "none", borderRadius: "4px", padding: "14px 36px", fontSize: "15px", fontWeight: 700, letterSpacing: "0.08em", cursor: rateLimitInfo.remaining > 0 ? "pointer" : "not-allowed", fontFamily: "Georgia, serif" }}>
               ▶ Starta podden
             </button>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-              <input type="checkbox" checked={spelarIn} onChange={e => setSpelarIn(e.target.checked)}
-                style={{ width: "16px", height: "16px", accentColor: C.accent, cursor: "pointer" }} />
-              <span style={{ fontSize: "13px", color: C.textMuted }}>Spela in video</span>
-            </label>
+            {stöderInspelning && (
+              <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                <input type="checkbox" checked={spelarIn} onChange={e => setSpelarIn(e.target.checked)}
+                  style={{ width: "16px", height: "16px", accentColor: C.accent, cursor: "pointer" }} />
+                <span style={{ fontSize: "13px", color: C.textMuted }}>Spela in video</span>
+              </label>
+            )}
           </div>
           <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>
             {rateLimitInfo.remaining}/{RL_LIMIT} debatter kvar denna period
