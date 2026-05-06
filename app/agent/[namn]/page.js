@@ -547,44 +547,51 @@ export default async function AgentPage({ params }) {
         {/* Direktdebatter */}
         <div style={{ marginBottom: "48px" }}>
           <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>
-            Direktdebatter ({debatter.length})
+            Direktdebatter ({debatter.length}{debatter.length === 30 ? "+" : ""})
           </p>
           {debatter.length === 0 ? (
             <p style={{ color: C.textMuted, fontSize: "15px", fontStyle: "italic" }}>Inga direktdebatter ännu.</p>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
-              {debatter.map(d => {
-                const score = d.scores?.[namn];
-                const motståndare = (d.agenter || []).filter(a => a !== namn);
-                return (
-                  <a key={d.id} href={`/chatt/${d.id}`} className="agent-rad">
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ marginBottom: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        <span style={{ fontSize: "15px", color: C.accent }}>{d.amne}</span>
+            <>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+                {debatter.slice(0, 5).map(d => {
+                  const score = d.scores?.[namn];
+                  const motståndare = (d.agenter || []).filter(a => a !== namn);
+                  return (
+                    <a key={d.id} href={`/chatt/${d.id}`} className="agent-rad">
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ marginBottom: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <span style={{ fontSize: "15px", color: C.accent }}>{d.amne}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "12px", color: C.textMuted }}>
+                            {d.skapad ? new Date(d.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                          </span>
+                          {motståndare.length > 0 && (
+                            <>
+                              <span style={{ color: C.border }}>·</span>
+                              <span style={{ fontSize: "12px", color: C.textMuted }}>mot {motståndare.join(", ")}</span>
+                            </>
+                          )}
+                          {score != null && (
+                            <>
+                              <span style={{ color: C.border }}>·</span>
+                              <span style={{ fontSize: "12px", color: scoreColor(score), fontFamily: "monospace" }}>{score}/10 poäng</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                        <span style={{ fontSize: "12px", color: C.textMuted }}>
-                          {d.skapad ? new Date(d.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
-                        </span>
-                        {motståndare.length > 0 && (
-                          <>
-                            <span style={{ color: C.border }}>·</span>
-                            <span style={{ fontSize: "12px", color: C.textMuted }}>mot {motståndare.join(", ")}</span>
-                          </>
-                        )}
-                        {score != null && (
-                          <>
-                            <span style={{ color: C.border }}>·</span>
-                            <span style={{ fontSize: "12px", color: scoreColor(score), fontFamily: "monospace" }}>{score}/10 poäng</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
-                  </a>
-                );
-              })}
-            </div>
+                      <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
+                    </a>
+                  );
+                })}
+              </div>
+              {debatter.length > 5 && (
+                <a href="/chatt/historik" style={{ display: "inline-block", marginTop: "12px", fontSize: "13px", color: C.textMuted, textDecoration: "none" }}>
+                  Visa alla {debatter.length}{debatter.length === 30 ? "+" : ""} direktdebatter →
+                </a>
+              )}
+            </>
           )}
         </div>
 
