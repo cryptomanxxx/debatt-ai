@@ -23,14 +23,13 @@ function avatarSrc(namn) {
 function talkingVideoSrc(namn) { return `/avatarer/podd/${agentSlug(namn)}-talking.mp4`; }
 
 const AGENT_AZURE_VOICE = {
+  "Miljöaktivist":  "sv-SE-SofieNeural",
+  "Journalist":     "sv-SE-SofieNeural",
+  "Läkare":         "sv-SE-SofieNeural",
   "Psykolog":       "sv-SE-SofieNeural",
-  "Sociolog":       "sv-SE-SofieNeural",
   "Mamman":         "sv-SE-SofieNeural",
   "Den stressade":  "sv-SE-SofieNeural",
   "Den lugna":      "sv-SE-SofieNeural",
-  "Hypokondrikern": "sv-SE-SofieNeural",
-  "Optimisten":     "sv-SE-SofieNeural",
-  "Miljöaktivist":  "sv-SE-SofieNeural",
 };
 
 const AGENT_FARG = {

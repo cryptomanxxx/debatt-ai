@@ -7,8 +7,8 @@ import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
 
 const KVINNLIGA_AGENTER = new Set([
-  "Psykolog", "Sociolog", "Mamman", "Den stressade",
-  "Den lugna", "Hypokondrikern", "Optimisten", "Miljöaktivist",
+  "Miljöaktivist", "Journalist", "Läkare",
+  "Psykolog", "Mamman", "Den stressade", "Den lugna",
 ]);
 const agentRost = namn => KVINNLIGA_AGENTER.has(namn) ? "Swedish Female" : "Swedish Male";
 
