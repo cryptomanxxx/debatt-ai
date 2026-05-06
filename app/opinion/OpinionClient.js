@@ -74,28 +74,32 @@ const ALLA_FRAGOR = Object.entries(AMNEN).flatMap(([kat, fragor]) =>
   fragor.map(f => ({ fraga: f, kategori: kat }))
 );
 
-function RostatBar({ ja, nej, osaker }) {
+function RostatBar({ ja, nej, osaker, label, color }) {
   const total = ja + nej + (osaker || 0);
   if (total === 0) return (
-    <p style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", margin: 0 }}>
-      Ingen har röstat ännu — bli först!
-    </p>
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+      <span style={{ fontSize: "10px", color, fontFamily: "monospace", letterSpacing: "0.08em", minWidth: "72px" }}>{label}</span>
+      <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>–</span>
+    </div>
   );
   const jaPct = Math.round((ja / total) * 100);
   const osakPct = Math.round(((osaker || 0) / total) * 100);
   const nejPct = 100 - jaPct - osakPct;
   return (
-    <div>
-      <div style={{ display: "flex", height: "6px", borderRadius: "3px", overflow: "hidden", marginBottom: "6px" }}>
-        <div style={{ width: `${jaPct}%`, background: C.green, transition: "width 0.4s ease" }} />
-        <div style={{ width: `${osakPct}%`, background: C.yellow, transition: "width 0.4s ease" }} />
-        <div style={{ width: `${nejPct}%`, background: C.red, transition: "width 0.4s ease" }} />
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ fontSize: "11px", color: C.green, fontFamily: "monospace" }}>Ja {jaPct}%</span>
-        <span style={{ fontSize: "11px", color: C.yellow, fontFamily: "monospace" }}>{osakPct}% Osäker</span>
-        <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>{total} röster</span>
-        <span style={{ fontSize: "11px", color: C.red, fontFamily: "monospace" }}>{nejPct}% Nej</span>
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+      <span style={{ fontSize: "10px", color, fontFamily: "monospace", letterSpacing: "0.08em", minWidth: "72px", flexShrink: 0 }}>{label}</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: "flex", height: "5px", borderRadius: "3px", overflow: "hidden", marginBottom: "3px" }}>
+          <div style={{ width: `${jaPct}%`, background: C.green, transition: "width 0.4s ease" }} />
+          <div style={{ width: `${osakPct}%`, background: C.yellow, transition: "width 0.4s ease" }} />
+          <div style={{ width: `${nejPct}%`, background: C.red, transition: "width 0.4s ease" }} />
+        </div>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <span style={{ fontSize: "10px", color: C.green, fontFamily: "monospace" }}>Ja {jaPct}%</span>
+          <span style={{ fontSize: "10px", color: C.yellow, fontFamily: "monospace" }}>{osakPct > 0 ? `Osäker ${osakPct}%` : ""}</span>
+          <span style={{ fontSize: "10px", color: C.red, fontFamily: "monospace" }}>Nej {nejPct}%</span>
+          <span style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace", marginLeft: "auto" }}>{total} röster</span>
+        </div>
       </div>
     </div>
   );
@@ -111,10 +115,13 @@ function FragaKort({ fraga, kategori, rosterData, onVote }) {
     if (sparat) setRostat(sparat);
   }, [key]);
 
-  const dbData = rosterData[fraga] ?? { roster_ja: 0, roster_nej: 0, roster_osaker: 0 };
+  const dbData = rosterData[fraga] ?? { roster_ja: 0, roster_nej: 0, roster_osaker: 0, ai_ja: 0, ai_nej: 0, ai_osaker: 0 };
   const visaJa = dbData.roster_ja;
   const visaNej = dbData.roster_nej;
   const visaOsaker = dbData.roster_osaker || 0;
+  const aiJa = dbData.ai_ja || 0;
+  const aiNej = dbData.ai_nej || 0;
+  const aiOsaker = dbData.ai_osaker || 0;
 
   async function rosta(svar) {
     if (rostat || loading) return;
@@ -165,7 +172,10 @@ function FragaKort({ fraga, kategori, rosterData, onVote }) {
         </div>
       )}
 
-      <RostatBar ja={visaJa} nej={visaNej} osaker={visaOsaker} />
+      <div style={{ marginTop: "4px" }}>
+        <RostatBar ja={visaJa} nej={visaNej} osaker={visaOsaker} label="BESÖKARE" color="#aaaaaa" />
+        <RostatBar ja={aiJa} nej={aiNej} osaker={aiOsaker} label="AI-AGENTER" color="#4a9eff" />
+      </div>
     </div>
   );
 }
@@ -187,7 +197,7 @@ export default function OpinionClient() {
 
   function onVote(fraga, kategori, svar) {
     setRosterData(prev => {
-      const current = prev[fraga] ?? { roster_ja: 0, roster_nej: 0, roster_osaker: 0, fraga, kategori };
+      const current = prev[fraga] ?? { roster_ja: 0, roster_nej: 0, roster_osaker: 0, ai_ja: 0, ai_nej: 0, ai_osaker: 0, fraga, kategori };
       return {
         ...prev,
         [fraga]: {
@@ -204,8 +214,11 @@ export default function OpinionClient() {
     ? ALLA_FRAGOR
     : ALLA_FRAGOR.filter(f => f.kategori === aktivKat);
 
-  const totalRoster = Object.values(rosterData).reduce(
-    (s, r) => s + r.roster_ja + r.roster_nej, 0
+  const totalBesokare = Object.values(rosterData).reduce(
+    (s, r) => s + (r.roster_ja || 0) + (r.roster_nej || 0), 0
+  );
+  const totalAI = Object.values(rosterData).reduce(
+    (s, r) => s + (r.ai_ja || 0) + (r.ai_nej || 0), 0
   );
 
   return (
@@ -217,8 +230,12 @@ export default function OpinionClient() {
           <p style={{ fontSize: "24px", color: C.text, margin: 0, fontFamily: "Georgia, serif" }}>{ALLA_FRAGOR.length}</p>
         </div>
         <div>
-          <p style={{ fontSize: "11px", color: C.accentDim, fontFamily: "monospace", margin: "0 0 4px", letterSpacing: "0.1em" }}>TOTALT RÖSTER</p>
-          <p style={{ fontSize: "24px", color: C.accent, margin: 0, fontFamily: "Georgia, serif" }}>{totalRoster}</p>
+          <p style={{ fontSize: "11px", color: "#aaaaaa", fontFamily: "monospace", margin: "0 0 4px", letterSpacing: "0.1em" }}>BESÖKARRÖSTER</p>
+          <p style={{ fontSize: "24px", color: C.accent, margin: 0, fontFamily: "Georgia, serif" }}>{totalBesokare}</p>
+        </div>
+        <div>
+          <p style={{ fontSize: "11px", color: "#4a9eff", fontFamily: "monospace", margin: "0 0 4px", letterSpacing: "0.1em" }}>AI-RÖSTER</p>
+          <p style={{ fontSize: "24px", color: "#4a9eff", margin: 0, fontFamily: "Georgia, serif" }}>{totalAI}</p>
         </div>
       </div>
 

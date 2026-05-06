@@ -49,7 +49,7 @@ export async function POST(req) {
 
 export async function GET() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/opinion_roster?select=fraga,kategori,roster_ja,roster_nej&order=fraga.asc`,
+    `${SB_URL}/rest/v1/opinion_roster?select=fraga,kategori,roster_ja,roster_nej,roster_osaker,ai_ja,ai_nej,ai_osaker&order=fraga.asc`,
     { headers: headers(), cache: "no-store" }
   );
   const data = res.ok ? await res.json() : [];

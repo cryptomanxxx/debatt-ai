@@ -1388,73 +1388,78 @@ def rösta_på_artikel(api_key: str, artikel_id: int, rod: str) -> bool:
         return False
 
 
-def rösta_på_opinion(agent: dict, sb_key: str) -> bool:
-    """Låt agenten rösta på en slumpmässig opinionsfråga."""
+def rösta_på_opinion(agent: dict, sb_key: str) -> int:
+    """Låt agenten rösta på 5 slumpmässiga opinionsfrågor med separata AI-kolumner."""
     import urllib.parse
-    try:
-        fraga, kategori = random.choice(OPINION_FRAGOR)
-        prompt = (
-            f"Du representerar följande perspektiv:\n{agent['system'][:400]}\n\n"
-            f"Fråga: \"{fraga}\"\n"
-            "Svara med exakt ett ord: Ja, Nej eller Osäker."
-        )
-        svar_raw = ""
+    hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    fragor = random.sample(OPINION_FRAGOR, min(5, len(OPINION_FRAGOR)))
+    ok_count = 0
+    for fraga, kategori in fragor:
         try:
-            r = groq_post({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 5,
-                "temperature": 0.3,
-            })
-            svar_raw = r.json()["choices"][0]["message"]["content"].strip().lower()
-        except Exception:
+            prompt = (
+                f"Du representerar följande perspektiv:\n{agent['system'][:400]}\n\n"
+                f"Fråga: \"{fraga}\"\n"
+                "Svara med exakt ett ord: Ja, Nej eller Osäker."
+            )
+            svar_raw = ""
             try:
-                svar_raw = gemini_post("", prompt, max_tokens=5).strip().lower()
+                r = groq_post({
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 5,
+                    "temperature": 0.3,
+                })
+                svar_raw = r.json()["choices"][0]["message"]["content"].strip().lower()
             except Exception:
-                pass
-        if "ja" in svar_raw and "nej" not in svar_raw:
-            svar = "ja"
-        elif "nej" in svar_raw:
-            svar = "nej"
-        else:
-            svar = "osaker"
-        print(f"  Fråga: \"{fraga[:60]}\" → {svar}")
-        fraga_enc = urllib.parse.quote(fraga)
-        hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
-        get_res = httpx.get(
-            f"{SB_URL}/rest/v1/opinion_roster?fraga=eq.{fraga_enc}&select=roster_ja,roster_nej,roster_osaker",
-            headers=hdrs, timeout=10,
-        )
-        rows = get_res.json() if get_res.is_success else []
-        if rows:
-            cur = rows[0]
-            patch_payload = {
-                "roster_ja": cur.get("roster_ja", 0) + (1 if svar == "ja" else 0),
-                "roster_nej": cur.get("roster_nej", 0) + (1 if svar == "nej" else 0),
-                "roster_osaker": cur.get("roster_osaker", 0) + (1 if svar == "osaker" else 0),
-            }
-            res = httpx.patch(
-                f"{SB_URL}/rest/v1/opinion_roster?fraga=eq.{fraga_enc}",
-                headers={**hdrs, "Content-Type": "application/json"},
-                json=patch_payload, timeout=10,
+                try:
+                    svar_raw = gemini_post("", prompt, max_tokens=5).strip().lower()
+                except Exception:
+                    pass
+            if "ja" in svar_raw and "nej" not in svar_raw:
+                svar = "ja"
+            elif "nej" in svar_raw:
+                svar = "nej"
+            else:
+                svar = "osaker"
+            print(f"  \"{fraga[:55]}\" → {svar}")
+            fraga_enc = urllib.parse.quote(fraga)
+            get_res = httpx.get(
+                f"{SB_URL}/rest/v1/opinion_roster?fraga=eq.{fraga_enc}&select=ai_ja,ai_nej,ai_osaker,roster_ja,roster_nej,roster_osaker",
+                headers=hdrs, timeout=10,
             )
-            return res.status_code in (200, 204)
-        else:
-            post_payload = {
-                "fraga": fraga, "kategori": kategori,
-                "roster_ja": 1 if svar == "ja" else 0,
-                "roster_nej": 1 if svar == "nej" else 0,
-                "roster_osaker": 1 if svar == "osaker" else 0,
-            }
-            res = httpx.post(
-                f"{SB_URL}/rest/v1/opinion_roster",
-                headers={**hdrs, "Content-Type": "application/json"},
-                json=post_payload, timeout=10,
-            )
-            return res.status_code in (200, 201)
-    except Exception as e:
-        print(f"  Fel vid opinion-röstning: {e}", file=sys.stderr)
-        return False
+            rows = get_res.json() if get_res.is_success else []
+            if rows:
+                cur = rows[0]
+                patch_payload = {
+                    "ai_ja":     cur.get("ai_ja", 0)     + (1 if svar == "ja"    else 0),
+                    "ai_nej":    cur.get("ai_nej", 0)    + (1 if svar == "nej"   else 0),
+                    "ai_osaker": cur.get("ai_osaker", 0) + (1 if svar == "osaker" else 0),
+                }
+                res = httpx.patch(
+                    f"{SB_URL}/rest/v1/opinion_roster?fraga=eq.{fraga_enc}",
+                    headers={**hdrs, "Content-Type": "application/json"},
+                    json=patch_payload, timeout=10,
+                )
+                if res.status_code in (200, 204):
+                    ok_count += 1
+            else:
+                post_payload = {
+                    "fraga": fraga, "kategori": kategori,
+                    "roster_ja": 0, "roster_nej": 0, "roster_osaker": 0,
+                    "ai_ja":     1 if svar == "ja"    else 0,
+                    "ai_nej":    1 if svar == "nej"   else 0,
+                    "ai_osaker": 1 if svar == "osaker" else 0,
+                }
+                res = httpx.post(
+                    f"{SB_URL}/rest/v1/opinion_roster",
+                    headers={**hdrs, "Content-Type": "application/json"},
+                    json=post_payload, timeout=10,
+                )
+                if res.status_code in (200, 201):
+                    ok_count += 1
+        except Exception as e:
+            print(f"  Fel vid opinion-röstning ({fraga[:40]}): {e}", file=sys.stderr)
+    return ok_count
 
 
 def skapa_opinion_fraga(agent: dict, sb_key: str, amne: str, rubrik: str = "") -> bool:
@@ -2323,13 +2328,13 @@ def main():
         else:
             print("  Ingen statistik ännu – hoppar över")
 
-    # Opinion-röstning (60% chans per körning)
-    if sb_key and random.random() < 0.6:
+    # Opinion-röstning (5 frågor per körning, alltid)
+    if sb_key:
         print(f"\n── Opinion-röstning: {agent['namn']} ──")
         ok_op = rösta_på_opinion(agent, sb_key)
-        print(f"  {'✓' if ok_op else '✗'} Röstade på opinionsfråga")
-        if ok_op:
-            logga_action(sb_key, agent["namn"], "cast_opinion_vote", {}, "ok")
+        print(f"  ✓ Röstade på {ok_op} opinionsfrågor")
+        if ok_op > 0:
+            logga_action(sb_key, agent["namn"], "cast_opinion_vote", {"antal": ok_op}, "ok")
 
     # Analytiker-agenter skapar nya opinionsfrågor (30% chans, max 80 frågor totalt)
     if sb_key and agent["namn"] not in ROST_AGENTER and random.random() < 0.3:
