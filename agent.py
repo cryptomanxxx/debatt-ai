@@ -818,6 +818,13 @@ def hamta_nyheter() -> list:
         ("Aftonbladet",        "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"),
         ("Expressen",          "https://feeds.expressen.se/nyheter/"),
         ("Dagens Arena",       "https://www.dagensarena.se/feed/"),
+        # Svenska ämnen via Reddit
+        ("Reddit r/sweden",       "https://www.reddit.com/r/sweden/.rss"),
+        ("Reddit r/Economics",    "https://www.reddit.com/r/Economics/.rss"),
+        ("Reddit r/environment",  "https://www.reddit.com/r/environment/.rss"),
+        ("Reddit r/europe",       "https://www.reddit.com/r/europe/.rss"),
+        ("Reddit r/medicine",     "https://www.reddit.com/r/medicine/.rss"),
+        ("Reddit r/urbanplanning","https://www.reddit.com/r/urbanplanning/.rss"),
         # Tech
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
         ("Ars Technica",       "https://feeds.arstechnica.com/arstechnica/index"),
@@ -831,15 +838,19 @@ def hamta_nyheter() -> list:
         # Kryptovalutor
         ("CoinDesk",           "https://www.coindesk.com/arc/outboundfeeds/rss/"),
         ("Cointelegraph",      "https://cointelegraph.com/rss"),
+        ("Reddit r/CryptoCurrency", "https://www.reddit.com/r/CryptoCurrency/.rss"),
+        ("Reddit r/Bitcoin",        "https://www.reddit.com/r/Bitcoin/.rss"),
         # Internationellt
         ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
         ("Al Jazeera",         "https://www.aljazeera.com/xml/rss/all.xml"),
+        ("Reddit r/worldnews", "https://www.reddit.com/r/worldnews/.rss"),
         # Medicin & forskning
         ("The Lancet",         "https://www.thelancet.com/rssfeed/lancet_online.xml"),
         ("MDPI Healthcare",    "https://www.mdpi.com/rss/journal/healthcare"),
         ("Nature",             "https://www.nature.com/nature.rss"),
         ("Science Alert",      "https://www.sciencealert.com/rss"),
         ("Quanta Magazine",    "https://www.quantamagazine.org/feed/"),
+        ("Reddit r/science",   "https://www.reddit.com/r/science/.rss"),
         # AI & forskning
         ("Google Research",    "https://research.google/blog/rss/"),
         ("Amazon Science",     "https://www.amazon.science/index.rss"),
