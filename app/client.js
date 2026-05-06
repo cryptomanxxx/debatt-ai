@@ -175,8 +175,9 @@ async function fetchLatestArtikel() {
 }
 
 async function fetchTrending() {
+  const sjuDagarSen = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,lasningar,nyhetskalla&lasningar=gte.1&order=lasningar.desc&limit=5`,
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,lasningar,nyhetskalla&lasningar=gte.1&skapad=gte.${encodeURIComponent(sjuDagarSen)}&order=lasningar.desc&limit=3`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
   if (!res.ok) return [];
@@ -904,6 +905,31 @@ export default function DebattClient({ initialArticleCount = null }) {
               </a>
             )}
 
+            {/* Trending – mest lästa senaste 7 dagarna */}
+            {trending.length > 0 && (
+              <div style={{ marginBottom:"24px" }}>
+                <div style={{ display:"flex", alignItems:"center", marginBottom:"12px" }}>
+                  <span style={{ fontSize:"11px", color:"#f59e0b", fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>📈 VECKANS MEST LÄSTA</span>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"1px", background:C.border, borderRadius:"8px", overflow:"hidden", border:"1px solid #2a2a2a" }}>
+                  {trending.map((a, i) => (
+                    <a key={a.id} href={`/artikel/${a.id}`} className="debatt-rad" style={{ display:"flex", alignItems:"center", gap:"14px", padding:"14px 18px", background:C.surface, textDecoration:"none" }}>
+                      <span style={{ fontSize:"18px", fontWeight:700, color:"#333", fontFamily:"monospace", flexShrink:0, width:"20px", textAlign:"right" }}>{i + 1}</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <p style={{ margin:"0 0 3px", fontSize:"15px", color:a.nyhetskalla ? "#38bdf8" : "#4ade80", lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {a.rubrik}
+                        </p>
+                        <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>
+                          {a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}
+                        </span>
+                      </div>
+                      <span style={{ fontSize:"11px", color:"#f59e0b", fontFamily:"monospace", flexShrink:0 }}>{a.lasningar} läsn.</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Hero – senaste nyheter */}
             {senasteNyhet.length > 0 && (
               <div style={{ marginBottom:"24px" }}>
@@ -1089,30 +1115,6 @@ export default function DebattClient({ initialArticleCount = null }) {
               </div>
             )}
 
-            {/* Trending */}
-            {trending.length > 0 && (
-              <div style={{ marginBottom:"28px" }}>
-                <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px", fontFamily:"Georgia, serif" }}>
-                  Mest lästa artiklarna
-                </p>
-                <div style={{ display:"flex", flexDirection:"column", gap:"1px", background:C.border, borderRadius:"8px", overflow:"hidden", border:`1px solid ${C.border}` }}>
-                  {trending.map((a, i) => (
-                    <a key={a.id} href={`/artikel/${a.id}`} className="debatt-rad" style={{ display:"flex", alignItems:"center", gap:"14px", padding:"14px 18px", background:C.surface, textDecoration:"none" }}>
-                      <span style={{ fontSize:"16px", fontWeight:700, color:"#333", fontFamily:"monospace", flexShrink:0, width:"18px", textAlign:"right" }}>{i + 1}</span>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <p style={{ margin:"0 0 3px", fontSize:"15px", color:a.nyhetskalla ? "#38bdf8" : "#4ade80", lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                          {a.rubrik}
-                        </p>
-                        <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>
-                          {a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}
-                        </span>
-                      </div>
-                      <span style={{ fontSize:"11px", color:"#555", fontFamily:"monospace", flexShrink:0 }}>{a.lasningar} läsn.</span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div style={{ background: "#0d0f0a", border: `1px solid ${C.green}30`, borderRadius: "8px", padding: "28px 32px", marginBottom: "40px" }}>
               <p style={{ fontSize: "11px", color: C.green, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 10px 0", fontWeight: 700 }}>Artikelinlämning</p>
