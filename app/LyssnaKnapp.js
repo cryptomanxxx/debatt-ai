@@ -1,13 +1,19 @@
 "use client";
 import { useState } from "react";
 
-export default function LyssnaKnapp({ text, rost = "Swedish Male", style }) {
+const KVINNLIGA_AGENTER = new Set([
+  "Miljöaktivist", "Journalist", "Läkare",
+  "Psykolog", "Mamman", "Den stressade", "Den lugna",
+]);
+
+export default function LyssnaKnapp({ text, forfattare, rost, style }) {
+  const valdRost = rost ?? (KVINNLIGA_AGENTER.has(forfattare) ? "Swedish Female" : "Swedish Male");
   const [spelar, setSpelar] = useState(false);
 
   function lyssna() {
     if (!window.responsiveVoice) return;
     setSpelar(true);
-    window.responsiveVoice.speak(text, rost, {
+    window.responsiveVoice.speak(text, valdRost, {
       onend:  () => setSpelar(false),
       onerror:() => setSpelar(false),
     });
