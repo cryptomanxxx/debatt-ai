@@ -1475,8 +1475,8 @@ def skapa_opinion_fraga(agent: dict, sb_key: str, amne: str, rubrik: str = "") -
         )
         content_range = count_res.headers.get("content-range", "")
         total = int(content_range.split("/")[-1]) if "/" in content_range else 0
-        if total >= 80:
-            print(f"  Max antal opinionsfrågor (80) nått — hoppar över")
+        if total >= 200:
+            print(f"  Max antal opinionsfrågor (200) nått — hoppar över")
             return False
 
         # Hämta de senaste frågorna för att undvika dubbletter
@@ -2336,8 +2336,8 @@ def main():
         if ok_op > 0:
             logga_action(sb_key, agent["namn"], "cast_opinion_vote", {"antal": ok_op}, "ok")
 
-    # Analytiker-agenter skapar nya opinionsfrågor (30% chans, max 80 frågor totalt)
-    if sb_key and agent["namn"] not in ROST_AGENTER and random.random() < 0.3:
+    # Analytiker-agenter skapar nya opinionsfrågor (60% chans, max 200 frågor totalt)
+    if sb_key and agent["namn"] not in ROST_AGENTER and random.random() < 0.6:
         print(f"\n── Ny opinionsfråga: {agent['namn']} ──")
         ok_fraga = skapa_opinion_fraga(agent, sb_key, amne, svar.get("rubrik", ""))
         if ok_fraga:
