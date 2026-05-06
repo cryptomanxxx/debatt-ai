@@ -359,9 +359,7 @@ export default function PoddPage() {
   const [rateLimitInfo, setRateLimitInfo] = useState({ remaining: RL_LIMIT, resetAt: null });
   const [fel, setFel]               = useState("");
   const [debattId, setDebattId]     = useState(null);
-  const [cachadDebatt, setCachadDebatt] = useState(null);
-  const [visarCacheModal, setVisarCacheModal] = useState(false);
-  const väntandeStartRef = useRef(null);
+  const [ärrRepris, setÄrRepris]    = useState(false);
 
   const stoppRef    = useRef(false);
   const abortRef    = useRef(null);
@@ -424,6 +422,7 @@ export default function PoddPage() {
     setAgenter(debatt.agenter); setFaktisktAmne(debatt.amne);
     setHistorik([]); setStreaming(null); setSummering(debatt.summering || "");
     setDebattId(debatt.id); setFel(""); setSpeakerAgent(null); setAmplitude(0);
+    setÄrRepris(true);
     setDisplayAgent(debatt.agenter[0]);
     autoplayRef.current = true; stoppRef.current = false;
     setFas("kör");
@@ -464,12 +463,7 @@ export default function PoddPage() {
     const valdaAgenter = panel.agenter ?? slumpAgenter;
     const valtAmne = amne.trim() || slumpaAmne();
     const cached = await sokCachadDebatt(valtAmne, valdaAgenter);
-    if (cached) {
-      setCachadDebatt(cached);
-      väntandeStartRef.current = { agenter: valdaAgenter, amne: valtAmne };
-      setVisarCacheModal(true);
-      return;
-    }
+    if (cached) { await replay(cached); return; }
     await startaNy(valdaAgenter, valtAmne);
   }
 
@@ -520,7 +514,7 @@ export default function PoddPage() {
   function nyDebatt() {
     stoppa(); autoplayRef.current = true;
     setFas("start"); setHistorik([]); setSummering(""); setDebattId(null);
-    setFel(""); setCachadDebatt(null); setVisarCacheModal(false);
+    setFel(""); setÄrRepris(false);
     setAmne(slumpaAmne()); setSlumpAgenter(pickRandom(ALLA_AGENTER, 3));
     setDisplayAgent(null);
   }
@@ -550,9 +544,14 @@ export default function PoddPage() {
           <a href="/chatt" className="neon-nav">Direktdebatt</a>
           <a href="/podd" className="neon-nav" style={{ color: C.accent }}>Videopodden</a>
           {fas === "kör" && (
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
-              <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>LIVE PODD</span>
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
+              {ärrRepris && (
+                <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.08em", border: `1px solid ${C.border}`, padding: "3px 8px", borderRadius: "4px" }}>REPRIS</span>
+              )}
+              <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
+                <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>LIVE PODD</span>
+              </span>
             </div>
           )}
         </div>
@@ -722,26 +721,6 @@ export default function PoddPage() {
         </main>
       )}
 
-      {/* Cache-modal */}
-      {visarCacheModal && cachadDebatt && (
-        <div style={{ position: "fixed", inset: 0, background: "#000000cc", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "32px", maxWidth: "480px", width: "100%" }}>
-            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 12px 0" }}>Sparad debatt hittad</p>
-            <p style={{ color: C.text, fontSize: "15px", lineHeight: 1.6, margin: "0 0 8px 0" }}>Den här kombinationen av agenter och ämne har debatterats förut.</p>
-            <p style={{ color: C.textMuted, fontSize: "13px", margin: "0 0 28px 0" }}>Vill du spela upp den sparade versionen (utan nya AI-anrop) eller köra en ny debatt?</p>
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <button onClick={() => { setVisarCacheModal(false); replay(cachadDebatt); }}
-                style={{ background: C.accent, color: C.bg, border: "none", borderRadius: "4px", padding: "11px 22px", fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "Georgia, serif" }}>
-                ▶ Spela upp sparad
-              </button>
-              <button onClick={() => { setVisarCacheModal(false); const p = väntandeStartRef.current; if (p) startaNy(p.agenter, p.amne); }}
-                style={{ background: "none", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "11px 22px", fontSize: "14px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
-                Kör ny debatt
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
