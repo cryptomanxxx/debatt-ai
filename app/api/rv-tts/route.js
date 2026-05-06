@@ -10,12 +10,18 @@ export async function GET(req) {
   // Swedish Male → sv-SE-Wavenet-C, Swedish Female → sv-SE-Wavenet-A
   const name = gender === "kvinna" ? "sv-SE-Wavenet-A" : "sv-SE-Wavenet-C";
 
+  const escaped = text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+
+  // SSML prosody rate controls speaking speed without affecting pitch
+  const ssml = `<speak><prosody rate="x-slow">${escaped}</prosody></speak>`;
+
   const url = new URL("https://texttospeech.responsivevoice.org/v1/text:synthesize");
-  url.searchParams.set("text", text);
+  url.searchParams.set("ssml", ssml);
   url.searchParams.set("lang", "sv-SE");
   url.searchParams.set("name", name);
   url.searchParams.set("pitch", "0.5");
-  url.searchParams.set("rate", "0.75");
   url.searchParams.set("key", "nQnR2SiW");
   url.searchParams.set("referrer", "debatt-ai.se");
 

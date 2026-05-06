@@ -278,8 +278,7 @@ export default function PoddTestPage() {
             animate();
             setTimeout(resolve, audioBuf.duration * 1000 + 800);
           });
-          // Paus mellan meningar — ger lugnare tempo utan att ändra tonhöjd
-          await new Promise(r => setTimeout(r, 600));
+          await new Promise(r => setTimeout(r, 1200));
         } catch { /* hoppa över mening */ }
       }
 
