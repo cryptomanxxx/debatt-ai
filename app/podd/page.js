@@ -569,15 +569,16 @@ export default function PoddPage() {
   const currentDisplay = displayAgent || (agenter.length > 0 ? agenter[0] : null);
 
   return (
-    <div style={{ background: C.bg, height: fas === "kör" ? "100dvh" : "auto", minHeight: fas === "kör" ? "unset" : "100vh", overflow: fas === "kör" ? "hidden" : "visible", color: C.text, fontFamily: "Georgia, serif", display: "flex", flexDirection: "column" }}>
+    <div style={{ background: C.bg, minHeight: "100dvh", color: C.text, fontFamily: "Georgia, serif", display: "flex", flexDirection: "column" }}>
       <style>{`
         @keyframes dot { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
         .podd-layout { display:flex; flex:1; overflow:hidden; }
         .podd-main   { flex:1; min-width:0; display:flex; flex-direction:column; }
         .podd-side   { width:300px; min-width:300px; background:#111111; border-left:1px solid #1a1a1a; overflow-y:auto; display:flex; flex-direction:column; }
         @media(max-width:720px){
-          .podd-layout{flex-direction:column;}
-          .podd-side{width:100%;min-width:0;border-left:none;border-top:1px solid #1a1a1a;max-height:380px;}
+          .podd-layout{flex-direction:column; overflow:visible;}
+          .podd-side{width:100%;min-width:0;border-left:none;border-top:1px solid #1a1a1a;}
+          .podd-side > div { height:auto !important; overflow:visible !important; }
         }
       `}</style>
 
