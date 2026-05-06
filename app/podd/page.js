@@ -359,24 +359,17 @@ export default function PoddPage() {
   const [rateLimitInfo, setRateLimitInfo] = useState({ remaining: RL_LIMIT, resetAt: null });
   const [fel, setFel]               = useState("");
   const [debattId, setDebattId]     = useState(null);
+  const [cachadDebatt, setCachadDebatt] = useState(null);
+  const [visarCacheModal, setVisarCacheModal] = useState(false);
+  const väntandeStartRef = useRef(null);
 
   const stoppRef    = useRef(false);
   const abortRef    = useRef(null);
   const autoplayRef = useRef(true);
-  const svVoiceRef  = useRef(null);
-  const audioCtxRef = useRef(null);
-  const audioSrcRef = useRef(null);
 
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
-    function laddaRoster() {
-      const voices = speechSynthesis.getVoices();
-      const sv = voices.find(v => v.lang.startsWith("sv")) || voices[0] || null;
-      svVoiceRef.current = sv;
-    }
-    laddaRoster();
-    speechSynthesis.onvoiceschanged = laddaRoster;
-    return () => { autoplayRef.current = false; speechSynthesis.cancel(); };
+    return () => { autoplayRef.current = false; };
   }, []);
 
   useEffect(() => {
@@ -388,60 +381,64 @@ export default function PoddPage() {
     if (!autoplayRef.current) return;
     setSpeakerAgent(agent);
     const vp = AGENT_ROST[agent] || { pitch: 1.0, rate: 1.0 };
-    const harSvRost = Boolean(typeof speechSynthesis !== "undefined" && svVoiceRef.current?.lang?.startsWith("sv"));
-
-    if (harSvRost) {
-      const meningar = text.replace(/\n+/g, " ").match(/[^.!?]+[.!?]*/g) || [text];
-      for (const mening of meningar) {
-        if (!autoplayRef.current || stoppRef.current) break;
-        await new Promise((resolve) => {
-          const utt = new SpeechSynthesisUtterance(mening.trim());
-          utt.lang = "sv-SE"; utt.voice = svVoiceRef.current; utt.pitch = vp.pitch; utt.rate = vp.rate; utt.volume = 1;
-          let boundaryFired = false;
-          let fallbackTimer = null;
-          utt.onboundary = (e) => {
-            if (e.name !== "word") return;
-            boundaryFired = true;
-            setAmplitude(0.45 + Math.random() * 0.55);
-            setTimeout(() => setAmplitude(0.08 + Math.random() * 0.12), 110 + Math.random() * 80);
-          };
-          fallbackTimer = setTimeout(() => {
-            if (!boundaryFired) {
-              const iv = setInterval(() => {
-                if (!autoplayRef.current) { clearInterval(iv); return; }
-                const t = Date.now();
-                setAmplitude(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
-              }, 70);
-              utt._fallbackIv = iv;
-            }
-          }, 300);
-          utt.onend = () => { clearTimeout(fallbackTimer); if (utt._fallbackIv) clearInterval(utt._fallbackIv); setAmplitude(0); resolve(); };
-          utt.onerror = () => { clearTimeout(fallbackTimer); if (utt._fallbackIv) clearInterval(utt._fallbackIv); setAmplitude(0); resolve(); };
-          speechSynthesis.speak(utt);
-        });
-      }
-    } else {
-      const rvVoice = AGENT_AZURE_VOICE[agent] === "sv-SE-SofieNeural" ? "Swedish Female" : "Swedish Male";
-      await new Promise(resolve => {
-        if (!autoplayRef.current || stoppRef.current) { resolve(); return; }
-        let iv;
-        const startAnim = () => {
-          iv = setInterval(() => {
-            if (!autoplayRef.current) { clearInterval(iv); return; }
-            const t = Date.now();
-            setAmplitude(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
-          }, 70);
-        };
-        const stopAnim = () => { clearInterval(iv); setAmplitude(0); resolve(); };
-        const timeout = setTimeout(stopAnim, text.length * 80 + 4000);
+    const rvVoice = AGENT_AZURE_VOICE[agent] ? "Swedish Female" : "Swedish Male";
+    await new Promise(resolve => {
+      if (!autoplayRef.current || stoppRef.current) { resolve(); return; }
+      let iv;
+      const startAnim = () => {
+        iv = setInterval(() => {
+          if (!autoplayRef.current) { clearInterval(iv); return; }
+          const t = Date.now();
+          setAmplitude(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
+        }, 70);
+      };
+      const stopAnim = () => { if (iv) clearInterval(iv); setAmplitude(0); resolve(); };
+      const timeout = setTimeout(stopAnim, text.length * 80 + 5000);
+      if (window.responsiveVoice) {
         window.responsiveVoice.speak(text, rvVoice, {
+          pitch: vp.pitch, rate: vp.rate,
           onstart: startAnim,
           onend:   () => { clearTimeout(timeout); stopAnim(); },
           onerror: () => { clearTimeout(timeout); stopAnim(); },
         });
-      });
-    }
+      } else {
+        setTimeout(stopAnim, 100);
+      }
+    });
     if (autoplayRef.current) { setSpeakerAgent(null); setAmplitude(0); }
+  }
+
+  async function sokCachadDebatt(amne, agenter) {
+    try {
+      const url = `${SB_URL}/rest/v1/chatt_debatter?amne=eq.${encodeURIComponent(amne)}&order=skapad.desc&limit=20`;
+      const res = await fetch(url, { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } });
+      if (!res.ok) return null;
+      const data = await res.json();
+      const sorted = [...agenter].sort().join(",");
+      return data.find(d => [...(d.agenter || [])].sort().join(",") === sorted) || null;
+    } catch { return null; }
+  }
+
+  async function replay(debatt) {
+    const h = debatt.inlagg || [];
+    setAgenter(debatt.agenter); setFaktisktAmne(debatt.amne);
+    setHistorik([]); setStreaming(null); setSummering(debatt.summering || "");
+    setDebattId(debatt.id); setFel(""); setSpeakerAgent(null); setAmplitude(0);
+    setDisplayAgent(debatt.agenter[0]);
+    autoplayRef.current = true; stoppRef.current = false;
+    setFas("kör");
+    for (let i = 0; i < h.length; i++) {
+      if (stoppRef.current) break;
+      const inlagg = h[i];
+      setTänkande(inlagg.agent);
+      await new Promise(r => setTimeout(r, 500));
+      setTänkande("");
+      setHistorik(h.slice(0, i + 1));
+      await spelaUppText(inlagg.text, inlagg.agent);
+      if (!stoppRef.current && i < h.length - 1) await new Promise(r => setTimeout(r, 150));
+    }
+    setStreaming(null); setTänkande(""); setSpeakerAgent(null); setAmplitude(0);
+    setFas("klar");
   }
 
   async function avsluta(h, valtAmne, valdaAgenter) {
@@ -466,6 +463,19 @@ export default function PoddPage() {
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? slumpAgenter;
     const valtAmne = amne.trim() || slumpaAmne();
+    const cached = await sokCachadDebatt(valtAmne, valdaAgenter);
+    if (cached) {
+      setCachadDebatt(cached);
+      väntandeStartRef.current = { agenter: valdaAgenter, amne: valtAmne };
+      setVisarCacheModal(true);
+      return;
+    }
+    await startaNy(valdaAgenter, valtAmne);
+  }
+
+  async function startaNy(valdaAgenter, valtAmne) {
+    const rl = peekLocalRL();
+    if (rl.remaining <= 0) return;
     setRateLimitInfo(consumeLocalRL());
     setAgenter(valdaAgenter); setFaktisktAmne(valtAmne);
     setHistorik([]); setStreaming(null); setSummering(""); setDebattId(null); setFel("");
@@ -502,10 +512,7 @@ export default function PoddPage() {
 
   function stoppa() {
     stoppRef.current = true; autoplayRef.current = false;
-    speechSynthesis.cancel();
     try { window.responsiveVoice?.cancel(); } catch {}
-    try { audioSrcRef.current?.stop(); } catch {}
-    try { audioCtxRef.current?.close(); } catch {}
     abortRef.current?.abort();
     setSpeakerAgent(null); setAmplitude(0);
   }
@@ -513,7 +520,8 @@ export default function PoddPage() {
   function nyDebatt() {
     stoppa(); autoplayRef.current = true;
     setFas("start"); setHistorik([]); setSummering(""); setDebattId(null);
-    setFel(""); setAmne(slumpaAmne()); setSlumpAgenter(pickRandom(ALLA_AGENTER, 3));
+    setFel(""); setCachadDebatt(null); setVisarCacheModal(false);
+    setAmne(slumpaAmne()); setSlumpAgenter(pickRandom(ALLA_AGENTER, 3));
     setDisplayAgent(null);
   }
 
@@ -712,6 +720,27 @@ export default function PoddPage() {
             )}
           </div>
         </main>
+      )}
+
+      {/* Cache-modal */}
+      {visarCacheModal && cachadDebatt && (
+        <div style={{ position: "fixed", inset: 0, background: "#000000cc", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "32px", maxWidth: "480px", width: "100%" }}>
+            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 12px 0" }}>Sparad debatt hittad</p>
+            <p style={{ color: C.text, fontSize: "15px", lineHeight: 1.6, margin: "0 0 8px 0" }}>Den här kombinationen av agenter och ämne har debatterats förut.</p>
+            <p style={{ color: C.textMuted, fontSize: "13px", margin: "0 0 28px 0" }}>Vill du spela upp den sparade versionen (utan nya AI-anrop) eller köra en ny debatt?</p>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+              <button onClick={() => { setVisarCacheModal(false); replay(cachadDebatt); }}
+                style={{ background: C.accent, color: C.bg, border: "none", borderRadius: "4px", padding: "11px 22px", fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "Georgia, serif" }}>
+                ▶ Spela upp sparad
+              </button>
+              <button onClick={() => { setVisarCacheModal(false); const p = väntandeStartRef.current; if (p) startaNy(p.agenter, p.amne); }}
+                style={{ background: "none", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "11px 22px", fontSize: "14px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+                Kör ny debatt
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
