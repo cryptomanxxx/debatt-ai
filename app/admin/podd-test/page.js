@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
+import { KVINNLIGA_AGENTER } from "../../agentData";
 
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
 
@@ -150,7 +151,7 @@ export default function PoddTestPage() {
     Object.fromEntries(TEST_AGENTER.map(n => [n, { recording: false, url: null, error: null }]))
   );
   const [konVal, setKonVal] = useState(
-    Object.fromEntries(TEST_AGENTER.map(n => [n, "man"]))
+    Object.fromEntries(TEST_AGENTER.map(n => [n, KVINNLIGA_AGENTER.has(n) ? "kvinna" : "man"]))
   );
 
   const autoplayRef = useRef(true);
