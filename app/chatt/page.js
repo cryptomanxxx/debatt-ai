@@ -333,7 +333,7 @@ export default function ChattPage() {
   const [rateLimitInfo, setRateLimitInfo] = useState({ remaining: RL_LIMIT, resetAt: null });
   const [usedProviders, setUsedProviders] = useState(new Set());
   const [felmeddelande, setFelmeddelande] = useState("");
-  const [spelar, setSpelar] = useState(false);
+  const [lyssnaFas, setLyssnaFas] = useState("idle"); // idle | spelar | pausad
   const [arkivAntal, setArkivAntal] = useState(null);
   const [aiVäljer, setAiVäljer] = useState(false);
   const stoppRef = useRef(false);
@@ -475,24 +475,34 @@ export default function ChattPage() {
       : summering ? [{ agent: null, text: summering }] : [];
     if (!entries.length) return;
     lyssnaStoppRef.current = false;
-    setSpelar(true);
+    setLyssnaFas("spelar");
     for (const e of entries) {
       if (lyssnaStoppRef.current) break;
       await spelaUppText(e.text, e.agent);
     }
-    if (!lyssnaStoppRef.current) setSpelar(false);
+    if (!lyssnaStoppRef.current) setLyssnaFas("idle");
+  }
+
+  function pausaLyssna() {
+    window.responsiveVoice?.pause();
+    setLyssnaFas("pausad");
+  }
+
+  function fortsattLyssna() {
+    window.responsiveVoice?.resume();
+    setLyssnaFas("spelar");
   }
 
   function stoppLyssna() {
     lyssnaStoppRef.current = true;
     window.responsiveVoice?.cancel();
-    setSpelar(false);
+    setLyssnaFas("idle");
   }
 
   function nyDebatt() {
     lyssnaStoppRef.current = true;
     window.responsiveVoice?.cancel();
-    setSpelar(false);
+    setLyssnaFas("idle");
     setFas("start");
     setHistorik([]);
     setStreaming(null);
@@ -645,9 +655,12 @@ export default function ChattPage() {
                 ))}
                 <span style={{ fontSize: "12px", color: C.textMuted, marginLeft: "4px" }}>{historik.length}/10</span>
                 {fas === "klar" && (
-                  <button onClick={spelar ? stoppLyssna : lyssna} style={{ padding: "3px 10px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "20px", color: C.textMuted, fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer", marginLeft: "4px" }}>
-                    {spelar ? "⏹ Stoppa" : "🎧 Lyssna"}
-                  </button>
+                  lyssnaFas === "idle"
+                    ? <button onClick={lyssna} style={{ padding: "3px 10px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "20px", color: C.textMuted, fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer", marginLeft: "4px" }}>🎧 Lyssna</button>
+                    : <span style={{ display: "inline-flex", gap: "4px", marginLeft: "4px" }}>
+                        <button onClick={lyssnaFas === "spelar" ? pausaLyssna : fortsattLyssna} style={{ padding: "3px 10px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "20px", color: C.textMuted, fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}>{lyssnaFas === "spelar" ? "⏸ Paus" : "▶ Fortsätt"}</button>
+                        <button onClick={stoppLyssna} style={{ padding: "3px 10px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "20px", color: C.textMuted, fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}>⏹</button>
+                      </span>
                 )}
               </div>
             </div>
@@ -691,9 +704,13 @@ export default function ChattPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
                 {/* Podcast-spelare */}
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 18px", background: "#0a0d10", border: "1px solid #4a9eff30", borderRadius: "8px", marginBottom: "16px" }}>
-                  <button onClick={spelar ? stoppLyssna : lyssna} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "9px 18px", background: spelar ? "transparent" : "#4a9eff18", border: `1px solid ${spelar ? "#f8717150" : "#4a9eff50"}`, borderRadius: "6px", color: spelar ? "#f87171" : "#4a9eff", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer", flexShrink: 0 }}>
-                    {spelar ? "⏹ Stoppa" : "▶ Lyssna på debatten"}
-                  </button>
+                  {lyssnaFas === "idle"
+                    ? <button onClick={lyssna} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "9px 18px", background: "#4a9eff18", border: "1px solid #4a9eff50", borderRadius: "6px", color: "#4a9eff", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer", flexShrink: 0 }}>▶ Lyssna på debatten</button>
+                    : <span style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                        <button onClick={lyssnaFas === "spelar" ? pausaLyssna : fortsattLyssna} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "9px 18px", background: "#4a9eff18", border: "1px solid #4a9eff50", borderRadius: "6px", color: "#4a9eff", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer" }}>{lyssnaFas === "spelar" ? "⏸ Paus" : "▶ Fortsätt"}</button>
+                        <button onClick={stoppLyssna} style={{ padding: "9px 14px", background: "transparent", border: "1px solid #f8717150", borderRadius: "6px", color: "#f87171", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer" }}>⏹</button>
+                      </span>
+                  }
                   <span style={{ fontSize: "12px", color: C.textMuted }}>
                     {spelar ? "Spelar upp…" : `${historik.length} inlägg · varje agent annonseras`}
                   </span>
