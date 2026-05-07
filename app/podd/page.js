@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -218,23 +218,77 @@ function Waveform({ amplitude, farg }) {
   );
 }
 
+function TalkingCanvas({ src, amplitude, speaking }) {
+  const canvasRef = useRef(null);
+  const imgRef = useRef(null);
+
+  const redraw = useCallback((amp, isSpeaking) => {
+    const canvas = canvasRef.current;
+    const img = imgRef.current;
+    if (!canvas || !img) return;
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // "contain" placement
+    const scale = Math.min(W / img.naturalWidth, H / img.naturalHeight);
+    const iw = img.naturalWidth * scale;
+    const ih = img.naturalHeight * scale;
+    const ix = (W - iw) / 2;
+    const iy = (H - ih) / 2;
+    ctx.drawImage(img, ix, iy, iw, ih);
+
+    if (!isSpeaking || amp < 0.03) return;
+
+    // Mouth center: ~50% horizontal, ~65% vertical within the portrait
+    const mx = ix + iw * 0.50;
+    const my = iy + ih * 0.65;
+    const mRx = iw * 0.13;
+    const mRy = ih * 0.038;
+    const scaleY = 1 + amp * 0.55; // 1.0 → ~1.55
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(mx, my, mRx, mRy * scaleY * 1.4, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.translate(mx, my);
+    ctx.scale(1, scaleY);
+    ctx.translate(-mx, -my);
+    ctx.drawImage(img, ix, iy, iw, ih);
+    ctx.restore();
+  }, []);
+
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => { imgRef.current = img; redraw(0, false); };
+    img.src = src;
+  }, [src, redraw]);
+
+  useEffect(() => {
+    redraw(amplitude, speaking);
+  }, [amplitude, speaking, redraw]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={800} height={600}
+      style={{ width: "100%", height: "100%", display: "block" }}
+    />
+  );
+}
+
 function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
   const farg = AGENT_FARG[namn] || C.accent;
   const isTänkande = tänkande === namn;
   const glow = speaking ? 18 + amplitude * 40 : 0;
-  const scale = speaking ? 1 + amplitude * 0.008 : 1;
 
   return (
     <div style={{ position: "relative", width: "100%", paddingTop: "75%", background: "#000", flexShrink: 0 }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
 
-        {/* HD-stillbild */}
-        <img src={avatarSrc(namn)} alt={namn}
-          style={{ width: "100%", height: "100%", objectFit: "contain", display: "block",
-            transform: `scale(${scale})`, transition: "transform 0.1s ease-out",
-            filter: speaking ? `drop-shadow(0 0 ${glow}px ${farg}88)` : "none",
-          }}
- />
+        {/* Avatar med munanimation */}
+        <TalkingCanvas src={avatarSrc(namn)} amplitude={amplitude} speaking={speaking} />
 
         {/* Tänker-overlay */}
         {isTänkande && !speaking && (
@@ -261,9 +315,13 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
           </div>
         </div>
 
-        {/* Glödram när agenten talar */}
+        {/* Glödram + canvas-filter när agenten talar */}
         {speaking && (
-          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", boxShadow: `inset 0 0 ${glow * 1.5}px ${farg}33`, border: `2px solid ${farg}55`, transition: "box-shadow 0.08s ease" }} />
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none",
+            boxShadow: `inset 0 0 ${glow * 1.5}px ${farg}33`,
+            border: `2px solid ${farg}55`,
+            transition: "box-shadow 0.08s ease",
+          }} />
         )}
       </div>
     </div>
