@@ -247,6 +247,7 @@ function TalkingCanvas({ src, amplitude, speaking }) {
     const mRy = ih * 0.038;
     const scaleY = 1 + amp * 0.55; // 1.0 → ~1.55
 
+    // Stretch the mouth region (läpprörelser)
     ctx.save();
     ctx.beginPath();
     ctx.ellipse(mx, my, mRx, mRy * scaleY * 1.4, 0, 0, Math.PI * 2);
@@ -256,6 +257,27 @@ function TalkingCanvas({ src, amplitude, speaking }) {
     ctx.translate(-mx, -my);
     ctx.drawImage(img, ix, iy, iw, ih);
     ctx.restore();
+
+    // Draw dark mouth opening — the dark interior is what makes it look open
+    const openness = Math.max(0, (amp - 0.05) / 0.95); // 0→1
+    if (openness > 0) {
+      const oW = mRx * 0.55;
+      const oH = mRy * scaleY * 0.75 * openness;
+      // Dark cavity
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(mx, my + mRy * 0.15, oW, oH, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(12, 6, 4, ${Math.min(0.92, openness * 1.1)})`;
+      ctx.fill();
+      // Teeth hint (upper)
+      if (openness > 0.25) {
+        ctx.beginPath();
+        ctx.ellipse(mx, my - mRy * scaleY * 0.18, oW * 0.75, oH * 0.28, 0, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(238, 228, 210, ${(openness - 0.25) * 0.55})`;
+        ctx.fill();
+      }
+      ctx.restore();
+    }
   }, []);
 
   useEffect(() => {
