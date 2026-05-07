@@ -240,9 +240,9 @@ function TalkingCanvas({ src, amplitude, speaking }) {
 
     if (!isSpeaking || amp < 0.03) return;
 
-    // Mouth center: ~50% horizontal, ~65% vertical within the portrait
+    // Mouth center: ~50% horizontal, ~55% vertical within the portrait
     const mx = ix + iw * 0.50;
-    const my = iy + ih * 0.65;
+    const my = iy + ih * 0.55;
     const mRx = iw * 0.13;
     const mRy = ih * 0.038;
     const scaleY = 1 + amp * 0.55; // 1.0 → ~1.55
@@ -260,8 +260,8 @@ function TalkingCanvas({ src, amplitude, speaking }) {
 
   useEffect(() => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
     img.onload = () => { imgRef.current = img; redraw(0, false); };
+    img.onerror = () => { imgRef.current = null; };
     img.src = src;
   }, [src, redraw]);
 
