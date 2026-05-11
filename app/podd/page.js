@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -14,7 +14,7 @@ function agentSlug(namn) {
     .replace(/ä/g, "a").replace(/å/g, "a").replace(/ö/g, "o")
     .replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 }
-const PODD_AVATARER = new Set(["Nationalekonom", "Miljöaktivist", "Teknikoptimist"]);
+const PODD_AVATARER = new Set(["Nationalekonom", "Miljöaktivist", "Teknikoptimist", "Filosof", "Journalist", "Jurist", "Konservativ debattör"]);
 function avatarSrc(namn) {
   return PODD_AVATARER.has(namn)
     ? `/avatarer/podd/${agentSlug(namn)}.png`
@@ -219,6 +219,54 @@ function Waveform({ amplitude, farg }) {
 }
 
 
+function TalkingCanvas({ src, amplitude, speaking }) {
+  const canvasRef = useRef(null);
+  const imgRef = useRef(null);
+
+  const draw = useCallback((amp, isSpeaking) => {
+    const canvas = canvasRef.current;
+    const img = imgRef.current;
+    if (!canvas || !img) return;
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const scale = Math.min(W / img.naturalWidth, H / img.naturalHeight);
+    const iw = img.naturalWidth * scale;
+    const ih = img.naturalHeight * scale;
+    const ix = (W - iw) / 2;
+    const iy = (H - ih) / 2;
+    ctx.drawImage(img, ix, iy, iw, ih);
+    if (!isSpeaking || amp < 0.03) return;
+    const mx = ix + iw * 0.50;
+    const my = iy + ih * 0.62;
+    const mRx = iw * 0.12;
+    const mRy = ih * 0.035;
+    const scaleY = 1 + amp * 0.55;
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(mx, my, mRx, mRy * scaleY * 1.5, 0, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.translate(mx, my);
+    ctx.scale(1, scaleY);
+    ctx.translate(-mx, -my);
+    ctx.drawImage(img, ix, iy, iw, ih);
+    ctx.restore();
+  }, []);
+
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => { imgRef.current = img; draw(0, false); };
+    img.src = src;
+  }, [src, draw]);
+
+  useEffect(() => { draw(amplitude, speaking); }, [amplitude, speaking, draw]);
+
+  return (
+    <canvas ref={canvasRef} width={800} height={600}
+      style={{ width: "100%", height: "100%", display: "block" }} />
+  );
+}
+
 function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
   const farg = AGENT_FARG[namn] || C.accent;
   const isTänkande = tänkande === namn;
@@ -228,8 +276,12 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
     <div style={{ position: "relative", width: "100%", paddingTop: "75%", background: "#000", flexShrink: 0 }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
 
-        {/* Avatar */}
-        <img src={avatarSrc(namn)} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        {/* HD-agenter: munanimation via canvas. Övriga: statisk bild */}
+        {PODD_AVATARER.has(namn) ? (
+          <TalkingCanvas src={avatarSrc(namn)} amplitude={amplitude} speaking={speaking} />
+        ) : (
+          <img src={avatarSrc(namn)} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        )}
 
         {/* Tänker-overlay */}
         {isTänkande && !speaking && (
