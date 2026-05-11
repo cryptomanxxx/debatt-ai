@@ -73,6 +73,20 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
+# YouTube-kanaler (gratis RSS + transkript via youtube-transcript-api)
+YOUTUBE_KANALER = [
+    ("Lex Fridman",         "UCSHZKyawb77ixDdsGog4iWA"),
+    ("Kurzgesagt",          "UCsXVk37bltHxD1rDPwtNM8Q"),
+    ("Two Minute Papers",   "UCbfYPyITQ-7l4upoX8nvctg"),
+    ("Fireship",            "UCsBjURrPoezykLs9EqgamOA"),
+    ("Google DeepMind",     "UCP7jMXSY2xbc3KCAE0MHQ-A"),
+    ("TED",                 "UCAuUUnT6oDeKwE6v1NGQxug"),
+    ("Sabine Hossenfelder", "UC1yNl2E66ZzKApQdRuTQ4tw"),
+    ("BBC News",            "UC16niRr50-MSBwiO3YDb3RA"),
+    ("DW News",             "UCknLrEdhRCp1aegoMqRaCZg"),
+    ("The Economist",       "UC0p5jTq6Xx_DosDFxVXnWaQ"),
+]
+
 # Förprogrammerade opinionsfrågor (samma som på /opinion-sidan)
 OPINION_FRAGOR = [
     ("Ska AI få fatta juridiska beslut?", "ai-tech"),
@@ -809,6 +823,70 @@ def hamta_statistik(kategorier: list[str] | None = None) -> str:
         return ""
 
 
+def hamta_youtube_nyheter() -> list:
+    """Hämtar senaste video + transkript från YouTube-kanaler. Kräver ej API-nyckel."""
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
+    except ImportError:
+        return []
+
+    nyheter = []
+    fjorton_dagar_sedan = datetime.utcnow() - timedelta(days=14)
+
+    for kanal_namn, kanal_id in YOUTUBE_KANALER:
+        try:
+            rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={kanal_id}"
+            res = httpx.get(rss_url, timeout=10, follow_redirects=True,
+                            headers={"User-Agent": "Mozilla/5.0 (compatible; RSS-reader/2.0)"})
+            if not res.ok:
+                continue
+            root = ET.fromstring(res.text)
+            ns = {
+                "atom": "http://www.w3.org/2005/Atom",
+                "yt":   "http://www.youtube.com/xml/schemas/2015",
+            }
+            for entry in root.findall("atom:entry", ns)[:5]:
+                video_id_el = entry.find("yt:videoId", ns)
+                if video_id_el is None:
+                    continue
+                video_id = video_id_el.text.strip()
+                title_el = entry.find("atom:title", ns)
+                titel = title_el.text.strip() if title_el is not None else ""
+                if not titel:
+                    continue
+                published_el = entry.find("atom:published", ns)
+                publicerad = published_el.text.strip() if published_el is not None else ""
+                # Skippa gamla videos
+                if publicerad:
+                    try:
+                        pub_dt = datetime.strptime(publicerad[:10], "%Y-%m-%d")
+                        if pub_dt < fjorton_dagar_sedan:
+                            continue
+                    except Exception:
+                        pass
+                # Hämta transkript
+                try:
+                    transcript_list = YouTubeTranscriptApi.get_transcript(
+                        video_id, languages=["sv", "en", "en-US", "en-GB"]
+                    )
+                    text = " ".join(t["text"] for t in transcript_list)[:2000].strip()
+                except (NoTranscriptFound, TranscriptsDisabled, Exception):
+                    continue
+                nyheter.append({
+                    "rubrik": titel,
+                    "beskrivning": f"[YouTube-transkript] {text}",
+                    "kalla": f"YouTube: {kanal_namn}",
+                    "url": f"https://www.youtube.com/watch?v={video_id}",
+                    "publicerad": publicerad,
+                })
+                break  # En video per kanal
+        except Exception as e:
+            print(f"  ✗ YouTube {kanal_namn}: {type(e).__name__}", file=sys.stderr)
+            continue
+
+    return nyheter
+
+
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från RSS-flöden."""
     feeds = [
@@ -967,6 +1045,13 @@ def hamta_nyheter() -> list:
     for rad in misslyckade:
         print(rad)
     print()
+
+    # YouTube-transkriptioner
+    yt_nyheter = hamta_youtube_nyheter()
+    if yt_nyheter:
+        nyheter.extend(yt_nyheter)
+        print(f"  ✓ YouTube ({len(yt_nyheter)} videor med transkript)")
+
     return nyheter, rss_stats
 
 
