@@ -46,9 +46,16 @@ export async function GET() {
     })
   );
 
-  const nyheter = results.flatMap(r =>
-    r.status === "fulfilled" ? r.value : []
-  );
+  // Interleave: SVT[0], Aftonbladet[0], Expressen[0], SVT[1], Aftonbladet[1]...
+  // Istället för alla SVT-items i rad följt av alla Aftonbladet-items
+  const perKalla = results.map(r => r.status === "fulfilled" ? r.value : []);
+  const maxLen = Math.max(...perKalla.map(a => a.length));
+  const nyheter = [];
+  for (let i = 0; i < maxLen; i++) {
+    for (const items of perKalla) {
+      if (items[i]) nyheter.push(items[i]);
+    }
+  }
 
   return NextResponse.json(nyheter, {
     headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" },
