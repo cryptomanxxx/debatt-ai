@@ -2,6 +2,7 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import AgentAvatar from "./agent/[namn]/AgentAvatar";
 import { agentVisuell } from "./agentData";
+import NewsTicker from "./NewsTicker";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -806,6 +807,8 @@ export default function DebattClient({ initialArticleCount = null }) {
           </button>
         </div>
       </header>
+
+      <NewsTicker />
 
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "48px 20px" }}>
 
