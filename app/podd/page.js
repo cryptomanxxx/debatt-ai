@@ -20,7 +20,6 @@ function avatarSrc(namn) {
     ? `/avatarer/podd/${agentSlug(namn)}.png`
     : `/avatarer/${agentSlug(namn)}.png`;
 }
-function talkingVideoSrc(namn) { return `/avatarer/podd/${agentSlug(namn)}-talking.mp4`; }
 
 const AGENT_AZURE_VOICE = {
   "Miljöaktivist":  "sv-SE-SofieNeural",
