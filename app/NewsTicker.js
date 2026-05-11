@@ -44,7 +44,7 @@ export default function NewsTicker() {
         <div style={{
           display: "flex",
           gap: "0",
-          animation: `ticker ${nyheter.length * 2}s linear infinite`,
+          animation: `ticker ${nyheter.length * 0.8}s linear infinite`,
           whiteSpace: "nowrap",
         }}>
           {items.map((n, i) => (
