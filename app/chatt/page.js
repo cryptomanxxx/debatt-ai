@@ -2,7 +2,6 @@
 import { useState, useRef, useEffect } from "react";
 import ChattShareButtons from "./[id]/ChattShareButtons";
 import ForsladsLadan from "../ForsladsLadan";
-import NavHistorikLink from "../NavHistorikLink";
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell, agentRost } from "../agentData";
 
@@ -548,23 +547,6 @@ export default function ChattPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", textDecoration: "none", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</a>
-          {navLink("/","Hem",false)}
-          {navLink("/?debatter=1","Debatter",false)}
-          {navLink("/nyheter","Nyheter",false)}
-          {navLink("/arkiv", arkivAntal !== null ? `Arkiv (${arkivAntal})` : "Arkiv", false)}
-          {navLink("/chatt","Direktdebatt",true)}
-          {navLink("/kanal","Nyhetskanal",false)}
-          <NavHistorikLink />
-          {navLink("/visualiseringar","Visualiseringar",false)}
-          {navLink("/rivaliteter","Rivaliteter",false)}
-          {navLink("/markets","Markets",false)}
-          {navLink("/om","Om DEBATT-AI",false)}
-          {navLink("/?kontakt=1","Kontakt",false)}
-        </div>
-      </header>
 
       <main style={{ maxWidth: "760px", margin: "0 auto", padding: "48px 20px" }}>
         <div style={{ marginBottom: "40px" }}>

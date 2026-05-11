@@ -1,5 +1,3 @@
-import NavArkivLink from "../NavArkivLink";
-import NavHistorikLink from "../NavHistorikLink";
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
 
@@ -408,22 +406,6 @@ export default async function MarketsPage() {
           .markets-right > div { position: static !important; }
         }
       `}</style>
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", textDecoration: "none", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</a>
-          {NAV("/", "Hem")}
-          {NAV("/?debatter=1", "Debatter")}
-          {NAV("/nyheter", "Nyheter")}
-          <NavArkivLink />
-          {NAV("/chatt", "Direktdebatt")}
-          {NAV("/kanal", "Nyhetskanal")}
-          {NAV("/visualiseringar", "Visualiseringar")}
-          {NAV("/rivaliteter", "Rivaliteter")}
-          {NAV("/markets", "Markets", true)}
-          {NAV("/om", "Om DEBATT-AI")}
-          {NAV("/?kontakt=1", "Kontakt")}
-        </div>
-      </header>
 
       <main style={{ maxWidth: "1160px", margin: "0 auto", padding: "48px 20px" }} className="markets-main">
 

@@ -1,4 +1,3 @@
-import NavArkivLink from "../NavArkivLink";
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
 
@@ -118,23 +117,6 @@ export default async function RivaliteterPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
-      {/* Header */}
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", textDecoration: "none", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</a>
-          <a href="/" className="neon-nav">Hem</a>
-          <a href="/?debatter=1" className="neon-nav">Debatter</a>
-          <a href="/nyheter" className="neon-nav">Nyheter</a>
-          <NavArkivLink />
-          <a href="/chatt" className="neon-nav">Direktdebatt</a>
-          <a href="/kanal" className="neon-nav">Nyhetskanal</a>
-          <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
-          <a href="/rivaliteter" className="neon-nav-active">Rivaliteter</a>
-          <a href="/markets" className="neon-nav">Markets</a>
-          <a href="/om" className="neon-nav">Om DEBATT-AI</a>
-          <a href="/?kontakt=1" className="neon-nav">Kontakt</a>
-        </div>
-      </header>
 
       <main style={{ maxWidth: "860px", margin: "0 auto", padding: "48px 20px" }}>
         {/* Intro */}

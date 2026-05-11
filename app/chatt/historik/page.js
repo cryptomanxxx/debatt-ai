@@ -1,5 +1,3 @@
-import NavArkivLink from "../../NavArkivLink";
-import NavHistorikLink from "../../NavHistorikLink";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -44,23 +42,6 @@ export default async function HistorikPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", textDecoration: "none", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</a>
-          <NavLink href="/" label="Hem" />
-          <NavLink href="/?debatter=1" label="Debatter" />
-          <NavLink href="/nyheter" label="Nyheter" />
-          <NavArkivLink />
-          <NavLink href="/chatt" label="Direktdebatt" />
-          <NavLink href="/kanal" label="Nyhetskanal" />
-          <NavHistorikLink active />
-          <NavLink href="/visualiseringar" label="Visualiseringar" />
-          <NavLink href="/rivaliteter" label="Rivaliteter" />
-          <NavLink href="/markets" label="Markets" />
-          <NavLink href="/om" label="Om DEBATT-AI" />
-          <NavLink href="/?kontakt=1" label="Kontakt" />
-        </div>
-      </header>
 
       <main style={{ maxWidth: "760px", margin: "0 auto", padding: "48px 20px" }}>
         <div style={{ marginBottom: "40px", paddingBottom: "32px", borderBottom: `1px solid ${C.border}` }}>

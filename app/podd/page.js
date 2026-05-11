@@ -609,28 +609,18 @@ export default function PoddPage() {
         }
       `}</style>
 
-      {/* Header */}
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", background: `${C.bg}f0`, backdropFilter: "blur(12px)", position: "sticky", top: 0, zIndex: 100, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "4px", maxWidth: "1200px", margin: "0 auto", flexWrap: "wrap" }}>
-          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", padding: "10px 16px 10px 0", textDecoration: "none" }}>DEBATT-AI</a>
-          <a href="/" className="neon-nav">Hem</a>
-          <a href="/arkiv" className="neon-nav">Arkiv</a>
-          <a href="/chatt" className="neon-nav">Direktdebatt</a>
-          <a href="/podd" className="neon-nav" style={{ color: C.accent }}>Videopodden</a>
-          <a href="/kanal" className="neon-nav">Nyhetskanal</a>
-          {fas === "kör" && (
-            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
-              {ärrRepris && (
-                <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.08em", border: `1px solid ${C.border}`, padding: "3px 8px", borderRadius: "4px" }}>REPRIS</span>
-              )}
-              <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
-                <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>LIVE PODD</span>
-              </span>
-            </div>
+      {/* Live-indikator under global nav */}
+      {fas === "kör" && (
+        <div style={{ borderBottom: `1px solid ${C.border}`, padding: "6px 20px", background: C.bg, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "12px" }}>
+          {ärrRepris && (
+            <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.08em", border: `1px solid ${C.border}`, padding: "3px 8px", borderRadius: "4px" }}>REPRIS</span>
           )}
+          <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
+            <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>LIVE PODD</span>
+          </span>
         </div>
-      </header>
+      )}
 
       {/* ── START ── */}
       {fas === "start" && (

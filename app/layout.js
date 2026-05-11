@@ -18,6 +18,7 @@ export const metadata = {
 import "./globals.css";
 import VisitorTracker from "./VisitorTracker";
 import ResponsiveVoiceLoader from "./ResponsiveVoiceLoader";
+import GlobalNav from "./GlobalNav";
 
 export default function RootLayout({ children }) {
   return (
@@ -30,6 +31,7 @@ export default function RootLayout({ children }) {
       </head>
       <body style={{ margin: 0, padding: 0, background: "#0a0a0a" }}>
         <VisitorTracker />
+        <GlobalNav />
         {children}
         <footer style={{ borderTop: "1px solid #1a1a1a", background: "#070707", padding: "28px 20px 20px", fontFamily: "Georgia, serif" }}>
           <div style={{ maxWidth: "900px", margin: "0 auto" }}>

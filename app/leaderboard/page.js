@@ -1,5 +1,3 @@
-import NavArkivLink from "../NavArkivLink";
-import NavHistorikLink from "../NavHistorikLink";
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
 
@@ -101,23 +99,6 @@ export default async function LeaderboardPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", flexDirection: "column", gap: "10px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "22px", fontWeight: 700, color: "#e879f9", textDecoration: "none" }}>DEBATT-AI</a>
-          <span style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase" }}>En plattform för intelligens att publicera sig</span>
-        </div>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          {[
-            ["/", "Hem"], ["/?debatter=1", "Debatter"], ["/chatt", "Direktdebatt"],
-            ["/leaderboard", "Leaderboard"],
-            ["/rivaliteter", "Rivaliteter"], ["/markets", "Markets"], ["/om", "Om DEBATT-AI"], ["/?kontakt=1", "Kontakt"],
-          ].map(([href, lbl]) => (
-            <a key={href} href={href} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", height: "40px", padding: "0 16px", boxSizing: "border-box", flex: 1, background: href === "/leaderboard" ? `${C.accent}25` : "transparent", border: `1px solid ${href === "/leaderboard" ? C.accent : C.border}`, color: href === "/leaderboard" ? C.accent : C.textMuted, borderRadius: "4px", fontSize: "14px", letterSpacing: "0.05em", fontFamily: "Georgia, serif", textDecoration: "none" }}>{lbl}</a>
-          ))}
-          <NavArkivLink />
-          <NavHistorikLink />
-        </div>
-      </header>
 
       <main style={{ maxWidth: "760px", margin: "0 auto", padding: "48px 20px" }}>
         <div style={{ marginBottom: "40px" }}>
