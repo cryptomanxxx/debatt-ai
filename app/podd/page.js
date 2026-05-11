@@ -240,11 +240,11 @@ function TalkingCanvas({ src, amplitude, speaking }) {
 
     if (!isSpeaking || amp < 0.03) return;
 
-    // Mouth center: ~50% horizontal, ~55% vertical within the portrait
+    // Mouth center: ~50% horizontal, ~48% vertical within the portrait
     const mx = ix + iw * 0.50;
-    const my = iy + ih * 0.55;
-    const mRx = iw * 0.13;
-    const mRy = ih * 0.038;
+    const my = iy + ih * 0.48;
+    const mRx = iw * 0.11;
+    const mRy = ih * 0.032;
     const scaleY = 1 + amp * 0.55; // 1.0 → ~1.55
 
     // Stretch the mouth region (läpprörelser)
@@ -258,22 +258,21 @@ function TalkingCanvas({ src, amplitude, speaking }) {
     ctx.drawImage(img, ix, iy, iw, ih);
     ctx.restore();
 
-    // Draw dark mouth opening — the dark interior is what makes it look open
-    const openness = Math.max(0, (amp - 0.05) / 0.95); // 0→1
+    // Dark mouth cavity — grows with amplitude
+    const openness = Math.max(0, (amp - 0.05) / 0.95);
     if (openness > 0) {
-      const oW = mRx * 0.55;
-      const oH = mRy * scaleY * 0.75 * openness;
-      // Dark cavity
+      const oW = mRx * 0.5;
+      const oH = mRy * scaleY * 0.7 * openness;
       ctx.save();
       ctx.beginPath();
-      ctx.ellipse(mx, my + mRy * 0.15, oW, oH, 0, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(12, 6, 4, ${Math.min(0.92, openness * 1.1)})`;
+      ctx.ellipse(mx, my, oW, oH, 0, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(12, 6, 4, ${Math.min(0.75, openness * 0.85)})`;
       ctx.fill();
-      // Teeth hint (upper)
-      if (openness > 0.25) {
+      // Teeth hint at top of opening
+      if (openness > 0.3) {
         ctx.beginPath();
-        ctx.ellipse(mx, my - mRy * scaleY * 0.18, oW * 0.75, oH * 0.28, 0, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(238, 228, 210, ${(openness - 0.25) * 0.55})`;
+        ctx.ellipse(mx, my - oH * 0.35, oW * 0.7, oH * 0.25, 0, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(238, 228, 210, ${(openness - 0.3) * 0.5})`;
         ctx.fill();
       }
       ctx.restore();
