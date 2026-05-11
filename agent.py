@@ -812,30 +812,60 @@ def hamta_statistik(kategorier: list[str] | None = None) -> str:
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från RSS-flöden."""
     feeds = [
-        # Svenska ämnen – Reddit (stabila, 10 artiklar/körning vardera)
+        # Svenska nyheter
+        ("SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"),
+        ("Aftonbladet",        "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"),
+        ("Dagens Arena",       "https://www.dagensarena.se/feed/"),
+        # Svenska ämnen – Reddit
         ("Reddit Sverige",     "https://www.reddit.com/r/sweden/.rss"),
         ("Reddit Ekonomi",     "https://www.reddit.com/r/Economics/.rss"),
         ("Reddit Klimat",      "https://www.reddit.com/r/environment/.rss"),
         ("Reddit Samhälle",    "https://www.reddit.com/r/europe/.rss"),
+        ("Reddit EU",          "https://www.reddit.com/r/europeanunion/.rss"),
         ("Reddit Sjukvård",    "https://www.reddit.com/r/medicine/.rss"),
         ("Reddit Bostäder",    "https://www.reddit.com/r/urbanplanning/.rss"),
-        # Tech
+        # Tech – direkta feeds
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
-        # Spel & underhållning – Reddit
-        ("Reddit Gaming",      "https://www.reddit.com/r/gaming/.rss"),
-        ("Reddit Games",       "https://www.reddit.com/r/Games/.rss"),
-        ("Reddit PS5",         "https://www.reddit.com/r/PS5/.rss"),
-        ("Reddit Xbox",        "https://www.reddit.com/r/xbox/.rss"),
-        ("Reddit TV",          "https://www.reddit.com/r/television/.rss"),
+        ("TechCrunch",         "https://techcrunch.com/feed/"),
+        ("Wired",              "https://www.wired.com/feed/rss"),
+        ("Ars Technica",       "https://feeds.arstechnica.com/arstechnica/index"),
+        ("Hacker News",        "https://hnrss.org/frontpage"),
+        ("Engadget",           "https://www.engadget.com/rss.xml"),
+        # Tech & AI – Reddit
+        ("Reddit AI",          "https://www.reddit.com/r/artificial/.rss"),
+        ("Reddit Singularity", "https://www.reddit.com/r/singularity/.rss"),
+        ("Reddit OpenAI",      "https://www.reddit.com/r/OpenAI/.rss"),
+        ("Reddit LocalLLM",    "https://www.reddit.com/r/LocalLLaMA/.rss"),
+        ("Reddit Futurology",  "https://www.reddit.com/r/Futurology/.rss"),
+        ("Reddit Technology",  "https://www.reddit.com/r/technology/.rss"),
+        ("Reddit ML",          "https://www.reddit.com/r/MachineLearning/.rss"),
+        # Politik & samhälle – Reddit
+        ("Reddit Geopolitics", "https://www.reddit.com/r/geopolitics/.rss"),
+        ("Reddit Philosophy",  "https://www.reddit.com/r/philosophy/.rss"),
+        ("Reddit ChangeMyView","https://www.reddit.com/r/changemyview/.rss"),
+        ("Reddit WorldPolitics","https://www.reddit.com/r/worldpolitics/.rss"),
+        # Internationella nyheter
+        ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
+        ("Al Jazeera",         "https://www.aljazeera.com/xml/rss/all.xml"),
+        ("Reddit World News",  "https://www.reddit.com/r/worldnews/.rss"),
+        # Ekonomi – Reddit
+        ("Reddit Finance",     "https://www.reddit.com/r/finance/.rss"),
+        ("Reddit Stocks",      "https://www.reddit.com/r/stocks/.rss"),
+        # Energi & klimat – Reddit
+        ("Reddit Energy",      "https://www.reddit.com/r/energy/.rss"),
+        ("Reddit Renewable",   "https://www.reddit.com/r/RenewableEnergy/.rss"),
+        ("Reddit Climate",     "https://www.reddit.com/r/climatechange/.rss"),
+        ("Reddit Nuclear",     "https://www.reddit.com/r/nuclear/.rss"),
         # Kryptovalutor – Reddit
         ("Reddit Crypto",      "https://www.reddit.com/r/CryptoCurrency/.rss"),
         ("Reddit Bitcoin",     "https://www.reddit.com/r/Bitcoin/.rss"),
-        # Internationellt – Reddit
-        ("Reddit World News",  "https://www.reddit.com/r/worldnews/.rss"),
-        # Medicin & forskning – Reddit
+        # Spel & underhållning – Reddit
+        ("Reddit Gaming",      "https://www.reddit.com/r/gaming/.rss"),
+        ("Reddit Games",       "https://www.reddit.com/r/Games/.rss"),
+        ("Reddit TV",          "https://www.reddit.com/r/television/.rss"),
+        # Medicin & forskning
         ("Reddit Science",     "https://www.reddit.com/r/science/.rss"),
-        # AI & forskning
-        ("Reddit ML",          "https://www.reddit.com/r/MachineLearning/.rss"),
+        # AI-forskning
         ("Google Research",    "https://research.google/blog/rss/"),
         # Populärvetenskap & idéer
         ("TED Talks",          "https://www.ted.com/talks/rss"),
