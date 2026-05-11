@@ -3,9 +3,15 @@ import { NextResponse } from "next/server";
 const FEEDS = [
   ["SVT Nyheter",   "https://www.svt.se/nyheter/rss.xml"],
   ["Aftonbladet",   "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"],
-  ["The Verge",     "https://www.theverge.com/rss/index.xml"],
-  ["BBC News",      "https://feeds.bbci.co.uk/news/rss.xml"],
+  ["Expressen",     "https://www.expressen.se/rss/nyheter/"],
   ["Dagens Arena",  "https://www.dagensarena.se/feed/"],
+  ["BBC News",      "https://feeds.bbci.co.uk/news/rss.xml"],
+  ["Reuters",       "https://feeds.reuters.com/reuters/topNews"],
+  ["The Guardian",  "https://www.theguardian.com/world/rss"],
+  ["Deutsche Welle","https://rss.dw.com/rdf/rss-en-all"],
+  ["The Verge",     "https://www.theverge.com/rss/index.xml"],
+  ["Ars Technica",  "https://feeds.arstechnica.com/arstechnica/index"],
+  ["TechCrunch",    "https://techcrunch.com/feed/"],
 ];
 
 const HEADERS = {
@@ -18,7 +24,7 @@ function extractTitles(xml, kalla) {
   const blockRx = /<(?:item|entry)[^>]*>([\s\S]*?)<\/(?:item|entry)>/g;
   const titleRx = /<title[^>]*>(?:<!\[CDATA\[)?\s*(.*?)\s*(?:\]\]>)?<\/title>/i;
   let block;
-  while ((block = blockRx.exec(xml)) !== null && items.length < 5) {
+  while ((block = blockRx.exec(xml)) !== null && items.length < 2) {
     const m = block[1].match(titleRx);
     if (m) {
       const rubrik = m[1]
@@ -35,6 +41,7 @@ async function expanderaMedGroq(nyheter) {
   if (!groqKey) return nyheter.map(n => ({ ...n, text: n.rubrik }));
 
   const lista = nyheter.map((n, i) => `${i + 1}. [${n.kalla}] ${n.rubrik}`).join("\n");
+  // max_tokens anpassat för 10 nyheter à ~180 tokens
 
   try {
     const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -49,7 +56,7 @@ async function expanderaMedGroq(nyheter) {
           },
           { role: "user", content: lista },
         ],
-        max_tokens: 1800,
+        max_tokens: 2500,
         temperature: 0.4,
         response_format: { type: "json_object" },
       }),
@@ -82,7 +89,7 @@ export async function GET() {
 
   const nyheter = results
     .flatMap(r => r.status === "fulfilled" ? r.value : [])
-    .slice(0, 7);
+    .slice(0, 10);
 
   if (!nyheter.length) return NextResponse.json([]);
 
