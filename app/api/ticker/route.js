@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
 
 const FEEDS = [
-  ["SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml"],
-  ["Aftonbladet",  "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"],
-  ["Expressen",    "https://www.expressen.se/rss/nyheter/"],
-  ["Dagens Nyheter","https://www.dn.se/rss/"],
-  ["SvD",          "https://www.svd.se/feed/articles.rss"],
-  ["Dagens Arena", "https://www.dagensarena.se/feed/"],
-  ["Omni",         "https://omni.se/rss.xml"],
-  ["The Verge",    "https://www.theverge.com/rss/index.xml"],
-  ["Ars Technica", "https://feeds.arstechnica.com/arstechnica/index"],
-  ["TechCrunch",   "https://techcrunch.com/feed/"],
+  ["SVT Nyheter",   "https://www.svt.se/nyheter/rss.xml"],
+  ["SVT Utrikes",   "https://www.svt.se/nyheter/utrikes/rss.xml"],
+  ["SVT Inrikes",   "https://www.svt.se/nyheter/inrikes/rss.xml"],
+  ["Aftonbladet",   "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"],
+  ["Expressen",     "https://www.expressen.se/rss/nyheter/"],
+  ["Dagens Arena",  "https://www.dagensarena.se/feed/"],
+  ["Breakit",       "https://breakit.se/rss"],
 ];
 
 const HEADERS = {
@@ -25,7 +22,7 @@ function extractTitles(xml, kalla) {
   const blockRx = /<(?:item|entry)[^>]*>([\s\S]*?)<\/(?:item|entry)>/g;
   const titleRx = /<title[^>]*>(?:<!\[CDATA\[)?\s*(.*?)\s*(?:\]\]>)?<\/title>/i;
   let block;
-  while ((block = blockRx.exec(xml)) !== null && items.length < 2) {
+  while ((block = blockRx.exec(xml)) !== null && items.length < 5) {
     const m = block[1].match(titleRx);
     if (m) {
       const rubrik = m[1]
