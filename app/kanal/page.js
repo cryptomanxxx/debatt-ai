@@ -61,6 +61,52 @@ function agentSlug(namn) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// ── Blink-hook ────────────────────────────────────────────────────────────────
+function useBlinkState(amplitudeRef) {
+  const [blinkState, setBlinkState] = useState("open"); // open | half | closed
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const doBlink = async () => {
+      if (cancelled) return;
+      setBlinkState("half");
+      await sleep(30);
+      if (cancelled) return;
+      setBlinkState("closed");
+      await sleep(45);
+      if (cancelled) return;
+      setBlinkState("half");
+      await sleep(35);
+      if (cancelled) return;
+      setBlinkState("open");
+    };
+
+    const schedule = () => {
+      const delay = 2500 + Math.random() * 4000;
+      timerRef.current = setTimeout(async () => {
+        // Skjut upp blinkning om munnen är brett öppen
+        if (amplitudeRef.current > 0.55) {
+          await sleep(300);
+        }
+        await doBlink();
+        // 20% chans för dubbelblink
+        if (!cancelled && Math.random() < 0.2) {
+          await sleep(200);
+          await doBlink();
+        }
+        if (!cancelled) schedule();
+      }, delay);
+    };
+
+    schedule();
+    return () => { cancelled = true; clearTimeout(timerRef.current); };
+  }, [amplitudeRef]);
+
+  return blinkState;
+}
+
 // ── Komponenter ──────────────────────────────────────────────────────────────
 
 function Waveform({ amplitude, farg = ANCHOR_FARG }) {
@@ -97,13 +143,19 @@ function TalkingFace({ amplitude, speaking }) {
   }
   const state = speaking ? stateRef.current : 0;
 
+  // Blink — amplitudeRef håller senaste värdet utan stale closure
+  const amplitudeRef = useRef(amp);
+  amplitudeRef.current = amp;
+  const blinkState = useBlinkState(amplitudeRef);
+
   const srcs = [`${base}.png`, `${base}-small.png`, `${base}-medium.png`, `${base}-large.png`];
   const imgStyle = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 8%" };
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      {/* Statisk bas — visar alltid fullt ansikte inklusive hår/panna */}
+      {/* Lager 1: statisk bas — fullt ansikte, rör sig aldrig */}
       <img src={`/avatarer/${slug}.png`} alt="" style={imgStyle} onError={e => { e.target.style.display = "none"; }} />
-      {/* Munlägesbilder: clip-path avslöjar bara nedre ~38% (munregionen) */}
+
+      {/* Lager 2: munrörelse — clip-path visar bara nedre ~52% */}
       {srcs.map((src, i) => (
         <img key={src} src={src} alt="" style={{
           ...imgStyle,
@@ -112,6 +164,18 @@ function TalkingFace({ amplitude, speaking }) {
           clipPath: "inset(48% 0 0 0)",
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
+
+      {/* Lager 3: blink — transparenta PNG:er overlay:as direkt (visas när bilder finns) */}
+      <img
+        src={`/avatarer/podd/${slug}-eyes-half.png`} alt=""
+        style={{ ...imgStyle, opacity: blinkState === "half" ? 1 : 0, transition: "opacity 30ms linear" }}
+        onError={e => { e.target.style.display = "none"; }}
+      />
+      <img
+        src={`/avatarer/podd/${slug}-eyes-closed.png`} alt=""
+        style={{ ...imgStyle, opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear" }}
+        onError={e => { e.target.style.display = "none"; }}
+      />
     </div>
   );
 }
