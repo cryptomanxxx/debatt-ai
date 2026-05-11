@@ -84,18 +84,13 @@ function useBlinkState(amplitudeRef) {
     };
 
     const schedule = () => {
-      const delay = 2500 + Math.random() * 4000;
+      const delay = 10000; // slow blink every 10s for positioning debug
       timerRef.current = setTimeout(async () => {
-        // Skjut upp blinkning om munnen är brett öppen
-        if (amplitudeRef.current > 0.55) {
-          await sleep(300);
-        }
-        await doBlink();
-        // 20% chans för dubbelblink
-        if (!cancelled && Math.random() < 0.2) {
-          await sleep(200);
-          await doBlink();
-        }
+        if (cancelled) return;
+        setBlinkState("closed");
+        await sleep(3000); // håll stängd 3s så man hinner ta screenshot
+        if (cancelled) return;
+        setBlinkState("open");
         if (!cancelled) schedule();
       }, delay);
     };
