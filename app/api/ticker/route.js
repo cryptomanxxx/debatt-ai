@@ -19,7 +19,7 @@ function extractTitles(xml, kalla) {
   const blockRx = /<(?:item|entry)[^>]*>([\s\S]*?)<\/(?:item|entry)>/g;
   const titleRx = /<title[^>]*>(?:<!\[CDATA\[)?\s*(.*?)\s*(?:\]\]>)?<\/title>/i;
   let block;
-  while ((block = blockRx.exec(xml)) !== null && items.length < 3) {
+  while ((block = blockRx.exec(xml)) !== null && items.length < 6) {
     const m = block[1].match(titleRx);
     if (m) {
       const rubrik = m[1]
