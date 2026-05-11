@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -218,86 +218,6 @@ function Waveform({ amplitude, farg }) {
   );
 }
 
-function TalkingCanvas({ src, amplitude, speaking }) {
-  const canvasRef = useRef(null);
-  const imgRef = useRef(null);
-
-  const redraw = useCallback((amp, isSpeaking) => {
-    const canvas = canvasRef.current;
-    const img = imgRef.current;
-    if (!canvas || !img) return;
-    const ctx = canvas.getContext("2d");
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
-
-    // "contain" placement
-    const scale = Math.min(W / img.naturalWidth, H / img.naturalHeight);
-    const iw = img.naturalWidth * scale;
-    const ih = img.naturalHeight * scale;
-    const ix = (W - iw) / 2;
-    const iy = (H - ih) / 2;
-    ctx.drawImage(img, ix, iy, iw, ih);
-
-    if (!isSpeaking || amp < 0.03) return;
-
-    // Mouth center: ~50% horizontal, ~48% vertical within the portrait
-    const mx = ix + iw * 0.50;
-    const my = iy + ih * 0.48;
-    const mRx = iw * 0.11;
-    const mRy = ih * 0.032;
-    const scaleY = 1 + amp * 0.55; // 1.0 → ~1.55
-
-    // Stretch the mouth region (läpprörelser)
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(mx, my, mRx, mRy * scaleY * 1.4, 0, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.translate(mx, my);
-    ctx.scale(1, scaleY);
-    ctx.translate(-mx, -my);
-    ctx.drawImage(img, ix, iy, iw, ih);
-    ctx.restore();
-
-    // Dark mouth cavity — grows with amplitude
-    const openness = Math.max(0, (amp - 0.05) / 0.95);
-    if (openness > 0) {
-      const oW = mRx * 0.5;
-      const oH = mRy * scaleY * 0.7 * openness;
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(mx, my, oW, oH, 0, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(12, 6, 4, ${Math.min(0.75, openness * 0.85)})`;
-      ctx.fill();
-      // Teeth hint at top of opening
-      if (openness > 0.3) {
-        ctx.beginPath();
-        ctx.ellipse(mx, my - oH * 0.35, oW * 0.7, oH * 0.25, 0, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(238, 228, 210, ${(openness - 0.3) * 0.5})`;
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-  }, []);
-
-  useEffect(() => {
-    const img = new Image();
-    img.onload = () => { imgRef.current = img; redraw(0, false); };
-    img.onerror = () => { imgRef.current = null; };
-    img.src = src;
-  }, [src, redraw]);
-
-  useEffect(() => {
-    redraw(amplitude, speaking);
-  }, [amplitude, speaking, redraw]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      width={800} height={600}
-      style={{ width: "100%", height: "100%", display: "block" }}
-    />
-  );
-}
 
 function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
   const farg = AGENT_FARG[namn] || C.accent;
@@ -308,8 +228,8 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
     <div style={{ position: "relative", width: "100%", paddingTop: "75%", background: "#000", flexShrink: 0 }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
 
-        {/* Avatar med munanimation */}
-        <TalkingCanvas src={avatarSrc(namn)} amplitude={amplitude} speaking={speaking} />
+        {/* Avatar */}
+        <img src={avatarSrc(namn)} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
 
         {/* Tänker-overlay */}
         {isTänkande && !speaking && (
