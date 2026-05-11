@@ -21,7 +21,7 @@ export default function NewsTicker() {
       borderBottom: "1px solid #1a1a1a",
       background: "#080808",
       overflow: "hidden",
-      height: "32px",
+      height: "40px",
       display: "flex",
       alignItems: "center",
     }}>
@@ -50,16 +50,16 @@ export default function NewsTicker() {
           {items.map((n, i) => (
             <span key={i} style={{ display: "inline-flex", alignItems: "center" }}>
               <span style={{
-                fontSize: "11px",
-                color: "#f0ede6",
+                fontSize: "13px",
+                color: "#fbbf24",
                 fontFamily: "Georgia, serif",
                 padding: "0 8px",
               }}>
                 {n.rubrik}
               </span>
               <span style={{
-                fontSize: "9px",
-                color: "#555",
+                fontSize: "10px",
+                color: "#888",
                 fontFamily: "monospace",
                 marginRight: "16px",
               }}>
