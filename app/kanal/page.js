@@ -101,12 +101,15 @@ function TalkingFace({ amplitude, speaking }) {
   const imgStyle = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 8%" };
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {/* Statisk bas — visar alltid fullt ansikte inklusive hår/panna */}
       <img src={`/avatarer/${slug}.png`} alt="" style={imgStyle} onError={e => { e.target.style.display = "none"; }} />
+      {/* Munlägesbilder: clip-path avslöjar bara nedre ~38% (munregionen) */}
       {srcs.map((src, i) => (
         <img key={src} src={src} alt="" style={{
           ...imgStyle,
           opacity: i === state ? 1 : 0,
           transition: "opacity 200ms ease-in-out",
+          clipPath: "inset(62% 0 0 0)",
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
     </div>
