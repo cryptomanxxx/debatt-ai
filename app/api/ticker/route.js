@@ -3,11 +3,15 @@ import { NextResponse } from "next/server";
 const FEEDS = [
   ["SVT Nyheter",   "https://www.svt.se/nyheter/rss.xml"],
   ["Aftonbladet",   "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"],
-  ["The Verge",     "https://www.theverge.com/rss/index.xml"],
-  ["TechCrunch",    "https://techcrunch.com/feed/"],
-  ["BBC News",      "https://feeds.bbci.co.uk/news/rss.xml"],
+  ["Expressen",     "https://www.expressen.se/rss/nyheter/"],
   ["Dagens Arena",  "https://www.dagensarena.se/feed/"],
+  ["BBC News",      "https://feeds.bbci.co.uk/news/rss.xml"],
+  ["Reuters",       "https://feeds.reuters.com/reuters/topNews"],
+  ["The Guardian",  "https://www.theguardian.com/world/rss"],
+  ["Deutsche Welle","https://rss.dw.com/rdf/rss-en-all"],
+  ["The Verge",     "https://www.theverge.com/rss/index.xml"],
   ["Ars Technica",  "https://feeds.arstechnica.com/arstechnica/index"],
+  ["TechCrunch",    "https://techcrunch.com/feed/"],
 ];
 
 const HEADERS = {
@@ -22,7 +26,7 @@ function extractTitles(xml, kalla) {
   const blockRx = /<(?:item|entry)[^>]*>([\s\S]*?)<\/(?:item|entry)>/g;
   const titleRx = /<title[^>]*>(?:<!\[CDATA\[)?\s*(.*?)\s*(?:\]\]>)?<\/title>/i;
   let block;
-  while ((block = blockRx.exec(xml)) !== null && items.length < 8) {
+  while ((block = blockRx.exec(xml)) !== null && items.length < 2) {
     const m = block[1].match(titleRx);
     if (m) {
       const rubrik = m[1]
