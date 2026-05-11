@@ -80,22 +80,19 @@ function TalkingFace({ amplitude, speaking }) {
   const base = `/avatarer/podd/${slug}`;
   const amp = speaking ? amplitude : 0;
   let state = 0;
-  if (amp > 0.65) state = 3;
-  else if (amp > 0.35) state = 2;
-  else if (amp > 0.08) state = 1;
+  if (amp > 0.60) state = 3;
+  else if (amp > 0.30) state = 2;
+  else if (amp > 0.06) state = 1;
   const srcs = [`${base}.png`, `${base}-small.png`, `${base}-medium.png`, `${base}-large.png`];
+  const imgStyle = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 8%" };
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      {/* Fallback: regular avatar visas tills podd-bilder finns */}
-      <img
-        src={`/avatarer/${slug}.png`} alt=""
-        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-        onError={e => { e.target.style.display = "none"; }}
-      />
+      <img src={`/avatarer/${slug}.png`} alt="" style={imgStyle} onError={e => { e.target.style.display = "none"; }} />
       {srcs.map((src, i) => (
         <img key={src} src={src} alt="" style={{
-          position: "absolute", inset: 0, width: "100%", height: "100%",
-          objectFit: "cover", opacity: i === state ? 1 : 0, transition: "opacity 0.05s ease",
+          ...imgStyle,
+          opacity: i === state ? 1 : 0,
+          transition: "opacity 0.12s ease-in-out",
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
     </div>
@@ -105,7 +102,7 @@ function TalkingFace({ amplitude, speaking }) {
 function AnchorPanel({ speaking, amplitude }) {
   const glow = speaking ? 18 + amplitude * 40 : 0;
   return (
-    <div style={{ position: "relative", width: "100%", paddingTop: "75%", background: "#000", borderRadius: "4px", overflow: "hidden" }}>
+    <div style={{ position: "relative", width: "100%", paddingTop: "95%", background: "#000", borderRadius: "4px", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0 }}>
         <TalkingFace amplitude={amplitude} speaking={speaking} />
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "48px 20px 18px", background: "linear-gradient(transparent, rgba(0,0,0,0.9))" }}>
@@ -214,8 +211,12 @@ export default function KanalPage() {
         ampTimer.current = setInterval(() => {
           if (!runningRef.current) { clearInterval(ampTimer.current); return; }
           const t = Date.now();
-          setAmplitude(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
-        }, 70);
+          // sin² ger naturlig öppning/stängning (~3.5 stavelser/sek) med paus vid noll
+          const syllable = Math.pow(Math.max(0, Math.sin(t * 0.022)), 1.8);
+          // Frasnivå-envelope: varierar intensiteten lite långsammare
+          const env = 0.45 + 0.55 * Math.pow(Math.abs(Math.sin(t * 0.004)), 0.5);
+          setAmplitude(syllable * env);
+        }, 60);
       };
       const stopAnim = () => {
         if (ampTimer.current) clearInterval(ampTimer.current);
