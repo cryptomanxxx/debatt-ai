@@ -1038,19 +1038,28 @@ def hamta_nyheter() -> list:
                     misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
                     rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
                     continue
-                root = ET.fromstring(res.text)
+                root = ET.fromstring(res.content)  # bytes → ET hanterar encoding korrekt
+                ATOM = "http://www.w3.org/2005/Atom"
                 ns = {
                     "content": "http://purl.org/rss/1.0/modules/content/",
-                    "atom":    "http://www.w3.org/2005/Atom",
+                    "atom":    ATOM,
                 }
-                items = root.findall(".//item") or root.findall(".//atom:entry", ns)
+                items = (root.findall(".//item") or
+                         root.findall(f".//{{{ATOM}}}entry") or
+                         root.findall(".//atom:entry", ns))
                 for item in items[:10]:
-                    title = item.find("title") or item.find("atom:title", ns)
+                    title = (item.find("title") or
+                             item.find(f"{{{ATOM}}}title") or
+                             item.find("atom:title", ns))
                     rubrik = (title.text or "").strip() if title is not None else ""
                     if len(rubrik) <= 10:
                         continue
                     fulltext = item.find("content:encoded", ns)
-                    desc = item.find("description") or item.find("atom:summary", ns)
+                    desc = (item.find("description") or
+                            item.find(f"{{{ATOM}}}summary") or
+                            item.find("atom:summary", ns) or
+                            item.find(f"{{{ATOM}}}content") or
+                            item.find("atom:content", ns))
                     text = ""
                     if fulltext is not None and fulltext.text:
                         import re
@@ -1059,14 +1068,21 @@ def hamta_nyheter() -> list:
                     elif desc is not None and desc.text:
                         import re
                         text = re.sub(r"<[^>]+>", " ", desc.text).strip()[:300]
-                    link_el = item.find("link") or item.find("atom:link", ns)
+                    link_el = (item.find("link") or
+                               item.find("atom:link", ns) or
+                               item.find(f"{{{ATOM}}}link"))
                     item_url = ""
                     if link_el is not None:
                         if link_el.text and link_el.text.strip():
                             item_url = link_el.text.strip()
                         elif link_el.get("href"):
                             item_url = link_el.get("href", "")
-                    pub_el = item.find("pubDate") or item.find("atom:published", ns) or item.find("published")
+                    pub_el = (item.find("pubDate") or
+                              item.find("published") or
+                              item.find(f"{{{ATOM}}}published") or
+                              item.find("atom:published", ns) or
+                              item.find(f"{{{ATOM}}}updated") or
+                              item.find("atom:updated", ns))
                     publicerad = ""
                     if pub_el is not None and pub_el.text:
                         publicerad = pub_el.text.strip()
