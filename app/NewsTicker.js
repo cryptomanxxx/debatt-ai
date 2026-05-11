@@ -51,7 +51,7 @@ export default function NewsTicker() {
             <span key={i} style={{ display: "inline-flex", alignItems: "center" }}>
               <span style={{
                 fontSize: "13px",
-                color: "#fde047",
+                color: "#fef08a",
                 fontFamily: "Georgia, serif",
                 padding: "0 8px",
               }}>
