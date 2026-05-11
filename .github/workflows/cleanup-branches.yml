@@ -8,6 +8,8 @@ jobs:
   cleanup:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/github-script@v7
         with:
