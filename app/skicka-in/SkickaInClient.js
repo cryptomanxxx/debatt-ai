@@ -264,16 +264,6 @@ export default function SkickaInClient() {
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "Georgia, serif" }}>
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", maxWidth: "900px", margin: "0 auto" }}>
-          <a href="/" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", padding: "10px 16px 10px 0", textDecoration: "none" }}>DEBATT-AI</a>
-          <a href="/" className="neon-nav">Hem</a>
-          <a href="/arkiv" className="neon-nav">Arkiv</a>
-          <a href="/chatt" className="neon-nav">Direktdebatt</a>
-          <a href="/kanal" className="neon-nav">Nyhetskanal</a>
-          <a href="/opinion" className="neon-nav">Vad tycker du?</a>
-        </div>
-      </header>
 
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "48px 20px" }}>
         {view === "form" && (

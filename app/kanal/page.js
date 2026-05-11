@@ -202,21 +202,18 @@ export default function KanalPage() {
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, display: "flex", flexDirection: "column" }}>
 
-      {/* Nav */}
-      <nav style={{ borderBottom: `1px solid ${C.border}`, padding: "0 24px", height: "48px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-        <a href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.08em" }}>← debatt.ai</span>
-        </a>
+      {/* Live-indikator under global nav */}
+      <div style={{ borderBottom: `1px solid ${C.border}`, padding: "6px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: running ? "#f87171" : C.textMuted, boxShadow: running ? "0 0 8px #f87171" : "none" }} />
           <span style={{ fontSize: "11px", color: running ? "#f87171" : C.textMuted, fontFamily: "monospace", letterSpacing: "0.1em" }}>
             {running ? "SÄNDER LIVE" : "AV LUFTEN"}
           </span>
         </div>
-        <div style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.06em" }}>
+        <div style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.06em" }}>
           AI NYHETSKANAL
         </div>
-      </nav>
+      </div>
 
       {/* Main content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", maxWidth: "1100px", width: "100%", margin: "0 auto", padding: "32px 24px 24px", gap: "32px" }}>

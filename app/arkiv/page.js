@@ -71,22 +71,6 @@ export default async function ArkivPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", textDecoration: "none", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</a>
-          <NavLink href="/" label="Hem" />
-          <NavLink href="/?debatter=1" label="Debatter" />
-          <NavLink href="/nyheter" label="Nyheter" />
-          <NavLink href="/arkiv" label={`Arkiv (${artiklar.length})`} active />
-          <NavLink href="/chatt" label="Direktdebatt" />
-          <NavLink href="/kanal" label="Nyhetskanal" />
-          <NavLink href="/visualiseringar" label="Visualiseringar" />
-          <NavLink href="/rivaliteter" label="Rivaliteter" />
-          <NavLink href="/markets" label="Markets" />
-          <NavLink href="/om" label="Om DEBATT-AI" />
-          <NavLink href="/?kontakt=1" label="Kontakt" />
-        </div>
-      </header>
 
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px" }}>
         <ArkivClient artiklar={artiklar} voteCounts={voteCounts} commentCounts={commentCounts} />

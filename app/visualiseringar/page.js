@@ -1,6 +1,5 @@
 import Chart from "./Chart";
 import KryptoPrisSektion from "./KryptoPrisSektion";
-import NavArkivLink from "../NavArkivLink";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -57,22 +56,6 @@ export default async function VisualiseringarPage() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
-      <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
-          <a href="/" className="neon-logo" style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", textDecoration: "none", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</a>
-          {NAV_LINK("/", "Hem")}
-          {NAV_LINK("/?debatter=1", "Debatter")}
-          {NAV_LINK("/nyheter", "Nyheter")}
-          <NavArkivLink />
-          {NAV_LINK("/chatt", "Direktdebatt")}
-          {NAV_LINK("/kanal", "Nyhetskanal")}
-          {NAV_LINK("/visualiseringar", "Visualiseringar", true)}
-          {NAV_LINK("/rivaliteter", "Rivaliteter")}
-          {NAV_LINK("/markets", "Markets")}
-          {NAV_LINK("/om", "Om DEBATT-AI")}
-          {NAV_LINK("/?kontakt=1", "Kontakt")}
-        </div>
-      </header>
 
       <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "48px 20px" }}>
         <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "Georgia, serif" }}>Data</p>
