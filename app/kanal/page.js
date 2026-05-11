@@ -10,21 +10,23 @@ const C = {
   text: "#e8e0d0", textMuted: "#555", accent: "#6abf6a",
 };
 
-const ANCHOR      = "Nationalekonom";
-const ANCHOR_FARG = "#6abf6a";
+const ANCHOR      = "Anna";
+const ANCHOR_FARG = "#a0c8f0";
 
 const AGENT_FARG = {
-  "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
-  "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#f8fafc",
-  "Filosof":"#e879f9","Läkare":"#f87171","Psykolog":"#c084fc",
-  "Historiker":"#c8a060","Sociolog":"#60a0d8","Kryptoanalytiker":"#f59e0b",
-  "Den hungriga":"#86efac","Mamman":"#f9a8d4","Den sura":"#94a3b8",
-  "Den trötta":"#7dd3fc","Den stressade":"#fca5a5","Den lugna":"#a7f3d0",
-  "Pensionären":"#d8b4fe","Tonåringen":"#fdba74","Den nostalgiske":"#fde68a",
-  "Hypokondrikern":"#6ee7b7","Optimisten":"#fcd34d","Den rike":"#c4b5fd",
+  "Anna":                 "#a0c8f0",
+  "Nationalekonom":       "#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
+  "Konservativ debattör": "#b8862a","Jurist":"#d4945a","Journalist":"#f8fafc",
+  "Filosof":              "#e879f9","Läkare":"#f87171","Psykolog":"#c084fc",
+  "Historiker":           "#c8a060","Sociolog":"#60a0d8","Kryptoanalytiker":"#f59e0b",
+  "Den hungriga":         "#86efac","Mamman":"#f9a8d4","Den sura":"#94a3b8",
+  "Den trötta":           "#7dd3fc","Den stressade":"#fca5a5","Den lugna":"#a7f3d0",
+  "Pensionären":          "#d8b4fe","Tonåringen":"#fdba74","Den nostalgiske":"#fde68a",
+  "Hypokondrikern":       "#6ee7b7","Optimisten":"#fcd34d","Den rike":"#c4b5fd",
 };
 
 const AGENT_ROST = {
+  "Anna":                 { voice: "Swedish Female", rate: 0.90, pitch: 1.02 },
   "Nationalekonom":       { voice: "Swedish Male",   rate: 0.88, pitch: 0.88 },
   "Teknikoptimist":       { voice: "Swedish Male",   rate: 1.12, pitch: 1.06 },
   "Konservativ debattör": { voice: "Swedish Male",   rate: 0.85, pitch: 0.85 },
@@ -84,11 +86,17 @@ function TalkingFace({ amplitude, speaking }) {
   const srcs = [`${base}.png`, `${base}-small.png`, `${base}-medium.png`, `${base}-large.png`];
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {/* Fallback: regular avatar visas tills podd-bilder finns */}
+      <img
+        src={`/avatarer/${slug}.png`} alt=""
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        onError={e => { e.target.style.display = "none"; }}
+      />
       {srcs.map((src, i) => (
         <img key={src} src={src} alt="" style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
           objectFit: "cover", opacity: i === state ? 1 : 0, transition: "opacity 0.05s ease",
-        }} />
+        }} onError={e => { e.target.style.display = "none"; }} />
       ))}
     </div>
   );
@@ -110,7 +118,7 @@ function AnchorPanel({ speaking, amplitude }) {
                 </div>
               )}
               <p style={{ fontSize: "20px", fontWeight: 700, color: C.text, margin: 0, fontFamily: "Times New Roman, serif", textShadow: "0 2px 8px #000" }}>{ANCHOR}</p>
-              <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>Nyhetspresentatör</p>
+              <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>Nyhetsankare</p>
             </div>
             {speaking && <Waveform amplitude={amplitude} />}
           </div>
@@ -157,25 +165,25 @@ function DebattAgentPanel({ agent, speaking, amplitude }) {
 // ── Huvud ─────────────────────────────────────────────────────────────────────
 
 export default function KanalPage() {
-  const [nyheter, setNyheter]         = useState([]);
-  const [debatt, setDebatt]           = useState(null);
-  const [mode, setMode]               = useState("nyheter"); // "nyheter" | "debatt"
-  const [currentIdx, setCurrentIdx]   = useState(0);
-  const [debattIdx, setDebattIdx]     = useState(0);
+  const [nyheter, setNyheter]           = useState([]);
+  const [debatt, setDebatt]             = useState(null);
+  const [mode, setMode]                 = useState("nyheter");
+  const [currentIdx, setCurrentIdx]     = useState(0);
+  const [debattIdx, setDebattIdx]       = useState(0);
   const [currentAgent, setCurrentAgent] = useState(null);
-  const [speaking, setSpeaking]       = useState(false);
-  const [amplitude, setAmplitude]     = useState(0);
-  const [running, setRunning]         = useState(false);
-  const [laddar, setLaddar]           = useState(true);
+  const [speaking, setSpeaking]         = useState(false);
+  const [amplitude, setAmplitude]       = useState(0);
+  const [running, setRunning]           = useState(false);
+  const [laddar, setLaddar]             = useState(true);
 
-  const runningRef  = useRef(false);
-  const ampTimer    = useRef(null);
-  const nyheterRef  = useRef([]);
-  const debattRef   = useRef(null);
+  const runningRef = useRef(false);
+  const ampTimer   = useRef(null);
+  const nyheterRef = useRef([]);
+  const debattRef  = useRef(null);
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/ticker").then(r => r.json()).catch(() => []),
+      fetch("/api/kanal/nyheter").then(r => r.json()).catch(() => []),
       fetch(`${SB_URL}/rest/v1/chatt_debatter?kalla=eq.kanal&order=skapad.desc&limit=1`, {
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
       }).then(r => r.json()).catch(() => []),
@@ -197,7 +205,7 @@ export default function KanalPage() {
   }, []);
 
   async function spelaUppText(text, agent) {
-    const rost = agent ? (AGENT_ROST[agent] || { voice: "Swedish Male", rate: 1.0, pitch: 1.0 }) : { voice: "Swedish Male", rate: 0.88, pitch: 0.88 };
+    const rost = AGENT_ROST[agent ?? ANCHOR] ?? { voice: "Swedish Female", rate: 0.90, pitch: 1.02 };
     setCurrentAgent(agent);
     setSpeaking(true);
     await new Promise(resolve => {
@@ -237,7 +245,7 @@ export default function KanalPage() {
     for (let i = 0; i < lista.length; i++) {
       if (!runningRef.current) return;
       setCurrentIdx(i);
-      await spelaUppText(`${lista[i].rubrik}. Källa: ${lista[i].kalla}.`, null);
+      await spelaUppText(lista[i].text || lista[i].rubrik, null);
       if (!runningRef.current) return;
       await sleep(600);
     }
@@ -247,22 +255,16 @@ export default function KanalPage() {
     const d = debattRef.current;
     if (!d) return;
     setMode("debatt");
-
-    // Läs upp ämnet som intro
     await spelaUppText(`Nu övergår vi till kvällens debatt: ${d.amne}`, null);
     if (!runningRef.current) return;
     await sleep(800);
-
     for (let i = 0; i < d.inlagg.length; i++) {
       if (!runningRef.current) return;
       setDebattIdx(i);
-      const inlagg = d.inlagg[i];
-      await spelaUppText(inlagg.text, inlagg.agent);
+      await spelaUppText(d.inlagg[i].text, d.inlagg[i].agent);
       if (!runningRef.current) return;
       await sleep(700);
     }
-
-    // Tillbaka till nyheter
     setMode("nyheter");
     setCurrentAgent(null);
   }
@@ -271,13 +273,10 @@ export default function KanalPage() {
     if (runningRef.current) return;
     runningRef.current = true;
     setRunning(true);
-
     while (runningRef.current) {
       await spelaUppNyheter();
       if (!runningRef.current) break;
-      if (debattRef.current) {
-        await spelaUppDebatt();
-      }
+      if (debattRef.current) await spelaUppDebatt();
     }
     stoppaKanal();
   }
@@ -326,9 +325,7 @@ export default function KanalPage() {
               DEBATT
             </span>
           )}
-          <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.06em" }}>
-            AI NYHETSKANAL
-          </span>
+          <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.06em" }}>AI NYHETSKANAL</span>
         </div>
       </div>
 
@@ -336,14 +333,13 @@ export default function KanalPage() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", maxWidth: "1100px", width: "100%", margin: "0 auto", padding: "32px 24px 24px", gap: "32px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", alignItems: "start" }}>
 
-          {/* Left: agent panel */}
+          {/* Left: anchor/agent panel */}
           <div>
             {isDebattMode && activeAgent
               ? <DebattAgentPanel agent={activeAgent} speaking={speaking} amplitude={amplitude} />
               : <AnchorPanel speaking={speaking && !isDebattMode} amplitude={amplitude} />
             }
 
-            {/* Controls */}
             <div style={{ marginTop: "20px" }}>
               {!running ? (
                 <button
@@ -363,7 +359,6 @@ export default function KanalPage() {
               )}
             </div>
 
-            {/* Status */}
             {!laddar && (
               <p style={{ fontSize: "11px", color: C.textMuted, margin: "12px 0 0 0", textAlign: "center", fontFamily: "monospace" }}>
                 {nyheter.length} nyheter · {debatt ? "debatt tillgänglig" : "ingen debatt ännu"}
@@ -377,22 +372,27 @@ export default function KanalPage() {
             {/* Nyheter-mode */}
             {!isDebattMode && (
               <>
-                <div style={{ padding: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", minHeight: "160px" }}>
+                <div style={{ padding: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", minHeight: "200px" }}>
                   <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "16px", fontFamily: "monospace" }}>
                     {running && speaking ? "LÄSER NU" : running ? "NÄSTA" : "SENASTE NYHET"}
                   </div>
                   {currentNyhet ? (
                     <>
-                      <p style={{ fontSize: "22px", fontWeight: 700, lineHeight: 1.35, fontFamily: "Times New Roman, serif", color: C.text, margin: "0 0 16px 0", borderLeft: `3px solid ${ANCHOR_FARG}`, paddingLeft: "16px" }}>
+                      <p style={{ fontSize: "20px", fontWeight: 700, lineHeight: 1.35, fontFamily: "Times New Roman, serif", color: C.text, margin: "0 0 14px 0", borderLeft: `3px solid ${ANCHOR_FARG}`, paddingLeft: "16px" }}>
                         {currentNyhet.rubrik}
                       </p>
-                      <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: 0, fontFamily: "monospace", letterSpacing: "0.06em" }}>
+                      {currentNyhet.text && currentNyhet.text !== currentNyhet.rubrik && (
+                        <p style={{ fontSize: "14px", lineHeight: 1.75, color: "#aaa", margin: "0 0 14px 0", paddingLeft: "19px" }}>
+                          {currentNyhet.text}
+                        </p>
+                      )}
+                      <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: 0, fontFamily: "monospace", letterSpacing: "0.06em", paddingLeft: "19px" }}>
                         {currentNyhet.kalla}
                       </p>
                     </>
                   ) : (
                     <p style={{ fontSize: "14px", color: C.textMuted, margin: 0 }}>
-                      {laddar ? "Hämtar nyheter…" : "Tryck STARTA SÄNDNING för att börja."}
+                      {laddar ? "Hämtar och expanderar nyheter…" : "Tryck STARTA SÄNDNING för att börja."}
                     </p>
                   )}
                 </div>
@@ -414,7 +414,6 @@ export default function KanalPage() {
                   </div>
                 )}
 
-                {/* Debatt-preview när stoppat */}
                 {!running && debatt && (
                   <div style={{ padding: "20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px" }}>
                     <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "12px", fontFamily: "monospace" }}>KVÄLLENS DEBATT</div>
@@ -435,13 +434,11 @@ export default function KanalPage() {
             {/* Debatt-mode */}
             {isDebattMode && currentInlagg && (
               <>
-                {/* Debattämne */}
                 <div style={{ padding: "16px 20px", background: "#0a0a14", border: `1px solid ${activeFarg}30`, borderRadius: "4px" }}>
                   <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "6px", fontFamily: "monospace" }}>DEBATTÄMNE</div>
                   <p style={{ fontSize: "14px", color: activeFarg, margin: 0, fontFamily: "Times New Roman, serif", lineHeight: 1.4 }}>{debatt.amne}</p>
                 </div>
 
-                {/* Aktuellt inlägg */}
                 <div style={{ padding: "28px", background: C.surface, border: `1px solid ${activeFarg}40`, borderRadius: "4px", minHeight: "160px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
                     <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
@@ -454,7 +451,6 @@ export default function KanalPage() {
                   </p>
                 </div>
 
-                {/* Kommande inlägg */}
                 {upcomingInlagg.length > 0 && (
                   <div style={{ padding: "20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px" }}>
                     <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "14px", fontFamily: "monospace" }}>NÄSTA UPP</div>
@@ -477,7 +473,6 @@ export default function KanalPage() {
         </div>
       </div>
 
-      {/* Bottom ticker */}
       <div style={{ flexShrink: 0 }}>
         <NewsTicker />
       </div>
