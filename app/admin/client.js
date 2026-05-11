@@ -472,6 +472,68 @@ function BacktestTab() {
   );
 }
 
+function FeedsTab() {
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  async function testa() {
+    setLoading(true);
+    setResults(null);
+    try {
+      const res = await fetch("/api/admin/test-feeds");
+      setResults(await res.json());
+    } catch { setResults([]); }
+    setLoading(false);
+  }
+
+  const ok = results?.filter(r => r.ok).length ?? 0;
+  const fel = results?.filter(r => !r.ok).length ?? 0;
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px" }}>
+        <button onClick={testa} disabled={loading} style={{
+          padding: "10px 20px", background: C.surface, border: `1px solid ${C.border}`,
+          color: C.accent, fontFamily: "Georgia, serif", fontSize: "13px",
+          borderRadius: "4px", cursor: loading ? "wait" : "pointer",
+        }}>
+          {loading ? "Testar feeds…" : "Testa alla feeds nu"}
+        </button>
+        {results && (
+          <span style={{ fontSize: "13px", fontFamily: "monospace" }}>
+            <span style={{ color: C.green }}>{ok} OK</span>
+            {" · "}
+            <span style={{ color: C.red }}>{fel} FEL</span>
+          </span>
+        )}
+      </div>
+
+      {loading && <p style={{ color: C.textMuted, fontSize: "13px", fontFamily: "monospace" }}>Testar {41} feeds från Vercels servrar…</p>}
+
+      {results && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          {results.map(r => (
+            <div key={r.url} style={{
+              display: "flex", alignItems: "center", gap: "12px",
+              padding: "8px 12px", background: C.surface,
+              border: `1px solid ${r.ok ? "#4ade8022" : "#f8717122"}`,
+              borderRadius: "4px", fontSize: "13px", fontFamily: "monospace",
+            }}>
+              <span style={{ color: r.ok ? C.green : C.red, minWidth: "28px" }}>
+                {r.ok ? "✓" : "✗"}
+              </span>
+              <span style={{ color: C.text, minWidth: "180px" }}>{r.namn}</span>
+              <span style={{ color: C.textMuted, fontSize: "11px" }}>
+                {r.ok ? `${r.ms}ms` : `HTTP ${r.status || r.error}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NyhetsloggTab() {
   const [logg, setLogg]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1173,6 +1235,7 @@ export default function AdminClient() {
             ["matning","Mätning"],
             ["backtest","Backtest"],
             ["nyhetslogg","Nyhetslogg"],
+            ["feeds","RSS-feeds"],
             ["markets","Markets"],
             ["api-status","API-status"],
           ].map(([val,lbl]) => (
@@ -1379,6 +1442,7 @@ export default function AdminClient() {
         {/* ── BACKTEST ── */}
         {mainTab === "backtest" && <BacktestTab />}
         {mainTab === "nyhetslogg" && <NyhetsloggTab />}
+        {mainTab === "feeds" && <FeedsTab />}
         {mainTab === "markets" && <MarketsTab />}
 
         {/* ── API-STATUS ── */}
