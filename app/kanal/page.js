@@ -165,15 +165,19 @@ function TalkingFace({ amplitude, speaking }) {
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
 
-      {/* Lager 3: blink — transparenta PNG:er overlay:as direkt (visas när bilder finns) */}
-      <img
-        src={`/avatarer/podd/${slug}-eyes-half.png`} alt=""
-        style={{ ...imgStyle, opacity: blinkState === "half" ? 1 : 0, transition: "opacity 30ms linear" }}
-        onError={e => { e.target.style.display = "none"; }}
-      />
+      {/* Lager 3: blink — transparent RGBA overlay, positionerad över ögonregionen */}
+      {/* half = 55% opacity av closed-bilden som approximation tills eyes-half.png finns */}
       <img
         src={`/avatarer/podd/${slug}-eyes-closed.png`} alt=""
-        style={{ ...imgStyle, opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear" }}
+        style={{
+          position: "absolute",
+          top: "30%",
+          left: 0,
+          width: "100%",
+          height: "auto",
+          opacity: blinkState === "closed" ? 1 : blinkState === "half" ? 0.55 : 0,
+          transition: "opacity 25ms linear",
+        }}
         onError={e => { e.target.style.display = "none"; }}
       />
     </div>
