@@ -75,20 +75,19 @@ function Waveform({ amplitude, farg = ANCHOR_FARG }) {
   );
 }
 
-const MIN_STATE_HOLD = 90; // ms — mänskliga munnar håller position 80–140ms
+const MIN_STATE_HOLD = 160; // ms — längre hold ger lugnare rörelse
 
 function TalkingFace({ amplitude, speaking }) {
   const slug = agentSlug(ANCHOR);
   const base = `/avatarer/podd/${slug}`;
   const amp = speaking ? amplitude : 0;
 
-  // Råstate från amplitud
+  // Höga trösklar → munnen är mest i small/closed, sällan medium, nästan aldrig large
   let rawState = 0;
-  if (amp > 0.72) rawState = 3;
-  else if (amp > 0.38) rawState = 2;
-  else if (amp > 0.10) rawState = 1;
+  if (amp > 0.82) rawState = 3;
+  else if (amp > 0.52) rawState = 2;
+  else if (amp > 0.18) rawState = 1;
 
-  // Hold-tid: ignorera state-byte tills MIN_STATE_HOLD ms gått
   const stateRef = useRef(0);
   const stateTimeRef = useRef(0);
   const now = Date.now();
@@ -107,7 +106,7 @@ function TalkingFace({ amplitude, speaking }) {
         <img key={src} src={src} alt="" style={{
           ...imgStyle,
           opacity: i === state ? 1 : 0,
-          transition: "opacity 85ms ease-out",
+          transition: "opacity 200ms ease-in-out",
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
     </div>
@@ -226,13 +225,11 @@ export default function KanalPage() {
         ampTimer.current = setInterval(() => {
           if (!runningRef.current) { clearInterval(ampTimer.current); return; }
           const t = Date.now();
-          // Snabb öppning, tydlig snap-shut (exp 2.4), ~2.8 stavelser/sek
-          const syllable = Math.pow(Math.max(0, Math.sin(t * 0.018)), 2.4);
-          // Långsam frasnivå-envelope — naturliga fraser
-          const env = 0.35 + 0.65 * Math.pow(Math.abs(Math.sin(t * 0.0028)), 0.7);
-          // Mikrorörelser — tar bort robotkänslan
-          const jitter = 0.04 * Math.sin(t * 0.11) + 0.03 * Math.sin(t * 0.047);
-          setAmplitude(Math.min(1, Math.max(0, syllable * env + jitter)));
+          // Dämpad amplitud — munnen rör sig lite, inte mycket
+          const syllable = Math.pow(Math.max(0, Math.sin(t * 0.016)), 2.8);
+          const env = 0.25 + 0.45 * Math.pow(Math.abs(Math.sin(t * 0.0025)), 0.8);
+          const jitter = 0.015 * Math.sin(t * 0.09) + 0.01 * Math.sin(t * 0.041);
+          setAmplitude(Math.min(0.75, Math.max(0, syllable * env + jitter)));
         }, 60);
       };
       const stopAnim = () => {
