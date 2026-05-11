@@ -26,7 +26,7 @@ const AGENT_FARG = {
 };
 
 const AGENT_ROST = {
-  "Anna":                 { voice: "Swedish Female", rate: 0.90, pitch: 1.02 },
+  "Anna":                 { voice: "Swedish Female", rate: 1.0,  pitch: 1.0  },
   "Nationalekonom":       { voice: "Swedish Male",   rate: 0.88, pitch: 0.88 },
   "Teknikoptimist":       { voice: "Swedish Male",   rate: 1.12, pitch: 1.06 },
   "Konservativ debattör": { voice: "Swedish Male",   rate: 0.85, pitch: 0.85 },
