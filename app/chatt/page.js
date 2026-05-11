@@ -460,8 +460,9 @@ export default function ChattPage() {
   function spelaUppText(text, agent) {
     return new Promise(resolve => {
       if (lyssnaStoppRef.current) { resolve(); return; }
-      const rost = agent ? agentRost(agent) : "Swedish Male";
-      window.responsiveVoice.speak(text, rost, {
+      const { voice, rate, pitch } = agent ? agentRost(agent) : { voice: "Swedish Male", rate: 1.0, pitch: 1.0 };
+      window.responsiveVoice.speak(text, voice, {
+        rate, pitch,
         onend:  resolve,
         onerror:resolve,
       });

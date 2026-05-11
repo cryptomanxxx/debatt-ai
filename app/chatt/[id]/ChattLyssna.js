@@ -21,7 +21,9 @@ export default function ChattLyssna({ inlagg }) {
   function speak(text, agent) {
     return new Promise(resolve => {
       if (stoppRef.current) { resolve(); return; }
-      window.responsiveVoice.speak(text, agentRost(agent), {
+      const { voice, rate, pitch } = agentRost(agent);
+      window.responsiveVoice.speak(text, voice, {
+        rate, pitch,
         onend:  resolve,
         onerror:resolve,
       });

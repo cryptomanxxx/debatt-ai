@@ -32,10 +32,44 @@ export function agentVisuell(namn) {
   return AGENT_VISUELL[namn] ?? FALLBACK;
 }
 
-export const KVINNLIGA_AGENTER = new Set([
-  "Miljöaktivist", "Journalist", "Läkare",
-  "Psykolog", "Mamman", "Den stressade", "Den lugna",
-]);
+// { voice, rate, pitch } per agent — rate: 0.7=långsam…1.3=snabb, pitch: 0.7=djup…1.2=ljus
+export const AGENT_ROST = {
+  // Analytiker – manliga
+  "Nationalekonom":       { voice: "Swedish Male",   rate: 0.88, pitch: 0.88 },
+  "Teknikoptimist":       { voice: "Swedish Male",   rate: 1.12, pitch: 1.06 },
+  "Konservativ debattör": { voice: "Swedish Male",   rate: 0.85, pitch: 0.85 },
+  "Jurist":               { voice: "Swedish Male",   rate: 0.88, pitch: 0.87 },
+  "Filosof":              { voice: "Swedish Male",   rate: 0.80, pitch: 0.90 },
+  "Historiker":           { voice: "Swedish Male",   rate: 0.90, pitch: 0.92 },
+  "Sociolog":             { voice: "Swedish Male",   rate: 0.88, pitch: 0.93 },
+  "Kryptoanalytiker":     { voice: "Swedish Male",   rate: 1.15, pitch: 1.04 },
+  // Analytiker – kvinnliga
+  "Miljöaktivist":        { voice: "Swedish Female", rate: 1.05, pitch: 1.10 },
+  "Journalist":           { voice: "Swedish Female", rate: 1.05, pitch: 1.02 },
+  "Läkare":               { voice: "Swedish Female", rate: 0.88, pitch: 0.95 },
+  "Psykolog":             { voice: "Swedish Female", rate: 0.82, pitch: 1.00 },
+  // Personligheter – manliga
+  "Den hungriga":         { voice: "Swedish Male",   rate: 0.85, pitch: 0.88 },
+  "Den sure":             { voice: "Swedish Male",   rate: 0.92, pitch: 0.83 },
+  "Den trötta":           { voice: "Swedish Male",   rate: 0.70, pitch: 0.78 },
+  "Pensionären":          { voice: "Swedish Male",   rate: 0.78, pitch: 0.82 },
+  "Tonåringen":           { voice: "Swedish Male",   rate: 1.25, pitch: 1.15 },
+  "Den nostalgiske":      { voice: "Swedish Male",   rate: 0.82, pitch: 0.90 },
+  "Hypokondrikern":       { voice: "Swedish Male",   rate: 1.02, pitch: 1.02 },
+  "Optimisten":           { voice: "Swedish Male",   rate: 1.12, pitch: 1.08 },
+  "Den rike":             { voice: "Swedish Male",   rate: 0.88, pitch: 0.87 },
+  // Personligheter – kvinnliga
+  "Mamman":               { voice: "Swedish Female", rate: 0.95, pitch: 1.08 },
+  "Den stressade":        { voice: "Swedish Female", rate: 1.28, pitch: 1.12 },
+  "Den lugna":            { voice: "Swedish Female", rate: 0.75, pitch: 0.97 },
+};
+
+const FALLBACK_ROST_K = { voice: "Swedish Female", rate: 1.0, pitch: 1.0 };
+const FALLBACK_ROST_M = { voice: "Swedish Male",   rate: 1.0, pitch: 1.0 };
+
+export const KVINNLIGA_AGENTER = new Set(
+  Object.entries(AGENT_ROST).filter(([, r]) => r.voice === "Swedish Female").map(([k]) => k)
+);
 
 export const agentRost = namn =>
-  KVINNLIGA_AGENTER.has(namn) ? "Swedish Female" : "Swedish Male";
+  AGENT_ROST[namn] ?? (KVINNLIGA_AGENTER.has(namn) ? FALLBACK_ROST_K : FALLBACK_ROST_M);
