@@ -43,7 +43,7 @@ export async function GET() {
     FEEDS.map(async ([namn, url]) => {
       const res = await fetch(url, {
         headers: HEADERS,
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(9000),
         next: { revalidate: 1800 },
       });
       if (!res.ok) return [];
