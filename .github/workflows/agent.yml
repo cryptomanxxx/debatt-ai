@@ -32,7 +32,7 @@ jobs:
           python-version: "3.12"
 
       - name: Installera beroenden
-        run: pip install anthropic httpx
+        run: pip install anthropic httpx youtube-transcript-api
 
       - name: Kör agent
         env:
