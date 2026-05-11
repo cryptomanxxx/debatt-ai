@@ -84,13 +84,12 @@ function useBlinkState(amplitudeRef) {
     };
 
     const schedule = () => {
-      const delay = 10000; // slow blink every 10s for positioning debug
+      const delay = 2500 + Math.random() * 4000; // 2.5–6.5s
       timerRef.current = setTimeout(async () => {
         if (cancelled) return;
-        setBlinkState("closed");
-        await sleep(3000); // håll stängd 3s så man hinner ta screenshot
-        if (cancelled) return;
-        setBlinkState("open");
+        if (amplitudeRef.current > 0.6) { if (!cancelled) schedule(); return; }
+        await doBlink();
+        if (!cancelled && Math.random() < 0.2) { await sleep(150); if (!cancelled) await doBlink(); }
         if (!cancelled) schedule();
       }, delay);
     };
