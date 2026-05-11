@@ -97,10 +97,6 @@ YOUTUBE_KANALER = [
     ("Patrick Boyle",       "UCJwKCyEIFHwUOPQQ-4kC1Zw"),
     ("Economics Explained", "UCZ4AMrDcNrfy3X6nsU8-rPg"),
     ("Bloomberg Originals", "UCUMZ7gohGI9HcU9VNsr2FJQ"),
-    # Gaming / Internet
-    ("videogamedunkey",     "UCsvn_Po0SmunchJYOWpOxMg"),
-    ("Asmongold TV",        "UCQeRaTukNYft1_6AZPACnog"),
-    ("Skill Up",            "UCZ7AeeVbyslLM_8-nVy2B8Q"),
     # Övrigt
     ("The Economist",       "UC0p5jTq6Xx_DosDFxVXnWaQ"),
     ("TED",                 "UCAuUUnT6oDeKwE6v1NGQxug"),
