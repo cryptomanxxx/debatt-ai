@@ -13,8 +13,10 @@ export default function NewsTicker() {
 
   if (!nyheter.length) return null;
 
-  // Dubbla listan så scrollen loopar sömlöst
+  // Dubbla listan — animationen scrollar exakt -50% för sömlös loop
   const items = [...nyheter, ...nyheter];
+  // ~5s per nyhet ger bekväm läshastighet
+  const duration = nyheter.length * 5;
 
   return (
     <div style={{
@@ -43,12 +45,12 @@ export default function NewsTicker() {
       <div style={{ overflow: "hidden", flex: 1 }}>
         <div style={{
           display: "flex",
-          gap: "0",
-          animation: `ticker ${nyheter.length * 0.8}s linear infinite`,
+          animation: `ticker ${duration}s linear infinite`,
           whiteSpace: "nowrap",
+          willChange: "transform",
         }}>
           {items.map((n, i) => (
-            <span key={i} style={{ display: "inline-flex", alignItems: "center" }}>
+            <span key={i} style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
               <span style={{
                 fontSize: "13px",
                 color: "#fef08a",
