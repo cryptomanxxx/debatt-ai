@@ -905,6 +905,33 @@ def hamta_youtube_nyheter() -> list:
     return nyheter
 
 
+def hamta_reddit_kommentarer(post_url: str, max_kommentarer: int = 5) -> str:
+    """Hämta toppkommentarer för ett Reddit-inlägg."""
+    try:
+        json_url = post_url.rstrip("/") + ".json?sort=top&limit=20"
+        res = httpx.get(json_url, timeout=8, follow_redirects=True,
+                        headers={"User-Agent": "Mozilla/5.0 (compatible; debatt-ai/1.0)"})
+        if res.status_code != 200:
+            return ""
+        data = res.json()
+        if not isinstance(data, list) or len(data) < 2:
+            return ""
+        kommentarer = []
+        for child in data[1].get("data", {}).get("children", []):
+            c = child.get("data", {})
+            body = (c.get("body") or "").strip()
+            score = c.get("score", 0)
+            if body and score >= 10 and body != "[deleted]" and body != "[removed]":
+                kommentarer.append((score, body[:300]))
+        kommentarer.sort(reverse=True)
+        if not kommentarer:
+            return ""
+        rader = [f"  [{score} upvotes] {text}" for score, text in kommentarer[:max_kommentarer]]
+        return "Toppkommentarer från Reddit:\n" + "\n".join(rader)
+    except Exception:
+        return ""
+
+
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från RSS-flöden."""
     feeds = [
@@ -2222,6 +2249,10 @@ def main():
             random.shuffle(nyheter)
             if nyheter and (force_nyhet or random.random() < 0.5):
                 nyhet = valj_nyhet_med_groq(nyheter, agent)
+                if nyhet and "reddit.com" in nyhet.get("url", ""):
+                    kommentarer = hamta_reddit_kommentarer(nyhet["url"])
+                    if kommentarer:
+                        nyhet["beskrivning"] = (nyhet.get("beskrivning") or "") + "\n\n" + kommentarer
 
         nyhetskalla = None
         artikelfmt = valj_format()
