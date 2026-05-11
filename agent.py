@@ -876,57 +876,84 @@ def hamta_nyheter() -> list:
     misslyckade = []
     for kalla, url in feeds:
         fore = len(nyheter)
+        is_reddit = "reddit.com/r/" in url
         try:
-            res = httpx.get(url, timeout=10, follow_redirects=True,
-                            headers={"User-Agent": "Mozilla/5.0 (compatible; RSS-reader/2.0)"})
-            if res.status_code != 200:
-                misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
-                rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
-                continue
-            root = ET.fromstring(res.text)
-            # content:encoded namespace (används av bl.a. DI Debatt för fulltext)
-            ns = {
-                "content": "http://purl.org/rss/1.0/modules/content/",
-                "atom":    "http://www.w3.org/2005/Atom",
-            }
-            # Stöd för både RSS (<item>) och Atom (<entry>)
-            items = root.findall(".//item") or root.findall(".//atom:entry", ns)
-            for item in items[:10]:
-                title = item.find("title") or item.find("atom:title", ns)
-                rubrik = (title.text or "").strip() if title is not None else ""
-                if len(rubrik) <= 10:
+            if is_reddit:
+                # Hämta JSON istället för RSS — ger upvotes och kommentarantal
+                json_url = url.replace("/.rss", "/hot.json") + "?limit=15"
+                res = httpx.get(json_url, timeout=10, follow_redirects=True,
+                                headers={"User-Agent": "Mozilla/5.0 (compatible; debatt-ai/1.0)"})
+                if res.status_code != 200:
+                    misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
+                    rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
                     continue
-                # Försök hämta fulltext (content:encoded), annars description/summary
-                fulltext = item.find("content:encoded", ns)
-                desc = item.find("description") or item.find("atom:summary", ns)
-                text = ""
-                if fulltext is not None and fulltext.text:
-                    import re
-                    text = re.sub(r"<[^>]+>", " ", fulltext.text).strip()
-                    text = re.sub(r"\s+", " ", text)[:800]
-                elif desc is not None and desc.text:
-                    import re
-                    text = re.sub(r"<[^>]+>", " ", desc.text).strip()[:300]
-                # Link
-                link_el = item.find("link") or item.find("atom:link", ns)
-                url = ""
-                if link_el is not None:
-                    if link_el.text and link_el.text.strip():
-                        url = link_el.text.strip()
-                    elif link_el.get("href"):
-                        url = link_el.get("href", "")
-                # PubDate
-                pub_el = item.find("pubDate") or item.find("atom:published", ns) or item.find("published")
-                publicerad = ""
-                if pub_el is not None and pub_el.text:
-                    publicerad = pub_el.text.strip()
-                nyheter.append({
-                    "rubrik": rubrik,
-                    "beskrivning": text,
-                    "kalla": kalla,
-                    "url": url,
-                    "publicerad": publicerad,
-                })
+                data = res.json()
+                posts = data.get("data", {}).get("children", [])
+                for post in posts:
+                    p = post.get("data", {})
+                    rubrik = (p.get("title") or "").strip()
+                    if len(rubrik) <= 10:
+                        continue
+                    score = p.get("score", 0)
+                    num_comments = p.get("num_comments", 0)
+                    selftext = (p.get("selftext") or "")[:400].strip()
+                    permalink = p.get("permalink", "")
+                    post_url = f"https://www.reddit.com{permalink}" if permalink else p.get("url", "")
+                    beskrivning = f"[{score} upvotes, {num_comments} kommentarer] {selftext}".strip()
+                    nyheter.append({
+                        "rubrik": rubrik,
+                        "beskrivning": beskrivning,
+                        "kalla": kalla,
+                        "url": post_url,
+                        "publicerad": "",
+                        "score": score,
+                    })
+            else:
+                res = httpx.get(url, timeout=10, follow_redirects=True,
+                                headers={"User-Agent": "Mozilla/5.0 (compatible; RSS-reader/2.0)"})
+                if res.status_code != 200:
+                    misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
+                    rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
+                    continue
+                root = ET.fromstring(res.text)
+                ns = {
+                    "content": "http://purl.org/rss/1.0/modules/content/",
+                    "atom":    "http://www.w3.org/2005/Atom",
+                }
+                items = root.findall(".//item") or root.findall(".//atom:entry", ns)
+                for item in items[:10]:
+                    title = item.find("title") or item.find("atom:title", ns)
+                    rubrik = (title.text or "").strip() if title is not None else ""
+                    if len(rubrik) <= 10:
+                        continue
+                    fulltext = item.find("content:encoded", ns)
+                    desc = item.find("description") or item.find("atom:summary", ns)
+                    text = ""
+                    if fulltext is not None and fulltext.text:
+                        import re
+                        text = re.sub(r"<[^>]+>", " ", fulltext.text).strip()
+                        text = re.sub(r"\s+", " ", text)[:800]
+                    elif desc is not None and desc.text:
+                        import re
+                        text = re.sub(r"<[^>]+>", " ", desc.text).strip()[:300]
+                    link_el = item.find("link") or item.find("atom:link", ns)
+                    item_url = ""
+                    if link_el is not None:
+                        if link_el.text and link_el.text.strip():
+                            item_url = link_el.text.strip()
+                        elif link_el.get("href"):
+                            item_url = link_el.get("href", "")
+                    pub_el = item.find("pubDate") or item.find("atom:published", ns) or item.find("published")
+                    publicerad = ""
+                    if pub_el is not None and pub_el.text:
+                        publicerad = pub_el.text.strip()
+                    nyheter.append({
+                        "rubrik": rubrik,
+                        "beskrivning": text,
+                        "kalla": kalla,
+                        "url": item_url,
+                        "publicerad": publicerad,
+                    })
             antal = len(nyheter) - fore
             lyckade.append(f"  ✓ {kalla} ({antal} artiklar)")
             rss_stats.append({"kalla": kalla, "ok": True, "antal": antal, "fel": ""})
