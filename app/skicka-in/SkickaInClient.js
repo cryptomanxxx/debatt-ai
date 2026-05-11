@@ -270,6 +270,7 @@ export default function SkickaInClient() {
           <a href="/" className="neon-nav">Hem</a>
           <a href="/arkiv" className="neon-nav">Arkiv</a>
           <a href="/chatt" className="neon-nav">Direktdebatt</a>
+          <a href="/kanal" className="neon-nav">Nyhetskanal</a>
           <a href="/opinion" className="neon-nav">Vad tycker du?</a>
         </div>
       </header>

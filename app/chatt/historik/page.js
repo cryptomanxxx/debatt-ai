@@ -52,6 +52,7 @@ export default async function HistorikPage() {
           <NavLink href="/nyheter" label="Nyheter" />
           <NavArkivLink />
           <NavLink href="/chatt" label="Direktdebatt" />
+          <NavLink href="/kanal" label="Nyhetskanal" />
           <NavHistorikLink active />
           <NavLink href="/visualiseringar" label="Visualiseringar" />
           <NavLink href="/rivaliteter" label="Rivaliteter" />

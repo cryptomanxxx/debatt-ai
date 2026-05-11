@@ -127,6 +127,7 @@ export default async function RivaliteterPage() {
           <a href="/nyheter" className="neon-nav">Nyheter</a>
           <NavArkivLink />
           <a href="/chatt" className="neon-nav">Direktdebatt</a>
+          <a href="/kanal" className="neon-nav">Nyhetskanal</a>
           <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
           <a href="/rivaliteter" className="neon-nav-active">Rivaliteter</a>
           <a href="/markets" className="neon-nav">Markets</a>

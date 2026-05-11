@@ -416,6 +416,7 @@ export default async function MarketsPage() {
           {NAV("/nyheter", "Nyheter")}
           <NavArkivLink />
           {NAV("/chatt", "Direktdebatt")}
+          {NAV("/kanal", "Nyhetskanal")}
           {NAV("/visualiseringar", "Visualiseringar")}
           {NAV("/rivaliteter", "Rivaliteter")}
           {NAV("/markets", "Markets", true)}

@@ -65,6 +65,7 @@ export default async function VisualiseringarPage() {
           {NAV_LINK("/nyheter", "Nyheter")}
           <NavArkivLink />
           {NAV_LINK("/chatt", "Direktdebatt")}
+          {NAV_LINK("/kanal", "Nyhetskanal")}
           {NAV_LINK("/visualiseringar", "Visualiseringar", true)}
           {NAV_LINK("/rivaliteter", "Rivaliteter")}
           {NAV_LINK("/markets", "Markets")}
