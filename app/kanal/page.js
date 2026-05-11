@@ -75,14 +75,29 @@ function Waveform({ amplitude, farg = ANCHOR_FARG }) {
   );
 }
 
+const MIN_STATE_HOLD = 90; // ms — mänskliga munnar håller position 80–140ms
+
 function TalkingFace({ amplitude, speaking }) {
   const slug = agentSlug(ANCHOR);
   const base = `/avatarer/podd/${slug}`;
   const amp = speaking ? amplitude : 0;
-  let state = 0;
-  if (amp > 0.60) state = 3;
-  else if (amp > 0.30) state = 2;
-  else if (amp > 0.06) state = 1;
+
+  // Råstate från amplitud
+  let rawState = 0;
+  if (amp > 0.72) rawState = 3;
+  else if (amp > 0.38) rawState = 2;
+  else if (amp > 0.10) rawState = 1;
+
+  // Hold-tid: ignorera state-byte tills MIN_STATE_HOLD ms gått
+  const stateRef = useRef(0);
+  const stateTimeRef = useRef(0);
+  const now = Date.now();
+  if (rawState !== stateRef.current && now - stateTimeRef.current >= MIN_STATE_HOLD) {
+    stateRef.current = rawState;
+    stateTimeRef.current = now;
+  }
+  const state = speaking ? stateRef.current : 0;
+
   const srcs = [`${base}.png`, `${base}-small.png`, `${base}-medium.png`, `${base}-large.png`];
   const imgStyle = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 8%" };
   return (
@@ -92,7 +107,7 @@ function TalkingFace({ amplitude, speaking }) {
         <img key={src} src={src} alt="" style={{
           ...imgStyle,
           opacity: i === state ? 1 : 0,
-          transition: "opacity 0.12s ease-in-out",
+          transition: "opacity 85ms ease-out",
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
     </div>
@@ -211,11 +226,13 @@ export default function KanalPage() {
         ampTimer.current = setInterval(() => {
           if (!runningRef.current) { clearInterval(ampTimer.current); return; }
           const t = Date.now();
-          // sin² ger naturlig öppning/stängning (~3.5 stavelser/sek) med paus vid noll
-          const syllable = Math.pow(Math.max(0, Math.sin(t * 0.022)), 1.8);
-          // Frasnivå-envelope: varierar intensiteten lite långsammare
-          const env = 0.45 + 0.55 * Math.pow(Math.abs(Math.sin(t * 0.004)), 0.5);
-          setAmplitude(syllable * env);
+          // Snabb öppning, tydlig snap-shut (exp 2.4), ~2.8 stavelser/sek
+          const syllable = Math.pow(Math.max(0, Math.sin(t * 0.018)), 2.4);
+          // Långsam frasnivå-envelope — naturliga fraser
+          const env = 0.35 + 0.65 * Math.pow(Math.abs(Math.sin(t * 0.0028)), 0.7);
+          // Mikrorörelser — tar bort robotkänslan
+          const jitter = 0.04 * Math.sin(t * 0.11) + 0.03 * Math.sin(t * 0.047);
+          setAmplitude(Math.min(1, Math.max(0, syllable * env + jitter)));
         }, 60);
       };
       const stopAnim = () => {
