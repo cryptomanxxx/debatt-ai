@@ -163,12 +163,12 @@ function TalkingFace({ amplitude, speaking }) {
       {/* Lager 3: blink — transparenta RGBA overlays, positionerade över ögonregionen */}
       <img
         src={`/avatarer/podd/${slug}-eyes-half.png`} alt=""
-        style={{ position: "absolute", top: "20%", left: 0, width: "100%", height: "auto", opacity: blinkState === "half" ? 1 : 0, transition: "opacity 25ms linear" }}
+        style={{ position: "absolute", top: "-12%", left: 0, width: "100%", height: "auto", opacity: blinkState === "half" ? 1 : 0, transition: "opacity 25ms linear" }}
         onError={e => { e.target.style.display = "none"; }}
       />
       <img
         src={`/avatarer/podd/${slug}-eyes-closed.png`} alt=""
-        style={{ position: "absolute", top: "20%", left: 0, width: "100%", height: "auto", opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear" }}
+        style={{ position: "absolute", top: "-12%", left: 0, width: "100%", height: "auto", opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear" }}
         onError={e => { e.target.style.display = "none"; }}
       />
     </div>
