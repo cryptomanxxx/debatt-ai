@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 const FEEDS = [
   ["SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml"],
   ["Aftonbladet",  "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"],
-  ["Expressen",    "https://www.expressen.se/rss/nyheter/"],
+  ["Expressen",    "https://expressen.se/rss/nyheter/"],
+  ["Omni",         "https://omni.se/rss.xml"],
   ["Dagens Arena", "https://www.dagensarena.se/feed/"],
-  ["Breakit",      "https://breakit.se/rss"],
 ];
 
 const HEADERS = {
@@ -37,8 +37,8 @@ export async function GET() {
     FEEDS.map(async ([namn, url]) => {
       const res = await fetch(url, {
         headers: HEADERS,
-        signal: AbortSignal.timeout(9000),
-        next: { revalidate: 60 },
+        signal: AbortSignal.timeout(6000),
+        cache: "no-store",
       });
       if (!res.ok) return [];
       const text = await res.text();
