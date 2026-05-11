@@ -43,7 +43,7 @@ export async function GET() {
       const res = await fetch(url, {
         headers: HEADERS,
         signal: AbortSignal.timeout(9000),
-        next: { revalidate: 1800 },
+        next: { revalidate: 60 },
       });
       if (!res.ok) return [];
       const text = await res.text();
@@ -56,6 +56,6 @@ export async function GET() {
   );
 
   return NextResponse.json(nyheter, {
-    headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=3600" },
+    headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" },
   });
 }
