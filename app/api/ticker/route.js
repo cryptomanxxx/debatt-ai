@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
 
 const FEEDS = [
-  ["SVT Nyheter",   "https://www.svt.se/nyheter/rss.xml"],
-  ["Aftonbladet",   "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"],
-  ["Expressen",     "https://www.expressen.se/rss/nyheter/"],
-  ["Dagens Arena",  "https://www.dagensarena.se/feed/"],
-  ["BBC News",      "https://feeds.bbci.co.uk/news/rss.xml"],
-  ["Reuters",       "https://feeds.reuters.com/reuters/topNews"],
-  ["The Guardian",  "https://www.theguardian.com/world/rss"],
-  ["Deutsche Welle","https://rss.dw.com/rdf/rss-en-all"],
-  ["The Verge",     "https://www.theverge.com/rss/index.xml"],
-  ["Ars Technica",  "https://feeds.arstechnica.com/arstechnica/index"],
-  ["TechCrunch",    "https://techcrunch.com/feed/"],
+  ["SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml"],
+  ["Aftonbladet",  "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"],
+  ["Expressen",    "https://www.expressen.se/rss/nyheter/"],
+  ["Dagens Nyheter","https://www.dn.se/rss/"],
+  ["SvD",          "https://www.svd.se/feed/articles.rss"],
+  ["Dagens Arena", "https://www.dagensarena.se/feed/"],
+  ["Omni",         "https://omni.se/rss.xml"],
+  ["The Verge",    "https://www.theverge.com/rss/index.xml"],
+  ["Ars Technica", "https://feeds.arstechnica.com/arstechnica/index"],
+  ["TechCrunch",   "https://techcrunch.com/feed/"],
 ];
 
 const HEADERS = {

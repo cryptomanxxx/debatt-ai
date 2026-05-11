@@ -16,7 +16,7 @@ export default function NewsTicker() {
   // Dubbla listan — animationen scrollar exakt -50% för sömlös loop
   const items = [...nyheter, ...nyheter];
   // ~5s per nyhet ger bekväm läshastighet
-  const duration = nyheter.length * 5;
+  const duration = nyheter.length * 2;
 
   return (
     <div style={{
