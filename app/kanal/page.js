@@ -109,7 +109,7 @@ function TalkingFace({ amplitude, speaking }) {
           ...imgStyle,
           opacity: i === state ? 1 : 0,
           transition: "opacity 200ms ease-in-out",
-          clipPath: "inset(62% 0 0 0)",
+          clipPath: "inset(48% 0 0 0)",
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
     </div>
