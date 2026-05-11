@@ -87,7 +87,6 @@ function useBlinkState(amplitudeRef) {
       const delay = 2500 + Math.random() * 4000; // 2.5–6.5s
       timerRef.current = setTimeout(async () => {
         if (cancelled) return;
-        if (amplitudeRef.current > 0.6) { if (!cancelled) schedule(); return; }
         await doBlink();
         if (!cancelled && Math.random() < 0.2) { await sleep(150); if (!cancelled) await doBlink(); }
         if (!cancelled) schedule();
