@@ -8,11 +8,12 @@ const C = {
 };
 
 const KATEGORIER = [
-  { id: "alla",    label: "Alla frågor" },
-  { id: "ai-tech", label: "AI & Tech" },
-  { id: "ekonomi", label: "Ekonomi" },
-  { id: "politik", label: "Politik" },
-  { id: "vardag",  label: "Vardag" },
+  { id: "alla",         label: "Alla frågor" },
+  { id: "ai-tech",      label: "AI & Tech" },
+  { id: "ekonomi",      label: "Ekonomi" },
+  { id: "politik",      label: "Politik" },
+  { id: "vardag",       label: "Vardag" },
+  { id: "agentfragor",  label: "Agentfrågor" },
 ];
 
 const AMNEN = {
@@ -105,7 +106,7 @@ function RostatBar({ ja, nej, osaker, label, color }) {
   );
 }
 
-function FragaKort({ fraga, kategori, rosterData, onVote }) {
+function FragaKort({ fraga, kategori, rosterData, onVote, isAgent = false }) {
   const key = `opinion_${fraga}`;
   const [rostat, setRostat] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -147,9 +148,14 @@ function FragaKort({ fraga, kategori, rosterData, onVote }) {
       borderRadius: "8px", padding: "20px 24px", marginBottom: "12px",
       transition: "border-color 0.3s",
     }}>
-      <p style={{ margin: "0 0 16px", fontSize: "16px", color: C.text, lineHeight: 1.4, fontFamily: "Georgia, serif" }}>
-        {fraga}
-      </p>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "16px" }}>
+        <p style={{ margin: 0, fontSize: "16px", color: C.text, lineHeight: 1.4, fontFamily: "Georgia, serif", flex: 1 }}>
+          {fraga}
+        </p>
+        {isAgent && (
+          <span style={{ fontSize: "9px", color: "#4a9eff", fontFamily: "monospace", letterSpacing: "0.1em", border: "1px solid #4a9eff44", borderRadius: "3px", padding: "2px 5px", flexShrink: 0, marginTop: "3px" }}>AI</span>
+        )}
+      </div>
 
       {!rostat ? (
         <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
@@ -180,9 +186,12 @@ function FragaKort({ fraga, kategori, rosterData, onVote }) {
   );
 }
 
+const HARDCODED_SET = new Set(ALLA_FRAGOR.map(f => f.fraga));
+
 export default function OpinionClient() {
   const [aktivKat, setAktivKat] = useState("alla");
   const [rosterData, setRosterData] = useState({});
+  const [agentFragor, setAgentFragor] = useState([]);
 
   useEffect(() => {
     fetch("/api/opinion")
@@ -191,6 +200,11 @@ export default function OpinionClient() {
         const map = {};
         for (const r of rows) map[r.fraga] = r;
         setRosterData(map);
+        // Frågor i DB men inte i hårdkodad lista = agent-skapade
+        const dynamic = rows
+          .filter(r => !HARDCODED_SET.has(r.fraga))
+          .map(r => ({ fraga: r.fraga, kategori: r.kategori || "övrigt", isAgent: true }));
+        setAgentFragor(dynamic);
       })
       .catch(() => {});
   }, []);
@@ -210,9 +224,11 @@ export default function OpinionClient() {
     });
   }
 
-  const fragor = aktivKat === "alla"
-    ? ALLA_FRAGOR
-    : ALLA_FRAGOR.filter(f => f.kategori === aktivKat);
+  const fragor = aktivKat === "agentfragor"
+    ? agentFragor
+    : aktivKat === "alla"
+      ? [...ALLA_FRAGOR, ...agentFragor]
+      : ALLA_FRAGOR.filter(f => f.kategori === aktivKat);
 
   const totalBesokare = Object.values(rosterData).reduce(
     (s, r) => s + (r.roster_ja || 0) + (r.roster_nej || 0), 0
@@ -227,7 +243,7 @@ export default function OpinionClient() {
       <div style={{ marginBottom: "28px", display: "flex", gap: "24px", flexWrap: "wrap" }}>
         <div>
           <p style={{ fontSize: "11px", color: C.accentDim, fontFamily: "monospace", margin: "0 0 4px", letterSpacing: "0.1em" }}>FRÅGOR</p>
-          <p style={{ fontSize: "24px", color: C.text, margin: 0, fontFamily: "Georgia, serif" }}>{ALLA_FRAGOR.length}</p>
+          <p style={{ fontSize: "24px", color: C.text, margin: 0, fontFamily: "Georgia, serif" }}>{ALLA_FRAGOR.length + agentFragor.length}</p>
         </div>
         <div>
           <p style={{ fontSize: "11px", color: "#aaaaaa", fontFamily: "monospace", margin: "0 0 4px", letterSpacing: "0.1em" }}>BESÖKARRÖSTER</p>
@@ -255,8 +271,8 @@ export default function OpinionClient() {
       </div>
 
       {/* Frågor */}
-      {fragor.map(({ fraga, kategori }) => (
-        <FragaKort key={fraga} fraga={fraga} kategori={kategori} rosterData={rosterData} onVote={onVote} />
+      {fragor.map(({ fraga, kategori, isAgent }) => (
+        <FragaKort key={fraga} fraga={fraga} kategori={kategori} rosterData={rosterData} onVote={onVote} isAgent={isAgent} />
       ))}
     </div>
   );
