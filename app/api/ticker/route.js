@@ -4,7 +4,6 @@ const FEEDS = [
   ["SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml"],
   ["Aftonbladet",  "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"],
   ["Expressen",    "https://expressen.se/rss/nyheter/"],
-  ["Omni",         "https://omni.se/rss.xml"],
   ["Dagens Arena", "https://www.dagensarena.se/feed/"],
 ];
 
@@ -58,6 +57,6 @@ export async function GET() {
   }
 
   return NextResponse.json(nyheter, {
-    headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" },
+    headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=3600" },
   });
 }
