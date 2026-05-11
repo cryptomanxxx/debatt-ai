@@ -315,9 +315,11 @@ export default function KanalPage() {
       <div style={{ borderBottom: `1px solid ${C.border}`, padding: "6px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: running ? "#f87171" : C.textMuted, boxShadow: running ? "0 0 8px #f87171" : "none", transition: "all 0.3s" }} />
-          <span style={{ fontSize: "11px", color: running ? "#f87171" : C.textMuted, fontFamily: "monospace", letterSpacing: "0.1em" }}>
-            {!running ? "AV LUFTEN" : isDebattMode ? "DEBATT PÅGÅR" : "SÄNDER NYHETER"}
-          </span>
+          {running && (
+            <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>
+              {isDebattMode ? "DEBATT PÅGÅR" : "SÄNDER NYHETER"}
+            </span>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
           {isDebattMode && (
