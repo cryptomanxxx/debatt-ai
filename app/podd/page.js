@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -218,51 +218,28 @@ function Waveform({ amplitude, farg }) {
 }
 
 
-function TalkingCanvas({ src, amplitude, speaking }) {
-  const canvasRef = useRef(null);
-  const imgRef = useRef(null);
+// Agenter med 4 munlägen (neutral, small, medium, large)
+const MOUTH_STATES = new Set(["Nationalekonom"]);
 
-  const draw = useCallback((amp, isSpeaking) => {
-    const canvas = canvasRef.current;
-    const img = imgRef.current;
-    if (!canvas || !img) return;
-    const ctx = canvas.getContext("2d");
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
-    const scale = Math.min(W / img.naturalWidth, H / img.naturalHeight);
-    const iw = img.naturalWidth * scale;
-    const ih = img.naturalHeight * scale;
-    const ix = (W - iw) / 2;
-    const iy = (H - ih) / 2;
-    ctx.drawImage(img, ix, iy, iw, ih);
-    if (!isSpeaking || amp < 0.03) return;
-    const mx = ix + iw * 0.50;
-    const my = iy + ih * 0.62;
-    const mRx = iw * 0.12;
-    const mRy = ih * 0.035;
-    const scaleY = 1 + amp * 0.55;
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(mx, my, mRx, mRy * scaleY * 1.5, 0, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.translate(mx, my);
-    ctx.scale(1, scaleY);
-    ctx.translate(-mx, -my);
-    ctx.drawImage(img, ix, iy, iw, ih);
-    ctx.restore();
-  }, []);
-
-  useEffect(() => {
-    const img = new Image();
-    img.onload = () => { imgRef.current = img; draw(0, false); };
-    img.src = src;
-  }, [src, draw]);
-
-  useEffect(() => { draw(amplitude, speaking); }, [amplitude, speaking, draw]);
-
+function TalkingFace({ namn, amplitude, speaking }) {
+  const slug = agentSlug(namn);
+  const base = `/avatarer/podd/${slug}`;
+  const amp = speaking ? amplitude : 0;
+  let state = 0;
+  if (amp > 0.65) state = 3;
+  else if (amp > 0.35) state = 2;
+  else if (amp > 0.08) state = 1;
+  const srcs = [`${base}.png`, `${base}-small.png`, `${base}-medium.png`, `${base}-large.png`];
   return (
-    <canvas ref={canvasRef} width={800} height={600}
-      style={{ width: "100%", height: "100%", display: "block" }} />
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {srcs.map((src, i) => (
+        <img key={src} src={src} alt="" style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          objectFit: "cover", opacity: i === state ? 1 : 0,
+          transition: "opacity 0.05s ease",
+        }} />
+      ))}
+    </div>
   );
 }
 
@@ -275,9 +252,9 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
     <div style={{ position: "relative", width: "100%", paddingTop: "75%", background: "#000", flexShrink: 0 }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
 
-        {/* HD-agenter: munanimation via canvas. Övriga: statisk bild */}
-        {PODD_AVATARER.has(namn) ? (
-          <TalkingCanvas src={avatarSrc(namn)} amplitude={amplitude} speaking={speaking} />
+        {/* Munanimation för agenter med 4-lägesbilder, annars statisk */}
+        {MOUTH_STATES.has(namn) ? (
+          <TalkingFace namn={namn} amplitude={amplitude} speaking={speaking} />
         ) : (
           <img src={avatarSrc(namn)} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         )}
