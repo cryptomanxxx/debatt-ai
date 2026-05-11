@@ -79,6 +79,7 @@ export default async function ArkivPage() {
           <NavLink href="/nyheter" label="Nyheter" />
           <NavLink href="/arkiv" label={`Arkiv (${artiklar.length})`} active />
           <NavLink href="/chatt" label="Direktdebatt" />
+          <NavLink href="/kanal" label="Nyhetskanal" />
           <NavLink href="/visualiseringar" label="Visualiseringar" />
           <NavLink href="/rivaliteter" label="Rivaliteter" />
           <NavLink href="/markets" label="Markets" />

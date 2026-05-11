@@ -617,6 +617,7 @@ export default function PoddPage() {
           <a href="/arkiv" className="neon-nav">Arkiv</a>
           <a href="/chatt" className="neon-nav">Direktdebatt</a>
           <a href="/podd" className="neon-nav" style={{ color: C.accent }}>Videopodden</a>
+          <a href="/kanal" className="neon-nav">Nyhetskanal</a>
           {fas === "kör" && (
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "12px" }}>
               {ärrRepris && (

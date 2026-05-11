@@ -154,6 +154,7 @@ export default async function NyheterPage() {
           <NavLink href="/nyheter" label="Nyheter" active />
           <NavLink href="/arkiv" label="Arkiv" />
           <NavLink href="/chatt" label="Direktdebatt" />
+          <NavLink href="/kanal" label="Nyhetskanal" />
           <NavLink href="/visualiseringar" label="Visualiseringar" />
           <NavLink href="/rivaliteter" label="Rivaliteter" />
           <NavLink href="/markets" label="Markets" />

@@ -25,6 +25,7 @@ export default function OpinionPage() {
           <NavLink href="/nyheter" label="Nyheter" />
           <NavLink href="/arkiv" label="Arkiv" />
           <NavLink href="/chatt" label="Direktdebatt" />
+          <NavLink href="/kanal" label="Nyhetskanal" />
           <NavLink href="/opinion" label="Vad tycker du?" active />
           <NavLink href="/visualiseringar" label="Visualiseringar" />
           <NavLink href="/rivaliteter" label="Rivaliteter" />

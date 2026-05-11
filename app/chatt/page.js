@@ -556,6 +556,7 @@ export default function ChattPage() {
           {navLink("/nyheter","Nyheter",false)}
           {navLink("/arkiv", arkivAntal !== null ? `Arkiv (${arkivAntal})` : "Arkiv", false)}
           {navLink("/chatt","Direktdebatt",true)}
+          {navLink("/kanal","Nyhetskanal",false)}
           <NavHistorikLink />
           {navLink("/visualiseringar","Visualiseringar",false)}
           {navLink("/rivaliteter","Rivaliteter",false)}
