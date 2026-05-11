@@ -75,16 +75,38 @@ SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 # YouTube-kanaler (gratis RSS + transkript via youtube-transcript-api)
 YOUTUBE_KANALER = [
+    # AI / Tech
+    ("OpenAI",              "UCXZCJLdBC09xxGZ6gcdrc6A"),
+    ("Anthropic",           "UCrDwWp7EBBv4NwvScIpBDOA"),
+    ("Google DeepMind",     "UCP7jMXSY2xbc3KCAE0MHQ-A"),
+    ("NVIDIA",              "UCHuiy8bXnmK5nisYHUd1J5g"),
     ("Lex Fridman",         "UCSHZKyawb77ixDdsGog4iWA"),
-    ("Kurzgesagt",          "UCsXVk37bltHxD1rDPwtNM8Q"),
     ("Two Minute Papers",   "UCbfYPyITQ-7l4upoX8nvctg"),
     ("Fireship",            "UCsBjURrPoezykLs9EqgamOA"),
-    ("Google DeepMind",     "UCP7jMXSY2xbc3KCAE0MHQ-A"),
-    ("TED",                 "UCAuUUnT6oDeKwE6v1NGQxug"),
+    # Framtid / Filosofi
+    ("Isaac Arthur",        "UCZFipeZtQM5CKUjx6grh54g"),
+    ("ColdFusion",          "UC4QZ_LsYcvcq7qOsOhpAX4A"),
+    ("Kurzgesagt",          "UCsXVk37bltHxD1rDPwtNM8Q"),
     ("Sabine Hossenfelder", "UC1yNl2E66ZzKApQdRuTQ4tw"),
+    # Politik / Samhälle
     ("BBC News",            "UC16niRr50-MSBwiO3YDb3RA"),
     ("DW News",             "UCknLrEdhRCp1aegoMqRaCZg"),
+    ("Reuters",             "UChqUTb7kYRX8-EiaN3XFrSQ"),
+    ("Associated Press",    "UC52X5wxOL_s5yw0dQk7NtgA"),
+    # Ekonomi
+    ("Patrick Boyle",       "UCJwKCyEIFHwUOPQQ-4kC1Zw"),
+    ("Economics Explained", "UCZ4AMrDcNrfy3X6nsU8-rPg"),
+    ("Bloomberg Originals", "UCUMZ7gohGI9HcU9VNsr2FJQ"),
+    # Gaming / Internet
+    ("videogamedunkey",     "UCsvn_Po0SmunchJYOWpOxMg"),
+    ("Asmongold TV",        "UCQeRaTukNYft1_6AZPACnog"),
+    ("Skill Up",            "UCZ7AeeVbyslLM_8-nVy2B8Q"),
+    # Övrigt
     ("The Economist",       "UC0p5jTq6Xx_DosDFxVXnWaQ"),
+    ("TED",                 "UCAuUUnT6oDeKwE6v1NGQxug"),
+    ("Engadget",            "UC-6OW5aJYBFM33zXQlBKPNA"),
+    ("The Verge",           "UCddiUEpeqJcYeBxX1IVBKvQ"),
+    ("Forbes",              "UCmh7afBz-uWwOSSNTqUBAhg"),
 ]
 
 # Förprogrammerade opinionsfrågor (samma som på /opinion-sidan)
