@@ -1765,6 +1765,7 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
         prompt = (
             f"Du är {agent['namn']} och har just skrivit en artikel om: \"{amne}\"\n\n"
             f"Skapa ETT prediction market med ett klart Ja/Nej-svar om 3 månader.\n"
+            f"Regeln: deadline får vara MAX 12 månader framåt — välj alltid en konkret, verifierbar fråga inom det intervallet.\n"
             f"Välj ett verifierbart utfall med angiven källa (t.ex. SCB, Riksbanken, SVT Nyheter, Eurostat).\n\n"
             "Svara ENBART med JSON:\n"
             '{"titel": "Kort fråga max 15 ord?", "beskrivning": "En kontextmening.", "resolution_kalla": "Källnamn"}'
