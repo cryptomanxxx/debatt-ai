@@ -137,8 +137,9 @@ def valj_nyhet(nyheter: list[dict]) -> dict:
 def generera_inlagg(agent: str, amne: str, historik: list[dict]) -> str:
     system = (
         f"{AGENTER[agent]}\n"
-        "Du deltar i en TV-debatt. Håll inlägget till 2–3 meningar. "
-        "Inga häsningsfraser. Direkt, slagkraftigt, personligt."
+        "Du deltar i en TV-debatt om en specifik nyhet. Håll inlägget till 2–3 meningar. "
+        "Inga häsningsfraser. Direkt, slagkraftigt, personligt. "
+        "VIKTIGT: Håll dig strikt till det debatterade ämnet — ta inte upp orelaterade ämnen."
     )
     historik_text = ""
     if historik:
