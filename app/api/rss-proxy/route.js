@@ -7,6 +7,7 @@ const TILLÅTNA_DOMÄNER = [
   "feeds.bbci.co.uk", "aljazeera.com",
   "ted.com", "research.google",
   "theverge.com",
+  "reddit.com", "old.reddit.com",
 ];
 
 export async function GET(request) {
@@ -29,10 +30,10 @@ export async function GET(request) {
     const res = await fetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept": "application/rss+xml, application/xml, text/xml, */*",
+        "Accept": "application/rss+xml, application/xml, application/json, text/xml, */*",
         "Accept-Language": "sv-SE,sv;q=0.9,en;q=0.8",
       },
-      signal: AbortSignal.timeout(12000),
+      signal: AbortSignal.timeout(15000),
     });
 
     const body = await res.arrayBuffer();
@@ -40,8 +41,9 @@ export async function GET(request) {
       status: res.status,
       headers: {
         "Content-Type": res.headers.get("content-type") || "application/xml; charset=utf-8",
-        "Cache-Control": "s-maxage=900, stale-while-revalidate=300",
+        "Cache-Control": "s-maxage=600, stale-while-revalidate=120",
         "X-Proxied-From": host,
+        "X-Proxied-Status": String(res.status),
       },
     });
   } catch (e) {
