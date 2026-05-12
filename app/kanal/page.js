@@ -84,7 +84,7 @@ function useBlinkState(amplitudeRef) {
     };
 
     const schedule = () => {
-      const delay = 2500 + Math.random() * 4000; // 2.5–6.5s
+      const delay = 12000 + Math.random() * 10000; // 12–22s (långsamt för felsökning)
       timerRef.current = setTimeout(async () => {
         if (cancelled) return;
         await doBlink();
@@ -148,25 +148,26 @@ function TalkingFace({ amplitude, speaking }) {
       {/* Lager 1: statisk bas — fullt ansikte, rör sig aldrig */}
       <img src={`/avatarer/${slug}.png`} alt="" style={imgStyle} onError={e => { e.target.style.display = "none"; }} />
 
-      {/* Lager 2: munrörelse — clip-path visar bara nedre ~52% */}
+      {/* Lager 2: munrörelse — gradient-mask för mjuk övergång (undviker käkförskjutning) */}
       {srcs.map((src, i) => (
         <img key={src} src={src} alt="" style={{
           ...imgStyle,
           opacity: i === state ? 1 : 0,
           transition: "opacity 200ms ease-in-out",
-          clipPath: "inset(48% 0 0 0)",
+          WebkitMaskImage: "linear-gradient(to bottom, transparent 44%, black 54%)",
+          maskImage: "linear-gradient(to bottom, transparent 44%, black 54%)",
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
 
-      {/* Lager 3: blink — transparenta RGBA overlays, positionerade över ögonregionen */}
+      {/* Lager 3: blink — RGBA overlays över ögonregionen */}
       <img
         src={`/avatarer/podd/${slug}-eyes-half.png`} alt=""
-        style={{ position: "absolute", top: "15%", left: "50%", transform: "translateX(-50%)", width: "30%", height: "auto", opacity: blinkState === "half" ? 1 : 0, transition: "opacity 25ms linear" }}
+        style={{ position: "absolute", top: "16%", left: "50%", transform: "translateX(-50%)", width: "44%", height: "auto", opacity: blinkState === "half" ? 1 : 0, transition: "opacity 25ms linear" }}
         onError={e => { e.target.style.display = "none"; }}
       />
       <img
         src={`/avatarer/podd/${slug}-eyes-closed.png`} alt=""
-        style={{ position: "absolute", top: "15%", left: "50%", transform: "translateX(-50%)", width: "30%", height: "auto", opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear" }}
+        style={{ position: "absolute", top: "16%", left: "50%", transform: "translateX(-50%)", width: "44%", height: "auto", opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear" }}
         onError={e => { e.target.style.display = "none"; }}
       />
     </div>
