@@ -72,19 +72,19 @@ function useBlinkState(amplitudeRef) {
     const doBlink = async () => {
       if (cancelled) return;
       setBlinkState("half");
-      await sleep(30);
+      await sleep(80);            // håll minst transitionstiden (80ms) innan nästa state
       if (cancelled) return;
       setBlinkState("closed");
-      await sleep(45);
+      await sleep(120);           // 60ms transition + 60ms faktisk stängd
       if (cancelled) return;
       setBlinkState("half");
-      await sleep(35);
+      await sleep(80);
       if (cancelled) return;
       setBlinkState("open");
     };
 
     const schedule = () => {
-      const delay = 12000 + Math.random() * 10000; // 12–22s (långsamt för felsökning)
+      const delay = 4000 + Math.random() * 3000; // 4–7s naturligt intervall
       timerRef.current = setTimeout(async () => {
         if (cancelled) return;
         await doBlink();
@@ -162,12 +162,12 @@ function TalkingFace({ amplitude, speaking }) {
       {/* Lager 3: blink — full-face state swap, gradient-mask visar bara övre ~40% (ögonregionen) */}
       <img
         src={`/avatarer/podd/${slug}-blink-half.png`} alt=""
-        style={{ ...imgStyle, opacity: blinkState === "half" ? 1 : 0, transition: "opacity 25ms linear", WebkitMaskImage: "linear-gradient(to bottom, black 38%, transparent 46%)", maskImage: "linear-gradient(to bottom, black 38%, transparent 46%)" }}
+        style={{ ...imgStyle, opacity: blinkState === "half" ? 1 : 0, transition: "opacity 80ms ease-in-out", WebkitMaskImage: "linear-gradient(to bottom, black 28%, transparent 50%)", maskImage: "linear-gradient(to bottom, black 28%, transparent 50%)" }}
         onError={e => { e.target.style.display = "none"; }}
       />
       <img
         src={`/avatarer/podd/${slug}-blink-closed.png`} alt=""
-        style={{ ...imgStyle, opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear", WebkitMaskImage: "linear-gradient(to bottom, black 38%, transparent 46%)", maskImage: "linear-gradient(to bottom, black 38%, transparent 46%)" }}
+        style={{ ...imgStyle, opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 60ms ease-in", WebkitMaskImage: "linear-gradient(to bottom, black 28%, transparent 50%)", maskImage: "linear-gradient(to bottom, black 28%, transparent 50%)" }}
         onError={e => { e.target.style.display = "none"; }}
       />
     </div>
