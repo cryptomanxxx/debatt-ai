@@ -159,15 +159,15 @@ function TalkingFace({ amplitude, speaking }) {
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
 
-      {/* Lager 3: blink — mix-blend-mode:darken döljer ljusare hudton, visar bara mörkare pixlar (fransar, skugga) */}
+      {/* Lager 3: blink — skärpt alpha-mask, centrerad på faktiskt ögoninnehåll (46.7% → 51.5% left) */}
       <img
         src={`/avatarer/podd/${slug}-eyes-half.png`} alt=""
-        style={{ position: "absolute", top: "16%", left: "50%", transform: "translateX(-50%)", width: "44%", height: "auto", opacity: blinkState === "half" ? 1 : 0, transition: "opacity 25ms linear", mixBlendMode: "darken" }}
+        style={{ position: "absolute", top: "16%", left: "51.5%", transform: "translateX(-50%)", width: "44%", height: "auto", opacity: blinkState === "half" ? 1 : 0, transition: "opacity 25ms linear", mixBlendMode: "darken" }}
         onError={e => { e.target.style.display = "none"; }}
       />
       <img
         src={`/avatarer/podd/${slug}-eyes-closed.png`} alt=""
-        style={{ position: "absolute", top: "16%", left: "50%", transform: "translateX(-50%)", width: "44%", height: "auto", opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear", mixBlendMode: "darken" }}
+        style={{ position: "absolute", top: "16%", left: "51.5%", transform: "translateX(-50%)", width: "44%", height: "auto", opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear", mixBlendMode: "darken" }}
         onError={e => { e.target.style.display = "none"; }}
       />
     </div>
