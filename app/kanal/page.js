@@ -148,7 +148,7 @@ function TalkingFace({ amplitude, speaking }) {
       {/* Lager 1: statisk bas — fullt ansikte, rör sig aldrig */}
       <img src={`/avatarer/${slug}.png`} alt="" style={imgStyle} onError={e => { e.target.style.display = "none"; }} />
 
-      {/* Lager 2: munrörelse — gradient-mask för mjuk övergång (undviker käkförskjutning) */}
+      {/* Lager 2: munrörelse — gradient-mask visar bara nedre ~56% */}
       {srcs.map((src, i) => (
         <img key={src} src={src} alt="" style={{
           ...imgStyle,
@@ -159,15 +159,15 @@ function TalkingFace({ amplitude, speaking }) {
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
 
-      {/* Lager 3: blink — skärpt alpha-mask, centrerad på faktiskt ögoninnehåll (46.7% → 51.5% left) */}
+      {/* Lager 3: blink — full-face state swap, gradient-mask visar bara övre ~40% (ögonregionen) */}
       <img
-        src={`/avatarer/podd/${slug}-eyes-half.png`} alt=""
-        style={{ position: "absolute", top: "16%", left: "51.5%", transform: "translateX(-50%)", width: "44%", height: "auto", opacity: blinkState === "half" ? 1 : 0, transition: "opacity 25ms linear", mixBlendMode: "darken" }}
+        src={`/avatarer/podd/${slug}-blink-half.png`} alt=""
+        style={{ ...imgStyle, opacity: blinkState === "half" ? 1 : 0, transition: "opacity 25ms linear", WebkitMaskImage: "linear-gradient(to bottom, black 38%, transparent 46%)", maskImage: "linear-gradient(to bottom, black 38%, transparent 46%)" }}
         onError={e => { e.target.style.display = "none"; }}
       />
       <img
-        src={`/avatarer/podd/${slug}-eyes-closed.png`} alt=""
-        style={{ position: "absolute", top: "16%", left: "51.5%", transform: "translateX(-50%)", width: "44%", height: "auto", opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear", mixBlendMode: "darken" }}
+        src={`/avatarer/podd/${slug}-blink-closed.png`} alt=""
+        style={{ ...imgStyle, opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear", WebkitMaskImage: "linear-gradient(to bottom, black 38%, transparent 46%)", maskImage: "linear-gradient(to bottom, black 38%, transparent 46%)" }}
         onError={e => { e.target.style.display = "none"; }}
       />
     </div>
