@@ -72,19 +72,19 @@ function useBlinkState(amplitudeRef) {
     const doBlink = async () => {
       if (cancelled) return;
       setBlinkState("half");
-      await sleep(30);
+      await sleep(80);            // håll minst transitionstiden (80ms) innan nästa state
       if (cancelled) return;
       setBlinkState("closed");
-      await sleep(45);
+      await sleep(120);           // 60ms transition + 60ms faktisk stängd
       if (cancelled) return;
       setBlinkState("half");
-      await sleep(35);
+      await sleep(80);
       if (cancelled) return;
       setBlinkState("open");
     };
 
     const schedule = () => {
-      const delay = 2500 + Math.random() * 4000; // 2.5–6.5s
+      const delay = 4000 + Math.random() * 3000; // 4–7s naturligt intervall
       timerRef.current = setTimeout(async () => {
         if (cancelled) return;
         await doBlink();
@@ -148,25 +148,26 @@ function TalkingFace({ amplitude, speaking }) {
       {/* Lager 1: statisk bas — fullt ansikte, rör sig aldrig */}
       <img src={`/avatarer/${slug}.png`} alt="" style={imgStyle} onError={e => { e.target.style.display = "none"; }} />
 
-      {/* Lager 2: munrörelse — clip-path visar bara nedre ~52% */}
+      {/* Lager 2: munrörelse — gradient-mask visar bara nedre ~56% */}
       {srcs.map((src, i) => (
         <img key={src} src={src} alt="" style={{
           ...imgStyle,
           opacity: i === state ? 1 : 0,
           transition: "opacity 200ms ease-in-out",
-          clipPath: "inset(48% 0 0 0)",
+          WebkitMaskImage: "linear-gradient(to bottom, transparent 44%, black 54%)",
+          maskImage: "linear-gradient(to bottom, transparent 44%, black 54%)",
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
 
-      {/* Lager 3: blink — transparenta RGBA overlays, positionerade över ögonregionen */}
+      {/* Lager 3: blink — full-face state swap, gradient-mask visar bara övre ~40% (ögonregionen) */}
       <img
-        src={`/avatarer/podd/${slug}-eyes-half.png`} alt=""
-        style={{ position: "absolute", top: "15%", left: "50%", transform: "translateX(-50%)", width: "30%", height: "auto", opacity: blinkState === "half" ? 1 : 0, transition: "opacity 25ms linear" }}
+        src={`/avatarer/podd/${slug}-blink-half.png`} alt=""
+        style={{ ...imgStyle, opacity: blinkState === "half" ? 1 : 0, transition: "opacity 80ms ease-in-out", WebkitMaskImage: "linear-gradient(to bottom, black 28%, transparent 50%)", maskImage: "linear-gradient(to bottom, black 28%, transparent 50%)" }}
         onError={e => { e.target.style.display = "none"; }}
       />
       <img
-        src={`/avatarer/podd/${slug}-eyes-closed.png`} alt=""
-        style={{ position: "absolute", top: "15%", left: "50%", transform: "translateX(-50%)", width: "30%", height: "auto", opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 20ms linear" }}
+        src={`/avatarer/podd/${slug}-blink-closed.png`} alt=""
+        style={{ ...imgStyle, opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 60ms ease-in", WebkitMaskImage: "linear-gradient(to bottom, black 28%, transparent 50%)", maskImage: "linear-gradient(to bottom, black 28%, transparent 50%)" }}
         onError={e => { e.target.style.display = "none"; }}
       />
     </div>

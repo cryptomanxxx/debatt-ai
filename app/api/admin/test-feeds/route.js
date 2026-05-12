@@ -2,7 +2,6 @@
 const FEEDS = [
   // Svenska nyheter
   ["SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"],
-  ["Omni",               "https://omni.se/rss"],
   ["Aftonbladet",        "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"],
   ["Dagens Arena",       "https://www.dagensarena.se/feed/"],
   // Svenska ämnen – Reddit
