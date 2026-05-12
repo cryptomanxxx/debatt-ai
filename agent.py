@@ -932,10 +932,22 @@ def hamta_reddit_kommentarer(post_url: str, max_kommentarer: int = 5) -> str:
         return ""
 
 
+_PROXY = "https://www.debatt-ai.se/api/rss-proxy?url="
+
+def _p(url: str) -> str:
+    """Skicka URL via Vercel RSS-proxy för att kringgå GitHub Actions IP-block."""
+    import urllib.parse
+    return _PROXY + urllib.parse.quote(url, safe="")
+
+
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från RSS-flöden."""
     feeds = [
-        # Svenska nyheter – via Reddit (direkta feeds blockeras från GitHub Actions IPs)
+        # Svenska nyheter – via proxy (direkta feeds blockeras från GitHub Actions IPs)
+        ("SVT Nyheter",        _p("https://www.svt.se/nyheter/rss.xml")),
+        ("Aftonbladet",        _p("https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/")),
+        ("Dagens Arena",       _p("https://www.dagensarena.se/feed/")),
+        # Svenska ämnen – Reddit
         ("Reddit Sverige",     "https://www.reddit.com/r/sweden/.rss"),
         ("Reddit Ekonomi",     "https://www.reddit.com/r/Economics/.rss"),
         ("Reddit Klimat",      "https://www.reddit.com/r/environment/.rss"),
@@ -943,8 +955,16 @@ def hamta_nyheter() -> list:
         ("Reddit EU",          "https://www.reddit.com/r/europeanunion/.rss"),
         ("Reddit Sjukvård",    "https://www.reddit.com/r/medicine/.rss"),
         ("Reddit Bostäder",    "https://www.reddit.com/r/urbanplanning/.rss"),
-        # Tech – The Verge fungerar, övriga blockeras
+        # Tech – direkta feeds via proxy
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
+        ("TechCrunch",         _p("https://techcrunch.com/feed/")),
+        ("Wired",              _p("https://www.wired.com/feed/rss")),
+        ("Ars Technica",       _p("https://feeds.arstechnica.com/arstechnica/index")),
+        ("Hacker News",        _p("https://hnrss.org/frontpage")),
+        ("Engadget",           _p("https://www.engadget.com/rss.xml")),
+        # Internationella nyheter – via proxy
+        ("BBC News",           _p("https://feeds.bbci.co.uk/news/rss.xml")),
+        ("Al Jazeera",         _p("https://www.aljazeera.com/xml/rss/all.xml")),
         # Tech & AI – Reddit
         ("Reddit AI",          "https://www.reddit.com/r/artificial/.rss"),
         ("Reddit Singularity", "https://www.reddit.com/r/singularity/.rss"),
@@ -980,9 +1000,9 @@ def hamta_nyheter() -> list:
         # Medicin & forskning
         ("Reddit Science",     "https://www.reddit.com/r/science/.rss"),
         # AI-forskning
-        ("Google Research",    "https://research.google/blog/rss/"),
+        ("Google Research",    _p("https://research.google/blog/rss/")),
         # Populärvetenskap & idéer
-        ("TED Talks",          "https://www.ted.com/talks/rss"),
+        ("TED Talks",          _p("https://www.ted.com/talks/rss")),
     ]
     nyheter = []
     rss_stats = []  # [{"kalla": str, "ok": bool, "antal": int, "fel": str}]
