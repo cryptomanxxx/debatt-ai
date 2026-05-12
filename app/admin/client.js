@@ -508,7 +508,7 @@ function FeedsTab() {
         )}
       </div>
 
-      {loading && <p style={{ color: C.textMuted, fontSize: "13px", fontFamily: "monospace" }}>Testar {41} feeds från Vercels servrar…</p>}
+      {loading && <p style={{ color: C.textMuted, fontSize: "13px", fontFamily: "monospace" }}>Testar {35} feeds från Vercels servrar…</p>}
 
       {results && (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -523,9 +523,10 @@ function FeedsTab() {
                 {r.ok ? "✓" : "✗"}
               </span>
               <span style={{ color: C.text, minWidth: "180px" }}>{r.namn}</span>
-              <span style={{ color: C.textMuted, fontSize: "11px" }}>
-                {r.ok ? `${r.ms}ms` : `HTTP ${r.status || r.error}`}
+              <span style={{ color: r.ok ? C.green : C.red, minWidth: "80px", fontSize: "11px" }}>
+                {r.ok ? `${r.antal} artiklar` : `HTTP ${r.status || r.error}`}
               </span>
+              <span style={{ color: C.textMuted, fontSize: "11px" }}>{r.ms}ms</span>
             </div>
           ))}
         </div>
