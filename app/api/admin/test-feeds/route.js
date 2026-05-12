@@ -1,5 +1,11 @@
+const P = (url) => `/api/rss-proxy?url=${encodeURIComponent(url)}`;
+
 const FEEDS = [
-  // Svenska ämnen – Reddit (direkta svenska nyhetsfeeds blockeras från GitHub Actions IPs)
+  // Svenska nyheter – via proxy
+  ["SVT Nyheter",        P("https://www.svt.se/nyheter/rss.xml")],
+  ["Aftonbladet",        P("https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/")],
+  ["Dagens Arena",       P("https://www.dagensarena.se/feed/")],
+  // Svenska ämnen – Reddit
   ["Reddit Sverige",     "https://www.reddit.com/r/sweden/.rss"],
   ["Reddit Ekonomi",     "https://www.reddit.com/r/Economics/.rss"],
   ["Reddit Klimat",      "https://www.reddit.com/r/environment/.rss"],
@@ -7,8 +13,18 @@ const FEEDS = [
   ["Reddit EU",          "https://www.reddit.com/r/europeanunion/.rss"],
   ["Reddit Sjukvård",    "https://www.reddit.com/r/medicine/.rss"],
   ["Reddit Bostäder",    "https://www.reddit.com/r/urbanplanning/.rss"],
-  // Tech
+  // Tech – via proxy + The Verge direkt
   ["The Verge",          "https://www.theverge.com/rss/index.xml"],
+  ["TechCrunch",         P("https://techcrunch.com/feed/")],
+  ["Wired",              P("https://www.wired.com/feed/rss")],
+  ["Ars Technica",       P("https://feeds.arstechnica.com/arstechnica/index")],
+  ["Hacker News",        P("https://hnrss.org/frontpage")],
+  ["Engadget",           P("https://www.engadget.com/rss.xml")],
+  // Internationellt – via proxy
+  ["BBC News",           P("https://feeds.bbci.co.uk/news/rss.xml")],
+  ["Al Jazeera",         P("https://www.aljazeera.com/xml/rss/all.xml")],
+  ["Reddit World News",  "https://www.reddit.com/r/worldnews/.rss"],
+  // Tech & AI – Reddit
   ["Reddit Technology",  "https://www.reddit.com/r/technology/.rss"],
   // Tech & AI – Reddit
   ["Reddit AI",          "https://www.reddit.com/r/artificial/.rss"],
@@ -41,6 +57,9 @@ const FEEDS = [
   ["Reddit TV",          "https://www.reddit.com/r/television/.rss"],
   // Medicin & forskning
   ["Reddit Science",     "https://www.reddit.com/r/science/.rss"],
+  // AI-forskning & populärvetenskap – via proxy
+  ["Google Research",    P("https://research.google/blog/rss/")],
+  ["TED Talks",          P("https://www.ted.com/talks/rss")],
 ];
 
 const ATOM = "http://www.w3.org/2005/Atom";
