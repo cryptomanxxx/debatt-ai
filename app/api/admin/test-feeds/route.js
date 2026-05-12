@@ -3,6 +3,7 @@ const P = (url) => `/api/rss-proxy?url=${encodeURIComponent(url)}`;
 const FEEDS = [
   // Svenska nyheter – via proxy
   ["SVT Nyheter",        P("https://www.svt.se/nyheter/rss.xml")],
+  ["Omni",               P("https://omni.se/rss")],
   ["Aftonbladet",        P("https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/")],
   ["Dagens Arena",       P("https://www.dagensarena.se/feed/")],
   // Svenska ämnen – Reddit
