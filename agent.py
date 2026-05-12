@@ -852,11 +852,17 @@ def hamta_youtube_nyheter() -> list:
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
     except ImportError:
+        print("  ✗ YouTube: youtube-transcript-api ej installerat", file=sys.stderr)
         return []
 
     yt_api = YouTubeTranscriptApi()
     nyheter = []
     fjorton_dagar_sedan = datetime.utcnow() - timedelta(days=14)
+
+    rss_ok = 0
+    rss_blockad = 0
+    transkript_ok = 0
+    transkript_fel = 0
 
     for kanal_namn, kanal_id in YOUTUBE_KANALER:
         try:
@@ -864,7 +870,9 @@ def hamta_youtube_nyheter() -> list:
             res = httpx.get(rss_url, timeout=10, follow_redirects=True,
                             headers={"User-Agent": "Mozilla/5.0 (compatible; RSS-reader/2.0)"})
             if not res.ok:
+                rss_blockad += 1
                 continue
+            rss_ok += 1
             root = ET.fromstring(res.text)
             ns = {
                 "atom": "http://www.w3.org/2005/Atom",
@@ -881,7 +889,6 @@ def hamta_youtube_nyheter() -> list:
                     continue
                 published_el = entry.find("atom:published", ns)
                 publicerad = published_el.text.strip() if published_el is not None else ""
-                # Skippa gamla videos
                 if publicerad:
                     try:
                         pub_dt = datetime.strptime(publicerad[:10], "%Y-%m-%d")
@@ -893,7 +900,10 @@ def hamta_youtube_nyheter() -> list:
                 try:
                     fetched = yt_api.fetch(video_id, languages=["sv", "en", "en-US", "en-GB"])
                     text = " ".join(t.text for t in fetched)[:2000].strip()
-                except Exception:
+                    transkript_ok += 1
+                except Exception as te:
+                    transkript_fel += 1
+                    print(f"  ✗ YouTube transkript {kanal_namn} ({video_id}): {type(te).__name__}", file=sys.stderr)
                     continue
                 nyheter.append({
                     "rubrik": titel,
@@ -904,9 +914,11 @@ def hamta_youtube_nyheter() -> list:
                 })
                 break  # En video per kanal
         except Exception as e:
-            print(f"  ✗ YouTube {kanal_namn}: {type(e).__name__}", file=sys.stderr)
+            rss_blockad += 1
+            print(f"  ✗ YouTube RSS {kanal_namn}: {type(e).__name__}", file=sys.stderr)
             continue
 
+    print(f"  YouTube: {rss_ok} RSS ok / {rss_blockad} blockade — {transkript_ok} transkript / {transkript_fel} misslyckade")
     return nyheter
 
 
@@ -1125,9 +1137,7 @@ def hamta_nyheter() -> list:
 
     # YouTube-transkriptioner
     yt_nyheter = hamta_youtube_nyheter()
-    if yt_nyheter:
-        nyheter.extend(yt_nyheter)
-        print(f"  ✓ YouTube ({len(yt_nyheter)} videor med transkript)")
+    nyheter.extend(yt_nyheter)
 
     return nyheter, rss_stats
 
