@@ -1013,9 +1013,9 @@ def hamta_nyheter() -> list:
         is_reddit = "reddit.com/r/" in url
         try:
             if is_reddit:
-                # Hämta JSON istället för RSS — ger upvotes och kommentarantal
+                # Hämta JSON via Vercel-proxy (Reddit blockerar GitHub Actions IPs)
                 json_url = url.replace("/.rss", "/hot.json") + "?limit=15"
-                res = httpx.get(json_url, timeout=10, follow_redirects=True,
+                res = httpx.get(_p(json_url), timeout=15, follow_redirects=True,
                                 headers={"User-Agent": "Mozilla/5.0 (compatible; debatt-ai/1.0)"})
                 if res.status_code != 200:
                     misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
