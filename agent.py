@@ -75,6 +75,12 @@ SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 # YouTube-kanaler (gratis RSS + transkript via youtube-transcript-api)
 YOUTUBE_KANALER = [
+    # Svenska nyheter
+    ("SVT",                 "UCG-Et3jfinzlQql4uEYjAVw"),
+    ("TV4 Nyheterna",       "UCvKaCKM0F5NE8K88bKcyklQ"),
+    ("Expressen",           "UCfCk_ylzLy6nz2NpW25DY5w"),
+    ("Aftonbladet",         "UC7peaobE6LOBLbVp2mr3JEw"),
+    ("Riksdagen",           "UCmyMhyy_FHtwui-3dsu-K8g"),
     # AI / Tech
     ("OpenAI",              "UCXZCJLdBC09xxGZ6gcdrc6A"),
     ("Anthropic",           "UCrDwWp7EBBv4NwvScIpBDOA"),
@@ -844,10 +850,11 @@ def hamta_statistik(kategorier: list[str] | None = None) -> str:
 def hamta_youtube_nyheter() -> list:
     """Hämtar senaste video + transkript från YouTube-kanaler. Kräver ej API-nyckel."""
     try:
-        from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
+        from youtube_transcript_api import YouTubeTranscriptApi
     except ImportError:
         return []
 
+    yt_api = YouTubeTranscriptApi()
     nyheter = []
     fjorton_dagar_sedan = datetime.utcnow() - timedelta(days=14)
 
@@ -882,13 +889,11 @@ def hamta_youtube_nyheter() -> list:
                             continue
                     except Exception:
                         pass
-                # Hämta transkript
+                # Hämta transkript (API v1.x: instansmetod fetch())
                 try:
-                    transcript_list = YouTubeTranscriptApi.get_transcript(
-                        video_id, languages=["sv", "en", "en-US", "en-GB"]
-                    )
-                    text = " ".join(t["text"] for t in transcript_list)[:2000].strip()
-                except (NoTranscriptFound, TranscriptsDisabled, Exception):
+                    fetched = yt_api.fetch(video_id, languages=["sv", "en", "en-US", "en-GB"])
+                    text = " ".join(t.text for t in fetched)[:2000].strip()
+                except Exception:
                     continue
                 nyheter.append({
                     "rubrik": titel,
