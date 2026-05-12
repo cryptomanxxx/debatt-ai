@@ -945,6 +945,7 @@ def hamta_nyheter() -> list:
     feeds = [
         # Svenska nyheter – via proxy (direkta feeds blockeras från GitHub Actions IPs)
         ("SVT Nyheter",        _p("https://www.svt.se/nyheter/rss.xml")),
+        ("Omni",               _p("https://omni.se/rss")),
         ("Aftonbladet",        _p("https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/")),
         ("Dagens Arena",       _p("https://www.dagensarena.se/feed/")),
         # Svenska ämnen – Reddit
