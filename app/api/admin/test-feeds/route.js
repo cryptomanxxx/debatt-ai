@@ -1,11 +1,10 @@
-const P = (url) => `/api/rss-proxy?url=${encodeURIComponent(url)}`;
-
+// Testa feeds direkt (ingen proxy behövs — denna route körs på Vercel, inte GitHub Actions)
 const FEEDS = [
-  // Svenska nyheter – via proxy
-  ["SVT Nyheter",        P("https://www.svt.se/nyheter/rss.xml")],
-  ["Omni",               P("https://omni.se/rss")],
-  ["Aftonbladet",        P("https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/")],
-  ["Dagens Arena",       P("https://www.dagensarena.se/feed/")],
+  // Svenska nyheter
+  ["SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"],
+  ["Omni",               "https://omni.se/rss"],
+  ["Aftonbladet",        "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"],
+  ["Dagens Arena",       "https://www.dagensarena.se/feed/"],
   // Svenska ämnen – Reddit
   ["Reddit Sverige",     "https://www.reddit.com/r/sweden/.rss"],
   ["Reddit Ekonomi",     "https://www.reddit.com/r/Economics/.rss"],
@@ -14,20 +13,19 @@ const FEEDS = [
   ["Reddit EU",          "https://www.reddit.com/r/europeanunion/.rss"],
   ["Reddit Sjukvård",    "https://www.reddit.com/r/medicine/.rss"],
   ["Reddit Bostäder",    "https://www.reddit.com/r/urbanplanning/.rss"],
-  // Tech – via proxy + The Verge direkt
+  // Tech
   ["The Verge",          "https://www.theverge.com/rss/index.xml"],
-  ["TechCrunch",         P("https://techcrunch.com/feed/")],
-  ["Wired",              P("https://www.wired.com/feed/rss")],
-  ["Ars Technica",       P("https://feeds.arstechnica.com/arstechnica/index")],
-  ["Hacker News",        P("https://hnrss.org/frontpage")],
-  ["Engadget",           P("https://www.engadget.com/rss.xml")],
-  // Internationellt – via proxy
-  ["BBC News",           P("https://feeds.bbci.co.uk/news/rss.xml")],
-  ["Al Jazeera",         P("https://www.aljazeera.com/xml/rss/all.xml")],
+  ["TechCrunch",         "https://techcrunch.com/feed/"],
+  ["Wired",              "https://www.wired.com/feed/rss"],
+  ["Ars Technica",       "https://feeds.arstechnica.com/arstechnica/index"],
+  ["Hacker News",        "https://hnrss.org/frontpage"],
+  ["Engadget",           "https://www.engadget.com/rss.xml"],
+  // Internationellt
+  ["BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"],
+  ["Al Jazeera",         "https://www.aljazeera.com/xml/rss/all.xml"],
   ["Reddit World News",  "https://www.reddit.com/r/worldnews/.rss"],
   // Tech & AI – Reddit
   ["Reddit Technology",  "https://www.reddit.com/r/technology/.rss"],
-  // Tech & AI – Reddit
   ["Reddit AI",          "https://www.reddit.com/r/artificial/.rss"],
   ["Reddit Singularity", "https://www.reddit.com/r/singularity/.rss"],
   ["Reddit OpenAI",      "https://www.reddit.com/r/OpenAI/.rss"],
@@ -39,8 +37,6 @@ const FEEDS = [
   ["Reddit Philosophy",  "https://www.reddit.com/r/philosophy/.rss"],
   ["Reddit ChangeMyView","https://www.reddit.com/r/changemyview/.rss"],
   ["Reddit WorldPolitics","https://www.reddit.com/r/worldpolitics/.rss"],
-  // Internationella nyheter
-  ["Reddit World News",  "https://www.reddit.com/r/worldnews/.rss"],
   // Ekonomi – Reddit
   ["Reddit Finance",     "https://www.reddit.com/r/finance/.rss"],
   ["Reddit Stocks",      "https://www.reddit.com/r/stocks/.rss"],
@@ -58,16 +54,13 @@ const FEEDS = [
   ["Reddit TV",          "https://www.reddit.com/r/television/.rss"],
   // Medicin & forskning
   ["Reddit Science",     "https://www.reddit.com/r/science/.rss"],
-  // AI-forskning & populärvetenskap – via proxy
-  ["Google Research",    P("https://research.google/blog/rss/")],
-  ["TED Talks",          P("https://www.ted.com/talks/rss")],
+  // AI-forskning & populärvetenskap
+  ["Google Research",    "https://research.google/blog/rss/"],
+  ["TED Talks",          "https://www.ted.com/talks/rss"],
 ];
-
-const ATOM = "http://www.w3.org/2005/Atom";
 
 async function countItems(text) {
   try {
-    // Enkel räkning av <item> eller <entry> utan full XML-parse
     const items = (text.match(/<item[\s>]/g) || []).length;
     const entries = (text.match(/<entry[\s>]/g) || []).length;
     return Math.max(items, entries);
