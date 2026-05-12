@@ -141,6 +141,14 @@ function TalkingFace({ amplitude, speaking }) {
   amplitudeRef.current = amp;
   const blinkState = useBlinkState(amplitudeRef);
 
+  // Preload blink images so they're in cache before the first blink fires (~4–7s from mount)
+  useEffect(() => {
+    [`/avatarer/podd/${slug}-blink-half.png`, `/avatarer/podd/${slug}-blink-closed.png`].forEach(src => {
+      const img = new window.Image();
+      img.src = src;
+    });
+  }, [slug]);
+
   const srcs = [`${base}.png`, `${base}-small.png`, `${base}-medium.png`, `${base}-large.png`];
   const imgStyle = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 8%" };
   return (
