@@ -935,11 +935,7 @@ def hamta_reddit_kommentarer(post_url: str, max_kommentarer: int = 5) -> str:
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från RSS-flöden."""
     feeds = [
-        # Svenska nyheter
-        ("SVT Nyheter",        "https://www.svt.se/nyheter/rss.xml"),
-        ("Aftonbladet",        "https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/"),
-        ("Dagens Arena",       "https://www.dagensarena.se/feed/"),
-        # Svenska ämnen – Reddit
+        # Svenska nyheter – via Reddit (direkta feeds blockeras från GitHub Actions IPs)
         ("Reddit Sverige",     "https://www.reddit.com/r/sweden/.rss"),
         ("Reddit Ekonomi",     "https://www.reddit.com/r/Economics/.rss"),
         ("Reddit Klimat",      "https://www.reddit.com/r/environment/.rss"),
@@ -947,13 +943,8 @@ def hamta_nyheter() -> list:
         ("Reddit EU",          "https://www.reddit.com/r/europeanunion/.rss"),
         ("Reddit Sjukvård",    "https://www.reddit.com/r/medicine/.rss"),
         ("Reddit Bostäder",    "https://www.reddit.com/r/urbanplanning/.rss"),
-        # Tech – direkta feeds
+        # Tech – The Verge fungerar, övriga blockeras
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
-        ("TechCrunch",         "https://techcrunch.com/feed/"),
-        ("Wired",              "https://www.wired.com/feed/rss"),
-        ("Ars Technica",       "https://feeds.arstechnica.com/arstechnica/index"),
-        ("Hacker News",        "https://hnrss.org/frontpage"),
-        ("Engadget",           "https://www.engadget.com/rss.xml"),
         # Tech & AI – Reddit
         ("Reddit AI",          "https://www.reddit.com/r/artificial/.rss"),
         ("Reddit Singularity", "https://www.reddit.com/r/singularity/.rss"),
