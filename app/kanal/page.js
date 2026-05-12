@@ -121,63 +121,48 @@ function TalkingFace({ amplitude, speaking }) {
   const base = `/avatarer/podd/${slug}`;
   const amp = speaking ? amplitude : 0;
 
-  // Höga trösklar → munnen är mest i small/closed, sällan medium, nästan aldrig large
-  let rawState = 0;
-  if (amp > 0.82) rawState = 3;
-  else if (amp > 0.52) rawState = 2;
-  else if (amp > 0.18) rawState = 1;
+  // Höga trösklar → munnen är mest i neutral/small, sällan medium, nästan aldrig large
+  let rawMouth = 0;
+  if (amp > 0.82) rawMouth = 3;
+  else if (amp > 0.52) rawMouth = 2;
+  else if (amp > 0.18) rawMouth = 1;
 
   const stateRef = useRef(0);
   const stateTimeRef = useRef(0);
   const now = Date.now();
-  if (rawState !== stateRef.current && now - stateTimeRef.current >= MIN_STATE_HOLD) {
-    stateRef.current = rawState;
+  if (rawMouth !== stateRef.current && now - stateTimeRef.current >= MIN_STATE_HOLD) {
+    stateRef.current = rawMouth;
     stateTimeRef.current = now;
   }
-  const state = speaking ? stateRef.current : 0;
+  const mouthState = speaking ? stateRef.current : 0; // 0–3
 
   // Blink — amplitudeRef håller senaste värdet utan stale closure
   const amplitudeRef = useRef(amp);
   amplitudeRef.current = amp;
-  const blinkState = useBlinkState(amplitudeRef);
+  const blinkState = useBlinkState(amplitudeRef); // "open" | "half" | "closed"
 
-  // Preload blink images so they're in cache before the first blink fires (~4–7s from mount)
-  useEffect(() => {
-    [`/avatarer/podd/${slug}-blink-half.png`, `/avatarer/podd/${slug}-blink-closed.png`].forEach(src => {
-      const img = new window.Image();
-      img.src = src;
-    });
-  }, [slug]);
+  // 12 förkomponerade bilder: 4 munlägen × 3 ögonlägen
+  const MOUTH_SUFFIX = ["", "-small", "-medium", "-large"];
+  const allStates = [];
+  for (let m = 0; m < 4; m++) {
+    for (const eyes of ["open", "half", "closed"]) {
+      const src = eyes === "open"
+        ? `${base}${MOUTH_SUFFIX[m]}.png`
+        : `${base}-m${m}-${eyes}.png`;
+      allStates.push({ m, eyes, src });
+    }
+  }
 
-  const srcs = [`${base}.png`, `${base}-small.png`, `${base}-medium.png`, `${base}-large.png`];
   const imgStyle = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 8%" };
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      {/* Lager 1: statisk bas — fullt ansikte, rör sig aldrig */}
-      <img src={`/avatarer/${slug}.png`} alt="" style={imgStyle} onError={e => { e.target.style.display = "none"; }} />
-
-      {/* Lager 2: munrörelse — gradient-mask visar bara nedre ~56% */}
-      {srcs.map((src, i) => (
+      {allStates.map(({ m, eyes, src }) => (
         <img key={src} src={src} alt="" style={{
           ...imgStyle,
-          opacity: i === state ? 1 : 0,
-          transition: "opacity 200ms ease-in-out",
-          WebkitMaskImage: "linear-gradient(to bottom, transparent 44%, black 54%)",
-          maskImage: "linear-gradient(to bottom, transparent 44%, black 54%)",
+          opacity: m === mouthState && eyes === blinkState ? 1 : 0,
+          transition: "opacity 80ms ease-in-out",
         }} onError={e => { e.target.style.display = "none"; }} />
       ))}
-
-      {/* Lager 3: blink — full-face state swap, gradient-mask visar bara övre ~40% (ögonregionen) */}
-      <img
-        src={`/avatarer/podd/${slug}-blink-half.png`} alt=""
-        style={{ ...imgStyle, opacity: blinkState === "half" ? 1 : 0, transition: "opacity 80ms ease-in-out", WebkitMaskImage: "linear-gradient(to bottom, black 28%, transparent 50%)", maskImage: "linear-gradient(to bottom, black 28%, transparent 50%)" }}
-        onError={e => { e.target.style.display = "none"; }}
-      />
-      <img
-        src={`/avatarer/podd/${slug}-blink-closed.png`} alt=""
-        style={{ ...imgStyle, opacity: blinkState === "closed" ? 1 : 0, transition: "opacity 60ms ease-in", WebkitMaskImage: "linear-gradient(to bottom, black 28%, transparent 50%)", maskImage: "linear-gradient(to bottom, black 28%, transparent 50%)" }}
-        onError={e => { e.target.style.display = "none"; }}
-      />
     </div>
   );
 }
