@@ -75,6 +75,12 @@ SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 # YouTube-kanaler (gratis RSS + transkript via youtube-transcript-api)
 YOUTUBE_KANALER = [
+    # Svenska nyheter
+    ("SVT",                 "UCG-Et3jfinzlQql4uEYjAVw"),
+    ("TV4 Nyheterna",       "UCvKaCKM0F5NE8K88bKcyklQ"),
+    ("Expressen",           "UCfCk_ylzLy6nz2NpW25DY5w"),
+    ("Aftonbladet",         "UC7peaobE6LOBLbVp2mr3JEw"),
+    ("Riksdagen",           "UCmyMhyy_FHtwui-3dsu-K8g"),
     # AI / Tech
     ("OpenAI",              "UCXZCJLdBC09xxGZ6gcdrc6A"),
     ("Anthropic",           "UCrDwWp7EBBv4NwvScIpBDOA"),
