@@ -475,6 +475,9 @@ function BacktestTab() {
 function FeedsTab() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [proxyResults, setProxyResults] = useState(null);
+  const [proxyLoading, setProxyLoading] = useState(false);
+  const [expanded, setExpanded] = useState({});
 
   async function testa() {
     setLoading(true);
@@ -486,12 +489,25 @@ function FeedsTab() {
     setLoading(false);
   }
 
+  async function testaProxy() {
+    setProxyLoading(true);
+    setProxyResults(null);
+    try {
+      const res = await fetch("/api/admin/test-proxy");
+      setProxyResults(await res.json());
+    } catch { setProxyResults([]); }
+    setProxyLoading(false);
+  }
+
   const ok = results?.filter(r => r.ok).length ?? 0;
   const fel = results?.filter(r => !r.ok).length ?? 0;
+  const pOk = proxyResults?.filter(r => r.ok).length ?? 0;
+  const pFel = proxyResults?.filter(r => !r.ok).length ?? 0;
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "24px" }}>
+      {/* Direkttest (admin-panels normala test) */}
+      <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px" }}>
         <button onClick={testa} disabled={loading} style={{
           padding: "10px 20px", background: C.surface, border: `1px solid ${C.border}`,
           color: C.accent, fontFamily: "Georgia, serif", fontSize: "13px",
@@ -511,7 +527,7 @@ function FeedsTab() {
       {loading && <p style={{ color: C.textMuted, fontSize: "13px", fontFamily: "monospace" }}>Testar {35} feeds från Vercels servrar…</p>}
 
       {results && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginBottom: "32px" }}>
           {results.map(r => (
             <div key={r.url} style={{
               display: "flex", alignItems: "center", gap: "12px",
@@ -519,9 +535,7 @@ function FeedsTab() {
               border: `1px solid ${r.ok ? "#4ade8022" : "#f8717122"}`,
               borderRadius: "4px", fontSize: "13px", fontFamily: "monospace",
             }}>
-              <span style={{ color: r.ok ? C.green : C.red, minWidth: "28px" }}>
-                {r.ok ? "✓" : "✗"}
-              </span>
+              <span style={{ color: r.ok ? C.green : C.red, minWidth: "28px" }}>{r.ok ? "✓" : "✗"}</span>
               <span style={{ color: C.text, minWidth: "180px" }}>{r.namn}</span>
               <span style={{ color: r.ok ? C.green : C.red, minWidth: "80px", fontSize: "11px" }}>
                 {r.ok ? `${r.antal} artiklar` : `HTTP ${r.status || r.error}`}
@@ -531,6 +545,67 @@ function FeedsTab() {
           ))}
         </div>
       )}
+
+      {/* Proxy-diagnostik — visar exakt vad agent.py ser */}
+      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "24px" }}>
+        <p style={{ fontSize: "12px", color: C.textMuted, marginBottom: "12px", fontFamily: "monospace" }}>
+          Proxy-diagnostik: anropar /api/rss-proxy exakt som agent.py gör. Avslöjar om proxyn returnerar HTML/fel istället för RSS.
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px" }}>
+          <button onClick={testaProxy} disabled={proxyLoading} style={{
+            padding: "10px 20px", background: C.surface, border: `1px solid ${C.border}`,
+            color: "#a78bfa", fontFamily: "Georgia, serif", fontSize: "13px",
+            borderRadius: "4px", cursor: proxyLoading ? "wait" : "pointer",
+          }}>
+            {proxyLoading ? "Testar proxy…" : "Testa via proxy (som agent.py)"}
+          </button>
+          {proxyResults && (
+            <span style={{ fontSize: "13px", fontFamily: "monospace" }}>
+              <span style={{ color: C.green }}>{pOk} OK</span>
+              {" · "}
+              <span style={{ color: C.red }}>{pFel} FEL</span>
+            </span>
+          )}
+        </div>
+
+        {proxyLoading && <p style={{ color: C.textMuted, fontSize: "13px", fontFamily: "monospace" }}>Testar via proxy…</p>}
+
+        {proxyResults && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            {proxyResults.map((r, i) => (
+              <div key={r.url} style={{ border: `1px solid ${r.ok ? "#4ade8022" : "#f8717122"}`, borderRadius: "4px", overflow: "hidden" }}>
+                <div
+                  onClick={() => setExpanded(e => ({ ...e, [i]: !e[i] }))}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "12px",
+                    padding: "8px 12px", background: C.surface,
+                    fontSize: "13px", fontFamily: "monospace", cursor: "pointer",
+                  }}
+                >
+                  <span style={{ color: r.ok ? C.green : C.red, minWidth: "28px" }}>{r.ok ? "✓" : "✗"}</span>
+                  <span style={{ color: C.text, minWidth: "160px" }}>{r.namn}</span>
+                  <span style={{ color: r.ok ? C.green : C.red, minWidth: "90px", fontSize: "11px" }}>
+                    {r.ok ? `${r.antal} items` : r.error ? r.error : `HTTP ${r.status}`}
+                  </span>
+                  <span style={{ color: C.textMuted, fontSize: "10px", minWidth: "80px" }}>
+                    proxy:{r.proxiedStatus} · {r.ms}ms
+                  </span>
+                  <span style={{ color: C.textMuted, fontSize: "10px", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {r.contentType}
+                  </span>
+                  <span style={{ color: C.textMuted, fontSize: "10px" }}>{expanded[i] ? "▲" : "▼"}</span>
+                </div>
+                {expanded[i] && (
+                  <div style={{ padding: "8px 12px", background: "#0a0a0a", fontSize: "11px", fontFamily: "monospace", color: "#888", wordBreak: "break-all" }}>
+                    <div style={{ color: "#666", marginBottom: "4px" }}>Snippet (400 tecken):</div>
+                    <div style={{ color: r.antal > 0 ? "#4ade80" : "#f87171" }}>{r.snippet || "(tom)"}</div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
