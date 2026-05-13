@@ -153,7 +153,7 @@ function TalkingFace({ amplitude, speaking }) {
     }
   }
 
-  const imgStyle = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "fill" };
+  const imgStyle = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 18%" };
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       {allStates.map(({ m, eyes, src }) => (
@@ -170,7 +170,7 @@ function TalkingFace({ amplitude, speaking }) {
 function AnchorPanel({ speaking, amplitude }) {
   const glow = speaking ? 18 + amplitude * 40 : 0;
   return (
-    <div style={{ position: "relative", width: "100%", paddingTop: "100%", background: "#000", borderRadius: "4px", overflow: "hidden" }}>
+    <div style={{ position: "relative", width: "100%", paddingTop: "75%", background: "#000", borderRadius: "4px", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0 }}>
         <TalkingFace amplitude={amplitude} speaking={speaking} />
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "48px 20px 18px", background: "linear-gradient(transparent, rgba(0,0,0,0.9))" }}>
