@@ -41,7 +41,7 @@ export async function GET(request) {
       status: res.status,
       headers: {
         "Content-Type": res.headers.get("content-type") || "application/xml; charset=utf-8",
-        "Cache-Control": "s-maxage=600, stale-while-revalidate=120",
+        "Cache-Control": "no-store",
         "X-Proxied-From": host,
         "X-Proxied-Status": String(res.status),
       },
