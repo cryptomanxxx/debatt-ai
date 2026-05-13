@@ -8,6 +8,7 @@ const TILLÅTNA_DOMÄNER = [
   "ted.com", "research.google",
   "theverge.com",
   "reddit.com", "old.reddit.com",
+  "youtube.com",
 ];
 
 export async function GET(request) {
