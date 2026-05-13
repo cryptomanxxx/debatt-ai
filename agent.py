@@ -866,10 +866,10 @@ def hamta_youtube_nyheter() -> list:
 
     for kanal_namn, kanal_id in YOUTUBE_KANALER:
         try:
-            rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={kanal_id}"
-            res = httpx.get(rss_url, timeout=10, follow_redirects=True,
-                            headers={"User-Agent": "Mozilla/5.0 (compatible; RSS-reader/2.0)"})
-            if not res.ok:
+            rss_url = _p(f"https://www.youtube.com/feeds/videos.xml?channel_id={kanal_id}")
+            res = httpx.get(rss_url, timeout=15, follow_redirects=True,
+                            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"})
+            if res.status_code != 200:
                 rss_blockad += 1
                 continue
             rss_ok += 1
