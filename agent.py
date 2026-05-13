@@ -959,66 +959,65 @@ def _p(url: str) -> str:
 
 def hamta_nyheter() -> list:
     """Hämta aktuella nyhetsrubriker från RSS-flöden."""
+    # Reddit RSS-feeds går via proxy (GitHub Actions IPs blockeras av Reddit).
+    # Övriga feeds hämtas direkt — eller via proxy om de kräver det.
+    # Proxy har no-store cache för att undvika att Vercel CDN cachar felaktiga svar.
     feeds = [
-        # Svenska nyheter – via proxy (direkta feeds blockeras från GitHub Actions IPs)
+        # Svenska nyheter
         ("SVT Nyheter",        _p("https://www.svt.se/nyheter/rss.xml")),
         ("Aftonbladet",        _p("https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/")),
         ("Dagens Arena",       _p("https://www.dagensarena.se/feed/")),
-        # Svenska ämnen – Reddit
-        ("Reddit Sverige",     "https://www.reddit.com/r/sweden/.rss"),
-        ("Reddit Ekonomi",     "https://www.reddit.com/r/Economics/.rss"),
-        ("Reddit Klimat",      "https://www.reddit.com/r/environment/.rss"),
-        ("Reddit Samhälle",    "https://www.reddit.com/r/europe/.rss"),
-        ("Reddit EU",          "https://www.reddit.com/r/europeanunion/.rss"),
-        ("Reddit Sjukvård",    "https://www.reddit.com/r/medicine/.rss"),
-        ("Reddit Bostäder",    "https://www.reddit.com/r/urbanplanning/.rss"),
-        # Tech – direkta feeds via proxy
+        # Svenska ämnen – Reddit (via proxy, Atom-format)
+        ("Reddit Sverige",     _p("https://www.reddit.com/r/sweden/.rss")),
+        ("Reddit Ekonomi",     _p("https://www.reddit.com/r/Economics/.rss")),
+        ("Reddit Klimat",      _p("https://www.reddit.com/r/environment/.rss")),
+        ("Reddit Samhälle",    _p("https://www.reddit.com/r/europe/.rss")),
+        ("Reddit EU",          _p("https://www.reddit.com/r/europeanunion/.rss")),
+        ("Reddit Sjukvård",    _p("https://www.reddit.com/r/medicine/.rss")),
+        ("Reddit Bostäder",    _p("https://www.reddit.com/r/urbanplanning/.rss")),
+        # Tech
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
         ("TechCrunch",         _p("https://techcrunch.com/feed/")),
         ("Wired",              _p("https://www.wired.com/feed/rss")),
         ("Ars Technica",       _p("https://feeds.arstechnica.com/arstechnica/index")),
         ("Hacker News",        _p("https://hnrss.org/frontpage")),
         ("Engadget",           _p("https://www.engadget.com/rss.xml")),
-        # Internationella nyheter – via proxy
+        # Internationella nyheter
         ("BBC News",           _p("https://feeds.bbci.co.uk/news/rss.xml")),
         ("Al Jazeera",         _p("https://www.aljazeera.com/xml/rss/all.xml")),
-        # Tech & AI – Reddit
-        ("Reddit AI",          "https://www.reddit.com/r/artificial/.rss"),
-        ("Reddit Singularity", "https://www.reddit.com/r/singularity/.rss"),
-        ("Reddit OpenAI",      "https://www.reddit.com/r/OpenAI/.rss"),
-        ("Reddit LocalLLM",    "https://www.reddit.com/r/LocalLLaMA/.rss"),
-        ("Reddit Futurology",  "https://www.reddit.com/r/Futurology/.rss"),
-        ("Reddit Technology",  "https://www.reddit.com/r/technology/.rss"),
-        ("Reddit ML",          "https://www.reddit.com/r/MachineLearning/.rss"),
-        # Politik & samhälle – Reddit
-        ("Reddit Geopolitics", "https://www.reddit.com/r/geopolitics/.rss"),
-        ("Reddit Philosophy",  "https://www.reddit.com/r/philosophy/.rss"),
-        ("Reddit ChangeMyView","https://www.reddit.com/r/changemyview/.rss"),
-        ("Reddit WorldPolitics","https://www.reddit.com/r/worldpolitics/.rss"),
-        # Internationella nyheter
-        ("BBC News",           "https://feeds.bbci.co.uk/news/rss.xml"),
-        ("Al Jazeera",         "https://www.aljazeera.com/xml/rss/all.xml"),
-        ("Reddit World News",  "https://www.reddit.com/r/worldnews/.rss"),
-        # Ekonomi – Reddit
-        ("Reddit Finance",     "https://www.reddit.com/r/finance/.rss"),
-        ("Reddit Stocks",      "https://www.reddit.com/r/stocks/.rss"),
-        # Energi & klimat – Reddit
-        ("Reddit Energy",      "https://www.reddit.com/r/energy/.rss"),
-        ("Reddit Renewable",   "https://www.reddit.com/r/RenewableEnergy/.rss"),
-        ("Reddit Climate",     "https://www.reddit.com/r/climatechange/.rss"),
-        ("Reddit Nuclear",     "https://www.reddit.com/r/nuclear/.rss"),
-        # Kryptovalutor – Reddit
-        ("Reddit Crypto",      "https://www.reddit.com/r/CryptoCurrency/.rss"),
-        ("Reddit Bitcoin",     "https://www.reddit.com/r/Bitcoin/.rss"),
-        # Spel & underhållning – Reddit
-        ("Reddit Gaming",      "https://www.reddit.com/r/gaming/.rss"),
-        ("Reddit Games",       "https://www.reddit.com/r/Games/.rss"),
-        ("Reddit TV",          "https://www.reddit.com/r/television/.rss"),
+        # Tech & AI – Reddit (via proxy)
+        ("Reddit AI",          _p("https://www.reddit.com/r/artificial/.rss")),
+        ("Reddit Singularity", _p("https://www.reddit.com/r/singularity/.rss")),
+        ("Reddit OpenAI",      _p("https://www.reddit.com/r/OpenAI/.rss")),
+        ("Reddit LocalLLM",    _p("https://www.reddit.com/r/LocalLLaMA/.rss")),
+        ("Reddit Futurology",  _p("https://www.reddit.com/r/Futurology/.rss")),
+        ("Reddit Technology",  _p("https://www.reddit.com/r/technology/.rss")),
+        ("Reddit ML",          _p("https://www.reddit.com/r/MachineLearning/.rss")),
+        # Politik & samhälle – Reddit (via proxy)
+        ("Reddit Geopolitics", _p("https://www.reddit.com/r/geopolitics/.rss")),
+        ("Reddit Philosophy",  _p("https://www.reddit.com/r/philosophy/.rss")),
+        ("Reddit ChangeMyView",_p("https://www.reddit.com/r/changemyview/.rss")),
+        ("Reddit WorldPolitics",_p("https://www.reddit.com/r/worldpolitics/.rss")),
+        ("Reddit World News",  _p("https://www.reddit.com/r/worldnews/.rss")),
+        # Ekonomi – Reddit (via proxy)
+        ("Reddit Finance",     _p("https://www.reddit.com/r/finance/.rss")),
+        ("Reddit Stocks",      _p("https://www.reddit.com/r/stocks/.rss")),
+        # Energi & klimat – Reddit (via proxy)
+        ("Reddit Energy",      _p("https://www.reddit.com/r/energy/.rss")),
+        ("Reddit Renewable",   _p("https://www.reddit.com/r/RenewableEnergy/.rss")),
+        ("Reddit Climate",     _p("https://www.reddit.com/r/climatechange/.rss")),
+        ("Reddit Nuclear",     _p("https://www.reddit.com/r/nuclear/.rss")),
+        # Kryptovalutor – Reddit (via proxy)
+        ("Reddit Crypto",      _p("https://www.reddit.com/r/CryptoCurrency/.rss")),
+        ("Reddit Bitcoin",     _p("https://www.reddit.com/r/Bitcoin/.rss")),
+        # Spel & underhållning – Reddit (via proxy)
+        ("Reddit Gaming",      _p("https://www.reddit.com/r/gaming/.rss")),
+        ("Reddit Games",       _p("https://www.reddit.com/r/Games/.rss")),
+        ("Reddit TV",          _p("https://www.reddit.com/r/television/.rss")),
         # Medicin & forskning
-        ("Reddit Science",     "https://www.reddit.com/r/science/.rss"),
-        # AI-forskning
+        ("Reddit Science",     _p("https://www.reddit.com/r/science/.rss")),
+        # AI-forskning & populärvetenskap
         ("Google Research",    _p("https://research.google/blog/rss/")),
-        # Populärvetenskap & idéer
         ("TED Talks",          _p("https://www.ted.com/talks/rss")),
     ]
     nyheter = []
@@ -1027,100 +1026,71 @@ def hamta_nyheter() -> list:
     misslyckade = []
     for kalla, url in feeds:
         fore = len(nyheter)
-        is_reddit = "reddit.com/r/" in url
         try:
-            if is_reddit:
-                # Hämta JSON via Vercel-proxy (Reddit blockerar GitHub Actions IPs)
-                json_url = url.replace("/.rss", "/hot.json") + "?limit=15"
-                res = httpx.get(_p(json_url), timeout=15, follow_redirects=True,
-                                headers={"User-Agent": "Mozilla/5.0 (compatible; debatt-ai/1.0)"})
-                if res.status_code != 200:
-                    misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
-                    rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
+            res = httpx.get(url, timeout=15, follow_redirects=True,
+                            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"})
+            if res.status_code != 200:
+                misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
+                rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
+                continue
+            root = ET.fromstring(res.content)
+            ATOM = "http://www.w3.org/2005/Atom"
+            ns = {
+                "content": "http://purl.org/rss/1.0/modules/content/",
+                "atom":    ATOM,
+            }
+            items = (root.findall(".//item") or
+                     root.findall(f".//{{{ATOM}}}entry") or
+                     root.findall(".//atom:entry", ns))
+            if not items:
+                snippet = res.text[:200].strip().replace("\n", " ")
+                print(f"  ⚠ {kalla}: 0 items — HTTP {res.status_code}, content-type={res.headers.get('content-type','?')!r}, snippet={snippet!r}", file=sys.stderr)
+            for item in items[:10]:
+                title = (item.find("title") or
+                         item.find(f"{{{ATOM}}}title") or
+                         item.find("atom:title", ns))
+                rubrik = (title.text or "").strip() if title is not None else ""
+                if len(rubrik) <= 10:
                     continue
-                data = res.json()
-                posts = data.get("data", {}).get("children", [])
-                for post in posts:
-                    p = post.get("data", {})
-                    rubrik = (p.get("title") or "").strip()
-                    if len(rubrik) <= 10:
-                        continue
-                    score = p.get("score", 0)
-                    num_comments = p.get("num_comments", 0)
-                    selftext = (p.get("selftext") or "")[:400].strip()
-                    permalink = p.get("permalink", "")
-                    post_url = f"https://www.reddit.com{permalink}" if permalink else p.get("url", "")
-                    beskrivning = f"[{score} upvotes, {num_comments} kommentarer] {selftext}".strip()
-                    nyheter.append({
-                        "rubrik": rubrik,
-                        "beskrivning": beskrivning,
-                        "kalla": kalla,
-                        "url": post_url,
-                        "publicerad": "",
-                        "score": score,
-                    })
-            else:
-                res = httpx.get(url, timeout=10, follow_redirects=True,
-                                headers={"User-Agent": "Mozilla/5.0 (compatible; RSS-reader/2.0)"})
-                if res.status_code != 200:
-                    misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
-                    rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
-                    continue
-                root = ET.fromstring(res.content)  # bytes → ET hanterar encoding korrekt
-                ATOM = "http://www.w3.org/2005/Atom"
-                ns = {
-                    "content": "http://purl.org/rss/1.0/modules/content/",
-                    "atom":    ATOM,
-                }
-                items = (root.findall(".//item") or
-                         root.findall(f".//{{{ATOM}}}entry") or
-                         root.findall(".//atom:entry", ns))
-                for item in items[:10]:
-                    title = (item.find("title") or
-                             item.find(f"{{{ATOM}}}title") or
-                             item.find("atom:title", ns))
-                    rubrik = (title.text or "").strip() if title is not None else ""
-                    if len(rubrik) <= 10:
-                        continue
-                    fulltext = item.find("content:encoded", ns)
-                    desc = (item.find("description") or
-                            item.find(f"{{{ATOM}}}summary") or
-                            item.find("atom:summary", ns) or
-                            item.find(f"{{{ATOM}}}content") or
-                            item.find("atom:content", ns))
-                    text = ""
-                    if fulltext is not None and fulltext.text:
-                        import re
-                        text = re.sub(r"<[^>]+>", " ", fulltext.text).strip()
-                        text = re.sub(r"\s+", " ", text)[:800]
-                    elif desc is not None and desc.text:
-                        import re
-                        text = re.sub(r"<[^>]+>", " ", desc.text).strip()[:300]
-                    link_el = (item.find("link") or
-                               item.find("atom:link", ns) or
-                               item.find(f"{{{ATOM}}}link"))
-                    item_url = ""
-                    if link_el is not None:
-                        if link_el.text and link_el.text.strip():
-                            item_url = link_el.text.strip()
-                        elif link_el.get("href"):
-                            item_url = link_el.get("href", "")
-                    pub_el = (item.find("pubDate") or
-                              item.find("published") or
-                              item.find(f"{{{ATOM}}}published") or
-                              item.find("atom:published", ns) or
-                              item.find(f"{{{ATOM}}}updated") or
-                              item.find("atom:updated", ns))
-                    publicerad = ""
-                    if pub_el is not None and pub_el.text:
-                        publicerad = pub_el.text.strip()
-                    nyheter.append({
-                        "rubrik": rubrik,
-                        "beskrivning": text,
-                        "kalla": kalla,
-                        "url": item_url,
-                        "publicerad": publicerad,
-                    })
+                fulltext = item.find("content:encoded", ns)
+                desc = (item.find("description") or
+                        item.find(f"{{{ATOM}}}summary") or
+                        item.find("atom:summary", ns) or
+                        item.find(f"{{{ATOM}}}content") or
+                        item.find("atom:content", ns))
+                text = ""
+                if fulltext is not None and fulltext.text:
+                    import re
+                    text = re.sub(r"<[^>]+>", " ", fulltext.text).strip()
+                    text = re.sub(r"\s+", " ", text)[:800]
+                elif desc is not None and desc.text:
+                    import re
+                    text = re.sub(r"<[^>]+>", " ", desc.text).strip()[:300]
+                link_el = (item.find("link") or
+                           item.find("atom:link", ns) or
+                           item.find(f"{{{ATOM}}}link"))
+                item_url = ""
+                if link_el is not None:
+                    if link_el.text and link_el.text.strip():
+                        item_url = link_el.text.strip()
+                    elif link_el.get("href"):
+                        item_url = link_el.get("href", "")
+                pub_el = (item.find("pubDate") or
+                          item.find("published") or
+                          item.find(f"{{{ATOM}}}published") or
+                          item.find("atom:published", ns) or
+                          item.find(f"{{{ATOM}}}updated") or
+                          item.find("atom:updated", ns))
+                publicerad = ""
+                if pub_el is not None and pub_el.text:
+                    publicerad = pub_el.text.strip()
+                nyheter.append({
+                    "rubrik": rubrik,
+                    "beskrivning": text,
+                    "kalla": kalla,
+                    "url": item_url,
+                    "publicerad": publicerad,
+                })
             antal = len(nyheter) - fore
             lyckade.append(f"  ✓ {kalla} ({antal} artiklar)")
             rss_stats.append({"kalla": kalla, "ok": True, "antal": antal, "fel": ""})
