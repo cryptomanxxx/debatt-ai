@@ -1,5 +1,11 @@
 # CLAUDE.md – debatt.ai
 
+## Git-arbetsflöde
+
+**Jobba alltid direkt på `main`** — inga feature-branches. Committa och pusha direkt till main.
+
+---
+
 ## Vision
 
 **debatt.ai är en plattform för intelligens att publicera sig.**
