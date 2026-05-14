@@ -183,7 +183,7 @@ function AnchorPanel({ speaking, amplitude }) {
                 </div>
               )}
               <p style={{ fontSize: "20px", fontWeight: 700, color: C.text, margin: 0, fontFamily: "Times New Roman, serif", textShadow: "0 2px 8px #000" }}>{ANCHOR}</p>
-              <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>Nyhetsankare</p>
+              <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>{lang === "en" ? "News Anchor" : "Nyhetsankare"}</p>
             </div>
             {speaking && <Waveform amplitude={amplitude} />}
           </div>
@@ -241,28 +241,60 @@ export default function KanalPage() {
   const [running, setRunning]           = useState(false);
   const [laddar, setLaddar]             = useState(true);
 
-  const runningRef = useRef(false);
-  const ampTimer   = useRef(null);
-  const nyheterRef = useRef([]);
-  const debattRef  = useRef(null);
+  const runningRef      = useRef(false);
+  const ampTimer        = useRef(null);
+  const nyheterRef      = useRef([]);
+  const debattRef       = useRef(null);
+  const langRef         = useRef("sv");
+  const translateCache  = useRef({});
+  const [lang, setLang] = useState("sv");
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/kanal/nyheter").then(r => r.json()).catch(() => []),
+  async function hamtaData(l = "sv") {
+    setLaddar(true);
+    const [nyheterData, debattData] = await Promise.all([
+      fetch(`/api/kanal/nyheter?lang=${l}`).then(r => r.json()).catch(() => []),
       fetch(`${SB_URL}/rest/v1/chatt_debatter?kalla=eq.kanal&order=skapad.desc&limit=1`, {
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
       }).then(r => r.json()).catch(() => []),
-    ]).then(([nyheterData, debattData]) => {
-      if (Array.isArray(nyheterData) && nyheterData.length) {
-        setNyheter(nyheterData);
-        nyheterRef.current = nyheterData;
-      }
-      if (Array.isArray(debattData) && debattData.length) {
-        setDebatt(debattData[0]);
-        debattRef.current = debattData[0];
-      }
-      setLaddar(false);
-    });
+    ]);
+    if (Array.isArray(nyheterData) && nyheterData.length) {
+      setNyheter(nyheterData);
+      nyheterRef.current = nyheterData;
+    }
+    if (Array.isArray(debattData) && debattData.length) {
+      setDebatt(debattData[0]);
+      debattRef.current = debattData[0];
+    }
+    setLaddar(false);
+  }
+
+  async function translateText(text) {
+    if (!text) return text;
+    if (translateCache.current[text]) return translateCache.current[text];
+    try {
+      const res = await fetch("/api/kanal/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const { translated } = await res.json();
+      translateCache.current[text] = translated;
+      return translated;
+    } catch {
+      return text;
+    }
+  }
+
+  async function handleLangChange(l) {
+    if (running) return;
+    setLang(l);
+    langRef.current = l;
+    translateCache.current = {};
+    await hamtaData(l);
+  }
+
+  useEffect(() => {
+    hamtaData("sv");
     return () => {
       runningRef.current = false;
       if (ampTimer.current) clearInterval(ampTimer.current);
@@ -270,7 +302,10 @@ export default function KanalPage() {
   }, []);
 
   async function spelaUppText(text, agent) {
-    const rost = AGENT_ROST[agent ?? ANCHOR] ?? { voice: "Swedish Female", rate: 0.90, pitch: 1.02 };
+    const svRost = AGENT_ROST[agent ?? ANCHOR] ?? { voice: "Swedish Female", rate: 0.90, pitch: 1.02 };
+    const rost = langRef.current === "en"
+      ? { ...svRost, voice: svRost.voice.includes("Female") ? "UK English Female" : "UK English Male" }
+      : svRost;
     setCurrentAgent(agent);
     setSpeaking(true);
     await new Promise(resolve => {
@@ -323,14 +358,20 @@ export default function KanalPage() {
   async function spelaUppDebatt() {
     const d = debattRef.current;
     if (!d) return;
+    const isEn = langRef.current === "en";
     setMode("debatt");
-    await spelaUppText(`Nu övergår vi till kvällens debatt: ${d.amne}`, null);
+    const amne = isEn ? await translateText(d.amne) : d.amne;
+    const intro = isEn
+      ? `Now moving to tonight's debate: ${amne}`
+      : `Nu övergår vi till kvällens debatt: ${amne}`;
+    await spelaUppText(intro, null);
     if (!runningRef.current) return;
     await sleep(800);
     for (let i = 0; i < d.inlagg.length; i++) {
       if (!runningRef.current) return;
       setDebattIdx(i);
-      await spelaUppText(d.inlagg[i].text, d.inlagg[i].agent);
+      const text = isEn ? await translateText(d.inlagg[i].text) : d.inlagg[i].text;
+      await spelaUppText(text, d.inlagg[i].agent);
       if (!runningRef.current) return;
       await sleep(700);
     }
@@ -412,6 +453,16 @@ export default function KanalPage() {
             }
 
             <div style={{ marginTop: "20px" }}>
+              {/* Språkväljare */}
+              <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                {[["sv", "🇸🇪 Svenska"], ["en", "🇬🇧 English"]].map(([l, label]) => (
+                  <button key={l} onClick={() => handleLangChange(l)} disabled={running}
+                    style={{ flex: 1, padding: "8px", background: lang === l ? ANCHOR_FARG : "transparent", color: lang === l ? "#000" : C.textMuted, border: `1px solid ${lang === l ? ANCHOR_FARG : C.border}`, borderRadius: "4px", fontSize: "12px", fontWeight: lang === l ? 700 : 400, cursor: running ? "default" : "pointer", fontFamily: "monospace", letterSpacing: "0.04em", transition: "all 0.15s" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
               {!running ? (
                 <button
                   onClick={startaKanal}

@@ -36,12 +36,15 @@ function extractTitles(xml, kalla) {
   return items;
 }
 
-async function expanderaMedGroq(nyheter) {
+async function expanderaMedGroq(nyheter, lang = "sv") {
   const groqKey = process.env.GROQ_API_KEY;
   if (!groqKey) return nyheter.map(n => ({ ...n, text: n.rubrik }));
 
   const lista = nyheter.map((n, i) => `${i + 1}. [${n.kalla}] ${n.rubrik}`).join("\n");
-  // max_tokens anpassat för 10 nyheter à ~180 tokens
+
+  const systemPrompt = lang === "en"
+    ? `You are a professional TV news anchor. Expand each news headline into a 3–4 sentence news segment with context and background. Always in fluent, natural English regardless of the headline's original language. No greetings. Reply ONLY with JSON: {"nyheter": [{"text": "..."}]}`
+    : `Du är en professionell TV-nyhetsuppläsare på svenska rikstäckande TV. Expandera varje nyhetsrubrik till en nyhetssnutt på 3-4 meningar med kontext och bakgrund. Alltid på flytande svenska oavsett källspråk. Inga häsningsfraser. Svara ENDAST med JSON: {"nyheter": [{"text": "..."}]}`;
 
   try {
     const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -50,10 +53,7 @@ async function expanderaMedGroq(nyheter) {
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          {
-            role: "system",
-            content: "Du är en professionell TV-nyhetsuppläsare på svenska rikstäckande TV. Expandera varje nyhetsrubrik till en nyhetssnutt på 3-4 meningar med kontext och bakgrund. Alltid på flytande svenska oavsett källspråk. Inga häsningsfraser. Svara ENDAST med JSON: {\"nyheter\": [{\"text\": \"...\"}]}",
-          },
+          { role: "system", content: systemPrompt },
           { role: "user", content: lista },
         ],
         max_tokens: 2500,
@@ -73,7 +73,9 @@ async function expanderaMedGroq(nyheter) {
   }
 }
 
-export async function GET() {
+export async function GET(req) {
+  const lang = new URL(req.url).searchParams.get("lang") === "en" ? "en" : "sv";
+
   const results = await Promise.allSettled(
     FEEDS.map(async ([namn, url]) => {
       const res = await fetch(url, {
@@ -93,7 +95,7 @@ export async function GET() {
 
   if (!nyheter.length) return NextResponse.json([]);
 
-  const expanderade = await expanderaMedGroq(nyheter);
+  const expanderade = await expanderaMedGroq(nyheter, lang);
 
   return NextResponse.json(expanderade, {
     headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=3600" },
