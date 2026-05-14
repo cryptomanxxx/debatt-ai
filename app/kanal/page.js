@@ -243,6 +243,8 @@ export default function KanalPage() {
   const [lang, setLang]                     = useState("sv");
   const [translatedAmne, setTranslatedAmne] = useState(null);
   const [translatedInlagg, setTranslatedInlagg] = useState(null);
+  const [oversatter, setOversatter]         = useState(false);
+  const [oversattIdx, setOversattIdx]       = useState(0);
 
   const runningRef     = useRef(false);
   const ampTimer       = useRef(null);
@@ -394,24 +396,39 @@ export default function KanalPage() {
     const lista = nyheterRef.current;
     setMode("nyheter");
 
-    // Pre-fetch the first item's expansion before starting
-    const expandCache = {};
-    expandCache[0] = await expanderaItem(lista[0], 0);
+    if (langRef.current === "en") {
+      // Pre-expand ALL items with pacing before starting broadcast.
+      // Without this, failed expansions cause items to play in ~3s (just the short
+      // Swedish rubrik), which triggers the next expansion immediately — a cascade
+      // that rate-limits all providers within seconds.
+      setOversatter(true);
+      setOversattIdx(0);
+      for (let i = 0; i < lista.length; i++) {
+        if (!runningRef.current) { setOversatter(false); return; }
+        setOversattIdx(i + 1);
+        await expanderaItem(nyheterRef.current[i], i);
+        if (i < lista.length - 1) await sleep(1500);
+      }
+      setOversatter(false);
+    } else {
+      // Swedish: only pre-expand first item, rest are fetched during playback
+      await expanderaItem(lista[0], 0);
+    }
 
     for (let i = 0; i < lista.length; i++) {
       if (!runningRef.current) return;
       setCurrentIdx(i);
 
-      // Pre-fetch next item while this one plays (fire-and-forget into cache)
-      const nextPrefetch = i + 1 < lista.length
-        ? expanderaItem(lista[i + 1], i + 1).then(t => { expandCache[i + 1] = t; })
+      // Swedish mode: pre-fetch next item during current item's playback
+      const nextPrefetch = langRef.current !== "en" && i + 1 < lista.length
+        ? expanderaItem(nyheterRef.current[i + 1], i + 1)
         : Promise.resolve();
 
-      const text = expandCache[i] ?? lista[i].rubrik;
+      const item = nyheterRef.current[i];
+      const text = (item.text && item.text !== item.rubrik) ? item.text : item.rubrik;
       await spelaUppText(text, null);
 
-      // Wait for next prefetch before moving on (usually already done)
-      await nextPrefetch;
+      if (langRef.current !== "en") await nextPrefetch;
 
       if (!runningRef.current) return;
       await sleep(600);
@@ -474,6 +491,8 @@ export default function KanalPage() {
     setMode("nyheter");
     setTranslatedAmne(null);
     setTranslatedInlagg(null);
+    setOversatter(false);
+    setOversattIdx(0);
     if (ampTimer.current) clearInterval(ampTimer.current);
     if (window.responsiveVoice) window.responsiveVoice.cancel();
   }
@@ -573,8 +592,10 @@ export default function KanalPage() {
             {!isDebattMode && (
               <>
                 <div style={{ padding: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", minHeight: "200px" }}>
-                  <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "16px", fontFamily: "monospace" }}>
-                    {running && speaking ? L.lasNu : running ? L.nasta : L.senasteNyhet}
+                  <div style={{ fontSize: "10px", color: oversatter ? ANCHOR_FARG : C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "16px", fontFamily: "monospace" }}>
+                    {oversatter
+                      ? (lang === "en" ? `TRANSLATING ${oversattIdx}/${nyheter.length}…` : `ÖVERSÄTTER ${oversattIdx}/${nyheter.length}…`)
+                      : running && speaking ? L.lasNu : running ? L.nasta : L.senasteNyhet}
                   </div>
                   {currentNyhet ? (
                     <>
