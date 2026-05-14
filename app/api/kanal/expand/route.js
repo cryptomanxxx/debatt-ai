@@ -3,7 +3,6 @@ export const runtime = "edge";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OR_URL   = "https://openrouter.ai/api/v1/chat/completions";
 
-// OpenRouter routes server-side across these free models in a single API call
 const OR_MODELS = [
   "meta-llama/llama-3.3-70b-instruct:free",
   "google/gemini-2.0-flash-exp:free",
@@ -27,31 +26,10 @@ export async function POST(req) {
   const gemKey  = process.env.GEMINI_API_KEY;
   const orKey   = process.env.OPENROUTER_API_KEY;
 
-  // Sequential fallback — one provider per item keeps rate limits intact.
-  // Race approach fires all 3 simultaneously; even aborted losers have already
-  // sent the request, consuming a rate-limit token. Sequential means item N
-  // costs at most 1 token from one provider.
-  // OR → Groq → Gemini
-
-  if (orKey) {
-    try {
-      const r = await fetch(OR_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${orKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://www.debatt-ai.se",
-          "X-Title": "Debatt AI",
-        },
-        body: JSON.stringify({ models: OR_MODELS, messages: msgs, max_tokens: 350, temperature: 0.4 }),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (r.ok) {
-        const text = (await r.json()).choices[0].message.content.trim();
-        if (text && text !== rubrik) return Response.json({ text });
-      }
-    } catch {}
-  }
+  // Groq first — 30 req/min, fast (~1-2s), most reliable for this use case.
+  // Gemini second. OR last (free tier rate limits are strict per-model).
+  // Sequential: each item uses at most 1 provider token.
+  // X-Provider header helps diagnose which provider handled each item.
 
   if (groqKey) {
     try {
@@ -59,11 +37,11 @@ export async function POST(req) {
         method: "POST",
         headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 350, temperature: 0.4 }),
-        signal: AbortSignal.timeout(7000),
+        signal: AbortSignal.timeout(6000),
       });
       if (r.ok) {
         const text = (await r.json()).choices[0].message.content.trim();
-        if (text && text !== rubrik) return Response.json({ text });
+        if (text && text !== rubrik) return Response.json({ text }, { headers: { "X-Provider": "groq" } });
       }
     } catch {}
   }
@@ -85,10 +63,30 @@ export async function POST(req) {
       );
       if (r.ok) {
         const text = (await r.json())?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-        if (text && text !== rubrik) return Response.json({ text });
+        if (text && text !== rubrik) return Response.json({ text }, { headers: { "X-Provider": "gemini" } });
       }
     } catch {}
   }
 
-  return Response.json({ text: rubrik });
+  if (orKey) {
+    try {
+      const r = await fetch(OR_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${orKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://www.debatt-ai.se",
+          "X-Title": "Debatt AI",
+        },
+        body: JSON.stringify({ models: OR_MODELS, messages: msgs, max_tokens: 350, temperature: 0.4 }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (r.ok) {
+        const text = (await r.json()).choices[0].message.content.trim();
+        if (text && text !== rubrik) return Response.json({ text }, { headers: { "X-Provider": "openrouter" } });
+      }
+    } catch {}
+  }
+
+  return Response.json({ text: rubrik }, { headers: { "X-Provider": "none" } });
 }
