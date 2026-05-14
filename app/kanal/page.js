@@ -429,6 +429,9 @@ export default function KanalPage() {
       setOversatter(false);
     } else {
       await expanderaItem(lista[0], 0);
+      // Gemini allows 15 req/min (one per 4 s). Item 1's nextPrefetch fires at the
+      // start of the loop — give it breathing room so it doesn't get rate-limited.
+      await sleep(4500);
     }
 
     for (let i = 0; i < lista.length; i++) {
@@ -441,7 +444,7 @@ export default function KanalPage() {
         : Promise.resolve();
 
       const item = nyheterRef.current[i];
-      // In English mode fall back to English headline if body expansion hasn't landed yet
+      // Fall back to English headline (sv: rubrik) if body expansion hasn't landed yet
       const text = (item.text && item.text !== item.rubrik)
         ? item.text
         : (langRef.current === "en" && item.rubrikEn ? item.rubrikEn : item.rubrik);
@@ -450,12 +453,11 @@ export default function KanalPage() {
       await spelaUppText(text, null);
       await nextPrefetch;
 
-      // In English mode enforce a 5 s floor between items so consecutive Gemini
-      // calls stay under the 15 req/min limit and body expansions actually succeed.
-      if (langRef.current === "en") {
-        const elapsed = Date.now() - t0;
-        if (elapsed < 5000) await sleep(5000 - elapsed);
-      }
+      // 5 s floor per item (both sv and en): when a short rubrik plays instead of
+      // expanded body text, the next expansion fires too soon and cascades into
+      // Gemini rate-limit failures. The floor ensures ≥5.6 s between expansion calls.
+      const elapsed = Date.now() - t0;
+      if (elapsed < 5000) await sleep(5000 - elapsed);
 
       if (!runningRef.current) return;
       await sleep(600);
