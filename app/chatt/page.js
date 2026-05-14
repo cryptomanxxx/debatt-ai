@@ -247,7 +247,7 @@ async function fetchAiAmne(agenter) {
   } catch { return ""; }
 }
 
-async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider }) {
+async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider, kalla }) {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/chatt_debatter`, {
       method: "POST",
@@ -257,7 +257,7 @@ async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider 
         "Content-Type": "application/json",
         "Prefer": "return=representation",
       },
-      body: JSON.stringify({ amne, agenter, inlagg, summering, scores: scores ?? null, provider: provider ?? null }),
+      body: JSON.stringify({ amne, agenter, inlagg, summering, scores: scores ?? null, provider: provider ?? null, kalla: kalla ?? "inbyggt" }),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -317,6 +317,7 @@ function ThinkingBubble({ agent, isFirst }) {
 export default function ChattPage() {
   const [fas, setFas] = useState("start");
   const [amne, setAmne] = useState(() => slumpaAmne());
+  const [kallaAmne, setKallaAmne] = useState("inbyggt");
   const [valdPanel, setValdPanel] = useState(0);
   const [slumpAgenter, setSlumpAgenter] = useState(() => pickRandom(ALLA_AGENTER, 3));
   const [agenter, setAgenter] = useState([]);
@@ -357,7 +358,7 @@ export default function ChattPage() {
     const valdaAgenter = panel.agenter ?? slumpAgenter;
     setAiVäljer(true);
     const genererat = await fetchAiAmne(valdaAgenter);
-    if (genererat) setAmne(genererat);
+    if (genererat) { setAmne(genererat); setKallaAmne("ai"); }
     setAiVäljer(false);
   }
 
@@ -371,7 +372,7 @@ export default function ChattPage() {
       const ps = providersRef.current;
       const provider = ps.has("groq") && ps.has("gemini") ? "groq+gemini"
         : ps.has("gemini") ? "gemini" : "groq";
-      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider });
+      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider, kalla: kallaAmne });
       setDebattId(id);
       setFelmeddelande(""); // debate saved — clear any mid-stream error
     }
@@ -509,6 +510,7 @@ export default function ChattPage() {
     setSummering("");
     setDebattId(null);
     setAmne(slumpaAmne());
+    setKallaAmne("inbyggt");
     setFelmeddelande("");
     setFöreslagStatus(null);
     setRateLimitInfo(peekLocalRL());
@@ -573,7 +575,7 @@ export default function ChattPage() {
               {/* Kategori-chips */}
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
                 {KATEGORIER.map(k => (
-                  <button key={k.id} onClick={() => setAmne(slumpaAmne(k.id))}
+                  <button key={k.id} onClick={() => { setAmne(slumpaAmne(k.id)); setKallaAmne("inbyggt"); }}
                     style={{ padding: "8px 16px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: "14px", fontFamily: "Georgia, serif", cursor: "pointer", transition: "all 0.15s" }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = C.accentDim; e.currentTarget.style.color = C.accent; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textMuted; }}>
@@ -584,10 +586,10 @@ export default function ChattPage() {
 
               {/* Input + slumpa-knapp */}
               <div style={{ display: "flex", gap: "8px" }}>
-                <input value={amne} onChange={e => setAmne(e.target.value)} placeholder="Skriv ett ämne…"
+                <input value={amne} onChange={e => { setAmne(e.target.value); setKallaAmne("besökare"); }} placeholder="Skriv ett ämne…"
                   style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "10px 14px", color: C.text, fontSize: "15px", fontFamily: "Georgia, serif", outline: "none" }}
                   onKeyDown={e => e.key === "Enter" && starta()} />
-                <button onClick={() => setAmne(slumpaAmne())} title="Slumpa ämne"
+                <button onClick={() => { setAmne(slumpaAmne()); setKallaAmne("inbyggt"); }} title="Slumpa ämne"
                   style={{ padding: "10px 14px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", color: C.textMuted, fontSize: "16px", cursor: "pointer", flexShrink: 0 }}>
                   🎲
                 </button>
