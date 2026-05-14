@@ -167,7 +167,7 @@ function TalkingFace({ amplitude, speaking }) {
   );
 }
 
-function AnchorPanel({ speaking, amplitude }) {
+function AnchorPanel({ speaking, amplitude, anchorTitle = "Nyhetsankare" }) {
   const glow = speaking ? 18 + amplitude * 40 : 0;
   return (
     <div style={{ position: "relative", width: "100%", paddingTop: "80%", background: "#000", borderRadius: "4px", overflow: "hidden" }}>
@@ -183,7 +183,7 @@ function AnchorPanel({ speaking, amplitude }) {
                 </div>
               )}
               <p style={{ fontSize: "20px", fontWeight: 700, color: C.text, margin: 0, fontFamily: "Times New Roman, serif", textShadow: "0 2px 8px #000" }}>{ANCHOR}</p>
-              <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>Nyhetsankare</p>
+              <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>{anchorTitle}</p>
             </div>
             {speaking && <Waveform amplitude={amplitude} />}
           </div>
@@ -196,7 +196,7 @@ function AnchorPanel({ speaking, amplitude }) {
   );
 }
 
-function DebattAgentPanel({ agent, speaking, amplitude }) {
+function DebattAgentPanel({ agent, speaking, amplitude, debattor = "Debattör", talar = "TALAR" }) {
   const farg = AGENT_FARG[agent] || C.accent;
   const glow = speaking ? 18 + amplitude * 40 : 0;
   const slug = agentSlug(agent);
@@ -210,11 +210,11 @@ function DebattAgentPanel({ agent, speaking, amplitude }) {
               {speaking && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
                   <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
-                  <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>TALAR</span>
+                  <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>{talar}</span>
                 </div>
               )}
               <p style={{ fontSize: "20px", fontWeight: 700, color: C.text, margin: 0, fontFamily: "Times New Roman, serif", textShadow: "0 2px 8px #000" }}>{agent}</p>
-              <p style={{ fontSize: "11px", color: farg, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>Debattör</p>
+              <p style={{ fontSize: "11px", color: farg, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>{debattor}</p>
             </div>
             {speaking && <Waveform amplitude={amplitude} farg={farg} />}
           </div>
@@ -230,39 +230,91 @@ function DebattAgentPanel({ agent, speaking, amplitude }) {
 // ── Huvud ─────────────────────────────────────────────────────────────────────
 
 export default function KanalPage() {
-  const [nyheter, setNyheter]           = useState([]);
-  const [debatt, setDebatt]             = useState(null);
-  const [mode, setMode]                 = useState("nyheter");
-  const [currentIdx, setCurrentIdx]     = useState(0);
-  const [debattIdx, setDebattIdx]       = useState(0);
-  const [currentAgent, setCurrentAgent] = useState(null);
-  const [speaking, setSpeaking]         = useState(false);
-  const [amplitude, setAmplitude]       = useState(0);
-  const [running, setRunning]           = useState(false);
-  const [laddar, setLaddar]             = useState(true);
+  const [nyheter, setNyheter]               = useState([]);
+  const [debatt, setDebatt]                 = useState(null);
+  const [mode, setMode]                     = useState("nyheter");
+  const [currentIdx, setCurrentIdx]         = useState(0);
+  const [debattIdx, setDebattIdx]           = useState(0);
+  const [currentAgent, setCurrentAgent]     = useState(null);
+  const [speaking, setSpeaking]             = useState(false);
+  const [amplitude, setAmplitude]           = useState(0);
+  const [running, setRunning]               = useState(false);
+  const [laddar, setLaddar]                 = useState(true);
+  const [lang, setLang]                     = useState("sv");
+  const [translatedAmne, setTranslatedAmne] = useState(null);
+  const [translatedInlagg, setTranslatedInlagg] = useState(null);
 
-  const runningRef = useRef(false);
-  const ampTimer   = useRef(null);
-  const nyheterRef = useRef([]);
-  const debattRef  = useRef(null);
+  const runningRef     = useRef(false);
+  const ampTimer       = useRef(null);
+  const nyheterRef     = useRef([]);
+  const debattRef      = useRef(null);
+  const langRef        = useRef("sv");
+  const translateCache = useRef({});
 
-  useEffect(() => {
-    Promise.all([
-      fetch("/api/kanal/nyheter").then(r => r.json()).catch(() => []),
+  const L = lang === "en" ? {
+    debattemne: "DEBATE TOPIC", nastaUpp: "UP NEXT", inlagg: "POST",
+    debattor: "Debater", talar: "SPEAKING",
+    stoppaSandning: "■  STOP BROADCAST", startaSandning: "▶  START BROADCAST",
+    sandingNyheter: "BROADCASTING NEWS", debattPagar: "DEBATE IN PROGRESS",
+    laddar: "LOADING…", kvallensDebatt: "TONIGHT'S DEBATE",
+    iKon: "UPCOMING", lasNu: "NOW READING", nasta: "NEXT", senasteNyhet: "LATEST NEWS",
+  } : {
+    debattemne: "DEBATTÄMNE", nastaUpp: "NÄSTA UPP", inlagg: "INLÄGG",
+    debattor: "Debattör", talar: "TALAR",
+    stoppaSandning: "■  STOPPA SÄNDNING", startaSandning: "▶  STARTA SÄNDNING",
+    sandingNyheter: "SÄNDER NYHETER", debattPagar: "DEBATT PÅGÅR",
+    laddar: "LADDAR…", kvallensDebatt: "KVÄLLENS DEBATT",
+    iKon: "I KÖN", lasNu: "LÄSER NU", nasta: "NÄSTA", senasteNyhet: "SENASTE NYHET",
+  };
+
+  async function hamtaData(l = "sv") {
+    setLaddar(true);
+    const [nyheterData, debattData] = await Promise.all([
+      fetch(`/api/kanal/nyheter?lang=${l}`).then(r => r.json()).catch(() => []),
       fetch(`${SB_URL}/rest/v1/chatt_debatter?kalla=eq.kanal&order=skapad.desc&limit=1`, {
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
       }).then(r => r.json()).catch(() => []),
-    ]).then(([nyheterData, debattData]) => {
-      if (Array.isArray(nyheterData) && nyheterData.length) {
-        setNyheter(nyheterData);
-        nyheterRef.current = nyheterData;
-      }
-      if (Array.isArray(debattData) && debattData.length) {
-        setDebatt(debattData[0]);
-        debattRef.current = debattData[0];
-      }
-      setLaddar(false);
-    });
+    ]);
+    if (Array.isArray(nyheterData) && nyheterData.length) {
+      setNyheter(nyheterData);
+      nyheterRef.current = nyheterData;
+    }
+    if (Array.isArray(debattData) && debattData.length) {
+      setDebatt(debattData[0]);
+      debattRef.current = debattData[0];
+    }
+    setLaddar(false);
+  }
+
+  async function translateText(text) {
+    if (!text) return text;
+    if (translateCache.current[text]) return translateCache.current[text];
+    try {
+      const res = await fetch("/api/kanal/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const { translated } = await res.json();
+      translateCache.current[text] = translated;
+      return translated;
+    } catch {
+      return text;
+    }
+  }
+
+  async function handleLangChange(l) {
+    if (running) return;
+    setLang(l);
+    langRef.current = l;
+    translateCache.current = {};
+    setTranslatedAmne(null);
+    setTranslatedInlagg(null);
+    await hamtaData(l);
+  }
+
+  useEffect(() => {
+    hamtaData("sv");
     return () => {
       runningRef.current = false;
       if (ampTimer.current) clearInterval(ampTimer.current);
@@ -270,7 +322,10 @@ export default function KanalPage() {
   }, []);
 
   async function spelaUppText(text, agent) {
-    const rost = AGENT_ROST[agent ?? ANCHOR] ?? { voice: "Swedish Female", rate: 0.90, pitch: 1.02 };
+    const svRost = AGENT_ROST[agent ?? ANCHOR] ?? { voice: "Swedish Female", rate: 0.90, pitch: 1.02 };
+    const rost = langRef.current === "en"
+      ? { ...svRost, voice: svRost.voice.includes("Female") ? "US English Female" : "US English Male" }
+      : svRost;
     setCurrentAgent(agent);
     setSpeaking(true);
     await new Promise(resolve => {
@@ -323,14 +378,31 @@ export default function KanalPage() {
   async function spelaUppDebatt() {
     const d = debattRef.current;
     if (!d) return;
+    const isEn = langRef.current === "en";
     setMode("debatt");
-    await spelaUppText(`Nu övergår vi till kvällens debatt: ${d.amne}`, null);
+
+    const amne = isEn ? await translateText(d.amne) : d.amne;
+
+    // Pre-translate all inlägg so the panel shows English text immediately
+    let inlaggTexts = null;
+    if (isEn) {
+      setTranslatedAmne(amne);
+      inlaggTexts = await Promise.all(d.inlagg.map(inp => translateText(inp.text)));
+      setTranslatedInlagg(inlaggTexts);
+    }
+
+    const intro = isEn
+      ? `Now moving to tonight's debate: ${amne}`
+      : `Nu övergår vi till kvällens debatt: ${amne}`;
+    await spelaUppText(intro, null);
     if (!runningRef.current) return;
     await sleep(800);
+
     for (let i = 0; i < d.inlagg.length; i++) {
       if (!runningRef.current) return;
       setDebattIdx(i);
-      await spelaUppText(d.inlagg[i].text, d.inlagg[i].agent);
+      const text = isEn ? (inlaggTexts?.[i] || d.inlagg[i].text) : d.inlagg[i].text;
+      await spelaUppText(text, d.inlagg[i].agent);
       if (!runningRef.current) return;
       await sleep(700);
     }
@@ -357,6 +429,8 @@ export default function KanalPage() {
     setAmplitude(0);
     setCurrentAgent(null);
     setMode("nyheter");
+    setTranslatedAmne(null);
+    setTranslatedInlagg(null);
     if (ampTimer.current) clearInterval(ampTimer.current);
     if (window.responsiveVoice) window.responsiveVoice.cancel();
   }
@@ -377,6 +451,8 @@ export default function KanalPage() {
     ? debatt.inlagg.slice(debattIdx + 1, debattIdx + 4)
     : [];
 
+  const displayAmne = translatedAmne || debatt?.amne;
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, display: "flex", flexDirection: "column" }}>
 
@@ -386,7 +462,7 @@ export default function KanalPage() {
           <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: running ? "#f87171" : C.textMuted, boxShadow: running ? "0 0 8px #f87171" : "none", transition: "all 0.3s" }} />
           {running && (
             <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>
-              {isDebattMode ? "DEBATT PÅGÅR" : "SÄNDER NYHETER"}
+              {isDebattMode ? L.debattPagar : L.sandingNyheter}
             </span>
           )}
         </div>
@@ -407,25 +483,35 @@ export default function KanalPage() {
           {/* Left: anchor/agent panel */}
           <div>
             {isDebattMode && activeAgent
-              ? <DebattAgentPanel agent={activeAgent} speaking={speaking} amplitude={amplitude} />
-              : <AnchorPanel speaking={speaking && !isDebattMode} amplitude={amplitude} />
+              ? <DebattAgentPanel agent={activeAgent} speaking={speaking} amplitude={amplitude} debattor={L.debattor} talar={L.talar} />
+              : <AnchorPanel speaking={speaking && !isDebattMode} amplitude={amplitude} anchorTitle={lang === "en" ? "News Anchor" : "Nyhetsankare"} />
             }
 
             <div style={{ marginTop: "20px" }}>
+              {/* Språkväljare */}
+              <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                {[["sv", "🇸🇪 Svenska"], ["en", "🇬🇧 English"]].map(([l, label]) => (
+                  <button key={l} onClick={() => handleLangChange(l)} disabled={running}
+                    style={{ flex: 1, padding: "8px", background: lang === l ? ANCHOR_FARG : "transparent", color: lang === l ? "#000" : C.textMuted, border: `1px solid ${lang === l ? ANCHOR_FARG : C.border}`, borderRadius: "4px", fontSize: "12px", fontWeight: lang === l ? 700 : 400, cursor: running ? "default" : "pointer", fontFamily: "monospace", letterSpacing: "0.04em", transition: "all 0.15s" }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+
               {!running ? (
                 <button
                   onClick={startaKanal}
                   disabled={laddar || nyheter.length === 0}
                   style={{ width: "100%", padding: "14px", background: laddar ? C.surface : ANCHOR_FARG, color: laddar ? C.textMuted : "#000", border: "none", borderRadius: "4px", fontSize: "13px", fontWeight: 700, cursor: laddar ? "default" : "pointer", letterSpacing: "0.08em", fontFamily: "monospace" }}
                 >
-                  {laddar ? "LADDAR…" : "▶  STARTA SÄNDNING"}
+                  {laddar ? L.laddar : L.startaSandning}
                 </button>
               ) : (
                 <button
                   onClick={stoppaKanal}
                   style={{ width: "100%", padding: "14px", background: "#1a1a1a", color: "#f87171", border: "1px solid #f8717133", borderRadius: "4px", fontSize: "13px", fontWeight: 700, cursor: "pointer", letterSpacing: "0.08em", fontFamily: "monospace" }}
                 >
-                  ■  STOPPA SÄNDNING
+                  {L.stoppaSandning}
                 </button>
               )}
             </div>
@@ -445,7 +531,7 @@ export default function KanalPage() {
               <>
                 <div style={{ padding: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", minHeight: "200px" }}>
                   <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "16px", fontFamily: "monospace" }}>
-                    {running && speaking ? "LÄSER NU" : running ? "NÄSTA" : "SENASTE NYHET"}
+                    {running && speaking ? L.lasNu : running ? L.nasta : L.senasteNyhet}
                   </div>
                   {currentNyhet ? (
                     <>
@@ -463,14 +549,16 @@ export default function KanalPage() {
                     </>
                   ) : (
                     <p style={{ fontSize: "14px", color: C.textMuted, margin: 0 }}>
-                      {laddar ? "Hämtar och expanderar nyheter…" : "Tryck STARTA SÄNDNING för att börja."}
+                      {laddar
+                        ? (lang === "en" ? "Fetching and expanding news…" : "Hämtar och expanderar nyheter…")
+                        : (lang === "en" ? "Press START BROADCAST to begin." : "Tryck STARTA SÄNDNING för att börja.")}
                     </p>
                   )}
                 </div>
 
                 {upcomingNyheter.length > 0 && (
                   <div style={{ padding: "20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px" }}>
-                    <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "14px", fontFamily: "monospace" }}>I KÖN</div>
+                    <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "14px", fontFamily: "monospace" }}>{L.iKon}</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                       {upcomingNyheter.map((n, i) => (
                         <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start", opacity: 1 - i * 0.15 }}>
@@ -487,7 +575,7 @@ export default function KanalPage() {
 
                 {!running && debatt && (
                   <div style={{ padding: "20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px" }}>
-                    <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "12px", fontFamily: "monospace" }}>KVÄLLENS DEBATT</div>
+                    <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "12px", fontFamily: "monospace" }}>{L.kvallensDebatt}</div>
                     <p style={{ fontSize: "15px", fontFamily: "Times New Roman, serif", color: C.text, margin: "0 0 10px 0", lineHeight: 1.4 }}>{debatt.amne}</p>
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                       {(debatt.agenter || []).map(a => (
@@ -506,32 +594,34 @@ export default function KanalPage() {
             {isDebattMode && currentInlagg && (
               <>
                 <div style={{ padding: "16px 20px", background: "#0a0a14", border: `1px solid ${activeFarg}30`, borderRadius: "4px" }}>
-                  <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "6px", fontFamily: "monospace" }}>DEBATTÄMNE</div>
-                  <p style={{ fontSize: "14px", color: activeFarg, margin: 0, fontFamily: "Times New Roman, serif", lineHeight: 1.4 }}>{debatt.amne}</p>
+                  <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "6px", fontFamily: "monospace" }}>{L.debattemne}</div>
+                  <p style={{ fontSize: "14px", color: activeFarg, margin: 0, fontFamily: "Times New Roman, serif", lineHeight: 1.4 }}>{displayAmne}</p>
                 </div>
 
                 <div style={{ padding: "28px", background: C.surface, border: `1px solid ${activeFarg}40`, borderRadius: "4px", minHeight: "160px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
                     <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
                     <span style={{ fontSize: "10px", color: activeFarg, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "monospace" }}>
-                      {currentInlagg.agent} · INLÄGG {debattIdx + 1}/{debatt.inlagg.length}
+                      {currentInlagg.agent} · {L.inlagg} {debattIdx + 1}/{debatt.inlagg.length}
                     </span>
                   </div>
                   <p style={{ fontSize: "18px", lineHeight: 1.6, fontFamily: "Times New Roman, serif", color: C.text, margin: 0, borderLeft: `3px solid ${activeFarg}`, paddingLeft: "16px" }}>
-                    {currentInlagg.text}
+                    {translatedInlagg?.[debattIdx] || currentInlagg.text}
                   </p>
                 </div>
 
                 {upcomingInlagg.length > 0 && (
                   <div style={{ padding: "20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px" }}>
-                    <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "14px", fontFamily: "monospace" }}>NÄSTA UPP</div>
+                    <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "14px", fontFamily: "monospace" }}>{L.nastaUpp}</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                       {upcomingInlagg.map((inp, i) => (
                         <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start", opacity: 1 - i * 0.25 }}>
                           <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: AGENT_FARG[inp.agent] || C.accent, flexShrink: 0, marginTop: "5px" }} />
                           <div>
                             <p style={{ fontSize: "11px", color: AGENT_FARG[inp.agent] || C.accent, margin: "0 0 2px 0", fontFamily: "monospace" }}>{inp.agent}</p>
-                            <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, lineHeight: 1.5 }}>{inp.text.slice(0, 80)}…</p>
+                            <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, lineHeight: 1.5 }}>
+                              {(translatedInlagg?.[debattIdx + 1 + i] || inp.text).slice(0, 80)}…
+                            </p>
                           </div>
                         </div>
                       ))}
