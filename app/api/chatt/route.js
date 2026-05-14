@@ -90,7 +90,8 @@ async function handlePost(request) {
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
-  const { amne, historik, agent } = body;
+  const { amne, historik, agent, lang } = body;
+  const isEn = lang === "en";
 
   const isFirstCall = !Array.isArray(historik) || historik.length === 0;
   if (isFirstCall) {
@@ -112,7 +113,19 @@ async function handlePost(request) {
   const kontext = historik.length > 0
     ? historik.map(h => `${h.agent}: ${h.text}`).join("\n") : null;
 
-  const systemPrompt = `Du är ${PERSONLIGHETER[agent]}
+  const systemPrompt = isEn
+    ? `You are ${PERSONLIGHETER[agent]}
+
+You are taking part in a rapid debate about: "${amne.slice(0, 200)}"
+
+RULES — important:
+- Answer with EXACTLY 2–3 sentences. Never more.
+- Be sharp and take a clear position. No filler.
+- React specifically to the latest post if there is one.
+- Never say you are an AI. Always speak in first person.
+- Reply only in English.
+- Do NOT start with "I agree", "As [your role]" or similar opening phrases.`
+    : `Du är ${PERSONLIGHETER[agent]}
 
 Du deltar i en snabbdebatt om: "${amne.slice(0, 200)}"
 
@@ -125,8 +138,12 @@ REGLER — viktiga:
 - Börja INTE med "Jag håller med", "Som [din roll]" eller liknande inledningsfraser.`;
 
   const userMessage = kontext
-    ? `Vad de andra just sagt:\n${kontext}\n\nNu är det din tur. Svara kort och direkt.`
-    : `Öppna debatten om "${amne.slice(0, 200)}". Var skarp och kortfattad.`;
+    ? isEn
+      ? `What the others just said:\n${kontext}\n\nNow it's your turn. Respond briefly and directly.`
+      : `Vad de andra just sagt:\n${kontext}\n\nNu är det din tur. Svara kort och direkt.`
+    : isEn
+      ? `Open the debate about "${amne.slice(0, 200)}". Be sharp and concise.`
+      : `Öppna debatten om "${amne.slice(0, 200)}". Var skarp och kortfattad.`;
 
   const info = getRateLimitInfo(ip);
   const rlHeaders = {
