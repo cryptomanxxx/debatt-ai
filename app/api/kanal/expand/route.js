@@ -22,7 +22,7 @@ export async function POST(req) {
   const user = kalla ? `[${kalla}] ${rubrik}` : rubrik;
   const msgs = [{ role: "system", content: system }, { role: "user", content: user }];
 
-  const groqKey = process.env.GROQ_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY_KANAL;
   const gemKey  = process.env.GEMINI_API_KEY;
   const orKey   = process.env.OPENROUTER_API_KEY;
 
