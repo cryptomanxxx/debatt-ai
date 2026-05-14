@@ -254,7 +254,7 @@ REGLER — viktiga:
     generationConfig: { maxOutputTokens: 250, temperature: 0.88 },
   });
 
-  const geminiModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash", "gemini-1.5-flash-latest"];
+  const geminiModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-latest"];
   let geminiText = "";
   let geminiErr = "";
   for (const model of geminiModels) {
