@@ -1,5 +1,7 @@
 export const runtime = "edge";
 
+import { logAiCall } from "@/app/lib/logAiCall";
+
 const AGENTER = new Set([
   "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
   "Jurist","Journalist","Filosof","Läkare","Psykolog","Historiker",
@@ -167,6 +169,7 @@ REGLER — viktiga:
   } else {
     const groqAbort = new AbortController();
     const groqTimeout = setTimeout(() => groqAbort.abort(), 5000);
+    const groqT0 = Date.now();
     try {
       const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -187,14 +190,19 @@ REGLER — viktiga:
       const rst = groqRes.headers.get("x-ratelimit-reset-requests");
       if (groqRes.ok) {
         ps.groq = { remaining: rem >= 0 ? rem : ps.groq.remaining, limit: 30, resetAt: rst, ts: Date.now(), status: rem <= 5 ? "warn" : "ok" };
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "ok", latency_ms: Date.now() - groqT0 });
         return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
       }
       if (groqRes.status === 429) {
         ps.groq = { remaining: 0, limit: 30, resetAt: rst, ts: Date.now(), status: "limited" };
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "rate_limited", latency_ms: Date.now() - groqT0 });
+      } else {
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "error", latency_ms: Date.now() - groqT0 });
       }
       groqFailReason = `Groq HTTP ${groqRes.status}`;
     } catch (e) {
       clearTimeout(groqTimeout);
+      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: e.name === "AbortError" ? "timeout" : "error", latency_ms: Date.now() - groqT0 });
       groqFailReason = e.name === "AbortError" ? "Groq timeout (5s)" : `Groq fel: ${e.message}`;
     }
   }
@@ -204,6 +212,7 @@ REGLER — viktiga:
   if (orKey) {
     const orAbort = new AbortController();
     const orTimeout = setTimeout(() => orAbort.abort(), 8000);
+    const orT0 = Date.now();
     try {
       const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -225,12 +234,15 @@ REGLER — viktiga:
       clearTimeout(orTimeout);
       if (orRes.ok) {
         ps.or = { ts: Date.now(), status: "ok" };
+        logAiCall({ provider: "openrouter", model: "llama-3.3-70b-instruct:free", source: "chatt", status: "ok", latency_ms: Date.now() - orT0 });
         return new Response(orRes.body, { headers: { ...rlHeaders, "X-Provider": "openrouter" } });
       }
       ps.or = { ts: Date.now(), status: orRes.status === 429 ? "limited" : "error" };
+      logAiCall({ provider: "openrouter", source: "chatt", status: orRes.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - orT0 });
     } catch (e) {
       clearTimeout(orTimeout);
       ps.or = { ts: Date.now(), status: "error" };
+      logAiCall({ provider: "openrouter", source: "chatt", status: e.name === "AbortError" ? "timeout" : "error", latency_ms: Date.now() - orT0 });
     }
   }
 
@@ -250,6 +262,7 @@ REGLER — viktiga:
   let geminiText = "";
   let geminiErr = "";
   for (const model of geminiModels) {
+    const gemT0 = Date.now();
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: geminiPayload }
@@ -258,9 +271,22 @@ REGLER — viktiga:
       ps.gemini = { remaining: null, limit: 15, resetAt: null, ts: Date.now(), status: "ok" };
       const data = await r.json().catch(() => null);
       const t = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      if (t) { geminiText = t; break; }
+      if (t) {
+        logAiCall({
+          provider: "gemini", model, source: "chatt", status: "ok", latency_ms: Date.now() - gemT0,
+          input_tokens: data?.usageMetadata?.promptTokenCount,
+          output_tokens: data?.usageMetadata?.candidatesTokenCount,
+        });
+        geminiText = t;
+        break;
+      }
     } else {
-      if (r.status === 429) ps.gemini = { ...ps.gemini, ts: Date.now(), status: "limited" };
+      if (r.status === 429) {
+        ps.gemini = { ...ps.gemini, ts: Date.now(), status: "limited" };
+        logAiCall({ provider: "gemini", model, source: "chatt", status: "rate_limited", latency_ms: Date.now() - gemT0 });
+      } else {
+        logAiCall({ provider: "gemini", model, source: "chatt", status: "error", latency_ms: Date.now() - gemT0 });
+      }
       const errBody = await r.text().catch(() => "");
       geminiErr += `${model}:${r.status} `;
       if (errBody.includes("API_KEY") || r.status === 400 || r.status === 403) {

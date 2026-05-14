@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, Legend, ResponsiveContainer } from "recharts";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -1210,6 +1210,184 @@ function MatningTab() {
   );
 }
 
+const AI_COLORS = { groq: "#4a9eff", gemini: "#4ade80", openrouter: "#f8954d", none: "#f87171" };
+const GROQ_DAILY_LIMIT = 100_000;
+
+function AiStatistikTab() {
+  const [rows, setRows]     = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]   = useState("");
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const res = await fetch(
+          `${SB_URL}/rest/v1/ai_log?select=*&ts=gte.${since}&order=ts.desc&limit=2000`,
+          { headers: sbHeaders() }
+        );
+        if (!res.ok) throw new Error(await res.text());
+        setRows(await res.json());
+      } catch (e) { setError(e.message); }
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  if (loading) return <p style={{ color: C.textMuted }}>Laddar AI-statistik…</p>;
+  if (error)   return <p style={{ color: C.red }}>Fel: {error}</p>;
+  if (!rows || rows.length === 0) return (
+    <div>
+      <p style={{ color: C.textMuted, fontSize: "14px", marginBottom: "16px" }}>
+        Ingen loggdata ännu. Kör SQL-schemat <code style={{ color: C.accent }}>supabase_ai_log.sql</code> i Supabase SQL Editor för att skapa tabellen.
+      </p>
+    </div>
+  );
+
+  // ── Aggregate by date × provider ────────────────────────────────────────
+  const byDay = {};
+  for (const r of rows) {
+    const day = r.ts.slice(0, 10);
+    if (!byDay[day]) byDay[day] = { day, groq: 0, gemini: 0, openrouter: 0, none: 0, errors: 0 };
+    byDay[day][r.provider] = (byDay[day][r.provider] || 0) + 1;
+    if (r.status !== "ok") byDay[day].errors++;
+  }
+  const chartData = Object.values(byDay).sort((a, b) => a.day.localeCompare(b.day));
+
+  // ── Today's token usage (kanal source, which has token counts) ──────────
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayRows = rows.filter(r => r.ts.slice(0, 10) === todayStr);
+
+  const groqKanalTokens = todayRows
+    .filter(r => r.provider === "groq" && r.source === "kanal" && r.status === "ok")
+    .reduce((s, r) => s + (r.input_tokens || 0) + (r.output_tokens || 0), 0);
+
+  const groqChattCalls = todayRows.filter(r => r.provider === "groq" && r.source === "chatt" && r.status === "ok").length;
+  const geminiCallsToday = todayRows.filter(r => r.provider === "gemini" && r.status === "ok").length;
+  const orCallsToday = todayRows.filter(r => r.provider === "openrouter" && r.status === "ok").length;
+  const errorsToday = todayRows.filter(r => r.status !== "ok").length;
+
+  // ── Summary totals (7 days) ──────────────────────────────────────────────
+  const totals = rows.reduce((acc, r) => {
+    acc[r.provider] = (acc[r.provider] || 0) + 1;
+    return acc;
+  }, {});
+
+  const totalOk    = rows.filter(r => r.status === "ok").length;
+  const totalError = rows.filter(r => r.status !== "ok").length;
+
+  const statCard = (label, value, sub, color = C.accent) => (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px 24px", minWidth: "140px" }}>
+      <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{label}</p>
+      <p style={{ fontSize: "28px", fontWeight: 400, color, margin: "0 0 2px", fontFamily: "monospace" }}>{value}</p>
+      {sub && <p style={{ fontSize: "11px", color: C.textMuted, margin: 0 }}>{sub}</p>}
+    </div>
+  );
+
+  const tokenPct = Math.min(100, Math.round((groqKanalTokens / GROQ_DAILY_LIMIT) * 100));
+  const tokenColor = tokenPct >= 80 ? C.red : tokenPct >= 50 ? C.yellow : C.green;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+
+      {/* ── Today summary ── */}
+      <div>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>Idag</p>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          {statCard("Gemini", geminiCallsToday, "anrop OK", AI_COLORS.gemini)}
+          {statCard("Groq Chatt", groqChattCalls, "anrop OK", AI_COLORS.groq)}
+          {statCard("OpenRouter", orCallsToday, "anrop OK", AI_COLORS.openrouter)}
+          {errorsToday > 0 && statCard("Fel/timeout", errorsToday, "misslyckade", C.red)}
+        </div>
+      </div>
+
+      {/* ── Groq Kanal token progress bar ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 8px", fontFamily: "monospace" }}>
+          Groq Kanal — daglig tokenkvot
+        </p>
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "8px" }}>
+          <p style={{ fontSize: "22px", fontWeight: 400, color: tokenColor, margin: 0, fontFamily: "monospace" }}>
+            {groqKanalTokens.toLocaleString("sv-SE")} <span style={{ fontSize: "14px", color: C.textMuted }}>/ {GROQ_DAILY_LIMIT.toLocaleString("sv-SE")} tokens</span>
+          </p>
+          <span style={{ fontSize: "14px", color: tokenColor, fontFamily: "monospace" }}>{tokenPct}%</span>
+        </div>
+        <div style={{ background: C.border, borderRadius: "4px", height: "8px", overflow: "hidden" }}>
+          <div style={{ background: tokenColor, width: `${tokenPct}%`, height: "100%", borderRadius: "4px", transition: "width 0.3s" }} />
+        </div>
+        <p style={{ fontSize: "11px", color: C.textMuted, margin: "8px 0 0" }}>
+          Baserat på loggade kanal-anrop idag. Groq Chatt-anrop loggas utan tokenantal (streaming).
+        </p>
+      </div>
+
+      {/* ── 7-day call volume chart ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Anrop per dag (7 dagar)</p>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+            <XAxis dataKey="day" tick={{ fill: C.textMuted, fontSize: 10 }} tickFormatter={d => d.slice(5)} />
+            <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} width={30} allowDecimals={false} />
+            <Tooltip
+              contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", fontSize: "11px", fontFamily: "monospace" }}
+              labelFormatter={l => l}
+            />
+            <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
+            <Bar dataKey="gemini"     name="Gemini"     stackId="a" fill={AI_COLORS.gemini}     radius={[0,0,0,0]} />
+            <Bar dataKey="groq"       name="Groq"       stackId="a" fill={AI_COLORS.groq}       radius={[0,0,0,0]} />
+            <Bar dataKey="openrouter" name="OpenRouter" stackId="a" fill={AI_COLORS.openrouter} radius={[0,0,0,0]} />
+            <Bar dataKey="none"       name="Fallback"   stackId="a" fill={AI_COLORS.none}       radius={[2,2,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── 7-day totals ── */}
+      <div>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>Totalt senaste 7 dagarna</p>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          {statCard("Gemini",     totals.gemini     ?? 0, "anrop", AI_COLORS.gemini)}
+          {statCard("Groq",       totals.groq       ?? 0, "anrop", AI_COLORS.groq)}
+          {statCard("OpenRouter", totals.openrouter ?? 0, "anrop", AI_COLORS.openrouter)}
+          {statCard("OK / Fel",   `${totalOk} / ${totalError}`, "anrop", totalError > 0 ? C.red : C.green)}
+        </div>
+      </div>
+
+      {/* ── Recent calls table ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Senaste 30 anrop</p>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", fontFamily: "monospace" }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                {["Tid","Källa","Provider","Modell","Status","ms","Input tok","Output tok"].map(h => (
+                  <th key={h} style={{ textAlign: "left", padding: "6px 12px", color: C.textMuted, fontWeight: 400 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(0, 30).map(r => (
+                <tr key={r.id} style={{ borderBottom: `1px solid ${C.border}22` }}>
+                  <td style={{ padding: "6px 12px", color: C.textMuted }}>
+                    {new Date(r.ts).toLocaleString("sv-SE", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                  </td>
+                  <td style={{ padding: "6px 12px", color: C.accentDim }}>{r.source}</td>
+                  <td style={{ padding: "6px 12px", color: AI_COLORS[r.provider] ?? C.text }}>{r.provider}</td>
+                  <td style={{ padding: "6px 12px", color: C.textMuted, maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {r.model ?? "–"}
+                  </td>
+                  <td style={{ padding: "6px 12px", color: r.status === "ok" ? C.green : C.red }}>{r.status}</td>
+                  <td style={{ padding: "6px 12px", color: C.textMuted }}>{r.latency_ms ?? "–"}</td>
+                  <td style={{ padding: "6px 12px", color: C.textMuted }}>{r.input_tokens ?? "–"}</td>
+                  <td style={{ padding: "6px 12px", color: C.textMuted }}>{r.output_tokens ?? "–"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminClient() {
   const [authed, setAuthed]       = useState(false);
   const [pw, setPw]               = useState("");
@@ -1465,6 +1643,7 @@ export default function AdminClient() {
             ["markets","Markets"],
             ["api-status","API-status"],
             ["beslut-api","Decision API"],
+            ["ai-statistik","AI-statistik"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
               {lbl}
@@ -1677,6 +1856,9 @@ export default function AdminClient() {
 
         {/* ── DECISION API ── */}
         {mainTab === "beslut-api" && <BeslutApiTab />}
+
+        {/* ── AI-STATISTIK ── */}
+        {mainTab === "ai-statistik" && <AiStatistikTab />}
 
         {/* ── NYHETSBREV ── */}
         {mainTab === "nyhetsbrev" && (
