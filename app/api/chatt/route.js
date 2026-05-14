@@ -59,6 +59,7 @@ function consumeRateLimit(ip) {
 const ps = {
   groq:   { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
   gemini: { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
+  or:     { ts: 0, status: "unknown" },
 };
 
 function groqReady() {
@@ -72,6 +73,7 @@ export async function GET() {
   return Response.json({
     groq:   { ...ps.groq,   keySet: !!process.env.GROQ_API_KEY },
     gemini: { ...ps.gemini, keySet: !!process.env.GEMINI_API_KEY },
+    or:     { ...ps.or,     keySet: !!process.env.OPENROUTER_API_KEY },
     ts: Date.now(),
   });
 }
@@ -222,10 +224,13 @@ REGLER — viktiga:
       });
       clearTimeout(orTimeout);
       if (orRes.ok) {
+        ps.or = { ts: Date.now(), status: "ok" };
         return new Response(orRes.body, { headers: { ...rlHeaders, "X-Provider": "openrouter" } });
       }
+      ps.or = { ts: Date.now(), status: orRes.status === 429 ? "limited" : "error" };
     } catch (e) {
       clearTimeout(orTimeout);
+      ps.or = { ts: Date.now(), status: "error" };
     }
   }
 
