@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export const metadata = undefined; // client component
 
@@ -310,18 +310,87 @@ export default function BeslutPage() {
                 </div>
               ))}
               <p style={{ fontSize: "12px", color: "#444", margin: "12px 0 0", fontStyle: "italic" }}>
-                Vill du ha högre gränser? Kontakta oss via formuläret på startsidan.
+                Vill du ha högre gränser? Ansök om API-nyckel längre ner på sidan.
               </p>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Ansök om API-nyckel */}
+      <ApiKeyForm />
+
       <style>{`
         @media (max-width: 720px) {
           .beslut-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
+    </div>
+  );
+}
+
+function ApiKeyForm() {
+  const [name, setName]       = useState("");
+  const [email, setEmail]     = useState("");
+  const [usecase, setUsecase] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent]       = useState(false);
+  const [error, setError]     = useState("");
+
+  async function submit(e) {
+    e.preventDefault();
+    if (loading || sent) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/api-key-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, usecase }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Något gick fel."); return; }
+      setSent(true);
+    } catch { setError("Nätverksfel. Försök igen."); }
+    finally { setLoading(false); }
+  }
+
+  return (
+    <div style={{ maxWidth: "640px", margin: "80px auto 0", paddingTop: "64px", borderTop: `1px solid ${C.border}` }}>
+      <p style={{ fontSize: "11px", color: C.purple, letterSpacing: "0.15em", textTransform: "uppercase", margin: "0 0 12px", fontFamily: "monospace" }}>
+        API-nyckel
+      </p>
+      <h2 style={{ fontSize: "28px", fontWeight: 400, color: C.text, margin: "0 0 12px" }}>
+        Ansök om högre rate limits
+      </h2>
+      <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.7, margin: "0 0 32px" }}>
+        Fri tier ger 10 req/timme per IP — tillräckligt för att testa. Vill du integrera API:et i en produkt kontaktar du oss här. Vi skapar en nyckel med anpassade gränser och hör av oss inom 24 timmar.
+      </p>
+
+      {sent ? (
+        <div style={{ background: "#0a1a0a", border: "1px solid #1a4a1a", borderRadius: "8px", padding: "24px" }}>
+          <p style={{ fontSize: "16px", color: C.green, margin: 0 }}>Ansökan mottagen. Vi hör av oss till {email} inom 24 timmar.</p>
+        </div>
+      ) : (
+        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div>
+            <label style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: "6px" }}>Företag eller namn *</label>
+            <input value={name} onChange={e => setName(e.target.value)} required placeholder="Acme AB" style={{ width: "100%", background: "#0f0f0f", border: `1px solid ${C.border2}`, borderRadius: "6px", color: C.text, fontFamily: "Georgia, serif", fontSize: "15px", padding: "12px 14px", outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: "6px" }}>E-postadress *</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="namn@företag.se" style={{ width: "100%", background: "#0f0f0f", border: `1px solid ${C.border2}`, borderRadius: "6px", color: C.text, fontFamily: "Georgia, serif", fontSize: "15px", padding: "12px 14px", outline: "none", boxSizing: "border-box" }} />
+          </div>
+          <div>
+            <label style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: "6px" }}>Vad ska du använda API:et till? *</label>
+            <textarea value={usecase} onChange={e => setUsecase(e.target.value)} required rows={4} placeholder="Beskriv din produkt eller integration…" style={{ width: "100%", background: "#0f0f0f", border: `1px solid ${C.border2}`, borderRadius: "6px", color: C.text, fontFamily: "Georgia, serif", fontSize: "15px", padding: "12px 14px", outline: "none", resize: "vertical", boxSizing: "border-box" }} />
+          </div>
+          {error && <p style={{ color: C.red, fontSize: "13px", margin: 0 }}>{error}</p>}
+          <button type="submit" disabled={loading} style={{ padding: "14px", background: loading ? "#111" : C.accent, color: loading ? C.textMuted : "#0a0a0a", border: "none", borderRadius: "6px", fontSize: "15px", fontWeight: 700, cursor: loading ? "default" : "pointer", fontFamily: "Georgia, serif" }}>
+            {loading ? "Skickar…" : "Skicka ansökan →"}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
