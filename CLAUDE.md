@@ -113,6 +113,7 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 | GET  | `/api/beslut` | Decision API-dokumentation (JSON) med schema, agenter och exempelsvar |
 | POST | `/api/beslut` | Decision API: tar en fråga, väljer agenter automatiskt baserat på ämne, kör dem parallellt, returnerar consensus (recommendation, probability, confidence, disagreement) + per-agent-svar. Stödjer `lang` (sv/en) och valfri `X-API-Key`-header. Loggar till `beslut_log`. |
 | POST | `/api/agent-fraga` | Besökare ställer frågor till enskilda agenter. Svarar i karaktär (2–4 meningar). Om offentlig=true sparas i `agent_fragor`-tabellen. |
+| GET  | `/api/opinion-stats` | Statistik för besökaromröstningar. Params: `?kategori=`, `?q=`, `?sort=total\|ja_pct\|nej_pct`, `?limit=` (max 200). 60s cache. Inkluderar AI-agenternas röster per fråga. |
 
 ---
 
@@ -166,6 +167,7 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 | `app/agent/[namn]/AgentFragaForm.js` | Klientkomponent för Agent Q&A på profilsidor. Privat/offentlig-toggle, offentliga frågor visas nedan. |
 | `supabase_beslut.sql` | SQL-schema för `api_nycklar` och `beslut_log` (Decision API) |
 | `supabase_agent_fragor.sql` | SQL-schema för `agent_fragor` (Agent Q&A) |
+| `app/api/opinion-stats/route.js` | Opinion Stats API. Exponerar besökaromröstningar med filter, sortering och 60s cache. |
 | `app/admin/page.js` | Admin-panel: inlämningar, publicerade artiklar, prenumeranter |
 | `app/admin/client.js` | Admin-klientkomponent: backtest-panel, nyhetslogg-flik, coin-cards (button-element för Android) |
 | `app/LyssnaKnapp.js` | Klientkomponent för TTS via Google Translate-proxy, används på artikel- och chattsidor |
@@ -290,7 +292,7 @@ Admin-panelen har en Backtest-flik som visar strategiresultat (total avkastning,
 ### ✅ 22. Decision API – KLART
 `POST /api/beslut` är en strukturerad beslutsmotor byggd på de 24 AI-agenterna. Designad för AI-companions, beslutsstödssystem och B2B-integration — "Stripe för AI-beslut".
 
-**Flöde:** Fråga in → auto-routing väljer 5 relevanta agenter baserat på ämne (krypto, ekonomi, klimat, tech, hälsa, juridik, politik, jobb, relation) → parallella Groq/Gemini-anrop → consensus-beräkning (avg, stddev) → strukturerad JSON ut.
+**Flöde:** Fråga in → auto-routing väljer 5 relevanta agenter baserat på ämne (14 domäner: krypto, investering, klimat, AI/tech, hälsa, juridik, politik, jobb, relation, sport, mat, resor, utbildning, bostad) → parallella Groq/Gemini-anrop → consensus-beräkning (avg, stddev) → strukturerad JSON ut.
 
 **Output-format:**
 ```json
@@ -303,9 +305,11 @@ Admin-panelen har en Backtest-flik som visar strategiresultat (total avkastning,
 
 **Autentisering:** Valfri `X-API-Key`-header. Utan nyckel: 10 req/timme per IP (fri tier). Med nyckel: `rate_limit` från `api_nycklar`-tabellen (default 100/timme). Alla anrop loggas i `beslut_log`. `GET /api/beslut` returnerar full API-dokumentation som JSON.
 
+**Webhook-stöd:** Lägg till `webhook_url` i request-bodyn. Resultatet POSTas dit efter beräkning — fire-and-forget från servern.
+
 **Språkstöd:** `lang: "sv"` (default) eller `"en"` — reasoning-fältet svarar på valt språk. Stances alltid på svenska för konsistens.
 
-**Demo-sida:** `/beslut` — interaktivt testgränssnitt med formulär, agent-urval, cURL-snippet och formaterat resultat.
+**Demo-sida:** `/beslut` — interaktivt testgränssnitt med formulär, agent-urval, cURL-snippet och formaterat resultat. Inkluderar ansökningsformulär för API-nyckel (skickar e-post till admin via Resend).
 
 Kräver Supabase-tabeller `api_nycklar` och `beslut_log` — kör `supabase_beslut.sql` i SQL Editor.
 
@@ -313,6 +317,13 @@ Kräver Supabase-tabeller `api_nycklar` och `beslut_log` — kör `supabase_besl
 Besökare kan ställa frågor direkt till enskilda AI-agenter på deras profilsidor (`/agent/[namn]`). Två lägen: **Privat** (svaret visas bara inline, sparas inte) och **Offentlig** (sparas i `agent_fragor`-tabellen, visas på profilsidan och startsidan). Rate limit: 10 frågor/timme per IP. Groq + Gemini-fallback. De 3 senaste offentliga frågorna visas som widget på startsidan.
 
 Kräver Supabase-tabell `agent_fragor` — kör `supabase_agent_fragor.sql`.
+
+### ✅ 24. Opinion Stats API – KLART
+`GET /api/opinion-stats` exponerar realtidsstatistik för besökaromröstningarna på `/opinion`-sidan. Returnerar röstfördelning (ja/nej/osäker), procentandelar och AI-agenternas eget ställningstagande per fråga.
+
+**Filtreringsparametrar:** `?kategori=ekonomi`, `?q=skatt` (fritextsökning i frågetexten), `?sort=total|ja_pct|nej_pct`, `?limit=N` (max 200).
+
+**60s in-memory cache** — lämpar sig för dashboards, externa integrationer och analytics. Inget API-nyckel krävs. Dokumenterat på `/om`-sidan och tillgängligt direkt på `/api/opinion-stats`.
 
 ---
 
