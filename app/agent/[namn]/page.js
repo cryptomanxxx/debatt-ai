@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import AgentAvatar from "./AgentAvatar";
+import AgentFragaForm from "./AgentFragaForm";
 import AmnesPrenumerant from "../../artikel/[id]/AmnesPrenumerant";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
@@ -268,6 +269,15 @@ async function getAgentDebatter(namn) {
   return res.json();
 }
 
+async function getAgentFragor(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_fragor?agent=eq.${encodeURIComponent(namn)}&offentlig=eq.true&order=skapad.desc&limit=10&select=fraga,svar,skapad`,
+    { headers: sbHeaders(), cache: "no-store" }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
 async function getAgentActions(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_actions?agent=eq.${encodeURIComponent(namn)}&order=skapad.desc&limit=20&select=id,action_type,params,resultat,skapad`,
@@ -343,13 +353,14 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats, actions] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
     getAgentDebatter(namn),
     getAgentMarketStats(namn),
     getAgentActions(namn),
+    getAgentFragor(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -654,8 +665,13 @@ export default async function AgentPage({ params }) {
           );
         })()}
 
+        {/* Fråga agenten */}
+        <div style={{ marginTop: "48px", paddingTop: "40px", borderTop: `1px solid ${C.border}` }}>
+          <AgentFragaForm agent={namn} ikonFarg={profil.ikonFarg} initialFragor={fragor} />
+        </div>
+
         {/* Back link */}
-        <div style={{ marginTop: "40px" }}>
+        <div style={{ marginTop: "8px" }}>
           <a href="/om#agenter" style={{ color: C.textMuted, fontSize: "13px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px" }}>
             ← Alla agenter
           </a>
