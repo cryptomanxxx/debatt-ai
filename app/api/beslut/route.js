@@ -50,6 +50,16 @@ function selectAgents(question) {
     return ["Nationalekonom", "Psykolog", "Journalist", "Den lugna", "Optimisten"];
   if (/relation|kärlek|familj|barn|föräld|gifta/.test(q))
     return ["Psykolog", "Mamman", "Filosof", "Den lugna", "Historiker"];
+  if (/sport|fotboll|hockey|tennis|golf|löpning|gym|träna|tävl/.test(q))
+    return ["Läkare", "Psykolog", "Teknikoptimist", "Den trötta", "Optimisten"];
+  if (/mat|recept|restaurang|kost|vegetarisk|vegan|äta|laga|måltid/.test(q))
+    return ["Den hungriga", "Läkare", "Miljöaktivist", "Mamman", "Nationalekonom"];
+  if (/resa|semester|hotell|flyg|destination|turism|utomlands|besök/.test(q))
+    return ["Den rike", "Miljöaktivist", "Den stressade", "Journalist", "Optimisten"];
+  if (/studera|utbildning|högskola|skola|kurs|examen|plugg|lär/.test(q))
+    return ["Nationalekonom", "Psykolog", "Sociolog", "Tonåringen", "Historiker"];
+  if (/bostad|hyra|köpa|lägenhet|villa|hus|bostadsrätt|flytta/.test(q))
+    return ["Nationalekonom", "Sociolog", "Jurist", "Den rike", "Mamman"];
   return ["Nationalekonom", "Filosof", "Sociolog", "Journalist", "Optimisten"];
 }
 
@@ -175,10 +185,18 @@ export async function GET() {
     endpoint: "POST /api/beslut",
     authentication: "Optional. Pass X-API-Key header for higher rate limits.",
     input: {
-      question: "string (required, 10–500 chars)",
-      agents:   "string[] (optional — override auto-selection, max 7)",
-      lang:     "\"sv\" | \"en\" (optional, default \"sv\")",
+      question:    "string (required, 10–500 chars)",
+      agents:      "string[] (optional — override auto-selection, max 7)",
+      lang:        "\"sv\" | \"en\" (optional, default \"sv\")",
+      webhook_url: "string (optional, must start with https://) — result POSTed here after completion",
     },
+    auto_routing_domains: [
+      "krypto/bitcoin/blockchain", "investering/aktier/ekonomi", "klimat/miljö/energi",
+      "ai/teknik/startup", "hälsa/medicin/träning", "juridik/lag/gdpr",
+      "politik/samhälle/välfärd", "jobb/karriär/lön", "relation/familj/barn",
+      "sport/fitness/tävling", "mat/kost/restaurang", "resor/semester/turism",
+      "utbildning/studier/skola", "bostad/hyra/köpa",
+    ],
     output: {
       question:  "string",
       consensus: {
@@ -248,11 +266,13 @@ export async function POST(req) {
   if (!body?.question || typeof body.question !== "string")
     return Response.json({ error: "Missing required field: question (string)" }, { status: 400 });
 
-  const question = body.question.trim().slice(0, 500);
+  const question    = body.question.trim().slice(0, 500);
   if (question.length < 10)
     return Response.json({ error: "Question too short (min 10 chars)" }, { status: 400 });
 
-  const lang = body.lang === "en" ? "en" : "sv";
+  const lang        = body.lang === "en" ? "en" : "sv";
+  const webhookUrl  = typeof body.webhook_url === "string" && body.webhook_url.startsWith("https://")
+    ? body.webhook_url : null;
 
   const requestedAgents = Array.isArray(body.agents) ? body.agents : null;
   const agentList = requestedAgents
@@ -290,7 +310,17 @@ export async function POST(req) {
     agents: valid.map(({ agent, stance, probability, reasoning }) => ({ agent, stance, probability, reasoning })),
     model: "debatt-ai/v1",
     latency_ms: latencyMs,
+    ...(webhookUrl ? { webhook_delivered: true } : {}),
   };
+
+  // Skicka till webhook om angiven (best-effort)
+  if (webhookUrl) {
+    fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "User-Agent": "debatt-ai-webhook/v1" },
+      body: JSON.stringify(response),
+    }).catch(() => {});
+  }
 
   // Logga asynkront — blockerar inte svaret
   logRequest({
