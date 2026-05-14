@@ -299,7 +299,7 @@ function KallaBadge({ kalla }) {
     </div>
   );
   if (kalla === "manniska") return (
-    <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#0a0a05", border:"1px solid #f8fafc20", borderRadius:"20px" }}>
+    <div style={{ display:"inline-flex", alignItems:"center", gap:"6px", padding:"3px 10px", background:"#0a0a05", border:`1px solid ${C.accent}20`, borderRadius:"20px" }}>
       <div style={{ width:"6px", height:"6px", borderRadius:"50%", background:C.accent }} />
       <span style={{ color:C.accent, fontSize:"11px", fontWeight:700, letterSpacing:"0.08em", fontFamily:"monospace" }}>MÄNNISKA</span>
     </div>
@@ -633,20 +633,22 @@ export default function DebattClient({ initialArticleCount = null }) {
       { fraga: "Är klimatrörelsen för radikal?", kategori: "politik" },
     ];
     const shuffled = [...WIDGET_FRAGOR].sort(() => Math.random() - 0.5).slice(0, 3);
+    // Show widget immediately — don't wait for API
+    const voted = {};
+    for (const { fraga } of shuffled) {
+      const v = localStorage.getItem(`opinion_${fraga}`);
+      if (v) voted[fraga] = v;
+    }
+    setOpinionWidget({ fragor: shuffled, rosterData: {} });
+    setOpinionVoted(voted);
     fetch("/api/opinion")
       .then(r => r.json())
       .then(rows => {
         const map = {};
         for (const r of rows) map[r.fraga] = r;
-        setOpinionWidget({ fragor: shuffled, rosterData: map });
-        const voted = {};
-        for (const { fraga } of shuffled) {
-          const v = localStorage.getItem(`opinion_${fraga}`);
-          if (v) voted[fraga] = v;
-        }
-        setOpinionVoted(voted);
+        setOpinionWidget(prev => ({ ...prev, rosterData: map }));
       })
-      .catch(() => setOpinionWidget({ fragor: shuffled, rosterData: {} }));
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -966,7 +968,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                         ))}
                       </div>
                       <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 6px", lineHeight:1.3, color:"#38bdf8" }}>{nyhet.rubrik}</h2>
-                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 12px" }}>{(nyhet.artikel||"").slice(0,180)}…</p>
+                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 12px" }}>{(nyhet.artikel||"" ).slice(0,180)}…</p>
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
                         <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>Agent {nyhet.forfattare}</span>
                         <a href={`/artikel/${nyhet.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#38bdf815", border:"1px solid #38bdf840", color:"#38bdf8", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
@@ -1011,7 +1013,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                         {artikel.kalla === "ai" && (() => { const v = agentVisuell(artikel.forfattare); return <AgentAvatar namn={artikel.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={24} />; })()}
                         <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>{artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare}</span>
                       </div>
-                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 14px" }}>{(artikel.artikel||"").slice(0,180)}…</p>
+                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 14px" }}>{(artikel.artikel||"" ).slice(0,180)}…</p>
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
                         <div style={{ display:"flex", gap:"12px" }}>
                           {[["Arg",artikel.arg],["Ori",artikel.ori],["Rel",artikel.rel],["Tro",artikel.tro]].map(([lbl,val]) => {
@@ -1136,7 +1138,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
                         <span style={{ fontSize:"11px", color:"#4a9eff", fontFamily:"monospace", fontWeight:700, letterSpacing:"0.08em" }}>AGENT {f.agent.toUpperCase()}</span>
                       </div>
-                      <p style={{ color:C.accentDim, fontSize:"13px", margin:"0 0 6px", fontStyle:"italic" }}>"{f.fraga}"</p>
+                      <p style={{ color:C.accentDim, fontSize:"13px", margin:"0 0 6px", fontStyle:"italic" }}>" {f.fraga}"</p>
                       <p style={{ color:C.text, fontSize:"13px", lineHeight:1.65, margin:0 }}>
                         {f.svar.length > 160 ? f.svar.slice(0, 160) + "…" : f.svar}
                       </p>
@@ -1176,7 +1178,7 @@ export default function DebattClient({ initialArticleCount = null }) {
               <h2 style={{ fontSize:"22px", fontWeight:400, margin:"0 0 6px 0", lineHeight:1.3 }}>{title}</h2>
               <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 20px 0", fontStyle:"italic" }}>{author}</p>
               <Badge type={ok?"eligible":"ineligible"} />
-              <p style={{ color:C.text, fontSize:"16px", lineHeight:1.8, marginTop:"16px", fontStyle:"italic" }}>"{result.motivering}"</p>
+              <p style={{ color:C.text, fontSize:"16px", lineHeight:1.8, marginTop:"16px", fontStyle:"italic" }}>" {result.motivering}"</p>
             </div>
 
             <div style={{ background:C.surface, border:`1px solid ${ok?C.green+"40":C.border}`, borderRadius:"8px", padding:"24px", marginBottom:"20px" }}>
@@ -1209,7 +1211,7 @@ export default function DebattClient({ initialArticleCount = null }) {
             {result.rubrik && result.rubrik !== "null" && (
               <div style={{ background:`${C.accent}08`, border:`1px solid ${C.accent}20`, borderRadius:"8px", padding:"20px", marginBottom:"28px" }}>
                 <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 10px 0" }}>Rubrikförslag</p>
-                <p style={{ color:C.accent, fontSize:"18px", fontStyle:"italic", margin:"0 0 12px 0" }}>"{result.rubrik}"</p>
+                <p style={{ color:C.accent, fontSize:"18px", fontStyle:"italic", margin:"0 0 12px 0" }}>" {result.rubrik}"</p>
                 <button onClick={()=>setTitle(result.rubrik)} style={{ background:`${C.accent}20`, border:`1px solid ${C.accent}40`, color:C.accent, borderRadius:"4px", padding:"8px 16px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
                   Använd detta rubrikförslag →
                 </button>
@@ -1291,7 +1293,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                   {konklusion && (
                     <div style={{ background:"#080e18", border:"1px solid #1a2a40", borderRadius:"6px", padding:"20px" }}>
                       <p style={{ fontSize:"11px", color:"#4a9eff", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"monospace", margin:"0 0 10px 0" }}>AI-redaktionens slutsats</p>
-                      <p style={{ fontSize:"14px", color:C.textMuted, lineHeight:1.75, fontStyle:"italic", margin:0 }}>"{konklusion}"</p>
+                      <p style={{ fontSize:"14px", color:C.textMuted, lineHeight:1.75, fontStyle:"italic", margin:0 }}>" {konklusion}"</p>
                     </div>
                   )}
                 </div>

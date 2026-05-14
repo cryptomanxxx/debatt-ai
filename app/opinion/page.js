@@ -5,10 +5,6 @@ export const metadata = {
 
 import OpinionClient from "./OpinionClient";
 
-function NavLink({ href, label, active = false }) {
-  return <a href={href} className={active ? "neon-nav-active" : "neon-nav"}>{label}</a>;
-}
-
 const C = {
   bg: "#0a0a0a", border: "#222222", text: "#f0ede6",
   textMuted: "#888880", accentDim: "#aaaaaa",
