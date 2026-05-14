@@ -269,29 +269,15 @@ export default function KanalPage() {
     statusDebatt: "debatt tillgänglig", statusIngen: "ingen debatt ännu",
   };
 
-  async function hamtaData(l = "sv") {
+  async function hamtaData() {
     setLaddar(true);
-    const [nyheterRaw, debattData] = await Promise.all([
-      fetch(`/api/kanal/nyheter?lang=${l}&_v=3`).then(r => r.json()).catch(() => []),
+    const [nyheterData, debattData] = await Promise.all([
+      fetch("/api/kanal/nyheter").then(r => r.json()).catch(() => []),
       fetch(`${SB_URL}/rest/v1/chatt_debatter?kalla=eq.kanal&order=skapad.desc&limit=1`, {
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
       }).then(r => r.json()).catch(() => []),
     ]);
-
-    let nyheterData = Array.isArray(nyheterRaw) ? nyheterRaw : [];
-
-    // If English mode and Groq batch expansion failed (text === rubrik for all items),
-    // fall back to translating each headline individually via the translate API
-    if (l === "en" && nyheterData.length > 0 && nyheterData.every(n => n.text === n.rubrik)) {
-      nyheterData = await Promise.all(
-        nyheterData.map(async (item) => {
-          const translated = await translateText(item.rubrik);
-          return { ...item, rubrik: translated, text: translated };
-        })
-      );
-    }
-
-    if (nyheterData.length) {
+    if (Array.isArray(nyheterData) && nyheterData.length) {
       setNyheter(nyheterData);
       nyheterRef.current = nyheterData;
     }
@@ -326,11 +312,11 @@ export default function KanalPage() {
     translateCache.current = {};
     setTranslatedAmne(null);
     setTranslatedInlagg(null);
-    await hamtaData(l);
+    await hamtaData();
   }
 
   useEffect(() => {
-    hamtaData("sv");
+    hamtaData();
     return () => {
       runningRef.current = false;
       if (ampTimer.current) clearInterval(ampTimer.current);
@@ -379,13 +365,48 @@ export default function KanalPage() {
     setAmplitude(0);
   }
 
+  async function expanderaItem(item, i) {
+    if (item.text && item.text !== item.rubrik) return item.text;
+    try {
+      const res = await fetch("/api/kanal/expand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rubrik: item.rubrik, kalla: item.kalla, lang: langRef.current }),
+      });
+      const { text } = await res.json();
+      if (text && text !== item.rubrik) {
+        // Update state so the panel shows the expanded text
+        nyheterRef.current = nyheterRef.current.map((n, j) => j === i ? { ...n, text } : n);
+        setNyheter([...nyheterRef.current]);
+        return text;
+      }
+    } catch {}
+    return item.rubrik;
+  }
+
   async function spelaUppNyheter() {
     const lista = nyheterRef.current;
     setMode("nyheter");
+
+    // Pre-fetch the first item's expansion before starting
+    const expandCache = {};
+    expandCache[0] = await expanderaItem(lista[0], 0);
+
     for (let i = 0; i < lista.length; i++) {
       if (!runningRef.current) return;
       setCurrentIdx(i);
-      await spelaUppText(lista[i].text || lista[i].rubrik, null);
+
+      // Pre-fetch next item while this one plays (fire-and-forget into cache)
+      const nextPrefetch = i + 1 < lista.length
+        ? expanderaItem(lista[i + 1], i + 1).then(t => { expandCache[i + 1] = t; })
+        : Promise.resolve();
+
+      const text = expandCache[i] ?? lista[i].rubrik;
+      await spelaUppText(text, null);
+
+      // Wait for next prefetch before moving on (usually already done)
+      await nextPrefetch;
+
       if (!runningRef.current) return;
       await sleep(600);
     }
