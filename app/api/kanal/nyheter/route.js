@@ -43,7 +43,7 @@ async function expanderaMedGroq(nyheter, lang = "sv") {
   const lista = nyheter.map((n, i) => `${i + 1}. [${n.kalla}] ${n.rubrik}`).join("\n");
 
   const systemPrompt = lang === "en"
-    ? `You are a professional TV news anchor. Expand each news headline into a 3–4 sentence news segment with context and background. Always in fluent, natural English regardless of the headline's original language. No greetings. Reply ONLY with JSON: {"nyheter": [{"text": "..."}]}`
+    ? `You are a professional TV news anchor. For each numbered headline: (1) translate the headline to English, (2) expand it into a 3–4 sentence news segment with context and background. Always in fluent, natural English regardless of the headline's original language. No greetings. Reply ONLY with JSON: {"nyheter": [{"rubrik": "translated headline", "text": "expanded segment"}]}`
     : `Du är en professionell TV-nyhetsuppläsare på svenska rikstäckande TV. Expandera varje nyhetsrubrik till en nyhetssnutt på 3-4 meningar med kontext och bakgrund. Alltid på flytande svenska oavsett källspråk. Inga häsningsfraser. Svara ENDAST med JSON: {"nyheter": [{"text": "..."}]}`;
 
   try {
@@ -67,7 +67,11 @@ async function expanderaMedGroq(nyheter, lang = "sv") {
 
     const data = await r.json();
     const expanded = JSON.parse(data.choices[0].message.content).nyheter;
-    return nyheter.map((n, i) => ({ ...n, text: expanded[i]?.text || n.rubrik }));
+    return nyheter.map((n, i) => ({
+      ...n,
+      rubrik: expanded[i]?.rubrik || n.rubrik,
+      text: expanded[i]?.text || n.rubrik,
+    }));
   } catch {
     return nyheter.map(n => ({ ...n, text: n.rubrik }));
   }
