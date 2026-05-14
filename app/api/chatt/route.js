@@ -197,6 +197,38 @@ REGLER — viktiga:
     }
   }
 
+  // ── Try OpenRouter (streaming, same format as Groq) ─────────────────────
+  const orKey = process.env.OPENROUTER_API_KEY;
+  if (orKey) {
+    const orAbort = new AbortController();
+    const orTimeout = setTimeout(() => orAbort.abort(), 8000);
+    try {
+      const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${orKey}`,
+          "HTTP-Referer": "https://www.debatt-ai.se",
+          "X-Title": "Debatt AI",
+        },
+        signal: orAbort.signal,
+        body: JSON.stringify({
+          model: "meta-llama/llama-3.3-70b-instruct:free",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
+          max_tokens: 250,
+          temperature: 0.88,
+          stream: true,
+        }),
+      });
+      clearTimeout(orTimeout);
+      if (orRes.ok) {
+        return new Response(orRes.body, { headers: { ...rlHeaders, "X-Provider": "openrouter" } });
+      }
+    } catch (e) {
+      clearTimeout(orTimeout);
+    }
+  }
+
   // ── Fall back to Gemini ──────────────────────────────────────────────────
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!geminiKey) {
