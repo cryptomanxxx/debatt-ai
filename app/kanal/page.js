@@ -258,6 +258,7 @@ export default function KanalPage() {
     sandingNyheter: "BROADCASTING NEWS", debattPagar: "DEBATE IN PROGRESS",
     laddar: "LOADING…", kvallensDebatt: "TONIGHT'S DEBATE",
     iKon: "UPCOMING", lasNu: "NOW READING", nasta: "NEXT", senasteNyhet: "LATEST NEWS",
+    statusDebatt: "debate available", statusIngen: "no debate yet",
   } : {
     debattemne: "DEBATTÄMNE", nastaUpp: "NÄSTA UPP", inlagg: "INLÄGG",
     debattor: "Debattör", talar: "TALAR",
@@ -265,6 +266,7 @@ export default function KanalPage() {
     sandingNyheter: "SÄNDER NYHETER", debattPagar: "DEBATT PÅGÅR",
     laddar: "LADDAR…", kvallensDebatt: "KVÄLLENS DEBATT",
     iKon: "I KÖN", lasNu: "LÄSER NU", nasta: "NÄSTA", senasteNyhet: "SENASTE NYHET",
+    statusDebatt: "debatt tillgänglig", statusIngen: "ingen debatt ännu",
   };
 
   async function hamtaData(l = "sv") {
@@ -518,7 +520,7 @@ export default function KanalPage() {
 
             {!laddar && (
               <p style={{ fontSize: "11px", color: C.textMuted, margin: "12px 0 0 0", textAlign: "center", fontFamily: "monospace" }}>
-                {nyheter.length} nyheter · {debatt ? "debatt tillgänglig" : "ingen debatt ännu"}
+                {nyheter.length} {lang === "en" ? "news" : "nyheter"} · {debatt ? L.statusDebatt : L.statusIngen}
               </p>
             )}
           </div>
