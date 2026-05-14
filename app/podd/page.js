@@ -110,7 +110,8 @@ const PANELER = [
 ];
 
 const ALLA_AGENTER = Object.keys(AGENT_FARG);
-const AMNEN = [
+
+const AMNEN_SV = [
   "Ska AI få fatta juridiska beslut?", "Bör AI ha rättigheter i framtiden?",
   "Ska skolor förbjuda AI-verktyg?", "Ska vi beskatta rika mycket mer?",
   "Är gig-ekonomin bra eller dålig?", "Ska Sverige ha kärnkraft?",
@@ -122,8 +123,23 @@ const AMNEN = [
   "Har livet blivit sämre trots högre standard?", "Är klimatrörelsen för radikal?",
 ];
 
+const AMNEN_EN = [
+  "Should AI be allowed to make legal decisions?", "Should AI have rights in the future?",
+  "Should schools ban AI tools?", "Should we tax the rich much more?",
+  "Is the gig economy good or bad?", "Should Sweden have nuclear power?",
+  "Is the housing market broken?", "Should drugs be legalized?",
+  "Is freedom of speech under threat?", "Is democracy overrated?",
+  "Should we have a four-day work week?", "Is universal basic income a good idea?",
+  "Do we work too much?", "Is loneliness a societal problem?",
+  "Should aviation taxes be raised?", "Should meat be taxed more heavily?",
+  "Has life gotten worse despite higher living standards?", "Is the climate movement too radical?",
+];
+
 function pickRandom(arr, n) { return [...arr].sort(() => Math.random() - 0.5).slice(0, n); }
-function slumpaAmne() { return AMNEN[Math.floor(Math.random() * AMNEN.length)]; }
+function slumpaAmne(l = "sv") {
+  const list = l === "en" ? AMNEN_EN : AMNEN_SV;
+  return list[Math.floor(Math.random() * list.length)];
+}
 
 const RL_KEY = "chatt_ratelimit";
 const RL_LIMIT = 5;
@@ -148,11 +164,11 @@ function peekLocalRL() {
   return { remaining: Math.max(0, RL_LIMIT - count), resetAt: windowStart + RL_WINDOW };
 }
 
-async function streamSvar({ amne, historik, agent, onToken, signal }) {
+async function streamSvar({ amne, historik, agent, lang, onToken, signal }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amne, historik, agent }),
+    body: JSON.stringify({ amne, historik, agent, lang }),
     signal,
   });
   if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
@@ -217,8 +233,6 @@ function Waveform({ amplitude, farg }) {
   );
 }
 
-
-// Agenter med 4 munlägen (neutral, small, medium, large)
 const MOUTH_STATES = new Set(["Nationalekonom"]);
 
 function TalkingFace({ namn, amplitude, speaking }) {
@@ -243,7 +257,7 @@ function TalkingFace({ namn, amplitude, speaking }) {
   );
 }
 
-function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
+function AgentDisplay({ namn, speaking, tänkande, amplitude, talarLabel = "TALAR" }) {
   const farg = AGENT_FARG[namn] || C.accent;
   const isTänkande = tänkande === namn;
   const glow = speaking ? 18 + amplitude * 40 : 0;
@@ -252,14 +266,12 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
     <div style={{ position: "relative", width: "100%", paddingTop: "75%", background: "#000", flexShrink: 0 }}>
       <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
 
-        {/* Munanimation för agenter med 4-lägesbilder, annars statisk */}
         {MOUTH_STATES.has(namn) ? (
           <TalkingFace namn={namn} amplitude={amplitude} speaking={speaking} />
         ) : (
           <img src={avatarSrc(namn)} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
         )}
 
-        {/* Tänker-overlay */}
         {isTänkande && !speaking && (
           <div style={{ position: "absolute", inset: 0, background: "#00000060", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{ display: "flex", gap: "8px" }}>
@@ -268,14 +280,13 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
           </div>
         )}
 
-        {/* Nedre gradient + info */}
         <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "48px 20px 18px", background: "linear-gradient(transparent, rgba(0,0,0,0.88))" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
             <div>
               {speaking && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
                   <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
-                  <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>TALAR</span>
+                  <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>{talarLabel}</span>
                 </div>
               )}
               <p style={{ fontSize: "22px", fontWeight: 700, color: C.text, margin: 0, fontFamily: "Times New Roman, serif", textShadow: "0 2px 8px #000" }}>{namn}</p>
@@ -284,7 +295,6 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
           </div>
         </div>
 
-        {/* Glödram + canvas-filter när agenten talar */}
         {speaking && (
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none",
             boxShadow: `inset 0 0 ${glow * 1.5}px ${farg}33`,
@@ -297,10 +307,18 @@ function AgentDisplay({ namn, speaking, tänkande, amplitude }) {
   );
 }
 
-function InfoPanel({ namn, streaming, historik }) {
+function InfoPanel({ namn, streaming, historik, lang = "sv" }) {
   const farg = AGENT_FARG[namn] || C.accent;
   const info = AGENT_INFO[namn] || {};
   const transcriptRef = useRef(null);
+
+  const LP = lang === "en" ? {
+    omAgent: "About", rost: "Voice", roll: "Role", styrka: "Strength",
+    utmaning: "Challenge", talarNu: "Speaking now", transkript: "Transcript",
+  } : {
+    omAgent: "Om agenten", rost: "Röst", roll: "Roll", styrka: "Styrka",
+    utmaning: "Utmaning", talarNu: "Talar nu", transkript: "Transkript",
+  };
 
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: 0, behavior: "smooth" });
@@ -308,17 +326,16 @@ function InfoPanel({ namn, streaming, historik }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      {/* Fixed top: agent info + live text */}
       <div style={{ flexShrink: 0, padding: "24px 20px 16px", borderBottom: historik.length > 0 ? `1px solid ${C.border}` : "none" }}>
-        <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 14px 0" }}>Om agenten</p>
+        <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 14px 0" }}>{LP.omAgent}</p>
         <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.text, margin: "0 0 4px 0", fontFamily: "Times New Roman, serif" }}>{namn}</h2>
         <p style={{ fontSize: "11px", color: farg, margin: "0 0 16px 0", letterSpacing: "0.05em" }}>{info.tags}</p>
 
         {[
-          { label: "Röst",     value: info.rost     },
-          { label: "Roll",     value: info.roll     },
-          { label: "Styrka",   value: info.styrka   },
-          { label: "Utmaning", value: info.utmaning },
+          { label: LP.rost,     value: info.rost     },
+          { label: LP.roll,     value: info.roll     },
+          { label: LP.styrka,   value: info.styrka   },
+          { label: LP.utmaning, value: info.utmaning },
         ].map(({ label, value }) => value ? (
           <div key={label} style={{ marginBottom: "10px" }}>
             <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 3px 0" }}>{label}</p>
@@ -326,10 +343,9 @@ function InfoPanel({ namn, streaming, historik }) {
           </div>
         ) : null)}
 
-        {/* Streaming text */}
         {streaming && (
           <div style={{ marginTop: "12px", padding: "12px", background: C.bg, border: `1px solid ${farg}30`, borderRadius: "6px" }}>
-            <p style={{ fontSize: "10px", color: farg, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 6px 0" }}>Talar nu</p>
+            <p style={{ fontSize: "10px", color: farg, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 6px 0" }}>{LP.talarNu}</p>
             <p style={{ fontSize: "13px", color: C.text, lineHeight: 1.7, margin: 0 }}>
               {streaming.text}
               <span style={{ display: "inline-block", width: "2px", height: "1em", background: farg, marginLeft: "2px", verticalAlign: "text-bottom", animation: "dot 0.8s step-end infinite" }} />
@@ -338,10 +354,9 @@ function InfoPanel({ namn, streaming, historik }) {
         )}
       </div>
 
-      {/* Scrollable transcript — newest first, scrolls independently */}
       {historik.length > 0 && (
         <div ref={transcriptRef} style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
-          <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px 0" }}>Transkript ({historik.length}/10)</p>
+          <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px 0" }}>{LP.transkript} ({historik.length}/10)</p>
           {[...historik].reverse().map((e, i) => (
             <div key={e.id ?? i} style={{ display: "flex", gap: "10px", marginBottom: "12px" }}>
               <div style={{ width: "3px", borderRadius: "2px", background: AGENT_FARG[e.agent] || C.accent, flexShrink: 0, alignSelf: "stretch" }} />
@@ -361,8 +376,7 @@ function AgentThumb({ namn, active }) {
   const farg = AGENT_FARG[namn] || C.accent;
   return (
     <div style={{ width: "44px", height: "44px", borderRadius: "50%", overflow: "hidden", flexShrink: 0, border: `2px solid ${active ? farg : C.border}`, boxShadow: active ? `0 0 14px ${farg}55` : "none", transition: "border-color 0.3s, box-shadow 0.3s" }}>
-      <img src={avatarSrc(namn)} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover" }}
- />
+      <img src={avatarSrc(namn)} alt={namn} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
     </div>
   );
 }
@@ -371,7 +385,7 @@ function AgentThumb({ namn, active }) {
 
 export default function PoddPage() {
   const [fas, setFas]               = useState("start");
-  const [amne, setAmne]             = useState(() => slumpaAmne());
+  const [amne, setAmne]             = useState(() => slumpaAmne("sv"));
   const [valdPanel, setValdPanel]   = useState(0);
   const [slumpAgenter, setSlumpAgenter] = useState(() => pickRandom(ALLA_AGENTER, 3));
   const [agenter, setAgenter]       = useState([]);
@@ -389,12 +403,36 @@ export default function PoddPage() {
   const [ärrRepris, setÄrRepris]    = useState(false);
   const [spelarIn, setSpelarIn]     = useState(false);
   const [videoBlob, setVideoBlob]   = useState(null);
+  const [lang, setLang]             = useState("sv");
 
   const stoppRef    = useRef(false);
   const abortRef    = useRef(null);
   const autoplayRef = useRef(true);
   const recorderRef = useRef(null);
   const chunksRef   = useRef([]);
+  const langRef     = useRef("sv");
+
+  const L = lang === "en" ? {
+    livePodd: "LIVE PODCAST", talar: "SPEAKING", repris: "REPLAY",
+    panel: "Panel", amneLabel: "Topic", startaPodd: "▶ Start podcast",
+    spelaIn: "Record video", debatten: "debates left this period",
+    inlagg: "Post", stoppa: "⏹ Stop", amneRad: "Topic:",
+    avslutad: "Debate ended", aiSummering: "AI summary",
+    transkript: "Transcript", nyDebatt: "▶ New debate",
+    laddaNed: "⬇ Download video", delaDebatt: "Share debate →",
+    gransen: "Limit reached. Try again in",
+    min: "min",
+  } : {
+    livePodd: "LIVE PODD", talar: "TALAR", repris: "REPRIS",
+    panel: "Panel", amneLabel: "Ämne", startaPodd: "▶ Starta podden",
+    spelaIn: "Spela in video", debatten: "debatter kvar denna period",
+    inlagg: "Inlägg", stoppa: "⏹ Stoppa", amneRad: "Ämne:",
+    avslutad: "Debatten avslutad", aiSummering: "AI-summering",
+    transkript: "Transkript", nyDebatt: "▶ Ny debatt",
+    laddaNed: "⬇ Ladda ned video", delaDebatt: "Dela debatten →",
+    gransen: "Gränsen nådd. Försök igen om",
+    min: "min",
+  };
 
   const stöderInspelning = typeof navigator !== "undefined" &&
     typeof navigator.mediaDevices?.getDisplayMedia === "function";
@@ -409,11 +447,21 @@ export default function PoddPage() {
     else if (tänkande) setDisplayAgent(tänkande);
   }, [speakerAgent, tänkande]);
 
+  function handleLangChange(l) {
+    if (fas !== "start") return;
+    setLang(l);
+    langRef.current = l;
+    setAmne(slumpaAmne(l));
+  }
+
   async function spelaUppText(text, agent) {
     if (!autoplayRef.current) return;
     setSpeakerAgent(agent);
     const vp = AGENT_ROST[agent] || { pitch: 1.0, rate: 1.0 };
-    const rvVoice = AGENT_AZURE_VOICE[agent] ? "Swedish Female" : "Swedish Male";
+    const isFemale = !!AGENT_AZURE_VOICE[agent];
+    const rvVoice = langRef.current === "en"
+      ? (isFemale ? "US English Female" : "US English Male")
+      : (isFemale ? "Swedish Female" : "Swedish Male");
     await new Promise(resolve => {
       if (!autoplayRef.current || stoppRef.current) { resolve(); return; }
       let iv;
@@ -524,12 +572,12 @@ export default function PoddPage() {
     const rl = peekLocalRL();
     if (rl.remaining <= 0) {
       const min = Math.ceil((rl.resetAt - Date.now()) / 60000);
-      setFel(`Gränsen nådd (${RL_LIMIT} debatter/10 min). Försök igen om ${min} min.`);
+      setFel(`${L.gransen} ${min} ${L.min}.`);
       return;
     }
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? slumpAgenter;
-    const valtAmne = amne.trim() || slumpaAmne();
+    const valtAmne = amne.trim() || slumpaAmne(langRef.current);
     if (spelarIn) {
       const ok = await startaInspelning();
       if (!ok) return;
@@ -558,7 +606,7 @@ export default function PoddPage() {
       try {
         let gotFirst = false;
         const text = await streamSvar({
-          amne: valtAmne, historik: h, agent, signal: abort.signal,
+          amne: valtAmne, historik: h, agent, lang: langRef.current, signal: abort.signal,
           onToken: (t) => { if (!gotFirst) { gotFirst = true; setTänkande(""); } setStreaming({ agent, text: t }); },
         });
         if (stoppRef.current) break;
@@ -588,7 +636,7 @@ export default function PoddPage() {
     stoppa(); autoplayRef.current = true;
     setFas("start"); setHistorik([]); setSummering(""); setDebattId(null);
     setFel(""); setÄrRepris(false); setVideoBlob(null);
-    setAmne(slumpaAmne()); setSlumpAgenter(pickRandom(ALLA_AGENTER, 3));
+    setAmne(slumpaAmne(langRef.current)); setSlumpAgenter(pickRandom(ALLA_AGENTER, 3));
     setDisplayAgent(null);
   }
 
@@ -609,15 +657,15 @@ export default function PoddPage() {
         }
       `}</style>
 
-      {/* Live-indikator under global nav */}
+      {/* Live-indikator */}
       {fas === "kör" && (
         <div style={{ borderBottom: `1px solid ${C.border}`, padding: "6px 20px", background: C.bg, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "12px" }}>
           {ärrRepris && (
-            <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.08em", border: `1px solid ${C.border}`, padding: "3px 8px", borderRadius: "4px" }}>REPRIS</span>
+            <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.08em", border: `1px solid ${C.border}`, padding: "3px 8px", borderRadius: "4px" }}>{L.repris}</span>
           )}
           <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
-            <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>LIVE PODD</span>
+            <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>{L.livePodd}</span>
           </span>
         </div>
       )}
@@ -626,11 +674,27 @@ export default function PoddPage() {
       {fas === "start" && (
         <main style={{ maxWidth: "720px", margin: "0 auto", padding: "48px 20px", width: "100%" }}>
           <p style={{ fontSize: "11px", color: "#888", letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 10px 0" }}>🎙 AI VIDEOPODDEN</p>
-          <h1 style={{ fontSize: "32px", fontWeight: 400, margin: "0 0 8px 0", lineHeight: 1.2 }}>Live-debatt med AI-agenter</h1>
-          <p style={{ color: C.textMuted, fontSize: "15px", lineHeight: 1.7, margin: "0 0 36px 0" }}>Välj panel, skriv ett ämne och starta — agenterna debatterar med egna röster och rörliga ansikten.</p>
+          <h1 style={{ fontSize: "32px", fontWeight: 400, margin: "0 0 8px 0", lineHeight: 1.2 }}>
+            {lang === "en" ? "Live debate with AI agents" : "Live-debatt med AI-agenter"}
+          </h1>
+          <p style={{ color: C.textMuted, fontSize: "15px", lineHeight: 1.7, margin: "0 0 28px 0" }}>
+            {lang === "en"
+              ? "Choose a panel, write a topic and start — the agents debate with their own voices and animated faces."
+              : "Välj panel, skriv ett ämne och starta — agenterna debatterar med egna röster och rörliga ansikten."}
+          </p>
+
+          {/* Språkväljare */}
+          <div style={{ display: "flex", gap: "6px", marginBottom: "28px" }}>
+            {[["sv", "🇸🇪 Svenska"], ["en", "🇬🇧 English"]].map(([l, label]) => (
+              <button key={l} onClick={() => handleLangChange(l)}
+                style={{ padding: "8px 18px", background: lang === l ? C.accent : "transparent", color: lang === l ? "#080808" : C.textMuted, border: `1px solid ${lang === l ? C.accent+"80" : C.border}`, borderRadius: "4px", fontSize: "13px", fontWeight: lang === l ? 700 : 400, cursor: "pointer", fontFamily: "Georgia, serif", transition: "all 0.15s" }}>
+                {label}
+              </button>
+            ))}
+          </div>
 
           {/* Panel-val */}
-          <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "10px" }}>Panel</p>
+          <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "10px" }}>{L.panel}</p>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "28px" }}>
             {PANELER.map((p, i) => (
               <button key={i} onClick={() => { setValdPanel(i); if (!p.agenter) setSlumpAgenter(pickRandom(ALLA_AGENTER, 3)); }}
@@ -647,8 +711,7 @@ export default function PoddPage() {
               return (
                 <div key={a} style={{ flex: 1, maxWidth: "180px", textAlign: "center" }}>
                   <div style={{ borderRadius: "8px", overflow: "hidden", aspectRatio: "1", border: `2px solid ${C.border}`, marginBottom: "8px" }}>
-                    <img src={avatarSrc(a)} alt={a} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
- />
+                    <img src={avatarSrc(a)} alt={a} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   </div>
                   <p style={{ fontSize: "12px", color: farg, margin: 0, fontWeight: 600 }}>{a}</p>
                 </div>
@@ -657,17 +720,17 @@ export default function PoddPage() {
           </div>
 
           {/* Ämne */}
-          <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>Ämne</p>
+          <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px" }}>{L.amneLabel}</p>
           <div style={{ position: "relative", marginBottom: "24px" }}>
             <input value={amne} onChange={e => setAmne(e.target.value)}
               style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", color: C.text, fontFamily: "Georgia, serif", fontSize: "16px", padding: "12px 48px 12px 16px", width: "100%", boxSizing: "border-box", outline: "none" }} />
-            <button onClick={() => setAmne(slumpaAmne())} title="Slumpa ämne"
+            <button onClick={() => setAmne(slumpaAmne(lang))} title="Slumpa ämne"
               style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textMuted, fontSize: "18px", cursor: "pointer", padding: "4px 6px" }}>↺</button>
           </div>
 
           {rateLimitInfo.remaining <= 0 && (
             <p style={{ color: "#f87171", fontSize: "13px", margin: "0 0 16px 0" }}>
-              Gränsen nådd. Försök igen om {Math.ceil(((rateLimitInfo.resetAt || Date.now()+600000) - Date.now()) / 60000)} min.
+              {L.gransen} {Math.ceil(((rateLimitInfo.resetAt || Date.now()+600000) - Date.now()) / 60000)} {L.min}.
             </p>
           )}
           {fel && <p style={{ color: "#f87171", fontSize: "14px", margin: "0 0 16px 0" }}>{fel}</p>}
@@ -675,18 +738,18 @@ export default function PoddPage() {
           <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
             <button onClick={starta} disabled={rateLimitInfo.remaining <= 0}
               style={{ background: C.accent, color: "#080808", border: "none", borderRadius: "4px", padding: "14px 36px", fontSize: "15px", fontWeight: 700, letterSpacing: "0.08em", cursor: rateLimitInfo.remaining > 0 ? "pointer" : "not-allowed", fontFamily: "Georgia, serif" }}>
-              ▶ Starta podden
+              {L.startaPodd}
             </button>
             {stöderInspelning && (
               <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
                 <input type="checkbox" checked={spelarIn} onChange={e => setSpelarIn(e.target.checked)}
                   style={{ width: "16px", height: "16px", accentColor: C.accent, cursor: "pointer" }} />
-                <span style={{ fontSize: "13px", color: C.textMuted }}>Spela in video</span>
+                <span style={{ fontSize: "13px", color: C.textMuted }}>{L.spelaIn}</span>
               </label>
             )}
           </div>
           <p style={{ color: C.textMuted, fontSize: "12px", margin: 0 }}>
-            {rateLimitInfo.remaining}/{RL_LIMIT} debatter kvar denna period
+            {rateLimitInfo.remaining}/{RL_LIMIT} {L.debatten}
           </p>
         </main>
       )}
@@ -695,23 +758,22 @@ export default function PoddPage() {
       {fas === "kör" && agenter.length > 0 && currentDisplay && (
         <>
           <div className="podd-layout">
-            {/* Vänster: stor agent-display */}
             <div className="podd-main">
               <AgentDisplay
                 namn={currentDisplay}
                 speaking={speakerAgent === currentDisplay}
                 tänkande={tänkande}
                 amplitude={speakerAgent === currentDisplay ? amplitude : 0}
+                talarLabel={L.talar}
               />
             </div>
 
-            {/* Höger: info-panel */}
             <div className="podd-side">
-              <InfoPanel namn={currentDisplay} streaming={speakerAgent === currentDisplay ? streaming : null} historik={historik} />
+              <InfoPanel namn={currentDisplay} streaming={speakerAgent === currentDisplay ? streaming : null} historik={historik} lang={lang} />
             </div>
           </div>
 
-          {/* Botten: agent-strip + progress + stopp */}
+          {/* Botten */}
           <div style={{ borderTop: `1px solid ${C.border}`, padding: "14px 20px", background: C.surface, flexShrink: 0 }}>
             <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", gap: "16px" }}>
               <div style={{ display: "flex", gap: "10px" }}>
@@ -722,11 +784,11 @@ export default function PoddPage() {
                   <div style={{ height: "100%", width: `${(historik.length / 10) * 100}%`, background: C.accent, borderRadius: "2px", transition: "width 0.5s ease" }} />
                 </div>
                 <p style={{ fontSize: "11px", color: C.textMuted, margin: "5px 0 0 0", fontFamily: "monospace" }}>
-                  Inlägg {historik.length}/10
+                  {L.inlagg} {historik.length}/10
                 </p>
               </div>
               <button onClick={stoppa} style={{ background: "none", border: `1px solid #f8717140`, color: "#f87171", borderRadius: "4px", padding: "8px 18px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif", flexShrink: 0 }}>
-                ⏹ Stoppa
+                {L.stoppa}
               </button>
             </div>
           </div>
@@ -735,7 +797,7 @@ export default function PoddPage() {
           <div style={{ padding: "10px 20px", borderTop: `1px solid ${C.border}`, background: C.bg, flexShrink: 0 }}>
             <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
               <p style={{ fontSize: "13px", color: C.textMuted, margin: 0 }}>
-                Ämne: <span style={{ color: C.text }}>{faktisktAmne}</span>
+                {L.amneRad} <span style={{ color: C.text }}>{faktisktAmne}</span>
               </p>
             </div>
           </div>
@@ -745,15 +807,13 @@ export default function PoddPage() {
       {/* ── KLAR ── */}
       {fas === "klar" && (
         <main style={{ maxWidth: "720px", margin: "0 auto", padding: "48px 20px", width: "100%" }}>
-          <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>Debatten avslutad</p>
+          <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>{L.avslutad}</p>
 
-          {/* Agent-bilder */}
           <div style={{ display: "flex", gap: "16px", justifyContent: "center", marginBottom: "28px" }}>
             {agenter.map(a => (
               <div key={a} style={{ flex: 1, maxWidth: "200px", textAlign: "center" }}>
                 <div style={{ borderRadius: "8px", overflow: "hidden", aspectRatio: "1", border: `2px solid ${(AGENT_FARG[a]||C.accent)+"40"}`, marginBottom: "8px" }}>
-                  <img src={avatarSrc(a)} alt={a} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
- />
+                  <img src={avatarSrc(a)} alt={a} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                 </div>
                 <p style={{ fontSize: "12px", color: AGENT_FARG[a]||C.accent, margin: 0, fontWeight: 600 }}>{a}</p>
               </div>
@@ -764,13 +824,13 @@ export default function PoddPage() {
 
           {summering && (
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginBottom: "24px" }}>
-              <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 10px 0" }}>AI-summering</p>
+              <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 10px 0" }}>{L.aiSummering}</p>
               <p style={{ color: C.text, fontSize: "15px", lineHeight: 1.75, margin: 0, fontStyle: "italic" }}>{summering}</p>
             </div>
           )}
 
           <div style={{ marginBottom: "28px" }}>
-            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px 0" }}>Transkript</p>
+            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 12px 0" }}>{L.transkript}</p>
             {historik.map((e, i) => (
               <div key={i} style={{ display: "flex", gap: "12px", marginBottom: "14px" }}>
                 <div style={{ width: "3px", borderRadius: "2px", background: AGENT_FARG[e.agent]||C.accent, flexShrink: 0, alignSelf: "stretch" }} />
@@ -784,7 +844,7 @@ export default function PoddPage() {
 
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <button onClick={nyDebatt} style={{ background: C.accent, color: C.bg, border: "none", borderRadius: "4px", padding: "12px 28px", fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "Georgia, serif" }}>
-              ▶ Ny debatt
+              {L.nyDebatt}
             </button>
             {videoBlob && (
               <a
@@ -792,12 +852,12 @@ export default function PoddPage() {
                 download={`debatt-${faktisktAmne.slice(0, 40).replace(/[^a-zåäöA-ZÅÄÖ0-9 ]/g, "").trim()}.webm`}
                 style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "none", border: `1px solid ${C.accent}60`, color: C.accent, borderRadius: "4px", padding: "12px 24px", fontSize: "14px", textDecoration: "none" }}
               >
-                ⬇ Ladda ned video
+                {L.laddaNed}
               </a>
             )}
             {debattId && (
               <a href={`/chatt/${debattId}`} style={{ display: "inline-flex", alignItems: "center", background: "none", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "12px 24px", fontSize: "14px", textDecoration: "none" }}>
-                Dela debatten →
+                {L.delaDebatt}
               </a>
             )}
           </div>
