@@ -244,7 +244,6 @@ export default function KanalPage() {
   const [translatedAmne, setTranslatedAmne] = useState(null);
   const [translatedInlagg, setTranslatedInlagg] = useState(null);
   const [oversatter, setOversatter]         = useState(false);
-  const [oversattIdx, setOversattIdx]       = useState(0);
 
   const runningRef     = useRef(false);
   const ampTimer       = useRef(null);
@@ -367,6 +366,27 @@ export default function KanalPage() {
     setAmplitude(0);
   }
 
+  async function batchOversattRubriker() {
+    const lista = nyheterRef.current;
+    if (!lista.length) return;
+    try {
+      const res = await fetch("/api/kanal/batch-rubriker", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rubriker: lista.map(n => n.rubrik) }),
+      });
+      const { translated } = await res.json();
+      if (Array.isArray(translated) && translated.length === lista.length) {
+        nyheterRef.current = nyheterRef.current.map((n, i) =>
+          translated[i] && translated[i] !== n.rubrik
+            ? { ...n, rubrikEn: translated[i] }
+            : n
+        );
+        setNyheter([...nyheterRef.current]);
+      }
+    } catch {}
+  }
+
   async function expanderaItem(item, i) {
     if (item.text && item.text !== item.rubrik) return item.text;
     try {
@@ -397,21 +417,17 @@ export default function KanalPage() {
     setMode("nyheter");
 
     if (langRef.current === "en") {
-      // Pre-expand ALL items with pacing before starting broadcast.
-      // Without this, failed expansions cause items to play in ~3s (just the short
-      // Swedish rubrik), which triggers the next expansion immediately — a cascade
-      // that rate-limits all providers within seconds.
       setOversatter(true);
-      setOversattIdx(0);
-      for (let i = 0; i < lista.length; i++) {
-        if (!runningRef.current) { setOversatter(false); return; }
-        setOversattIdx(i + 1);
-        await expanderaItem(nyheterRef.current[i], i);
-        if (i < lista.length - 1) await sleep(1500);
+      // One API call translates all headlines at once — UPCOMING shows English instantly.
+      // This avoids making 10 individual calls (which cascade into rate-limit failures).
+      if (nyheterRef.current.some(n => !n.rubrikEn)) {
+        await batchOversattRubriker();
+        await sleep(4000); // rate-limit buffer before the first body-expansion call
       }
+      // Pre-expand body text for first item only, then expand lazily during playback
+      await expanderaItem(nyheterRef.current[0], 0);
       setOversatter(false);
     } else {
-      // Swedish: only pre-expand first item, rest are fetched during playback
       await expanderaItem(lista[0], 0);
     }
 
@@ -419,16 +435,27 @@ export default function KanalPage() {
       if (!runningRef.current) return;
       setCurrentIdx(i);
 
-      // Swedish mode: pre-fetch next item during current item's playback
-      const nextPrefetch = langRef.current !== "en" && i + 1 < lista.length
+      // Pre-fetch next item's body text during current item's playback
+      const nextPrefetch = i + 1 < lista.length
         ? expanderaItem(nyheterRef.current[i + 1], i + 1)
         : Promise.resolve();
 
       const item = nyheterRef.current[i];
-      const text = (item.text && item.text !== item.rubrik) ? item.text : item.rubrik;
-      await spelaUppText(text, null);
+      // In English mode fall back to English headline if body expansion hasn't landed yet
+      const text = (item.text && item.text !== item.rubrik)
+        ? item.text
+        : (langRef.current === "en" && item.rubrikEn ? item.rubrikEn : item.rubrik);
 
-      if (langRef.current !== "en") await nextPrefetch;
+      const t0 = Date.now();
+      await spelaUppText(text, null);
+      await nextPrefetch;
+
+      // In English mode enforce a 5 s floor between items so consecutive Gemini
+      // calls stay under the 15 req/min limit and body expansions actually succeed.
+      if (langRef.current === "en") {
+        const elapsed = Date.now() - t0;
+        if (elapsed < 5000) await sleep(5000 - elapsed);
+      }
 
       if (!runningRef.current) return;
       await sleep(600);
@@ -492,7 +519,6 @@ export default function KanalPage() {
     setTranslatedAmne(null);
     setTranslatedInlagg(null);
     setOversatter(false);
-    setOversattIdx(0);
     if (ampTimer.current) clearInterval(ampTimer.current);
     if (window.responsiveVoice) window.responsiveVoice.cancel();
   }
@@ -594,7 +620,7 @@ export default function KanalPage() {
                 <div style={{ padding: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", minHeight: "200px" }}>
                   <div style={{ fontSize: "10px", color: oversatter ? ANCHOR_FARG : C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "16px", fontFamily: "monospace" }}>
                     {oversatter
-                      ? (lang === "en" ? `TRANSLATING ${oversattIdx}/${nyheter.length}…` : `ÖVERSÄTTER ${oversattIdx}/${nyheter.length}…`)
+                      ? (lang === "en" ? "PREPARING BROADCAST…" : "FÖRBEREDER SÄNDNING…")
                       : running && speaking ? L.lasNu : running ? L.nasta : L.senasteNyhet}
                   </div>
                   {currentNyhet ? (
