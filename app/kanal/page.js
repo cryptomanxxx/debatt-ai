@@ -271,13 +271,27 @@ export default function KanalPage() {
 
   async function hamtaData(l = "sv") {
     setLaddar(true);
-    const [nyheterData, debattData] = await Promise.all([
-      fetch(`/api/kanal/nyheter?lang=${l}`).then(r => r.json()).catch(() => []),
+    const [nyheterRaw, debattData] = await Promise.all([
+      fetch(`/api/kanal/nyheter?lang=${l}&_v=3`).then(r => r.json()).catch(() => []),
       fetch(`${SB_URL}/rest/v1/chatt_debatter?kalla=eq.kanal&order=skapad.desc&limit=1`, {
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
       }).then(r => r.json()).catch(() => []),
     ]);
-    if (Array.isArray(nyheterData) && nyheterData.length) {
+
+    let nyheterData = Array.isArray(nyheterRaw) ? nyheterRaw : [];
+
+    // If English mode and Groq batch expansion failed (text === rubrik for all items),
+    // fall back to translating each headline individually via the translate API
+    if (l === "en" && nyheterData.length > 0 && nyheterData.every(n => n.text === n.rubrik)) {
+      nyheterData = await Promise.all(
+        nyheterData.map(async (item) => {
+          const translated = await translateText(item.rubrik);
+          return { ...item, rubrik: translated, text: translated };
+        })
+      );
+    }
+
+    if (nyheterData.length) {
       setNyheter(nyheterData);
       nyheterRef.current = nyheterData;
     }

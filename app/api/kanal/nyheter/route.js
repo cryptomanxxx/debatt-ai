@@ -43,7 +43,7 @@ async function expanderaMedGroq(nyheter, lang = "sv") {
   const lista = nyheter.map((n, i) => `${i + 1}. [${n.kalla}] ${n.rubrik}`).join("\n");
 
   const systemPrompt = lang === "en"
-    ? `You are a professional TV news anchor. For each numbered headline: (1) translate the headline to English, (2) expand it into a 3–4 sentence news segment with context and background. Always in fluent, natural English regardless of the headline's original language. No greetings. Reply ONLY with JSON: {"nyheter": [{"rubrik": "translated headline", "text": "expanded segment"}]}`
+    ? `You are a TV news anchor. For each numbered headline translate it to English and write a 2-sentence English news segment. Reply ONLY with JSON: {"nyheter":[{"rubrik":"English headline","text":"2-sentence English segment"}]}`
     : `Du är en professionell TV-nyhetsuppläsare på svenska rikstäckande TV. Expandera varje nyhetsrubrik till en nyhetssnutt på 3-4 meningar med kontext och bakgrund. Alltid på flytande svenska oavsett källspråk. Inga häsningsfraser. Svara ENDAST med JSON: {"nyheter": [{"text": "..."}]}`;
 
   try {
@@ -66,7 +66,13 @@ async function expanderaMedGroq(nyheter, lang = "sv") {
     if (!r.ok) return nyheter.map(n => ({ ...n, text: n.rubrik }));
 
     const data = await r.json();
-    const expanded = JSON.parse(data.choices[0].message.content).nyheter;
+    let expanded;
+    try {
+      expanded = JSON.parse(data.choices[0].message.content).nyheter;
+    } catch {
+      expanded = null;
+    }
+    if (!Array.isArray(expanded)) return nyheter.map(n => ({ ...n, text: n.rubrik }));
     return nyheter.map((n, i) => {
       const expandedText = expanded[i]?.text || n.rubrik;
       const translatedRubrik = expanded[i]?.rubrik;
@@ -107,7 +113,14 @@ export async function GET(req) {
 
   const expanderade = await expanderaMedGroq(nyheter, lang);
 
+  // Don't cache failed responses (text === rubrik means Groq fallback was used)
+  const groqFailed = expanderade.length > 0 && expanderade.every(n => n.text === n.rubrik);
+
   return NextResponse.json(expanderade, {
-    headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=3600" },
+    headers: {
+      "Cache-Control": groqFailed
+        ? "no-store"
+        : "public, s-maxage=1800, stale-while-revalidate=3600",
+    },
   });
 }
