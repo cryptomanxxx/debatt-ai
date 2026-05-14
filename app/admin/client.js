@@ -767,8 +767,8 @@ function ApiStatusTab() {
   }, []);
 
   function ProviderCard({ name, model, p }) {
-    const colors = { ok: C.green, warn: C.yellow, limited: C.red, unknown: C.textMuted };
-    const labels = { ok: "OK", warn: "LÅGT", limited: "STOPP", unknown: "OKÄND" };
+    const colors = { ok: C.green, warn: C.yellow, limited: C.red, error: C.red, unknown: C.textMuted };
+    const labels = { ok: "OK", warn: "LÅGT", limited: "STOPP", error: "FEL", unknown: "OKÄND" };
     const s = p?.status ?? "unknown";
     const col = colors[s];
     const pct = (p?.remaining != null && p?.limit) ? Math.round(p.remaining / p.limit * 100) : null;
@@ -817,6 +817,7 @@ function ApiStatusTab() {
         <>
           <ProviderCard name="Groq" model="llama-3.3-70b-versatile · 30 req/min" p={health?.groq} />
           <ProviderCard name="Gemini" model="2.0 Flash / 1.5 Flash · 15 req/min" p={health?.gemini} />
+          <ProviderCard name="OpenRouter" model="5 gratis modeller · nyhetskanal + chatt-fallback" p={health?.or} />
 
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginTop: "8px" }}>
             <p style={{ fontSize: "11px", color: C.accentDim, textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px", fontFamily: "monospace" }}>Tips</p>
