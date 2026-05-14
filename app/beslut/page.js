@@ -1,7 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
-
-export const metadata = undefined; // client component
+import { useState } from "react";
 
 const C = {
   bg: "#0a0a0a", surface: "#0f0f0f", border: "#1e1e1e",
