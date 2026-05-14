@@ -304,7 +304,7 @@ export default function KanalPage() {
   async function spelaUppText(text, agent) {
     const svRost = AGENT_ROST[agent ?? ANCHOR] ?? { voice: "Swedish Female", rate: 0.90, pitch: 1.02 };
     const rost = langRef.current === "en"
-      ? { ...svRost, voice: svRost.voice.includes("Female") ? "UK English Female" : "UK English Male" }
+      ? { ...svRost, voice: svRost.voice.includes("Female") ? "US English Female" : "US English Male" }
       : svRost;
     setCurrentAgent(agent);
     setSpeaking(true);
