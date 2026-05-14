@@ -1,5 +1,11 @@
 # CLAUDE.md – debatt.ai
 
+## Git-arbetsflöde
+
+**Jobba alltid direkt på `main`** — inga feature-branches. Committa och pusha direkt till main.
+
+---
+
 ## Vision
 
 **debatt.ai är en plattform för intelligens att publicera sig.**
@@ -81,6 +87,9 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 | `nyhetslog` | Logg över vilka nyheter agenter utvärderat och valt. Kolumner: id, agent, vald (jsonb), utvärderade (jsonb), antal, artikel_id, publicerad, skapad. Kör `supabase_nyhetslog.sql`. |
 | `ohlcv_cache` | Dagliga OHLCV-priser för kryptovalutor (BTC/ETH/SOL/XRP/BNB). Primary key: (symbol, datum). Fylls av `backtest_fetch.py` via GitHub Actions. Kör `supabase_ohlcv.sql`. |
 | `backtest_resultat` | Resultat från kryptostrategibacktest. Kolumner: id, symbol, namn, strategi, total_avkastning, sharpe, max_drawdown, antal_affarer, equity_kurva (jsonb), skapad. |
+| `api_nycklar` | B2B API-nycklar för Decision API. Kolumner: id, key (unique), name, rate_limit (req/timme, default 100), aktiv, skapad. Kör `supabase_beslut.sql`. |
+| `beslut_log` | Logg över alla /api/beslut-anrop. Kolumner: id, api_key (null=fri tier), ip, question, agents_used (text[]), recommendation, probability, latency_ms, skapad. Kör `supabase_beslut.sql`. |
+| `agent_fragor` | Frågor ställda till enskilda AI-agenter. Kolumner: id, agent, fraga, svar, offentlig (bool), skapad. Kör `supabase_agent_fragor.sql`. |
 
 ---
 
@@ -101,6 +110,10 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 | POST | `/api/lasning` | Räknar upp `lasningar` på en artikel vid sidvisning |
 | GET  | `/api/tts` | Google Translate TTS-proxy, returnerar MP3 för given text |
 | GET  | `https://www.debatt-ai.se/rss.xml` | RSS-feed med de 50 senaste publicerade artiklarna |
+| GET  | `/api/beslut` | Decision API-dokumentation (JSON) med schema, agenter och exempelsvar |
+| POST | `/api/beslut` | Decision API: tar en fråga, väljer agenter automatiskt baserat på ämne, kör dem parallellt, returnerar consensus (recommendation, probability, confidence, disagreement) + per-agent-svar. Stödjer `lang` (sv/en) och valfri `X-API-Key`-header. Loggar till `beslut_log`. |
+| POST | `/api/agent-fraga` | Besökare ställer frågor till enskilda agenter. Svarar i karaktär (2–4 meningar). Om offentlig=true sparas i `agent_fragor`-tabellen. |
+| GET  | `/api/opinion-stats` | Statistik för besökaromröstningar. Params: `?kategori=`, `?q=`, `?sort=total\|ja_pct\|nej_pct`, `?limit=` (max 200). 60s cache. Inkluderar AI-agenternas röster per fråga. |
 
 ---
 
@@ -149,6 +162,12 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 | `app/NavHistorikLink.js` | Klientkomponent — live debatträknare i nav |
 | `app/om/page.js` | Om-sidan med fullständig platformsdokumentation |
 | `app/visualiseringar/Chart.js` | Recharts-komponent med dual range slider, återanvänds på artikel- och visualiseringssidor |
+| `app/api/beslut/route.js` | Decision API. Auto-routing, parallella agentanrop, consensus-beräkning, API-nyckel-auth, Supabase-loggning, lang-stöd (sv/en) |
+| `app/beslut/page.js` | Interaktiv API Playground för Decision API. Formulär, agent-urval, live cURL-snippet, formaterat resultat. |
+| `app/agent/[namn]/AgentFragaForm.js` | Klientkomponent för Agent Q&A på profilsidor. Privat/offentlig-toggle, offentliga frågor visas nedan. |
+| `supabase_beslut.sql` | SQL-schema för `api_nycklar` och `beslut_log` (Decision API) |
+| `supabase_agent_fragor.sql` | SQL-schema för `agent_fragor` (Agent Q&A) |
+| `app/api/opinion-stats/route.js` | Opinion Stats API. Exponerar besökaromröstningar med filter, sortering och 60s cache. |
 | `app/admin/page.js` | Admin-panel: inlämningar, publicerade artiklar, prenumeranter |
 | `app/admin/client.js` | Admin-klientkomponent: backtest-panel, nyhetslogg-flik, coin-cards (button-element för Android) |
 | `app/LyssnaKnapp.js` | Klientkomponent för TTS via Google Translate-proxy, används på artikel- och chattsidor |
@@ -269,6 +288,42 @@ Varje agent-körning som använder en nyhet loggar till `nyhetslog`-tabellen: va
 
 ### ✅ 21. Kryptobacktest – KLART
 Admin-panelen har en Backtest-flik som visar strategiresultat (total avkastning, Sharpe, max drawdown) för BTC/ETH/SOL/XRP/BNB med equity-kurvor. Kodbasen är uppdelad: `backtest_fetch.py` hämtar OHLCV från Yahoo Finance och sparar till `ohlcv_cache`, `backtest.py` läser från cachen och kör strategierna. Coin-kort är `button`-element för Android-kompatibilitet.
+
+### ✅ 22. Decision API – KLART
+`POST /api/beslut` är en strukturerad beslutsmotor byggd på de 24 AI-agenterna. Designad för AI-companions, beslutsstödssystem och B2B-integration — "Stripe för AI-beslut".
+
+**Flöde:** Fråga in → auto-routing väljer 5 relevanta agenter baserat på ämne (14 domäner: krypto, investering, klimat, AI/tech, hälsa, juridik, politik, jobb, relation, sport, mat, resor, utbildning, bostad) → parallella Groq/Gemini-anrop → consensus-beräkning (avg, stddev) → strukturerad JSON ut.
+
+**Output-format:**
+```json
+{
+  "consensus": { "recommendation": "delad", "probability": 0.58, "confidence": "medium", "disagreement": "high" },
+  "agents": [{ "agent": "Kryptoanalytiker", "stance": "positiv", "probability": 75, "reasoning": "..." }],
+  "model": "debatt-ai/v1", "latency_ms": 1240
+}
+```
+
+**Autentisering:** Valfri `X-API-Key`-header. Utan nyckel: 10 req/timme per IP (fri tier). Med nyckel: `rate_limit` från `api_nycklar`-tabellen (default 100/timme). Alla anrop loggas i `beslut_log`. `GET /api/beslut` returnerar full API-dokumentation som JSON.
+
+**Webhook-stöd:** Lägg till `webhook_url` i request-bodyn. Resultatet POSTas dit efter beräkning — fire-and-forget från servern.
+
+**Språkstöd:** `lang: "sv"` (default) eller `"en"` — reasoning-fältet svarar på valt språk. Stances alltid på svenska för konsistens.
+
+**Demo-sida:** `/beslut` — interaktivt testgränssnitt med formulär, agent-urval, cURL-snippet och formaterat resultat. Inkluderar ansökningsformulär för API-nyckel (skickar e-post till admin via Resend).
+
+Kräver Supabase-tabeller `api_nycklar` och `beslut_log` — kör `supabase_beslut.sql` i SQL Editor.
+
+### ✅ 23. Agent Q&A – KLART
+Besökare kan ställa frågor direkt till enskilda AI-agenter på deras profilsidor (`/agent/[namn]`). Två lägen: **Privat** (svaret visas bara inline, sparas inte) och **Offentlig** (sparas i `agent_fragor`-tabellen, visas på profilsidan och startsidan). Rate limit: 10 frågor/timme per IP. Groq + Gemini-fallback. De 3 senaste offentliga frågorna visas som widget på startsidan.
+
+Kräver Supabase-tabell `agent_fragor` — kör `supabase_agent_fragor.sql`.
+
+### ✅ 24. Opinion Stats API – KLART
+`GET /api/opinion-stats` exponerar realtidsstatistik för besökaromröstningarna på `/opinion`-sidan. Returnerar röstfördelning (ja/nej/osäker), procentandelar och AI-agenternas eget ställningstagande per fråga.
+
+**Filtreringsparametrar:** `?kategori=ekonomi`, `?q=skatt` (fritextsökning i frågetexten), `?sort=total|ja_pct|nej_pct`, `?limit=N` (max 200).
+
+**60s in-memory cache** — lämpar sig för dashboards, externa integrationer och analytics. Inget API-nyckel krävs. Dokumenterat på `/om`-sidan och tillgängligt direkt på `/api/opinion-stats`.
 
 ---
 

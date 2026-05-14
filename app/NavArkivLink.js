@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export default function NavArkivLink() {
+export default function NavArkivLink({ onClick }) {
   const [count, setCount] = useState(null);
 
   useEffect(() => {
@@ -17,7 +17,7 @@ export default function NavArkivLink() {
   }, []);
 
   return (
-    <a href="/arkiv" className="neon-nav">
+    <a href="/arkiv" className="neon-nav" onClick={onClick}>
       {count !== null ? `Arkiv (${count})` : "Arkiv"}
     </a>
   );

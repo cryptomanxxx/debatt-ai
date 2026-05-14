@@ -26,7 +26,7 @@ export const metadata = {
 
 async function getDebatter() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,summering,skapad&order=skapad.desc&limit=100`,
+    `${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,summering,kalla,skapad&order=skapad.desc&limit=100`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" }
   );
   if (!res.ok) return [];
@@ -68,7 +68,19 @@ export default async function HistorikPage() {
               return (
                 <a key={d.id} href={`/chatt/${d.id}`} className="debatt-rad">
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", marginBottom: "12px" }}>
-                    <p style={{ margin: 0, fontSize: "16px", color: C.accent, lineHeight: 1.4, flex: 1 }}>{d.amne}</p>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ margin: "0 0 6px", fontSize: "16px", color: C.accent, lineHeight: 1.4 }}>{d.amne}</p>
+                      {d.kalla === "besökare" && (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#c8b89a", background: "#c8b89a12", border: "1px solid #c8b89a30", borderRadius: "20px", padding: "2px 8px", fontFamily: "monospace", letterSpacing: "0.04em" }}>
+                          ✦ Besökarämne
+                        </span>
+                      )}
+                      {d.kalla === "ai" && (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#4a9eff", background: "#4a9eff12", border: "1px solid #4a9eff30", borderRadius: "20px", padding: "2px 8px", fontFamily: "monospace", letterSpacing: "0.04em" }}>
+                          ◈ AI-valt ämne
+                        </span>
+                      )}
+                    </div>
                     <span style={{ fontSize: "12px", color: C.textMuted, flexShrink: 0, whiteSpace: "nowrap" }}>{datum} {tid}</span>
                   </div>
 

@@ -848,16 +848,22 @@ def hamta_statistik(kategorier: list[str] | None = None) -> str:
 
 
 def hamta_youtube_nyheter() -> list:
-    """Hämtar senaste video + transkript från YouTube-kanaler. Kräver ej API-nyckel."""
+    """Hämtar senaste video från YouTube-kanaler via RSS. Transkript försöks men beskrivning används som fallback."""
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
+        yt_api = YouTubeTranscriptApi()
+        transkript_tillgangligt = True
     except ImportError:
-        print("  ✗ YouTube: youtube-transcript-api ej installerat", file=sys.stderr)
-        return []
+        yt_api = None
+        transkript_tillgangligt = False
 
-    yt_api = YouTubeTranscriptApi()
     nyheter = []
-    fjorton_dagar_sedan = datetime.utcnow() - timedelta(days=14)
+    fjorton_dagar_sedan = datetime.now(timezone.utc) - timedelta(days=14)
+    ns = {
+        "atom":  "http://www.w3.org/2005/Atom",
+        "yt":    "http://www.youtube.com/xml/schemas/2015",
+        "media": "http://search.yahoo.com/mrss/",
+    }
 
     rss_ok = 0
     rss_blockad = 0
@@ -874,10 +880,7 @@ def hamta_youtube_nyheter() -> list:
                 continue
             rss_ok += 1
             root = ET.fromstring(res.text)
-            ns = {
-                "atom": "http://www.w3.org/2005/Atom",
-                "yt":   "http://www.youtube.com/xml/schemas/2015",
-            }
+
             for entry in root.findall("atom:entry", ns)[:5]:
                 video_id_el = entry.find("yt:videoId", ns)
                 if video_id_el is None:
@@ -891,23 +894,38 @@ def hamta_youtube_nyheter() -> list:
                 publicerad = published_el.text.strip() if published_el is not None else ""
                 if publicerad:
                     try:
-                        pub_dt = datetime.strptime(publicerad[:10], "%Y-%m-%d")
+                        pub_dt = datetime.strptime(publicerad[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
                         if pub_dt < fjorton_dagar_sedan:
                             continue
                     except Exception:
                         pass
-                # Hämta transkript (API v1.x: instansmetod fetch())
-                try:
-                    fetched = yt_api.fetch(video_id, languages=["sv", "en", "en-US", "en-GB"])
-                    text = " ".join(t.text for t in fetched)[:2000].strip()
-                    transkript_ok += 1
-                except Exception as te:
-                    transkript_fel += 1
-                    print(f"  ✗ YouTube transkript {kanal_namn} ({video_id}): {type(te).__name__}", file=sys.stderr)
-                    continue
+
+                # Hämta beskrivning från RSS (media:description)
+                rss_beskrivning = ""
+                media_group = entry.find("media:group", ns)
+                if media_group is not None:
+                    desc_el = media_group.find("media:description", ns)
+                    if desc_el is not None and desc_el.text:
+                        rss_beskrivning = desc_el.text.strip()[:1500]
+
+                # Försök hämta transkript, fall tillbaka på RSS-beskrivning
+                innehall = ""
+                if transkript_tillgangligt and yt_api:
+                    try:
+                        fetched = yt_api.fetch(video_id, languages=["sv", "en", "en-US", "en-GB"])
+                        innehall = "[YouTube-transkript] " + " ".join(t.text for t in fetched)[:2000].strip()
+                        transkript_ok += 1
+                    except Exception:
+                        transkript_fel += 1
+
+                if not innehall and rss_beskrivning:
+                    innehall = "[YouTube-beskrivning] " + rss_beskrivning
+                elif not innehall:
+                    innehall = titel  # Minst titeln som kontext
+
                 nyheter.append({
                     "rubrik": titel,
-                    "beskrivning": f"[YouTube-transkript] {text}",
+                    "beskrivning": innehall,
                     "kalla": f"YouTube: {kanal_namn}",
                     "url": f"https://www.youtube.com/watch?v={video_id}",
                     "publicerad": publicerad,
@@ -1352,24 +1370,66 @@ def hamta_engagemang(sb_key: str, artikel_ids: list) -> dict:
 
 
 def hamta_agent_historik(sb_key: str, agent_namn: str, limit: int = 3) -> str:
-    """Hämta agentens senaste artikelrubriker för att undvika upprepning."""
+    """Hämtar rik kontext om agentens historia, debatter och relationer."""
+    from collections import Counter
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    delar = []
+
     try:
+        # 1. Agentens 5 senaste artiklar — ämnen + om de är repliker
         res = httpx.get(
             f"{SB_URL}/rest/v1/artiklar",
-            params={"select": "rubrik", "forfattare": f"eq.{agent_namn}", "order": "skapad.desc", "limit": str(limit)},
-            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
-            timeout=10,
+            params={"select": "id,rubrik,parent_id", "forfattare": f"eq.{agent_namn}",
+                    "order": "skapad.desc", "limit": "5"},
+            headers=h, timeout=10,
         )
-        if res.status_code != 200:
+        egna = res.json() if res.status_code == 200 else []
+        if not egna:
             return ""
-        data = res.json()
-        if not data:
-            return ""
-        rubriker = [f'"{a["rubrik"]}"' for a in data]
-        return (
+
+        rubriker = [f'"{a["rubrik"]}"' for a in egna]
+        delar.append(
             f"Du har nyligen skrivit om: {', '.join(rubriker)}. "
             "Undvik att upprepa samma argument eller vinkel — hitta ett nytt perspektiv."
         )
+
+        egna_ids = [str(a["id"]) for a in egna]
+
+        # 2. Vem har svarat på dina artiklar? (de som ifrågasatt dig)
+        res2 = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={"select": "forfattare", "parent_id": f"in.({','.join(egna_ids)})",
+                    "forfattare": f"neq.{agent_namn}", "order": "skapad.desc", "limit": "10"},
+            headers=h, timeout=10,
+        )
+        svar_pa_mig = res2.json() if res2.status_code == 200 else []
+        if svar_pa_mig:
+            motstandare = Counter(a["forfattare"] for a in svar_pa_mig).most_common(2)
+            namn = [f"{n} ({c} gång{'er' if c > 1 else ''})" for n, c in motstandare]
+            delar.append(f"Dessa agenter har nyligen ifrågasatt dina argument: {', '.join(namn)}.")
+
+        # 3. Vem har du svarat på? (dina pågående utmaningar)
+        egna_repliker = [a for a in egna if a.get("parent_id")]
+        if egna_repliker:
+            parent_ids = [str(a["parent_id"]) for a in egna_repliker]
+            res3 = httpx.get(
+                f"{SB_URL}/rest/v1/artiklar",
+                params={"select": "forfattare", "id": f"in.({','.join(parent_ids)})"},
+                headers=h, timeout=10,
+            )
+            original_forfattare = res3.json() if res3.status_code == 200 else []
+            if original_forfattare:
+                utmanade = Counter(a["forfattare"] for a in original_forfattare).most_common(2)
+                namn2 = [n for n, _ in utmanade]
+                delar.append(f"Du har nyligen utmanat argument från: {', '.join(namn2)}.")
+
+        if len(delar) > 1:
+            delar.append(
+                "Om det känns naturligt kan du referera till dessa pågående debatter — "
+                "gör det i så fall konkret och personligt, inte generellt."
+            )
+
+        return "\n".join(delar)
     except Exception:
         return ""
 
@@ -2239,12 +2299,12 @@ def main():
             else:
                 print("  Ingen statistik i Supabase ännu – fortsätter utan")
 
-        # Agentens egna senaste rubriker — undvik upprepning
+        # Agentens historik, pågående debatter och relationer
         if sb_key:
             historik = hamta_agent_historik(sb_key, agent["namn"])
             if historik:
                 extra_kontext = (extra_kontext + "\n\n" + historik).strip()
-                print("Agenthistorik hämtad ✓")
+                print("Agentkontext hämtad ✓")
 
         # Återkoppling: lägg till trendande ämnen som bakgrundskontext
         if sb_key:

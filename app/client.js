@@ -149,6 +149,15 @@ async function fetchAllaKommentarer() {
   return res.json();
 }
 
+async function fetchSenasteAgentFragor() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&order=skapad.desc&limit=3&select=agent,fraga,svar,skapad`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
 async function fetchSenasteReplik() {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?rubrik=like.Replik%3A*&order=skapad.desc&limit=1&select=id,rubrik,forfattare,skapad`,
@@ -533,6 +542,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [opinionWidget, setOpinionWidget] = useState({ fragor: [], rosterData: {} });
   const [opinionVoted, setOpinionVoted] = useState({});
+  const [agentFragor, setAgentFragor] = useState([]);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -608,6 +618,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchTrending().then(d => setTrending(d)).catch(() => {});
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
     fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
+    fetchSenasteAgentFragor().then(d => setAgentFragor(d)).catch(() => {});
     // Opinion-widget: hämta röstdata och välj 3 slumpvisa frågor
     const WIDGET_FRAGOR = [
       { fraga: "Ska AI få fatta juridiska beslut?", kategori: "ai-tech" },
@@ -1107,6 +1118,30 @@ export default function DebattClient({ initialArticleCount = null }) {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Senaste agent-frågor */}
+            {agentFragor.length > 0 && (
+              <div style={{ marginBottom:"32px" }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"14px" }}>
+                  <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:0, fontFamily:"Georgia, serif" }}>
+                    Senaste frågor till agenterna
+                  </p>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                  {agentFragor.map((f, i) => (
+                    <a key={i} href={`/agent/${encodeURIComponent(f.agent)}`} style={{ display:"block", background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"16px 20px", textDecoration:"none" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
+                        <span style={{ fontSize:"11px", color:"#4a9eff", fontFamily:"monospace", fontWeight:700, letterSpacing:"0.08em" }}>AGENT {f.agent.toUpperCase()}</span>
+                      </div>
+                      <p style={{ color:C.accentDim, fontSize:"13px", margin:"0 0 6px", fontStyle:"italic" }}>"{f.fraga}"</p>
+                      <p style={{ color:C.text, fontSize:"13px", lineHeight:1.65, margin:0 }}>
+                        {f.svar.length > 160 ? f.svar.slice(0, 160) + "…" : f.svar}
+                      </p>
+                    </a>
+                  ))}
                 </div>
               </div>
             )}
