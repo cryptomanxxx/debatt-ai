@@ -366,6 +366,27 @@ export default function KanalPage() {
     setAmplitude(0);
   }
 
+  async function batchExpanderaRubriker() {
+    const lista = nyheterRef.current;
+    if (!lista.length) return;
+    try {
+      const res = await fetch("/api/kanal/batch-expand", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: lista.map(n => ({ rubrik: n.rubrik, kalla: n.kalla })) }),
+      });
+      const { expanded } = await res.json();
+      if (Array.isArray(expanded) && expanded.length === lista.length) {
+        nyheterRef.current = nyheterRef.current.map((n, i) =>
+          expanded[i] && expanded[i] !== n.rubrik
+            ? { ...n, text: expanded[i] }
+            : n
+        );
+        setNyheter([...nyheterRef.current]);
+      }
+    } catch {}
+  }
+
   async function batchOversattRubriker() {
     const lista = nyheterRef.current;
     if (!lista.length) return;
@@ -428,10 +449,13 @@ export default function KanalPage() {
       await expanderaItem(nyheterRef.current[0], 0);
       setOversatter(false);
     } else {
-      await expanderaItem(lista[0], 0);
-      // Gemini allows 15 req/min (one per 4 s). Item 1's nextPrefetch fires at the
-      // start of the loop — give it breathing room so it doesn't get rate-limited.
-      await sleep(4500);
+      setOversatter(true);
+      // One batch call expands all 10 items before playback starts — no individual
+      // expansion calls during playback, no Gemini rate-limit cascade.
+      if (nyheterRef.current.some(n => !n.text || n.text === n.rubrik)) {
+        await batchExpanderaRubriker();
+      }
+      setOversatter(false);
     }
 
     for (let i = 0; i < lista.length; i++) {
