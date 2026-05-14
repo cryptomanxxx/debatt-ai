@@ -26,25 +26,9 @@ export async function POST(req) {
   const gemKey  = process.env.GEMINI_API_KEY;
   const orKey   = process.env.OPENROUTER_API_KEY;
 
-  // Groq first — 30 req/min, fast (~1-2s), most reliable for this use case.
-  // Gemini second. OR last (free tier rate limits are strict per-model).
-  // Sequential: each item uses at most 1 provider token.
-  // X-Provider header helps diagnose which provider handled each item.
-
-  if (groqKey) {
-    try {
-      const r = await fetch(GROQ_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 350, temperature: 0.4 }),
-        signal: AbortSignal.timeout(6000),
-      });
-      if (r.ok) {
-        const text = (await r.json()).choices[0].message.content.trim();
-        if (text && text !== rubrik) return Response.json({ text }, { headers: { "X-Provider": "groq" } });
-      }
-    } catch {}
-  }
+  // Gemini first — no daily token cap (only 15 req/min).
+  // Groq shares its 100k tokens/day with agent.py (12 runs/day) and runs
+  // out by afternoon. Use Groq as backup, OR as last resort.
 
   if (gemKey) {
     try {
@@ -64,6 +48,21 @@ export async function POST(req) {
       if (r.ok) {
         const text = (await r.json())?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
         if (text && text !== rubrik) return Response.json({ text }, { headers: { "X-Provider": "gemini" } });
+      }
+    } catch {}
+  }
+
+  if (groqKey) {
+    try {
+      const r = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 350, temperature: 0.4 }),
+        signal: AbortSignal.timeout(6000),
+      });
+      if (r.ok) {
+        const text = (await r.json()).choices[0].message.content.trim();
+        if (text && text !== rubrik) return Response.json({ text }, { headers: { "X-Provider": "groq" } });
       }
     } catch {}
   }
