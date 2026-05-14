@@ -696,7 +696,7 @@ export default function ChattPage() {
                       </span>
                   }
                   <span style={{ fontSize: "12px", color: C.textMuted }}>
-                    {spelar ? "Spelar upp…" : `${historik.length} inlägg · varje agent annonseras`}
+                    {lyssnaFas === "spelar" ? "Spelar upp…" : `${historik.length} inlägg · varje agent annonseras`}
                   </span>
                 </div>
                 {felmeddelande && (

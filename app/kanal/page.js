@@ -402,7 +402,7 @@ export default function KanalPage() {
 
       {/* Main content */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", maxWidth: "1100px", width: "100%", margin: "0 auto", padding: "32px 24px 24px", gap: "32px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", alignItems: "start" }}>
+        <div className="kanal-grid">
 
           {/* Left: anchor/agent panel */}
           <div>
@@ -551,6 +551,8 @@ export default function KanalPage() {
       <style>{`
         @keyframes dot { 0%,100%{opacity:1}50%{opacity:0} }
         * { box-sizing: border-box; }
+        .kanal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+        @media (max-width: 640px) { .kanal-grid { grid-template-columns: 1fr; } }
       `}</style>
     </div>
   );
