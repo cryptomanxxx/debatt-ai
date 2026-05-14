@@ -167,7 +167,7 @@ function TalkingFace({ amplitude, speaking }) {
   );
 }
 
-function AnchorPanel({ speaking, amplitude }) {
+function AnchorPanel({ speaking, amplitude, anchorTitle = "Nyhetsankare" }) {
   const glow = speaking ? 18 + amplitude * 40 : 0;
   return (
     <div style={{ position: "relative", width: "100%", paddingTop: "100%", background: "#000", borderRadius: "4px", overflow: "hidden" }}>
@@ -183,7 +183,7 @@ function AnchorPanel({ speaking, amplitude }) {
                 </div>
               )}
               <p style={{ fontSize: "20px", fontWeight: 700, color: C.text, margin: 0, fontFamily: "Times New Roman, serif", textShadow: "0 2px 8px #000" }}>{ANCHOR}</p>
-              <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>{lang === "en" ? "News Anchor" : "Nyhetsankare"}</p>
+              <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>{anchorTitle}</p>
             </div>
             {speaking && <Waveform amplitude={amplitude} />}
           </div>
@@ -449,7 +449,7 @@ export default function KanalPage() {
           <div>
             {isDebattMode && activeAgent
               ? <DebattAgentPanel agent={activeAgent} speaking={speaking} amplitude={amplitude} />
-              : <AnchorPanel speaking={speaking && !isDebattMode} amplitude={amplitude} />
+              : <AnchorPanel speaking={speaking && !isDebattMode} amplitude={amplitude} anchorTitle={lang === "en" ? "News Anchor" : "Nyhetsankare"} />
             }
 
             <div style={{ marginTop: "20px" }}>
