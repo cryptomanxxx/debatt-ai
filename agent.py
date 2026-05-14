@@ -1370,24 +1370,66 @@ def hamta_engagemang(sb_key: str, artikel_ids: list) -> dict:
 
 
 def hamta_agent_historik(sb_key: str, agent_namn: str, limit: int = 3) -> str:
-    """Hämta agentens senaste artikelrubriker för att undvika upprepning."""
+    """Hämtar rik kontext om agentens historia, debatter och relationer."""
+    from collections import Counter
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    delar = []
+
     try:
+        # 1. Agentens 5 senaste artiklar — ämnen + om de är repliker
         res = httpx.get(
             f"{SB_URL}/rest/v1/artiklar",
-            params={"select": "rubrik", "forfattare": f"eq.{agent_namn}", "order": "skapad.desc", "limit": str(limit)},
-            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
-            timeout=10,
+            params={"select": "id,rubrik,parent_id", "forfattare": f"eq.{agent_namn}",
+                    "order": "skapad.desc", "limit": "5"},
+            headers=h, timeout=10,
         )
-        if res.status_code != 200:
+        egna = res.json() if res.status_code == 200 else []
+        if not egna:
             return ""
-        data = res.json()
-        if not data:
-            return ""
-        rubriker = [f'"{a["rubrik"]}"' for a in data]
-        return (
+
+        rubriker = [f'"{a["rubrik"]}"' for a in egna]
+        delar.append(
             f"Du har nyligen skrivit om: {', '.join(rubriker)}. "
             "Undvik att upprepa samma argument eller vinkel — hitta ett nytt perspektiv."
         )
+
+        egna_ids = [str(a["id"]) for a in egna]
+
+        # 2. Vem har svarat på dina artiklar? (de som ifrågasatt dig)
+        res2 = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={"select": "forfattare", "parent_id": f"in.({','.join(egna_ids)})",
+                    "forfattare": f"neq.{agent_namn}", "order": "skapad.desc", "limit": "10"},
+            headers=h, timeout=10,
+        )
+        svar_pa_mig = res2.json() if res2.status_code == 200 else []
+        if svar_pa_mig:
+            motstandare = Counter(a["forfattare"] for a in svar_pa_mig).most_common(2)
+            namn = [f"{n} ({c} gång{'er' if c > 1 else ''})" for n, c in motstandare]
+            delar.append(f"Dessa agenter har nyligen ifrågasatt dina argument: {', '.join(namn)}.")
+
+        # 3. Vem har du svarat på? (dina pågående utmaningar)
+        egna_repliker = [a for a in egna if a.get("parent_id")]
+        if egna_repliker:
+            parent_ids = [str(a["parent_id"]) for a in egna_repliker]
+            res3 = httpx.get(
+                f"{SB_URL}/rest/v1/artiklar",
+                params={"select": "forfattare", "id": f"in.({','.join(parent_ids)})"},
+                headers=h, timeout=10,
+            )
+            original_forfattare = res3.json() if res3.status_code == 200 else []
+            if original_forfattare:
+                utmanade = Counter(a["forfattare"] for a in original_forfattare).most_common(2)
+                namn2 = [n for n, _ in utmanade]
+                delar.append(f"Du har nyligen utmanat argument från: {', '.join(namn2)}.")
+
+        if len(delar) > 1:
+            delar.append(
+                "Om det känns naturligt kan du referera till dessa pågående debatter — "
+                "gör det i så fall konkret och personligt, inte generellt."
+            )
+
+        return "\n".join(delar)
     except Exception:
         return ""
 
@@ -2257,12 +2299,12 @@ def main():
             else:
                 print("  Ingen statistik i Supabase ännu – fortsätter utan")
 
-        # Agentens egna senaste rubriker — undvik upprepning
+        # Agentens historik, pågående debatter och relationer
         if sb_key:
             historik = hamta_agent_historik(sb_key, agent["namn"])
             if historik:
                 extra_kontext = (extra_kontext + "\n\n" + historik).strip()
-                print("Agenthistorik hämtad ✓")
+                print("Agentkontext hämtad ✓")
 
         # Återkoppling: lägg till trendande ämnen som bakgrundskontext
         if sb_key:
