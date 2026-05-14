@@ -1,5 +1,7 @@
 export const runtime = "edge";
 
+import { logAiCall } from "@/app/lib/logAiCall";
+
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OR_URL   = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -31,6 +33,7 @@ export async function POST(req) {
   // out by afternoon. Use Groq as backup, OR as last resort.
 
   if (gemKey) {
+    const t0 = Date.now();
     try {
       const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
@@ -45,14 +48,29 @@ export async function POST(req) {
           signal: AbortSignal.timeout(8000),
         }
       );
+      const latency_ms = Date.now() - t0;
       if (r.ok) {
-        const text = (await r.json())?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-        if (text && text !== rubrik) return Response.json({ text }, { headers: { "X-Provider": "gemini" } });
+        const json = await r.json();
+        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+        if (text && text !== rubrik) {
+          logAiCall({
+            provider: "gemini", model: "gemini-2.0-flash", source: "kanal",
+            status: "ok", latency_ms,
+            input_tokens: json?.usageMetadata?.promptTokenCount,
+            output_tokens: json?.usageMetadata?.candidatesTokenCount,
+          });
+          return Response.json({ text }, { headers: { "X-Provider": "gemini" } });
+        }
+      } else {
+        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
-    } catch {}
+    } catch (e) {
+      logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+    }
   }
 
   if (groqKey) {
+    const t0 = Date.now();
     try {
       const r = await fetch(GROQ_URL, {
         method: "POST",
@@ -60,14 +78,29 @@ export async function POST(req) {
         body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 350, temperature: 0.4 }),
         signal: AbortSignal.timeout(6000),
       });
+      const latency_ms = Date.now() - t0;
       if (r.ok) {
-        const text = (await r.json()).choices[0].message.content.trim();
-        if (text && text !== rubrik) return Response.json({ text }, { headers: { "X-Provider": "groq" } });
+        const json = await r.json();
+        const text = json.choices[0].message.content.trim();
+        if (text && text !== rubrik) {
+          logAiCall({
+            provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal",
+            status: "ok", latency_ms,
+            input_tokens: json?.usage?.prompt_tokens,
+            output_tokens: json?.usage?.completion_tokens,
+          });
+          return Response.json({ text }, { headers: { "X-Provider": "groq" } });
+        }
+      } else {
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
-    } catch {}
+    } catch (e) {
+      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+    }
   }
 
   if (orKey) {
+    const t0 = Date.now();
     try {
       const r = await fetch(OR_URL, {
         method: "POST",
@@ -80,12 +113,27 @@ export async function POST(req) {
         body: JSON.stringify({ models: OR_MODELS, messages: msgs, max_tokens: 350, temperature: 0.4 }),
         signal: AbortSignal.timeout(10000),
       });
+      const latency_ms = Date.now() - t0;
       if (r.ok) {
-        const text = (await r.json()).choices[0].message.content.trim();
-        if (text && text !== rubrik) return Response.json({ text }, { headers: { "X-Provider": "openrouter" } });
+        const json = await r.json();
+        const text = json.choices[0].message.content.trim();
+        if (text && text !== rubrik) {
+          logAiCall({
+            provider: "openrouter", model: json?.model ?? OR_MODELS[0], source: "kanal",
+            status: "ok", latency_ms,
+            input_tokens: json?.usage?.prompt_tokens,
+            output_tokens: json?.usage?.completion_tokens,
+          });
+          return Response.json({ text }, { headers: { "X-Provider": "openrouter" } });
+        }
+      } else {
+        logAiCall({ provider: "openrouter", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
-    } catch {}
+    } catch (e) {
+      logAiCall({ provider: "openrouter", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+    }
   }
 
+  logAiCall({ provider: "none", source: "kanal", status: "error", latency_ms: 0 });
   return Response.json({ text: rubrik }, { headers: { "X-Provider": "none" } });
 }
