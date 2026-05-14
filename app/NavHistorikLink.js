@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export default function NavHistorikLink({ active }) {
+export default function NavHistorikLink({ active, onClick }) {
   const [count, setCount] = useState(null);
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export default function NavHistorikLink({ active }) {
   const label = count !== null ? `Debatthistorik (${count})` : "Debatthistorik";
 
   return (
-    <a href="/chatt/historik" className={active ? "neon-nav-active" : "neon-nav"}>
+    <a href="/chatt/historik" className={active ? "neon-nav-active" : "neon-nav"} onClick={onClick}>
       {label}
     </a>
   );

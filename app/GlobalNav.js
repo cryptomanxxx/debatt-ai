@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import NavArkivLink from "./NavArkivLink";
 import NavHistorikLink from "./NavHistorikLink";
@@ -21,6 +22,7 @@ const LINKS = [
 
 export default function GlobalNav() {
   const pathname = usePathname();
+  const [open, setOpen] = useState(false);
 
   // Startsidan har sin egen header-nav med hamburger-meny och SPA-navigering
   if (pathname === "/") return null;
@@ -32,7 +34,7 @@ export default function GlobalNav() {
   }
 
   const L = ({ href, label }) => (
-    <a key={href} href={href} className={isActive(href) ? "neon-nav-active" : "neon-nav"}>
+    <a href={href} onClick={() => setOpen(false)} className={isActive(href) ? "neon-nav-active" : "neon-nav"}>
       {label}
     </a>
   );
@@ -47,7 +49,7 @@ export default function GlobalNav() {
       backdropFilter: "blur(12px)",
       zIndex: 100,
     }}>
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
         <a href="/" style={{
           fontFamily: "Times New Roman, serif",
           fontSize: "20px",
@@ -59,11 +61,25 @@ export default function GlobalNav() {
         }}>
           DEBATT-AI
         </a>
-        {LINKS.slice(0, 3).map(l => <L key={l.href} {...l} />)}
-        <NavArkivLink />
-        {LINKS.slice(3, 4).map(l => <L key={l.href} {...l} />)}
-        <NavHistorikLink />
-        {LINKS.slice(4).map(l => <L key={l.href} {...l} />)}
+
+        {/* Desktop: alla länkar i rad */}
+        <div className={open ? "nav-links open" : "nav-links"}>
+          {LINKS.slice(0, 3).map(l => <L key={l.href} {...l} />)}
+          <NavArkivLink onClick={() => setOpen(false)} />
+          {LINKS.slice(3, 4).map(l => <L key={l.href} {...l} />)}
+          <NavHistorikLink onClick={() => setOpen(false)} />
+          {LINKS.slice(4).map(l => <L key={l.href} {...l} />)}
+        </div>
+
+        {/* Mobil: hamburgerknapp */}
+        <button
+          className="hamburger-btn"
+          onClick={() => setOpen(o => !o)}
+          aria-label={open ? "Stäng meny" : "Öppna meny"}
+          aria-expanded={open}
+        >
+          {open ? "✕" : "☰"}
+        </button>
       </div>
     </header>
   );
