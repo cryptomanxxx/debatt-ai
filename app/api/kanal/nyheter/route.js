@@ -67,11 +67,17 @@ async function expanderaMedGroq(nyheter, lang = "sv") {
 
     const data = await r.json();
     const expanded = JSON.parse(data.choices[0].message.content).nyheter;
-    return nyheter.map((n, i) => ({
-      ...n,
-      rubrik: expanded[i]?.rubrik || n.rubrik,
-      text: expanded[i]?.text || n.rubrik,
-    }));
+    return nyheter.map((n, i) => {
+      const expandedText = expanded[i]?.text || n.rubrik;
+      const translatedRubrik = expanded[i]?.rubrik;
+      // If Groq didn't return a translated rubrik, derive one from the first sentence of the English text
+      const finalRubrik = translatedRubrik && translatedRubrik !== n.rubrik
+        ? translatedRubrik
+        : lang === "en" && expandedText !== n.rubrik
+          ? expandedText.split(/(?<=[.!?])\s/)[0].replace(/[.!?]$/, "").trim()
+          : n.rubrik;
+      return { ...n, rubrik: finalRubrik, text: expandedText };
+    });
   } catch {
     return nyheter.map(n => ({ ...n, text: n.rubrik }));
   }
