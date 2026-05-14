@@ -375,8 +375,14 @@ export default function KanalPage() {
       });
       const { text } = await res.json();
       if (text && text !== item.rubrik) {
+        // Extract the first sentence as the English headline
+        const rubrikEn = langRef.current === "en"
+          ? (text.split(/(?<=[.!?])\s+/)[0] || text).slice(0, 120)
+          : undefined;
         // Update state so the panel shows the expanded text
-        nyheterRef.current = nyheterRef.current.map((n, j) => j === i ? { ...n, text } : n);
+        nyheterRef.current = nyheterRef.current.map((n, j) =>
+          j === i ? { ...n, text, ...(rubrikEn ? { rubrikEn } : {}) } : n
+        );
         setNyheter([...nyheterRef.current]);
         return text;
       }
@@ -573,7 +579,7 @@ export default function KanalPage() {
                   {currentNyhet ? (
                     <>
                       <p style={{ fontSize: "20px", fontWeight: 700, lineHeight: 1.35, fontFamily: "Times New Roman, serif", color: C.text, margin: "0 0 14px 0", borderLeft: `3px solid ${ANCHOR_FARG}`, paddingLeft: "16px" }}>
-                        {currentNyhet.rubrik}
+                        {lang === "en" && currentNyhet.rubrikEn ? currentNyhet.rubrikEn : currentNyhet.rubrik}
                       </p>
                       {currentNyhet.text && currentNyhet.text !== currentNyhet.rubrik && (
                         <p style={{ fontSize: "14px", lineHeight: 1.75, color: "#aaa", margin: "0 0 14px 0", paddingLeft: "19px" }}>
@@ -601,7 +607,7 @@ export default function KanalPage() {
                         <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start", opacity: 1 - i * 0.15 }}>
                           <span style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace", paddingTop: "2px", flexShrink: 0 }}>{String(i + 1).padStart(2, "0")}</span>
                           <div>
-                            <p style={{ fontSize: "13px", color: C.text, margin: "0 0 2px 0", lineHeight: 1.4 }}>{n.rubrik}</p>
+                            <p style={{ fontSize: "13px", color: C.text, margin: "0 0 2px 0", lineHeight: 1.4 }}>{lang === "en" && n.rubrikEn ? n.rubrikEn : n.rubrik}</p>
                             <p style={{ fontSize: "10px", color: C.textMuted, margin: 0, fontFamily: "monospace" }}>{n.kalla}</p>
                           </div>
                         </div>
