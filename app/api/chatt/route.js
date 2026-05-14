@@ -1,5 +1,7 @@
 export const runtime = "edge";
 
+import { logAiCall } from "@/app/lib/logAiCall";
+
 const AGENTER = new Set([
   "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
   "Jurist","Journalist","Filosof","Läkare","Psykolog","Historiker",
@@ -10,9 +12,9 @@ const AGENTER = new Set([
 
 const PERSONLIGHETER = {
   "Nationalekonom": "nationalekonom med doktorsexamen. Analyserar alltid ur kostnads- och incitamentsperspektiv. Konkret och lite kylig i tonen.",
-  "Miljöaktivist": "passionerad miljöaktivist. Sätter alltid planetens gränser och klimaträttvisa i centrum. Kan bli upprörd men faktabaserad.",
+  "Miljöaktivist": "passionerad miljöaktivist. Sätter alltid planetens gränser och klimatträttvisa i centrum. Kan bli uprörd men faktabaserad.",
   "Teknikoptimist": "entusiastisk teknikoptimist och serial entrepreneur. Tror att innovation löser de flesta problem. Energisk och framåtblickande.",
-  "Konservativ debattör": "eftertänksam konservativ debattör. Värnar tradition, stabilitet och beprövade institutioner. Skeptisk mot snabba förändringar.",
+  "Konservativ debattör": "eftertänksam konservativ debattör. Värnar tradition, stabilitet och beprovade institutioner. Skeptisk mot snabba förändringar.",
   "Jurist": "skarp jurist. Analyserar ur rättssäkerhet och proportionalitetsprincipen. Precis och kräver tydliga definitioner.",
   "Journalist": "granskande journalist. Ifrågasätter makt, kräver transparens, ser alltid vems intressen som gynnas.",
   "Filosof": "djuptänkt filosof. Ställer de svåra etiska frågorna om frihet, ansvar och mänsklig värdighet.",
@@ -35,7 +37,7 @@ const PERSONLIGHETER = {
   "Den rike": "mycket förmögen, välmenande, ibland totalt ute ur kontakt med verkligheten.",
 };
 
-// ── Debatt rate limiter (per IP, 5/10 min) ────────────────────────────────────
+// ── Debatt rate limiter (per IP, 5/10 min) ────────────────────────────────────────────
 const rateLimitStore = new Map();
 const LIMIT = 5;
 const WINDOW_MS = 10 * 60 * 1000;
@@ -54,8 +56,7 @@ function consumeRateLimit(ip) {
   else entry.count++;
 }
 
-// ── Provider health state (per Edge isolate, best-effort) ────────────────────
-// Tracks rate limit info from API response headers to enable proactive switching
+// ── Provider health state (per Edge isolate, best-effort) ────────────────────────────
 const ps = {
   groq:   { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
   gemini: { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
@@ -64,7 +65,6 @@ const ps = {
 
 function groqReady() {
   if (ps.groq.status !== "limited") return true;
-  // Reset time passed → assume ready again
   return !!(ps.groq.resetAt && Date.now() > new Date(ps.groq.resetAt).getTime());
 }
 
@@ -157,16 +157,16 @@ REGLER — viktiga:
     "X-RateLimit-Limit": String(LIMIT),
   };
 
-  // ── Try Groq first ───────────────────────────────────────────────────────
+  // ── Try Groq first ─────────────────────────────────────────────────────────────────────────────
   let groqFailReason = "";
   if (!process.env.GROQ_API_KEY) {
     groqFailReason = "GROQ_API_KEY saknas";
   } else if (!groqReady()) {
-    // Proactively skip — we know it's rate-limited, no point wasting a request
     groqFailReason = `Groq rate-limited (reset: ${ps.groq.resetAt ?? "okänt"})`;
   } else {
     const groqAbort = new AbortController();
     const groqTimeout = setTimeout(() => groqAbort.abort(), 5000);
+    const groqT0 = Date.now();
     try {
       const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -182,28 +182,33 @@ REGLER — viktiga:
       });
       clearTimeout(groqTimeout);
 
-      // Update health from response headers regardless of success/failure
       const rem = parseInt(groqRes.headers.get("x-ratelimit-remaining-requests") ?? "-1");
       const rst = groqRes.headers.get("x-ratelimit-reset-requests");
       if (groqRes.ok) {
         ps.groq = { remaining: rem >= 0 ? rem : ps.groq.remaining, limit: 30, resetAt: rst, ts: Date.now(), status: rem <= 5 ? "warn" : "ok" };
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "ok", latency_ms: Date.now() - groqT0 });
         return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
       }
       if (groqRes.status === 429) {
         ps.groq = { remaining: 0, limit: 30, resetAt: rst, ts: Date.now(), status: "limited" };
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "rate_limited", latency_ms: Date.now() - groqT0 });
+      } else {
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "error", latency_ms: Date.now() - groqT0 });
       }
       groqFailReason = `Groq HTTP ${groqRes.status}`;
     } catch (e) {
       clearTimeout(groqTimeout);
+      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: e.name === "AbortError" ? "timeout" : "error", latency_ms: Date.now() - groqT0 });
       groqFailReason = e.name === "AbortError" ? "Groq timeout (5s)" : `Groq fel: ${e.message}`;
     }
   }
 
-  // ── Try OpenRouter (streaming, same format as Groq) ─────────────────────
+  // ── Try OpenRouter (streaming, same format as Groq) ──────────────────────────────────────
   const orKey = process.env.OPENROUTER_API_KEY;
   if (orKey) {
     const orAbort = new AbortController();
     const orTimeout = setTimeout(() => orAbort.abort(), 8000);
+    const orT0 = Date.now();
     try {
       const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
@@ -225,16 +230,19 @@ REGLER — viktiga:
       clearTimeout(orTimeout);
       if (orRes.ok) {
         ps.or = { ts: Date.now(), status: "ok" };
+        logAiCall({ provider: "openrouter", model: "llama-3.3-70b-instruct:free", source: "chatt", status: "ok", latency_ms: Date.now() - orT0 });
         return new Response(orRes.body, { headers: { ...rlHeaders, "X-Provider": "openrouter" } });
       }
       ps.or = { ts: Date.now(), status: orRes.status === 429 ? "limited" : "error" };
+      logAiCall({ provider: "openrouter", source: "chatt", status: orRes.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - orT0 });
     } catch (e) {
       clearTimeout(orTimeout);
       ps.or = { ts: Date.now(), status: "error" };
+      logAiCall({ provider: "openrouter", source: "chatt", status: e.name === "AbortError" ? "timeout" : "error", latency_ms: Date.now() - orT0 });
     }
   }
 
-  // ── Fall back to Gemini ──────────────────────────────────────────────────
+  // ── Fall back to Gemini ───────────────────────────────────────────────────────────────────────
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!geminiKey) {
     return Response.json({ error: `GEMINI_API_KEY saknas. ${groqFailReason}` }, { status: 502 });
@@ -250,6 +258,7 @@ REGLER — viktiga:
   let geminiText = "";
   let geminiErr = "";
   for (const model of geminiModels) {
+    const gemT0 = Date.now();
     const r = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: geminiPayload }
@@ -258,9 +267,22 @@ REGLER — viktiga:
       ps.gemini = { remaining: null, limit: 15, resetAt: null, ts: Date.now(), status: "ok" };
       const data = await r.json().catch(() => null);
       const t = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      if (t) { geminiText = t; break; }
+      if (t) {
+        logAiCall({
+          provider: "gemini", model, source: "chatt", status: "ok", latency_ms: Date.now() - gemT0,
+          input_tokens: data?.usageMetadata?.promptTokenCount,
+          output_tokens: data?.usageMetadata?.candidatesTokenCount,
+        });
+        geminiText = t;
+        break;
+      }
     } else {
-      if (r.status === 429) ps.gemini = { ...ps.gemini, ts: Date.now(), status: "limited" };
+      if (r.status === 429) {
+        ps.gemini = { ...ps.gemini, ts: Date.now(), status: "limited" };
+        logAiCall({ provider: "gemini", model, source: "chatt", status: "rate_limited", latency_ms: Date.now() - gemT0 });
+      } else {
+        logAiCall({ provider: "gemini", model, source: "chatt", status: "error", latency_ms: Date.now() - gemT0 });
+      }
       const errBody = await r.text().catch(() => "");
       geminiErr += `${model}:${r.status} `;
       if (errBody.includes("API_KEY") || r.status === 400 || r.status === 403) {
