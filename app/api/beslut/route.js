@@ -1,3 +1,5 @@
+const SB_URL     = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const SB_KEY     = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const GROQ_KEY   = process.env.GROQ_API_KEY;
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
 
@@ -28,7 +30,6 @@ const PERSONLIGHETER = {
   "Den rike":             "mycket förmögen, välmenande, ibland totalt ute ur kontakt med verkligheten.",
 };
 
-// Automatisk agent-routing baserat på ämne
 function selectAgents(question) {
   const q = question.toLowerCase();
   if (/krypto|bitcoin|eth|solana|blockchain|defi|nft|web3/.test(q))
@@ -52,7 +53,6 @@ function selectAgents(question) {
   return ["Nationalekonom", "Filosof", "Sociolog", "Journalist", "Optimisten"];
 }
 
-// Extrahera JSON även om LLM skickade extra text
 function extractJSON(raw) {
   try { return JSON.parse(raw); } catch {}
   const m = raw.match(/\{[\s\S]*\}/);
@@ -60,12 +60,17 @@ function extractJSON(raw) {
   return null;
 }
 
-async function askAgent(agent, question) {
+async function askAgent(agent, question, lang) {
+  const langInstruction = lang === "en"
+    ? "Respond in English."
+    : "Svara på svenska.";
+
   const systemPrompt = `Du är ${PERSONLIGHETER[agent]}
 
 En AI-assistent ber om din bedömning för att hjälpa en användare fatta ett beslut.
+${langInstruction}
 Svara ENBART med giltig JSON på exakt detta format, inga andra ord:
-{"stance":"positiv","probability":70,"reasoning":"Max 2 meningar på svenska."}
+{"stance":"positiv","probability":70,"reasoning":"Max 2 meningar."}
 
 stance: "positiv" | "negativ" | "neutral"
 probability: heltal 0–100 (hur troligt är ett positivt utfall för användaren)
@@ -118,55 +123,95 @@ reasoning: din kortaste möjliga motivering`;
   return null;
 }
 
-// Rate limit: 20 req/timme per IP (fri tier)
+// Rate limiting — per API-nyckel eller IP
 const rlStore = new Map();
-function checkRL(ip) {
+function checkRL(id, limit) {
   const now = Date.now();
-  const e = rlStore.get(ip);
-  if (!e || now - e.start > 3_600_000) { rlStore.set(ip, { count: 1, start: now }); return true; }
-  if (e.count >= 20) return false;
+  const e = rlStore.get(id);
+  if (!e || now - e.start > 3_600_000) { rlStore.set(id, { count: 1, start: now }); return true; }
+  if (e.count >= limit) return false;
   e.count++;
   return true;
 }
 
-// GET — API-dokumentation
+async function validateApiKey(key) {
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/api_nycklar?key=eq.${encodeURIComponent(key)}&aktiv=eq.true&select=key,name,rate_limit`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.[0] ?? null;
+  } catch { return null; }
+}
+
+async function logRequest({ apiKey, ip, question, agentsUsed, recommendation, probability, latencyMs }) {
+  await fetch(`${SB_URL}/rest/v1/beslut_log`, {
+    method: "POST",
+    headers: {
+      apikey: SB_KEY,
+      Authorization: `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify({
+      api_key: apiKey || null,
+      ip,
+      question,
+      agents_used: agentsUsed,
+      recommendation,
+      probability,
+      latency_ms: latencyMs,
+    }),
+  }).catch(() => {});
+}
+
 export async function GET() {
   return Response.json({
     name: "DEBATT-AI Decision API",
     version: "v1",
     description: "Structured opinion signals from 24 AI agents with distinct personalities. Designed for AI companions and decision-support systems.",
     endpoint: "POST /api/beslut",
+    authentication: "Optional. Pass X-API-Key header for higher rate limits.",
     input: {
       question: "string (required, 10–500 chars)",
-      agents: "string[] (optional — override auto-selection, max 7)",
+      agents:   "string[] (optional — override auto-selection, max 7)",
+      lang:     "\"sv\" | \"en\" (optional, default \"sv\")",
     },
     output: {
-      question: "string",
+      question:  "string",
       consensus: {
-        recommendation: "positiv | negativ | neutral | delad",
-        probability: "float 0–1",
-        confidence: "low | medium | high",
-        disagreement: "low | medium | high",
+        recommendation: "\"positiv\" | \"negativ\" | \"neutral\" | \"delad\"",
+        probability:    "float 0–1",
+        confidence:     "\"low\" | \"medium\" | \"high\"",
+        disagreement:   "\"low\" | \"medium\" | \"high\"",
       },
       agents: [{
-        agent: "string",
-        stance: "positiv | negativ | neutral",
+        agent:       "string",
+        stance:      "\"positiv\" | \"negativ\" | \"neutral\"",
         probability: "integer 0–100",
-        reasoning: "string",
+        reasoning:   "string",
       }],
-      model: "debatt-ai/v1",
+      model:      "\"debatt-ai/v1\"",
       latency_ms: "integer",
     },
     available_agents: Object.keys(PERSONLIGHETER),
-    rate_limit: "20 requests/hour per IP (free tier)",
+    rate_limits: {
+      free:       "10 requests/hour per IP (no key required)",
+      api_key:    "100 requests/hour (default) — contact for higher limits",
+    },
+    demo: "https://www.debatt-ai.se/beslut",
     example: {
-      request: { question: "Ska jag investera i Bitcoin nu?" },
+      curl: `curl -X POST https://www.debatt-ai.se/api/beslut \\
+  -H "Content-Type: application/json" \\
+  -d '{"question":"Should I invest in Bitcoin now?","lang":"en"}'`,
       response: {
-        question: "Ska jag investera i Bitcoin nu?",
+        question: "Should I invest in Bitcoin now?",
         consensus: { recommendation: "delad", probability: 0.58, confidence: "medium", disagreement: "high" },
         agents: [
-          { agent: "Kryptoanalytiker", stance: "positiv", probability: 75, reasoning: "Bitcoin befinner sig i ett historiskt ackumuleringsfönster. Halving-cykeln och institutionellt kapital talar för uppgång." },
-          { agent: "Nationalekonom", stance: "neutral", probability: 50, reasoning: "Risk-justerad avkastning kräver tydlig tidshorisont. Volatiliteten är oacceptabel för kapital man inte har råd att förlora." },
+          { agent: "Kryptoanalytiker", stance: "positiv", probability: 75, reasoning: "Bitcoin is in a historical accumulation window. The halving cycle and institutional capital suggest upward movement." },
+          { agent: "Nationalekonom",   stance: "neutral",  probability: 50, reasoning: "Risk-adjusted returns require a clear time horizon. Volatility is unacceptable for capital you cannot afford to lose." },
         ],
         model: "debatt-ai/v1",
         latency_ms: 1240,
@@ -177,10 +222,27 @@ export async function GET() {
 
 export async function POST(req) {
   const start = Date.now();
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const ip    = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 
-  if (!checkRL(ip))
-    return Response.json({ error: "Rate limit exceeded. 20 requests/hour per IP." }, { status: 429 });
+  // API-nyckel-autentisering (valfri)
+  const rawKey   = req.headers.get("x-api-key") || req.headers.get("authorization")?.replace("Bearer ", "");
+  let keyRecord  = null;
+  let rateLimitId = ip;
+  let rateLimit   = 10; // fri tier: 10/timme per IP
+
+  if (rawKey) {
+    keyRecord = await validateApiKey(rawKey);
+    if (!keyRecord)
+      return Response.json({ error: "Invalid or inactive API key." }, { status: 401 });
+    rateLimitId = `key:${rawKey}`;
+    rateLimit   = keyRecord.rate_limit ?? 100;
+  }
+
+  if (!checkRL(rateLimitId, rateLimit)) {
+    return Response.json({
+      error: `Rate limit exceeded. ${rateLimit} requests/hour.${rawKey ? "" : " Use an API key for higher limits."}`,
+    }, { status: 429 });
+  }
 
   const body = await req.json().catch(() => null);
   if (!body?.question || typeof body.question !== "string")
@@ -190,6 +252,8 @@ export async function POST(req) {
   if (question.length < 10)
     return Response.json({ error: "Question too short (min 10 chars)" }, { status: 400 });
 
+  const lang = body.lang === "en" ? "en" : "sv";
+
   const requestedAgents = Array.isArray(body.agents) ? body.agents : null;
   const agentList = requestedAgents
     ? requestedAgents.filter(a => PERSONLIGHETER[a]).slice(0, 7)
@@ -198,43 +262,46 @@ export async function POST(req) {
   if (!agentList.length)
     return Response.json({ error: "No valid agents specified" }, { status: 400 });
 
-  // Kör alla agenter parallellt
-  const results = await Promise.all(agentList.map(a => askAgent(a, question)));
-  const valid = results.filter(r => r && typeof r.probability === "number" && r.stance);
+  const results = await Promise.all(agentList.map(a => askAgent(a, question, lang)));
+  const valid   = results.filter(r => r && typeof r.probability === "number" && r.stance);
 
   if (!valid.length)
     return Response.json({ error: "AI service unavailable. Try again." }, { status: 502 });
 
-  // Beräkna consensus
-  const probs   = valid.map(r => r.probability);
-  const avg     = probs.reduce((s, p) => s + p, 0) / probs.length;
-  const variance = probs.reduce((s, p) => s + (p - avg) ** 2, 0) / probs.length;
-  const stddev  = Math.sqrt(variance);
-
+  const probs    = valid.map(r => r.probability);
+  const avg      = probs.reduce((s, p) => s + p, 0) / probs.length;
+  const stddev   = Math.sqrt(probs.reduce((s, p) => s + (p - avg) ** 2, 0) / probs.length);
   const positiva = valid.filter(r => r.stance === "positiv").length;
   const negativa = valid.filter(r => r.stance === "negativ").length;
   const share    = n => n / valid.length;
 
   let recommendation = "delad";
-  if (share(positiva) >= 0.7)       recommendation = "positiv";
-  else if (share(negativa) >= 0.7)  recommendation = "negativ";
-  else if (Math.abs(avg - 50) < 8)  recommendation = "neutral";
+  if (share(positiva) >= 0.7)      recommendation = "positiv";
+  else if (share(negativa) >= 0.7) recommendation = "negativ";
+  else if (Math.abs(avg - 50) < 8) recommendation = "neutral";
 
   const confidence   = stddev < 12 ? "high" : stddev < 25 ? "medium" : "low";
   const disagreement = stddev < 12 ? "low"  : stddev < 25 ? "medium" : "high";
+  const latencyMs    = Date.now() - start;
 
-  return Response.json({
+  const response = {
     question,
-    consensus: {
-      recommendation,
-      probability: Math.round(avg) / 100,
-      confidence,
-      disagreement,
-    },
-    agents: valid.map(({ agent, stance, probability, reasoning }) => ({
-      agent, stance, probability, reasoning,
-    })),
+    consensus: { recommendation, probability: Math.round(avg) / 100, confidence, disagreement },
+    agents: valid.map(({ agent, stance, probability, reasoning }) => ({ agent, stance, probability, reasoning })),
     model: "debatt-ai/v1",
-    latency_ms: Date.now() - start,
+    latency_ms: latencyMs,
+  };
+
+  // Logga asynkront — blockerar inte svaret
+  logRequest({
+    apiKey:         keyRecord?.key ?? null,
+    ip,
+    question,
+    agentsUsed:     agentList,
+    recommendation,
+    probability:    Math.round(avg) / 100,
+    latencyMs,
   });
+
+  return Response.json(response);
 }

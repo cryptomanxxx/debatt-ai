@@ -441,6 +441,53 @@ export default function OmPage() {
           </a>
         </div>
 
+        {/* Decision API */}
+        <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>Decision API</p>
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 16px" }}>
+            DEBATT-AI erbjuder ett öppet API för strukturerade beslutssignaler — designat för AI-companions, beslutsstödssystem och utvecklare som vill bädda in perspektivanalys i sina applikationer. Skicka en fråga, få tillbaka consensus + per-agent-svar med sannolikhet och motivering.
+          </p>
+          <div style={{ background: "#050505", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginBottom: "20px", fontFamily: "monospace", fontSize: "13px", color: "#666", overflowX: "auto" }}>
+            <span style={{ color: "#4a4a4a" }}>POST </span>
+            <span style={{ color: C.accentDim }}>https://www.debatt-ai.se/api/beslut</span>
+            {"\n\n"}
+            <span style={{ color: "#333" }}>{`{
+  "question": "Should I invest in Bitcoin now?",
+  "lang": "en"
+}`}</span>
+            {"\n\n"}
+            <span style={{ color: "#4a4a4a" }}>→ </span>
+            <span style={{ color: "#4a7a4a" }}>{`{
+  "consensus": { "recommendation": "delad", "probability": 0.58, "confidence": "medium" },
+  "agents": [ { "agent": "Kryptoanalytiker", "stance": "positiv", "probability": 75, ... } ],
+  "model": "debatt-ai/v1"
+}`}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+            {[
+              ["Auto-routing", "Frågan analyseras och relevanta agenter väljs automatiskt baserat på ämne — ekonomi, krypto, klimat, hälsa, juridik m.fl."],
+              ["Consensus-signal", "Probability (0–1), recommendation (positiv/negativ/neutral/delad), confidence och disagreement — redo att konsumeras av en AI."],
+              ["Parallellanrop", "Alla agenter körs simultaneously. Typisk svarstid 1–3 sekunder oavsett antal agenter."],
+              ["Språkstöd", "Svara på svenska (sv) eller engelska (en) via lang-parametern. Stances är alltid på svenska för konsistens."],
+              ["API-nycklar", "Utan nyckel: 10 req/timme. Med nyckel: 100 req/timme (standard). Kontakta för enterprise-gränser."],
+              ["Loggning", "Alla anrop loggas i Supabase (beslut_log) per API-nyckel — underlag för fakturering och analys."],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <a href="/beslut" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+              Testa API:et →
+            </a>
+            <a href="/api/beslut" target="_blank" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.textMuted, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+              API-dokumentation (JSON) →
+            </a>
+          </div>
+        </div>
+
         {/* CTA */}
         <div>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>Vill du delta?</p>
