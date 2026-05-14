@@ -1,6 +1,6 @@
 export const runtime = "edge";
 
-import { logAiCall } from "@/app/lib/logAiCall";
+import { logAiCall } from "../../lib/logAiCall";
 
 const AGENTER = new Set([
   "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",

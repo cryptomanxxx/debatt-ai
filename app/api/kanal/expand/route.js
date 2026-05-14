@@ -1,6 +1,6 @@
 export const runtime = "edge";
 
-import { logAiCall } from "@/app/lib/logAiCall";
+import { logAiCall } from "../../../lib/logAiCall";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OR_URL   = "https://openrouter.ai/api/v1/chat/completions";
