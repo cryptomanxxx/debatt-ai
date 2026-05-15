@@ -211,8 +211,8 @@ function AnchorImage({ blinkState, isSpeaking }) {
     src = `/avatarer/podd/${frames[mouthIdx]}`;
   } else {
     src = blinkState === "open"   ? `/avatarer/podd/anna.png`
-        : blinkState === "half"   ? `/avatarer/podd/anna-eyes-half.png`
-        :                           `/avatarer/podd/anna-eyes-closed.png`;
+        : blinkState === "half"   ? `/avatarer/podd/anna-m0-half.png`
+        :                           `/avatarer/podd/anna-m0-closed.png`;
   }
 
   return (
