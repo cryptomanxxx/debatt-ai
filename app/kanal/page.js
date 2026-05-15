@@ -189,6 +189,11 @@ function WaveformBar({ isSpeaking, isThinking }) {
 }
 
 // ── AnchorImage ───────────────────────────────────────────────────────────────
+// Open-eye mouth frames: anna.png (m0), anna-small.png (m1), anna-medium.png (m2), anna-large.png (m3)
+const MOUTH_OPEN   = ["anna.png", "anna-small.png", "anna-medium.png", "anna-large.png"];
+const MOUTH_HALF   = ["anna-m0-half.png", "anna-m1-half.png", "anna-m2-half.png", "anna-m3-half.png"];
+const MOUTH_CLOSED = ["anna-m0-closed.png", "anna-m1-closed.png", "anna-m2-closed.png", "anna-m3-closed.png"];
+
 function AnchorImage({ blinkState, isSpeaking }) {
   const [mouthIdx, setMouthIdx] = useState(0);
 
@@ -198,15 +203,12 @@ function AnchorImage({ blinkState, isSpeaking }) {
     return () => clearInterval(id);
   }, [isSpeaking]);
 
-  const mouth = ["anna-m0", "anna-m1", "anna-m2", "anna-m3"][mouthIdx];
-
   let src;
   if (isSpeaking) {
-    // Open-eye mouth files don't exist — use half-eye variants (subtle squint)
-    // which DO exist and show lip movement.
-    src = blinkState === "closed"
-      ? `/avatarer/podd/${mouth}-closed.png`
-      : `/avatarer/podd/${mouth}-half.png`;
+    const frames = blinkState === "closed" ? MOUTH_CLOSED
+                 : blinkState === "half"   ? MOUTH_HALF
+                 :                           MOUTH_OPEN;
+    src = `/avatarer/podd/${frames[mouthIdx]}`;
   } else {
     src = blinkState === "open"   ? `/avatarer/podd/anna.png`
         : blinkState === "half"   ? `/avatarer/podd/anna-eyes-half.png`
