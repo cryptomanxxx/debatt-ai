@@ -883,11 +883,11 @@ def hamta_youtube_nyheter() -> list:
 
             for entry in root.findall("atom:entry", ns)[:5]:
                 video_id_el = entry.find("yt:videoId", ns)
-                if video_id_el is None:
+                if video_id_el is None or not video_id_el.text:
                     continue
                 video_id = video_id_el.text.strip()
                 title_el = entry.find("atom:title", ns)
-                titel = title_el.text.strip() if title_el is not None else ""
+                titel = title_el.text.strip() if title_el is not None and title_el.text else ""
                 if not titel:
                     continue
                 published_el = entry.find("atom:published", ns)
@@ -909,14 +909,16 @@ def hamta_youtube_nyheter() -> list:
                         rss_beskrivning = desc_el.text.strip()[:1500]
 
                 # Försök hämta transkript, fall tillbaka på RSS-beskrivning
+                # OBS: GitHub Actions IPs blockeras av YouTube (RequestsBlocked) — fallback till beskrivning
                 innehall = ""
                 if transkript_tillgangligt and yt_api:
                     try:
                         fetched = yt_api.fetch(video_id, languages=["sv", "en", "en-US", "en-GB"])
                         innehall = "[YouTube-transkript] " + " ".join(t.text for t in fetched)[:2000].strip()
                         transkript_ok += 1
-                    except Exception:
+                    except Exception as te:
                         transkript_fel += 1
+                        print(f"  ✗ YouTube transkript {kanal_namn} ({video_id}): {type(te).__name__}", file=sys.stderr)
 
                 if not innehall and rss_beskrivning:
                     innehall = "[YouTube-beskrivning] " + rss_beskrivning
