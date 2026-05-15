@@ -81,294 +81,190 @@ function useBlinkState(amplitudeRef) {
       await sleep(80);
       if (cancelled) return;
       setBlinkState("open");
+
+      // Nästa blink om 3–7 sekunder
+      const delay = 3000 + Math.random() * 4000;
+      timerRef.current = setTimeout(doBlink, delay);
     };
 
-    const schedule = () => {
-      const delay = 4000 + Math.random() * 3000; // 4–7s naturligt intervall
-      timerRef.current = setTimeout(async () => {
-        if (cancelled) return;
-        await doBlink();
-        if (!cancelled && Math.random() < 0.2) { await sleep(150); if (!cancelled) await doBlink(); }
-        if (!cancelled) schedule();
-      }, delay);
-    };
+    // Starta första blinkningen efter 1–3 sekunder
+    const initialDelay = 1000 + Math.random() * 2000;
+    timerRef.current = setTimeout(doBlink, initialDelay);
 
-    schedule();
-    return () => { cancelled = true; clearTimeout(timerRef.current); };
-  }, [amplitudeRef]);
+    return () => {
+      cancelled = true;
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   return blinkState;
 }
 
-// ── Komponenter ──────────────────────────────────────────────────────────────
-
-function Waveform({ amplitude, farg = ANCHOR_FARG }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "2px", height: "24px" }}>
-      {Array.from({ length: 24 }, (_, i) => {
-        const base = 0.2 + 0.35 * Math.abs(Math.sin(i * 0.85));
-        const h = amplitude > 0.02 ? 3 + (base + amplitude * 0.65) * 22 : 3;
-        return <div key={i} style={{ width: "3px", height: `${Math.min(24, Math.max(3, h))}px`, background: farg, borderRadius: "1.5px", opacity: 0.75, transition: "height 0.08s ease" }} />;
-      })}
-    </div>
-  );
-}
-
-const MIN_STATE_HOLD = 160; // ms — längre hold ger lugnare rörelse
-
-function TalkingFace({ amplitude, speaking }) {
-  const slug = agentSlug(ANCHOR);
-  const base = `/avatarer/podd/${slug}`;
-  const amp = speaking ? amplitude : 0;
-
-  // Höga trösklar → munnen är mest i neutral/small, sällan medium, nästan aldrig large
-  let rawMouth = 0;
-  if (amp > 0.82) rawMouth = 3;
-  else if (amp > 0.52) rawMouth = 2;
-  else if (amp > 0.18) rawMouth = 1;
-
-  const stateRef = useRef(0);
-  const stateTimeRef = useRef(0);
-  const now = Date.now();
-  if (rawMouth !== stateRef.current && now - stateTimeRef.current >= MIN_STATE_HOLD) {
-    stateRef.current = rawMouth;
-    stateTimeRef.current = now;
-  }
-  const mouthState = speaking ? stateRef.current : 0; // 0–3
-
-  // Blink — amplitudeRef håller senaste värdet utan stale closure
-  const amplitudeRef = useRef(amp);
-  amplitudeRef.current = amp;
-  const blinkState = useBlinkState(amplitudeRef); // "open" | "half" | "closed"
-
-  // 12 förkomponerade bilder: 4 munlägen × 3 ögonlägen
-  const MOUTH_SUFFIX = ["", "-small", "-medium", "-large"];
-  const allStates = [];
-  for (let m = 0; m < 4; m++) {
-    for (const eyes of ["open", "half", "closed"]) {
-      const src = eyes === "open"
-        ? `${base}${MOUTH_SUFFIX[m]}.png`
-        : `${base}-m${m}-${eyes}.png`;
-      allStates.push({ m, eyes, src });
-    }
-  }
-
-  const imgStyle = { position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "fill" };
-  return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      {allStates.map(({ m, eyes, src }) => (
-        <img key={src} src={src} alt="" style={{
-          ...imgStyle,
-          opacity: m === mouthState && eyes === blinkState ? 1 : 0,
-          transition: "opacity 80ms ease-in-out",
-        }} onError={e => { e.target.style.display = "none"; }} />
-      ))}
-    </div>
-  );
-}
-
-function AnchorPanel({ speaking, amplitude, anchorTitle = "Nyhetsankare" }) {
-  const glow = speaking ? 18 + amplitude * 40 : 0;
-  return (
-    <div style={{ position: "relative", width: "100%", paddingTop: "80%", background: "#000", borderRadius: "4px", overflow: "hidden" }}>
-      <div style={{ position: "absolute", inset: 0 }}>
-        <TalkingFace amplitude={amplitude} speaking={speaking} />
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "48px 20px 18px", background: "linear-gradient(transparent, rgba(0,0,0,0.9))" }}>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-            <div>
-              {speaking && (
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                  <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
-                  <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>LIVE</span>
-                </div>
-              )}
-              <p style={{ fontSize: "20px", fontWeight: 700, color: C.text, margin: 0, fontFamily: "Times New Roman, serif", textShadow: "0 2px 8px #000" }}>{ANCHOR}</p>
-              <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>{anchorTitle}</p>
-            </div>
-            {speaking && <Waveform amplitude={amplitude} />}
-          </div>
-        </div>
-        {speaking && (
-          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", boxShadow: `inset 0 0 ${glow * 1.5}px ${ANCHOR_FARG}33`, border: `2px solid ${ANCHOR_FARG}55`, transition: "box-shadow 0.08s ease" }} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function DebattAgentPanel({ agent, speaking, amplitude, debattor = "Debattör", talar = "TALAR" }) {
-  const farg = AGENT_FARG[agent] || C.accent;
-  const glow = speaking ? 18 + amplitude * 40 : 0;
-  const slug = agentSlug(agent);
-  return (
-    <div style={{ position: "relative", width: "100%", paddingTop: "75%", background: "#000", borderRadius: "4px", overflow: "hidden" }}>
-      <div style={{ position: "absolute", inset: 0 }}>
-        <img src={`/avatarer/${slug}.png`} alt={agent} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "48px 20px 18px", background: "linear-gradient(transparent, rgba(0,0,0,0.92))" }}>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-            <div>
-              {speaking && (
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                  <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
-                  <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>{talar}</span>
-                </div>
-              )}
-              <p style={{ fontSize: "20px", fontWeight: 700, color: C.text, margin: 0, fontFamily: "Times New Roman, serif", textShadow: "0 2px 8px #000" }}>{agent}</p>
-              <p style={{ fontSize: "11px", color: farg, margin: "2px 0 0 0", letterSpacing: "0.06em" }}>{debattor}</p>
-            </div>
-            {speaking && <Waveform amplitude={amplitude} farg={farg} />}
-          </div>
-        </div>
-        {speaking && (
-          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", boxShadow: `inset 0 0 ${glow * 1.5}px ${farg}33`, border: `2px solid ${farg}55`, transition: "box-shadow 0.08s ease" }} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Huvud ─────────────────────────────────────────────────────────────────────
-
-export default function KanalPage() {
-  const [nyheter, setNyheter]               = useState([]);
-  const [debatt, setDebatt]                 = useState(null);
-  const [mode, setMode]                     = useState("nyheter");
-  const [currentIdx, setCurrentIdx]         = useState(0);
-  const [debattIdx, setDebattIdx]           = useState(0);
-  const [currentAgent, setCurrentAgent]     = useState(null);
-  const [speaking, setSpeaking]             = useState(false);
-  const [amplitude, setAmplitude]           = useState(0);
-  const [running, setRunning]               = useState(false);
-  const [laddar, setLaddar]                 = useState(true);
-  const [lang, setLang]                     = useState("sv");
-  const [translatedAmne, setTranslatedAmne] = useState(null);
-  const [translatedInlagg, setTranslatedInlagg] = useState(null);
-  const [oversatter, setOversatter]         = useState(false);
-
-  const runningRef     = useRef(false);
-  const ampTimer       = useRef(null);
-  const nyheterRef     = useRef([]);
-  const debattRef      = useRef(null);
-  const langRef        = useRef("sv");
-  const translateCache = useRef({});
-
-  const L = lang === "en" ? {
-    debattemne: "DEBATE TOPIC", nastaUpp: "UP NEXT", inlagg: "POST",
-    debattor: "Debater", talar: "SPEAKING",
-    stoppaSandning: "■  STOP BROADCAST", startaSandning: "▶  START BROADCAST",
-    sandingNyheter: "BROADCASTING NEWS", debattPagar: "DEBATE IN PROGRESS",
-    laddar: "LOADING…", kvallensDebatt: "TONIGHT'S DEBATE",
-    iKon: "UPCOMING", lasNu: "NOW READING", nasta: "NEXT", senasteNyhet: "LATEST NEWS",
-    statusDebatt: "debate available", statusIngen: "no debate yet",
-  } : {
-    debattemne: "DEBATTÄMNE", nastaUpp: "NÄSTA UPP", inlagg: "INLÄGG",
-    debattor: "Debattör", talar: "TALAR",
-    stoppaSandning: "■  STOPPA SÄNDNING", startaSandning: "▶  STARTA SÄNDNING",
-    sandingNyheter: "SÄNDER NYHETER", debattPagar: "DEBATT PÅGÅR",
-    laddar: "LADDAR…", kvallensDebatt: "KVÄLLENS DEBATT",
-    iKon: "I KÖN", lasNu: "LÄSER NU", nasta: "NÄSTA", senasteNyhet: "SENASTE NYHET",
-    statusDebatt: "debatt tillgänglig", statusIngen: "ingen debatt ännu",
-  };
-
-  async function hamtaData() {
-    setLaddar(true);
-    const [nyheterData, debattData] = await Promise.all([
-      fetch("/api/kanal/nyheter").then(r => r.json()).catch(() => []),
-      fetch(`${SB_URL}/rest/v1/chatt_debatter?kalla=eq.kanal&order=skapad.desc&limit=1`, {
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      }).then(r => r.json()).catch(() => []),
-    ]);
-    if (Array.isArray(nyheterData) && nyheterData.length) {
-      setNyheter(nyheterData);
-      nyheterRef.current = nyheterData;
-    }
-    if (Array.isArray(debattData) && debattData.length) {
-      setDebatt(debattData[0]);
-      debattRef.current = debattData[0];
-    }
-    setLaddar(false);
-  }
-
-  async function translateText(text) {
-    if (!text) return text;
-    if (translateCache.current[text]) return translateCache.current[text];
-    try {
-      const res = await fetch("/api/kanal/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const { translated } = await res.json();
-      translateCache.current[text] = translated;
-      return translated;
-    } catch {
-      return text;
-    }
-  }
-
-  async function handleLangChange(l) {
-    if (running) return;
-    setLang(l);
-    langRef.current = l;
-    translateCache.current = {};
-    setTranslatedAmne(null);
-    setTranslatedInlagg(null);
-    await hamtaData();
-  }
+// ── Amplitude-hook ────────────────────────────────────────────────────────────
+function useAmplitude(isSpeaking) {
+  const amplitudeRef = useRef(1);
+  const frameRef     = useRef(null);
 
   useEffect(() => {
-    hamtaData();
-    return () => {
-      runningRef.current = false;
-      if (ampTimer.current) clearInterval(ampTimer.current);
+    let running = true;
+    const tick = () => {
+      if (!running) return;
+      const target = isSpeaking
+        ? 0.5 + Math.random() * 0.5
+        : 0.05 + Math.random() * 0.08;
+      amplitudeRef.current += (target - amplitudeRef.current) * 0.15;
+      frameRef.current = requestAnimationFrame(tick);
     };
+    frameRef.current = requestAnimationFrame(tick);
+    return () => {
+      running = false;
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    };
+  }, [isSpeaking]);
+
+  return amplitudeRef;
+}
+
+// ── WaveformBar ────────────────────────────────────────────────────────────────
+function WaveformBar({ isSpeaking, isThinking }) {
+  const canvasRef    = useRef(null);
+  const amplitudeRef = useAmplitude(isSpeaking);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx    = canvas.getContext("2d");
+    const W      = canvas.width;
+    const H      = canvas.height;
+    const BARS   = 24;
+    const GAP    = 2;
+    const barW   = (W - GAP * (BARS - 1)) / BARS;
+    let frameId;
+    let dotPhase = 0;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, W, H);
+
+      if (isThinking) {
+        // ── Thinking-animation: tre pulserande punkter ──────────────────────
+        dotPhase += 0.06;
+        const dotR   = 4;
+        const dots   = 3;
+        const totalW = dots * dotR * 2 + (dots - 1) * 10;
+        const startX = (W - totalW) / 2;
+        const cy     = H / 2;
+        for (let d = 0; d < dots; d++) {
+          const phase   = dotPhase + d * (Math.PI * 2 / 3);
+          const opacity = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(phase));
+          const scale   = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(phase));
+          ctx.beginPath();
+          ctx.arc(startX + d * (dotR * 2 + 10) + dotR, cy, dotR * scale, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(160, 200, 240, ${opacity})`;
+          ctx.fill();
+        }
+      } else {
+        // ── Waveform-animation ─────────────────────────────────────────────
+        for (let b = 0; b < BARS; b++) {
+          const amp    = amplitudeRef.current;
+          const noise  = 0.4 + Math.random() * 0.6;
+          const height = Math.max(2, (H * amp * noise) * (isSpeaking ? 1 : 0.12));
+          const x      = b * (barW + GAP);
+          const y      = (H - height) / 2;
+          ctx.fillStyle = "rgba(160, 200, 240, 0.85)";
+          ctx.beginPath();
+          ctx.roundRect(x, y, barW, height, 2);
+          ctx.fill();
+        }
+      }
+      frameId = requestAnimationFrame(draw);
+    };
+    frameId = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(frameId);
+  }, [isSpeaking, isThinking, amplitudeRef]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={420}
+      height={36}
+      style={{ width: "100%", height: "36px", display: "block" }}
+    />
+  );
+}
+
+// ── AnchorImage ───────────────────────────────────────────────────────────────
+function AnchorImage({ blinkState, isSpeaking }) {
+  const mouthIdx = isSpeaking ? Math.floor(Date.now() / 120) % 4 : 0;
+  const eyeState = blinkState; // open | half | closed
+
+  const mouth = ["anna-m0", "anna-m1", "anna-m2", "anna-m3"][mouthIdx];
+  const eyeSuffix = eyeState === "open" ? "" : eyeState === "half" ? "-half" : "-closed";
+  const src = `/avatarer/podd/${mouth}${eyeSuffix}.png`;
+
+  return (
+    <img
+      src={src}
+      alt="Anna"
+      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+    />
+  );
+}
+
+export default function KanalPage() {
+  const [mode, setMode]           = useState("idle");
+  const [nyheter, setNyheter]     = useState([]);
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [lang, setLang]           = useState("sv");
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isThinking, setIsThinking] = useState(false);
+  const [oversatter, setOversatter] = useState(false);
+  const [debattMode, setDebattMode] = useState(false);
+  const [debattInfo, setDebattInfo] = useState(null);
+
+  const nyheterRef  = useRef([]);
+  const runningRef  = useRef(false);
+  const langRef     = useRef("sv");
+  const blinkState  = useBlinkState();
+
+  // ── Hämta nyheter ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    fetch("/api/kanal/nyheter")
+      .then(r => r.json())
+      .then(data => {
+        nyheterRef.current = data;
+        setNyheter(data);
+      })
+      .catch(() => {});
   }, []);
 
+  // ── TTS via ResponsiveVoice ─────────────────────────────────────────────────
   async function spelaUppText(text, agent) {
-    const svRost = AGENT_ROST[agent ?? ANCHOR] ?? { voice: "Swedish Female", rate: 0.90, pitch: 1.02 };
-    const rost = langRef.current === "en"
-      ? { ...svRost, voice: svRost.voice.includes("Female") ? "US English Female" : "US English Male" }
-      : svRost;
-    setCurrentAgent(agent);
-    setSpeaking(true);
-    await new Promise(resolve => {
-      if (!runningRef.current) { resolve(); return; }
-      const startAnim = () => {
-        ampTimer.current = setInterval(() => {
-          if (!runningRef.current) { clearInterval(ampTimer.current); return; }
-          const t = Date.now();
-          // Dämpad amplitud — munnen rör sig lite, inte mycket
-          const syllable = Math.pow(Math.max(0, Math.sin(t * 0.016)), 2.8);
-          const env = 0.25 + 0.45 * Math.pow(Math.abs(Math.sin(t * 0.0025)), 0.8);
-          const jitter = 0.015 * Math.sin(t * 0.09) + 0.01 * Math.sin(t * 0.041);
-          setAmplitude(Math.min(0.75, Math.max(0, syllable * env + jitter)));
-        }, 60);
-      };
-      const stopAnim = () => {
-        if (ampTimer.current) clearInterval(ampTimer.current);
-        setAmplitude(0);
+    return new Promise(resolve => {
+      const voiceConf = (agent && AGENT_ROST[agent]) ? AGENT_ROST[agent] : AGENT_ROST["Anna"];
+      if (typeof responsiveVoice === "undefined" || !responsiveVoice.voiceSupport()) {
         resolve();
-      };
-      const timeout = setTimeout(stopAnim, text.length * 75 + 4000);
-      if (window.responsiveVoice) {
-        window.responsiveVoice.speak(text, rost.voice, {
-          pitch: rost.pitch, rate: rost.rate,
-          onstart: startAnim,
-          onend:   () => { clearTimeout(timeout); stopAnim(); },
-          onerror: () => { clearTimeout(timeout); stopAnim(); },
-        });
-      } else {
-        startAnim();
-        setTimeout(stopAnim, Math.max(2000, text.length * 60));
+        return;
       }
+      setIsSpeaking(false);
+      setIsThinking(true);
+      responsiveVoice.speak(
+        text,
+        voiceConf.voice,
+        {
+          rate: voiceConf.rate,
+          pitch: voiceConf.pitch,
+          onstart: () => { setIsThinking(false); setIsSpeaking(true); },
+          onend:   () => { setIsSpeaking(false); resolve(); },
+          onerror: () => { setIsSpeaking(false); resolve(); },
+        }
+      );
     });
-    setSpeaking(false);
-    setAmplitude(0);
   }
 
+  // ── Expansion-funktioner ────────────────────────────────────────────────────
   async function batchExpanderaRubriker() {
     const lista = nyheterRef.current;
-    if (!lista.length) return;
+    if (!lista.length) return false;
     try {
       const res = await fetch("/api/kanal/batch-expand", {
         method: "POST",
@@ -383,8 +279,10 @@ export default function KanalPage() {
             : n
         );
         setNyheter([...nyheterRef.current]);
+        return true;
       }
     } catch {}
+    return false;
   }
 
   async function batchOversattRubriker() {
@@ -450,10 +348,16 @@ export default function KanalPage() {
       setOversatter(false);
     } else {
       setOversatter(true);
-      // One batch call expands all 10 items before playback starts — no individual
-      // expansion calls during playback, no Gemini rate-limit cascade.
+      // One batch call expands all 10 items before playback starts.
+      // If batch fails (Gemini+Groq rate-limited), fall back to expanding item 0
+      // individually — which has OpenRouter as last resort. The 5s floor in the
+      // playback loop then gives enough spacing for items 1-9 to expand lazily.
       if (nyheterRef.current.some(n => !n.text || n.text === n.rubrik)) {
-        await batchExpanderaRubriker();
+        const batchOk = await batchExpanderaRubriker();
+        if (!batchOk) {
+          await sleep(2000); // let rate-limit recover after the failed batch call
+          await expanderaItem(nyheterRef.current[0], 0);
+        }
       }
       setOversatter(false);
     }
@@ -488,276 +392,274 @@ export default function KanalPage() {
     }
   }
 
-  async function spelaUppDebatt() {
-    const d = debattRef.current;
-    if (!d) return;
-    const isEn = langRef.current === "en";
+  // ── Debatt-loop ─────────────────────────────────────────────────────────────
+  async function spelaUppDebatt(artiklar) {
     setMode("debatt");
-
-    const amne = isEn ? await translateText(d.amne) : d.amne;
-
-    // Pre-translate all inlägg so the panel shows English text immediately
-    let inlaggTexts = null;
-    if (isEn) {
-      setTranslatedAmne(amne);
-      inlaggTexts = await Promise.all(d.inlagg.map(inp => translateText(inp.text)));
-      setTranslatedInlagg(inlaggTexts);
-    }
-
-    const intro = isEn
-      ? `Now moving to tonight's debate: ${amne}`
-      : `Nu övergår vi till kvällens debatt: ${amne}`;
-    await spelaUppText(intro, null);
-    if (!runningRef.current) return;
-    await sleep(800);
-
-    for (let i = 0; i < d.inlagg.length; i++) {
+    for (let i = 0; i < artiklar.length; i++) {
       if (!runningRef.current) return;
-      setDebattIdx(i);
-      const text = isEn ? (inlaggTexts?.[i] || d.inlagg[i].text) : d.inlagg[i].text;
-      await spelaUppText(text, d.inlagg[i].agent);
+      const art  = artiklar[i];
+      const text = art.rubrik + ". " + (art.artikel || "").slice(0, 500);
+      setDebattInfo({ agent: art.forfattare, rubrik: art.rubrik, idx: i, total: artiklar.length });
+      await spelaUppText(text, art.forfattare);
       if (!runningRef.current) return;
-      await sleep(700);
+      await sleep(1200);
     }
-    setMode("nyheter");
-    setCurrentAgent(null);
   }
 
-  async function startaKanal() {
+  // ── Starta sändning ─────────────────────────────────────────────────────────
+  async function startaSandning() {
     if (runningRef.current) return;
     runningRef.current = true;
-    setRunning(true);
-    while (runningRef.current) {
-      await spelaUppNyheter();
-      if (!runningRef.current) break;
-      if (debattRef.current) await spelaUppDebatt();
-    }
-    stoppaKanal();
-  }
-
-  function stoppaKanal() {
-    runningRef.current = false;
-    setRunning(false);
-    setSpeaking(false);
-    setAmplitude(0);
-    setCurrentAgent(null);
-    setMode("nyheter");
-    setTranslatedAmne(null);
-    setTranslatedInlagg(null);
+    setMode("starting");
     setOversatter(false);
-    if (ampTimer.current) clearInterval(ampTimer.current);
-    if (window.responsiveVoice) window.responsiveVoice.cancel();
+
+    try {
+      await spelaUppNyheter();
+    } catch (e) {
+      console.error("Nyheter-fel:", e);
+    }
+
+    if (runningRef.current && debattMode) {
+      try {
+        const res = await fetch(
+          `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla&order=skapad.desc&limit=6`,
+          { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+        );
+        if (res.ok) {
+          const artiklar = await res.json();
+          if (artiklar.length > 0) await spelaUppDebatt(artiklar);
+        }
+      } catch (e) {
+        console.error("Debatt-fel:", e);
+      }
+    }
+
+    runningRef.current = false;
+    setMode("idle");
+    setIsSpeaking(false);
+    setIsThinking(false);
+    setOversatter(false);
   }
 
-  // ── UI-beräkningar ────────────────────────────────────────────────────────
+  function stoppaSandning() {
+    runningRef.current = false;
+    if (typeof responsiveVoice !== "undefined") responsiveVoice.cancel();
+    setMode("idle");
+    setIsSpeaking(false);
+    setIsThinking(false);
+    setOversatter(false);
+    setCurrentIdx(0);
+    setDebattInfo(null);
+  }
 
-  const isDebattMode  = mode === "debatt" && running;
-  const currentNyhet  = nyheter[currentIdx];
-  const currentInlagg = debatt?.inlagg?.[debattIdx];
-  const activeAgent   = isDebattMode ? currentAgent : null;
-  const activeFarg    = activeAgent ? (AGENT_FARG[activeAgent] || C.accent) : ANCHOR_FARG;
+  function bytLang(nyttLang) {
+    if (nyttLang === lang) return;
+    stoppaSandning();
+    setLang(nyttLang);
+    langRef.current = nyttLang;
+    // Nollställ expansioner när språket byts
+    nyheterRef.current = nyheterRef.current.map(n => ({ ...n, text: n.rubrik, rubrikEn: undefined }));
+    setNyheter([...nyheterRef.current]);
+  }
 
-  const upcomingNyheter = running && !isDebattMode
-    ? [...Array(Math.min(5, nyheter.length))].map((_, i) => nyheter[(currentIdx + i + 1) % nyheter.length]).filter(Boolean)
-    : [];
+  const running  = mode !== "idle";
+  const current  = nyheter[currentIdx] || null;
+  const upcoming = nyheter.slice(currentIdx + 1, currentIdx + 6);
 
-  const upcomingInlagg = isDebattMode && debatt?.inlagg
-    ? debatt.inlagg.slice(debattIdx + 1, debattIdx + 4)
-    : [];
-
-  const displayAmne = translatedAmne || debatt?.amne;
-
+  // ── RENDER ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
 
-      {/* Live-indikator */}
-      <div style={{ borderBottom: `1px solid ${C.border}`, padding: "6px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: running ? "#f87171" : C.textMuted, boxShadow: running ? "0 0 8px #f87171" : "none", transition: "all 0.3s" }} />
-          {running && (
-            <span style={{ fontSize: "11px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.1em" }}>
-              {isDebattMode ? L.debattPagar : L.sandingNyheter}
-            </span>
-          )}
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          {isDebattMode && (
-            <span style={{ fontSize: "10px", color: activeFarg, fontFamily: "monospace", letterSpacing: "0.08em", border: `1px solid ${activeFarg}44`, padding: "2px 8px", borderRadius: "3px" }}>
-              DEBATT
-            </span>
-          )}
-          <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.06em" }}>AI NYHETSKANAL</span>
-        </div>
+      {/* Live-strip */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "6px 20px", background: "#050505", borderBottom: `1px solid ${C.border}`,
+        fontSize: "11px", fontFamily: "monospace", letterSpacing: "0.1em",
+      }}>
+        <span style={{ display: "flex", alignItems: "center", gap: "6px", color: running ? "#e05050" : C.textMuted }}>
+          <span style={{
+            width: "7px", height: "7px", borderRadius: "50%",
+            background: running ? "#e05050" : "#333",
+            boxShadow: running ? "0 0 6px #e05050" : "none",
+          }} />
+          {running ? "SÄNDER NYHETER" : "NYHETSKANAL"}
+        </span>
+        <span style={{ color: C.textMuted }}>AI NYHETSKANAL</span>
       </div>
 
-      {/* Main content */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", maxWidth: "1100px", width: "100%", margin: "0 auto", padding: "32px 24px 24px", gap: "32px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", alignItems: "start" }}>
+      <main style={{ maxWidth: "960px", margin: "0 auto", padding: "32px 20px" }}>
+        <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
 
-          {/* Left: anchor/agent panel */}
-          <div>
-            {isDebattMode && activeAgent
-              ? <DebattAgentPanel agent={activeAgent} speaking={speaking} amplitude={amplitude} debattor={L.debattor} talar={L.talar} />
-              : <AnchorPanel speaking={speaking && !isDebattMode} amplitude={amplitude} anchorTitle={lang === "en" ? "News Anchor" : "Nyhetsankare"} />
-            }
+          {/* ── Vänster kolumn: Anna ── */}
+          <div style={{ flex: "0 0 320px", minWidth: 0 }}>
 
-            <div style={{ marginTop: "20px" }}>
-              {/* Språkväljare */}
-              <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
-                {[["sv", "🇸🇪 Svenska"], ["en", "🇬🇧 English"]].map(([l, label]) => (
-                  <button key={l} onClick={() => handleLangChange(l)} disabled={running}
-                    style={{ flex: 1, padding: "8px", background: lang === l ? ANCHOR_FARG : "transparent", color: lang === l ? "#000" : C.textMuted, border: `1px solid ${lang === l ? ANCHOR_FARG : C.border}`, borderRadius: "4px", fontSize: "12px", fontWeight: lang === l ? 700 : 400, cursor: running ? "default" : "pointer", fontFamily: "monospace", letterSpacing: "0.04em", transition: "all 0.15s" }}>
-                    {label}
-                  </button>
-                ))}
+            {/* Anna-bild */}
+            <div style={{
+              position: "relative", borderRadius: "12px", overflow: "hidden",
+              border: `1px solid ${C.border}`,
+              aspectRatio: "4/3",
+              background: "#050505",
+            }}>
+              <AnchorImage blinkState={blinkState} isSpeaking={isSpeaking} />
+
+              {/* Live-badge */}
+              <div style={{
+                position: "absolute", top: "12px", left: "12px",
+                display: "flex", alignItems: "center", gap: "6px",
+                background: "rgba(0,0,0,0.7)", borderRadius: "4px", padding: "4px 8px",
+              }}>
+                <span style={{
+                  width: "6px", height: "6px", borderRadius: "50%",
+                  background: running ? "#e05050" : "#444",
+                  boxShadow: running ? "0 0 6px #e05050" : "none",
+                }} />
+                <span style={{ fontSize: "10px", letterSpacing: "0.12em", color: running ? "#e05050" : "#555", fontFamily: "monospace" }}>LIVE</span>
               </div>
 
-              {!running ? (
-                <button
-                  onClick={startaKanal}
-                  disabled={laddar || nyheter.length === 0}
-                  style={{ width: "100%", padding: "14px", background: laddar ? C.surface : ANCHOR_FARG, color: laddar ? C.textMuted : "#000", border: "none", borderRadius: "4px", fontSize: "13px", fontWeight: 700, cursor: laddar ? "default" : "pointer", letterSpacing: "0.08em", fontFamily: "monospace" }}
-                >
-                  {laddar ? L.laddar : L.startaSandning}
-                </button>
-              ) : (
-                <button
-                  onClick={stoppaKanal}
-                  style={{ width: "100%", padding: "14px", background: "#1a1a1a", color: "#f87171", border: "1px solid #f8717133", borderRadius: "4px", fontSize: "13px", fontWeight: 700, cursor: "pointer", letterSpacing: "0.08em", fontFamily: "monospace" }}
-                >
-                  {L.stoppaSandning}
-                </button>
-              )}
+              {/* Namn-banner */}
+              <div style={{
+                position: "absolute", bottom: 0, left: 0, right: 0,
+                background: "linear-gradient(transparent, rgba(0,0,0,0.85))",
+                padding: "20px 14px 10px",
+              }}>
+                <div style={{ fontSize: "20px", fontWeight: 400, color: ANCHOR_FARG, lineHeight: 1 }}>Anna</div>
+                <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", marginTop: "2px" }}>Nyhetsankare</div>
+                <div style={{ marginTop: "8px" }}>
+                  <WaveformBar isSpeaking={isSpeaking} isThinking={isThinking || oversatter} />
+                </div>
+              </div>
             </div>
 
-            {!laddar && (
-              <p style={{ fontSize: "11px", color: C.textMuted, margin: "12px 0 0 0", textAlign: "center", fontFamily: "monospace" }}>
-                {nyheter.length} {lang === "en" ? "news" : "nyheter"} · {debatt ? L.statusDebatt : L.statusIngen}
-              </p>
-            )}
+            {/* Språkväljare */}
+            <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+              {[["sv","🇸🇪 Svenska"],["en","🇬🇧 English"]].map(([l, lbl]) => (
+                <button key={l} onClick={() => bytLang(l)} style={{
+                  flex: 1, padding: "9px", borderRadius: "6px", fontSize: "13px",
+                  border: `1px solid ${lang === l ? "#4a7a9b" : C.border}`,
+                  background: lang === l ? "#0a1a2a" : "transparent",
+                  color: lang === l ? "#a0c8f0" : C.textMuted,
+                  cursor: "pointer", fontFamily: "Georgia, serif",
+                }}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+
+            {/* Start/stopp */}
+            <button
+              onClick={running ? stoppaSandning : startaSandning}
+              style={{
+                width: "100%", marginTop: "8px", padding: "13px",
+                borderRadius: "6px", fontSize: "14px", fontFamily: "Georgia, serif",
+                border: `1px solid ${running ? "#5a2020" : "#2a4a2a"}`,
+                background: running ? "#1a0808" : "#081208",
+                color: running ? "#e05050" : C.accent,
+                cursor: "pointer", letterSpacing: "0.08em",
+              }}
+            >
+              {running ? "⏹ STOPPA SÄNDNING" : "▶ STARTA SÄNDNING"}
+            </button>
+
+            {/* Debatt-toggle */}
+            <label style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "14px", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={debattMode}
+                onChange={e => setDebattMode(e.target.checked)}
+                style={{ accentColor: C.accent, width: "15px", height: "15px" }}
+              />
+              <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.05em" }}>debatt tillgänglig</span>
+            </label>
+
+            <p style={{ fontSize: "11px", color: C.textMuted, marginTop: "16px", lineHeight: 1.6, fontFamily: "monospace" }}>
+              {nyheter.length} nyheter · {debattMode ? "debatt tillgänglig" : "debatt tillgänglig"}
+            </p>
           </div>
 
-          {/* Right: content panel */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* ── Höger kolumn: Nyheter ── */}
+          <div style={{ flex: 1, minWidth: 0 }}>
 
-            {/* Nyheter-mode */}
-            {!isDebattMode && (
-              <>
-                <div style={{ padding: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", minHeight: "200px" }}>
-                  <div style={{ fontSize: "10px", color: oversatter ? ANCHOR_FARG : C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "16px", fontFamily: "monospace" }}>
-                    {oversatter
-                      ? (lang === "en" ? "PREPARING BROADCAST…" : "FÖRBEREDER SÄNDNING…")
-                      : running && speaking ? L.lasNu : running ? L.nasta : L.senasteNyhet}
-                  </div>
-                  {currentNyhet ? (
-                    <>
-                      <p style={{ fontSize: "20px", fontWeight: 700, lineHeight: 1.35, fontFamily: "Times New Roman, serif", color: C.text, margin: "0 0 14px 0", borderLeft: `3px solid ${ANCHOR_FARG}`, paddingLeft: "16px" }}>
-                        {lang === "en" && currentNyhet.rubrikEn ? currentNyhet.rubrikEn : currentNyhet.rubrik}
-                      </p>
-                      {currentNyhet.text && currentNyhet.text !== currentNyhet.rubrik && (
-                        <p style={{ fontSize: "14px", lineHeight: 1.75, color: "#aaa", margin: "0 0 14px 0", paddingLeft: "19px" }}>
-                          {currentNyhet.text}
-                        </p>
-                      )}
-                      <p style={{ fontSize: "11px", color: ANCHOR_FARG, margin: 0, fontFamily: "monospace", letterSpacing: "0.06em", paddingLeft: "19px" }}>
-                        {currentNyhet.kalla}
-                      </p>
-                    </>
-                  ) : (
-                    <p style={{ fontSize: "14px", color: C.textMuted, margin: 0 }}>
-                      {laddar
-                        ? (lang === "en" ? "Fetching and expanding news…" : "Hämtar och expanderar nyheter…")
-                        : (lang === "en" ? "Press START BROADCAST to begin." : "Tryck STARTA SÄNDNING för att börja.")}
-                    </p>
-                  )}
-                </div>
-
-                {upcomingNyheter.length > 0 && (
-                  <div style={{ padding: "20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px" }}>
-                    <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "14px", fontFamily: "monospace" }}>{L.iKon}</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                      {upcomingNyheter.map((n, i) => (
-                        <div key={i} style={{ display: "flex", gap: "12px", alignItems: "flex-start", opacity: 1 - i * 0.15 }}>
-                          <span style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace", paddingTop: "2px", flexShrink: 0 }}>{String(i + 1).padStart(2, "0")}</span>
-                          <div>
-                            <p style={{ fontSize: "13px", color: C.text, margin: "0 0 2px 0", lineHeight: 1.4 }}>{lang === "en" && n.rubrikEn ? n.rubrikEn : n.rubrik}</p>
-                            <p style={{ fontSize: "10px", color: C.textMuted, margin: 0, fontFamily: "monospace" }}>{n.kalla}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!running && debatt && (
-                  <div style={{ padding: "20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px" }}>
-                    <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "12px", fontFamily: "monospace" }}>{L.kvallensDebatt}</div>
-                    <p style={{ fontSize: "15px", fontFamily: "Times New Roman, serif", color: C.text, margin: "0 0 10px 0", lineHeight: 1.4 }}>{debatt.amne}</p>
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                      {(debatt.agenter || []).map(a => (
-                        <span key={a} style={{ fontSize: "11px", color: AGENT_FARG[a] || C.accent, background: `${AGENT_FARG[a] || C.accent}12`, border: `1px solid ${AGENT_FARG[a] || C.accent}30`, borderRadius: "20px", padding: "2px 10px" }}>{a}</span>
-                      ))}
-                    </div>
-                    {debatt.summering && (
-                      <p style={{ fontSize: "12px", color: C.textMuted, margin: "12px 0 0 0", lineHeight: 1.65, fontStyle: "italic" }}>{debatt.summering}</p>
-                    )}
-                  </div>
-                )}
-              </>
+            {/* Förbereder-banner */}
+            {oversatter && (
+              <div style={{
+                background: "#0a0f0a", border: `1px solid ${C.accent}40`,
+                borderRadius: "8px", padding: "14px 18px", marginBottom: "16px",
+                display: "flex", alignItems: "center", gap: "10px",
+              }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: C.accent, boxShadow: `0 0 8px ${C.accent}`, flexShrink: 0 }} />
+                <span style={{ fontSize: "12px", color: C.accent, fontFamily: "monospace", letterSpacing: "0.1em" }}>
+                  {lang === "en" ? "PREPARING BROADCAST…" : "FÖRBEREDER SÄNDNING…"}
+                </span>
+              </div>
             )}
 
-            {/* Debatt-mode */}
-            {isDebattMode && currentInlagg && (
-              <>
-                <div style={{ padding: "16px 20px", background: "#0a0a14", border: `1px solid ${activeFarg}30`, borderRadius: "4px" }}>
-                  <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "6px", fontFamily: "monospace" }}>{L.debattemne}</div>
-                  <p style={{ fontSize: "14px", color: activeFarg, margin: 0, fontFamily: "Times New Roman, serif", lineHeight: 1.4 }}>{displayAmne}</p>
-                </div>
+            {/* LÄSER NU */}
+            {current && mode === "nyheter" && (
+              <div style={{
+                background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: "8px", padding: "20px 24px", marginBottom: "16px",
+              }}>
+                <p style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>LÄSER NU</p>
+                <h2 style={{ fontSize: "22px", fontWeight: 400, lineHeight: 1.3, margin: "0 0 8px", color: C.text }}>
+                  {lang === "en" && current.rubrikEn ? current.rubrikEn : current.rubrik}
+                </h2>
+                <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, fontFamily: "monospace" }}>{current.kalla}</p>
+              </div>
+            )}
 
-                <div style={{ padding: "28px", background: C.surface, border: `1px solid ${activeFarg}40`, borderRadius: "4px", minHeight: "160px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
-                    <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
-                    <span style={{ fontSize: "10px", color: activeFarg, letterSpacing: "0.14em", textTransform: "uppercase", fontFamily: "monospace" }}>
-                      {currentInlagg.agent} · {L.inlagg} {debattIdx + 1}/{debatt.inlagg.length}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: "18px", lineHeight: 1.6, fontFamily: "Times New Roman, serif", color: C.text, margin: 0, borderLeft: `3px solid ${activeFarg}`, paddingLeft: "16px" }}>
-                    {translatedInlagg?.[debattIdx] || currentInlagg.text}
-                  </p>
-                </div>
+            {/* Debatt-info */}
+            {debattInfo && mode === "debatt" && (
+              <div style={{
+                background: "#0a080f", border: "1px solid #3a2a5a",
+                borderRadius: "8px", padding: "20px 24px", marginBottom: "16px",
+              }}>
+                <p style={{ fontSize: "11px", color: "#8080c0", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 6px" }}>
+                  DEBATTÖR {debattInfo.idx + 1}/{debattInfo.total}
+                </p>
+                <h2 style={{ fontSize: "20px", fontWeight: 400, lineHeight: 1.3, margin: "0 0 6px", color: "#c0b0e8" }}>
+                  {debattInfo.rubrik}
+                </h2>
+                <p style={{ fontSize: "12px", color: "#8080c0", margin: 0, fontFamily: "monospace" }}>{debattInfo.agent}</p>
+              </div>
+            )}
 
-                {upcomingInlagg.length > 0 && (
-                  <div style={{ padding: "20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px" }}>
-                    <div style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "14px", fontFamily: "monospace" }}>{L.nastaUpp}</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                      {upcomingInlagg.map((inp, i) => (
-                        <div key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start", opacity: 1 - i * 0.25 }}>
-                          <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: AGENT_FARG[inp.agent] || C.accent, flexShrink: 0, marginTop: "5px" }} />
-                          <div>
-                            <p style={{ fontSize: "11px", color: AGENT_FARG[inp.agent] || C.accent, margin: "0 0 2px 0", fontFamily: "monospace" }}>{inp.agent}</p>
-                            <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, lineHeight: 1.5 }}>
-                              {(translatedInlagg?.[debattIdx + 1 + i] || inp.text).slice(0, 80)}…
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+            {/* I KÖN */}
+            {upcoming.length > 0 && (
+              <div style={{
+                background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: "8px", padding: "16px 20px",
+              }}>
+                <p style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 12px" }}>I KÖN</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {upcoming.map((n, idx) => (
+                    <div key={n.rubrik} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                      <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", flexShrink: 0, paddingTop: "2px" }}>
+                        {String(idx + 1).padStart(2, "0")}
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ margin: "0 0 2px", fontSize: "14px", color: "#b0a898", lineHeight: 1.35 }}>
+                          {lang === "en" && n.rubrikEn ? n.rubrikEn : n.rubrik}
+                        </p>
+                        <p style={{ margin: 0, fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>{n.kalla}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Idle-state */}
+            {mode === "idle" && (
+              <div style={{ padding: "40px 0", textAlign: "center" }}>
+                <p style={{ fontSize: "13px", color: C.textMuted, fontStyle: "italic" }}>
+                  Tryck på ▶ STARTA SÄNDNING för att börja
+                </p>
+              </div>
             )}
           </div>
         </div>
-      </div>
-
-      <div style={{ flexShrink: 0 }}>
-        <NewsTicker />
-      </div>
-
-      <style>{`
-        @keyframes dot { 0%,100%{opacity:1}50%{opacity:0} }
-        * { box-sizing: border-box; }
-      `}</style>
+      </main>
+      <NewsTicker />
     </div>
   );
 }
