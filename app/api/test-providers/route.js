@@ -27,26 +27,26 @@ async function testCerebras() {
     }
   } catch {}
 
-  // Try each plausible model name
-  const candidates = ["llama-3.3-70b", "llama3.3-70b", "llama-3.3-70b-instruct", "llama3.3-70b-instruct"];
-  for (const model of candidates) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages: PROMPT, max_tokens: 30 }),
-        signal: AbortSignal.timeout(15000),
-      });
-      const latency = Date.now() - t0;
-      if (r.ok) {
-        const json = await r.json();
-        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-        return { ok: true, text, latency, model: json.model, availableModels };
-      }
-    } catch {}
+  const model = "qwen-3-235b-a22b-instruct-2507";
+  const t0 = Date.now();
+  try {
+    const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, messages: PROMPT, max_tokens: 30 }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const latency = Date.now() - t0;
+    if (r.ok) {
+      const json = await r.json();
+      const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+      return { ok: true, text, latency, model: json.model, availableModels };
+    }
+    const err = await r.text();
+    return { ok: false, status: r.status, error: err.slice(0, 300), latency, availableModels };
+  } catch (e) {
+    return { ok: false, error: e.message, latency: Date.now() - t0, availableModels };
   }
-  return { ok: false, error: "Ingen av modellnamnen fungerade", availableModels };
 }
 
 async function testSambanova() {
