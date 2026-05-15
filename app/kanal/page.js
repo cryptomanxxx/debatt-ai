@@ -182,8 +182,8 @@ function WaveformBar({ isSpeaking, isThinking }) {
     <canvas
       ref={canvasRef}
       width={420}
-      height={36}
-      style={{ width: "100%", height: "36px", display: "block" }}
+      height={20}
+      style={{ width: "100%", height: "20px", display: "block" }}
     />
   );
 }
@@ -199,7 +199,8 @@ function AnchorImage({ blinkState, isSpeaking }) {
 
   useEffect(() => {
     if (!isSpeaking) { setMouthIdx(0); return; }
-    const id = setInterval(() => setMouthIdx(m => (m + 1) % 4), 120);
+    // Only cycle between m0 and m1 (subtle movement, not all the way to wide open)
+    const id = setInterval(() => setMouthIdx(m => (m + 1) % 2), 220);
     return () => clearInterval(id);
   }, [isSpeaking]);
 
@@ -483,10 +484,10 @@ export default function KanalPage() {
         <span style={{ color: C.textMuted }}>AI NYHETSKANAL</span>
       </div>
 
-      <main style={{ maxWidth: "960px", margin: "0 auto", padding: "32px 20px" }}>
+      <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "32px 20px" }}>
         <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
 
-          <div style={{ flex: "0 0 320px", minWidth: 0 }}>
+          <div style={{ flex: "0 0 440px", minWidth: 0 }}>
 
             <div style={{
               position: "relative", borderRadius: "12px", overflow: "hidden",
