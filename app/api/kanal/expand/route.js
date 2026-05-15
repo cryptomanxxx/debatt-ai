@@ -1,4 +1,4 @@
-export const runtime = "edge";
+// No edge runtime — Node.js enables Cerebras fallback
 
 import { logAiCall } from "../../../lib/logAiCall";
 
@@ -24,14 +24,13 @@ export async function POST(req) {
   const user = kalla ? `[${kalla}] ${rubrik}` : rubrik;
   const msgs = [{ role: "system", content: system }, { role: "user", content: user }];
 
-  const groqKey = process.env.GROQ_API_KEY_KANAL;
   const gemKey  = process.env.GEMINI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY_KANAL;
+  const cbKey   = process.env.CEREBRAS_API_KEY;
+  const sbKey   = process.env.SAMBANOVA_API_KEY;
   const orKey   = process.env.OPENROUTER_API_KEY;
 
-  // Gemini first — no daily token cap (only 15 req/min).
-  // Groq shares its 100k tokens/day with agent.py (12 runs/day) and runs
-  // out by afternoon. Use Groq as backup, OR as last resort.
-
+  // Gemini first — no daily token cap (only 15 req/min)
   if (gemKey) {
     const t0 = Date.now();
     try {
@@ -53,18 +52,13 @@ export async function POST(req) {
         const json = await r.json();
         const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
         if (text && text !== rubrik) {
-          logAiCall({
-            provider: "gemini", model: "gemini-2.0-flash", source: "kanal",
-            status: "ok", latency_ms,
-            input_tokens: json?.usageMetadata?.promptTokenCount,
-            output_tokens: json?.usageMetadata?.candidatesTokenCount,
-          });
+          logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usageMetadata?.promptTokenCount, output_tokens: json?.usageMetadata?.candidatesTokenCount });
           return Response.json({ text }, { headers: { "X-Provider": "gemini" } });
         }
       } else {
         logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
-    } catch (e) {
+    } catch {
       logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
@@ -83,19 +77,64 @@ export async function POST(req) {
         const json = await r.json();
         const text = json.choices[0].message.content.trim();
         if (text && text !== rubrik) {
-          logAiCall({
-            provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal",
-            status: "ok", latency_ms,
-            input_tokens: json?.usage?.prompt_tokens,
-            output_tokens: json?.usage?.completion_tokens,
-          });
+          logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
           return Response.json({ text }, { headers: { "X-Provider": "groq" } });
         }
       } else {
         logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
-    } catch (e) {
+    } catch {
       logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
+  if (cbKey) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cbKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "qwen-3-235b-a22b-instruct-2507", messages: msgs, max_tokens: 350, temperature: 0.4 }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const latency_ms = Date.now() - t0;
+      if (r.ok) {
+        const json = await r.json();
+        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+        if (text && text !== rubrik) {
+          logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
+          return Response.json({ text }, { headers: { "X-Provider": "cerebras" } });
+        }
+      } else {
+        logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
+      }
+    } catch {
+      logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
+  if (sbKey) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch("https://api.sambanova.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sbKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "Meta-Llama-3.3-70B-Instruct", messages: msgs, max_tokens: 350, temperature: 0.4 }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const latency_ms = Date.now() - t0;
+      if (r.ok) {
+        const json = await r.json();
+        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+        if (text && text !== rubrik) {
+          logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
+          return Response.json({ text }, { headers: { "X-Provider": "sambanova" } });
+        }
+      } else {
+        logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
+      }
+    } catch {
+      logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 
@@ -118,18 +157,13 @@ export async function POST(req) {
         const json = await r.json();
         const text = json.choices[0].message.content.trim();
         if (text && text !== rubrik) {
-          logAiCall({
-            provider: "openrouter", model: json?.model ?? OR_MODELS[0], source: "kanal",
-            status: "ok", latency_ms,
-            input_tokens: json?.usage?.prompt_tokens,
-            output_tokens: json?.usage?.completion_tokens,
-          });
+          logAiCall({ provider: "openrouter", model: json?.model ?? OR_MODELS[0], source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
           return Response.json({ text }, { headers: { "X-Provider": "openrouter" } });
         }
       } else {
         logAiCall({ provider: "openrouter", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
-    } catch (e) {
+    } catch {
       logAiCall({ provider: "openrouter", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
