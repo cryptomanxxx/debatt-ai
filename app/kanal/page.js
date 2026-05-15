@@ -62,7 +62,7 @@ function agentSlug(namn) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── Blink-hook ────────────────────────────────────────────────────────────────
-function useBlinkState(amplitudeRef) {
+function useBlinkState() {
   const [blinkState, setBlinkState] = useState("open"); // open | half | closed
   const timerRef = useRef(null);
 
@@ -239,6 +239,7 @@ export default function KanalPage() {
 
   const nyheterRef  = useRef([]);
   const runningRef  = useRef(false);
+  const sessionRef  = useRef(0); // incremented on every stop; async loops bail if session changed
   const langRef     = useRef("sv");
   const blinkState  = useBlinkState();
 
@@ -246,10 +247,11 @@ export default function KanalPage() {
     fetch("/api/kanal/nyheter")
       .then(r => r.json())
       .then(data => {
-        nyheterRef.current = data;
-        setNyheter(data);
+        const withStatus = data.map(n => ({ ...n, expandStatus: "idle" }));
+        nyheterRef.current = withStatus;
+        setNyheter(withStatus);
       })
-      .catch(() => {});
+      .catch(e => console.error("Nyheter-fetch-fel:", e));
   }, []);
 
   async function spelaUppText(text, agent) {
@@ -288,13 +290,15 @@ export default function KanalPage() {
       if (Array.isArray(expanded) && expanded.length === lista.length) {
         nyheterRef.current = nyheterRef.current.map((n, i) =>
           expanded[i] && expanded[i] !== n.rubrik
-            ? { ...n, text: expanded[i] }
-            : n
+            ? { ...n, text: expanded[i], expandStatus: "done" }
+            : { ...n, expandStatus: "failed" }
         );
         setNyheter([...nyheterRef.current]);
         return true;
       }
-    } catch {}
+    } catch (e) {
+      console.error("Batch-expand-fel:", e);
+    }
     return false;
   }
 
@@ -316,11 +320,16 @@ export default function KanalPage() {
         );
         setNyheter([...nyheterRef.current]);
       }
-    } catch {}
+    } catch (e) {
+      console.error("Batch-översätt-fel:", e);
+    }
   }
 
   async function expanderaItem(item, i) {
-    if (item.text && item.text !== item.rubrik) return item.text;
+    if (item.expandStatus === "done") return item.text;
+    nyheterRef.current = nyheterRef.current.map((n, j) =>
+      j === i ? { ...n, expandStatus: "loading" } : n
+    );
     try {
       const res = await fetch("/api/kanal/expand", {
         method: "POST",
@@ -333,41 +342,54 @@ export default function KanalPage() {
           ? (text.split(/(?<=[.!?])\s+/)[0] || text).slice(0, 120)
           : undefined;
         nyheterRef.current = nyheterRef.current.map((n, j) =>
-          j === i ? { ...n, text, ...(rubrikEn ? { rubrikEn } : {}) } : n
+          j === i ? { ...n, text, expandStatus: "done", ...(rubrikEn ? { rubrikEn } : {}) } : n
         );
         setNyheter([...nyheterRef.current]);
         return text;
       }
-    } catch {}
+      nyheterRef.current = nyheterRef.current.map((n, j) =>
+        j === i ? { ...n, expandStatus: "failed" } : n
+      );
+    } catch (e) {
+      console.error("expanderaItem-fel:", e);
+      nyheterRef.current = nyheterRef.current.map((n, j) =>
+        j === i ? { ...n, expandStatus: "failed" } : n
+      );
+    }
     return item.rubrik;
   }
 
   async function spelaUppNyheter() {
-    const lista = nyheterRef.current;
+    const session = sessionRef.current;
+    const lista   = nyheterRef.current;
     setMode("nyheter");
 
     if (langRef.current === "en") {
       setOversatter(true);
       if (nyheterRef.current.some(n => !n.rubrikEn)) {
         await batchOversattRubriker();
+        if (session !== sessionRef.current) return;
         await sleep(4000);
       }
       await expanderaItem(nyheterRef.current[0], 0);
+      if (session !== sessionRef.current) return;
       setOversatter(false);
     } else {
       setOversatter(true);
-      if (nyheterRef.current.some(n => !n.text || n.text === n.rubrik)) {
+      if (nyheterRef.current.some(n => n.expandStatus !== "done")) {
         const batchOk = await batchExpanderaRubriker();
+        if (session !== sessionRef.current) return;
         if (!batchOk) {
           await sleep(2000);
           await expanderaItem(nyheterRef.current[0], 0);
+          if (session !== sessionRef.current) return;
         }
       }
       setOversatter(false);
     }
 
     for (let i = 0; i < lista.length; i++) {
-      if (!runningRef.current) return;
+      if (session !== sessionRef.current) return;
       setCurrentIdx(i);
 
       const nextPrefetch = i + 1 < lista.length
@@ -375,32 +397,38 @@ export default function KanalPage() {
         : Promise.resolve();
 
       const item = nyheterRef.current[i];
-      const text = (item.text && item.text !== item.rubrik)
+      const text = item.expandStatus === "done"
         ? item.text
         : (langRef.current === "en" && item.rubrikEn ? item.rubrikEn : item.rubrik);
 
       setCurrentText(text);
       const t0 = Date.now();
       await spelaUppText(text, null);
+      if (session !== sessionRef.current) return;
       await nextPrefetch;
 
       const elapsed = Date.now() - t0;
       if (elapsed < 5000) await sleep(5000 - elapsed);
 
-      if (!runningRef.current) return;
+      if (session !== sessionRef.current) return;
       await sleep(600);
     }
   }
 
   async function spelaUppDebatt(artiklar) {
+    const session = sessionRef.current;
     setMode("debatt");
     for (let i = 0; i < artiklar.length; i++) {
-      if (!runningRef.current) return;
+      if (session !== sessionRef.current) return;
       const art  = artiklar[i];
       const text = art.rubrik + ". " + (art.artikel || "").slice(0, 500);
       setDebattInfo({ agent: art.forfattare, rubrik: art.rubrik, idx: i, total: artiklar.length });
-      await spelaUppText(text, art.forfattare);
-      if (!runningRef.current) return;
+      try {
+        await spelaUppText(text, art.forfattare);
+      } catch (e) {
+        console.error("spelaUppDebatt-fel:", e);
+      }
+      if (session !== sessionRef.current) return;
       await sleep(1200);
     }
   }
@@ -442,6 +470,7 @@ export default function KanalPage() {
 
   function stoppaSandning() {
     runningRef.current = false;
+    sessionRef.current++; // invalidates all in-flight async loops
     if (typeof responsiveVoice !== "undefined") responsiveVoice.cancel();
     setMode("idle");
     setIsSpeaking(false);
@@ -457,7 +486,7 @@ export default function KanalPage() {
     stoppaSandning();
     setLang(nyttLang);
     langRef.current = nyttLang;
-    nyheterRef.current = nyheterRef.current.map(n => ({ ...n, text: n.rubrik, rubrikEn: undefined }));
+    nyheterRef.current = nyheterRef.current.map(n => ({ ...n, text: undefined, expandStatus: "idle", rubrikEn: undefined }));
     setNyheter([...nyheterRef.current]);
   }
 
@@ -558,11 +587,11 @@ export default function KanalPage() {
                 onChange={e => setDebattMode(e.target.checked)}
                 style={{ accentColor: C.accent, width: "15px", height: "15px" }}
               />
-              <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.05em" }}>debatt tillgänglig</span>
+              <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.05em" }}>inkludera debatter</span>
             </label>
 
             <p style={{ fontSize: "11px", color: C.textMuted, marginTop: "16px", lineHeight: 1.6, fontFamily: "monospace" }}>
-              {nyheter.length} nyheter · {debattMode ? "debatt tillgänglig" : "debatt tillgänglig"}
+              {nyheter.length} nyheter · debatt {debattMode ? "på" : "av"}
             </p>
           </div>
 
@@ -622,7 +651,7 @@ export default function KanalPage() {
                 <p style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 12px" }}>I KÖN</p>
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {upcoming.map((n, idx) => (
-                    <div key={n.rubrik} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                    <div key={`${n.rubrik}-${idx}`} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                       <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", flexShrink: 0, paddingTop: "2px" }}>
                         {String(idx + 1).padStart(2, "0")}
                       </span>
