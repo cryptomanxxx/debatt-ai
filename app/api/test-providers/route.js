@@ -1,4 +1,4 @@
-export const runtime = "edge";
+// No edge runtime — use Node.js so Cerebras doesn't block Vercel edge IPs
 
 const PROMPT = [
   { role: "system", content: "Du är en hjälpsam assistent. Svara kort på svenska." },
@@ -18,7 +18,7 @@ async function testCerebras() {
     const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "llama-3.3-70b", messages: PROMPT, max_tokens: 30 }),
+      body: JSON.stringify({ model: "llama3.3-70b", messages: PROMPT, max_tokens: 30 }),
       signal: AbortSignal.timeout(15000),
     });
     const latency = Date.now() - t0;
