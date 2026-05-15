@@ -190,14 +190,28 @@ function WaveformBar({ isSpeaking, isThinking }) {
 
 // ── AnchorImage ───────────────────────────────────────────────────────────────
 function AnchorImage({ blinkState, isSpeaking }) {
-  const mouthIdx = isSpeaking ? Math.floor(Date.now() / 120) % 4 : 0;
-  const eyeState = blinkState; // open | half | closed
+  const [mouthIdx, setMouthIdx] = useState(0);
+
+  useEffect(() => {
+    if (!isSpeaking) { setMouthIdx(0); return; }
+    const id = setInterval(() => setMouthIdx(m => (m + 1) % 4), 120);
+    return () => clearInterval(id);
+  }, [isSpeaking]);
 
   const mouth = ["anna-m0", "anna-m1", "anna-m2", "anna-m3"][mouthIdx];
-  // open-eye variants don't exist — anna.png is the default (open, mouth closed)
-  const src = eyeState === "open"
-    ? `/avatarer/podd/anna.png`
-    : `/avatarer/podd/${mouth}-${eyeState === "half" ? "half" : "closed"}.png`;
+
+  let src;
+  if (isSpeaking) {
+    // Open-eye mouth files don't exist — use half-eye variants (subtle squint)
+    // which DO exist and show lip movement.
+    src = blinkState === "closed"
+      ? `/avatarer/podd/${mouth}-closed.png`
+      : `/avatarer/podd/${mouth}-half.png`;
+  } else {
+    src = blinkState === "open"   ? `/avatarer/podd/anna.png`
+        : blinkState === "half"   ? `/avatarer/podd/anna-eyes-half.png`
+        :                           `/avatarer/podd/anna-eyes-closed.png`;
+  }
 
   return (
     <img
@@ -218,6 +232,7 @@ export default function KanalPage() {
   const [oversatter, setOversatter] = useState(false);
   const [debattMode, setDebattMode] = useState(false);
   const [debattInfo, setDebattInfo] = useState(null);
+  const [currentText, setCurrentText] = useState("");
 
   const nyheterRef  = useRef([]);
   const runningRef  = useRef(false);
@@ -361,6 +376,7 @@ export default function KanalPage() {
         ? item.text
         : (langRef.current === "en" && item.rubrikEn ? item.rubrikEn : item.rubrik);
 
+      setCurrentText(text);
       const t0 = Date.now();
       await spelaUppText(text, null);
       await nextPrefetch;
@@ -418,6 +434,7 @@ export default function KanalPage() {
     setIsSpeaking(false);
     setIsThinking(false);
     setOversatter(false);
+    setCurrentText("");
   }
 
   function stoppaSandning() {
@@ -429,6 +446,7 @@ export default function KanalPage() {
     setOversatter(false);
     setCurrentIdx(0);
     setDebattInfo(null);
+    setCurrentText("");
   }
 
   function bytLang(nyttLang) {
@@ -569,6 +587,11 @@ export default function KanalPage() {
                 <h2 style={{ fontSize: "22px", fontWeight: 400, lineHeight: 1.3, margin: "0 0 8px", color: C.text }}>
                   {lang === "en" && current.rubrikEn ? current.rubrikEn : current.rubrik}
                 </h2>
+                {currentText && currentText !== current.rubrik && currentText !== current.rubrikEn && (
+                  <p style={{ fontSize: "15px", color: "#c0b8a8", lineHeight: 1.75, margin: "12px 0 10px" }}>
+                    {currentText}
+                  </p>
+                )}
                 <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, fontFamily: "monospace" }}>{current.kalla}</p>
               </div>
             )}
