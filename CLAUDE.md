@@ -1,5 +1,11 @@
 # CLAUDE.md – debatt.ai
 
+## Sessionsstart
+
+**Läs alltid `/ai-bus/context.md` i början av varje session** — den innehåller senaste beslut, vad som inte ska göras och nästa prioritet.
+
+---
+
 ## Git-arbetsflöde
 
 **Jobba alltid direkt på `main`** — inga feature-branches. Committa och pusha direkt till main.
