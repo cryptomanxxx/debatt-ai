@@ -1,4 +1,4 @@
-import { logAiCall } from "../lib/logAiCall";
+import { logAiCall } from "../../lib/logAiCall";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
