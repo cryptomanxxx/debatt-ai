@@ -72,22 +72,20 @@ function useBlinkState(amplitudeRef) {
     const doBlink = async () => {
       if (cancelled) return;
       setBlinkState("half");
-      await sleep(80);            // håll minst transitionstiden (80ms) innan nästa state
+      await sleep(80);
       if (cancelled) return;
       setBlinkState("closed");
-      await sleep(120);           // 60ms transition + 60ms faktisk stängd
+      await sleep(120);
       if (cancelled) return;
       setBlinkState("half");
       await sleep(80);
       if (cancelled) return;
       setBlinkState("open");
 
-      // Nästa blink om 3–7 sekunder
       const delay = 3000 + Math.random() * 4000;
       timerRef.current = setTimeout(doBlink, delay);
     };
 
-    // Starta första blinkningen efter 1–3 sekunder
     const initialDelay = 1000 + Math.random() * 2000;
     timerRef.current = setTimeout(doBlink, initialDelay);
 
@@ -146,7 +144,6 @@ function WaveformBar({ isSpeaking, isThinking }) {
       ctx.clearRect(0, 0, W, H);
 
       if (isThinking) {
-        // ── Thinking-animation: tre pulserande punkter ──────────────────────
         dotPhase += 0.06;
         const dotR   = 4;
         const dots   = 3;
@@ -163,7 +160,6 @@ function WaveformBar({ isSpeaking, isThinking }) {
           ctx.fill();
         }
       } else {
-        // ── Waveform-animation ─────────────────────────────────────────────
         for (let b = 0; b < BARS; b++) {
           const amp    = amplitudeRef.current;
           const noise  = 0.4 + Math.random() * 0.6;
@@ -198,8 +194,10 @@ function AnchorImage({ blinkState, isSpeaking }) {
   const eyeState = blinkState; // open | half | closed
 
   const mouth = ["anna-m0", "anna-m1", "anna-m2", "anna-m3"][mouthIdx];
-  const eyeSuffix = eyeState === "open" ? "" : eyeState === "half" ? "-half" : "-closed";
-  const src = `/avatarer/podd/${mouth}${eyeSuffix}.png`;
+  // open-eye variants don't exist — anna.png is the default (open, mouth closed)
+  const src = eyeState === "open"
+    ? `/avatarer/podd/anna.png`
+    : `/avatarer/podd/${mouth}-${eyeState === "half" ? "half" : "closed"}.png`;
 
   return (
     <img
@@ -226,7 +224,6 @@ export default function KanalPage() {
   const langRef     = useRef("sv");
   const blinkState  = useBlinkState();
 
-  // ── Hämta nyheter ──────────────────────────────────────────────────────────
   useEffect(() => {
     fetch("/api/kanal/nyheter")
       .then(r => r.json())
@@ -237,7 +234,6 @@ export default function KanalPage() {
       .catch(() => {});
   }, []);
 
-  // ── TTS via ResponsiveVoice ─────────────────────────────────────────────────
   async function spelaUppText(text, agent) {
     return new Promise(resolve => {
       const voiceConf = (agent && AGENT_ROST[agent]) ? AGENT_ROST[agent] : AGENT_ROST["Anna"];
@@ -261,7 +257,6 @@ export default function KanalPage() {
     });
   }
 
-  // ── Expansion-funktioner ────────────────────────────────────────────────────
   async function batchExpanderaRubriker() {
     const lista = nyheterRef.current;
     if (!lista.length) return false;
@@ -316,11 +311,9 @@ export default function KanalPage() {
       });
       const { text } = await res.json();
       if (text && text !== item.rubrik) {
-        // Extract the first sentence as the English headline
         const rubrikEn = langRef.current === "en"
           ? (text.split(/(?<=[.!?])\s+/)[0] || text).slice(0, 120)
           : undefined;
-        // Update state so the panel shows the expanded text
         nyheterRef.current = nyheterRef.current.map((n, j) =>
           j === i ? { ...n, text, ...(rubrikEn ? { rubrikEn } : {}) } : n
         );
@@ -337,25 +330,18 @@ export default function KanalPage() {
 
     if (langRef.current === "en") {
       setOversatter(true);
-      // One API call translates all headlines at once — UPCOMING shows English instantly.
-      // This avoids making 10 individual calls (which cascade into rate-limit failures).
       if (nyheterRef.current.some(n => !n.rubrikEn)) {
         await batchOversattRubriker();
-        await sleep(4000); // rate-limit buffer before the first body-expansion call
+        await sleep(4000);
       }
-      // Pre-expand body text for first item only, then expand lazily during playback
       await expanderaItem(nyheterRef.current[0], 0);
       setOversatter(false);
     } else {
       setOversatter(true);
-      // One batch call expands all 10 items before playback starts.
-      // If batch fails (Gemini+Groq rate-limited), fall back to expanding item 0
-      // individually — which has OpenRouter as last resort. The 5s floor in the
-      // playback loop then gives enough spacing for items 1-9 to expand lazily.
       if (nyheterRef.current.some(n => !n.text || n.text === n.rubrik)) {
         const batchOk = await batchExpanderaRubriker();
         if (!batchOk) {
-          await sleep(2000); // let rate-limit recover after the failed batch call
+          await sleep(2000);
           await expanderaItem(nyheterRef.current[0], 0);
         }
       }
@@ -366,13 +352,11 @@ export default function KanalPage() {
       if (!runningRef.current) return;
       setCurrentIdx(i);
 
-      // Pre-fetch next item's body text during current item's playback
       const nextPrefetch = i + 1 < lista.length
         ? expanderaItem(nyheterRef.current[i + 1], i + 1)
         : Promise.resolve();
 
       const item = nyheterRef.current[i];
-      // Fall back to English headline (sv: rubrik) if body expansion hasn't landed yet
       const text = (item.text && item.text !== item.rubrik)
         ? item.text
         : (langRef.current === "en" && item.rubrikEn ? item.rubrikEn : item.rubrik);
@@ -381,9 +365,6 @@ export default function KanalPage() {
       await spelaUppText(text, null);
       await nextPrefetch;
 
-      // 5 s floor per item (both sv and en): when a short rubrik plays instead of
-      // expanded body text, the next expansion fires too soon and cascades into
-      // Gemini rate-limit failures. The floor ensures ≥5.6 s between expansion calls.
       const elapsed = Date.now() - t0;
       if (elapsed < 5000) await sleep(5000 - elapsed);
 
@@ -392,7 +373,6 @@ export default function KanalPage() {
     }
   }
 
-  // ── Debatt-loop ─────────────────────────────────────────────────────────────
   async function spelaUppDebatt(artiklar) {
     setMode("debatt");
     for (let i = 0; i < artiklar.length; i++) {
@@ -406,7 +386,6 @@ export default function KanalPage() {
     }
   }
 
-  // ── Starta sändning ─────────────────────────────────────────────────────────
   async function startaSandning() {
     if (runningRef.current) return;
     runningRef.current = true;
@@ -457,7 +436,6 @@ export default function KanalPage() {
     stoppaSandning();
     setLang(nyttLang);
     langRef.current = nyttLang;
-    // Nollställ expansioner när språket byts
     nyheterRef.current = nyheterRef.current.map(n => ({ ...n, text: n.rubrik, rubrikEn: undefined }));
     setNyheter([...nyheterRef.current]);
   }
@@ -466,11 +444,9 @@ export default function KanalPage() {
   const current  = nyheter[currentIdx] || null;
   const upcoming = nyheter.slice(currentIdx + 1, currentIdx + 6);
 
-  // ── RENDER ──────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
 
-      {/* Live-strip */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "6px 20px", background: "#050505", borderBottom: `1px solid ${C.border}`,
@@ -490,10 +466,8 @@ export default function KanalPage() {
       <main style={{ maxWidth: "960px", margin: "0 auto", padding: "32px 20px" }}>
         <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
 
-          {/* ── Vänster kolumn: Anna ── */}
           <div style={{ flex: "0 0 320px", minWidth: 0 }}>
 
-            {/* Anna-bild */}
             <div style={{
               position: "relative", borderRadius: "12px", overflow: "hidden",
               border: `1px solid ${C.border}`,
@@ -502,7 +476,6 @@ export default function KanalPage() {
             }}>
               <AnchorImage blinkState={blinkState} isSpeaking={isSpeaking} />
 
-              {/* Live-badge */}
               <div style={{
                 position: "absolute", top: "12px", left: "12px",
                 display: "flex", alignItems: "center", gap: "6px",
@@ -516,7 +489,6 @@ export default function KanalPage() {
                 <span style={{ fontSize: "10px", letterSpacing: "0.12em", color: running ? "#e05050" : "#555", fontFamily: "monospace" }}>LIVE</span>
               </div>
 
-              {/* Namn-banner */}
               <div style={{
                 position: "absolute", bottom: 0, left: 0, right: 0,
                 background: "linear-gradient(transparent, rgba(0,0,0,0.85))",
@@ -530,7 +502,6 @@ export default function KanalPage() {
               </div>
             </div>
 
-            {/* Språkväljare */}
             <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
               {[["sv","🇸🇪 Svenska"],["en","🇬🇧 English"]].map(([l, lbl]) => (
                 <button key={l} onClick={() => bytLang(l)} style={{
@@ -545,7 +516,6 @@ export default function KanalPage() {
               ))}
             </div>
 
-            {/* Start/stopp */}
             <button
               onClick={running ? stoppaSandning : startaSandning}
               style={{
@@ -560,7 +530,6 @@ export default function KanalPage() {
               {running ? "⏹ STOPPA SÄNDNING" : "▶ STARTA SÄNDNING"}
             </button>
 
-            {/* Debatt-toggle */}
             <label style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "14px", cursor: "pointer" }}>
               <input
                 type="checkbox"
@@ -576,10 +545,8 @@ export default function KanalPage() {
             </p>
           </div>
 
-          {/* ── Höger kolumn: Nyheter ── */}
           <div style={{ flex: 1, minWidth: 0 }}>
 
-            {/* Förbereder-banner */}
             {oversatter && (
               <div style={{
                 background: "#0a0f0a", border: `1px solid ${C.accent}40`,
@@ -593,7 +560,6 @@ export default function KanalPage() {
               </div>
             )}
 
-            {/* LÄSER NU */}
             {current && mode === "nyheter" && (
               <div style={{
                 background: C.surface, border: `1px solid ${C.border}`,
@@ -607,7 +573,6 @@ export default function KanalPage() {
               </div>
             )}
 
-            {/* Debatt-info */}
             {debattInfo && mode === "debatt" && (
               <div style={{
                 background: "#0a080f", border: "1px solid #3a2a5a",
@@ -623,7 +588,6 @@ export default function KanalPage() {
               </div>
             )}
 
-            {/* I KÖN */}
             {upcoming.length > 0 && (
               <div style={{
                 background: C.surface, border: `1px solid ${C.border}`,
@@ -648,7 +612,6 @@ export default function KanalPage() {
               </div>
             )}
 
-            {/* Idle-state */}
             {mode === "idle" && (
               <div style={{ padding: "40px 0", textAlign: "center" }}>
                 <p style={{ fontSize: "13px", color: C.textMuted, fontStyle: "italic" }}>
