@@ -1,3 +1,5 @@
+import { logAiCall } from "../../lib/logAiCall";
+
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
@@ -39,6 +41,7 @@ export async function POST(request) {
   const debattText = inlagg.map(h => `${h.agent}: ${h.text}`).join("\n\n");
   const agenter = [...new Set(inlagg.map(h => h.agent))];
 
+  const t0 = Date.now();
   const [sumText, scoreText] = await Promise.all([
     groqOrGemini({
       messages: [
@@ -75,5 +78,6 @@ export async function POST(request) {
     scores = null;
   }
 
+  logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt-summering", status: summering ? "ok" : "error", latency_ms: Date.now() - t0 });
   return Response.json({ summering, scores });
 }

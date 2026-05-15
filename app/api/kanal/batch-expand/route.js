@@ -1,5 +1,7 @@
 export const runtime = "edge";
 
+import { logAiCall } from "../../../lib/logAiCall";
+
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 function parseNumberedList(text, count) {
@@ -25,6 +27,7 @@ Exempel:
 
   const gemKey = process.env.GEMINI_API_KEY;
   if (gemKey) {
+    const t0 = Date.now();
     try {
       const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
@@ -43,13 +46,22 @@ Exempel:
         const json = await r.json();
         const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
         const parsed = parseNumberedList(text, items.length);
-        if (parsed) return Response.json({ expanded: parsed });
+        if (parsed) {
+          logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usageMetadata?.promptTokenCount ?? null, output_tokens: json.usageMetadata?.candidatesTokenCount ?? null });
+          return Response.json({ expanded: parsed });
+        }
+        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
+      } else {
+        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
       }
-    } catch {}
+    } catch {
+      logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
+    }
   }
 
   const groqKey = process.env.GROQ_API_KEY_KANAL;
   if (groqKey) {
+    const t0 = Date.now();
     try {
       const r = await fetch(GROQ_URL, {
         method: "POST",
@@ -66,10 +78,19 @@ Exempel:
         const json = await r.json();
         const text = json.choices[0].message.content.trim();
         const parsed = parseNumberedList(text, items.length);
-        if (parsed) return Response.json({ expanded: parsed });
+        if (parsed) {
+          logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
+          return Response.json({ expanded: parsed });
+        }
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
+      } else {
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
       }
-    } catch {}
+    } catch {
+      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
+    }
   }
 
+  logAiCall({ provider: "none", model: null, source: "kanal-batch", status: "all_failed", latency_ms: 0 });
   return Response.json({ expanded: [] });
 }

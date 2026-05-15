@@ -1,3 +1,5 @@
+import { logAiCall } from "../lib/logAiCall";
+
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -78,6 +80,7 @@ En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer
   let svar = "";
 
   if (process.env.GROQ_API_KEY) {
+    const t0 = Date.now();
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -92,11 +95,17 @@ En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer
       if (res.ok) {
         const data = await res.json();
         svar = data.choices?.[0]?.message?.content?.trim() ?? "";
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
+      } else {
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: `error_${res.status}`, latency_ms: Date.now() - t0 });
       }
-    } catch { /* fall through to Gemini */ }
+    } catch {
+      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
+    }
   }
 
   if (!svar && process.env.GEMINI_API_KEY) {
+    const t0 = Date.now();
     try {
       const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -113,8 +122,13 @@ En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer
       if (r.ok) {
         const data = await r.json();
         svar = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+        logAiCall({ provider: "gemini", model: "gemini-2.0-flash-lite", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usageMetadata?.promptTokenCount ?? null, output_tokens: data.usageMetadata?.candidatesTokenCount ?? null });
+      } else {
+        logAiCall({ provider: "gemini", model: "gemini-2.0-flash-lite", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
       }
-    } catch { /* ignore */ }
+    } catch {
+      logAiCall({ provider: "gemini", model: "gemini-2.0-flash-lite", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
+    }
   }
 
   if (!svar) return Response.json({ error: "AI-tjänsten är inte tillgänglig just nu. Försök igen." }, { status: 502 });

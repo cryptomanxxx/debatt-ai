@@ -1276,6 +1276,29 @@ function AiStatistikTab() {
   const totalOk    = rows.filter(r => r.status === "ok").length;
   const totalError = rows.filter(r => r.status !== "ok").length;
 
+  // ── Per-source breakdown ─────────────────────────────────────────────────
+  const SOURCE_LABELS = { "kanal": "Kanal (expand)", "kanal-batch": "Kanal (batch sv)", "kanal-batch-en": "Kanal (batch en)", "chatt": "Direktdebatt", "chatt-summering": "Debatt summering", "agent-fraga": "Fråga agenten", "beslut": "Decision API" };
+  const SOURCE_COLORS_MAP = { "kanal": "#60a5fa", "kanal-batch": "#38bdf8", "kanal-batch-en": "#93c5fd", "chatt": "#a78bfa", "chatt-summering": "#c4b5fd", "agent-fraga": "#fb923c", "beslut": "#f59e0b" };
+  const bySource = {};
+  for (const r of rows) {
+    const key = r.source || "okänd";
+    if (!bySource[key]) bySource[key] = { source: SOURCE_LABELS[key] || key, ok: 0, error: 0, total: 0 };
+    bySource[key].total++;
+    if (r.status === "ok") bySource[key].ok++;
+    else bySource[key].error++;
+  }
+  const sourceChartData = Object.entries(bySource)
+    .map(([k, v]) => ({ ...v, _key: k, color: SOURCE_COLORS_MAP[k] || "#888" }))
+    .sort((a, b) => b.total - a.total);
+
+  // ── Per-hour call distribution (7 days) ─────────────────────────────────
+  const byHour = Array.from({ length: 24 }, (_, h) => ({ hour: `${String(h).padStart(2, "0")}:00`, ok: 0, error: 0 }));
+  for (const r of rows) {
+    const h = new Date(r.ts).getHours();
+    if (r.status === "ok") byHour[h].ok++;
+    else byHour[h].error++;
+  }
+
   const statCard = (label, value, sub, color = C.accent) => (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px 24px", minWidth: "140px" }}>
       <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{label}</p>
@@ -1338,6 +1361,49 @@ function AiStatistikTab() {
             <Bar dataKey="none"       name="Fallback"   stackId="a" fill={AI_COLORS.none}       radius={[2,2,0,0]} />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+
+      {/* ── Per-source breakdown ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Anrop per funktion (7 dagar)</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {sourceChartData.map(s => {
+            const errPct = s.total > 0 ? Math.round((s.error / s.total) * 100) : 0;
+            const okPct = 100 - errPct;
+            return (
+              <div key={s._key}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "12px", color: s.color, fontFamily: "monospace" }}>{s.source}</span>
+                  <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>
+                    {s.ok} OK{s.error > 0 ? ` · ${s.error} fel (${errPct}%)` : ""}
+                  </span>
+                </div>
+                <div style={{ background: C.border, borderRadius: "3px", height: "6px", overflow: "hidden", display: "flex" }}>
+                  <div style={{ background: s.color, width: `${okPct}%`, height: "100%" }} />
+                  {s.error > 0 && <div style={{ background: C.red, width: `${errPct}%`, height: "100%" }} />}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Per-hour heatmap ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Anrop per timme – dygnsfördelning (7 dagar)</p>
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={byHour} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+            <XAxis dataKey="hour" tick={{ fill: C.textMuted, fontSize: 9 }} interval={2} />
+            <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} width={28} allowDecimals={false} />
+            <Tooltip
+              contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", fontSize: "11px", fontFamily: "monospace" }}
+              labelFormatter={l => l}
+            />
+            <Bar dataKey="ok"    name="OK"  stackId="h" fill={AI_COLORS.groq} radius={[0,0,0,0]} />
+            <Bar dataKey="error" name="Fel" stackId="h" fill={C.red}          radius={[2,2,0,0]} />
+          </BarChart>
+        </ResponsiveContainer>
+        <p style={{ fontSize: "11px", color: C.textMuted, margin: "8px 0 0" }}>Lokal tid. Röda staplar = misslyckade anrop (rate limit, timeout). Identifiera tider med hög belastning.</p>
       </div>
 
       {/* ── 7-day totals ── */}
