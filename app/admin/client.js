@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, Legend, ResponsiveContainer } from "recharts";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
@@ -1210,14 +1210,19 @@ function MatningTab() {
   );
 }
 
-const AI_COLORS = { groq: "#4a9eff", gemini: "#4ade80", openrouter: "#f8954d", none: "#f87171" };
+const AI_COLORS = { groq: "#4a9eff", gemini: "#4ade80", openrouter: "#f8954d", cerebras: "#a78bfa", sambanova: "#fb923c", none: "#f87171" };
 const GROQ_DAILY_LIMIT = 100_000;
 
 function AiStatistikTab() {
-  const [rows, setRows]     = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState("");
+  const [rows, setRows]         = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState("");
+  const [liveRows, setLiveRows] = useState([]);
+  const [liveOk, setLiveOk]     = useState(false);
+  const latestTsRef             = useRef(null);
+  const pollingRef              = useRef(false);
 
+  // Initial 7-day data load
   useEffect(() => {
     async function load() {
       try {
@@ -1227,12 +1232,44 @@ function AiStatistikTab() {
           { headers: sbHeaders() }
         );
         if (!res.ok) throw new Error(await res.text());
-        setRows(await res.json());
+        const data = await res.json();
+        setRows(data);
+        setLiveRows(data.slice(0, 200));
+        if (data.length > 0) latestTsRef.current = data[0].ts;
       } catch (e) { setError(e.message); }
       setLoading(false);
     }
     load();
   }, []);
+
+  // Live polling — starts after initial load, every 3 s
+  useEffect(() => {
+    if (loading) return;
+    pollingRef.current = true;
+
+    async function poll() {
+      if (!pollingRef.current) return;
+      try {
+        const since = latestTsRef.current ?? new Date(Date.now() - 60000).toISOString();
+        const res = await fetch(
+          `${SB_URL}/rest/v1/ai_log?select=*&ts=gt.${since}&order=ts.desc&limit=100`,
+          { headers: sbHeaders() }
+        );
+        if (res.ok) {
+          const fresh = await res.json();
+          if (fresh.length > 0) {
+            setLiveRows(prev => [...fresh, ...prev].slice(0, 300));
+            latestTsRef.current = fresh[0].ts;
+          }
+          setLiveOk(true);
+        }
+      } catch {}
+      if (pollingRef.current) setTimeout(poll, 3000);
+    }
+
+    const t = setTimeout(poll, 3000);
+    return () => { pollingRef.current = false; clearTimeout(t); setLiveOk(false); };
+  }, [loading]);
 
   if (loading) return <p style={{ color: C.textMuted }}>Laddar AI-statistik…</p>;
   if (error)   return <p style={{ color: C.red }}>Fel: {error}</p>;
@@ -1248,7 +1285,7 @@ function AiStatistikTab() {
   const byDay = {};
   for (const r of rows) {
     const day = r.ts.slice(0, 10);
-    if (!byDay[day]) byDay[day] = { day, groq: 0, gemini: 0, openrouter: 0, none: 0, errors: 0 };
+    if (!byDay[day]) byDay[day] = { day, groq: 0, gemini: 0, cerebras: 0, sambanova: 0, openrouter: 0, none: 0, errors: 0 };
     byDay[day][r.provider] = (byDay[day][r.provider] || 0) + 1;
     if (r.status !== "ok") byDay[day].errors++;
   }
@@ -1265,6 +1302,8 @@ function AiStatistikTab() {
   const groqChattCalls = todayRows.filter(r => r.provider === "groq" && r.source === "chatt" && r.status === "ok").length;
   const geminiCallsToday = todayRows.filter(r => r.provider === "gemini" && r.status === "ok").length;
   const orCallsToday = todayRows.filter(r => r.provider === "openrouter" && r.status === "ok").length;
+  const cerebrasCallsToday = todayRows.filter(r => r.provider === "cerebras" && r.status === "ok").length;
+  const sambanovaCallsToday = todayRows.filter(r => r.provider === "sambanova" && r.status === "ok").length;
   const errorsToday = todayRows.filter(r => r.status !== "ok").length;
 
   // ── Summary totals (7 days) ──────────────────────────────────────────────
@@ -1279,6 +1318,7 @@ function AiStatistikTab() {
   // ── Per-source breakdown ─────────────────────────────────────────────────
   const SOURCE_LABELS = { "kanal": "Kanal (expand)", "kanal-batch": "Kanal (batch sv)", "kanal-batch-en": "Kanal (batch en)", "chatt": "Direktdebatt", "chatt-summering": "Debatt summering", "agent-fraga": "Fråga agenten", "beslut": "Decision API" };
   const SOURCE_COLORS_MAP = { "kanal": "#60a5fa", "kanal-batch": "#38bdf8", "kanal-batch-en": "#93c5fd", "chatt": "#a78bfa", "chatt-summering": "#c4b5fd", "agent-fraga": "#fb923c", "beslut": "#f59e0b" };
+  const ALL_PROVIDER_COLORS = { ...AI_COLORS };
   const bySource = {};
   for (const r of rows) {
     const key = r.source || "okänd";
@@ -1313,13 +1353,56 @@ function AiStatistikTab() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
 
+      {/* ── Live call log ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, fontFamily: "monospace" }}>Live AI-logg</p>
+          <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+            <div style={{
+              width: "7px", height: "7px", borderRadius: "50%",
+              background: liveOk ? C.green : C.red,
+              boxShadow: liveOk ? `0 0 6px ${C.green}` : "none",
+            }} />
+            <span style={{ fontSize: "10px", color: liveOk ? C.green : C.textMuted, fontFamily: "monospace", letterSpacing: "0.05em" }}>
+              {liveOk ? "LIVE · uppdateras var 3s" : "väntar…"}
+            </span>
+          </div>
+        </div>
+        <div style={{
+          height: "340px", overflowY: "auto", fontFamily: "monospace", fontSize: "11px",
+          background: "#050505", borderRadius: "4px", padding: "10px 14px",
+        }}>
+          {liveRows.length === 0
+            ? <span style={{ color: C.textMuted }}>Inga anrop ännu…</span>
+            : liveRows.map((r, i) => {
+                const d = new Date(r.ts);
+                const ts = d.toLocaleDateString("sv-SE") + " " + d.toLocaleTimeString("sv-SE");
+                const provColor = ALL_PROVIDER_COLORS[r.provider] ?? C.text;
+                const srcColor  = SOURCE_COLORS_MAP[r.source] ?? "#888";
+                return (
+                  <div key={r.id ?? i} style={{ display: "flex", gap: "8px", padding: "3px 0", borderBottom: "1px solid #111" }}>
+                    <span style={{ color: "#555", flexShrink: 0, width: "138px" }}>{ts}</span>
+                    <span style={{ color: srcColor, flexShrink: 0, width: "104px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.source ?? "?"}</span>
+                    <span style={{ color: provColor, flexShrink: 0, width: "76px" }}>{r.provider}</span>
+                    <span style={{ color: "#444", flexShrink: 0, maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.model ?? "–"}</span>
+                    <span style={{ color: r.status === "ok" ? C.green : C.red, flexShrink: 0, width: "60px" }}>{r.status}</span>
+                    <span style={{ color: "#555" }}>{r.latency_ms != null ? `${r.latency_ms}ms` : ""}</span>
+                  </div>
+                );
+              })
+          }
+        </div>
+      </div>
+
       {/* ── Today summary ── */}
       <div>
         <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>Idag</p>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           {statCard("Gemini", geminiCallsToday, "anrop OK", AI_COLORS.gemini)}
           {statCard("Groq Chatt", groqChattCalls, "anrop OK", AI_COLORS.groq)}
-          {statCard("OpenRouter", orCallsToday, "anrop OK", AI_COLORS.openrouter)}
+          {cerebrasCallsToday > 0 && statCard("Cerebras", cerebrasCallsToday, "anrop OK", AI_COLORS.cerebras)}
+          {sambanovaCallsToday > 0 && statCard("Sambanova", sambanovaCallsToday, "anrop OK", AI_COLORS.sambanova)}
+          {orCallsToday > 0 && statCard("OpenRouter", orCallsToday, "anrop OK", AI_COLORS.openrouter)}
           {errorsToday > 0 && statCard("Fel/timeout", errorsToday, "misslyckade", C.red)}
         </div>
       </div>
@@ -1357,6 +1440,8 @@ function AiStatistikTab() {
             <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
             <Bar dataKey="gemini"     name="Gemini"     stackId="a" fill={AI_COLORS.gemini}     radius={[0,0,0,0]} />
             <Bar dataKey="groq"       name="Groq"       stackId="a" fill={AI_COLORS.groq}       radius={[0,0,0,0]} />
+            <Bar dataKey="cerebras"   name="Cerebras"   stackId="a" fill={AI_COLORS.cerebras}   radius={[0,0,0,0]} />
+            <Bar dataKey="sambanova"  name="Sambanova"  stackId="a" fill={AI_COLORS.sambanova}  radius={[0,0,0,0]} />
             <Bar dataKey="openrouter" name="OpenRouter" stackId="a" fill={AI_COLORS.openrouter} radius={[0,0,0,0]} />
             <Bar dataKey="none"       name="Fallback"   stackId="a" fill={AI_COLORS.none}       radius={[2,2,0,0]} />
           </BarChart>
@@ -1412,7 +1497,9 @@ function AiStatistikTab() {
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           {statCard("Gemini",     totals.gemini     ?? 0, "anrop", AI_COLORS.gemini)}
           {statCard("Groq",       totals.groq       ?? 0, "anrop", AI_COLORS.groq)}
-          {statCard("OpenRouter", totals.openrouter ?? 0, "anrop", AI_COLORS.openrouter)}
+          {(totals.cerebras  ?? 0) > 0 && statCard("Cerebras",  totals.cerebras  ?? 0, "anrop", AI_COLORS.cerebras)}
+          {(totals.sambanova ?? 0) > 0 && statCard("Sambanova", totals.sambanova ?? 0, "anrop", AI_COLORS.sambanova)}
+          {(totals.openrouter ?? 0) > 0 && statCard("OpenRouter", totals.openrouter ?? 0, "anrop", AI_COLORS.openrouter)}
           {statCard("OK / Fel",   `${totalOk} / ${totalError}`, "anrop", totalError > 0 ? C.red : C.green)}
         </div>
       </div>
