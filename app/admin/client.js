@@ -875,16 +875,21 @@ function MetricCard({ label, value, sub, color }) {
 }
 
 function MarketsTab() {
-  const [markets, setMarkets] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState("");
+  const [foreslagna, setForeslagna] = useState([]);
+  const [oppna, setOppna]           = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [msg, setMsg]               = useState("");
+  const [editId, setEditId]         = useState(null);
+  const [editTitel, setEditTitel]   = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`${SB_URL}/rest/v1/markets?status=eq.f%C3%B6reslagen&order=skapad.desc`, {
-      headers: sbHeaders(),
-    });
-    setMarkets(res.ok ? await res.json() : []);
+    const [fRes, oRes] = await Promise.all([
+      fetch(`${SB_URL}/rest/v1/markets?status=eq.f%C3%B6reslagen&order=skapad.desc`, { headers: sbHeaders() }),
+      fetch(`${SB_URL}/rest/v1/markets?status=eq.%C3%B6ppen&order=skapad.desc`,      { headers: sbHeaders() }),
+    ]);
+    setForeslagna(fRes.ok ? await fRes.json() : []);
+    setOppna(oRes.ok ? await oRes.json() : []);
     setLoading(false);
   }, []);
 
@@ -912,6 +917,18 @@ function MarketsTab() {
     load();
   }
 
+  async function sparaTitel(id) {
+    setMsg("");
+    const res = await fetch(`${SB_URL}/rest/v1/markets?id=eq.${id}`, {
+      method: "PATCH",
+      headers: { ...sbHeaders(), "Prefer": "return=minimal" },
+      body: JSON.stringify({ titel: editTitel.trim() }),
+    });
+    setMsg(res.ok ? "✓ Titel uppdaterad." : "✗ Fel vid uppdatering.");
+    setEditId(null);
+    load();
+  }
+
   return (
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
@@ -922,10 +939,56 @@ function MarketsTab() {
       </div>
       {msg && <p style={{ color: msg.startsWith("✓") ? C.green : C.red, fontSize:"14px", marginBottom:"16px" }}>{msg}</p>}
       {loading && <p style={{ color:C.textMuted }}>Laddar…</p>}
-      {!loading && markets.length === 0 && (
+
+      {/* ── Öppna markets ─────────────────────────────────────────── */}
+      {!loading && oppna.length > 0 && (
+        <div style={{ marginBottom:"32px" }}>
+          <h3 style={{ color:C.accent, fontSize:"15px", fontWeight:400, margin:"0 0 16px 0", letterSpacing:"0.05em" }}>
+            Öppna markets ({oppna.length})
+          </h3>
+          {oppna.map(m => (
+            <div key={m.id} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"16px 20px", marginBottom:"12px" }}>
+              <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 8px 0" }}>
+                {m.kategori} · Deadline {m.deadline}
+              </p>
+              {editId === m.id ? (
+                <div style={{ display:"flex", gap:"8px", marginBottom:"10px" }}>
+                  <input
+                    value={editTitel}
+                    onChange={e => setEditTitel(e.target.value)}
+                    style={{ flex:1, background:"#111", border:`1px solid ${C.accent}60`, borderRadius:"4px", padding:"7px 10px", color:C.text, fontSize:"15px", fontFamily:"Georgia, serif" }}
+                  />
+                  <button onClick={() => sparaTitel(m.id)} style={{ background:"#052011", border:`1px solid ${C.green}50`, color:C.green, borderRadius:"4px", padding:"7px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                    Spara
+                  </button>
+                  <button onClick={() => setEditId(null)} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"7px 12px", fontSize:"13px", cursor:"pointer" }}>
+                    Avbryt
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display:"flex", alignItems:"flex-start", gap:"10px", marginBottom:"8px" }}>
+                  <p style={{ fontSize:"16px", color:C.accent, margin:0, flex:1 }}>{m.titel}</p>
+                  <button onClick={() => { setEditId(m.id); setEditTitel(m.titel); }} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"4px 10px", fontSize:"12px", cursor:"pointer", flexShrink:0 }}>
+                    Redigera titel
+                  </button>
+                </div>
+              )}
+              <p style={{ color:C.textMuted, fontSize:"12px", fontFamily:"monospace", margin:0 }}>
+                {m.bets?.length ?? 0} bets · Skapad {new Date(m.skapad).toLocaleDateString("sv-SE")}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Föreslagna markets ────────────────────────────────────── */}
+      <h3 style={{ color:C.textMuted, fontSize:"15px", fontWeight:400, margin:"0 0 16px 0", letterSpacing:"0.05em" }}>
+        Föreslagna ({foreslagna.length})
+      </h3>
+      {!loading && foreslagna.length === 0 && (
         <p style={{ color:C.textMuted, fontSize:"14px", fontStyle:"italic" }}>Inga föreslagna markets just nu.</p>
       )}
-      {markets.map(m => (
+      {foreslagna.map(m => (
         <div key={m.id} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"20px", marginBottom:"16px" }}>
           <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 8px 0" }}>
             {m.kategori} · Deadline {m.deadline}
