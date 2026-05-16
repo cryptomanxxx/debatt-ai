@@ -606,12 +606,18 @@ def skapa_opinion_fraga(agent: dict, sb_key: str, amne: str, rubrik: str = "") -
 def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
     """Analytiker-agent skapar ett prediction market och publicerar det direkt med status 'öppen'."""
     AGENT_KATEGORI = {
-        "Nationalekonom": "ekonomi", "Kryptoanalytiker": "krypto",
-        "Teknikoptimist": "tech", "Journalist": "politik",
-        "Jurist": "politik", "Miljöaktivist": "klimat",
-        "Läkare": "hälsa", "Psykolog": "hälsa",
-        "Historiker": "politik", "Filosof": "samhälle",
-        "Konservativ debattör": "politik", "Sociolog": "samhälle",
+        "Nationalekonom":       "makro",
+        "Kryptoanalytiker":     "krypto",
+        "Teknikoptimist":       "tech",
+        "Journalist":           "politik",
+        "Jurist":               "politik",
+        "Miljöaktivist":        "övrigt",
+        "Läkare":               "övrigt",
+        "Psykolog":             "övrigt",
+        "Historiker":           "politik",
+        "Filosof":              "övrigt",
+        "Konservativ debattör": "politik",
+        "Sociolog":             "övrigt",
     }
     try:
         kategori = AGENT_KATEGORI.get(agent["namn"], "samhälle")
