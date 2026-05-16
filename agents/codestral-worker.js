@@ -17,6 +17,7 @@ const MISTRAL_API_KEY  = process.env.MISTRAL_API_KEY;
 const SUPABASE_URL     = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SUPABASE_KEY     = process.env.SUPABASE_ANON_KEY;
 const SUGGESTIONS_DIR  = path.join(__dirname, "../ai-bus/suggestions");
+const REPORTS_DIR      = path.join(__dirname, "../ai-bus/reports");
 const DAYS_BACK        = parseInt(process.env.DAYS_BACK || "7", 10);
 const MAX_FILES        = parseInt(process.env.MAX_FILES || "15", 10);
 const MAX_CHARS_TOTAL  = 12000;
@@ -53,7 +54,10 @@ async function main() {
   const runtimeSummary = buildRuntimeSummary(runtimeData);
   if (runtimeSummary) console.log("Runtime-data hämtad från Supabase.");
 
-  const codeBlock = buildCodeBlock(allFiles);
+  const snapshot = saveWeeklySnapshot(runtimeData);
+  if (snapshot) console.log(`✓ Veckorapport sparad: ai-bus/reports/${snapshot}`);
+
+  const codeBlock   = buildCodeBlock(allFiles);
   const suggestions = await analyzeWithCodestral(codeBlock, runtimeSummary);
 
   if (!suggestions.length) {
@@ -113,17 +117,95 @@ async function fetchRuntimeData() {
   const since = new Date(Date.now() - DAYS_BACK * 86400_000).toISOString();
   const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
   try {
-    const [aiRes, felRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/ai_log?select=provider,status,source&skapad=gte.${since}&limit=2000`, { headers }),
+    const [aiRes, felRes, artRes] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/ai_log?select=provider,status,latency_ms&skapad=gte.${since}&limit=2000`, { headers }),
       fetch(`${SUPABASE_URL}/rest/v1/fel_log?select=kalla,feltyp,meddelande,skapad&skapad=gte.${since}&order=skapad.desc&limit=100`, { headers }),
+      fetch(`${SUPABASE_URL}/rest/v1/artiklar?select=id&skapad=gte.${since}`, { headers: { ...headers, "Prefer": "count=exact", "Range": "0-0" } }),
     ]);
-    const aiRows  = aiRes.ok  ? await aiRes.json()  : [];
-    const felRows = felRes.ok ? await felRes.json() : [];
-    return { aiRows, felRows };
+    const aiRows          = aiRes.ok  ? await aiRes.json()  : [];
+    const felRows         = felRes.ok ? await felRes.json() : [];
+    const articlesCount   = artRes.ok ? parseInt(artRes.headers.get("content-range")?.split("/")[1] || "0") : 0;
+    return { aiRows, felRows, articlesCount };
   } catch (e) {
     console.warn("Kunde inte hämta runtime-data:", e.message);
     return null;
   }
+}
+
+// ── Veckovis metrics-snapshot ──────────────────────────────────────────────
+
+function getISOWeek() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
+  const w1 = new Date(d.getFullYear(), 0, 4);
+  const week = 1 + Math.round(((d - w1) / 86400000 - 3 + (w1.getDay() + 6) % 7) / 7);
+  return `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function countDir(dir) {
+  try { return fs.readdirSync(dir).filter(f => f.endsWith(".md")).length; } catch { return 0; }
+}
+
+function saveWeeklySnapshot(data) {
+  if (!data) return null;
+  const { aiRows, felRows, articlesCount } = data;
+
+  const providers = ["groq", "gemini", "codestral", "cerebras", "openrouter", "sambanova"];
+  const ai = {};
+  for (const p of providers) {
+    const rows = aiRows.filter(r => r.provider === p);
+    if (!rows.length) continue;
+    const ok      = rows.filter(r => r.status === "ok").length;
+    const rl      = rows.filter(r => r.status === "rate_limited").length;
+    const err     = rows.filter(r => r.status === "error").length;
+    const tout    = rows.filter(r => r.status === "timeout").length;
+    const latencies = rows.filter(r => r.latency_ms).map(r => r.latency_ms);
+    const avg_latency_ms = latencies.length
+      ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
+      : null;
+    ai[p] = { ok, rate_limited: rl, error: err, timeout: tout, avg_latency_ms };
+  }
+
+  const week     = getISOWeek();
+  const filename = `${week}.json`;
+  const filepath = path.join(REPORTS_DIR, filename);
+
+  // Load previous snapshot for delta
+  let prevSnapshot = null;
+  try {
+    const files = fs.readdirSync(REPORTS_DIR).filter(f => f.endsWith(".json")).sort();
+    if (files.length > 0 && files[files.length - 1] !== filename) {
+      prevSnapshot = JSON.parse(fs.readFileSync(path.join(REPORTS_DIR, files[files.length - 1]), "utf8"));
+    }
+  } catch {}
+
+  const totalRateLimited = Object.values(ai).reduce((s, p) => s + (p.rate_limited || 0), 0);
+  const prevRateLimited  = prevSnapshot
+    ? Object.values(prevSnapshot.ai_providers || {}).reduce((s, p) => s + (p.rate_limited || 0), 0)
+    : null;
+
+  const snapshot = {
+    week,
+    generated: new Date().toISOString(),
+    ai_providers: ai,
+    critical_errors: felRows.length,
+    articles_published: articlesCount,
+    suggestions: {
+      pending:     countDir(path.join(__dirname, "../ai-bus/suggestions")),
+      implemented: countDir(path.join(__dirname, "../ai-bus/implemented")),
+      rejected:    countDir(path.join(__dirname, "../ai-bus/rejected")),
+    },
+    vs_prev_week: prevSnapshot ? {
+      rate_limited_delta:     totalRateLimited - prevRateLimited,
+      critical_errors_delta:  felRows.length - (prevSnapshot.critical_errors || 0),
+      articles_delta:         articlesCount - (prevSnapshot.articles_published || 0),
+    } : null,
+  };
+
+  fs.mkdirSync(REPORTS_DIR, { recursive: true });
+  fs.writeFileSync(filepath, JSON.stringify(snapshot, null, 2), "utf8");
+  return filename;
 }
 
 function buildRuntimeSummary(data) {

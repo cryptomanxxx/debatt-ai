@@ -44,6 +44,6 @@ jobs:
         run: |
           git config user.name "Codestral Bot"
           git config user.email "noreply@debatt-ai.se"
-          git add ai-bus/suggestions/
+          git add ai-bus/suggestions/ ai-bus/reports/
           git diff --cached --quiet || git commit -m "chore: Codestral-förslag $(date +%Y-%m-%d)"
           git push
