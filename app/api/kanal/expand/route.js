@@ -180,6 +180,32 @@ export async function POST(req) {
     }
   }
 
+  const ghKey = process.env.GITHUB_TOKEN;
+  if (ghKey) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch("https://models.inference.ai.azure.com/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${ghKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "Llama-3.3-70B-Instruct", messages: msgs, max_tokens: 350, temperature: 0.4 }),
+        signal: AbortSignal.timeout(12000),
+      });
+      const latency_ms = Date.now() - t0;
+      if (r.ok) {
+        const json = await r.json();
+        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+        if (text && text !== rubrik) {
+          logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal", status: "ok", latency_ms });
+          return Response.json({ text }, { headers: { "X-Provider": "github_models" } });
+        }
+      } else {
+        logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal", status: `error_${r.status}`, latency_ms });
+      }
+    } catch {
+      logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
   logAiCall({ provider: "none", source: "kanal", status: "error", latency_ms: 0 });
   logFel({ kalla: "kanal/expand", feltyp: "ai_fail", meddelande: "Alla providers misslyckades", ip });
   return Response.json({ text: rubrik }, { headers: { "X-Provider": "none" } });

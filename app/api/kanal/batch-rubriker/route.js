@@ -152,6 +152,33 @@ export async function POST(req) {
     }
   }
 
+  const ghKey = process.env.GITHUB_TOKEN;
+  if (ghKey) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch("https://models.inference.ai.azure.com/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${ghKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "Llama-3.3-70B-Instruct", messages: msgs, max_tokens: 600, temperature: 0.1 }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (r.ok) {
+        const json = await r.json();
+        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+        const parsed = parseNumberedList(text, rubriker.length);
+        if (parsed) {
+          logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal-batch-en", status: "ok", latency_ms: Date.now() - t0 });
+          return Response.json({ translated: parsed });
+        }
+        logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal-batch-en", status: "parse_fail", latency_ms: Date.now() - t0 });
+      } else {
+        logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal-batch-en", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+      }
+    } catch {
+      logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal-batch-en", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
   logAiCall({ provider: "none", model: null, source: "kanal-batch-en", status: "all_failed", latency_ms: 0 });
   logFel({ kalla: "kanal/batch-rubriker", feltyp: "ai_fail", meddelande: "Alla providers misslyckades", ip });
   return Response.json({ translated: rubriker });
