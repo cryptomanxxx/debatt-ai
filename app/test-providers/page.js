@@ -10,7 +10,7 @@ const LABELS = {
   sambanova: "Sambanova — Meta-Llama-3.3-70B",
   openrouter: "OpenRouter — llama-3.3-70b (free)",
   codestral: "Codestral — codestral-latest",
-  github_models: "GitHub Models — gpt-4o-mini",
+  github_models: "GitHub Models — Llama-3.3-70B-Instruct",
 };
 
 export default function TestProviders() {

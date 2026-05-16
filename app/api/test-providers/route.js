@@ -183,7 +183,7 @@ async function testCodestral() {
 async function testGithubModels() {
   const key = process.env.GITHUB_TOKEN;
   if (!key) return { ok: false, error: "GITHUB_TOKEN saknas" };
-  const model = "gpt-4o-mini";
+  const model = "Llama-3.3-70B-Instruct";
   const t0 = Date.now();
   try {
     const r = await fetch("https://models.inference.ai.azure.com/chat/completions", {

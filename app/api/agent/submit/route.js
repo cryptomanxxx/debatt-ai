@@ -202,7 +202,7 @@ export async function POST(req) {
     for (const [name, url, model, key] of [
       ["codestral",     "https://api.mistral.ai/v1/chat/completions",             "codestral-latest", MISTRAL_KEY],
       ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",            "llama3.1-8b",      CEREBRAS_KEY],
-      ["github_models", "https://models.inference.ai.azure.com/chat/completions", "gpt-4o-mini",      GITHUB_TOKEN],
+      ["github_models", "https://models.inference.ai.azure.com/chat/completions", "Llama-3.3-70B-Instruct", GITHUB_TOKEN],
     ]) {
       if (!key || evalResult) continue;
       try {

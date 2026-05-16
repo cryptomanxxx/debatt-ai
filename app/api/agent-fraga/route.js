@@ -181,6 +181,31 @@ En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer
     }
   }
 
+  if (!svar && process.env.GITHUB_TOKEN) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch("https://models.inference.ai.azure.com/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GITHUB_TOKEN}` },
+        body: JSON.stringify({
+          model: "Llama-3.3-70B-Instruct",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
+          max_tokens: 300,
+          temperature: 0.9,
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        svar = data.choices?.[0]?.message?.content?.trim() ?? "";
+        logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0 });
+      } else {
+        logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+      }
+    } catch {
+      logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
   if (!svar) return Response.json({ error: "AI-tjänsten är inte tillgänglig just nu. Försök igen." }, { status: 502 });
 
   // Spara offentliga frågor i Supabase

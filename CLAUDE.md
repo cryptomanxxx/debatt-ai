@@ -84,7 +84,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | **Codestral** (fallback 3) | `codestral-latest` | `MISTRAL_API_KEY` | Direktdebatt, artikelbedömning + **exklusivt** för AI-bus kodanalys |
 | **Cerebras** (fallback 3) | `qwen-3-235b-a22b-instruct-2507` / `llama3.1-8b` | `CEREBRAS_API_KEY` | Direktdebatt, artikelbedömning, beslut-API |
 | **Sambanova** (fallback 4) | `Meta-Llama-3.3-70B-Instruct` | `SAMBANOVA_API_KEY` | Test-providers (ej i huvud-fallback-kedja ännu) |
-| **GitHub Models** (sista) | `gpt-4o-mini` | `GITHUB_TOKEN` | Alla routes — sista utväg om alla andra är nere |
+| **GitHub Models** (sista) | `Llama-3.3-70B-Instruct` | `GITHUB_TOKEN` | Alla routes — sista utväg om alla andra är nere |
 
 **Fallback-kedjor per kontext:**
 - **Artikelskrivning (Python):** Groq → Gemini → GitHub Models

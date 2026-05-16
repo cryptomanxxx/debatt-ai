@@ -4,31 +4,61 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 async function groqOrGemini({ messages, max_tokens, temperature, json = false }) {
-  const groqHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` };
-  const groqBody = { model: GROQ_MODEL, messages, max_tokens, temperature, ...(json ? { response_format: { type: "json_object" } } : {}) };
-  const res = await fetch(GROQ_URL, { method: "POST", headers: groqHeaders, body: JSON.stringify(groqBody) });
-  if (res.ok) {
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content ?? "";
+  const oaiBody = { model: GROQ_MODEL, messages, max_tokens, temperature, ...(json ? { response_format: { type: "json_object" } } : {}) };
+
+  // Groq
+  if (process.env.GROQ_API_KEY) {
+    const res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      body: JSON.stringify(oaiBody),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content ?? "";
+      if (text) return text;
+    }
   }
 
-  // Groq failed — fall back to Gemini
+  // Gemini
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) return "";
-  const systemMsg = messages.find(m => m.role === "system")?.content ?? "";
-  const userMsg   = messages.find(m => m.role === "user")?.content ?? "";
-  const geminiBody = {
-    contents: [{ role: "user", parts: [{ text: userMsg }] }],
-    ...(systemMsg ? { systemInstruction: { parts: [{ text: systemMsg }] } } : {}),
-    generationConfig: { maxOutputTokens: max_tokens, temperature },
-  };
-  const gRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(geminiBody) }
-  );
-  if (!gRes.ok) return "";
-  const gData = await gRes.json();
-  return gData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  if (geminiKey) {
+    const systemMsg = messages.find(m => m.role === "system")?.content ?? "";
+    const userMsg   = messages.find(m => m.role === "user")?.content ?? "";
+    const gRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: userMsg }] }],
+          ...(systemMsg ? { systemInstruction: { parts: [{ text: systemMsg }] } } : {}),
+          generationConfig: { maxOutputTokens: max_tokens, temperature },
+        }),
+      }
+    );
+    if (gRes.ok) {
+      const gData = await gRes.json();
+      const text = gData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      if (text) return text;
+    }
+  }
+
+  // GitHub Models
+  const githubToken = process.env.GITHUB_TOKEN;
+  if (githubToken) {
+    const res = await fetch("https://models.inference.ai.azure.com/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${githubToken}` },
+      body: JSON.stringify({ ...oaiBody, model: "Llama-3.3-70B-Instruct" }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content ?? "";
+    }
+  }
+
+  return "";
 }
 
 export async function POST(request) {
