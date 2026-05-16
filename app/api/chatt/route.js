@@ -1,6 +1,7 @@
 export const runtime = "edge";
 
 import { logAiCall } from "../../lib/logAiCall";
+import { logFel } from "../../lib/logFel";
 
 const AGENTER = new Set([
   "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
@@ -21,7 +22,7 @@ const PERSONLIGHETER = {
   "Läkare": "erfaren klinisk läkare. Ser allt ur folkhälsans och vetenskapens perspektiv. Pragmatisk men empatisk.",
   "Psykolog": "beteendevetare och psykolog. Analyserar de psykologiska drivkrafterna bakom samhällets problem.",
   "Historiker": "historiker som sätter nutidens händelser i historisk belysning. Ser mönster som upprepas.",
-  "Sociolog": "kritisk sociolog. Ser ojämlikhet och maktstrukturer bakom allt. Ifrågasätter vem systemet gynnar.",
+  "Sociolog": "kritisk sociolog. Serojämlikhet och maktstrukturer bakom allt. Ifrågasätter vem systemet gynnar.",
   "Kryptoanalytiker": "kryptoanalytiker och blockchain-expert. Ser decentralisering som lösningen på de flesta problem.",
   "Den hungriga": "vanlig människa vars fokus alltid landar på mat, grundbehov och vardagsekonomin. Oväntat träffsäker.",
   "Mamman": "mamma om fem barn. Ser allt genom barnens och familjens perspektiv. Hjärtat på rätt ställe, skarpt omdöme.",
@@ -37,7 +38,7 @@ const PERSONLIGHETER = {
   "Den rike": "mycket förmögen, välmenande, ibland totalt ute ur kontakt med verkligheten.",
 };
 
-// ── Debatt rate limiter (per IP, 5/10 min) ────────────────────────────────────────────
+// ── Debatt rate limiter (per IP, 5/10 min) ────────────────────────────────────────────────────
 const rateLimitStore = new Map();
 const LIMIT = 5;
 const WINDOW_MS = 10 * 60 * 1000;
@@ -56,7 +57,7 @@ function consumeRateLimit(ip) {
   else entry.count++;
 }
 
-// ── Provider health state (per Edge isolate, best-effort) ────────────────────────────
+// ── Provider health state (per Edge isolate, best-effort) ────────────────────────────────────────
 const ps = {
   groq:   { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
   gemini: { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
@@ -100,6 +101,7 @@ async function handlePost(request) {
     const info = getRateLimitInfo(ip);
     if (info.remaining <= 0) {
       const minutesLeft = info.resetAt ? Math.ceil((info.resetAt - Date.now()) / 60000) : 10;
+      logFel({ kalla: "chatt", feltyp: "rate_limit", meddelande: "429 rate limit direktdebatt", ip, extra: { minutesLeft } });
       return Response.json({ error: "rate_limit", remaining: 0, resetAt: info.resetAt, minutesLeft }, { status: 429 });
     }
     consumeRateLimit(ip);
@@ -157,7 +159,7 @@ REGLER — viktiga:
     "X-RateLimit-Limit": String(LIMIT),
   };
 
-  // ── Try Groq first ─────────────────────────────────────────────────────────────────────────────
+  // ── Try Groq first ──────────────────────────────────────────────────────────────────────────────────────
   let groqFailReason = "";
   if (!process.env.GROQ_API_KEY) {
     groqFailReason = "GROQ_API_KEY saknas";
@@ -203,7 +205,7 @@ REGLER — viktiga:
     }
   }
 
-  // ── Try OpenRouter (streaming, same format as Groq) ──────────────────────────────────────
+  // ── Try OpenRouter (streaming, same format as Groq) ──────────────────────────────────────────────────────────────────
   const orKey = process.env.OPENROUTER_API_KEY;
   if (orKey) {
     const orAbort = new AbortController();
@@ -242,7 +244,7 @@ REGLER — viktiga:
     }
   }
 
-  // ── Fall back to Gemini ───────────────────────────────────────────────────────────────────────
+  // ── Fall back to Gemini ─────────────────────────────────────────────────────────────────────────────────────
   const geminiKey = process.env.GEMINI_API_KEY;
   if (!geminiKey) {
     return Response.json({ error: `GEMINI_API_KEY saknas. ${groqFailReason}` }, { status: 502 });
@@ -293,6 +295,7 @@ REGLER — viktiga:
   }
 
   if (!geminiText) {
+    logFel({ kalla: "chatt", feltyp: "ai_fail", meddelande: "Alla providers misslyckades", ip, extra: { groqFailReason, geminiErr } });
     return Response.json({ error: `Alla AI-tjänster är otillgängliga. ${groqFailReason} | Gemini: ${geminiErr}` }, { status: 502 });
   }
 

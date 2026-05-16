@@ -1,3 +1,5 @@
+import { logFel } from "../../../lib/logFel";
+
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const GROQ_KEY = process.env.GROQ_API_KEY;
@@ -191,6 +193,7 @@ export async function POST(req) {
     if (!jsonMatch) throw new Error("Kunde inte tolka AI-svar som JSON");
     groqResult = JSON.parse(jsonMatch[0]);
   } catch (err) {
+    logFel({ kalla: "agent/submit", feltyp: "ai_fail", meddelande: err.message, extra: { agent: agentName } });
     return Response.json({ fel: "AI-utvärdering misslyckades", detalj: err.message }, { status: 502 });
   }
 

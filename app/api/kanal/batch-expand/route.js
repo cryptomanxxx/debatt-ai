@@ -2,6 +2,7 @@
 
 import { logAiCall } from "../../../lib/logAiCall";
 import { checkRateLimit } from "../../../lib/kanalRateLimit";
+import { logFel, getIp } from "../../../lib/logFel";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -16,8 +17,10 @@ function parseNumberedList(text, count) {
 }
 
 export async function POST(req) {
+  const ip = getIp(req);
   const rl = checkRateLimit(req, "batch-expand", 5, 10 * 60 * 1000);
   if (!rl.ok) {
+    logFel({ kalla: "kanal/batch-expand", feltyp: "rate_limit", meddelande: "429 rate limit", ip, extra: { retryAfter: rl.retryAfter } });
     return Response.json(
       { error: "Too many requests", retryAfter: rl.retryAfter },
       { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
@@ -152,5 +155,6 @@ Exempel:
   }
 
   logAiCall({ provider: "none", model: null, source: "kanal-batch", status: "all_failed", latency_ms: 0 });
+  logFel({ kalla: "kanal/batch-expand", feltyp: "ai_fail", meddelande: "Alla providers misslyckades", ip });
   return Response.json({ expanded: [] });
 }
