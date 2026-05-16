@@ -59,9 +59,11 @@ function consumeRateLimit(ip) {
 
 // ── Provider health state (per Edge isolate, best-effort) ────────────────────────────────────────
 const ps = {
-  groq:   { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
-  gemini: { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
-  or:     { ts: 0, status: "unknown" },
+  groq:      { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
+  gemini:    { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
+  or:        { ts: 0, status: "unknown" },
+  codestral: { ts: 0, status: "unknown" },
+  cerebras:  { ts: 0, status: "unknown" },
 };
 
 function groqReady() {
@@ -72,9 +74,11 @@ function groqReady() {
 // GET /api/chatt — returns provider health for the admin dashboard
 export async function GET() {
   return Response.json({
-    groq:   { ...ps.groq,   keySet: !!process.env.GROQ_API_KEY },
-    gemini: { ...ps.gemini, keySet: !!process.env.GEMINI_API_KEY },
-    or:     { ...ps.or,     keySet: !!process.env.OPENROUTER_API_KEY },
+    groq:      { ...ps.groq,      keySet: !!process.env.GROQ_API_KEY },
+    gemini:    { ...ps.gemini,    keySet: !!process.env.GEMINI_API_KEY },
+    or:        { ...ps.or,        keySet: !!process.env.OPENROUTER_API_KEY },
+    codestral: { ...ps.codestral, keySet: !!process.env.MISTRAL_API_KEY },
+    cerebras:  { ...ps.cerebras,  keySet: !!process.env.CEREBRAS_API_KEY },
     ts: Date.now(),
   });
 }
