@@ -32,6 +32,11 @@ export default function KoalitionClient({ initialData }) {
   useEffect(() => {
     setMinAgent(localStorage.getItem(LS_KEY));
     setMounted(true);
+    // Fetch fresh counts — SSR data can be up to 60s stale
+    fetch("/api/koalition")
+      .then(r => r.json())
+      .then(data => setRanking(buildRanking(data)))
+      .catch(() => {});
   }, []);
 
   async function join(agent) {

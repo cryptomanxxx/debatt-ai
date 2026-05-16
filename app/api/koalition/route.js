@@ -5,7 +5,16 @@ const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const hdrs = () => ({ apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" });
 
-// POST: join or switch coalition
+// GET: fresh follower counts (bypasses SSR cache)
+export async function GET() {
+  const r = await fetch(
+    `${SB_URL}/rest/v1/koalitioner?select=agent,foljare&order=foljare.desc`,
+    { headers: hdrs(), cache: "no-store" }
+  );
+  const data = r.ok ? await r.json() : [];
+  return Response.json(data, { headers: { "Cache-Control": "no-store" } });
+}
+
 // Body: { agent: string, previousAgent?: string }
 export async function POST(req) {
   const ip = getIp(req);
