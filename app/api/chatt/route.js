@@ -295,6 +295,36 @@ REGLER — viktiga:
   }
 
   if (!geminiText) {
+    const oaiMessages = [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ];
+    for (const [name, url, model, key] of [
+      ["codestral", "https://api.mistral.ai/v1/chat/completions", "codestral-latest", process.env.MISTRAL_API_KEY],
+      ["cerebras",  "https://api.cerebras.ai/v1/chat/completions", "llama3.1-8b",     process.env.CEREBRAS_API_KEY],
+    ]) {
+      if (!key) continue;
+      try {
+        const t0 = Date.now();
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+          body: JSON.stringify({ model, messages: oaiMessages, max_tokens: 250, temperature: 0.88 }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          const text = data.choices?.[0]?.message?.content?.trim();
+          if (text) {
+            logAiCall({ provider: name, model, source: "chatt", status: "ok", latency_ms: Date.now() - t0 });
+            const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
+            const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
+            return new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": name } });
+          }
+        }
+        logAiCall({ provider: name, model, source: "chatt", status: "error", latency_ms: Date.now() - t0 });
+      } catch {}
+    }
     logFel({ kalla: "chatt", feltyp: "ai_fail", meddelande: "Alla providers misslyckades", ip, extra: { groqFailReason, geminiErr } });
     return Response.json({ error: `Alla AI-tjänster är otillgängliga. ${groqFailReason} | Gemini: ${geminiErr}` }, { status: 502 });
   }
