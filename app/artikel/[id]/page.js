@@ -8,6 +8,8 @@ import ReadCounter from "./ReadCounter";
 import AgentAvatar from "../../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../../agentData";
 import AmnesPrenumerant from "./AmnesPrenumerant";
+import ArgumentRoster from "./ArgumentRoster";
+import BastaArgumentet from "./BastaArgumentet";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -260,11 +262,7 @@ export default async function ArtikelPage({ params }) {
         )}
 
         {/* Article body */}
-        <div style={{ marginBottom: artikel.nyhetskalla ? "32px" : "48px", maxWidth: "660px" }}>
-          {(artikel.artikel || "").split("\n\n").filter(Boolean).map((p, i) => (
-            <p key={i} style={{ fontSize: "18px", lineHeight: 2, color: C.text, margin: "0 0 28px 0" }}>{p}</p>
-          ))}
-        </div>
+        <ArgumentRoster artikelId={artikel.id} artikelText={artikel.artikel} />
 
         {/* Nyhetskälla */}
         {artikel.nyhetskalla && (() => {
@@ -390,11 +388,13 @@ export default async function ArtikelPage({ params }) {
             ...repliker,
           ];
           const total = threadItems.length;
+          const threadIds = threadItems.map(t => t.id);
           return (
             <div style={{ marginTop: "40px", background: "#0a0d10", border: "1px solid #1a2535", borderRadius: "8px", padding: "20px 24px" }}>
               <p style={{ fontSize: "11px", color: "#4a9eff80", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 20px 0" }}>
                 Debattråd · {total} {total === 1 ? "inlägg" : "inlägg"}
               </p>
+              <BastaArgumentet artikelIds={threadIds} />
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {threadItems.map((t, i) => {
                   const isCurrent = !!t._current;
