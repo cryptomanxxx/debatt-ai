@@ -1447,6 +1447,143 @@ function FellogTab() {
   );
 }
 
+function LabbTab() {
+  const [rows, setRows]     = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(
+      `${SB_URL}/rest/v1/labb_log?select=*&order=skapad.desc&limit=200`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" }
+    )
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { setRows(data); setLoading(false); })
+      .catch(() => { setRows([]); setLoading(false); });
+  }, []);
+
+  if (loading) return <p style={{ color: C.textMuted }}>Laddar labb-statistik…</p>;
+  if (!rows || rows.length === 0) return (
+    <p style={{ color: C.textMuted }}>
+      Ingen data ännu. Kör <code style={{ color: C.accent }}>supabase_labb_log.sql</code> i Supabase SQL Editor och generera ett inlägg på <a href="/labb" style={{ color: C.accent }}>/labb</a>.
+    </p>
+  );
+
+  // Aggregera
+  const total = rows.length;
+  const avg = key => Math.round(rows.reduce((s, r) => s + (r[key] || 0), 0) / total);
+  const avgAggr = avg("aggressivitet");
+  const avgFakta = avg("faktafokus");
+  const avgHumor = avg("humor");
+  const avgOpt   = avg("optimism");
+
+  // Provider-fördelning
+  const provCounts = {};
+  rows.forEach(r => { provCounts[r.provider || "okänd"] = (provCounts[r.provider || "okänd"] || 0) + 1; });
+
+  // Senaste 14 dagar
+  const dagMap = {};
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    dagMap[d.toISOString().slice(0, 10)] = 0;
+  }
+  rows.forEach(r => {
+    const dag = r.skapad?.slice(0, 10);
+    if (dag && dagMap[dag] !== undefined) dagMap[dag]++;
+  });
+  const dagData = Object.entries(dagMap);
+  const maxDag = Math.max(...dagData.map(([, v]) => v), 1);
+
+  const SLIDERS = [
+    { key: "aggressivitet", label: "Aggressivitet", color: "#f87171", val: avgAggr },
+    { key: "faktafokus",    label: "Faktafokus",    color: "#4a9eff", val: avgFakta },
+    { key: "humor",         label: "Humor",         color: "#facc15", val: avgHumor },
+    { key: "optimism",      label: "Optimism",      color: "#4ade80", val: avgOpt  },
+  ];
+
+  return (
+    <div>
+      {/* KPI-rad */}
+      <div style={{ display: "flex", gap: "16px", marginBottom: "28px", flexWrap: "wrap" }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 24px", minWidth: "120px" }}>
+          <p style={{ fontSize: "11px", color: C.textMuted, margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.08em" }}>Genereringar</p>
+          <p style={{ fontSize: "28px", color: C.accent, fontWeight: 700, margin: 0, fontFamily: "monospace" }}>{total}</p>
+        </div>
+        {SLIDERS.map(s => (
+          <div key={s.key} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 24px", minWidth: "120px" }}>
+            <p style={{ fontSize: "11px", color: C.textMuted, margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.08em" }}>⌀ {s.label}</p>
+            <p style={{ fontSize: "28px", color: s.color, fontWeight: 700, margin: 0, fontFamily: "monospace" }}>{s.val}</p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "28px" }}>
+        {/* Genomsnittliga slidervärden */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px" }}>
+          <p style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 16px" }}>Populäraste personligheten (snitt)</p>
+          {SLIDERS.map(s => (
+            <div key={s.key} style={{ marginBottom: "12px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                <span style={{ fontSize: "12px", color: C.textMuted }}>{s.label}</span>
+                <span style={{ fontSize: "12px", color: s.color, fontFamily: "monospace" }}>{s.val}</span>
+              </div>
+              <div style={{ height: "4px", background: "#1e1e1e", borderRadius: "2px" }}>
+                <div style={{ height: "100%", width: `${s.val}%`, background: s.color, borderRadius: "2px" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Provider-fördelning */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px" }}>
+          <p style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 16px" }}>AI-provider</p>
+          {Object.entries(provCounts).sort((a, b) => b[1] - a[1]).map(([prov, count]) => (
+            <div key={prov} style={{ marginBottom: "10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                <span style={{ fontSize: "12px", color: C.accentDim, fontFamily: "monospace" }}>{prov}</span>
+                <span style={{ fontSize: "12px", color: C.textMuted }}>{count} ({Math.round(count / total * 100)}%)</span>
+              </div>
+              <div style={{ height: "3px", background: "#1e1e1e", borderRadius: "2px" }}>
+                <div style={{ height: "100%", width: `${count / total * 100}%`, background: "#4a9eff", borderRadius: "2px" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Daglig användning */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginBottom: "28px" }}>
+        <p style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 16px" }}>Daglig användning (14 dagar)</p>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: "4px", height: "60px" }}>
+          {dagData.map(([dag, count]) => (
+            <div key={dag} title={`${dag}: ${count}`} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+              <div style={{ width: "100%", height: `${Math.round(count / maxDag * 52)}px`, background: count > 0 ? "#4ade80" : "#1e1e1e", borderRadius: "2px 2px 0 0", minHeight: "2px", transition: "height 0.3s" }} />
+              <span style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", transform: "rotate(-45deg)", transformOrigin: "top left", whiteSpace: "nowrap", marginTop: "2px" }}>
+                {dag.slice(5)}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Senaste ämnen */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px" }}>
+        <p style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", margin: "0 0 14px" }}>Senaste ämnen</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          {rows.slice(0, 20).map((r, i) => (
+            <div key={i} style={{ display: "flex", gap: "12px", alignItems: "baseline", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+              <span style={{ fontSize: "11px", color: "#333", fontFamily: "monospace", whiteSpace: "nowrap" }}>{r.skapad?.slice(0, 16).replace("T", " ")}</span>
+              <span style={{ fontSize: "13px", color: C.accentDim, flex: 1 }}>{r.amne}</span>
+              <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", whiteSpace: "nowrap" }}>
+                A{r.aggressivitet} F{r.faktafokus} H{r.humor} O{r.optimism}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AiStatistikTab() {
   const [rows, setRows]         = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -2039,6 +2176,7 @@ export default function AdminClient() {
             ["markets","Markets"],
             ["api-status","API-status"],
             ["beslut-api","Decision API"],
+            ["labb","Experimentlabb"],
             ["ai-statistik","AI-statistik"],
             ["fellog","Fellog"],
             ["rapporter","Veckorapporter"],
@@ -2256,6 +2394,7 @@ export default function AdminClient() {
         {mainTab === "beslut-api" && <BeslutApiTab />}
 
         {/* ── AI-STATISTIK ── */}
+        {mainTab === "labb" && <LabbTab />}
         {mainTab === "ai-statistik" && <AiStatistikTab />}
 
         {/* ── FELLOG ── */}
