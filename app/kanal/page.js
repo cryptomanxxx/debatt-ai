@@ -62,11 +62,17 @@ function agentSlug(namn) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── Blink-hook ────────────────────────────────────────────────────────────────
-function useBlinkState() {
-  const [blinkState, setBlinkState] = useState("open"); // open | half | closed
+function useBlinkState(active) {
+  const [blinkState, setBlinkState] = useState("open");
   const timerRef = useRef(null);
 
   useEffect(() => {
+    if (!active) {
+      setBlinkState("open");
+      if (timerRef.current) clearTimeout(timerRef.current);
+      return;
+    }
+
     let cancelled = false;
 
     const doBlink = async () => {
@@ -93,7 +99,7 @@ function useBlinkState() {
       cancelled = true;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, []);
+  }, [active]);
 
   return blinkState;
 }
@@ -134,8 +140,8 @@ function WaveformBar({ isSpeaking, isThinking }) {
     const ctx    = canvas.getContext("2d");
     const W      = canvas.width;
     const H      = canvas.height;
-    const BARS   = 24;
-    const GAP    = 2;
+    const BARS   = 12;
+    const GAP    = 3;
     const barW   = (W - GAP * (BARS - 1)) / BARS;
     let frameId;
     let dotPhase = 0;
@@ -181,9 +187,9 @@ function WaveformBar({ isSpeaking, isThinking }) {
   return (
     <canvas
       ref={canvasRef}
-      width={420}
-      height={20}
-      style={{ width: "100%", height: "20px", display: "block" }}
+      width={240}
+      height={12}
+      style={{ width: "100%", height: "12px", display: "block" }}
     />
   );
 }
@@ -195,12 +201,12 @@ const MOUTH_HALF   = ["anna-m0-half.png", "anna-m1-half.png", "anna-m2-half.png"
 const MOUTH_CLOSED = ["anna-m0-closed.png", "anna-m1-closed.png", "anna-m2-closed.png", "anna-m3-closed.png"];
 
 function AnchorImage({ blinkState, isSpeaking }) {
-  const [mouthIdx, setMouthIdx] = useState(0);
+  const [mouthIdx, setMouthIdx] = useState(1);
 
   useEffect(() => {
-    if (!isSpeaking) { setMouthIdx(0); return; }
-    // Only cycle between m0 and m1 (subtle movement, not all the way to wide open)
-    const id = setInterval(() => setMouthIdx(m => (m + 1) % 2), 220);
+    if (!isSpeaking) { setMouthIdx(1); return; }
+    // Cycle between m1 and m2 — avoids jumping back to m0 which shifts the head
+    const id = setInterval(() => setMouthIdx(m => m === 1 ? 2 : 1), 220);
     return () => clearInterval(id);
   }, [isSpeaking]);
 
@@ -233,15 +239,13 @@ export default function KanalPage() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [oversatter, setOversatter] = useState(false);
-  const [debattMode, setDebattMode] = useState(false);
   const [debattInfo, setDebattInfo] = useState(null);
   const [currentText, setCurrentText] = useState("");
 
   const nyheterRef  = useRef([]);
   const runningRef  = useRef(false);
-  const sessionRef  = useRef(0); // incremented on every stop; async loops bail if session changed
+  const sessionRef  = useRef(0);
   const langRef     = useRef("sv");
-  const blinkState  = useBlinkState();
 
   useEffect(() => {
     fetch("/api/kanal/nyheter")
@@ -448,7 +452,7 @@ export default function KanalPage() {
       console.error("Nyheter-fel:", e);
     }
 
-    if (runningRef.current && debattMode) {
+    if (runningRef.current) {
       try {
         const res = await fetch(
           `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla&order=skapad.desc&limit=6`,
@@ -494,6 +498,7 @@ export default function KanalPage() {
   }
 
   const running  = mode !== "idle";
+  const blinkState = useBlinkState(running);
   const current  = nyheter[currentIdx] || null;
   const upcoming = nyheter.slice(currentIdx + 1, currentIdx + 6);
 
@@ -583,18 +588,8 @@ export default function KanalPage() {
               {running ? "⏹ STOPPA SÄNDNING" : "▶ STARTA SÄNDNING"}
             </button>
 
-            <label style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "14px", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={debattMode}
-                onChange={e => setDebattMode(e.target.checked)}
-                style={{ accentColor: C.accent, width: "15px", height: "15px" }}
-              />
-              <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.05em" }}>inkludera debatter</span>
-            </label>
-
-            <p style={{ fontSize: "11px", color: C.textMuted, marginTop: "16px", lineHeight: 1.6, fontFamily: "monospace" }}>
-              {nyheter.length} nyheter · debatt {debattMode ? "på" : "av"}
+            <p style={{ fontSize: "11px", color: C.textMuted, marginTop: "12px", lineHeight: 1.6, fontFamily: "monospace" }}>
+              {nyheter.length} nyheter · följs av debatter
             </p>
           </div>
 
