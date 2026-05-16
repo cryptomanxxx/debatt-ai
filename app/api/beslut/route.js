@@ -1,7 +1,9 @@
 const SB_URL     = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY     = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const GROQ_KEY   = process.env.GROQ_API_KEY;
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
+const GROQ_KEY     = process.env.GROQ_API_KEY;
+const GEMINI_KEY   = process.env.GEMINI_API_KEY;
+const MISTRAL_KEY  = process.env.MISTRAL_API_KEY;
+const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
 
 const PERSONLIGHETER = {
   "Nationalekonom":       "nationalekonom med doktorsexamen. Analyserar ur kostnads- och incitamentsperspektiv. Konkret och kylig.",
@@ -124,6 +126,46 @@ reasoning: din kortaste möjliga motivering`;
       if (r.ok) {
         const data = await r.json();
         const parsed = extractJSON(data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "");
+        if (parsed?.stance && typeof parsed.probability === "number")
+          return { agent, ...parsed };
+      }
+    } catch {}
+  }
+
+  if (MISTRAL_KEY) {
+    try {
+      const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${MISTRAL_KEY}` },
+        body: JSON.stringify({
+          model: "codestral-latest",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: question }],
+          max_tokens: 150, temperature: 0.7,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const parsed = extractJSON(data.choices?.[0]?.message?.content ?? "");
+        if (parsed?.stance && typeof parsed.probability === "number")
+          return { agent, ...parsed };
+      }
+    } catch {}
+  }
+
+  if (CEREBRAS_KEY) {
+    try {
+      const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${CEREBRAS_KEY}` },
+        body: JSON.stringify({
+          model: "llama3.1-8b",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: question }],
+          max_tokens: 150, temperature: 0.7,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const parsed = extractJSON(data.choices?.[0]?.message?.content ?? "");
         if (parsed?.stance && typeof parsed.probability === "number")
           return { agent, ...parsed };
       }

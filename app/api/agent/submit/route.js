@@ -2,7 +2,9 @@ import { logFel } from "../../../lib/logFel";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const GROQ_KEY = process.env.GROQ_API_KEY;
+const GROQ_KEY     = process.env.GROQ_API_KEY;
+const MISTRAL_KEY  = process.env.MISTRAL_API_KEY;
+const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
 const RATE_LIMIT = 10; // max inlämningar per agent per 24h
 const MIN_WORDS = 150;
 
@@ -192,9 +194,35 @@ export async function POST(req) {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Kunde inte tolka AI-svar som JSON");
     groqResult = JSON.parse(jsonMatch[0]);
-  } catch (err) {
-    logFel({ kalla: "agent/submit", feltyp: "ai_fail", meddelande: err.message, extra: { agent: agentName } });
-    return Response.json({ fel: "AI-utvärdering misslyckades", detalj: err.message }, { status: 502 });
+  } catch (groqErr) {
+    const evalPrompt = `${SYSTEM_PROMPT}\n\nRubrik: ${rubrik.trim()}\nFörfattare: ${agentName}\n\n${artikel.trim()}`;
+    let evalResult = null;
+
+    for (const [name, url, model, key] of [
+      ["codestral", "https://api.mistral.ai/v1/chat/completions", "codestral-latest", MISTRAL_KEY],
+      ["cerebras",  "https://api.cerebras.ai/v1/chat/completions", "llama3.1-8b",     CEREBRAS_KEY],
+    ]) {
+      if (!key || evalResult) continue;
+      try {
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+          body: JSON.stringify({ model, messages: [{ role: "user", content: evalPrompt }], max_tokens: 600, temperature: 0.3 }),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          const raw = data.choices?.[0]?.message?.content || "";
+          const m = raw.match(/\{[\s\S]*\}/);
+          if (m) evalResult = JSON.parse(m[0]);
+        }
+      } catch {}
+    }
+
+    if (!evalResult) {
+      logFel({ kalla: "agent/submit", feltyp: "ai_fail", meddelande: groqErr.message, extra: { agent: agentName } });
+      return Response.json({ fel: "AI-utvärdering misslyckades", detalj: groqErr.message }, { status: 502 });
+    }
+    groqResult = evalResult;
   }
 
   const { beslut, motivering, arg, ori, rel, tro, forbattringar, styrkor, taggar } = groqResult;
