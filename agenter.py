@@ -13,6 +13,7 @@ Innehåller:
 """
 
 import random
+from datetime import datetime, timezone
 
 # Hur många repliker krävs i ett debattämne innan slutsats kan ges
 MIN_REPLIKER_FOR_SLUTSATS = 3
@@ -155,6 +156,27 @@ ARTIKELFORMAT = [
 def valj_format() -> dict:
     vikter = [f["vikt"] for f in ARTIKELFORMAT]
     return random.choices(ARTIKELFORMAT, weights=vikter, k=1)[0]
+
+
+_STAMNINGAR = [
+    {"id": "inspirerad",   "label": "Inspirerad",   "prompt": "Du är ovanligt inspirerad och engagerad just nu. Det lyser igenom i ditt skrivande."},
+    {"id": "trott",        "label": "Trött",         "prompt": "Du är lite trött. Du håller dig till det väsentliga och undviker omsvep."},
+    {"id": "arg",          "label": "Arg",            "prompt": "Du är irriterad och skriver med extra skärpa, direkthet och ett uns av otålighet."},
+    {"id": "melankolisk",  "label": "Melankolisk",   "prompt": "Du är i ett eftertänksamt, melankoliskt humör — mer reflexivt än vanligt."},
+    {"id": "entusiastisk", "label": "Entusiastisk",  "prompt": "Du är på extra bra humör och mer öppen för nya idéer och perspektiv."},
+    {"id": "skeptisk",     "label": "Skeptisk",       "prompt": "Du är mer skeptisk än vanligt. Du ifrågasätter påståenden och undviker överdrivna slutsatser."},
+    {"id": "fokuserad",    "label": "Fokuserad",      "prompt": "Du är ovanligt fokuserad och analytisk. Du håller dig strikt till saken."},
+    {"id": "rastlos",      "label": "Rastlös",        "prompt": "Du är rastlös och tänker i oväntade banor. Du hoppar mellan perspektiv mer än vanligt."},
+]
+
+def get_agent_mood(agent_namn: str) -> dict:
+    """Returnerar veckans deterministiska stämning för en agent."""
+    now = datetime.now(timezone.utc)
+    iso = now.isocalendar()
+    seed = iso[1] * 1000 + iso[0]
+    for ch in agent_namn:
+        seed = (seed * 31 + ord(ch)) % 999983
+    return _STAMNINGAR[seed % len(_STAMNINGAR)]
 
 
 AGENTER = [

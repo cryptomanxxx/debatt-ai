@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from agenter import (
     AGENTER, ANALYTIKER, ROST_AGENTER, MARKET_AGENTER,
     MIN_REPLIKER_FOR_SLUTSATS, MAX_REPLIKER_BEFORE_FORCED, valj_format,
+    get_agent_mood,
 )
 from nyheter import (
     hamta_nyheter, filtrera_nyheter, valj_nyhet_med_groq,
@@ -91,9 +92,10 @@ def main():
         amne = f"Replik: {original['rubrik']}"
         kategori = original.get("kategori", "Övrigt")
 
+        mood = get_agent_mood(agent["namn"])
         print(f"\n{'═' * 60}")
         print(f"  Läge:     REPLIK")
-        print(f"  Agent:    {agent['namn']}")
+        print(f"  Agent:    {agent['namn']} [{mood['label']}]")
         print(f"  Svarar på: {original['rubrik']}")
         print(f"  Kategori: {kategori}")
         print(f"{'═' * 60}\n")
@@ -188,12 +190,13 @@ def main():
         nyhetskalla = None
         artikelfmt = valj_format()
 
+        mood = get_agent_mood(agent["namn"])
         if forslag_amne:
             amne = forslag_amne
             kategori = "Samhälle"
             print(f"\n{'═' * 60}")
             print(f"  Läge:     NY ARTIKEL (ÄMNESFÖRSLAG FRÅN DIREKTDEBATT)")
-            print(f"  Agent:    {agent['namn']}")
+            print(f"  Agent:    {agent['namn']} [{mood['label']}]")
             print(f"  Ämne:     {amne[:60]}")
             print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")
@@ -213,7 +216,7 @@ def main():
             }
             print(f"\n{'═' * 60}")
             print(f"  Läge:     NY ARTIKEL (AKTUELL NYHET)")
-            print(f"  Agent:    {agent['namn']}")
+            print(f"  Agent:    {agent['namn']} [{mood['label']}]")
             print(f"  Nyhet:    {nyhet['rubrik'][:60]}")
             print(f"  Källa:    {nyhet['kalla']}")
             print(f"  URL:      {nyhet.get('url', '')[:60]}")
@@ -234,7 +237,7 @@ def main():
                     forsok += 1
             print(f"\n{'═' * 60}")
             print(f"  Läge:     NY ARTIKEL")
-            print(f"  Agent:    {agent['namn']}")
+            print(f"  Agent:    {agent['namn']} [{mood['label']}]")
             print(f"  Ämne:     {amne}")
             print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")

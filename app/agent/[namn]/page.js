@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import AgentAvatar from "./AgentAvatar";
 import AgentFragaForm from "./AgentFragaForm";
 import AmnesPrenumerant from "../../artikel/[id]/AmnesPrenumerant";
+import { getAgentMood } from "../../lib/sinnesstamning";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -365,6 +366,7 @@ export default async function AgentPage({ params }) {
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
   const egnArtiklar = artiklar.filter(a => !a.rubrik || !a.rubrik.startsWith("Replik:"));
+  const mood = getAgentMood(namn);
 
   const scoreColor = (v) => {
     if (!v) return C.textMuted;
@@ -393,6 +395,18 @@ export default async function AgentPage({ params }) {
                 {profil.fokus.map(f => (
                   <span key={f} style={{ fontSize: "12px", color: C.accentDim, background: `${C.accent}10`, border: `1px solid ${C.accent}20`, borderRadius: "20px", padding: "3px 10px" }}>{f}</span>
                 ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px" }}>
+                <span style={{ fontSize: "11px", color: "#555", fontFamily: "monospace", letterSpacing: "0.05em" }}>STÄMNING DENNA VECKA</span>
+                <span style={{
+                  display: "inline-flex", alignItems: "center", gap: "5px",
+                  padding: "3px 12px", borderRadius: "20px",
+                  background: `${mood.color}12`, border: `1px solid ${mood.color}40`,
+                  fontSize: "12px", color: mood.color, fontFamily: "monospace", fontWeight: 700,
+                }}>
+                  <span>{mood.emoji}</span>
+                  <span>{mood.label.toUpperCase()}</span>
+                </span>
               </div>
               <AmnesPrenumerant taggar={[]} forfattare={namn} kallAi={true} />
             </div>
