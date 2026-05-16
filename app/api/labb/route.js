@@ -7,6 +7,17 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// Server-side deduplicering: blockerar identiska requests inom 10 sekunder
+const recentDedup = new Map();
+function dedupCheck(ip, amne, aggressivitet, faktafokus, humor, optimism) {
+  const key = `${ip}_${amne.slice(0, 40)}_${aggressivitet}_${faktafokus}_${humor}_${optimism}`;
+  const now = Date.now();
+  for (const [k, ts] of recentDedup) { if (now - ts > 10000) recentDedup.delete(k); }
+  if (recentDedup.has(key)) return true; // duplikat
+  recentDedup.set(key, now);
+  return false;
+}
+
 async function logLabb({ amne, aggressivitet, faktafokus, humor, optimism, provider }) {
   try {
     await fetch(`${SB_URL}/rest/v1/labb_log`, {
@@ -59,6 +70,10 @@ export async function POST(req) {
   const { amne, aggressivitet, faktafokus, humor, optimism } = await req.json().catch(() => ({}));
   if (!amne || typeof amne !== "string" || amne.trim().length < 5) {
     return Response.json({ error: "Ange ett ämne (minst 5 tecken)." }, { status: 400 });
+  }
+
+  if (dedupCheck(ip, amne.trim(), Number(aggressivitet)||50, Number(faktafokus)||50, Number(humor)||50, Number(optimism)||50)) {
+    return Response.json({ error: "Duplicat — vänta en stund." }, { status: 429 });
   }
 
   const system = buildSystemPrompt(
