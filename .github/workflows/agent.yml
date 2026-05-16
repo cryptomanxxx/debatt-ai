@@ -22,6 +22,9 @@ on:
 jobs:
   publicera:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      models: read
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -40,4 +43,5 @@ jobs:
           DEBATT_API_KEY: ${{ secrets.DEBATT_API_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python agent.py

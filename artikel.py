@@ -10,7 +10,7 @@ innehåller:
   skriv_kommentar()         – kort kommentar (2–3 meningar) på en artikel
 """
 
-from ai_klient import groq_post, gemini_post
+from ai_klient import groq_post, gemini_post, github_models_post
 from agenter import ARTIKELFORMAT
 
 
@@ -42,20 +42,24 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
         "kräver att X faktiskt nämns i nyheten du fick.\n\n"
         "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
     )
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "max_tokens": 2000,
+        "temperature": 0.8,
+        "messages": [
+            {"role": "system", "content": agent["system"]},
+            {"role": "user", "content": user_msg},
+        ],
+    }
     try:
-        response = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 2000,
-            "temperature": 0.8,
-            "messages": [
-                {"role": "system", "content": agent["system"]},
-                {"role": "user", "content": user_msg},
-            ],
-        })
-        return response.json()["choices"][0]["message"]["content"]
+        return groq_post(payload).json()["choices"][0]["message"]["content"]
     except Exception as e:
         print(f"  Groq misslyckades ({e}) — försöker Gemini...")
+    try:
         return gemini_post(agent["system"], user_msg, max_tokens=2000)
+    except Exception as e:
+        print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
+        return github_models_post({**payload, "model": "gpt-4o-mini"}).json()["choices"][0]["message"]["content"]
 
 
 def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | None = None) -> str:
@@ -74,20 +78,24 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
         f"- Skriv i första person som {agent['namn']}\n\n"
         "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
     )
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "max_tokens": 2000,
+        "temperature": 0.8,
+        "messages": [
+            {"role": "system", "content": agent["system"]},
+            {"role": "user", "content": user_msg},
+        ],
+    }
     try:
-        response = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 2000,
-            "temperature": 0.8,
-            "messages": [
-                {"role": "system", "content": agent["system"]},
-                {"role": "user", "content": user_msg},
-            ],
-        })
-        return response.json()["choices"][0]["message"]["content"]
+        return groq_post(payload).json()["choices"][0]["message"]["content"]
     except Exception as e:
         print(f"  Groq misslyckades ({e}) — försöker Gemini...")
+    try:
         return gemini_post(agent["system"], user_msg, max_tokens=2000)
+    except Exception as e:
+        print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
+        return github_models_post({**payload, "model": "gpt-4o-mini"}).json()["choices"][0]["message"]["content"]
 
 
 def skriv_replik(agent: dict, original: dict) -> str:
@@ -111,20 +119,24 @@ def skriv_replik(agent: dict, original: dict) -> str:
         "från X' kräver att X faktiskt förekommer i texten du svarar på.\n\n"
         "Skriv ENBART repliktexten. Ingen inledning, inga kommentarer."
     )
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "max_tokens": 2000,
+        "temperature": 0.8,
+        "messages": [
+            {"role": "system", "content": agent["system"]},
+            {"role": "user", "content": user_msg},
+        ],
+    }
     try:
-        response = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 2000,
-            "temperature": 0.8,
-            "messages": [
-                {"role": "system", "content": agent["system"]},
-                {"role": "user", "content": user_msg},
-            ],
-        })
-        return response.json()["choices"][0]["message"]["content"]
+        return groq_post(payload).json()["choices"][0]["message"]["content"]
     except Exception as e:
         print(f"  Groq misslyckades ({e}) — försöker Gemini...")
+    try:
         return gemini_post(agent["system"], user_msg, max_tokens=2000)
+    except Exception as e:
+        print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
+        return github_models_post({**payload, "model": "gpt-4o-mini"}).json()["choices"][0]["message"]["content"]
 
 
 def generera_konklusion(original: dict, replik_text: str) -> str:

@@ -51,3 +51,16 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
         if r.status_code in (400, 403) or "API_KEY" in r.text:
             break
     raise Exception(f"Gemini misslyckades: {last_err}")
+
+
+def github_models_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
+    """GitHub Models — gratis OpenAI-kompatibel access via GITHUB_TOKEN."""
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise Exception("GITHUB_TOKEN saknas")
+    url = "https://models.inference.ai.azure.com/chat/completions"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {**json_payload, "model": json_payload.get("model", "gpt-4o-mini")}
+    r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+    r.raise_for_status()
+    return r
