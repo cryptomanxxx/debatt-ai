@@ -4,7 +4,7 @@ title: "Saknad validering av miljövariabler"
 type: bug
 severity: medium
 file: agents/codestral-worker.js
-status: pending
+status: rejected
 created: 2026-05-16
 ---
 

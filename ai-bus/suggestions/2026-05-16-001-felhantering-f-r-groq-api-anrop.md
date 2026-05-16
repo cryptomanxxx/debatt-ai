@@ -4,7 +4,7 @@ title: "Felhantering för Groq API-anrop"
 type: bug
 severity: medium
 file: ai_klient.py
-status: pending
+status: rejected
 created: 2026-05-16
 ---
 

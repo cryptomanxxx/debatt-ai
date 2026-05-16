@@ -90,7 +90,9 @@ function buildCodeBlock(files) {
       if (total + chunk.length > MAX_CHARS_TOTAL) break;
       parts.push(chunk);
       total += chunk.length;
-    } catch {}
+    } catch (err) {
+      console.warn(`  Kunde inte läsa ${f}: ${err.message}`);
+    }
   }
   return parts.join("");
 }

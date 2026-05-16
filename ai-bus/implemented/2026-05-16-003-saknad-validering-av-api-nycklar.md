@@ -4,7 +4,7 @@ title: "Saknad validering av API-nycklar"
 type: security
 severity: high
 file: agent.py
-status: pending
+status: implemented
 created: 2026-05-16
 ---
 
