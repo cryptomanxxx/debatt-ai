@@ -13,6 +13,16 @@ const C = {
 const ANCHOR      = "Anna";
 const ANCHOR_FARG = "#a0c8f0";
 
+const DEBATT_AGENTER = [
+  "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
+  "Jurist","Journalist","Filosof","Läkare","Psykolog","Historiker",
+  "Sociolog","Kryptoanalytiker",
+];
+
+function randomPanel(n = 3) {
+  return [...DEBATT_AGENTER].sort(() => Math.random() - 0.5).slice(0, n);
+}
+
 const AGENT_FARG = {
   "Anna":                 "#a0c8f0",
   "Nationalekonom":       "#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
@@ -239,7 +249,8 @@ export default function KanalPage() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [oversatter, setOversatter] = useState(false);
-  const [debattInfo, setDebattInfo] = useState(null);
+  const [debattInfo, setDebattInfo]   = useState(null);
+  const [currentSpeaker, setCurrentSpeaker] = useState(null); // null = Anna
   const [currentText, setCurrentText] = useState("");
 
   const nyheterRef  = useRef([]);
@@ -422,22 +433,83 @@ export default function KanalPage() {
     }
   }
 
-  async function spelaUppDebatt(artiklar) {
-    const session = sessionRef.current;
-    setMode("debatt");
-    for (let i = 0; i < artiklar.length; i++) {
-      if (session !== sessionRef.current) return;
-      const art  = artiklar[i];
-      const text = art.rubrik + ". " + (art.artikel || "").slice(0, 500);
-      setDebattInfo({ agent: art.forfattare, rubrik: art.rubrik, idx: i, total: artiklar.length });
-      try {
-        await spelaUppText(text, art.forfattare);
-      } catch (e) {
-        console.error("spelaUppDebatt-fel:", e);
+  async function streamText(amne, historik, agent) {
+    try {
+      const res = await fetch("/api/chatt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amne, historik, agent, lang: "sv" }),
+      });
+      if (!res.ok || !res.body) return "";
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let text = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        for (const line of decoder.decode(value, { stream: true }).split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6);
+          if (raw === "[DONE]") continue;
+          try { text += JSON.parse(raw).choices?.[0]?.delta?.content ?? ""; } catch {}
+        }
       }
-      if (session !== sessionRef.current) return;
-      await sleep(1200);
+      return text.trim();
+    } catch { return ""; }
+  }
+
+  async function spelaUppDirektDebatt() {
+    const session = sessionRef.current;
+    const agenter = randomPanel(3);
+
+    // Hämta ämne
+    setIsThinking(true);
+    let amne = "Framtidens Sverige";
+    try {
+      const r    = await fetch("/api/chatt/amne", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agenter }),
+      });
+      const data = await r.json();
+      if (data.amne) amne = data.amne;
+    } catch {}
+    setIsThinking(false);
+    if (session !== sessionRef.current) return;
+
+    // Anna presenterar debatten
+    setCurrentSpeaker(null);
+    setCurrentText(`Nu följer en direktdebatt om: ${amne}`);
+    await spelaUppText(`Nu följer en direktdebatt. Ämne: ${amne}`, null);
+    if (session !== sessionRef.current) return;
+    await sleep(400);
+
+    setMode("debatt");
+    const historik = [];
+    const TURNS    = 6;
+
+    for (let t = 0; t < TURNS; t++) {
+      if (session !== sessionRef.current) { setCurrentSpeaker(null); return; }
+      const agent = agenter[t % agenter.length];
+
+      setCurrentSpeaker(agent);
+      setDebattInfo({ amne, agenter, turn: t + 1, total: TURNS, agent });
+      setIsThinking(true);
+
+      const text = await streamText(amne, historik, agent);
+      if (session !== sessionRef.current) { setCurrentSpeaker(null); return; }
+      setIsThinking(false);
+
+      if (text) {
+        setCurrentText(text);
+        historik.push({ agent, text: text.slice(0, 300) });
+        await spelaUppText(text, agent);
+      }
+      if (session !== sessionRef.current) { setCurrentSpeaker(null); return; }
+      await sleep(800);
     }
+
+    setCurrentSpeaker(null);
   }
 
   async function startaSandning() {
@@ -454,14 +526,7 @@ export default function KanalPage() {
 
     if (runningRef.current) {
       try {
-        const res = await fetch(
-          `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla&order=skapad.desc&limit=6`,
-          { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
-        );
-        if (res.ok) {
-          const artiklar = await res.json();
-          if (artiklar.length > 0) await spelaUppDebatt(artiklar);
-        }
+        await spelaUppDirektDebatt();
       } catch (e) {
         console.error("Debatt-fel:", e);
       }
@@ -485,6 +550,7 @@ export default function KanalPage() {
     setOversatter(false);
     setCurrentIdx(0);
     setDebattInfo(null);
+    setCurrentSpeaker(null);
     setCurrentText("");
   }
 
@@ -532,7 +598,15 @@ export default function KanalPage() {
               aspectRatio: "4/3",
               background: "#050505",
             }}>
-              <AnchorImage blinkState={blinkState} isSpeaking={isSpeaking} />
+              {currentSpeaker ? (
+                <img
+                  src={`/avatarer/${agentSlug(currentSpeaker)}.png`}
+                  alt={currentSpeaker}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }}
+                />
+              ) : (
+                <AnchorImage blinkState={blinkState} isSpeaking={isSpeaking} />
+              )}
 
               <div style={{
                 position: "absolute", top: "12px", left: "12px",
@@ -541,10 +615,15 @@ export default function KanalPage() {
               }}>
                 <span style={{
                   width: "6px", height: "6px", borderRadius: "50%",
-                  background: running ? "#e05050" : "#444",
-                  boxShadow: running ? "0 0 6px #e05050" : "none",
+                  background: running ? (mode === "debatt" ? "#9060e0" : "#e05050") : "#444",
+                  boxShadow: running ? `0 0 6px ${mode === "debatt" ? "#9060e0" : "#e05050"}` : "none",
                 }} />
-                <span style={{ fontSize: "10px", letterSpacing: "0.12em", color: running ? "#e05050" : "#555", fontFamily: "monospace" }}>LIVE</span>
+                <span style={{
+                  fontSize: "10px", letterSpacing: "0.12em", fontFamily: "monospace",
+                  color: running ? (mode === "debatt" ? "#9060e0" : "#e05050") : "#555",
+                }}>
+                  {mode === "debatt" ? "DEBATT" : "LIVE"}
+                </span>
               </div>
 
               <div style={{
@@ -552,8 +631,15 @@ export default function KanalPage() {
                 background: "linear-gradient(transparent, rgba(0,0,0,0.85))",
                 padding: "20px 14px 10px",
               }}>
-                <div style={{ fontSize: "20px", fontWeight: 400, color: ANCHOR_FARG, lineHeight: 1 }}>Anna</div>
-                <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", marginTop: "2px" }}>Nyhetsankare</div>
+                <div style={{
+                  fontSize: "20px", fontWeight: 400, lineHeight: 1,
+                  color: currentSpeaker ? (AGENT_FARG[currentSpeaker] || "#c0b0e8") : ANCHOR_FARG,
+                }}>
+                  {currentSpeaker || "Anna"}
+                </div>
+                <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", marginTop: "2px" }}>
+                  {currentSpeaker ? "Debattör" : "Nyhetsankare"}
+                </div>
                 <div style={{ marginTop: "8px" }}>
                   <WaveformBar isSpeaking={isSpeaking} isThinking={isThinking || oversatter} />
                 </div>
@@ -631,13 +717,29 @@ export default function KanalPage() {
                 background: "#0a080f", border: "1px solid #3a2a5a",
                 borderRadius: "8px", padding: "20px 24px", marginBottom: "16px",
               }}>
-                <p style={{ fontSize: "11px", color: "#8080c0", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 6px" }}>
-                  DEBATTÖR {debattInfo.idx + 1}/{debattInfo.total}
+                <p style={{ fontSize: "11px", color: "#8080c0", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>
+                  DIREKTDEBATT · INLÄGG {debattInfo.turn}/{debattInfo.total}
                 </p>
-                <h2 style={{ fontSize: "20px", fontWeight: 400, lineHeight: 1.3, margin: "0 0 6px", color: "#c0b0e8" }}>
-                  {debattInfo.rubrik}
+                <h2 style={{ fontSize: "17px", fontWeight: 400, lineHeight: 1.4, margin: "0 0 14px", color: "#c0b0e8" }}>
+                  {debattInfo.amne}
                 </h2>
-                <p style={{ fontSize: "12px", color: "#8080c0", margin: 0, fontFamily: "monospace" }}>{debattInfo.agent}</p>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {debattInfo.agenter?.map(a => (
+                    <span key={a} style={{
+                      fontSize: "11px", padding: "3px 8px", borderRadius: "4px", fontFamily: "monospace",
+                      background: a === debattInfo.agent ? "#2a1a4a" : "transparent",
+                      border: `1px solid ${a === debattInfo.agent ? (AGENT_FARG[a] || "#9060e0") : "#2a2a3a"}`,
+                      color: a === debattInfo.agent ? (AGENT_FARG[a] || "#c0b0e8") : "#555",
+                    }}>
+                      {a}
+                    </span>
+                  ))}
+                </div>
+                {currentText && (
+                  <p style={{ fontSize: "14px", color: "#a098c0", lineHeight: 1.7, margin: "14px 0 0", fontStyle: "italic" }}>
+                    {currentText.slice(0, 300)}{currentText.length > 300 ? "…" : ""}
+                  </p>
+                )}
               </div>
             )}
 
