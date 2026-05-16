@@ -9,7 +9,7 @@ Läs alltid `ai-bus/context.md` och kontrollera `ai-bus/approved/` för väntand
 Filer i `ai-bus/approved/` med `status: approved` ska implementeras.
 
 **För varje godkänt förslag:**
-1. Läs frontmatter: `file`, `type`, `severity`, `description`, `proposed_fix`
+1. Läs frontmatter: `file`, `type`, `severity`, `risk`, `description`, `proposed_fix`
 2. Implementera förändringen
 3. Flytta filen till `ai-bus/implemented/` och uppdatera `status: implemented`
 4. Committa och pusha
@@ -22,6 +22,7 @@ id: 2026-05-16-001
 title: "Kortfattad titel"
 type: bug|perf|ux|security|architecture|duplicate|cleanup
 severity: low|medium|high
+risk: low|medium|high
 file: relativ/sökväg.js
 status: pending|approved|rejected|implemented
 created: 2026-05-16
@@ -52,3 +53,10 @@ Konkret lösningsförslag.
 1. `severity: high` i `approved/` — implementera direkt
 2. `severity: medium` — implementera i samma session
 3. `severity: low` — implementera om tid finns, annars nästa session
+
+## Risk-nivå
+
+`risk` anger konsekvens om förändringen implementeras fel:
+- `low` — säkert att göra, minimal risk för sidoeffekter
+- `medium` — testa noga efter implementering
+- `high` — kräver manuell verifiering och extra försiktighet

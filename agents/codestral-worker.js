@@ -58,10 +58,19 @@ async function main() {
     console.warn("Runtime-data misslyckades — fortsätter utan:", e.message);
   }
 
-  const runtimeSummary = buildRuntimeSummary(runtimeData);
+  let buildFailures = null;
+  try {
+    buildFailures = await fetchBuildFailures();
+    if (buildFailures !== null)
+      console.log(`Build failures hämtade: ${buildFailures.length} st senaste 30 körningarna.`);
+  } catch (e) {
+    console.warn("Build failures misslyckades — fortsätter utan:", e.message);
+  }
+
+  const runtimeSummary = buildRuntimeSummary(runtimeData, buildFailures);
 
   try {
-    const snapshot = saveWeeklySnapshot(runtimeData);
+    const snapshot = saveWeeklySnapshot(runtimeData, buildFailures);
     if (snapshot) console.log(`✓ Veckorapport sparad: ai-bus/reports/${snapshot}`);
   } catch (e) {
     console.warn("Veckorapport misslyckades:", e.message);
@@ -168,6 +177,59 @@ async function fetchRuntimeData() {
   };
 }
 
+// ── GitHub Actions build failures ─────────────────────────────────────────
+
+async function fetchBuildFailures() {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) return null;
+  try {
+    const r = await fetch(
+      "https://api.github.com/repos/cryptomanxxx/debatt-ai/actions/runs?per_page=30",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.v3+json",
+          "User-Agent": "debatt-ai-codestral-worker",
+        },
+      }
+    );
+    if (!r.ok) return null;
+    const json = await r.json();
+    return (json.workflow_runs || [])
+      .filter(run => run.conclusion === "failure" || run.conclusion === "timed_out")
+      .map(run => ({
+        workflow:   run.name,
+        branch:     run.head_branch,
+        conclusion: run.conclusion,
+        created_at: run.created_at,
+        url:        run.html_url,
+      }))
+      .slice(0, 10);
+  } catch {
+    return null;
+  }
+}
+
+// ── Långsammaste endpoints ─────────────────────────────────────────────────
+
+function slowestEndpoints(aiRows) {
+  const bySource = {};
+  for (const r of aiRows) {
+    if (!r.source || !r.latency_ms) continue;
+    if (!bySource[r.source]) bySource[r.source] = [];
+    bySource[r.source].push(r.latency_ms);
+  }
+  return Object.entries(bySource)
+    .map(([src, lats]) => ({
+      source: src,
+      count:  lats.length,
+      avg:    Math.round(lats.reduce((a, b) => a + b, 0) / lats.length),
+      max:    Math.max(...lats),
+    }))
+    .sort((a, b) => b.avg - a.avg)
+    .slice(0, 5);
+}
+
 // ── Veckovis metrics-snapshot ──────────────────────────────────────────────
 
 function getISOWeek() {
@@ -187,7 +249,7 @@ function countDir(dir) {
   try { return fs.readdirSync(dir).filter(f => f.endsWith(".md")).length; } catch { return 0; }
 }
 
-function saveWeeklySnapshot(data) {
+function saveWeeklySnapshot(data, buildFailures) {
   if (!data) return null;
   const {
     aiRows, felRows, artRows, chattRows,
@@ -286,6 +348,12 @@ function saveWeeklySnapshot(data) {
 
     kritiska_fel: felRows.length,
 
+    slowest_endpoints: slowestEndpoints(aiRows),
+
+    build_failures: buildFailures
+      ? { count: buildFailures.length, senaste: buildFailures.slice(0, 3) }
+      : null,
+
     ai_bus: {
       pending:     countDir(path.join(__dirname, "../ai-bus/suggestions")),
       implemented: countDir(path.join(__dirname, "../ai-bus/implemented")),
@@ -310,7 +378,7 @@ function saveWeeklySnapshot(data) {
 
 // ── Weekly digest för Codestral-prompten ─────────────────────────────────
 
-function buildRuntimeSummary(data) {
+function buildRuntimeSummary(data, buildFailures) {
   if (!data) return "";
   const { aiRows, felRows, artRows, chattRows, beslutRows, fragaRows, nyhetsRows, prenRows } = data;
 
@@ -340,6 +408,28 @@ function buildRuntimeSummary(data) {
     .sort((a,b) => b.n - a.n);
   if (topRL.length) {
     lines.push(`\n**Mest rate-limitad:** ${topRL[0].p} (${topRL[0].n} gånger)`);
+  }
+
+  // ── Långsammaste endpoints ──
+  const endpoints = slowestEndpoints(aiRows);
+  if (endpoints.length) {
+    lines.push("\n## Långsammaste endpoints (snitt-latens)");
+    lines.push("| Källa | Anrop | Snitt | Max |");
+    lines.push("|---|---|---|---|");
+    for (const e of endpoints)
+      lines.push(`| ${e.source} | ${e.count} | ${e.avg}ms | ${e.max}ms |`);
+  }
+
+  // ── Build failures ──
+  lines.push("\n## GitHub Actions build failures (senaste 30 körningar)");
+  if (buildFailures === null) {
+    lines.push("GITHUB_TOKEN saknas — data ej tillgänglig.");
+  } else if (buildFailures.length === 0) {
+    lines.push("Inga build failures. ✓");
+  } else {
+    lines.push(`${buildFailures.length} misslyckade körningar:`);
+    for (const f of buildFailures.slice(0, 5))
+      lines.push(`- **${f.workflow}** (${f.branch}) — ${f.conclusion} — ${f.created_at?.slice(0, 10)}`);
   }
 
   // ── Kritiska fel ──
@@ -386,6 +476,7 @@ Svara ENDAST med ett JSON-objekt (inga andra tecken):
       "title": "Kort beskrivning (max 10 ord)",
       "type": "bug|perf|ux|security|architecture|duplicate|cleanup",
       "severity": "low|medium|high",
+      "risk": "low|medium|high",
       "file": "relativ/sökväg/till/fil.js",
       "description": "Vad problemet är och varför det är ett problem (2-4 meningar)",
       "proposed_fix": "Konkret förslag på lösning med eventuell pseudokod"
@@ -398,6 +489,7 @@ Regler:
 - Enbart konkreta, actionable förslag — inga luddiga "förbättra felhantering"
 - Ange ALLTID en fil från listan ovan — hitta aldrig på filnamn
 - Om runtime-data visar återkommande fel, prioritera dessa
+- risk = konsekvens om förändringen implementeras fel (low=säkert ändra, medium=testa noga, high=kräver manuell verifiering)
 - Om du inte hittar något viktigt, returnera suggestions: []`;
 
   const runtimeSection = runtimeSummary ? `\n\n${runtimeSummary}` : "";
@@ -462,6 +554,7 @@ id: ${id}
 title: "${s.title}"
 type: ${s.type || "cleanup"}
 severity: ${s.severity || "low"}
+risk: ${s.risk || "low"}
 file: ${s.file || "okänd"}
 status: pending
 created: ${today}
