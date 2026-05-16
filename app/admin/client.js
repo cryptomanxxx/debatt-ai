@@ -1349,6 +1349,7 @@ function AiStatistikTab() {
   const [newIds, setNewIds]     = useState(new Set());
   const latestTsRef             = useRef(null);
   const pollingRef              = useRef(false);
+  const scrollRef               = useRef(null);
 
   // Initial 7-day data load
   useEffect(() => {
@@ -1390,7 +1391,8 @@ function AiStatistikTab() {
             latestTsRef.current = fresh[0].ts;
             const ids = new Set(fresh.map(r => r.id));
             setNewIds(ids);
-            setTimeout(() => setNewIds(prev => { const next = new Set(prev); ids.forEach(id => next.delete(id)); return next; }), 3000);
+            setTimeout(() => setNewIds(prev => { const next = new Set(prev); ids.forEach(id => next.delete(id)); return next; }), 5000);
+            if (scrollRef.current) scrollRef.current.scrollTop = 0;
           }
           setLiveOk(true);
         }
@@ -1499,7 +1501,7 @@ function AiStatistikTab() {
             </span>
           </div>
         </div>
-        <div style={{
+        <div ref={scrollRef} style={{
           height: "340px", overflowY: "auto", fontFamily: "monospace", fontSize: "11px",
           background: "#050505", borderRadius: "4px", padding: "10px 14px",
         }}>
@@ -1507,16 +1509,18 @@ function AiStatistikTab() {
             ? <span style={{ color: C.textMuted }}>Inga anrop ännu…</span>
             : liveRows.map((r, i) => {
                 const d = new Date(r.ts);
-                const ts = d.toLocaleDateString("sv-SE") + " " + d.toLocaleTimeString("sv-SE");
+                const ts = d.toLocaleTimeString("sv-SE");
                 const provColor = ALL_PROVIDER_COLORS[r.provider] ?? C.text;
                 const srcColor  = SOURCE_COLORS_MAP[r.source] ?? "#888";
                 const isNew = newIds.has(r.id);
+                const num = liveRows.length - i;
                 return (
-                  <div key={r.id ?? i} style={{ display: "flex", gap: "8px", padding: "3px 0", borderBottom: "1px solid #111", borderLeft: isNew ? `2px solid ${C.green}` : "2px solid transparent", paddingLeft: isNew ? "6px" : "0", background: isNew ? "#0a1a0a" : "transparent", transition: "background 1s, border-left-color 1s" }}>
-                    <span style={{ color: "#555", flexShrink: 0, width: "138px" }}>{ts}</span>
+                  <div key={r.id ?? i} style={{ display: "flex", gap: "8px", padding: "4px 0", borderBottom: "1px solid #111", borderLeft: isNew ? `3px solid ${C.green}` : "3px solid transparent", paddingLeft: "6px", background: isNew ? "#061a06" : "transparent", transition: "background 2s, border-left-color 2s" }}>
+                    <span style={{ color: "#333", flexShrink: 0, width: "32px", textAlign: "right" }}>#{num}</span>
+                    <span style={{ color: isNew ? C.green : "#555", flexShrink: 0, width: "80px" }}>{ts}</span>
                     <span style={{ color: srcColor, flexShrink: 0, width: "104px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.source ?? "?"}</span>
                     <span style={{ color: provColor, flexShrink: 0, width: "76px" }}>{r.provider}</span>
-                    <span style={{ color: "#444", flexShrink: 0, maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.model ?? "–"}</span>
+                    <span style={{ color: "#444", flexShrink: 0, maxWidth: "130px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.model ?? "–"}</span>
                     <span style={{ color: r.status === "ok" ? C.green : C.red, flexShrink: 0, width: "60px" }}>{r.status}</span>
                     <span style={{ color: "#555" }}>{r.latency_ms != null ? `${r.latency_ms}ms` : ""}</span>
                   </div>
