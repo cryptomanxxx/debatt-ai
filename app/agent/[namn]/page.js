@@ -3,6 +3,7 @@ import AgentAvatar from "./AgentAvatar";
 import AgentFragaForm from "./AgentFragaForm";
 import AmnesPrenumerant from "../../artikel/[id]/AmnesPrenumerant";
 import { getAgentMood } from "../../lib/sinnesstamning";
+import KoalitionKnapp from "./KoalitionKnapp";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -303,6 +304,16 @@ async function getAgentMarketStats(namn) {
   return { ratta: ratta.length, totalt: resolved.length };
 }
 
+async function getAgentFoljare(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/koalitioner?agent=eq.${encodeURIComponent(namn)}&select=foljare`,
+    { headers: sbHeaders(), next: { revalidate: 60 } }
+  );
+  if (!res.ok) return 0;
+  const data = await res.json();
+  return data?.[0]?.foljare ?? 0;
+}
+
 async function getAgentStats(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&select=id,arg,ori,rel,tro`,
@@ -354,7 +365,7 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
@@ -362,6 +373,7 @@ export default async function AgentPage({ params }) {
     getAgentMarketStats(namn),
     getAgentActions(namn),
     getAgentFragor(namn),
+    getAgentFoljare(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -409,6 +421,9 @@ export default async function AgentPage({ params }) {
                 </span>
               </div>
               <AmnesPrenumerant taggar={[]} forfattare={namn} kallAi={true} />
+              <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #1a1a1a" }}>
+                <KoalitionKnapp agent={namn} initialFoljare={foljare} />
+              </div>
             </div>
           </div>
         </div>
