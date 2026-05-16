@@ -41,6 +41,7 @@ Konkret lösningsförslag.
 | `ai-bus/suggestions/` | Nytt från Codestral — väntar på granskning |
 | `ai-bus/approved/` | Godkänt av projektägaren — ska implementeras av Claude |
 | `ai-bus/implemented/` | Klart — arkiv |
+| `ai-bus/rejected/` | Avvisat — arkiv |
 | `ai-bus/tasks/` | Manuella uppgifter skapade av projektägaren |
 | `reports/bugs/` | Buggrapporter |
 | `reports/performance/` | Prestandarapporter |
