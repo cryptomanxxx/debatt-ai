@@ -60,7 +60,7 @@ def github_models_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
         raise Exception("GITHUB_TOKEN saknas")
     url = "https://models.inference.ai.azure.com/chat/completions"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    payload = {**json_payload, "model": json_payload.get("model", "gpt-4o-mini")}
+    payload = {**json_payload, "model": json_payload.get("model", "Llama-3.3-70B-Instruct")}
     r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
     r.raise_for_status()
     return r

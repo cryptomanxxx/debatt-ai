@@ -644,7 +644,7 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
                 svar_raw = gemini_post("", prompt, max_tokens=150).strip()
             except Exception:
                 try:
-                    svar_raw = github_models_post({**_market_payload, "model": "gpt-4o-mini"}).json()["choices"][0]["message"]["content"].strip()
+                    svar_raw = github_models_post({**_market_payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"].strip()
                 except Exception:
                     return False
         svar_raw = svar_raw.replace("```json", "").replace("```", "").strip()
@@ -822,7 +822,7 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "") -> tup
             text = gemini_post(system, user_msg, max_tokens=120)
         except Exception:
             try:
-                text = github_models_post({**_payload, "model": "gpt-4o-mini"}).json()["choices"][0]["message"]["content"].strip()
+                text = github_models_post({**_payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"].strip()
             except Exception:
                 return 50, "Ingen analys tillgänglig."
 

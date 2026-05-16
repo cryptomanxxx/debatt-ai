@@ -308,7 +308,7 @@ REGLER — viktiga:
     for (const [name, url, model, key] of [
       ["codestral",     "https://api.mistral.ai/v1/chat/completions",                    "codestral-latest", process.env.MISTRAL_API_KEY],
       ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",                   "llama3.1-8b",      process.env.CEREBRAS_API_KEY],
-      ["github_models", "https://models.inference.ai.azure.com/chat/completions",        "gpt-4o-mini",      process.env.GITHUB_TOKEN],
+      ["github_models", "https://models.inference.ai.azure.com/chat/completions",        "Llama-3.3-70B-Instruct", process.env.GITHUB_TOKEN],
     ]) {
       if (!key) continue;
       try {

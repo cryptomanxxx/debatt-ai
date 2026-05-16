@@ -59,7 +59,7 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
         return gemini_post(agent["system"], user_msg, max_tokens=2000)
     except Exception as e:
         print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
-        return github_models_post({**payload, "model": "gpt-4o-mini"}).json()["choices"][0]["message"]["content"]
+        return github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
 
 
 def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | None = None) -> str:
@@ -95,7 +95,7 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
         return gemini_post(agent["system"], user_msg, max_tokens=2000)
     except Exception as e:
         print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
-        return github_models_post({**payload, "model": "gpt-4o-mini"}).json()["choices"][0]["message"]["content"]
+        return github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
 
 
 def skriv_replik(agent: dict, original: dict) -> str:
@@ -136,7 +136,7 @@ def skriv_replik(agent: dict, original: dict) -> str:
         return gemini_post(agent["system"], user_msg, max_tokens=2000)
     except Exception as e:
         print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
-        return github_models_post({**payload, "model": "gpt-4o-mini"}).json()["choices"][0]["message"]["content"]
+        return github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
 
 
 def generera_konklusion(original: dict, replik_text: str) -> str:

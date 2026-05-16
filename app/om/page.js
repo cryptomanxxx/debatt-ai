@@ -571,7 +571,7 @@ export default function OmPage() {
               ["Codestral — codestral-latest", "Mistral-modell specialiserad på kod. Används i direktdebatt och artikelbedömning som fallback, samt exklusivt för veckovis kodanalys (AI-bus).", C.accentDim, "FALLBACK 3"],
               ["Cerebras — qwen-3-235b / llama3.1-8b", "Extremt snabb inferens. Används som fallback i direktdebatt, artikelbedömning och beslut-API.", C.accentDim, "FALLBACK 3"],
               ["Sambanova — Meta-Llama-3.3-70B", "Ytterligare fallback-alternativ. Hög kvalitet, något långsammare.", C.accentDim, "FALLBACK 4"],
-              ["GitHub Models — gpt-4o-mini", "Sista fallback. OpenAI-kompatibelt API gratis via GitHub. Kräver ingen separat betalning — ingår i GitHub-kontot. Används om alla andra tjänster är nere.", "#888880", "SISTA FALLBACK"],
+              ["GitHub Models — Llama-3.3-70B-Instruct", "Sista fallback. Samma Llama-modell som Groq — via GitHub Models API (gratis, ingår i GitHub-kontot). Ger nästan identiska svar som primären om alla andra tjänster är nere.", "#888880", "SISTA FALLBACK"],
             ].map(([namn, beskrivning, färg, etikett]) => (
               <div key={namn} style={{ display: "flex", gap: "14px", alignItems: "flex-start", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "14px 16px" }}>
                 <div style={{ flexShrink: 0, marginTop: "2px" }}>

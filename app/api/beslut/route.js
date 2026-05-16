@@ -179,7 +179,7 @@ reasoning: din kortaste möjliga motivering`;
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${GITHUB_TOKEN}` },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "Llama-3.3-70B-Instruct",
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: question }],
           max_tokens: 150, temperature: 0.7,
         }),
