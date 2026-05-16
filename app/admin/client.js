@@ -875,7 +875,6 @@ function MetricCard({ label, value, sub, color }) {
 }
 
 function MarketsTab() {
-  const [foreslagna, setForeslagna] = useState([]);
   const [oppna, setOppna]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [msg, setMsg]               = useState("");
@@ -885,44 +884,19 @@ function MarketsTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [fRes, oRes, bRes] = await Promise.all([
-      fetch(`${SB_URL}/rest/v1/markets?status=eq.f%C3%B6reslagen&order=skapad.desc`, { headers: sbHeaders() }),
-      fetch(`${SB_URL}/rest/v1/markets?status=eq.%C3%B6ppen&order=skapad.desc`,      { headers: sbHeaders() }),
-      fetch(`${SB_URL}/rest/v1/agent_bets?select=market_id`,                          { headers: sbHeaders() }),
+    const [oRes, bRes] = await Promise.all([
+      fetch(`${SB_URL}/rest/v1/markets?status=eq.%C3%B6ppen&order=skapad.desc`, { headers: sbHeaders() }),
+      fetch(`${SB_URL}/rest/v1/agent_bets?select=market_id`,                    { headers: sbHeaders() }),
     ]);
     const bets = bRes.ok ? await bRes.json() : [];
     const betCount = {};
     for (const b of bets) betCount[b.market_id] = (betCount[b.market_id] || 0) + 1;
-
     const withBets = arr => (arr || []).map(m => ({ ...m, betAntal: betCount[m.id] || 0 }));
-    setForeslagna(fRes.ok ? withBets(await fRes.json()) : []);
     setOppna(oRes.ok ? withBets(await oRes.json()) : []);
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  async function godkann(id) {
-    setMsg("");
-    const res = await fetch(`${SB_URL}/rest/v1/markets?id=eq.${id}`, {
-      method: "PATCH",
-      headers: { ...sbHeaders(), "Prefer": "return=minimal" },
-      body: JSON.stringify({ status: "öppen" }),
-    });
-    setMsg(res.ok ? "✓ Market godkänt och publicerat." : "✗ Fel vid godkännande.");
-    load();
-  }
-
-  async function avvisa(id) {
-    if (!window.confirm("Ta bort detta market-förslag?")) return;
-    setMsg("");
-    const res = await fetch(`${SB_URL}/rest/v1/markets?id=eq.${id}`, {
-      method: "DELETE",
-      headers: sbHeaders(),
-    });
-    setMsg(res.ok ? "✓ Förslag borttaget." : "✗ Fel vid borttagning.");
-    load();
-  }
 
   async function sparaMarket(id) {
     setMsg("");
@@ -940,95 +914,64 @@ function MarketsTab() {
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
         <p style={{ color:C.textMuted, fontSize:"14px", margin:0 }}>
-          Agenter föreslår prediction markets automatiskt. Godkänn för att publicera på /markets.
+          Agenter publicerar prediction markets automatiskt. Redigera titel eller beskrivning vid behov.
         </p>
         <button onClick={load} style={{ background:"transparent", color:C.textMuted, border:`1px solid ${C.border}`, borderRadius:"4px", padding:"6px 14px", cursor:"pointer", fontFamily:"Georgia, serif", fontSize:"13px" }}>↻</button>
       </div>
       {msg && <p style={{ color: msg.startsWith("✓") ? C.green : C.red, fontSize:"14px", marginBottom:"16px" }}>{msg}</p>}
       {loading && <p style={{ color:C.textMuted }}>Laddar…</p>}
-
-      {/* ── Öppna markets ─────────────────────────────────────────── */}
-      {!loading && oppna.length > 0 && (
-        <div style={{ marginBottom:"32px" }}>
-          <h3 style={{ color:C.accent, fontSize:"15px", fontWeight:400, margin:"0 0 16px 0", letterSpacing:"0.05em" }}>
-            Öppna markets ({oppna.length})
-          </h3>
-          {oppna.map(m => (
-            <div key={m.id} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"16px 20px", marginBottom:"12px" }}>
-              <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 8px 0" }}>
-                {m.kategori} · Deadline {m.deadline}
-              </p>
-              {editId === m.id ? (
-                <div style={{ marginBottom:"10px" }}>
-                  <input
-                    value={editTitel}
-                    onChange={e => setEditTitel(e.target.value)}
-                    placeholder="Titel"
-                    style={{ width:"100%", boxSizing:"border-box", background:"#111", border:`1px solid ${C.accent}60`, borderRadius:"4px", padding:"7px 10px", color:C.text, fontSize:"15px", fontFamily:"Georgia, serif", marginBottom:"8px" }}
-                  />
-                  <textarea
-                    value={editBeskrivning}
-                    onChange={e => setEditBeskrivning(e.target.value)}
-                    placeholder="Beskrivning (valfritt)"
-                    rows={2}
-                    style={{ width:"100%", boxSizing:"border-box", background:"#111", border:`1px solid ${C.border}`, borderRadius:"4px", padding:"7px 10px", color:C.textMuted, fontSize:"13px", fontFamily:"Georgia, serif", resize:"vertical", marginBottom:"8px" }}
-                  />
-                  <div style={{ display:"flex", gap:"8px" }}>
-                    <button onClick={() => sparaMarket(m.id)} style={{ background:"#052011", border:`1px solid ${C.green}50`, color:C.green, borderRadius:"4px", padding:"7px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
-                      Spara
-                    </button>
-                    <button onClick={() => setEditId(null)} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"7px 12px", fontSize:"13px", cursor:"pointer" }}>
-                      Avbryt
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display:"flex", alignItems:"flex-start", gap:"10px", marginBottom:"8px" }}>
-                  <div style={{ flex:1 }}>
-                    <p style={{ fontSize:"16px", color:C.accent, margin:"0 0 4px 0" }}>{m.titel}</p>
-                    {m.beskrivning && <p style={{ fontSize:"13px", color:C.textMuted, margin:0 }}>{m.beskrivning}</p>}
-                  </div>
-                  <button onClick={() => { setEditId(m.id); setEditTitel(m.titel); setEditBeskrivning(m.beskrivning || ""); }} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"4px 10px", fontSize:"12px", cursor:"pointer", flexShrink:0 }}>
-                    Redigera
-                  </button>
-                </div>
-              )}
-              <p style={{ color:C.textMuted, fontSize:"12px", fontFamily:"monospace", margin:0 }}>
-                {m.betAntal} bets · Skapad {new Date(m.skapad).toLocaleDateString("sv-SE")}
-              </p>
-            </div>
-          ))}
-        </div>
+      {!loading && oppna.length === 0 && (
+        <p style={{ color:C.textMuted, fontSize:"14px", fontStyle:"italic" }}>Inga öppna markets just nu.</p>
       )}
 
-      {/* ── Föreslagna markets ────────────────────────────────────── */}
-      <h3 style={{ color:C.textMuted, fontSize:"15px", fontWeight:400, margin:"0 0 16px 0", letterSpacing:"0.05em" }}>
-        Föreslagna ({foreslagna.length})
-      </h3>
-      {!loading && foreslagna.length === 0 && (
-        <p style={{ color:C.textMuted, fontSize:"14px", fontStyle:"italic" }}>Inga föreslagna markets just nu.</p>
-      )}
-      {foreslagna.map(m => (
-        <div key={m.id} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"20px", marginBottom:"16px" }}>
+      {oppna.map(m => (
+        <div key={m.id} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"16px 20px", marginBottom:"12px" }}>
           <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 8px 0" }}>
             {m.kategori} · Deadline {m.deadline}
           </p>
-          <p style={{ fontSize:"18px", color:C.accent, margin:"0 0 8px 0", fontWeight:400 }}>{m.titel}</p>
-          {m.beskrivning && <p style={{ color:C.textMuted, fontSize:"14px", lineHeight:1.6, margin:"0 0 8px 0" }}>{m.beskrivning}</p>}
-          {m.resolution_kalla && <p style={{ color:C.textMuted, fontSize:"13px", margin:"0 0 12px 0" }}>Källa: {m.resolution_kalla}</p>}
-          <p style={{ color:C.textMuted, fontSize:"12px", fontFamily:"monospace", margin:"0 0 16px 0" }}>
-            Föreslagen {new Date(m.skapad).toLocaleDateString("sv-SE")}
+          {editId === m.id ? (
+            <div style={{ marginBottom:"10px" }}>
+              <input
+                value={editTitel}
+                onChange={e => setEditTitel(e.target.value)}
+                placeholder="Titel"
+                style={{ width:"100%", boxSizing:"border-box", background:"#111", border:`1px solid ${C.accent}60`, borderRadius:"4px", padding:"7px 10px", color:C.text, fontSize:"15px", fontFamily:"Georgia, serif", marginBottom:"8px" }}
+              />
+              <textarea
+                value={editBeskrivning}
+                onChange={e => setEditBeskrivning(e.target.value)}
+                placeholder="Beskrivning (valfritt)"
+                rows={2}
+                style={{ width:"100%", boxSizing:"border-box", background:"#111", border:`1px solid ${C.border}`, borderRadius:"4px", padding:"7px 10px", color:C.textMuted, fontSize:"13px", fontFamily:"Georgia, serif", resize:"vertical", marginBottom:"8px" }}
+              />
+              <div style={{ display:"flex", gap:"8px" }}>
+                <button onClick={() => sparaMarket(m.id)} style={{ background:"#052011", border:`1px solid ${C.green}50`, color:C.green, borderRadius:"4px", padding:"7px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                  Spara
+                </button>
+                <button onClick={() => setEditId(null)} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"7px 12px", fontSize:"13px", cursor:"pointer" }}>
+                  Avbryt
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display:"flex", alignItems:"flex-start", gap:"10px", marginBottom:"8px" }}>
+              <div style={{ flex:1 }}>
+                <p style={{ fontSize:"16px", color:C.accent, margin:"0 0 4px 0" }}>{m.titel}</p>
+                {m.beskrivning && <p style={{ fontSize:"13px", color:C.textMuted, margin:0 }}>{m.beskrivning}</p>}
+              </div>
+              <button onClick={() => { setEditId(m.id); setEditTitel(m.titel); setEditBeskrivning(m.beskrivning || ""); }} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"4px 10px", fontSize:"12px", cursor:"pointer", flexShrink:0 }}>
+                Redigera
+              </button>
+            </div>
+          )}
+          <p style={{ color:C.textMuted, fontSize:"12px", fontFamily:"monospace", margin:0 }}>
+            {m.betAntal} bets · Skapad {new Date(m.skapad).toLocaleDateString("sv-SE")}
           </p>
-          <div style={{ display:"flex", gap:"10px" }}>
-            <button onClick={() => godkann(m.id)} style={{ background:"#052011", border:`1px solid ${C.green}50`, color:C.green, borderRadius:"4px", padding:"8px 18px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
-              ✓ Godkänn
-            </button>
-            <button onClick={() => avvisa(m.id)} style={{ background:"#200505", border:`1px solid ${C.red}50`, color:C.red, borderRadius:"4px", padding:"8px 18px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
-              ✗ Avvisa
-            </button>
-          </div>
         </div>
       ))}
+    </div>
+  );
+}
     </div>
   );
 }
