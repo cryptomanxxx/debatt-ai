@@ -879,8 +879,9 @@ function MarketsTab() {
   const [oppna, setOppna]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [msg, setMsg]               = useState("");
-  const [editId, setEditId]         = useState(null);
-  const [editTitel, setEditTitel]   = useState("");
+  const [editId, setEditId]               = useState(null);
+  const [editTitel, setEditTitel]         = useState("");
+  const [editBeskrivning, setEditBeskrivning] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -917,14 +918,14 @@ function MarketsTab() {
     load();
   }
 
-  async function sparaTitel(id) {
+  async function sparaMarket(id) {
     setMsg("");
     const res = await fetch(`${SB_URL}/rest/v1/markets?id=eq.${id}`, {
       method: "PATCH",
       headers: { ...sbHeaders(), "Prefer": "return=minimal" },
-      body: JSON.stringify({ titel: editTitel.trim() }),
+      body: JSON.stringify({ titel: editTitel.trim(), beskrivning: editBeskrivning.trim() || null }),
     });
-    setMsg(res.ok ? "✓ Titel uppdaterad." : "✗ Fel vid uppdatering.");
+    setMsg(res.ok ? "✓ Market uppdaterat." : "✗ Fel vid uppdatering.");
     setEditId(null);
     load();
   }
@@ -952,24 +953,37 @@ function MarketsTab() {
                 {m.kategori} · Deadline {m.deadline}
               </p>
               {editId === m.id ? (
-                <div style={{ display:"flex", gap:"8px", marginBottom:"10px" }}>
+                <div style={{ marginBottom:"10px" }}>
                   <input
                     value={editTitel}
                     onChange={e => setEditTitel(e.target.value)}
-                    style={{ flex:1, background:"#111", border:`1px solid ${C.accent}60`, borderRadius:"4px", padding:"7px 10px", color:C.text, fontSize:"15px", fontFamily:"Georgia, serif" }}
+                    placeholder="Titel"
+                    style={{ width:"100%", boxSizing:"border-box", background:"#111", border:`1px solid ${C.accent}60`, borderRadius:"4px", padding:"7px 10px", color:C.text, fontSize:"15px", fontFamily:"Georgia, serif", marginBottom:"8px" }}
                   />
-                  <button onClick={() => sparaTitel(m.id)} style={{ background:"#052011", border:`1px solid ${C.green}50`, color:C.green, borderRadius:"4px", padding:"7px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
-                    Spara
-                  </button>
-                  <button onClick={() => setEditId(null)} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"7px 12px", fontSize:"13px", cursor:"pointer" }}>
-                    Avbryt
-                  </button>
+                  <textarea
+                    value={editBeskrivning}
+                    onChange={e => setEditBeskrivning(e.target.value)}
+                    placeholder="Beskrivning (valfritt)"
+                    rows={2}
+                    style={{ width:"100%", boxSizing:"border-box", background:"#111", border:`1px solid ${C.border}`, borderRadius:"4px", padding:"7px 10px", color:C.textMuted, fontSize:"13px", fontFamily:"Georgia, serif", resize:"vertical", marginBottom:"8px" }}
+                  />
+                  <div style={{ display:"flex", gap:"8px" }}>
+                    <button onClick={() => sparaMarket(m.id)} style={{ background:"#052011", border:`1px solid ${C.green}50`, color:C.green, borderRadius:"4px", padding:"7px 14px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                      Spara
+                    </button>
+                    <button onClick={() => setEditId(null)} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"7px 12px", fontSize:"13px", cursor:"pointer" }}>
+                      Avbryt
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div style={{ display:"flex", alignItems:"flex-start", gap:"10px", marginBottom:"8px" }}>
-                  <p style={{ fontSize:"16px", color:C.accent, margin:0, flex:1 }}>{m.titel}</p>
-                  <button onClick={() => { setEditId(m.id); setEditTitel(m.titel); }} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"4px 10px", fontSize:"12px", cursor:"pointer", flexShrink:0 }}>
-                    Redigera titel
+                  <div style={{ flex:1 }}>
+                    <p style={{ fontSize:"16px", color:C.accent, margin:"0 0 4px 0" }}>{m.titel}</p>
+                    {m.beskrivning && <p style={{ fontSize:"13px", color:C.textMuted, margin:0 }}>{m.beskrivning}</p>}
+                  </div>
+                  <button onClick={() => { setEditId(m.id); setEditTitel(m.titel); setEditBeskrivning(m.beskrivning || ""); }} style={{ background:"transparent", border:`1px solid ${C.border}`, color:C.textMuted, borderRadius:"4px", padding:"4px 10px", fontSize:"12px", cursor:"pointer", flexShrink:0 }}>
+                    Redigera
                   </button>
                 </div>
               )}
