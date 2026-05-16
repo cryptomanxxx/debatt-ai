@@ -59,16 +59,29 @@ def hamta_kryptodata() -> str:
         return ""
 
 
-def hamta_youtube_nyheter() -> list:
-    """Hämtar senaste video från YouTube-kanaler via RSS. Transkript försöks men beskrivning används som fallback."""
-    try:
-        from youtube_transcript_api import YouTubeTranscriptApi
-        yt_api = YouTubeTranscriptApi()
-        transkript_tillgangligt = True
-    except ImportError:
-        yt_api = None
-        transkript_tillgangligt = False
+_VERCEL_URL = os.getenv("VERCEL_URL", "https://www.debatt-ai.se")
+_YT_SECRET  = os.getenv("YOUTUBE_PROXY_SECRET", "")
 
+
+def _hamta_transkript_via_vercel(video_id: str) -> str:
+    """Hämtar YouTube-transkript via Vercel-proxy (undviker GitHub Actions IP-blockering)."""
+    try:
+        url = f"{_VERCEL_URL}/api/youtube-transcript?video_id={video_id}"
+        headers = {}
+        if _YT_SECRET:
+            headers["x-proxy-secret"] = _YT_SECRET
+        res = httpx.get(url, timeout=15, headers=headers)
+        if res.status_code == 200:
+            return res.json().get("transcript", "")
+        print(f"  ✗ Vercel transcript proxy HTTP {res.status_code} för {video_id}", file=sys.stderr)
+        return ""
+    except Exception as e:
+        print(f"  ✗ Vercel transcript proxy fel ({video_id}): {type(e).__name__}", file=sys.stderr)
+        return ""
+
+
+def hamta_youtube_nyheter() -> list:
+    """Hämtar senaste video från YouTube-kanaler via RSS. Transkript hämtas via Vercel-proxy."""
     nyheter = []
     fjorton_dagar_sedan = datetime.now(timezone.utc) - timedelta(days=14)
     ns = {
@@ -119,21 +132,17 @@ def hamta_youtube_nyheter() -> list:
                     if desc_el is not None and desc_el.text:
                         rss_beskrivning = desc_el.text.strip()[:1500]
 
-                # OBS: GitHub Actions IPs blockeras av YouTube (RequestsBlocked) — fallback till beskrivning
-                innehall = ""
-                if transkript_tillgangligt and yt_api:
-                    try:
-                        fetched = yt_api.fetch(video_id, languages=["sv", "en", "en-US", "en-GB"])
-                        innehall = "[YouTube-transkript] " + " ".join(t.text for t in fetched)[:2000].strip()
-                        transkript_ok += 1
-                    except Exception as te:
-                        transkript_fel += 1
-                        print(f"  ✗ YouTube transkript {kanal_namn} ({video_id}): {type(te).__name__}", file=sys.stderr)
-
-                if not innehall and rss_beskrivning:
+                # Hämta transkript via Vercel-proxy (undviker GitHub Actions IP-block)
+                transkript = _hamta_transkript_via_vercel(video_id)
+                if transkript:
+                    innehall = "[YouTube-transkript] " + transkript[:2000]
+                    transkript_ok += 1
+                elif rss_beskrivning:
                     innehall = "[YouTube-beskrivning] " + rss_beskrivning
-                elif not innehall:
+                    transkript_fel += 1
+                else:
                     innehall = titel
+                    transkript_fel += 1
 
                 nyheter.append({
                     "rubrik": titel,
@@ -148,7 +157,7 @@ def hamta_youtube_nyheter() -> list:
             print(f"  ✗ YouTube RSS {kanal_namn}: {type(e).__name__}", file=sys.stderr)
             continue
 
-    print(f"  YouTube: {rss_ok} RSS ok / {rss_blockad} blockade — {transkript_ok} transkript / {transkript_fel} misslyckade")
+    print(f"  YouTube: {rss_ok} RSS ok / {rss_blockad} blockade — {transkript_ok} transkript / {transkript_fel} utan transkript")
     return nyheter
 
 
