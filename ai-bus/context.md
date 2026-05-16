@@ -13,24 +13,16 @@ Stack: Next.js App Router, Supabase, Groq (primär AI), Gemini Flash (fallback),
 
 ---
 
-## Senaste sessionen (2026-05-15)
+## Senaste sessionen (2026-05-16)
 
 **Vad som gjordes:**
-- Fixade Annas mun-animation på `/kanal` — `useEffect` + `setInterval` för att faktiskt animera `mouthIdx`
-- Fixade halvöppna ögon under tal — `anna-small/medium/large.png` är open-eye mouth frames
-- Tog bort gamla ögon-crop-bilder som blinkade på skärmen (`anna-eyes-half.png` etc.)
-- Justerade animationen: bara m0↔m1 (220ms), inte alla 4 frames
-- Mindre waveform-stapel (höjd 20px), större TV-skärm (440px)
-- `objectPosition: "center top"` för att stoppa huvudbobbing
-- Session IDs (`sessionRef`) för race conditions
-- Explicit `expandStatus: idle|loading|done|failed` istället för `item.text !== item.rubrik`
-- Felloggar i alla catch-block
-- Stabil `key`-prop i kölistans map
+- Centraliserad fellogg: ny Supabase-tabell `fel_log` + `logFel()`-funktion i `app/lib/logFel.js`
+- `logFel`-anrop i kanal/expand, kanal/batch-expand, kanal/batch-rubriker, chatt, agent/submit
+- `FellogTab` i admin-panelen: färgkodad tabell (gul=rate_limit, orange=ai_fail, blå=rss_fail, lila=db-fel, röd=server-fel), filter per feltyp, sammanfattningskort, senaste 7 dagarna
 
 **Varför vi valde dessa lösningar:**
-- Session IDs är enklare än AbortController för detta use case — 3 rader löser 70% av async-buggarna
-- `expandStatus` som explicit state är klarare än rubrik-som-proxy
-- Vi refaktorerade INTE till XState/useReducer/separata hooks — för komplext för ett soloprojekt
+- Fire-and-forget (`.catch(() => {})`) — samma mönster som `logAiCall`, påverkar inte request-flödet
+- Separata kolumner (kalla, feltyp, meddelande, ip, extra) — enkelt att filtrera i admin utan att parsa JSON
 
 ---
 
@@ -40,7 +32,7 @@ Stack: Next.js App Router, Supabase, Groq (primär AI), Gemini Flash (fallback),
 - **XState eller Zustand** — overkill för projektet
 - **p-queue/bottleneck** — `await sleep()` fungerar tillräckligt bra
 - **Server-side förrenderade MP3-filer** — intressant långsiktigt men inte nu
-- **Feature-branches** — jobba alltid direkt på `main`
+- **Feature-branches** — jobba alltid direkt på `main`. Claude Code-proxyn blockerar push till `main` om sessionen startas på en feature-branch. Begär alltid sessioner utan feature-branch så att `main` är målet från start.
 
 ---
 
