@@ -26,7 +26,7 @@ import urllib.parse
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 
-from ai_klient import groq_post, gemini_post
+from ai_klient import groq_post, gemini_post, github_models_post
 from agenter import OPINION_FRAGOR
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
@@ -631,19 +631,22 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
             '{"titel": "Kort fråga max 15 ord?", "beskrivning": "En kontextmening.", "resolution_kalla": "Källnamn"}'
         )
         svar_raw = ""
+        _market_payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 150,
+            "temperature": 0.85,
+        }
         try:
-            r = groq_post({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 150,
-                "temperature": 0.85,
-            })
-            svar_raw = r.json()["choices"][0]["message"]["content"].strip()
+            svar_raw = groq_post(_market_payload).json()["choices"][0]["message"]["content"].strip()
         except Exception:
             try:
                 svar_raw = gemini_post("", prompt, max_tokens=150).strip()
             except Exception:
-                return False
+                try:
+                    svar_raw = github_models_post({**_market_payload, "model": "gpt-4o-mini"}).json()["choices"][0]["message"]["content"].strip()
+                except Exception:
+                    return False
         svar_raw = svar_raw.replace("```json", "").replace("```", "").strip()
         parsed = json.loads(svar_raw)
         titel = parsed.get("titel", "").strip()
@@ -806,18 +809,22 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "") -> tup
         "\nSvara EXAKT i detta JSON-format (inget annat):\n"
         '{"sannolikhet": <heltal 0-100>, "motivering": "<1-2 meningar>"}'
     )
+    _payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
+        "max_tokens": 120,
+        "temperature": 0.4,
+    }
     try:
-        text = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
-            "max_tokens": 120,
-            "temperature": 0.4,
-        }).json()["choices"][0]["message"]["content"].strip()
+        text = groq_post(_payload).json()["choices"][0]["message"]["content"].strip()
     except Exception:
         try:
             text = gemini_post(system, user_msg, max_tokens=120)
         except Exception:
-            return 50, "Ingen analys tillgänglig."
+            try:
+                text = github_models_post({**_payload, "model": "gpt-4o-mini"}).json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                return 50, "Ingen analys tillgänglig."
 
     start = text.find("{")
     end = text.rfind("}") + 1

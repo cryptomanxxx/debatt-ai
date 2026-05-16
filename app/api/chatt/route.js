@@ -59,11 +59,12 @@ function consumeRateLimit(ip) {
 
 // ── Provider health state (per Edge isolate, best-effort) ────────────────────────────────────────
 const ps = {
-  groq:      { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
-  gemini:    { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
-  or:        { ts: 0, status: "unknown" },
-  codestral: { ts: 0, status: "unknown" },
-  cerebras:  { ts: 0, status: "unknown" },
+  groq:          { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
+  gemini:        { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
+  or:            { ts: 0, status: "unknown" },
+  codestral:     { ts: 0, status: "unknown" },
+  cerebras:      { ts: 0, status: "unknown" },
+  github_models: { ts: 0, status: "unknown" },
 };
 
 function groqReady() {
@@ -74,11 +75,12 @@ function groqReady() {
 // GET /api/chatt — returns provider health for the admin dashboard
 export async function GET() {
   return Response.json({
-    groq:      { ...ps.groq,      keySet: !!process.env.GROQ_API_KEY },
-    gemini:    { ...ps.gemini,    keySet: !!process.env.GEMINI_API_KEY },
-    or:        { ...ps.or,        keySet: !!process.env.OPENROUTER_API_KEY },
-    codestral: { ...ps.codestral, keySet: !!process.env.MISTRAL_API_KEY },
-    cerebras:  { ...ps.cerebras,  keySet: !!process.env.CEREBRAS_API_KEY },
+    groq:          { ...ps.groq,          keySet: !!process.env.GROQ_API_KEY },
+    gemini:        { ...ps.gemini,        keySet: !!process.env.GEMINI_API_KEY },
+    or:            { ...ps.or,            keySet: !!process.env.OPENROUTER_API_KEY },
+    codestral:     { ...ps.codestral,     keySet: !!process.env.MISTRAL_API_KEY },
+    cerebras:      { ...ps.cerebras,      keySet: !!process.env.CEREBRAS_API_KEY },
+    github_models: { ...ps.github_models, keySet: !!process.env.GITHUB_TOKEN },
     ts: Date.now(),
   });
 }
@@ -304,8 +306,9 @@ REGLER — viktiga:
       { role: "user", content: userMessage },
     ];
     for (const [name, url, model, key] of [
-      ["codestral", "https://api.mistral.ai/v1/chat/completions", "codestral-latest", process.env.MISTRAL_API_KEY],
-      ["cerebras",  "https://api.cerebras.ai/v1/chat/completions", "llama3.1-8b",     process.env.CEREBRAS_API_KEY],
+      ["codestral",     "https://api.mistral.ai/v1/chat/completions",                    "codestral-latest", process.env.MISTRAL_API_KEY],
+      ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",                   "llama3.1-8b",      process.env.CEREBRAS_API_KEY],
+      ["github_models", "https://models.inference.ai.azure.com/chat/completions",        "gpt-4o-mini",      process.env.GITHUB_TOKEN],
     ]) {
       if (!key) continue;
       try {

@@ -4,6 +4,7 @@ const GROQ_KEY     = process.env.GROQ_API_KEY;
 const GEMINI_KEY   = process.env.GEMINI_API_KEY;
 const MISTRAL_KEY  = process.env.MISTRAL_API_KEY;
 const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
 const PERSONLIGHETER = {
   "Nationalekonom":       "nationalekonom med doktorsexamen. Analyserar ur kostnads- och incitamentsperspektiv. Konkret och kylig.",
@@ -159,6 +160,26 @@ reasoning: din kortaste möjliga motivering`;
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${CEREBRAS_KEY}` },
         body: JSON.stringify({
           model: "llama3.1-8b",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: question }],
+          max_tokens: 150, temperature: 0.7,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const parsed = extractJSON(data.choices?.[0]?.message?.content ?? "");
+        if (parsed?.stance && typeof parsed.probability === "number")
+          return { agent, ...parsed };
+      }
+    } catch {}
+  }
+
+  if (GITHUB_TOKEN) {
+    try {
+      const res = await fetch("https://models.inference.ai.azure.com/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${GITHUB_TOKEN}` },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: question }],
           max_tokens: 150, temperature: 0.7,
         }),

@@ -2,9 +2,10 @@ import { logFel } from "../../../lib/logFel";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const GROQ_KEY     = process.env.GROQ_API_KEY;
-const MISTRAL_KEY  = process.env.MISTRAL_API_KEY;
-const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
+const GROQ_KEY        = process.env.GROQ_API_KEY;
+const MISTRAL_KEY     = process.env.MISTRAL_API_KEY;
+const CEREBRAS_KEY    = process.env.CEREBRAS_API_KEY;
+const GITHUB_TOKEN    = process.env.GITHUB_TOKEN;
 const RATE_LIMIT = 10; // max inlämningar per agent per 24h
 const MIN_WORDS = 150;
 
@@ -199,8 +200,9 @@ export async function POST(req) {
     let evalResult = null;
 
     for (const [name, url, model, key] of [
-      ["codestral", "https://api.mistral.ai/v1/chat/completions", "codestral-latest", MISTRAL_KEY],
-      ["cerebras",  "https://api.cerebras.ai/v1/chat/completions", "llama3.1-8b",     CEREBRAS_KEY],
+      ["codestral",     "https://api.mistral.ai/v1/chat/completions",             "codestral-latest", MISTRAL_KEY],
+      ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",            "llama3.1-8b",      CEREBRAS_KEY],
+      ["github_models", "https://models.inference.ai.azure.com/chat/completions", "gpt-4o-mini",      GITHUB_TOKEN],
     ]) {
       if (!key || evalResult) continue;
       try {
