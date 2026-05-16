@@ -972,9 +972,6 @@ function MarketsTab() {
     </div>
   );
 }
-    </div>
-  );
-}
 
 function BeslutApiTab() {
   const [stats, setStats]     = useState(null);
