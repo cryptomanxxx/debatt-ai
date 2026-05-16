@@ -158,6 +158,15 @@ async function fetchSenasteAgentFragor() {
   return res.json();
 }
 
+async function fetchSenasteUtmaningar() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_utmaningar?order=skapad.desc&limit=3&select=agent,tes,motargument,skapad`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
 async function fetchSenasteReplik() {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?rubrik=like.Replik%3A*&order=skapad.desc&limit=1&select=id,rubrik,forfattare,skapad`,
@@ -543,6 +552,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [opinionWidget, setOpinionWidget] = useState({ fragor: [], rosterData: {} });
   const [opinionVoted, setOpinionVoted] = useState({});
   const [agentFragor, setAgentFragor] = useState([]);
+  const [agentUtmaningar, setAgentUtmaningar] = useState([]);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -619,6 +629,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
     fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
     fetchSenasteAgentFragor().then(d => setAgentFragor(d)).catch(() => {});
+    fetchSenasteUtmaningar().then(d => setAgentUtmaningar(d)).catch(() => {});
     // Opinion-widget: hämta röstdata och välj 3 slumpvisa frågor
     const WIDGET_FRAGOR = [
       { fraga: "Ska AI få fatta juridiska beslut?", kategori: "ai-tech" },
@@ -1144,6 +1155,40 @@ export default function DebattClient({ initialArticleCount = null }) {
                       </p>
                     </a>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Senaste utmaningar mot agenter */}
+            {agentUtmaningar.length > 0 && (
+              <div style={{ marginBottom:"32px" }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"14px" }}>
+                  <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:0, fontFamily:"Georgia, serif" }}>
+                    Senaste läsarutmaningar
+                  </p>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                  {agentUtmaningar.map((u, i) => {
+                    const av = agentVisuell(u.agent);
+                    const farg = av?.ikonFarg || "#aaaaaa";
+                    return (
+                      <a key={i} href={`/agent/${encodeURIComponent(u.agent)}`} style={{ display:"block", background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", overflow:"hidden", textDecoration:"none" }}>
+                        {/* Tes */}
+                        <div style={{ padding:"12px 16px", background:`${farg}08`, borderBottom:`1px solid ${farg}18` }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"6px" }}>
+                            <span style={{ fontSize:"10px", color:farg, fontFamily:"monospace", fontWeight:700, letterSpacing:"0.1em" }}>UTMANING → {u.agent.toUpperCase()}</span>
+                          </div>
+                          <p style={{ color:"#aaaaaa", fontSize:"13px", margin:0, fontStyle:"italic" }}>"{u.tes.length > 120 ? u.tes.slice(0,120)+"…" : u.tes}"</p>
+                        </div>
+                        {/* Motargument */}
+                        <div style={{ padding:"12px 16px" }}>
+                          <p style={{ color:C.text, fontSize:"13px", lineHeight:1.65, margin:0 }}>
+                            {u.motargument.length > 180 ? u.motargument.slice(0,180)+"…" : u.motargument}
+                          </p>
+                        </div>
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             )}
