@@ -115,21 +115,40 @@ async function fetchRuntimeData() {
     return null;
   }
   const since = new Date(Date.now() - DAYS_BACK * 86400_000).toISOString();
-  const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
-  try {
-    const [aiRes, felRes, artRes] = await Promise.all([
-      fetch(`${SUPABASE_URL}/rest/v1/ai_log?select=provider,status,latency_ms&skapad=gte.${since}&limit=2000`, { headers }),
-      fetch(`${SUPABASE_URL}/rest/v1/fel_log?select=kalla,feltyp,meddelande,skapad&skapad=gte.${since}&order=skapad.desc&limit=100`, { headers }),
-      fetch(`${SUPABASE_URL}/rest/v1/artiklar?select=id&skapad=gte.${since}`, { headers: { ...headers, "Prefer": "count=exact", "Range": "0-0" } }),
-    ]);
-    const aiRows          = aiRes.ok  ? await aiRes.json()  : [];
-    const felRows         = felRes.ok ? await felRes.json() : [];
-    const articlesCount   = artRes.ok ? parseInt(artRes.headers.get("content-range")?.split("/")[1] || "0") : 0;
-    return { aiRows, felRows, articlesCount };
-  } catch (e) {
-    console.warn("Kunde inte hämta runtime-data:", e.message);
-    return null;
+  const h  = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+  const SB = SUPABASE_URL;
+
+  async function sb(path) {
+    try {
+      const r = await fetch(`${SB}/rest/v1/${path}`, { headers: h });
+      return r.ok ? r.json() : [];
+    } catch { return []; }
   }
+
+  const [
+    aiRows, felRows, artRows, chattRows,
+    opinionRows, betRows, prenRows, beslutRows,
+    fragaRows, forslagRows, inlamRows, nyhetsRows,
+  ] = await Promise.all([
+    sb(`ai_log?select=provider,status,latency_ms,source&skapad=gte.${since}&limit=2000`),
+    sb(`fel_log?select=kalla,feltyp,meddelande,skapad&skapad=gte.${since}&order=skapad.desc&limit=100`),
+    sb(`artiklar?select=forfattare,parent_id,arg,ori,rel,tro&skapad=gte.${since}&limit=500`),
+    sb(`chatt_debatter?select=id,inlagg&skapad=gte.${since}&limit=200`),
+    sb(`opinion_roster?select=roster_ja,roster_nej&limit=500`),
+    sb(`agent_bets?select=id&skapad=gte.${since}&limit=500`),
+    sb(`prenumeranter?select=id&aktiv=eq.true&skapad=gte.${since}&limit=200`),
+    sb(`beslut_log?select=ip&skapad=gte.${since}&limit=1000`),
+    sb(`agent_fragor?select=id,offentlig&skapad=gte.${since}&limit=500`),
+    sb(`amnesforslag?select=id,behandlad&skapad=gte.${since}&limit=200`),
+    sb(`inlamningar?select=status&skapad=gte.${since}&limit=300`),
+    sb(`nyhetslog?select=antal&skapad=gte.${since}&limit=300`),
+  ]);
+
+  return {
+    aiRows, felRows, artRows, chattRows,
+    opinionRows, betRows, prenRows, beslutRows,
+    fragaRows, forslagRows, inlamRows, nyhetsRows,
+  };
 }
 
 // ── Veckovis metrics-snapshot ──────────────────────────────────────────────
@@ -143,63 +162,126 @@ function getISOWeek() {
   return `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
+function avg(arr) {
+  return arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
+}
+
 function countDir(dir) {
   try { return fs.readdirSync(dir).filter(f => f.endsWith(".md")).length; } catch { return 0; }
 }
 
 function saveWeeklySnapshot(data) {
   if (!data) return null;
-  const { aiRows, felRows, articlesCount } = data;
+  const {
+    aiRows, felRows, artRows, chattRows,
+    opinionRows, betRows, prenRows, beslutRows,
+    fragaRows, forslagRows, inlamRows, nyhetsRows,
+  } = data;
 
+  // ── AI providers ──
   const providers = ["groq", "gemini", "codestral", "cerebras", "openrouter", "sambanova"];
-  const ai = {};
+  const ai_providers = {};
   for (const p of providers) {
     const rows = aiRows.filter(r => r.provider === p);
     if (!rows.length) continue;
-    const ok      = rows.filter(r => r.status === "ok").length;
-    const rl      = rows.filter(r => r.status === "rate_limited").length;
-    const err     = rows.filter(r => r.status === "error").length;
-    const tout    = rows.filter(r => r.status === "timeout").length;
-    const latencies = rows.filter(r => r.latency_ms).map(r => r.latency_ms);
-    const avg_latency_ms = latencies.length
-      ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
-      : null;
-    ai[p] = { ok, rate_limited: rl, error: err, timeout: tout, avg_latency_ms };
+    ai_providers[p] = {
+      ok:           rows.filter(r => r.status === "ok").length,
+      rate_limited: rows.filter(r => r.status === "rate_limited").length,
+      error:        rows.filter(r => r.status === "error").length,
+      timeout:      rows.filter(r => r.status === "timeout").length,
+      avg_latency_ms: avg(rows.filter(r => r.latency_ms).map(r => r.latency_ms)),
+    };
   }
 
+  // ── Artiklar ──
+  const repliker    = artRows.filter(r => r.parent_id).length;
+  const originala   = artRows.length - repliker;
+  const scores      = artRows.map(r => ((r.arg||0)+(r.ori||0)+(r.rel||0)+(r.tro||0))/4).filter(s => s > 0);
+  const agentCount  = {};
+  for (const r of artRows) agentCount[r.forfattare] = (agentCount[r.forfattare] || 0) + 1;
+  const topAgent    = Object.entries(agentCount).sort((a,b) => b[1]-a[1])[0] || null;
+
+  // ── Direktdebatter ──
+  const debattLangder = chattRows.map(r => {
+    try { return Array.isArray(r.inlagg) ? r.inlagg.length : JSON.parse(r.inlagg || "[]").length; } catch { return 0; }
+  }).filter(n => n > 0);
+
+  // ── Opinion ──
+  const opinionTotalJa  = opinionRows.reduce((s, r) => s + (r.roster_ja  || 0), 0);
+  const opinionTotalNej = opinionRows.reduce((s, r) => s + (r.roster_nej || 0), 0);
+
+  // ── Nyhetslogg ──
+  const nyhetsAntal = nyhetsRows.map(r => r.antal || 0).filter(n => n > 0);
+
+  // ── Inlämningar ──
+  const humanPubl = inlamRows.filter(r => r.status === "publicerad").length;
+  const humanAvv  = inlamRows.filter(r => r.status === "avvisad").length;
+
+  // ── Delta mot förra veckan ──
   const week     = getISOWeek();
   const filename = `${week}.json`;
   const filepath = path.join(REPORTS_DIR, filename);
-
-  // Load previous snapshot for delta
   let prevSnapshot = null;
   try {
     const files = fs.readdirSync(REPORTS_DIR).filter(f => f.endsWith(".json")).sort();
-    if (files.length > 0 && files[files.length - 1] !== filename) {
+    if (files.length > 0 && files[files.length - 1] !== filename)
       prevSnapshot = JSON.parse(fs.readFileSync(path.join(REPORTS_DIR, files[files.length - 1]), "utf8"));
-    }
   } catch {}
 
-  const totalRateLimited = Object.values(ai).reduce((s, p) => s + (p.rate_limited || 0), 0);
-  const prevRateLimited  = prevSnapshot
-    ? Object.values(prevSnapshot.ai_providers || {}).reduce((s, p) => s + (p.rate_limited || 0), 0)
-    : null;
+  const totalRateLimited = Object.values(ai_providers).reduce((s, p) => s + (p.rate_limited || 0), 0);
+  const prev = prevSnapshot || {};
 
   const snapshot = {
     week,
     generated: new Date().toISOString(),
-    ai_providers: ai,
-    critical_errors: felRows.length,
-    articles_published: articlesCount,
-    suggestions: {
+
+    ai_providers,
+
+    plattform: {
+      artiklar_publicerade:  artRows.length,
+      artiklar_originala:    originala,
+      artiklar_repliker:     repliker,
+      replik_ratio_pct:      artRows.length ? Math.round(repliker / artRows.length * 100) : 0,
+      genomsnittlig_score:   avg(scores),
+      mest_aktiv_agent:      topAgent ? { agent: topAgent[0], antal: topAgent[1] } : null,
+
+      direktdebatter:        chattRows.length,
+      avg_debatt_langd:      avg(debattLangder),
+
+      nyhetskanal_korningar: aiRows.filter(r => r.source === "kanal" && r.status === "ok").length,
+      nyheter_utvärderade:   avg(nyhetsAntal),
+
+      opinion_roster_ja:     opinionTotalJa,
+      opinion_roster_nej:    opinionTotalNej,
+
+      prediction_bets:       betRows.length,
+      nya_prenumeranter:     prenRows.length,
+      api_anrop:             beslutRows.length,
+      api_unika_anvandare:   new Set(beslutRows.map(r => r.ip).filter(Boolean)).size,
+      agent_fragor:          fragaRows.length,
+      agent_fragor_offentliga: fragaRows.filter(r => r.offentlig).length,
+      amnesforslag:          forslagRows.length,
+
+      inlamningar_publicerade: humanPubl,
+      inlamningar_avvisade:    humanAvv,
+    },
+
+    kritiska_fel: felRows.length,
+
+    ai_bus: {
       pending:     countDir(path.join(__dirname, "../ai-bus/suggestions")),
       implemented: countDir(path.join(__dirname, "../ai-bus/implemented")),
       rejected:    countDir(path.join(__dirname, "../ai-bus/rejected")),
     },
+
     vs_prev_week: prevSnapshot ? {
-      rate_limited_delta:     totalRateLimited - prevRateLimited,
-      critical_errors_delta:  felRows.length - (prevSnapshot.critical_errors || 0),
-      articles_delta:         articlesCount - (prevSnapshot.articles_published || 0),
+      rate_limited_delta:     totalRateLimited - Object.values(prev.ai_providers || {}).reduce((s,p) => s+(p.rate_limited||0), 0),
+      kritiska_fel_delta:     felRows.length         - (prev.kritiska_fel || 0),
+      artiklar_delta:         artRows.length         - (prev.plattform?.artiklar_publicerade || 0),
+      direktdebatter_delta:   chattRows.length       - (prev.plattform?.direktdebatter || 0),
+      prenumeranter_delta:    prenRows.length        - (prev.plattform?.nya_prenumeranter || 0),
+      api_anrop_delta:        beslutRows.length      - (prev.plattform?.api_anrop || 0),
+      agent_fragor_delta:     fragaRows.length       - (prev.plattform?.agent_fragor || 0),
     } : null,
   };
 
@@ -208,9 +290,11 @@ function saveWeeklySnapshot(data) {
   return filename;
 }
 
+// ── Runtime-sammanfattning för Codestral-prompten ─────────────────────────
+
 function buildRuntimeSummary(data) {
   if (!data) return "";
-  const { aiRows, felRows } = data;
+  const { aiRows, felRows, artRows, chattRows, beslutRows, fragaRows } = data;
 
   const counts = {};
   for (const r of aiRows) {
@@ -219,22 +303,29 @@ function buildRuntimeSummary(data) {
   }
 
   const lines = ["=== Runtime-data senaste 7 dagarna ==="];
+
   const providers = ["groq", "gemini", "codestral", "cerebras", "openrouter", "sambanova"];
   for (const p of providers) {
-    const ok    = counts[`${p}:ok`]           || 0;
-    const rl    = counts[`${p}:rate_limited`] || 0;
-    const err   = counts[`${p}:error`]        || 0;
-    const tout  = counts[`${p}:timeout`]      || 0;
-    if (ok + rl + err + tout > 0)
-      lines.push(`${p}: ${ok} ok, ${rl} rate-limited, ${err} fel, ${tout} timeout`);
+    const ok  = counts[`${p}:ok`]           || 0;
+    const rl  = counts[`${p}:rate_limited`] || 0;
+    const err = counts[`${p}:error`]        || 0;
+    const to  = counts[`${p}:timeout`]      || 0;
+    if (ok + rl + err + to > 0)
+      lines.push(`${p}: ${ok} ok, ${rl} rate-limited, ${err} fel, ${to} timeout`);
   }
 
+  const repliker = artRows.filter(r => r.parent_id).length;
+  lines.push(`\nArtiklar: ${artRows.length} (${repliker} repliker, ${artRows.length - repliker} originala)`);
+  lines.push(`Direktdebatter: ${chattRows.length}`);
+  lines.push(`API-anrop (beslut): ${beslutRows.length}`);
+  lines.push(`Agent-frågor: ${fragaRows.length}`);
+
   if (felRows.length > 0) {
-    lines.push(`\nKritiska fel (fel_log): ${felRows.length} st`);
+    lines.push(`\nKritiska fel: ${felRows.length} st`);
     for (const r of felRows.slice(0, 5))
       lines.push(`  - [${r.feltyp}] ${r.kalla}: ${r.meddelande || ""}`);
   } else {
-    lines.push("\nKritiska fel (fel_log): inga");
+    lines.push("\nKritiska fel: inga");
   }
 
   return lines.join("\n");
