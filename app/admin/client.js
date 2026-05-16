@@ -1346,6 +1346,7 @@ function AiStatistikTab() {
   const [error, setError]       = useState("");
   const [liveRows, setLiveRows] = useState([]);
   const [liveOk, setLiveOk]     = useState(false);
+  const [newIds, setNewIds]     = useState(new Set());
   const latestTsRef             = useRef(null);
   const pollingRef              = useRef(false);
 
@@ -1387,6 +1388,9 @@ function AiStatistikTab() {
           if (fresh.length > 0) {
             setLiveRows(prev => [...fresh, ...prev].slice(0, 300));
             latestTsRef.current = fresh[0].ts;
+            const ids = new Set(fresh.map(r => r.id));
+            setNewIds(ids);
+            setTimeout(() => setNewIds(prev => { const next = new Set(prev); ids.forEach(id => next.delete(id)); return next; }), 3000);
           }
           setLiveOk(true);
         }
@@ -1506,8 +1510,9 @@ function AiStatistikTab() {
                 const ts = d.toLocaleDateString("sv-SE") + " " + d.toLocaleTimeString("sv-SE");
                 const provColor = ALL_PROVIDER_COLORS[r.provider] ?? C.text;
                 const srcColor  = SOURCE_COLORS_MAP[r.source] ?? "#888";
+                const isNew = newIds.has(r.id);
                 return (
-                  <div key={r.id ?? i} style={{ display: "flex", gap: "8px", padding: "3px 0", borderBottom: "1px solid #111" }}>
+                  <div key={r.id ?? i} style={{ display: "flex", gap: "8px", padding: "3px 0", borderBottom: "1px solid #111", borderLeft: isNew ? `2px solid ${C.green}` : "2px solid transparent", paddingLeft: isNew ? "6px" : "0", background: isNew ? "#0a1a0a" : "transparent", transition: "background 1s, border-left-color 1s" }}>
                     <span style={{ color: "#555", flexShrink: 0, width: "138px" }}>{ts}</span>
                     <span style={{ color: srcColor, flexShrink: 0, width: "104px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.source ?? "?"}</span>
                     <span style={{ color: provColor, flexShrink: 0, width: "76px" }}>{r.provider}</span>
