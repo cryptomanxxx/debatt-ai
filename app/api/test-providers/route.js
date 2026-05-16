@@ -161,7 +161,7 @@ async function testCodestral() {
   const model = "codestral-latest";
   const t0 = Date.now();
   try {
-    const r = await fetch("https://codestral.mistral.ai/v1/chat/completions", {
+    const r = await fetch("https://api.mistral.ai/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model, messages: makeMessages("Codestral"), max_tokens: 30 }),
