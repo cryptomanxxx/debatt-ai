@@ -228,7 +228,8 @@ function saveWeeklySnapshot(data) {
   const opinionTotalNej = opinionRows.reduce((s, r) => s + (r.roster_nej || 0), 0);
 
   // ── Nyhetslogg ──
-  const nyhetsAntal = nyhetsRows.map(r => r.antal || 0).filter(n => n > 0);
+  const nyhetsKorningar = nyhetsRows.length;
+  const nyhetsAntal     = nyhetsRows.map(r => r.antal || 0).filter(n => n > 0);
 
   // ── Inlämningar ──
   const humanPubl = inlamRows.filter(r => r.status === "publicerad").length;
@@ -265,8 +266,8 @@ function saveWeeklySnapshot(data) {
       direktdebatter:        chattRows.length,
       avg_debatt_langd:      avg(debattLangder),
 
-      nyhetskanal_korningar: aiRows.filter(r => r.source === "kanal" && r.status === "ok").length,
-      nyheter_utvärderade:   avg(nyhetsAntal),
+      nyhetskanal_korningar:       nyhetsKorningar,
+      nyheter_utvärderade_snitt:   avg(nyhetsAntal),
 
       opinion_roster_ja:     opinionTotalJa,
       opinion_roster_nej:    opinionTotalNej,
@@ -355,6 +356,11 @@ async function analyzeWithCodestral(codeBlock, runtimeSummary) {
 Du får både källkod och runtime-statistik från produktionsmiljön.
 Använd runtime-datan för att prioritera verkliga problem framför hypotetiska.
 
+Projektets faktiska filer (ange ENBART dessa i "file"-fältet):
+Python: agent.py, agenter.py, ai_klient.py, artikel.py, nyheter.py, supabase_utils.py, kanal_debatt.py, backtest.py, backtest_fetch.py, data_agent.py
+JS API-routes: app/api/agent/submit/route.js, app/api/chatt/route.js, app/api/beslut/route.js, app/api/agent-fraga/route.js, app/api/opinion-stats/route.js, app/api/youtube-transcript/route.js
+JS övrigt: app/admin/client.js, app/agentData.js, agents/codestral-worker.js
+
 Svara ENDAST med ett JSON-objekt (inga andra tecken):
 {
   "suggestions": [
@@ -372,7 +378,7 @@ Svara ENDAST med ett JSON-objekt (inga andra tecken):
 Regler:
 - Max 5 förslag per analys — prioritera det viktigaste
 - Enbart konkreta, actionable förslag — inga luddiga "förbättra felhantering"
-- Ange alltid vilken fil problemet gäller
+- Ange ALLTID en fil från listan ovan — hitta aldrig på filnamn
 - Om runtime-data visar återkommande fel, prioritera dessa
 - Om du inte hittar något viktigt, returnera suggestions: []`;
 
