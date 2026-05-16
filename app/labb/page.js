@@ -168,6 +168,7 @@ export default function LabbPage() {
             cursor: loading || amne.trim().length < 5 ? "default" : "pointer",
             fontFamily: "Georgia, serif", opacity: amne.trim().length < 5 ? 0.5 : 1,
             transition: "background 0.15s", marginBottom: "24px",
+            pointerEvents: loading ? "none" : "auto",
           }}
         >
           {loading ? "Genererar…" : "Generera debattinlägg →"}
