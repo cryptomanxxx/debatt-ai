@@ -1213,6 +1213,133 @@ function MatningTab() {
 const AI_COLORS = { groq: "#4a9eff", gemini: "#4ade80", openrouter: "#f8954d", cerebras: "#a78bfa", sambanova: "#fb923c", none: "#f87171" };
 const GROQ_DAILY_LIMIT = 100_000;
 
+// ── FellogTab ─────────────────────────────────────────────────────────────────
+const FEL_FARG = {
+  rate_limit:    "#f59e0b",
+  ai_fail:       "#f97316",
+  rss_fail:      "#60a0d8",
+  supabase_fail: "#a78bfa",
+  server_error:  "#f87171",
+};
+const FEL_ETIKETT = {
+  rate_limit:    "RATE LIMIT",
+  ai_fail:       "AI-FEL",
+  rss_fail:      "RSS-FEL",
+  supabase_fail: "DB-FEL",
+  server_error:  "SERVER-FEL",
+};
+
+function FellogTab() {
+  const [rows, setRows]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState("");
+  const [filter, setFilter]   = useState("alla");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const r = await fetch(
+        `${SB_URL}/rest/v1/fel_log?select=*&skapad=gte.${since}&order=skapad.desc&limit=500`,
+        { headers: sbHeaders() }
+      );
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setRows(await r.json());
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <p style={{ color: C.textMuted }}>Laddar…</p>;
+  if (error)   return (
+    <div>
+      <p style={{ color: C.red }}>Fel: {error}</p>
+      <p style={{ color: C.textMuted, fontSize: "13px" }}>
+        Om tabellen inte finns ännu: kör <code style={{ color: C.accent }}>supabase_fel_log.sql</code> i Supabase SQL Editor.
+      </p>
+    </div>
+  );
+  if (!rows) return null;
+
+  const feltyper = ["alla", "rate_limit", "ai_fail", "rss_fail", "supabase_fail", "server_error"];
+  const filtered = filter === "alla" ? rows : rows.filter(r => r.feltyp === filter);
+
+  // Summary counts per type
+  const counts = {};
+  for (const r of rows) counts[r.feltyp] = (counts[r.feltyp] ?? 0) + 1;
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: "12px", marginBottom: "24px", flexWrap: "wrap" }}>
+        {Object.entries(counts).length === 0
+          ? <p style={{ color: C.textMuted, fontSize: "14px" }}>Inga fel loggade senaste 7 dagarna.</p>
+          : Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([typ, n]) => (
+            <div key={typ} style={{ background: C.surface, border: `1px solid ${FEL_FARG[typ] ?? C.border}30`, borderRadius: "8px", padding: "12px 20px", minWidth: "120px" }}>
+              <p style={{ fontSize: "22px", fontWeight: 400, color: FEL_FARG[typ] ?? C.text, margin: "0 0 2px", fontFamily: "monospace" }}>{n}</p>
+              <p style={{ fontSize: "11px", color: C.textMuted, margin: 0, letterSpacing: "0.08em" }}>{FEL_ETIKETT[typ] ?? typ}</p>
+            </div>
+          ))
+        }
+      </div>
+
+      <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
+        {feltyper.map(t => (
+          <button key={t} onClick={() => setFilter(t)} style={{
+            background: filter === t ? `${C.accent}15` : "transparent",
+            border: `1px solid ${filter === t ? C.accentDim : C.border}`,
+            color: filter === t ? C.accent : C.textMuted,
+            padding: "6px 14px", borderRadius: "4px", cursor: "pointer", fontSize: "12px", fontFamily: "monospace",
+          }}>
+            {t === "alla" ? `Alla (${rows.length})` : `${FEL_ETIKETT[t] ?? t} (${counts[t] ?? 0})`}
+          </button>
+        ))}
+        <button onClick={load} style={{ marginLeft: "auto", background: "transparent", color: C.textMuted, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "6px 14px", cursor: "pointer", fontSize: "12px", fontFamily: "monospace" }}>↻ Uppdatera</button>
+      </div>
+
+      {filtered.length === 0
+        ? <p style={{ color: C.textMuted, fontSize: "14px" }}>Inga träffar.</p>
+        : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", fontFamily: "monospace" }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                  {["Tidpunkt", "Typ", "Källa", "Meddelande", "IP", "Extra"].map(h => (
+                    <th key={h} style={{ textAlign: "left", padding: "6px 10px", color: C.textMuted, fontWeight: 400, whiteSpace: "nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(r => (
+                  <tr key={r.id} style={{ borderBottom: `1px solid ${C.border}20` }}>
+                    <td style={{ padding: "7px 10px", color: C.textMuted, whiteSpace: "nowrap" }}>
+                      {new Date(r.skapad).toLocaleString("sv-SE", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                    </td>
+                    <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}>
+                      <span style={{ color: FEL_FARG[r.feltyp] ?? C.text, fontWeight: 500 }}>
+                        {FEL_ETIKETT[r.feltyp] ?? r.feltyp}
+                      </span>
+                    </td>
+                    <td style={{ padding: "7px 10px", color: C.text }}>{r.kalla}</td>
+                    <td style={{ padding: "7px 10px", color: C.textMuted, maxWidth: "280px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        title={r.meddelande ?? ""}>{r.meddelande ?? "—"}</td>
+                    <td style={{ padding: "7px 10px", color: C.textMuted }}>{r.ip ?? "—"}</td>
+                    <td style={{ padding: "7px 10px", color: C.textMuted, maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                        title={r.extra ? JSON.stringify(r.extra) : ""}>{r.extra ? JSON.stringify(r.extra) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </div>
+  );
+}
+
 function AiStatistikTab() {
   const [rows, setRows]         = useState(null);
   const [loading, setLoading]   = useState(true);
@@ -1797,6 +1924,7 @@ export default function AdminClient() {
             ["api-status","API-status"],
             ["beslut-api","Decision API"],
             ["ai-statistik","AI-statistik"],
+            ["fellog","Fellog"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
               {lbl}
@@ -2012,6 +2140,9 @@ export default function AdminClient() {
 
         {/* ── AI-STATISTIK ── */}
         {mainTab === "ai-statistik" && <AiStatistikTab />}
+
+        {/* ── FELLOG ── */}
+        {mainTab === "fellog" && <FellogTab />}
 
         {/* ── NYHETSBREV ── */}
         {mainTab === "nyhetsbrev" && (
