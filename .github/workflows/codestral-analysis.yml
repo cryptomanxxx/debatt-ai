@@ -1,0 +1,48 @@
+name: Codestral Code Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      days_back:
+        description: "Antal dagar bakåt att analysera (default: 7)"
+        required: false
+        default: "7"
+      max_files:
+        description: "Max antal filer att analysera (default: 15)"
+        required: false
+        default: "15"
+  schedule:
+    # Varje måndag kl 09:00 UTC (11:00 svensk tid)
+    - cron: "0 9 * * 1"
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 50  # Behövs för git log
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run Codestral analysis
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          DAYS_BACK: ${{ github.event.inputs.days_back || '7' }}
+          MAX_FILES: ${{ github.event.inputs.max_files || '15' }}
+        run: node agents/codestral-worker.js
+
+      - name: Commit suggestions
+        run: |
+          git config user.name "Codestral Bot"
+          git config user.email "noreply@debatt-ai.se"
+          git add ai-bus/suggestions/
+          git diff --cached --quiet || git commit -m "chore: Codestral-förslag $(date +%Y-%m-%d)"
+          git push
