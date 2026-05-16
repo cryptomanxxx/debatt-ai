@@ -10,15 +10,13 @@ created: 2026-05-16
 
 ## Problem
 
-Gemini API-anrop saknar felhantering för nätverksfel och timeout. Om anropet misslyckas kommer det att kasta ett undantag direkt utan någon försök att återförsöka.
+gemini_post() misslyckas inte korrekt när alla modeller misslyckas. Detta kan leda till osynliga fel för användare.
 
 ## Föreslagen lösning
 
-Lägg till felhantering för nätverksfel och timeout i gemini_post-funktionen. Exempel:
-try:
-    r = httpx.post(url, json=payload, headers=headers, timeout=timeout)
-except httpx.RequestError as e:
-    raise Exception(f"Gemini API-anrop misslyckades: {str(e)}")
+Lägg till explicit felhantering för alla misslyckade modeller och logga felmeddelande med detaljer. Exempel:
+
+raise Exception(f"Gemini misslyckades för alla modeller: {last_err}")
 
 ## Åtgärd
 
