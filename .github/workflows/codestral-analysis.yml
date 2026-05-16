@@ -35,6 +35,7 @@ jobs:
       - name: Run Codestral analysis
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           DAYS_BACK: ${{ github.event.inputs.days_back || '7' }}
           MAX_FILES: ${{ github.event.inputs.max_files || '15' }}
         run: node agents/codestral-worker.js
