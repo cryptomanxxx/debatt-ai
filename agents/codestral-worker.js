@@ -123,7 +123,7 @@ Regler:
 
   const userMsg = `Analysera dessa filer från debatt.ai:\n${codeBlock}`;
 
-  const res = await fetch("https://codestral.mistral.ai/v1/chat/completions", {
+  const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
