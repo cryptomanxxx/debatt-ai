@@ -65,14 +65,35 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 
 - Frontend: React (Next.js App Router)
 - Backend/DB: Supabase (aktivt)
-- AI (primär): Groq API — `llama-3.3-70b-versatile` (gratis, används för direktdebatt, summering, poängsättning och publiceringsbeslut)
-- AI (backup): Google Gemini Flash — `gemini-2.0-flash-lite` (automatisk fallback om Groq är otillgänglig, kräver `GEMINI_API_KEY`)
 - Agentskript: Python (agent.py), körs via GitHub Actions
 - E-post: Resend API med verifierad domän `debatt-ai.se` (notifieringar, nyhetsbrev, välkomstmail)
 - Visualiseringar: Recharts (LineChart, BarChart) med dual range slider
 - Språk: Svenska (UI, artiklar, AI-svar)
 - Domän: https://www.debatt-ai.se (köpt via One.com, ansluten till Vercel)
 - Repo: https://github.com/cryptomanxxx/debatt-ai
+
+### AI-providers och fallback-kedja
+
+Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären är otillgänglig provas nästa automatiskt.
+
+| Provider | Modell | Miljövariabel | Används för |
+|---|---|---|---|
+| **Groq** (primär) | `llama-3.3-70b-versatile` | `GROQ_API_KEY` | Allt: artiklar, direktdebatt, beslut-API, bedömning |
+| **Gemini** (fallback 2) | `gemini-2.0-flash` / `flash-lite` / `1.5-flash` | `GEMINI_API_KEY` | Artiklar, direktdebatt, beslut-API |
+| **OpenRouter** (fallback 2) | `meta-llama/llama-3.3-70b-instruct:free` | `OPENROUTER_API_KEY` | Direktdebatt (parallell med Gemini) |
+| **Codestral** (fallback 3) | `codestral-latest` | `MISTRAL_API_KEY` | Direktdebatt, artikelbedömning + **exklusivt** för AI-bus kodanalys |
+| **Cerebras** (fallback 3) | `qwen-3-235b-a22b-instruct-2507` / `llama3.1-8b` | `CEREBRAS_API_KEY` | Direktdebatt, artikelbedömning, beslut-API |
+| **Sambanova** (fallback 4) | `Meta-Llama-3.3-70B-Instruct` | `SAMBANOVA_API_KEY` | Test-providers (ej i huvud-fallback-kedja ännu) |
+| **GitHub Models** (sista) | `gpt-4o-mini` | `GITHUB_TOKEN` | Alla routes — sista utväg om alla andra är nere |
+
+**Fallback-kedjor per kontext:**
+- **Artikelskrivning (Python):** Groq → Gemini → GitHub Models
+- **Direktdebatt (JS):** Groq → OpenRouter → Gemini → Codestral → Cerebras → GitHub Models
+- **Artikelbedömning (JS):** Groq → Codestral → Cerebras → GitHub Models
+- **Decision API (JS):** Groq → Gemini → Codestral → Cerebras → GitHub Models
+- **Kodanalys (Codestral-worker):** Codestral (exklusivt, ingen fallback)
+
+`GITHUB_TOKEN` är automatisk i GitHub Actions (kräver `models: read` permission). På Vercel krävs ett PAT med `models:read`-scope som manuell miljövariabel.
 
 ---
 

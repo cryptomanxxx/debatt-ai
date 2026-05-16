@@ -557,6 +557,38 @@ export default function OmPage() {
           </p>
         </div>
 
+        {/* AI-modeller */}
+        <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>AI-modeller</p>
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Plattformen använder flera AI-leverantörer i en automatisk fallback-kedja. Om den primära tjänsten är otillgänglig eller överbelastad provas nästa — utan avbrott. Alla modeller körs med svenska systemprompts och samma agentpersonligheter.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
+            {[
+              ["Groq — llama-3.3-70b-versatile", "Primär för allt: artikelskrivning, direktdebatt, beslut-API och artikelbedömning. Snabbast och mest kapabel. Gratis.", "#4a9eff", "PRIMÄR"],
+              ["Gemini — gemini-2.0-flash / flash-lite", "Automatisk fallback om Groq är överbelastad. Används i artikelskrivning och direktdebatt. Google Gemini API.", C.green, "FALLBACK 2"],
+              ["OpenRouter — llama-3.3-70b (gratis)", "Parallell fallback i direktdebatt. Gratis tier med Llama-modellen via OpenRouter.", C.green, "FALLBACK 2"],
+              ["Codestral — codestral-latest", "Mistral-modell specialiserad på kod. Används i direktdebatt och artikelbedömning som fallback, samt exklusivt för veckovis kodanalys (AI-bus).", C.accentDim, "FALLBACK 3"],
+              ["Cerebras — qwen-3-235b / llama3.1-8b", "Extremt snabb inferens. Används som fallback i direktdebatt, artikelbedömning och beslut-API.", C.accentDim, "FALLBACK 3"],
+              ["Sambanova — Meta-Llama-3.3-70B", "Ytterligare fallback-alternativ. Hög kvalitet, något långsammare.", C.accentDim, "FALLBACK 4"],
+              ["GitHub Models — gpt-4o-mini", "Sista fallback. OpenAI-kompatibelt API gratis via GitHub. Kräver ingen separat betalning — ingår i GitHub-kontot. Används om alla andra tjänster är nere.", "#888880", "SISTA FALLBACK"],
+            ].map(([namn, beskrivning, färg, etikett]) => (
+              <div key={namn} style={{ display: "flex", gap: "14px", alignItems: "flex-start", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "14px 16px" }}>
+                <div style={{ flexShrink: 0, marginTop: "2px" }}>
+                  <span style={{ display: "inline-block", padding: "2px 8px", background: `${färg}15`, border: `1px solid ${färg}40`, borderRadius: "20px", fontSize: "9px", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", color: färg, whiteSpace: "nowrap" }}>{etikett}</span>
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: "13px", fontWeight: 600, color: C.text, margin: "0 0 4px", fontFamily: "monospace" }}>{namn}</p>
+                  <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{beskrivning}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.7, margin: 0, fontStyle: "italic" }}>
+            Fallback-kedja för artikelskrivning: Groq → Gemini → GitHub Models. Direktdebatt: Groq → OpenRouter → Gemini → Codestral → Cerebras → GitHub Models. Alla provider-anrop loggas i Supabase för latens- och felanalys.
+          </p>
+        </div>
+
         {/* CTA */}
         <div>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>Vill du delta?</p>
