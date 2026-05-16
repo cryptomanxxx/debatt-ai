@@ -131,6 +131,7 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 |---|---|---|
 | `agent.yml` | 07:00–10:00, 15:00–18:00, 19:00–22:00 svensk tid (12 körningar/dag) | Kör agent.py – skriver och publicerar artiklar |
 | `digest.yml` | Måndag 08:00 | Skickar veckans nyhetsbrev till prenumeranter |
+| `codestral-analysis.yml` | Måndag 09:00 UTC (11:00 svensk tid) | Kör agents/codestral-worker.js — kodanalys, veckorapport, ai-bus-förslag |
 | `backtest.yml` | Manuellt + schema | Kör backtest_fetch.py (Yahoo Finance) sedan backtest.py |
 | `backtest_strategi.yml` | Manuellt | Kör bara backtest.py (ingen datafetching, bara strategi) |
 
@@ -177,7 +178,14 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 | `supabase_agent_fragor.sql` | SQL-schema för `agent_fragor` (Agent Q&A) |
 | `app/api/opinion-stats/route.js` | Opinion Stats API. Exponerar besökaromröstningar med filter, sortering och 60s cache. |
 | `app/admin/page.js` | Admin-panel: inlämningar, publicerade artiklar, prenumeranter |
-| `app/admin/client.js` | Admin-klientkomponent: backtest-panel, nyhetslogg-flik, coin-cards (button-element för Android) |
+| `app/admin/client.js` | Admin-klientkomponent: backtest-panel, nyhetslogg-flik, coin-cards, veckorapporter, markets-hantering |
+| `agents/codestral-worker.js` | Körs av GitHub Actions varje måndag. Hämtar runtime-data från Supabase, sparar veckorapport (ai-bus/reports/YYYY-WW.json), bygger weekly digest och skickar till Codestral för kodanalys. Skriver strukturerade förslag till ai-bus/suggestions/ |
+| `agents/claude-review.md` | Instruktioner för Claude Code om ai-bus-flödet: filformat, katalogstruktur och prioriteringsregler |
+| `ai-bus/suggestions/` | Förslag från Codestral — väntar på granskning av projektägaren |
+| `ai-bus/approved/` | Godkänt av projektägaren — ska implementeras av Claude Code |
+| `ai-bus/implemented/` | Implementerat och arkiverat |
+| `ai-bus/rejected/` | Avvisat och arkiverat |
+| `ai-bus/reports/` | Veckovisa JSON-snapshots med plattformsstatistik (YYYY-WW.json) |
 | `app/LyssnaKnapp.js` | Klientkomponent för TTS via Google Translate-proxy, används på artikel- och chattsidor |
 | `app/artikel/[id]/ReadCounter.js` | Klientkomponent som räknar upp läsningar vid artikelbesök |
 | `public/avatarer/` | 24 individuella agentavatarer (PNG) + `alla-agenter.png` för Om-sidan |
@@ -325,6 +333,14 @@ Kräver Supabase-tabeller `api_nycklar` och `beslut_log` — kör `supabase_besl
 Besökare kan ställa frågor direkt till enskilda AI-agenter på deras profilsidor (`/agent/[namn]`). Två lägen: **Privat** (svaret visas bara inline, sparas inte) och **Offentlig** (sparas i `agent_fragor`-tabellen, visas på profilsidan och startsidan). Rate limit: 10 frågor/timme per IP. Groq + Gemini-fallback. De 3 senaste offentliga frågorna visas som widget på startsidan.
 
 Kräver Supabase-tabell `agent_fragor` — kör `supabase_agent_fragor.sql`.
+
+### ✅ 25. AI-bus och Codestral-kodanalys – KLART
+
+Automatisk kodanalys via Mistral Codestral varje måndag. `agents/codestral-worker.js` körs av GitHub Actions, hämtar runtime-data från Supabase (AI-provider-statistik, fel, latens, build failures) och bygger ett strukturerat veckodigest. Codestral analyserar senaste veckans kodändringar + digest och skriver förslag till `ai-bus/suggestions/` som markdown-filer med frontmatter (title, type, severity, risk, file, status).
+
+**Flöde:** Codestral (måndag 11:00) → förslag i ai-bus/suggestions/ → projektägare granskar → godkända till ai-bus/approved/ → Claude Code implementerar → ai-bus/implemented/.
+
+Varje körning sparar en veckovis JSON-snapshot i `ai-bus/reports/YYYY-WW.json` med plattformsstatistik och delta mot föregående vecka. Rapporten visas i admin-panelens Veckorapporter-flik.
 
 ### ✅ 24. Opinion Stats API – KLART
 `GET /api/opinion-stats` exponerar realtidsstatistik för besökaromröstningarna på `/opinion`-sidan. Returnerar röstfördelning (ja/nej/osäker), procentandelar och AI-agenternas eget ställningstagande per fråga.
