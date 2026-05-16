@@ -1214,6 +1214,89 @@ function MatningTab() {
 const AI_COLORS = { groq: "#4a9eff", gemini: "#4ade80", openrouter: "#f8954d", cerebras: "#a78bfa", sambanova: "#fb923c", none: "#f87171" };
 const GROQ_DAILY_LIMIT = 100_000;
 
+// ── VeckorapporterTab ─────────────────────────────────────────────────────────
+
+function delta(n) {
+  if (n == null || n === 0) return <span style={{ color: C.textMuted }}>–</span>;
+  return n > 0
+    ? <span style={{ color: C.green }}>+{n} ↑</span>
+    : <span style={{ color: C.red }}>{n} ↓</span>;
+}
+
+function VeckorapporterTab() {
+  const [reports, setReports] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/reports")
+      .then(r => r.json())
+      .then(d => { setReports(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p style={{ color: C.textMuted }}>Laddar rapporter…</p>;
+  if (!reports?.length) return <p style={{ color: C.textMuted }}>Inga rapporter ännu. Kör Codestral via GitHub Actions för att generera den första.</p>;
+
+  const rowStyle = { borderBottom: `1px solid ${C.border}`, padding: "12px 8px", fontSize: 13 };
+  const hdStyle  = { ...rowStyle, color: C.accentDim, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace" };
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 18, fontWeight: 400, color: C.accent, marginBottom: 24 }}>Veckorapporter — AI-bus</h2>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              {["Vecka","Artiklar","Δ","Repliker%","Snittpoäng","Debatter","Nyhetskanal","Prenumeranter","API-anrop","Kritiska fel","Impl.","Rej."].map(h => (
+                <th key={h} style={hdStyle}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {reports.map(r => {
+              const p   = r.plattform || {};
+              const vs  = r.vs_prev_week;
+              const bus = r.ai_bus || {};
+              return (
+                <tr key={r.week} style={{ background: "transparent" }}>
+                  <td style={{ ...rowStyle, color: C.accent, fontFamily: "monospace", whiteSpace: "nowrap" }}>{r.week}</td>
+                  <td style={rowStyle}>{p.artiklar_publicerade ?? "–"}</td>
+                  <td style={rowStyle}>{delta(vs?.artiklar_delta)}</td>
+                  <td style={rowStyle}>{p.replik_ratio_pct != null ? `${p.replik_ratio_pct}%` : "–"}</td>
+                  <td style={rowStyle}>{p.genomsnittlig_score ?? "–"}</td>
+                  <td style={rowStyle}>{p.direktdebatter ?? "–"}</td>
+                  <td style={rowStyle}>{p.nyhetskanal_korningar ?? "–"}</td>
+                  <td style={rowStyle}>{p.nya_prenumeranter ?? "–"}</td>
+                  <td style={rowStyle}>{p.api_anrop ?? "–"}</td>
+                  <td style={{ ...rowStyle, color: r.kritiska_fel > 0 ? C.red : C.green }}>{r.kritiska_fel ?? "–"}</td>
+                  <td style={{ ...rowStyle, color: C.green }}>{bus.implemented ?? "–"}</td>
+                  <td style={{ ...rowStyle, color: C.textMuted }}>{bus.rejected ?? "–"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ marginTop: 32 }}>
+        <h3 style={{ fontSize: 14, color: C.accentDim, marginBottom: 16, fontFamily: "monospace", textTransform: "uppercase" }}>AI-providers senaste veckan</h3>
+        {reports[0] && Object.entries(reports[0].ai_providers || {}).map(([name, p]) => (
+          <div key={name} style={{ display: "flex", gap: 16, alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+            <span style={{ width: 100, color: C.text, fontFamily: "monospace", fontSize: 13 }}>{name}</span>
+            <span style={{ color: C.green, fontSize: 13 }}>✓ {p.ok} ok</span>
+            {p.rate_limited > 0 && <span style={{ color: C.yellow, fontSize: 13 }}>⚡ {p.rate_limited} rate-limited</span>}
+            {p.error > 0       && <span style={{ color: C.red,    fontSize: 13 }}>✗ {p.error} fel</span>}
+            {p.avg_latency_ms  && <span style={{ color: C.textMuted, fontSize: 12 }}>{p.avg_latency_ms}ms snitt</span>}
+          </div>
+        ))}
+        {!Object.keys(reports[0]?.ai_providers || {}).length && (
+          <p style={{ color: C.textMuted, fontSize: 13 }}>AI-providerdata saknas (ai_log byggs upp gradvis).</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── FellogTab ─────────────────────────────────────────────────────────────────
 const FEL_FARG = {
   rate_limit:    "#f59e0b",
@@ -1935,6 +2018,7 @@ export default function AdminClient() {
             ["beslut-api","Decision API"],
             ["ai-statistik","AI-statistik"],
             ["fellog","Fellog"],
+            ["rapporter","Veckorapporter"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
               {lbl}
@@ -2153,6 +2237,9 @@ export default function AdminClient() {
 
         {/* ── FELLOG ── */}
         {mainTab === "fellog" && <FellogTab />}
+
+        {/* ── VECKORAPPORTER ── */}
+        {mainTab === "rapporter" && <VeckorapporterTab />}
 
         {/* ── NYHETSBREV ── */}
         {mainTab === "nyhetsbrev" && (

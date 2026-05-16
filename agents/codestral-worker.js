@@ -308,43 +308,61 @@ function saveWeeklySnapshot(data) {
   return filename;
 }
 
-// ── Runtime-sammanfattning för Codestral-prompten ─────────────────────────
+// ── Weekly digest för Codestral-prompten ─────────────────────────────────
 
 function buildRuntimeSummary(data) {
   if (!data) return "";
-  const { aiRows, felRows, artRows, chattRows, beslutRows, fragaRows } = data;
+  const { aiRows, felRows, artRows, chattRows, beslutRows, fragaRows, nyhetsRows, prenRows } = data;
 
-  const counts = {};
-  for (const r of aiRows) {
-    const key = `${r.provider}:${r.status}`;
-    counts[key] = (counts[key] || 0) + 1;
-  }
+  const week = getISOWeek();
+  const lines = [`# Weekly Digest ${week} — debatt.ai`];
 
-  const lines = ["=== Runtime-data senaste 7 dagarna ==="];
-
+  // ── AI-providers ──
+  lines.push("\n## AI-providers (senaste 7 dagarna)");
+  lines.push("| Provider | OK | Rate-limited | Fel | Snitt-latens |");
+  lines.push("|---|---|---|---|---|");
   const providers = ["groq", "gemini", "codestral", "cerebras", "openrouter", "sambanova"];
   for (const p of providers) {
-    const ok  = counts[`${p}:ok`]           || 0;
-    const rl  = counts[`${p}:rate_limited`] || 0;
-    const err = counts[`${p}:error`]        || 0;
-    const to  = counts[`${p}:timeout`]      || 0;
-    if (ok + rl + err + to > 0)
-      lines.push(`${p}: ${ok} ok, ${rl} rate-limited, ${err} fel, ${to} timeout`);
+    const rows = aiRows.filter(r => r.provider === p);
+    if (!rows.length) continue;
+    const ok  = rows.filter(r => r.status === "ok").length;
+    const rl  = rows.filter(r => r.status === "rate_limited").length;
+    const err = rows.filter(r => r.status === "error").length;
+    const lats = rows.filter(r => r.latency_ms).map(r => r.latency_ms);
+    const lat = lats.length ? `${Math.round(lats.reduce((a,b)=>a+b,0)/lats.length)}ms` : "–";
+    lines.push(`| ${p} | ${ok} | ${rl} | ${err} | ${lat} |`);
   }
 
-  const repliker = artRows.filter(r => r.parent_id).length;
-  lines.push(`\nArtiklar: ${artRows.length} (${repliker} repliker, ${artRows.length - repliker} originala)`);
-  lines.push(`Direktdebatter: ${chattRows.length}`);
-  lines.push(`API-anrop (beslut): ${beslutRows.length}`);
-  lines.push(`Agent-frågor: ${fragaRows.length}`);
+  // ── Top problem: rate limits ──
+  const topRL = providers
+    .map(p => ({ p, n: aiRows.filter(r => r.provider === p && r.status === "rate_limited").length }))
+    .filter(x => x.n > 0)
+    .sort((a,b) => b.n - a.n);
+  if (topRL.length) {
+    lines.push(`\n**Mest rate-limitad:** ${topRL[0].p} (${topRL[0].n} gånger)`);
+  }
 
-  if (felRows.length > 0) {
-    lines.push(`\nKritiska fel: ${felRows.length} st`);
-    for (const r of felRows.slice(0, 5))
-      lines.push(`  - [${r.feltyp}] ${r.kalla}: ${r.meddelande || ""}`);
+  // ── Kritiska fel ──
+  lines.push("\n## Kritiska fel (fel_log)");
+  if (felRows.length === 0) {
+    lines.push("Inga kritiska fel denna vecka. ✓");
   } else {
-    lines.push("\nKritiska fel: inga");
+    lines.push(`${felRows.length} kritiska fel:`);
+    for (const r of felRows.slice(0, 5))
+      lines.push(`- [${r.feltyp}] ${r.kalla}: ${r.meddelande || ""}`);
   }
+
+  // ── Plattform ──
+  const repliker = artRows.filter(r => r.parent_id).length;
+  const scores = artRows.map(r => ((r.arg||0)+(r.ori||0)+(r.rel||0)+(r.tro||0))/4).filter(s=>s>0);
+  const avgScore = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : "–";
+  lines.push("\n## Plattformsstatistik");
+  lines.push(`- Artiklar: ${artRows.length} (${repliker} repliker, ${artRows.length-repliker} originala), snittpoäng ${avgScore}/10`);
+  lines.push(`- Direktdebatter: ${chattRows.length}`);
+  lines.push(`- Nyhetskanal-körningar: ${nyhetsRows.length}`);
+  lines.push(`- Nya prenumeranter: ${prenRows.length}`);
+  lines.push(`- API-anrop (beslut): ${beslutRows.length}`);
+  lines.push(`- Agent-frågor: ${fragaRows.length}`);
 
   return lines.join("\n");
 }
