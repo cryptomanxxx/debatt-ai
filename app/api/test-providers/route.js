@@ -1,20 +1,72 @@
-// No edge runtime — use Node.js so Cerebras doesn't block Vercel edge IPs
+// No edge runtime — use Node.js so providers don't block Vercel edge IPs
 
-const PROMPT = [
-  { role: "system", content: "Du är en hjälpsam assistent. Svara kort på svenska." },
-  { role: "user", content: "Säg 'Cerebras fungerar!' och inget annat." },
-];
+function makeMessages(providerName) {
+  return [
+    { role: "system", content: "Du är en hjälpsam assistent. Svara kort på svenska." },
+    { role: "user", content: `Säg '${providerName} fungerar!' och inget annat.` },
+  ];
+}
 
-const PROMPT_SB = [
-  { role: "system", content: "Du är en hjälpsam assistent. Svara kort på svenska." },
-  { role: "user", content: "Säg 'Sambanova fungerar!' och inget annat." },
-];
+async function testGroq() {
+  const key = process.env.GROQ_API_KEY;
+  if (!key) return { ok: false, error: "GROQ_API_KEY saknas" };
+  const model = "llama-3.3-70b-versatile";
+  const t0 = Date.now();
+  try {
+    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, messages: makeMessages("Groq"), max_tokens: 30 }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const latency = Date.now() - t0;
+    if (!r.ok) {
+      const err = await r.text();
+      return { ok: false, status: r.status, error: err.slice(0, 200), latency };
+    }
+    const json = await r.json();
+    const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+    return { ok: true, text, latency, model: json.model };
+  } catch (e) {
+    return { ok: false, error: e.message, latency: Date.now() - t0 };
+  }
+}
+
+async function testGemini() {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return { ok: false, error: "GEMINI_API_KEY saknas" };
+  const model = "gemini-2.0-flash-lite";
+  const t0 = Date.now();
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: "Säg 'Gemini fungerar!' och inget annat." }] }],
+          generationConfig: { maxOutputTokens: 30 },
+        }),
+        signal: AbortSignal.timeout(15000),
+      }
+    );
+    const latency = Date.now() - t0;
+    if (!r.ok) {
+      const err = await r.text();
+      return { ok: false, status: r.status, error: err.slice(0, 200), latency };
+    }
+    const json = await r.json();
+    const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+    return { ok: true, text, latency, model };
+  } catch (e) {
+    return { ok: false, error: e.message, latency: Date.now() - t0 };
+  }
+}
 
 async function testCerebras() {
   const key = process.env.CEREBRAS_API_KEY;
   if (!key) return { ok: false, error: "CEREBRAS_API_KEY saknas" };
 
-  // First: list available models
   let availableModels = [];
   try {
     const mr = await fetch("https://api.cerebras.ai/v1/models", {
@@ -33,7 +85,7 @@ async function testCerebras() {
     const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages: PROMPT, max_tokens: 30 }),
+      body: JSON.stringify({ model, messages: makeMessages("Cerebras"), max_tokens: 30 }),
       signal: AbortSignal.timeout(15000),
     });
     const latency = Date.now() - t0;
@@ -57,7 +109,62 @@ async function testSambanova() {
     const r = await fetch("https://api.sambanova.ai/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "Meta-Llama-3.3-70B-Instruct", messages: PROMPT_SB, max_tokens: 30 }),
+      body: JSON.stringify({ model: "Meta-Llama-3.3-70B-Instruct", messages: makeMessages("Sambanova"), max_tokens: 30 }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const latency = Date.now() - t0;
+    if (!r.ok) {
+      const err = await r.text();
+      return { ok: false, status: r.status, error: err.slice(0, 200), latency };
+    }
+    const json = await r.json();
+    const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+    return { ok: true, text, latency, model: json.model };
+  } catch (e) {
+    return { ok: false, error: e.message, latency: Date.now() - t0 };
+  }
+}
+
+async function testOpenRouter() {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key) return { ok: false, error: "OPENROUTER_API_KEY saknas" };
+  const model = "meta-llama/llama-3.3-70b-instruct:free";
+  const t0 = Date.now();
+  try {
+    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://www.debatt-ai.se",
+        "X-Title": "debatt.ai",
+      },
+      body: JSON.stringify({ model, messages: makeMessages("OpenRouter"), max_tokens: 30 }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const latency = Date.now() - t0;
+    if (!r.ok) {
+      const err = await r.text();
+      return { ok: false, status: r.status, error: err.slice(0, 200), latency };
+    }
+    const json = await r.json();
+    const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+    return { ok: true, text, latency, model: json.model };
+  } catch (e) {
+    return { ok: false, error: e.message, latency: Date.now() - t0 };
+  }
+}
+
+async function testCodestral() {
+  const key = process.env.MISTRAL_API_KEY;
+  if (!key) return { ok: false, error: "MISTRAL_API_KEY saknas" };
+  const model = "codestral-latest";
+  const t0 = Date.now();
+  try {
+    const r = await fetch("https://codestral.mistral.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, messages: makeMessages("Codestral"), max_tokens: 30 }),
       signal: AbortSignal.timeout(15000),
     });
     const latency = Date.now() - t0;
@@ -74,8 +181,16 @@ async function testSambanova() {
 }
 
 export async function GET() {
-  const [cerebras, sambanova] = await Promise.all([testCerebras(), testSambanova()]);
-  return Response.json({ cerebras, sambanova }, {
-    headers: { "Cache-Control": "no-store" },
-  });
+  const [groq, gemini, cerebras, sambanova, openrouter, codestral] = await Promise.all([
+    testGroq(),
+    testGemini(),
+    testCerebras(),
+    testSambanova(),
+    testOpenRouter(),
+    testCodestral(),
+  ]);
+  return Response.json(
+    { groq, gemini, cerebras, sambanova, openrouter, codestral },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
