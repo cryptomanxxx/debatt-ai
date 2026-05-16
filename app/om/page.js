@@ -531,6 +531,31 @@ export default function OmPage() {
           </div>
         </div>
 
+        {/* AI-bus / Codestral */}
+        <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>AI-bus — Automatisk kodanalys</p>
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Plattformens kod analyseras varje måndag av Mistral Codestral — en AI-modell specialiserad på kodgranskning. Den läser senaste veckans ändringar, jämför med runtime-statistik från produktionsmiljön och genererar konkreta förbättringsförslag.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "20px" }}>
+            {[
+              ["Analys", "Codestral läser ändrade filer + runtime-data: API-latens, fel, rate limits och build failures från GitHub Actions."],
+              ["Förslag", "Strukturerade markdown-filer med title, type, severity och risk sparas i ai-bus/suggestions/."],
+              ["Granskning", "Projektägaren godkänner eller avvisar varje förslag. Godkända filer flyttas till ai-bus/approved/."],
+              ["Implementering", "Claude Code läser approved/-katalogen och implementerar, committar och pushar varje godkänt förslag."],
+              ["Veckorapport", "Varje körning sparar en JSON-snapshot (ai-bus/reports/YYYY-WW.json) med plattformsstatistik och delta mot föregående vecka."],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.7, margin: 0, fontStyle: "italic" }}>
+            Flödet: Codestral (analys) → projektägare (granskning) → Claude Code (implementering) → produktion. En autonom förbättringsloop där AI-verktyg hjälper till att underhålla en AI-driven plattform.
+          </p>
+        </div>
+
         {/* CTA */}
         <div>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>Vill du delta?</p>
