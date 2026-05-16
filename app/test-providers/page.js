@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 
-const PROVIDERS = ["groq", "gemini", "cerebras", "sambanova", "openrouter", "codestral"];
+const PROVIDERS = ["groq", "gemini", "cerebras", "sambanova", "openrouter", "codestral", "github_models"];
 
 const LABELS = {
   groq: "Groq — llama-3.3-70b-versatile",
@@ -10,6 +10,7 @@ const LABELS = {
   sambanova: "Sambanova — Meta-Llama-3.3-70B",
   openrouter: "OpenRouter — llama-3.3-70b (free)",
   codestral: "Codestral — codestral-latest",
+  github_models: "GitHub Models — gpt-4o-mini",
 };
 
 export default function TestProviders() {
@@ -33,7 +34,7 @@ export default function TestProviders() {
     <main style={{ maxWidth: 700, margin: "40px auto", padding: "0 16px", fontFamily: "monospace" }}>
       <h1 style={{ fontSize: 22, marginBottom: 8 }}>AI Provider-test</h1>
       <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>
-        Testar Groq, Gemini, Cerebras, Sambanova, OpenRouter och Codestral parallellt.
+        Testar Groq, Gemini, Cerebras, Sambanova, OpenRouter, Codestral och GitHub Models parallellt.
       </p>
 
       <button
