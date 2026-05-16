@@ -604,7 +604,7 @@ def skapa_opinion_fraga(agent: dict, sb_key: str, amne: str, rubrik: str = "") -
 
 
 def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
-    """Analytiker-agent skapar ett draft prediction market. Status 'föreslagen' — kräver admin-godkännande."""
+    """Analytiker-agent skapar ett prediction market och publicerar det direkt med status 'öppen'."""
     AGENT_KATEGORI = {
         "Nationalekonom": "ekonomi", "Kryptoanalytiker": "krypto",
         "Teknikoptimist": "tech", "Journalist": "politik",
@@ -654,7 +654,7 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
             timeout=10,
         )
         if res.status_code in (200, 201):
-            print(f"  ✓ Market-förslag (inväntar admin): \"{titel}\"")
+            print(f"  ✓ Market publicerat: \"{titel}\"")
             return True
         else:
             print(f"  ✗ Kunde inte spara market-förslag: {res.status_code}", file=sys.stderr)
