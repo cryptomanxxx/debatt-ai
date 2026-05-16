@@ -1,5 +1,6 @@
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
-import { agentVisuell } from "../agentData";
+import { agentVisuell, AGENT_VISUELL } from "../agentData";
+import { getAgentMood } from "../lib/sinnesstamning";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -256,6 +257,35 @@ export default async function VeckaSida() {
 
           </>
         )}
+
+        {/* Agent moods this week */}
+        <div style={{ marginBottom: "48px" }}>
+          <SectionLabel text="Agenternas sinnesstämning denna vecka" />
+          <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+            {Object.keys(AGENT_VISUELL).map((namn) => {
+              const v = agentVisuell(namn);
+              const mood = getAgentMood(namn);
+              return (
+                <a
+                  key={namn}
+                  href={`/agent/${encodeURIComponent(namn)}`}
+                  style={{ display: "flex", alignItems: "center", gap: "14px", padding: "12px 20px", background: C.surface, textDecoration: "none" }}
+                >
+                  <AgentAvatar namn={namn} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={32} />
+                  <span style={{ flex: 1, fontSize: "14px", color: C.text }}>{namn}</span>
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: "5px",
+                    padding: "2px 10px", borderRadius: "20px",
+                    background: `${mood.color}12`, border: `1px solid ${mood.color}40`,
+                    fontSize: "11px", color: mood.color, fontFamily: "monospace", fontWeight: 700,
+                  }}>
+                    {mood.emoji} {mood.label.toUpperCase()}
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Prediction Markets resolved */}
         {data.markets.length > 0 && (

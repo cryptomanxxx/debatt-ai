@@ -11,13 +11,20 @@ innehåller:
 """
 
 from ai_klient import groq_post, gemini_post, github_models_post
-from agenter import ARTIKELFORMAT
+from agenter import ARTIKELFORMAT, get_agent_mood
+
+
+def _system_med_stamning(agent: dict) -> str:
+    """Append this week's mood instruction to the agent's system prompt."""
+    mood = get_agent_mood(agent["namn"])
+    return agent["system"].rstrip() + f"\n\n{mood['prompt']}"
 
 
 def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fmt: dict | None = None) -> str:
     """Skriv en debattartikel som kommenterar en aktuell nyhet."""
     if fmt is None:
         fmt = ARTIKELFORMAT[0]
+    system = _system_med_stamning(agent)
     kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
     user_msg = (
         f"Följande nyhet har precis publicerats:\n\n"
@@ -47,7 +54,7 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
         "max_tokens": 2000,
         "temperature": 0.8,
         "messages": [
-            {"role": "system", "content": agent["system"]},
+            {"role": "system", "content": system},
             {"role": "user", "content": user_msg},
         ],
     }
@@ -56,7 +63,7 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
     except Exception as e:
         print(f"  Groq misslyckades ({e}) — försöker Gemini...")
     try:
-        return gemini_post(agent["system"], user_msg, max_tokens=2000)
+        return gemini_post(system, user_msg, max_tokens=2000)
     except Exception as e:
         print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
         return github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
@@ -66,6 +73,7 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
     """Använd Groq (med Gemini-fallback) för att skriva en debattartikel."""
     if fmt is None:
         fmt = ARTIKELFORMAT[0]
+    system = _system_med_stamning(agent)
     kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
     user_msg = (
         f'Skriv en debattartikel om: "{amne}"\n'
@@ -83,7 +91,7 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
         "max_tokens": 2000,
         "temperature": 0.8,
         "messages": [
-            {"role": "system", "content": agent["system"]},
+            {"role": "system", "content": system},
             {"role": "user", "content": user_msg},
         ],
     }
@@ -92,7 +100,7 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
     except Exception as e:
         print(f"  Groq misslyckades ({e}) — försöker Gemini...")
     try:
-        return gemini_post(agent["system"], user_msg, max_tokens=2000)
+        return gemini_post(system, user_msg, max_tokens=2000)
     except Exception as e:
         print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
         return github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
@@ -100,6 +108,7 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
 
 def skriv_replik(agent: dict, original: dict) -> str:
     """Använd Groq (med Gemini-fallback) för att skriva en replik på en befintlig artikel."""
+    system = _system_med_stamning(agent)
     user_msg = (
         f'Du ska skriva en replik på följande debattartikel av {original["forfattare"]}.\n\n'
         f'ORIGINALETS RUBRIK: {original["rubrik"]}\n\n'
@@ -124,7 +133,7 @@ def skriv_replik(agent: dict, original: dict) -> str:
         "max_tokens": 2000,
         "temperature": 0.8,
         "messages": [
-            {"role": "system", "content": agent["system"]},
+            {"role": "system", "content": system},
             {"role": "user", "content": user_msg},
         ],
     }
@@ -133,7 +142,7 @@ def skriv_replik(agent: dict, original: dict) -> str:
     except Exception as e:
         print(f"  Groq misslyckades ({e}) — försöker Gemini...")
     try:
-        return gemini_post(agent["system"], user_msg, max_tokens=2000)
+        return gemini_post(system, user_msg, max_tokens=2000)
     except Exception as e:
         print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
         return github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
