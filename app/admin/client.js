@@ -885,12 +885,18 @@ function MarketsTab() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [fRes, oRes] = await Promise.all([
+    const [fRes, oRes, bRes] = await Promise.all([
       fetch(`${SB_URL}/rest/v1/markets?status=eq.f%C3%B6reslagen&order=skapad.desc`, { headers: sbHeaders() }),
       fetch(`${SB_URL}/rest/v1/markets?status=eq.%C3%B6ppen&order=skapad.desc`,      { headers: sbHeaders() }),
+      fetch(`${SB_URL}/rest/v1/agent_bets?select=market_id`,                          { headers: sbHeaders() }),
     ]);
-    setForeslagna(fRes.ok ? await fRes.json() : []);
-    setOppna(oRes.ok ? await oRes.json() : []);
+    const bets = bRes.ok ? await bRes.json() : [];
+    const betCount = {};
+    for (const b of bets) betCount[b.market_id] = (betCount[b.market_id] || 0) + 1;
+
+    const withBets = arr => (arr || []).map(m => ({ ...m, betAntal: betCount[m.id] || 0 }));
+    setForeslagna(fRes.ok ? withBets(await fRes.json()) : []);
+    setOppna(oRes.ok ? withBets(await oRes.json()) : []);
     setLoading(false);
   }, []);
 
@@ -988,7 +994,7 @@ function MarketsTab() {
                 </div>
               )}
               <p style={{ color:C.textMuted, fontSize:"12px", fontFamily:"monospace", margin:0 }}>
-                {m.bets?.length ?? 0} bets · Skapad {new Date(m.skapad).toLocaleDateString("sv-SE")}
+                {m.betAntal} bets · Skapad {new Date(m.skapad).toLocaleDateString("sv-SE")}
               </p>
             </div>
           ))}
