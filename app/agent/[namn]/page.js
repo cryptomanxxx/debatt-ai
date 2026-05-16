@@ -4,6 +4,7 @@ import AgentFragaForm from "./AgentFragaForm";
 import AmnesPrenumerant from "../../artikel/[id]/AmnesPrenumerant";
 import { getAgentMood } from "../../lib/sinnesstamning";
 import KoalitionKnapp from "./KoalitionKnapp";
+import AgentUtmaningForm from "./AgentUtmaningForm";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -453,6 +454,8 @@ export default async function AgentPage({ params }) {
         )}
 
         <style>{`.agent-rad { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; } .agent-rad:hover { background:#161616; }`}</style>
+
+        <AgentUtmaningForm agent={namn} ikonFarg={profil.ikonFarg} />
 
         {/* Articles */}
         <div style={{ marginBottom: "48px" }}>
