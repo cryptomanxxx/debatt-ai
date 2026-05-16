@@ -254,9 +254,12 @@ export default function KanalPage() {
       .catch(e => console.error("Nyheter-fetch-fel:", e));
   }, []);
 
-  async function spelaUppText(text, agent) {
+  async function spelaUppText(text, agent, textLang = "sv") {
     return new Promise(resolve => {
       const voiceConf = (agent && AGENT_ROST[agent]) ? AGENT_ROST[agent] : AGENT_ROST["Anna"];
+      // Use English voice when reading English content (Anna or no specific agent)
+      const isAnna = !agent || agent === "Anna";
+      const voice = (textLang === "en" && isAnna) ? "US English Female" : voiceConf.voice;
       if (typeof responsiveVoice === "undefined" || !responsiveVoice.voiceSupport()) {
         resolve();
         return;
@@ -265,7 +268,7 @@ export default function KanalPage() {
       setIsThinking(true);
       responsiveVoice.speak(
         text,
-        voiceConf.voice,
+        voice,
         {
           rate: voiceConf.rate,
           pitch: voiceConf.pitch,
@@ -403,7 +406,7 @@ export default function KanalPage() {
 
       setCurrentText(text);
       const t0 = Date.now();
-      await spelaUppText(text, null);
+      await spelaUppText(text, null, langRef.current);
       if (session !== sessionRef.current) return;
       await nextPrefetch;
 

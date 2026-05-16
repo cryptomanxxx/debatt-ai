@@ -1,6 +1,7 @@
 // No edge runtime — Node.js enables Cerebras fallback
 
 import { logAiCall } from "../../../lib/logAiCall";
+import { checkRateLimit } from "../../../lib/kanalRateLimit";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OR_URL   = "https://openrouter.ai/api/v1/chat/completions";
@@ -14,6 +15,14 @@ const OR_MODELS = [
 ];
 
 export async function POST(req) {
+  const rl = checkRateLimit(req, "expand", 30, 10 * 60 * 1000);
+  if (!rl.ok) {
+    return Response.json(
+      { error: "Too many requests", retryAfter: rl.retryAfter },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
+    );
+  }
+
   const { rubrik, kalla, lang = "sv" } = await req.json().catch(() => ({}));
   if (!rubrik) return Response.json({ text: "" });
 
