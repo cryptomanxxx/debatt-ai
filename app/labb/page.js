@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
@@ -91,11 +91,13 @@ export default function LabbPage() {
   const [svar, setSvar] = useState("");
   const [loading, setLoading] = useState(false);
   const [fel, setFel] = useState("");
+  const loadingRef = useRef(false);
 
   function set(key, v) { setVals(prev => ({ ...prev, [key]: v })); }
 
   async function generera() {
-    if (!amne.trim() || loading) return;
+    if (!amne.trim() || loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true); setFel(""); setSvar("");
     try {
       const res = await fetch("/api/labb", {
@@ -107,7 +109,7 @@ export default function LabbPage() {
       if (!res.ok) { setFel(data.error || "Något gick fel."); return; }
       setSvar(data.svar);
     } catch { setFel("Nätverksfel. Försök igen."); }
-    finally { setLoading(false); }
+    finally { loadingRef.current = false; setLoading(false); }
   }
 
   const personlighet = buildPersonlighet(vals);
