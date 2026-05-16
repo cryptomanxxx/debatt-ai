@@ -4,6 +4,8 @@
 
 **Läs alltid `/ai-bus/context.md` i början av varje session** — den innehåller senaste beslut, vad som inte ska göras och nästa prioritet.
 
+**Kontrollera `/ai-bus/approved/`** — filer med `status: approved` ska implementeras enligt instruktionerna i `agents/claude-review.md`.
+
 ---
 
 ## Git-arbetsflöde
