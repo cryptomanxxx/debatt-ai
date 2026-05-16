@@ -4,7 +4,7 @@ title: "Saknad felhantering för Codestral-analys"
 type: bug
 severity: medium
 file: agents/codestral-worker.js
-status: pending
+status: implemented
 created: 2026-05-16
 ---
 

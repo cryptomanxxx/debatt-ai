@@ -1,25 +1,25 @@
 ---
-id: 2026-05-16-004
-title: "Saknad felhantering för filoperationer"
+id: 2026-05-16-003
+title: "Saknad felhantering för Supabase-anrop"
 type: bug
 severity: medium
 file: agents/codestral-worker.js
-status: pending
+status: implemented
 created: 2026-05-16
 ---
 
 ## Problem
 
-getChangedFiles() saknar felhantering. Om git-kommandot misslyckas kommer arbetaren att krascha.
+fetchRuntimeData() saknar felhantering. Om Supabase-anropet misslyckas kommer arbetaren att krascha.
 
 ## Föreslagen lösning
 
-Lägg till try-catch för getChangedFiles() och logga felmeddelande. Exempel:
+Lägg till try-catch för fetchRuntimeData() och logga felmeddelande. Exempel:
 
 try {
-  const changedFiles = getChangedFiles();
+  const runtimeData = await fetchRuntimeData();
 } catch (error) {
-  console.error("Fel vid hämtning av ändrade filer:", error);
+  console.error("Fel vid hämtning av runtime-data:", error);
 }
 
 ## Åtgärd

@@ -50,15 +50,32 @@ async function main() {
 
   console.log(`Filer: ${allFiles.join(", ")}`);
 
-  const runtimeData    = await fetchRuntimeData();
+  let runtimeData = null;
+  try {
+    runtimeData = await fetchRuntimeData();
+    if (runtimeData) console.log("Runtime-data hämtad från Supabase.");
+  } catch (e) {
+    console.warn("Runtime-data misslyckades — fortsätter utan:", e.message);
+  }
+
   const runtimeSummary = buildRuntimeSummary(runtimeData);
-  if (runtimeSummary) console.log("Runtime-data hämtad från Supabase.");
 
-  const snapshot = saveWeeklySnapshot(runtimeData);
-  if (snapshot) console.log(`✓ Veckorapport sparad: ai-bus/reports/${snapshot}`);
+  try {
+    const snapshot = saveWeeklySnapshot(runtimeData);
+    if (snapshot) console.log(`✓ Veckorapport sparad: ai-bus/reports/${snapshot}`);
+  } catch (e) {
+    console.warn("Veckorapport misslyckades:", e.message);
+  }
 
-  const codeBlock   = buildCodeBlock(allFiles);
-  const suggestions = await analyzeWithCodestral(codeBlock, runtimeSummary);
+  const codeBlock = buildCodeBlock(allFiles);
+
+  let suggestions = [];
+  try {
+    suggestions = await analyzeWithCodestral(codeBlock, runtimeSummary);
+  } catch (e) {
+    console.error("Codestral-analys misslyckades:", e.message);
+    return;
+  }
 
   if (!suggestions.length) {
     console.log("Inga förslag genererade.");
