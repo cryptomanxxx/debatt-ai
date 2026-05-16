@@ -1,13 +1,17 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function ArgumentRoster({ artikelId, artikelText }) {
   const paragraphs = (artikelText || "").split("\n\n").filter(Boolean);
   const [votes, setVotes] = useState({});
   const [voted, setVoted] = useState({});
   const [hovered, setHovered] = useState(null);
+  const [isTouch, setIsTouch] = useState(false);
 
   useEffect(() => {
+    // Detect touch device
+    if (window.matchMedia("(hover: none)").matches) setIsTouch(true);
+
     const v = {};
     paragraphs.forEach((_, i) => {
       if (localStorage.getItem(`arg_${artikelId}_${i}`) === "1") v[i] = true;
@@ -44,10 +48,19 @@ export default function ArgumentRoster({ artikelId, artikelText }) {
 
   return (
     <div style={{ marginBottom: "48px", maxWidth: "660px" }}>
+      {/* Förklaringstext */}
+      <p style={{ fontSize: "11px", color: "#444", fontFamily: "monospace", letterSpacing: "0.06em", margin: "0 0 24px 0", textAlign: "right" }}>
+        {isTouch ? "Tryck på ▲ bredvid ett stycke för att lyfta fram det bästa argumentet" : "Hovra över ett stycke och klicka ▲ för att lyfta fram det bästa argumentet"}
+      </p>
+
       {paragraphs.map((p, i) => {
         const hasVotes = (votes[i] || 0) > 0;
         const isVoted = !!voted[i];
-        const showBtn = hovered === i || hasVotes || isVoted;
+        // On touch: always show button (at low opacity unless voted/has votes)
+        // On desktop: show on hover or if voted/has votes
+        const showBtn = isTouch || hovered === i || hasVotes || isVoted;
+        const btnOpacity = isTouch && !hovered && !hasVotes && !isVoted ? 0.25 : 1;
+
         return (
           <div
             key={i}
@@ -64,7 +77,7 @@ export default function ArgumentRoster({ artikelId, artikelText }) {
                 position: "absolute",
                 right: 0,
                 top: "4px",
-                display: "flex",
+                display: showBtn ? "flex" : "none",
                 flexDirection: "column",
                 alignItems: "center",
                 gap: "1px",
@@ -73,7 +86,7 @@ export default function ArgumentRoster({ artikelId, artikelText }) {
                 borderRadius: "6px",
                 cursor: isVoted ? "default" : "pointer",
                 padding: "5px 8px",
-                opacity: showBtn ? 1 : 0,
+                opacity: btnOpacity,
                 transition: "opacity 0.15s, background 0.15s",
                 minWidth: "32px",
               }}
