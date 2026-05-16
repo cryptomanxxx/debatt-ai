@@ -42,18 +42,20 @@ from supabase_utils import (
 
 
 def main():
-    api_key = os.environ.get("DEBATT_API_KEY")
+    api_key = os.environ.get("DEBATT_API_KEY", "").strip()
     if not api_key:
         print("Fel: Sätt miljövariabeln DEBATT_API_KEY")
         sys.exit(1)
 
-    if not os.environ.get("GROQ_API_KEY") and not os.environ.get("GEMINI_API_KEY"):
+    groq_key   = os.environ.get("GROQ_API_KEY", "").strip()
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not groq_key and not gemini_key:
         print("Fel: Sätt GROQ_API_KEY eller GEMINI_API_KEY (eller båda)")
         sys.exit(1)
-    if not os.environ.get("GROQ_API_KEY"):
+    if not groq_key:
         print("Varning: GROQ_API_KEY saknas — använder Gemini som primär AI")
 
-    sb_key = os.environ.get("SUPABASE_ANON_KEY")
+    sb_key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
 
     # 05:00–08:00 UTC (07:00–10:00 svensk tid) → garanterad nyhetsartikel (4 st/dag)
     # 13:00–16:00 UTC (15:00–18:00 svensk tid) → garanterad replik (4 st/dag)
