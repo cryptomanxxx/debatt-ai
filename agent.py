@@ -497,8 +497,8 @@ def main():
             from supabase_utils import svara_ultimatum
             svara_ultimatum(agent, pending, sb_key)
 
-    # Agent ställer en fråga till en annan agent (~10% chans per körning)
-    if sb_key and random.random() < 0.10:
+    # Agent ställer en fråga till en annan agent (~20% chans per körning)
+    if sb_key and random.random() < 0.20:
         mottagare = random.choice([a for a in AGENTER if a["namn"] != agent["namn"]])
         print(f"\n── Agent-till-agent-fråga: {agent['namn']} → {mottagare['namn']} ──")
         try:
