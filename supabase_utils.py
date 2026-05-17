@@ -948,3 +948,245 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "") -> tup
         return s, m
     except Exception:
         return 50, text[:150]
+
+
+# ── AI-parlamentet ──────────────────────────────────────────────
+
+_PARLAMENT_KATEGORIER = frozenset(
+    ["Klimat", "Ekonomi", "Sjukvård", "Utbildning", "Arbetsmarknad", "Bostäder", "Digital", "Övrigt"]
+)
+
+
+def hamta_lagforslag(sb_key: str) -> list[dict]:
+    """Hämtar öppna lagförslag (status != avgjort), nyast först."""
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/lagforslag?status=neq.avgjort&order=skapad.desc&limit=30",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
+            timeout=10,
+        )
+        return r.json() if r.is_success else []
+    except Exception:
+        return []
+
+
+def hamta_lag_roster_agenter(sb_key: str, lagforslag_id: int) -> list[str]:
+    """Returnerar lista med agentnamn som redan röstat på förslaget."""
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag?lagforslag_id=eq.{lagforslag_id}&select=agent",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
+            timeout=8,
+        )
+        return [row["agent"] for row in (r.json() if r.is_success else [])]
+    except Exception:
+        return []
+
+
+def spara_lag_rost(sb_key: str, lagforslag_id: int, agent_namn: str, rod: str, motivering: str) -> bool:
+    """Sparar agentröst och uppdaterar räknare på lagförslaget. Returnerar True vid lyckad insert."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    try:
+        r = httpx.post(
+            f"{SB_URL}/rest/v1/agent_roster_lag",
+            headers=h,
+            json={"lagforslag_id": lagforslag_id, "agent": agent_namn, "rod": rod, "motivering": motivering},
+            timeout=10,
+        )
+        if not r.is_success:
+            return False
+        kolumn = f"ai_{rod}_roster"  # ai_ja_roster / ai_nej_roster / ai_avstar_roster
+        cr = httpx.get(
+            f"{SB_URL}/rest/v1/lagforslag?id=eq.{lagforslag_id}&select={kolumn}",
+            headers={**h, "Prefer": ""}, timeout=8,
+        )
+        if cr.is_success and cr.json():
+            httpx.patch(
+                f"{SB_URL}/rest/v1/lagforslag?id=eq.{lagforslag_id}",
+                headers=h,
+                json={kolumn: cr.json()[0][kolumn] + 1},
+                timeout=10,
+            )
+        return True
+    except Exception:
+        return False
+
+
+def rösta_på_lagforslag_block(agent: dict, sb_key: str) -> int:
+    """Agent röstar på öppna lagförslag den inte röstat på (max 2 per körning)."""
+    forslag = hamta_lagforslag(sb_key)
+    if not forslag:
+        return 0
+    antal = 0
+    for f in forslag:
+        if antal >= 2:
+            break
+        if agent["namn"] in hamta_lag_roster_agenter(sb_key, f["id"]):
+            continue
+        try:
+            prompt = (
+                f"Lagförslag: \"{f['titel']}\"\n\n"
+                f"{f['beskrivning'][:600]}\n\n"
+                "Rösta på detta förslag utifrån din personlighet och dina värderingar. "
+                "Svara EXAKT i detta format:\n"
+                "RÖST: ja\n"
+                "MOTIVERING: Din motivering på svenska, 1–2 meningar.\n\n"
+                "Välj RÖST: ja, nej eller avstar"
+            )
+            payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": agent["system"][:600]},
+                    {"role": "user", "content": prompt},
+                ],
+                "max_tokens": 120, "temperature": 0.7,
+            }
+            try:
+                raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                raw = gemini_post(agent["system"][:600], prompt, max_tokens=120)
+
+            rod, motivering = "avstar", ""
+            for line in raw.splitlines():
+                line = line.strip()
+                key = line.upper()
+                if key.startswith("RÖST:") or key.startswith("ROST:"):
+                    val = line.split(":", 1)[1].strip().lower()
+                    rod = "avstar" if val in ("avstar", "avstår") else val if val in ("ja", "nej") else "avstar"
+                elif key.startswith("MOTIVERING:"):
+                    motivering = line.split(":", 1)[1].strip()[:300]
+
+            if spara_lag_rost(sb_key, f["id"], agent["namn"], rod, motivering):
+                antal += 1
+        except Exception:
+            pass
+    return antal
+
+
+def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str) -> bool:
+    """Agent formulerar ett nytt AI-lagförslag inspirerat av aktuellt ämne."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    kat_str = " / ".join(sorted(_PARLAMENT_KATEGORIER))
+    try:
+        prompt = (
+            f"Du är {agent['namn']}. Formulera ett konkret riksdagsförslag (motion) "
+            f"inspirerat av ämnet: \"{amne[:120]}\".\n\n"
+            f"Svara EXAKT i detta format:\n"
+            f"TITEL: [Kortfattad titel, max 80 tecken]\n"
+            f"KATEGORI: [En av: {kat_str}]\n"
+            f"BESKRIVNING: [150–250 ord. Vad föreslås, varför, vilka effekter förväntas]\n\n"
+            "Inga andra ord. Ingen inledning."
+        )
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": agent["system"][:600]},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": 400, "temperature": 0.85,
+        }
+        try:
+            raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            raw = gemini_post(agent["system"][:600], prompt, max_tokens=400)
+
+        titel, kategori, beskrivning = amne[:80], "Övrigt", ""
+        for line in raw.splitlines():
+            line = line.strip()
+            key = line.upper()
+            if key.startswith("TITEL:"):
+                titel = line.split(":", 1)[1].strip()[:80]
+            elif key.startswith("KATEGORI:"):
+                kat = line.split(":", 1)[1].strip()
+                if kat in _PARLAMENT_KATEGORIER:
+                    kategori = kat
+            elif key.startswith("BESKRIVNING:"):
+                beskrivning = line.split(":", 1)[1].strip()
+            elif beskrivning:
+                beskrivning += " " + line
+
+        if len(beskrivning) < 50:
+            return False
+
+        r = httpx.post(
+            f"{SB_URL}/rest/v1/lagforslag",
+            headers=h,
+            json={
+                "titel": titel, "beskrivning": beskrivning.strip()[:1500],
+                "kategori": kategori, "kalla": "ai", "status": "omrostning",
+            },
+            timeout=10,
+        )
+        return r.is_success
+    except Exception:
+        return False
+
+
+def importera_riksdagen_forslag(sb_key: str) -> int:
+    """Hämtar färska propositioner från riksdagen.se API och importerar nya. Returnerar antal importerade."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    importerade = 0
+    try:
+        api_r = httpx.get(
+            "https://data.riksdagen.se/dokumentlista/"
+            "?doktyp=prop&utformat=json&sz=8&sort=datum&sortorder=desc",
+            timeout=15,
+        )
+        if not api_r.is_success:
+            return 0
+
+        data = api_r.json()
+        dokument = data.get("dokumentlista", {}).get("dokument", [])
+        if isinstance(dokument, dict):
+            dokument = [dokument]
+
+        for dok in dokument[:3]:
+            dok_id = dok.get("dok_id", "").strip()
+            if not dok_id:
+                continue
+            check = httpx.get(
+                f"{SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.{urllib.parse.quote(dok_id)}&select=id",
+                headers={**h, "Prefer": ""}, timeout=8,
+            )
+            if check.is_success and check.json():
+                continue
+
+            titel = dok.get("titel", "").strip()[:120]
+            if not titel:
+                continue
+
+            notis = (dok.get("notis", "") or "").strip()
+            notis2 = (dok.get("notis2", "") or "").strip()
+            beskrivning = (notis + " " + notis2).strip() or f"Proposition från riksdagen: {titel}"
+
+            riksdagen_url = dok.get("url", "") or ""
+            if riksdagen_url and not riksdagen_url.startswith("http"):
+                riksdagen_url = "https://www.riksdagen.se" + riksdagen_url
+
+            r = httpx.post(
+                f"{SB_URL}/rest/v1/lagforslag",
+                headers=h,
+                json={
+                    "titel": titel, "beskrivning": beskrivning[:1500],
+                    "kategori": "Övrigt", "kalla": "riksdagen",
+                    "riksdagen_id": dok_id, "riksdagen_url": riksdagen_url or None,
+                    "status": "omrostning",
+                },
+                timeout=10,
+            )
+            if r.is_success:
+                importerade += 1
+
+    except Exception as e:
+        print(f"  ✗ Riksdagen-import misslyckades: {e}", file=sys.stderr)
+
+    return importerade
