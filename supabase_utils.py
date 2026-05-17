@@ -1314,6 +1314,194 @@ def uppdatera_riksdagen_utfall(sb_key: str) -> int:
     return uppdaterade
 
 
+# ── Lobbying (AI-demokrati × AI-ekonomi) ─────────────────────────────────────
+
+def kör_lobbying(agent: dict, sb_key: str) -> bool:
+    """Agent försöker lobba en annan agent att byta röst mot betalning (~8%/körning).
+
+    Isolerat från ekonomispelen: loggas som typ='lobbying' i agent_transaktioner
+    och separat i lobbying_log. Möjliggör Gilens-Page-analys.
+    """
+    agent_namn = agent["namn"]
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+
+    try:
+        # Hämta motioner agenten röstat "ja" på
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag",
+            params={"agent": f"eq.{urllib.parse.quote(agent_namn)}", "rod": "eq.ja",
+                    "select": "lagforslag_id"},
+            headers=h, timeout=8,
+        )
+        if not res.is_success or not res.json():
+            return False
+
+        forslag_ids = [r["lagforslag_id"] for r in res.json()]
+        ids_str = ",".join(str(i) for i in forslag_ids)
+
+        # Filtrera till öppna motioner
+        res2 = httpx.get(
+            f"{SB_URL}/rest/v1/lagforslag",
+            params={"id": f"in.({ids_str})", "status": "eq.omrostning",
+                    "select": "id,titel"},
+            headers=h, timeout=8,
+        )
+        if not res2.is_success or not res2.json():
+            return False
+
+        forslag = random.choice(res2.json())
+        forslag_id = forslag["id"]
+
+        # Kontrollera saldo
+        saldo_res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker",
+            params={"agent": f"eq.{urllib.parse.quote(agent_namn)}", "select": "saldo"},
+            headers=h, timeout=8,
+        )
+        saldo_data = saldo_res.json() if saldo_res.is_success else []
+        saldo = saldo_data[0]["saldo"] if saldo_data else 0
+        if saldo < 80:
+            return False
+
+        # Hitta kandidater att lobba (röstat nej eller ej röstat)
+        res3 = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag",
+            params={"lagforslag_id": f"eq.{forslag_id}", "select": "agent,rod"},
+            headers=h, timeout=8,
+        )
+        existerande = {r["agent"]: r["rod"] for r in (res3.json() if res3.is_success else [])}
+
+        from agenter import AGENTER
+        alla = [a["namn"] for a in AGENTER if a["namn"] != agent_namn]
+        nej_roster = [a for a, r in existerande.items() if r == "nej" and a != agent_namn]
+        ej_rostat = [a for a in alla if a not in existerande]
+        kandidater = nej_roster + ej_rostat[:4]
+        if not kandidater:
+            return False
+
+        mal_namn = random.choice(kandidater)
+        from agenter import AGENTER as _AG
+        mal_agent = next((a for a in _AG if a["namn"] == mal_namn), None)
+        if not mal_agent:
+            return False
+
+        belopp = random.choice([20, 30, 40, 50])
+
+        # Agent formulerar lobbyingargument
+        lobby_prompt = (
+            f"{agent.get('systemprompt', f'Du är {agent_namn}.')}\n\n"
+            f"Du stödjer starkt denna motion i AI-parlamentet: \"{forslag['titel']}\"\n"
+            f"Du vill lobba {mal_namn} att rösta JA. Du erbjuder {belopp} krediter ur din plånbok.\n"
+            f"Ditt saldo: {saldo} kr.\n\n"
+            f"Skriv ett kort, övertygande lobbyingargument (2 meningar) till {mal_namn}:"
+        )
+        argument = groq_post(lobby_prompt, system="Du skriver politiska lobbyingargument.", max_tokens=120)
+        if not argument:
+            argument = gemini_post(lobby_prompt, system="Du skriver politiska lobbyingargument.", max_tokens=120)
+        if not argument:
+            return False
+
+        # Målagenten beslutar
+        rod_fore = existerande.get(mal_namn, "ej röstat")
+        mal_saldo_res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker",
+            params={"agent": f"eq.{urllib.parse.quote(mal_namn)}", "select": "saldo"},
+            headers=h, timeout=8,
+        )
+        mal_saldo_data = mal_saldo_res.json() if mal_saldo_res.is_success else []
+        mal_saldo = mal_saldo_data[0]["saldo"] if mal_saldo_data else 1000
+
+        mal_prompt = (
+            f"{mal_agent.get('systemprompt', f'Du är {mal_namn}.')}\n\n"
+            f"{agent_namn} erbjuder dig {belopp} krediter för att rösta JA på:\n"
+            f"\"{forslag['titel']}\"\n\n"
+            f"Deras argument: \"{argument}\"\n"
+            f"Din nuvarande ståndpunkt: {rod_fore}. Ditt saldo: {mal_saldo} kr.\n\n"
+            f"Svara EXAKT:\nBESLUT: accepterar eller avvisar\nMOTIVERING: [1 mening]"
+        )
+        mal_svar = groq_post(mal_prompt, system="Du fattar politiska beslut.", max_tokens=80)
+        if not mal_svar:
+            mal_svar = gemini_post(mal_prompt, system="Du fattar politiska beslut.", max_tokens=80)
+
+        resultat = "avvisat"
+        motivering = ""
+        for rad in (mal_svar or "").strip().splitlines():
+            upper = rad.upper()
+            if "BESLUT:" in upper and "accepterar" in rad.lower():
+                resultat = "accepterat"
+            elif "MOTIVERING:" in upper:
+                motivering = rad.split(":", 1)[1].strip()
+
+        rod_efter = rod_fore
+        if resultat == "accepterat":
+            # Uppdatera röst
+            httpx.post(
+                f"{SB_URL}/rest/v1/agent_roster_lag",
+                json={
+                    "lagforslag_id": forslag_id, "agent": mal_namn,
+                    "rod": "ja",
+                    "motivering": f"[Lobbad av {agent_namn}] {motivering}"[:300],
+                },
+                headers={**h, "Content-Type": "application/json",
+                         "Prefer": "resolution=merge-duplicates"},
+                timeout=8,
+            )
+            rod_efter = "ja"
+
+            # Kreditöverföring
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+                json={"saldo": max(0, saldo - belopp), "uppdaterad": "now()"},
+                headers={**h, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                timeout=8,
+            )
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(mal_namn)}",
+                json={"saldo": mal_saldo + belopp, "uppdaterad": "now()"},
+                headers={**h, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                timeout=8,
+            )
+
+            # Transaktion
+            httpx.post(
+                f"{SB_URL}/rest/v1/agent_transaktioner",
+                json={
+                    "fran_agent": agent_namn, "till_agent": mal_namn,
+                    "belopp": belopp, "typ": "lobbying",
+                    "motivering": argument[:200],
+                },
+                headers={**h, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                timeout=8,
+            )
+
+        # Logga alltid
+        httpx.post(
+            f"{SB_URL}/rest/v1/lobbying_log",
+            json={
+                "lagforslag_id": forslag_id,
+                "lobbying_agent": agent_namn,
+                "mal_agent": mal_namn,
+                "belopp": belopp,
+                "argument": argument[:300],
+                "resultat": resultat,
+                "rod_fore": rod_fore,
+                "rod_efter": rod_efter,
+            },
+            headers={**h, "Content-Type": "application/json", "Prefer": "return=minimal"},
+            timeout=8,
+        )
+
+        emoji = "✓" if resultat == "accepterat" else "✗"
+        print(f"  {emoji} Lobbying: {agent_namn} → {mal_namn} ({belopp} kr) — {resultat}")
+        if resultat == "accepterat":
+            print(f"    Röst ändrad: {rod_fore} → ja")
+        return True
+
+    except Exception as e:
+        print(f"  ✗ Lobbying misslyckades: {e}", file=sys.stderr)
+        return False
+
+
 # ── Agent-positioner (emergent ideologi) ─────────────────────────────────────
 
 POSITIONS_AMNEN = [

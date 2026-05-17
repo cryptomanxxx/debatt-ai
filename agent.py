@@ -47,6 +47,7 @@ from supabase_utils import (
     uppdatera_riksdagen_utfall,
     kör_ekonomispel,
     hamta_agent_positioner, uppdatera_agent_positioner,
+    kör_lobbying,
 )
 
 
@@ -472,6 +473,12 @@ def main():
         uppdaterade = uppdatera_riksdagen_utfall(sb_key)
         if uppdaterade > 0:
             print(f"  ✓ Automatiskt uppdaterade riksdagen_utfall för {uppdaterade} förslag")
+
+        if random.random() < 0.08:
+            print(f"\n── Lobbying: {agent['namn']} ──")
+            ok_lob = kör_lobbying(agent, sb_key)
+            if ok_lob:
+                logga_action(sb_key, agent["namn"], "lobbying", {}, "ok")
 
     # Ekonomispel (~5% chans per körning, eller om pending ultimatum)
     if sb_key and random.random() < 0.05:
