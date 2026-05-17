@@ -48,6 +48,7 @@ from supabase_utils import (
     kör_ekonomispel,
     hamta_agent_positioner, uppdatera_agent_positioner,
     kör_lobbying, initiera_koalition,
+    reglera_prediction_bets,
 )
 
 
@@ -443,6 +444,14 @@ def main():
                             "titel": market.get("titel", "")[:80],
                             "sannolikhet": sannolikhet,
                         }, f"{sannolikhet}%")
+
+    if sb_key:
+        print(f"\n── Prediction-reglering ──")
+        antal_reglerade = reglera_prediction_bets(sb_key)
+        if antal_reglerade:
+            print(f"  ✓ Reglerade {antal_reglerade} bets")
+        else:
+            print("  Inga bets att reglera")
 
     if sb_key and agent["namn"] not in ROST_AGENTER and random.random() < 0.2:
         print(f"\n── Market-förslag: {agent['namn']} ──")
