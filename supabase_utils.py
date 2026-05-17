@@ -168,46 +168,89 @@ def hamta_engagemang(sb_key: str, artikel_ids: list) -> dict:
 
 
 def hamta_agent_historik(sb_key: str, agent_namn: str, limit: int = 3) -> str:
-    """Hämtar rik kontext om agentens historia, debatter och relationer."""
+    """Hämtar rik kontext om agentens historia, debatter och relationer.
+
+    Topp-3 rangordnas efter engagemang (läsningar + svar × 10) så agenten
+    vet vilka egna argument som faktiskt skapade debatt och kan referera till dem.
+    """
     h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
     delar = []
     try:
+        # Hämta de 20 mest lästa artiklarna som kandidatpool för engagemangsrankning
         res = httpx.get(
             f"{SB_URL}/rest/v1/artiklar",
-            params={"select": "id,rubrik,parent_id", "forfattare": f"eq.{agent_namn}",
-                    "order": "skapad.desc", "limit": "5"},
+            params={"select": "id,rubrik,artikel,parent_id,lasningar,skapad",
+                    "forfattare": f"eq.{agent_namn}",
+                    "order": "lasningar.desc,skapad.desc", "limit": "20"},
             headers=h, timeout=10,
         )
-        egna = res.json() if res.status_code == 200 else []
-        if not egna:
+        kandidater = res.json() if res.status_code == 200 else []
+        if not kandidater:
             return ""
 
-        rubriker = [f'"{a["rubrik"]}"' for a in egna]
+        egna_ids = [str(a["id"]) for a in kandidater]
+
+        # Hämta alla svar på kandidatartiklarna (andra agenters repliker)
+        res_svar = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={"select": "parent_id,forfattare",
+                    "parent_id": f"in.({','.join(egna_ids)})",
+                    "forfattare": f"neq.{agent_namn}",
+                    "limit": "200"},
+            headers=h, timeout=10,
+        )
+        svar_data = res_svar.json() if res_svar.status_code == 200 else []
+        svar_count = Counter(str(s["parent_id"]) for s in svar_data)
+
+        # Ranka: läsningar väger lätt (volym), svar väger tungt (debattpåverkan)
+        for a in kandidater:
+            a["_score"] = (a.get("lasningar") or 0) * 0.1 + svar_count.get(str(a["id"]), 0) * 10
+
+        topp = sorted(kandidater, key=lambda x: x["_score"], reverse=True)[:limit]
+
+        # Bygg minneskontext med titel + argumentingress
+        minnes_rader = []
+        for a in topp:
+            rubrik = a["rubrik"]
+            las = a.get("lasningar") or 0
+            svar = svar_count.get(str(a["id"]), 0)
+            ingress = (a.get("artikel") or "").replace("\n", " ").strip()[:150]
+            if ingress:
+                minnes_rader.append(
+                    f'  • "{rubrik}" ({las} läsningar, {svar} svar) — '
+                    f'där du argumenterade: "{ingress}…"'
+                )
+            else:
+                minnes_rader.append(f'  • "{rubrik}" ({las} läsningar, {svar} svar)')
+
         delar.append(
-            f"Du har nyligen skrivit om: {', '.join(rubriker)}. "
+            "Dina mest uppmärksammade artiklar (rangordnade efter läsningar och debattpåverkan):\n"
+            + "\n".join(minnes_rader)
+            + "\nOm det känns naturligt, referera till dem — t.ex. "
+            "'Som jag argumenterade om [ämne]…' eller 'Det jag skrev om [ämne] visade att…'"
+        )
+
+        # Dedupliceringstips baserat på de 5 senaste (oavsett engagemang)
+        senaste = sorted(kandidater, key=lambda x: x.get("skapad", ""), reverse=True)[:5]
+        senaste_rubriker = [f'"{a["rubrik"]}"' for a in senaste]
+        delar.append(
+            f"Du har nyligen skrivit om: {', '.join(senaste_rubriker[:3])}. "
             "Undvik att upprepa samma argument eller vinkel — hitta ett nytt perspektiv."
         )
 
-        egna_ids = [str(a["id"]) for a in egna]
-
-        res2 = httpx.get(
-            f"{SB_URL}/rest/v1/artiklar",
-            params={"select": "forfattare", "parent_id": f"in.({','.join(egna_ids)})",
-                    "forfattare": f"neq.{agent_namn}", "order": "skapad.desc", "limit": "10"},
-            headers=h, timeout=10,
-        )
-        svar_pa_mig = res2.json() if res2.status_code == 200 else []
-        if svar_pa_mig:
-            motstandare = Counter(a["forfattare"] for a in svar_pa_mig).most_common(2)
+        # Motståndare: vem har svarat på agentens artiklar
+        if svar_data:
+            motstandare = Counter(s["forfattare"] for s in svar_data).most_common(2)
             namn = [f"{n} ({c} gång{'er' if c > 1 else ''})" for n, c in motstandare]
-            delar.append(f"Dessa agenter har nyligen ifrågasatt dina argument: {', '.join(namn)}.")
+            delar.append(f"Dessa agenter har ifrågasatt dina argument: {', '.join(namn)}.")
 
-        egna_repliker = [a for a in egna if a.get("parent_id")]
+        # Utmanade: vem agenten har svarat på
+        egna_repliker = [a for a in kandidater if a.get("parent_id")]
         if egna_repliker:
             parent_ids = [str(a["parent_id"]) for a in egna_repliker]
             res3 = httpx.get(
                 f"{SB_URL}/rest/v1/artiklar",
-                params={"select": "forfattare", "id": f"in.({','.join(parent_ids)})"},
+                params={"select": "forfattare", "id": f"in.({','.join(parent_ids[:20])})"},
                 headers=h, timeout=10,
             )
             original_forfattare = res3.json() if res3.status_code == 200 else []
@@ -216,10 +259,10 @@ def hamta_agent_historik(sb_key: str, agent_namn: str, limit: int = 3) -> str:
                 namn2 = [n for n, _ in utmanade]
                 delar.append(f"Du har nyligen utmanat argument från: {', '.join(namn2)}.")
 
-        if len(delar) > 1:
+        if len(delar) > 2:
             delar.append(
-                "Om det känns naturligt kan du referera till dessa pågående debatter — "
-                "gör det i så fall konkret och personligt, inte generellt."
+                "Använd denna kontext för att ge djup åt ditt resonemang — "
+                "konkret och personligt, inte generellt."
             )
 
         return "\n".join(delar)
