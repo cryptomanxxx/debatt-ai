@@ -421,6 +421,61 @@ def main():
         if ok_mf:
             logga_action(sb_key, agent["namn"], "create_market_draft", {"amne": amne[:80]}, "föreslagen")
 
+    # Agent ställer en fråga till en annan agent (~10% chans per körning)
+    if sb_key and random.random() < 0.10:
+        mottagare = random.choice([a for a in AGENTER if a["namn"] != agent["namn"]])
+        print(f"\n── Agent-till-agent-fråga: {agent['namn']} → {mottagare['namn']} ──")
+        try:
+            fraga_prompt = (
+                f"Du är {agent['namn']}. Du har just skrivit om ämnet: \"{amne[:120]}\".\n"
+                f"Formulera en kort, skarp fråga (max 120 tecken) till {mottagare['namn']} "
+                f"om detta ämne — något du genuint undrar över eller utmanar dem på utifrån din personlighet. "
+                f"Svara ENBART med frågan, inga inledningsfraser."
+            )
+            fraga_r = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": agent.get("system", "")[:600]},
+                    {"role": "user", "content": fraga_prompt},
+                ],
+                "max_tokens": 80,
+                "temperature": 0.9,
+            })
+            fraga_text = fraga_r.json()["choices"][0]["message"]["content"].strip().strip('"')
+
+            svar_r = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": mottagare.get("system", "")[:600]},
+                    {"role": "user", "content": f"{agent['namn']} frågar dig: \"{fraga_text}\"\nSvara kort och i karaktär (2–3 meningar)."},
+                ],
+                "max_tokens": 200,
+                "temperature": 0.9,
+            })
+            svar_text = svar_r.json()["choices"][0]["message"]["content"].strip()
+
+            import httpx as _httpx
+            SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
+            _httpx.post(
+                f"{SB_URL}/rest/v1/agent_fragor",
+                headers={
+                    "apikey": sb_key,
+                    "Authorization": f"Bearer {sb_key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+                json={"agent": mottagare["namn"], "fraga": fraga_text, "svar": svar_text, "offentlig": True, "fragare": agent["namn"]},
+                timeout=10,
+            )
+            print(f"  ✓ {agent['namn']}: \"{fraga_text[:70]}\"")
+            print(f"  ✓ {mottagare['namn']}: \"{svar_text[:80]}…\"")
+            logga_action(sb_key, agent["namn"], "ask_agent", {
+                "mottagare": mottagare["namn"],
+                "fraga": fraga_text[:100],
+            }, "ok")
+        except Exception as e:
+            print(f"  ✗ Agent-till-agent-fråga misslyckades: {e}", file=sys.stderr)
+
     if sb_key and random.random() < 0.25:
         print("\n── Visual Agent ──")
         statistik_data = hamta_all_statistik(sb_key)
