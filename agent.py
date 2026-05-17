@@ -43,6 +43,7 @@ from supabase_utils import (
     rösta_på_opinion, skapa_opinion_fraga, skapa_market_forslag,
     rakna_debattdjup, ar_duplikat, hamta_pexels_bild, logga_action,
     hamta_relation, upsert_koalition,
+    rösta_på_lagforslag_block, skapa_lagforslag_ai, importera_riksdagen_forslag,
 )
 
 
@@ -428,6 +429,26 @@ def main():
         ok_mf = skapa_market_forslag(agent, sb_key, amne)
         if ok_mf:
             logga_action(sb_key, agent["namn"], "create_market_draft", {"amne": amne[:80]}, "föreslagen")
+
+    if sb_key:
+        print(f"\n── AI-parlamentet: {agent['namn']} ──")
+        antal_lag = rösta_på_lagforslag_block(agent, sb_key)
+        if antal_lag > 0:
+            print(f"  ✓ Röstade på {antal_lag} lagförslag")
+            logga_action(sb_key, agent["namn"], "cast_parliament_vote", {"antal": antal_lag}, "ok")
+        else:
+            print("  Inga nya lagförslag att rösta på")
+
+        if agent["namn"] not in ROST_AGENTER and random.random() < 0.12:
+            ok_lag = skapa_lagforslag_ai(agent, sb_key, amne)
+            if ok_lag:
+                print(f"  ✓ Nytt lagförslag skapat av {agent['namn']}")
+                logga_action(sb_key, agent["namn"], "create_lagforslag", {"amne": amne[:80]}, "ok")
+
+        if random.random() < 0.10:
+            imp = importera_riksdagen_forslag(sb_key)
+            if imp > 0:
+                print(f"  ✓ Importerade {imp} riksdagsproposition(er)")
 
     # Agent ställer en fråga till en annan agent (~10% chans per körning)
     if sb_key and random.random() < 0.10:
