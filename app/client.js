@@ -657,8 +657,8 @@ export default function DebattClient({ initialArticleCount = null }) {
       }
     }).catch(() => {});
     // Kolla om besökaren redan röstat idag
-    const voted = localStorage.getItem("platform_stamning_voted");
-    if (voted && Date.now() - Number(voted) < 24 * 60 * 60 * 1000) setStamningVoted(true);
+    const stamningVotedTs = localStorage.getItem("platform_stamning_voted");
+    if (stamningVotedTs && Date.now() - Number(stamningVotedTs) < 24 * 60 * 60 * 1000) setStamningVoted(true);
     // Agent-koalitioner
     fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka,antal_utbyten&order=styrka.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
       .then(r => r.json()).then(d => setAgentKoalitioner(Array.isArray(d) ? d : [])).catch(() => {});
