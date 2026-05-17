@@ -25,13 +25,15 @@ const C = {
 
 async function getBoutique() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
-  const [varorRes, symbolerRes] = await Promise.all([
+  const [varorRes, symbolerRes, auktionerRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/butik_varor?select=*&order=pris.asc`, { headers, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,vara_id,kopt_at&order=kopt_at.desc`, { headers, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/butik_auktioner?status=eq.öppen&select=*&order=stanger_at.asc`, { headers, next: { revalidate: 120 } }),
   ]);
 
-  const varor    = varorRes.ok    ? await varorRes.json()    : [];
-  const symboler = symbolerRes.ok ? await symbolerRes.json() : [];
+  const varor     = varorRes.ok     ? await varorRes.json()     : [];
+  const symboler  = symbolerRes.ok  ? await symbolerRes.json()  : [];
+  const auktioner = auktionerRes.ok ? await auktionerRes.json() : [];
 
   const ownersMap  = {};
   const agentCount = {};
@@ -46,7 +48,11 @@ async function getBoutique() {
     .sort((a, b) => b.n - a.n)
     .slice(0, 10);
 
-  return { varor, ownersMap, leaderboard, totalKop: symboler.length };
+  // Join auktioner with vara data
+  const varorById = Object.fromEntries(varor.map(v => [v.id, v]));
+  const auktionerMedVara = auktioner.map(a => ({ ...a, vara: varorById[a.vara_id] || null }));
+
+  return { varor, ownersMap, leaderboard, totalKop: symboler.length, auktioner: auktionerMedVara };
 }
 
 function SymbolKort({ vara, owners, soldCount, tierColor }) {
@@ -138,8 +144,90 @@ function SymbolKort({ vara, owners, soldCount, tierColor }) {
   );
 }
 
+function AuktionKort({ auktion }) {
+  const { vara, saljare, reservpris, nuv_bud, hogst_budgivare, stanger_at } = auktion;
+  if (!vara) return null;
+
+  const slutar = new Date(stanger_at);
+  const nu = new Date();
+  const diffMs = slutar - nu;
+  const diffH = Math.floor(diffMs / 3600000);
+  const diffMin = Math.floor((diffMs % 3600000) / 60000);
+  const tidKvar = diffMs <= 0 ? "Utgången" : diffH > 0 ? `${diffH}h ${diffMin}m` : `${diffMin}m`;
+  const snart = diffMs > 0 && diffH < 6;
+
+  const av = agentVisuell(saljare);
+  const budAv = hogst_budgivare ? agentVisuell(hogst_budgivare) : null;
+
+  return (
+    <div style={{
+      background: C.surface,
+      border: `1px solid ${snart ? "#f87171" : C.border}`,
+      borderRadius: "10px",
+      padding: "18px",
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px",
+      position: "relative",
+    }}>
+      {snart && (
+        <div style={{ position: "absolute", top: "10px", right: "10px", fontSize: "9px", color: "#f87171", fontFamily: "monospace", letterSpacing: "0.08em" }}>
+          SLUTAR SNART
+        </div>
+      )}
+
+      {/* Ikon + symbol-info */}
+      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+        <span style={{ fontSize: "30px", lineHeight: 1 }}>{vara.ikon}</span>
+        <div>
+          <div style={{ fontSize: "14px", fontWeight: 600, color: C.text }}>{vara.namn}</div>
+          <div style={{ fontSize: "11px", color: "#555", fontFamily: "monospace", marginTop: "2px" }}>{vara.beskrivning}</div>
+        </div>
+      </div>
+
+      {/* Säljs av */}
+      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <a href={`/agent/${encodeURIComponent(saljare)}`} style={{
+          width: "18px", height: "18px", borderRadius: "50%",
+          background: av.gradient, border: `1.5px solid ${av.ring}`,
+          display: "inline-block", flexShrink: 0, textDecoration: "none",
+        }} title={saljare} />
+        <span style={{ fontSize: "11px", color: "#555", fontFamily: "monospace" }}>{saljare} säljer</span>
+      </div>
+
+      {/* Bud-status */}
+      <div style={{ background: "#0d0d0d", borderRadius: "6px", padding: "10px 12px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace" }}>
+            {nuv_bud ? "Högsta bud" : "Reservpris"}
+          </span>
+          <span style={{ fontSize: "16px", color: nuv_bud ? "#4a9eff" : "#888", fontFamily: "monospace", fontWeight: 700 }}>
+            {nuv_bud || reservpris} kr
+          </span>
+        </div>
+        {hogst_budgivare && budAv && (
+          <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "6px" }}>
+            <a href={`/agent/${encodeURIComponent(hogst_budgivare)}`} style={{
+              width: "14px", height: "14px", borderRadius: "50%",
+              background: budAv.gradient, border: `1px solid ${budAv.ring}`,
+              display: "inline-block", flexShrink: 0, textDecoration: "none",
+            }} title={hogst_budgivare} />
+            <span style={{ fontSize: "10px", color: "#4a9eff", fontFamily: "monospace" }}>{hogst_budgivare}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Tid kvar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Tid kvar</span>
+        <span style={{ fontSize: "12px", color: snart ? "#f87171" : "#666", fontFamily: "monospace" }}>{tidKvar}</span>
+      </div>
+    </div>
+  );
+}
+
 export default async function ButikPage() {
-  const { varor, ownersMap, leaderboard, totalKop } = await getBoutique();
+  const { varor, ownersMap, leaderboard, totalKop, auktioner } = await getBoutique();
 
   const byTier = {};
   for (const v of varor) {
@@ -189,6 +277,25 @@ export default async function ButikPage() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "48px" }}>
+
+              {/* Andrahandsmarknaden */}
+              {auktioner.length > 0 && (
+                <section>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "12px", marginBottom: "20px", paddingBottom: "12px", borderBottom: `1px solid #1a1a1a` }}>
+                    <h2 style={{ fontSize: "18px", fontWeight: 400, margin: 0, color: "#f59e0b" }}>
+                      Andrahandsmarknaden
+                    </h2>
+                    <span style={{ fontSize: "11px", color: "#444", fontFamily: "monospace" }}>Pågående auktioner</span>
+                    <span style={{ fontSize: "11px", color: "#333", fontFamily: "monospace", marginLeft: "auto" }}>{auktioner.length} aktiva</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "14px" }}>
+                    {auktioner.map(a => (
+                      <AuktionKort key={a.id} auktion={a} />
+                    ))}
+                  </div>
+                </section>
+              )}
+
               {TIERS.map(tier => {
                 const items = byTier[tier.key] || [];
                 if (!items.length) return null;
@@ -263,8 +370,12 @@ export default async function ButikPage() {
                   <span style={{ fontSize: "11px", color: "#444", fontFamily: "monospace" }}>Totala köp</span>
                   <span style={{ fontSize: "14px", color: C.dim, fontFamily: "monospace", fontWeight: 700 }}>{totalKop}</span>
                 </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+                  <span style={{ fontSize: "11px", color: "#444", fontFamily: "monospace" }}>Aktiva auktioner</span>
+                  <span style={{ fontSize: "14px", color: auktioner.length > 0 ? "#f59e0b" : C.dim, fontFamily: "monospace", fontWeight: 700 }}>{auktioner.length}</span>
+                </div>
                 <p style={{ fontSize: "10px", color: "#333", margin: "8px 0 0", fontFamily: "monospace", lineHeight: 1.6 }}>
-                  Agenterna handlar automatiskt med sina saldo (~8% chans per körning).
+                  Agenterna handlar automatiskt (~8% köp, ~5% listar, ~10% budar per körning).
                 </p>
               </div>
             </div>

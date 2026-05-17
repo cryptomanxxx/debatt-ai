@@ -2375,3 +2375,253 @@ def kop_statussymbol(sb_key: str, agent_namn: str, preferenser: list = None) -> 
     except Exception as e:
         print(f"  Butik-kop misslyckades: {e}", file=sys.stderr)
         return None
+
+
+# ── Andrahandsmarknaden ──────────────────────────────────────────────────────
+
+def stang_auktioner(sb_key: str) -> int:
+    """Stäng utgångna auktioner och genomför eventuella transaktioner."""
+    try:
+        import datetime, urllib.parse
+        hdrs = {
+            "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+            "Content-Type": "application/json",
+        }
+        nu = datetime.datetime.utcnow().isoformat() + "Z"
+
+        # Hämta alla öppna auktioner som löpt ut
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/butik_auktioner"
+            f"?status=eq.öppen&stanger_at=lt.{nu}&select=*",
+            headers=hdrs, timeout=10,
+        )
+        if not r.is_success:
+            return 0
+
+        auktioner = r.json()
+        stangda = 0
+        for a in auktioner:
+            aid = a["id"]
+            if a.get("hogst_budgivare") and a.get("nuv_bud"):
+                # Genomför affär: köpare betalar säljare, symbol byter ägare
+                kopare = a["hogst_budgivare"]
+                saljare = a["saljare"]
+                belopp = a["nuv_bud"]
+                vara_id = a["vara_id"]
+
+                # Dra från köparens saldo
+                kr = httpx.get(
+                    f"{SB_URL}/rest/v1/agent_planbocker"
+                    f"?agent=eq.{urllib.parse.quote(kopare)}&select=saldo",
+                    headers=hdrs, timeout=8,
+                )
+                if not kr.is_success or not kr.json():
+                    continue
+                saldo_kopare = kr.json()[0]["saldo"]
+                if saldo_kopare < belopp:
+                    httpx.patch(
+                        f"{SB_URL}/rest/v1/butik_auktioner?id=eq.{aid}",
+                        json={"status": "inställd"},
+                        headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+                    )
+                    stangda += 1
+                    continue
+
+                httpx.patch(
+                    f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(kopare)}",
+                    json={"saldo": saldo_kopare - belopp},
+                    headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+                )
+
+                # Lägg till säljares saldo
+                sr = httpx.get(
+                    f"{SB_URL}/rest/v1/agent_planbocker"
+                    f"?agent=eq.{urllib.parse.quote(saljare)}&select=saldo",
+                    headers=hdrs, timeout=8,
+                )
+                if sr.is_success and sr.json():
+                    httpx.patch(
+                        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(saljare)}",
+                        json={"saldo": sr.json()[0]["saldo"] + belopp},
+                        headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+                    )
+
+                # Flytta symbol: ta bort från säljare, lägg till köpare
+                httpx.delete(
+                    f"{SB_URL}/rest/v1/agent_symboler"
+                    f"?agent=eq.{urllib.parse.quote(saljare)}&vara_id=eq.{vara_id}",
+                    headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+                )
+                httpx.post(
+                    f"{SB_URL}/rest/v1/agent_symboler",
+                    json={"agent": kopare, "vara_id": vara_id, "pris_betalt": belopp},
+                    headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+                )
+
+                httpx.patch(
+                    f"{SB_URL}/rest/v1/butik_auktioner?id=eq.{aid}",
+                    json={"status": "avgjord"},
+                    headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+                )
+            else:
+                # Inga bud — inställd
+                httpx.patch(
+                    f"{SB_URL}/rest/v1/butik_auktioner?id=eq.{aid}",
+                    json={"status": "inställd"},
+                    headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+                )
+            stangda += 1
+
+        return stangda
+    except Exception as e:
+        print(f"  Auktion-stang misslyckades: {e}", file=sys.stderr)
+        return 0
+
+
+def lista_symbol_for_forsaljning(sb_key: str, agent_namn: str) -> str | None:
+    """Agenten listar en av sina symboler på andrahandsmarknaden (48h, reservpris = 60% av butikspris)."""
+    try:
+        import datetime, urllib.parse
+        hdrs = {
+            "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+            "Content-Type": "application/json",
+        }
+
+        # Hämta ägda symboler
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_symboler"
+            f"?agent=eq.{urllib.parse.quote(agent_namn)}&select=vara_id,pris_betalt",
+            headers=hdrs, timeout=8,
+        )
+        if not r.is_success or not r.json():
+            return None
+
+        agda = r.json()
+
+        # Filtrera bort symboler som redan är ute till försäljning
+        pa_r = httpx.get(
+            f"{SB_URL}/rest/v1/butik_auktioner"
+            f"?saljare=eq.{urllib.parse.quote(agent_namn)}&status=eq.öppen&select=vara_id",
+            headers=hdrs, timeout=8,
+        )
+        ute_ids = {x["vara_id"] for x in (pa_r.json() if pa_r.is_success else [])}
+
+        listbara = [x for x in agda if x["vara_id"] not in ute_ids]
+        if not listbara:
+            return None
+
+        vald = random.choice(listbara)
+
+        # Hämta varans data för namn och pris
+        vr = httpx.get(
+            f"{SB_URL}/rest/v1/butik_varor?id=eq.{vald['vara_id']}&select=namn,pris",
+            headers=hdrs, timeout=8,
+        )
+        if not vr.is_success or not vr.json():
+            return None
+        vara = vr.json()[0]
+
+        reservpris = max(10, int(vara["pris"] * 0.6))
+        stanger_at = (datetime.datetime.utcnow() + datetime.timedelta(hours=48)).isoformat() + "Z"
+
+        ins = httpx.post(
+            f"{SB_URL}/rest/v1/butik_auktioner",
+            json={
+                "vara_id": vald["vara_id"],
+                "saljare": agent_namn,
+                "reservpris": reservpris,
+                "stanger_at": stanger_at,
+                "status": "öppen",
+            },
+            headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+        )
+        if ins.is_success:
+            return vara["namn"]
+        return None
+    except Exception as e:
+        print(f"  Listning misslyckades: {e}", file=sys.stderr)
+        return None
+
+
+def buda_pa_auktion(sb_key: str, agent_namn: str) -> str | None:
+    """Agenten lägger ett bud på en öppen auktion (inte sina egna, har råd med budet)."""
+    try:
+        import urllib.parse
+        hdrs = {
+            "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+            "Content-Type": "application/json",
+        }
+
+        # Hämta saldo
+        sr = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker"
+            f"?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo",
+            headers=hdrs, timeout=8,
+        )
+        if not sr.is_success or not sr.json():
+            return None
+        saldo = sr.json()[0]["saldo"]
+        if saldo < 10:
+            return None
+
+        # Hämta öppna auktioner (inte egna)
+        ar = httpx.get(
+            f"{SB_URL}/rest/v1/butik_auktioner"
+            f"?status=eq.öppen&saljare=neq.{urllib.parse.quote(agent_namn)}&select=*",
+            headers=hdrs, timeout=8,
+        )
+        if not ar.is_success or not ar.json():
+            return None
+
+        auktioner = ar.json()
+
+        # Filtrera: kan inte buda på symbol man redan äger, ha råd med bud + 10%
+        agda_r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_symboler"
+            f"?agent=eq.{urllib.parse.quote(agent_namn)}&select=vara_id",
+            headers=hdrs, timeout=8,
+        )
+        agda_ids = {x["vara_id"] for x in (agda_r.json() if agda_r.is_success else [])}
+
+        mojliga = []
+        for a in auktioner:
+            if a["vara_id"] in agda_ids:
+                continue
+            min_bud = (a["nuv_bud"] or a["reservpris"] - 1) + 1
+            if min_bud > saldo:
+                continue
+            mojliga.append((a, min_bud))
+
+        if not mojliga:
+            return None
+
+        vald_auktion, min_bud = random.choice(mojliga)
+        # Bjud min_bud till max saldo*0.4
+        max_bud = min(saldo, int(saldo * 0.4))
+        bud = random.randint(min_bud, max(min_bud, max_bud))
+
+        # Hämta varans namn för loggning
+        vr = httpx.get(
+            f"{SB_URL}/rest/v1/butik_varor?id=eq.{vald_auktion['vara_id']}&select=namn",
+            headers=hdrs, timeout=8,
+        )
+        vara_namn = vr.json()[0]["namn"] if vr.is_success and vr.json() else "okänd"
+
+        # Spara budet
+        httpx.post(
+            f"{SB_URL}/rest/v1/butik_bud",
+            json={"auktion_id": vald_auktion["id"], "budgivare": agent_namn, "belopp": bud},
+            headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+        )
+
+        # Uppdatera auktionens nuv_bud och hogst_budgivare
+        httpx.patch(
+            f"{SB_URL}/rest/v1/butik_auktioner?id=eq.{vald_auktion['id']}",
+            json={"nuv_bud": bud, "hogst_budgivare": agent_namn},
+            headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+        )
+
+        return vara_namn
+    except Exception as e:
+        print(f"  Budgivning misslyckades: {e}", file=sys.stderr)
+        return None

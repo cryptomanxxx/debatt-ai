@@ -50,6 +50,7 @@ from supabase_utils import (
     kör_lobbying, initiera_koalition,
     reglera_prediction_bets,
     kop_statussymbol,
+    stang_auktioner, lista_symbol_for_forsaljning, buda_pa_auktion,
 )
 
 SYMBOL_PREFERENSER = {
@@ -481,6 +482,12 @@ def main():
         else:
             print("  Inga bets att reglera")
 
+    # Stäng utgångna auktioner (körs varje gång)
+    if sb_key:
+        stangda = stang_auktioner(sb_key)
+        if stangda:
+            print(f"\n── Auktioner stängda: {stangda} ──")
+
     if sb_key and agent["namn"] not in ROST_AGENTER and random.random() < 0.2:
         print(f"\n── Market-förslag: {agent['namn']} ──")
         ok_mf = skapa_market_forslag(agent, sb_key, amne)
@@ -543,6 +550,24 @@ def main():
             print(f"  ✓ Köpte: {symbol}")
         else:
             print("  Inget köp (ej råd eller inga tillgängliga)")
+
+    # Listar en symbol på andrahandsmarknaden (~5% chans)
+    if sb_key and random.random() < 0.05:
+        print(f"\n── Andrahand: {agent['namn']} listar symbol ──")
+        listad = lista_symbol_for_forsaljning(sb_key, agent["namn"])
+        if listad:
+            print(f"  ✓ Listade: {listad}")
+        else:
+            print("  Inget att lista")
+
+    # Lägger bud på öppen auktion (~10% chans)
+    if sb_key and random.random() < 0.10:
+        print(f"\n── Andrahand: {agent['namn']} budar ──")
+        budvara = buda_pa_auktion(sb_key, agent["namn"])
+        if budvara:
+            print(f"  ✓ Lade bud på: {budvara}")
+        else:
+            print("  Inget bud")
 
     # Agent ställer en fråga till en annan agent (~20% chans per körning)
     if sb_key and random.random() < 0.20:
