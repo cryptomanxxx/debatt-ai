@@ -2276,3 +2276,102 @@ def reglera_prediction_bets(sb_key: str) -> int:
     except Exception as e:
         print(f"  ✗ Prediction-reglering misslyckades: {e}", file=sys.stderr)
         return 0
+
+
+# ── Butik: statussymboler ────────────────────────────────────────────────────
+
+def kop_statussymbol(sb_key: str, agent_namn: str, preferenser: list = None) -> str | None:
+    """
+    Köper en statussymbol för agenten med saldo från agent_planbocker.
+    Väljer bland prefererade symboler (65%) annars slumpmässigt bland tillgängliga.
+    Returnerar symbolens namn om köpet lyckas, annars None.
+    """
+    hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+            "Content-Type": "application/json"}
+    try:
+        # Hämta agentens saldo
+        pr = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo",
+            headers=hdrs, timeout=8,
+        )
+        if not pr.is_success or not pr.json():
+            return None
+        saldo = pr.json()[0].get("saldo", 0)
+        if saldo < 25:
+            return None
+
+        # Hämta alla varor
+        vr = httpx.get(
+            f"{SB_URL}/rest/v1/butik_varor?select=*&order=pris.asc",
+            headers=hdrs, timeout=8,
+        )
+        if not vr.is_success:
+            return None
+        varor = vr.json()
+
+        # Hämta redan agda symboler
+        ar = httpx.get(
+            f"{SB_URL}/rest/v1/agent_symboler?agent=eq.{urllib.parse.quote(agent_namn)}&select=vara_id",
+            headers=hdrs, timeout=8,
+        )
+        agda_ids = {s["vara_id"] for s in (ar.json() if ar.is_success else [])}
+
+        # Rakna salda exemplar av limiterade varor
+        limiterade_ids = [str(v["id"]) for v in varor if v.get("max_antal")]
+        sold_count: dict = {}
+        if limiterade_ids:
+            lr = httpx.get(
+                f"{SB_URL}/rest/v1/agent_symboler?vara_id=in.({','.join(limiterade_ids)})&select=vara_id",
+                headers=hdrs, timeout=8,
+            )
+            if lr.is_success:
+                for s in lr.json():
+                    sold_count[s["vara_id"]] = sold_count.get(s["vara_id"], 0) + 1
+
+        # Filtrera tillgangliga varor
+        tillgangliga = [
+            v for v in varor
+            if v["id"] not in agda_ids
+            and v["pris"] <= saldo
+            and not (v.get("max_antal") and sold_count.get(v["id"], 0) >= v["max_antal"])
+        ]
+        if not tillgangliga:
+            return None
+
+        # Valj med personlighetsbaserad preferens
+        vald = None
+        if preferenser:
+            foredragna = [v for v in tillgangliga if v["namn"] in preferenser]
+            if foredragna and random.random() < 0.65:
+                vald = random.choice(foredragna)
+        if vald is None:
+            vald = random.choice(tillgangliga)
+
+        # Dra saldo
+        patch_r = httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+            json={"saldo": saldo - vald["pris"]},
+            headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+        )
+        if not patch_r.is_success:
+            return None
+
+        # Spara kopet
+        ins_r = httpx.post(
+            f"{SB_URL}/rest/v1/agent_symboler",
+            json={"agent": agent_namn, "vara_id": vald["id"], "pris_betalt": vald["pris"]},
+            headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+        )
+        if not ins_r.is_success:
+            # Aterbetala om insert misslyckades
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+                json={"saldo": saldo},
+                headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+            )
+            return None
+
+        return vald["namn"]
+    except Exception as e:
+        print(f"  Butik-kop misslyckades: {e}", file=sys.stderr)
+        return None

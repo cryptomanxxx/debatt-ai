@@ -49,7 +49,35 @@ from supabase_utils import (
     hamta_agent_positioner, uppdatera_agent_positioner,
     kör_lobbying, initiera_koalition,
     reglera_prediction_bets,
+    kop_statussymbol,
 )
+
+SYMBOL_PREFERENSER = {
+    "Nationalekonom":       ["Expert", "Analytiker", "Tankledare", "Inflytelsefull", "Elite"],
+    "Miljöaktivist":        ["Fredsmäklare", "Visionär", "Sanningens Röst", "Byggare", "Innovatör"],
+    "Teknikoptimist":       ["Innovatör", "Visionär", "Expert", "Byggare", "Analytiker"],
+    "Konservativ debattör": ["Verifierad", "Expert", "Faktastyrka", "Sanningens Röst", "Hög Förtroende"],
+    "Jurist":               ["Faktastyrka", "Expert", "Verifierad", "Hög Förtroende", "Inflytelsefull"],
+    "Journalist":           ["Sanningens Röst", "Inflytelsefull", "Faktastyrka", "Aktiv Debattör", "Påhittig Röst"],
+    "Filosof":              ["Visionär", "Oratel", "Tankledare", "Sanningens Röst", "Fredsmäklare"],
+    "Läkare":               ["Faktastyrka", "Expert", "Hög Förtroende", "Verifierad", "Analytiker"],
+    "Psykolog":             ["Fredsmäklare", "Mentor", "Hög Förtroende", "Aktiv Debattör", "Visionär"],
+    "Historiker":           ["Verifierad", "Expert", "Tankledare", "Säsong 1", "Grundare"],
+    "Sociolog":             ["Inflytelsefull", "Tankledare", "Sanningens Röst", "Aktiv Debattör", "Fredsmäklare"],
+    "Kryptoanalytiker":     ["Kryptoportör", "Analytiker", "Expert", "Elite", "Inflytelsefull"],
+    "Den hungriga":         ["Verifierad", "Responserad", "Aktiv Debattör", "Påhittig Röst"],
+    "Mamman":               ["Verifierad", "Aktiv Debattör", "Responserad", "Hög Förtroende", "Fredsmäklare"],
+    "Den sura":             ["Sanningens Röst", "Faktastyrka", "Aktiv Debattör", "Responserad"],
+    "Den trötta":           ["Verifierad", "Responserad", "Aktiv Debattör"],
+    "Den stressade":        ["Aktiv Debattör", "Responserad", "Verifierad", "Analytiker"],
+    "Den lugna":            ["Fredsmäklare", "Hög Förtroende", "Visionär", "Verifierad", "Mentor"],
+    "Pensionären":          ["Verifierad", "Aktiv Debattör", "Hög Förtroende", "Säsong 1", "Grundare"],
+    "Tonåringen":           ["Innovatör", "Påhittig Röst", "Aktiv Debattör", "Responserad", "Visionär"],
+    "Den nostalgiske":      ["Säsong 1", "Grundare", "Verifierad", "Aktiv Debattör"],
+    "Hypokondrikern":       ["Faktastyrka", "Verifierad", "Expert", "Responserad", "Hög Förtroende"],
+    "Optimisten":           ["Innovatör", "Visionär", "Byggare", "Aktiv Debattör", "Inflytelsefull"],
+    "Den rike":             ["Oratel", "Legend", "Elite", "Särskild Röst", "Expert"],
+}
 
 
 def main():
@@ -505,6 +533,16 @@ def main():
             print(f"\n── AI-Ekonomi (pending ultimatum): {agent['namn']} ──")
             from supabase_utils import svara_ultimatum
             svara_ultimatum(agent, pending, sb_key)
+
+    # Statussymbol-köp (~8% chans per körning)
+    if sb_key and random.random() < 0.08:
+        print(f"\n── Butik: {agent['namn']} shoppar ──")
+        preferenser = SYMBOL_PREFERENSER.get(agent["namn"], [])
+        symbol = kop_statussymbol(sb_key, agent["namn"], preferenser)
+        if symbol:
+            print(f"  ✓ Köpte: {symbol}")
+        else:
+            print("  Inget köp (ej råd eller inga tillgängliga)")
 
     # Agent ställer en fråga till en annan agent (~20% chans per körning)
     if sb_key and random.random() < 0.20:
