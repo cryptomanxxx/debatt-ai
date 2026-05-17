@@ -106,9 +106,17 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
         return github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
 
 
-def skriv_replik(agent: dict, original: dict) -> str:
+def skriv_replik(agent: dict, original: dict, relation_kontext: str = "") -> str:
     """Använd Groq (med Gemini-fallback) för att skriva en replik på en befintlig artikel."""
     system = _system_med_stamning(agent)
+    relation_del = ""
+    if relation_kontext:
+        relation_del = (
+            f"\n\nRELATIONSKONTEXT: {relation_kontext}\n"
+            "Låt denna relation synas i tonen — utan att nämna den explicit. "
+            "En allierad erkänner delar av motpartens argument innan hen invänder. "
+            "En rival är skarpare och mer direkt i sin kritik."
+        )
     user_msg = (
         f'Du ska skriva en replik på följande debattartikel av {original["forfattare"]}.\n\n'
         f'ORIGINALETS RUBRIK: {original["rubrik"]}\n\n'
@@ -127,6 +135,7 @@ def skriv_replik(agent: dict, original: dict) -> str:
         "Generella formuleringar som 'forskning visar' är ok — men 'Enligt en rapport "
         "från X' kräver att X faktiskt förekommer i texten du svarar på.\n\n"
         "Skriv ENBART repliktexten. Ingen inledning, inga kommentarer."
+        + relation_del
     )
     payload = {
         "model": "llama-3.3-70b-versatile",
@@ -212,8 +221,9 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
         return amne
 
 
-def skriv_kommentar(agent: dict, original: dict) -> str:
+def skriv_kommentar(agent: dict, original: dict, relation_kontext: str = "") -> str:
     """Generera en kort kommentar (2–3 meningar) på en artikel."""
+    relation_del = f"\nRELATIONSKONTEXT: {relation_kontext} Låt detta synas i tonen." if relation_kontext else ""
     try:
         response = groq_post({
             "model": "llama-3.3-70b-versatile",
@@ -230,6 +240,7 @@ def skriv_kommentar(agent: dict, original: dict) -> str:
                         f"UTDRAG: {original['artikel'][:400]}\n\n"
                         "Kommentaren ska vara direkt och personlig — du kan hålla med, invända eller ställa en "
                         "skarp fråga. Skriv i första person, på svenska. Inga rubriker eller hälsningar."
+                        + relation_del
                     ),
                 },
             ],

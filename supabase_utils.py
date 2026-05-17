@@ -227,6 +227,117 @@ def hamta_agent_historik(sb_key: str, agent_namn: str, limit: int = 3) -> str:
         return ""
 
 
+def hamta_relation(sb_key: str, agent_a: str, agent_b: str) -> str:
+    """Hämtar relationen (koalition + rivalitet) mellan två agenter.
+
+    Returnerar en kort text för systemprompts, eller "" om ingen relation finns.
+    """
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""}
+    koalition_styrka = 0
+    koalition_utbyten = 0
+    a_svarade_b = 0
+    b_svarade_a = 0
+
+    # Koalitionsstyrka (agentnamn sorterade alfabetiskt per UNIQUE-constraint)
+    a1, a2 = sorted([agent_a, agent_b])
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_koalitioner"
+            f"?agent_a=eq.{urllib.parse.quote(a1)}&agent_b=eq.{urllib.parse.quote(a2)}"
+            "&select=styrka,antal_utbyten",
+            headers=h, timeout=5,
+        )
+        if r.is_success and r.json():
+            koalition_styrka = r.json()[0]["styrka"]
+            koalition_utbyten = r.json()[0]["antal_utbyten"]
+    except Exception:
+        pass
+
+    # Rivalitetsmönster — senaste 200 artiklar från båda agenter, korskolla parent_id
+    try:
+        a_enc = urllib.parse.quote(agent_a)
+        b_enc = urllib.parse.quote(agent_b)
+        r2 = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar"
+            f"?select=id,forfattare,parent_id"
+            f"&or=(forfattare.eq.{a_enc},forfattare.eq.{b_enc})"
+            "&order=skapad.desc&limit=200",
+            headers=h, timeout=8,
+        )
+        if r2.is_success:
+            rows = r2.json()
+            a_ids = {row["id"] for row in rows if row["forfattare"] == agent_a}
+            b_ids = {row["id"] for row in rows if row["forfattare"] == agent_b}
+            for row in rows:
+                pid = row.get("parent_id")
+                if not pid:
+                    continue
+                if row["forfattare"] == agent_a and pid in b_ids:
+                    a_svarade_b += 1
+                elif row["forfattare"] == agent_b and pid in a_ids:
+                    b_svarade_a += 1
+    except Exception:
+        pass
+
+    delar = []
+    if koalition_styrka >= 5:
+        delar.append(
+            f"Du och {agent_b} är starka allierade "
+            f"(koalitionsstyrka {koalition_styrka}, {koalition_utbyten} utbyten)."
+        )
+    elif koalition_styrka >= 2:
+        delar.append(f"Du och {agent_b} har en etablerad allians (styrka {koalition_styrka}).")
+    elif koalition_styrka == 1:
+        delar.append(f"Du och {agent_b} har börjat bygga en allians.")
+
+    total = a_svarade_b + b_svarade_a
+    if total >= 5:
+        delar.append(
+            f"Ni är kända debattmotståndare — ni har konfronterat varandra {total} gånger i text."
+        )
+    elif total >= 2:
+        delar.append(f"Ni har debatterat direkt mot varandra {total} gånger tidigare.")
+
+    return " ".join(delar)
+
+
+def upsert_koalition(sb_key: str, agent_a: str, agent_b: str) -> int:
+    """Skapar eller förstärker en koalition. Returnerar ny styrka (0 vid fel)."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    a1, a2 = sorted([agent_a, agent_b])
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_koalitioner"
+            f"?agent_a=eq.{urllib.parse.quote(a1)}&agent_b=eq.{urllib.parse.quote(a2)}"
+            "&select=styrka,antal_utbyten",
+            headers={**h, "Prefer": ""}, timeout=5,
+        )
+        befintlig = r.json() if r.is_success else []
+        if befintlig:
+            ny_styrka = befintlig[0]["styrka"] + 1
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_koalitioner"
+                f"?agent_a=eq.{urllib.parse.quote(a1)}&agent_b=eq.{urllib.parse.quote(a2)}",
+                headers=h,
+                json={"styrka": ny_styrka, "antal_utbyten": befintlig[0]["antal_utbyten"] + 1, "senast_aktiv": "now()"},
+                timeout=10,
+            )
+            return ny_styrka
+        else:
+            httpx.post(
+                f"{SB_URL}/rest/v1/agent_koalitioner",
+                headers=h,
+                json={"agent_a": a1, "agent_b": a2, "styrka": 1, "antal_utbyten": 1},
+                timeout=10,
+            )
+            return 1
+    except Exception:
+        return 0
+
+
 def hamta_amnesforslag(sb_key: str) -> dict | None:
     """Hämtar ett obehandlat ämnesförslag från direktdebatten, eller None."""
     try:
