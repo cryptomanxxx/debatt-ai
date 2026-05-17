@@ -2265,7 +2265,7 @@ def reglera_prediction_bets(sb_key: str) -> int:
 
             httpx.patch(
                 f"{SB_URL}/rest/v1/agent_bets?id=eq.{bet['id']}",
-                json={"avgjord": True, "vinst": vinst},
+                json={"avgjord": True, "vinst": vinst, "avgjord_at": "now()"},
                 headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
             )
             print(f"  {'✓ vann' if won else '✗ förlorade'} {bet['agent']}: "
