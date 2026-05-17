@@ -19,18 +19,33 @@ const HEADERS = {
   "Accept": "application/rss+xml, application/xml, text/xml, */*",
 };
 
+const TABLOID_MONSTER = [
+  "kungafamilj", "kungaparet", "kungen och", "drottning silvia",
+  "prins carl", "prinsessan victoria", "prinsessan sofia", "prinsessan madeleine",
+  "prins oscar", "prins nicolas", "prinsessan estelle", "kronprinsessan",
+  "dejtar", "gör slut med", "separerar från", "försonas med",
+  "kändispar", "kändisbröllop", "kändisbaby",
+  "klädningsvalet", "bäst klädda", "stilsäkra", "outfiten",
+  "tränar med", "lämnar klubben", "skriver på för",
+];
+
+function isTableid(rubrik) {
+  const lower = rubrik.toLowerCase();
+  return TABLOID_MONSTER.some(m => lower.includes(m));
+}
+
 function extractTitles(xml, kalla) {
   const items = [];
   const blockRx = /<(?:item|entry)[^>]*>([\s\S]*?)<\/(?:item|entry)>/g;
   const titleRx = /<title[^>]*>(?:<!\[CDATA\[)?\s*(.*?)\s*(?:\]\]>)?<\/title>/i;
   let block;
-  while ((block = blockRx.exec(xml)) !== null && items.length < 2) {
+  while ((block = blockRx.exec(xml)) !== null && items.length < 5) {
     const m = block[1].match(titleRx);
     if (m) {
       const rubrik = m[1]
         .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
         .replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
-      if (rubrik.length > 10) items.push({ rubrik, kalla });
+      if (rubrik.length > 10 && !isTableid(rubrik)) items.push({ rubrik, kalla });
     }
   }
   return items;
