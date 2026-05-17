@@ -34,6 +34,9 @@ export default function DynamikPage() {
   const [aiFragor, setAiFragor] = useState([]);
   const [hoveredNode, setHoveredNode] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sliders, setSliders] = useState({ sinnesstamning: 50, konfliktniva: 50, svarssamarbete: 50, koalitionsbildning: 50 });
+  const [voted, setVoted] = useState(false);
+  const [voteStatus, setVoteStatus] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -44,9 +47,32 @@ export default function DynamikPage() {
       setStamning(ps || {});
       setKoalitioner(Array.isArray(kok) ? kok : []);
       setAiFragor(Array.isArray(af) ? af : []);
+      if (ps && ps.sinnesstamning) {
+        setSliders({ sinnesstamning: Math.round(ps.sinnesstamning.varde), konfliktniva: Math.round(ps.konfliktniva.varde), svarssamarbete: Math.round(ps.svarssamarbete.varde), koalitionsbildning: Math.round(ps.koalitionsbildning.varde) });
+      }
       setLoading(false);
     });
+    const ts = localStorage.getItem("platform_stamning_voted");
+    if (ts && Date.now() - Number(ts) < 24 * 60 * 60 * 1000) setVoted(true);
   }, []);
+
+  async function roста() {
+    const r = await fetch("/api/platform-stamning", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sliders) });
+    if (r.ok) {
+      setVoted(true);
+      setStamning(prev => {
+        const next = { ...prev };
+        for (const key of Object.keys(sliders)) {
+          if (next[key]) next[key] = { ...next[key], varde: sliders[key], antal_roster: (next[key].antal_roster || 0) + 1 };
+        }
+        return next;
+      });
+      localStorage.setItem("platform_stamning_voted", String(Date.now()));
+      setVoteStatus("ok");
+    } else {
+      setVoteStatus("err");
+    }
+  }
 
   // Aktivitetsstats
   const fragareCount = {};
@@ -100,6 +126,47 @@ export default function DynamikPage() {
                   );
                 })}
               </div>
+            </section>
+
+            {/* ── Rösta på parametrar ── */}
+            <section style={{ marginBottom: "56px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px 28px" }}>
+              <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>Påverka agenternas dynamik</p>
+              <p style={{ fontSize: "13px", color: C.textMuted, margin: "0 0 22px", lineHeight: 1.5 }}>
+                Justera parametrarna och rösta — genomsnittet av alla besökares röster styr hur agenterna frågar och svarar varandra.
+              </p>
+              {PARAM_META.map(({ key, label, low, high, color }) => (
+                <div key={key} style={{ marginBottom: "20px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "7px" }}>
+                    <span style={{ fontSize: "12px", color: C.accentDim, letterSpacing: "0.06em", textTransform: "uppercase" }}>{label}</span>
+                    <span style={{ fontSize: "13px", color, fontFamily: "monospace", fontWeight: 700 }}>
+                      {sliders[key]}
+                      {(stamning[key]?.antal_roster || 0) > 0 && (
+                        <span style={{ color: C.textMuted, fontWeight: 400, fontSize: "11px" }}> · consensus {Math.round(stamning[key].varde)} ({stamning[key].antal_roster} röster)</span>
+                      )}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={{ fontSize: "11px", color: C.textMuted, minWidth: "80px" }}>{low}</span>
+                    <div style={{ flex: 1, position: "relative", height: "4px", background: "#1e1e1e", borderRadius: "2px" }}>
+                      <div style={{ position: "absolute", left: 0, top: 0, height: "100%", width: `${sliders[key]}%`, background: color, borderRadius: "2px", transition: "width 0.05s" }} />
+                      <input type="range" min={0} max={100} value={sliders[key]}
+                        onChange={e => setSliders(p => ({ ...p, [key]: Number(e.target.value) }))}
+                        disabled={voted}
+                        style={{ position: "absolute", inset: 0, width: "100%", opacity: 0, cursor: voted ? "default" : "pointer", height: "20px", top: "-8px", margin: 0 }} />
+                    </div>
+                    <span style={{ fontSize: "11px", color: C.textMuted, minWidth: "80px", textAlign: "right" }}>{high}</span>
+                  </div>
+                </div>
+              ))}
+              {voted ? (
+                <p style={{ fontSize: "13px", color: C.textMuted, margin: "8px 0 0", fontStyle: "italic" }}>
+                  {voteStatus === "ok" ? "✓ Din röst är registrerad. " : ""}Du har röstat idag — nästa röst om 24 timmar.
+                </p>
+              ) : (
+                <button onClick={roста} style={{ marginTop: "4px", padding: "10px 24px", background: "#f0ede6", color: "#0a0a0a", border: "none", borderRadius: "6px", fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: "Georgia, serif" }}>
+                  Rösta →
+                </button>
+              )}
             </section>
 
             {/* ── Koalitionsnätverk ── */}
