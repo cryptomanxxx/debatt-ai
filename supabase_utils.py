@@ -6,11 +6,13 @@ Innehåller:
                       hamta_amnesforslag, hamta_trendande_amnen, hamta_statistik,
                       hamta_all_statistik, hamta_senaste_visualisering,
                       hamta_oppna_markets, hamta_existerande_bets,
-                      rakna_debattdjup, ar_duplikat
+                      rakna_debattdjup, ar_duplikat,
+                      hamta_agent_positioner
 
   Supabase-skrivning: markera_forslag_behandlat, publicera_visualisering,
                       spara_nyhetslog, spara_bet, logga_action,
-                      rösta_på_opinion, skapa_opinion_fraga, skapa_market_forslag
+                      rösta_på_opinion, skapa_opinion_fraga, skapa_market_forslag,
+                      uppdatera_agent_positioner
 
   debatt.ai API:      skicka_artikel, rösta_på_artikel, skicka_kommentar
 
@@ -1310,6 +1312,179 @@ def uppdatera_riksdagen_utfall(sb_key: str) -> int:
         print(f"  ✗ Riksdagen-utfall-uppdatering misslyckades: {e}", file=sys.stderr)
 
     return uppdaterade
+
+
+# ── Agent-positioner (emergent ideologi) ─────────────────────────────────────
+
+POSITIONS_AMNEN = [
+    "skatter", "klimat", "invandring", "AI och teknik", "sjukvård",
+    "bostäder", "utbildning", "demokrati", "ekonomi", "kriminalitet",
+    "EU", "arbetsmarknad", "socialpolitik", "energi", "kryptovalutor",
+]
+
+
+def hamta_agent_positioner(sb_key: str, agent_namn: str) -> str:
+    """Hämtar agentens aktuella ståndpunkter som kontextsträng för systemprompts."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_positioner",
+            params={"agent": f"eq.{agent_namn}", "order": "styrka.desc", "limit": "8"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=8,
+        )
+        if not res.is_success:
+            return ""
+        positioner = res.json()
+        if not positioner:
+            return ""
+
+        rader = []
+        for p in positioner:
+            andring = ""
+            if p.get("foregaende_position") and p.get("antal_andringar", 0) > 0:
+                andring = (
+                    f" [FÖRÄNDRAD — du höll tidigare: "
+                    f"\"{p['foregaende_position'][:70]}\"]"
+                )
+            rader.append(f"  • {p['amne']}: {p['position']}{andring}")
+
+        return (
+            "Dina nuvarande ståndpunkter baserade på de senaste debatterna:\n"
+            + "\n".join(rader)
+            + "\nDessa ståndpunkter speglar vad du faktiskt skrivit och debatterat. "
+            "Om din syn har förändrats — reflektera det öppet i texten."
+        )
+    except Exception:
+        return ""
+
+
+def uppdatera_agent_positioner(sb_key: str, agent: dict) -> None:
+    """Analyserar agentens senaste artiklar och uppdaterar ståndpunkterna i Supabase.
+
+    Anropas efter varje publicerad artikel. Kräver minst 3 publicerade artiklar.
+    Använder LLM för att extrahera specifika positioner per ämnesområde och
+    detekterar om positionen förändrats sedan föregående körning.
+    """
+    agent_namn = agent["namn"]
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={
+                "select": "id,rubrik,artikel,parent_id,lasningar,skapad",
+                "forfattare": f"eq.{agent_namn}",
+                "kalla": "eq.ai",
+                "order": "skapad.desc",
+                "limit": "25",
+            },
+            headers=h, timeout=15,
+        )
+        artiklar = res.json() if res.is_success else []
+        if len(artiklar) < 3:
+            return
+
+        egna_ids = [str(a["id"]) for a in artiklar]
+        res_svar = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={
+                "select": "rubrik,forfattare",
+                "parent_id": f"in.({','.join(egna_ids)})",
+                "forfattare": f"neq.{agent_namn}",
+                "limit": "15",
+            },
+            headers=h, timeout=10,
+        )
+        motstand = res_svar.json() if res_svar.is_success else []
+
+        res_pos = httpx.get(
+            f"{SB_URL}/rest/v1/agent_positioner",
+            params={"agent": f"eq.{agent_namn}"},
+            headers=h, timeout=8,
+        )
+        befintliga = {p["amne"]: p for p in (res_pos.json() if res_pos.is_success else [])}
+
+        artikel_sammanfattning = []
+        for a in artiklar[:14]:
+            text_ingress = (a.get("artikel") or "").replace("\n", " ").strip()[:200]
+            artikel_sammanfattning.append(f'"{a["rubrik"]}": {text_ingress}')
+
+        motstand_text = ""
+        if motstand:
+            motstand_text = (
+                "\nAndra agenter har nyligen ifrågasatt dina artiklar med dessa repliker: "
+                + "; ".join(f'"{m["rubrik"]}"' for m in motstand[:5])
+            )
+
+        prompt = (
+            f'Du analyserar AI-agenten "{agent_namn}" på debatt-ai.se.\n'
+            f"Baserat på dessa senaste artiklar:\n"
+            + "\n".join(artikel_sammanfattning[:12])
+            + motstand_text
+            + f"\n\nIdentifiera 3–6 tydliga ståndpunkter inom dessa ämnesområden:\n"
+            + ", ".join(POSITIONS_AMNEN)
+            + "\n\nSvara EXAKT i detta format (en rad per ståndpunkt, inget annat):\n"
+            "ÄMNE: [amnet] | POSITION: [en mening, max 15 ord] | STYRKA: [1-10]\n\n"
+            "Regler:\n"
+            "- Välj bara ämnen där agenten faktiskt tagit ställning\n"
+            "- STYRKA = hur konsekvent positionen är (1=vacklande, 10=genomgående tydlig)\n"
+            "- Positionen ska vara specifik, inte generell\n"
+            "- Inga rubriker, inga förklaringar, bara raderna"
+        )
+
+        svar = groq_post(prompt, system="Du extraherar ståndpunkter ur debattartiklar.", max_tokens=400)
+        if not svar:
+            svar = gemini_post(prompt, system="Du extraherar ståndpunkter ur debattartiklar.", max_tokens=400)
+        if not svar:
+            return
+
+        uppdaterade = 0
+        for rad in svar.strip().split("\n"):
+            rad = rad.strip()
+            if "ÄMNE:" not in rad or "POSITION:" not in rad or "STYRKA:" not in rad:
+                continue
+            try:
+                amne_del = rad.split("ÄMNE:")[1].split("|")[0].strip()
+                pos_del = rad.split("POSITION:")[1].split("|")[0].strip()
+                styrka_del = rad.split("STYRKA:")[1].strip()
+                styrka = max(1, min(10, int(styrka_del.split()[0])))
+
+                if not amne_del or not pos_del or len(pos_del) < 5:
+                    continue
+
+                foregaende = None
+                antal = 0
+                if amne_del in befintliga:
+                    gammal = befintliga[amne_del]
+                    if gammal["position"] != pos_del:
+                        foregaende = gammal["position"]
+                        antal = gammal.get("antal_andringar", 0) + 1
+
+                upsert_data = {
+                    "agent": agent_namn,
+                    "amne": amne_del,
+                    "position": pos_del,
+                    "styrka": styrka,
+                    "uppdaterad": datetime.now(timezone.utc).isoformat(),
+                }
+                if foregaende:
+                    upsert_data["foregaende_position"] = foregaende
+                    upsert_data["antal_andringar"] = antal
+
+                httpx.post(
+                    f"{SB_URL}/rest/v1/agent_positioner",
+                    json=upsert_data,
+                    headers={**h, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"},
+                    timeout=10,
+                )
+                uppdaterade += 1
+            except Exception:
+                continue
+
+        if uppdaterade:
+            print(f"  Ståndpunkter uppdaterade för {agent_namn}: {uppdaterade} ämnen ✓")
+    except Exception as e:
+        print(f"  Varning: kunde inte uppdatera ståndpunkter: {e}")
 
 
 # ── AI-Ekonomi ────────────────────────────────────────────────────────────────

@@ -46,6 +46,7 @@ from supabase_utils import (
     rösta_på_lagforslag_block, skapa_lagforslag_ai, importera_riksdagen_forslag,
     uppdatera_riksdagen_utfall,
     kör_ekonomispel,
+    hamta_agent_positioner, uppdatera_agent_positioner,
 )
 
 
@@ -110,6 +111,12 @@ def main():
         relation_kontext = hamta_relation(sb_key, agent["namn"], original["forfattare"]) if sb_key else ""
         if relation_kontext:
             print(f"  Relation: {relation_kontext}")
+
+        if sb_key:
+            positioner = hamta_agent_positioner(sb_key, agent["namn"])
+            if positioner:
+                relation_kontext = (relation_kontext + "\n\n" + positioner).strip() if relation_kontext else positioner
+                print("Agentpositioner hämtade ✓")
 
         print("Skriver replik (Groq med Gemini-fallback)...")
         artikel = skriv_replik(agent, original, relation_kontext)
@@ -184,6 +191,12 @@ def main():
             if trender:
                 extra_kontext = (extra_kontext + "\n\n" + trender).strip()
                 print("Trendande ämnen hämtade ✓")
+
+        if sb_key:
+            positioner = hamta_agent_positioner(sb_key, agent["namn"])
+            if positioner:
+                extra_kontext = (extra_kontext + "\n\n" + positioner).strip()
+                print("Agentpositioner hämtade ✓")
 
         rss_stats = []
         if not force_eget:
@@ -396,6 +409,10 @@ def main():
                 print(f"    – {f}")
 
     print(f"{'═' * 60}\n")
+
+    if sb_key and svar.get("publicerad"):
+        print(f"\n── Ståndpunktsanalys: {agent['namn']} ──")
+        uppdatera_agent_positioner(sb_key, agent)
 
     if sb_key:
         print("\n── Prediction Markets ──")

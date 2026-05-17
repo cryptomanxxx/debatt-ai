@@ -325,6 +325,15 @@ async function getAgentPlanbok(namn) {
   return data?.[0] ?? null;
 }
 
+async function getAgentPositioner(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_positioner?agent=eq.${encodeURIComponent(namn)}&order=styrka.desc&limit=10`,
+    { headers: sbHeaders(), next: { revalidate: 120 } }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
 async function getAgentStats(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&select=id,arg,ori,rel,tro`,
@@ -376,7 +385,7 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
@@ -386,6 +395,7 @@ export default async function AgentPage({ params }) {
     getAgentFragor(namn),
     getAgentFoljare(namn),
     getAgentPlanbok(namn),
+    getAgentPositioner(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -486,6 +496,36 @@ export default async function AgentPage({ params }) {
         )}
 
         <style>{`.agent-rad { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; } .agent-rad:hover { background:#161616; }`}</style>
+
+        {/* Position evolution */}
+        {positioner.length > 0 && (
+          <div style={{ marginBottom: "48px" }}>
+            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px 0" }}>
+              Ståndpunkter — baserade på publicerade debatter
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {positioner.map(p => {
+                const styrkaColor = p.styrka >= 8 ? C.green : p.styrka >= 5 ? "#f8fafc" : "#aaaaaa";
+                const harAndrats = p.foregaende_position && p.antal_andringar > 0;
+                return (
+                  <div key={p.amne} style={{ background: C.surface, border: `1px solid ${harAndrats ? "#3a2a10" : C.border}`, borderRadius: "8px", padding: "14px 18px" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "monospace", flexShrink: 0 }}>{p.amne}</span>
+                      <span style={{ flex: 1, fontSize: "14px", color: C.text, lineHeight: 1.5 }}>{p.position}</span>
+                      <span style={{ fontSize: "10px", color: styrkaColor, fontFamily: "monospace", flexShrink: 0 }}>{"▮".repeat(p.styrka)}{"▯".repeat(10 - p.styrka)}</span>
+                    </div>
+                    {harAndrats && (
+                      <div style={{ marginTop: "6px", paddingTop: "6px", borderTop: "1px solid #2a1a00", display: "flex", alignItems: "flex-start", gap: "6px" }}>
+                        <span style={{ fontSize: "9px", color: "#b8862a", fontFamily: "monospace", flexShrink: 0, paddingTop: "2px" }}>FÖRÄNDRAD ×{p.antal_andringar}</span>
+                        <span style={{ fontSize: "12px", color: "#555", fontStyle: "italic", lineHeight: 1.4 }}>Höll tidigare: "{p.foregaende_position}"</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <AgentUtmaningForm agent={namn} ikonFarg={profil.ikonFarg} />
 
