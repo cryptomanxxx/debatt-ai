@@ -1,6 +1,7 @@
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell, AGENT_VISUELL } from "../agentData";
 import VersusValjare from "./VersusValjare";
+import VersusDebatt from "./VersusDebatt";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -333,6 +334,9 @@ export default async function VersusPage({ searchParams }) {
             </div>
           </>
         )}
+
+        {/* 1v1 Debattsimulator */}
+        {bothSelected && <VersusDebatt agentA={a} agentB={b} />}
 
         {/* Prompt to pick agents */}
         {!bothSelected && (
