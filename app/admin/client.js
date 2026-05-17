@@ -1623,7 +1623,9 @@ function AiStatistikTab() {
     async function poll() {
       if (!pollingRef.current) return;
       try {
-        const since = new Date(latestTsRef.current ?? Date.now() - 60000).toISOString();
+        const since = latestTsRef.current
+          ? new Date(new Date(latestTsRef.current).getTime() + 1).toISOString()
+          : new Date(Date.now() - 60000).toISOString();
         const res = await fetch(
           `${SB_URL}/rest/v1/ai_log?select=*&ts=gt.${since}&order=ts.desc&limit=100`,
           { headers: sbHeaders() }
