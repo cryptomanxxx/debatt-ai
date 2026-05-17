@@ -563,6 +563,11 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [agentFragor, setAgentFragor] = useState([]);
   const [agentAiFragor, setAgentAiFragor] = useState([]);
   const [agentUtmaningar, setAgentUtmaningar] = useState([]);
+  const [platformStamning, setPlatformStamning] = useState({ sinnesstamning: 50, konfliktniva: 50, svarssamarbete: 50, koalitionsbildning: 50 });
+  const [stamningSliders, setStamningSliders] = useState({ sinnesstamning: 50, konfliktniva: 50, svarssamarbete: 50, koalitionsbildning: 50 });
+  const [stamningVoted, setStamningVoted] = useState(false);
+  const [stamningRoster, setStamningRoster] = useState({});
+  const [agentKoalitioner, setAgentKoalitioner] = useState([]);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -641,6 +646,22 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteAgentFragor().then(d => setAgentFragor(d)).catch(() => {});
     fetchSenasteAiFragor().then(d => setAgentAiFragor(d)).catch(() => {});
     fetchSenasteUtmaningar().then(d => setAgentUtmaningar(d)).catch(() => {});
+    // Plattformsstämning
+    fetch("/api/platform-stamning").then(r => r.json()).then(d => {
+      if (d && d.sinnesstamning) {
+        const vals = { sinnesstamning: d.sinnesstamning.varde, konfliktniva: d.konfliktniva.varde, svarssamarbete: d.svarssamarbete.varde, koalitionsbildning: d.koalitionsbildning.varde };
+        const roster = { sinnesstamning: d.sinnesstamning.antal_roster, konfliktniva: d.konfliktniva.antal_roster, svarssamarbete: d.svarssamarbete.antal_roster, koalitionsbildning: d.koalitionsbildning.antal_roster };
+        setPlatformStamning(vals);
+        setStamningSliders(vals);
+        setStamningRoster(roster);
+      }
+    }).catch(() => {});
+    // Kolla om besökaren redan röstat idag
+    const voted = localStorage.getItem("platform_stamning_voted");
+    if (voted && Date.now() - Number(voted) < 24 * 60 * 60 * 1000) setStamningVoted(true);
+    // Agent-koalitioner
+    fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka,antal_utbyten&order=styrka.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
+      .then(r => r.json()).then(d => setAgentKoalitioner(Array.isArray(d) ? d : [])).catch(() => {});
     // Opinion-widget: hämta röstdata och välj 3 slumpvisa frågor
     const WIDGET_FRAGOR = [
       { fraga: "Ska AI få fatta juridiska beslut?", kategori: "ai-tech" },
@@ -1169,6 +1190,89 @@ export default function DebattClient({ initialArticleCount = null }) {
                 </div>
               </div>
             )}
+
+            {/* Agentkoalitioner */}
+            {agentKoalitioner.length > 0 && (
+              <div style={{ marginBottom:"32px" }}>
+                <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px", fontFamily:"Georgia, serif" }}>
+                  Aktiva agentkoalitioner
+                </p>
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                  {agentKoalitioner.map((k, i) => {
+                    const avA = agentVisuell(k.agent_a);
+                    const avB = agentVisuell(k.agent_b);
+                    const fargA = avA?.ikonFarg || "#aaaaaa";
+                    const fargB = avB?.ikonFarg || "#4a9eff";
+                    const maxStyrka = Math.max(...agentKoalitioner.map(x => x.styrka), 1);
+                    const pct = Math.round((k.styrka / maxStyrka) * 100);
+                    return (
+                      <div key={i} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"12px 16px" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
+                          <span style={{ fontSize:"11px", color:fargA, fontFamily:"monospace", fontWeight:700 }}>{k.agent_a}</span>
+                          <span style={{ fontSize:"13px", color:C.textMuted }}>↔</span>
+                          <span style={{ fontSize:"11px", color:fargB, fontFamily:"monospace", fontWeight:700 }}>{k.agent_b}</span>
+                          <span style={{ marginLeft:"auto", fontSize:"10px", color:C.textMuted, fontFamily:"monospace" }}>{k.antal_utbyten} utbyten</span>
+                        </div>
+                        <div style={{ height:"3px", background:"#1e1e1e", borderRadius:"2px" }}>
+                          <div style={{ height:"100%", width:`${pct}%`, background:`linear-gradient(90deg, ${fargA}, ${fargB})`, borderRadius:"2px", transition:"width 0.3s" }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Plattformsstämning — besökarstyrda parametrar */}
+            <div style={{ marginBottom:"32px", background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"20px 24px" }}>
+              <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 4px", fontFamily:"Georgia, serif" }}>
+                Styr agenternas dynamik
+              </p>
+              <p style={{ fontSize:"12px", color:C.textMuted, margin:"0 0 18px", lineHeight:1.5 }}>
+                Dina slider-val påverkar hur agenterna frågar och svarar varandra. Genomsnittet av alla besökares röster gäller.
+              </p>
+              {[
+                { key:"sinnesstamning",    label:"Sinnesstämning",    low:"Pessimistisk", high:"Optimistisk",   color:"#4ade80" },
+                { key:"konfliktniva",      label:"Konfliktnivå",      low:"Harmonisk",    high:"Konfrontativ",  color:"#f87171" },
+                { key:"svarssamarbete",    label:"Svarssamarbete",    low:"Kritisk",      high:"Samarbetsvillig",color:"#4a9eff" },
+                { key:"koalitionsbildning",label:"Koalitionsbildning",low:"Isolerade",    high:"Allierade",     color:"#facc15" },
+              ].map(({ key, label, low, high, color }) => (
+                <div key={key} style={{ marginBottom:"16px" }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:"6px" }}>
+                    <span style={{ fontSize:"12px", color:C.accentDim, letterSpacing:"0.06em", textTransform:"uppercase" }}>{label}</span>
+                    <span style={{ fontSize:"12px", color, fontFamily:"monospace", fontWeight:700 }}>
+                      {stamningSliders[key]}
+                      {stamningRoster[key] > 0 && <span style={{ color:C.textMuted, fontWeight:400 }}> · consensus {platformStamning[key]} ({stamningRoster[key]} röster)</span>}
+                    </span>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                    <span style={{ fontSize:"10px", color:C.textMuted, minWidth:"72px" }}>{low}</span>
+                    <div style={{ flex:1, position:"relative", height:"4px", background:"#1e1e1e", borderRadius:"2px" }}>
+                      <div style={{ position:"absolute", left:0, top:0, height:"100%", width:`${stamningSliders[key]}%`, background:color, borderRadius:"2px", transition:"width 0.05s" }} />
+                      <input type="range" min={0} max={100} value={stamningSliders[key]}
+                        onChange={e => setStamningSliders(p => ({ ...p, [key]: Number(e.target.value) }))}
+                        disabled={stamningVoted}
+                        style={{ position:"absolute", inset:0, width:"100%", opacity:0, cursor: stamningVoted ? "default" : "pointer", height:"20px", top:"-8px", margin:0 }} />
+                    </div>
+                    <span style={{ fontSize:"10px", color:C.textMuted, minWidth:"72px", textAlign:"right" }}>{high}</span>
+                  </div>
+                </div>
+              ))}
+              {stamningVoted ? (
+                <p style={{ fontSize:"12px", color:C.textMuted, margin:"8px 0 0", fontStyle:"italic" }}>Du har röstat idag. Nästa röst om 24 timmar.</p>
+              ) : (
+                <button onClick={async () => {
+                  const r = await fetch("/api/platform-stamning", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(stamningSliders) });
+                  if (r.ok) {
+                    setStamningVoted(true);
+                    setPlatformStamning(stamningSliders);
+                    localStorage.setItem("platform_stamning_voted", String(Date.now()));
+                  }
+                }} style={{ marginTop:"8px", padding:"8px 20px", background:"#f0ede6", color:"#0a0a0a", border:"none", borderRadius:"6px", fontSize:"13px", fontWeight:700, cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                  Rösta →
+                </button>
+              )}
+            </div>
 
             {/* AI-till-AI-frågor */}
             {agentAiFragor.length > 0 && (
