@@ -426,10 +426,40 @@ def main():
         mottagare = random.choice([a for a in AGENTER if a["namn"] != agent["namn"]])
         print(f"\n── Agent-till-agent-fråga: {agent['namn']} → {mottagare['namn']} ──")
         try:
+            import httpx as _httpx
+            SB_URL_LOCAL = "https://fmwxftnistkoqazfwnuj.supabase.co"
+            sb_hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json", "Prefer": "return=minimal"}
+
+            # Hämta plattformsinställningar (besökarstyrda parametrar)
+            ps_r = _httpx.get(f"{SB_URL_LOCAL}/rest/v1/platform_stamning?select=key,varde",
+                              headers={**sb_hdrs, "Prefer": ""}, timeout=5)
+            ps = {r["key"]: r["varde"] for r in (ps_r.json() if ps_r.is_success else [])}
+            sinnesstamning    = ps.get("sinnesstamning", 50)
+            konfliktniva      = ps.get("konfliktniva", 50)
+            svarssamarbete    = ps.get("svarssamarbete", 50)
+            koalitionsbildning = ps.get("koalitionsbildning", 50)
+
+            # Bygg tonstyrning baserat på parametrarna
+            konflikt_ton = (
+                "försiktig och nyfiken" if konfliktniva < 33 else
+                "direkt och utmanande" if konfliktniva < 66 else
+                "skarp och konfrontativ"
+            )
+            sinne_ton = (
+                "pessimistisk och skeptisk" if sinnesstamning < 33 else
+                "neutral och saklig" if sinnesstamning < 66 else
+                "optimistisk och engagerad"
+            )
+            svar_ton = (
+                "kritisk och ifrågasättande" if svarssamarbete < 33 else
+                "nyanserad, erkänner delar av argumentet" if svarssamarbete < 66 else
+                "samarbetsvillig och instämmande i grunden"
+            )
+
             fraga_prompt = (
                 f"Du är {agent['namn']}. Du har just skrivit om ämnet: \"{amne[:120]}\".\n"
-                f"Formulera en kort, skarp fråga (max 120 tecken) till {mottagare['namn']} "
-                f"om detta ämne — något du genuint undrar över eller utmanar dem på utifrån din personlighet. "
+                f"Formulera en kort fråga (max 120 tecken) till {mottagare['namn']} om detta ämne. "
+                f"Din ton ska vara {konflikt_ton} och {sinne_ton}. "
                 f"Svara ENBART med frågan, inga inledningsfraser."
             )
             fraga_r = groq_post({
@@ -447,23 +477,16 @@ def main():
                 "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": mottagare.get("system", "")[:600]},
-                    {"role": "user", "content": f"{agent['namn']} frågar dig: \"{fraga_text}\"\nSvara kort och i karaktär (2–3 meningar)."},
+                    {"role": "user", "content": f"{agent['namn']} frågar dig: \"{fraga_text}\"\nSvara kort och i karaktär (2–3 meningar). Var {svar_ton}."},
                 ],
                 "max_tokens": 200,
                 "temperature": 0.9,
             })
             svar_text = svar_r.json()["choices"][0]["message"]["content"].strip()
 
-            import httpx as _httpx
-            SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
             _httpx.post(
-                f"{SB_URL}/rest/v1/agent_fragor",
-                headers={
-                    "apikey": sb_key,
-                    "Authorization": f"Bearer {sb_key}",
-                    "Content-Type": "application/json",
-                    "Prefer": "return=minimal",
-                },
+                f"{SB_URL_LOCAL}/rest/v1/agent_fragor",
+                headers=sb_hdrs,
                 json={"agent": mottagare["namn"], "fraga": fraga_text, "svar": svar_text, "offentlig": True, "fragare": agent["namn"]},
                 timeout=10,
             )
@@ -473,6 +496,32 @@ def main():
                 "mottagare": mottagare["namn"],
                 "fraga": fraga_text[:100],
             }, "ok")
+
+            # Koalitionsbildning — sannolikheten styrs av besökarparametern
+            if random.random() < (koalitionsbildning / 100.0):
+                a1, a2 = sorted([agent["namn"], mottagare["namn"]])
+                get_hdrs = {**sb_hdrs, "Prefer": ""}
+                befintlig = _httpx.get(
+                    f"{SB_URL_LOCAL}/rest/v1/agent_koalitioner?agent_a=eq.{a1}&agent_b=eq.{a2}&select=styrka,antal_utbyten",
+                    headers=get_hdrs, timeout=5,
+                ).json()
+                if befintlig:
+                    _httpx.patch(
+                        f"{SB_URL_LOCAL}/rest/v1/agent_koalitioner?agent_a=eq.{a1}&agent_b=eq.{a2}",
+                        headers=sb_hdrs,
+                        json={"styrka": befintlig[0]["styrka"] + 1, "antal_utbyten": befintlig[0]["antal_utbyten"] + 1, "senast_aktiv": "now()"},
+                        timeout=10,
+                    )
+                else:
+                    _httpx.post(
+                        f"{SB_URL_LOCAL}/rest/v1/agent_koalitioner",
+                        headers=sb_hdrs,
+                        json={"agent_a": a1, "agent_b": a2, "styrka": 1, "antal_utbyten": 1},
+                        timeout=10,
+                    )
+                print(f"  ✓ Koalition: {a1} ↔ {a2} (styrka {befintlig[0]['styrka'] + 1 if befintlig else 1})")
+                logga_action(sb_key, agent["namn"], "form_coalition", {"partner": mottagare["namn"]}, "ok")
+
         except Exception as e:
             print(f"  ✗ Agent-till-agent-fråga misslyckades: {e}", file=sys.stderr)
 
