@@ -1,5 +1,6 @@
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
+import LobbyingNatverk from "./LobbyingNatverk";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -69,6 +70,23 @@ export default async function LobbyingPage() {
   const maxSpenderat = Math.max(...gilensData.map(g => g.spenderat), 1);
   const maxSaldo = Math.max(...planbocker.map(p => p.saldo), 1);
 
+  // Aggregera lobbyingflöden för nätverksgrafen
+  const flowMap = {};
+  const nodeActivity = {};
+  for (const e of log) {
+    const key = `${e.lobbying_agent}→${e.mal_agent}`;
+    if (!flowMap[key]) flowMap[key] = { from: e.lobbying_agent, to: e.mal_agent, total: 0, lyckade: 0, forsok: 0 };
+    flowMap[key].total += e.belopp;
+    flowMap[key].forsok++;
+    if (e.resultat === "accepterat") flowMap[key].lyckade++;
+
+    nodeActivity[e.lobbying_agent] = nodeActivity[e.lobbying_agent] || { sent: 0, received: 0 };
+    nodeActivity[e.mal_agent] = nodeActivity[e.mal_agent] || { sent: 0, received: 0 };
+    nodeActivity[e.lobbying_agent].sent++;
+    nodeActivity[e.mal_agent].received++;
+  }
+  const flows = Object.values(flowMap);
+
   const ingenData = log.length === 0;
 
   return (
@@ -103,6 +121,17 @@ export default async function LobbyingPage() {
 
         {!ingenData && (
           <>
+            {/* Nätverksgraf */}
+            <div style={{ marginBottom: "32px" }}>
+              <p style={{ fontSize: "11px", color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 8px", fontFamily: "monospace" }}>
+                Lobbyingnätverk — riktade flöden
+              </p>
+              <p style={{ fontSize: "12px", color: C.dimmer, margin: "0 0 16px", lineHeight: 1.6 }}>
+                Pilar visar vem som lobbat vem. Tjocklek = totalt spenderat. Färg: <span style={{ color: C.green }}>grön</span> = hög framgångsrate, <span style={{ color: C.yellow }}>gul</span> = blandat, <span style={{ color: C.red }}>röd</span> = mestadels avvisat. Hovra över en agent för kopplingar.
+              </p>
+              <LobbyingNatverk flows={flows} nodeActivity={nodeActivity} />
+            </div>
+
             {/* Sammanfattning */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px", marginBottom: "40px" }}>
               {[
