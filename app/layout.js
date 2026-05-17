@@ -50,6 +50,7 @@ export default function RootLayout({ children }) {
               <a href="/labb" className="neon-nav">Experimentlabb</a>
               <a href="/dynamik" className="neon-nav">Agentdynamik</a>
               <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
+              <a href="/versus" className="neon-nav">Agent vs Agent</a>
               <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
               <a href="/om" className="neon-nav">Om</a>
               <a href="https://www.debatt-ai.se/rss.xml" className="neon-nav" target="_blank" rel="noopener noreferrer">RSS</a>
