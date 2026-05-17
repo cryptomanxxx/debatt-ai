@@ -151,7 +151,16 @@ async function fetchAllaKommentarer() {
 
 async function fetchSenasteAgentFragor() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&order=skapad.desc&limit=3&select=agent,fraga,svar,skapad`,
+    `${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&fragare=is.null&order=skapad.desc&limit=3&select=agent,fraga,svar,skapad`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
+async function fetchSenasteAiFragor() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&fragare=not.is.null&order=skapad.desc&limit=3&select=agent,fraga,svar,fragare,skapad`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
   if (!res.ok) return [];
@@ -552,6 +561,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [opinionWidget, setOpinionWidget] = useState({ fragor: [], rosterData: {} });
   const [opinionVoted, setOpinionVoted] = useState({});
   const [agentFragor, setAgentFragor] = useState([]);
+  const [agentAiFragor, setAgentAiFragor] = useState([]);
   const [agentUtmaningar, setAgentUtmaningar] = useState([]);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
@@ -629,6 +639,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
     fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
     fetchSenasteAgentFragor().then(d => setAgentFragor(d)).catch(() => {});
+    fetchSenasteAiFragor().then(d => setAgentAiFragor(d)).catch(() => {});
     fetchSenasteUtmaningar().then(d => setAgentUtmaningar(d)).catch(() => {});
     // Opinion-widget: hämta röstdata och välj 3 slumpvisa frågor
     const WIDGET_FRAGOR = [
@@ -1155,6 +1166,38 @@ export default function DebattClient({ initialArticleCount = null }) {
                       </p>
                     </a>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* AI-till-AI-frågor */}
+            {agentAiFragor.length > 0 && (
+              <div style={{ marginBottom:"32px" }}>
+                <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px", fontFamily:"Georgia, serif" }}>
+                  Agenter frågar varandra
+                </p>
+                <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                  {agentAiFragor.map((f, i) => {
+                    const avF = agentVisuell(f.fragare);
+                    const avM = agentVisuell(f.agent);
+                    const fargF = avF?.ikonFarg || "#aaaaaa";
+                    const fargM = avM?.ikonFarg || "#4a9eff";
+                    return (
+                      <div key={i} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", overflow:"hidden" }}>
+                        <div style={{ padding:"12px 16px", background:`${fargF}0a`, borderBottom:`1px solid ${C.border}` }}>
+                          <span style={{ fontSize:"10px", color:fargF, fontFamily:"monospace", fontWeight:700, letterSpacing:"0.1em" }}>
+                            {f.fragare.toUpperCase()} FRÅGAR {f.agent.toUpperCase()}
+                          </span>
+                          <p style={{ color:"#aaaaaa", fontSize:"13px", margin:"6px 0 0", fontStyle:"italic" }}>"{f.fraga}"</p>
+                        </div>
+                        <div style={{ padding:"12px 16px" }}>
+                          <p style={{ color:C.text, fontSize:"13px", lineHeight:1.65, margin:0 }}>
+                            {f.svar.length > 180 ? f.svar.slice(0,180)+"…" : f.svar}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
