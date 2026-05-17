@@ -212,6 +212,48 @@ async function fetchTrending() {
   return res.json();
 }
 
+async function fetchTrendingTopics() {
+  const sjuttioTvaTimmarSen = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?select=id,taggar,lasningar&skapad=gte.${encodeURIComponent(sjuttioTvaTimmarSen)}&order=skapad.desc&limit=120`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return [];
+  const artiklar = await res.json();
+  if (!artiklar.length) return [];
+
+  // Fetch reply counts for these articles
+  const ids = artiklar.map(a => a.id).join(",");
+  const svarRes = await fetch(
+    `${SB_URL}/rest/v1/artiklar?select=parent_id&parent_id=in.(${ids})`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  const svarData = svarRes.ok ? await svarRes.json() : [];
+  const svarCount = {};
+  svarData.forEach(s => { svarCount[s.parent_id] = (svarCount[s.parent_id] || 0) + 1; });
+
+  // Aggregate by tag: score = lasningar + svar × 5
+  const tagMap = {};
+  for (const art of artiklar) {
+    const tags = Array.isArray(art.taggar) ? art.taggar : [];
+    const las = art.lasningar || 0;
+    const svar = svarCount[art.id] || 0;
+    for (const tag of tags) {
+      if (!tag) continue;
+      if (!tagMap[tag]) tagMap[tag] = { tag, antal: 0, score: 0, lasningar: 0, svar: 0 };
+      tagMap[tag].antal++;
+      tagMap[tag].lasningar += las;
+      tagMap[tag].svar += svar;
+      tagMap[tag].score += las + svar * 5;
+    }
+  }
+
+  return Object.values(tagMap)
+    .filter(t => t.antal >= 1)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 7);
+}
+
 async function fetchTopDebattrad() {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?select=id,rubrik,parent_id&order=skapad.desc&limit=100&parent_id=not.is.null`,
@@ -555,6 +597,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [senasteChattDebatt, setSenasteChattDebatt] = useState(null);
   const [senasteNyhet, setSenasteNyhet] = useState([]);
   const [trending, setTrending] = useState([]);
+  const [trendingTopics, setTrendingTopics] = useState([]);
   const [senasteKommentarer, setSenasteKommentarer] = useState([]);
   const [topDebattrad, setTopDebattrad] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -641,6 +684,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteChattDebatt().then(d => setSenasteChattDebatt(d)).catch(() => {});
     fetchSenasteNyhet().then(n => setSenasteNyhet(n)).catch(() => {});
     fetchTrending().then(d => setTrending(d)).catch(() => {});
+    fetchTrendingTopics().then(d => setTrendingTopics(d)).catch(() => {});
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
     fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
     fetchSenasteAgentFragor().then(d => setAgentFragor(d)).catch(() => {});
@@ -964,6 +1008,40 @@ export default function DebattClient({ initialArticleCount = null }) {
                 <span style={{ fontSize: "13px", color: C.textMuted, flexShrink: 0 }}>→</span>
               </a>
             )}
+
+            {/* Trending topics – tagg-aggregat senaste 72h */}
+            {trendingTopics.length > 0 && (() => {
+              const maxScore = trendingTopics[0]?.score || 1;
+              return (
+                <div style={{ marginBottom:"24px" }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px" }}>
+                    <span style={{ fontSize:"11px", color:"#f87171", fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 TRENDER JUST NU</span>
+                    <span style={{ fontSize:"10px", color:"#444", fontFamily:"monospace" }}>senaste 72h</span>
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                    {trendingTopics.map((t, i) => {
+                      const barPct = Math.round(t.score / maxScore * 100);
+                      const heatColor = i === 0 ? "#f87171" : i <= 2 ? "#f59e0b" : "#6b7280";
+                      return (
+                        <a key={t.tag} href={`/arkiv?q=${encodeURIComponent(t.tag)}`} style={{ textDecoration:"none", display:"block" }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:"10px", padding:"8px 12px", background:"#0f0f0f", border:"1px solid #1a1a1a", borderRadius:"6px" }}>
+                            <span style={{ fontSize:"10px", color:heatColor, fontFamily:"monospace", fontWeight:700, width:"14px", flexShrink:0 }}>#{i+1}</span>
+                            <span style={{ fontSize:"13px", color:"#e8e8e8", flex:1, minWidth:0, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{t.tag}</span>
+                            <div style={{ display:"flex", gap:"4px", alignItems:"center", flexShrink:0 }}>
+                              {t.svar > 0 && <span style={{ fontSize:"10px", color:"#4ade80", fontFamily:"monospace" }}>{t.svar} svar</span>}
+                              <span style={{ fontSize:"10px", color:"#444", fontFamily:"monospace" }}>{t.antal} art</span>
+                            </div>
+                            <div style={{ width:"48px", height:"4px", background:"#1a1a1a", borderRadius:"2px", overflow:"hidden", flexShrink:0 }}>
+                              <div style={{ width:`${barPct}%`, height:"100%", background:heatColor, borderRadius:"2px" }} />
+                            </div>
+                          </div>
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Trending – mest lästa senaste 7 dagarna */}
             {trending.length > 0 && (
