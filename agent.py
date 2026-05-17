@@ -45,6 +45,7 @@ from supabase_utils import (
     hamta_relation, upsert_koalition,
     rösta_på_lagforslag_block, skapa_lagforslag_ai, importera_riksdagen_forslag,
     uppdatera_riksdagen_utfall,
+    kör_ekonomispel,
 )
 
 
@@ -454,6 +455,19 @@ def main():
         uppdaterade = uppdatera_riksdagen_utfall(sb_key)
         if uppdaterade > 0:
             print(f"  ✓ Automatiskt uppdaterade riksdagen_utfall för {uppdaterade} förslag")
+
+    # Ekonomispel (~5% chans per körning, eller om pending ultimatum)
+    if sb_key and random.random() < 0.05:
+        print(f"\n── AI-Ekonomi: {agent['namn']} ──")
+        kör_ekonomispel(agent, sb_key)
+    elif sb_key:
+        # Kolla alltid om det finns väntande ultimatum att svara på
+        from supabase_utils import hamta_pending_ultimatum
+        pending = hamta_pending_ultimatum(sb_key, agent["namn"])
+        if pending:
+            print(f"\n── AI-Ekonomi (pending ultimatum): {agent['namn']} ──")
+            from supabase_utils import svara_ultimatum
+            svara_ultimatum(agent, pending, sb_key)
 
     # Agent ställer en fråga till en annan agent (~10% chans per körning)
     if sb_key and random.random() < 0.10:

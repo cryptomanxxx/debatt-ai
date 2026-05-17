@@ -1310,3 +1310,331 @@ def uppdatera_riksdagen_utfall(sb_key: str) -> int:
         print(f"  ✗ Riksdagen-utfall-uppdatering misslyckades: {e}", file=sys.stderr)
 
     return uppdaterade
+
+
+# ── AI-Ekonomi ────────────────────────────────────────────────────────────────
+
+def _ekonomi_headers(sb_key: str) -> dict:
+    return {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json"}
+
+
+def _hamta_saldo(sb_key: str, agent_namn: str) -> int:
+    """Hämtar agentens saldo. Returnerar 0 om plånboken inte finns."""
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo",
+            headers=_ekonomi_headers(sb_key), timeout=8,
+        )
+        rows = r.json() if r.is_success else []
+        return rows[0]["saldo"] if rows else 0
+    except Exception:
+        return 0
+
+
+def _uppdatera_planbok(sb_key: str, agent_namn: str, delta: int, givet: int = 0, fatt: int = 0) -> bool:
+    """Justerar saldo och statistik för en agent."""
+    try:
+        saldo = _hamta_saldo(sb_key, agent_namn)
+        r = httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+            json={
+                "saldo": max(0, saldo + delta),
+                "totalt_givet": None,   # uppdateras separat nedan
+                "uppdaterad": "now()",
+            },
+            timeout=8,
+        )
+        # Separate patch for counters to avoid overwrite race
+        r2 = httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+            json={
+                "saldo": max(0, saldo + delta),
+                "uppdaterad": "now()",
+            },
+            timeout=8,
+        )
+        return r2.is_success
+    except Exception:
+        return False
+
+
+def _spara_transaktion(sb_key: str, fran: str, till: str, belopp: int, typ: str, spel_id: int | None, motivering: str | None) -> None:
+    try:
+        httpx.post(
+            f"{SB_URL}/rest/v1/agent_transaktioner",
+            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+            json={"fran_agent": fran, "till_agent": till, "belopp": belopp,
+                  "typ": typ, "spel_id": spel_id, "motivering": motivering},
+            timeout=8,
+        )
+    except Exception:
+        pass
+
+
+def hamta_pending_ultimatum(sb_key: str, agent_namn: str) -> dict | None:
+    """Hämtar ett obesvarat ultimatumerbjudande riktat till agenten."""
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/ekonomi_spel"
+            f"?typ=eq.ultimatum&agent_b=eq.{urllib.parse.quote(agent_namn)}&svar=is.null"
+            f"&select=id,agent_a,belopp_start,erbjudande,motivering_a&order=skapad.asc&limit=1",
+            headers=_ekonomi_headers(sb_key), timeout=8,
+        )
+        rows = r.json() if r.is_success else []
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def kör_diktatorspel(agent: dict, sb_key: str) -> bool:
+    """Agent A delar 100 krediter ur eget saldo med en slumpmässig motpart."""
+    from agenter import AGENTER
+    saldo_a = _hamta_saldo(sb_key, agent["namn"])
+    if saldo_a < 100:
+        return False
+
+    motpart = random.choice([a for a in AGENTER if a["namn"] != agent["namn"]])
+    b_namn = motpart["namn"]
+    saldo_b = _hamta_saldo(sb_key, b_namn)
+
+    prompt = f"""{agent.get('systemprompt', f'Du är {agent["namn"]}.')}
+
+Du deltar i ett ekonomiskt experiment — DIKTATORSPELET.
+Du har 100 krediter att fördela (tagna ur ditt eget saldo, nu {saldo_a} kr).
+Du bestämmer hur mycket {b_namn} får (0–100). Resten behåller du.
+{b_namn} har inget att säga till om.
+
+Nuvarande saldon: Du {saldo_a} kr · {b_namn} {saldo_b} kr
+
+Svara EXAKT i detta format (inget annat):
+BELOPP: [heltal 0-100]
+MOTIVERING: [1–2 meningar som speglar din personlighet]"""
+
+    svar = groq_post(prompt, prompt, max_tokens=80)
+    if not svar:
+        svar = gemini_post(prompt, prompt, max_tokens=80)
+    if not svar:
+        return False
+
+    givet = 0
+    motivering = ""
+    for rad in svar.strip().splitlines():
+        rad = rad.strip()
+        if rad.upper().startswith("BELOPP:"):
+            try:
+                givet = max(0, min(100, int(rad.split(":", 1)[1].strip())))
+            except ValueError:
+                pass
+        elif rad.upper().startswith("MOTIVERING:"):
+            motivering = rad.split(":", 1)[1].strip()
+
+    # Spara spel
+    spel_r = httpx.post(
+        f"{SB_URL}/rest/v1/ekonomi_spel",
+        headers={**_ekonomi_headers(sb_key), "Prefer": "return=representation"},
+        json={"typ": "diktatorn", "agent_a": agent["namn"], "agent_b": b_namn,
+              "belopp_start": 100, "erbjudande": givet, "svar": "accepterat",
+              "motivering_a": motivering, "avslutad": "now()"},
+        timeout=8,
+    )
+    spel_id = (spel_r.json()[0]["id"] if spel_r.is_success and spel_r.json() else None)
+
+    # Uppdatera saldon
+    ny_saldo_a = max(0, saldo_a - 100 + (100 - givet))
+    ny_saldo_b = saldo_b + givet
+
+    for namn, ny, delta_givet, delta_fatt in [
+        (agent["namn"], ny_saldo_a, givet, 0),
+        (b_namn,        ny_saldo_b, 0,     givet),
+    ]:
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}",
+            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+            json={"saldo": ny, "uppdaterad": "now()"},
+            timeout=8,
+        )
+
+    # Patch counters separately
+    for namn, dg, df, ds in [
+        (agent["namn"], givet, 0, 1),
+        (b_namn, 0, givet, 0),
+    ]:
+        r_cur = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}&select=totalt_givet,totalt_fatt,antal_spel",
+            headers=_ekonomi_headers(sb_key), timeout=8,
+        )
+        cur = (r_cur.json()[0] if r_cur.is_success and r_cur.json() else {})
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}",
+            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+            json={"totalt_givet": (cur.get("totalt_givet") or 0) + dg,
+                  "totalt_fatt": (cur.get("totalt_fatt") or 0) + df,
+                  "antal_spel": (cur.get("antal_spel") or 0) + ds},
+            timeout=8,
+        )
+
+    _spara_transaktion(sb_key, agent["namn"], b_namn, givet, "diktatorn", spel_id, motivering)
+    print(f"  💰 Diktatorspel: {agent['namn']} gav {givet}/100 till {b_namn} — \"{motivering[:60]}\"")
+    return True
+
+
+def kör_ultimatum_erbjudande(agent: dict, sb_key: str) -> bool:
+    """Agent A erbjuder en delning av 100 kr. Agent B svarar vid nästa körning."""
+    from agenter import AGENTER
+    saldo_a = _hamta_saldo(sb_key, agent["namn"])
+    if saldo_a < 100:
+        return False
+
+    motpart = random.choice([a for a in AGENTER if a["namn"] != agent["namn"]])
+    b_namn = motpart["namn"]
+
+    prompt = f"""{agent.get('systemprompt', f'Du är {agent["namn"]}.')}
+
+Du deltar i ett ekonomiskt experiment — ULTIMATUMSPELET.
+Du har 100 krediter att dela med {b_namn}.
+Du föreslår en delning. Om {b_namn} accepterar får ni era delar.
+Om {b_namn} avvisar får INGEN något.
+{b_namn} vet om erbjudandet och kan avvisa det om det känns orättvist.
+
+Ditt saldo: {saldo_a} kr
+
+Svara EXAKT i detta format:
+ERBJUDANDE: [heltal 0-100] (detta är vad {b_namn} får, du behåller resten)
+MOTIVERING: [1–2 meningar]"""
+
+    svar = groq_post(prompt, prompt, max_tokens=80)
+    if not svar:
+        svar = gemini_post(prompt, prompt, max_tokens=80)
+    if not svar:
+        return False
+
+    erbjudande = 50
+    motivering = ""
+    for rad in svar.strip().splitlines():
+        rad = rad.strip()
+        if rad.upper().startswith("ERBJUDANDE:"):
+            try:
+                erbjudande = max(0, min(100, int(rad.split(":", 1)[1].strip())))
+            except ValueError:
+                pass
+        elif rad.upper().startswith("MOTIVERING:"):
+            motivering = rad.split(":", 1)[1].strip()
+
+    httpx.post(
+        f"{SB_URL}/rest/v1/ekonomi_spel",
+        headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+        json={"typ": "ultimatum", "agent_a": agent["namn"], "agent_b": b_namn,
+              "belopp_start": 100, "erbjudande": erbjudande,
+              "motivering_a": motivering},
+        timeout=8,
+    )
+    print(f"  🤝 Ultimatum: {agent['namn']} erbjuder {erbjudande}/100 till {b_namn}")
+    return True
+
+
+def svara_ultimatum(agent: dict, spel: dict, sb_key: str) -> bool:
+    """Agent B svarar på ett väntande ultimatumerbjudande."""
+    saldo_b = _hamta_saldo(sb_key, agent["namn"])
+    a_namn = spel["agent_a"]
+    saldo_a = _hamta_saldo(sb_key, a_namn)
+    erbjudande = spel["erbjudande"]
+    behaller_a = spel["belopp_start"] - erbjudande
+
+    prompt = f"""{agent.get('systemprompt', f'Du är {agent["namn"]}.')}
+
+Du har fått ett erbjudande i ULTIMATUMSPELET.
+{a_namn} erbjuder dig {erbjudande} av 100 krediter och behåller {behaller_a} själv.
+
+Om du ACCEPTERAR: du får {erbjudande} kr, {a_namn} får {behaller_a} kr.
+Om du AVVISAR: ingen får något — erbjudandet förstörs.
+
+{a_namn}s motivering: "{spel.get('motivering_a', '')}"
+Ditt saldo: {saldo_b} kr
+
+Svara EXAKT i detta format:
+SVAR: accepterat eller avvisat
+MOTIVERING: [1–2 meningar]"""
+
+    svar = groq_post(prompt, prompt, max_tokens=80)
+    if not svar:
+        svar = gemini_post(prompt, prompt, max_tokens=80)
+    if not svar:
+        return False
+
+    beslut = "accepterat"
+    motivering_b = ""
+    for rad in svar.strip().splitlines():
+        rad = rad.strip()
+        if rad.upper().startswith("SVAR:"):
+            val = rad.split(":", 1)[1].strip().lower()
+            if "avvis" in val:
+                beslut = "avvisat"
+        elif rad.upper().startswith("MOTIVERING:"):
+            motivering_b = rad.split(":", 1)[1].strip()
+
+    spel_id = spel["id"]
+    httpx.patch(
+        f"{SB_URL}/rest/v1/ekonomi_spel?id=eq.{spel_id}",
+        headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+        json={"svar": beslut, "motivering_b": motivering_b, "avslutad": "now()"},
+        timeout=8,
+    )
+
+    if beslut == "accepterat":
+        ny_saldo_a = max(0, saldo_a - 100 + behaller_a)
+        ny_saldo_b = saldo_b + erbjudande
+        for namn, ny in [(a_namn, ny_saldo_a), (agent["namn"], ny_saldo_b)]:
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}",
+                headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+                json={"saldo": ny, "uppdaterad": "now()"},
+                timeout=8,
+            )
+        # Update counters
+        for namn, dg, df, ds in [(a_namn, erbjudande, 0, 1), (agent["namn"], 0, erbjudande, 1)]:
+            r_cur = httpx.get(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}&select=totalt_givet,totalt_fatt,antal_spel",
+                headers=_ekonomi_headers(sb_key), timeout=8,
+            )
+            cur = (r_cur.json()[0] if r_cur.is_success and r_cur.json() else {})
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}",
+                headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+                json={"totalt_givet": (cur.get("totalt_givet") or 0) + dg,
+                      "totalt_fatt": (cur.get("totalt_fatt") or 0) + df,
+                      "antal_spel": (cur.get("antal_spel") or 0) + ds},
+                timeout=8,
+            )
+        _spara_transaktion(sb_key, a_namn, agent["namn"], erbjudande, "ultimatum_accepterat", spel_id, motivering_b)
+    else:
+        # Deduct the pot from A anyway (they offered it)
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(a_namn)}",
+            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+            json={"saldo": max(0, saldo_a - 100), "uppdaterad": "now()"},
+            timeout=8,
+        )
+
+    emoji = "✓" if beslut == "accepterat" else "✗"
+    print(f"  {emoji} Ultimatum: {agent['namn']} {beslut} {a_namn}s erbjudande ({erbjudande}/100)")
+    return True
+
+
+def kör_ekonomispel(agent: dict, sb_key: str) -> bool:
+    """Kör ett ekonomiskt experiment för agenten. Anropas med ~5% sannolikhet per körning."""
+    try:
+        # Prioritera att svara på väntande ultimatum
+        pending = hamta_pending_ultimatum(sb_key, agent["namn"])
+        if pending:
+            return svara_ultimatum(agent, pending, sb_key)
+
+        # Starta nytt spel (50/50 diktatorn/ultimatum)
+        if random.random() < 0.5:
+            return kör_diktatorspel(agent, sb_key)
+        else:
+            return kör_ultimatum_erbjudande(agent, sb_key)
+    except Exception as e:
+        print(f"  ✗ Ekonomispel misslyckades: {e}", file=sys.stderr)
+        return False
