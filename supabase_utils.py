@@ -1314,6 +1314,171 @@ def uppdatera_riksdagen_utfall(sb_key: str) -> int:
     return uppdaterade
 
 
+# ── Aktiv koalitionsinitiering ────────────────────────────────────────────────
+
+def initiera_koalition(agent: dict, sb_key: str) -> bool:
+    """Agent föreslår aktivt en koalition baserat på gemensamma parlamentsröster och lobbying.
+
+    Skiljer sig från passiva koalitioner (biprodukt av frågor) genom att:
+    - Grunda sig i faktisk ideologisk samsyn (delade "ja"-röster)
+    - Generera ett explicit förslag i karaktär
+    - Ge +3 styrka vid accept (vs +1 passivt)
+    """
+    agent_namn = agent["namn"]
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+
+    try:
+        # Hämta agentens "ja"-röster
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag",
+            params={"agent": f"eq.{urllib.parse.quote(agent_namn)}", "rod": "eq.ja",
+                    "select": "lagforslag_id"},
+            headers=h, timeout=8,
+        )
+        egna_ja = {r["lagforslag_id"] for r in (res.json() if res.is_success else [])}
+        if not egna_ja:
+            return False
+
+        # Hämta alla "ja"-röster från andra agenter på samma motioner
+        ids_str = ",".join(str(i) for i in egna_ja)
+        res2 = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag",
+            params={"lagforslag_id": f"in.({ids_str})", "rod": "eq.ja",
+                    "agent": f"neq.{urllib.parse.quote(agent_namn)}", "select": "agent,lagforslag_id"},
+            headers=h, timeout=8,
+        )
+        andra_roster = res2.json() if res2.is_success else []
+
+        # Räkna gemensamma "ja"-röster per agent
+        samsyn: dict[str, int] = {}
+        for r in andra_roster:
+            samsyn[r["agent"]] = samsyn.get(r["agent"], 0) + 1
+
+        if not samsyn:
+            return False
+
+        # Kolla lobbying-historia (bonus för framgångsrika partnerskap)
+        res3 = httpx.get(
+            f"{SB_URL}/rest/v1/lobbying_log",
+            params={"or": f"(lobbying_agent.eq.{urllib.parse.quote(agent_namn)},mal_agent.eq.{urllib.parse.quote(agent_namn)})",
+                    "resultat": "eq.accepterat", "select": "lobbying_agent,mal_agent"},
+            headers=h, timeout=8,
+        )
+        for lr in (res3.json() if res3.is_success else []):
+            partner = lr["mal_agent"] if lr["lobbying_agent"] == agent_namn else lr["lobbying_agent"]
+            if partner != agent_namn:
+                samsyn[partner] = samsyn.get(partner, 0) + 2  # lobbying-bonus
+
+        # Filtrera bort redan starka koalitioner (styrka > 5)
+        res4 = httpx.get(
+            f"{SB_URL}/rest/v1/agent_koalitioner",
+            params={"or": f"(agent_a.eq.{urllib.parse.quote(agent_namn)},agent_b.eq.{urllib.parse.quote(agent_namn)})",
+                    "select": "agent_a,agent_b,styrka"},
+            headers=h, timeout=8,
+        )
+        starka = set()
+        for k in (res4.json() if res4.is_success else []):
+            partner = k["agent_b"] if k["agent_a"] == agent_namn else k["agent_a"]
+            if k["styrka"] > 5:
+                starka.add(partner)
+
+        kandidater = [(a, s) for a, s in samsyn.items() if a not in starka and s >= 2]
+        if not kandidater:
+            return False
+
+        # Välj kandidaten med högst samsyn
+        mal_namn, alignment = max(kandidater, key=lambda x: x[1])
+        from agenter import AGENTER as _AG
+        mal_agent = next((a for a in _AG if a["namn"] == mal_namn), None)
+        if not mal_agent:
+            return False
+
+        # Hämta motioner de är överens om (för kontext i förslaget)
+        res5 = httpx.get(
+            f"{SB_URL}/rest/v1/lagforslag",
+            params={"id": f"in.({ids_str})", "select": "id,titel", "limit": "3"},
+            headers=h, timeout=8,
+        )
+        gemensamma_motioner = [f["titel"] for f in (res5.json() if res5.is_success else [])][:3]
+        motioner_text = ", ".join(f'"{t[:50]}"' for t in gemensamma_motioner) if gemensamma_motioner else "gemensamma frågor"
+
+        # Agenten formulerar ett koalitionsförslag
+        forslag_prompt = (
+            f"{agent.get('systemprompt', f'Du är {agent_namn}.')}\n\n"
+            f"Du och {mal_namn} har röstat lika i AI-parlamentet på {alignment} motioner, "
+            f"inklusive: {motioner_text}.\n\n"
+            f"Föreslå en koalition. Skriv ett kort, personligt förslag (2–3 meningar) i din karaktär — "
+            f"förklara varför ni bör samarbeta och vad ni kan åstadkomma tillsammans:"
+        )
+        forslag = groq_post(forslag_prompt, system="Du föreslår politiska allianser.", max_tokens=120)
+        if not forslag:
+            forslag = gemini_post(forslag_prompt, system="Du föreslår politiska allianser.", max_tokens=120)
+        if not forslag:
+            return False
+
+        # Målagenten svarar
+        svar_prompt = (
+            f"{mal_agent.get('systemprompt', f'Du är {mal_namn}.')}\n\n"
+            f"{agent_namn} föreslår en koalition med dig i AI-parlamentet.\n"
+            f"Ni har röstat lika på {alignment} motioner.\n\n"
+            f"Förslaget: \"{forslag}\"\n\n"
+            f"Svara EXAKT:\nBESLUT: accepterar eller avvisar\nSVAR: [1–2 meningar i din karaktär]"
+        )
+        svar = groq_post(svar_prompt, system="Du besvarar politiska koalitionsförslag.", max_tokens=100)
+        if not svar:
+            svar = gemini_post(svar_prompt, system="Du besvarar politiska koalitionsförslag.", max_tokens=100)
+
+        beslut = "avvisar"
+        svar_text = ""
+        for rad in (svar or "").strip().splitlines():
+            upper = rad.upper()
+            if "BESLUT:" in upper and "accepterar" in rad.lower():
+                beslut = "accepterar"
+            elif "SVAR:" in upper:
+                svar_text = rad.split(":", 1)[1].strip()
+
+        if beslut == "accepterar":
+            # +3 styrka för aktiv koalition (vs +1 passiv)
+            a1, a2 = sorted([agent_namn, mal_namn])
+            befintlig_res = httpx.get(
+                f"{SB_URL}/rest/v1/agent_koalitioner"
+                f"?agent_a=eq.{urllib.parse.quote(a1)}&agent_b=eq.{urllib.parse.quote(a2)}"
+                "&select=styrka,antal_utbyten",
+                headers={**h, "Prefer": ""},
+                timeout=5,
+            )
+            befintlig = befintlig_res.json() if befintlig_res.is_success else []
+            if befintlig:
+                ny_styrka = befintlig[0]["styrka"] + 3
+                httpx.patch(
+                    f"{SB_URL}/rest/v1/agent_koalitioner"
+                    f"?agent_a=eq.{urllib.parse.quote(a1)}&agent_b=eq.{urllib.parse.quote(a2)}",
+                    headers={**h, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                    json={"styrka": ny_styrka, "antal_utbyten": befintlig[0]["antal_utbyten"] + 1, "senast_aktiv": "now()"},
+                    timeout=8,
+                )
+            else:
+                httpx.post(
+                    f"{SB_URL}/rest/v1/agent_koalitioner",
+                    headers={**h, "Content-Type": "application/json", "Prefer": "return=minimal"},
+                    json={"agent_a": a1, "agent_b": a2, "styrka": 3, "antal_utbyten": 1},
+                    timeout=8,
+                )
+            print(f"  ✓ Koalition bildad: {agent_namn} + {mal_namn} (samsyn: {alignment}, +3 styrka)")
+            print(f"    Förslag: {forslag[:100]}…")
+            print(f"    Svar: {svar_text[:100]}")
+        else:
+            print(f"  ✗ Koalition avvisad: {mal_namn} tackade nej till {agent_namn}")
+            if svar_text:
+                print(f"    Motivering: {svar_text[:100]}")
+
+        return beslut == "accepterar"
+
+    except Exception as e:
+        print(f"  ✗ Koalitionsinitiering misslyckades: {e}", file=sys.stderr)
+        return False
+
+
 # ── Lobbying (AI-demokrati × AI-ekonomi) ─────────────────────────────────────
 
 def kör_lobbying(agent: dict, sb_key: str) -> bool:

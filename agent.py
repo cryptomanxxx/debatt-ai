@@ -47,7 +47,7 @@ from supabase_utils import (
     uppdatera_riksdagen_utfall,
     kör_ekonomispel,
     hamta_agent_positioner, uppdatera_agent_positioner,
-    kör_lobbying,
+    kör_lobbying, initiera_koalition,
 )
 
 
@@ -479,6 +479,10 @@ def main():
             ok_lob = kör_lobbying(agent, sb_key)
             if ok_lob:
                 logga_action(sb_key, agent["namn"], "lobbying", {}, "ok")
+
+        if random.random() < 0.12:
+            print(f"\n── Koalitionsinitiering: {agent['namn']} ──")
+            initiera_koalition(agent, sb_key)
 
     # Ekonomispel (~5% chans per körning, eller om pending ultimatum)
     if sb_key and random.random() < 0.05:
