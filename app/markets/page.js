@@ -1,5 +1,6 @@
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
+import SaldoSpelChart from "./SaldoSpelChart";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -409,6 +410,40 @@ function KryptoPriser({ priser }) {
   );
 }
 
+async function getSaldoSpelHistorik() {
+  const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_bets?select=agent,insats,vinst,avgjord,avgjord_at,skapad&order=skapad.asc`,
+    { headers, cache: "no-store" }
+  );
+  if (!res.ok) return [];
+  const bets = await res.json();
+  const relevant = bets.filter(b => b.insats > 0);
+  if (!relevant.length) return [];
+
+  const agentEvents = {};
+  for (const bet of relevant) {
+    if (!agentEvents[bet.agent]) agentEvents[bet.agent] = [];
+    agentEvents[bet.agent].push({ date: bet.skapad.slice(0, 10), delta: -bet.insats });
+    if (bet.avgjord && bet.avgjord_at) {
+      agentEvents[bet.agent].push({ date: bet.avgjord_at.slice(0, 10), delta: bet.vinst });
+    }
+  }
+
+  const allAgents = Object.keys(agentEvents);
+  const allDates = [...new Set(allAgents.flatMap(a => agentEvents[a].map(e => e.date)))].sort();
+  const balances = Object.fromEntries(allAgents.map(a => [a, 200]));
+
+  return allDates.map(date => {
+    for (const agent of allAgents) {
+      for (const e of agentEvents[agent]) {
+        if (e.date === date) balances[agent] += e.delta;
+      }
+    }
+    return { date, ...Object.fromEntries(allAgents.map(a => [a, balances[a]])) };
+  });
+}
+
 async function getSpelarKonton() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const res = await fetch(
@@ -421,12 +456,13 @@ async function getSpelarKonton() {
 }
 
 export default async function MarketsPage() {
-  const [{ oppna, avgjorda }, aktivitet, rankning, kryptoPriser, spelarKonton] = await Promise.all([
+  const [{ oppna, avgjorda }, aktivitet, rankning, kryptoPriser, spelarKonton, saldoSpelSeries] = await Promise.all([
     getMarkets(),
     getSenasteAktivitet(),
     getPrediktionsRankning(),
     getKryptoPriser(),
     getSpelarKonton(),
+    getSaldoSpelHistorik(),
   ]);
 
   return (
@@ -478,6 +514,15 @@ export default async function MarketsPage() {
                   {avgjorda.map(m => <AvgjordKort key={m.id} market={m} />)}
                 </div>
               )}
+              <div style={{ marginTop: "48px" }}>
+                <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 16px" }}>
+                  Spelkontoutveckling · 200 kr startbudget
+                </p>
+                <SaldoSpelChart
+                  series={saldoSpelSeries}
+                  highlighted={spelarKonton.slice(0, 6).map(k => k.agent)}
+                />
+              </div>
             </>
           )}
         </div>
