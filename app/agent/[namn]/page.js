@@ -315,6 +315,16 @@ async function getAgentFoljare(namn) {
   return data?.[0]?.foljare ?? 0;
 }
 
+async function getAgentPlanbok(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_planbocker?agent=eq.${encodeURIComponent(namn)}&select=saldo,totalt_givet,totalt_fatt,antal_spel`,
+    { headers: sbHeaders(), next: { revalidate: 120 } }
+  );
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data?.[0] ?? null;
+}
+
 async function getAgentStats(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&select=id,arg,ori,rel,tro`,
@@ -366,7 +376,7 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
@@ -375,6 +385,7 @@ export default async function AgentPage({ params }) {
     getAgentActions(namn),
     getAgentFragor(namn),
     getAgentFoljare(namn),
+    getAgentPlanbok(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -450,6 +461,27 @@ export default async function AgentPage({ params }) {
                 <div style={{ fontSize: "10px", color: C.border, marginTop: "2px" }}>{unit}</div>
               </div>
             ))}
+            {planbok && (() => {
+              const delta = planbok.saldo - 1000;
+              const deltaColor = delta > 0 ? "#4ade80" : delta < 0 ? "#f87171" : "#555";
+              const generositet = planbok.antal_spel > 0
+                ? Math.round(planbok.totalt_givet / (planbok.antal_spel * 100) * 100)
+                : null;
+              return (
+                <a href="/ekonomi" style={{ background: C.surface, border: `1px solid #2a1a3a`, borderRadius: "8px", padding: "16px", textAlign: "center", textDecoration: "none", display: "block" }}>
+                  <div style={{ fontSize: "22px", fontWeight: 700, color: "#e879f9", fontFamily: "monospace" }}>
+                    {planbok.saldo}
+                  </div>
+                  <div style={{ fontSize: "10px", color: deltaColor, fontFamily: "monospace", marginTop: "2px" }}>
+                    {delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : "±0"}
+                  </div>
+                  <div style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "4px" }}>Plånbok</div>
+                  <div style={{ fontSize: "10px", color: "#555", marginTop: "2px" }}>
+                    {planbok.antal_spel > 0 ? `${planbok.antal_spel} spel · ${generositet}% generositet` : "inga spel ännu"}
+                  </div>
+                </a>
+              );
+            })()}
           </div>
         )}
 
