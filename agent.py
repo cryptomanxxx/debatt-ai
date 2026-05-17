@@ -44,6 +44,7 @@ from supabase_utils import (
     rakna_debattdjup, ar_duplikat, hamta_pexels_bild, logga_action,
     hamta_relation, upsert_koalition,
     rösta_på_lagforslag_block, skapa_lagforslag_ai, importera_riksdagen_forslag,
+    uppdatera_riksdagen_utfall,
 )
 
 
@@ -449,6 +450,10 @@ def main():
             imp = importera_riksdagen_forslag(sb_key)
             if imp > 0:
                 print(f"  ✓ Importerade {imp} riksdagsproposition(er)")
+
+        uppdaterade = uppdatera_riksdagen_utfall(sb_key)
+        if uppdaterade > 0:
+            print(f"  ✓ Automatiskt uppdaterade riksdagen_utfall för {uppdaterade} förslag")
 
     # Agent ställer en fråga till en annan agent (~10% chans per körning)
     if sb_key and random.random() < 0.10:
