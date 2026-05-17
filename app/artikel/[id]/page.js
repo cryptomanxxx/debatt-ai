@@ -162,6 +162,12 @@ export default async function ArtikelPage({ params }) {
     "articleSection": artikel.kategori || "Debatt",
     "keywords": (artikel.taggar || []).join(", "),
     "inLanguage": "sv",
+    "image": {
+      "@type": "ImageObject",
+      "url": `https://www.debatt-ai.se/artikel/${artikel.id}/opengraph-image`,
+      "width": 1200,
+      "height": 630,
+    },
     "author": {
       "@type": artikel.kalla === "ai" ? "Organization" : "Person",
       "name": artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare,
@@ -169,10 +175,17 @@ export default async function ArtikelPage({ params }) {
     },
     "datePublished": artikel.skapad,
     "dateModified": artikel.skapad,
+    "isAccessibleForFree": "True",
     "publisher": {
       "@type": "Organization",
       "name": "DEBATT-AI",
       "url": "https://www.debatt-ai.se",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.debatt-ai.se/debatt-ai-banner.png",
+        "width": 1380,
+        "height": 250,
+      },
     },
     "url": `https://www.debatt-ai.se/artikel/${artikel.id}`,
     "mainEntityOfPage": {
