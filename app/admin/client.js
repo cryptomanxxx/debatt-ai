@@ -1234,7 +1234,7 @@ function MatningTab() {
   );
 }
 
-const AI_COLORS = { groq: "#4a9eff", gemini: "#4ade80", openrouter: "#f8954d", cerebras: "#a78bfa", sambanova: "#fb923c", none: "#f87171" };
+const AI_COLORS = { groq: "#4a9eff", gemini: "#4ade80", openrouter: "#f8954d", cerebras: "#a78bfa", sambanova: "#fb923c", github_models: "#e2c08d", none: "#f87171" };
 const GROQ_DAILY_LIMIT = 100_000;
 
 // ── VeckorapporterTab ─────────────────────────────────────────────────────────
@@ -1664,7 +1664,7 @@ function AiStatistikTab() {
   const byDay = {};
   for (const r of rows) {
     const day = r.ts.slice(0, 10);
-    if (!byDay[day]) byDay[day] = { day, groq: 0, gemini: 0, cerebras: 0, sambanova: 0, openrouter: 0, none: 0, errors: 0 };
+    if (!byDay[day]) byDay[day] = { day, groq: 0, gemini: 0, cerebras: 0, sambanova: 0, openrouter: 0, github_models: 0, none: 0, errors: 0 };
     byDay[day][r.provider] = (byDay[day][r.provider] || 0) + 1;
     if (r.status !== "ok") byDay[day].errors++;
   }
@@ -1683,6 +1683,7 @@ function AiStatistikTab() {
   const orCallsToday = todayRows.filter(r => r.provider === "openrouter" && r.status === "ok").length;
   const cerebrasCallsToday = todayRows.filter(r => r.provider === "cerebras" && r.status === "ok").length;
   const sambanovaCallsToday = todayRows.filter(r => r.provider === "sambanova" && r.status === "ok").length;
+  const githubCallsToday    = todayRows.filter(r => r.provider === "github_models" && r.status === "ok").length;
   const errorsToday = todayRows.filter(r => r.status !== "ok").length;
 
   // ── Summary totals (7 days) ──────────────────────────────────────────────
@@ -1785,6 +1786,7 @@ function AiStatistikTab() {
           {cerebrasCallsToday > 0 && statCard("Cerebras", cerebrasCallsToday, "anrop OK", AI_COLORS.cerebras)}
           {sambanovaCallsToday > 0 && statCard("Sambanova", sambanovaCallsToday, "anrop OK", AI_COLORS.sambanova)}
           {orCallsToday > 0 && statCard("OpenRouter", orCallsToday, "anrop OK", AI_COLORS.openrouter)}
+          {githubCallsToday > 0 && statCard("GitHub Models", githubCallsToday, "anrop OK", AI_COLORS.github_models)}
           {errorsToday > 0 && statCard("Fel/timeout", errorsToday, "misslyckade", C.red)}
         </div>
       </div>
@@ -1824,7 +1826,8 @@ function AiStatistikTab() {
             <Bar dataKey="groq"       name="Groq"       stackId="a" fill={AI_COLORS.groq}       radius={[0,0,0,0]} />
             <Bar dataKey="cerebras"   name="Cerebras"   stackId="a" fill={AI_COLORS.cerebras}   radius={[0,0,0,0]} />
             <Bar dataKey="sambanova"  name="Sambanova"  stackId="a" fill={AI_COLORS.sambanova}  radius={[0,0,0,0]} />
-            <Bar dataKey="openrouter" name="OpenRouter" stackId="a" fill={AI_COLORS.openrouter} radius={[0,0,0,0]} />
+            <Bar dataKey="openrouter"    name="OpenRouter"    stackId="a" fill={AI_COLORS.openrouter}    radius={[0,0,0,0]} />
+            <Bar dataKey="github_models" name="GitHub Models" stackId="a" fill={AI_COLORS.github_models} radius={[0,0,0,0]} />
             <Bar dataKey="none"       name="Fallback"   stackId="a" fill={AI_COLORS.none}       radius={[2,2,0,0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -1881,7 +1884,8 @@ function AiStatistikTab() {
           {statCard("Groq",       totals.groq       ?? 0, "anrop", AI_COLORS.groq)}
           {(totals.cerebras  ?? 0) > 0 && statCard("Cerebras",  totals.cerebras  ?? 0, "anrop", AI_COLORS.cerebras)}
           {(totals.sambanova ?? 0) > 0 && statCard("Sambanova", totals.sambanova ?? 0, "anrop", AI_COLORS.sambanova)}
-          {(totals.openrouter ?? 0) > 0 && statCard("OpenRouter", totals.openrouter ?? 0, "anrop", AI_COLORS.openrouter)}
+          {(totals.openrouter    ?? 0) > 0 && statCard("OpenRouter",    totals.openrouter    ?? 0, "anrop", AI_COLORS.openrouter)}
+          {(totals.github_models ?? 0) > 0 && statCard("GitHub Models", totals.github_models ?? 0, "anrop", AI_COLORS.github_models)}
           {statCard("OK / Fel",   `${totalOk} / ${totalError}`, "anrop", totalError > 0 ? C.red : C.green)}
         </div>
       </div>
