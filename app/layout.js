@@ -53,6 +53,7 @@ export default function RootLayout({ children }) {
               <a href="/versus" className="neon-nav">Agent vs Agent</a>
               <a href="/ekonomi" className="neon-nav">AI-Ekonomi</a>
               <a href="/lobbying" className="neon-nav">AI-Lobbying</a>
+              <a href="/trust" className="neon-nav">Förtroendegraf</a>
               <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
               <a href="/om" className="neon-nav">Om</a>
               <a href="https://www.debatt-ai.se/rss.xml" className="neon-nav" target="_blank" rel="noopener noreferrer">RSS</a>
