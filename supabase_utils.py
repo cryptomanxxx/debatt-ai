@@ -1190,3 +1190,80 @@ def importera_riksdagen_forslag(sb_key: str) -> int:
         print(f"  ✗ Riksdagen-import misslyckades: {e}", file=sys.stderr)
 
     return importerade
+
+
+def uppdatera_riksdagen_utfall(sb_key: str) -> int:
+    """Hämtar voteringsresultat från riksdagen.se och sätter riksdagen_utfall automatiskt.
+
+    Matchar tillhor_dok_id mot våra lagrade riksdagen_id-värden.
+    Returnerar antal uppdaterade förslag.
+    """
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json",
+    }
+    uppdaterade = 0
+    try:
+        # Hämta våra riksdagsförslag som saknar utfall
+        pending_r = httpx.get(
+            f"{SB_URL}/rest/v1/lagforslag"
+            "?kalla=eq.riksdagen&riksdagen_utfall=is.null&select=id,riksdagen_id",
+            headers=h, timeout=10,
+        )
+        if not pending_r.is_success or not pending_r.json():
+            return 0
+
+        pending = {row["riksdagen_id"]: row["id"] for row in pending_r.json() if row.get("riksdagen_id")}
+        if not pending:
+            return 0
+
+        # Hämta senaste voteringar från riksdagen.se
+        api_r = httpx.get(
+            "https://data.riksdagen.se/voteringlista/"
+            "?utformat=json&sz=200&sort=datum&sortorder=desc",
+            timeout=15,
+        )
+        if not api_r.is_success:
+            return 0
+
+        data = api_r.json()
+        voteringar = data.get("voteringlista", {}).get("votering", [])
+        if isinstance(voteringar, dict):
+            voteringar = [voteringar]
+
+        # Gå igenom voteringar och hitta matchningar
+        for v in voteringar:
+            dok_id = (v.get("tillhor_dok_id") or "").strip()
+            if dok_id not in pending:
+                continue
+
+            utfall_raw = (v.get("utfall") or "").strip()
+            if utfall_raw == "Ja":
+                riksdagen_utfall = "bifall"
+            elif utfall_raw == "Nej":
+                riksdagen_utfall = "avslag"
+            else:
+                continue
+
+            datum = (v.get("datum") or "").strip() or None
+            lagforslag_id = pending[dok_id]
+
+            patch_r = httpx.patch(
+                f"{SB_URL}/rest/v1/lagforslag?id=eq.{lagforslag_id}",
+                headers={**h, "Prefer": "return=minimal"},
+                json={
+                    "riksdagen_utfall": riksdagen_utfall,
+                    "riksdagen_utfall_datum": datum,
+                    "status": "avgjort",
+                },
+                timeout=10,
+            )
+            if patch_r.is_success:
+                uppdaterade += 1
+                print(f"  ✓ Uppdaterade riksdagen_utfall={riksdagen_utfall} för lagforslag {lagforslag_id} ({dok_id})")
+                del pending[dok_id]  # Undvik dubbelbearbetning om flera voteringsrader matchar
+
+    except Exception as e:
+        print(f"  ✗ Riksdagen-utfall-uppdatering misslyckades: {e}", file=sys.stderr)
+
+    return uppdaterade
