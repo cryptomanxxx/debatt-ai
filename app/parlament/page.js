@@ -174,6 +174,19 @@ export default async function ParlamentPage() {
   const aktiva   = forslag.filter(f => f.status !== "avgjort");
   const avgjorda = forslag.filter(f => f.status === "avgjort");
 
+  // Samstämmighetsindex — avgjorda riksdagsförslag med känt utfall
+  const jamforbara = avgjorda.filter(f => f.riksdagen_utfall && f.kalla === "riksdagen");
+  const samstammiga = jamforbara.filter(f => {
+    const votes = rosterMap[f.id] || [];
+    const ja  = votes.filter(v => v.rod === "ja").length;
+    const nej = votes.filter(v => v.rod === "nej").length;
+    const aiUtfall = ja > nej ? "bifall" : ja < nej ? "avslag" : null;
+    return aiUtfall !== null && aiUtfall === f.riksdagen_utfall;
+  });
+  const indexProcent = jamforbara.length > 0
+    ? Math.round(samstammiga.length / jamforbara.length * 100)
+    : null;
+
   const sectionTitle = {
     fontSize: "11px", color: C.accent, letterSpacing: "0.12em",
     textTransform: "uppercase", margin: "0 0 20px",
@@ -212,6 +225,55 @@ export default async function ParlamentPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Samstämmighetsindex */}
+        <div style={{
+          background: "#0c0c0c", border: `1px solid ${C.border}`,
+          borderRadius: "10px", padding: "28px 32px", marginBottom: "52px",
+        }}>
+          <p style={{ fontSize: "11px", color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 16px" }}>
+            Håller AI med den svenska demokratin?
+          </p>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }}>
+            <div style={{
+              fontSize: "clamp(48px, 10vw, 72px)", fontWeight: "700", lineHeight: 1,
+              color: indexProcent === null ? C.dim
+                : indexProcent >= 60 ? C.ja
+                : indexProcent >= 40 ? C.riksdagen
+                : C.nej,
+            }}>
+              {indexProcent !== null ? `${indexProcent}%` : "—"}
+            </div>
+            <div style={{ paddingBottom: "8px" }}>
+              <div style={{ fontSize: "16px", color: C.text, fontWeight: "600" }}>Samstämmighetsindex</div>
+              <div style={{ fontSize: "13px", color: C.dim, marginTop: "4px" }}>
+                {jamforbara.length === 0
+                  ? "Samlas in i takt med att riksdagen fattar beslut"
+                  : `${samstammiga.length} av ${jamforbara.length} riksdagsförslag — AI och riksdagen röstade lika`
+                }
+              </div>
+            </div>
+          </div>
+
+          {jamforbara.length > 0 && (
+            <div>
+              <div style={{ display: "flex", height: "6px", borderRadius: "3px", overflow: "hidden", maxWidth: "480px", marginBottom: "8px" }}>
+                <div style={{ width: `${indexProcent}%`, background: C.ja, transition: "width 0.4s" }} />
+                <div style={{ width: `${100 - indexProcent}%`, background: C.nej }} />
+              </div>
+              <div style={{ display: "flex", gap: "20px", fontSize: "12px" }}>
+                <span style={{ color: C.ja }}>{samstammiga.length} samstämmiga</span>
+                <span style={{ color: C.nej }}>{jamforbara.length - samstammiga.length} avvikelser</span>
+              </div>
+            </div>
+          )}
+
+          {jamforbara.length === 0 && (
+            <p style={{ fontSize: "13px", color: "#444", margin: "8px 0 0", fontStyle: "italic" }}>
+              Indexet uppdateras automatiskt när riksdagen fattar beslut på importerade förslag.
+            </p>
+          )}
         </div>
 
         {/* Active */}
