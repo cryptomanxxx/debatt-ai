@@ -542,19 +542,68 @@ def spara_nyhetslog(sb_key: str, agent_namn: str, vald: dict,
         print(f"  Nyhetslog-fel: {e}", file=sys.stderr)
 
 
-def spara_bet(sb_key: str, market_id: int, agent_namn: str, sannolikhet: int, motivering: str) -> bool:
-    """Sparar ett agent-bet i Supabase. Ignorerar om bet redan finns (unique constraint)."""
+def _hamta_saldo_spel(sb_key: str, agent_namn: str) -> int:
+    """Hämtar agentens spelkonto (saldo_spel). Returnerar 0 om det inte finns."""
     try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo_spel",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}, timeout=8,
+        )
+        rows = r.json() if r.is_success else []
+        return rows[0].get("saldo_spel", 0) if rows else 0
+    except Exception:
+        return 0
+
+
+def _uppdatera_saldo_spel(sb_key: str, agent_namn: str, delta: int) -> None:
+    """Justerar saldo_spel för en agent (delta kan vara positivt eller negativt)."""
+    try:
+        saldo = _hamta_saldo_spel(sb_key, agent_namn)
+        nytt = max(0, saldo + delta)
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+            json={"saldo_spel": nytt, "uppdaterad": "now()"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                     "Content-Type": "application/json", "Prefer": "return=minimal"},
+            timeout=8,
+        )
+    except Exception:
+        pass
+
+
+def spara_bet(sb_key: str, market_id: int, agent_namn: str, sannolikhet: int, motivering: str) -> bool:
+    """Sparar ett agent-bet i Supabase. Drar insats från saldo_spel."""
+    try:
+        # Insats baseras på konfidensgrad: 10–40 kr
+        confidence = abs(sannolikhet - 50)
+        insats = max(10, min(40, 10 + int(confidence * 0.6)))
+
+        # Kontrollera spelkonto
+        saldo_spel = _hamta_saldo_spel(sb_key, agent_namn)
+        if saldo_spel < 10:
+            print(f"  {agent_namn}: tomt spelkonto ({saldo_spel} kr) — hoppar bet")
+            return False
+        insats = min(insats, saldo_spel)
+
+        # Dra insatsen direkt
+        _uppdatera_saldo_spel(sb_key, agent_namn, -insats)
+
         res = httpx.post(
             f"{SB_URL}/rest/v1/agent_bets",
-            json={"market_id": market_id, "agent": agent_namn, "sannolikhet": sannolikhet, "motivering": motivering},
+            json={"market_id": market_id, "agent": agent_namn, "sannolikhet": sannolikhet,
+                  "motivering": motivering, "insats": insats},
             headers={
                 "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
                 "Content-Type": "application/json", "Prefer": "return=minimal",
             },
             timeout=15,
         )
-        return res.status_code in (200, 201)
+        if res.status_code in (200, 201):
+            print(f"  Insats: {insats} kr (saldo_spel: {saldo_spel} → {saldo_spel - insats} kr)")
+            return True
+        # Återbetala om bet misslyckades
+        _uppdatera_saldo_spel(sb_key, agent_namn, insats)
+        return False
     except Exception:
         return False
 
@@ -2166,3 +2215,64 @@ def kör_ekonomispel(agent: dict, sb_key: str) -> bool:
     except Exception as e:
         print(f"  ✗ Ekonomispel misslyckades: {e}", file=sys.stderr)
         return False
+
+
+# ── Prediction market-settlement ────────────────────────────────────────────
+
+def reglera_prediction_bets(sb_key: str) -> int:
+    """
+    Reglerar oavgjorda bets på avgjorda markets.
+    Vinnare får tillbaka 2× insatsen (insats + samma belopp i vinst).
+    Returnerar antal reglerade bets.
+    """
+    hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+            "Content-Type": "application/json"}
+    try:
+        # Hämta avgjorda markets
+        m_res = httpx.get(
+            f"{SB_URL}/rest/v1/markets?status=eq.avgjord&utfall=not.is.null&select=id,utfall",
+            headers=hdrs, timeout=10,
+        )
+        if not m_res.is_success or not m_res.json():
+            return 0
+        utfall_map = {m["id"]: m["utfall"] for m in m_res.json()}
+        ids = ",".join(str(i) for i in utfall_map)
+
+        # Hämta oavgjorda bets på dessa markets
+        b_res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_bets?avgjord=eq.false&market_id=in.({ids})&select=id,market_id,agent,sannolikhet,insats",
+            headers=hdrs, timeout=10,
+        )
+        if not b_res.is_success:
+            return 0
+        bets = b_res.json()
+        if not bets:
+            return 0
+
+        settled = 0
+        for bet in bets:
+            utfall = utfall_map.get(bet["market_id"])
+            if not utfall:
+                continue
+            insats = bet.get("insats") or 0
+            sann   = bet.get("sannolikhet", 50)
+
+            won = (utfall == "ja" and sann > 50) or (utfall == "nej" and sann < 50)
+            vinst = insats if won else -insats
+
+            if won and insats > 0:
+                _uppdatera_saldo_spel(sb_key, bet["agent"], insats * 2)
+
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_bets?id=eq.{bet['id']}",
+                json={"avgjord": True, "vinst": vinst},
+                headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+            )
+            print(f"  {'✓ vann' if won else '✗ förlorade'} {bet['agent']}: "
+                  f"{'+'if won else ''}{vinst} kr (insats {insats} kr, {sann}% → {utfall})")
+            settled += 1
+
+        return settled
+    except Exception as e:
+        print(f"  ✗ Prediction-reglering misslyckades: {e}", file=sys.stderr)
+        return 0

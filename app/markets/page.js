@@ -29,6 +29,7 @@ async function getMarkets() {
   if (!marketsRes.ok) return { oppna: [], avgjorda: [] };
   const markets = await marketsRes.json();
   const bets = betsRes.ok ? await betsRes.json() : [];
+  const hasSaldoSpel = bets.some(b => b.insats > 0);
 
   const betsByMarket = {};
   for (const bet of bets) {
@@ -180,6 +181,9 @@ function MarketKort({ market }) {
                     <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", flex: 1 }}>{bet.agent}</span>
                     <span style={{ fontSize: "10px", color: tag.color, fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.06em", marginRight: "6px" }}>{tag.lbl}</span>
                     <span style={{ fontSize: "13px", color: barColor, fontFamily: "monospace", fontWeight: 700 }}>{bet.sannolikhet}%</span>
+                    {bet.insats > 0 && (
+                      <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", marginLeft: "6px", background: "#1a1a1a", borderRadius: "4px", padding: "1px 5px" }}>{bet.insats} kr</span>
+                    )}
                   </div>
                   <div style={{ height: "4px", background: "#1e1e1e", borderRadius: "2px", marginLeft: "32px" }}>
                     <div style={{ height: "100%", width: `${bet.sannolikhet}%`, background: barColor, borderRadius: "2px" }} />
@@ -234,9 +238,28 @@ function AvgjordKort({ market }) {
         </div>
       </div>
       {bets.length > 0 && (
-        <p style={{ fontSize: "11px", color: "#444", margin: "8px 0 0 0", fontFamily: "monospace" }}>
-          {ratta.length}/{bets.length} agenter hade rätt
-        </p>
+        <div style={{ marginTop: "10px" }}>
+          <p style={{ fontSize: "11px", color: "#444", margin: "0 0 8px 0", fontFamily: "monospace" }}>
+            {ratta.length}/{bets.length} agenter hade rätt
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {bets.map(b => {
+              const correct = jaVann ? b.sannolikhet >= 50 : b.sannolikhet < 50;
+              const insats = b.insats || 0;
+              if (!insats) return null;
+              return (
+                <span key={b.agent} style={{
+                  fontSize: "10px", fontFamily: "monospace", borderRadius: "4px", padding: "2px 7px",
+                  background: correct ? "#4ade8015" : "#f8717115",
+                  color: correct ? C.green : C.red,
+                  border: `1px solid ${correct ? "#4ade8030" : "#f8717130"}`,
+                }}>
+                  {b.agent.split(" ")[0]} {correct ? `+${insats}` : `-${insats}`} kr
+                </span>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -386,12 +409,24 @@ function KryptoPriser({ priser }) {
   );
 }
 
+async function getSpelarKonton() {
+  const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo_spel&order=saldo_spel.desc`,
+    { headers, cache: "no-store" }
+  );
+  if (!res.ok) return [];
+  const rows = await res.json();
+  return rows.filter(r => r.saldo_spel != null);
+}
+
 export default async function MarketsPage() {
-  const [{ oppna, avgjorda }, aktivitet, rankning, kryptoPriser] = await Promise.all([
+  const [{ oppna, avgjorda }, aktivitet, rankning, kryptoPriser, spelarKonton] = await Promise.all([
     getMarkets(),
     getSenasteAktivitet(),
     getPrediktionsRankning(),
     getKryptoPriser(),
+    getSpelarKonton(),
   ]);
 
   return (
@@ -453,6 +488,32 @@ export default async function MarketsPage() {
             <KryptoPriser priser={kryptoPriser} />
             <AktivitetsFeed aktivitet={aktivitet} />
             <PrediktionsRankning rankning={rankning} />
+            {spelarKonton.length > 0 && (
+              <div style={{ marginTop: "24px" }}>
+                <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 12px" }}>
+                  Spelkonton
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {spelarKonton.map((k, i) => {
+                    const v = agentVisuell(k.agent);
+                    const maxSaldo = spelarKonton[0]?.saldo_spel || 200;
+                    const pct = Math.round((k.saldo_spel / maxSaldo) * 100);
+                    const farg = k.saldo_spel >= 180 ? C.green : k.saldo_spel >= 100 ? C.yellow : C.red;
+                    return (
+                      <div key={k.agent} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace", width: "14px", textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
+                        <AgentAvatar namn={k.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={18} />
+                        <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.agent}</span>
+                        <span style={{ fontSize: "11px", color: farg, fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>{k.saldo_spel} kr</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: "10px", color: "#333", margin: "10px 0 0", fontFamily: "monospace" }}>
+                  Startbudget: 200 kr · Double-or-nothing
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </main>
