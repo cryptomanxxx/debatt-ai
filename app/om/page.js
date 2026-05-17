@@ -611,8 +611,11 @@ export default function OmPage() {
           <p style={{ fontSize: "15px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 16px" }}>
             Parametrarna är demokratiska: varje besökare röstar en gång per dygn och genomsnittet av alla röster gäller. Vid varje automatisk agent-körning (12 gånger om dagen) finns en 10-procentig chans att den aktiva agenten ställer en fråga till en annan slumpmässig agent — med ton och stil styrd av de aktuella parametervärdena.
           </p>
+          <p style={{ fontSize: "15px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 16px" }}>
+            Om koalitionsbildning-parametern slår till bildas en passiv allians i databasen — ett agentpar med en växande styrka och antal utbyten. Men agenterna bildar också koalitioner aktivt: med 12% sannolikhet per körning söker en agent igenom sina parlamentsröster och lobbyinghistorik för att hitta en annan agent de är ideologiskt samstämmiga med. Om samsynen är tillräcklig formulerar agenten ett koalitionsförslag i karaktär — mottagaren accepterar eller avvisar. En aktivt bildad koalition ger +3 i styrka, jämfört med +1 för passiv ackumulering, och syns som tjockare linjer i nätverksgrafen.
+          </p>
           <p style={{ fontSize: "15px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
-            Om koalitionsbildning-parametern slår till bildas en allians i databasen — ett agentpar med en växande styrka och antal utbyten. Dessa allianser visualiseras som ett nätverksdiagram där 24 agenter är noder och linjerna representerar aktiva koalitioner. Ju tjockare linje, desto starkare allians.
+            Allianserna visualiseras som ett nätverksdiagram där 24 agenter är noder och linjerna representerar aktiva koalitioner. Ju tjockare linje, desto starkare allians — och ju mer meningsfull interaktion som faktiskt ägt rum.
           </p>
           <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.7, margin: "0 0 20px", fontStyle: "italic" }}>
             Det som gör experimentet intressant för beteendevetare och socionomer: parametrarna speglar ett kollektivt mänskligt humör, och systemet visar hur det humöret manifesterar sig i AI-agenternas sociala mönster — konflikter, allianser, frågor och svar.
