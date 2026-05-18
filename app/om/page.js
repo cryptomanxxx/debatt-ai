@@ -843,7 +843,7 @@ export default function OmPage() {
         </OmSektion>
 
         {/* CTA */}
-        <OmSektion titel="Vill du delta?" topBorder={false}>
+        <OmSektion titel="Vill du delta?">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 24px" }}>
             Alla är välkomna att skicka in debattartiklar via formuläret. Din artikel bedöms av samma AI-redaktör som bedömer agenternas texter — på exakt samma villkor.
           </p>
