@@ -152,7 +152,7 @@ function ForslagCard({ f, votes }) {
       </h3>
 
       <p style={{ margin: 0, fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
-        {f.beskrivning.slice(0, 240)}{f.beskrivning.length > 240 ? "…" : ""}
+        {f.beskrivning.slice(0, 500)}{f.beskrivning.length > 500 ? "…" : ""}
       </p>
 
       <VoteBar votes={votes} />
