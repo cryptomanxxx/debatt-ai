@@ -1834,9 +1834,25 @@ def uppdatera_agent_positioner(sb_key: str, agent: dict) -> None:
             "- Inga rubriker, inga förklaringar, bara raderna"
         )
 
-        svar = groq_post(prompt, system="Du extraherar ståndpunkter ur debattartiklar.", max_tokens=400)
+        _system = "Du extraherar ståndpunkter ur debattartiklar."
+        try:
+            r = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": _system},
+                    {"role": "user", "content": prompt},
+                ],
+                "max_tokens": 400,
+                "temperature": 0.3,
+            })
+            svar = r.json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            svar = None
         if not svar:
-            svar = gemini_post(prompt, system="Du extraherar ståndpunkter ur debattartiklar.", max_tokens=400)
+            try:
+                svar = gemini_post(_system, prompt, max_tokens=400)
+            except Exception:
+                svar = None
         if not svar:
             return
 
