@@ -213,31 +213,85 @@ REGLER — viktiga:
     }
   }
 
-  // ── Try OpenRouter (streaming, same format as Groq) ──────────────────────────────────────────────────────────────────
+  // ── Reliable non-streaming fallbacks (fake SSE) ─────────────────────────────────────────────────
+  const oaiMessages = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userMessage },
+  ];
+  for (const [name, url, model, key] of [
+    ["codestral",     "https://api.mistral.ai/v1/chat/completions",                 "codestral-latest",            process.env.MISTRAL_API_KEY],
+    ["sambanova",     "https://api.sambanova.ai/v1/chat/completions",               "Meta-Llama-3.3-70B-Instruct", process.env.SAMBANOVA_API_KEY],
+    ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",                "llama3.1-8b",                 process.env.CEREBRAS_API_KEY],
+    ["github_models", "https://models.inference.ai.azure.com/chat/completions",     "Llama-3.3-70B-Instruct",      process.env.GITHUB_TOKEN],
+  ]) {
+    if (!key) continue;
+    try {
+      const t0 = Date.now();
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ model, messages: oaiMessages, max_tokens: 250, temperature: 0.88 }),
+        signal: AbortSignal.timeout(15000),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const text = data.choices?.[0]?.message?.content?.trim();
+        if (text) {
+          logAiCall({ provider: name, model, source: "chatt", status: "ok", latency_ms: Date.now() - t0 });
+          const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
+          const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
+          return new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": name } });
+        }
+      }
+      logAiCall({ provider: name, model, source: "chatt", status: r.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - t0 });
+    } catch {}
+  }
+
+  // ── Gemini (unreliable — quota issues, last resort non-streaming) ────────────────────────────────
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    const geminiPayload = JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: userMessage }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { maxOutputTokens: 250, temperature: 0.88 },
+    });
+    for (const model of ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-latest"]) {
+      const gemT0 = Date.now();
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
+          { method: "POST", headers: { "Content-Type": "application/json" }, body: geminiPayload, signal: AbortSignal.timeout(12000) }
+        );
+        if (r.ok) {
+          const data = await r.json().catch(() => null);
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+          if (text) {
+            ps.gemini = { remaining: null, limit: 15, resetAt: null, ts: Date.now(), status: "ok" };
+            logAiCall({ provider: "gemini", model, source: "chatt", status: "ok", latency_ms: Date.now() - gemT0, input_tokens: data?.usageMetadata?.promptTokenCount, output_tokens: data?.usageMetadata?.candidatesTokenCount });
+            const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
+            const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
+            return new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": "gemini" } });
+          }
+        }
+        const status = r.status === 429 ? "rate_limited" : "error";
+        if (r.status === 429) ps.gemini = { ...ps.gemini, ts: Date.now(), status: "limited" };
+        logAiCall({ provider: "gemini", model, source: "chatt", status, latency_ms: Date.now() - gemT0 });
+        if (r.status === 400 || r.status === 403) break;
+      } catch {}
+    }
+  }
+
+  // ── OpenRouter (unreliable — rate limited free tier, last resort streaming) ──────────────────────
   const orKey = process.env.OPENROUTER_API_KEY;
   if (orKey) {
-    const orAbort = new AbortController();
-    const orTimeout = setTimeout(() => orAbort.abort(), 8000);
     const orT0 = Date.now();
     try {
       const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${orKey}`,
-          "HTTP-Referer": "https://www.debatt-ai.se",
-          "X-Title": "Debatt AI",
-        },
-        signal: orAbort.signal,
-        body: JSON.stringify({
-          model: "meta-llama/llama-3.3-70b-instruct:free",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
-          max_tokens: 250,
-          temperature: 0.88,
-          stream: true,
-        }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${orKey}`, "HTTP-Referer": "https://www.debatt-ai.se", "X-Title": "Debatt AI" },
+        body: JSON.stringify({ model: "meta-llama/llama-3.3-70b-instruct:free", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }], max_tokens: 250, temperature: 0.88, stream: true }),
+        signal: AbortSignal.timeout(10000),
       });
-      clearTimeout(orTimeout);
       if (orRes.ok) {
         ps.or = { ts: Date.now(), status: "ok" };
         logAiCall({ provider: "openrouter", model: "llama-3.3-70b-instruct:free", source: "chatt", status: "ok", latency_ms: Date.now() - orT0 });
@@ -245,102 +299,9 @@ REGLER — viktiga:
       }
       ps.or = { ts: Date.now(), status: orRes.status === 429 ? "limited" : "error" };
       logAiCall({ provider: "openrouter", source: "chatt", status: orRes.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - orT0 });
-    } catch (e) {
-      clearTimeout(orTimeout);
-      ps.or = { ts: Date.now(), status: "error" };
-      logAiCall({ provider: "openrouter", source: "chatt", status: e.name === "AbortError" ? "timeout" : "error", latency_ms: Date.now() - orT0 });
-    }
+    } catch {}
   }
 
-  // ── Fall back to Gemini ─────────────────────────────────────────────────────────────────────────────────────
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) {
-    return Response.json({ error: `GEMINI_API_KEY saknas. ${groqFailReason}` }, { status: 502 });
-  }
-
-  const geminiPayload = JSON.stringify({
-    contents: [{ role: "user", parts: [{ text: userMessage }] }],
-    systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: { maxOutputTokens: 250, temperature: 0.88 },
-  });
-
-  const geminiModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-latest"];
-  let geminiText = "";
-  let geminiErr = "";
-  for (const model of geminiModels) {
-    const gemT0 = Date.now();
-    const r = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: geminiPayload }
-    );
-    if (r.ok) {
-      ps.gemini = { remaining: null, limit: 15, resetAt: null, ts: Date.now(), status: "ok" };
-      const data = await r.json().catch(() => null);
-      const t = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-      if (t) {
-        logAiCall({
-          provider: "gemini", model, source: "chatt", status: "ok", latency_ms: Date.now() - gemT0,
-          input_tokens: data?.usageMetadata?.promptTokenCount,
-          output_tokens: data?.usageMetadata?.candidatesTokenCount,
-        });
-        geminiText = t;
-        break;
-      }
-    } else {
-      if (r.status === 429) {
-        ps.gemini = { ...ps.gemini, ts: Date.now(), status: "limited" };
-        logAiCall({ provider: "gemini", model, source: "chatt", status: "rate_limited", latency_ms: Date.now() - gemT0 });
-      } else {
-        logAiCall({ provider: "gemini", model, source: "chatt", status: "error", latency_ms: Date.now() - gemT0 });
-      }
-      const errBody = await r.text().catch(() => "");
-      geminiErr += `${model}:${r.status} `;
-      if (errBody.includes("API_KEY") || r.status === 400 || r.status === 403) {
-        geminiErr += errBody.slice(0, 100);
-        break;
-      }
-    }
-  }
-
-  if (!geminiText) {
-    const oaiMessages = [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMessage },
-    ];
-    for (const [name, url, model, key] of [
-      ["codestral",     "https://api.mistral.ai/v1/chat/completions",                    "codestral-latest",           process.env.MISTRAL_API_KEY],
-      ["sambanova",     "https://api.sambanova.ai/v1/chat/completions",                  "Meta-Llama-3.3-70B-Instruct", process.env.SAMBANOVA_API_KEY],
-      ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",                   "llama3.1-8b",                process.env.CEREBRAS_API_KEY],
-      ["github_models", "https://models.inference.ai.azure.com/chat/completions",        "Llama-3.3-70B-Instruct",     process.env.GITHUB_TOKEN],
-    ]) {
-      if (!key) continue;
-      try {
-        const t0 = Date.now();
-        const r = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify({ model, messages: oaiMessages, max_tokens: 250, temperature: 0.88 }),
-          signal: AbortSignal.timeout(15000),
-        });
-        if (r.ok) {
-          const data = await r.json();
-          const text = data.choices?.[0]?.message?.content?.trim();
-          if (text) {
-            logAiCall({ provider: name, model, source: "chatt", status: "ok", latency_ms: Date.now() - t0 });
-            const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
-            const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
-            return new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": name } });
-          }
-        }
-        logAiCall({ provider: name, model, source: "chatt", status: "error", latency_ms: Date.now() - t0 });
-      } catch {}
-    }
-    logFel({ kalla: "chatt", feltyp: "ai_fail", meddelande: "Alla providers misslyckades", ip, extra: { groqFailReason, geminiErr } });
-    return Response.json({ error: `Alla AI-tjänster är otillgängliga. ${groqFailReason} | Gemini: ${geminiErr}` }, { status: 502 });
-  }
-
-  const encoder = new TextEncoder();
-  const chunk = JSON.stringify({ choices: [{ delta: { content: geminiText } }] });
-  const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
-  return new Response(encoder.encode(sseBody), { headers: { ...rlHeaders, "X-Provider": "gemini" } });
+  logFel({ kalla: "chatt", feltyp: "ai_fail", meddelande: "Alla providers misslyckades", ip, extra: { groqFailReason } });
+  return Response.json({ error: `Alla AI-tjänster är otillgängliga. ${groqFailReason}` }, { status: 502 });
 }

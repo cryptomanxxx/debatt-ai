@@ -42,39 +42,6 @@ export async function POST(req) {
   const sbKey   = process.env.SAMBANOVA_API_KEY;
   const orKey   = process.env.OPENROUTER_API_KEY;
 
-  // Gemini first — no daily token cap (only 15 req/min)
-  if (gemKey) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: user }] }],
-            systemInstruction: { parts: [{ text: system }] },
-            generationConfig: { maxOutputTokens: 350, temperature: 0.4 },
-          }),
-          signal: AbortSignal.timeout(8000),
-        }
-      );
-      const latency_ms = Date.now() - t0;
-      if (r.ok) {
-        const json = await r.json();
-        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-        if (text && text !== rubrik) {
-          logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usageMetadata?.promptTokenCount, output_tokens: json?.usageMetadata?.candidatesTokenCount });
-          return Response.json({ text }, { headers: { "X-Provider": "gemini" } });
-        }
-      } else {
-        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
-      }
-    } catch {
-      logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
   if (groqKey) {
     const t0 = Date.now();
     try {
@@ -150,36 +117,6 @@ export async function POST(req) {
     }
   }
 
-  if (orKey) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch(OR_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${orKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://www.debatt-ai.se",
-          "X-Title": "Debatt AI",
-        },
-        body: JSON.stringify({ models: OR_MODELS, messages: msgs, max_tokens: 350, temperature: 0.4 }),
-        signal: AbortSignal.timeout(10000),
-      });
-      const latency_ms = Date.now() - t0;
-      if (r.ok) {
-        const json = await r.json();
-        const text = json.choices[0].message.content.trim();
-        if (text && text !== rubrik) {
-          logAiCall({ provider: "openrouter", model: json?.model ?? OR_MODELS[0], source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
-          return Response.json({ text }, { headers: { "X-Provider": "openrouter" } });
-        }
-      } else {
-        logAiCall({ provider: "openrouter", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
-      }
-    } catch {
-      logAiCall({ provider: "openrouter", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
   const ghKey = process.env.GITHUB_TOKEN;
   if (ghKey) {
     const t0 = Date.now();
@@ -203,6 +140,56 @@ export async function POST(req) {
       }
     } catch {
       logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
+  // Gemini (unreliable — quota issues, last resort)
+  if (gemKey) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: user }] }], systemInstruction: { parts: [{ text: system }] }, generationConfig: { maxOutputTokens: 350, temperature: 0.4 } }), signal: AbortSignal.timeout(8000) }
+      );
+      const latency_ms = Date.now() - t0;
+      if (r.ok) {
+        const json = await r.json();
+        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+        if (text && text !== rubrik) {
+          logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usageMetadata?.promptTokenCount, output_tokens: json?.usageMetadata?.candidatesTokenCount });
+          return Response.json({ text }, { headers: { "X-Provider": "gemini" } });
+        }
+      } else {
+        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
+      }
+    } catch {
+      logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
+  // OpenRouter (unreliable — rate limited free tier, last resort)
+  if (orKey) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch(OR_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${orKey}`, "Content-Type": "application/json", "HTTP-Referer": "https://www.debatt-ai.se", "X-Title": "Debatt AI" },
+        body: JSON.stringify({ models: OR_MODELS, messages: msgs, max_tokens: 350, temperature: 0.4 }),
+        signal: AbortSignal.timeout(10000),
+      });
+      const latency_ms = Date.now() - t0;
+      if (r.ok) {
+        const json = await r.json();
+        const text = json.choices[0].message.content.trim();
+        if (text && text !== rubrik) {
+          logAiCall({ provider: "openrouter", model: json?.model ?? OR_MODELS[0], source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
+          return Response.json({ text }, { headers: { "X-Provider": "openrouter" } });
+        }
+      } else {
+        logAiCall({ provider: "openrouter", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
+      }
+    } catch {
+      logAiCall({ provider: "openrouter", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 
