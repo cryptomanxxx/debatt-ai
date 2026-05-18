@@ -317,7 +317,7 @@ async function getAgentFoljare(namn) {
 
 async function getAgentPlanbok(namn) {
   const res = await fetch(
-    `${SB_URL}/rest/v1/agent_planbocker?agent=eq.${encodeURIComponent(namn)}&select=saldo,totalt_givet,totalt_fatt,antal_spel`,
+    `${SB_URL}/rest/v1/agent_planbocker?agent=eq.${encodeURIComponent(namn)}&select=saldo,saldo_spel,totalt_givet,totalt_fatt,antal_spel`,
     { headers: sbHeaders(), next: { revalidate: 120 } }
   );
   if (!res.ok) return null;
@@ -516,18 +516,32 @@ export default async function AgentPage({ params }) {
                 ? Math.round(planbok.totalt_givet / (planbok.antal_spel * 100) * 100)
                 : null;
               return (
-                <a href="/ekonomi" style={{ background: C.surface, border: `1px solid #2a1a3a`, borderRadius: "8px", padding: "16px", textAlign: "center", textDecoration: "none", display: "block" }}>
-                  <div style={{ fontSize: "22px", fontWeight: 700, color: "#e879f9", fontFamily: "monospace" }}>
-                    {planbok.saldo}
-                  </div>
-                  <div style={{ fontSize: "10px", color: deltaColor, fontFamily: "monospace", marginTop: "2px" }}>
-                    {delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : "±0"}
-                  </div>
-                  <div style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "4px" }}>Plånbok</div>
-                  <div style={{ fontSize: "10px", color: "#555", marginTop: "2px" }}>
-                    {planbok.antal_spel > 0 ? `${planbok.antal_spel} spel · ${generositet}% generositet` : "inga spel ännu"}
-                  </div>
-                </a>
+                <>
+                  <a href="/ekonomi" style={{ background: C.surface, border: `1px solid #2a1a3a`, borderRadius: "8px", padding: "16px", textAlign: "center", textDecoration: "none", display: "block" }}>
+                    <div style={{ fontSize: "22px", fontWeight: 700, color: "#e879f9", fontFamily: "monospace" }}>
+                      {planbok.saldo} kr
+                    </div>
+                    <div style={{ fontSize: "10px", color: deltaColor, fontFamily: "monospace", marginTop: "2px" }}>
+                      {delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : "±0"} från start
+                    </div>
+                    <div style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "4px" }}>Ekonomi</div>
+                    <div style={{ fontSize: "10px", color: "#555", marginTop: "2px" }}>
+                      {planbok.antal_spel > 0 ? `${planbok.antal_spel} spel · ${generositet}% generositet` : "inga spel ännu"}
+                    </div>
+                  </a>
+                  {planbok.saldo_spel != null && (
+                    <a href="/markets" style={{ background: C.surface, border: `1px solid #1a2a1a`, borderRadius: "8px", padding: "16px", textAlign: "center", textDecoration: "none", display: "block" }}>
+                      <div style={{ fontSize: "22px", fontWeight: 700, color: "#4ade80", fontFamily: "monospace" }}>
+                        {planbok.saldo_spel} kr
+                      </div>
+                      <div style={{ fontSize: "10px", color: planbok.saldo_spel >= 200 ? "#4ade80" : planbok.saldo_spel < 200 ? "#f87171" : "#555", fontFamily: "monospace", marginTop: "2px" }}>
+                        {planbok.saldo_spel >= 200 ? `+${planbok.saldo_spel - 200}` : `${planbok.saldo_spel - 200}`} från start
+                      </div>
+                      <div style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "4px" }}>Spelkonto</div>
+                      <div style={{ fontSize: "10px", color: "#555", marginTop: "2px" }}>prediction markets</div>
+                    </a>
+                  )}
+                </>
               );
             })()}
           </div>
