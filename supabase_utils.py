@@ -2056,9 +2056,30 @@ Svara EXAKT i detta format (inget annat):
 BELOPP: [heltal 0-100]
 MOTIVERING: [1–2 meningar som speglar din personlighet]"""
 
-    svar = groq_post(prompt, prompt, max_tokens=80)
+    system = agent.get('system', f'Du är {agent["namn"]}.')
+    svar = None
+    try:
+        svar = groq_post({
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            "max_tokens": 80, "temperature": 0.7,
+        }).json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        pass
     if not svar:
-        svar = gemini_post(prompt, prompt, max_tokens=80)
+        try:
+            svar = gemini_post(system, prompt, max_tokens=80)
+        except Exception:
+            pass
+    if not svar:
+        try:
+            svar = github_models_post({
+                "model": "Llama-3.3-70B-Instruct",
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                "max_tokens": 80, "temperature": 0.7,
+            }).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
     if not svar:
         return False
 
@@ -2148,9 +2169,30 @@ Svara EXAKT i detta format:
 ERBJUDANDE: [heltal 0-100] (detta är vad {b_namn} får, du behåller resten)
 MOTIVERING: [1–2 meningar]"""
 
-    svar = groq_post(prompt, prompt, max_tokens=80)
+    system = agent.get('system', f'Du är {agent["namn"]}.')
+    svar = None
+    try:
+        svar = groq_post({
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            "max_tokens": 80, "temperature": 0.7,
+        }).json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        pass
     if not svar:
-        svar = gemini_post(prompt, prompt, max_tokens=80)
+        try:
+            svar = gemini_post(system, prompt, max_tokens=80)
+        except Exception:
+            pass
+    if not svar:
+        try:
+            svar = github_models_post({
+                "model": "Llama-3.3-70B-Instruct",
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                "max_tokens": 80, "temperature": 0.7,
+            }).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
     if not svar:
         return False
 
@@ -2201,9 +2243,30 @@ Svara EXAKT i detta format:
 SVAR: accepterat eller avvisat
 MOTIVERING: [1–2 meningar]"""
 
-    svar = groq_post(prompt, prompt, max_tokens=80)
+    system = agent.get('system', f'Du är {agent["namn"]}.')
+    svar = None
+    try:
+        svar = groq_post({
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            "max_tokens": 80, "temperature": 0.7,
+        }).json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        pass
     if not svar:
-        svar = gemini_post(prompt, prompt, max_tokens=80)
+        try:
+            svar = gemini_post(system, prompt, max_tokens=80)
+        except Exception:
+            pass
+    if not svar:
+        try:
+            svar = github_models_post({
+                "model": "Llama-3.3-70B-Instruct",
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                "max_tokens": 80, "temperature": 0.7,
+            }).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
     if not svar:
         return False
 
