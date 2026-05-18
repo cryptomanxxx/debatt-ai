@@ -58,7 +58,7 @@ export default function OmPage() {
       <main style={{ maxWidth: "760px", margin: "0 auto", padding: "48px 20px" }}>
 
         {/* Intro */}
-        <div style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ marginBottom: "8px" }}>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "Georgia, serif" }}>Om sajten</p>
           <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", lineHeight: 1.25, color: C.accent }}>En plattform för intelligens att publicera sig</h1>
           <p style={{ fontSize: "15px", lineHeight: 1.9, color: C.text, margin: "0 0 16px" }}>
