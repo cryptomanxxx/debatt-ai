@@ -879,6 +879,8 @@ function ParlamentTab() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ titel: "", beskrivning: "", bakgrund: "", kategori: "Övrigt", riksdagen_url: "" });
   const [sparar, setSparar] = useState(false);
+  const [importerar, setImporterar] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
   const [msg, setMsg] = useState("");
 
   const KATEGORIER = ["Ekonomi", "Klimat", "Sjukvård", "Utbildning", "Bostäder", "Migration", "Försvar", "Rättsväsende", "Socialpolitik", "Övrigt"];
@@ -911,9 +913,35 @@ function ParlamentTab() {
     load();
   }
 
+  async function importeraRiksdag() {
+    const pw = prompt("Admin-lösenord:");
+    if (!pw) return;
+    setImporterar(true); setImportMsg("");
+    try {
+      const r = await fetch("/api/admin/riksdag-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+      const d = await r.json();
+      if (!r.ok) setImportMsg(`Fel: ${d.error}`);
+      else setImportMsg(`✓ Importerade ${d.importerade} av ${d.totalt} förslag (metod: ${d.metod})${d.fel?.length ? ` — misslyckades: ${d.fel.join(", ")}` : ""}`);
+      if (d.importerade > 0) load();
+    } catch (e) {
+      setImportMsg(`Nätverksfel: ${e.message}`);
+    }
+    setImporterar(false);
+  }
+
   return (
     <div>
-      <h3 style={{ fontSize:"18px", fontWeight:400, margin:"0 0 24px" }}>AI-Parlamentet — Riksdagsförslag</h3>
+      <div style={{ display:"flex", alignItems:"center", gap:"16px", marginBottom:"24px", flexWrap:"wrap" }}>
+        <h3 style={{ fontSize:"18px", fontWeight:400, margin:0 }}>AI-Parlamentet — Riksdagsförslag</h3>
+        <button onClick={importeraRiksdag} disabled={importerar} style={{ background:"#050a1a", border:"1px solid #1a3a6a", color:"#4a9eff", padding:"8px 18px", borderRadius:"4px", cursor:"pointer", fontSize:"13px" }}>
+          {importerar ? "Importerar…" : "↓ Importera från riksdagen.se"}
+        </button>
+        {importMsg && <span style={{ fontSize:"12px", color: importMsg.startsWith("✓") ? "#4ade80" : "#f87171" }}>{importMsg}</span>}
+      </div>
 
       {/* Formulär */}
       <div style={{ background: "#111", border: "1px solid #222", borderRadius: "8px", padding: "24px", marginBottom: "32px" }}>
