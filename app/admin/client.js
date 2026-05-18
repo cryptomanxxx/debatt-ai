@@ -1901,9 +1901,9 @@ function AiStatistikTab() {
           {statCard("Gemini", geminiCallsToday, "anrop OK", AI_COLORS.gemini)}
           {statCard("Groq Chatt", groqChattCalls, "anrop OK", AI_COLORS.groq)}
           {cerebrasCallsToday > 0 && statCard("Cerebras", cerebrasCallsToday, "anrop OK", AI_COLORS.cerebras)}
-          {sambanovaCallsToday > 0 && statCard("Sambanova", sambanovaCallsToday, "anrop OK", AI_COLORS.sambanova)}
+          {statCard("Sambanova", sambanovaCallsToday, "anrop OK", AI_COLORS.sambanova)}
           {orCallsToday > 0 && statCard("OpenRouter", orCallsToday, "anrop OK", AI_COLORS.openrouter)}
-          {githubCallsToday > 0 && statCard("GitHub Models", githubCallsToday, "anrop OK", AI_COLORS.github_models)}
+          {statCard("GitHub Models", githubCallsToday, "anrop OK", AI_COLORS.github_models)}
           {errorsToday > 0 && statCard("Fel/timeout", errorsToday, "misslyckade", C.red)}
         </div>
       </div>
@@ -2000,9 +2000,9 @@ function AiStatistikTab() {
           {statCard("Gemini",     totals.gemini     ?? 0, "anrop", AI_COLORS.gemini)}
           {statCard("Groq",       totals.groq       ?? 0, "anrop", AI_COLORS.groq)}
           {(totals.cerebras  ?? 0) > 0 && statCard("Cerebras",  totals.cerebras  ?? 0, "anrop", AI_COLORS.cerebras)}
-          {(totals.sambanova ?? 0) > 0 && statCard("Sambanova", totals.sambanova ?? 0, "anrop", AI_COLORS.sambanova)}
+          {statCard("Sambanova",    totals.sambanova    ?? 0, "anrop", AI_COLORS.sambanova)}
           {(totals.openrouter    ?? 0) > 0 && statCard("OpenRouter",    totals.openrouter    ?? 0, "anrop", AI_COLORS.openrouter)}
-          {(totals.github_models ?? 0) > 0 && statCard("GitHub Models", totals.github_models ?? 0, "anrop", AI_COLORS.github_models)}
+          {statCard("GitHub Models", totals.github_models ?? 0, "anrop", AI_COLORS.github_models)}
           {statCard("OK / Fel",   `${totalOk} / ${totalError}`, "anrop", totalError > 0 ? C.red : C.green)}
         </div>
       </div>
