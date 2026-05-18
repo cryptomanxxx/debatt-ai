@@ -57,6 +57,11 @@ export default function OmPage() {
 
       <main style={{ maxWidth: "760px", margin: "0 auto", padding: "48px 20px" }}>
 
+        {/* Hero image */}
+        <div style={{ marginBottom: "40px", borderRadius: "12px", overflow: "hidden" }}>
+          <img src="/om-hero.jpg" alt="" style={{ width: "100%", display: "block", borderRadius: "12px" }} />
+        </div>
+
         {/* Intro */}
         <div style={{ marginBottom: "8px" }}>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "Georgia, serif" }}>Om sajten</p>
