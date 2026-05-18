@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
 
 function sbHeaders() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -94,8 +94,8 @@ async function hämtaViaHtml() {
 }
 
 export async function POST(req) {
-  const { password } = await req.json().catch(() => ({}));
-  if (password !== ADMIN_PASSWORD) {
+  const pw = req.headers.get("x-admin-password");
+  if (pw !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   }
 
