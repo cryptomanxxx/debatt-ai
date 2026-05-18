@@ -169,7 +169,7 @@ function ForslagCard({ f, votes }) {
             {f.beskrivning.slice(0, 500)}…
           </p>
           <details>
-            <summary style={{ fontSize: "12px", color: "#555", cursor: "pointer", listStyle: "none", display: "inline-block", userSelect: "none" }}>
+            <summary style={{ fontSize: "12px", color: C.accent, cursor: "pointer", listStyle: "none", display: "inline-block", userSelect: "none", marginTop: "4px" }}>
               visa mer ▼
             </summary>
             <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
@@ -203,6 +203,7 @@ const STEG = 20;
 
 export default function ParlamentKlient({ forslag, rosterMap }) {
   const [valdKategori, setValdKategori] = useState("Alla");
+  const [valdStatus, setValdStatus]     = useState("Alla");
   const [visaAktiva, setVisaAktiva]     = useState(STEG);
   const [visaAvgjorda, setVisaAvgjorda] = useState(STEG);
 
@@ -211,15 +212,25 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
     ...Array.from(new Set(forslag.map(f => f.kategori).filter(Boolean))).sort(),
   ];
 
-  const filtrerade = valdKategori === "Alla"
+  const efterKategori = valdKategori === "Alla"
     ? forslag
     : forslag.filter(f => f.kategori === valdKategori);
+
+  const filtrerade = valdStatus === "Pågående" ? efterKategori.filter(f => f.status !== "avgjort")
+    : valdStatus === "Avgjorda" ? efterKategori.filter(f => f.status === "avgjort")
+    : efterKategori;
 
   const aktiva   = filtrerade.filter(f => f.status !== "avgjort");
   const avgjorda = filtrerade.filter(f => f.status === "avgjort");
 
   function byttKategori(k) {
     setValdKategori(k);
+    setVisaAktiva(STEG);
+    setVisaAvgjorda(STEG);
+  }
+
+  function byttStatus(s) {
+    setValdStatus(s);
     setVisaAktiva(STEG);
     setVisaAvgjorda(STEG);
   }
@@ -235,8 +246,33 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
     whiteSpace: "nowrap",
   });
 
+  const statusStyle = (aktiv) => ({
+    padding: "5px 16px", borderRadius: "20px",
+    background: aktiv ? "#fff" + "10" : "transparent",
+    color: aktiv ? "#fff" : C.dim,
+    border: `1px solid ${aktiv ? "#ffffff40" : C.border}`,
+    cursor: "pointer", fontSize: "12px",
+    fontWeight: aktiv ? "600" : "400",
+    fontFamily: "Georgia, serif",
+    whiteSpace: "nowrap",
+  });
+
   return (
     <>
+      {/* Statusfilter */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+        {["Alla", "Pågående", "Avgjorda"].map(s => {
+          const antal = s === "Alla" ? efterKategori.length
+            : s === "Pågående" ? efterKategori.filter(f => f.status !== "avgjort").length
+            : efterKategori.filter(f => f.status === "avgjort").length;
+          return (
+            <button key={s} onClick={() => byttStatus(s)} style={statusStyle(valdStatus === s)}>
+              {s} <span style={{ fontSize: "10px", opacity: 0.6 }}>({antal})</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Kategori-filter */}
       <div style={{
         display: "flex", gap: "8px", flexWrap: "wrap",
