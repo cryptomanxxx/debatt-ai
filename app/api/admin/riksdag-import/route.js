@@ -68,7 +68,7 @@ async function hämtaViaApi() {
     riksdagen_url: byggUrl(d),
   })).filter(d => d.dok_id && d.titel);
 
-  // Hämta fullständig sammanfattning via dokumentstatus-endpointen (parallellt)
+  // Steg 1: dokumentstatus för sammanfattning (parallellt)
   await Promise.all(forslag.map(async (item) => {
     try {
       const dr = await fetch(
@@ -79,7 +79,42 @@ async function hämtaViaApi() {
       const dd = await dr.json();
       const sammanfattning = dd?.dokumentstatus?.dokument?.sammanfattning?.trim();
       if (sammanfattning && sammanfattning.length > (item.beskrivning?.length || 0)) {
-        item.beskrivning = sammanfattning.slice(0, 2000);
+        item.beskrivning = sammanfattning.slice(0, 3000);
+      }
+    } catch {}
+  }));
+
+  // Steg 2: för propositioner med kort text (<500 tecken), hämta HTML-sidan för mer innehåll
+  await Promise.all(forslag.map(async (item) => {
+    if ((item.beskrivning?.length || 0) >= 500) return;
+    const url = item.riksdagen_url;
+    if (!url) return;
+    try {
+      const dr = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; debatt-ai.se/1.0)",
+          "Accept": "text/html",
+          "Accept-Language": "sv-SE,sv;q=0.9",
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!dr.ok) return;
+      const html = await dr.text();
+
+      // Extrahera "Propositionens huvudsakliga innehåll"-avsnittet
+      const huvud = html.match(
+        /Propositionens huvudsakliga inneh[åa]ll([\s\S]{100,4000}?)(?=<h[123]|<\/(?:div|section|article)>)/i
+      )?.[1]?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+      // Alternativ: brödtext i article/main
+      const brödtext = html.match(
+        /<(?:article|main)[^>]*>([\s\S]{200,4000}?)<\/(?:article|main)>/
+      )?.[1]?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+      const kandidater = [huvud, brödtext].filter(t => t && t.length > 200);
+      const bäst = kandidater.sort((a, b) => b.length - a.length)[0];
+      if (bäst && bäst.length > (item.beskrivning?.length || 0)) {
+        item.beskrivning = bäst.slice(0, 3000);
       }
     } catch {}
   }));

@@ -116,7 +116,7 @@ function isNy(iso) {
 
 function ForslagCard({ f, votes }) {
   const isRiksdagen = f.kalla === "riksdagen";
-  const langBeskrivning = f.beskrivning && f.beskrivning.length > 500;
+  const langBeskrivning = f.beskrivning && f.beskrivning.length > 300;
   const datum = formatDatum(f.skapad);
   const ny = isNy(f.skapad);
 
@@ -166,14 +166,14 @@ function ForslagCard({ f, votes }) {
       {langBeskrivning ? (
         <>
           <p style={{ margin: "0 0 4px", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
-            {f.beskrivning.slice(0, 500)}…
+            {f.beskrivning.slice(0, 300)}…
           </p>
           <details>
             <summary style={{ fontSize: "12px", color: C.accent, cursor: "pointer", listStyle: "none", display: "inline-block", userSelect: "none", marginTop: "4px" }}>
               visa mer ▼
             </summary>
             <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
-              {f.beskrivning.slice(500)}
+              {f.beskrivning.slice(300)}
             </p>
           </details>
         </>
