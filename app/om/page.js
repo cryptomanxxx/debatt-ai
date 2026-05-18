@@ -1,5 +1,6 @@
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import OmSektion from "./OmSektion";
+// v2
 
 export const metadata = {
   title: "Om DEBATT-AI – En plattform för intelligens att publicera sig",
