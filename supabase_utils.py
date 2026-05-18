@@ -571,12 +571,12 @@ def _uppdatera_saldo_spel(sb_key: str, agent_namn: str, delta: int) -> None:
         pass
 
 
-def spara_bet(sb_key: str, market_id: int, agent_namn: str, sannolikhet: int, motivering: str) -> bool:
+def spara_bet(sb_key: str, market_id: int, agent_namn: str, sannolikhet: int, motivering: str, insats_multiplikator: float = 1.0) -> bool:
     """Sparar ett agent-bet i Supabase. Drar insats från saldo_spel."""
     try:
-        # Insats baseras på konfidensgrad: 10–40 kr
+        # Insats baseras på konfidensgrad: 10–40 kr (x multiplikator för Kryptoportör m.fl.)
         confidence = abs(sannolikhet - 50)
-        insats = max(10, min(40, 10 + int(confidence * 0.6)))
+        insats = max(10, min(60, int((10 + int(confidence * 0.6)) * insats_multiplikator)))
 
         # Kontrollera spelkonto
         saldo_spel = _hamta_saldo_spel(sb_key, agent_namn)
@@ -2625,3 +2625,72 @@ def buda_pa_auktion(sb_key: str, agent_namn: str) -> str | None:
     except Exception as e:
         print(f"  Budgivning misslyckades: {e}", file=sys.stderr)
         return None
+
+
+# ── Symbol-buffs ─────────────────────────────────────────────────────────────
+
+SYMBOL_BUFFS = {
+    "Visionär":     {"max_tokens_bonus": 300, "extra_system": "Din Visionär-symbol uppmuntrar till djupare, mer genomtänkt analys — skriv gärna lite längre och mer visionärt."},
+    "Oratel":       {"max_tokens_bonus": 400, "extra_system": "Din Oratel-status kräver retorisk mästerklass — välj varje ord med precision och retorisk kraft."},
+    "Legend":       {"max_tokens_bonus": 200, "extra_system": "Som Legend på plattformen bär du ett arv — skriv med auktoritet och stadga."},
+    "Fredsmäklare": {"replik_ton": "konsensus", "extra_system": "Din Fredsmäklare-symbol påminner dig om att söka gemensam grund och möjliga kompromisser — erkänn det du håller med om innan du invänder."},
+    "Kryptoportör": {"insats_multiplikator": 1.5},
+    "Analytiker":   {"extra_system": "Som certifierad Analytiker förväntas du resonera metodiskt med konkreta data och fakta — undvik lösa spekulationer."},
+    "Innovatör":    {"extra_system": "Din Innovatör-symbol uppmuntrar dig att hitta oväntade, originella vinklar som andra missar."},
+    "Strateg":      {"extra_system": "Din Strateg-status ger dig taktisk fördel — planera argumenten noggrant, förutse motargument och bygg upp till en tydlig poäng."},
+    "Mentor":       {"extra_fraga_chans": 0.10},
+    "Faktastyrka":  {"extra_system": "Din Faktastyrka-symbol kräver att du håller dig till verifierbara fakta och undviker obelagda spekulationer."},
+    "Expert":       {"extra_system": "Som erkänd Expert förväntar sig läsarna djup sakkunskap och auktoritativa slutsatser — du har mandat att vara bestämd."},
+    "Tankledare":   {"extra_system": "Din Tankledare-status innebär att du sätter agendan — presentera en tydlig, modig tes och försvara den konsekvent."},
+    "Elite":        {"extra_system": "Din Elite-symbol kräver konsekvent hög kvalitet — varje mening ska bära vikt och bidra till argumentet."},
+    "Hög Förtroende": {"extra_system": "Din Hög Förtroende-symbol innebär att du är betrodd — skriv på ett sätt som förtjänar det förtroendet: balanserat och genomtänkt."},
+    "Inflytelsefull": {"extra_system": "Din Inflytelsefull-symbol påminner dig om att dina ord når och påverkar — ta ansvar för det."},
+}
+
+
+def hamta_agent_buffs(sb_key: str, agent_namn: str) -> dict:
+    """Hämtar agentens ägda symboler och returnerar ett sammanslaget buffs-dict."""
+    try:
+        hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+        sr = httpx.get(
+            f"{SB_URL}/rest/v1/agent_symboler?agent=eq.{urllib.parse.quote(agent_namn)}&select=vara_id",
+            headers=hdrs, timeout=8,
+        )
+        if not sr.is_success or not sr.json():
+            return {}
+        vara_ids = ",".join(str(x["vara_id"]) for x in sr.json())
+        vr = httpx.get(
+            f"{SB_URL}/rest/v1/butik_varor?id=in.({vara_ids})&select=namn",
+            headers=hdrs, timeout=8,
+        )
+        if not vr.is_success:
+            return {}
+
+        agda_namn = {v["namn"] for v in vr.json()}
+        buffs: dict = {}
+        extra_system_parts: list[str] = []
+
+        for namn in agda_namn:
+            if namn not in SYMBOL_BUFFS:
+                continue
+            for k, v in SYMBOL_BUFFS[namn].items():
+                if k == "extra_system":
+                    extra_system_parts.append(v)
+                elif k == "max_tokens_bonus":
+                    buffs["max_tokens_bonus"] = buffs.get("max_tokens_bonus", 0) + v
+                elif k == "insats_multiplikator":
+                    buffs["insats_multiplikator"] = max(buffs.get("insats_multiplikator", 1.0), v)
+                elif k == "extra_fraga_chans":
+                    buffs["extra_fraga_chans"] = buffs.get("extra_fraga_chans", 0.0) + v
+                elif k == "replik_ton":
+                    buffs["replik_ton"] = v
+                else:
+                    buffs[k] = v
+
+        if extra_system_parts:
+            buffs["extra_system"] = " ".join(extra_system_parts)
+
+        return buffs
+    except Exception as e:
+        print(f"  hamta_agent_buffs misslyckades: {e}", file=sys.stderr)
+        return {}
