@@ -205,10 +205,9 @@ export async function POST(req) {
     const finnsByTitle = befintliga.titlar.has(normTitle(d.titel));
 
     if (finnsByID || finnsByTitle) {
-      // Uppdatera kategori och URL på befintliga "Övrigt"-poster (bara om vi hittat via ID för säkerhet)
       if (finnsByID) {
-        const upd = await fetch(
-          `${SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.${encodeURIComponent(d.dok_id)}&kategori=eq.Övrigt`,
+        await fetch(
+          `${SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.${encodeURIComponent(d.dok_id)}`,
           {
             method: "PATCH",
             headers: { ...sbHeaders(), Prefer: "return=minimal" },
@@ -219,7 +218,7 @@ export async function POST(req) {
             }),
           }
         );
-        if (upd.ok) omkategoriserade++;
+        omkategoriserade++;
       }
       continue;
     }
