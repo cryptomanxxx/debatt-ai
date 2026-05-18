@@ -19,6 +19,8 @@ def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
         r = httpx.post(url, headers=headers, json=json_payload, timeout=timeout)
         last_r = r
         if r.status_code == 429:
+            if "tokens per day" in r.text or "TPD" in r.text:
+                raise Exception(f"Groq dagsgräns nådd (TPD). Svar: {r.text[:200]}")
             wait = min(int(r.headers.get("retry-after", 20)) + 2, 60)
             print(f"  Groq rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
             time.sleep(wait)
