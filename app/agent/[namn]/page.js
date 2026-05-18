@@ -343,6 +343,15 @@ async function getAgentDagbok(namn) {
   return res.json();
 }
 
+async function getAgentBets(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_bets?agent=eq.${encodeURIComponent(namn)}&select=sannolikhet,insats,avgjord,vinst,skapad,markets(titel,utfall,status,deadline)&order=skapad.desc&limit=20`,
+    { headers: sbHeaders(), cache: "no-store" }
+  );
+  if (!res.ok) return [];
+  return await res.json();
+}
+
 async function getAgentSymboler(namn) {
   const [symRes, varorRes] = await Promise.all([
     fetch(
@@ -411,7 +420,7 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler, dagbok] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler, dagbok, bets] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
@@ -424,6 +433,7 @@ export default async function AgentPage({ params }) {
     getAgentPositioner(namn),
     getAgentSymboler(namn),
     getAgentDagbok(namn),
+    getAgentBets(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -860,6 +870,46 @@ export default async function AgentPage({ params }) {
             </div>
           );
         })()}
+
+        {/* Prediction market-bets */}
+        {bets.length > 0 && (
+          <div style={{ marginTop: "48px", paddingTop: "40px", borderTop: `1px solid ${C.border}` }}>
+            <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 20px", fontFamily: "monospace" }}>
+              Prediction Markets — {bets.length} bet{bets.length !== 1 ? "s" : ""}
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, borderRadius: "8px", overflow: "hidden" }}>
+              {bets.map((b, i) => {
+                const avgjord = b.markets?.status === "avgjord";
+                const vann = b.avgjord && b.vinst > 0;
+                const forlorade = b.avgjord && b.vinst <= 0;
+                return (
+                  <div key={i} style={{ background: C.surface, padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: "13px", color: C.text, margin: "0 0 4px", lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {b.markets?.titel || "Okänd market"}
+                      </p>
+                      <p style={{ fontSize: "11px", color: C.textMuted, margin: 0, fontFamily: "monospace" }}>
+                        {b.sannolikhet}% · {b.insats} kr insats
+                        {avgjord && b.markets?.utfall && (
+                          <span style={{ marginLeft: "8px", color: "#aaaaaa" }}>· utfall: {b.markets.utfall === "ja" ? "JA" : "NEJ"}</span>
+                        )}
+                      </p>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      {b.avgjord ? (
+                        <span style={{ fontSize: "13px", fontFamily: "monospace", fontWeight: 600, color: vann ? "#4ade80" : "#ef4444" }}>
+                          {vann ? `+${b.vinst}` : b.vinst} kr
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>öppen</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Fråga agenten */}
         <div style={{ marginTop: "48px", paddingTop: "40px", borderTop: `1px solid ${C.border}` }}>
