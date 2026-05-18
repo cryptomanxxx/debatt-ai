@@ -44,4 +44,5 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python agent.py
+          PYTHONUNBUFFERED: "1"
+        run: python -u agent.py
