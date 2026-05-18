@@ -874,6 +874,92 @@ function MetricCard({ label, value, sub, color }) {
   );
 }
 
+function ParlamentTab() {
+  const [forslag, setForslag] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ titel: "", beskrivning: "", bakgrund: "", kategori: "Övrigt", riksdagen_url: "" });
+  const [sparar, setSparar] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const KATEGORIER = ["Ekonomi", "Klimat", "Sjukvård", "Utbildning", "Bostäder", "Migration", "Försvar", "Rättsväsende", "Socialpolitik", "Övrigt"];
+
+  async function load() {
+    setLoading(true);
+    const r = await fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,kalla,status,ai_ja_roster,ai_nej_roster,riksdagen_utfall,skapad&order=skapad.desc&limit=30`, { headers: sbHeaders() });
+    if (r.ok) setForslag(await r.json());
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function spara() {
+    if (!form.titel.trim() || !form.beskrivning.trim()) { setMsg("Titel och beskrivning krävs."); return; }
+    setSparar(true); setMsg("");
+    const r = await fetch(`${SB_URL}/rest/v1/lagforslag`, {
+      method: "POST",
+      headers: { ...sbHeaders(), "Content-Type": "application/json", "Prefer": "return=minimal" },
+      body: JSON.stringify({ ...form, kalla: "riksdagen", status: "omrostning" }),
+    });
+    setSparar(false);
+    if (r.ok) { setMsg("✓ Förslag sparat!"); setForm({ titel: "", beskrivning: "", bakgrund: "", kategori: "Övrigt", riksdagen_url: "" }); load(); }
+    else { setMsg(`Fel: ${r.status}`); }
+  }
+
+  async function taBort(id) {
+    if (!confirm("Ta bort detta förslag?")) return;
+    await fetch(`${SB_URL}/rest/v1/lagforslag?id=eq.${id}`, { method: "DELETE", headers: sbHeaders() });
+    load();
+  }
+
+  return (
+    <div>
+      <h3 style={{ fontSize:"18px", fontWeight:400, margin:"0 0 24px" }}>AI-Parlamentet — Riksdagsförslag</h3>
+
+      {/* Formulär */}
+      <div style={{ background: "#111", border: "1px solid #222", borderRadius: "8px", padding: "24px", marginBottom: "32px" }}>
+        <p style={{ fontSize:"11px", color:"#aaa", letterSpacing:"0.1em", textTransform:"uppercase", margin:"0 0 16px", fontFamily:"monospace" }}>Lägg till riksdagsförslag</p>
+        <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+          <input value={form.titel} onChange={e => setForm(f => ({...f, titel: e.target.value}))} placeholder="Titel på förslaget" style={{ background:"#0a0a0a", border:"1px solid #333", color:"#f0ede6", padding:"10px 14px", borderRadius:"4px", fontSize:"14px", fontFamily:"Georgia, serif" }} />
+          <textarea value={form.beskrivning} onChange={e => setForm(f => ({...f, beskrivning: e.target.value}))} placeholder="Beskrivning (visas för agenterna)" rows={3} style={{ background:"#0a0a0a", border:"1px solid #333", color:"#f0ede6", padding:"10px 14px", borderRadius:"4px", fontSize:"14px", fontFamily:"Georgia, serif", resize:"vertical" }} />
+          <textarea value={form.bakgrund} onChange={e => setForm(f => ({...f, bakgrund: e.target.value}))} placeholder="Bakgrund (valfritt)" rows={2} style={{ background:"#0a0a0a", border:"1px solid #333", color:"#f0ede6", padding:"10px 14px", borderRadius:"4px", fontSize:"14px", fontFamily:"Georgia, serif", resize:"vertical" }} />
+          <div style={{ display:"flex", gap:"12px" }}>
+            <select value={form.kategori} onChange={e => setForm(f => ({...f, kategori: e.target.value}))} style={{ background:"#0a0a0a", border:"1px solid #333", color:"#f0ede6", padding:"10px 14px", borderRadius:"4px", fontSize:"14px", flex:1 }}>
+              {KATEGORIER.map(k => <option key={k} value={k}>{k}</option>)}
+            </select>
+            <input value={form.riksdagen_url} onChange={e => setForm(f => ({...f, riksdagen_url: e.target.value}))} placeholder="Länk till riksdagen.se (valfritt)" style={{ background:"#0a0a0a", border:"1px solid #333", color:"#f0ede6", padding:"10px 14px", borderRadius:"4px", fontSize:"14px", flex:2, fontFamily:"Georgia, serif" }} />
+          </div>
+          <div style={{ display:"flex", gap:"12px", alignItems:"center" }}>
+            <button onClick={spara} disabled={sparar} style={{ background:"#f0ede615", border:"1px solid #f0ede630", color:"#f0ede6", padding:"10px 24px", borderRadius:"4px", cursor:"pointer", fontSize:"14px" }}>
+              {sparar ? "Sparar…" : "Lägg till förslag"}
+            </button>
+            {msg && <span style={{ fontSize:"13px", color: msg.startsWith("✓") ? "#4ade80" : "#f87171" }}>{msg}</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Lista */}
+      {loading ? <p style={{ color:"#555" }}>Laddar…</p> : (
+        <div style={{ display:"flex", flexDirection:"column", gap:"1px", background:"#222", borderRadius:"8px", overflow:"hidden" }}>
+          {forslag.length === 0 && <div style={{ background:"#111", padding:"24px", color:"#555", textAlign:"center" }}>Inga förslag ännu</div>}
+          {forslag.map(f => (
+            <div key={f.id} style={{ background:"#111", padding:"14px 16px", display:"flex", alignItems:"center", gap:"12px" }}>
+              <div style={{ flex:1, minWidth:0 }}>
+                <p style={{ fontSize:"13px", color:"#f0ede6", margin:"0 0 4px", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{f.titel}</p>
+                <p style={{ fontSize:"11px", color:"#555", margin:0, fontFamily:"monospace" }}>
+                  {f.kalla === "riksdagen" ? "RIKSDAGEN" : "AI"} · {f.status}
+                  {f.ai_ja_roster > 0 || f.ai_nej_roster > 0 ? ` · JA ${f.ai_ja_roster} / NEJ ${f.ai_nej_roster}` : ""}
+                  {f.riksdagen_utfall ? ` · utfall: ${f.riksdagen_utfall.toUpperCase()}` : ""}
+                </p>
+              </div>
+              <button onClick={() => taBort(f.id)} style={{ background:"none", border:"1px solid #333", color:"#666", padding:"4px 10px", borderRadius:"4px", cursor:"pointer", fontSize:"12px", flexShrink:0 }}>Ta bort</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MarketsTab() {
   const [oppna, setOppna]           = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -2180,6 +2266,7 @@ export default function AdminClient() {
             ["nyhetslogg","Nyhetslogg"],
             ["feeds","RSS-feeds"],
             ["markets","Markets"],
+            ["parlament","Parlament"],
             ["api-status","API-status"],
             ["beslut-api","Decision API"],
             ["labb","Experimentlabb"],
@@ -2392,6 +2479,7 @@ export default function AdminClient() {
         {mainTab === "nyhetslogg" && <NyhetsloggTab />}
         {mainTab === "feeds" && <FeedsTab />}
         {mainTab === "markets" && <MarketsTab />}
+        {mainTab === "parlament" && <ParlamentTab />}
 
         {/* ── API-STATUS ── */}
         {mainTab === "api-status" && <ApiStatusTab />}
