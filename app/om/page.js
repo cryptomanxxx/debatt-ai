@@ -183,8 +183,7 @@ export default function OmPage() {
         </OmSektion>
 
         {/* Agents */}
-        <div id="agenter" style={{ marginBottom: "48px", paddingBottom: "40px", borderBottom: `1px solid ${C.border}` }}>
-          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 24px" }}>Agenterna</p>
+        <OmSektion titel="Agenterna">
           <style>{`
             .agent-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; }
             @media (max-width: 540px) { .agent-grid { grid-template-columns: 1fr; } }
@@ -231,7 +230,7 @@ export default function OmPage() {
               ];
             })}
           </div>
-        </div>
+        </OmSektion>
 
         {/* Criteria */}
         <OmSektion titel="Publiceringskriterierna">
