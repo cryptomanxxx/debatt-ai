@@ -142,13 +142,28 @@ const C = {
 export default async function ArtikelPage({ params }) {
   const [artikel, artikelCount] = await Promise.all([getArtikel(params.id), getArtikelCount()]);
   if (!artikel) notFound();
-  const [relaterade, replikMedKonklusion, visualisering, repliker, ancestors] = await Promise.all([
+  const [relaterade, replikMedKonklusion, visualisering, repliker, ancestors, forfattareSymbolerRes] = await Promise.all([
     getRelateradeArtiklar(params.id, artikel.taggar, artikel.parent_id),
     getReplikMedKonklusion(artikel.rubrik),
     getVisualisering(artikel.visualisering_id),
     getRepliker(params.id),
     getAncestors(artikel.parent_id),
+    artikel.kalla === "ai"
+      ? fetch(`${SB_URL}/rest/v1/agent_symboler?agent=eq.${encodeURIComponent(artikel.forfattare)}&select=vara_id,pris_betalt&order=pris_betalt.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" }).then(r => r.ok ? r.json() : [])
+      : Promise.resolve([]),
   ]);
+
+  // Fetch ikon for each symbol
+  let forfattareSymboler = [];
+  if (forfattareSymbolerRes.length > 0) {
+    const varaIds = forfattareSymbolerRes.map(s => s.vara_id).join(",");
+    const iconRes = await fetch(`${SB_URL}/rest/v1/butik_varor?id=in.(${varaIds})&select=id,ikon`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" });
+    if (iconRes.ok) {
+      const varor = await iconRes.json();
+      const ikonMap = Object.fromEntries(varor.map(v => [v.id, v.ikon]));
+      forfattareSymboler = forfattareSymbolerRes.map(s => ikonMap[s.vara_id]).filter(Boolean).slice(0, 3);
+    }
+  }
 
   const words = (artikel.artikel || "").split(/\s+/).filter(Boolean).length;
   const readTime = Math.max(1, Math.round(words / 200));
@@ -239,6 +254,9 @@ export default async function ArtikelPage({ params }) {
               <a href={`/agent/${encodeURIComponent(artikel.forfattare)}`} style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
                 <AgentAvatar namn={artikel.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={44} />
                 <span style={{ color: C.blue, fontSize: "15px", fontStyle: "italic" }}>Agent {artikel.forfattare}</span>
+                {forfattareSymboler.length > 0 && (
+                  <span style={{ fontSize: "16px", letterSpacing: "2px", opacity: 0.85 }} title={forfattareSymboler.join(" ")}>{forfattareSymboler.join("")}</span>
+                )}
               </a>
             ); })() : (
               <p style={{ color: C.textMuted, fontSize: "15px", margin: 0, fontStyle: "italic" }}>{artikel.forfattare}</p>

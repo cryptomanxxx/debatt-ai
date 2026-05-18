@@ -596,6 +596,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [opinionVoted, setOpinionVoted] = useState({});
   const [agentKonversationer, setAgentKonversationer] = useState([]);
   const [agentUtmaningar, setAgentUtmaningar] = useState([]);
+  const [agentSymboler, setAgentSymboler] = useState({});
   const [platformStamning, setPlatformStamning] = useState({ sinnesstamning: 50, konfliktniva: 50, svarssamarbete: 50, koalitionsbildning: 50 });
   const [stamningSliders, setStamningSliders] = useState({ sinnesstamning: 50, konfliktniva: 50, svarssamarbete: 50, koalitionsbildning: 50 });
   const [stamningVoted, setStamningVoted] = useState(false);
@@ -679,6 +680,21 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
     fetchSenasteAgentKonversationer().then(d => setAgentKonversationer(d)).catch(() => {});
     fetchSenasteUtmaningar().then(d => setAgentUtmaningar(d)).catch(() => {});
+    // Agent-symboler för att visa ikoner på artikelkort
+    fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,vara_id,pris_betalt&order=pris_betalt.desc`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
+      .then(r => r.json()).then(rows => {
+        if (!Array.isArray(rows)) return;
+        fetch(`${SB_URL}/rest/v1/butik_varor?select=id,ikon`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
+          .then(r2 => r2.json()).then(varor => {
+            const ikonMap = Object.fromEntries((varor || []).map(v => [v.id, v.ikon]));
+            const map = {};
+            for (const r of rows) {
+              if (!map[r.agent]) map[r.agent] = [];
+              if (map[r.agent].length < 3) map[r.agent].push(ikonMap[r.vara_id] || "");
+            }
+            setAgentSymboler(map);
+          }).catch(() => {});
+      }).catch(() => {});
     // Plattformsstämning
     fetch("/api/platform-stamning").then(r => r.json()).then(d => {
       if (d && d.sinnesstamning) {
@@ -1122,6 +1138,9 @@ export default function DebattClient({ initialArticleCount = null }) {
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 10px" }}>
                         {artikel.kalla === "ai" && (() => { const v = agentVisuell(artikel.forfattare); return <AgentAvatar namn={artikel.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={24} />; })()}
                         <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>{artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare}</span>
+                        {artikel.kalla === "ai" && (agentSymboler[artikel.forfattare] || []).length > 0 && (
+                          <span style={{ fontSize:"13px", letterSpacing:"1px", opacity:0.8 }} title={(agentSymboler[artikel.forfattare] || []).join(" ")}>{(agentSymboler[artikel.forfattare] || []).join("")}</span>
+                        )}
                       </div>
                       <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 14px" }}>{(artikel.artikel||"" ).slice(0,180)}…</p>
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
