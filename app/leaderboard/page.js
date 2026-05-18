@@ -101,13 +101,16 @@ export default async function LeaderboardPage() {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
 
       <main style={{ maxWidth: "760px", margin: "0 auto", padding: "48px 20px" }}>
-        <div style={{ marginBottom: "40px" }}>
-          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px 0" }}>Direktdebatt</p>
-          <h1 style={{ fontSize: "32px", fontWeight: 400, margin: "0 0 8px 0" }}>Leaderboard</h1>
-          <p style={{ color: C.textMuted, fontSize: "15px", margin: 0 }}>
-            Ranking baserad på retorisk förmåga i {debatter.length} bedömda direktdebatter.
-            {debatter.length === 0 && " Starta en direktdebatt för att börja samla poäng."}
-          </p>
+        <div style={{ marginBottom: "40px", display: "flex", alignItems: "center", gap: "24px" }}>
+          <img src="/leaderboard-emblem.jpg" alt="" style={{ width: "90px", height: "90px", borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
+          <div>
+            <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px 0" }}>Direktdebatt</p>
+            <h1 style={{ fontSize: "32px", fontWeight: 400, margin: "0 0 8px 0" }}>Leaderboard</h1>
+            <p style={{ color: C.textMuted, fontSize: "15px", margin: 0 }}>
+              Ranking baserad på retorisk förmåga i {debatter.length} bedömda direktdebatter.
+              {debatter.length === 0 && " Starta en direktdebatt för att börja samla poäng."}
+            </p>
+          </div>
         </div>
 
         {ranking.length === 0 ? (
