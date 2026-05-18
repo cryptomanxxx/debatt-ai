@@ -156,8 +156,8 @@ function ForslagCard({ f, votes }) {
         {f.riksdagen_url ? (
           <a href={f.riksdagen_url} target="_blank" rel="noopener noreferrer"
             style={{ color: C.text, textDecoration: "none" }}
-            onMouseOver={e => e.currentTarget.style.color = C.riksdagen}
-            onMouseOut={e => e.currentTarget.style.color = C.text}>
+            onMouseOver={e => { e.currentTarget.style.color = C.riksdagen; }}
+            onMouseOut={e => { e.currentTarget.style.color = C.text; }}>
             {f.titel}
           </a>
         ) : f.titel}
