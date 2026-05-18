@@ -43,7 +43,7 @@ from supabase_utils import (
     rösta_på_opinion, skapa_opinion_fraga, skapa_market_forslag,
     rakna_debattdjup, ar_duplikat, hamta_pexels_bild, logga_action,
     hamta_relation, upsert_koalition,
-    rösta_på_lagforslag_block, skapa_lagforslag_ai, importera_riksdagen_forslag,
+    rösta_på_lagforslag_block, skapa_lagforslag_ai,
     uppdatera_riksdagen_utfall,
     kör_ekonomispel,
     hamta_agent_positioner, uppdatera_agent_positioner,
@@ -540,11 +540,6 @@ def main():
             if ok_lag:
                 print(f"  ✓ Nytt lagförslag skapat av {agent['namn']}")
                 logga_action(sb_key, agent["namn"], "create_lagforslag", {"amne": amne[:80]}, "ok")
-
-        if random.random() < 0.40:
-            imp = importera_riksdagen_forslag(sb_key)
-            if imp > 0:
-                print(f"  ✓ Importerade {imp} riksdagsproposition(er)")
 
         uppdaterade = uppdatera_riksdagen_utfall(sb_key)
         if uppdaterade > 0:
