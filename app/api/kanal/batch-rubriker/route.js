@@ -41,39 +41,6 @@ export async function POST(req) {
   const cbKey   = process.env.CEREBRAS_API_KEY;
   const sbKey   = process.env.SAMBANOVA_API_KEY;
 
-  if (gemKey) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: user }] }],
-            systemInstruction: { parts: [{ text: system }] },
-            generationConfig: { maxOutputTokens: 600, temperature: 0.1 },
-          }),
-          signal: AbortSignal.timeout(10000),
-        }
-      );
-      if (r.ok) {
-        const json = await r.json();
-        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-        const parsed = parseNumberedList(text, rubriker.length);
-        if (parsed) {
-          logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch-en", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usageMetadata?.promptTokenCount ?? null, output_tokens: json.usageMetadata?.candidatesTokenCount ?? null });
-          return Response.json({ translated: parsed });
-        }
-        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch-en", status: "parse_fail", latency_ms: Date.now() - t0 });
-      } else {
-        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch-en", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch-en", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
   if (groqKey) {
     const t0 = Date.now();
     try {
@@ -176,6 +143,31 @@ export async function POST(req) {
       }
     } catch {
       logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal-batch-en", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
+  // Gemini (unreliable — quota issues, last resort)
+  if (gemKey) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: user }] }], systemInstruction: { parts: [{ text: system }] }, generationConfig: { maxOutputTokens: 600, temperature: 0.1 } }), signal: AbortSignal.timeout(10000) }
+      );
+      if (r.ok) {
+        const json = await r.json();
+        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+        const parsed = parseNumberedList(text, rubriker.length);
+        if (parsed) {
+          logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch-en", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usageMetadata?.promptTokenCount ?? null, output_tokens: json.usageMetadata?.candidatesTokenCount ?? null });
+          return Response.json({ translated: parsed });
+        }
+        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch-en", status: "parse_fail", latency_ms: Date.now() - t0 });
+      } else {
+        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch-en", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+      }
+    } catch {
+      logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch-en", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 
