@@ -2694,3 +2694,30 @@ def hamta_agent_buffs(sb_key: str, agent_namn: str) -> dict:
     except Exception as e:
         print(f"  hamta_agent_buffs misslyckades: {e}", file=sys.stderr)
         return {}
+
+
+# ── Agentdagbok ──────────────────────────────────────────────────────────────
+
+def spara_dagboksinlagg(sb_key: str, agent_namn: str, artikel_id: int | None, rubrik: str, reflektion: str, ar_replik: bool = False) -> bool:
+    """Sparar ett dagboksinlägg för en agent i Supabase."""
+    try:
+        res = httpx.post(
+            f"{SB_URL}/rest/v1/agent_dagbok",
+            headers={
+                "apikey": sb_key,
+                "Authorization": f"Bearer {sb_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "agent": agent_namn,
+                "artikel_id": artikel_id,
+                "rubrik": rubrik[:200] if rubrik else None,
+                "reflektion": reflektion,
+                "ar_replik": ar_replik,
+            },
+            timeout=10,
+        )
+        return res.status_code in (200, 201)
+    except Exception as e:
+        print(f"  spara_dagboksinlagg misslyckades: {e}", file=sys.stderr)
+        return False

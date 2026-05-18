@@ -334,6 +334,15 @@ async function getAgentPositioner(namn) {
   return res.json();
 }
 
+async function getAgentDagbok(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_dagbok?agent=eq.${encodeURIComponent(namn)}&order=skapad.desc&limit=8&select=id,rubrik,reflektion,ar_replik,skapad`,
+    { headers: sbHeaders(), next: { revalidate: 120 } }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
 async function getAgentSymboler(namn) {
   const [symRes, varorRes] = await Promise.all([
     fetch(
@@ -402,7 +411,7 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler, dagbok] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
@@ -414,6 +423,7 @@ export default async function AgentPage({ params }) {
     getAgentPlanbok(namn),
     getAgentPositioner(namn),
     getAgentSymboler(namn),
+    getAgentDagbok(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -541,6 +551,37 @@ export default async function AgentPage({ params }) {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Agentdagbok */}
+        {dagbok.length > 0 && (
+          <div style={{ marginBottom: "48px" }}>
+            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px 0" }}>
+              Dagbok — interna reflektioner
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {dagbok.map(d => (
+                <div key={d.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 20px", position: "relative" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "10px", fontFamily: "monospace", color: "#555", letterSpacing: "0.08em" }}>
+                      {d.skapad ? new Date(d.skapad).toLocaleDateString("sv-SE") : ""}
+                    </span>
+                    {d.ar_replik && (
+                      <span style={{ fontSize: "10px", color: "#38bdf8", fontFamily: "monospace", border: "1px solid #38bdf830", borderRadius: "20px", padding: "1px 7px" }}>REPLIK</span>
+                    )}
+                    {d.rubrik && (
+                      <span style={{ fontSize: "12px", color: C.textMuted, fontStyle: "italic", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {d.rubrik}
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: "14px", color: "#c8c4ba", lineHeight: 1.75, margin: 0, fontStyle: "italic" }}>
+                    &ldquo;{d.reflektion}&rdquo;
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         )}

@@ -30,7 +30,7 @@ from nyheter import (
     hamta_reddit_kommentarer, hamta_kryptodata,
 )
 from artikel import (
-    skriv_artikel, skriv_artikel_om_nyhet, skriv_replik,
+    skriv_artikel, skriv_artikel_om_nyhet, skriv_replik, skriv_dagboksinlagg,
     generera_konklusion, generera_rubrik, skriv_kommentar,
 )
 from supabase_utils import (
@@ -51,7 +51,7 @@ from supabase_utils import (
     reglera_prediction_bets,
     kop_statussymbol,
     stang_auktioner, lista_symbol_for_forsaljning, buda_pa_auktion,
-    hamta_agent_buffs,
+    hamta_agent_buffs, spara_dagboksinlagg,
 )
 
 SYMBOL_PREFERENSER = {
@@ -457,6 +457,20 @@ def main():
                 print(f"    – {f}")
 
     print(f"{'═' * 60}\n")
+
+    if sb_key and svar.get("publicerad"):
+        print(f"\n── Dagboksinlägg: {agent['namn']} ──")
+        rubrik_pub = svar.get("rubrik") or amne
+        inlagg = skriv_dagboksinlagg(
+            agent, rubrik_pub, artikel,
+            ar_replik=bool(original),
+            original_forfattare=original.get("forfattare") if original else None,
+        )
+        if inlagg:
+            ok_dag = spara_dagboksinlagg(sb_key, agent["namn"], artikel_id_num, rubrik_pub, inlagg, ar_replik=bool(original))
+            print(f"  {'✓' if ok_dag else '✗'} {inlagg[:120]}…")
+        else:
+            print("  (inget inlägg genererat)")
 
     if sb_key and svar.get("publicerad"):
         print(f"\n── Ståndpunktsanalys: {agent['namn']} ──")
