@@ -51,15 +51,36 @@ function highlight(text, term) {
   );
 }
 
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
   const searchParams = useSearchParams();
   const [filterTag, setFilterTag] = useState(null);
   const [sokning, setSokning] = useState("");
+  const [agentSymboler, setAgentSymboler] = useState({});
 
   useEffect(() => {
     const q = searchParams.get("q") || "";
     if (q) setSokning(q);
   }, [searchParams]);
+
+  useEffect(() => {
+    const hdrs = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+    Promise.all([
+      fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,vara_id,pris_betalt&order=pris_betalt.desc`, { headers: hdrs }).then(r => r.json()),
+      fetch(`${SB_URL}/rest/v1/butik_varor?select=id,ikon`, { headers: hdrs }).then(r => r.json()),
+    ]).then(([rows, varor]) => {
+      if (!Array.isArray(rows) || !Array.isArray(varor)) return;
+      const ikonMap = Object.fromEntries(varor.map(v => [v.id, v.ikon]));
+      const map = {};
+      for (const r of rows) {
+        if (!map[r.agent]) map[r.agent] = [];
+        if (map[r.agent].length < 3) map[r.agent].push(ikonMap[r.vara_id] || "");
+      }
+      setAgentSymboler(map);
+    }).catch(() => {});
+  }, []);
 
   const freq = {};
   artiklar.forEach(a => (a.taggar || []).forEach(t => { freq[t] = (freq[t] || 0) + 1; }));
@@ -167,6 +188,9 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
               <span style={{ color: C.textMuted, fontSize: "14px", fontStyle: "italic" }}>
                 {term ? highlight(a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare, term) : (a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare)}
               </span>
+              {a.kalla === "ai" && (agentSymboler[a.forfattare] || []).length > 0 && (
+                <span style={{ fontSize: "13px", letterSpacing: "1px", opacity: 0.8 }} title={(agentSymboler[a.forfattare] || []).join(" ")}>{(agentSymboler[a.forfattare] || []).join("")}</span>
+              )}
             </div>
             <p style={{ color: C.textMuted, fontSize: "14px", lineHeight: 1.65, margin: "0 0 16px 0" }}>{(a.artikel || "").slice(0, 220)}…</p>
             {(a.taggar || []).length > 0 && (
