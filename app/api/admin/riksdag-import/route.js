@@ -28,25 +28,31 @@ function kategorifrånText(titel, beskrivning) {
   return "Övrigt";
 }
 
-// Hämtar befintliga riksdagen_id för att undvika dubletter
-async function getBefintligaIds() {
+function normTitle(s) {
+  return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+// Hämtar befintliga riksdagen_id OCH titlar för robust dubblettskydd
+async function getBefintligaData() {
   const r = await fetch(
-    `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&select=riksdagen_id`,
+    `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&select=riksdagen_id,titel`,
     { headers: sbHeaders() }
   );
-  if (!r.ok) return new Set();
+  if (!r.ok) return { ids: new Set(), titlar: new Set() };
   const data = await r.json();
-  return new Set(data.map(d => d.riksdagen_id).filter(Boolean));
+  return {
+    ids: new Set(data.map(d => d.riksdagen_id).filter(Boolean)),
+    titlar: new Set(data.map(d => normTitle(d.titel)).filter(Boolean)),
+  };
 }
 
 function byggUrl(d) {
   if (d.url?.startsWith("http")) return d.url;
   if (d.url) return `https://www.riksdagen.se${d.url}`;
-  // Fallback: data.riksdagen.se direktlänk fungerar alltid
   return d.dok_id ? `https://data.riksdagen.se/dokument/${d.dok_id}.html` : null;
 }
 
-// Försök 1: data.riksdagen.se JSON API
+// Försök 1: data.riksdagen.se JSON API + dokumentstatus för fullständig text
 async function hämtaViaApi() {
   const r = await fetch(
     "https://data.riksdagen.se/dokumentlista/?doktyp=prop&utformat=json&sz=10&sort=datum&sortorder=desc",
@@ -55,12 +61,30 @@ async function hämtaViaApi() {
   if (!r.ok) throw new Error(`API ${r.status}`);
   const data = await r.json();
   const dokument = data?.dokumentlista?.dokument || [];
-  return (Array.isArray(dokument) ? dokument : [dokument]).map(d => ({
+  const forslag = (Array.isArray(dokument) ? dokument : [dokument]).map(d => ({
     dok_id: d.dok_id?.trim(),
     titel: d.titel?.trim().slice(0, 200),
     beskrivning: ((d.notis || "") + " " + (d.notis2 || "")).trim().slice(0, 2000) || `Proposition: ${d.titel}`,
     riksdagen_url: byggUrl(d),
   })).filter(d => d.dok_id && d.titel);
+
+  // Hämta fullständig sammanfattning via dokumentstatus-endpointen (parallellt)
+  await Promise.all(forslag.map(async (item) => {
+    try {
+      const dr = await fetch(
+        `https://data.riksdagen.se/dokumentstatus/${item.dok_id}.json`,
+        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(8000) }
+      );
+      if (!dr.ok) return;
+      const dd = await dr.json();
+      const sammanfattning = dd?.dokumentstatus?.dokument?.sammanfattning?.trim();
+      if (sammanfattning && sammanfattning.length > (item.beskrivning?.length || 0)) {
+        item.beskrivning = sammanfattning.slice(0, 2000);
+      }
+    } catch {}
+  }));
+
+  return forslag;
 }
 
 // Försök 2: scrapa HTML från riksdagen.se
@@ -79,17 +103,11 @@ async function hämtaViaHtml() {
   if (!r.ok) throw new Error(`HTML ${r.status}`);
   const html = await r.text();
 
-  // Extrahera propositionslänkar
   const forslag = [];
-  // Matcha href-mönster för propositioner: /sv/dokument-och-lagar/dokument/proposition/XX/
   const lankRegex = /href="(\/sv\/dokument-och-lagar\/dokument\/proposition\/[^"]+?)"/g;
-  const titelRegex = /<h[23][^>]*>([^<]{10,200})<\/h[23]>/g;
-  const seeddaRegex = /(\d{4}\/\d{2}:\d+)/g;
-
   const lankar = [...new Set([...html.matchAll(lankRegex)].map(m => m[1]))].slice(0, 10);
 
   for (const lank of lankar) {
-    // Hämta detaljsida
     try {
       const dr = await fetch(`https://www.riksdagen.se${lank}`, {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; debatt-ai.se/1.0)" },
@@ -126,7 +144,7 @@ export async function POST(req) {
     return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   }
 
-  const befintliga = await getBefintligaIds();
+  const befintliga = await getBefintligaData();
   let forslag = [];
   let metod = "";
 
@@ -148,22 +166,29 @@ export async function POST(req) {
 
   for (const d of forslag) {
     const kategori = kategorifrånText(d.titel, d.beskrivning);
-    if (befintliga.has(d.dok_id)) {
-      // Re-kategorisera befintliga "Övrigt"-poster och lägg till saknad URL
-      const upd = await fetch(
-        `${SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.${encodeURIComponent(d.dok_id)}&kategori=eq.Övrigt`,
-        {
-          method: "PATCH",
-          headers: { ...sbHeaders(), Prefer: "return=minimal" },
-          body: JSON.stringify({
-            kategori,
-            ...(d.riksdagen_url ? { riksdagen_url: d.riksdagen_url } : {}),
-          }),
-        }
-      );
-      if (upd.ok) omkategoriserade++;
+    const finnsByID = befintliga.ids.has(d.dok_id);
+    const finnsByTitle = befintliga.titlar.has(normTitle(d.titel));
+
+    if (finnsByID || finnsByTitle) {
+      // Uppdatera kategori och URL på befintliga "Övrigt"-poster (bara om vi hittat via ID för säkerhet)
+      if (finnsByID) {
+        const upd = await fetch(
+          `${SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.${encodeURIComponent(d.dok_id)}&kategori=eq.Övrigt`,
+          {
+            method: "PATCH",
+            headers: { ...sbHeaders(), Prefer: "return=minimal" },
+            body: JSON.stringify({
+              kategori,
+              beskrivning: d.beskrivning,
+              ...(d.riksdagen_url ? { riksdagen_url: d.riksdagen_url } : {}),
+            }),
+          }
+        );
+        if (upd.ok) omkategoriserade++;
+      }
       continue;
     }
+
     const r = await fetch(`${SB_URL}/rest/v1/lagforslag`, {
       method: "POST",
       headers: { ...sbHeaders(), Prefer: "return=minimal" },
