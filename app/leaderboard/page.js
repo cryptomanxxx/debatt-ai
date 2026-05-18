@@ -102,7 +102,7 @@ export default async function LeaderboardPage() {
 
       <main style={{ maxWidth: "760px", margin: "0 auto", padding: "48px 20px" }}>
         <div style={{ marginBottom: "40px", display: "flex", alignItems: "center", gap: "24px" }}>
-          <img src="/leaderboard-emblem.jpg" alt="" style={{ width: "140px", height: "140px", borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
+          <img src="/leaderboard-emblem.jpg" alt="" style={{ width: "200px", height: "200px", borderRadius: "50%", flexShrink: 0, objectFit: "cover" }} />
           <div>
             <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px 0" }}>Direktdebatt</p>
             <h1 style={{ fontSize: "32px", fontWeight: 400, margin: "0 0 8px 0" }}>Leaderboard</h1>
