@@ -122,6 +122,7 @@ function klippVidOrd(text, max) {
 }
 
 function ForslagCard({ f, votes }) {
+  const [expanded, setExpanded] = useState(false);
   const isRiksdagen = f.kalla === "riksdagen";
   const { preview, rest } = klippVidOrd(f.beskrivning, 300);
   const langBeskrivning = rest.length > 80;
@@ -174,16 +175,15 @@ function ForslagCard({ f, votes }) {
       {langBeskrivning ? (
         <>
           <p style={{ margin: "0 0 4px", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
-            {preview}…
+            {expanded ? f.beskrivning : preview + "…"}
           </p>
-          <details>
-            <summary style={{ fontSize: "12px", color: C.accent, cursor: "pointer", listStyle: "none", display: "inline-block", userSelect: "none", marginTop: "4px" }}>
-              visa mer ▼
-            </summary>
-            <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
-              {rest}
-            </p>
-          </details>
+          <button onClick={() => setExpanded(e => !e)} style={{
+            background: "none", border: "none", padding: "0",
+            fontSize: "12px", color: C.accent, cursor: "pointer",
+            marginTop: "2px", fontFamily: "Georgia, serif",
+          }}>
+            {expanded ? "visa mindre ▲" : "visa mer ▼"}
+          </button>
         </>
       ) : (
         <p style={{ margin: 0, fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
