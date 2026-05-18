@@ -36,11 +36,12 @@ export async function POST(req) {
   const user = kalla ? `[${kalla}] ${rubrik}` : rubrik;
   const msgs = [{ role: "system", content: system }, { role: "user", content: user }];
 
-  const gemKey  = process.env.GEMINI_API_KEY;
-  const groqKey = process.env.GROQ_API_KEY_KANAL;
-  const cbKey   = process.env.CEREBRAS_API_KEY;
-  const sbKey   = process.env.SAMBANOVA_API_KEY;
-  const orKey   = process.env.OPENROUTER_API_KEY;
+  const gemKey    = process.env.GEMINI_API_KEY;
+  const groqKey   = process.env.GROQ_API_KEY_KANAL;
+  const csKey     = process.env.MISTRAL_API_KEY;
+  const sbKey     = process.env.SAMBANOVA_API_KEY;
+  const cbKey     = process.env.CEREBRAS_API_KEY;
+  const orKey     = process.env.OPENROUTER_API_KEY;
 
   if (groqKey) {
     const t0 = Date.now();
@@ -67,28 +68,28 @@ export async function POST(req) {
     }
   }
 
-  if (cbKey) {
+  if (csKey) {
     const t0 = Date.now();
     try {
-      const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+      const r = await fetch("https://api.mistral.ai/v1/chat/completions", {
         method: "POST",
-        headers: { Authorization: `Bearer ${cbKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "qwen-3-235b-a22b-instruct-2507", messages: msgs, max_tokens: 350, temperature: 0.4 }),
-        signal: AbortSignal.timeout(8000),
+        headers: { Authorization: `Bearer ${csKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "codestral-latest", messages: msgs, max_tokens: 350, temperature: 0.4 }),
+        signal: AbortSignal.timeout(10000),
       });
       const latency_ms = Date.now() - t0;
       if (r.ok) {
         const json = await r.json();
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         if (text && text !== rubrik) {
-          logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
-          return Response.json({ text }, { headers: { "X-Provider": "cerebras" } });
+          logAiCall({ provider: "codestral", model: "codestral-latest", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
+          return Response.json({ text }, { headers: { "X-Provider": "codestral" } });
         }
       } else {
-        logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
+        logAiCall({ provider: "codestral", model: "codestral-latest", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
     } catch {
-      logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+      logAiCall({ provider: "codestral", model: "codestral-latest", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 
@@ -114,6 +115,31 @@ export async function POST(req) {
       }
     } catch {
       logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
+  if (cbKey) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cbKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "qwen-3-235b-a22b-instruct-2507", messages: msgs, max_tokens: 350, temperature: 0.4 }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const latency_ms = Date.now() - t0;
+      if (r.ok) {
+        const json = await r.json();
+        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+        if (text && text !== rubrik) {
+          logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
+          return Response.json({ text }, { headers: { "X-Provider": "cerebras" } });
+        }
+      } else {
+        logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
+      }
+    } catch {
+      logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 
