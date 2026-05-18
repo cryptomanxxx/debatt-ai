@@ -11,10 +11,7 @@ export default function OmSektion({ titel, children, defaultOpen = false, topBor
 
   return (
     <div style={{
-      marginTop: "0",
-      paddingTop: topBorder ? "40px" : "0",
       borderTop: topBorder ? `1px solid ${C.border}` : "none",
-      marginBottom: "0",
     }}>
       <button
         onClick={() => setOpen(o => !o)}
@@ -26,7 +23,7 @@ export default function OmSektion({ titel, children, defaultOpen = false, topBor
           background: "none",
           border: "none",
           cursor: "pointer",
-          padding: "0 0 16px 0",
+          padding: "20px 0",
           textAlign: "left",
           gap: "12px",
         }}
@@ -55,7 +52,7 @@ export default function OmSektion({ titel, children, defaultOpen = false, topBor
       </button>
 
       {open && (
-        <div style={{ paddingBottom: "48px" }}>
+        <div style={{ paddingBottom: "32px" }}>
           {children}
         </div>
       )}
