@@ -1,4 +1,5 @@
 import { logFel } from "../../../lib/logFel";
+import { providerReady, markProviderDown } from "../../../lib/aiCircuitBreaker";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -168,6 +169,7 @@ export async function POST(req) {
   // Evaluate with Groq
   let groqResult;
   try {
+    if (!providerReady("groq")) throw new Error("Groq är nere (circuit breaker)");
     const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -187,6 +189,7 @@ export async function POST(req) {
       }),
     });
     if (!groqRes.ok) {
+      if (groqRes.status === 429) markProviderDown("groq");
       const errText = await groqRes.text();
       throw new Error(`Groq svarade ${groqRes.status}: ${errText}`);
     }

@@ -1,3 +1,5 @@
+import { providerReady, markProviderDown } from "../../../lib/aiCircuitBreaker";
+
 const MESSAGES = (agentText) => [
   {
     role: "system",
@@ -27,17 +29,23 @@ export async function POST(request) {
   const oaiBody = { messages, max_tokens: 40, temperature: 0.95 };
 
   // Groq
-  if (process.env.GROQ_API_KEY) {
-    const amne = await fetchAmne(
-      "https://api.groq.com/openai/v1/chat/completions",
-      { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-      { ...oaiBody, model: "llama-3.3-70b-versatile" }
-    );
-    if (amne) return Response.json({ amne });
+  if (process.env.GROQ_API_KEY && providerReady("groq")) {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      body: JSON.stringify({ ...oaiBody, model: "llama-3.3-70b-versatile" }),
+      signal: AbortSignal.timeout(10000),
+    }).catch(() => null);
+    if (res?.status === 429) markProviderDown("groq");
+    if (res?.ok) {
+      const data = await res.json();
+      const amne = data.choices?.[0]?.message?.content?.trim().replace(/^["']|["']$/g, "") ?? "";
+      if (amne) return Response.json({ amne });
+    }
   }
 
   // Gemini
-  if (process.env.GEMINI_API_KEY) {
+  if (process.env.GEMINI_API_KEY && providerReady("gemini")) {
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -57,6 +65,7 @@ export async function POST(request) {
         const amne = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim().replace(/^["']|["']$/g, "") ?? "";
         if (amne) return Response.json({ amne });
       }
+      if (res.status === 429) markProviderDown("gemini");
     } catch {}
   }
 
