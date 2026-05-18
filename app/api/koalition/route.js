@@ -59,9 +59,13 @@ export async function POST(req) {
     logFel({ kalla: "api/koalition POST", feltyp: "db_error", meddelande: `agent not found: ${agent}`, ip });
     return Response.json({ error: "agent not found" }, { status: 500 });
   }
-  const ok = await setCount(agent, current + 1);
-  if (!ok) {
-    logFel({ kalla: "api/koalition POST", feltyp: "db_error", meddelande: "patch failed", ip });
+  const patchRes = await fetch(
+    `${SB_URL}/rest/v1/koalitioner?agent=eq.${encodeURIComponent(agent)}`,
+    { method: "PATCH", headers: writeHdrs, body: JSON.stringify({ foljare: current + 1 }) }
+  );
+  if (!patchRes.ok) {
+    const body = await patchRes.text().catch(() => "");
+    logFel({ kalla: "api/koalition POST", feltyp: "db_error", meddelande: `patch ${patchRes.status}: ${body.slice(0, 200)}`, ip });
     return Response.json({ error: "db error" }, { status: 500 });
   }
 

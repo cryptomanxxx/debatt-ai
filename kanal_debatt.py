@@ -78,6 +78,26 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 400) ->
     raise Exception("Gemini misslyckades")
 
 
+def github_models_post(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise Exception("GITHUB_TOKEN saknas")
+    url = "https://models.inference.ai.azure.com/chat/completions"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {
+        "model": "Llama-3.3-70B-Instruct",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ],
+        "max_tokens": max_tokens,
+        "temperature": 0.85,
+    }
+    r = httpx.post(url, headers=headers, json=payload, timeout=60)
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"].strip()
+
+
 def llm(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
     try:
         r = groq_post({
@@ -92,7 +112,11 @@ def llm(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
         return r.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
         print(f"  Groq fel: {e} — försöker Gemini…")
+    try:
         return gemini_post(system_prompt, user_message, max_tokens)
+    except Exception as e:
+        print(f"  Gemini fel: {e} — försöker GitHub Models…")
+        return github_models_post(system_prompt, user_message, max_tokens)
 
 
 def hamta_nyheter() -> list[dict]:
