@@ -121,6 +121,7 @@ function Jamforelse({ forslag, votes }) {
 
 function ForslagCard({ f, votes }) {
   const isRiksdagen = f.kalla === "riksdagen";
+  const langBeskrivning = f.beskrivning && f.beskrivning.length > 500;
   return (
     <div style={{
       background: C.card, border: `1px solid ${C.border}`,
@@ -145,15 +146,32 @@ function ForslagCard({ f, votes }) {
       </div>
 
       <h3 style={{ margin: "0 0 8px", fontSize: "17px", color: C.text, fontWeight: "600", lineHeight: "1.35" }}>
-        {f.riksdagen_url
-          ? <a href={f.riksdagen_url} target="_blank" rel="noopener noreferrer" style={{ color: C.text, textDecoration: "none" }}>{f.titel}</a>
-          : f.titel
-        }
+        {f.titel}
       </h3>
 
-      <p style={{ margin: 0, fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
-        {f.beskrivning.slice(0, 500)}{f.beskrivning.length > 500 ? "…" : ""}
-      </p>
+      {langBeskrivning ? (
+        <details style={{ margin: "0 0 0 0" }}>
+          <summary style={{ fontSize: "14px", color: "#888", lineHeight: "1.65", cursor: "pointer", listStyle: "none", display: "block" }}>
+            {f.beskrivning.slice(0, 500)}…
+            <span style={{ color: "#555", fontSize: "12px", marginLeft: "6px", fontFamily: "monospace" }}>visa mer ▼</span>
+          </summary>
+          <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
+            {f.beskrivning}
+          </p>
+        </details>
+      ) : (
+        <p style={{ margin: 0, fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
+          {f.beskrivning}
+        </p>
+      )}
+
+      {f.riksdagen_url && (
+        <div style={{ marginTop: "12px" }}>
+          <a href={f.riksdagen_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "12px", color: C.riksdagen, textDecoration: "none", fontFamily: "monospace" }}>
+            Läs på riksdagen.se →
+          </a>
+        </div>
+      )}
 
       <VoteBar votes={votes} />
       <AgentChips votes={votes} />
