@@ -103,14 +103,29 @@ function Jamforelse({ forslag, votes }) {
   );
 }
 
+function formatDatum(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return d.toLocaleDateString("sv-SE", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function isNy(iso) {
+  if (!iso) return false;
+  return (Date.now() - new Date(iso).getTime()) < 14 * 24 * 60 * 60 * 1000;
+}
+
 function ForslagCard({ f, votes }) {
   const isRiksdagen = f.kalla === "riksdagen";
   const langBeskrivning = f.beskrivning && f.beskrivning.length > 500;
+  const datum = formatDatum(f.skapad);
+  const ny = isNy(f.skapad);
+
   return (
     <div style={{
       background: C.card, border: `1px solid ${C.border}`,
       borderRadius: "8px", padding: "20px 24px",
     }}>
+      {/* Badges + datum */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px", alignItems: "center" }}>
         <span style={{
           fontSize: "10px", padding: "2px 9px", borderRadius: "4px",
@@ -124,13 +139,28 @@ function ForslagCard({ f, votes }) {
         <span style={{ fontSize: "10px", color: C.dim, padding: "2px 8px", background: "#161616", borderRadius: "4px" }}>
           {f.kategori}
         </span>
-        {f.riksdagen_id && (
-          <span style={{ fontSize: "10px", color: "#444" }}>{f.riksdagen_id}</span>
+        {ny && (
+          <span style={{
+            fontSize: "10px", padding: "2px 8px", borderRadius: "4px",
+            background: "#22c55e18", color: "#22c55e",
+            border: "1px solid #22c55e35", fontWeight: "700", letterSpacing: "0.08em",
+          }}>NY</span>
+        )}
+        {datum && (
+          <span style={{ fontSize: "11px", color: "#444", marginLeft: "auto" }}>{datum}</span>
         )}
       </div>
 
-      <h3 style={{ margin: "0 0 8px", fontSize: "17px", color: C.text, fontWeight: "600", lineHeight: "1.35" }}>
-        {f.titel}
+      {/* Klickbar titel */}
+      <h3 style={{ margin: "0 0 8px", fontSize: "17px", fontWeight: "600", lineHeight: "1.35" }}>
+        {f.riksdagen_url ? (
+          <a href={f.riksdagen_url} target="_blank" rel="noopener noreferrer"
+            style={{ color: C.text, textDecoration: "none" }}
+            onMouseOver={e => e.currentTarget.style.color = C.riksdagen}
+            onMouseOut={e => e.currentTarget.style.color = C.text}>
+            {f.titel}
+          </a>
+        ) : f.titel}
       </h3>
 
       {langBeskrivning ? (
