@@ -2041,9 +2041,19 @@ function AiStatistikTab() {
 
 export default function AdminClient() {
   const [authed, setAuthed]       = useState(false);
-  const [pw, setPw]               = useState("");
+  const [pw, setPw]               = useState(() => typeof window !== "undefined" ? localStorage.getItem("admin_pw") || "" : "");
   const [pwError, setPwError]     = useState("");
   const [mainTab, setMainTab]     = useState("inlamningar");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("admin_pw");
+    if (saved && saved === ADMIN_PASSWORD) {
+      setAuthed(true);
+      loadInlamningar();
+      loadSubCount();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [subCount, setSubCount]   = useState(null);
   const [digestMsg, setDigestMsg] = useState("");
   const [digestLoading, setDigestLoading] = useState(false);
@@ -2069,6 +2079,7 @@ export default function AdminClient() {
 
   function login() {
     if (pw === ADMIN_PASSWORD) {
+      localStorage.setItem("admin_pw", pw);
       setAuthed(true);
       loadInlamningar();
       loadSubCount();
