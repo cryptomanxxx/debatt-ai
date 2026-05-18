@@ -6,6 +6,12 @@ const MISTRAL_KEY  = process.env.MISTRAL_API_KEY;
 const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
+// Circuit breaker — provider markeras nere tills cooldown löper ut (process-minne på warm instances)
+const _providerDownUntil = { groq: 0, gemini: 0 };
+const COOLDOWN_MS = 5 * 60 * 1000; // 5 minuter
+function providerReady(name) { return Date.now() > _providerDownUntil[name]; }
+function markProviderDown(name) { _providerDownUntil[name] = Date.now() + COOLDOWN_MS; }
+
 const PERSONLIGHETER = {
   "Nationalekonom":       "nationalekonom med doktorsexamen. Analyserar ur kostnads- och incitamentsperspektiv. Konkret och kylig.",
   "Miljöaktivist":        "passionerad miljöaktivist. Sätter planetens gränser och klimaträttvisa i centrum. Faktabaserad.",
@@ -89,7 +95,7 @@ stance: "positiv" | "negativ" | "neutral"
 probability: heltal 0–100 (hur troligt är ett positivt utfall för användaren)
 reasoning: din kortaste möjliga motivering`;
 
-  if (GROQ_KEY) {
+  if (GROQ_KEY && providerReady("groq")) {
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
@@ -107,10 +113,11 @@ reasoning: din kortaste möjliga motivering`;
         if (parsed?.stance && typeof parsed.probability === "number")
           return { agent, ...parsed };
       }
+      if (res.status === 429) markProviderDown("groq");
     } catch {}
   }
 
-  if (GEMINI_KEY) {
+  if (GEMINI_KEY && providerReady("gemini")) {
     try {
       const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`,
@@ -130,6 +137,7 @@ reasoning: din kortaste möjliga motivering`;
         if (parsed?.stance && typeof parsed.probability === "number")
           return { agent, ...parsed };
       }
+      if (r.status === 429) markProviderDown("gemini");
     } catch {}
   }
 
