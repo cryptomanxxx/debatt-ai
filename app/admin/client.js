@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ReferenceLine, Legend, ResponsiveContainer } from "recharts";
+import { BUILD_ID } from "../buildId";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -2565,6 +2566,9 @@ export default function AdminClient() {
           </div>
         )}
       </main>
+      <div style={{ textAlign: "center", padding: "16px", fontSize: "11px", color: "#333", fontFamily: "monospace" }}>
+        build {BUILD_ID}
+      </div>
     </div>
   );
 }
