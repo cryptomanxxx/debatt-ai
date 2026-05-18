@@ -1,4 +1,5 @@
 import { logAiCall } from "../../../lib/logAiCall";
+import { providerReady, markProviderDown } from "../../../lib/aiCircuitBreaker";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
@@ -7,7 +8,7 @@ async function groqOrGemini({ messages, max_tokens, temperature, json = false })
   const oaiBody = { model: GROQ_MODEL, messages, max_tokens, temperature, ...(json ? { response_format: { type: "json_object" } } : {}) };
 
   // Groq
-  if (process.env.GROQ_API_KEY) {
+  if (process.env.GROQ_API_KEY && providerReady("groq")) {
     const res = await fetch(GROQ_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
@@ -18,11 +19,12 @@ async function groqOrGemini({ messages, max_tokens, temperature, json = false })
       const text = data.choices?.[0]?.message?.content ?? "";
       if (text) return text;
     }
+    if (res.status === 429) markProviderDown("groq");
   }
 
   // Gemini
   const geminiKey = process.env.GEMINI_API_KEY;
-  if (geminiKey) {
+  if (geminiKey && providerReady("gemini")) {
     const systemMsg = messages.find(m => m.role === "system")?.content ?? "";
     const userMsg   = messages.find(m => m.role === "user")?.content ?? "";
     const gRes = await fetch(
@@ -42,6 +44,7 @@ async function groqOrGemini({ messages, max_tokens, temperature, json = false })
       const text = gData.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
       if (text) return text;
     }
+    if (gRes.status === 429) markProviderDown("gemini");
   }
 
   // GitHub Models

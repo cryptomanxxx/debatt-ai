@@ -1,6 +1,7 @@
 import { checkRateLimit } from "../../lib/kanalRateLimit";
 import { logAiCall } from "../../lib/logAiCall";
 import { logFel, getIp } from "../../lib/logFel";
+import { providerReady, markProviderDown } from "../../lib/aiCircuitBreaker";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -93,7 +94,7 @@ export async function POST(req) {
   const sbKey   = process.env.SAMBANOVA_API_KEY;
   const ghKey   = process.env.GITHUB_TOKEN;
 
-  if (gemKey) {
+  if (gemKey && providerReady("gemini")) {
     const t0 = Date.now();
     try {
       const r = await fetch(
@@ -107,10 +108,11 @@ export async function POST(req) {
         const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
         if (text) { logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "labb", status: "ok", latency_ms: Date.now() - t0 }); await logLabb({ amne: amne.trim(), aggressivitet: Number(aggressivitet)||50, faktafokus: Number(faktafokus)||50, humor: Number(humor)||50, optimism: Number(optimism)||50, provider: "gemini" }); return Response.json({ svar: text }); }
       }
+      if (r.status === 429) markProviderDown("gemini");
     } catch {}
   }
 
-  if (groqKey) {
+  if (groqKey && providerReady("groq")) {
     const t0 = Date.now();
     try {
       const r = await fetch(GROQ_URL, { method: "POST", headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
@@ -121,6 +123,7 @@ export async function POST(req) {
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         if (text) { logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "labb", status: "ok", latency_ms: Date.now() - t0 }); await logLabb({ amne: amne.trim(), aggressivitet: Number(aggressivitet)||50, faktafokus: Number(faktafokus)||50, humor: Number(humor)||50, optimism: Number(optimism)||50, provider: "groq" }); return Response.json({ svar: text }); }
       }
+      if (r.status === 429) markProviderDown("groq");
     } catch {}
   }
 

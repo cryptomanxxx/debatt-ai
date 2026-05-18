@@ -1,6 +1,7 @@
 import { logAiCall } from "../../lib/logAiCall";
 import { checkRateLimit } from "../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../lib/logFel";
+import { providerReady, markProviderDown } from "../../lib/aiCircuitBreaker";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -83,7 +84,7 @@ export async function POST(req) {
   const ghKey   = process.env.GITHUB_TOKEN;
 
   // Gemini first
-  if (gemKey) {
+  if (gemKey && providerReady("gemini")) {
     const t0 = Date.now();
     try {
       const r = await fetch(
@@ -108,11 +109,12 @@ export async function POST(req) {
           return Response.json({ motargument: text });
         }
       }
+      if (r.status === 429) markProviderDown("gemini");
     } catch {}
   }
 
   // Groq
-  if (groqKey) {
+  if (groqKey && providerReady("groq")) {
     const t0 = Date.now();
     try {
       const r = await fetch(GROQ_URL, {
@@ -130,6 +132,7 @@ export async function POST(req) {
           return Response.json({ motargument: text });
         }
       }
+      if (r.status === 429) markProviderDown("groq");
     } catch {}
   }
 
