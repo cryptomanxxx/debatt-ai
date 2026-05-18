@@ -914,14 +914,12 @@ function ParlamentTab() {
   }
 
   async function importeraRiksdag() {
-    const pw = prompt("Admin-lösenord:");
-    if (!pw) return;
     setImporterar(true); setImportMsg("");
     try {
       const r = await fetch("/api/admin/riksdag-import", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw }),
+        headers: { "Content-Type": "application/json", "x-admin-password": ADMIN_PASSWORD },
+        body: JSON.stringify({}),
       });
       const d = await r.json();
       if (!r.ok) setImportMsg(`Fel: ${d.error}`);
