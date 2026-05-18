@@ -923,7 +923,12 @@ function ParlamentTab() {
       });
       const d = await r.json();
       if (!r.ok) setImportMsg(`Fel: ${d.error}`);
-      else setImportMsg(`✓ Importerade ${d.importerade} av ${d.totalt} förslag (metod: ${d.metod})${d.fel?.length ? ` — misslyckades: ${d.fel.join(", ")}` : ""}`);
+      else {
+        const delar = [`✓ Importerade ${d.importerade} av ${d.totalt} förslag (metod: ${d.metod})`];
+        if (d.omkategoriserade > 0) delar.push(`uppdaterade ${d.omkategoriserade} befintliga`);
+        if (d.fel?.length) delar.push(`misslyckades: ${d.fel.join(", ")}`);
+        setImportMsg(delar.join(" — "));
+      }
       if (d.importerade > 0) load();
     } catch (e) {
       setImportMsg(`Nätverksfel: ${e.message}`);
