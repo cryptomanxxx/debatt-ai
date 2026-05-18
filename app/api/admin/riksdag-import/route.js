@@ -55,7 +55,7 @@ function byggUrl(d) {
 // Försök 1: data.riksdagen.se JSON API + dokumentstatus för fullständig text
 async function hämtaViaApi() {
   const r = await fetch(
-    "https://data.riksdagen.se/dokumentlista/?doktyp=prop&utformat=json&sz=10&sort=datum&sortorder=desc",
+    "https://data.riksdagen.se/dokumentlista/?doktyp=prop&utformat=json&sz=50&sort=datum&sortorder=desc",
     { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
   );
   if (!r.ok) throw new Error(`API ${r.status}`);
