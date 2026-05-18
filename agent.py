@@ -545,11 +545,8 @@ def main():
         if uppdaterade > 0:
             print(f"  ✓ Automatiskt uppdaterade riksdagen_utfall för {uppdaterade} förslag")
 
-        sys.stderr.write("LOBBYING_CHECK: sb_key OK, kör lobbying nu\n")
-        sys.stderr.flush()
-        if True:  # TEMP: force lobbying for test (återställ till 0.08 efter)
+        if random.random() < 0.08:
             print(f"\n── Lobbying: {agent['namn']} ──")
-            sys.stdout.flush()
             ok_lob = kör_lobbying(agent, sb_key)
             if ok_lob:
                 logga_action(sb_key, agent["namn"], "lobbying", {}, "ok")
