@@ -881,7 +881,6 @@ export default async function AgentPage({ params }) {
               {bets.map((b, i) => {
                 const avgjord = b.markets?.status === "avgjord";
                 const vann = b.avgjord && b.vinst > 0;
-                const forlorade = b.avgjord && b.vinst <= 0;
                 return (
                   <div key={i} style={{ background: C.surface, padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px" }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
