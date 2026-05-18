@@ -350,7 +350,6 @@ async function getAgentSymboler(namn) {
   const varorMap = Object.fromEntries(varor.map(v => [v.id, v]));
   return syms.map(s => ({ ...varorMap[s.vara_id], pris_betalt: s.pris_betalt, kopt_at: s.kopt_at })).filter(s => s.namn);
 }
-}
 
 async function getAgentStats(namn) {
   const res = await fetch(
