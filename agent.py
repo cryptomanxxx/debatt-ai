@@ -51,6 +51,7 @@ from supabase_utils import (
     reglera_prediction_bets,
     kop_statussymbol,
     stang_auktioner, lista_symbol_for_forsaljning, buda_pa_auktion,
+    hamta_agent_buffs,
 )
 
 SYMBOL_PREFERENSER = {
@@ -149,8 +150,12 @@ def main():
                 relation_kontext = (relation_kontext + "\n\n" + positioner).strip() if relation_kontext else positioner
                 print("Agentpositioner hämtade ✓")
 
+        buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
+        if buffs:
+            aktiva = [k for k in buffs if k not in ("extra_system",)]
+            print(f"  Symbol-buffs: {aktiva or ['extra_system']}")
         print("Skriver replik (Groq med Gemini-fallback)...")
-        artikel = skriv_replik(agent, original, relation_kontext)
+        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs)
 
         konklusion = ""
         djup = rakna_debattdjup(sb_key, original["rubrik"]) if sb_key else 0
@@ -256,8 +261,12 @@ def main():
             print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
+            buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
+            if buffs:
+                aktiva = [k for k in buffs if k != "extra_system"]
+                print(f"  Symbol-buffs: {aktiva or ['extra_system']}")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs)
             markera_forslag_behandlat(sb_key, forslag_id)
             print("  Förslag markerat som behandlat ✓")
         elif nyhet:
@@ -280,8 +289,12 @@ def main():
             print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
+            buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
+            if buffs:
+                aktiva = [k for k in buffs if k != "extra_system"]
+                print(f"  Symbol-buffs: {aktiva or ['extra_system']}")
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt)
+            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs)
         else:
             amne, kategori = random.choice(agent["amnen"])
             if sb_key:
@@ -297,8 +310,12 @@ def main():
             print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")
             print(f"{'═' * 60}\n")
+            buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
+            if buffs:
+                aktiva = [k for k in buffs if k != "extra_system"]
+                print(f"  Symbol-buffs: {aktiva or ['extra_system']}")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs)
 
         print("Genererar rubrik...")
         amne = generera_rubrik(agent, amne, artikel, fmt=artikelfmt)
@@ -464,7 +481,8 @@ def main():
                         continue
                     print(f"  Analyserar: \"{market['titel'][:60]}\"…")
                     sannolikhet, motivering = estimera_sannolikhet(agent, market, krypto_data)
-                    ok = spara_bet(sb_key, market["id"], agent["namn"], sannolikhet, motivering)
+                    bet_buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
+                    ok = spara_bet(sb_key, market["id"], agent["namn"], sannolikhet, motivering, insats_multiplikator=bet_buffs.get("insats_multiplikator", 1.0))
                     status = "✓" if ok else "✗"
                     print(f"  {status} {agent['namn']}: {sannolikhet}% — {motivering[:80]}")
                     if ok:
@@ -569,8 +587,10 @@ def main():
         else:
             print("  Inget bud")
 
-    # Agent ställer en fråga till en annan agent (~20% chans per körning)
-    if sb_key and random.random() < 0.20:
+    # Agent ställer en fråga till en annan agent (~20% + Mentor-buff per körning)
+    _fraga_buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
+    _fraga_chans = 0.20 + _fraga_buffs.get("extra_fraga_chans", 0.0)
+    if sb_key and random.random() < _fraga_chans:
         mottagare = random.choice([a for a in AGENTER if a["namn"] != agent["namn"]])
         print(f"\n── Agent-till-agent-fråga: {agent['namn']} → {mottagare['namn']} ──")
         try:
