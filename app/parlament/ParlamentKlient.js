@@ -114,9 +114,17 @@ function isNy(iso) {
   return (Date.now() - new Date(iso).getTime()) < 14 * 24 * 60 * 60 * 1000;
 }
 
+function klippVidOrd(text, max) {
+  if (!text || text.length <= max) return { preview: text, rest: "" };
+  const cut = text.lastIndexOf(" ", max);
+  const pos = cut > max * 0.7 ? cut : max;
+  return { preview: text.slice(0, pos), rest: text.slice(pos).trimStart() };
+}
+
 function ForslagCard({ f, votes }) {
   const isRiksdagen = f.kalla === "riksdagen";
-  const langBeskrivning = f.beskrivning && f.beskrivning.length > 300;
+  const { preview, rest } = klippVidOrd(f.beskrivning, 300);
+  const langBeskrivning = rest.length > 80;
   const datum = formatDatum(f.skapad);
   const ny = isNy(f.skapad);
 
@@ -166,14 +174,14 @@ function ForslagCard({ f, votes }) {
       {langBeskrivning ? (
         <>
           <p style={{ margin: "0 0 4px", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
-            {f.beskrivning.slice(0, 300)}…
+            {preview}…
           </p>
           <details>
             <summary style={{ fontSize: "12px", color: C.accent, cursor: "pointer", listStyle: "none", display: "inline-block", userSelect: "none", marginTop: "4px" }}>
               visa mer ▼
             </summary>
             <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
-              {f.beskrivning.slice(300)}
+              {rest}
             </p>
           </details>
         </>
