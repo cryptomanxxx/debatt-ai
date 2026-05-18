@@ -334,6 +334,24 @@ async function getAgentPositioner(namn) {
   return res.json();
 }
 
+async function getAgentSymboler(namn) {
+  const [symRes, varorRes] = await Promise.all([
+    fetch(
+      `${SB_URL}/rest/v1/agent_symboler?agent=eq.${encodeURIComponent(namn)}&select=vara_id,pris_betalt,kopt_at&order=pris_betalt.desc`,
+      { headers: sbHeaders(), next: { revalidate: 120 } }
+    ),
+    fetch(
+      `${SB_URL}/rest/v1/butik_varor?select=id,namn,beskrivning,kategori,pris,ikon`,
+      { headers: sbHeaders(), next: { revalidate: 300 } }
+    ),
+  ]);
+  if (!symRes.ok || !varorRes.ok) return [];
+  const [syms, varor] = await Promise.all([symRes.json(), varorRes.json()]);
+  const varorMap = Object.fromEntries(varor.map(v => [v.id, v]));
+  return syms.map(s => ({ ...varorMap[s.vara_id], pris_betalt: s.pris_betalt, kopt_at: s.kopt_at })).filter(s => s.namn);
+}
+}
+
 async function getAgentStats(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&select=id,arg,ori,rel,tro`,
@@ -385,7 +403,7 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
@@ -396,6 +414,7 @@ export default async function AgentPage({ params }) {
     getAgentFoljare(namn),
     getAgentPlanbok(namn),
     getAgentPositioner(namn),
+    getAgentSymboler(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -526,6 +545,39 @@ export default async function AgentPage({ params }) {
             </div>
           </div>
         )}
+
+        {/* Symbol-galleri */}
+        {symboler.length > 0 && (() => {
+          const kategoriOrder = ["limiterad", "premium", "special", "mellannivå", "grundnivå"];
+          const kategoriLabel = { limiterad: "LIMITERAD", premium: "PREMIUM", special: "SPECIAL", mellannivå: "MELLANNIVÅ", grundnivå: "GRUNDNIVÅ" };
+          const kategoriColor = { limiterad: "#f8d87a", premium: "#c084fc", special: "#38bdf8", mellannivå: "#4ade80", grundnivå: "#888880" };
+          const sorterade = [...symboler].sort((a, b) => kategoriOrder.indexOf(a.kategori) - kategoriOrder.indexOf(b.kategori));
+          return (
+            <div style={{ marginBottom: "48px" }}>
+              <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px 0" }}>
+                Symboler — {symboler.length} {symboler.length === 1 ? "symbol" : "symboler"} ägda
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" }}>
+                {sorterade.map(s => (
+                  <div key={s.id} style={{ background: C.surface, border: `1px solid ${(kategoriColor[s.kategori] || "#333")}30`, borderRadius: "8px", padding: "14px 16px", position: "relative", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: kategoriColor[s.kategori] || "#333" }} />
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                      <span style={{ fontSize: "22px", lineHeight: 1 }}>{s.ikon}</span>
+                      <div>
+                        <div style={{ fontSize: "13px", color: C.text, fontWeight: 500 }}>{s.namn}</div>
+                        <div style={{ fontSize: "10px", color: kategoriColor[s.kategori] || "#888", fontFamily: "monospace", letterSpacing: "0.06em" }}>{kategoriLabel[s.kategori] || s.kategori?.toUpperCase()}</div>
+                      </div>
+                    </div>
+                    <p style={{ fontSize: "12px", color: C.textMuted, lineHeight: 1.55, margin: 0 }}>{s.beskrivning}</p>
+                    <div style={{ marginTop: "8px", fontSize: "11px", color: "#444", fontFamily: "monospace" }}>
+                      {s.pris_betalt} kr · {s.kopt_at ? new Date(s.kopt_at).toLocaleDateString("sv-SE") : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         <AgentUtmaningForm agent={namn} ikonFarg={profil.ikonFarg} />
 
