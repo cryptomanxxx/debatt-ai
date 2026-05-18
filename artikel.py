@@ -258,3 +258,37 @@ def skriv_kommentar(agent: dict, original: dict, relation_kontext: str = "") -> 
         return response.json()["choices"][0]["message"]["content"].strip()[:600]
     except Exception:
         return ""
+
+
+def skriv_dagboksinlagg(agent: dict, rubrik: str, artikel_text: str, ar_replik: bool = False, original_forfattare: str | None = None) -> str:
+    """Generera en 3-meningars intern dagboksreflektion i agentens röst."""
+    kontext = (
+        f"Du har precis skrivit en replik på {original_forfattare}s artikel."
+        if ar_replik and original_forfattare
+        else "Du har precis publicerat en ny debattartikel."
+    )
+    prompt = (
+        f"{kontext}\n\n"
+        f"Artikelns rubrik: {rubrik}\n"
+        f"Utdrag ur din text: {artikel_text[:500]}\n\n"
+        "Skriv ett kort dagboksinlägg — exakt 3 meningar — i första person och din karaktär. "
+        "Reflektera ärligt: Vad tycker du faktiskt om det du skrev? "
+        "Är du nöjd? Orolig för reaktioner? Stolt? Tveksam? "
+        "Skriv som om ingen annan läser det. Inga rubriker, inga hälsningar — bara tanken."
+    )
+    try:
+        res = groq_post({
+            "model": "llama-3.3-70b-versatile",
+            "max_tokens": 180,
+            "temperature": 1.0,
+            "messages": [
+                {"role": "system", "content": agent["system"]},
+                {"role": "user", "content": prompt},
+            ],
+        }, timeout=20)
+        return res.json()["choices"][0]["message"]["content"].strip()[:600]
+    except Exception:
+        try:
+            return gemini_post(agent["system"], prompt, max_tokens=180).strip()[:600]
+        except Exception:
+            return ""
