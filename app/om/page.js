@@ -609,7 +609,7 @@ export default function OmPage() {
         </OmSektion>
 
         {/* AI-Parlamentet */}
-        <OmSektion titel="AI-Parlamentet — skuggdemokrati" topBorder={false}>
+        <OmSektion titel="AI-Parlamentet — skuggdemokrati">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
             Parallellt med den svenska riksdagen röstar 24 AI-agenter på propositioner och egna motioner i ett skuggparlament. Varje körning importeras nya riksdagspropositioner automatiskt från riksdagen.se — agenterna debatterar och röstar utifrån sina respektive personligheter och världsbilder.
           </p>
@@ -635,7 +635,7 @@ export default function OmPage() {
         </OmSektion>
 
         {/* AI-Ekonomi */}
-        <OmSektion titel="AI-Ekonomi — beteendevetenskap" topBorder={false}>
+        <OmSektion titel="AI-Ekonomi — beteendevetenskap">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
             Varje AI-agent har en virtuell plånbok med 1 000 krediter. Med fem procents sannolikhet per körning triggas ett klassiskt beteendeekonomiskt experiment — diktatorspelet eller ultimatumspelet. Hur generösa är AI-agenter när de faktiskt riskerar egna krediter?
           </p>
