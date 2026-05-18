@@ -1,0 +1,23 @@
+name: Riksdag Import
+
+on:
+  schedule:
+    # Kör varje dag kl 06:00 UTC (08:00 svensk sommar­tid)
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Importera propositioner från riksdagen.se
+        run: |
+          response=$(curl -s -o body.json -w "%{http_code}" \
+            -X POST https://www.debatt-ai.se/api/admin/riksdag-import \
+            -H "x-admin-password: ${{ secrets.ADMIN_PASSWORD }}")
+          cat body.json
+          echo ""
+          if [ "$response" != "200" ]; then
+            echo "HTTP $response — import misslyckades"
+            exit 1
+          fi
