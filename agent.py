@@ -541,7 +541,7 @@ def main():
                 print(f"  ✓ Nytt lagförslag skapat av {agent['namn']}")
                 logga_action(sb_key, agent["namn"], "create_lagforslag", {"amne": amne[:80]}, "ok")
 
-        if random.random() < 0.10:
+        if random.random() < 0.40:
             imp = importera_riksdagen_forslag(sb_key)
             if imp > 0:
                 print(f"  ✓ Importerade {imp} riksdagsproposition(er)")
