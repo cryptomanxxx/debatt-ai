@@ -8,6 +8,26 @@ function sbHeaders() {
   return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
 }
 
+function kategorifrånText(titel, beskrivning) {
+  const text = ((titel || "") + " " + (beskrivning || "")).toLowerCase();
+  if (/klimat|miljö|utsläpp|koldioxid|hållbar|energi|förnybar|kärnkraft|natur|biologisk mångfald|skog|vatten/.test(text)) return "Klimat & Miljö";
+  if (/skatt|budget|ekonomi|tillväxt|inflation|skuld|finansiell|finans|kostnad|avgift|konjunktur/.test(text)) return "Ekonomi";
+  if (/sjukvård|hälsa|vård|omsorg|patient|läkare|sjukhus|psykiatri|tandvård|folkhälsa/.test(text)) return "Sjukvård";
+  if (/skola|utbildning|gymnasium|grundskola|högskola|universitet|lärare|elev|student/.test(text)) return "Utbildning";
+  if (/migration|asyl|flyktingar|invandring|utvisning|medborgarskap/.test(text)) return "Migration";
+  if (/försvar|militär|nato|säkerhet|krig|fred|totalförsvar|beredskap/.test(text)) return "Försvar";
+  if (/bostäder|bostad|hyra|fastighet|mark|planering|byggande/.test(text)) return "Bostad";
+  if (/kriminalitet|brott|polis|rättsväsen|straff|fängelse|gäng/.test(text)) return "Rättsväsen";
+  if (/arbete|jobb|anställning|lön|arbetsmarknad|fackförbund|a-kassa|sysselsättning/.test(text)) return "Arbetsmarknad";
+  if (/integration|segregation|diskriminering|jämlikhet|jämställdhet/.test(text)) return "Integration";
+  if (/infrastruktur|trafik|väg|järnväg|kollektivtrafik|flygplats|hamn/.test(text)) return "Infrastruktur";
+  if (/digitalisering|ai |teknik|internet|\bit\b|data|cybersäkerhet/.test(text)) return "Teknik";
+  if (/socialbidrag|fattigdom|välfärd|barnbidrag|pension|äldre|försäkring/.test(text)) return "Välfärd";
+  if (/jordbruk|lantbruk|livsmedel|mat|fiske|landsbygd/.test(text)) return "Jordbruk";
+  if (/kultur|idrott|sport|media|konst|bibliotek|film/.test(text)) return "Kultur";
+  return "Övrigt";
+}
+
 // Hämtar befintliga riksdagen_id för att undvika dubletter
 async function getBefintligaIds() {
   const r = await fetch(
@@ -17,6 +37,13 @@ async function getBefintligaIds() {
   if (!r.ok) return new Set();
   const data = await r.json();
   return new Set(data.map(d => d.riksdagen_id).filter(Boolean));
+}
+
+function byggUrl(d) {
+  if (d.url?.startsWith("http")) return d.url;
+  if (d.url) return `https://www.riksdagen.se${d.url}`;
+  // Fallback: data.riksdagen.se direktlänk fungerar alltid
+  return d.dok_id ? `https://data.riksdagen.se/dokument/${d.dok_id}.html` : null;
 }
 
 // Försök 1: data.riksdagen.se JSON API
@@ -32,7 +59,7 @@ async function hämtaViaApi() {
     dok_id: d.dok_id?.trim(),
     titel: d.titel?.trim().slice(0, 200),
     beskrivning: ((d.notis || "") + " " + (d.notis2 || "")).trim().slice(0, 2000) || `Proposition: ${d.titel}`,
-    riksdagen_url: d.url?.startsWith("http") ? d.url : d.url ? `https://www.riksdagen.se${d.url}` : null,
+    riksdagen_url: byggUrl(d),
   })).filter(d => d.dok_id && d.titel);
 }
 
@@ -116,17 +143,34 @@ export async function POST(req) {
   }
 
   let importerade = 0;
+  let omkategoriserade = 0;
   const fel = [];
 
   for (const d of forslag) {
-    if (befintliga.has(d.dok_id)) continue;
+    const kategori = kategorifrånText(d.titel, d.beskrivning);
+    if (befintliga.has(d.dok_id)) {
+      // Re-kategorisera befintliga "Övrigt"-poster och lägg till saknad URL
+      const upd = await fetch(
+        `${SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.${encodeURIComponent(d.dok_id)}&kategori=eq.Övrigt`,
+        {
+          method: "PATCH",
+          headers: { ...sbHeaders(), Prefer: "return=minimal" },
+          body: JSON.stringify({
+            kategori,
+            ...(d.riksdagen_url ? { riksdagen_url: d.riksdagen_url } : {}),
+          }),
+        }
+      );
+      if (upd.ok) omkategoriserade++;
+      continue;
+    }
     const r = await fetch(`${SB_URL}/rest/v1/lagforslag`, {
       method: "POST",
       headers: { ...sbHeaders(), Prefer: "return=minimal" },
       body: JSON.stringify({
         titel: d.titel,
         beskrivning: d.beskrivning,
-        kategori: "Övrigt",
+        kategori,
         kalla: "riksdagen",
         riksdagen_id: d.dok_id,
         riksdagen_url: d.riksdagen_url,
@@ -137,5 +181,5 @@ export async function POST(req) {
     else fel.push(d.titel?.slice(0, 40));
   }
 
-  return NextResponse.json({ importerade, totalt: forslag.length, metod, fel });
+  return NextResponse.json({ importerade, omkategoriserade, totalt: forslag.length, metod, fel });
 }

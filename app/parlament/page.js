@@ -150,15 +150,19 @@ function ForslagCard({ f, votes }) {
       </h3>
 
       {langBeskrivning ? (
-        <details style={{ margin: "0 0 0 0" }}>
-          <summary style={{ fontSize: "14px", color: "#888", lineHeight: "1.65", cursor: "pointer", listStyle: "none", display: "block" }}>
+        <>
+          <p style={{ margin: "0 0 4px", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
             {f.beskrivning.slice(0, 500)}…
-            <span style={{ color: "#555", fontSize: "12px", marginLeft: "6px", fontFamily: "monospace" }}>visa mer ▼</span>
-          </summary>
-          <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
-            {f.beskrivning}
           </p>
-        </details>
+          <details>
+            <summary style={{ fontSize: "12px", color: "#555", cursor: "pointer", listStyle: "none", display: "inline-block", userSelect: "none" }}>
+              visa mer ▼
+            </summary>
+            <p style={{ margin: "8px 0 0", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
+              {f.beskrivning.slice(500)}
+            </p>
+          </details>
+        </>
       ) : (
         <p style={{ margin: 0, fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
           {f.beskrivning}
