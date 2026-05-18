@@ -545,7 +545,7 @@ def main():
         if uppdaterade > 0:
             print(f"  ✓ Automatiskt uppdaterade riksdagen_utfall för {uppdaterade} förslag")
 
-        if True:  # TEMP: force lobbying for test (återställ till 0.08 efter)
+        if random.random() < 0.08:
             print(f"\n── Lobbying: {agent['namn']} ──")
             ok_lob = kör_lobbying(agent, sb_key)
             if ok_lob:

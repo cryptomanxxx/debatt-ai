@@ -1548,12 +1548,10 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
             headers=h, timeout=8,
         )
         if not res.is_success or not res.json():
-            print(f"  [lobbying] Avbryter: {agent_namn} har inga ja-röster i parlamentet (status={res.status_code})")
             return False
 
         forslag_ids = [r["lagforslag_id"] for r in res.json()]
         ids_str = ",".join(str(i) for i in forslag_ids)
-        print(f"  [lobbying] {agent_namn} har ja-röster på förslag: {forslag_ids}")
 
         # Filtrera till öppna motioner
         res2 = httpx.get(
@@ -1563,12 +1561,10 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
             headers=h, timeout=8,
         )
         if not res2.is_success or not res2.json():
-            print(f"  [lobbying] Avbryter: inga öppna motioner bland förslag {forslag_ids} (status={res2.status_code}, data={res2.text[:100]})")
             return False
 
         forslag = random.choice(res2.json())
         forslag_id = forslag["id"]
-        print(f"  [lobbying] Vald motion: {forslag['titel']} (id={forslag_id})")
 
         # Kontrollera saldo
         saldo_res = httpx.get(
@@ -1578,9 +1574,7 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         )
         saldo_data = saldo_res.json() if saldo_res.is_success else []
         saldo = saldo_data[0]["saldo"] if saldo_data else 0
-        print(f"  [lobbying] {agent_namn} saldo: {saldo} kr")
         if saldo < 80:
-            print(f"  [lobbying] Avbryter: saldo {saldo} < 80 kr")
             return False
 
         # Hitta kandidater att lobba (röstat nej eller ej röstat)
@@ -1596,9 +1590,7 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         nej_roster = [a for a, r in existerande.items() if r == "nej" and a != agent_namn]
         ej_rostat = [a for a in alla if a not in existerande]
         kandidater = nej_roster + ej_rostat[:4]
-        print(f"  [lobbying] Kandidater: nej={nej_roster}, ej_röstat_urval={ej_rostat[:4]}")
         if not kandidater:
-            print(f"  [lobbying] Avbryter: inga kandidater att lobba")
             return False
 
         mal_namn = random.choice(kandidater)
