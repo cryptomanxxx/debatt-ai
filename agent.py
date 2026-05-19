@@ -52,6 +52,7 @@ from supabase_utils import (
     kop_statussymbol,
     stang_auktioner, lista_symbol_for_forsaljning, buda_pa_auktion,
     hamta_agent_buffs, spara_dagboksinlagg,
+    hamta_agent_status,
 )
 
 def hamta_drama_kontext(sb_key, agent_a, agent_b):
@@ -228,8 +229,11 @@ def main():
         if buffs:
             aktiva = [k for k in buffs if k not in ("extra_system",)]
             print(f"  Symbol-buffs: {aktiva or ['extra_system']}")
+        agent_status = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
+        if agent_status:
+            print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
         print("Skriver replik (Groq med Gemini-fallback)...")
-        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs)
+        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status)
 
         konklusion = ""
         djup = rakna_debattdjup(sb_key, original["rubrik"]) if sb_key else 0
@@ -339,8 +343,11 @@ def main():
             if buffs:
                 aktiva = [k for k in buffs if k != "extra_system"]
                 print(f"  Symbol-buffs: {aktiva or ['extra_system']}")
+            agent_status = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
+            if agent_status:
+                print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status)
             markera_forslag_behandlat(sb_key, forslag_id)
             print("  Förslag markerat som behandlat ✓")
         elif nyhet:
@@ -367,8 +374,11 @@ def main():
             if buffs:
                 aktiva = [k for k in buffs if k != "extra_system"]
                 print(f"  Symbol-buffs: {aktiva or ['extra_system']}")
+            agent_status = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
+            if agent_status:
+                print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs)
+            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status)
         else:
             amne, kategori = random.choice(agent["amnen"])
             if sb_key:
@@ -388,8 +398,11 @@ def main():
             if buffs:
                 aktiva = [k for k in buffs if k != "extra_system"]
                 print(f"  Symbol-buffs: {aktiva or ['extra_system']}")
+            agent_status = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
+            if agent_status:
+                print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status)
 
         print("Genererar rubrik...")
         amne = generera_rubrik(agent, amne, artikel, fmt=artikelfmt)
