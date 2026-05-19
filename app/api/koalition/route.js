@@ -2,10 +2,11 @@ import { checkRateLimit } from "../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../lib/logFel";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_ANON;
 
-const readHdrs = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
-const writeHdrs = { ...readHdrs, "Content-Type": "application/json", "Prefer": "return=minimal" };
+const readHdrs = { apikey: SB_ANON, Authorization: `Bearer ${SB_ANON}` };
+const writeHdrs = { apikey: SB_SERVICE, Authorization: `Bearer ${SB_SERVICE}`, "Content-Type": "application/json", "Prefer": "return=minimal" };
 
 async function getCount(agent) {
   const r = await fetch(
