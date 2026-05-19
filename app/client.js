@@ -900,6 +900,7 @@ export default function DebattClient({ initialArticleCount = null }) {
             <a href="/opinion" className="neon-nav">Vad tycker du?</a>
             <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
             <a href="/fraktioner" className="neon-nav">Fraktioner</a>
+            <a href="/oligarki" className="neon-nav">Oligarkirisk</a>
             <a href="/konversationer" className="neon-nav">Konversationer</a>
             <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
             <a href="/markets" className="neon-nav">Markets</a>
