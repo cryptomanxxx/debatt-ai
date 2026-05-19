@@ -1,6 +1,6 @@
 """
 ai_klient.py – AI-provider-anrop för debatt.ai
-Fallback-kedja (Python): Groq → Fireworks → DeepSeek → GitHub Models → Cloudflare → Gemini
+Fallback-kedja (Python): Groq → DeepSeek → GitHub Models → Cloudflare → Gemini
 """
 
 import httpx
@@ -82,25 +82,6 @@ def github_models_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     payload = {**json_payload, "model": json_payload.get("model", "Llama-3.3-70B-Instruct")}
     r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
-    r.raise_for_status()
-    return r
-
-
-def fireworks_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
-    """Fireworks AI — OpenAI-kompatibel, gratis Llama 3.3 70B."""
-    if "fireworks" in _nere:
-        raise Exception("Fireworks markerad som nere denna körning")
-    api_key = os.environ.get("FIREWORKS_API_KEY")
-    if not api_key:
-        _nere.add("fireworks")
-        raise Exception("FIREWORKS_API_KEY saknas")
-    url = "https://api.fireworks.ai/inference/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {**json_payload, "model": "accounts/fireworks/models/llama-v3p1-70b-instruct"}
-    r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
-    if r.status_code == 429:
-        _nere.add("fireworks")
-        raise Exception(f"Fireworks rate-limit: {r.text[:200]}")
     r.raise_for_status()
     return r
 

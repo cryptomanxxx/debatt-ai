@@ -205,54 +205,6 @@ async function testGithubModels() {
   }
 }
 
-async function testFireworks() {
-  const key = process.env.FIREWORKS_API_KEY;
-  if (!key) return { ok: false, error: "FIREWORKS_API_KEY saknas" };
-
-  // Hämta tillgängliga modeller
-  let availableModels = [];
-  try {
-    const mr = await fetch("https://api.fireworks.ai/inference/v1/models", {
-      headers: { Authorization: `Bearer ${key}` },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (mr.ok) {
-      const mj = await mr.json();
-      availableModels = (mj.data || []).map(m => m.id).slice(0, 20);
-    }
-  } catch {}
-
-  // Prova kandidater i ordning
-  const candidates = [
-    "accounts/fireworks/models/llama4-scout-instruct-basic",
-    "accounts/fireworks/models/llama4-maverick-instruct-basic",
-    "accounts/fireworks/models/llama-v3p3-70b-instruct",
-    "accounts/fireworks/models/llama-v3p1-70b-instruct",
-    "accounts/fireworks/models/llama-v3p1-8b-instruct",
-    "accounts/fireworks/models/mixtral-8x7b-instruct",
-  ];
-  for (const model of candidates) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://api.fireworks.ai/inference/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages: makeMessages("Fireworks"), max_tokens: 30 }),
-        signal: AbortSignal.timeout(15000),
-      });
-      const latency = Date.now() - t0;
-      if (r.status === 404) continue;
-      if (!r.ok) {
-        const err = await r.text();
-        return { ok: false, status: r.status, error: err.slice(0, 300), latency, availableModels };
-      }
-      const json = await r.json();
-      const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-      return { ok: true, text, latency, model: json.model ?? model, availableModels };
-    } catch {}
-  }
-  return { ok: false, error: "Inga modeller fungerade — se listan nedan", availableModels };
-}
 
 async function testDeepSeek() {
   const key = process.env.DEEPSEEK_API_KEY;
@@ -309,7 +261,7 @@ async function testCloudflare() {
 }
 
 export async function GET() {
-  const [groq, gemini, cerebras, sambanova, openrouter, codestral, github_models, fireworks, deepseek, cloudflare] = await Promise.all([
+  const [groq, gemini, cerebras, sambanova, openrouter, codestral, github_models, deepseek, cloudflare] = await Promise.all([
     testGroq(),
     testGemini(),
     testCerebras(),
@@ -317,12 +269,11 @@ export async function GET() {
     testOpenRouter(),
     testCodestral(),
     testGithubModels(),
-    testFireworks(),
     testDeepSeek(),
     testCloudflare(),
   ]);
   return Response.json(
-    { groq, gemini, cerebras, sambanova, openrouter, codestral, github_models, fireworks, deepseek, cloudflare },
+    { groq, gemini, cerebras, sambanova, openrouter, codestral, github_models, deepseek, cloudflare },
     { headers: { "Cache-Control": "no-store" } }
   );
 }
