@@ -3,6 +3,7 @@
 import { logAiCall } from "../../../lib/logAiCall";
 import { checkRateLimit } from "../../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../../lib/logFel";
+import { providerReady, markProviderDown } from "../../../lib/aiCircuitBreaker";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OR_URL   = "https://openrouter.ai/api/v1/chat/completions";
@@ -43,7 +44,7 @@ export async function POST(req) {
   const cbKey     = process.env.CEREBRAS_API_KEY;
   const orKey     = process.env.OPENROUTER_API_KEY;
 
-  if (groqKey) {
+  if (groqKey && providerReady("groq_kanal")) {
     const t0 = Date.now();
     try {
       const r = await fetch(GROQ_URL, {
@@ -61,6 +62,7 @@ export async function POST(req) {
           return Response.json({ text }, { headers: { "X-Provider": "groq" } });
         }
       } else {
+        if (r.status === 429) markProviderDown("groq_kanal");
         logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
     } catch {
@@ -68,7 +70,7 @@ export async function POST(req) {
     }
   }
 
-  if (csKey) {
+  if (csKey && providerReady("mistral")) {
     const t0 = Date.now();
     try {
       const r = await fetch("https://api.mistral.ai/v1/chat/completions", {
@@ -86,6 +88,7 @@ export async function POST(req) {
           return Response.json({ text }, { headers: { "X-Provider": "codestral" } });
         }
       } else {
+        if (r.status === 429) markProviderDown("mistral");
         logAiCall({ provider: "codestral", model: "codestral-latest", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
     } catch {
@@ -93,7 +96,7 @@ export async function POST(req) {
     }
   }
 
-  if (sbKey) {
+  if (sbKey && providerReady("sambanova")) {
     const t0 = Date.now();
     try {
       const r = await fetch("https://api.sambanova.ai/v1/chat/completions", {
@@ -111,6 +114,7 @@ export async function POST(req) {
           return Response.json({ text }, { headers: { "X-Provider": "sambanova" } });
         }
       } else {
+        if (r.status === 429) markProviderDown("sambanova");
         logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
     } catch {
@@ -118,7 +122,7 @@ export async function POST(req) {
     }
   }
 
-  if (cbKey) {
+  if (cbKey && providerReady("cerebras")) {
     const t0 = Date.now();
     try {
       const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
@@ -136,6 +140,7 @@ export async function POST(req) {
           return Response.json({ text }, { headers: { "X-Provider": "cerebras" } });
         }
       } else {
+        if (r.status === 429) markProviderDown("cerebras");
         logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
     } catch {
@@ -169,8 +174,8 @@ export async function POST(req) {
     }
   }
 
-  // Gemini (unreliable — quota issues, last resort)
-  if (gemKey) {
+  // Gemini (sista utväg — ofta rate-limitad)
+  if (gemKey && providerReady("gemini")) {
     const t0 = Date.now();
     try {
       const r = await fetch(
@@ -186,6 +191,7 @@ export async function POST(req) {
           return Response.json({ text }, { headers: { "X-Provider": "gemini" } });
         }
       } else {
+        if (r.status === 429) markProviderDown("gemini");
         logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
     } catch {
@@ -193,7 +199,7 @@ export async function POST(req) {
     }
   }
 
-  // OpenRouter (unreliable — rate limited free tier, last resort)
+  // OpenRouter (sista utväg — fri tier med rate limit)
   if (orKey) {
     const t0 = Date.now();
     try {

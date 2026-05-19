@@ -94,24 +94,6 @@ export async function POST(req) {
   const sbKey   = process.env.SAMBANOVA_API_KEY;
   const ghKey   = process.env.GITHUB_TOKEN;
 
-  if (gemKey && providerReady("gemini")) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
-        { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: msgs[1].content }] }], systemInstruction: { parts: [{ text: system }] }, generationConfig: { maxOutputTokens: 250, temperature: 1.0 } }),
-          signal: AbortSignal.timeout(8000) }
-      );
-      if (r.ok) {
-        const json = await r.json();
-        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-        if (text) { logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "labb", status: "ok", latency_ms: Date.now() - t0 }); await logLabb({ amne: amne.trim(), aggressivitet: Number(aggressivitet)||50, faktafokus: Number(faktafokus)||50, humor: Number(humor)||50, optimism: Number(optimism)||50, provider: "gemini" }); return Response.json({ svar: text }); }
-      }
-      if (r.status === 429) markProviderDown("gemini");
-    } catch {}
-  }
-
   if (groqKey && providerReady("groq")) {
     const t0 = Date.now();
     try {
@@ -127,7 +109,7 @@ export async function POST(req) {
     } catch {}
   }
 
-  if (cbKey) {
+  if (cbKey && providerReady("cerebras")) {
     const t0 = Date.now();
     try {
       const r = await fetch("https://api.cerebras.ai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${cbKey}`, "Content-Type": "application/json" },
@@ -138,10 +120,11 @@ export async function POST(req) {
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         if (text) { logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "labb", status: "ok", latency_ms: Date.now() - t0 }); await logLabb({ amne: amne.trim(), aggressivitet: Number(aggressivitet)||50, faktafokus: Number(faktafokus)||50, humor: Number(humor)||50, optimism: Number(optimism)||50, provider: "cerebras" }); return Response.json({ svar: text }); }
       }
+      if (r.status === 429) markProviderDown("cerebras");
     } catch {}
   }
 
-  if (sbKey) {
+  if (sbKey && providerReady("sambanova")) {
     const t0 = Date.now();
     try {
       const r = await fetch("https://api.sambanova.ai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${sbKey}`, "Content-Type": "application/json" },
@@ -152,6 +135,25 @@ export async function POST(req) {
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         if (text) { logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "labb", status: "ok", latency_ms: Date.now() - t0 }); await logLabb({ amne: amne.trim(), aggressivitet: Number(aggressivitet)||50, faktafokus: Number(faktafokus)||50, humor: Number(humor)||50, optimism: Number(optimism)||50, provider: "sambanova" }); return Response.json({ svar: text }); }
       }
+      if (r.status === 429) markProviderDown("sambanova");
+    } catch {}
+  }
+
+  if (gemKey && providerReady("gemini")) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: msgs[1].content }] }], systemInstruction: { parts: [{ text: system }] }, generationConfig: { maxOutputTokens: 250, temperature: 1.0 } }),
+          signal: AbortSignal.timeout(8000) }
+      );
+      if (r.ok) {
+        const json = await r.json();
+        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
+        if (text) { logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "labb", status: "ok", latency_ms: Date.now() - t0 }); await logLabb({ amne: amne.trim(), aggressivitet: Number(aggressivitet)||50, faktafokus: Number(faktafokus)||50, humor: Number(humor)||50, optimism: Number(optimism)||50, provider: "gemini" }); return Response.json({ svar: text }); }
+      }
+      if (r.status === 429) markProviderDown("gemini");
     } catch {}
   }
 
