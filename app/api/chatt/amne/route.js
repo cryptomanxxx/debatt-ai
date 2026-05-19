@@ -44,6 +44,38 @@ export async function POST(request) {
     }
   }
 
+  // Cerebras
+  if (process.env.CEREBRAS_API_KEY && providerReady("cerebras")) {
+    const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CEREBRAS_API_KEY}` },
+      body: JSON.stringify({ ...oaiBody, model: "qwen-3-235b-a22b-instruct-2507" }),
+      signal: AbortSignal.timeout(8000),
+    }).catch(() => null);
+    if (res?.status === 429) markProviderDown("cerebras");
+    if (res?.ok) {
+      const data = await res.json();
+      const amne = data.choices?.[0]?.message?.content?.trim().replace(/^["']|["']$/g, "") ?? "";
+      if (amne) return Response.json({ amne });
+    }
+  }
+
+  // Sambanova
+  if (process.env.SAMBANOVA_API_KEY && providerReady("sambanova")) {
+    const res = await fetch("https://api.sambanova.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.SAMBANOVA_API_KEY}` },
+      body: JSON.stringify({ ...oaiBody, model: "Meta-Llama-3.3-70B-Instruct" }),
+      signal: AbortSignal.timeout(10000),
+    }).catch(() => null);
+    if (res?.status === 429) markProviderDown("sambanova");
+    if (res?.ok) {
+      const data = await res.json();
+      const amne = data.choices?.[0]?.message?.content?.trim().replace(/^["']|["']$/g, "") ?? "";
+      if (amne) return Response.json({ amne });
+    }
+  }
+
   // Gemini
   if (process.env.GEMINI_API_KEY && providerReady("gemini")) {
     try {

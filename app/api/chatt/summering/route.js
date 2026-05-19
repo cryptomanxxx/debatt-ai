@@ -22,6 +22,38 @@ async function groqOrGemini({ messages, max_tokens, temperature, json = false })
     if (res.status === 429) markProviderDown("groq");
   }
 
+  // Cerebras
+  const cerebrasKey = process.env.CEREBRAS_API_KEY;
+  if (cerebrasKey && providerReady("cerebras")) {
+    const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cerebrasKey}` },
+      body: JSON.stringify({ ...oaiBody, model: "qwen-3-235b-a22b-instruct-2507" }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content ?? "";
+      if (text) return text;
+    }
+    if (res.status === 429) markProviderDown("cerebras");
+  }
+
+  // Sambanova
+  const sambanovaKey = process.env.SAMBANOVA_API_KEY;
+  if (sambanovaKey && providerReady("sambanova")) {
+    const res = await fetch("https://api.sambanova.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sambanovaKey}` },
+      body: JSON.stringify({ ...oaiBody, model: "Meta-Llama-3.3-70B-Instruct" }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content ?? "";
+      if (text) return text;
+    }
+    if (res.status === 429) markProviderDown("sambanova");
+  }
+
   // Gemini
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey && providerReady("gemini")) {

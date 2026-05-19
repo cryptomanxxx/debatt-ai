@@ -11,10 +11,12 @@
 const COOLDOWN_MS = 5 * 60 * 1000; // 5 minuter
 
 const _downUntil = {
-  groq:    0,
-  gemini:  0,
-  mistral: 0,
-  cerebras: 0,
+  groq:       0,
+  groq_kanal: 0,
+  gemini:     0,
+  mistral:    0,
+  cerebras:   0,
+  sambanova:  0,
 };
 
 export function providerReady(name) {
