@@ -72,15 +72,15 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
         print("  ✓ Groq: artikel klar")
         return result
     except Exception as e:
-        print(f"  Groq misslyckades ({e}) — försöker Gemini...")
+        print(f"  Groq misslyckades ({e}) — försöker GitHub Models...")
     try:
-        result = gemini_post(system, user_msg, max_tokens=max_tok)
-        print("  ✓ Gemini: artikel klar")
+        result = github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
+        print("  ✓ GitHub Models: artikel klar")
         return result
     except Exception as e:
-        print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
-    result = github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
-    print("  ✓ GitHub Models: artikel klar")
+        print(f"  GitHub Models misslyckades ({e}) — försöker Gemini...")
+    result = gemini_post(system, user_msg, max_tokens=max_tok)
+    print("  ✓ Gemini: artikel klar")
     return result
 
 
@@ -116,15 +116,15 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
         print("  ✓ Groq: artikel klar")
         return result
     except Exception as e:
-        print(f"  Groq misslyckades ({e}) — försöker Gemini...")
+        print(f"  Groq misslyckades ({e}) — försöker GitHub Models...")
     try:
-        result = gemini_post(system, user_msg, max_tokens=max_tok)
-        print("  ✓ Gemini: artikel klar")
+        result = github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
+        print("  ✓ GitHub Models: artikel klar")
         return result
     except Exception as e:
-        print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
-    result = github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
-    print("  ✓ GitHub Models: artikel klar")
+        print(f"  GitHub Models misslyckades ({e}) — försöker Gemini...")
+    result = gemini_post(system, user_msg, max_tokens=max_tok)
+    print("  ✓ Gemini: artikel klar")
     return result
 
 
@@ -178,15 +178,15 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
         print("  ✓ Groq: replik klar")
         return result
     except Exception as e:
-        print(f"  Groq misslyckades ({e}) — försöker Gemini...")
+        print(f"  Groq misslyckades ({e}) — försöker GitHub Models...")
     try:
-        result = gemini_post(system, user_msg, max_tokens=max_tok)
-        print("  ✓ Gemini: replik klar")
+        result = github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
+        print("  ✓ GitHub Models: replik klar")
         return result
     except Exception as e:
-        print(f"  Gemini misslyckades ({e}) — försöker GitHub Models...")
-    result = github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
-    print("  ✓ GitHub Models: replik klar")
+        print(f"  GitHub Models misslyckades ({e}) — försöker Gemini...")
+    result = gemini_post(system, user_msg, max_tokens=max_tok)
+    print("  ✓ Gemini: replik klar")
     return result
 
 
@@ -310,8 +310,20 @@ def skriv_dagboksinlagg(agent: dict, rubrik: str, artikel_text: str, ar_replik: 
             ],
         }, timeout=20)
         return res.json()["choices"][0]["message"]["content"].strip()[:600]
-    except Exception:
+    except Exception as e:
         try:
-            return gemini_post(agent["system"], prompt, max_tokens=180).strip()[:600]
+            res2 = github_models_post({
+                "model": "Llama-3.3-70B-Instruct",
+                "max_tokens": 180,
+                "temperature": 1.0,
+                "messages": [
+                    {"role": "system", "content": agent["system"]},
+                    {"role": "user", "content": prompt},
+                ],
+            }, timeout=20)
+            return res2.json()["choices"][0]["message"]["content"].strip()[:600]
         except Exception:
-            return ""
+            try:
+                return gemini_post(agent["system"], prompt, max_tokens=180).strip()[:600]
+            except Exception:
+                return ""

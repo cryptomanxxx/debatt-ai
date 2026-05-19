@@ -18,7 +18,7 @@ import os
 import sys
 from datetime import datetime, timezone
 
-from ai_klient import groq_post, gemini_post
+from ai_klient import groq_post, gemini_post, github_models_post
 
 from agenter import (
     AGENTER, ANALYTIKER, ROST_AGENTER, MARKET_AGENTER,
@@ -761,7 +761,10 @@ def main():
             try:
                 fraga_text = groq_post(fraga_payload).json()["choices"][0]["message"]["content"].strip().strip('"')
             except Exception:
-                fraga_text = gemini_post(agent.get("system", "")[:600], fraga_prompt, max_tokens=80).strip().strip('"')
+                try:
+                    fraga_text = github_models_post(fraga_payload).json()["choices"][0]["message"]["content"].strip().strip('"')
+                except Exception:
+                    fraga_text = gemini_post(agent.get("system", "")[:600], fraga_prompt, max_tokens=80).strip().strip('"')
 
             svar_innehall = (
                 f"{agent['namn']} frågar dig: \"{fraga_text}\"\n"
@@ -786,7 +789,10 @@ def main():
             try:
                 svar_text = groq_post(svar_payload).json()["choices"][0]["message"]["content"].strip()
             except Exception:
-                svar_text = gemini_post(mottagare.get("system", "")[:600], svar_innehall, max_tokens=200).strip()
+                try:
+                    svar_text = github_models_post(svar_payload).json()["choices"][0]["message"]["content"].strip()
+                except Exception:
+                    svar_text = gemini_post(mottagare.get("system", "")[:600], svar_innehall, max_tokens=200).strip()
 
             httpx.post(
                 f"{SB_URL_LOCAL}/rest/v1/agent_fragor",
@@ -841,7 +847,10 @@ def main():
             try:
                 fraga_text2 = groq_post(fraga_payload2).json()["choices"][0]["message"]["content"].strip().strip('"')
             except Exception:
-                fraga_text2 = gemini_post(agent.get("system", "")[:600], fraga_prompt2, max_tokens=80).strip().strip('"')
+                try:
+                    fraga_text2 = github_models_post(fraga_payload2).json()["choices"][0]["message"]["content"].strip().strip('"')
+                except Exception:
+                    fraga_text2 = gemini_post(agent.get("system", "")[:600], fraga_prompt2, max_tokens=80).strip().strip('"')
 
             svar_innehall2 = (
                 f"{agent['namn']} frågar dig: \"{fraga_text2}\"\n"
@@ -858,7 +867,10 @@ def main():
             try:
                 svar_text2 = groq_post(svar_payload2).json()["choices"][0]["message"]["content"].strip()
             except Exception:
-                svar_text2 = gemini_post(mottagare2.get("system", "")[:600], svar_innehall2, max_tokens=200).strip()
+                try:
+                    svar_text2 = github_models_post(svar_payload2).json()["choices"][0]["message"]["content"].strip()
+                except Exception:
+                    svar_text2 = gemini_post(mottagare2.get("system", "")[:600], svar_innehall2, max_tokens=200).strip()
 
             httpx.post(
                 f"{SB_URL_LOCAL2}/rest/v1/agent_fragor",
