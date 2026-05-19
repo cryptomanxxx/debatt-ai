@@ -1,6 +1,7 @@
 import { AGENT_VISUELL } from "../agentData";
 import OligarkiGraf from "./OligarkiGraf";
 import Maktkarta from "./Maktkarta";
+import OligarkiTidsserie from "./OligarkiTidsserie";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -30,12 +31,13 @@ async function fetchData() {
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   const r = (path) => fetch(`${SB_URL}/rest/v1/${path}`, { headers: h, next: { revalidate: 180 } });
 
-  const [plRes, symRes, koalRes, lobbyRes, betsRes] = await Promise.all([
+  const [plRes, symRes, koalRes, lobbyRes, betsRes, histRes] = await Promise.all([
     r("agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc"),
     r("agent_symboler?select=agent"),
     r("agent_koalitioner?select=agent_a,agent_b,styrka&order=styrka.desc"),
     r("lobbying_log?select=lobbying_agent,resultat"),
     r("agent_bets?select=agent,vinst&avgjord=eq.true"),
+    r("oligarki_historik?select=datum,gini,oligarki_risk,top3_andel,mobilitet,dynasti_index&order=datum.asc&limit=90"),
   ]);
 
   return {
@@ -44,6 +46,7 @@ async function fetchData() {
     koalitioner: koalRes.ok  ? await koalRes.json()  : [],
     lobbying:    lobbyRes.ok ? await lobbyRes.json() : [],
     bets:        betsRes.ok  ? await betsRes.json()  : [],
+    historik:    histRes.ok  ? await histRes.json()  : [],
   };
 }
 
@@ -66,7 +69,7 @@ export default async function OligarkiPage() {
   const raw = await fetchData();
   if (!raw) return <div style={{ color: C.muted, padding: 40, fontFamily: "monospace" }}>Saknar Supabase-nyckel.</div>;
 
-  const { planbocker, symboler, koalitioner, lobbying, bets } = raw;
+  const { planbocker, symboler, koalitioner, lobbying, bets, historik } = raw;
 
   // Symbol count per agent
   const symCount = {};
@@ -412,6 +415,15 @@ export default async function OligarkiPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Tidsserie */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, color: C.text, fontFamily: "Georgia, serif", fontWeight: 700, marginBottom: 4 }}>Historisk trend</div>
+          <p style={{ fontSize: 12, color: C.muted, fontFamily: "monospace", margin: "0 0 16px", lineHeight: 1.6 }}>
+            Dagliga snapshots — ser vi en driftande rörelse mot lägre mobilitet och högre koncentration?
+          </p>
+          <OligarkiTidsserie data={historik} />
         </div>
 
         {/* Methodology */}
