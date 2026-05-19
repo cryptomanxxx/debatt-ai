@@ -5,7 +5,7 @@ type: bug
 severity: medium
 risk: medium
 file: riksdag_import.py
-status: pending
+status: rejected
 created: 2026-05-19
 ---
 

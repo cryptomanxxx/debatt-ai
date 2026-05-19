@@ -5,7 +5,7 @@ type: security
 severity: high
 risk: high
 file: app/api/koalition/route.js
-status: pending
+status: implemented
 created: 2026-05-19
 ---
 
