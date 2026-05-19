@@ -1,5 +1,13 @@
 import { agentVisuell } from "../agentData";
 
+function agentSlug(namn) {
+  return namn.toLowerCase()
+    .replace(/ /g, "-")
+    .replace(/ö/g, "o")
+    .replace(/ä/g, "a")
+    .replace(/å/g, "a");
+}
+
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -123,13 +131,15 @@ function SymbolKort({ vara, owners, soldCount, tierColor }) {
             {owners.slice(0, 8).map(agent => {
               const av = agentVisuell(agent);
               return (
-                <a key={agent} href={`/agent/${encodeURIComponent(agent)}`} title={agent} style={{
-                  width: "22px", height: "22px", borderRadius: "50%",
-                  background: av.gradient,
-                  border: `1.5px solid ${av.ring}`,
-                  display: "inline-block", flexShrink: 0,
-                  textDecoration: "none",
-                }} />
+                <a key={agent} href={`/agent/${encodeURIComponent(agent)}`} title={agent} style={{ display: "inline-block", flexShrink: 0, textDecoration: "none" }}>
+                  <img
+                    src={`/avatarer/${agentSlug(agent)}.png`}
+                    alt={agent}
+                    width={22}
+                    height={22}
+                    style={{ width: "22px", height: "22px", borderRadius: "50%", objectFit: "cover", display: "block", border: `1.5px solid ${av.ring}` }}
+                  />
+                </a>
               );
             })}
             {owners.length > 8 && (
@@ -187,11 +197,9 @@ function AuktionKort({ auktion }) {
 
       {/* Säljs av */}
       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-        <a href={`/agent/${encodeURIComponent(saljare)}`} style={{
-          width: "18px", height: "18px", borderRadius: "50%",
-          background: av.gradient, border: `1.5px solid ${av.ring}`,
-          display: "inline-block", flexShrink: 0, textDecoration: "none",
-        }} title={saljare} />
+        <a href={`/agent/${encodeURIComponent(saljare)}`} style={{ display: "inline-block", flexShrink: 0, textDecoration: "none" }} title={saljare}>
+          <img src={`/avatarer/${agentSlug(saljare)}.png`} alt={saljare} width={18} height={18} style={{ width: "18px", height: "18px", borderRadius: "50%", objectFit: "cover", display: "block", border: `1.5px solid ${av.ring}` }} />
+        </a>
         <span style={{ fontSize: "11px", color: "#555", fontFamily: "monospace" }}>{saljare} säljer</span>
       </div>
 
@@ -207,11 +215,9 @@ function AuktionKort({ auktion }) {
         </div>
         {hogst_budgivare && budAv && (
           <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "6px" }}>
-            <a href={`/agent/${encodeURIComponent(hogst_budgivare)}`} style={{
-              width: "14px", height: "14px", borderRadius: "50%",
-              background: budAv.gradient, border: `1px solid ${budAv.ring}`,
-              display: "inline-block", flexShrink: 0, textDecoration: "none",
-            }} title={hogst_budgivare} />
+            <a href={`/agent/${encodeURIComponent(hogst_budgivare)}`} style={{ display: "inline-block", flexShrink: 0, textDecoration: "none" }} title={hogst_budgivare}>
+              <img src={`/avatarer/${agentSlug(hogst_budgivare)}.png`} alt={hogst_budgivare} width={14} height={14} style={{ width: "14px", height: "14px", borderRadius: "50%", objectFit: "cover", display: "block", border: `1px solid ${budAv.ring}` }} />
+            </a>
             <span style={{ fontSize: "10px", color: "#4a9eff", fontFamily: "monospace" }}>{hogst_budgivare}</span>
           </div>
         )}
@@ -352,7 +358,7 @@ export default async function ButikPage() {
                         <span style={{ fontSize: "11px", color: medalColor, fontFamily: "monospace", fontWeight: 700, width: "18px", flexShrink: 0 }}>
                           {i + 1}
                         </span>
-                        <div style={{ width: "24px", height: "24px", borderRadius: "50%", background: av.gradient, border: `1.5px solid ${av.ring}`, flexShrink: 0 }} />
+                        <img src={`/avatarer/${agentSlug(r.agent)}.png`} alt={r.agent} width={24} height={24} style={{ width: "24px", height: "24px", borderRadius: "50%", objectFit: "cover", display: "block", flexShrink: 0, border: `1.5px solid ${av.ring}` }} />
                         <span style={{ fontSize: "12px", color: C.muted, fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {r.agent}
                         </span>
