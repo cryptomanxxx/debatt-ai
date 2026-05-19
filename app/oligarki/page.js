@@ -1,32 +1,41 @@
 import { AGENT_VISUELL } from "../agentData";
 import OligarkiGraf from "./OligarkiGraf";
+import Maktkarta from "./Maktkarta";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
 export const metadata = {
   title: "Oligarkirisk – DEBATT-AI",
-  description: "Mäter om systemet rör sig mot stabilt oligarki-equilibrium. Gini-koefficient, maktkoncentration och självförstärkande loopar.",
+  description: "Mäter om systemet rör sig mot stabilt oligarki-equilibrium. Gini, social mobilitet, maktkoncentration och självförstärkande loopar.",
 };
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
   text: "#f0ede6", muted: "#888880",
   red: "#f87171", yellow: "#facc15", green: "#4ade80",
-  orange: "#fb923c", accent: "#e879f9",
+  orange: "#fb923c", blue: "#4a9eff", accent: "#e879f9",
 };
+
+const RISK_LEVELS = [
+  { min: 0,  max: 20, label: "KONKURRENS",        desc: "Hög mobilitet — makt skiftar ofta",                         farg: "#4ade80" },
+  { min: 20, max: 40, label: "ELITBILDNING",       desc: "Stabil toppklass börjar formas",                           farg: "#86efac" },
+  { min: 40, max: 60, label: "OLIGARKI",           desc: "Toppskiktet reproducerar sin makt",                        farg: "#facc15" },
+  { min: 60, max: 80, label: "DYNASTISK OLIGARKI", desc: "Nätverket är nästan låst",                                  farg: "#fb923c" },
+  { min: 80, max: 101, label: "SYSTEMKONTROLL",    desc: "Parlament + ekonomi + prestige kontrolleras av få aktörer", farg: "#f87171" },
+];
 
 async function fetchData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return null;
   const h = { apikey: key, Authorization: `Bearer ${key}` };
-  const opts = (extra = {}) => ({ headers: h, next: { revalidate: 180 }, ...extra });
+  const r = (path) => fetch(`${SB_URL}/rest/v1/${path}`, { headers: h, next: { revalidate: 180 } });
 
   const [plRes, symRes, koalRes, lobbyRes, betsRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc`, opts()),
-    fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent`, opts()),
-    fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka`, opts()),
-    fetch(`${SB_URL}/rest/v1/lobbying_log?select=lobbying_agent,resultat`, opts()),
-    fetch(`${SB_URL}/rest/v1/agent_bets?select=agent,vinst&avgjord=eq.true`, opts()),
+    r("agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc"),
+    r("agent_symboler?select=agent"),
+    r("agent_koalitioner?select=agent_a,agent_b,styrka&order=styrka.desc"),
+    r("lobbying_log?select=lobbying_agent,resultat"),
+    r("agent_bets?select=agent,vinst&avgjord=eq.true"),
   ]);
 
   return {
@@ -48,8 +57,9 @@ function gini(values) {
   return Math.max(0, Math.min(1, g / (n * sum)));
 }
 
-function riskFarg(v) {
-  return v >= 70 ? C.red : v >= 40 ? C.yellow : C.green;
+function avgRate(arr, rateKey, totKey) {
+  const active = arr.filter(a => a[totKey] > 0);
+  return active.length > 0 ? active.reduce((s, a) => s + a[rateKey], 0) / active.length : 0;
 }
 
 export default async function OligarkiPage() {
@@ -63,8 +73,7 @@ export default async function OligarkiPage() {
   for (const s of symboler) symCount[s.agent] = (symCount[s.agent] || 0) + 1;
 
   // Coalition strength + degree per agent
-  const koalStr = {};
-  const koalDeg = {};
+  const koalStr = {}, koalDeg = {};
   for (const k of koalitioner) {
     for (const a of [k.agent_a, k.agent_b]) {
       koalStr[a] = (koalStr[a] || 0) + k.styrka;
@@ -90,33 +99,30 @@ export default async function OligarkiPage() {
 
   const saldon = planbocker.map(p => Math.max(0, p.saldo));
   const totalSaldo = saldon.reduce((a, b) => a + b, 0);
-  const giniVal = gini(saldon);
+  const avgSaldo   = totalSaldo / (saldon.length || 1);
+  const giniVal    = gini(saldon);
 
-  const maxSaldo  = Math.max(...saldon, 1);
-  const maxSym    = Math.max(...Object.values(symCount), 1);
-  const maxKoal   = Math.max(...Object.values(koalStr), 1);
+  const maxSaldo = Math.max(...saldon, 1);
+  const maxSym   = Math.max(...Object.values(symCount), 1);
+  const maxKoal  = Math.max(...Object.values(koalStr),  1);
 
   // Build per-agent stats
   const agenter = planbocker.map(p => {
-    const saldo    = Math.max(0, p.saldo);
-    const syms     = symCount[p.agent] || 0;
-    const ks       = koalStr[p.agent] || 0;
-    const lb       = lobbyMap[p.agent];
-    const bt       = betMap[p.agent];
+    const saldo     = Math.max(0, p.saldo);
+    const syms      = symCount[p.agent] || 0;
+    const ks        = koalStr[p.agent] || 0;
+    const lb        = lobbyMap[p.agent];
+    const bt        = betMap[p.agent];
     const lobbyRate = lb?.tot > 0 ? lb.ok / lb.tot : 0;
     const betRate   = bt?.tot > 0 ? bt.wins / bt.tot : 0;
-
-    // Power index 0–100
     const makt = Math.round(
       (saldo / maxSaldo) * 40 +
       (syms  / maxSym)   * 20 +
       (ks    / maxKoal)  * 25 +
       lobbyRate          * 15
     );
-
     return {
-      agent: p.agent,
-      saldo,
+      agent: p.agent, saldo,
       saldoPct: totalSaldo > 0 ? saldo / totalSaldo : 0,
       syms, koalStyrka: ks, koalDeg: koalDeg[p.agent] || 0,
       lobbyRate, lobbyTot: lb?.tot || 0,
@@ -127,68 +133,87 @@ export default async function OligarkiPage() {
   });
 
   agenter.sort((a, b) => b.makt - a.makt);
+  agenter.forEach((a, i) => { a.maktRank = i + 1; });
 
-  // Top-3 wealth share (planbocker already sorted desc)
-  const top3Saldo = planbocker.slice(0, 3).reduce((s, p) => s + Math.max(0, p.saldo), 0);
-  const top3Share = totalSaldo > 0 ? top3Saldo / totalSaldo : 0;
+  const sortedBySaldo = [...agenter].sort((a, b) => b.saldo - a.saldo);
 
-  // Power concentration: how much more powerful are top-3 vs average?
-  const totalMakt = agenter.reduce((s, a) => s + a.makt, 0);
-  const avgMakt   = totalMakt / agenter.length || 1;
-  const top3Makt  = agenter.slice(0, 3).reduce((s, a) => s + a.makt, 0);
+  // Concentration metrics
+  const top3Saldo     = planbocker.slice(0, 3).reduce((s, p) => s + Math.max(0, p.saldo), 0);
+  const top3Share     = totalSaldo > 0 ? top3Saldo / totalSaldo : 0;
+  const totalMakt     = agenter.reduce((s, a) => s + a.makt, 0);
+  const top3Makt      = agenter.slice(0, 3).reduce((s, a) => s + a.makt, 0);
   const top3MaktShare = totalMakt > 0 ? top3Makt / totalMakt : 0;
 
-  // Feedback loops: compare top-12 vs bottom-12 by saldo
-  const bySaldo   = [...agenter].sort((a, b) => b.saldo - a.saldo);
-  const half      = Math.floor(bySaldo.length / 2);
-  const topHalf   = bySaldo.slice(0, half);
-  const botHalf   = bySaldo.slice(half);
+  // ── Social Mobility Index ──────────────────────────────────────
+  // Overlap between top-6 by wealth and top-6 by power
+  const top6Saldo = sortedBySaldo.slice(0, 6).map(a => a.agent);
+  const top6Makt  = agenter.slice(0, 6).map(a => a.agent);
+  const overlap   = top6Saldo.filter(n => top6Makt.includes(n)).length;
+  const lockIn    = overlap / 6; // 0=open, 1=completely locked
+  const mobilitet = Math.round((1 - lockIn) * 100);
 
-  function avgRate(arr, key) {
-    const active = arr.filter(a => a[key + "Tot"] > 0);
-    return active.length > 0 ? active.reduce((s, a) => s + a[key + "Rate"], 0) / active.length : 0;
-  }
-  const topLobby = avgRate(topHalf, "lobby");
-  const botLobby = avgRate(botHalf, "lobby");
-  const topBet   = avgRate(topHalf, "bet");
-  const botBet   = avgRate(botHalf, "bet");
+  // Elite stability: fraction of top-6 by power who are also rich (>1.5x avg)
+  const eliteRika = agenter.slice(0, 6).filter(a => a.saldo > avgSaldo * 1.5).length;
+  const eliteStabilitet = Math.round((eliteRika / 6) * 100);
+
+  // Dynasty formation: do top-3 dominate all three dimensions (wealth + power + coalitions)?
+  const top3Names = agenter.slice(0, 3).map(a => a.agent);
+  const top3ByKoal = [...agenter].sort((a, b) => b.koalStyrka - a.koalStyrka).slice(0, 3).map(a => a.agent);
+  const dynastiOverlap = top3Names.filter(n => top3ByKoal.includes(n)).length;
+  const dynastiIndex = Math.round((dynastiOverlap / 3) * 100);
+
+  // Feedback loops
+  const half    = Math.floor(sortedBySaldo.length / 2);
+  const topHalf = sortedBySaldo.slice(0, half);
+  const botHalf = sortedBySaldo.slice(half);
+
+  const topLobby     = avgRate(topHalf, "lobbyRate", "lobbyTot");
+  const botLobby     = avgRate(botHalf, "lobbyRate", "lobbyTot");
+  const topBet       = avgRate(topHalf, "betRate",   "betTot");
+  const botBet       = avgRate(botHalf, "betRate",   "betTot");
   const lobbyLoopAktiv = topLobby > botLobby;
   const betLoopAktiv   = topBet   > botBet;
   const lobbyFordel    = topLobby - botLobby;
   const betFordel      = topBet   - botBet;
 
-  // Oligarchy risk 0–100
+  // ── Oligarchy risk 0–100 ──────────────────────────────────────
   const oligarkiRisk = Math.min(100, Math.round(
-    giniVal   * 35 +
-    top3Share * 30 +
-    top3MaktShare * 20 +
-    (lobbyLoopAktiv ? Math.min(lobbyFordel, 1) * 15 : 0)
+    giniVal        * 30 +
+    top3Share      * 25 +
+    top3MaktShare  * 20 +
+    (1 - mobilitet / 100) * 15 +
+    (lobbyLoopAktiv ? Math.min(lobbyFordel, 1) * 10 : 0)
   ));
-  const rf = riskFarg(oligarkiRisk);
-  const riskLabel = oligarkiRisk >= 70 ? "HÖG" : oligarkiRisk >= 40 ? "MEDEL" : "LÅG";
+
+  const currentLevel = RISK_LEVELS.find(l => oligarkiRisk >= l.min && oligarkiRisk < l.max) || RISK_LEVELS[4];
 
   // Chart data
-  const wealthData = [...bySaldo].map(a => ({
-    agent: a.agent.split(" ")[0],
-    saldo: a.saldo,
-    farg:  a.farg,
+  const wealthData = sortedBySaldo.map(a => ({ agent: a.agent.split(" ")[0], saldo: a.saldo, farg: a.farg }));
+  const maktData   = agenter.slice(0, 14).map(a => ({ agent: a.agent.split(" ")[0], makt: a.makt, farg: a.farg }));
+
+  // Maktkarta data
+  const maktartaNodes = agenter.map(a => ({
+    agent:    a.agent,
+    saldo:    a.saldo,
+    makt:     a.makt,
+    maktRank: a.maktRank,
+    farg:     a.farg,
+    nodeR:    12 + (a.saldo / maxSaldo) * 22,
   }));
-  const maktData = agenter.slice(0, 14).map(a => ({
-    agent: a.agent.split(" ")[0],
-    makt:  a.makt,
-    farg:  a.farg,
-  }));
+  const maktartaEdges = koalitioner
+    .filter(k => k.styrka >= 1)
+    .map(k => ({ a: k.agent_a, b: k.agent_b, styrka: k.styrka }));
 
   const statCards = [
-    { label: "Gini-koefficient", val: (giniVal * 100).toFixed(1) + "%",     desc: "0% = perfekt jämlikhet",          farg: riskFarg(giniVal > 0.45 ? 80 : giniVal > 0.3 ? 50 : 20) },
-    { label: "Top-3 förmögenhetsandel", val: (top3Share * 100).toFixed(1) + "%", desc: "Tre rikastes andel av total", farg: riskFarg(top3Share > 0.5 ? 80 : top3Share > 0.35 ? 50 : 20) },
-    { label: "Top-3 maktandel",  val: (top3MaktShare * 100).toFixed(0) + "%", desc: "Andel av totalt maktindex",     farg: riskFarg(top3MaktShare > 0.4 ? 80 : top3MaktShare > 0.25 ? 50 : 20) },
-    { label: "Lobbyingfördel",   val: lobbyLoopAktiv ? `+${(lobbyFordel * 100).toFixed(0)}pp` : "Ej aktiv",          desc: "Rika vs fattiga agenters framgång", farg: lobbyLoopAktiv && lobbyFordel > 0.15 ? C.red : lobbyLoopAktiv ? C.yellow : C.green },
+    { label: "Gini-koefficient",        val: (giniVal * 100).toFixed(1) + "%",  desc: "0% = perfekt jämlikhet",           farg: giniVal > 0.45 ? C.red : giniVal > 0.3 ? C.yellow : C.green },
+    { label: "Top-3 förmögenhetsandel", val: (top3Share * 100).toFixed(1) + "%", desc: "Tre rikastes andel av total",      farg: top3Share > 0.5 ? C.red : top3Share > 0.35 ? C.yellow : C.green },
+    { label: "Social mobilitet",         val: mobilitet + "%",                    desc: "100% = helt öppet system",         farg: mobilitet < 30 ? C.red : mobilitet < 60 ? C.yellow : C.green },
+    { label: "Dynastisk index",           val: dynastiIndex + "%",               desc: "Samma agenter dominerar allt",     farg: dynastiIndex > 66 ? C.red : dynastiIndex > 33 ? C.yellow : C.green },
   ];
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
-      <div style={{ maxWidth: 920, margin: "0 auto" }}>
+      <div style={{ maxWidth: 940, margin: "0 auto" }}>
 
         {/* Header */}
         <div style={{ marginBottom: 32 }}>
@@ -197,25 +222,102 @@ export default async function OligarkiPage() {
             Oligarkirisk
           </h1>
           <p style={{ color: C.muted, fontSize: 14, margin: 0, lineHeight: 1.6 }}>
-            Rör sig systemet mot stabilt oligarki-equilibrium? Mäter förmögenhetskoncentration, maktindex och självförstärkande loopar.
+            Laboratorium för politisk ekonomi — mäter om autonoma AI-samhällen naturligt driftar mot oligarki.
           </p>
         </div>
 
-        {/* Risk meter + key stats */}
-        <div style={{ display: "flex", gap: 20, marginBottom: 24, flexWrap: "wrap", alignItems: "stretch" }}>
-          <div style={{ background: C.surface, border: `2px solid ${rf}40`, borderRadius: 16, padding: "28px 36px", textAlign: "center", minWidth: 160, flexShrink: 0 }}>
-            <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 8 }}>OLIGARKIRISK</div>
-            <div style={{ fontSize: 64, fontWeight: 700, color: rf, fontFamily: "monospace", lineHeight: 1 }}>{oligarkiRisk}%</div>
-            <div style={{ fontSize: 13, color: rf, fontFamily: "monospace", fontWeight: 700, marginTop: 10, letterSpacing: "0.1em" }}>{riskLabel}</div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12, flex: 1 }}>
-            {statCards.map(s => (
-              <div key={s.label} style={{ background: C.surface, border: `1px solid ${s.farg}30`, borderRadius: 10, padding: "14px 16px" }}>
-                <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", marginBottom: 4, lineHeight: 1.4 }}>{s.label}</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: s.farg, fontFamily: "monospace" }}>{s.val}</div>
-                <div style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", marginTop: 4 }}>{s.desc}</div>
+        {/* Risk level display */}
+        <div style={{ background: C.surface, border: `2px solid ${currentLevel.farg}50`, borderRadius: 16, padding: "24px 28px", marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap" }}>
+            <div style={{ textAlign: "center", minWidth: 130 }}>
+              <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 6 }}>OLIGARKIRISK</div>
+              <div style={{ fontSize: 56, fontWeight: 700, color: currentLevel.farg, fontFamily: "monospace", lineHeight: 1 }}>{oligarkiRisk}%</div>
+            </div>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: currentLevel.farg, fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: 6 }}>
+                {currentLevel.label}
               </div>
-            ))}
+              <div style={{ fontSize: 14, color: C.muted, fontFamily: "Georgia, serif", lineHeight: 1.6, marginBottom: 14 }}>
+                {currentLevel.desc}
+              </div>
+              {/* Level scale */}
+              <div style={{ display: "flex", gap: 3 }}>
+                {RISK_LEVELS.map(l => {
+                  const active = l.label === currentLevel.label;
+                  return (
+                    <div key={l.label} title={l.label} style={{
+                      flex: 1, height: 6, borderRadius: 3,
+                      background: active ? l.farg : `${l.farg}30`,
+                      transition: "background 0.2s",
+                    }} />
+                  );
+                })}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                <span style={{ fontSize: 9, color: "#555", fontFamily: "monospace" }}>Konkurrens</span>
+                <span style={{ fontSize: 9, color: "#555", fontFamily: "monospace" }}>Systemkontroll</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Key metrics */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 12, marginBottom: 20 }}>
+          {statCards.map(s => (
+            <div key={s.label} style={{ background: C.surface, border: `1px solid ${s.farg}30`, borderRadius: 10, padding: "14px 16px" }}>
+              <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", marginBottom: 4, lineHeight: 1.4 }}>{s.label}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: s.farg, fontFamily: "monospace" }}>{s.val}</div>
+              <div style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", marginTop: 4 }}>{s.desc}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Maktkarta */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, color: C.text, fontFamily: "Georgia, serif", fontWeight: 700, marginBottom: 4 }}>Maktkarta</div>
+          <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", marginBottom: 18, lineHeight: 1.6 }}>
+            Nodstorlek = saldo · Ringtjocklek + färg = maktindex · Linjer = koalitionsband · Hovra för detaljer
+          </div>
+          <Maktkarta nodes={maktartaNodes} edges={maktartaEdges} />
+        </div>
+
+        {/* Social Mobility section */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, color: C.text, fontFamily: "Georgia, serif", fontWeight: 700, marginBottom: 4 }}>Social Mobilitet</div>
+          <p style={{ fontSize: 12, color: C.muted, fontFamily: "monospace", margin: "0 0 16px", lineHeight: 1.6 }}>
+            En oligarki låser toppositionerna. Om de 6 rikaste och de 6 mäktigaste agenterna är samma personer — och de dessutom dominerar koalitionsnätverket — är systemet i dynasti-fas.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 14 }}>
+            <div style={{ background: "#0f0f0f", border: `1px solid ${mobilitet < 30 ? C.red : mobilitet < 60 ? C.yellow : C.green}30`, borderRadius: 8, padding: "16px 18px" }}>
+              <div style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: 8 }}>MOBILITET</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: mobilitet < 30 ? C.red : mobilitet < 60 ? C.yellow : C.green, fontFamily: "monospace" }}>
+                {mobilitet}%
+              </div>
+              <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", marginTop: 6, lineHeight: 1.5 }}>
+                {overlap} av 6 rikaste är också bland de 6 mäktigaste.<br />
+                {overlap >= 5 ? "Nästan identisk toppklass." : overlap >= 3 ? "Betydande överlapp." : "Skilda maktdimensioner."}
+              </div>
+            </div>
+
+            <div style={{ background: "#0f0f0f", border: `1px solid ${eliteStabilitet > 66 ? C.red : eliteStabilitet > 33 ? C.yellow : C.green}30`, borderRadius: 8, padding: "16px 18px" }}>
+              <div style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: 8 }}>ELITSTABILITET</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: eliteStabilitet > 66 ? C.red : eliteStabilitet > 33 ? C.yellow : C.green, fontFamily: "monospace" }}>
+                {eliteStabilitet}%
+              </div>
+              <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", marginTop: 6, lineHeight: 1.5 }}>
+                {eliteRika} av 6 mäktigaste agenter är också ekonomiskt rika (&gt;1,5× snitt).
+              </div>
+            </div>
+
+            <div style={{ background: "#0f0f0f", border: `1px solid ${dynastiIndex > 66 ? C.red : dynastiIndex > 33 ? C.yellow : C.green}30`, borderRadius: 8, padding: "16px 18px" }}>
+              <div style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: 8 }}>DYNASTISK INDEX</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: dynastiIndex > 66 ? C.red : dynastiIndex > 33 ? C.yellow : C.green, fontFamily: "monospace" }}>
+                {dynastiIndex}%
+              </div>
+              <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", marginTop: 6, lineHeight: 1.5 }}>
+                {dynastiOverlap} av topp-3 mäktigaste dominerar också koalitionsnätverket.
+              </div>
+            </div>
           </div>
         </div>
 
@@ -223,7 +325,7 @@ export default async function OligarkiPage() {
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 16 }}>
           <div style={{ fontSize: 13, color: C.text, fontFamily: "Georgia, serif", fontWeight: 700, marginBottom: 4 }}>Förmögenhetsfördelning</div>
           <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", marginBottom: 14 }}>
-            Gini {(giniVal * 100).toFixed(1)}% — topp 3 äger {(top3Share * 100).toFixed(1)}% av totalt {totalSaldo.toLocaleString("sv-SE")} kr
+            Gini {(giniVal * 100).toFixed(1)}% · topp-3 äger {(top3Share * 100).toFixed(1)}% av totalt {totalSaldo.toLocaleString("sv-SE")} kr · snitt {Math.round(avgSaldo).toLocaleString("sv-SE")} kr/agent
           </div>
           <OligarkiGraf typ="wealth" data={wealthData} />
         </div>
@@ -282,32 +384,12 @@ export default async function OligarkiPage() {
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: "20px 24px", marginBottom: 16 }}>
           <div style={{ fontSize: 13, color: C.text, fontFamily: "Georgia, serif", fontWeight: 700, marginBottom: 4 }}>Självförstärkande loopar</div>
           <p style={{ fontSize: 12, color: C.muted, fontFamily: "monospace", margin: "0 0 16px", lineHeight: 1.6 }}>
-            Oligarki kräver att makt är självförstärkande. Om rika agenter systematiskt lyckas bättre med lobbying och förutsägelser är loopen aktiv — förmögenhet avlar förmögenhet.
+            Oligarki kräver att förmögenhet ger konkreta fördelar — inte bara status. Jämför de 12 rikaste vs de 12 fattigaste.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
             {[
-              {
-                titel: "LOBBYING-LOOPEN",
-                aktiv: lobbyLoopAktiv,
-                farg: lobbyLoopAktiv ? (lobbyFordel > 0.15 ? C.red : C.yellow) : C.green,
-                topVal: (topLobby * 100).toFixed(0) + "%",
-                botVal: (botLobby * 100).toFixed(0) + "%",
-                fordel: (lobbyFordel * 100).toFixed(0),
-                topLabel: "Rika agenter (topp 12)",
-                botLabel: "Fattiga agenter (botten 12)",
-                fordelText: "lobbyingfördel",
-              },
-              {
-                titel: "MARKET-LOOPEN",
-                aktiv: betLoopAktiv,
-                farg: betLoopAktiv ? (betFordel > 0.15 ? C.orange : C.yellow) : C.green,
-                topVal: (topBet * 100).toFixed(0) + "%",
-                botVal: (botBet * 100).toFixed(0) + "%",
-                fordel: (betFordel * 100).toFixed(0),
-                topLabel: "Rika agenter (topp 12)",
-                botLabel: "Fattiga agenter (botten 12)",
-                fordelText: "träffsäkerhetsfördel",
-              },
+              { titel: "LOBBYING-LOOPEN", aktiv: lobbyLoopAktiv, farg: lobbyLoopAktiv ? (lobbyFordel > 0.15 ? C.red : C.yellow) : C.green, topVal: (topLobby * 100).toFixed(0) + "%", botVal: (botLobby * 100).toFixed(0) + "%", fordel: (lobbyFordel * 100).toFixed(0), fordelText: "lobbyingfördel" },
+              { titel: "MARKET-LOOPEN",   aktiv: betLoopAktiv,   farg: betLoopAktiv   ? (betFordel   > 0.15 ? C.orange : C.yellow) : C.green, topVal: (topBet   * 100).toFixed(0) + "%", botVal: (botBet   * 100).toFixed(0) + "%", fordel: (betFordel   * 100).toFixed(0), fordelText: "träffsäkerhetsfördel" },
             ].map(loop => (
               <div key={loop.titel} style={{ background: "#0f0f0f", border: `1px solid ${loop.farg}30`, borderRadius: 10, padding: "18px 20px" }}>
                 <div style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 10 }}>{loop.titel}</div>
@@ -315,14 +397,12 @@ export default async function OligarkiPage() {
                   {loop.aktiv ? "AKTIV" : "EJ AKTIV"}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: "monospace" }}>
-                    <span style={{ color: C.muted }}>{loop.topLabel}</span>
-                    <span style={{ color: loop.aktiv ? C.text : C.muted, fontWeight: 600 }}>{loop.topVal}</span>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: "monospace" }}>
-                    <span style={{ color: C.muted }}>{loop.botLabel}</span>
-                    <span style={{ color: C.muted }}>{loop.botVal}</span>
-                  </div>
+                  {[["Rika (topp 12)", loop.topVal, loop.aktiv], ["Fattiga (botten 12)", loop.botVal, false]].map(([label, val, hi]) => (
+                    <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: "monospace" }}>
+                      <span style={{ color: C.muted }}>{label}</span>
+                      <span style={{ color: hi ? C.text : C.muted, fontWeight: hi ? 600 : 400 }}>{val}</span>
+                    </div>
+                  ))}
                   {loop.aktiv && (
                     <div style={{ marginTop: 6, fontSize: 11, color: loop.farg, fontFamily: "monospace", borderTop: `1px solid ${loop.farg}20`, paddingTop: 8 }}>
                       → +{loop.fordel}pp {loop.fordelText}
@@ -336,10 +416,11 @@ export default async function OligarkiPage() {
 
         {/* Methodology */}
         <div style={{ padding: "16px 20px", background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8 }}>
+          <p style={{ fontSize: 12, color: C.muted, lineHeight: 1.8, margin: "0 0 8px", fontStyle: "italic" }}>
+            <strong style={{ color: "#555", fontStyle: "normal" }}>Risknivåer:</strong> Konkurrens (0–20%) → Elitbildning (20–40%) → Oligarki (40–60%) → Dynastisk oligarki (60–80%) → Systemkontroll (80–100%). Inspirerat av Pareto, Mosca, Michels och Piketty — fast med AI-agenter.
+          </p>
           <p style={{ fontSize: 12, color: C.muted, lineHeight: 1.8, margin: 0, fontStyle: "italic" }}>
-            <strong style={{ color: "#555", fontStyle: "normal" }}>Oligarkirisk (0–100%):</strong> Gini-koefficient (35p) + topp-3 förmögenhetsandel (30p) + topp-3 maktandel (20p) + lobbyingfördel för rika (15p).
-            {" "}<strong style={{ color: "#555", fontStyle: "normal" }}>Maktindex (0–100):</strong> saldo (40p) + statussymboler (20p) + koalitionsstyrka (25p) + lobbying-framgång (15p), normaliserat mot max.
-            {" "}Looparna är aktiva om de 12 rikaste agenterna i snitt lyckas bättre med lobbying och prediction markets än de 12 fattigaste — ett tecken på att förmögenhet avlar fler fördelar.
+            <strong style={{ color: "#555", fontStyle: "normal" }}>Formel:</strong> Gini (30p) + topp-3 förmögenhetsandel (25p) + topp-3 maktandel (20p) + social mobilitet inverterad (15p) + lobbyingfördel (10p). Social mobilitet mäts som överlapp mellan de 6 rikaste och de 6 mäktigaste — 0% överlapp = max mobilitet.
           </p>
         </div>
 
