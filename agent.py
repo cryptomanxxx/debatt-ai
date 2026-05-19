@@ -69,7 +69,11 @@ def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> 
         return cloudflare_post(system[:600], prompt, max_tokens=max_tokens).strip()
     except Exception:
         pass
-    return gemini_post(system[:600], prompt, max_tokens=max_tokens).strip()
+    try:
+        return (gemini_post(system[:600], prompt, max_tokens=max_tokens) or "").strip()
+    except Exception:
+        pass
+    return ""
 
 
 def hamta_drama_kontext(sb_key, agent_a, agent_b):
