@@ -1803,9 +1803,8 @@ function AiStatistikTab() {
       else byProv[p].error++;
     }
     providerStats = [...AI_PROVIDER_ORDER, ...Object.keys(byProv).filter(p => !AI_PROVIDER_ORDER.includes(p) && p !== "none")]
-      .filter(p => byProv[p])
       .map(p => {
-        const d = byProv[p];
+        const d = byProv[p] || { ok: 0, rate_limited: 0, timeout: 0, error: 0, latencies: [] };
         const total = d.ok + d.rate_limited + d.timeout + d.error;
         const successPct = total > 0 ? Math.round((d.ok / total) * 100) : 0;
         const avgMs = d.latencies.length > 0 ? Math.round(d.latencies.reduce((a, b) => a + b, 0) / d.latencies.length) : null;
