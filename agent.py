@@ -53,6 +53,7 @@ from supabase_utils import (
     stang_auktioner, lista_symbol_for_forsaljning, buda_pa_auktion,
     hamta_agent_buffs, spara_dagboksinlagg,
     hamta_agent_status,
+    ta_oligarki_snapshot,
 )
 
 def hamta_drama_kontext(sb_key, agent_a, agent_b):
@@ -926,6 +927,12 @@ def main():
                             "rubrik": malartikel.get("rubrik", "")[:80],
                             "text": kommentar[:120],
                         }, "ok")
+
+    if sb_key:
+        try:
+            ta_oligarki_snapshot(sb_key)
+        except Exception as e:
+            print(f"  ✗ Oligarki-snapshot: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":

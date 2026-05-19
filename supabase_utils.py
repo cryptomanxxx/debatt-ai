@@ -2972,3 +2972,147 @@ def format_status_for_prompt(status: dict) -> str:
         "\n".join(f"- {d}" for d in delar) +
         "\nLåt denna status subtilt påverka din ton. En förmögen agent med hög träffsäkerhet skriver med naturlig auktoritet. En utarmad agent som förlorat sina förutsägelser kan vara mer defensiv, aggressiv eller identitetsskyddande. Visa det i argumentationen — inte explicit."
     )
+
+
+# ── Oligarki-snapshot ────────────────────────────────────────────
+
+def ta_oligarki_snapshot(sb_key: str) -> None:
+    """Sparar dagens oligarki-mätvärden till oligarki_historik (upsert per datum)."""
+    if not sb_key:
+        return
+    from datetime import date
+
+    hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+
+    def get(path):
+        r = httpx.get(f"{SB_URL}/rest/v1/{path}", headers=hdrs, timeout=15)
+        return r.json() if r.is_success else []
+
+    planbocker  = get("agent_planbocker?select=agent,saldo&order=saldo.desc")
+    symboler    = get("agent_symboler?select=agent")
+    koalitioner = get("agent_koalitioner?select=agent_a,agent_b,styrka")
+    lobbying    = get("lobbying_log?select=lobbying_agent,resultat")
+    bets        = get("agent_bets?select=agent,vinst&avgjord=eq.true")
+
+    if not planbocker:
+        return
+
+    sym_count = {}
+    for s in symboler:
+        sym_count[s["agent"]] = sym_count.get(s["agent"], 0) + 1
+
+    koal_str = {}
+    for k in koalitioner:
+        for a in [k["agent_a"], k["agent_b"]]:
+            koal_str[a] = koal_str.get(a, 0) + k["styrka"]
+
+    lobby_map = {}
+    for l in lobbying:
+        ag = l["lobbying_agent"]
+        if ag not in lobby_map:
+            lobby_map[ag] = {"ok": 0, "tot": 0}
+        lobby_map[ag]["tot"] += 1
+        if l["resultat"] == "accepterat":
+            lobby_map[ag]["ok"] += 1
+
+    bet_map = {}
+    for b in bets:
+        ag = b["agent"]
+        if ag not in bet_map:
+            bet_map[ag] = {"wins": 0, "tot": 0}
+        bet_map[ag]["tot"] += 1
+        if (b.get("vinst") or 0) > 0:
+            bet_map[ag]["wins"] += 1
+
+    saldon = [max(0, p["saldo"]) for p in planbocker]
+    total_saldo = sum(saldon)
+
+    if total_saldo > 0:
+        sv = sorted(saldon)
+        n = len(sv)
+        g = sum((2 * (i + 1) - n - 1) * v for i, v in enumerate(sv))
+        gini_val = max(0.0, min(1.0, g / (n * total_saldo)))
+    else:
+        gini_val = 0.0
+
+    max_s  = max(saldon) if saldon else 1
+    max_sy = max(sym_count.values()) if sym_count else 1
+    max_k  = max(koal_str.values()) if koal_str else 1
+
+    agenter = []
+    for p in planbocker:
+        saldo = max(0, p["saldo"])
+        lb    = lobby_map.get(p["agent"])
+        lr    = lb["ok"] / lb["tot"] if lb and lb["tot"] > 0 else 0
+        makt  = round(
+            (saldo / max_s)                          * 40 +
+            (sym_count.get(p["agent"], 0) / max_sy)  * 20 +
+            (koal_str.get(p["agent"], 0) / max_k)    * 25 +
+            lr                                        * 15
+        )
+        agenter.append({
+            "agent": p["agent"], "saldo": saldo, "makt": makt,
+            "koal_str": koal_str.get(p["agent"], 0),
+            "lobby_rate": lr, "lobby_tot": lb["tot"] if lb else 0,
+        })
+
+    agenter.sort(key=lambda a: -a["makt"])
+    by_saldo = sorted(agenter, key=lambda a: -a["saldo"])
+
+    top3_andel = round(sum(a["saldo"] for a in by_saldo[:3]) / total_saldo, 4) if total_saldo > 0 else 0
+
+    top6_s = {a["agent"] for a in by_saldo[:6]}
+    top6_m = {a["agent"] for a in agenter[:6]}
+    mobilitet = round((1 - len(top6_s & top6_m) / 6) * 100)
+
+    by_koal = sorted(agenter, key=lambda a: -a["koal_str"])
+    top3_m  = {a["agent"] for a in agenter[:3]}
+    top3_k  = {a["agent"] for a in by_koal[:3]}
+    dynasti = round(len(top3_m & top3_k) / 3 * 100)
+
+    half   = len(by_saldo) // 2
+    tl     = [a for a in by_saldo[:half] if a["lobby_tot"] > 0]
+    bl     = [a for a in by_saldo[half:] if a["lobby_tot"] > 0]
+    top_lr = sum(a["lobby_rate"] for a in tl) / len(tl) if tl else 0
+    bot_lr = sum(a["lobby_rate"] for a in bl) / len(bl) if bl else 0
+    lobby_loop   = top_lr > bot_lr
+    lobby_fordel = top_lr - bot_lr
+
+    def br(ag):
+        bm = bet_map.get(ag["agent"], {})
+        return bm.get("wins", 0) / bm["tot"] if bm.get("tot", 0) > 0 else 0
+
+    tb = [a for a in by_saldo[:half] if bet_map.get(a["agent"], {}).get("tot", 0) > 0]
+    bb = [a for a in by_saldo[half:] if bet_map.get(a["agent"], {}).get("tot", 0) > 0]
+    bet_loop = (sum(br(a) for a in tb) / len(tb) if tb else 0) > (sum(br(a) for a in bb) / len(bb) if bb else 0)
+
+    total_makt   = sum(a["makt"] for a in agenter) or 1
+    top3_makt_sh = sum(a["makt"] for a in agenter[:3]) / total_makt
+
+    risk = min(100, round(
+        gini_val        * 30 +
+        top3_andel      * 25 +
+        top3_makt_sh    * 20 +
+        (1 - mobilitet / 100) * 15 +
+        (min(lobby_fordel, 1) * 10 if lobby_loop else 0)
+    ))
+
+    httpx.post(
+        f"{SB_URL}/rest/v1/oligarki_historik",
+        headers={**hdrs, "Content-Type": "application/json",
+                 "Prefer": "resolution=merge-duplicates,return=minimal"},
+        params={"on_conflict": "datum"},
+        json={
+            "datum":         str(date.today()),
+            "gini":          round(gini_val, 4),
+            "oligarki_risk": risk,
+            "top3_andel":    top3_andel,
+            "mobilitet":     mobilitet,
+            "dynasti_index": dynasti,
+            "lobby_loop":    lobby_loop,
+            "bet_loop":      bet_loop,
+            "topp_agent":    agenter[0]["agent"] if agenter else None,
+        },
+        timeout=10,
+    )
+    print(f"  ✓ Oligarki-snapshot: risk={risk}%, gini={gini_val:.1%}, mobilitet={mobilitet}%")
