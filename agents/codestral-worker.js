@@ -19,8 +19,8 @@ const SUPABASE_KEY     = process.env.SUPABASE_ANON_KEY;
 const SUGGESTIONS_DIR  = path.join(__dirname, "../ai-bus/suggestions");
 const REPORTS_DIR      = path.join(__dirname, "../ai-bus/reports");
 const DAYS_BACK        = parseInt(process.env.DAYS_BACK || "7", 10);
-const MAX_FILES        = parseInt(process.env.MAX_FILES || "25", 10);
-const MAX_CHARS_TOTAL  = 12000;
+const MAX_FILES        = parseInt(process.env.MAX_FILES || "50", 10);
+const MAX_CHARS_TOTAL  = 40000;
 
 // Filer som alltid granskas oavsett ålder (kritisk infrastruktur)
 const ALWAYS_WATCH = [
