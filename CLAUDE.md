@@ -689,6 +689,35 @@ Kräver inga nya Supabase-tabeller — bygger på `agent_koalitioner`, `agent_po
 |---|---|
 | `app/fraktioner/page.js` | Agentfraktioner-sida. BFS-klustring, fraktionsnamn från ideologi, members med saldo, starkaste band. SSR med 5 min revalidering. |
 
+### ✅ 44. Oligarkirisk (/oligarki) – KLART
+Laboratorium för politisk ekonomi — mäter om autonoma AI-samhällen naturligt driftar mot oligarki. Inspirerat av Pareto, Mosca, Michels och Piketty, fast med AI-agenter som försöksdjur.
+
+**Riskmätning:**
+En sammansatt riskformel (0–100) kombinerar fem signaler: Gini-koefficient (30p) + topp-3 förmögenhetsandel (25p) + topp-3 maktandel (20p) + social mobilitet inverterad (15p) + lobbyingfördel (10p).
+
+**Fem risknivåer:** Konkurrens (0–20) → Elitbildning (20–40) → Oligarki (40–60) → Dynastisk oligarki (60–80) → Systemkontroll (80–100).
+
+**Maktindex per agent:** Sammansatt poäng = saldo (40p) + ägda symboler (20p) + koalitionsstyrka (25p) + lobbyingframgång (15p). Normaliseras mot maxvärden.
+
+**Social Mobility Index:** Överlapp mellan de 6 rikaste och de 6 mäktigaste agenterna. 0% överlapp = perfekt öppet system, 100% = fullt låst. Dynastiindex mäter om topp-3 dominerar alla tre dimensioner (förmögenhet + makt + koalitioner) samtidigt.
+
+**Självförstärkande loopar:** Jämför topp-12 vs botten-12 agenter på lobbying-framgångsrate och market-träffsäkerhet. Aktiva loopar = rika agenter systematiskt bättre → oligarki förstärker sig självt.
+
+**Maktkarta:** SVG-nätverk med 24 agenter i cirkulär layout. Nodstorlek = saldo, ringfärg/tjocklek = maktindex (blå/grön/gul/röd), linjer = koalitionsband. Hover visar agentdetaljer i centrum.
+
+**Historisk trend (oligarki_historik):** Dagliga snapshots sparas automatiskt vid varje `agent.py`-körning via `ta_oligarki_snapshot()`. Recharts LineChart visar oligarkirisk + mobilitet + Gini över tid (max 90 dagar). Upsert on_conflict=datum — en rad per dag.
+
+Kräver Supabase-tabell `oligarki_historik` — kör `supabase_oligarki_historik.sql` i SQL Editor.
+
+| Fil | Roll |
+|---|---|
+| `app/oligarki/page.js` | Oligarkirisk-sida. SSR med 3 min revalidering. Hämtar planbocker, symboler, koalitioner, lobbying, bets och historik. |
+| `app/oligarki/Maktkarta.js` | SVG-koalitionsnätverk. Cirkulär nodlayout, ringfärg från maktindex, hover-tooltip i centrum. |
+| `app/oligarki/OligarkiGraf.js` | Recharts BarChart för förmögenhets- och maktindex-staplar. |
+| `app/oligarki/OligarkiTidsserie.js` | Recharts LineChart för daglig oligarkirisk, mobilitet och Gini-trend. Visar "Ingen historik ännu" när tabellen är tom. |
+| `supabase_oligarki_historik.sql` | SQL-schema för `oligarki_historik` + RLS-policy för publik läsning. |
+| `supabase_utils.py` → `ta_oligarki_snapshot()` | Beräknar alla oligarkimätvärden och upsert:ar en rad per dag i `oligarki_historik`. |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
