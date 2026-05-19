@@ -1352,7 +1352,7 @@ function MatningTab() {
   );
 }
 
-const AI_COLORS = { groq: "#4a9eff", gemini: "#4ade80", openrouter: "#f8954d", cerebras: "#a78bfa", sambanova: "#fb923c", github_models: "#e2c08d", none: "#f87171" };
+const AI_COLORS = { groq: "#4a9eff", gemini: "#4ade80", openrouter: "#f8954d", cerebras: "#a78bfa", sambanova: "#fb923c", github_models: "#e2c08d", codestral: "#f472b6", none: "#f87171" };
 const GROQ_DAILY_LIMIT = 100_000;
 
 // ── VeckorapporterTab ─────────────────────────────────────────────────────────
@@ -1702,42 +1702,55 @@ function LabbTab() {
   );
 }
 
+const PERIOD_OPTIONS = [
+  { label: "1 dag",    days: 1,  limit: 2000  },
+  { label: "3 dagar",  days: 3,  limit: 5000  },
+  { label: "1 vecka",  days: 7,  limit: 10000 },
+  { label: "2 veckor", days: 14, limit: 20000 },
+  { label: "4 veckor", days: 28, limit: 40000 },
+];
+const AI_PROVIDER_ORDER = ["groq", "codestral", "cerebras", "sambanova", "gemini", "openrouter", "github_models"];
+const AI_PROVIDER_LABELS = { groq: "Groq", codestral: "Codestral", cerebras: "Cerebras", sambanova: "Sambanova", gemini: "Gemini", openrouter: "OpenRouter", github_models: "GitHub Models" };
+const SOURCE_LABELS_MAP = { "kanal": "Kanal (expand)", "kanal-batch": "Kanal (batch sv)", "kanal-batch-en": "Kanal (batch en)", "chatt": "Direktdebatt", "chatt-summering": "Debatt summering", "agent-fraga": "Fråga agenten", "agent-utmaning": "Utmaning", "labb": "Labb", "beslut": "Decision API" };
+const SOURCE_COLORS_MAP = { "kanal": "#60a5fa", "kanal-batch": "#38bdf8", "kanal-batch-en": "#93c5fd", "chatt": "#a78bfa", "chatt-summering": "#c4b5fd", "agent-fraga": "#fb923c", "agent-utmaning": "#34d399", "labb": "#e879f9", "beslut": "#f59e0b" };
+
 function AiStatistikTab() {
-  const [rows, setRows]         = useState(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState("");
-  const [liveRows, setLiveRows] = useState([]);
-  const [liveOk, setLiveOk]     = useState(false);
-  const [newIds, setNewIds]     = useState(new Set());
-  const latestTsRef             = useRef(null);
-  const pollingRef              = useRef(false);
-  const scrollRef               = useRef(null);
+  const [period, setPeriod]      = useState(7);
+  const [rows, setRows]          = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [error, setError]        = useState("");
+  const [liveRows, setLiveRows]  = useState([]);
+  const [liveOk, setLiveOk]      = useState(false);
+  const [newIds, setNewIds]      = useState(new Set());
+  const latestTsRef              = useRef(null);
+  const pollingRef               = useRef(false);
+  const scrollRef                = useRef(null);
+  const liveInitRef              = useRef(false);
 
-  // Initial 7-day data load
+  // Reload stats data when period changes
   useEffect(() => {
-    async function load() {
-      try {
-        const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const res = await fetch(
-          `${SB_URL}/rest/v1/ai_log?select=*&ts=gte.${since}&order=ts.desc&limit=2000`,
-          { headers: sbHeaders() }
-        );
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
+    setStatsLoading(true);
+    setRows(null);
+    setError("");
+    const opt = PERIOD_OPTIONS.find(p => p.days === period) ?? PERIOD_OPTIONS[2];
+    const since = new Date(Date.now() - period * 24 * 60 * 60 * 1000).toISOString();
+    fetch(`${SB_URL}/rest/v1/ai_log?select=*&ts=gte.${since}&order=ts.desc&limit=${opt.limit}`, { headers: sbHeaders() })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => {
         setRows(data);
-        setLiveRows(data.slice(0, 200));
-        if (data.length > 0) latestTsRef.current = data[0].ts;
-      } catch (e) { setError(e.message); }
-      setLoading(false);
-    }
-    load();
-  }, []);
+        if (!liveInitRef.current && data.length > 0) {
+          liveInitRef.current = true;
+          latestTsRef.current = data[0].ts;
+          setLiveRows(data.slice(0, 200));
+        }
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setStatsLoading(false));
+  }, [period]);
 
-  // Live polling — starts after initial load, every 3 s
+  // Live polling — runs continuously regardless of period
   useEffect(() => {
-    if (loading) return;
     pollingRef.current = true;
-
     async function poll() {
       if (!pollingRef.current) return;
       try {
@@ -1751,7 +1764,9 @@ function AiStatistikTab() {
         if (res.ok) {
           const fresh = await res.json();
           if (fresh.length > 0) {
+            liveInitRef.current = true;
             setLiveRows(prev => [...fresh, ...prev].slice(0, 300));
+            setRows(prev => prev ? [...fresh, ...prev] : fresh);
             latestTsRef.current = fresh[0].ts;
             const ids = new Set(fresh.map(r => r.id));
             setNewIds(ids);
@@ -1763,130 +1778,129 @@ function AiStatistikTab() {
       } catch {}
       if (pollingRef.current) setTimeout(poll, 3000);
     }
-
-    const t = setTimeout(poll, 3000);
+    const t = setTimeout(poll, 4000);
     return () => { pollingRef.current = false; clearTimeout(t); setLiveOk(false); };
-  }, [loading]);
+  }, []);
 
-  if (loading) return <p style={{ color: C.textMuted }}>Laddar AI-statistik…</p>;
-  if (error)   return <p style={{ color: C.red }}>Fel: {error}</p>;
-  if (!rows || rows.length === 0) return (
-    <div>
-      <p style={{ color: C.textMuted, fontSize: "14px", marginBottom: "16px" }}>
-        Ingen loggdata ännu. Kör SQL-schemat <code style={{ color: C.accent }}>supabase_ai_log.sql</code> i Supabase SQL Editor för att skapa tabellen.
-      </p>
-    </div>
-  );
+  const isRateLimit = s => s === "rate_limited" || (typeof s === "string" && s.includes("429"));
+  const periodLabel = PERIOD_OPTIONS.find(p => p.days === period)?.label ?? `${period} dagar`;
 
-  // ── Aggregate by date × provider ────────────────────────────────────────
-  const byDay = {};
-  for (const r of rows) {
-    const day = r.ts.slice(0, 10);
-    if (!byDay[day]) byDay[day] = { day, groq: 0, gemini: 0, cerebras: 0, sambanova: 0, openrouter: 0, github_models: 0, none: 0, errors: 0 };
-    byDay[day][r.provider] = (byDay[day][r.provider] || 0) + 1;
-    if (r.status !== "ok") byDay[day].errors++;
+  // ── Aggregations ────────────────────────────────────────────────────────
+  let providerStats = [], chartData = [], byHour = null, sourceChartData = [];
+  let totalOk = 0, totalAll = 0, groqKanalTokens = 0;
+
+  if (rows && rows.length > 0) {
+    // Per-provider breakdown
+    const byProv = {};
+    for (const r of rows) {
+      const p = r.provider || "none";
+      if (!byProv[p]) byProv[p] = { ok: 0, rate_limited: 0, timeout: 0, error: 0, latencies: [] };
+      if (r.status === "ok") { byProv[p].ok++; if (r.latency_ms) byProv[p].latencies.push(r.latency_ms); }
+      else if (isRateLimit(r.status)) byProv[p].rate_limited++;
+      else if (r.status === "timeout") byProv[p].timeout++;
+      else byProv[p].error++;
+    }
+    providerStats = [...AI_PROVIDER_ORDER, ...Object.keys(byProv).filter(p => !AI_PROVIDER_ORDER.includes(p) && p !== "none")]
+      .filter(p => byProv[p])
+      .map(p => {
+        const d = byProv[p];
+        const total = d.ok + d.rate_limited + d.timeout + d.error;
+        const successPct = total > 0 ? Math.round((d.ok / total) * 100) : 0;
+        const avgMs = d.latencies.length > 0 ? Math.round(d.latencies.reduce((a, b) => a + b, 0) / d.latencies.length) : null;
+        return { provider: p, label: AI_PROVIDER_LABELS[p] || p, total, ok: d.ok, rate_limited: d.rate_limited, timeout: d.timeout, error: d.error, successPct, avgMs };
+      })
+      .sort((a, b) => b.total - a.total);
+
+    totalOk  = rows.filter(r => r.status === "ok").length;
+    totalAll = rows.length;
+
+    // Daily chart
+    const byDay = {};
+    for (const r of rows) {
+      const day = r.ts.slice(0, 10);
+      if (!byDay[day]) byDay[day] = { day, groq: 0, codestral: 0, cerebras: 0, sambanova: 0, gemini: 0, openrouter: 0, github_models: 0, none: 0 };
+      const p = r.provider || "none";
+      byDay[day][p] = (byDay[day][p] || 0) + 1;
+    }
+    chartData = Object.values(byDay).sort((a, b) => a.day.localeCompare(b.day));
+
+    // Hourly heatmap
+    byHour = Array.from({ length: 24 }, (_, h) => ({ hour: `${String(h).padStart(2, "0")}:00`, ok: 0, error: 0 }));
+    for (const r of rows) {
+      const h = new Date(r.ts).getHours();
+      if (r.status === "ok") byHour[h].ok++;
+      else byHour[h].error++;
+    }
+
+    // Per-source
+    const bySrc = {};
+    for (const r of rows) {
+      const k = r.source || "okänd";
+      if (!bySrc[k]) bySrc[k] = { source: SOURCE_LABELS_MAP[k] || k, ok: 0, error: 0, total: 0 };
+      bySrc[k].total++;
+      if (r.status === "ok") bySrc[k].ok++;
+      else bySrc[k].error++;
+    }
+    sourceChartData = Object.entries(bySrc)
+      .map(([k, v]) => ({ ...v, _key: k, color: SOURCE_COLORS_MAP[k] || "#888" }))
+      .sort((a, b) => b.total - a.total);
+
+    // Token usage (today, kanal source only)
+    const todayStr = new Date().toISOString().slice(0, 10);
+    groqKanalTokens = rows
+      .filter(r => r.ts.slice(0, 10) === todayStr && r.provider === "groq" && r.source === "kanal" && r.status === "ok")
+      .reduce((s, r) => s + (r.input_tokens || 0) + (r.output_tokens || 0), 0);
   }
-  const chartData = Object.values(byDay).sort((a, b) => a.day.localeCompare(b.day));
 
-  // ── Today's token usage (kanal source, which has token counts) ──────────
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const todayRows = rows.filter(r => r.ts.slice(0, 10) === todayStr);
-
-  const groqKanalTokens = todayRows
-    .filter(r => r.provider === "groq" && r.source === "kanal" && r.status === "ok")
-    .reduce((s, r) => s + (r.input_tokens || 0) + (r.output_tokens || 0), 0);
-
-  const groqChattCalls = todayRows.filter(r => r.provider === "groq" && r.source === "chatt" && r.status === "ok").length;
-  const geminiCallsToday = todayRows.filter(r => r.provider === "gemini" && r.status === "ok").length;
-  const orCallsToday = todayRows.filter(r => r.provider === "openrouter" && r.status === "ok").length;
-  const cerebrasCallsToday = todayRows.filter(r => r.provider === "cerebras" && r.status === "ok").length;
-  const sambanovaCallsToday = todayRows.filter(r => r.provider === "sambanova" && r.status === "ok").length;
-  const githubCallsToday    = todayRows.filter(r => r.provider === "github_models" && r.status === "ok").length;
-  const errorsToday = todayRows.filter(r => r.status !== "ok").length;
-
-  // ── Summary totals (7 days) ──────────────────────────────────────────────
-  const totals = rows.reduce((acc, r) => {
-    acc[r.provider] = (acc[r.provider] || 0) + 1;
-    return acc;
-  }, {});
-
-  const totalOk    = rows.filter(r => r.status === "ok").length;
-  const totalError = rows.filter(r => r.status !== "ok").length;
-
-  // ── Per-source breakdown ─────────────────────────────────────────────────
-  const SOURCE_LABELS = { "kanal": "Kanal (expand)", "kanal-batch": "Kanal (batch sv)", "kanal-batch-en": "Kanal (batch en)", "chatt": "Direktdebatt", "chatt-summering": "Debatt summering", "agent-fraga": "Fråga agenten", "beslut": "Decision API" };
-  const SOURCE_COLORS_MAP = { "kanal": "#60a5fa", "kanal-batch": "#38bdf8", "kanal-batch-en": "#93c5fd", "chatt": "#a78bfa", "chatt-summering": "#c4b5fd", "agent-fraga": "#fb923c", "beslut": "#f59e0b" };
-  const ALL_PROVIDER_COLORS = { ...AI_COLORS };
-  const bySource = {};
-  for (const r of rows) {
-    const key = r.source || "okänd";
-    if (!bySource[key]) bySource[key] = { source: SOURCE_LABELS[key] || key, ok: 0, error: 0, total: 0 };
-    bySource[key].total++;
-    if (r.status === "ok") bySource[key].ok++;
-    else bySource[key].error++;
-  }
-  const sourceChartData = Object.entries(bySource)
-    .map(([k, v]) => ({ ...v, _key: k, color: SOURCE_COLORS_MAP[k] || "#888" }))
-    .sort((a, b) => b.total - a.total);
-
-  // ── Per-hour call distribution (7 days) ─────────────────────────────────
-  const byHour = Array.from({ length: 24 }, (_, h) => ({ hour: `${String(h).padStart(2, "0")}:00`, ok: 0, error: 0 }));
-  for (const r of rows) {
-    const h = new Date(r.ts).getHours();
-    if (r.status === "ok") byHour[h].ok++;
-    else byHour[h].error++;
-  }
-
-  const statCard = (label, value, sub, color = C.accent) => (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px 24px", minWidth: "140px" }}>
-      <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{label}</p>
-      <p style={{ fontSize: "28px", fontWeight: 400, color, margin: "0 0 2px", fontFamily: "monospace" }}>{value}</p>
-      {sub && <p style={{ fontSize: "11px", color: C.textMuted, margin: 0 }}>{sub}</p>}
-    </div>
-  );
-
-  const tokenPct = Math.min(100, Math.round((groqKanalTokens / GROQ_DAILY_LIMIT) * 100));
+  const tokenPct   = Math.min(100, Math.round((groqKanalTokens / GROQ_DAILY_LIMIT) * 100));
   const tokenColor = tokenPct >= 80 ? C.red : tokenPct >= 50 ? C.yellow : C.green;
+
+  if (error) return <p style={{ color: C.red }}>Fel: {error}</p>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
 
-      {/* ── Live call log ── */}
+      {/* ── Period selector ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", marginRight: "4px", letterSpacing: "0.08em" }}>PERIOD:</span>
+        {PERIOD_OPTIONS.map(p => (
+          <button key={p.days} onClick={() => setPeriod(p.days)} style={{
+            background: period === p.days ? C.accent : C.surface,
+            color: period === p.days ? "#0a0a0a" : C.textMuted,
+            border: `1px solid ${period === p.days ? C.accent : C.border}`,
+            borderRadius: "4px", padding: "6px 16px", cursor: "pointer",
+            fontSize: "12px", fontFamily: "monospace", transition: "all 0.15s",
+          }}>{p.label}</button>
+        ))}
+        {statsLoading && <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>laddar…</span>}
+      </div>
+
+      {/* ── Live log ── */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
           <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, fontFamily: "monospace" }}>Live AI-logg</p>
           <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-            <div style={{
-              width: "7px", height: "7px", borderRadius: "50%",
-              background: liveOk ? C.green : C.red,
-              boxShadow: liveOk ? `0 0 6px ${C.green}` : "none",
-            }} />
+            <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: liveOk ? C.green : C.red, boxShadow: liveOk ? `0 0 6px ${C.green}` : "none" }} />
             <span style={{ fontSize: "10px", color: liveOk ? C.green : C.textMuted, fontFamily: "monospace", letterSpacing: "0.05em" }}>
               {liveOk ? "LIVE · uppdateras var 3s" : "väntar…"}
             </span>
           </div>
         </div>
-        <div ref={scrollRef} style={{
-          height: "340px", overflowY: "auto", fontFamily: "monospace", fontSize: "11px",
-          background: "#050505", borderRadius: "4px", padding: "10px 14px",
-        }}>
+        <div ref={scrollRef} style={{ height: "300px", overflowY: "auto", fontFamily: "monospace", fontSize: "11px", background: "#050505", borderRadius: "4px", padding: "10px 14px" }}>
           {liveRows.length === 0
             ? <span style={{ color: C.textMuted }}>Inga anrop ännu…</span>
             : liveRows.map((r, i) => {
-                const d = new Date(r.ts);
-                const ts = d.toLocaleTimeString("sv-SE");
-                const provColor = ALL_PROVIDER_COLORS[r.provider] ?? C.text;
+                const ts = new Date(r.ts).toLocaleTimeString("sv-SE");
+                const provColor = AI_COLORS[r.provider] ?? C.text;
                 const srcColor  = SOURCE_COLORS_MAP[r.source] ?? "#888";
                 const isNew = newIds.has(r.id);
-                const num = liveRows.length - i;
                 return (
-                  <div key={r.id ?? i} style={{ display: "flex", gap: "8px", padding: "4px 0", borderBottom: "1px solid #111", borderLeft: isNew ? `3px solid ${C.green}` : "3px solid transparent", paddingLeft: "6px", background: isNew ? "#061a06" : "transparent", transition: "background 2s, border-left-color 2s" }}>
-                    <span style={{ color: "#333", flexShrink: 0, width: "32px", textAlign: "right" }}>#{num}</span>
-                    <span style={{ color: isNew ? C.green : "#555", flexShrink: 0, width: "80px" }}>{ts}</span>
-                    <span style={{ color: srcColor, flexShrink: 0, width: "104px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.source ?? "?"}</span>
-                    <span style={{ color: provColor, flexShrink: 0, width: "76px" }}>{r.provider}</span>
-                    <span style={{ color: "#444", flexShrink: 0, maxWidth: "130px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.model ?? "–"}</span>
-                    <span style={{ color: r.status === "ok" ? C.green : C.red, flexShrink: 0, width: "60px" }}>{r.status}</span>
+                  <div key={r.id ?? i} style={{ display: "flex", gap: "8px", padding: "3px 0", borderBottom: "1px solid #111", borderLeft: isNew ? `3px solid ${C.green}` : "3px solid transparent", paddingLeft: "6px", background: isNew ? "#061a06" : "transparent", transition: "background 2s" }}>
+                    <span style={{ color: isNew ? C.green : "#555", flexShrink: 0, width: "72px" }}>{ts}</span>
+                    <span style={{ color: srcColor, flexShrink: 0, width: "100px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.source ?? "?"}</span>
+                    <span style={{ color: provColor, flexShrink: 0, width: "80px" }}>{r.provider}</span>
+                    <span style={{ color: "#444", flexShrink: 0, maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.model ?? "–"}</span>
+                    <span style={{ color: r.status === "ok" ? C.green : isRateLimit(r.status) ? C.yellow : C.red, flexShrink: 0, width: "90px" }}>{r.status}</span>
                     <span style={{ color: "#555" }}>{r.latency_ms != null ? `${r.latency_ms}ms` : ""}</span>
                   </div>
                 );
@@ -1895,27 +1909,97 @@ function AiStatistikTab() {
         </div>
       </div>
 
-      {/* ── Today summary ── */}
+      {statsLoading && !rows ? (
+        <p style={{ color: C.textMuted, fontFamily: "monospace", fontSize: "13px" }}>Laddar statistik…</p>
+      ) : !rows || rows.length === 0 ? (
+        <p style={{ color: C.textMuted, fontSize: "14px" }}>
+          Ingen loggdata för vald period. Kör <code style={{ color: C.accent }}>supabase_ai_log.sql</code> i Supabase för att skapa tabellen.
+        </p>
+      ) : (<>
+
+      {/* ── Provider leaderboard ── */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px", fontFamily: "monospace" }}>
+          Provider-analys — {periodLabel}
+        </p>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", fontFamily: "monospace" }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                {["Provider", "Totalt", "✓ Lyckade", "⚡ Rate limit", "⏱ Timeout", "✗ Fel", "Framgång %", "Avg ms", "Betyg"].map(h => (
+                  <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: C.textMuted, fontWeight: 400, whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {providerStats.map(s => {
+                const color = AI_COLORS[s.provider] ?? C.text;
+                const rating = s.successPct >= 90 ? "★★★" : s.successPct >= 70 ? "★★☆" : s.successPct >= 40 ? "★☆☆" : "☆☆☆";
+                const ratingColor = s.successPct >= 90 ? C.green : s.successPct >= 70 ? C.yellow : C.red;
+                const rlPct = s.total > 0 ? Math.round((s.rate_limited / s.total) * 100) : 0;
+                return (
+                  <tr key={s.provider} style={{ borderBottom: `1px solid ${C.border}22` }}>
+                    <td style={{ padding: "10px 12px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: color, flexShrink: 0 }} />
+                        <span style={{ color }}>{s.label}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: "10px 12px", color: C.text }}>{s.total.toLocaleString("sv-SE")}</td>
+                    <td style={{ padding: "10px 12px", color: C.green }}>{s.ok.toLocaleString("sv-SE")}</td>
+                    <td style={{ padding: "10px 12px", color: s.rate_limited > 0 ? C.yellow : C.textMuted }}>
+                      {s.rate_limited > 0 ? `${s.rate_limited} (${rlPct}%)` : "0"}
+                    </td>
+                    <td style={{ padding: "10px 12px", color: s.timeout > 0 ? C.red : C.textMuted }}>{s.timeout > 0 ? s.timeout : "0"}</td>
+                    <td style={{ padding: "10px 12px", color: s.error > 0 ? C.red : C.textMuted }}>{s.error > 0 ? s.error : "0"}</td>
+                    <td style={{ padding: "10px 12px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ flex: 1, background: C.border, borderRadius: "3px", height: "6px", overflow: "hidden", minWidth: "60px" }}>
+                          <div style={{ background: s.successPct >= 90 ? C.green : s.successPct >= 70 ? C.yellow : C.red, width: `${s.successPct}%`, height: "100%" }} />
+                        </div>
+                        <span style={{ color: s.successPct >= 90 ? C.green : s.successPct >= 70 ? C.yellow : C.red, flexShrink: 0, width: "36px", textAlign: "right" }}>{s.successPct}%</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: "10px 12px", color: C.textMuted }}>{s.avgMs != null ? `${s.avgMs}ms` : "–"}</td>
+                    <td style={{ padding: "10px 12px", color: ratingColor, letterSpacing: "2px", fontSize: "14px" }}>{rating}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p style={{ fontSize: "11px", color: C.textMuted, margin: "12px 0 0" }}>
+          ★★★ ≥90% framgång &nbsp;·&nbsp; ★★☆ 70–89% &nbsp;·&nbsp; ★☆☆ 40–69% &nbsp;·&nbsp; ☆☆☆ &lt;40% &nbsp;·&nbsp; ⚡ Rate limit = 429-svar
+        </p>
+      </div>
+
+      {/* ── Summary cards ── */}
       <div>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>Idag</p>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>Totalt — {periodLabel}</p>
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-          {statCard("Gemini", geminiCallsToday, "anrop OK", AI_COLORS.gemini)}
-          {statCard("Groq Chatt", groqChattCalls, "anrop OK", AI_COLORS.groq)}
-          {cerebrasCallsToday > 0 && statCard("Cerebras", cerebrasCallsToday, "anrop OK", AI_COLORS.cerebras)}
-          {statCard("Sambanova", sambanovaCallsToday, "anrop OK", AI_COLORS.sambanova)}
-          {orCallsToday > 0 && statCard("OpenRouter", orCallsToday, "anrop OK", AI_COLORS.openrouter)}
-          {statCard("GitHub Models", githubCallsToday, "anrop OK", AI_COLORS.github_models)}
-          {errorsToday > 0 && statCard("Fel/timeout", errorsToday, "misslyckade", C.red)}
+          {providerStats.filter(s => s.total > 0).map(s => (
+            <div key={s.provider} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 20px", minWidth: "110px" }}>
+              <p style={{ fontSize: "10px", color: AI_COLORS[s.provider] ?? C.text, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{s.label}</p>
+              <p style={{ fontSize: "22px", color: C.text, margin: "0 0 2px", fontFamily: "monospace" }}>{s.ok.toLocaleString("sv-SE")}</p>
+              <p style={{ fontSize: "11px", color: s.successPct >= 90 ? C.green : s.successPct >= 70 ? C.yellow : C.red, margin: "0 0 2px" }}>{s.successPct}% OK</p>
+              {s.rate_limited > 0 && <p style={{ fontSize: "10px", color: C.yellow, margin: 0 }}>{s.rate_limited} rate limits</p>}
+            </div>
+          ))}
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 20px", minWidth: "110px" }}>
+            <p style={{ fontSize: "10px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>Alla</p>
+            <p style={{ fontSize: "22px", color: C.text, margin: "0 0 2px", fontFamily: "monospace" }}>{totalAll.toLocaleString("sv-SE")}</p>
+            <p style={{ fontSize: "11px", color: totalAll > 0 && totalOk / totalAll >= 0.85 ? C.green : C.yellow, margin: 0 }}>
+              {totalAll > 0 ? Math.round(totalOk / totalAll * 100) : 0}% OK
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* ── Groq Kanal token progress bar ── */}
+      {/* ── Groq token bar (today) ── */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 8px", fontFamily: "monospace" }}>
-          Groq Kanal — daglig tokenkvot
-        </p>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 8px", fontFamily: "monospace" }}>Groq Kanal — daglig tokenkvot (idag)</p>
         <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "8px" }}>
-          <p style={{ fontSize: "22px", fontWeight: 400, color: tokenColor, margin: 0, fontFamily: "monospace" }}>
+          <p style={{ fontSize: "22px", color: tokenColor, margin: 0, fontFamily: "monospace" }}>
             {groqKanalTokens.toLocaleString("sv-SE")} <span style={{ fontSize: "14px", color: C.textMuted }}>/ {GROQ_DAILY_LIMIT.toLocaleString("sv-SE")} tokens</span>
           </p>
           <span style={{ fontSize: "14px", color: tokenColor, fontFamily: "monospace" }}>{tokenPct}%</span>
@@ -1923,37 +2007,33 @@ function AiStatistikTab() {
         <div style={{ background: C.border, borderRadius: "4px", height: "8px", overflow: "hidden" }}>
           <div style={{ background: tokenColor, width: `${tokenPct}%`, height: "100%", borderRadius: "4px", transition: "width 0.3s" }} />
         </div>
-        <p style={{ fontSize: "11px", color: C.textMuted, margin: "8px 0 0" }}>
-          Baserat på loggade kanal-anrop idag. Groq Chatt-anrop loggas utan tokenantal (streaming).
-        </p>
+        <p style={{ fontSize: "11px", color: C.textMuted, margin: "8px 0 0" }}>Baserat på loggade kanal-anrop idag. Chatt-streaming loggas utan tokenantal.</p>
       </div>
 
-      {/* ── 7-day call volume chart ── */}
+      {/* ── Daily call volume chart ── */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Anrop per dag (7 dagar)</p>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Anrop per dag — {periodLabel}</p>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={chartData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
             <XAxis dataKey="day" tick={{ fill: C.textMuted, fontSize: 10 }} tickFormatter={d => d.slice(5)} />
             <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} width={30} allowDecimals={false} />
-            <Tooltip
-              contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", fontSize: "11px", fontFamily: "monospace" }}
-              labelFormatter={l => l}
-            />
+            <Tooltip contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", fontSize: "11px", fontFamily: "monospace" }} labelFormatter={l => l} />
             <Legend wrapperStyle={{ fontSize: "11px", paddingTop: "8px" }} />
-            <Bar dataKey="gemini"     name="Gemini"     stackId="a" fill={AI_COLORS.gemini}     radius={[0,0,0,0]} />
-            <Bar dataKey="groq"       name="Groq"       stackId="a" fill={AI_COLORS.groq}       radius={[0,0,0,0]} />
-            <Bar dataKey="cerebras"   name="Cerebras"   stackId="a" fill={AI_COLORS.cerebras}   radius={[0,0,0,0]} />
-            <Bar dataKey="sambanova"  name="Sambanova"  stackId="a" fill={AI_COLORS.sambanova}  radius={[0,0,0,0]} />
+            <Bar dataKey="groq"          name="Groq"          stackId="a" fill={AI_COLORS.groq}          radius={[0,0,0,0]} />
+            <Bar dataKey="codestral"     name="Codestral"     stackId="a" fill={AI_COLORS.codestral}     radius={[0,0,0,0]} />
+            <Bar dataKey="cerebras"      name="Cerebras"      stackId="a" fill={AI_COLORS.cerebras}      radius={[0,0,0,0]} />
+            <Bar dataKey="sambanova"     name="Sambanova"     stackId="a" fill={AI_COLORS.sambanova}     radius={[0,0,0,0]} />
+            <Bar dataKey="gemini"        name="Gemini"        stackId="a" fill={AI_COLORS.gemini}        radius={[0,0,0,0]} />
             <Bar dataKey="openrouter"    name="OpenRouter"    stackId="a" fill={AI_COLORS.openrouter}    radius={[0,0,0,0]} />
             <Bar dataKey="github_models" name="GitHub Models" stackId="a" fill={AI_COLORS.github_models} radius={[0,0,0,0]} />
-            <Bar dataKey="none"       name="Fallback"   stackId="a" fill={AI_COLORS.none}       radius={[2,2,0,0]} />
+            <Bar dataKey="none"          name="Fallback"      stackId="a" fill={AI_COLORS.none}          radius={[2,2,0,0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
       {/* ── Per-source breakdown ── */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Anrop per funktion (7 dagar)</p>
+        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Anrop per funktion — {periodLabel}</p>
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           {sourceChartData.map(s => {
             const errPct = s.total > 0 ? Math.round((s.error / s.total) * 100) : 0;
@@ -1963,7 +2043,7 @@ function AiStatistikTab() {
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
                   <span style={{ fontSize: "12px", color: s.color, fontFamily: "monospace" }}>{s.source}</span>
                   <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>
-                    {s.ok} OK{s.error > 0 ? ` · ${s.error} fel (${errPct}%)` : ""}
+                    {s.total} tot · {s.ok} OK{s.error > 0 ? ` · ${s.error} fel (${errPct}%)` : ""}
                   </span>
                 </div>
                 <div style={{ background: C.border, borderRadius: "3px", height: "6px", overflow: "hidden", display: "flex" }}>
@@ -1976,71 +2056,24 @@ function AiStatistikTab() {
         </div>
       </div>
 
-      {/* ── Per-hour heatmap ── */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Anrop per timme – dygnsfördelning (7 dagar)</p>
-        <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={byHour} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-            <XAxis dataKey="hour" tick={{ fill: C.textMuted, fontSize: 9 }} interval={2} />
-            <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} width={28} allowDecimals={false} />
-            <Tooltip
-              contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", fontSize: "11px", fontFamily: "monospace" }}
-              labelFormatter={l => l}
-            />
-            <Bar dataKey="ok"    name="OK"  stackId="h" fill={AI_COLORS.groq} radius={[0,0,0,0]} />
-            <Bar dataKey="error" name="Fel" stackId="h" fill={C.red}          radius={[2,2,0,0]} />
-          </BarChart>
-        </ResponsiveContainer>
-        <p style={{ fontSize: "11px", color: C.textMuted, margin: "8px 0 0" }}>Lokal tid. Röda staplar = misslyckade anrop (rate limit, timeout). Identifiera tider med hög belastning.</p>
-      </div>
-
-      {/* ── 7-day totals ── */}
-      <div>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>Totalt senaste 7 dagarna</p>
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-          {statCard("Gemini",     totals.gemini     ?? 0, "anrop", AI_COLORS.gemini)}
-          {statCard("Groq",       totals.groq       ?? 0, "anrop", AI_COLORS.groq)}
-          {(totals.cerebras  ?? 0) > 0 && statCard("Cerebras",  totals.cerebras  ?? 0, "anrop", AI_COLORS.cerebras)}
-          {statCard("Sambanova",    totals.sambanova    ?? 0, "anrop", AI_COLORS.sambanova)}
-          {(totals.openrouter    ?? 0) > 0 && statCard("OpenRouter",    totals.openrouter    ?? 0, "anrop", AI_COLORS.openrouter)}
-          {statCard("GitHub Models", totals.github_models ?? 0, "anrop", AI_COLORS.github_models)}
-          {statCard("OK / Fel",   `${totalOk} / ${totalError}`, "anrop", totalError > 0 ? C.red : C.green)}
+      {/* ── Hourly heatmap ── */}
+      {byHour && (
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Dygnsfördelning — {periodLabel}</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={byHour} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
+              <XAxis dataKey="hour" tick={{ fill: C.textMuted, fontSize: 9 }} interval={2} />
+              <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} width={28} allowDecimals={false} />
+              <Tooltip contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", fontSize: "11px", fontFamily: "monospace" }} />
+              <Bar dataKey="ok"    name="OK"  stackId="h" fill={AI_COLORS.groq} radius={[0,0,0,0]} />
+              <Bar dataKey="error" name="Fel" stackId="h" fill={C.red}          radius={[2,2,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          <p style={{ fontSize: "11px", color: C.textMuted, margin: "8px 0 0" }}>Lokal tid. Rött = misslyckade (rate limit + timeout). Identifierar tider med hög belastning.</p>
         </div>
-      </div>
+      )}
 
-      {/* ── Recent calls table ── */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 16px", fontFamily: "monospace" }}>Senaste 30 anrop</p>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", fontFamily: "monospace" }}>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                {["Tid","Källa","Provider","Modell","Status","ms","Input tok","Output tok"].map(h => (
-                  <th key={h} style={{ textAlign: "left", padding: "6px 12px", color: C.textMuted, fontWeight: 400 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.slice(0, 30).map(r => (
-                <tr key={r.id} style={{ borderBottom: `1px solid ${C.border}22` }}>
-                  <td style={{ padding: "6px 12px", color: C.textMuted }}>
-                    {new Date(r.ts).toLocaleString("sv-SE", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                  </td>
-                  <td style={{ padding: "6px 12px", color: C.accentDim }}>{r.source}</td>
-                  <td style={{ padding: "6px 12px", color: AI_COLORS[r.provider] ?? C.text }}>{r.provider}</td>
-                  <td style={{ padding: "6px 12px", color: C.textMuted, maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {r.model ?? "–"}
-                  </td>
-                  <td style={{ padding: "6px 12px", color: r.status === "ok" ? C.green : C.red }}>{r.status}</td>
-                  <td style={{ padding: "6px 12px", color: C.textMuted }}>{r.latency_ms ?? "–"}</td>
-                  <td style={{ padding: "6px 12px", color: C.textMuted }}>{r.input_tokens ?? "–"}</td>
-                  <td style={{ padding: "6px 12px", color: C.textMuted }}>{r.output_tokens ?? "–"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      </>)}
     </div>
   );
 }
