@@ -12,7 +12,6 @@ function TT({ contentStyle, ...props }) {
 }
 
 function kortNamn(name) {
-  if (name.startsWith("Den ")) return name.slice(4);
   const map = {
     "Nationalekonom": "Nat.ek.",
     "Kryptoanalytiker": "Krypto",
@@ -20,15 +19,18 @@ function kortNamn(name) {
     "Teknikoptimist": "Teknik",
     "Hypokondrikern": "Hypok.",
     "Miljöaktivist": "Miljö",
+    "Den nostalgiske": "Nostalgiske",
+    "Den stressade": "Stressade",
+    "Den hungriga": "Hungriga",
   };
-  return map[name] || (name.length > 9 ? name.slice(0, 9) : name);
+  return map[name] || name;
 }
 
 export default function OligarkiGraf({ typ, data }) {
   if (typ === "wealth") {
     return (
-      <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 44 }}>
+      <ResponsiveContainer width="100%" height={240}>
+        <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 80 }}>
           <XAxis dataKey="agent" tickFormatter={kortNamn} tick={{ fill: "#666", fontSize: 10, fontFamily: "monospace" }} angle={-45} textAnchor="end" interval={0} />
           <YAxis tick={{ fill: "#555", fontSize: 10, fontFamily: "monospace" }} />
           <TT formatter={(v) => [`${v} kr`, "Saldo"]} />
@@ -42,8 +44,8 @@ export default function OligarkiGraf({ typ, data }) {
 
   if (typ === "makt") {
     return (
-      <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 44 }}>
+      <ResponsiveContainer width="100%" height={240}>
+        <BarChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 80 }}>
           <XAxis dataKey="agent" tickFormatter={kortNamn} tick={{ fill: "#666", fontSize: 10, fontFamily: "monospace" }} angle={-45} textAnchor="end" interval={0} />
           <YAxis domain={[0, 100]} tick={{ fill: "#555", fontSize: 10, fontFamily: "monospace" }} />
           <TT formatter={(v, name) => {
