@@ -117,30 +117,6 @@ reasoning: din kortaste möjliga motivering`;
     } catch {}
   }
 
-  if (GEMINI_KEY && providerReady("gemini")) {
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: question }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { maxOutputTokens: 150, temperature: 0.7 },
-          }),
-        }
-      );
-      if (r.ok) {
-        const data = await r.json();
-        const parsed = extractJSON(data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "");
-        if (parsed?.stance && typeof parsed.probability === "number")
-          return { agent, ...parsed };
-      }
-      if (r.status === 429) markProviderDown("gemini");
-    } catch {}
-  }
-
   if (MISTRAL_KEY) {
     try {
       const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
@@ -198,6 +174,30 @@ reasoning: din kortaste möjliga motivering`;
         if (parsed?.stance && typeof parsed.probability === "number")
           return { agent, ...parsed };
       }
+    } catch {}
+  }
+
+  if (GEMINI_KEY && providerReady("gemini")) {
+    try {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: question }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { maxOutputTokens: 150, temperature: 0.7 },
+          }),
+        }
+      );
+      if (r.ok) {
+        const data = await r.json();
+        const parsed = extractJSON(data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "");
+        if (parsed?.stance && typeof parsed.probability === "number")
+          return { agent, ...parsed };
+      }
+      if (r.status === 429) markProviderDown("gemini");
     } catch {}
   }
 

@@ -247,7 +247,28 @@ REGLER — viktiga:
     } catch {}
   }
 
-  // ── Gemini (unreliable — quota issues, last resort non-streaming) ────────────────────────────────
+  // ── OpenRouter (unreliable — rate limited free tier, last resort streaming) ──────────────────────
+  const orKey = process.env.OPENROUTER_API_KEY;
+  if (orKey) {
+    const orT0 = Date.now();
+    try {
+      const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${orKey}`, "HTTP-Referer": "https://www.debatt-ai.se", "X-Title": "Debatt AI" },
+        body: JSON.stringify({ model: "meta-llama/llama-3.3-70b-instruct:free", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }], max_tokens: 250, temperature: 0.88, stream: true }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (orRes.ok) {
+        ps.or = { ts: Date.now(), status: "ok" };
+        logAiCall({ provider: "openrouter", model: "llama-3.3-70b-instruct:free", source: "chatt", status: "ok", latency_ms: Date.now() - orT0 });
+        return new Response(orRes.body, { headers: { ...rlHeaders, "X-Provider": "openrouter" } });
+      }
+      ps.or = { ts: Date.now(), status: orRes.status === 429 ? "limited" : "error" };
+      logAiCall({ provider: "openrouter", source: "chatt", status: orRes.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - orT0 });
+    } catch {}
+  }
+
+  // ── Gemini (sista utväg — 99% rate-limitad, prövas bara när allt annat misslyckats) ─────────────
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey) {
     const geminiPayload = JSON.stringify({
@@ -279,27 +300,6 @@ REGLER — viktiga:
         if (r.status === 400 || r.status === 403) break;
       } catch {}
     }
-  }
-
-  // ── OpenRouter (unreliable — rate limited free tier, last resort streaming) ──────────────────────
-  const orKey = process.env.OPENROUTER_API_KEY;
-  if (orKey) {
-    const orT0 = Date.now();
-    try {
-      const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${orKey}`, "HTTP-Referer": "https://www.debatt-ai.se", "X-Title": "Debatt AI" },
-        body: JSON.stringify({ model: "meta-llama/llama-3.3-70b-instruct:free", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }], max_tokens: 250, temperature: 0.88, stream: true }),
-        signal: AbortSignal.timeout(10000),
-      });
-      if (orRes.ok) {
-        ps.or = { ts: Date.now(), status: "ok" };
-        logAiCall({ provider: "openrouter", model: "llama-3.3-70b-instruct:free", source: "chatt", status: "ok", latency_ms: Date.now() - orT0 });
-        return new Response(orRes.body, { headers: { ...rlHeaders, "X-Provider": "openrouter" } });
-      }
-      ps.or = { ts: Date.now(), status: orRes.status === 429 ? "limited" : "error" };
-      logAiCall({ provider: "openrouter", source: "chatt", status: orRes.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - orT0 });
-    } catch {}
   }
 
   logFel({ kalla: "chatt", feltyp: "ai_fail", meddelande: "Alla providers misslyckades", ip, extra: { groqFailReason } });
