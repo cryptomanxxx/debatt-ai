@@ -11,11 +11,11 @@ created: 2026-05-19
 
 ## Problem
 
-Det uppstår ett kritiskt fel när alla AI-providers misslyckas, vilket gör att kanal/batch-expand-funktionen inte fungerar.
+Kritiskt fel när alla AI-providers misslyckas. Nuvarande implementering av _llm_kort() faller tillbaka till gemini_post() utan någon verifiering av resultatet.
 
 ## Föreslagen lösning
 
-Implementera en fallback-mekanism som använder en lokal LLM-modell när alla providers misslyckas. Lägg till en try-catch-block runt hela provider-anropslogiken och implementera en lokal fallback.
+Implementera en mer robust fallback-strategi som inkluderar: 1) Explicit kontroll av varje providers svar 2) Fallback till en lokal cache 3) Explicit felmeddelande till användaren om alla providers misslyckas
 
 ## Åtgärd
 
