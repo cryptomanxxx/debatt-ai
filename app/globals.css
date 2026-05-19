@@ -118,9 +118,9 @@
   border-color: #3a3a3a !important;
 }
 
-/* ── Hamburgermeny (mobil) ─────────────────────────────────── */
+/* ── Hamburgermeny — default på allt utom stor desktop ─────── */
 .hamburger-btn {
-  display: none;
+  display: block;
   background: none;
   border: none;
   cursor: pointer;
@@ -132,31 +132,41 @@
 }
 
 .nav-links {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  flex: 1;
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  background: rgba(10,10,10,0.97);
+  border-bottom: 1px solid #222;
+  padding: 8px 0 12px;
+  backdrop-filter: blur(12px);
+  z-index: 99;
 }
 
-@media (max-width: 1400px) {
-  .hamburger-btn { display: block; }
+.nav-links.open { display: flex; }
+.nav-links .neon-nav,
+.nav-links .neon-nav-active { padding: 10px 20px; width: 100%; box-sizing: border-box; }
+
+/* Stor desktop (≥1600px): visa full navrad istället */
+@media (min-width: 1600px) {
+  .hamburger-btn { display: none; }
   .nav-links {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    align-items: flex-start;
-    background: rgba(10,10,10,0.97);
-    border-bottom: 1px solid #222;
-    padding: 8px 0 12px;
-    backdrop-filter: blur(12px);
-    z-index: 99;
+    display: flex;
+    position: static;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    background: transparent;
+    border: none;
+    padding: 0;
+    backdrop-filter: none;
+    flex: 1;
   }
-  .nav-links.open { display: flex; }
   .nav-links .neon-nav,
-  .nav-links .neon-nav-active { padding: 10px 20px; width: 100%; box-sizing: border-box; }
+  .nav-links .neon-nav-active { padding: 0 10px; width: auto; }
 }
 
 .nyhet-rad {
