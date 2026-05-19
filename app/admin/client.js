@@ -817,15 +817,17 @@ function ApiStatusTab() {
       {loading ? <p style={{ color: C.textMuted }}>Hämtar status…</p> : (
         <>
           <ProviderCard name="Groq" model="llama-3.3-70b-versatile · primär" p={health?.groq} />
-          <ProviderCard name="Gemini" model="2.0 Flash / 1.5 Flash · fallback 1" p={health?.gemini} />
-          <ProviderCard name="Codestral" model="codestral-latest · fallback 2" p={health?.codestral} />
-          <ProviderCard name="Cerebras" model="llama3.1-8b · fallback 3" p={health?.cerebras} />
-          <ProviderCard name="OpenRouter" model="llama-3.3-70b (free) · nyhetskanal" p={health?.or} />
+          <ProviderCard name="Codestral" model="codestral-latest · fallback 1" p={health?.codestral} />
+          <ProviderCard name="Cerebras" model="llama3.1-8b · fallback 2" p={health?.cerebras} />
+          <ProviderCard name="OpenRouter" model="llama-3.3-70b (free) · fallback 3 / nyhetskanal" p={health?.or} />
+          <ProviderCard name="GitHub Models" model="Llama-3.3-70B-Instruct · fallback 4" p={health?.github_models} />
+          <ProviderCard name="Gemini" model="2.0 Flash / 1.5 Flash · sista utväg" p={health?.gemini} />
 
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginTop: "8px" }}>
             <p style={{ fontSize: "11px", color: C.accentDim, textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px", fontFamily: "monospace" }}>Tips</p>
             <ul style={{ margin: 0, paddingLeft: "20px", color: C.textMuted, fontSize: "13px", lineHeight: 1.8 }}>
-              <li>Fallback-kedja: <b style={{ color: C.text }}>Groq → Gemini → Codestral → Cerebras</b>. Systemet byter automatiskt.</li>
+              <li>Fallback-kedja: <b style={{ color: C.text }}>Groq → Codestral → Cerebras → GitHub Models → Gemini</b>. Systemet byter automatiskt.</li>
+              <li>Gemini har ~99% rate-limit-andel — den prövas nu sist av alla providers.</li>
               <li>Status uppdateras bara när en riktig debatt körs — inte vid polling.</li>
               <li>Skapa en <b style={{ color: C.text }}>separat Groq-nyckel</b> för agent.py (GitHub Actions) för att isolera trafiken.</li>
             </ul>
