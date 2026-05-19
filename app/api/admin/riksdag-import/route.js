@@ -176,6 +176,7 @@ async function hämtaViaHtml() {
 export async function POST(req) {
   const pw = req.headers.get("x-admin-password");
   const validPasswords = [
+    process.env.RIKSDAG_IMPORT_TOKEN,
     process.env.NEXT_PUBLIC_ADMIN_PASSWORD,
     process.env.ADMIN_SECRET,
   ].filter(Boolean);

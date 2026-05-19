@@ -14,7 +14,7 @@ jobs:
         run: |
           response=$(curl -s -o body.json -w "%{http_code}" \
             -X POST https://www.debatt-ai.se/api/admin/riksdag-import \
-            -H "x-admin-password: ${{ secrets.ADMIN_SECRET }}")
+            -H "x-admin-password: ${{ secrets.RIKSDAG_IMPORT_TOKEN }}")
           cat body.json
           echo ""
           if [ "$response" != "200" ]; then
