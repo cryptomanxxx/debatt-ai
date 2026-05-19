@@ -175,7 +175,11 @@ async function hämtaViaHtml() {
 
 export async function POST(req) {
   const pw = req.headers.get("x-admin-password");
-  if (pw !== ADMIN_PASSWORD) {
+  const validPasswords = [
+    process.env.NEXT_PUBLIC_ADMIN_PASSWORD,
+    process.env.ADMIN_SECRET,
+  ].filter(Boolean);
+  if (!validPasswords.includes(pw)) {
     return NextResponse.json({ error: "Obehörig" }, { status: 401 });
   }
 
