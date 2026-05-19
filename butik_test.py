@@ -12,6 +12,7 @@ from supabase_utils import kop_statussymbol
 from agent import AGENTER, SYMBOL_PREFERENSER
 
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY")
+SB_WRITE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
 
 if not SB_KEY:
     print("SUPABASE_ANON_KEY saknas", file=sys.stderr)
@@ -36,6 +37,7 @@ if len(varor) > 5:
 planbok_r = httpx.get(f"{SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc&limit=3", headers=hdrs, timeout=8)
 planbockar = planbok_r.json() if planbok_r.is_success else []
 print(f"\nTopp-3 saldo: {[(p['agent'], p['saldo']) for p in planbockar]}")
+print(f"Använder service role key: {'ja' if SB_WRITE_KEY != SB_KEY else 'nej (fallback till anon)'}")
 print()
 
 print(f"=== Butik testkörning ({len(AGENTER)} agenter) ===\n")
@@ -45,7 +47,7 @@ for agent in AGENTER:
     namn = agent["namn"]
     preferenser = SYMBOL_PREFERENSER.get(namn, [])
     print(f"── {namn}: shoppar ──")
-    symbol = kop_statussymbol(SB_KEY, namn, preferenser)
+    symbol = kop_statussymbol(SB_WRITE_KEY, namn, preferenser)
     if symbol:
         print(f"  ✓ Köpte: {symbol}")
         köpte += 1
