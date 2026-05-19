@@ -5,7 +5,7 @@ type: bug
 severity: medium
 risk: low
 file: supabase_utils.py
-status: pending
+status: rejected
 created: 2026-05-19
 ---
 

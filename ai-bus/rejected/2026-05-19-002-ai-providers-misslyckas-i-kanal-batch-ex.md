@@ -5,7 +5,7 @@ type: bug
 severity: high
 risk: medium
 file: kanal_debatt.py
-status: pending
+status: rejected
 created: 2026-05-19
 ---
 

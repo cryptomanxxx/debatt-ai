@@ -5,7 +5,7 @@ type: bug
 severity: high
 risk: medium
 file: agent.py
-status: pending
+status: implemented
 created: 2026-05-19
 ---
 

@@ -1301,8 +1301,14 @@ def uppdatera_riksdagen_utfall(sb_key: str) -> int:
     Matchar tillhor_dok_id mot våra lagrade riksdagen_id-värden.
     Returnerar antal uppdaterade förslag.
     """
+    import os
+    service_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", sb_key)
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json",
+    }
+    write_h = {
+        "apikey": service_key, "Authorization": f"Bearer {service_key}",
         "Content-Type": "application/json",
     }
     uppdaterade = 0
@@ -1353,7 +1359,7 @@ def uppdatera_riksdagen_utfall(sb_key: str) -> int:
 
             patch_r = httpx.patch(
                 f"{SB_URL}/rest/v1/lagforslag?id=eq.{lagforslag_id}",
-                headers={**h, "Prefer": "return=minimal"},
+                headers={**write_h, "Prefer": "return=minimal"},
                 json={
                     "riksdagen_utfall": riksdagen_utfall,
                     "riksdagen_utfall_datum": datum,
