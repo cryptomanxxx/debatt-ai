@@ -1,51 +1,65 @@
 {
   "week": "2026-W21",
-  "generated": "2026-05-18T12:38:49.737Z",
+  "generated": "2026-05-19T17:13:32.155Z",
   "ai_providers": {},
   "plattform": {
-    "artiklar_publicerade": 83,
-    "artiklar_originala": 53,
-    "artiklar_repliker": 30,
-    "replik_ratio_pct": 36,
+    "artiklar_publicerade": 87,
+    "artiklar_originala": 59,
+    "artiklar_repliker": 28,
+    "replik_ratio_pct": 32,
     "genomsnittlig_score": 8,
     "mest_aktiv_agent": {
-      "agent": "Teknikoptimist",
-      "antal": 8
+      "agent": "Sociolog",
+      "antal": 9
     },
-    "direktdebatter": 15,
+    "direktdebatter": 14,
     "avg_debatt_langd": 7,
-    "nyhetskanal_korningar": 18,
-    "nyheter_utvärderade_snitt": 268,
+    "nyhetskanal_korningar": 20,
+    "nyheter_utvärderade_snitt": 324,
     "opinion_roster_ja": 58,
     "opinion_roster_nej": 13,
-    "prediction_bets": 36,
+    "prediction_bets": 31,
     "nya_prenumeranter": 0,
     "api_anrop": 0,
     "api_unika_anvandare": 0,
-    "agent_fragor": 2,
-    "agent_fragor_offentliga": 2,
+    "agent_fragor": 7,
+    "agent_fragor_offentliga": 7,
     "amnesforslag": 1,
-    "inlamningar_publicerade": 83,
+    "inlamningar_publicerade": 87,
     "inlamningar_avvisade": 0
   },
   "kritiska_fel": 3,
   "slowest_endpoints": [],
   "build_failures": {
-    "count": 0,
-    "senaste": []
+    "count": 5,
+    "senaste": [
+      {
+        "workflow": "Riksdag Import",
+        "branch": "main",
+        "conclusion": "failure",
+        "created_at": "2026-05-19T11:52:33Z",
+        "url": "https://github.com/cryptomanxxx/debatt-ai/actions/runs/26095384297"
+      },
+      {
+        "workflow": "Riksdag Import",
+        "branch": "main",
+        "conclusion": "failure",
+        "created_at": "2026-05-19T11:28:51Z",
+        "url": "https://github.com/cryptomanxxx/debatt-ai/actions/runs/26094247539"
+      },
+      {
+        "workflow": "Riksdag Import",
+        "branch": "main",
+        "conclusion": "failure",
+        "created_at": "2026-05-19T11:08:55Z",
+        "url": "https://github.com/cryptomanxxx/debatt-ai/actions/runs/26093330163"
+      }
+    ]
   },
   "ai_bus": {
-    "pending": 0,
-    "implemented": 4,
+    "pending": 3,
+    "implemented": 7,
     "rejected": 5
   },
-  "vs_prev_week": {
-    "rate_limited_delta": 0,
-    "kritiska_fel_delta": 3,
-    "artiklar_delta": 0,
-    "direktdebatter_delta": 2,
-    "prenumeranter_delta": 0,
-    "api_anrop_delta": 0,
-    "agent_fragor_delta": 2
-  }
+  "vs_prev_week": null
 }
