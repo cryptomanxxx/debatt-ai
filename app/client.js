@@ -910,9 +910,11 @@ export default function DebattClient({ initialArticleCount = null }) {
               <span style={{ fontSize: "12px", color: C.textMuted, marginLeft: "auto", paddingLeft: "12px", flexShrink: 0 }}>👁 {visitors.toLocaleString("sv-SE")}</span>
             )}
           </div>
-          <button className="hamburger-btn" onClick={() => setMenuOpen(m => !m)} aria-label="Öppna meny">
-            {menuOpen ? "✕" : "☰"}
-          </button>
+          <div style={{ marginLeft: "auto", flexShrink: 0 }}>
+            <button className="hamburger-btn" onClick={() => setMenuOpen(m => !m)} aria-label="Öppna meny">
+              {menuOpen ? "✕" : "☰"}
+            </button>
+          </div>
         </div>
       </header>
 
