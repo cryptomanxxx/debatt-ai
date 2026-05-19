@@ -596,9 +596,9 @@ def main():
         else:
             print("  Inget bud")
 
-    # Agent ställer en fråga till en annan agent (~20% + Mentor-buff per körning)
+    # Agent ställer en fråga till en annan agent (~60% + Mentor-buff per körning)
     _fraga_buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
-    _fraga_chans = 0.20 + _fraga_buffs.get("extra_fraga_chans", 0.0)
+    _fraga_chans = 0.60 + _fraga_buffs.get("extra_fraga_chans", 0.0)
     if sb_key and random.random() < _fraga_chans:
         mottagare = random.choice([a for a in AGENTER if a["namn"] != agent["namn"]])
         print(f"\n── Agent-till-agent-fråga: {agent['namn']} → {mottagare['namn']} ──")
@@ -713,6 +713,65 @@ def main():
 
         except Exception as e:
             print(f"  ✗ Agent-till-agent-fråga misslyckades: {e}", file=sys.stderr)
+
+    # Möjlighet till en andra AI-till-AI-konversation med annan agent (50% chans per körning)
+    if sb_key and random.random() < 0.50:
+        mottagare2 = random.choice([a for a in AGENTER if a["namn"] != agent["namn"]])
+        print(f"\n── Agent-till-agent-fråga 2: {agent['namn']} → {mottagare2['namn']} ──")
+        try:
+            SB_URL_LOCAL2 = "https://fmwxftnistkoqazfwnuj.supabase.co"
+            sb_hdrs2 = {
+                "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                "Content-Type": "application/json", "Prefer": "return=minimal",
+            }
+            fraga_prompt2 = (
+                f"Du är {agent['namn']}. Du har just skrivit om ämnet: \"{amne[:120]}\".\n"
+                f"Formulera en kort fråga (max 120 tecken) till {mottagare2['namn']} om detta ämne. "
+                f"Svara ENBART med frågan, inga inledningsfraser."
+            )
+            fraga_payload2 = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": agent.get("system", "")[:600]},
+                    {"role": "user", "content": fraga_prompt2},
+                ],
+                "max_tokens": 80, "temperature": 0.9,
+            }
+            try:
+                fraga_text2 = groq_post(fraga_payload2).json()["choices"][0]["message"]["content"].strip().strip('"')
+            except Exception:
+                fraga_text2 = gemini_post(agent.get("system", "")[:600], fraga_prompt2, max_tokens=80).strip().strip('"')
+
+            svar_innehall2 = (
+                f"{agent['namn']} frågar dig: \"{fraga_text2}\"\n"
+                f"Svara kort och i karaktär (2–3 meningar)."
+            )
+            svar_payload2 = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": mottagare2.get("system", "")[:600]},
+                    {"role": "user", "content": svar_innehall2},
+                ],
+                "max_tokens": 200, "temperature": 0.9,
+            }
+            try:
+                svar_text2 = groq_post(svar_payload2).json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                svar_text2 = gemini_post(mottagare2.get("system", "")[:600], svar_innehall2, max_tokens=200).strip()
+
+            httpx.post(
+                f"{SB_URL_LOCAL2}/rest/v1/agent_fragor",
+                headers=sb_hdrs2,
+                json={
+                    "agent": mottagare2["namn"], "fraga": fraga_text2,
+                    "svar": svar_text2, "offentlig": True, "fragare": agent["namn"],
+                },
+                timeout=10,
+            )
+            print(f"  ✓ {agent['namn']}: \"{fraga_text2[:70]}\"")
+            print(f"  ✓ {mottagare2['namn']}: \"{svar_text2[:80]}…\"")
+        except Exception as e:
+            print(f"  ✗ Agent-till-agent-fråga 2 misslyckades: {e}", file=sys.stderr)
 
     if sb_key and random.random() < 0.25:
         print("\n── Visual Agent ──")
