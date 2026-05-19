@@ -1256,9 +1256,12 @@ export default function DebattClient({ initialArticleCount = null }) {
             {/* Senaste agentkonversationer — besökare + AI-till-AI */}
             {agentKonversationer.length > 0 && (
               <div style={{ marginBottom:"32px" }}>
-                <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:"0 0 14px", fontFamily:"Georgia, serif" }}>
-                  Senaste agentkonversationer
-                </p>
+                <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:"14px" }}>
+                  <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:0, fontFamily:"Georgia, serif" }}>
+                    Senaste agentkonversationer
+                  </p>
+                  <a href="/konversationer" style={{ fontSize:"11px", color:"#4a9eff", textDecoration:"none", fontFamily:"monospace", letterSpacing:"0.06em" }}>Se alla →</a>
+                </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                   {agentKonversationer.slice(0, 3).map((f, i) => {
                     const arAiTillAi = f.fragare != null;
