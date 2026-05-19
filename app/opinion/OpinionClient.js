@@ -188,10 +188,13 @@ function FragaKort({ fraga, kategori, rosterData, onVote, isAgent = false }) {
 
 const HARDCODED_SET = new Set(ALLA_FRAGOR.map(f => f.fraga));
 
+const PAGE_SIZE = 10;
+
 export default function OpinionClient() {
   const [aktivKat, setAktivKat] = useState("alla");
   const [rosterData, setRosterData] = useState({});
   const [agentFragor, setAgentFragor] = useState([]);
+  const [visaAntal, setVisaAntal] = useState(PAGE_SIZE);
 
   useEffect(() => {
     fetch("/api/opinion")
@@ -224,11 +227,19 @@ export default function OpinionClient() {
     });
   }
 
-  const fragor = aktivKat === "agentfragor"
+  const allaFragor = aktivKat === "agentfragor"
     ? agentFragor
     : aktivKat === "alla"
       ? [...ALLA_FRAGOR, ...agentFragor]
       : ALLA_FRAGOR.filter(f => f.kategori === aktivKat);
+
+  const sorterade = [...allaFragor].sort((a, b) => {
+    const totA = (rosterData[a.fraga]?.roster_ja || 0) + (rosterData[a.fraga]?.roster_nej || 0) + (rosterData[a.fraga]?.ai_ja || 0) + (rosterData[a.fraga]?.ai_nej || 0);
+    const totB = (rosterData[b.fraga]?.roster_ja || 0) + (rosterData[b.fraga]?.roster_nej || 0) + (rosterData[b.fraga]?.ai_ja || 0) + (rosterData[b.fraga]?.ai_nej || 0);
+    return totB - totA;
+  });
+
+  const fragor = sorterade.slice(0, visaAntal);
 
   const totalBesokare = Object.values(rosterData).reduce(
     (s, r) => s + (r.roster_ja || 0) + (r.roster_nej || 0), 0
@@ -258,7 +269,7 @@ export default function OpinionClient() {
       {/* Kategori-filter */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "28px" }}>
         {KATEGORIER.map(k => (
-          <button key={k.id} onClick={() => setAktivKat(k.id)} style={{
+          <button key={k.id} onClick={() => { setAktivKat(k.id); setVisaAntal(PAGE_SIZE); }} style={{
             padding: "7px 16px", borderRadius: "20px",
             border: `1px solid ${aktivKat === k.id ? C.accent + "80" : C.border}`,
             background: aktivKat === k.id ? C.accent + "12" : "transparent",
@@ -274,6 +285,22 @@ export default function OpinionClient() {
       {fragor.map(({ fraga, kategori, isAgent }) => (
         <FragaKort key={fraga} fraga={fraga} kategori={kategori} rosterData={rosterData} onVote={onVote} isAgent={isAgent} />
       ))}
+
+      {visaAntal < sorterade.length && (
+        <button
+          onClick={() => setVisaAntal(v => v + PAGE_SIZE)}
+          style={{
+            width: "100%", padding: "14px", marginTop: "8px",
+            background: "transparent", border: `1px solid ${C.border}`,
+            borderRadius: "8px", color: C.textMuted, fontSize: "14px",
+            fontFamily: "Georgia, serif", cursor: "pointer",
+          }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = C.accentDim}
+          onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+        >
+          Visa fler ({sorterade.length - visaAntal} återstår)
+        </button>
+      )}
     </div>
   );
 }
