@@ -113,6 +113,16 @@ export default function GlobalNav() {
         ) : (
           <>
             {/* Desktop: alla länkar i rad */}
+              {/* Hamburger — vänster efter logo */}
+            <button
+              className="hamburger-btn"
+              onClick={() => setOpen(o => !o)}
+              aria-label={open ? "Stäng meny" : "Öppna meny"}
+              aria-expanded={open}
+            >
+              {open ? "✕" : "☰"}
+            </button>
+
             <div className={open ? "nav-links open" : "nav-links"}>
               {LINKS.slice(0, 3).map(l => <L key={l.href} {...l} />)}
               <NavArkivLink onClick={() => setOpen(false)} />
@@ -121,25 +131,14 @@ export default function GlobalNav() {
               {LINKS.slice(4).map(l => <L key={l.href} {...l} />)}
             </div>
 
-            {/* Sök + hamburger */}
-            <div style={{ display: "flex", alignItems: "center", marginLeft: "auto", gap: "4px", flexShrink: 0 }}>
-              <button
-                onClick={openSearch}
-                aria-label="Sök"
-                style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: "17px", padding: "10px 8px", lineHeight: 1 }}
-              >
-                🔍
-              </button>
-              <button
-                className="hamburger-btn"
-                onClick={() => setOpen(o => !o)}
-                aria-label={open ? "Stäng meny" : "Öppna meny"}
-                aria-expanded={open}
-                style={{ marginLeft: 0 }}
-              >
-                {open ? "✕" : "☰"}
-              </button>
-            </div>
+            {/* Sök — höger */}
+            <button
+              onClick={openSearch}
+              aria-label="Sök"
+              style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: "17px", padding: "10px 8px", lineHeight: 1, marginLeft: "auto", flexShrink: 0 }}
+            >
+              🔍
+            </button>
           </>
         )}
       </div>
