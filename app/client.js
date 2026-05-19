@@ -149,6 +149,17 @@ async function fetchAllaKommentarer() {
   return res.json();
 }
 
+async function fetchCivilisationDrift() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/oligarki_historik?select=datum,oligarki_risk,gini,mobilitet&order=datum.desc&limit=2`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return null;
+  const rows = await res.json();
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  return rows;
+}
+
 async function fetchSenasteAgentKonversationer() {
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&order=skapad.desc&limit=6&select=agent,fraga,svar,fragare,skapad`,
@@ -562,6 +573,102 @@ function StarField() {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
+const DRIFT_LEVELS = [
+  { min: 0,  max: 20, label: "KONKURRENS",        farg: "#4ade80" },
+  { min: 20, max: 40, label: "ELITBILDNING",       farg: "#86efac" },
+  { min: 40, max: 60, label: "OLIGARKI",           farg: "#facc15" },
+  { min: 60, max: 80, label: "DYNASTISK OLIGARKI", farg: "#fb923c" },
+  { min: 80, max: 101, label: "SYSTEMKONTROLL",    farg: "#f87171" },
+];
+
+function CivilisationDriftWidget({ data }) {
+  if (!data) return null;
+  const latest = data[0];
+  const prev   = data[1] || null;
+  const risk   = latest.oligarki_risk;
+  const level  = DRIFT_LEVELS.find(l => risk >= l.min && risk < l.max) || DRIFT_LEVELS[4];
+  const trend  = prev == null ? null : risk > prev.oligarki_risk ? "↑" : risk < prev.oligarki_risk ? "↓" : "→";
+  const trendFarg = trend === "↑" ? "#f87171" : trend === "↓" ? "#4ade80" : "#888";
+
+  return (
+    <a href="/oligarki" style={{ display: "block", textDecoration: "none", marginBottom: "24px" }}>
+      <div style={{ background: "#0a0a0a", border: `1px solid ${level.farg}40`, borderRadius: "8px", overflow: "hidden" }}>
+        {/* Header */}
+        <div style={{ padding: "10px 14px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "10px", color: "#666", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace" }}>
+            Civilisationsdrift
+          </span>
+          <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace" }}>
+            {latest.datum}
+          </span>
+        </div>
+
+        {/* Level name + risk score */}
+        <div style={{ padding: "8px 14px", display: "flex", alignItems: "baseline", gap: "10px" }}>
+          <span style={{ fontSize: "18px", fontWeight: 700, color: level.farg, fontFamily: "monospace", letterSpacing: "0.04em" }}>
+            {level.label}
+          </span>
+          <span style={{ fontSize: "13px", color: "#666", fontFamily: "monospace" }}>
+            {risk}/100
+          </span>
+          {trend && (
+            <span style={{ fontSize: "14px", fontWeight: 700, color: trendFarg, fontFamily: "monospace", marginLeft: "auto" }}>
+              {trend}
+            </span>
+          )}
+        </div>
+
+        {/* 5-segment scale bar */}
+        <div style={{ padding: "0 14px 10px" }}>
+          <div style={{ display: "flex", height: "6px", borderRadius: "3px", overflow: "hidden", gap: "1px" }}>
+            {DRIFT_LEVELS.map((l, i) => {
+              const active = level.label === l.label;
+              return (
+                <div key={i} style={{
+                  flex: 1,
+                  background: active ? l.farg : `${l.farg}22`,
+                  transition: "background 0.3s",
+                  position: "relative",
+                }} />
+              );
+            })}
+          </div>
+          {/* Position marker */}
+          <div style={{ position: "relative", height: "8px", marginTop: "2px" }}>
+            <div style={{
+              position: "absolute",
+              left: `calc(${Math.min(risk, 99)}% - 4px)`,
+              top: 0,
+              width: 0,
+              height: 0,
+              borderLeft: "4px solid transparent",
+              borderRight: "4px solid transparent",
+              borderBottom: `6px solid ${level.farg}`,
+              transition: "left 0.4s ease",
+            }} />
+          </div>
+        </div>
+
+        {/* Secondary stats */}
+        <div style={{ display: "flex", gap: 0, borderTop: "1px solid #1a1a1a" }}>
+          {[
+            { label: "Gini", val: (latest.gini * 100).toFixed(1) + "%", farg: latest.gini > 0.45 ? "#f87171" : latest.gini > 0.3 ? "#facc15" : "#4ade80" },
+            { label: "Mobilitet", val: latest.mobilitet + "%", farg: latest.mobilitet < 30 ? "#f87171" : latest.mobilitet < 60 ? "#facc15" : "#4ade80" },
+          ].map(s => (
+            <div key={s.label} style={{ flex: 1, padding: "8px 14px", borderRight: "1px solid #1a1a1a" }}>
+              <div style={{ fontSize: "9px", color: "#555", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>{s.label}</div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: s.farg, fontFamily: "monospace" }}>{s.val}</div>
+            </div>
+          ))}
+          <div style={{ flex: 1, padding: "8px 14px", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+            <span style={{ fontSize: "11px", color: "#444", fontFamily: "monospace" }}>Fullständig analys →</span>
+          </div>
+        </div>
+      </div>
+    </a>
+  );
+}
+
 export default function DebattClient({ initialArticleCount = null }) {
   const [view, setView]     = useState("submit");
   const [title, setTitle]   = useState("");
@@ -594,6 +701,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [opinionWidget, setOpinionWidget] = useState({ fragor: [], rosterData: {} });
   const [opinionVoted, setOpinionVoted] = useState({});
+  const [civilisationDrift, setCivilisationDrift] = useState(null);
   const [agentKonversationer, setAgentKonversationer] = useState([]);
   const [agentUtmaningar, setAgentUtmaningar] = useState([]);
   const [agentSymboler, setAgentSymboler] = useState({});
@@ -678,6 +786,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchTrendingTopics().then(d => setTrendingTopics(d)).catch(() => {});
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
     fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
+    fetchCivilisationDrift().then(d => setCivilisationDrift(d)).catch(() => {});
     fetchSenasteAgentKonversationer().then(d => setAgentKonversationer(d)).catch(() => {});
     fetchSenasteUtmaningar().then(d => setAgentUtmaningar(d)).catch(() => {});
     // Agent-symboler för att visa ikoner på artikelkort
@@ -977,6 +1086,8 @@ export default function DebattClient({ initialArticleCount = null }) {
                 <span style={{ fontSize:"22px", fontWeight:700, fontFamily:"monospace", color:"#e879f9", letterSpacing:"0.08em" }}>{nextTimer}</span>
               </div>
             )}
+
+            <CivilisationDriftWidget data={civilisationDrift} />
 
             {senasteReplik && (
               <a href={`/artikel/${senasteReplik.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#050a1a", border: "1px solid #4a9eff30", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
