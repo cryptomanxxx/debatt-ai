@@ -1,1 +1,1 @@
-PLACEHOLDER - will be replaced
+placeholder - will be replaced
