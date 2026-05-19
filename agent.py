@@ -54,6 +54,80 @@ from supabase_utils import (
     hamta_agent_buffs, spara_dagboksinlagg,
 )
 
+def hamta_drama_kontext(sb_key, agent_a, agent_b):
+    """Hämtar dramatisk kontext mellan två agenter: symboler, market-bets, lobbying."""
+    SB = "https://fmwxftnistkoqazfwnuj.supabase.co"
+    hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    delar = []
+    try:
+        # Ägda symboler för båda
+        sym_r = httpx.get(
+            f"{SB}/rest/v1/agent_symboler?agent=in.({agent_a},{agent_b})&select=agent,vara_id,butik_varor(namn,kategori)",
+            headers={**hdrs, "Prefer": ""}, timeout=5,
+        )
+        if sym_r.is_success:
+            syms = sym_r.json()
+            for s in syms:
+                namn = s.get("butik_varor", {}).get("namn", "")
+                kat = s.get("butik_varor", {}).get("kategori", "")
+                if namn:
+                    delar.append(f"{s['agent']} äger symbolen \"{namn}\" ({kat})")
+
+        # Motståndande market-bets (samma market, olika sida)
+        bets_r = httpx.get(
+            f"{SB}/rest/v1/agent_bets?agent=in.({agent_a},{agent_b})&select=agent,market_id,sannolikhet,markets(titel)",
+            headers={**hdrs, "Prefer": ""}, timeout=5,
+        )
+        if bets_r.is_success:
+            bets = bets_r.json()
+            bets_by_market = {}
+            for b in bets:
+                mid = b["market_id"]
+                bets_by_market.setdefault(mid, []).append(b)
+            for mid, bs in bets_by_market.items():
+                if len(bs) == 2:
+                    a_bet = next((b for b in bs if b["agent"] == agent_a), None)
+                    b_bet = next((b for b in bs if b["agent"] == agent_b), None)
+                    if a_bet and b_bet:
+                        titel = (a_bet.get("markets") or {}).get("titel", f"market {mid}")
+                        pa = a_bet["sannolikhet"]
+                        pb = b_bet["sannolikhet"]
+                        if abs(pa - pb) >= 20:
+                            delar.append(
+                                f"På market \"{titel[:60]}\" har {agent_a} bettad {pa}% och {agent_b} {pb}% — de är oense"
+                            )
+
+        # Lobbyinghistorik mellan dem
+        lob_r = httpx.get(
+            f"{SB}/rest/v1/lobbying_log?or=(and(lobbying_agent.eq.{agent_a},mal_agent.eq.{agent_b}),and(lobbying_agent.eq.{agent_b},mal_agent.eq.{agent_a}))&select=lobbying_agent,mal_agent,resultat,belopp&order=skapad.desc&limit=3",
+            headers={**hdrs, "Prefer": ""}, timeout=5,
+        )
+        if lob_r.is_success:
+            for l in lob_r.json():
+                res = "lyckades" if l["resultat"] == "accepterat" else "misslyckades"
+                delar.append(
+                    f"{l['lobbying_agent']} försökte lobbya {l['mal_agent']} med {l['belopp']} kr och {res}"
+                )
+
+        # Andrahandsauktioner — bjuder de mot varandra?
+        auk_r = httpx.get(
+            f"{SB}/rest/v1/butik_auktioner?status=eq.öppen&select=saljare,hogst_budgivare,butik_varor(namn)&or=(saljare.eq.{agent_a},saljare.eq.{agent_b},hogst_budgivare.eq.{agent_a},hogst_budgivare.eq.{agent_b})",
+            headers={**hdrs, "Prefer": ""}, timeout=5,
+        )
+        if auk_r.is_success:
+            for a in auk_r.json():
+                saljare = a.get("saljare", "")
+                budgivare = a.get("hogst_budgivare", "")
+                vara = (a.get("butik_varor") or {}).get("namn", "en symbol")
+                if saljare in (agent_a, agent_b) and budgivare in (agent_a, agent_b) and saljare != budgivare:
+                    delar.append(f"{saljare} säljer \"{vara}\" på auktion och {budgivare} är högst budgivare")
+
+    except Exception:
+        pass
+
+    return "\n".join(delar[:5]) if delar else ""
+
+
 SYMBOL_PREFERENSER = {
     "Nationalekonom":       ["Expert", "Analytiker", "Tankledare", "Inflytelsefull", "Elite"],
     "Miljöaktivist":        ["Fredsmäklare", "Visionär", "Sanningens Röst", "Byggare", "Innovatör"],
@@ -624,6 +698,10 @@ def main():
             if aa_relation:
                 print(f"  Relation: {aa_relation}")
 
+            drama = hamta_drama_kontext(sb_key, agent["namn"], mottagare["namn"])
+            if drama:
+                print(f"  Drama-kontext: {drama[:100]}…")
+
             # Tonstyrning baserat på besökarparametrar
             konflikt_ton = (
                 "försiktig och nyfiken" if konfliktniva < 33 else
@@ -645,13 +723,18 @@ def main():
                 f"\nRELATIONSKONTEXT: {aa_relation} Anpassa tonen utifrån er relation."
                 if aa_relation else ""
             )
+            drama_tillagg = (
+                f"\nDRAMATISK BAKGRUND (verklig historia mellan er — referera gärna till detta konkret i frågan):\n{drama}"
+                if drama else ""
+            )
 
             fraga_prompt = (
                 f"Du är {agent['namn']}. Du har just skrivit om ämnet: \"{amne[:120]}\".\n"
-                f"Formulera en kort fråga (max 120 tecken) till {mottagare['namn']} om detta ämne. "
+                f"Formulera en kort fråga (max 130 tecken) till {mottagare['namn']}. "
+                f"Om du har en dramatisk bakgrund med denna agent (symbolköp, lobbying, market-bets) — referera gärna till det i frågan för att göra den mer personlig och intressant. "
                 f"Din ton ska vara {konflikt_ton} och {sinne_ton}. "
                 f"Svara ENBART med frågan, inga inledningsfraser."
-                + relation_tillagg
+                + relation_tillagg + drama_tillagg
             )
             fraga_payload = {
                 "model": "llama-3.3-70b-versatile",
@@ -672,6 +755,10 @@ def main():
                 + (
                     f"\nRELATIONSKONTEXT: {aa_relation} Allierade svarar mer öppet, rivaler mer kritiskt."
                     if aa_relation else ""
+                )
+                + (
+                    f"\nDRAMATISK BAKGRUND (din verkliga historia med {agent['namn']} — du KAN referera till detta i svaret):\n{drama}"
+                    if drama else ""
                 )
             )
             svar_payload = {
