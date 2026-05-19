@@ -623,7 +623,7 @@ def main():
         else:
             print("  Inga nya lagförslag att rösta på")
 
-        if agent["namn"] not in ROST_AGENTER and random.random() < 0.12:
+        if agent["namn"] not in ROST_AGENTER and random.random() < 0.25:
             ok_lag = skapa_lagforslag_ai(agent, sb_key, amne)
             if ok_lag:
                 print(f"  ✓ Nytt lagförslag skapat av {agent['namn']}")
