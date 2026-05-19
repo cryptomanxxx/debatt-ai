@@ -1110,13 +1110,13 @@ def spara_lag_rost(sb_key: str, lagforslag_id: int, agent_namn: str, rod: str, m
 
 
 def rösta_på_lagforslag_block(agent: dict, sb_key: str) -> int:
-    """Agent röstar på öppna lagförslag den inte röstat på (max 2 per körning)."""
+    """Agent röstar på öppna lagförslag den inte röstat på (max 5 per körning)."""
     forslag = hamta_lagforslag(sb_key)
     if not forslag:
         return 0
     antal = 0
     for f in forslag:
-        if antal >= 2:
+        if antal >= 5:
             break
         if agent["namn"] in hamta_lag_roster_agenter(sb_key, f["id"]):
             continue
@@ -1141,7 +1141,10 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str) -> int:
             try:
                 raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
             except Exception:
-                raw = gemini_post(agent["system"][:600], prompt, max_tokens=120)
+                try:
+                    raw = github_models_post(payload).json()["choices"][0]["message"]["content"].strip()
+                except Exception:
+                    raw = gemini_post(agent["system"][:600], prompt, max_tokens=120)
 
             rod, motivering = "avstar", ""
             for line in raw.splitlines():
