@@ -422,34 +422,104 @@ function isEligible(r) {
   return r && r.arg >= MIN_SCORE && r.ori >= MIN_SCORE && r.rel >= MIN_SCORE && r.tro >= MIN_SCORE;
 }
 
-function useNextAgentTimer() {
-  const [timeLeft, setTimeLeft] = useState("");
+const ALLA_KÖRNINGAR = [
+  { h: 7,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
+  { h: 8,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
+  { h: 9,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
+  { h: 10, m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
+  { h: 11, m: 0,  namn: "Butiken",         farg: "#f59e0b", ikon: "🛍" },
+  { h: 11, m: 30, namn: "Andrahandsmkn",   farg: "#e879f9", ikon: "🔨" },
+  { h: 12, m: 0,  namn: "Parlamentet",     farg: "#a78bfa", ikon: "🏛" },
+  { h: 12, m: 30, namn: "Lobbying",        farg: "#f87171", ikon: "💰" },
+  { h: 13, m: 0,  namn: "Koalitioner",     farg: "#34d399", ikon: "🤝" },
+  { h: 13, m: 30, namn: "Ekonomispel",     farg: "#e8d5a3", ikon: "💸" },
+  { h: 15, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
+  { h: 16, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
+  { h: 17, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
+  { h: 18, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
+  { h: 19, m: 0,  namn: "Egna artiklar",   farg: "#e879f9", ikon: "📝" },
+  { h: 20, m: 0,  namn: "Egna artiklar",   farg: "#e879f9", ikon: "📝" },
+  { h: 21, m: 0,  namn: "Egna artiklar",   farg: "#e879f9", ikon: "📝" },
+  { h: 22, m: 0,  namn: "Egna artiklar",   farg: "#e879f9", ikon: "📝" },
+];
+
+function svTidSek() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }).formatToParts(now);
+  const h = parseInt(parts.find(p => p.type === "hour").value);
+  const m = parseInt(parts.find(p => p.type === "minute").value);
+  const s = parseInt(parts.find(p => p.type === "second").value);
+  return h * 3600 + m * 60 + s;
+}
+
+function useNastaKorning() {
+  const [state, setState] = useState({ timeLeft: "", namn: "", farg: "#e879f9", ikon: "⚙", nextIdx: 0 });
   useEffect(() => {
-    const SCHEMA = [9, 13, 17, 21]; // Swedish time
     function calc() {
-      const now = new Date();
-      const parts = new Intl.DateTimeFormat("sv-SE", {
-        timeZone: "Europe/Stockholm",
-        hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-      }).formatToParts(now);
-      const h = parseInt(parts.find(p => p.type === "hour").value);
-      const m = parseInt(parts.find(p => p.type === "minute").value);
-      const s = parseInt(parts.find(p => p.type === "second").value);
-      const nowSec = h * 3600 + m * 60 + s;
-      const nextIdx = SCHEMA.findIndex(sh => sh * 3600 > nowSec);
-      const nextHour = nextIdx === -1 ? SCHEMA[0] : SCHEMA[nextIdx];
-      const nextSec = nextHour * 3600 + (nextIdx === -1 ? 86400 : 0);
+      const nowSec = svTidSek();
+      const idx = ALLA_KÖRNINGAR.findIndex(k => k.h * 3600 + k.m * 60 > nowSec);
+      const next = idx === -1 ? ALLA_KÖRNINGAR[0] : ALLA_KÖRNINGAR[idx];
+      const nextSec = next.h * 3600 + next.m * 60 + (idx === -1 ? 86400 : 0);
       const diff = nextSec - nowSec;
       const hh = Math.floor(diff / 3600);
       const mm = Math.floor((diff % 3600) / 60);
       const ss = diff % 60;
-      setTimeLeft(`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`);
+      setState({
+        timeLeft: `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}:${String(ss).padStart(2,"0")}`,
+        namn: next.namn,
+        farg: next.farg,
+        ikon: next.ikon,
+        nextIdx: idx,
+      });
     }
     calc();
     const iv = setInterval(calc, 1000);
     return () => clearInterval(iv);
   }, []);
-  return timeLeft;
+  return state;
+}
+
+function DagensSchema({ nextIdx }) {
+  const [nowSec, setNowSec] = useState(null);
+  useEffect(() => {
+    setNowSec(svTidSek());
+    const iv = setInterval(() => setNowSec(svTidSek()), 30000);
+    return () => clearInterval(iv);
+  }, []);
+  return (
+    <div style={{ marginBottom: "24px", background: "#0a0a0f", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+        <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Dagens schema</span>
+        <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>18 körningar · svensk tid</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+        {ALLA_KÖRNINGAR.map((k, i) => {
+          const eventSec = k.h * 3600 + k.m * 60;
+          const past = nowSec !== null && eventSec < nowSec;
+          const isNext = i === nextIdx || (nextIdx === -1 && i === 0);
+          const tid = `${String(k.h).padStart(2, "0")}:${String(k.m).padStart(2, "0")}`;
+          return (
+            <div key={i} style={{
+              display: "flex", alignItems: "center", gap: "8px",
+              padding: "4px 8px", borderRadius: "4px",
+              background: isNext ? `${k.farg}12` : "transparent",
+              border: `1px solid ${isNext ? k.farg + "40" : "transparent"}`,
+              opacity: past ? 0.3 : 1,
+            }}>
+              <span style={{ fontSize: "11px", color: past ? "#333" : isNext ? k.farg : "#555", fontFamily: "monospace", width: "34px", flexShrink: 0 }}>{tid}</span>
+              <span style={{ fontSize: "11px", flexShrink: 0 }}>{k.ikon}</span>
+              <span style={{ fontSize: "11px", color: past ? "#333" : isNext ? k.farg : "#666", fontFamily: "monospace", flex: 1 }}>{k.namn}</span>
+              {isNext && <span style={{ fontSize: "9px", color: k.farg, fontFamily: "monospace", letterSpacing: "0.06em", flexShrink: 0 }}>← NÄSTA</span>}
+              {past && <span style={{ fontSize: "11px", color: "#2a2a2a", flexShrink: 0 }}>✓</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ── Starfield ─────────────────────────────────────────────────────────────────
@@ -721,7 +791,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [kontaktSvar, setKontaktSvar]             = useState("");
   const [kontaktTurnstile, setKontaktTurnstile]   = useState(null);
   const [kontaktLoading, setKontaktLoading] = useState(false);
-  const nextTimer = useNextAgentTimer();
+  const nastaKorning = useNastaKorning();
 
   function navigate(newView) {
     const urls = { submit: "/", debatter: "/?debatter=1", kontakt: "/?kontakt=1" };
@@ -1075,14 +1145,17 @@ export default function DebattClient({ initialArticleCount = null }) {
               />
             </div>
 
-            {nextTimer && (
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"24px", padding:"14px 20px", background:"#0a0a0f", border:"1px solid #e879f920", borderRadius:"8px", flexWrap:"wrap", gap:"8px" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                  <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:"#e879f9", boxShadow:"0 0 8px #e879f9", animation:"neonPulse 2.4s ease-in-out infinite" }} />
-                  <span style={{ fontSize:"12px", color:"#aaaaaa", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"monospace" }}>Nästa AI-körning</span>
+            {nastaKorning.timeLeft && (
+              <>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px", padding:"14px 20px", background:"#0a0a0f", border:`1px solid ${nastaKorning.farg}20`, borderRadius:"8px", flexWrap:"wrap", gap:"8px" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                    <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:nastaKorning.farg, boxShadow:`0 0 8px ${nastaKorning.farg}`, animation:"neonPulse 2.4s ease-in-out infinite" }} />
+                    <span style={{ fontSize:"12px", color:"#aaaaaa", letterSpacing:"0.1em", textTransform:"uppercase", fontFamily:"monospace" }}>{nastaKorning.ikon} {nastaKorning.namn}</span>
+                  </div>
+                  <span style={{ fontSize:"22px", fontWeight:700, fontFamily:"monospace", color:nastaKorning.farg, letterSpacing:"0.08em" }}>{nastaKorning.timeLeft}</span>
                 </div>
-                <span style={{ fontSize:"22px", fontWeight:700, fontFamily:"monospace", color:"#e879f9", letterSpacing:"0.08em" }}>{nextTimer}</span>
-              </div>
+                <DagensSchema nextIdx={nastaKorning.nextIdx} />
+              </>
             )}
 
             <CivilisationDriftWidget data={civilisationDrift} />
