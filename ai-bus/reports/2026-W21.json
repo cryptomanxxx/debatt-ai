@@ -1,6 +1,6 @@
 {
   "week": "2026-W21",
-  "generated": "2026-05-19T17:13:32.155Z",
+  "generated": "2026-05-19T17:34:25.335Z",
   "ai_providers": {},
   "plattform": {
     "artiklar_publicerade": 87,
@@ -57,9 +57,9 @@
     ]
   },
   "ai_bus": {
-    "pending": 3,
-    "implemented": 7,
-    "rejected": 5
+    "pending": 0,
+    "implemented": 9,
+    "rejected": 7
   },
   "vs_prev_week": null
 }
