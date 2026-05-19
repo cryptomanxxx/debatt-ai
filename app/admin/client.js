@@ -28,20 +28,25 @@ function sbHeaders() {
   };
 }
 
-async function fetchInlamningar() {
-  const res = await fetch(`${SB_URL}/rest/v1/inlamningar?select=*&order=skapad.desc`, {
-    headers: sbHeaders(),
+const INL_PAGE = 50;
+const ART_PAGE = 50;
+
+async function fetchInlamningar(offset = 0) {
+  const res = await fetch(`${SB_URL}/rest/v1/inlamningar?select=*&order=skapad.desc&limit=${INL_PAGE}&offset=${offset}`, {
+    headers: { ...sbHeaders(), "Prefer": "count=exact" },
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  const total = parseInt(res.headers.get("content-range")?.split("/")[1] ?? "0", 10);
+  return { rows: await res.json(), total };
 }
 
-async function fetchArtiklar() {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc`, {
-    headers: sbHeaders(),
+async function fetchArtiklar(offset = 0) {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc&limit=${ART_PAGE}&offset=${offset}`, {
+    headers: { ...sbHeaders(), "Prefer": "count=exact" },
   });
   if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  const total = parseInt(res.headers.get("content-range")?.split("/")[1] ?? "0", 10);
+  return { rows: await res.json(), total };
 }
 
 async function updateStatus(id, status) {
@@ -2100,13 +2105,21 @@ export default function AdminClient() {
 
   // Inlamningar state
   const [inlamningar, setInlamningar] = useState([]);
+  const [inlTotal, setInlTotal]       = useState(0);
+  const [inlOffset, setInlOffset]     = useState(0);
   const [loadingInl, setLoadingInl]   = useState(false);
+  const [loadingMoreInl, setLoadingMoreInl] = useState(false);
   const [filter, setFilter]           = useState("alla");
+  const [inlSearch, setInlSearch]     = useState("");
   const [expanded, setExpanded]       = useState(null);
 
   // Artiklar state
   const [artiklar, setArtiklar]       = useState([]);
+  const [artTotal, setArtTotal]       = useState(0);
+  const [artOffset, setArtOffset]     = useState(0);
   const [loadingArt, setLoadingArt]   = useState(false);
+  const [loadingMoreArt, setLoadingMoreArt] = useState(false);
+  const [artSearch, setArtSearch]     = useState("");
   const [editingId, setEditingId]     = useState(null);
   const [editData, setEditData]       = useState({});
 
@@ -2132,33 +2145,49 @@ export default function AdminClient() {
     if (!silent) setLoadingInl(true);
     setError("");
     try {
-      const data = await fetchInlamningar();
-      setInlamningar(prev => {
-        const prevKey = prev.map(a => `${a.id}:${a.status}`).join(",");
-        const newKey  = data.map(a => `${a.id}:${a.status}`).join(",");
-        return prevKey === newKey ? prev : data;
-      });
+      const { rows, total } = await fetchInlamningar(0);
+      setInlOffset(INL_PAGE);
+      setInlTotal(total);
+      setInlamningar(rows);
     } catch (e) {
       if (!silent) setError("Kunde inte hämta inlämningar: " + e.message);
     }
     if (!silent) setLoadingInl(false);
   }, []);
 
+  const loadMoreInlamningar = useCallback(async () => {
+    setLoadingMoreInl(true);
+    try {
+      const { rows } = await fetchInlamningar(inlOffset);
+      setInlOffset(o => o + INL_PAGE);
+      setInlamningar(prev => [...prev, ...rows]);
+    } catch (e) { setError("Fel: " + e.message); }
+    setLoadingMoreInl(false);
+  }, [inlOffset]);
+
   const loadArtiklar = useCallback(async (silent = false) => {
     if (!silent) setLoadingArt(true);
     setError("");
     try {
-      const data = await fetchArtiklar();
-      setArtiklar(prev => {
-        const prevKey = prev.map(a => `${a.id}`).join(",");
-        const newKey  = data.map(a => `${a.id}`).join(",");
-        return prevKey === newKey ? prev : data;
-      });
+      const { rows, total } = await fetchArtiklar(0);
+      setArtOffset(ART_PAGE);
+      setArtTotal(total);
+      setArtiklar(rows);
     } catch (e) {
       if (!silent) setError("Kunde inte hämta artiklar: " + e.message);
     }
     if (!silent) setLoadingArt(false);
   }, []);
+
+  const loadMoreArtiklar = useCallback(async () => {
+    setLoadingMoreArt(true);
+    try {
+      const { rows } = await fetchArtiklar(artOffset);
+      setArtOffset(o => o + ART_PAGE);
+      setArtiklar(prev => [...prev, ...rows]);
+    } catch (e) { setError("Fel: " + e.message); }
+    setLoadingMoreArt(false);
+  }, [artOffset]);
 
   const loadKommentarer = useCallback(async (silent = false) => {
     if (!silent) setLoadingKomm(true);
@@ -2282,9 +2311,14 @@ export default function AdminClient() {
     setActionLoading(null);
   }
 
-  const filteredInl = inlamningar.filter(a =>
-    filter === "alla" ? true : a.status === filter
-  );
+  const filteredInl = inlamningar.filter(a => {
+    if (filter !== "alla" && a.status !== filter) return false;
+    if (inlSearch) {
+      const q = inlSearch.toLowerCase();
+      return (a.rubrik||"").toLowerCase().includes(q) || (a.forfattare||"").toLowerCase().includes(q);
+    }
+    return true;
+  });
   const counts = {
     alla: inlamningar.length,
     inkorg: inlamningar.filter(a => a.status === "inkorg").length,
@@ -2360,13 +2394,20 @@ export default function AdminClient() {
         {/* ── INLÄMNINGAR ── */}
         {mainTab === "inlamningar" && (
           <>
-            <div style={{ display:"flex", gap:"8px", marginBottom:"28px", flexWrap:"wrap" }}>
+            <div style={{ display:"flex", gap:"8px", marginBottom:"16px", flexWrap:"wrap", alignItems:"center" }}>
               {[["alla","Alla"],["inkorg","Inkorg"],["publicerad","Publicerade"],["avvisad","Avvisade"]].map(([val,lbl]) => (
                 <button key={val} onClick={() => setFilter(val)} style={{ background:filter===val?`${C.accent}15`:"transparent", border:`1px solid ${filter===val?C.accentDim:C.border}`, color:filter===val?C.accent:C.textMuted, padding:"6px 14px", borderRadius:"4px", cursor:"pointer", fontSize:"13px", fontFamily:"Georgia, serif" }}>
                   {lbl} ({counts[val]})
                 </button>
               ))}
+              <span style={{ fontSize:"12px", color:C.textMuted, marginLeft:"auto" }}>{inlTotal} totalt i databasen</span>
             </div>
+            <input
+              placeholder="Sök rubrik eller författare…"
+              value={inlSearch}
+              onChange={e => setInlSearch(e.target.value)}
+              style={{ ...inp, marginBottom:"24px", maxWidth:"400px" }}
+            />
 
             {loadingInl ? <p style={{ color:C.textMuted }}>Laddar…</p>
               : filteredInl.length === 0 ? <p style={{ color:C.textMuted }}>Inga inlämningar.</p>
@@ -2428,17 +2469,32 @@ export default function AdminClient() {
                 </div>
               </div>
             ))}
+            {!inlSearch && inlamningar.length < inlTotal && (
+              <div style={{ textAlign:"center", padding:"16px 0 8px" }}>
+                <button onClick={loadMoreInlamningar} disabled={loadingMoreInl} style={{ background:"transparent", border:`1px solid ${C.accentDim}`, color:C.accent, borderRadius:"4px", padding:"10px 28px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                  {loadingMoreInl ? "Laddar…" : `Ladda fler (visar ${inlamningar.length} av ${inlTotal})`}
+                </button>
+              </div>
+            )}
           </>
         )}
 
         {/* ── PUBLICERADE ARTIKLAR ── */}
         {mainTab === "artiklar" && (
           <>
-            <p style={{ color:C.textMuted, fontSize:"14px", margin:"0 0 24px 0" }}>{artiklar.length} publicerade artiklar. Redigering och borttagning sker direkt i databasen.</p>
+            <div style={{ display:"flex", gap:"12px", alignItems:"center", marginBottom:"16px", flexWrap:"wrap" }}>
+              <p style={{ color:C.textMuted, fontSize:"14px", margin:0 }}>Visar {artiklar.length} av {artTotal} publicerade artiklar.</p>
+            </div>
+            <input
+              placeholder="Sök rubrik eller författare…"
+              value={artSearch}
+              onChange={e => setArtSearch(e.target.value)}
+              style={{ ...inp, marginBottom:"24px", maxWidth:"400px" }}
+            />
 
             {loadingArt ? <p style={{ color:C.textMuted }}>Laddar…</p>
-              : artiklar.length === 0 ? <p style={{ color:C.textMuted }}>Inga publicerade artiklar.</p>
-              : artiklar.map(a => (
+              : artiklar.filter(a => !artSearch || (a.rubrik||"").toLowerCase().includes(artSearch.toLowerCase()) || (a.forfattare||"").toLowerCase().includes(artSearch.toLowerCase())).length === 0 ? <p style={{ color:C.textMuted }}>Inga publicerade artiklar.</p>
+              : artiklar.filter(a => !artSearch || (a.rubrik||"").toLowerCase().includes(artSearch.toLowerCase()) || (a.forfattare||"").toLowerCase().includes(artSearch.toLowerCase())).map(a => (
               <div key={a.id} style={{ borderTop:`1px solid ${C.border}`, paddingTop:"24px", marginBottom:"24px" }}>
                 {editingId === a.id ? (
                   /* ── Edit form ── */
@@ -2511,6 +2567,13 @@ export default function AdminClient() {
                 )}
               </div>
             ))}
+            {!artSearch && artiklar.length < artTotal && (
+              <div style={{ textAlign:"center", padding:"16px 0 8px" }}>
+                <button onClick={loadMoreArtiklar} disabled={loadingMoreArt} style={{ background:"transparent", border:`1px solid ${C.accentDim}`, color:C.accent, borderRadius:"4px", padding:"10px 28px", fontSize:"13px", cursor:"pointer", fontFamily:"Georgia, serif" }}>
+                  {loadingMoreArt ? "Laddar…" : `Ladda fler (visar ${artiklar.length} av ${artTotal})`}
+                </button>
+              </div>
+            )}
           </>
         )}
 
