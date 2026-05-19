@@ -18,7 +18,7 @@ import os
 import sys
 from datetime import datetime, timezone
 
-from ai_klient import groq_post, gemini_post, github_models_post, fireworks_post, deepseek_post, cloudflare_post
+from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post
 
 from agenter import (
     AGENTER, ANALYTIKER, ROST_AGENTER, MARKET_AGENTER,
@@ -59,7 +59,6 @@ from supabase_utils import (
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
     """Försöker alla providers i ordning för korta LLM-anrop (frågor, svar, etc.)."""
     for fn in [lambda: groq_post(payload),
-               lambda: fireworks_post(payload),
                lambda: deepseek_post(payload),
                lambda: github_models_post(payload)]:
         try:

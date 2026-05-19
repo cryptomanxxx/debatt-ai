@@ -28,7 +28,7 @@ import urllib.parse
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 
-from ai_klient import groq_post, gemini_post, github_models_post, fireworks_post, deepseek_post, cloudflare_post
+from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post
 from agenter import OPINION_FRAGOR
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
@@ -1140,10 +1140,9 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str) -> int:
             }
             raw = None
             for _name, _fn in [
-                ("Groq",   lambda: groq_post(payload)),
-                ("Fireworks", lambda: fireworks_post(payload)),
-                ("DeepSeek",  lambda: deepseek_post(payload)),
-                ("GitHub",    lambda: github_models_post(payload)),
+                ("Groq",     lambda: groq_post(payload)),
+                ("DeepSeek", lambda: deepseek_post(payload)),
+                ("GitHub",   lambda: github_models_post(payload)),
             ]:
                 try:
                     raw = _fn().json()["choices"][0]["message"]["content"].strip()
