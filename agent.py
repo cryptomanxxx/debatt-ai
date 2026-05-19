@@ -18,7 +18,7 @@ import os
 import sys
 from datetime import datetime, timezone
 
-from ai_klient import groq_post, gemini_post, github_models_post
+from ai_klient import groq_post, gemini_post, github_models_post, fireworks_post, deepseek_post, cloudflare_post
 
 from agenter import (
     AGENTER, ANALYTIKER, ROST_AGENTER, MARKET_AGENTER,
@@ -55,6 +55,23 @@ from supabase_utils import (
     hamta_agent_status,
     ta_oligarki_snapshot,
 )
+
+def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
+    """Försöker alla providers i ordning för korta LLM-anrop (frågor, svar, etc.)."""
+    for fn in [lambda: groq_post(payload),
+               lambda: fireworks_post(payload),
+               lambda: deepseek_post(payload),
+               lambda: github_models_post(payload)]:
+        try:
+            return fn().json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
+    try:
+        return cloudflare_post(system[:600], prompt, max_tokens=max_tokens).strip()
+    except Exception:
+        pass
+    return gemini_post(system[:600], prompt, max_tokens=max_tokens).strip()
+
 
 def hamta_drama_kontext(sb_key, agent_a, agent_b):
     """Hämtar dramatisk kontext mellan två agenter: symboler, market-bets, lobbying."""
@@ -758,13 +775,7 @@ def main():
                 ],
                 "max_tokens": 80, "temperature": 0.9,
             }
-            try:
-                fraga_text = groq_post(fraga_payload).json()["choices"][0]["message"]["content"].strip().strip('"')
-            except Exception:
-                try:
-                    fraga_text = github_models_post(fraga_payload).json()["choices"][0]["message"]["content"].strip().strip('"')
-                except Exception:
-                    fraga_text = gemini_post(agent.get("system", "")[:600], fraga_prompt, max_tokens=80).strip().strip('"')
+            fraga_text = _llm_kort(fraga_payload, agent.get("system", ""), fraga_prompt, max_tokens=80).strip('"')
 
             svar_innehall = (
                 f"{agent['namn']} frågar dig: \"{fraga_text}\"\n"
@@ -786,13 +797,7 @@ def main():
                 ],
                 "max_tokens": 200, "temperature": 0.9,
             }
-            try:
-                svar_text = groq_post(svar_payload).json()["choices"][0]["message"]["content"].strip()
-            except Exception:
-                try:
-                    svar_text = github_models_post(svar_payload).json()["choices"][0]["message"]["content"].strip()
-                except Exception:
-                    svar_text = gemini_post(mottagare.get("system", "")[:600], svar_innehall, max_tokens=200).strip()
+            svar_text = _llm_kort(svar_payload, mottagare.get("system", ""), svar_innehall, max_tokens=200)
 
             httpx.post(
                 f"{SB_URL_LOCAL}/rest/v1/agent_fragor",
@@ -844,13 +849,7 @@ def main():
                 ],
                 "max_tokens": 80, "temperature": 0.9,
             }
-            try:
-                fraga_text2 = groq_post(fraga_payload2).json()["choices"][0]["message"]["content"].strip().strip('"')
-            except Exception:
-                try:
-                    fraga_text2 = github_models_post(fraga_payload2).json()["choices"][0]["message"]["content"].strip().strip('"')
-                except Exception:
-                    fraga_text2 = gemini_post(agent.get("system", "")[:600], fraga_prompt2, max_tokens=80).strip().strip('"')
+            fraga_text2 = _llm_kort(fraga_payload2, agent.get("system", ""), fraga_prompt2, max_tokens=80).strip('"')
 
             svar_innehall2 = (
                 f"{agent['namn']} frågar dig: \"{fraga_text2}\"\n"
@@ -864,13 +863,7 @@ def main():
                 ],
                 "max_tokens": 200, "temperature": 0.9,
             }
-            try:
-                svar_text2 = groq_post(svar_payload2).json()["choices"][0]["message"]["content"].strip()
-            except Exception:
-                try:
-                    svar_text2 = github_models_post(svar_payload2).json()["choices"][0]["message"]["content"].strip()
-                except Exception:
-                    svar_text2 = gemini_post(mottagare2.get("system", "")[:600], svar_innehall2, max_tokens=200).strip()
+            svar_text2 = _llm_kort(svar_payload2, mottagare2.get("system", ""), svar_innehall2, max_tokens=200)
 
             httpx.post(
                 f"{SB_URL_LOCAL2}/rest/v1/agent_fragor",

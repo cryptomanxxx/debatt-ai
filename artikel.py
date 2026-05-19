@@ -10,7 +10,7 @@ innehåller:
   skriv_kommentar()         – kort kommentar (2–3 meningar) på en artikel
 """
 
-from ai_klient import groq_post, gemini_post, github_models_post
+from ai_klient import groq_post, gemini_post, github_models_post, fireworks_post, deepseek_post, cloudflare_post
 from agenter import ARTIKELFORMAT, get_agent_mood
 
 
@@ -67,18 +67,22 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
             {"role": "user", "content": user_msg},
         ],
     }
+    for name, fn in [("Groq", lambda: groq_post(payload)),
+                     ("Fireworks", lambda: fireworks_post(payload)),
+                     ("DeepSeek", lambda: deepseek_post(payload)),
+                     ("GitHub Models", lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}))]:
+        try:
+            result = fn().json()["choices"][0]["message"]["content"]
+            print(f"  ✓ {name}: artikel klar")
+            return result
+        except Exception as e:
+            print(f"  {name} misslyckades ({e}) — försöker nästa...")
     try:
-        result = groq_post(payload).json()["choices"][0]["message"]["content"]
-        print("  ✓ Groq: artikel klar")
+        result = cloudflare_post(system, user_msg, max_tokens=max_tok)
+        print("  ✓ Cloudflare: artikel klar")
         return result
     except Exception as e:
-        print(f"  Groq misslyckades ({e}) — försöker GitHub Models...")
-    try:
-        result = github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
-        print("  ✓ GitHub Models: artikel klar")
-        return result
-    except Exception as e:
-        print(f"  GitHub Models misslyckades ({e}) — försöker Gemini...")
+        print(f"  Cloudflare misslyckades ({e}) — försöker Gemini...")
     result = gemini_post(system, user_msg, max_tokens=max_tok)
     print("  ✓ Gemini: artikel klar")
     return result
@@ -111,18 +115,22 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
             {"role": "user", "content": user_msg},
         ],
     }
+    for name, fn in [("Groq", lambda: groq_post(payload)),
+                     ("Fireworks", lambda: fireworks_post(payload)),
+                     ("DeepSeek", lambda: deepseek_post(payload)),
+                     ("GitHub Models", lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}))]:
+        try:
+            result = fn().json()["choices"][0]["message"]["content"]
+            print(f"  ✓ {name}: artikel klar")
+            return result
+        except Exception as e:
+            print(f"  {name} misslyckades ({e}) — försöker nästa...")
     try:
-        result = groq_post(payload).json()["choices"][0]["message"]["content"]
-        print("  ✓ Groq: artikel klar")
+        result = cloudflare_post(system, user_msg, max_tokens=max_tok)
+        print("  ✓ Cloudflare: artikel klar")
         return result
     except Exception as e:
-        print(f"  Groq misslyckades ({e}) — försöker GitHub Models...")
-    try:
-        result = github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
-        print("  ✓ GitHub Models: artikel klar")
-        return result
-    except Exception as e:
-        print(f"  GitHub Models misslyckades ({e}) — försöker Gemini...")
+        print(f"  Cloudflare misslyckades ({e}) — försöker Gemini...")
     result = gemini_post(system, user_msg, max_tokens=max_tok)
     print("  ✓ Gemini: artikel klar")
     return result
@@ -173,18 +181,22 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
             {"role": "user", "content": user_msg},
         ],
     }
+    for name, fn in [("Groq", lambda: groq_post(payload)),
+                     ("Fireworks", lambda: fireworks_post(payload)),
+                     ("DeepSeek", lambda: deepseek_post(payload)),
+                     ("GitHub Models", lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}))]:
+        try:
+            result = fn().json()["choices"][0]["message"]["content"]
+            print(f"  ✓ {name}: replik klar")
+            return result
+        except Exception as e:
+            print(f"  {name} misslyckades ({e}) — försöker nästa...")
     try:
-        result = groq_post(payload).json()["choices"][0]["message"]["content"]
-        print("  ✓ Groq: replik klar")
+        result = cloudflare_post(system, user_msg, max_tokens=max_tok)
+        print("  ✓ Cloudflare: replik klar")
         return result
     except Exception as e:
-        print(f"  Groq misslyckades ({e}) — försöker GitHub Models...")
-    try:
-        result = github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]
-        print("  ✓ GitHub Models: replik klar")
-        return result
-    except Exception as e:
-        print(f"  GitHub Models misslyckades ({e}) — försöker Gemini...")
+        print(f"  Cloudflare misslyckades ({e}) — försöker Gemini...")
     result = gemini_post(system, user_msg, max_tokens=max_tok)
     print("  ✓ Gemini: replik klar")
     return result
