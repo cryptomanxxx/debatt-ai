@@ -203,7 +203,6 @@ export default function OpinionClient() {
         const map = {};
         for (const r of rows) map[r.fraga] = r;
         setRosterData(map);
-        // Frågor i DB men inte i hårdkodad lista = agent-skapade
         const dynamic = rows
           .filter(r => !HARDCODED_SET.has(r.fraga))
           .map(r => ({ fraga: r.fraga, kategori: r.kategori || "övrigt", isAgent: true }));
@@ -250,7 +249,6 @@ export default function OpinionClient() {
 
   return (
     <div>
-      {/* Statistik-header */}
       <div style={{ marginBottom: "28px", display: "flex", gap: "24px", flexWrap: "wrap" }}>
         <div>
           <p style={{ fontSize: "11px", color: C.accentDim, fontFamily: "monospace", margin: "0 0 4px", letterSpacing: "0.1em" }}>FRÅGOR</p>
@@ -266,7 +264,6 @@ export default function OpinionClient() {
         </div>
       </div>
 
-      {/* Kategori-filter */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "28px" }}>
         {KATEGORIER.map(k => (
           <button key={k.id} onClick={() => { setAktivKat(k.id); setVisaAntal(PAGE_SIZE); }} style={{
@@ -281,7 +278,6 @@ export default function OpinionClient() {
         ))}
       </div>
 
-      {/* Frågor */}
       {fragor.map(({ fraga, kategori, isAgent }) => (
         <FragaKort key={fraga} fraga={fraga} kategori={kategori} rosterData={rosterData} onVote={onVote} isAgent={isAgent} />
       ))}
