@@ -2,6 +2,16 @@ name: AI-Ekonomi test
 
 on:
   workflow_dispatch:
+    inputs:
+      speltyp:
+        description: "Vilket spel ska köras?"
+        required: true
+        default: "slump"
+        type: choice
+        options:
+          - slump
+          - diktatorn
+          - ultimatum
 
 jobs:
   ekonomi:
@@ -28,4 +38,5 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYTHONUNBUFFERED: "1"
+          SPEL_TYP: ${{ github.event.inputs.speltyp }}
         run: python -u ekonomi_test.py
