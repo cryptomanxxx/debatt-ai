@@ -997,6 +997,9 @@ export default function DebattClient({ initialArticleCount = null }) {
       <header style={{ borderBottom: `1px solid ${C.border}`, padding: "0 20px", position: "sticky", top: 0, background: `${C.bg}f0`, backdropFilter: "blur(12px)", zIndex: 100 }}>
         <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
           <span className="neon-logo" onClick={() => { reset(); setMenuOpen(false); }} style={{ fontFamily: "Times New Roman, serif", fontSize: "20px", fontWeight: 700, color: "#e879f9", cursor: "pointer", padding: "10px 16px 10px 0", flexShrink: 0 }}>DEBATT-AI</span>
+          <button className="hamburger-btn" onClick={() => setMenuOpen(m => !m)} aria-label="Öppna meny">
+            {menuOpen ? "✕" : "☰"}
+          </button>
           <div className={`nav-links${menuOpen ? " open" : ""}`}>
             {[["submit","Hem"],["debatter","Debatter"]].map(([v,lbl])=>(
               <button key={v} onClick={()=>{ navigate(v); setMenuOpen(false); }} className={view===v ? "neon-nav-active" : "neon-nav"}>{lbl}</button>
@@ -1019,11 +1022,6 @@ export default function DebattClient({ initialArticleCount = null }) {
             {visitors !== null && (
               <span style={{ fontSize: "12px", color: C.textMuted, marginLeft: "auto", paddingLeft: "12px", flexShrink: 0 }}>👁 {visitors.toLocaleString("sv-SE")}</span>
             )}
-          </div>
-          <div style={{ marginLeft: "auto", flexShrink: 0 }}>
-            <button className="hamburger-btn" onClick={() => setMenuOpen(m => !m)} aria-label="Öppna meny">
-              {menuOpen ? "✕" : "☰"}
-            </button>
           </div>
         </div>
       </header>
