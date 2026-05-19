@@ -5,7 +5,7 @@ const PROVIDERS = ["groq", "fireworks", "deepseek", "github_models", "cloudflare
 
 const LABELS = {
   groq:         "Groq — llama-3.3-70b-versatile",
-  fireworks:    "Fireworks AI — llama-v3p3-70b-instruct",
+  fireworks:    "Fireworks AI — llama-v3p1-70b-instruct",
   deepseek:     "DeepSeek — deepseek-chat (V3)",
   github_models:"GitHub Models — Llama-3.3-70B-Instruct",
   cloudflare:   "Cloudflare Workers AI — llama-3.3-70b-fp8-fast",

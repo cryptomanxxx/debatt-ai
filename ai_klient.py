@@ -96,7 +96,7 @@ def fireworks_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
         raise Exception("FIREWORKS_API_KEY saknas")
     url = "https://api.fireworks.ai/inference/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {**json_payload, "model": "accounts/fireworks/models/llama-v3p3-70b-instruct"}
+    payload = {**json_payload, "model": "accounts/fireworks/models/llama-v3p1-70b-instruct"}
     r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
     if r.status_code == 429:
         _nere.add("fireworks")
