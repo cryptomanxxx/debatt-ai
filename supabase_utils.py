@@ -1459,23 +1459,65 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
             f"Föreslå en koalition. Skriv ett kort, personligt förslag (2–3 meningar) i din karaktär — "
             f"förklara varför ni bör samarbeta och vad ni kan åstadkomma tillsammans:"
         )
-        forslag = groq_post(forslag_prompt, system="Du föreslår politiska allianser.", max_tokens=120)
+        forslag_system = "Du föreslår politiska allianser."
+        forslag = None
+        try:
+            forslag = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": forslag_system}, {"role": "user", "content": forslag_prompt}],
+                "max_tokens": 120, "temperature": 0.8,
+            }).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
         if not forslag:
-            forslag = gemini_post(forslag_prompt, system="Du föreslår politiska allianser.", max_tokens=120)
+            try:
+                forslag = gemini_post(forslag_system, forslag_prompt, max_tokens=120)
+            except Exception:
+                pass
+        if not forslag:
+            try:
+                forslag = github_models_post({
+                    "model": "Llama-3.3-70B-Instruct",
+                    "messages": [{"role": "system", "content": forslag_system}, {"role": "user", "content": forslag_prompt}],
+                    "max_tokens": 120, "temperature": 0.8,
+                }).json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                pass
         if not forslag:
             return False
 
         # Målagenten svarar
         svar_prompt = (
-            f"{mal_agent.get('systemprompt', f'Du är {mal_namn}.')}\n\n"
+            f"{mal_agent.get('system', f'Du är {mal_namn}.')}\n\n"
             f"{agent_namn} föreslår en koalition med dig i AI-parlamentet.\n"
             f"Ni har röstat lika på {alignment} motioner.\n\n"
             f"Förslaget: \"{forslag}\"\n\n"
             f"Svara EXAKT:\nBESLUT: accepterar eller avvisar\nSVAR: [1–2 meningar i din karaktär]"
         )
-        svar = groq_post(svar_prompt, system="Du besvarar politiska koalitionsförslag.", max_tokens=100)
+        svar_system = "Du besvarar politiska koalitionsförslag."
+        svar = None
+        try:
+            svar = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": svar_system}, {"role": "user", "content": svar_prompt}],
+                "max_tokens": 100, "temperature": 0.8,
+            }).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
         if not svar:
-            svar = gemini_post(svar_prompt, system="Du besvarar politiska koalitionsförslag.", max_tokens=100)
+            try:
+                svar = gemini_post(svar_system, svar_prompt, max_tokens=100)
+            except Exception:
+                pass
+        if not svar:
+            try:
+                svar = github_models_post({
+                    "model": "Llama-3.3-70B-Instruct",
+                    "messages": [{"role": "system", "content": svar_system}, {"role": "user", "content": svar_prompt}],
+                    "max_tokens": 100, "temperature": 0.8,
+                }).json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                pass
 
         beslut = "avvisar"
         svar_text = ""
@@ -1548,10 +1590,12 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
             headers=h, timeout=8,
         )
         if not res.is_success or not res.json():
+            print(f"  [lobbying] Avbryter: {agent_namn} har inga ja-röster i parlamentet (status={res.status_code})")
             return False
 
         forslag_ids = [r["lagforslag_id"] for r in res.json()]
         ids_str = ",".join(str(i) for i in forslag_ids)
+        print(f"  [lobbying] {agent_namn} har ja-röster på förslag: {forslag_ids}")
 
         # Filtrera till öppna motioner
         res2 = httpx.get(
@@ -1561,10 +1605,12 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
             headers=h, timeout=8,
         )
         if not res2.is_success or not res2.json():
+            print(f"  [lobbying] Avbryter: inga öppna motioner bland förslag {forslag_ids} (status={res2.status_code}, data={res2.text[:100]})")
             return False
 
         forslag = random.choice(res2.json())
         forslag_id = forslag["id"]
+        print(f"  [lobbying] Vald motion: {forslag['titel']} (id={forslag_id})")
 
         # Kontrollera saldo
         saldo_res = httpx.get(
@@ -1574,7 +1620,9 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         )
         saldo_data = saldo_res.json() if saldo_res.is_success else []
         saldo = saldo_data[0]["saldo"] if saldo_data else 0
+        print(f"  [lobbying] {agent_namn} saldo: {saldo} kr")
         if saldo < 80:
+            print(f"  [lobbying] Avbryter: saldo {saldo} < 80 kr")
             return False
 
         # Hitta kandidater att lobba (röstat nej eller ej röstat)
@@ -1590,7 +1638,9 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         nej_roster = [a for a, r in existerande.items() if r == "nej" and a != agent_namn]
         ej_rostat = [a for a in alla if a not in existerande]
         kandidater = nej_roster + ej_rostat[:4]
+        print(f"  [lobbying] Kandidater: nej={nej_roster}, ej_röstat_urval={ej_rostat[:4]}")
         if not kandidater:
+            print(f"  [lobbying] Avbryter: inga kandidater att lobba")
             return False
 
         mal_namn = random.choice(kandidater)
@@ -1602,17 +1652,39 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         belopp = random.choice([20, 30, 40, 50])
 
         # Agent formulerar lobbyingargument
-        lobby_prompt = (
+        lobby_system = "Du skriver politiska lobbyingargument."
+        lobby_user = (
             f"{agent.get('systemprompt', f'Du är {agent_namn}.')}\n\n"
             f"Du stödjer starkt denna motion i AI-parlamentet: \"{forslag['titel']}\"\n"
             f"Du vill lobba {mal_namn} att rösta JA. Du erbjuder {belopp} krediter ur din plånbok.\n"
             f"Ditt saldo: {saldo} kr.\n\n"
             f"Skriv ett kort, övertygande lobbyingargument (2 meningar) till {mal_namn}:"
         )
-        argument = groq_post(lobby_prompt, system="Du skriver politiska lobbyingargument.", max_tokens=120)
+        argument = None
+        try:
+            argument = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": lobby_system}, {"role": "user", "content": lobby_user}],
+                "max_tokens": 120, "temperature": 0.7,
+            }).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
         if not argument:
-            argument = gemini_post(lobby_prompt, system="Du skriver politiska lobbyingargument.", max_tokens=120)
+            try:
+                argument = gemini_post(lobby_system, lobby_user, max_tokens=120)
+            except Exception:
+                pass
         if not argument:
+            try:
+                argument = github_models_post({
+                    "model": "Llama-3.3-70B-Instruct",
+                    "messages": [{"role": "system", "content": lobby_system}, {"role": "user", "content": lobby_user}],
+                    "max_tokens": 120, "temperature": 0.7,
+                }).json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                pass
+        if not argument:
+            print("  [lobbying] Avbryter: kunde inte generera argument")
             return False
 
         # Målagenten beslutar
@@ -1633,9 +1705,30 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
             f"Din nuvarande ståndpunkt: {rod_fore}. Ditt saldo: {mal_saldo} kr.\n\n"
             f"Svara EXAKT:\nBESLUT: accepterar eller avvisar\nMOTIVERING: [1 mening]"
         )
-        mal_svar = groq_post(mal_prompt, system="Du fattar politiska beslut.", max_tokens=80)
+        mal_system = "Du fattar politiska beslut."
+        mal_svar = None
+        try:
+            mal_svar = groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": mal_system}, {"role": "user", "content": mal_prompt}],
+                "max_tokens": 80, "temperature": 0.7,
+            }).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
         if not mal_svar:
-            mal_svar = gemini_post(mal_prompt, system="Du fattar politiska beslut.", max_tokens=80)
+            try:
+                mal_svar = gemini_post(mal_system, mal_prompt, max_tokens=80)
+            except Exception:
+                pass
+        if not mal_svar:
+            try:
+                mal_svar = github_models_post({
+                    "model": "Llama-3.3-70B-Instruct",
+                    "messages": [{"role": "system", "content": mal_system}, {"role": "user", "content": mal_prompt}],
+                    "max_tokens": 80, "temperature": 0.7,
+                }).json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                pass
 
         resultat = "avvisat"
         motivering = ""
@@ -2005,9 +2098,30 @@ Svara EXAKT i detta format (inget annat):
 BELOPP: [heltal 0-100]
 MOTIVERING: [1–2 meningar som speglar din personlighet]"""
 
-    svar = groq_post(prompt, prompt, max_tokens=80)
+    system = agent.get('system', f'Du är {agent["namn"]}.')
+    svar = None
+    try:
+        svar = groq_post({
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            "max_tokens": 80, "temperature": 0.7,
+        }).json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        pass
     if not svar:
-        svar = gemini_post(prompt, prompt, max_tokens=80)
+        try:
+            svar = gemini_post(system, prompt, max_tokens=80)
+        except Exception:
+            pass
+    if not svar:
+        try:
+            svar = github_models_post({
+                "model": "Llama-3.3-70B-Instruct",
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                "max_tokens": 80, "temperature": 0.7,
+            }).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
     if not svar:
         return False
 
@@ -2097,9 +2211,30 @@ Svara EXAKT i detta format:
 ERBJUDANDE: [heltal 0-100] (detta är vad {b_namn} får, du behåller resten)
 MOTIVERING: [1–2 meningar]"""
 
-    svar = groq_post(prompt, prompt, max_tokens=80)
+    system = agent.get('system', f'Du är {agent["namn"]}.')
+    svar = None
+    try:
+        svar = groq_post({
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            "max_tokens": 80, "temperature": 0.7,
+        }).json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        pass
     if not svar:
-        svar = gemini_post(prompt, prompt, max_tokens=80)
+        try:
+            svar = gemini_post(system, prompt, max_tokens=80)
+        except Exception:
+            pass
+    if not svar:
+        try:
+            svar = github_models_post({
+                "model": "Llama-3.3-70B-Instruct",
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                "max_tokens": 80, "temperature": 0.7,
+            }).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
     if not svar:
         return False
 
@@ -2150,9 +2285,30 @@ Svara EXAKT i detta format:
 SVAR: accepterat eller avvisat
 MOTIVERING: [1–2 meningar]"""
 
-    svar = groq_post(prompt, prompt, max_tokens=80)
+    system = agent.get('system', f'Du är {agent["namn"]}.')
+    svar = None
+    try:
+        svar = groq_post({
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+            "max_tokens": 80, "temperature": 0.7,
+        }).json()["choices"][0]["message"]["content"].strip()
+    except Exception:
+        pass
     if not svar:
-        svar = gemini_post(prompt, prompt, max_tokens=80)
+        try:
+            svar = gemini_post(system, prompt, max_tokens=80)
+        except Exception:
+            pass
+    if not svar:
+        try:
+            svar = github_models_post({
+                "model": "Llama-3.3-70B-Instruct",
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+                "max_tokens": 80, "temperature": 0.7,
+            }).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
     if not svar:
         return False
 

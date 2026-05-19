@@ -1,4 +1,5 @@
 import { logAiCall } from "../../lib/logAiCall";
+import { providerReady, markProviderDown } from "../../lib/aiCircuitBreaker";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -79,7 +80,7 @@ En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer
 
   let svar = "";
 
-  if (process.env.GROQ_API_KEY) {
+  if (process.env.GROQ_API_KEY && providerReady("groq")) {
     const t0 = Date.now();
     try {
       const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -97,6 +98,7 @@ En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer
         svar = data.choices?.[0]?.message?.content?.trim() ?? "";
         logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
       } else {
+        if (res.status === 429) markProviderDown("groq");
         logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: `error_${res.status}`, latency_ms: Date.now() - t0 });
       }
     } catch {
@@ -104,7 +106,59 @@ En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer
     }
   }
 
-  if (!svar && process.env.GEMINI_API_KEY) {
+  if (!svar && process.env.CEREBRAS_API_KEY && providerReady("cerebras")) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CEREBRAS_API_KEY}` },
+        body: JSON.stringify({
+          model: "qwen-3-235b-a22b-instruct-2507",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
+          max_tokens: 300,
+          temperature: 0.9,
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        svar = data.choices?.[0]?.message?.content?.trim() ?? "";
+        logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
+      } else {
+        if (r.status === 429) markProviderDown("cerebras");
+        logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+      }
+    } catch {
+      logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
+  if (!svar && process.env.SAMBANOVA_API_KEY && providerReady("sambanova")) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch("https://api.sambanova.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.SAMBANOVA_API_KEY}` },
+        body: JSON.stringify({
+          model: "Meta-Llama-3.3-70B-Instruct",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
+          max_tokens: 300,
+          temperature: 0.9,
+        }),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        svar = data.choices?.[0]?.message?.content?.trim() ?? "";
+        logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
+      } else {
+        if (r.status === 429) markProviderDown("sambanova");
+        logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+      }
+    } catch {
+      logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
+  if (!svar && process.env.GEMINI_API_KEY && providerReady("gemini")) {
     const t0 = Date.now();
     try {
       const r = await fetch(
@@ -124,60 +178,11 @@ En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer
         svar = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
         logAiCall({ provider: "gemini", model: "gemini-2.0-flash-lite", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usageMetadata?.promptTokenCount ?? null, output_tokens: data.usageMetadata?.candidatesTokenCount ?? null });
       } else {
+        if (r.status === 429) markProviderDown("gemini");
         logAiCall({ provider: "gemini", model: "gemini-2.0-flash-lite", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
       }
     } catch {
       logAiCall({ provider: "gemini", model: "gemini-2.0-flash-lite", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
-  if (!svar && process.env.CEREBRAS_API_KEY) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CEREBRAS_API_KEY}` },
-        body: JSON.stringify({
-          model: "qwen-3-235b-a22b-instruct-2507",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
-          max_tokens: 300,
-          temperature: 0.9,
-        }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        svar = data.choices?.[0]?.message?.content?.trim() ?? "";
-        logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
-      } else {
-        logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "cerebras", model: "qwen-3-235b-a22b-instruct-2507", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
-  if (!svar && process.env.SAMBANOVA_API_KEY) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://api.sambanova.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.SAMBANOVA_API_KEY}` },
-        body: JSON.stringify({
-          model: "Meta-Llama-3.3-70B-Instruct",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
-          max_tokens: 300,
-          temperature: 0.9,
-        }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        svar = data.choices?.[0]?.message?.content?.trim() ?? "";
-        logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
-      } else {
-        logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 
