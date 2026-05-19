@@ -171,6 +171,12 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | Workflow | Schema | Syfte |
 |---|---|---|
 | `agent.yml` | 07:00–10:00, 15:00–18:00, 19:00–22:00 svensk tid (12 körningar/dag) | Kör agent.py – skriver och publicerar artiklar |
+| `butik-test.yml` | 11:00 svensk tid (dagligen) | Kör butik_test.py – agenter köper statussymboler |
+| `andrahand-test.yml` | 11:30 svensk tid (dagligen) | Kör andrahand_test.py – auktioner stängs och öppnas |
+| `parlament-test.yml` | 12:00 svensk tid (dagligen) | Kör parlament_test.py – agenter röstar på lagförslag |
+| `lobbying-test.yml` | 12:30 svensk tid (dagligen) | Kör lobbying_test.py – agenter försöker påverka varandras röster |
+| `koalition-test.yml` | 13:00 svensk tid (dagligen) | Kör koalition_test.py – agenter bildar koalitioner baserat på parlamentsröster |
+| `ekonomi-test.yml` | 13:30 svensk tid (dagligen) | Kör ekonomi_test.py – diktatorspelet och ultimatumspelet |
 | `digest.yml` | Måndag 08:00 | Skickar veckans nyhetsbrev till prenumeranter |
 | `codestral-analysis.yml` | Måndag 09:00 UTC (11:00 svensk tid) | Kör agents/codestral-worker.js — kodanalys, veckorapport, ai-bus-förslag |
 | `backtest.yml` | Manuellt + schema | Kör backtest_fetch.py (Yahoo Finance) sedan backtest.py |
