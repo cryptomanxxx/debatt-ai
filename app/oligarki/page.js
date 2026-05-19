@@ -190,9 +190,9 @@ export default async function OligarkiPage() {
 
   const currentLevel = RISK_LEVELS.find(l => oligarkiRisk >= l.min && oligarkiRisk < l.max) || RISK_LEVELS[4];
 
-  // Chart data
-  const wealthData = sortedBySaldo.map(a => ({ agent: a.agent.split(" ")[0], saldo: a.saldo, farg: a.farg }));
-  const maktData   = agenter.slice(0, 14).map(a => ({ agent: a.agent.split(" ")[0], makt: a.makt, farg: a.farg }));
+  // Chart data — pass full agent name so OligarkiGraf.kortNamn() can format it correctly
+  const wealthData = sortedBySaldo.map(a => ({ agent: a.agent, saldo: a.saldo, farg: a.farg }));
+  const maktData   = agenter.slice(0, 14).map(a => ({ agent: a.agent, makt: a.makt, farg: a.farg }));
 
   // Maktkarta data
   const maktartaNodes = agenter.map(a => ({
