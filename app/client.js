@@ -495,7 +495,7 @@ function DagensSchema({ nextIdx }) {
         <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Dagens schema</span>
         <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>18 körningar · svensk tid</span>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3px 10px" }}>
         {ALLA_KÖRNINGAR.map((k, i) => {
           const eventSec = k.h * 3600 + k.m * 60;
           const past = nowSec !== null && eventSec < nowSec;
