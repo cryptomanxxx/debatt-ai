@@ -2,6 +2,8 @@ name: AI-Koalitioner test
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 11 * * *"
 
 jobs:
   koalitioner:

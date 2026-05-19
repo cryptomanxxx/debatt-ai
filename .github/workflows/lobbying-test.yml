@@ -2,6 +2,8 @@ name: AI-Lobbying test
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "30 10 * * *"
 
 jobs:
   lobbying:

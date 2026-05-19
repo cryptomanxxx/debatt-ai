@@ -12,6 +12,8 @@ on:
           - slump
           - diktatorn
           - ultimatum
+  schedule:
+    - cron: "30 11 * * *"
 
 jobs:
   ekonomi:
