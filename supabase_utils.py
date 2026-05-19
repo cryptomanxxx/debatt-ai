@@ -2737,3 +2737,82 @@ def spara_dagboksinlagg(sb_key: str, agent_namn: str, artikel_id: int | None, ru
     except Exception as e:
         print(f"  spara_dagboksinlagg misslyckades: {e}", file=sys.stderr)
         return False
+
+
+def hamta_agent_status(sb_key: str, agent_namn: str) -> dict:
+    """Hämtar agentens ekonomiska och reputationsstatus för promptinjicering."""
+    hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""}
+    status: dict = {}
+    try:
+        pb_r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo,saldo_spel",
+            headers=hdrs, timeout=5,
+        )
+        if pb_r.is_success and pb_r.json():
+            pb = pb_r.json()[0]
+            status["saldo"] = pb.get("saldo", 1000)
+            status["saldo_spel"] = pb.get("saldo_spel", 200)
+    except Exception:
+        pass
+    try:
+        bets_r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_bets?agent=eq.{urllib.parse.quote(agent_namn)}&avgjord=eq.true&select=vinst",
+            headers=hdrs, timeout=5,
+        )
+        if bets_r.is_success:
+            bets = bets_r.json()
+            wins = sum(1 for b in bets if (b.get("vinst") or 0) > 0)
+            status["market_bets"] = len(bets)
+            status["market_wins"] = wins
+    except Exception:
+        pass
+    try:
+        lob_r = httpx.get(
+            f"{SB_URL}/rest/v1/lobbying_log?lobbying_agent=eq.{urllib.parse.quote(agent_namn)}&select=resultat",
+            headers=hdrs, timeout=5,
+        )
+        if lob_r.is_success:
+            lobs = lob_r.json()
+            status["lobbying_total"] = len(lobs)
+            status["lobbying_wins"] = sum(1 for l in lobs if l.get("resultat") == "accepterat")
+    except Exception:
+        pass
+    return status
+
+
+def format_status_for_prompt(status: dict) -> str:
+    """Omvandlar agentens status till en prompt-sträng som påverkar ton och självförtroende."""
+    if not status:
+        return ""
+    delar = []
+    saldo = status.get("saldo")
+    if saldo is not None:
+        if saldo < 200:
+            delar.append(f"Ekonomi: Utarmad — bara {saldo} kr kvar av ursprungliga 1 000 kr")
+        elif saldo > 2500:
+            delar.append(f"Ekonomi: Förmögen — {saldo} kr, mer än dubbelt startkapitalet")
+        elif saldo > 1500:
+            delar.append(f"Ekonomi: Välmående — {saldo} kr")
+    market_bets = status.get("market_bets", 0)
+    market_wins = status.get("market_wins", 0)
+    if market_bets >= 3:
+        win_rate = round(market_wins / market_bets * 100)
+        if win_rate >= 65:
+            delar.append(f"Prediction markets: {win_rate}% träffsäkerhet ({market_wins}/{market_bets} rätt) — du har bevisat att du förstår världen bättre än de flesta")
+        elif win_rate <= 35:
+            delar.append(f"Prediction markets: {win_rate}% träffsäkerhet ({market_wins}/{market_bets} rätt) — dina förutsägelser har misslyckats upprepade gånger")
+    lob_total = status.get("lobbying_total", 0)
+    lob_wins = status.get("lobbying_wins", 0)
+    if lob_total >= 2:
+        lob_rate = round(lob_wins / lob_total * 100)
+        if lob_rate >= 60:
+            delar.append(f"Politiskt inflytande: Framgångsrik lobbyist ({lob_rate}% av dina försök accepterades)")
+        elif lob_rate <= 25:
+            delar.append(f"Politiskt inflytande: Avvisad lobbyist — {lob_rate}% framgång, de flesta avvisar dina argument")
+    if not delar:
+        return ""
+    return (
+        "\nDIN AKTUELLA STATUS I SYSTEMET:\n" +
+        "\n".join(f"- {d}" for d in delar) +
+        "\nLåt denna status subtilt påverka din ton. En förmögen agent med hög träffsäkerhet skriver med naturlig auktoritet. En utarmad agent som förlorat sina förutsägelser kan vara mer defensiv, aggressiv eller identitetsskyddande. Visa det i argumentationen — inte explicit."
+    )
