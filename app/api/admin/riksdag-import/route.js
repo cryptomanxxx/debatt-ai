@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
 
 function sbHeaders() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -32,7 +31,6 @@ function normTitle(s) {
   return (s || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-// Hämtar befintliga riksdagen_id OCH titlar för robust dubblettskydd
 async function getBefintligaData() {
   const r = await fetch(
     `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&select=riksdagen_id,titel`,
@@ -52,7 +50,6 @@ function byggUrl(d) {
   return d.dok_id ? `https://data.riksdagen.se/dokument/${d.dok_id}.html` : null;
 }
 
-// Försök 1: data.riksdagen.se JSON API + dokumentstatus för fullständig text
 async function hämtaViaApi() {
   const r = await fetch(
     "https://data.riksdagen.se/dokumentlista/?doktyp=prop&utformat=json&sz=50&sort=datum&sortorder=desc",
@@ -68,7 +65,6 @@ async function hämtaViaApi() {
     riksdagen_url: byggUrl(d),
   })).filter(d => d.dok_id && d.titel);
 
-  // Steg 1: dokumentstatus för sammanfattning (parallellt)
   await Promise.all(forslag.map(async (item) => {
     try {
       const dr = await fetch(
@@ -84,7 +80,6 @@ async function hämtaViaApi() {
     } catch {}
   }));
 
-  // Steg 2: för propositioner med kort text (<500 tecken), hämta HTML-sidan för mer innehåll
   await Promise.all(forslag.map(async (item) => {
     if ((item.beskrivning?.length || 0) >= 500) return;
     const url = item.riksdagen_url;
@@ -101,12 +96,10 @@ async function hämtaViaApi() {
       if (!dr.ok) return;
       const html = await dr.text();
 
-      // Extrahera "Propositionens huvudsakliga innehåll"-avsnittet
       const huvud = html.match(
         /Propositionens huvudsakliga inneh[åa]ll([\s\S]{100,4000}?)(?=<h[123]|<\/(?:div|section|article)>)/i
       )?.[1]?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
-      // Alternativ: brödtext i article/main
       const brödtext = html.match(
         /<(?:article|main)[^>]*>([\s\S]{200,4000}?)<\/(?:article|main)>/
       )?.[1]?.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -122,7 +115,6 @@ async function hämtaViaApi() {
   return forslag;
 }
 
-// Försök 2: scrapa HTML från riksdagen.se
 async function hämtaViaHtml() {
   const r = await fetch(
     "https://www.riksdagen.se/sv/dokument-och-lagar/dokument/proposition/",
@@ -174,16 +166,6 @@ async function hämtaViaHtml() {
 }
 
 export async function POST(req) {
-  const pw = req.headers.get("x-admin-password");
-  const validPasswords = [
-    process.env.RIKSDAG_IMPORT_TOKEN,
-    process.env.NEXT_PUBLIC_ADMIN_PASSWORD,
-    process.env.ADMIN_SECRET,
-  ].filter(Boolean);
-  if (!validPasswords.includes(pw)) {
-    return NextResponse.json({ error: "Obehörig" }, { status: 401 });
-  }
-
   const befintliga = await getBefintligaData();
   let forslag = [];
   let metod = "";
