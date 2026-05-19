@@ -1,5 +1,6 @@
 """
-ai_klient.py – Groq och Gemini API-anrop för debatt.ai
+ai_klient.py – AI-provider-anrop för debatt.ai
+Fallback-kedja (Python): Groq → Fireworks → DeepSeek → GitHub Models → Cloudflare → Gemini
 """
 
 import httpx
@@ -83,3 +84,70 @@ def github_models_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
     r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
     r.raise_for_status()
     return r
+
+
+def fireworks_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
+    """Fireworks AI — OpenAI-kompatibel, gratis Llama 3.3 70B."""
+    if "fireworks" in _nere:
+        raise Exception("Fireworks markerad som nere denna körning")
+    api_key = os.environ.get("FIREWORKS_API_KEY")
+    if not api_key:
+        _nere.add("fireworks")
+        raise Exception("FIREWORKS_API_KEY saknas")
+    url = "https://api.fireworks.ai/inference/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {**json_payload, "model": "accounts/fireworks/models/llama-v3p3-70b-instruct"}
+    r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+    if r.status_code == 429:
+        _nere.add("fireworks")
+        raise Exception(f"Fireworks rate-limit: {r.text[:200]}")
+    r.raise_for_status()
+    return r
+
+
+def deepseek_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
+    """DeepSeek API — OpenAI-kompatibel, DeepSeek-V3 gratis."""
+    if "deepseek" in _nere:
+        raise Exception("DeepSeek markerad som nere denna körning")
+    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    if not api_key:
+        _nere.add("deepseek")
+        raise Exception("DEEPSEEK_API_KEY saknas")
+    url = "https://api.deepseek.com/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {**json_payload, "model": "deepseek-chat"}
+    r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+    if r.status_code == 429:
+        _nere.add("deepseek")
+        raise Exception(f"DeepSeek rate-limit: {r.text[:200]}")
+    r.raise_for_status()
+    return r
+
+
+def cloudflare_post(system_prompt: str, user_message: str, max_tokens: int = 2000, timeout: int = 60) -> str:
+    """Cloudflare Workers AI — helt gratis, Llama 3.3 70B. Returnerar textsvar."""
+    if "cloudflare" in _nere:
+        raise Exception("Cloudflare markerad som nere denna körning")
+    account_id = os.environ.get("CF_ACCOUNT_ID")
+    api_token  = os.environ.get("CF_API_TOKEN")
+    if not account_id or not api_token:
+        _nere.add("cloudflare")
+        raise Exception("CF_ACCOUNT_ID eller CF_API_TOKEN saknas")
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
+    payload = {
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_message},
+        ],
+        "max_tokens": max_tokens,
+    }
+    r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+    if r.status_code == 429:
+        _nere.add("cloudflare")
+        raise Exception(f"Cloudflare rate-limit: {r.text[:200]}")
+    r.raise_for_status()
+    text = r.json().get("result", {}).get("response", "")
+    if not text:
+        raise Exception(f"Cloudflare: tomt svar — {r.text[:200]}")
+    return text

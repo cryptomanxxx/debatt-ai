@@ -28,7 +28,7 @@ import urllib.parse
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 
-from ai_klient import groq_post, gemini_post, github_models_post
+from ai_klient import groq_post, gemini_post, github_models_post, fireworks_post, deepseek_post, cloudflare_post
 from agenter import OPINION_FRAGOR
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
@@ -1138,13 +1138,20 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str) -> int:
                 ],
                 "max_tokens": 120, "temperature": 0.7,
             }
-            try:
-                raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
-            except Exception:
+            raw = None
+            for _name, _fn in [
+                ("Groq",   lambda: groq_post(payload)),
+                ("Fireworks", lambda: fireworks_post(payload)),
+                ("DeepSeek",  lambda: deepseek_post(payload)),
+                ("GitHub",    lambda: github_models_post(payload)),
+            ]:
                 try:
-                    raw = github_models_post(payload).json()["choices"][0]["message"]["content"].strip()
+                    raw = _fn().json()["choices"][0]["message"]["content"].strip()
+                    break
                 except Exception:
-                    raw = gemini_post(agent["system"][:600], prompt, max_tokens=120)
+                    pass
+            if not raw:
+                raw = cloudflare_post(agent["system"][:600], prompt, max_tokens=120)
 
             rod, motivering = "avstar", ""
             for line in raw.splitlines():
