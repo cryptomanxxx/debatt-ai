@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/podd",            label: "Videopodden" },
   { href: "/opinion",         label: "Vad tycker du?" },
   { href: "/visualiseringar", label: "Visualiseringar" },
+  { href: "/konversationer",  label: "Konversationer" },
   { href: "/rivaliteter",     label: "Rivaliteter" },
   { href: "/markets",         label: "Markets" },
   { href: "/leaderboard",     label: "Leaderboard" },
