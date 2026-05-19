@@ -1,16 +1,19 @@
 "use client";
 import { useState } from "react";
 
-const PROVIDERS = ["groq", "gemini", "cerebras", "sambanova", "openrouter", "codestral", "github_models"];
+const PROVIDERS = ["groq", "fireworks", "deepseek", "github_models", "cloudflare", "cerebras", "sambanova", "openrouter", "codestral", "gemini"];
 
 const LABELS = {
-  groq: "Groq — llama-3.3-70b-versatile",
-  gemini: "Gemini — gemini-2.0-flash-lite",
-  cerebras: "Cerebras — qwen-3-235b",
-  sambanova: "Sambanova — Meta-Llama-3.3-70B",
-  openrouter: "OpenRouter — llama-3.3-70b (free)",
-  codestral: "Codestral — codestral-latest",
-  github_models: "GitHub Models — Llama-3.3-70B-Instruct",
+  groq:         "Groq — llama-3.3-70b-versatile",
+  fireworks:    "Fireworks AI — llama-v3p3-70b-instruct",
+  deepseek:     "DeepSeek — deepseek-chat (V3)",
+  github_models:"GitHub Models — Llama-3.3-70B-Instruct",
+  cloudflare:   "Cloudflare Workers AI — llama-3.3-70b-fp8-fast",
+  cerebras:     "Cerebras — qwen-3-235b",
+  sambanova:    "Sambanova — Meta-Llama-3.3-70B",
+  openrouter:   "OpenRouter — llama-3.3-70b (free)",
+  codestral:    "Codestral — codestral-latest",
+  gemini:       "Gemini — gemini-2.0-flash-lite",
 };
 
 export default function TestProviders() {
@@ -34,7 +37,7 @@ export default function TestProviders() {
     <main style={{ maxWidth: 700, margin: "40px auto", padding: "0 16px", fontFamily: "monospace" }}>
       <h1 style={{ fontSize: 22, marginBottom: 8 }}>AI Provider-test</h1>
       <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>
-        Testar Groq, Gemini, Cerebras, Sambanova, OpenRouter, Codestral och GitHub Models parallellt.
+        Testar alla 10 providers parallellt — i fallback-ordning: Groq → Fireworks → DeepSeek → GitHub Models → Cloudflare → Gemini m.fl.
       </p>
 
       <button
