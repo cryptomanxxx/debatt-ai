@@ -227,7 +227,7 @@ async function fetchAktivitetsFeed() {
   return feed.sort((a, b) => new Date(b.skapad) - new Date(a.skapad)).slice(0, 10);
 }
 
-
+async function fetchSenasteAgentKonversationer() {
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&order=skapad.desc&limit=6&select=agent,fraga,svar,fragare,skapad`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
