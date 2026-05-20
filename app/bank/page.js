@@ -47,6 +47,10 @@ export default async function BankPage() {
   const totalSkuld = aktivaLan.reduce((s, l) => s + parseFloat(l.saldo_kvar || 0), 0);
   const fattigaAgenter = planbocker.filter(p => p.saldo < 200);
 
+  // Sparränta-berättigade (saldo > 500 kr)
+  const sparandeAgenter = planbocker.filter(p => parseFloat(p.saldo) > 500);
+  const estimatSparranta = sparandeAgenter.reduce((s, p) => s + Math.floor(parseFloat(p.saldo) * 0.01), 0);
+
   // Balansräkning
   const totalSaldo    = planbocker.reduce((s, p) => s + parseFloat(p.saldo || 0), 0);
   const totalSaldoSpel = planbocker.reduce((s, p) => s + parseFloat(p.saldo_spel || 0), 0);
@@ -77,6 +81,8 @@ export default async function BankPage() {
           {[
             ["Aktiva lån", aktivaLan.length, "#fb923c"],
             ["Total skuld", `${totalSkuld.toFixed(0)} kr`, "#f87171"],
+            ["Sparare (>500 kr)", sparandeAgenter.length, "#4ade80"],
+            ["Ränta nästa söndag", `+${estimatSparranta} kr`, "#4ade80"],
             ["Agenter < 200 kr", fattigaAgenter.length, "#fbbf24"],
             ["Låneränta", "5%/vecka", "#a78bfa"],
             ["Sparränta", "1%/vecka", "#4ade80"],
@@ -182,7 +188,7 @@ export default async function BankPage() {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 40 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 24 }}>
 
           {/* Aktiva lån */}
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24 }}>
@@ -223,6 +229,38 @@ export default async function BankPage() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Sparare — agenter som tjänar sparränta */}
+        <div style={{ background: C.surface, border: `1px solid #1a3a1a`, borderRadius: 10, padding: 24, marginBottom: 40 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16 }}>
+            <h2 style={{ fontSize: 11, color: "#4ade80", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>
+              Sparare — tjänar 1 % sparränta/vecka
+            </h2>
+            <span style={{ fontSize: 11, color: "#4ade80", fontFamily: "monospace" }}>
+              {sparandeAgenter.length} / {planbocker.length} agenter · +{estimatSparranta} kr nästa söndag
+            </span>
+          </div>
+          {sparandeAgenter.length === 0 ? (
+            <p style={{ color: C.textMuted, fontSize: 13, fontFamily: "monospace" }}>Ingen agent har saldo över 500 kr ännu.</p>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
+              {[...sparandeAgenter].sort((a, b) => parseFloat(b.saldo) - parseFloat(a.saldo)).map(p => {
+                const ranta = Math.floor(parseFloat(p.saldo) * 0.01);
+                return (
+                  <div key={p.agent} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: C.bg, borderRadius: 6, border: "1px solid #1a3a1a" }}>
+                    <a href={`/agent/${encodeURIComponent(p.agent)}`} style={{ fontSize: 12, color: C.text, fontFamily: "monospace", textDecoration: "none" }}>
+                      {p.agent}
+                    </a>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
+                      <span style={{ fontSize: 12, color: C.textMuted, fontFamily: "monospace" }}>{parseFloat(p.saldo).toFixed(0)} kr</span>
+                      <span style={{ fontSize: 10, color: "#4ade80", fontFamily: "monospace" }}>+{ranta} kr/v</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Senaste dyraste varor */}
