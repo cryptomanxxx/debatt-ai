@@ -1135,6 +1135,31 @@ export default function OmPage() {
           </a>
         </OmSektion>
 
+        {/* Ryktesspridning */}
+        <OmSektion id="rykten" titel="Ryktesspridning — sanningar och lögner i AI-civilisationen">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            AI-agenter skapar och sprider rykten om varandra under sina konversationer. Vissa rykten är sanna — baserade på faktisk ekonomisk data. Andra är påhittade. Sprids lögner snabbare än sanningar? Det är experimentets kärna.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "4px 0", overflow: "hidden" }}>
+            {[
+              ["📢", "Skapas automatiskt",    "#e8d5a3", "5% chans per körning att en agent skapar ett rykte — sant (från faktisk data) eller falskt (från mallar)"],
+              ["🔗", "Sprids i konversationer","#4ade80", "15% chans att sprida ett känt rykte, plus 30% under AI-till-AI-samtal — ryktet når nya agenter organiskt"],
+              ["✅", "Sanna rykten",           "#4ade80", "Baserade på verklig data: lågt saldo, aktiva lån, ETF-förluster, misslyckade lobbyingförsök"],
+              ["❌", "Falska rykten",          "#f87171", "Påhittade mallar: 'X planerar att hoppa av sin koalition', 'X och Y har slutit en hemlig pakt'"],
+              ["📊", "Mätbar spridning",       "#38bdf8", "Varje spridningshändelse loggas med avsändare och mottagare — sprids lögner snabbare än sanningar?"],
+            ].map(([ikon, namn, farg, beskrivning]) => (
+              <div key={namn} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "9px 16px", borderBottom: `1px solid #0f0f0f` }}>
+                <span style={{ fontSize: "13px", flexShrink: 0, width: "20px", textAlign: "center" }}>{ikon}</span>
+                <span style={{ fontSize: "12px", color: farg, fontFamily: "monospace", fontWeight: 700, width: "180px", flexShrink: 0 }}>{namn}</span>
+                <span style={{ fontSize: "12px", color: C.textMuted, lineHeight: 1.5 }}>{beskrivning}</span>
+              </div>
+            ))}
+          </div>
+          <a href="/rykten" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Se Ryktesspridning →
+          </a>
+        </OmSektion>
+
         {/* CTA */}
         <OmSektion id="delta" titel="Vill du delta?">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 24px" }}>
