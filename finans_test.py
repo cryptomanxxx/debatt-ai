@@ -15,7 +15,7 @@ Kräver:
   GROQ_API_KEY / GEMINI_API_KEY / GITHUB_TOKEN  (minst en för LLM-beslut)
 """
 
-import os, sys, math, random, urllib.parse
+import os, sys, math, random, re, urllib.parse
 import httpx
 
 from agenter import AGENTER
@@ -50,10 +50,31 @@ def _llm(system: str, prompt: str, max_tokens: int = 60) -> str:
 
 
 def _parse_val(svar: str) -> str:
-    """Extraherar A/B/C/D ur LLM-svaret. Faller tillbaka på D."""
-    for ch in svar.upper():
-        if ch in "ABCD":
-            return ch
+    """
+    Extraherar A/B/C/D ur LLM-svaret på ett robust sätt.
+
+    Prioritetsordning:
+    1. Rad som bara innehåller en bokstav: "A", "B", "C" eller "D"
+    2. Prefix-mönster: "SVAR: X", "Svar: X", "Val: X"
+    3. Bokstav följd av ) eller . eller : – t.ex. "B)" eller "C."
+    Faller tillbaka på D om inget hittas.
+    """
+    # 1. Exakt rad
+    for rad in svar.strip().splitlines():
+        rad = rad.strip().upper()
+        if rad in ("A", "B", "C", "D"):
+            return rad
+
+    # 2. Explicit prefix
+    m = re.search(r'(?:SVAR|VAL|VÄLJER|CHOOSE)[:\s]+([ABCD])', svar.upper())
+    if m:
+        return m.group(1)
+
+    # 3. Bokstav med separator
+    m = re.search(r'\b([ABCD])[).:\s]', svar.upper())
+    if m:
+        return m.group(1)
+
     return "D"
 
 
@@ -235,7 +256,7 @@ def bygg_prompt(agent: dict, status: dict) -> tuple[str, str]:
         f"{arketyp_hint}"
         + (f" {situtations_hint}" if situtations_hint else "")
         + "\n\nDu fattar nu ett ekonomiskt beslut för din plånbok i AI-civilisationens ekonomisystem. "
-        "Svara med EXAKT en bokstav: A, B, C eller D. Ingen annan text."
+        "Svara med EXAKT detta format och inget annat:\nSVAR: X\n(där X är A, B, C eller D)"
     )
 
     etf_prefs  = ETF_KRYPTO_PREFERENSER.get(agent["namn"], ["BTC", "ETH"])
@@ -257,7 +278,7 @@ def bygg_prompt(agent: dict, status: dict) -> tuple[str, str]:
         f"  D) Avstå — väljs BARA om inget av alternativen ovan passar din personlighet\n\n"
         f"Din personlighetstyp pekar mot: "
         + {"etf": "B (investering)", "spar": "A (sparande)", "lan": "C (lån)", "mix": "A, B eller C (välj fritt)"}[arketyp]
-        + f"\n\nSvara med en enda bokstav."
+        + "\n\nSvara exakt så här (ersätt X med din bokstav):\nSVAR: X"
     )
     return system, user
 
