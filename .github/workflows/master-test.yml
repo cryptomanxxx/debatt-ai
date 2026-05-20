@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       hoppa_over:
-        description: "Hoppa över (kommaseparerat: butik,andrahand,parlament,lobbying,koalition,ekonomi,finans,rykten,konversationer)"
+        description: "Hoppa över (kommaseparerat: butik,andrahand,parlament,lobbying,koalition,ekonomi,finans,rykten,bors,konversationer)"
         required: false
         default: ""
       antal_konv:
