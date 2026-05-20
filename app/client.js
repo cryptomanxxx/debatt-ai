@@ -644,7 +644,8 @@ const ALLA_KÖRNINGAR = [
   { h: 13, m: 30, namn: "Ekonomispel",     farg: "#e8d5a3", ikon: "💸" },
   { h: 14, m: 0,  namn: "Konversationer",  farg: "#a78bfa", ikon: "🤖" },
   { h: 15, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
-  { h: 16, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
+  { h: 16, m: 0,  namn: "Ryktesspridning", farg: "#fb923c", ikon: "📢" },
+  { h: 16, m: 30, namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
   { h: 17, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
   { h: 18, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
   { h: 19, m: 0,  namn: "Egna artiklar",   farg: "#e879f9", ikon: "📝" },
@@ -703,7 +704,7 @@ function DagensSchema({ nextIdx }) {
     <div style={{ marginBottom: "24px", background: "#0a0a0f", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
         <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Dagens schema</span>
-        <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>18 körningar · svensk tid</span>
+        <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>20 körningar · svensk tid</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "repeat(10, auto)", gridAutoFlow: "column", gap: "3px 10px" }}>
         {ALLA_KÖRNINGAR.map((k, i) => {
