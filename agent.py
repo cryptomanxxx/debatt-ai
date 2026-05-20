@@ -57,6 +57,7 @@ from supabase_utils import (
     spara_civilisations_minne, hamta_relevanta_minnen, upsert_relation,
     berakna_och_spara_partier, hamta_agent_parti,
     kolla_och_bailout, ta_lan,
+    ETF_KRYPTO_PREFERENSER, kop_etf, salj_etf, hamta_senaste_etf_pris,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -650,6 +651,17 @@ def main():
         kolla_och_bailout(sb_key, agent["namn"])
         if random.random() < 0.05:
             ta_lan(sb_key, agent["namn"])
+
+        # ETF-handel (~8% köp, ~4% sälj per körning)
+        etf_prefs = ETF_KRYPTO_PREFERENSER.get(agent["namn"], [])
+        if etf_prefs:
+            etf_roll = random.random()
+            if etf_roll < 0.08:
+                # Investera 100–200 kr beroende på agentens kategori; kop_etf avvisar om saldot är för lågt
+                belopp = 200.0 if agent["namn"] in ("Kryptoanalytiker", "Den rike") else 100.0
+                kop_etf(sb_key, agent["namn"], random.choice(etf_prefs), belopp)
+            elif etf_roll < 0.12:
+                salj_etf(sb_key, agent["namn"], random.choice(etf_prefs), fraktion=1.0)
 
         # Uppdatera partier (~20% per körning) och hämta agentens parti
         if random.random() < 0.20:
