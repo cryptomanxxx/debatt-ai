@@ -58,6 +58,7 @@ from supabase_utils import (
     berakna_och_spara_partier, hamta_agent_parti,
     kolla_och_bailout, ta_lan,
     ETF_KRYPTO_PREFERENSER, kop_etf, salj_etf, hamta_senaste_etf_pris,
+    skapa_rykte, sprid_rykte, hamta_kanda_rykten, hamta_rykte_underlag,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -663,6 +664,36 @@ def main():
             elif etf_roll < 0.12:
                 salj_etf(sb_key, agent["namn"], random.choice(etf_prefs), fraktion=1.0)
 
+        # Ryktesspridning: ~5% chans att skapa nytt rykte, ~15% chans att sprida känt rykte
+        alla_agenter_namn = [a["namn"] for a in AGENTER if a["namn"] != agent["namn"]]
+        rykte_roll = random.random()
+        if rykte_roll < 0.05 and alla_agenter_namn:
+            # Skapa nytt rykte om en slumpmässig agent
+            om_vem = random.choice(alla_agenter_namn)
+            faktamening, sant = hamta_rykte_underlag(sb_key, om_vem)
+            falska_mallar = [
+                f"{om_vem} planerar att hoppa av sin koalition inom kort.",
+                f"{om_vem} har röstat emot sin partiledare i hemlighet.",
+                f"{om_vem} funderar på att ta maximalt lån från centralbanken.",
+                f"{om_vem} och {random.choice([a for a in alla_agenter_namn if a != om_vem])} har slutit en hemlig pakt.",
+                f"{om_vem} är djupt missnöjd med hela debattsystemet.",
+                f"{om_vem} planerar att sälja av hela sin ETF-portfölj.",
+            ]
+            if sant and faktamening:
+                innehall = f"Har du hört? {om_vem} {faktamening}."
+            else:
+                innehall = random.choice(falska_mallar)
+                sant = False
+            skapa_rykte(sb_key, agent["namn"], om_vem, innehall, sanning=sant)
+
+        elif rykte_roll < 0.20 and alla_agenter_namn:
+            # Sprid ett känt rykte till en slumpmässig annan agent
+            kanda = hamta_kanda_rykten(sb_key, agent["namn"], limit=5)
+            if kanda:
+                rykte = random.choice(kanda)
+                mottagare_namn = random.choice(alla_agenter_namn)
+                sprid_rykte(sb_key, rykte["id"], agent["namn"], mottagare_namn)
+
         # Uppdatera partier (~20% per körning) och hämta agentens parti
         if random.random() < 0.20:
             n_partier = berakna_och_spara_partier(sb_key)
@@ -852,6 +883,19 @@ def main():
             )
             print(f"  ✓ {agent['namn']}: \"{fraga_text[:70]}\"")
             print(f"  ✓ {mottagare['namn']}: \"{svar_text[:80]}…\"")
+            # Sprid ett känt rykte till konversationspartnern (~30% chans)
+            if random.random() < 0.30:
+                kanda_om_mottagare = [
+                    r for r in hamta_kanda_rykten(sb_key, agent["namn"], limit=10)
+                    if r["om_agent"] == mottagare["namn"]
+                ]
+                kanda_ovriga = [
+                    r for r in hamta_kanda_rykten(sb_key, agent["namn"], limit=10)
+                    if r["om_agent"] != mottagare["namn"]
+                ]
+                pool = kanda_om_mottagare or kanda_ovriga
+                if pool:
+                    sprid_rykte(sb_key, random.choice(pool)["id"], agent["namn"], mottagare["namn"])
             logga_action(sb_key, agent["namn"], "ask_agent", {
                 "mottagare": mottagare["namn"],
                 "fraga": fraga_text[:100],

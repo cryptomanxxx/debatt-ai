@@ -3648,3 +3648,133 @@ def salj_etf(sb_key: str, agent_namn: str, symbol: str, fraktion: float = 1.0) -
     except Exception as e:
         print(f"  ETF sälj-fel: {e}")
         return None
+
+
+# ── Ryktesspridning ───────────────────────────────────────────────────────────
+
+def skapa_rykte(sb_key: str, ursprung_agent: str, om_agent: str, innehall: str, sanning: bool = False) -> int | None:
+    """Skapar ett nytt rykte. Ursprungsagenten läggs automatiskt till i kanda_av."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=representation",
+    }
+    try:
+        r = httpx.post(f"{SB_URL}/rest/v1/rykten", headers=h,
+                       json={"innehall": innehall, "om_agent": om_agent,
+                             "ursprung_agent": ursprung_agent, "sanning": sanning,
+                             "kanda_av": [ursprung_agent]},
+                       timeout=8)
+        if r.is_success:
+            data = r.json()
+            rykte_id = data[0]["id"] if isinstance(data, list) else data.get("id")
+            print(f"  📢 Nytt rykte av {ursprung_agent} om {om_agent}: \"{innehall[:60]}\"")
+            return rykte_id
+    except Exception as e:
+        print(f"  Skapa rykte-fel: {e}")
+    return None
+
+
+def sprid_rykte(sb_key: str, rykte_id: int, fran_agent: str, till_agent: str) -> bool:
+    """Sprider ett känt rykte från fran_agent till till_agent. Returnerar True om nytt."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/rykten?id=eq.{rykte_id}&select=kanda_av,antal_spridningar",
+            headers={**h, "Prefer": ""}, timeout=6,
+        )
+        if not r.is_success or not r.json():
+            return False
+        rykte = r.json()[0]
+        kanda_av = rykte.get("kanda_av") or []
+        if till_agent in kanda_av:
+            return False  # Agenten känner redan till det
+        kanda_av = list(kanda_av) + [till_agent]
+        httpx.patch(
+            f"{SB_URL}/rest/v1/rykten?id=eq.{rykte_id}",
+            headers=h,
+            json={"kanda_av": kanda_av, "antal_spridningar": rykte["antal_spridningar"] + 1},
+            timeout=8,
+        )
+        httpx.post(f"{SB_URL}/rest/v1/rykte_spridningar", headers=h,
+                   json={"rykte_id": rykte_id, "fran_agent": fran_agent, "till_agent": till_agent},
+                   timeout=8)
+        print(f"  📢 Rykte #{rykte_id} spreds: {fran_agent} → {till_agent}")
+        return True
+    except Exception as e:
+        print(f"  Sprid rykte-fel: {e}")
+        return False
+
+
+def hamta_kanda_rykten(sb_key: str, agent_namn: str, limit: int = 5) -> list[dict]:
+    """Hämtar rykten som agenten känner till men INTE handlar om agenten själv."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/rykten?order=antal_spridningar.desc&limit=50"
+            "&select=id,innehall,om_agent,sanning,antal_spridningar,kanda_av",
+            headers=h, timeout=8,
+        )
+        if not r.is_success:
+            return []
+        alla = r.json()
+        return [
+            x for x in alla
+            if agent_namn in (x.get("kanda_av") or []) and x["om_agent"] != agent_namn
+        ][:limit]
+    except Exception:
+        return []
+
+
+def hamta_rykte_underlag(sb_key: str, om_agent: str) -> tuple[str, bool]:
+    """
+    Hämtar faktabaserat underlag om om_agent för att skapa ett (sant) rykte.
+    Returnerar (faktamening, sanning=True). Returnerar ("", False) om inget underlag.
+    """
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    fakta = []
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(om_agent)}&select=saldo",
+            headers=h, timeout=5,
+        )
+        if r.is_success and r.json():
+            saldo = float(r.json()[0]["saldo"])
+            if saldo < 200:
+                fakta.append(f"har bara {saldo:.0f} kr kvar på kontot")
+            elif saldo > 2500:
+                fakta.append(f"har samlat på sig {saldo:.0f} kr")
+
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_lan?agent=eq.{urllib.parse.quote(om_agent)}&aktiv=eq.true&select=saldo_kvar&limit=1",
+            headers=h, timeout=5,
+        )
+        if r.is_success and r.json():
+            skuld = r.json()[0]["saldo_kvar"]
+            fakta.append(f"har ett aktivt lån på {skuld} kr hos centralbanken")
+
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/etf_transaktioner?agent=eq.{urllib.parse.quote(om_agent)}&order=skapad.desc&limit=1&select=symbol,typ,belopp_kr",
+            headers=h, timeout=5,
+        )
+        if r.is_success and r.json():
+            t = r.json()[0]
+            verb = "köpte" if t["typ"] == "kop" else "sålde"
+            fakta.append(f"{verb} nyligen {t['symbol']}-ETF för {t['belopp_kr']} kr")
+
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/lobbying_log?lobbying_agent=eq.{urllib.parse.quote(om_agent)}&resultat=eq.avvisat&order=skapad.desc&limit=1&select=mal_agent",
+            headers=h, timeout=5,
+        )
+        if r.is_success and r.json():
+            mal = r.json()[0]["mal_agent"]
+            fakta.append(f"försökte nyligen muta {mal} i parlamentet men misslyckades")
+
+    except Exception:
+        pass
+
+    if fakta:
+        return random.choice(fakta), True
+    return "", False
