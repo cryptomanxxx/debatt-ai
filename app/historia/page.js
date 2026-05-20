@@ -5,7 +5,7 @@ const sb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-export const revalidate = 120;
+export const revalidate = 180;
 
 const TYP_META = {
   koalition_bildad: { ikon: "🤝", label: "Allians bildad",   farg: "#4ade80" },
