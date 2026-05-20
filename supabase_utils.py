@@ -1133,8 +1133,9 @@ def spara_lag_rost(sb_key: str, lagforslag_id: int, agent_namn: str, rod: str, m
         return False
 
 
-def rösta_på_lagforslag_block(agent: dict, sb_key: str) -> int:
-    """Agent röstar på öppna lagförslag den inte röstat på (max 5 per körning)."""
+def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = None) -> int:
+    """Agent röstar på öppna lagförslag den inte röstat på (max 5 per körning).
+    Om agenten är med i ett parti följer den partiledaren med 80% sannolikhet."""
     forslag = hamta_lagforslag(sb_key)
     if not forslag:
         return 0
@@ -1145,6 +1146,14 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str) -> int:
         if agent["namn"] in hamta_lag_roster_agenter(sb_key, f["id"]):
             continue
         try:
+            # Partilinje-röstning: följ ledaren med 80% chans
+            if parti and parti.get("ledare") and parti["ledare"] != agent["namn"]:
+                ledare_rod = hamta_ledare_rost(sb_key, f["id"], parti["ledare"])
+                if ledare_rod and random.random() < 0.80:
+                    motivering = f"[Partilinjen — {parti['namn']}] Följer partiledaren {parti['ledare']}s {ledare_rod}-röst."
+                    if spara_lag_rost(sb_key, f["id"], agent["namn"], ledare_rod, motivering):
+                        antal += 1
+                    continue
             prompt = (
                 f"Lagförslag: \"{f['titel']}\"\n\n"
                 f"{f['beskrivning'][:600]}\n\n"
@@ -3191,3 +3200,181 @@ def upsert_relation(sb_key: str, agent_a: str, agent_b: str, typ: str, styrka: i
         return r.is_success
     except Exception:
         return False
+
+
+# ---------------------------------------------------------------------------
+# Politiska partier
+# ---------------------------------------------------------------------------
+
+_AMNE_PARTINAMN = {
+    "klimat":     "Klimatblocket",
+    "skatter":    "Skattepolitiska alliansen",
+    "AI":         "Teknikpartiet",
+    "demokrati":  "Demokratiblocket",
+    "sjukvård":   "Hälsoalliansen",
+    "ekonomi":    "Ekonomipartiet",
+    "invandring": "Migrationsfraktionen",
+    "krypto":     "Kryptopartiet",
+    "feminism":   "Progressiva blocket",
+    "bostäder":   "Bostadskoalitionen",
+    "utbildning": "Utbildningsblocket",
+    "EU":         "Europablocket",
+}
+
+
+def _parti_namn_fran_positioner(sb_key: str, medlemmar: list[str]) -> str:
+    """Härleder partinamn från medlemmarnas starkaste gemensamma ämnespositioner."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        namn_str = ",".join(urllib.parse.quote(m) for m in medlemmar)
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_positioner?agent=in.({namn_str})&styrka=gte.6&select=amne,styrka",
+            headers=h, timeout=6,
+        )
+        if not r.is_success:
+            return "Politisk allians"
+        raknare: dict[str, int] = {}
+        for p in r.json():
+            raknare[p["amne"]] = raknare.get(p["amne"], 0) + p["styrka"]
+        if not raknare:
+            return "Politisk allians"
+        topp = max(raknare, key=lambda k: raknare[k])
+        return _AMNE_PARTINAMN.get(topp, f"{topp.capitalize()}-blocket")
+    except Exception:
+        return "Politisk allians"
+
+
+def _hamta_ledare(sb_key: str, medlemmar: list[str]) -> str:
+    """Returnerar partiledaren — agenten med högst saldo i partiet."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        namn_str = ",".join(urllib.parse.quote(m) for m in medlemmar)
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=in.({namn_str})&select=agent,saldo&order=saldo.desc&limit=1",
+            headers=h, timeout=6,
+        )
+        if r.is_success and r.json():
+            return r.json()[0]["agent"]
+    except Exception:
+        pass
+    return sorted(medlemmar)[0]
+
+
+def berakna_och_spara_partier(sb_key: str) -> int:
+    """
+    Beräknar politiska partier från agent_koalitioner (BFS, styrka ≥ 3, storlek 3–8).
+    Rensar befintliga partier och sparar nya. Returnerar antal aktiva partier.
+    """
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    try:
+        # Hämta koalitioner med styrka ≥ 3
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_koalitioner?styrka=gte.3&select=agent_a,agent_b,styrka,antal_utbyten",
+            headers={**h, "Prefer": ""}, timeout=8,
+        )
+        if not r.is_success:
+            return 0
+        koalitioner = r.json()
+        if not koalitioner:
+            return 0
+
+        # BFS-klustring
+        grannar: dict[str, list[str]] = {}
+        styrka_map: dict[str, int] = {}
+        for k in koalitioner:
+            a, b = k["agent_a"], k["agent_b"]
+            grannar.setdefault(a, []).append(b)
+            grannar.setdefault(b, []).append(a)
+            styrka_map[f"{a}||{b}"] = k["styrka"]
+
+        besokt: set[str] = set()
+        kluster: list[list[str]] = []
+        for start in grannar:
+            if start in besokt:
+                continue
+            fraktion: list[str] = []
+            ko = [start]
+            while ko:
+                nod = ko.pop()
+                if nod in besokt:
+                    continue
+                besokt.add(nod)
+                fraktion.append(nod)
+                for granne in grannar.get(nod, []):
+                    if granne not in besokt:
+                        ko.append(granne)
+            if 3 <= len(fraktion) <= 8:
+                kluster.append(sorted(fraktion))
+
+        if not kluster:
+            return 0
+
+        # Ta bort gamla partier
+        httpx.delete(f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true", headers=h, timeout=8)
+
+        # Spara nya
+        aktiva = 0
+        for medlemmar in kluster:
+            ledare = _hamta_ledare(sb_key, medlemmar)
+            namn = _parti_namn_fran_positioner(sb_key, medlemmar)
+            intern_styrka = sum(
+                styrka_map.get(f"{a}||{b}", styrka_map.get(f"{b}||{a}", 0))
+                for i, a in enumerate(medlemmar)
+                for b in medlemmar[i+1:]
+            )
+            payload = {
+                "namn": namn,
+                "medlemmar": medlemmar,
+                "ledare": ledare,
+                "styrka": intern_styrka,
+                "aktiv": True,
+                "senast_uppdaterad": "now()",
+            }
+            r2 = httpx.post(f"{SB_URL}/rest/v1/politiska_partier", headers=h, json=payload, timeout=8)
+            if r2.is_success:
+                aktiva += 1
+                spara_civilisations_minne(
+                    sb_key, typ="koalition_bildad",
+                    rubrik=f"Parti bildat: {namn}",
+                    beskrivning=f"Partiet {namn} bildades med {len(medlemmar)} medlemmar. Partiledare: {ledare}. Styrka: {intern_styrka}.",
+                    agenter=medlemmar, relaterat_typ="politiska_partier",
+                )
+        return aktiva
+    except Exception:
+        return 0
+
+
+def hamta_agent_parti(sb_key: str, agent_namn: str) -> dict | None:
+    """Returnerar agentens aktiva parti eller None."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/politiska_partier"
+            f"?aktiv=eq.true&medlemmar=cs.{{{urllib.parse.quote(agent_namn)}}}"
+            "&select=id,namn,ledare,medlemmar,platform,styrka&limit=1",
+            headers=h, timeout=6,
+        )
+        if r.is_success and r.json():
+            return r.json()[0]
+    except Exception:
+        pass
+    return None
+
+
+def hamta_ledare_rost(sb_key: str, lagforslag_id: int, ledare: str) -> str | None:
+    """Hämtar partiledaren röst på ett specifikt lagförslag, eller None."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag"
+            f"?lagforslag_id=eq.{lagforslag_id}&agent=eq.{urllib.parse.quote(ledare)}&select=rod&limit=1",
+            headers=h, timeout=5,
+        )
+        if r.is_success and r.json():
+            return r.json()[0]["rod"]
+    except Exception:
+        pass
+    return None
