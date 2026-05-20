@@ -56,6 +56,7 @@ from supabase_utils import (
     ta_oligarki_snapshot,
     spara_civilisations_minne, hamta_relevanta_minnen, upsert_relation,
     berakna_och_spara_partier, hamta_agent_parti,
+    kolla_och_bailout, ta_lan,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -645,6 +646,11 @@ def main():
             logga_action(sb_key, agent["namn"], "create_market_draft", {"amne": amne[:80]}, "föreslagen")
 
     if sb_key:
+        # Bank: bailout om saldo < 100 kr, frivilligt lån med ~5% chans
+        kolla_och_bailout(sb_key, agent["namn"])
+        if random.random() < 0.05:
+            ta_lan(sb_key, agent["namn"])
+
         # Uppdatera partier (~20% per körning) och hämta agentens parti
         if random.random() < 0.20:
             n_partier = berakna_och_spara_partier(sb_key)

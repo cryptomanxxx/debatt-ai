@@ -3378,3 +3378,87 @@ def hamta_ledare_rost(sb_key: str, lagforslag_id: int, ledare: str) -> str | Non
     except Exception:
         pass
     return None
+
+
+# ---------------------------------------------------------------------------
+# Bank & kreditsystem
+# ---------------------------------------------------------------------------
+
+def kolla_och_bailout(sb_key: str, agent_namn: str) -> bool:
+    """Ger 500 kr från centralbanken om agentens saldo < 100 kr. Returnerar True om bailout gavs."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo",
+            headers={**h, "Prefer": ""}, timeout=6,
+        )
+        if not r.is_success or not r.json():
+            return False
+        saldo = r.json()[0]["saldo"]
+        if saldo >= 100:
+            return False
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+            headers=h, json={"saldo": 500, "uppdaterad": "now()"}, timeout=8,
+        )
+        spara_civilisations_minne(
+            sb_key, typ="triumf",
+            rubrik=f"Centralbanken räddade {agent_namn}",
+            beskrivning=f"{agent_namn} hade bara {saldo} kr och fick en akutinjection på 500 kr från centralbanken.",
+            agenter=[agent_namn], relaterat_typ="agent_planbocker",
+        )
+        print(f"  🏦 Bailout: {agent_namn} ({saldo} kr → 500 kr)")
+        return True
+    except Exception:
+        return False
+
+
+def ta_lan(sb_key: str, agent_namn: str) -> bool:
+    """Agent tar ett frivilligt lån (200–500 kr) om saldo < 600 kr. Returnerar True om lån gavs."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo",
+            headers={**h, "Prefer": ""}, timeout=6,
+        )
+        if not r.is_success or not r.json():
+            return False
+        saldo = r.json()[0]["saldo"]
+        if saldo >= 600:
+            return False
+        # Kolla om agenten redan har ett aktivt lån
+        lan_r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_lan?agent=eq.{urllib.parse.quote(agent_namn)}&aktiv=eq.true&select=id&limit=1",
+            headers={**h, "Prefer": ""}, timeout=6,
+        )
+        if lan_r.is_success and lan_r.json():
+            return False  # Bara ett lån åt gången
+        belopp = random.choice([200, 300, 400, 500])
+        # Ge pengarna
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+            headers=h, json={"saldo": saldo + belopp, "uppdaterad": "now()"}, timeout=8,
+        )
+        # Registrera lånet
+        httpx.post(
+            f"{SB_URL}/rest/v1/agent_lan",
+            headers=h,
+            json={"agent": agent_namn, "ursprungsbelopp": belopp, "saldo_kvar": belopp, "rantefot": 0.05},
+            timeout=8,
+        )
+        spara_civilisations_minne(
+            sb_key, typ="marknadsseger",
+            rubrik=f"{agent_namn} tog ett lån på {belopp} kr",
+            beskrivning=f"{agent_namn} lånade {belopp} kr från centralbanken (5% veckoränta). Saldo: {saldo} → {saldo + belopp} kr.",
+            agenter=[agent_namn], relaterat_typ="agent_lan",
+        )
+        print(f"  🏦 Lån: {agent_namn} lånade {belopp} kr (saldo {saldo} → {saldo + belopp} kr)")
+        return True
+    except Exception:
+        return False
