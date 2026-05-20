@@ -603,6 +603,7 @@ const ALLA_KÖRNINGAR = [
   { h: 12, m: 30, namn: "Lobbying",        farg: "#f87171", ikon: "💰" },
   { h: 13, m: 0,  namn: "Koalitioner",     farg: "#34d399", ikon: "🤝" },
   { h: 13, m: 30, namn: "Ekonomispel",     farg: "#e8d5a3", ikon: "💸" },
+  { h: 14, m: 0,  namn: "Konversationer",  farg: "#a78bfa", ikon: "🤖" },
   { h: 15, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
   { h: 16, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
   { h: 17, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
@@ -665,7 +666,7 @@ function DagensSchema({ nextIdx }) {
         <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Dagens schema</span>
         <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>18 körningar · svensk tid</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "repeat(9, auto)", gridAutoFlow: "column", gap: "3px 10px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "repeat(10, auto)", gridAutoFlow: "column", gap: "3px 10px" }}>
         {ALLA_KÖRNINGAR.map((k, i) => {
           const eventSec = k.h * 3600 + k.m * 60;
           const past = nowSec !== null && eventSec < nowSec;
