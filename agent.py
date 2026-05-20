@@ -54,6 +54,7 @@ from supabase_utils import (
     hamta_agent_buffs, spara_dagboksinlagg,
     hamta_agent_status,
     ta_oligarki_snapshot,
+    spara_civilisations_minne, hamta_relevanta_minnen, upsert_relation,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -147,7 +148,15 @@ def hamta_drama_kontext(sb_key, agent_a, agent_b):
     except Exception:
         pass
 
-    return "\n".join(delar[:5]) if delar else ""
+    # Historiska minnen mellan agenterna
+    try:
+        minnen = hamta_relevanta_minnen(sb_key, agent_a, agent_b, limit=3)
+        for m in minnen:
+            delar.append(f"Historiskt minne — {m}")
+    except Exception:
+        pass
+
+    return "\n".join(delar[:7]) if delar else ""
 
 
 SYMBOL_PREFERENSER = {

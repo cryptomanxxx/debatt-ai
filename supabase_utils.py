@@ -1594,10 +1594,30 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
                     json={"agent_a": a1, "agent_b": a2, "styrka": 3, "antal_utbyten": 1},
                     timeout=8,
                 )
+            spara_civilisations_minne(
+                sb_key,
+                typ="koalition_bildad",
+                rubrik=f"Allians: {agent_namn} och {mal_namn}",
+                beskrivning=f"{agent_namn} föreslog koalition med {mal_namn} baserat på {alignment} gemensamma parlamentsröster. {mal_namn} accepterade: \"{svar_text[:100]}\"",
+                agenter=[agent_namn, mal_namn],
+                relaterat_typ="agent_koalitioner",
+            )
+            upsert_relation(sb_key, agent_namn, mal_namn, "allierad", 75,
+                            f"Parlamentskoalition: {alignment} gemensamma röster")
             print(f"  ✓ Koalition bildad: {agent_namn} + {mal_namn} (samsyn: {alignment}, +3 styrka)")
             print(f"    Förslag: {forslag[:100]}…")
             print(f"    Svar: {svar_text[:100]}")
         else:
+            spara_civilisations_minne(
+                sb_key,
+                typ="allians_bruten",
+                rubrik=f"{mal_namn} avvisade {agent_namn}s koalitionsförslag",
+                beskrivning=f"{agent_namn} föreslog allians baserat på {alignment} gemensamma röster. {mal_namn} avvisade: \"{svar_text[:100]}\"",
+                agenter=[agent_namn, mal_namn],
+                relaterat_typ="agent_koalitioner",
+            )
+            upsert_relation(sb_key, agent_namn, mal_namn, "rival", 40,
+                            f"Avvisat koalitionsförslag")
             print(f"  ✗ Koalition avvisad: {mal_namn} tackade nej till {agent_namn}")
             if svar_text:
                 print(f"    Motivering: {svar_text[:100]}")
@@ -1836,6 +1856,28 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
             headers={**h, "Content-Type": "application/json", "Prefer": "return=minimal"},
             timeout=8,
         )
+
+        # Spara till civilisationsminnet
+        if resultat == "accepterat":
+            spara_civilisations_minne(
+                sb_key,
+                typ="triumf",
+                rubrik=f"{agent_namn} vann lobbying mot {mal_namn}",
+                beskrivning=f"{agent_namn} övertygade {mal_namn} att rösta JA på \"{forslag['titel'][:60]}\" mot {belopp} kr. {motivering[:80] if motivering else ''}",
+                agenter=[agent_namn, mal_namn],
+                relaterat_typ="lobbying_log",
+            )
+            upsert_relation(sb_key, agent_namn, mal_namn, "allierad", 60,
+                            f"Lobbying-allians: {agent_namn} övertygade {mal_namn}")
+        else:
+            spara_civilisations_minne(
+                sb_key,
+                typ="förräderi",
+                rubrik=f"{mal_namn} avvisade {agent_namn}s lobbying",
+                beskrivning=f"{mal_namn} vägrade ta emot {belopp} kr från {agent_namn} för att rösta JA på \"{forslag['titel'][:60]}\". {motivering[:80] if motivering else ''}",
+                agenter=[agent_namn, mal_namn],
+                relaterat_typ="lobbying_log",
+            )
 
         emoji = "✓" if resultat == "accepterat" else "✗"
         print(f"  {emoji} Lobbying: {agent_namn} → {mal_namn} ({belopp} kr) — {resultat}")
@@ -3088,4 +3130,64 @@ def ta_oligarki_snapshot(sb_key: str) -> None:
         },
         timeout=10,
     )
-    print(f"  ✓ Oligarki-snapshot: risk={risk}%, gini={gini_val:.1%}, mobilitet={mobilitet}%")
+
+
+# ── Civilisationsminne och relationsgrafen ────────────────────────────────────
+
+def spara_civilisations_minne(sb_key: str, typ: str, rubrik: str, beskrivning: str,
+                               agenter: list[str] | None = None,
+                               relaterat_id: int | None = None,
+                               relaterat_typ: str | None = None) -> bool:
+    """Sparar en historisk händelse till civilisationsminnet."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    try:
+        payload: dict = {"typ": typ, "rubrik": rubrik, "beskrivning": beskrivning}
+        if agenter:
+            payload["agenter"] = agenter
+        if relaterat_id is not None:
+            payload["relaterat_id"] = relaterat_id
+        if relaterat_typ:
+            payload["relaterat_typ"] = relaterat_typ
+        r = httpx.post(f"{SB_URL}/rest/v1/civilisations_minne", headers=h, json=payload, timeout=8)
+        return r.is_success
+    except Exception:
+        return False
+
+
+def hamta_relevanta_minnen(sb_key: str, agent_a: str, agent_b: str | None = None, limit: int = 5) -> list[str]:
+    """Hämtar relevanta historiska minnen för ett agentpar (eller en enskild agent)."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        params: dict = {"select": "typ,rubrik,beskrivning,skapad", "order": "skapad.desc", "limit": str(limit * 3)}
+        if agent_b:
+            params["agenter"] = f"cs.{{{urllib.parse.quote(agent_a)},{urllib.parse.quote(agent_b)}}}"
+        else:
+            params["agenter"] = f"cs.{{{urllib.parse.quote(agent_a)}}}"
+        r = httpx.get(f"{SB_URL}/rest/v1/civilisations_minne", params=params, headers=h, timeout=6)
+        if not r.is_success:
+            return []
+        resultat = []
+        for m in r.json()[:limit]:
+            resultat.append(f"{m['rubrik']}: {m['beskrivning'][:120]}")
+        return resultat
+    except Exception:
+        return []
+
+
+def upsert_relation(sb_key: str, agent_a: str, agent_b: str, typ: str, styrka: int, beskrivning: str = "") -> bool:
+    """Upsertar en relationstyp mellan två agenter (agent_a < agent_b, alphabetiskt sorterat)."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    a1, a2 = sorted([agent_a, agent_b])
+    try:
+        payload = {"agent_a": a1, "agent_b": a2, "typ": typ, "styrka": styrka,
+                   "beskrivning": beskrivning, "senast_uppdaterad": "now()"}
+        r = httpx.post(f"{SB_URL}/rest/v1/agent_relationer", headers=h, json=payload, timeout=8)
+        return r.is_success
+    except Exception:
+        return False
