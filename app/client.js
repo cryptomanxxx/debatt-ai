@@ -162,11 +162,12 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,skapad&order=skapad.desc&limit=4`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,skapad,lagforslag(titel)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
   ]);
 
   const feed = [];
@@ -222,6 +223,21 @@ async function fetchAktivitetsFeed() {
       href: `/chatt/${d.id}`,
       skapad: d.skapad,
       farg: "#34d399",
+    });
+  });
+
+  (roster.value || []).forEach(r => {
+    if (!r.skapad) return;
+    const titel = r.lagforslag?.titel || "parlamentsförslag";
+    const rodIkon = r.rod === "ja" ? "✅" : r.rod === "nej" ? "❌" : "⬜";
+    const rodFarg = r.rod === "ja" ? "#4ade80" : r.rod === "nej" ? "#f87171" : "#888";
+    feed.push({
+      typ: "parlament",
+      ikon: rodIkon,
+      text: `${r.agent} röstade ${r.rod}: "${titel.slice(0, 55)}"`,
+      href: "/parlament",
+      skapad: r.skapad,
+      farg: rodFarg,
     });
   });
 
