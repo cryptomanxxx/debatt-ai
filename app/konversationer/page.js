@@ -12,7 +12,7 @@ const C = {
 };
 
 const ALLA_AGENTER = Object.keys(AGENT_VISUELL).sort();
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 function agentVisuell(namn) {
   return AGENT_VISUELL[namn] || null;
