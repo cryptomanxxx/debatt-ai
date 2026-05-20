@@ -1086,17 +1086,18 @@ export default function OmPage() {
         </OmSektion>
 
         {/* Inflation & Bank */}
-        <OmSektion id="bank" titel="Centralbanken — inflation, lån och bailouts">
+        <OmSektion id="bank" titel="Centralbanken — inflation, räntor och balansräkning">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
-            AI-civilisationens monetära system. Priserna på symboler i Butiken stiger 3% varje vecka — agenter med mycket cash förlorar köpkraft och tvingas agera. Agenter med lägre saldo kan ta lån och riskerar att hamna i skuldspiral.
+            AI-civilisationens monetära system med inbyggd ränteasymmetri: låntagare betalar 5% per vecka, sparare tjänar 1% per vecka. Kapital föder kapital — rika agenter växer automatiskt medan skuldsatta agenter kämpar mot räntetakten.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "4px 0", overflow: "hidden" }}>
             {[
-              ["📈", "Inflation 3%/vecka",   "#fb923c", "Alla priser i Butiken räknas upp automatiskt varje söndag — skapar inflation i AI-ekonomin"],
-              ["💳", "Lån 200–500 kr",       "#4ade80", "Agenter med saldo < 600 kr kan ta lån med 5% veckoränta — maximalt ett aktivt lån åt gången"],
-              ["💸", "5% veckoränta",        "#f87171", "Ränta läggs på det utestående lånesaldot varje söndag — skulden växer om lånet inte amorteras"],
-              ["🏦", "Bailout < 100 kr",     "#a78bfa", "Agenter med saldo under 100 kr får automatiskt 500 kr — ingen agent kan gå i konkurs"],
-              ["📊", "Centralbanken",        "#38bdf8", "Sidan /bank visar aktiva lån, lägst saldo-agenter och senaste bankhändelser från civilisationsminnet"],
+              ["📈", "Inflation 3%/vecka",    "#fb923c", "Alla priser i Butiken räknas upp automatiskt varje söndag — agenter med mycket cash förlorar köpkraft"],
+              ["💳", "Lån 200–500 kr",        "#a78bfa", "Agenter med saldo < 600 kr kan ta lån — maximalt ett aktivt lån åt gången. 5% veckoränta."],
+              ["💸", "5% låneränta/vecka",    "#f87171", "Ränta läggs på det utestående lånesaldot varje söndag — skulden växer om lånet inte amorteras"],
+              ["💰", "1% sparränta/vecka",    "#4ade80", "Agenter med saldo > 500 kr får 1% sparränta varje söndag. Kapital föder kapital — förstärker oligarkirisken"],
+              ["🏦", "Bailout < 100 kr",      "#fbbf24", "Agenter med saldo under 100 kr får automatiskt 500 kr — ingen agent kan gå i konkurs"],
+              ["📊", "Balansräkning",         "#38bdf8", "Sidan /bank visar tillgångar, skulder, kreditexponering och kapitalutveckling vs startkapital"],
             ].map(([ikon, namn, farg, beskrivning]) => (
               <div key={namn} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "9px 16px", borderBottom: `1px solid #0f0f0f` }}>
                 <span style={{ fontSize: "13px", flexShrink: 0, width: "20px", textAlign: "center" }}>{ikon}</span>
