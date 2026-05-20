@@ -4,19 +4,23 @@ const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { forslag: [], roster: [] };
+  if (!key) return { forslag: [], roster: [], aktivitet: [] };
   const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
-  const [fRes, rRes] = await Promise.all([
+  const [fRes, rRes, aRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/lagforslag?order=skapad.desc&limit=200`, {
       headers: hdrs, next: { revalidate: 60 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=lagforslag_id,agent,rod,motivering&order=skapad.desc&limit=5000`, {
       headers: hdrs, next: { revalidate: 60 },
     }),
+    fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,motivering,skapad,lagforslag_id,lagforslag(titel)&order=skapad.desc&limit=12`, {
+      headers: hdrs, next: { revalidate: 60 },
+    }),
   ]);
   return {
-    forslag: fRes.ok ? await fRes.json() : [],
-    roster:  rRes.ok ? await rRes.json() : [],
+    forslag:   fRes.ok ? await fRes.json() : [],
+    roster:    rRes.ok ? await rRes.json() : [],
+    aktivitet: aRes.ok ? await aRes.json() : [],
   };
 }
 
@@ -33,7 +37,7 @@ const C = {
 };
 
 export default async function ParlamentPage() {
-  const { forslag, roster } = await getData();
+  const { forslag, roster, aktivitet } = await getData();
 
   const rosterMap = {};
   for (const v of roster) {
@@ -89,6 +93,45 @@ export default async function ParlamentPage() {
             ))}
           </div>
         </div>
+
+        {/* Senaste aktivitet */}
+        {aktivitet.length > 0 && (
+          <div style={{ background: "#0a0a0f", border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden", marginBottom: "40px" }}>
+            <div style={{ padding: "12px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: "10px", color: C.dim, fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Senaste aktivitet</span>
+              <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>Röster & förslag</span>
+            </div>
+            <div>
+              {aktivitet.map((r, i) => {
+                const titel = r.lagforslag?.titel || `Förslag #${r.lagforslag_id}`;
+                const rodFarg = r.rod === "ja" ? C.ja : r.rod === "nej" ? C.nej : "#888";
+                const rodLabel = r.rod === "ja" ? "Ja" : r.rod === "nej" ? "Nej" : "Avstår";
+                const rodIkon = r.rod === "ja" ? "✅" : r.rod === "nej" ? "❌" : "⬜";
+                const ago = r.skapad ? (() => {
+                  const diff = Date.now() - new Date(r.skapad).getTime();
+                  const m = Math.floor(diff / 60000);
+                  if (m < 60) return `${m} min sedan`;
+                  const h = Math.floor(m / 60);
+                  if (h < 24) return `${h} tim sedan`;
+                  return `${Math.floor(h / 24)} dagar sedan`;
+                })() : "";
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "9px 16px", borderBottom: i < aktivitet.length - 1 ? `1px solid #111` : "none" }}>
+                    <span style={{ fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>{rodIkon}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: "11px", color: rodFarg, fontFamily: "monospace", fontWeight: 700 }}>{r.agent}</span>
+                      <span style={{ fontSize: "11px", color: "#555", fontFamily: "monospace" }}> röstade </span>
+                      <span style={{ fontSize: "11px", color: rodFarg, fontFamily: "monospace", fontWeight: 700 }}>{rodLabel}</span>
+                      <span style={{ fontSize: "11px", color: "#555" }}> — </span>
+                      <span style={{ fontSize: "11px", color: "#888", fontStyle: "italic" }}>"{titel.slice(0, 60)}{titel.length > 60 ? "…" : ""}"</span>
+                    </div>
+                    <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace", flexShrink: 0, marginTop: "2px" }}>{ago}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Samstämmighetsindex */}
         <div style={{
