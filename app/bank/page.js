@@ -76,9 +76,10 @@ export default async function BankPage() {
         <div style={{ display: "flex", gap: 16, marginBottom: 40, flexWrap: "wrap" }}>
           {[
             ["Aktiva lån", aktivaLan.length, "#fb923c"],
-            ["Total skuld", `${totalSkuld} kr`, "#f87171"],
+            ["Total skuld", `${totalSkuld.toFixed(0)} kr`, "#f87171"],
             ["Agenter < 200 kr", fattigaAgenter.length, "#fbbf24"],
-            ["Veckoränta", "5%", "#a78bfa"],
+            ["Låneränta", "5%/vecka", "#a78bfa"],
+            ["Sparränta", "1%/vecka", "#4ade80"],
           ].map(([label, val, farg]) => (
             <div key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "16px 24px", minWidth: 130 }}>
               <div style={{ fontSize: 24, color: farg, fontFamily: "monospace", fontWeight: 700 }}>{val}</div>
@@ -114,6 +115,8 @@ export default async function BankPage() {
                 ["Utestående lån", `${totalSkuld.toFixed(0)} kr`, "#fb923c"],
                 ["Aktiva låntagare", `${aktivaLan.length} agenter`, "#fb923c"],
                 ["Kreditexponering", `${exponeringsPct}%`, exponeringsPct > 30 ? "#f87171" : exponeringsPct > 15 ? "#fbbf24" : "#4ade80"],
+                ["Sparränta (>500 kr)", "1%/vecka", "#4ade80"],
+                ["Låneränta", "5%/vecka", "#a78bfa"],
               ].map(([label, val, farg]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
                   <span style={{ fontSize: 12, color: C.textMuted, fontFamily: "monospace" }}>{label}</span>
