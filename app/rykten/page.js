@@ -1,3 +1,5 @@
+import RyktenNat from "./RyktenNat";
+
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 export const revalidate = 60;
 export const metadata = {
@@ -165,6 +167,50 @@ export default async function RyktenPage() {
                   <span style={{ fontSize: 11, color: "#a78bfa", fontFamily: "monospace", marginLeft: 8 }}>{antal} spridningar</span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Spridningsnätverk */}
+        <RyktenNat spridningar={spridningar} rykten={rykten} />
+
+        {/* Mutationsträd */}
+        {Object.keys(mutationChildren).length > 0 && (
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24, marginBottom: 32 }}>
+            <h2 style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 16px" }}>
+              🧬 Mutationskedjor
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {rykten.filter(r => !r.parent_rykte_id && mutationChildren[r.id]).map(original => {
+                const barn = rykten.filter(r => r.parent_rykte_id === original.id);
+                return (
+                  <div key={original.id}>
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 6 }}>
+                      <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", marginTop: 2, flexShrink: 0 }}>#{original.id}</span>
+                      <div style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: 6, padding: "8px 12px", flex: 1 }}>
+                        <p style={{ fontSize: 12, color: C.text, margin: 0, lineHeight: 1.5 }}>&ldquo;{original.innehall}&rdquo;</p>
+                        <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>
+                          {original.ursprung_agent} · {original.sanning ? "SANT" : "FALSKT"}
+                        </span>
+                      </div>
+                    </div>
+                    {barn.map(b => (
+                      <div key={b.id} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginLeft: 32, marginBottom: 4 }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 4 }}>
+                          <div style={{ width: 1, height: 10, background: "#fb923c44" }} />
+                          <div style={{ width: 12, height: 1, background: "#fb923c44" }} />
+                        </div>
+                        <div style={{ background: "#140a00", border: `1px solid #fb923c33`, borderLeft: "3px solid #fb923c", borderRadius: 6, padding: "7px 12px", flex: 1 }}>
+                          <p style={{ fontSize: 12, color: C.text, margin: 0, lineHeight: 1.5 }}>&ldquo;{b.innehall}&rdquo;</p>
+                          <span style={{ fontSize: 10, color: "#fb923c", fontFamily: "monospace" }}>
+                            🧬 {b.ursprung_agent} · {b.sanning ? "SANT" : "FALSKT"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
