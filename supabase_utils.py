@@ -3462,3 +3462,189 @@ def ta_lan(sb_key: str, agent_namn: str) -> bool:
         return True
     except Exception:
         return False
+
+
+# ── ETF: agenter investerar i kryptovaluta-ETF ─────────────────────────────
+
+# Agenter som deltar i ETF-handel och deras föredragna kryptovalutor
+ETF_KRYPTO_PREFERENSER: dict[str, list[str]] = {
+    "Kryptoanalytiker":     ["BTC", "ETH", "SOL", "BNB", "XRP"],
+    "Teknikoptimist":       ["ETH", "SOL", "BTC"],
+    "Nationalekonom":       ["BTC"],
+    "Den rike":             ["BTC", "ETH"],
+    "Filosof":              ["ETH"],
+    "Optimisten":           ["BTC", "ETH", "SOL"],
+    "Tonåringen":           ["SOL", "XRP", "BNB"],
+    "Psykolog":             ["ETH"],
+    "Historiker":           ["BTC"],
+    "Den lugna":            ["BTC"],
+}
+
+
+def hamta_senaste_etf_pris(sb_key: str, symbol: str) -> float | None:
+    """Hämtar senaste stängningspris (USD) från ohlcv_cache."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{urllib.parse.quote(symbol)}"
+            "&order=datum.desc&limit=1&select=pris,datum",
+            headers=h, timeout=8,
+        )
+        if r.is_success and r.json():
+            return float(r.json()[0]["pris"])
+    except Exception:
+        pass
+    return None
+
+
+def kop_etf(sb_key: str, agent_namn: str, symbol: str, belopp_kr: float) -> bool:
+    """Agent köper ETF för belopp_kr. Pris hämtas från ohlcv_cache (USD)."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    try:
+        pris_usd = hamta_senaste_etf_pris(sb_key, symbol)
+        if not pris_usd:
+            return False
+
+        # Kolla saldo
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo",
+            headers={**h, "Prefer": ""}, timeout=6,
+        )
+        if not r.is_success or not r.json():
+            return False
+        saldo = float(r.json()[0]["saldo"])
+        if saldo < belopp_kr:
+            return False
+
+        # Hämta befintligt innehav
+        ih_r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_etf_innehav"
+            f"?agent=eq.{urllib.parse.quote(agent_namn)}&symbol=eq.{symbol}"
+            "&select=investerat_kr,kopt_pris_usd",
+            headers={**h, "Prefer": ""}, timeout=6,
+        )
+        innehav = ih_r.json() if ih_r.is_success else []
+
+        if innehav:
+            old_inv  = float(innehav[0]["investerat_kr"])
+            old_pris = float(innehav[0]["kopt_pris_usd"])
+            new_inv  = old_inv + belopp_kr
+            # Viktat genomsnittspris (cost basis)
+            new_pris = (old_inv * old_pris + belopp_kr * pris_usd) / new_inv
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_etf_innehav"
+                f"?agent=eq.{urllib.parse.quote(agent_namn)}&symbol=eq.{symbol}",
+                headers=h,
+                json={"investerat_kr": round(new_inv, 2), "kopt_pris_usd": round(new_pris, 4), "uppdaterad": "now()"},
+                timeout=8,
+            )
+        else:
+            httpx.post(
+                f"{SB_URL}/rest/v1/agent_etf_innehav",
+                headers=h,
+                json={"agent": agent_namn, "symbol": symbol,
+                      "investerat_kr": round(belopp_kr, 2), "kopt_pris_usd": round(pris_usd, 4)},
+                timeout=8,
+            )
+
+        # Dra från saldo
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+            headers=h, json={"saldo": round(saldo - belopp_kr, 2), "uppdaterad": "now()"}, timeout=8,
+        )
+
+        # Logga
+        httpx.post(f"{SB_URL}/rest/v1/etf_transaktioner", headers=h,
+                   json={"agent": agent_namn, "symbol": symbol, "typ": "kop",
+                         "belopp_kr": round(belopp_kr, 2), "pris_usd": round(pris_usd, 4)},
+                   timeout=8)
+
+        print(f"  📈 ETF: {agent_namn} köpte {symbol} för {belopp_kr} kr (pris ${pris_usd:,.0f})")
+        return True
+    except Exception as e:
+        print(f"  ETF köp-fel: {e}")
+        return False
+
+
+def salj_etf(sb_key: str, agent_namn: str, symbol: str, fraktion: float = 1.0) -> float | None:
+    """
+    Agent säljer fraktion (0–1) av sin {symbol}-position.
+    Returnerar proceeds i kr, eller None om ingen position finns.
+    """
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    try:
+        ih_r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_etf_innehav"
+            f"?agent=eq.{urllib.parse.quote(agent_namn)}&symbol=eq.{symbol}"
+            "&select=investerat_kr,kopt_pris_usd",
+            headers={**h, "Prefer": ""}, timeout=6,
+        )
+        if not ih_r.is_success or not ih_r.json():
+            return None
+        innehav  = ih_r.json()[0]
+        investerat = float(innehav["investerat_kr"])
+        kopt_pris  = float(innehav["kopt_pris_usd"])
+
+        pris_usd = hamta_senaste_etf_pris(sb_key, symbol)
+        if not pris_usd:
+            return None
+
+        aktuellt_varde = investerat * (pris_usd / kopt_pris)
+        proceeds       = round(aktuellt_varde * fraktion, 2)
+
+        # Uppdatera eller radera position
+        if fraktion >= 0.99:
+            httpx.delete(
+                f"{SB_URL}/rest/v1/agent_etf_innehav"
+                f"?agent=eq.{urllib.parse.quote(agent_namn)}&symbol=eq.{symbol}",
+                headers=h, timeout=8,
+            )
+        else:
+            kvar = round(investerat * (1 - fraktion), 2)
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_etf_innehav"
+                f"?agent=eq.{urllib.parse.quote(agent_namn)}&symbol=eq.{symbol}",
+                headers=h, json={"investerat_kr": kvar, "uppdaterad": "now()"}, timeout=8,
+            )
+
+        # Lägg till proceeds i saldo
+        saldo_r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo",
+            headers={**h, "Prefer": ""}, timeout=6,
+        )
+        if saldo_r.is_success and saldo_r.json():
+            saldo = float(saldo_r.json()[0]["saldo"])
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+                headers=h, json={"saldo": round(saldo + proceeds, 2), "uppdaterad": "now()"}, timeout=8,
+            )
+
+        # Logga
+        httpx.post(f"{SB_URL}/rest/v1/etf_transaktioner", headers=h,
+                   json={"agent": agent_namn, "symbol": symbol, "typ": "salj",
+                         "belopp_kr": proceeds, "pris_usd": round(pris_usd, 4)},
+                   timeout=8)
+
+        pnl = round(proceeds - investerat * fraktion, 2)
+        pnl_str = f"+{pnl}" if pnl >= 0 else str(pnl)
+        print(f"  📉 ETF: {agent_namn} sålde {symbol} ({int(fraktion*100)}%) → {proceeds} kr ({pnl_str} kr P&L)")
+
+        if abs(pnl) >= 50:
+            typ    = "marknadsseger" if pnl > 0 else "marknadskrasch"
+            rubrik = (f"{agent_namn} tjänade {pnl} kr på {symbol}-ETF"
+                      if pnl > 0 else f"{agent_namn} förlorade {abs(pnl)} kr på {symbol}-ETF")
+            spara_civilisations_minne(
+                sb_key, typ=typ, rubrik=rubrik,
+                beskrivning=f"ETF-handel: {agent_namn} sålde {symbol} för {proceeds} kr (P&L: {pnl_str} kr).",
+                agenter=[agent_namn], relaterat_typ="etf_transaktioner",
+            )
+        return proceeds
+    except Exception as e:
+        print(f"  ETF sälj-fel: {e}")
+        return None
