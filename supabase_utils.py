@@ -3674,7 +3674,7 @@ def skapa_rykte(sb_key: str, ursprung_agent: str, om_agent: str, innehall: str, 
     return None
 
 
-def sprid_rykte(sb_key: str, rykte_id: int, fran_agent: str, till_agent: str) -> bool:
+def sprid_rykte(sb_key: str, rykte_id: int, fran_agent: str, till_agent: str, kanal: str = "slumpmässig") -> bool:
     """Sprider ett känt rykte från fran_agent till till_agent. Returnerar True om nytt."""
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
@@ -3699,9 +3699,9 @@ def sprid_rykte(sb_key: str, rykte_id: int, fran_agent: str, till_agent: str) ->
             timeout=8,
         )
         httpx.post(f"{SB_URL}/rest/v1/rykte_spridningar", headers=h,
-                   json={"rykte_id": rykte_id, "fran_agent": fran_agent, "till_agent": till_agent},
+                   json={"rykte_id": rykte_id, "fran_agent": fran_agent, "till_agent": till_agent, "kanal": kanal},
                    timeout=8)
-        print(f"  📢 Rykte #{rykte_id} spreds: {fran_agent} → {till_agent}")
+        print(f"  📢 Rykte #{rykte_id} spreds [{kanal}]: {fran_agent} → {till_agent}")
         return True
     except Exception as e:
         print(f"  Sprid rykte-fel: {e}")
@@ -3778,3 +3778,176 @@ def hamta_rykte_underlag(sb_key: str, om_agent: str) -> tuple[str, bool]:
     if fakta:
         return random.choice(fakta), True
     return "", False
+
+
+# ── Ryktesspridning v2: godtrogenhet, mutation, bankrun ───────────────────────
+
+AGENT_GODTROGENHET: dict[str, int] = {
+    "Nationalekonom":       20,
+    "Miljöaktivist":        55,
+    "Teknikoptimist":       35,
+    "Konservativ debattör": 45,
+    "Jurist":               15,
+    "Journalist":           70,
+    "Filosof":              25,
+    "Läkare":               20,
+    "Psykolog":             50,
+    "Historiker":           35,
+    "Sociolog":             55,
+    "Kryptoanalytiker":     60,
+    "Den hungriga":         50,
+    "Mamman":               75,
+    "Den sura":             20,
+    "Den trötta":           40,
+    "Den stressade":        80,
+    "Den lugna":            15,
+    "Pensionären":          65,
+    "Tonåringen":           85,
+    "Den nostalgiske":      60,
+    "Hypokondrikern":       90,
+    "Optimisten":           30,
+    "Den rike":             25,
+}
+
+
+def mutera_rykte_innehall(groq_key: str, original: str) -> str | None:
+    """Muterar ett rykte med LLM. Returnerar lätt modifierad text eller None vid fel."""
+    try:
+        import groq as groq_lib
+        client = groq_lib.Groq(api_key=groq_key)
+        resp = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{
+                "role": "user",
+                "content": (
+                    "Skriv en lätt modifierad version av detta rykte. "
+                    "Byt ut ETT litet detalj (ett belopp, ett ord eller en handling) men behåll kärnan. "
+                    "Svara BARA med den modifierade texten, inga förklaringar, inga citattecken.\n\n"
+                    f"Original: {original}"
+                ),
+            }],
+            max_tokens=120,
+            temperature=0.9,
+        )
+        muterad = resp.choices[0].message.content.strip().strip('"').strip("'")
+        if muterad and muterad != original and len(muterad) > 15:
+            return muterad
+    except Exception as e:
+        print(f"  Mutation-LLM-fel: {e}")
+    return None
+
+
+def sprid_med_mutation(
+    sb_key: str, rykte_id: int, fran_agent: str, till_agent: str,
+    kanal: str = "slumpmässig", groq_key: str | None = None,
+) -> bool:
+    """Sprider ett rykte med 30% chans till mutation (skapar nytt rykte med parent_rykte_id)."""
+    if groq_key and random.random() < 0.30:
+        h_get = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+        try:
+            r = httpx.get(
+                f"{SB_URL}/rest/v1/rykten?id=eq.{rykte_id}&select=innehall,om_agent,sanning",
+                headers=h_get, timeout=5,
+            )
+            if r.is_success and r.json():
+                original = r.json()[0]
+                muterad_text = mutera_rykte_innehall(groq_key, original["innehall"])
+                if muterad_text:
+                    h_post = {
+                        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                        "Content-Type": "application/json", "Prefer": "return=representation",
+                    }
+                    resp2 = httpx.post(
+                        f"{SB_URL}/rest/v1/rykten",
+                        headers=h_post,
+                        json={
+                            "innehall": muterad_text,
+                            "om_agent": original["om_agent"],
+                            "ursprung_agent": fran_agent,
+                            "sanning": original["sanning"],
+                            "kanda_av": [fran_agent, till_agent],
+                            "antal_spridningar": 1,
+                            "parent_rykte_id": rykte_id,
+                        },
+                        timeout=8,
+                    )
+                    if resp2.is_success:
+                        data = resp2.json()
+                        new_id = data[0]["id"] if isinstance(data, list) else data.get("id")
+                        httpx.post(
+                            f"{SB_URL}/rest/v1/rykte_spridningar",
+                            headers={**h_post, "Prefer": "return=minimal"},
+                            json={"rykte_id": new_id, "fran_agent": fran_agent, "till_agent": till_agent, "kanal": kanal},
+                            timeout=8,
+                        )
+                        print(f"  📢 Rykte #{rykte_id} muterade → #{new_id}: \"{muterad_text[:60]}\"")
+                        return True
+        except Exception as e:
+            print(f"  Mutation-fel: {e}")
+    return sprid_rykte(sb_key, rykte_id, fran_agent, till_agent, kanal)
+
+
+def kolla_reflexiv_bankrun(sb_key: str, agent_namn: str) -> bool:
+    """Returnerar True om agenten känner till ett vitt spritt falskt bankruns-rykte (≥3 agenter)."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/rykten?sanning=eq.false&om_agent=eq.Centralbanken"
+            f"&select=kanda_av,antal_spridningar&order=antal_spridningar.desc&limit=3",
+            headers=h, timeout=5,
+        )
+        if r.is_success:
+            for rykte in r.json():
+                kanda = rykte.get("kanda_av") or []
+                if agent_namn in kanda and len(kanda) >= 3:
+                    return True
+    except Exception:
+        pass
+    return False
+
+
+def aterbetala_lan_delvis(sb_key: str, agent_namn: str, belopp: float = 50.0) -> bool:
+    """Agenten gör en panikbetalning på lånet (bankruns-beteende). Returnerar True om genomförd."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    try:
+        r_lan = httpx.get(
+            f"{SB_URL}/rest/v1/agent_lan?agent=eq.{urllib.parse.quote(agent_namn)}&aktiv=eq.true&select=id,saldo_kvar&limit=1",
+            headers={**h, "Prefer": ""}, timeout=5,
+        )
+        if not r_lan.is_success or not r_lan.json():
+            return False
+        lan = r_lan.json()[0]
+        aterbetal = min(belopp, float(lan["saldo_kvar"]))
+        if aterbetal <= 0:
+            return False
+        r_plb = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo&limit=1",
+            headers={**h, "Prefer": ""}, timeout=5,
+        )
+        if not r_plb.is_success or not r_plb.json():
+            return False
+        saldo = float(r_plb.json()[0]["saldo"])
+        if saldo < aterbetal:
+            return False
+        nytt_saldo_kvar = float(lan["saldo_kvar"]) - aterbetal
+        aktiv = nytt_saldo_kvar > 0
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_lan?id=eq.{lan['id']}",
+            headers=h,
+            json={"saldo_kvar": round(nytt_saldo_kvar, 2), "aktiv": aktiv},
+            timeout=8,
+        )
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+            headers=h,
+            json={"saldo": round(saldo - aterbetal, 2), "uppdaterad": "now()"},
+            timeout=8,
+        )
+        print(f"  🏦 BANKRUN-PANIK: {agent_namn} återbetalar {aterbetal:.0f} kr av lån (rykte om insolvens!)")
+        return True
+    except Exception as e:
+        print(f"  Återbetala lån-fel: {e}")
+        return False
