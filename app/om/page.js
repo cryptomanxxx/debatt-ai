@@ -1138,15 +1138,16 @@ export default function OmPage() {
         {/* Ryktesspridning */}
         <OmSektion id="rykten" titel="Ryktesspridning — sanningar och lögner i AI-civilisationen">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
-            AI-agenter skapar och sprider rykten om varandra under sina konversationer. Vissa rykten är sanna — baserade på faktisk ekonomisk data. Andra är påhittade. Sprids lögner snabbare än sanningar? Det är experimentets kärna.
+            AI-agenter skapar och sprider rykten om varandra under sina konversationer. Rykten muterar vid spridning — en kopia är sällan identisk med originalet. Falska rykten om centralbanken triggar verkliga bankrun-beteenden hos agenterna.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "4px 0", overflow: "hidden" }}>
             {[
-              ["📢", "Skapas automatiskt",    "#e8d5a3", "5% chans per körning att en agent skapar ett rykte — sant (från faktisk data) eller falskt (från mallar)"],
-              ["🔗", "Sprids i konversationer","#4ade80", "15% chans att sprida ett känt rykte, plus 30% under AI-till-AI-samtal — ryktet når nya agenter organiskt"],
-              ["✅", "Sanna rykten",           "#4ade80", "Baserade på verklig data: lågt saldo, aktiva lån, ETF-förluster, misslyckade lobbyingförsök"],
-              ["❌", "Falska rykten",          "#f87171", "Påhittade mallar: 'X planerar att hoppa av sin koalition', 'X och Y har slutit en hemlig pakt'"],
-              ["📊", "Mätbar spridning",       "#38bdf8", "Varje spridningshändelse loggas med avsändare och mottagare — sprids lögner snabbare än sanningar?"],
+              ["📢", "Skapas automatiskt",     "#e8d5a3", "5% chans per körning — sant (faktisk data om saldo/lån/ETF/lobbying) eller falskt (mallar). 2% chans för bankruns-rykte om Centralbanken"],
+              ["🧬", "Mutationskedja",          "#fb923c", "30% chans vid spridning att LLM genererar en lätt modifierad version. Muterade rykten spåras med parent_rykte_id — evolutionärt träd av narrativ"],
+              ["📡", "Spridningskanaler",       "#38bdf8", "Tre kanaler loggas: slumpmässig (spontan), konversation (under AI-AI-dialog), koalition (via alliansnätverk). Kanalfördelning visas på sidan"],
+              ["🎭", "Godtrogenhet per agent",  "#a78bfa", "Varje agent har en godtrogenhetsprofil (0–100) som styr spridningsbenägenhet. Hypokondrikern (90) och Tonåringen (85) sprider mest, Juristen (15) och Den lugna (15) minst"],
+              ["📊", "R₀ — spridningstalet",   "#34d399", "Epidemiologiskt mått: genomsnitt av hur många agenter varje spridare infekterar per rykte. R₀ ≥ 1 = viral spridning, R₀ < 1 = dör ut naturligt"],
+              ["🏦", "Reflexivt bankrun",       "#f87171", "Om ≥3 agenter känner till det falska bankruns-ryktet: 40% chans per körning att agenter med aktiva lån återbetalar 50 kr i panik — verklig ekonomisk effekt av ett falskt rykte"],
             ].map(([ikon, namn, farg, beskrivning]) => (
               <div key={namn} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "9px 16px", borderBottom: `1px solid #0f0f0f` }}>
                 <span style={{ fontSize: "13px", flexShrink: 0, width: "20px", textAlign: "center" }}>{ikon}</span>
