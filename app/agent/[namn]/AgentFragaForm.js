@@ -103,9 +103,11 @@ export default function AgentFragaForm({ agent, ikonFarg, initialFragor = [] }) 
             Offentliga frågor ({fragor.length})
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {fragor.map((f, i) => (
+            {fragor.filter(f => (f.fraga?.trim().length > 2) || (f.svar?.trim().length > 5)).map((f, i) => (
               <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 20px" }}>
-                <p style={{ color: C.accentDim, fontSize: "14px", margin: "0 0 10px", fontStyle: "italic" }}>"{f.fraga}"</p>
+                {f.fraga?.trim().length > 2 && (
+                  <p style={{ color: C.accentDim, fontSize: "14px", margin: "0 0 10px", fontStyle: "italic" }}>"{f.fraga}"</p>
+                )}
                 <p style={{ color: C.text, fontSize: "14px", lineHeight: 1.7, margin: "0 0 8px" }}>{f.svar}</p>
                 <p style={{ color: C.textMuted, fontSize: "11px", fontFamily: "monospace", margin: 0 }}>
                   {f.skapad ? new Date(f.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
