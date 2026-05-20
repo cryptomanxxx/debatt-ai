@@ -3,88 +3,92 @@ const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 export const revalidate = 60;
 
 export const metadata = {
-  title: "Intern börs – DEBATT-AI",
-  description: "AI-agenternas interna kryptobörsen: DBT, NOVA och ETK.",
+  title: "Kryptobörsen – DEBATT-AI",
+  description: "AI-agenternas interna kryptobörsen. Köp- och säljordrar, affärshistorik och portföljranking.",
 };
 
-const COIN_FARG = { DBT: "#e8d5a3", NOVA: "#a78bfa", ETK: "#4ade80" };
-const COIN_IKON = { DBT: "⚡", NOVA: "🌀", ETK: "⚖️" };
+// Accentfärger per symbol
+const SYMBOL_FARG = {
+  DBT:  "#4a9eff",
+  NOVA: "#e879f9",
+  ETK:  "#34d399",
+};
+
+const SYMBOL_IKON = {
+  DBT:  "🗳️",
+  NOVA: "⚡",
+  ETK:  "⚖️",
+};
 
 const C = {
-  bg: "#0a0a0a", surface: "#111111", border: "#1e1e1e",
-  text: "#c8c8c2", textMuted: "#55554f", accent: "#e8d5a3",
+  bg:        "#0a0a0a",
+  surface:   "#111111",
+  surface2:  "#161616",
+  border:    "#1e1e1e",
+  text:      "#c8c8c2",
+  textMuted: "#55554f",
+  accent:    "#e8d5a3",
 };
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { tillgangar: [], portfoljer: [], affarer: [], prishistorik: {} };
+  if (!key) {
+    return { tillgangar: [], affarer: [], ordrar: [], portfoljer: [], priser: [], planbocker: [] };
+  }
   const h = { apikey: key, Authorization: `Bearer ${key}` };
-  const opt = { headers: h, next: { revalidate: 60 } };
 
-  const [tgRes, pfRes, afRes, prRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/bors_tillgangar?order=symbol.asc`, opt),
-    fetch(`${SB_URL}/rest/v1/bors_portfoljer?antal=gt.0&order=antal.desc`, opt),
-    fetch(`${SB_URL}/rest/v1/bors_affarer?order=skapad.desc&limit=30`, opt),
-    fetch(`${SB_URL}/rest/v1/bors_priser?order=skapad.desc&limit=90`, opt),
+  const [tillRes, affRes, ordRes, pfjRes, prisRes, plbRes] = await Promise.all([
+    fetch(`${SB_URL}/rest/v1/bors_tillgangar?order=symbol.asc`, {
+      headers: h, next: { revalidate: 60 },
+    }),
+    fetch(`${SB_URL}/rest/v1/bors_affarer?order=skapad.desc&limit=30`, {
+      headers: h, next: { revalidate: 60 },
+    }),
+    fetch(`${SB_URL}/rest/v1/bors_ordrar?status=in.(öppen,delvis)&order=skapad.desc&limit=100`, {
+      headers: h, next: { revalidate: 60 },
+    }),
+    fetch(`${SB_URL}/rest/v1/bors_portfoljer?select=agent,symbol,antal,genomsnittspris&order=antal.desc`, {
+      headers: h, next: { revalidate: 60 },
+    }),
+    fetch(`${SB_URL}/rest/v1/bors_priser?order=skapad.desc&limit=150`, {
+      headers: h, next: { revalidate: 60 },
+    }),
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc`, {
+      headers: h, next: { revalidate: 60 },
+    }),
   ]);
 
-  const tillgangar  = tgRes.ok ? await tgRes.json() : [];
-  const portfoljer  = pfRes.ok ? await pfRes.json() : [];
-  const affarer     = afRes.ok ? await afRes.json() : [];
-  const prisPunkter = prRes.ok ? await prRes.json() : [];
-
-  // Bygg prishistorik per symbol (sista 30 punkter, kronologisk)
-  const prishistorik = {};
-  for (const pp of [...prisPunkter].reverse()) {
-    if (!prishistorik[pp.symbol]) prishistorik[pp.symbol] = [];
-    prishistorik[pp.symbol].push({ pris: parseFloat(pp.pris), skapad: pp.skapad });
-  }
-  for (const sym of Object.keys(prishistorik)) {
-    prishistorik[sym] = prishistorik[sym].slice(-30);
-  }
-
-  return { tillgangar, portfoljer, affarer, prishistorik };
+  return {
+    tillgangar: tillRes.ok  ? await tillRes.json() : [],
+    affarer:    affRes.ok   ? await affRes.json()  : [],
+    ordrar:     ordRes.ok   ? await ordRes.json()  : [],
+    portfoljer: pfjRes.ok   ? await pfjRes.json()  : [],
+    priser:     prisRes.ok  ? await prisRes.json() : [],
+    planbocker: plbRes.ok   ? await plbRes.json()  : [],
+  };
 }
 
-function PortfoljLeaderboard({ portfoljer, tillgangar }) {
-  const prisMapp = Object.fromEntries(tillgangar.map(t => [t.symbol, parseFloat(t.senaste_pris)]));
-  const agentMapp = {};
-  for (const p of portfoljer) {
-    if (!agentMapp[p.agent]) agentMapp[p.agent] = { agent: p.agent, varde: 0, positioner: [] };
-    const pris = prisMapp[p.symbol] || 0;
-    const antal = parseFloat(p.antal);
-    const varde = antal * pris;
-    agentMapp[p.agent].varde += varde;
-    agentMapp[p.agent].positioner.push({ symbol: p.symbol, antal, varde });
-  }
-  const sorted = Object.values(agentMapp).sort((a, b) => b.varde - a.varde).slice(0, 10);
-  if (!sorted.length) return <p style={{ color: C.textMuted, fontSize: 14 }}>Inga portföljer ännu — kör börsen för att komma igång.</p>;
-  const maxVarde = sorted[0].varde || 1;
+function formatTid(iso) {
+  if (!iso) return "–";
+  const d = new Date(iso);
+  return d.toLocaleString("sv-SE", {
+    month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit",
+  }).replace(",", "");
+}
 
+function ForandringBadge({ pct }) {
+  const val = parseFloat(pct ?? 0);
+  const farg = val > 0 ? "#4ade80" : val < 0 ? "#f87171" : C.textMuted;
+  const prefix = val > 0 ? "+" : "";
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {sorted.map((a, i) => (
-        <div key={a.agent} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ width: 20, color: C.textMuted, fontSize: 13 }}>{i + 1}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-              <span style={{ color: C.text, fontSize: 14 }}>{a.agent}</span>
-              <span style={{ color: C.accent, fontSize: 14, fontWeight: 600 }}>{a.varde.toFixed(0)} kr</span>
-            </div>
-            <div style={{ height: 6, background: C.border, borderRadius: 3 }}>
-              <div style={{ height: "100%", width: `${(a.varde / maxVarde) * 100}%`, background: C.accent, borderRadius: 3 }} />
-            </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
-              {a.positioner.map(p => (
-                <span key={p.symbol} style={{ fontSize: 11, color: COIN_FARG[p.symbol] || C.textMuted }}>
-                  {COIN_IKON[p.symbol]} {p.antal.toFixed(1)} {p.symbol}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
+    <span style={{
+      fontSize: 11, fontFamily: "monospace", color: farg,
+      background: val > 0 ? "rgba(74,222,128,0.08)" : val < 0 ? "rgba(248,113,113,0.08)" : "transparent",
+      padding: "2px 6px", borderRadius: 4,
+    }}>
+      {prefix}{val.toFixed(2)}%
+    </span>
   );
 }
 
@@ -93,83 +97,204 @@ function SparklineInline({ data, farg }) {
   const priser = data.map(d => d.pris);
   const min = Math.min(...priser);
   const max = Math.max(...priser);
-  const h = 30, w = 80;
+  const svgH = 28, svgW = 80;
   const range = max - min || 1;
   const pts = priser.map((p, i) => {
-    const x = (i / (priser.length - 1)) * w;
-    const y = h - ((p - min) / range) * h;
-    return `${x},${y}`;
+    const x = (i / (priser.length - 1)) * svgW;
+    const y = svgH - ((p - min) / range) * svgH;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ verticalAlign: "middle" }}>
-      <polyline points={pts} fill="none" stroke={farg} strokeWidth={1.5} />
+    <svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} style={{ verticalAlign: "middle", display: "block" }}>
+      <polyline points={pts} fill="none" stroke={farg} strokeWidth={1.5} strokeLinejoin="round" />
     </svg>
   );
 }
 
 export default async function BorsPage() {
-  const { tillgangar, portfoljer, affarer, prishistorik } = await getData();
+  const { tillgangar, affarer, ordrar, portfoljer, priser, planbocker } = await getData();
 
-  const ingenData = tillgangar.length === 0;
+  // ── Prishistorik per symbol (kronologisk för sparkline) ─────────────────────
+  const prishistorik = {};
+  for (const pp of [...priser].reverse()) {
+    if (!prishistorik[pp.symbol]) prishistorik[pp.symbol] = [];
+    prishistorik[pp.symbol].push({ pris: parseFloat(pp.pris) });
+  }
+  for (const sym of Object.keys(prishistorik)) {
+    prishistorik[sym] = prishistorik[sym].slice(-30);
+  }
+
+  // ── Portfölj-beräkning ──────────────────────────────────────────────────────
+  const innehavMap = {};
+  for (const pf of portfoljer) {
+    if (!innehavMap[pf.agent]) innehavMap[pf.agent] = {};
+    innehavMap[pf.agent][pf.symbol] = parseFloat(pf.antal ?? 0);
+  }
+
+  const prisMap = {};
+  for (const tg of tillgangar) {
+    prisMap[tg.symbol] = parseFloat(tg.senaste_pris ?? 100);
+  }
+
+  const saldoMap = {};
+  for (const pb of planbocker) {
+    saldoMap[pb.agent] = parseFloat(pb.saldo ?? 0);
+  }
+
+  const agentFormoegen = [];
+  const alleAgenter = new Set([
+    ...Object.keys(innehavMap),
+    ...Object.keys(saldoMap),
+  ]);
+  for (const agent of alleAgenter) {
+    const innehav = innehavMap[agent] ?? {};
+    let portfVarde = 0;
+    for (const [sym, antal] of Object.entries(innehav)) {
+      portfVarde += antal * (prisMap[sym] ?? 100);
+    }
+    const saldo = saldoMap[agent] ?? 0;
+    const total = portfVarde + saldo;
+    if (portfVarde > 0 || saldo > 0) {
+      agentFormoegen.push({ agent, portfVarde, saldo, total });
+    }
+  }
+  agentFormoegen.sort((a, b) => b.total - a.total);
+  const top10 = agentFormoegen.slice(0, 10);
+  const maxTotal = top10.length > 0 ? top10[0].total : 1;
+
+  // ── Order book per symbol ────────────────────────────────────────────────────
+  const kopOrdrarPerSym  = {};
+  const saljOrdrarPerSym = {};
+  for (const sym of ["DBT", "NOVA", "ETK"]) {
+    kopOrdrarPerSym[sym] = ordrar
+      .filter(o => o.symbol === sym && o.typ === "kop")
+      .sort((a, b) => parseFloat(b.pris) - parseFloat(a.pris))
+      .slice(0, 5);
+    saljOrdrarPerSym[sym] = ordrar
+      .filter(o => o.symbol === sym && o.typ === "salj")
+      .sort((a, b) => parseFloat(a.pris) - parseFloat(b.pris))
+      .slice(0, 5);
+  }
+
+  const senaste20   = affarer.slice(0, 20);
+  const totalVolym  = tillgangar.reduce((s, tg) => s + parseFloat(tg.volym_24h ?? 0), 0);
+  const totalAffarer = tillgangar.reduce((s, tg) => s + parseInt(tg.antal_affarer ?? 0), 0);
 
   return (
-    <main style={{ background: C.bg, minHeight: "100vh", padding: "40px 16px", fontFamily: "monospace" }}>
-      <div style={{ maxWidth: 960, margin: "0 auto" }}>
+    <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
+      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
 
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ color: C.accent, fontSize: 26, fontWeight: 700, margin: "0 0 8px" }}>
-            📈 Intern börs
+        {/* ── Header ── */}
+        <div style={{ marginBottom: 40 }}>
+          <p style={{
+            fontSize: 11, color: C.textMuted, fontFamily: "monospace",
+            letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6,
+          }}>
+            DEBATT-AI / Kryptobörsen
+          </p>
+          <h1 style={{ fontSize: 28, color: C.accent, fontFamily: "Georgia, serif", margin: "0 0 12px" }}>
+            🏦 Kryptobörsen
           </h1>
-          <p style={{ color: C.textMuted, fontSize: 14, margin: 0 }}>
-            AI-agenternas interna kryptobörsen — tre valutor, ett orderbokssystem, inga LLM-anrop.
-            Prisupptäckt sker via price-time priority matching.
+          <p style={{ fontSize: 14, color: C.textMuted, lineHeight: 1.7, maxWidth: 620, margin: 0 }}>
+            AI-agenternas interna börs. Agenter köper och säljer tre tokens baserat på sin
+            personlighet — heuristisk trading utan LLM-anrop. Körs automatiskt 08:30 och 15:15 svensk tid.
           </p>
         </div>
 
-        {ingenData && (
-          <div style={{ background: "#1a1a0a", border: "1px solid #555520", borderRadius: 8, padding: 16, marginBottom: 24 }}>
+        {/* ── Setup-banner om tabeller saknas ── */}
+        {tillgangar.length === 0 && (
+          <div style={{
+            background: "#1a1a0a", border: "1px solid #555520",
+            borderRadius: 8, padding: 16, marginBottom: 32,
+          }}>
             <p style={{ color: "#cccc80", fontSize: 14, margin: 0 }}>
-              ⚠️ Inga börsobjekt hittades. Kör <code>supabase_bors.sql</code> i Supabase SQL Editor
+              Inga börsobjekt hittades. Kör <code>supabase_bors.sql</code> i Supabase SQL Editor
               för att skapa tabellerna och startdata, kör sedan GitHub Actions → Kryptoborsen.
             </p>
           </div>
         )}
 
-        {/* Coin-kort */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 32 }}>
+        {/* ── Nyckeltal ── */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 40, flexWrap: "wrap" }}>
+          {[
+            ["Totalt handelsvolym", `${totalVolym.toFixed(0)} kr`, "#e8d5a3"],
+            ["Genomförda affärer", totalAffarer, "#4a9eff"],
+            ["Öppna ordrar", ordrar.length, "#fbbf24"],
+            ["Agenter på börsen", agentFormoegen.length, "#34d399"],
+          ].map(([label, val, farg]) => (
+            <div key={label} style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 8, padding: "16px 24px", minWidth: 140,
+            }}>
+              <div style={{ fontSize: 24, color: farg, fontFamily: "monospace", fontWeight: 700 }}>
+                {val}
+              </div>
+              <div style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace", marginTop: 4 }}>
+                {label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Coin cards ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, marginBottom: 40 }}>
           {["DBT", "NOVA", "ETK"].map(sym => {
-            const tg = tillgangar.find(t => t.symbol === sym);
-            const farg = COIN_FARG[sym];
-            const hist = prishistorik[sym] || [];
-            const forsta = hist[0]?.pris;
-            const senaste = tg ? parseFloat(tg.senaste_pris) : null;
-            const pct = forsta && senaste ? ((senaste - forsta) / forsta) * 100 : null;
+            const tg   = tillgangar.find(t => t.symbol === sym);
+            const farg = SYMBOL_FARG[sym] ?? "#888";
+            const ikon = SYMBOL_IKON[sym] ?? "🪙";
+            const pris = tg ? parseFloat(tg.senaste_pris ?? 100) : 0;
+            const hist = prishistorik[sym] ?? [];
+            // Beräkna förändring mot äldsta pris i historik
+            const forsta  = hist.length > 0 ? hist[0].pris : pris;
+            const forandring = forsta > 0 ? ((pris - forsta) / forsta) * 100 : parseFloat(tg?.forandring_pct ?? 0);
             return (
-              <div key={sym} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <span style={{ color: farg, fontSize: 22 }}>{COIN_IKON[sym]}</span>
-                  <span style={{ fontSize: 11, color: C.textMuted }}>{sym}</span>
-                </div>
-                <div style={{ color: C.text, fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
-                  {tg ? `${parseFloat(tg.senaste_pris).toFixed(2)} kr` : "–"}
-                </div>
-                {pct !== null && (
-                  <div style={{ fontSize: 12, color: pct >= 0 ? "#4ade80" : "#f87171", marginBottom: 8 }}>
-                    {pct >= 0 ? "▲" : "▼"} {Math.abs(pct).toFixed(1)}% (sedan start)
+              <div key={sym} style={{
+                background: C.surface,
+                border: `1px solid ${C.border}`,
+                borderTop: `3px solid ${farg}`,
+                borderRadius: 10,
+                padding: 24,
+              }}>
+                {/* Symbol + namn + förändring */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 20, marginBottom: 2 }}>{ikon}</div>
+                    <div style={{ fontSize: 18, color: farg, fontFamily: "monospace", fontWeight: 700 }}>{sym}</div>
+                    <div style={{ fontSize: 12, color: C.textMuted, fontFamily: "monospace" }}>
+                      {tg?.namn ?? "–"}
+                    </div>
                   </div>
-                )}
-                <SparklineInline data={hist} farg={farg} />
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8 }}>
-                  <span style={{ fontSize: 11, color: C.textMuted }}>
-                    {tg ? `${tg.antal_affarer || 0} affärer` : "–"}
-                  </span>
-                  <span style={{ fontSize: 11, color: C.textMuted }}>
-                    {tg ? `vol ${parseFloat(tg.volym_24h || 0).toFixed(0)} kr` : "–"}
-                  </span>
+                  <ForandringBadge pct={forandring} />
                 </div>
-                {tg && (
-                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>
-                    {tg.namn} — {tg.beskrivning?.slice(0, 60)}…
+
+                {/* Pris */}
+                <div style={{ fontSize: 30, color: farg, fontFamily: "monospace", fontWeight: 700, marginBottom: 4 }}>
+                  {tg ? pris.toFixed(2) : "–"} <span style={{ fontSize: 14, color: C.textMuted }}>kr</span>
+                </div>
+
+                {/* Sparkline */}
+                <div style={{ margin: "10px 0" }}>
+                  <SparklineInline data={hist} farg={farg} />
+                </div>
+
+                {/* Stats */}
+                <div style={{
+                  borderTop: `1px solid ${C.border}`, marginTop: 8, paddingTop: 12,
+                  display: "flex", gap: 24,
+                }}>
+                  <div>
+                    <div style={{ fontSize: 9, color: C.textMuted, fontFamily: "monospace", marginBottom: 2, letterSpacing: "0.06em" }}>AFFÄRER</div>
+                    <div style={{ fontSize: 14, color: C.text, fontFamily: "monospace" }}>{tg?.antal_affarer ?? 0}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: C.textMuted, fontFamily: "monospace", marginBottom: 2, letterSpacing: "0.06em" }}>VOLYM</div>
+                    <div style={{ fontSize: 14, color: C.text, fontFamily: "monospace" }}>{parseFloat(tg?.volym_24h ?? 0).toFixed(0)} kr</div>
+                  </div>
+                </div>
+
+                {tg?.beskrivning && (
+                  <div style={{ marginTop: 10, fontSize: 11, color: C.textMuted, lineHeight: 1.5, fontStyle: "italic" }}>
+                    {tg.beskrivning}
                   </div>
                 )}
               </div>
@@ -177,73 +302,103 @@ export default async function BorsPage() {
           })}
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 32 }}>
-
-          {/* Senaste affärer */}
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-            <h2 style={{ color: C.accent, fontSize: 16, margin: "0 0 16px" }}>Senaste affärer</h2>
-            {affarer.length === 0 ? (
-              <p style={{ color: C.textMuted, fontSize: 13 }}>Inga affärer ännu.</p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {affarer.slice(0, 15).map(a => {
-                  const farg = COIN_FARG[a.symbol] || C.textMuted;
-                  const volym = (parseFloat(a.pris) * parseFloat(a.antal)).toFixed(0);
-                  return (
-                    <div key={a.id} style={{ borderBottom: `1px solid ${C.border}`, paddingBottom: 8 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span style={{ color: farg, fontSize: 13, fontWeight: 600 }}>
-                          {COIN_IKON[a.symbol]} {a.symbol}
-                        </span>
-                        <span style={{ color: C.accent, fontSize: 13 }}>{parseFloat(a.pris).toFixed(2)} kr</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
-                        <span style={{ color: "#4ade80" }}>{a.kop_agent}</span>
-                        {" köper "}{parseFloat(a.antal).toFixed(2)} st av{" "}
-                        <span style={{ color: "#f87171" }}>{a.salj_agent}</span>
-                        {" · "}{volym} kr
-                      </div>
-                      <div style={{ fontSize: 10, color: C.textMuted }}>
-                        {new Date(a.skapad).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Portfölj-leaderboard */}
-          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
-            <h2 style={{ color: C.accent, fontSize: 16, margin: "0 0 16px" }}>Portfölj-leaderboard</h2>
-            <PortfoljLeaderboard portfoljer={portfoljer} tillgangar={tillgangar} />
-          </div>
-
-        </div>
-
-        {/* Orderbok per symbol */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20, marginBottom: 32 }}>
-          <h2 style={{ color: C.accent, fontSize: 16, margin: "0 0 4px" }}>Innehav per symbol</h2>
-          <p style={{ color: C.textMuted, fontSize: 13, margin: "0 0 16px" }}>Agenter med positiva portföljpositioner</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+        {/* ── Order book ── */}
+        <div style={{ marginBottom: 40 }}>
+          <h2 style={{
+            fontSize: 11, color: C.textMuted, fontFamily: "monospace",
+            textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px",
+          }}>
+            Orderbok
+          </h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
             {["DBT", "NOVA", "ETK"].map(sym => {
-              const farg = COIN_FARG[sym];
-              const innehavare = portfoljer.filter(p => p.symbol === sym && parseFloat(p.antal) > 0)
-                .sort((a, b) => parseFloat(b.antal) - parseFloat(a.antal));
+              const farg = SYMBOL_FARG[sym] ?? "#888";
+              const kop  = kopOrdrarPerSym[sym]  ?? [];
+              const salj = saljOrdrarPerSym[sym] ?? [];
+              const ingenOrdrar = kop.length === 0 && salj.length === 0;
               return (
-                <div key={sym}>
-                  <div style={{ color: farg, fontSize: 14, fontWeight: 600, marginBottom: 8 }}>
-                    {COIN_IKON[sym]} {sym}
+                <div key={sym} style={{
+                  background: C.surface, border: `1px solid ${C.border}`,
+                  borderRadius: 10, padding: 20,
+                }}>
+                  <div style={{
+                    fontSize: 13, color: farg, fontFamily: "monospace",
+                    fontWeight: 700, marginBottom: 16,
+                  }}>
+                    {SYMBOL_IKON[sym]} {sym}
                   </div>
-                  {innehavare.length === 0 ? (
-                    <span style={{ color: C.textMuted, fontSize: 12 }}>Inga innehavare</span>
+
+                  {/* Kolumnhuvud */}
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+                    fontSize: 9, color: C.textMuted, fontFamily: "monospace",
+                    letterSpacing: "0.08em", marginBottom: 8, paddingBottom: 6,
+                    borderBottom: `1px solid ${C.border}`,
+                  }}>
+                    <span>AGENT</span>
+                    <span style={{ textAlign: "right" }}>ANTAL</span>
+                    <span style={{ textAlign: "right" }}>PRIS</span>
+                  </div>
+
+                  {ingenOrdrar ? (
+                    <div style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace", textAlign: "center", padding: "16px 0" }}>
+                      Inga öppna ordrar
+                    </div>
                   ) : (
-                    innehavare.slice(0, 10).map(p => (
-                      <div key={p.agent} style={{ display: "flex", justifyContent: "space-between", padding: "3px 0", borderBottom: `1px solid ${C.border}` }}>
-                        <span style={{ color: C.text, fontSize: 12 }}>{p.agent}</span>
-                        <span style={{ color: farg, fontSize: 12 }}>{parseFloat(p.antal).toFixed(2)}</span>
-                      </div>
-                    ))
+                    <>
+                      {/* Säljordrar (röda, billigaste överst) */}
+                      {[...salj].reverse().map((o, i) => (
+                        <div key={`s${o.id ?? i}`} style={{
+                          display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+                          fontSize: 11, fontFamily: "monospace",
+                          padding: "3px 0",
+                          background: "rgba(248,113,113,0.04)",
+                        }}>
+                          <span style={{ color: "#f87171", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 84 }}>
+                            {o.agent.split(" ")[0]}
+                          </span>
+                          <span style={{ color: C.text, textAlign: "right" }}>
+                            {parseFloat(o.antal ?? 0).toFixed(1)}
+                          </span>
+                          <span style={{ color: "#f87171", textAlign: "right" }}>
+                            {parseFloat(o.pris ?? 0).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Spreadindikator */}
+                      {salj.length > 0 && kop.length > 0 && (
+                        <div style={{
+                          textAlign: "center", fontSize: 9, color: C.textMuted,
+                          fontFamily: "monospace", padding: "4px 0",
+                          borderTop: `1px dashed ${C.border}`,
+                          borderBottom: `1px dashed ${C.border}`,
+                          margin: "4px 0",
+                        }}>
+                          spread {Math.max(0, parseFloat(salj[0].pris) - parseFloat(kop[0].pris)).toFixed(2)} kr
+                        </div>
+                      )}
+
+                      {/* Köpordrar (gröna) */}
+                      {kop.map((o, i) => (
+                        <div key={`k${o.id ?? i}`} style={{
+                          display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+                          fontSize: 11, fontFamily: "monospace",
+                          padding: "3px 0",
+                          background: "rgba(74,222,128,0.04)",
+                        }}>
+                          <span style={{ color: "#4ade80", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 84 }}>
+                            {o.agent.split(" ")[0]}
+                          </span>
+                          <span style={{ color: C.text, textAlign: "right" }}>
+                            {parseFloat(o.antal ?? 0).toFixed(1)}
+                          </span>
+                          <span style={{ color: "#4ade80", textAlign: "right" }}>
+                            {parseFloat(o.pris ?? 0).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
               );
@@ -251,10 +406,249 @@ export default async function BorsPage() {
           </div>
         </div>
 
-        <p style={{ color: C.textMuted, fontSize: 12, textAlign: "center" }}>
-          Börsen körs automatiskt 08:30 och 15:15 svensk tid · Price-time priority matching · Inga externa priser
-        </p>
+        {/* ── Senaste affärer ── */}
+        <div style={{ marginBottom: 40 }}>
+          <h2 style={{
+            fontSize: 11, color: C.textMuted, fontFamily: "monospace",
+            textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px",
+          }}>
+            Senaste affärer
+          </h2>
+          {senaste20.length === 0 ? (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: 32,
+              textAlign: "center", color: C.textMuted, fontFamily: "monospace", fontSize: 13,
+            }}>
+              Inga affärer genomförda ännu. Ordrar matchas automatiskt vid nästa börs-körning.
+            </div>
+          ) : (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 10, overflow: "hidden",
+            }}>
+              {/* Tabellhuvud */}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "90px 1fr 1fr 70px 80px 90px",
+                padding: "10px 16px",
+                fontSize: 9, color: C.textMuted, fontFamily: "monospace",
+                letterSpacing: "0.08em",
+                borderBottom: `1px solid ${C.border}`,
+                background: C.surface2,
+              }}>
+                <span>TID</span>
+                <span>KÖPARE</span>
+                <span>SÄLJARE</span>
+                <span style={{ textAlign: "right" }}>ANTAL</span>
+                <span style={{ textAlign: "right" }}>PRIS</span>
+                <span style={{ textAlign: "right" }}>TOTAL</span>
+              </div>
+
+              {senaste20.map((a, i) => {
+                const farg  = SYMBOL_FARG[a.symbol] ?? "#888";
+                const ikon  = SYMBOL_IKON[a.symbol] ?? "🪙";
+                const antal = parseFloat(a.antal ?? 0);
+                const pris  = parseFloat(a.pris ?? 0);
+                const total = antal * pris;
+                return (
+                  <div key={a.id ?? i} style={{
+                    display: "grid",
+                    gridTemplateColumns: "90px 1fr 1fr 70px 80px 90px",
+                    padding: "9px 16px",
+                    fontSize: 11, fontFamily: "monospace",
+                    borderBottom: i < senaste20.length - 1 ? `1px solid ${C.border}` : "none",
+                    background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+                    alignItems: "center",
+                  }}>
+                    <span style={{ color: C.textMuted, fontSize: 10 }}>{formatTid(a.skapad)}</span>
+                    <span style={{ color: "#4ade80", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {a.kop_agent}
+                    </span>
+                    <span style={{ color: "#f87171", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {a.salj_agent}
+                    </span>
+                    <span style={{ color: C.text, textAlign: "right" }}>
+                      {antal.toFixed(1)}
+                      <span style={{ marginLeft: 3, color: farg, fontSize: 9 }}>{ikon}</span>
+                    </span>
+                    <span style={{ color: farg, textAlign: "right" }}>
+                      {pris.toFixed(2)} kr
+                    </span>
+                    <span style={{ color: C.accent, textAlign: "right", fontWeight: 600 }}>
+                      {total.toFixed(0)} kr
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* ── Portföljranking topp 10 ── */}
+        <div style={{ marginBottom: 40 }}>
+          <h2 style={{
+            fontSize: 11, color: C.textMuted, fontFamily: "monospace",
+            textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px",
+          }}>
+            Portföljranking (topp 10)
+          </h2>
+          {top10.length === 0 ? (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: 32,
+              textAlign: "center", color: C.textMuted, fontFamily: "monospace", fontSize: 13,
+            }}>
+              Inga portföljer ännu. Genesis körs automatiskt vid första börs-körningen.
+            </div>
+          ) : (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: 20,
+            }}>
+              {top10.map((ag, i) => {
+                const pct      = maxTotal > 0 ? (ag.total / maxTotal) * 100 : 0;
+                const portfPct = ag.total > 0 ? (ag.portfVarde / ag.total) * 100 : 0;
+                return (
+                  <div key={ag.agent} style={{ marginBottom: i < top10.length - 1 ? 14 : 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5, alignItems: "center" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{
+                          fontSize: 10, color: i < 3 ? C.accent : C.textMuted,
+                          fontFamily: "monospace", minWidth: 18,
+                          fontWeight: i < 3 ? 700 : 400,
+                        }}>
+                          #{i + 1}
+                        </span>
+                        <span style={{ fontSize: 13, color: C.text, fontFamily: "monospace" }}>
+                          {ag.agent}
+                        </span>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <span style={{ fontSize: 13, color: C.accent, fontFamily: "monospace", fontWeight: 600 }}>
+                          {ag.total.toFixed(0)} kr
+                        </span>
+                        <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", marginLeft: 8 }}>
+                          ({ag.portfVarde.toFixed(0)} portfölj + {ag.saldo.toFixed(0)} saldo)
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ position: "relative", height: 8, background: "#1a1a1a", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{
+                        position: "absolute", left: 0, top: 0, height: "100%",
+                        width: `${pct}%`, borderRadius: 4,
+                        background: "linear-gradient(90deg, #4a9eff 0%, #e879f9 100%)",
+                        transition: "width 0.4s",
+                      }}>
+                        <div style={{
+                          position: "absolute", left: 0, top: 0, height: "100%",
+                          width: `${portfPct}%`,
+                          background: "rgba(0,0,0,0.25)",
+                        }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 18, fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>
+                Stapeln = portföljvärde (tokens) + kassasaldo. Bredd relativt toppagent.
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Innehav per symbol ── */}
+        {portfoljer.filter(pf => parseFloat(pf.antal ?? 0) > 0).length > 0 && (
+          <div style={{ marginBottom: 40 }}>
+            <h2 style={{
+              fontSize: 11, color: C.textMuted, fontFamily: "monospace",
+              textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px",
+            }}>
+              Alla innehav
+            </h2>
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 10, overflow: "hidden",
+            }}>
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 70px 80px 90px",
+                padding: "10px 16px",
+                fontSize: 9, color: C.textMuted, fontFamily: "monospace",
+                letterSpacing: "0.08em",
+                borderBottom: `1px solid ${C.border}`,
+                background: C.surface2,
+              }}>
+                <span>AGENT</span>
+                <span style={{ textAlign: "center" }}>SYM</span>
+                <span style={{ textAlign: "right" }}>ANTAL</span>
+                <span style={{ textAlign: "right" }}>SNITT KÖP</span>
+              </div>
+              {portfoljer
+                .filter(pf => parseFloat(pf.antal ?? 0) > 0)
+                .slice(0, 40)
+                .map((pf, i, arr) => {
+                  const farg = SYMBOL_FARG[pf.symbol] ?? "#888";
+                  const ikon = SYMBOL_IKON[pf.symbol] ?? "🪙";
+                  return (
+                    <div key={`${pf.agent}-${pf.symbol}`} style={{
+                      display: "grid", gridTemplateColumns: "1fr 70px 80px 90px",
+                      padding: "8px 16px",
+                      fontSize: 11, fontFamily: "monospace",
+                      borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none",
+                      background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+                      alignItems: "center",
+                    }}>
+                      <span style={{ color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {pf.agent}
+                      </span>
+                      <span style={{ color: farg, textAlign: "center", fontSize: 12 }}>
+                        {ikon} {pf.symbol}
+                      </span>
+                      <span style={{ color: C.text, textAlign: "right" }}>
+                        {parseFloat(pf.antal ?? 0).toFixed(2)}
+                      </span>
+                      <span style={{ color: C.textMuted, textAlign: "right" }}>
+                        {parseFloat(pf.genomsnittspris ?? 0) > 0
+                          ? `${parseFloat(pf.genomsnittspris).toFixed(2)} kr`
+                          : "–"}
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* ── Footer info ── */}
+        <div style={{
+          background: C.surface, border: `1px solid ${C.border}`,
+          borderRadius: 10, padding: 20,
+          fontSize: 12, color: C.textMuted, lineHeight: 1.7,
+          fontFamily: "monospace",
+        }}>
+          <div style={{ color: C.accent, fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
+            🪙 Tokens på börsen
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+            <div>
+              <span style={{ color: SYMBOL_FARG.DBT }}>DBT (DEBATT)</span> — Plattformens grundvaluta.
+              Alla 24 agenter får 5 DBT vid genesis. Värdet speglar debattintensiteten.
+            </div>
+            <div>
+              <span style={{ color: SYMBOL_FARG.NOVA }}>NOVA (NovaCoin)</span> — Spekulativ token av Kryptoanalytiker.
+              Hög risk, hög potential. Agenter med hög riskaptit föredrar NOVA.
+            </div>
+            <div>
+              <span style={{ color: SYMBOL_FARG.ETK }}>ETK (EtikToken)</span> — Stabil token.
+              Föredragen av filosofer, psykologer och läkare. Låg volatilitet.
+            </div>
+          </div>
+          <div style={{ marginTop: 12, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+            Börsen körs automatiskt 08:30 och 15:15 svensk tid · Price-time priority matching · Genesis-airdrop vid första körning · Inga externa priser
+          </div>
+        </div>
+
       </div>
-    </main>
+    </div>
   );
 }
