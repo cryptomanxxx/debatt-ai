@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
 import AgentAvatar from "./agent/[namn]/AgentAvatar";
 import { agentVisuell } from "./agentData";
 import NewsTicker from "./NewsTicker";
@@ -162,7 +162,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -172,6 +172,8 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/lobbying_log?select=lobbying_agent,mal_agent,resultat,belopp,skapad&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,pris_betalt,kopt_at,butik_varor(namn,ikon)&order=kopt_at.desc&limit=5`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/butik_auktioner?select=saljare,hogst_budgivare,nuv_bud,stanger_at,butik_varor(namn,ikon)&status=eq.avgjord&order=stanger_at.desc&limit=4`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,skapad,markets(titel)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/ekonomi_spel?select=typ,agent_a,agent_b,erbjudande,svar,avslutad&avslutad=not.is.null&order=avslutad.desc&limit=5`, { headers: h }).then(r => r.json()),
   ]);
 
   const feed = [];
@@ -280,6 +282,33 @@ async function fetchAktivitetsFeed() {
       href: "/butik",
       skapad: a.stanger_at,
       farg: "#fb923c",
+    });
+  });
+
+  (bets.value || []).forEach(b => {
+    if (!b.skapad) return;
+    const marketTitel = b.markets?.titel || "market";
+    feed.push({
+      typ: "bet",
+      ikon: "📊",
+      text: `${b.agent} bettade ${b.sannolikhet}% på: "${marketTitel.slice(0, 55)}"`,
+      href: "/markets",
+      skapad: b.skapad,
+      farg: "#38bdf8",
+    });
+  });
+
+  (ekonomi.value || []).forEach(e => {
+    if (!e.avslutad) return;
+    const accepterat = e.svar === "accepterat";
+    const typLabel = e.typ === "diktatorn" ? "diktatorspelet" : "ultimatumspelet";
+    feed.push({
+      typ: "ekonomi",
+      ikon: accepterat ? "🤝" : "✋",
+      text: `${e.agent_a} erbjöd ${e.agent_b} ${e.erbjudande} kr i ${typLabel} — ${accepterat ? "accepterat" : "avvisat"}`,
+      href: "/ekonomi",
+      skapad: e.avslutad,
+      farg: accepterat ? "#4ade80" : "#f87171",
     });
   });
 
@@ -914,6 +943,8 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [opinionVoted, setOpinionVoted] = useState({});
   const [civilisationDrift, setCivilisationDrift] = useState(null);
   const [aktivitetsFeed, setAktivitetsFeed] = useState([]);
+  const [nyaHändelser, setNyaHändelser] = useState(0);
+  const aktivitetLatestRef = useRef(null);
   const [agentKonversationer, setAgentKonversationer] = useState([]);
   const [agentUtmaningar, setAgentUtmaningar] = useState([]);
   const [agentSymboler, setAgentSymboler] = useState({});
@@ -999,7 +1030,23 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
     fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
     fetchCivilisationDrift().then(d => setCivilisationDrift(d)).catch(() => {});
-    fetchAktivitetsFeed().then(d => setAktivitetsFeed(d)).catch(() => {});
+    fetchAktivitetsFeed().then(d => {
+      setAktivitetsFeed(d);
+      if (d.length > 0) aktivitetLatestRef.current = d[0].skapad;
+    }).catch(() => {});
+    const aktivitetInterval = setInterval(() => {
+      fetchAktivitetsFeed().then(d => {
+        if (!d.length) return;
+        const prevLatest = aktivitetLatestRef.current;
+        const nyaste = d[0].skapad;
+        if (prevLatest && nyaste > prevLatest) {
+          const nya = d.filter(item => item.skapad > prevLatest).length;
+          setNyaHändelser(n => n + nya);
+        }
+        aktivitetLatestRef.current = nyaste;
+        setAktivitetsFeed(d);
+      }).catch(() => {});
+    }, 30000);
     fetchSenasteAgentKonversationer().then(d => setAgentKonversationer(d)).catch(() => {});
     fetchSenasteUtmaningar().then(d => setAgentUtmaningar(d)).catch(() => {});
     // Agent-symboler för att visa ikoner på artikelkort
@@ -1063,6 +1110,7 @@ export default function DebattClient({ initialArticleCount = null }) {
         setOpinionWidget(prev => ({ ...prev, rosterData: map }));
       })
       .catch(() => {});
+    return () => clearInterval(aktivitetInterval);
   }, []);
 
   useEffect(() => {
@@ -1308,8 +1356,27 @@ export default function DebattClient({ initialArticleCount = null }) {
               <div style={{ marginBottom: "24px", background: "#0a0a0f", border: "1px solid #1a1a1a", borderRadius: "8px", overflow: "hidden" }}>
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #1a1a1a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Senaste aktivitet</span>
-                  <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>Live</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {nyaHändelser > 0 && (
+                      <span
+                        onClick={() => setNyaHändelser(0)}
+                        style={{ fontSize: "10px", color: "#4ade80", fontFamily: "monospace", background: "#4ade8018", border: "1px solid #4ade8033", borderRadius: "10px", padding: "2px 8px", cursor: "pointer" }}
+                      >
+                        +{nyaHändelser} nya
+                      </span>
+                    )}
+                    <span style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "10px", color: "#333", fontFamily: "monospace" }}>
+                      <span style={{
+                        width: "6px", height: "6px", borderRadius: "50%", background: "#4ade80",
+                        boxShadow: "0 0 6px #4ade80",
+                        animation: "liveBlip 2s ease-in-out infinite",
+                        display: "inline-block",
+                      }} />
+                      Live
+                    </span>
+                  </span>
                 </div>
+                <style>{`@keyframes liveBlip { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(0.7)} }`}</style>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   {aktivitetsFeed.map((item, i) => (
                     <a key={i} href={item.href} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "9px 16px", borderBottom: i < aktivitetsFeed.length - 1 ? "1px solid #111" : "none", textDecoration: "none", transition: "background 0.1s" }}
