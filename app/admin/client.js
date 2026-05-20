@@ -1448,6 +1448,141 @@ function VeckorapporterTab() {
   );
 }
 
+// ── GithubKörningarTab ────────────────────────────────────────────────────────
+const WORKFLOW_FARG = {
+  success:    "#4ade80",
+  failure:    "#f87171",
+  cancelled:  "#888",
+  skipped:    "#555",
+  in_progress:"#facc15",
+  queued:     "#60a0d8",
+};
+const WORKFLOW_IKON = {
+  success:    "✅",
+  failure:    "❌",
+  cancelled:  "⏹",
+  skipped:    "⏭",
+  in_progress:"⏳",
+  queued:     "🕐",
+};
+const EVENT_ETIKETT = {
+  schedule:          "⏰ Schemalagd",
+  workflow_dispatch: "▶ Manuell",
+  push:              "⬆ Push",
+};
+
+function tidAgo(iso) {
+  if (!iso) return "—";
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 60) return `${m} min sedan`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} tim sedan`;
+  return `${Math.floor(h / 24)} dagar sedan`;
+}
+
+function körningsTid(start, end) {
+  if (!start || !end) return null;
+  const s = Math.round((new Date(end) - new Date(start)) / 1000);
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function GithubKörningarTab() {
+  const [runs, setRuns]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState("");
+  const [filter, setFilter]   = useState("alla"); // alla | success | failure | schedule | dispatch
+  const [search, setSearch]   = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    fetch("/api/admin/github-runs?per_page=80")
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) { setError(d.error); return; }
+        setRuns(d.runs || []);
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p style={{ color: C.textMuted, fontFamily: "monospace", padding: "40px 0" }}>Hämtar körningar från GitHub…</p>;
+  if (error)   return <p style={{ color: "#f87171", fontFamily: "monospace" }}>Fel: {error}</p>;
+  if (!runs)   return null;
+
+  const filtered = runs.filter(r => {
+    if (filter === "success"  && r.conclusion !== "success")    return false;
+    if (filter === "failure"  && r.conclusion !== "failure")    return false;
+    if (filter === "schedule" && r.event !== "schedule")        return false;
+    if (filter === "dispatch" && r.event !== "workflow_dispatch") return false;
+    if (search && !r.workflow.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  // Gruppera per workflow för sammanfattning
+  const wfSummary = {};
+  runs.forEach(r => {
+    if (!wfSummary[r.workflow]) wfSummary[r.workflow] = { ok: 0, fail: 0, senast: r.created_at };
+    if (r.conclusion === "success") wfSummary[r.workflow].ok++;
+    else if (r.conclusion === "failure") wfSummary[r.workflow].fail++;
+  });
+
+  return (
+    <div>
+      <p style={{ color: C.textMuted, fontSize: "14px", marginBottom: "24px" }}>
+        Senaste {runs.length} körningar från GitHub Actions. Klicka på en rad för att se loggen på GitHub.
+      </p>
+
+      {/* Workflow-sammanfattning */}
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "24px" }}>
+        {Object.entries(wfSummary).sort((a, b) => b[1].ok + b[1].fail - (a[1].ok + a[1].fail)).map(([namn, s]) => (
+          <div key={namn} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "8px 14px", fontSize: "11px", fontFamily: "monospace" }}>
+            <div style={{ color: C.text, fontWeight: 700, marginBottom: "3px" }}>{namn}</div>
+            <span style={{ color: "#4ade80" }}>✅ {s.ok}</span>
+            {s.fail > 0 && <span style={{ color: "#f87171", marginLeft: "8px" }}>❌ {s.fail}</span>}
+          </div>
+        ))}
+      </div>
+
+      {/* Filter */}
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+        {[["alla","Alla"],["success","✅ Lyckade"],["failure","❌ Misslyckade"],["schedule","⏰ Schemalagda"],["dispatch","▶ Manuella"]].map(([val, lbl]) => (
+          <button key={val} onClick={() => setFilter(val)} style={{ padding: "5px 12px", fontSize: "11px", fontFamily: "monospace", cursor: "pointer", border: `1px solid ${filter === val ? C.accent : C.border}`, background: filter === val ? `${C.accent}15` : C.surface, color: filter === val ? C.accent : C.textMuted, borderRadius: "4px" }}>
+            {lbl}
+          </button>
+        ))}
+        <input type="text" placeholder="Sök workflow…" value={search} onChange={e => setSearch(e.target.value)}
+          style={{ flex: 1, minWidth: "140px", padding: "5px 10px", fontSize: "11px", fontFamily: "monospace", border: `1px solid ${C.border}`, background: C.bg, color: C.text, borderRadius: "4px", outline: "none" }} />
+      </div>
+
+      {/* Körningslista */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+        {filtered.map(r => {
+          const conc = r.conclusion || r.status;
+          const farg = WORKFLOW_FARG[conc] || "#888";
+          const ikon = WORKFLOW_IKON[conc] || "?";
+          const varaktighet = körningsTid(r.run_started_at, r.updated_at);
+          return (
+            <a key={r.id} href={r.html_url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 14px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", textDecoration: "none", transition: "border-color 0.1s" }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = C.accentDim}
+              onMouseLeave={e => e.currentTarget.style.borderColor = C.border}
+            >
+              <span style={{ fontSize: "14px", flexShrink: 0 }}>{ikon}</span>
+              <span style={{ fontSize: "12px", color: farg, fontFamily: "monospace", fontWeight: 700, flexShrink: 0, width: "70px" }}>{(conc || "—").toUpperCase()}</span>
+              <span style={{ fontSize: "13px", color: C.text, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.workflow}</span>
+              <span style={{ fontSize: "10px", color: "#4a9eff", fontFamily: "monospace", flexShrink: 0 }}>{EVENT_ETIKETT[r.event] || r.event}</span>
+              {varaktighet && <span style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace", flexShrink: 0 }}>{varaktighet}</span>}
+              <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace", flexShrink: 0 }}>{tidAgo(r.created_at)}</span>
+            </a>
+          );
+        })}
+      </div>
+      {filtered.length === 0 && <p style={{ color: C.textMuted, fontFamily: "monospace", padding: "40px 0", textAlign: "center" }}>Inga körningar matchar filtret.</p>}
+    </div>
+  );
+}
+
 // ── FellogTab ─────────────────────────────────────────────────────────────────
 const FEL_FARG = {
   rate_limit:    "#f59e0b",
@@ -2386,6 +2521,7 @@ export default function AdminClient() {
             ["labb","Experimentlabb"],
             ["ai-statistik","AI-statistik"],
             ["fellog","Fellog"],
+            ["körningar","GitHub-körningar"],
             ["rapporter","Veckorapporter"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
@@ -2636,6 +2772,7 @@ export default function AdminClient() {
 
         {/* ── FELLOG ── */}
         {mainTab === "fellog" && <FellogTab />}
+        {mainTab === "körningar" && <GithubKörningarTab />}
 
         {/* ── VECKORAPPORTER ── */}
         {mainTab === "rapporter" && <VeckorapporterTab />}
