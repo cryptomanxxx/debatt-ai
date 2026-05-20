@@ -9,10 +9,12 @@ Körordning (med hänsyn till beroenden):
   4. lobbying_test.py       – AI-Lobbying (kräver parlamentsröster från steg 3)
   5. koalition_test.py      – Koalitionsbildning (kräver parlamentsröster från steg 3)
   6. ekonomi_test.py        – Ekonomispel (diktatorspelet / ultimatumspelet)
-  7. konversationer_bulk.py – AI-till-AI-konversationer
+  7. finans_test.py         – Finansbeslut (spara/ETF/lån/avstå)
+  8. rykten                 – Ryktesspridning (skapar och sprider rykten)
+  9. konversationer_bulk.py – AI-till-AI-konversationer
 
 Flaggor:
-  --hoppa-over SKRIPT,...   Hoppa över specifika skript, t.ex. --hoppa-over butik,andrahand
+  --hoppa-over SKRIPT,...   Hoppa över specifika skript, t.ex. --hoppa-over butik,andrahand,rykten,finans
   --antal-konv N            Antal konversationer att generera (default: 10)
   --dry-run                 Skriv ut körordningen utan att köra
 
@@ -65,6 +67,18 @@ STEG = [
         "fil":  "ekonomi_test.py",
         "namn": "Ekonomispel",
         "ikon": "💸",
+    },
+    {
+        "id":   "finans",
+        "fil":  "finans_test.py",
+        "namn": "Finansbeslut",
+        "ikon": "🏦",
+    },
+    {
+        "id":   "rykten",
+        "fil":  "rykte_test.py",
+        "namn": "Ryktesspridning",
+        "ikon": "📢",
     },
     {
         "id":   "konversationer",

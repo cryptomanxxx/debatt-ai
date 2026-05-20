@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       hoppa_over:
-        description: "Hoppa över (kommaseparerat: butik,andrahand,parlament,lobbying,koalition,ekonomi,konversationer)"
+        description: "Hoppa över (kommaseparerat: butik,andrahand,parlament,lobbying,koalition,ekonomi,finans,rykten,konversationer)"
         required: false
         default: ""
       antal_konv:
@@ -38,6 +38,7 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
