@@ -184,7 +184,7 @@ export default function KonversationerPage() {
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {filtered.map((f) => {
+          {filtered.filter(f => (f.fraga?.trim().length > 2) || (f.svar?.trim().length > 5)).map((f) => {
             const arAiTillAi = f.fragare != null;
             const avF = arAiTillAi ? agentVisuell(f.fragare) : null;
             const avM = agentVisuell(f.agent);
