@@ -162,7 +162,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -174,6 +174,7 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/butik_auktioner?select=saljare,hogst_budgivare,nuv_bud,stanger_at,butik_varor(namn,ikon)&status=eq.avgjord&order=stanger_at.desc&limit=4`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,skapad,markets(titel)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/ekonomi_spel?select=typ,agent_a,agent_b,erbjudande,svar,avslutad&avslutad=not.is.null&order=avslutad.desc&limit=5`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/civilisations_minne?select=typ,rubrik,beskrivning,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
   ]);
 
   const feed = [];
@@ -324,6 +325,28 @@ async function fetchAktivitetsFeed() {
       href: "/parlament",
       skapad: r.skapad,
       farg: rodFarg,
+    });
+  });
+
+  const MINNE_IKON = {
+    koalition_bildad: "🤝", allians_bruten: "💔", förräderi: "🗡️",
+    triumf: "🏆", skandal: "😱", marknadsseger: "💰",
+    marknadskrasch: "📉", symbolkup: "👑",
+  };
+  const MINNE_FARG = {
+    koalition_bildad: "#facc15", allians_bruten: "#f87171", förräderi: "#fb923c",
+    triumf: "#4ade80", skandal: "#f87171", marknadsseger: "#4ade80",
+    marknadskrasch: "#f87171", symbolkup: "#e879f9",
+  };
+  (minnen.value || []).forEach(m => {
+    if (!m.skapad) return;
+    feed.push({
+      typ: `minne-${m.typ}`,
+      ikon: MINNE_IKON[m.typ] || "📜",
+      text: m.rubrik || m.beskrivning?.slice(0, 70) || "Civilisationshändelse",
+      href: "/historia",
+      skapad: m.skapad,
+      farg: MINNE_FARG[m.typ] || "#a78bfa",
     });
   });
 
