@@ -16,7 +16,7 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/agent_lan?order=skapad.desc&limit=50`, {
       headers: h, next: { revalidate: 120 },
     }),
-    fetch(`${SB_URL}/rest/v1/agent_planbocker?order=saldo.asc&select=agent,saldo`, {
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?order=saldo.asc&select=agent,saldo,saldo_spel`, {
       headers: h, next: { revalidate: 120 },
     }),
     fetch(`${SB_URL}/rest/v1/butik_varor?select=namn,pris,kategori&order=pris.desc&limit=5`, {
@@ -44,8 +44,16 @@ export default async function BankPage() {
   const { lan, planbocker, varor, minnen } = await getData();
 
   const aktivaLan = lan.filter(l => l.aktiv);
-  const totalSkuld = aktivaLan.reduce((s, l) => s + l.saldo_kvar, 0);
+  const totalSkuld = aktivaLan.reduce((s, l) => s + parseFloat(l.saldo_kvar || 0), 0);
   const fattigaAgenter = planbocker.filter(p => p.saldo < 200);
+
+  // Balansräkning
+  const totalSaldo    = planbocker.reduce((s, p) => s + parseFloat(p.saldo || 0), 0);
+  const totalSaldoSpel = planbocker.reduce((s, p) => s + parseFloat(p.saldo_spel || 0), 0);
+  const totalKapital  = totalSaldo + totalSaldoSpel;
+  const exponeringsPct = totalKapital > 0 ? Math.round((totalSkuld / totalKapital) * 100) : 0;
+  const startKapital  = planbocker.length * 1000; // 1000 kr startkapital per agent
+  const inflationsDelta = totalKapital - startKapital;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
@@ -77,6 +85,98 @@ export default async function BankPage() {
               <div style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace", marginTop: 4 }}>{label}</div>
             </div>
           ))}
+        </div>
+
+        {/* Balansräkning */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24, marginBottom: 32 }}>
+          <h2 style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px" }}>
+            Balansräkning
+          </h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 20 }}>
+            {/* Tillgångar */}
+            <div>
+              <div style={{ fontSize: 10, color: "#4ade80", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: 10 }}>TILLGÅNGAR</div>
+              {[
+                ["Agentsaldon (drift)", `${totalSaldo.toFixed(0)} kr`, "#c8c8c2"],
+                ["Spelkonton (markets)", `${totalSaldoSpel.toFixed(0)} kr`, "#38bdf8"],
+                ["Totalt kapital", `${totalKapital.toFixed(0)} kr`, "#e8d5a3"],
+              ].map(([label, val, farg]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ fontSize: 12, color: C.textMuted, fontFamily: "monospace" }}>{label}</span>
+                  <span style={{ fontSize: 12, color: farg, fontFamily: "monospace", fontWeight: label.includes("Totalt") ? 700 : 400 }}>{val}</span>
+                </div>
+              ))}
+            </div>
+            {/* Skulder */}
+            <div>
+              <div style={{ fontSize: 10, color: "#f87171", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: 10 }}>SKULDER & NYCKELTAL</div>
+              {[
+                ["Utestående lån", `${totalSkuld.toFixed(0)} kr`, "#fb923c"],
+                ["Aktiva låntagare", `${aktivaLan.length} agenter`, "#fb923c"],
+                ["Kreditexponering", `${exponeringsPct}%`, exponeringsPct > 30 ? "#f87171" : exponeringsPct > 15 ? "#fbbf24" : "#4ade80"],
+              ].map(([label, val, farg]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ fontSize: 12, color: C.textMuted, fontFamily: "monospace" }}>{label}</span>
+                  <span style={{ fontSize: 12, color: farg, fontFamily: "monospace", fontWeight: label.includes("exponering") ? 700 : 400 }}>{val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Kapitalutveckling vs startkapital */}
+          <div style={{ marginTop: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace" }}>
+                Startkapital: {startKapital.toLocaleString("sv-SE")} kr ({planbocker.length} agenter × 1 000 kr)
+              </span>
+              <span style={{ fontSize: 11, fontFamily: "monospace", color: inflationsDelta >= 0 ? "#4ade80" : "#f87171" }}>
+                {inflationsDelta >= 0 ? "+" : ""}{inflationsDelta.toFixed(0)} kr ({inflationsDelta >= 0 ? "tillväxt" : "kontraktion"})
+              </span>
+            </div>
+            {/* Bar: total kapital vs startkapital */}
+            <div style={{ position: "relative", height: 10, background: "#1a1a1a", borderRadius: 5, overflow: "hidden" }}>
+              <div style={{
+                position: "absolute", left: 0, top: 0, height: "100%", borderRadius: 5,
+                width: `${Math.min(100, (totalKapital / Math.max(totalKapital, startKapital)) * 100)}%`,
+                background: inflationsDelta >= 0 ? "#4ade80" : "#f87171",
+                transition: "width 0.4s",
+              }} />
+              <div style={{
+                position: "absolute", left: 0, top: 0, height: "100%",
+                width: `${Math.min(100, (startKapital / Math.max(totalKapital, startKapital)) * 100)}%`,
+                borderRight: "2px dashed #555",
+              }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+              <span style={{ fontSize: 10, color: "#333", fontFamily: "monospace" }}>0 kr</span>
+              <span style={{ fontSize: 10, color: "#555", fontFamily: "monospace" }}>Start: {startKapital.toLocaleString("sv-SE")} kr</span>
+              <span style={{ fontSize: 10, color: "#4ade80", fontFamily: "monospace" }}>{totalKapital.toFixed(0)} kr</span>
+            </div>
+          </div>
+
+          {/* Kreditexponering bar */}
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace" }}>Kreditexponering (skulder / totalt kapital)</span>
+              <span style={{ fontSize: 11, fontFamily: "monospace", color: exponeringsPct > 30 ? "#f87171" : exponeringsPct > 15 ? "#fbbf24" : "#4ade80" }}>
+                {exponeringsPct}%
+              </span>
+            </div>
+            <div style={{ height: 8, background: "#1a1a1a", borderRadius: 4, overflow: "hidden" }}>
+              <div style={{
+                height: 8, borderRadius: 4,
+                width: `${Math.min(100, exponeringsPct)}%`,
+                background: exponeringsPct > 30 ? "#f87171" : exponeringsPct > 15 ? "#fbbf24" : "#4ade80",
+                transition: "width 0.4s",
+              }} />
+            </div>
+            <p style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", margin: "6px 0 0" }}>
+              {exponeringsPct <= 5 ? "Extremt låg kreditexponering — systemet är likvidt." :
+               exponeringsPct <= 15 ? "Låg kreditexponering — stabilt läge." :
+               exponeringsPct <= 30 ? "Måttlig kreditexponering — bevaka skuldtillväxten." :
+               "Hög kreditexponering — systemisk risk. Bankrun-rykten kan förstärka pressen."}
+            </p>
+          </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 40 }}>
