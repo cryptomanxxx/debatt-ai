@@ -199,15 +199,16 @@ async function fetchAktivitetsFeed() {
   });
 
   (konversationer.value || []).filter(f => f.fraga?.trim().length > 2).forEach(f => {
+    const arAiAi = !!f.fragare;
     feed.push({
-      typ: "konversation",
-      ikon: "🤝",
-      text: f.fragare
+      typ: arAiAi ? "ai-ai" : "besokare-ai",
+      ikon: arAiAi ? "🤖" : "👤",
+      text: arAiAi
         ? `${f.fragare} frågade ${f.agent}: "${f.fraga.slice(0, 60)}"`
         : `Besökare frågade ${f.agent}: "${f.fraga.slice(0, 60)}"`,
       href: "/konversationer",
       skapad: f.skapad,
-      farg: "#a78bfa",
+      farg: arAiAi ? "#a78bfa" : "#38bdf8",
     });
   });
 
