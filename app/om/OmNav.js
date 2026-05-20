@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 // Exakt samma ordning som sektionerna i page.js
 const SEKTIONER = [
@@ -47,6 +47,8 @@ const ALL_IDS = SEKTIONER.filter(Boolean).map(s => s.id);
 
 export default function OmNav() {
   const [aktiv, setAktiv] = useState(null);
+  const navRef = useRef(null);
+  const lankRefs = useRef({});
 
   useEffect(() => {
     const grans = Math.round(window.innerHeight * 0.35);
@@ -66,6 +68,22 @@ export default function OmNav() {
     return () => window.removeEventListener("scroll", update);
   }, []);
 
+  // Scrolla nav till aktiv länk när den byts
+  useEffect(() => {
+    if (!aktiv || !navRef.current || !lankRefs.current[aktiv]) return;
+    const nav = navRef.current;
+    const el = lankRefs.current[aktiv];
+    const navTop = nav.scrollTop;
+    const navBottom = navTop + nav.clientHeight;
+    const elTop = el.offsetTop;
+    const elBottom = elTop + el.clientHeight;
+    if (elTop < navTop + 20) {
+      nav.scrollTo({ top: elTop - 20, behavior: "smooth" });
+    } else if (elBottom > navBottom - 20) {
+      nav.scrollTo({ top: elBottom - nav.clientHeight + 20, behavior: "smooth" });
+    }
+  }, [aktiv]);
+
   return (
     <>
       <style>{`
@@ -82,6 +100,7 @@ export default function OmNav() {
         .om-nav::-webkit-scrollbar { display: none; }
       `}</style>
       <nav
+        ref={navRef}
         className="om-nav"
         style={{
           width: "192px",
@@ -101,6 +120,7 @@ export default function OmNav() {
           ) : (
             <a
               key={item.id}
+              ref={el => { lankRefs.current[item.id] = el; }}
               href={`#${item.id}`}
               className={`om-nav-lank${aktiv === item.id ? " aktiv" : ""}`}
             >
