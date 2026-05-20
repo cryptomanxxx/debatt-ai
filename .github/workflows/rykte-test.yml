@@ -3,7 +3,7 @@ name: Ryktesspridning
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 14 * * *"  # 14:00 UTC = 16:00 svensk tid, varje dag
+    - cron: "45 11 * * *"  # 11:45 UTC = 13:45 svensk tid, varje dag
 
 jobs:
   rykten:
