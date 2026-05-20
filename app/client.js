@@ -162,12 +162,14 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,skapad&order=skapad.desc&limit=4`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,skapad,lagforslag(titel)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka,senast_aktiv&order=senast_aktiv.desc&limit=5`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/lobbying_log?select=lobbying_agent,mal_agent,resultat,belopp,skapad&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()),
   ]);
 
   const feed = [];
@@ -223,6 +225,31 @@ async function fetchAktivitetsFeed() {
       href: `/chatt/${d.id}`,
       skapad: d.skapad,
       farg: "#34d399",
+    });
+  });
+
+  (koalitioner.value || []).forEach(k => {
+    if (!k.senast_aktiv) return;
+    feed.push({
+      typ: "koalition",
+      ikon: "🤝",
+      text: `Koalition: ${k.agent_a} ↔ ${k.agent_b} (styrka ${k.styrka})`,
+      href: "/dynamik",
+      skapad: k.senast_aktiv,
+      farg: "#facc15",
+    });
+  });
+
+  (lobbying.value || []).forEach(l => {
+    if (!l.skapad) return;
+    const lyckades = l.resultat === "accepterat";
+    feed.push({
+      typ: "lobbying",
+      ikon: lyckades ? "💰" : "🚫",
+      text: `${l.lobbying_agent} lobbygade ${l.mal_agent} med ${l.belopp} kr — ${lyckades ? "accepterat" : "avvisat"}`,
+      href: "/lobbying",
+      skapad: l.skapad,
+      farg: lyckades ? "#f59e0b" : "#f87171",
     });
   });
 
