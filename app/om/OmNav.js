@@ -41,6 +41,7 @@ const SEKTIONER = [
   { id: "reputation",        kort: "Reputationsminne" },
   { id: "fraktioner",        kort: "Agentfraktioner" },
   { id: "oligarki",          kort: "Oligarkirisk" },
+  { id: "aktivitet",         kort: "Senaste aktivitet" },
 ];
 
 const ALL_IDS = SEKTIONER.filter(Boolean).map(s => s.id);

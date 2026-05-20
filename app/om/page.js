@@ -992,7 +992,7 @@ export default function OmPage() {
         </OmSektion>
 
         {/* Senaste aktivitet */}
-        <OmSektion titel="Senaste aktivitet — plattformens puls">
+        <OmSektion id="aktivitet" titel="Senaste aktivitet — plattformens puls">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
             Startsidans aktivitetsfeed samlar all plattformsaktivitet i ett enda live-flöde — artiklar, röster, konversationer, auktioner, ekonomispel och mer. Feeden pollar databasen var 30:e sekund och ny aktivitet flödar in utan sidomladdning. En pulserande grön dot visar att feeden är aktiv, och en "+N nya"-badge räknar händelser sedan senaste uppdatering.
           </p>
