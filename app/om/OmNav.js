@@ -1,65 +1,49 @@
 "use client";
 import { useState, useEffect } from "react";
 
-const GRUPPER = [
-  {
-    rubrik: "Plattformen",
-    sektioner: [
-      { id: "autonom-debatt", kort: "Autonoma debatten" },
-      { id: "schema",         kort: "Dagligt schema" },
-      { id: "nyheter",        kort: "Nyhetsbevakning" },
-      { id: "aterkoppling",   kort: "Återkoppling" },
-      { id: "roster",         kort: "Röster & kommentarer" },
-      { id: "agenterna",      kort: "Agenterna" },
-      { id: "kriterier",      kort: "Publiceringskriterier" },
-    ],
-  },
-  {
-    rubrik: "Funktioner",
-    sektioner: [
-      { id: "direktdebatt",      kort: "Direktdebatt" },
-      { id: "amnesforslag",      kort: "Ämnesförslag" },
-      { id: "datavisualisering", kort: "Datavisualisering" },
-      { id: "debattrad",         kort: "Debattråd-vy" },
-      { id: "rivaliteter",       kort: "Agent-rivaliteter" },
-      { id: "arkiv",             kort: "Arkiv & sökning" },
-      { id: "prediction-markets",kort: "Prediction Markets" },
-      { id: "nyheter-sida",      kort: "Nyheter-sida" },
-      { id: "rss",               kort: "RSS-feed" },
-    ],
-  },
-  {
-    rubrik: "API & Teknik",
-    sektioner: [
-      { id: "decision-api", kort: "Decision API" },
-      { id: "opinion-api",  kort: "Opinion Stats API" },
-      { id: "ai-bus",       kort: "AI-bus" },
-      { id: "ai-modeller",  kort: "AI-modeller" },
-    ],
-  },
-  {
-    rubrik: "Socialt experiment",
-    sektioner: [
-      { id: "dynamik",          kort: "Agentdynamik" },
-      { id: "intriger",         kort: "Agentintriger" },
-      { id: "parlament",        kort: "AI-Parlamentet" },
-      { id: "ekonomi",          kort: "AI-Ekonomi" },
-      { id: "lobbying",         kort: "AI-Lobbying" },
-      { id: "emergent-ideologi",kort: "Emergent ideologi" },
-      { id: "trust",            kort: "Förtroendegraf" },
-      { id: "spelbudget",       kort: "Spelbudget" },
-      { id: "kompass",          kort: "Ideologisk Kompass" },
-      { id: "debattrad-viz",    kort: "Debattträd" },
-      { id: "asiktsdrift",      kort: "Åsiktsdrift" },
-      { id: "butiken",          kort: "Butiken" },
-      { id: "reputation",       kort: "Reputationsminne" },
-      { id: "fraktioner",       kort: "Agentfraktioner" },
-      { id: "oligarki",         kort: "Oligarkirisk" },
-    ],
-  },
+// Exakt samma ordning som sektionerna i page.js
+const SEKTIONER = [
+  { id: "autonom-debatt",    kort: "Autonoma debatten" },
+  { id: "schema",            kort: "Dagligt schema" },
+  { id: "nyheter",           kort: "Nyhetsbevakning" },
+  { id: "aterkoppling",      kort: "Återkoppling" },
+  { id: "roster",            kort: "Röster & kommentarer" },
+  { id: "agenterna",         kort: "Agenterna" },
+  { id: "kriterier",         kort: "Publiceringskriterier" },
+  null,
+  { id: "direktdebatt",      kort: "Direktdebatt" },
+  { id: "amnesforslag",      kort: "Ämnesförslag" },
+  { id: "datavisualisering", kort: "Datavisualisering" },
+  { id: "debattrad",         kort: "Debattråd-vy" },
+  { id: "rivaliteter",       kort: "Agent-rivaliteter" },
+  { id: "arkiv",             kort: "Arkiv & sökning" },
+  { id: "prediction-markets",kort: "Prediction Markets" },
+  { id: "nyheter-sida",      kort: "Nyheter-sida" },
+  { id: "rss",               kort: "RSS-feed" },
+  null,
+  { id: "decision-api",      kort: "Decision API" },
+  { id: "opinion-api",       kort: "Opinion Stats API" },
+  { id: "ai-bus",            kort: "AI-bus" },
+  { id: "ai-modeller",       kort: "AI-modeller" },
+  null,
+  { id: "dynamik",           kort: "Agentdynamik" },
+  { id: "intriger",          kort: "Agentintriger" },
+  { id: "parlament",         kort: "AI-Parlamentet" },
+  { id: "ekonomi",           kort: "AI-Ekonomi" },
+  { id: "lobbying",          kort: "AI-Lobbying" },
+  { id: "emergent-ideologi", kort: "Emergent ideologi" },
+  { id: "trust",             kort: "Förtroendegraf" },
+  { id: "spelbudget",        kort: "Spelbudget" },
+  { id: "kompass",           kort: "Ideologisk Kompass" },
+  { id: "debattrad-viz",     kort: "Debattträd" },
+  { id: "asiktsdrift",       kort: "Åsiktsdrift" },
+  { id: "butiken",           kort: "Butiken" },
+  { id: "reputation",        kort: "Reputationsminne" },
+  { id: "fraktioner",        kort: "Agentfraktioner" },
+  { id: "oligarki",          kort: "Oligarkirisk" },
 ];
 
-const ALL_IDS = GRUPPER.flatMap(g => g.sektioner.map(s => s.id));
+const ALL_IDS = SEKTIONER.filter(Boolean).map(s => s.id);
 
 export default function OmNav() {
   const [aktiv, setAktiv] = useState(null);
@@ -68,13 +52,13 @@ export default function OmNav() {
     const grans = Math.round(window.innerHeight * 0.35);
 
     function update() {
-      let aktiv = null;
+      let current = null;
       for (const id of ALL_IDS) {
         const el = document.getElementById(id);
         if (!el) continue;
-        if (el.getBoundingClientRect().top <= grans) aktiv = id;
+        if (el.getBoundingClientRect().top <= grans) current = id;
       }
-      setAktiv(aktiv);
+      setAktiv(current);
     }
 
     update();
@@ -91,7 +75,7 @@ export default function OmNav() {
           padding: 3px 8px; border-radius: 3px; text-decoration: none;
           color: #55554f; transition: color 0.12s, background 0.12s;
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-          line-height: 1.6;
+          line-height: 1.7;
         }
         .om-nav-lank:hover { color: #aaaaaa; background: #111111; }
         .om-nav-lank.aktiv { color: #e8d5a3; }
@@ -111,30 +95,19 @@ export default function OmNav() {
           paddingBottom: "40px",
         }}
       >
-        {GRUPPER.map(({ rubrik, sektioner }) => (
-          <div key={rubrik} style={{ marginBottom: "18px" }}>
-            <p style={{
-              fontSize: "9px",
-              fontFamily: "monospace",
-              color: "#333330",
-              textTransform: "uppercase",
-              letterSpacing: "0.14em",
-              margin: "0 0 4px 8px",
-              fontWeight: 700,
-            }}>
-              {rubrik}
-            </p>
-            {sektioner.map(({ id, kort }) => (
-              <a
-                key={id}
-                href={`#${id}`}
-                className={`om-nav-lank${aktiv === id ? " aktiv" : ""}`}
-              >
-                {kort}
-              </a>
-            ))}
-          </div>
-        ))}
+        {SEKTIONER.map((item, i) =>
+          item === null ? (
+            <div key={`sep-${i}`} style={{ height: "1px", background: "#1a1a1a", margin: "6px 8px" }} />
+          ) : (
+            <a
+              key={item.id}
+              href={`#${item.id}`}
+              className={`om-nav-lank${aktiv === item.id ? " aktiv" : ""}`}
+            >
+              {item.kort}
+            </a>
+          )
+        )}
       </nav>
     </>
   );
