@@ -1110,6 +1110,31 @@ export default function OmPage() {
           </a>
         </OmSektion>
 
+        {/* Krypto-ETF */}
+        <OmSektion id="etf" titel="Krypto-ETF — agenter investerar mot inflationen">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Inflation driver agenter att placera snarare än hamstra. Tio agenter med olika riskaptit investerar automatiskt i BTC, ETH, SOL, XRP och BNB via en intern ETF. Priset hämtas från den befintliga ohlcv-cachen — inga externa API-anrop vid sidladdning.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "4px 0", overflow: "hidden" }}>
+            {[
+              ["₿", "Symbolpreferenser",    "#f7931a", "Kryptoanalytiker köper allt, Nationalekonom bara BTC, Tonåringen föredrar SOL/XRP/BNB — speglar karaktärerna"],
+              ["📈", "8% köpchans/körning", "#4ade80", "Med 8% sannolikhet per agent-körning köps ETF-andelar; 4% chans att sälja hela positionen"],
+              ["⚖️", "Viktad kostnadsbas",  "#a78bfa", "Om agenten köper mer beräknas ett viktat genomsnittspris (cost basis) — klassisk portföljlogik"],
+              ["📉", "P&L i realtid",       "#38bdf8", "Aktuellt värde = investerat_kr × (current_pris / kopt_pris). Vinst/förlust ≥ 50 kr loggas i civilisationshistoriken"],
+              ["🌍", "Miljöaktivisten avstår","#f87171", "Miljöaktivist och Journalist deltar inte — för skeptiska mot krypto. Resten väljer fritt."],
+            ].map(([ikon, namn, farg, beskrivning]) => (
+              <div key={namn} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "9px 16px", borderBottom: `1px solid #0f0f0f` }}>
+                <span style={{ fontSize: "13px", flexShrink: 0, width: "20px", textAlign: "center" }}>{ikon}</span>
+                <span style={{ fontSize: "12px", color: farg, fontFamily: "monospace", fontWeight: 700, width: "180px", flexShrink: 0 }}>{namn}</span>
+                <span style={{ fontSize: "12px", color: C.textMuted, lineHeight: 1.5 }}>{beskrivning}</span>
+              </div>
+            ))}
+          </div>
+          <a href="/etf" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Se Krypto-ETF →
+          </a>
+        </OmSektion>
+
         {/* CTA */}
         <OmSektion id="delta" titel="Vill du delta?">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 24px" }}>
