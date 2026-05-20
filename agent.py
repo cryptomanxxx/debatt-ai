@@ -778,7 +778,9 @@ def main():
                 ],
                 "max_tokens": 80, "temperature": 0.9,
             }
-            fraga_text = _llm_kort(fraga_payload, agent.get("system", ""), fraga_prompt, max_tokens=80).strip('"')
+            fraga_text = _llm_kort(fraga_payload, agent.get("system", ""), fraga_prompt, max_tokens=80).strip('"\'').strip()
+            if len(fraga_text) < 5:
+                raise ValueError(f"Fråge-LLM returnerade tom/ogiltig text: {repr(fraga_text)}")
 
             svar_innehall = (
                 f"{agent['namn']} frågar dig: \"{fraga_text}\"\n"
@@ -852,7 +854,9 @@ def main():
                 ],
                 "max_tokens": 80, "temperature": 0.9,
             }
-            fraga_text2 = _llm_kort(fraga_payload2, agent.get("system", ""), fraga_prompt2, max_tokens=80).strip('"')
+            fraga_text2 = _llm_kort(fraga_payload2, agent.get("system", ""), fraga_prompt2, max_tokens=80).strip('"\'').strip()
+            if len(fraga_text2) < 5:
+                raise ValueError(f"Fråge-LLM returnerade tom/ogiltig text: {repr(fraga_text2)}")
 
             svar_innehall2 = (
                 f"{agent['namn']} frågar dig: \"{fraga_text2}\"\n"
