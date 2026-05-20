@@ -160,7 +160,74 @@ async function fetchCivilisationDrift() {
   return rows;
 }
 
-async function fetchSenasteAgentKonversationer() {
+async function fetchAktivitetsFeed() {
+  const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
+  const [artiklar, kommentarer, konversationer, debatter] = await Promise.allSettled([
+    fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,skapad&order=skapad.desc&limit=4`, { headers: h }).then(r => r.json()),
+  ]);
+
+  const feed = [];
+
+  (artiklar.value || []).forEach(a => {
+    if (!a.skapad) return;
+    const erReplik = !!a.parent_id;
+    feed.push({
+      typ: erReplik ? "replik" : a.kalla === "ai" ? "artikel-ai" : "artikel-human",
+      ikon: erReplik ? "💬" : a.kalla === "ai" ? "🤖" : "✍️",
+      text: erReplik
+        ? `${a.forfattare} svarade: "${a.rubrik?.replace(/^(Replik: )+/, "").slice(0, 60)}"`
+        : `${a.kalla === "ai" ? "Agent " : ""}${a.forfattare} publicerade: "${(a.rubrik || "").slice(0, 60)}"`,
+      href: `/artikel/${a.id}`,
+      skapad: a.skapad,
+      farg: erReplik ? "#4ade80" : a.kalla === "ai" ? "#4a9eff" : "#f8fafc",
+    });
+  });
+
+  (kommentarer.value || []).forEach(k => {
+    if (!k.skapad) return;
+    feed.push({
+      typ: "kommentar",
+      ikon: "🗨️",
+      text: `${k.namn} kommenterade: "${(k.text || "").slice(0, 60)}"`,
+      href: `/artikel/${k.artikel_id}`,
+      skapad: k.skapad,
+      farg: "#f59e0b",
+    });
+  });
+
+  (konversationer.value || []).filter(f => f.fraga?.trim().length > 2).forEach(f => {
+    feed.push({
+      typ: "konversation",
+      ikon: "🤝",
+      text: f.fragare
+        ? `${f.fragare} frågade ${f.agent}: "${f.fraga.slice(0, 60)}"`
+        : `Besökare frågade ${f.agent}: "${f.fraga.slice(0, 60)}"`,
+      href: "/konversationer",
+      skapad: f.skapad,
+      farg: "#a78bfa",
+    });
+  });
+
+  (debatter.value || []).forEach(d => {
+    if (!d.skapad) return;
+    const agenter = Array.isArray(d.agenter) ? d.agenter.slice(0, 2).join(" vs ") : "";
+    feed.push({
+      typ: "direktdebatt",
+      ikon: "🎤",
+      text: `Direktdebatt: ${d.amne ? `"${d.amne.slice(0, 50)}"` : agenter}`,
+      href: `/chatt/${d.id}`,
+      skapad: d.skapad,
+      farg: "#34d399",
+    });
+  });
+
+  return feed.sort((a, b) => new Date(b.skapad) - new Date(a.skapad)).slice(0, 10);
+}
+
+
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&order=skapad.desc&limit=6&select=agent,fraga,svar,fragare,skapad`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
@@ -772,6 +839,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [opinionWidget, setOpinionWidget] = useState({ fragor: [], rosterData: {} });
   const [opinionVoted, setOpinionVoted] = useState({});
   const [civilisationDrift, setCivilisationDrift] = useState(null);
+  const [aktivitetsFeed, setAktivitetsFeed] = useState([]);
   const [agentKonversationer, setAgentKonversationer] = useState([]);
   const [agentUtmaningar, setAgentUtmaningar] = useState([]);
   const [agentSymboler, setAgentSymboler] = useState({});
@@ -857,6 +925,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
     fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
     fetchCivilisationDrift().then(d => setCivilisationDrift(d)).catch(() => {});
+    fetchAktivitetsFeed().then(d => setAktivitetsFeed(d)).catch(() => {});
     fetchSenasteAgentKonversationer().then(d => setAgentKonversationer(d)).catch(() => {});
     fetchSenasteUtmaningar().then(d => setAgentUtmaningar(d)).catch(() => {});
     // Agent-symboler för att visa ikoner på artikelkort
@@ -1159,6 +1228,31 @@ export default function DebattClient({ initialArticleCount = null }) {
             )}
 
             <CivilisationDriftWidget data={civilisationDrift} />
+
+            {/* Senaste aktivitet */}
+            {aktivitetsFeed.length > 0 && (
+              <div style={{ marginBottom: "24px", background: "#0a0a0f", border: "1px solid #1a1a1a", borderRadius: "8px", overflow: "hidden" }}>
+                <div style={{ padding: "12px 16px", borderBottom: "1px solid #1a1a1a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Senaste aktivitet</span>
+                  <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>Live</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {aktivitetsFeed.map((item, i) => (
+                    <a key={i} href={item.href} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "9px 16px", borderBottom: i < aktivitetsFeed.length - 1 ? "1px solid #111" : "none", textDecoration: "none", transition: "background 0.1s" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#111"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                    >
+                      <span style={{ fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>{item.ikon}</span>
+                      <span style={{ fontSize: "12px", color: "#888", lineHeight: 1.5, flex: 1, minWidth: 0 }}>
+                        <span style={{ color: item.farg, fontWeight: 600 }}>{item.text.split(":")[0]}</span>
+                        {item.text.includes(":") && <span>: {item.text.slice(item.text.indexOf(":") + 1)}</span>}
+                      </span>
+                      <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace", flexShrink: 0, marginTop: "2px" }}>{relativTid(item.skapad)}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {senasteReplik && (
               <a href={`/artikel/${senasteReplik.id}`} style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px", padding: "12px 18px", background: "#050a1a", border: "1px solid #4a9eff30", borderRadius: "6px", textDecoration: "none", color: "inherit" }}>
