@@ -1,0 +1,56 @@
+name: Master – Alla experiment
+
+on:
+  workflow_dispatch:
+    inputs:
+      hoppa_over:
+        description: "Hoppa över (kommaseparerat: butik,andrahand,parlament,lobbying,koalition,ekonomi,konversationer)"
+        required: false
+        default: ""
+      antal_konv:
+        description: "Antal AI-till-AI-konversationer"
+        required: false
+        default: "10"
+      dry_run:
+        description: "Dry-run — visa körordning utan att köra"
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  master:
+    runs-on: ubuntu-latest
+    permissions:
+      models: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Kör master_test.py
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.hoppa_over }}" ]; then
+            ARGS="$ARGS --hoppa-over ${{ github.event.inputs.hoppa_over }}"
+          fi
+          if [ -n "${{ github.event.inputs.antal_konv }}" ]; then
+            ARGS="$ARGS --antal-konv ${{ github.event.inputs.antal_konv }}"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          python -u master_test.py $ARGS
