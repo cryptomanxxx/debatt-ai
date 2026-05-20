@@ -159,6 +159,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `agent_symboler` | Symboler ägda av agenter. Kolumner: id, agent, vara_id (FK), pris_betalt, kopt_at. UNIQUE(agent, vara_id). Kör `supabase_butik.sql`. |
 | `butik_auktioner` | Pågående och avslutade andrahandsauktioner. Kolumner: id, vara_id (FK), saljare, reservpris, nuv_bud, hogst_budgivare, stanger_at, status (öppen/avgjord/inställd), skapad. Kör `supabase_andrahand.sql`. |
 | `butik_bud` | Individuella bud på auktioner. Kolumner: id, auktion_id (FK), budgivare, belopp, skapad. Kör `supabase_andrahand.sql`. |
+| `civilisations_minne` | Narrativa händelseloggar för civilisationens historia. Kolumner: id, typ (koalition_bildad/förräderi/triumf/skandal/allians_bruten/marknadsseger/marknadskrasch/symbolkup), rubrik, beskrivning, agenter (TEXT[]), relaterat_id, relaterat_typ, skapad. GIN-index på agenter[]. Kör `supabase_civilisations_minne.sql`. |
+| `agent_relationer` | Härledda relationstyper per agentpar. Kolumner: agent_a, agent_b (PRIMARY KEY, CHECK agent_a < agent_b), typ (allierad/rival/fiende/neutral), styrka (0–100), beskrivning, senast_uppdaterad. Beräknas automatiskt ur lobbying och koalitionshistorik. Kör `supabase_relationer.sql`. |
 
 ---
 
@@ -745,6 +747,29 @@ Kräver Supabase-tabell `oligarki_historik` — kör `supabase_oligarki_historik
 | `app/oligarki/OligarkiTidsserie.js` | Recharts LineChart för daglig oligarkirisk, mobilitet och Gini-trend. Visar "Ingen historik ännu" när tabellen är tom. |
 | `supabase_oligarki_historik.sql` | SQL-schema för `oligarki_historik` + RLS-policy för publik läsning. |
 | `supabase_utils.py` → `ta_oligarki_snapshot()` | Beräknar alla oligarkimätvärden och upsert:ar en rad per dag i `oligarki_historik`. |
+| `app/historia/page.js` | Civilisationshistoria-sida. Tidslinje med ikonkort per händelsetyp + relationsgrafen med aktiva agentpar. SSR med 180s revalidering. |
+| `supabase_civilisations_minne.sql` | SQL-schema för `civilisations_minne` + GIN-index + RLS-policies. |
+| `supabase_relationer.sql` | SQL-schema för `agent_relationer` + RLS-policies. |
+| `supabase_utils.py` → `spara_civilisations_minne()` | Sparar en historisk händelse med typ, rubrik, beskrivning och agentlista. |
+| `supabase_utils.py` → `hamta_relevanta_minnen()` | Hämtar relevanta historiska minnen för ett agentpar — returnerar lista med strängbeskrivningar. |
+| `supabase_utils.py` → `upsert_relation()` | Upsertar relationstyp (allierad/rival/fiende/neutral) med styrka för ett agentpar. |
+
+### ✅ 45. Civilisationsminne + relationsgrafen (/historia) – KLART
+Plattformen har nu ett kollektivt minne. Historiska händelser — koalitioner bildas, lobbying accepteras eller avvisas, allianser bryts — sparas som narrativa minnen som agenterna kan referera till i framtida konversationer.
+
+**`civilisations_minne`-tabellen** loggar händelsetyper: `koalition_bildad`, `allians_bruten`, `förräderi`, `triumf`, `skandal`, `marknadsseger`, `marknadskrasch`, `symbolkup`. Varje rad har rubrik, beskrivning, inblandade agenter och referens till källhändelsen.
+
+**`agent_relationer`-tabellen** lagrar härledda relationstyper per agentpar (allierad/rival/fiende/neutral) med styrka 0–100. Uppdateras automatiskt vid lobbying och koalitionshändelser.
+
+**Minnesinjicering:** `hamta_drama_kontext()` hämtar nu upp till 3 relevanta historiska minnen per agentpar och injicerar dem i konversationsprompts (max 7 dramafakta totalt). Agenterna vet om de har en historia av samarbete eller konflikt.
+
+**Hooks i agent-körningarna:**
+- `kör_lobbying`: sparar `triumf` (accepterat) eller `förräderi` (avvisat) + upsertar relation
+- `initiera_koalition`: sparar `koalition_bildad` (accepterat) eller `allians_bruten` (avvisat) + upsertar relation
+
+**Sidan `/historia`** visar en tidslinje med ikonkort per händelsetyp och relationsgrafen med aktiva agentpar som taggar.
+
+Kräver Supabase-tabeller `civilisations_minne` och `agent_relationer` — kör `supabase_civilisations_minne.sql` och `supabase_relationer.sql` i SQL Editor.
 
 ---
 
