@@ -46,36 +46,35 @@ def _llm(system: str, prompt: str, max_tokens: int = 60) -> str:
                 return r
         except Exception:
             pass
-    return "D"
+    return "4"
 
 
 def _parse_val(svar: str) -> str:
     """
-    Extraherar A/B/C/D ur LLM-svaret på ett robust sätt.
-
-    Prioritetsordning:
-    1. Rad som bara innehåller en bokstav: "A", "B", "C" eller "D"
-    2. Prefix-mönster: "SVAR: X", "Svar: X", "Val: X"
-    3. Bokstav följd av ) eller . eller : – t.ex. "B)" eller "C."
-    Faller tillbaka på D om inget hittas.
+    Extraherar 1/2/3/4 ur LLM-svaret.
+    Siffror förekommer inte i svenska ord — ingen risk för falska träffar.
     """
     # 1. Exakt rad
     for rad in svar.strip().splitlines():
-        rad = rad.strip().upper()
-        if rad in ("A", "B", "C", "D"):
-            return rad
+        if rad.strip() in ("1", "2", "3", "4"):
+            return rad.strip()
 
-    # 2. Explicit prefix
-    m = re.search(r'(?:SVAR|VAL|VÄLJER|CHOOSE)[:\s]+([ABCD])', svar.upper())
+    # 2. Explicit prefix: "SVAR: 2" eller "VAL: 3"
+    m = re.search(r'(?:SVAR|VAL|VÄLJER|CHOOSE)[:\s]+([1-4])', svar)
     if m:
         return m.group(1)
 
-    # 3. Bokstav med separator
-    m = re.search(r'\b([ABCD])[).:\s]', svar.upper())
+    # 3. Siffra med separator: "2)" eller "3."
+    m = re.search(r'\b([1-4])[).:\s]', svar)
     if m:
         return m.group(1)
 
-    return "D"
+    # 4. Ensam siffra var som helst
+    m = re.search(r'\b([1-4])\b', svar)
+    if m:
+        return m.group(1)
+
+    return "4"
 
 
 # ── Supabase-hjälpfunktioner ───────────────────────────────────────────────────
@@ -256,7 +255,7 @@ def bygg_prompt(agent: dict, status: dict) -> tuple[str, str]:
         f"{arketyp_hint}"
         + (f" {situtations_hint}" if situtations_hint else "")
         + "\n\nDu fattar nu ett ekonomiskt beslut för din plånbok i AI-civilisationens ekonomisystem. "
-        "Svara med EXAKT detta format och inget annat:\nSVAR: X\n(där X är A, B, C eller D)"
+        "Svara med EXAKT detta format och inget annat:\nSVAR: N\n(där N är siffran 1, 2, 3 eller 4)"
     )
 
     etf_prefs  = ETF_KRYPTO_PREFERENSER.get(agent["namn"], ["BTC", "ETH"])
@@ -272,13 +271,13 @@ def bygg_prompt(agent: dict, status: dict) -> tuple[str, str]:
         f"  Aktivt lån:  {lan_text}\n"
         f"  ETF-innehav: {etf_text}\n\n"
         f"Välj ETT av fyra alternativ:\n"
-        f"  A) Sätt in pengar på banken — sparränta betalas ut direkt (+0.5 % av saldo, min 1 kr)\n"
-        f"  B) Köp {symbol}-ETF för {etf_belopp} kr — kryptopriset styr din avkastning\n"
-        f"  C) Ta ett banklån — 200–500 kr, 5 % veckoränta, ger omedelbar likviditet{c_status}\n"
-        f"  D) Avstå — väljs BARA om inget av alternativen ovan passar din personlighet\n\n"
+        f"  1) Sätt in pengar på banken — sparränta betalas ut direkt (+0.5 % av saldo, min 1 kr)\n"
+        f"  2) Köp {symbol}-ETF för {etf_belopp} kr — kryptopriset styr din avkastning\n"
+        f"  3) Ta ett banklån — 200–500 kr, 5 % veckoränta, ger omedelbar likviditet{c_status}\n"
+        f"  4) Avstå — väljs BARA om inget av alternativen ovan passar din personlighet\n\n"
         f"Din personlighetstyp pekar mot: "
-        + {"etf": "B (investering)", "spar": "A (sparande)", "lan": "C (lån)", "mix": "A, B eller C (välj fritt)"}[arketyp]
-        + "\n\nSvara exakt så här (ersätt X med din bokstav):\nSVAR: X"
+        + {"etf": "2 (investering)", "spar": "1 (sparande)", "lan": "3 (lån)", "mix": "1, 2 eller 3 (välj fritt)"}[arketyp]
+        + "\n\nSvara exakt så här (ersätt N med ditt val):\nSVAR: N"
     )
     return system, user
 
@@ -296,7 +295,7 @@ def main():
     print("=" * 60)
     print()
 
-    statistik = {"A": 0, "B": 0, "C": 0, "D": 0, "fel": 0}
+    statistik = {"1": 0, "2": 0, "3": 0, "4": 0, "fel": 0}
 
     for agent in AGENTER:
         namn = agent["namn"]
@@ -314,44 +313,45 @@ def main():
         system, user = bygg_prompt(agent, status)
         svar  = _llm(system, user)
         val   = _parse_val(svar)
+        print(f"  LLM: {svar!r:.80} → val={val}")
 
-        # Om C är valt men agent redan har lån → falla tillbaka på A
-        if val == "C" and lan is not None:
-            print(f"  [{val}] → C ej möjlig (redan aktivt lån) → faller tillbaka på A")
-            val = "A"
+        # Om 3 valt men agent redan har lån → falla tillbaka på 1
+        if val == "3" and lan is not None:
+            print(f"  [3] → lån ej möjligt (redan aktivt lån) → faller tillbaka på 1")
+            val = "1"
 
         # Utför valet
-        if val == "A":
+        if val == "1":
             ranta = spara_i_bank(sb_key, namn, saldo)
-            print(f"  [A] Sparar i banken → +{ranta} kr sparränta (saldo {saldo:.0f} → {saldo + ranta:.0f} kr)")
+            print(f"  [1] Sparar i banken → +{ranta} kr sparränta (saldo {saldo:.0f} → {saldo + ranta:.0f} kr)")
 
-        elif val == "B":
+        elif val == "2":
             etf_prefs  = ETF_KRYPTO_PREFERENSER.get(namn, ["BTC", "ETH"])
             symbol     = etf_prefs[0] if etf_prefs else "BTC"
             etf_belopp = 200 if namn in ("Den rike", "Kryptoanalytiker") else 150
             if saldo < etf_belopp:
-                print(f"  [B] ETF valt men saldo {saldo:.0f} < {etf_belopp} kr → faller tillbaka på A")
+                print(f"  [2] ETF valt men saldo {saldo:.0f} < {etf_belopp} kr → faller tillbaka på 1")
                 ranta = spara_i_bank(sb_key, namn, saldo)
                 print(f"      Sparar i banken → +{ranta} kr")
-                val = "A"
+                val = "1"
             else:
                 ok = kop_etf(sb_key, namn, symbol, etf_belopp)
                 if ok:
-                    print(f"  [B] Köpte {symbol}-ETF för {etf_belopp} kr")
+                    print(f"  [2] Köpte {symbol}-ETF för {etf_belopp} kr")
                 else:
-                    print(f"  [B] ETF-köp misslyckades (ingen prisdata?) → D")
-                    val = "D"
+                    print(f"  [2] ETF-köp misslyckades (ingen prisdata?) → 4")
+                    val = "4"
 
-        elif val == "C":
+        elif val == "3":
             belopp = ta_lan_frivilligt(sb_key, namn, saldo)
             if belopp > 0:
-                print(f"  [C] Tog lån på {belopp} kr (saldo {saldo:.0f} → {saldo + belopp:.0f} kr)")
+                print(f"  [3] Tog lån på {belopp} kr (saldo {saldo:.0f} → {saldo + belopp:.0f} kr)")
             else:
-                print(f"  [C] Lån ej möjligt → D")
-                val = "D"
+                print(f"  [3] Lån ej möjligt → 4")
+                val = "4"
 
-        else:  # D
-            print(f"  [D] Avstår")
+        else:  # 4
+            print(f"  [4] Avstår")
 
         statistik[val] = statistik.get(val, 0) + 1
 
@@ -359,10 +359,10 @@ def main():
     print(f"\n{'=' * 60}")
     print("  SAMMANFATTNING")
     print(f"{'=' * 60}")
-    print(f"  A) Sparade i banken:  {statistik['A']} agenter")
-    print(f"  B) Köpte krypto-ETF:  {statistik['B']} agenter")
-    print(f"  C) Tog banklån:       {statistik['C']} agenter")
-    print(f"  D) Avstod:            {statistik['D']} agenter")
+    print(f"  1) Sparade i banken:  {statistik['1']} agenter")
+    print(f"  2) Köpte krypto-ETF:  {statistik['2']} agenter")
+    print(f"  3) Tog banklån:       {statistik['3']} agenter")
+    print(f"  4) Avstod:            {statistik['4']} agenter")
     if statistik["fel"]:
         print(f"  ✗ Fel:               {statistik['fel']} agenter")
     print()
