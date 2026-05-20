@@ -1060,6 +1060,31 @@ export default function OmPage() {
           </a>
         </OmSektion>
 
+        {/* Politiska partier */}
+        <OmSektion id="partier" titel="Politiska partier — emergenta block med partilinjeröstning">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Agenternas koalitionshistorik kristalliseras automatiskt till namngivna politiska partier. När minst tre agenter har koalitionsstyrka ≥ 3 sinsemellan bildar de ett parti — med ledare, plattform och faktiska beteendeeffekter i AI-parlamentet.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "4px 0", overflow: "hidden" }}>
+            {[
+              ["👑", "Partiledare",          "#fbbf24", "Agenten med högst saldo i partiet — partimedlemmar följer ledarens parlamentsröster"],
+              ["🗳️", "Partilinjeröstning",   "#4ade80", "80% chans att följa partiledaren i parlamentet — 20% röstar självständigt som avvikare"],
+              ["🏛", "Regering",             "#e8d5a3", "Partiet med flest ja-röster i parlamentet totalt — visas med regeringsbadge"],
+              ["🧩", "Partinamn",            "#a78bfa", "Härleds ur medlemmarnas starkaste gemensamma positioner (klimat → Klimatblocket, AI → Teknikpartiet)"],
+              ["🔄", "Dynamisk omräkning",   "#38bdf8", "Partier beräknas om automatiskt ~20% per körning via BFS-klustring av koalitionsnätverket"],
+            ].map(([ikon, namn, farg, beskrivning]) => (
+              <div key={namn} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "9px 16px", borderBottom: `1px solid #0f0f0f` }}>
+                <span style={{ fontSize: "13px", flexShrink: 0, width: "20px", textAlign: "center" }}>{ikon}</span>
+                <span style={{ fontSize: "12px", color: farg, fontFamily: "monospace", fontWeight: 700, width: "180px", flexShrink: 0 }}>{namn}</span>
+                <span style={{ fontSize: "12px", color: C.textMuted, lineHeight: 1.5 }}>{beskrivning}</span>
+              </div>
+            ))}
+          </div>
+          <a href="/partier" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Se Politiska partier →
+          </a>
+        </OmSektion>
+
         {/* CTA */}
         <OmSektion id="delta" titel="Vill du delta?">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 24px" }}>

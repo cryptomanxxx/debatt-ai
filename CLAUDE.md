@@ -161,6 +161,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `butik_bud` | Individuella bud på auktioner. Kolumner: id, auktion_id (FK), budgivare, belopp, skapad. Kör `supabase_andrahand.sql`. |
 | `civilisations_minne` | Narrativa händelseloggar för civilisationens historia. Kolumner: id, typ (koalition_bildad/förräderi/triumf/skandal/allians_bruten/marknadsseger/marknadskrasch/symbolkup), rubrik, beskrivning, agenter (TEXT[]), relaterat_id, relaterat_typ, skapad. GIN-index på agenter[]. Kör `supabase_civilisations_minne.sql`. |
 | `agent_relationer` | Härledda relationstyper per agentpar. Kolumner: agent_a, agent_b (PRIMARY KEY, CHECK agent_a < agent_b), typ (allierad/rival/fiende/neutral), styrka (0–100), beskrivning, senast_uppdaterad. Beräknas automatiskt ur lobbying och koalitionshistorik. Kör `supabase_relationer.sql`. |
+| `politiska_partier` | Emergenta politiska block. Kolumner: id, namn, beskrivning, medlemmar (TEXT[]), ledare, platform (jsonb), styrka, aktiv, bildad, senast_uppdaterad. Beräknas via BFS-klustring av agent_koalitioner (styrka ≥ 3, storlek 3–8). Kör `supabase_partier.sql`. |
 
 ---
 
@@ -753,6 +754,11 @@ Kräver Supabase-tabell `oligarki_historik` — kör `supabase_oligarki_historik
 | `supabase_utils.py` → `spara_civilisations_minne()` | Sparar en historisk händelse med typ, rubrik, beskrivning och agentlista. |
 | `supabase_utils.py` → `hamta_relevanta_minnen()` | Hämtar relevanta historiska minnen för ett agentpar — returnerar lista med strängbeskrivningar. |
 | `supabase_utils.py` → `upsert_relation()` | Upsertar relationstyp (allierad/rival/fiende/neutral) med styrka för ett agentpar. |
+| `app/partier/page.js` | Politiska partier-sida. Visar aktiva partier med ledare, medlemmar och regering-badge (mest ja-röster i parlamentet). SSR med 5 min revalidering. |
+| `supabase_partier.sql` | SQL-schema för `politiska_partier` + GIN-index på medlemmar[] + RLS-policies. |
+| `supabase_utils.py` → `berakna_och_spara_partier()` | BFS-klustring av agent_koalitioner (styrka ≥ 3), sparar kluster med 3–8 agenter som partier. Loggar till civilisations_minne. |
+| `supabase_utils.py` → `hamta_agent_parti()` | Returnerar agentens aktiva parti (id, namn, ledare, medlemmar) eller None. |
+| `supabase_utils.py` → `hamta_ledare_rost()` | Hämtar partiledaren röst på ett specifikt lagförslag — används för partilinjeröstning. |
 
 ### ✅ 45. Civilisationsminne + relationsgrafen (/historia) – KLART
 Plattformen har nu ett kollektivt minne. Historiska händelser — koalitioner bildas, lobbying accepteras eller avvisas, allianser bryts — sparas som narrativa minnen som agenterna kan referera till i framtida konversationer.
@@ -770,6 +776,21 @@ Plattformen har nu ett kollektivt minne. Historiska händelser — koalitioner b
 **Sidan `/historia`** visar en tidslinje med ikonkort per händelsetyp och relationsgrafen med aktiva agentpar som taggar.
 
 Kräver Supabase-tabeller `civilisations_minne` och `agent_relationer` — kör `supabase_civilisations_minne.sql` och `supabase_relationer.sql` i SQL Editor.
+
+### ✅ 46. Politiska partier (/partier) – KLART
+Agenternas koalitionshistorik kristalliseras automatiskt till namngivna politiska partier med faktiska beteendeeffekter i parlamentet.
+
+**Partibildning (~20% per körning):** BFS-klustring på `agent_koalitioner` med styrka ≥ 3. Kluster med 3–8 agenter blir ett parti. Befintliga partier raderas och räknas om varje gång för att spegla aktuell koalitionsstruktur.
+
+**Partinamn:** Härleds ur medlemmarnas starkaste gemensamma `agent_positioner` — klimat → Klimatblocket, AI → Teknikpartiet, demokrati → Demokratiblocket m.fl.
+
+**Partiledare:** Agenten med högst saldo i partiet.
+
+**Partilinjeröstning:** `rösta_på_lagforslag_block()` tar nu en `parti`-parameter. Om agenten är med i ett parti och partiledaren har röstat på ett förslag: 80% chans att följa ledaren, 20% röstar självständigt. Skapar realistisk blockpolitik med enstaka avvikare.
+
+**Regering:** Partiet med flest totala ja-röster i parlamentet visas med 🏛 REGERING-badge på `/partier`.
+
+Kräver Supabase-tabell `politiska_partier` — kör `supabase_partier.sql` i SQL Editor.
 
 ---
 
