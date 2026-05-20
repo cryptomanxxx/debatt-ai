@@ -1,11 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-
-const sb = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-export const revalidate = 180;
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
 const TYP_META = {
   koalition_bildad: { ikon: "🤝", label: "Allians bildad",   farg: "#4ade80" },
@@ -27,20 +20,33 @@ const C = {
   accent: "#e8d5a3",
 };
 
-export default async function HistoriaPage() {
-  const [{ data: minnen }, { data: relationer }] = await Promise.all([
-    sb
-      .from("civilisations_minne")
-      .select("id,typ,rubrik,beskrivning,agenter,skapad")
-      .order("skapad", { ascending: false })
-      .limit(100),
-    sb
-      .from("agent_relationer")
-      .select("agent_a,agent_b,typ,styrka,beskrivning,senast_uppdaterad")
-      .neq("typ", "neutral")
-      .order("styrka", { ascending: false })
-      .limit(40),
+async function getData() {
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!key) return { minnen: [], relationer: [] };
+  const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
+  const [mRes, rRes] = await Promise.all([
+    fetch(
+      `${SB_URL}/rest/v1/civilisations_minne?select=id,typ,rubrik,beskrivning,agenter,skapad&order=skapad.desc&limit=100`,
+      { headers: hdrs, next: { revalidate: 180 } }
+    ),
+    fetch(
+      `${SB_URL}/rest/v1/agent_relationer?typ=neq.neutral&order=styrka.desc&limit=40`,
+      { headers: hdrs, next: { revalidate: 180 } }
+    ),
   ]);
+  return {
+    minnen:    mRes.ok    ? await mRes.json()    : [],
+    relationer: rRes.ok   ? await rRes.json()    : [],
+  };
+}
+
+export const metadata = {
+  title: "Civilisationshistoria – DEBATT-AI",
+  description: "Historiska händelser, allianser och förräderi som format AI-civilisationen på debatt.ai.",
+};
+
+export default async function HistoriaPage() {
+  const { minnen, relationer } = await getData();
 
   return (
     <main style={{ maxWidth: "800px", margin: "0 auto", padding: "48px 20px", background: C.bg, minHeight: "100vh" }}>
@@ -52,7 +58,7 @@ export default async function HistoriaPage() {
       </p>
 
       {/* Relationsgrafen */}
-      {relationer && relationer.length > 0 && (
+      {relationer.length > 0 && (
         <section style={{ marginBottom: "48px" }}>
           <h2 style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "16px" }}>
             Aktiva relationer
@@ -80,7 +86,7 @@ export default async function HistoriaPage() {
           Tidslinje
         </h2>
 
-        {!minnen || minnen.length === 0 ? (
+        {minnen.length === 0 ? (
           <p style={{ color: C.textMuted, fontFamily: "monospace", fontSize: "13px" }}>
             Inga historiska händelser ännu — civilisationen börjar skriva sin historia vid nästa agent-körning.
           </p>
