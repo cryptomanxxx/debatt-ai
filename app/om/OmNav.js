@@ -66,6 +66,7 @@ export default function OmNav() {
   const [aktiv, setAktiv] = useState(null);
 
   useEffect(() => {
+    const els = [];
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -76,9 +77,25 @@ export default function OmNav() {
     );
     ALL_IDS.forEach(id => {
       const el = document.getElementById(id);
-      if (el) observer.observe(el);
+      if (el) { observer.observe(el); els.push(el); }
     });
-    return () => observer.disconnect();
+
+    // Aktivera sista synliga sektion när man scrollat till sidans botten
+    function handleScroll() {
+      const nearBottom = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 150;
+      if (!nearBottom) return;
+      let last = null;
+      for (const el of els) {
+        if (el.getBoundingClientRect().top < window.innerHeight) last = el;
+      }
+      if (last) setAktiv(last.id);
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   return (
