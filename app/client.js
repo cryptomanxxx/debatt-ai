@@ -1337,6 +1337,8 @@ export default function DebattClient({ initialArticleCount = null }) {
               />
             </div>
 
+            <CivilisationDriftWidget data={civilisationDrift} />
+
             {nastaKorning.timeLeft && (
               <>
                 <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px", padding:"14px 20px", background:"#0a0a0f", border:`1px solid ${nastaKorning.farg}20`, borderRadius:"8px", flexWrap:"wrap", gap:"8px" }}>
@@ -1349,8 +1351,6 @@ export default function DebattClient({ initialArticleCount = null }) {
                 <DagensSchema nextIdx={nastaKorning.nextIdx} />
               </>
             )}
-
-            <CivilisationDriftWidget data={civilisationDrift} />
 
             {/* Senaste aktivitet */}
             {aktivitetsFeed.length > 0 && (
