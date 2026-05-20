@@ -11,10 +11,11 @@ Körordning (med hänsyn till beroenden):
   6. ekonomi_test.py        – Ekonomispel (diktatorspelet / ultimatumspelet)
   7. finans_test.py         – Finansbeslut (spara/ETF/lån/avstå)
   8. rykten                 – Ryktesspridning (skapar och sprider rykten)
-  9. konversationer_bulk.py – AI-till-AI-konversationer
+  9. bors_test.py           – Intern börs (agenter handlar DBT/NOVA/ETK)
+ 10. konversationer_bulk.py – AI-till-AI-konversationer
 
 Flaggor:
-  --hoppa-over SKRIPT,...   Hoppa över specifika skript, t.ex. --hoppa-over butik,andrahand,rykten,finans
+  --hoppa-over SKRIPT,...   Hoppa över specifika skript, t.ex. --hoppa-over butik,andrahand,rykten,finans,bors
   --antal-konv N            Antal konversationer att generera (default: 10)
   --dry-run                 Skriv ut körordningen utan att köra
 
@@ -79,6 +80,12 @@ STEG = [
         "fil":  "rykte_test.py",
         "namn": "Ryktesspridning",
         "ikon": "📢",
+    },
+    {
+        "id":   "bors",
+        "fil":  "bors_test.py",
+        "namn": "Intern börs",
+        "ikon": "📈",
     },
     {
         "id":   "konversationer",
