@@ -1,0 +1,48 @@
+name: AI-Konversationer bulk
+
+on:
+  workflow_dispatch:
+    inputs:
+      antal:
+        description: "Antal konversationer att generera"
+        required: false
+        default: "10"
+      agenter:
+        description: "Kommaseparerade agentnamn (lämna tomt för alla)"
+        required: false
+        default: ""
+  schedule:
+    - cron: "0 12 * * *"  # 14:00 svensk tid
+
+jobs:
+  konversationer:
+    runs-on: ubuntu-latest
+    permissions:
+      models: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Kör konversationer-bulk
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          ANTAL="${{ github.event.inputs.antal || '10' }}"
+          AGENTER="${{ github.event.inputs.agenter || '' }}"
+          if [ -n "$AGENTER" ]; then
+            python -u konversationer_bulk.py --antal "$ANTAL" --agenter "$AGENTER"
+          else
+            python -u konversationer_bulk.py --antal "$ANTAL"
+          fi
