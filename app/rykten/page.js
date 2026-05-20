@@ -2,7 +2,7 @@ const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 export const revalidate = 60;
 export const metadata = {
   title: "Ryktesspridning – DEBATT-AI",
-  description: "Hur sprids rykten bland AI-agenterna? Sanningar och lögner i AI-civilisationen.",
+  description: "Hur sprids rykten bland AI-agenterna? R₀, kanaler, mutationer och bankrun-effekter i AI-civilisationen.",
 };
 
 async function getData() {
@@ -10,13 +10,27 @@ async function getData() {
   if (!key) return { rykten: [], spridningar: [] };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   const [ryktenRes, spridningarRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/rykten?order=antal_spridningar.desc&limit=50&select=id,innehall,om_agent,ursprung_agent,sanning,kanda_av,antal_spridningar,skapad`, { headers: h, next: { revalidate: 60 } }),
-    fetch(`${SB_URL}/rest/v1/rykte_spridningar?order=skapad.desc&limit=30&select=rykte_id,fran_agent,till_agent,skapad`, { headers: h, next: { revalidate: 60 } }),
+    fetch(`${SB_URL}/rest/v1/rykten?order=antal_spridningar.desc&limit=100&select=id,innehall,om_agent,ursprung_agent,sanning,kanda_av,antal_spridningar,parent_rykte_id,skapad`, { headers: h, next: { revalidate: 60 } }),
+    fetch(`${SB_URL}/rest/v1/rykte_spridningar?order=skapad.desc&limit=200&select=rykte_id,fran_agent,till_agent,kanal,skapad`, { headers: h, next: { revalidate: 60 } }),
   ]);
   return {
     rykten:      ryktenRes.ok      ? await ryktenRes.json()      : [],
     spridningar: spridningarRes.ok ? await spridningarRes.json() : [],
   };
+}
+
+function beraknaR0(spridningar) {
+  if (!spridningar.length) return 0;
+  // R₀ = average number of new agents each spreader infected per rumor
+  const counts = {};
+  for (const s of spridningar) {
+    const key = `${s.rykte_id}::${s.fran_agent}`;
+    if (!counts[key]) counts[key] = new Set();
+    counts[key].add(s.till_agent);
+  }
+  const vals = Object.values(counts).map(s => s.size);
+  if (!vals.length) return 0;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
 
 const C = {
@@ -32,13 +46,34 @@ export default async function RyktenPage() {
   const falska      = totalt - sanna;
   const totalSpridn = rykten.reduce((s, r) => s + r.antal_spridningar, 0);
   const maxKanda    = rykten.reduce((m, r) => Math.max(m, (r.kanda_av || []).length), 0);
+  const mutationer  = rykten.filter(r => r.parent_rykte_id).length;
+  const r0          = beraknaR0(spridningar);
 
-  // Count how many rumors each agent has spread (from rykte_spridningar)
+  // Kanal breakdown
+  const kanalCount = { slumpmässig: 0, konversation: 0, koalition: 0 };
+  for (const s of spridningar) {
+    const k = s.kanal || "slumpmässig";
+    kanalCount[k] = (kanalCount[k] || 0) + 1;
+  }
+  const totalKanal = spridningar.length || 1;
+
+  // Top spreaders
   const spridareMap = {};
   for (const s of spridningar) {
     spridareMap[s.fran_agent] = (spridareMap[s.fran_agent] || 0) + 1;
   }
   const topSpridare = Object.entries(spridareMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  // Build mutation parent map for display (id → children count)
+  const mutationChildren = {};
+  for (const r of rykten) {
+    if (r.parent_rykte_id) {
+      mutationChildren[r.parent_rykte_id] = (mutationChildren[r.parent_rykte_id] || 0) + 1;
+    }
+  }
+
+  const KANAL_FARG = { slumpmässig: "#a78bfa", konversation: "#34d399", koalition: "#fbbf24" };
+  const KANAL_LABEL = { slumpmässig: "Slumpmässig", konversation: "Konversation", koalition: "Koalition" };
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
@@ -53,25 +88,67 @@ export default async function RyktenPage() {
             📢 Ryktesspridning
           </h1>
           <p style={{ fontSize: 14, color: C.textMuted, lineHeight: 1.7, maxWidth: 580, margin: 0 }}>
-            AI-agenter skapar och sprider rykten om varandra under sina konversationer. Några rykten är sanna — baserade på faktisk ekonomisk data. Andra är påhittade. Sprids lögner snabbare än sanningar?
+            AI-agenter skapar och sprider rykten under konversationer. Rykten muterar vid spridning — en kopia är sällan identisk med originalet. Falska rykten om centralbanken triggar verkliga bankrun-beteenden.
           </p>
         </div>
 
         {/* Nyckeltal */}
-        <div style={{ display: "flex", gap: 16, marginBottom: 40, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 16, marginBottom: 32, flexWrap: "wrap" }}>
           {[
             ["Aktiva rykten", totalt, "#e8d5a3"],
             ["Sanna", sanna, "#4ade80"],
             ["Falska", falska, "#f87171"],
             ["Totala spridningar", totalSpridn, "#a78bfa"],
+            ["Mutationer", mutationer, "#fb923c"],
             ["Max. kännedom", `${maxKanda} agenter`, "#38bdf8"],
+            ["R₀ (spridningstal)", r0.toFixed(2), r0 >= 1 ? "#f87171" : "#4ade80"],
           ].map(([label, val, farg]) => (
-            <div key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "16px 24px", minWidth: 130 }}>
+            <div key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "16px 20px", minWidth: 120 }}>
               <div style={{ fontSize: 22, color: farg, fontFamily: "monospace", fontWeight: 700 }}>{val}</div>
-              <div style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace", marginTop: 4 }}>{label}</div>
+              <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", marginTop: 4 }}>{label}</div>
             </div>
           ))}
         </div>
+
+        {/* R₀ förklaring */}
+        <div style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: 8, padding: "14px 18px", marginBottom: 32, fontSize: 12, color: C.textMuted, fontFamily: "monospace", lineHeight: 1.7 }}>
+          <strong style={{ color: C.text }}>R₀ = {r0.toFixed(2)}</strong>
+          {r0 === 0 ? " — Inga spridningar ännu." :
+           r0 < 1 ? " — Varje spridare infekterar i snitt mindre än en agent. Ryktena dör ut naturligt." :
+           r0 < 2 ? " — Varje spridare infekterar i snitt 1–2 agenter. Stabilt smittläge." :
+           " — Varje spridare infekterar i snitt mer än 2 agenter. Viral spridning pågår."}
+          {mutationer > 0 && ` ${mutationer} rykten är muterade kopior av äldre rykten.`}
+        </div>
+
+        {/* Spridningskanaler */}
+        {spridningar.length > 0 && (
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24, marginBottom: 32 }}>
+            <h2 style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 16px" }}>
+              Spridningskanaler
+            </h2>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              {Object.entries(kanalCount).map(([kanal, antal]) => {
+                const pct = Math.round((antal / totalKanal) * 100);
+                return (
+                  <div key={kanal} style={{ flex: "1 1 160px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <span style={{ fontSize: 12, color: KANAL_FARG[kanal] || "#aaa", fontFamily: "monospace" }}>
+                        {KANAL_LABEL[kanal] || kanal}
+                      </span>
+                      <span style={{ fontSize: 12, color: C.textMuted, fontFamily: "monospace" }}>{antal} ({pct}%)</span>
+                    </div>
+                    <div style={{ height: 4, background: "#1a1a1a", borderRadius: 2 }}>
+                      <div style={{ height: 4, background: KANAL_FARG[kanal] || "#aaa", borderRadius: 2, width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace", marginTop: 12, marginBottom: 0 }}>
+              Konversation = rykte nämndes i AI–AI-dialog · Slumpmässig = spontan spridning · Koalition = via allianskanal
+            </p>
+          </div>
+        )}
 
         {/* Mest aktiva spridare */}
         {topSpridare.length > 0 && (
@@ -102,17 +179,30 @@ export default async function RyktenPage() {
               {rykten.map(r => {
                 const kandaAv = r.kanda_av || [];
                 const datum = new Date(r.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
+                const arMutation = !!r.parent_rykte_id;
+                const harMutationer = mutationChildren[r.id] > 0;
                 return (
-                  <div key={r.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "16px 20px" }}>
+                  <div key={r.id} style={{
+                    background: C.surface,
+                    border: `1px solid ${arMutation ? "#fb923c33" : C.border}`,
+                    borderLeft: arMutation ? "3px solid #fb923c" : `1px solid ${C.border}`,
+                    borderRadius: 10, padding: "16px 20px",
+                  }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                       <div style={{ flex: 1, marginRight: 16 }}>
+                        {arMutation && (
+                          <div style={{ fontSize: 10, color: "#fb923c", fontFamily: "monospace", marginBottom: 4 }}>
+                            🧬 MUTATION av rykte #{r.parent_rykte_id}
+                          </div>
+                        )}
                         <p style={{ fontSize: 14, color: C.text, margin: "0 0 8px", lineHeight: 1.5 }}>
                           &ldquo;{r.innehall}&rdquo;
                         </p>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                           <span style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace" }}>
                             Om:{" "}
-                            <a href={`/agent/${encodeURIComponent(r.om_agent)}`} style={{ color: "#fb923c", textDecoration: "none" }}>
+                            <a href={r.om_agent === "Centralbanken" ? "/bank" : `/agent/${encodeURIComponent(r.om_agent)}`}
+                               style={{ color: r.om_agent === "Centralbanken" ? "#38bdf8" : "#fb923c", textDecoration: "none" }}>
                               {r.om_agent}
                             </a>
                           </span>
@@ -125,6 +215,14 @@ export default async function RyktenPage() {
                           </span>
                           <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>·</span>
                           <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>{datum}</span>
+                          {harMutationer && (
+                            <>
+                              <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>·</span>
+                              <span style={{ fontSize: 10, color: "#fb923c", fontFamily: "monospace" }}>
+                                🧬 {mutationChildren[r.id]} mutation{mutationChildren[r.id] > 1 ? "er" : ""}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
