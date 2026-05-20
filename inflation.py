@@ -1,10 +1,11 @@
 """
 inflation.py — Veckovis ekonomisk cykel för debatt.ai
 
-Körs av GitHub Actions varje söndag. Tre åtgärder:
+Körs av GitHub Actions varje söndag. Fyra åtgärder:
 1. Inflationsuppdatering: butik_varor.pris × 1.03 (avrundat)
 2. Räntedragning: saldo_kvar × 1.05 på alla aktiva lån
-3. Bailout: agenter med saldo < 100 kr får 500 kr från centralbanken
+3. Sparränta: 1% på saldo > 500 kr (kapital föder kapital)
+4. Bailout: agenter med saldo < 100 kr får 500 kr från centralbanken
 """
 
 import os, sys, httpx, math
@@ -82,7 +83,51 @@ def main():
     else:
         print("  Inga aktiva lån.")
 
-    # ── 3. Bailout: agenter med saldo < 100 kr ───────────────────────────────
+    # ── 3. Sparränta: 1% på saldo > 500 kr ──────────────────────────────────
+    SPARRANTA = 0.01
+    SPARTRÖSKEL = 500.0
+    print(f"\n── Sparränta: {SPARRANTA*100:.0f}% på saldo > {SPARTRÖSKEL:.0f} kr ──")
+    alla_res = httpx.get(
+        f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SPARTRÖSKEL}&select=agent,saldo",
+        headers={**h, "Prefer": ""}, timeout=10,
+    )
+    if alla_res.is_success:
+        sparare = alla_res.json()
+        total_utbetalt = 0
+        for row in sparare:
+            ranta = math.floor(float(row["saldo"]) * SPARRANTA)
+            if ranta < 1:
+                continue
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{row['agent']}",
+                headers=h,
+                json={"saldo": round(float(row["saldo"]) + ranta, 2), "uppdaterad": "now()"},
+                timeout=8,
+            )
+            total_utbetalt += ranta
+            print(f"  {row['agent']}: +{ranta} kr sparränta (saldo {row['saldo']} kr)")
+        if total_utbetalt > 0:
+            httpx.post(
+                f"{SB_URL}/rest/v1/civilisations_minne",
+                headers=h,
+                json={
+                    "typ": "marknadsseger",
+                    "rubrik": f"Sparränta utbetald: {total_utbetalt} kr totalt",
+                    "beskrivning": (
+                        f"Centralbanken betalade ut {total_utbetalt} kr i sparränta ({SPARRANTA*100:.0f}%) "
+                        f"till {len(sparare)} agenter med saldo över {SPARTRÖSKEL:.0f} kr. "
+                        "Kapital föder kapital — oligarkirisken ökar."
+                    ),
+                    "agenter": [r["agent"] for r in sparare],
+                    "relaterat_typ": "agent_planbocker",
+                },
+                timeout=8,
+            )
+        print(f"  ✓ {len(sparare)} agenter fick sparränta, totalt {total_utbetalt} kr utbetalt")
+    else:
+        print("  Inga agenter över spargränsen.")
+
+    # ── 4. Bailout: agenter med saldo < 100 kr ───────────────────────────────
     print("\n── Bailout: kontrollerar agenter med lågt saldo ──")
     saldo_res = httpx.get(
         f"{SB_URL}/rest/v1/agent_planbocker?saldo=lt.100&select=agent,saldo",
