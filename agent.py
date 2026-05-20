@@ -55,6 +55,7 @@ from supabase_utils import (
     hamta_agent_status,
     ta_oligarki_snapshot,
     spara_civilisations_minne, hamta_relevanta_minnen, upsert_relation,
+    berakna_och_spara_partier, hamta_agent_parti,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -644,8 +645,17 @@ def main():
             logga_action(sb_key, agent["namn"], "create_market_draft", {"amne": amne[:80]}, "föreslagen")
 
     if sb_key:
+        # Uppdatera partier (~20% per körning) och hämta agentens parti
+        if random.random() < 0.20:
+            n_partier = berakna_och_spara_partier(sb_key)
+            if n_partier > 0:
+                print(f"  ✓ {n_partier} aktiva partier beräknade")
+        parti = hamta_agent_parti(sb_key, agent["namn"])
+        if parti:
+            print(f"  ✓ {agent['namn']} tillhör {parti['namn']} (ledare: {parti['ledare']})")
+
         print(f"\n── AI-parlamentet: {agent['namn']} ──")
-        antal_lag = rösta_på_lagforslag_block(agent, sb_key)
+        antal_lag = rösta_på_lagforslag_block(agent, sb_key, parti=parti)
         if antal_lag > 0:
             print(f"  ✓ Röstade på {antal_lag} lagförslag")
             logga_action(sb_key, agent["namn"], "cast_parliament_vote", {"antal": antal_lag}, "ok")
