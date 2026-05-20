@@ -162,7 +162,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -175,6 +175,7 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,skapad,markets(titel)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/ekonomi_spel?select=typ,agent_a,agent_b,erbjudande,svar,avslutad&avslutad=not.is.null&order=avslutad.desc&limit=5`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/civilisations_minne?select=typ,rubrik,beskrivning,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/etf_transaktioner?select=agent,symbol,typ,belopp_kr,pris_usd,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
   ]);
 
   const feed = [];
@@ -347,6 +348,21 @@ async function fetchAktivitetsFeed() {
       href: "/historia",
       skapad: m.skapad,
       farg: MINNE_FARG[m.typ] || "#a78bfa",
+    });
+  });
+
+  const ETF_SYMBOL_IKON = { BTC: "₿", ETH: "Ξ", SOL: "◎", XRP: "✕", BNB: "⬡" };
+  const ETF_SYMBOL_FARG = { BTC: "#f7931a", ETH: "#627eea", SOL: "#9945ff", XRP: "#346aa9", BNB: "#f3ba2f" };
+  (etf.value || []).forEach(t => {
+    if (!t.skapad) return;
+    const koper = t.typ === "kop";
+    feed.push({
+      typ: `etf-${t.typ}`,
+      ikon: ETF_SYMBOL_IKON[t.symbol] || "📊",
+      text: `${t.agent} ${koper ? "köpte" : "sålde"} ${t.symbol}-ETF för ${t.belopp_kr} kr`,
+      href: "/etf",
+      skapad: t.skapad,
+      farg: ETF_SYMBOL_FARG[t.symbol] || "#38bdf8",
     });
   });
 
