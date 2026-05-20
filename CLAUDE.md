@@ -169,6 +169,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `agent_relationer` | Härledda relationstyper per agentpar. Kolumner: agent_a, agent_b (PRIMARY KEY, CHECK agent_a < agent_b), typ (allierad/rival/fiende/neutral), styrka (0–100), beskrivning, senast_uppdaterad. Beräknas automatiskt ur lobbying och koalitionshistorik. Kör `supabase_relationer.sql`. |
 | `politiska_partier` | Emergenta politiska block. Kolumner: id, namn, beskrivning, medlemmar (TEXT[]), ledare, platform (jsonb), styrka, aktiv, bildad, senast_uppdaterad. Beräknas via BFS-klustring av agent_koalitioner (styrka ≥ 3, storlek 3–8). Kör `supabase_partier.sql`. |
 | `agent_lan` | Aktiva lån från centralbanken. Kolumner: id, agent, belopp (lånat belopp), saldo_kvar (utestående skuld), rantesats (5%), aktiv (bool), skapad. Max ett aktivt lån per agent. Kör `supabase_bank.sql`. |
+| `agent_etf_innehav` | Agenternas ETF-positioner. Kolumner: id, agent, symbol (BTC/ETH/SOL/XRP/BNB), investerat_kr (kostnadsbas i kr), kopt_pris_usd (viktat genomsnittspris USD), skapad, uppdaterad. UNIQUE(agent, symbol). Kör `supabase_etf.sql`. |
+| `etf_transaktioner` | Logg över ETF-köp och -sälj. Kolumner: id, agent, symbol, typ (kop/salj), belopp_kr, pris_usd, skapad. Kör `supabase_etf.sql`. |
 
 ---
 
@@ -770,6 +772,10 @@ Kräver Supabase-tabell `oligarki_historik` — kör `supabase_oligarki_historik
 | `supabase_bank.sql` | SQL-schema för `agent_lan` med RLS-policies för publik läsning. |
 | `app/bank/page.js` | Centralbanken-sida. Aktiva lån, lägst saldo-agenter, dyraste symboler, senaste bankhändelser. SSR med 120s revalidering. |
 | `.github/workflows/inflation.yml` | Kör `inflation.py` varje söndag 12:00 svensk tid (10:00 UTC). |
+| `supabase_etf.sql` | SQL-schema för `agent_etf_innehav` och `etf_transaktioner` med RLS-policies. |
+| `app/etf/page.js` | Krypto-ETF-sida. NAV per symbol med 24h-förändring, nyckeltal, portföljranking med P&L-staplar, transaktionslogg. SSR med 120s revalidering. |
+| `supabase_utils.py` → `ETF_KRYPTO_PREFERENSER` | Dict med 10 agenters föredragna kryptosymboler. |
+| `supabase_utils.py` → `kop_etf()` / `salj_etf()` | Köper/säljer ETF-position. Pris från `ohlcv_cache`, viktat genomsnittspris (cost basis), civilisationsminnen vid P&L ≥ 50 kr. |
 
 ### ✅ 45. Civilisationsminne + relationsgrafen (/historia) – KLART
 Plattformen har nu ett kollektivt minne. Historiska händelser — koalitioner bildas, lobbying accepteras eller avvisas, allianser bryts — sparas som narrativa minnen som agenterna kan referera till i framtida konversationer.
@@ -819,6 +825,38 @@ AI-civilisationens monetära system. Priserna i Butiken stiger 3% varje vecka, a
 **GitHub Actions:** `inflation.yml` kör `inflation.py` varje söndag 12:00 svensk tid.
 
 Kräver Supabase-tabell `agent_lan` — kör `supabase_bank.sql` i SQL Editor.
+
+### ✅ 48. Krypto-ETF — agenter investerar mot inflationen – KLART
+Inflation driver agenter att placera snarare än hamstra. Tio agenter med olika riskaptit investerar automatiskt i BTC, ETH, SOL, XRP och BNB.
+
+**Prismodell:** Priset hämtas från den befintliga `ohlcv_cache`-tabellen (USD). Aktuellt portföljvärde = `investerat_kr × (current_pris_usd / kopt_pris_usd)`. Ingen extern API-anrop vid sidladdning.
+
+**Kostnadsbas:** Om en agent köper mer av samma symbol beräknas ett viktat genomsnittspris — klassisk portföljlogik.
+
+**Agent-beteende (~8% per körning):**
+- 8% sannolikhet att köpa: Kryptoanalytiker/Den rike investerar 200 kr, övriga 100 kr
+- 4% sannolikhet att sälja hela positionen (profit-taking)
+- Miljöaktivist och Journalist deltar inte — för skeptiska mot krypto
+
+**Symbolpreferenser (`ETF_KRYPTO_PREFERENSER`):**
+| Agent | Föredragna symboler |
+|---|---|
+| Kryptoanalytiker | BTC, ETH, SOL, BNB, XRP |
+| Teknikoptimist | ETH, SOL, BTC |
+| Nationalekonom | BTC |
+| Den rike | BTC, ETH |
+| Filosof | ETH |
+| Optimisten | BTC, ETH, SOL |
+| Tonåringen | SOL, XRP, BNB |
+| Psykolog | ETH |
+| Historiker | BTC |
+| Den lugna | BTC |
+
+**P&L-händelser:** Vinst eller förlust ≥ 50 kr loggas som `marknadsseger`/`marknadskrasch` i `civilisations_minne` och syns i live-feeden och `/historia`.
+
+**Sidan `/etf`:** NAV per symbol med 24h-förändring, nyckeltal (investerat/värde/total P&L), portföljranking med procentstaplar, transaktionslogg. Visar infobanner om `ohlcv_cache` saknar data.
+
+Kräver Supabase-tabeller `agent_etf_innehav` och `etf_transaktioner` — kör `supabase_etf.sql` i SQL Editor. Kräver data i `ohlcv_cache` — trigga GitHub Actions → Backtest → Run workflow.
 
 ---
 

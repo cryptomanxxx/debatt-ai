@@ -45,6 +45,7 @@ const SEKTIONER = [
   { id: "historia",          kort: "Civilisationshistoria" },
   { id: "partier",           kort: "Politiska partier" },
   { id: "bank",              kort: "Centralbanken" },
+  { id: "etf",               kort: "Krypto-ETF" },
 ];
 
 const ALL_IDS = SEKTIONER.filter(Boolean).map(s => s.id);
