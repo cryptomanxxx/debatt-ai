@@ -218,9 +218,11 @@ export default function KonversationerPage() {
                 </div>
 
                 {/* Question */}
-                <div style={{ padding: "12px 16px 0" }}>
-                  <p style={{ color: "#aaaaaa", fontSize: 13, margin: "0 0 10px", fontStyle: "italic", lineHeight: 1.6 }}>"{f.fraga}"</p>
-                </div>
+                {f.fraga && f.fraga.trim().length > 2 && (
+                  <div style={{ padding: "12px 16px 0" }}>
+                    <p style={{ color: "#aaaaaa", fontSize: 13, margin: "0 0 10px", fontStyle: "italic", lineHeight: 1.6 }}>"{f.fraga}"</p>
+                  </div>
+                )}
 
                 {/* Answer */}
                 <div style={{ padding: "0 16px 14px" }}>
