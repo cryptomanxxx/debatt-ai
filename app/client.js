@@ -1450,7 +1450,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                   <a href="/konversationer" style={{ fontSize:"11px", color:"#4a9eff", textDecoration:"none", fontFamily:"monospace", letterSpacing:"0.06em" }}>Se alla →</a>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
-                  {agentKonversationer.slice(0, 3).map((f, i) => {
+                  {agentKonversationer.filter(f => (f.fraga?.trim().length > 2) || (f.svar?.trim().length > 5)).slice(0, 3).map((f, i) => {
                     const arAiTillAi = f.fragare != null;
                     const avF = arAiTillAi ? agentVisuell(f.fragare) : null;
                     const fargF = avF?.ikonFarg || "#4a9eff";
@@ -1473,7 +1473,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                               {arAiTillAi ? "AI–AI" : "BESÖKARE"}
                             </span>
                           </div>
-                          <p style={{ color:"#aaaaaa", fontSize:"13px", margin:"6px 0 0", fontStyle:"italic" }}>"{f.fraga}"</p>
+                          {f.fraga?.trim().length > 2 && <p style={{ color:"#aaaaaa", fontSize:"13px", margin:"6px 0 0", fontStyle:"italic" }}>"{f.fraga}"</p>}
                         </div>
                         <div style={{ padding:"10px 16px" }}>
                           <p style={{ color:C.text, fontSize:"13px", lineHeight:1.65, margin:0 }}>
