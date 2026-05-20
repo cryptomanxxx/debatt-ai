@@ -1,16 +1,26 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const C = {
   border: "#222222",
   accentDim: "#aaaaaa",
 };
 
-export default function OmSektion({ titel, children, defaultOpen = false, topBorder = true }) {
+export default function OmSektion({ id, titel, children, defaultOpen = false, topBorder = true }) {
   const [open, setOpen] = useState(defaultOpen);
 
+  useEffect(() => {
+    if (!id) return;
+    function checkHash() {
+      if (window.location.hash === `#${id}`) setOpen(true);
+    }
+    checkHash();
+    window.addEventListener("hashchange", checkHash);
+    return () => window.removeEventListener("hashchange", checkHash);
+  }, [id]);
+
   return (
-    <div style={{
+    <div id={id} style={{
       borderTop: topBorder ? `1px solid ${C.border}` : "none",
     }}>
       <button
