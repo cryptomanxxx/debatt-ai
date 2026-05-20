@@ -162,7 +162,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -170,6 +170,8 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,skapad,lagforslag(titel)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka,senast_aktiv&order=senast_aktiv.desc&limit=5`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/lobbying_log?select=lobbying_agent,mal_agent,resultat,belopp,skapad&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,pris_betalt,kopt_at,butik_varor(namn,ikon)&order=kopt_at.desc&limit=5`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/butik_auktioner?select=saljare,hogst_budgivare,nuv_bud,stanger_at,butik_varor(namn,ikon)&status=eq.avgjord&order=stanger_at.desc&limit=4`, { headers: h }).then(r => r.json()),
   ]);
 
   const feed = [];
@@ -250,6 +252,34 @@ async function fetchAktivitetsFeed() {
       href: "/lobbying",
       skapad: l.skapad,
       farg: lyckades ? "#f59e0b" : "#f87171",
+    });
+  });
+
+  (kop.value || []).forEach(s => {
+    if (!s.kopt_at) return;
+    const varuNamn = s.butik_varor?.namn || "symbol";
+    const ikon = s.butik_varor?.ikon || "🛍️";
+    feed.push({
+      typ: "butik-kop",
+      ikon,
+      text: `${s.agent} köpte ${varuNamn} för ${s.pris_betalt} kr`,
+      href: "/butik",
+      skapad: s.kopt_at,
+      farg: "#e879f9",
+    });
+  });
+
+  (auktioner.value || []).forEach(a => {
+    if (!a.stanger_at || !a.hogst_budgivare) return;
+    const varuNamn = a.butik_varor?.namn || "symbol";
+    const ikon = a.butik_varor?.ikon || "🔨";
+    feed.push({
+      typ: "andrahand",
+      ikon,
+      text: `${a.hogst_budgivare} vann auktionen på ${varuNamn} (${a.nuv_bud} kr) från ${a.saljare}`,
+      href: "/butik",
+      skapad: a.stanger_at,
+      farg: "#fb923c",
     });
   });
 
