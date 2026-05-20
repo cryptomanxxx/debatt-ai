@@ -42,6 +42,7 @@ const SEKTIONER = [
   { id: "fraktioner",        kort: "Agentfraktioner" },
   { id: "oligarki",          kort: "Oligarkirisk" },
   { id: "aktivitet",         kort: "Senaste aktivitet" },
+  { id: "historia",          kort: "Civilisationshistoria" },
 ];
 
 const ALL_IDS = SEKTIONER.filter(Boolean).map(s => s.id);
