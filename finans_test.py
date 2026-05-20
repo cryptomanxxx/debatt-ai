@@ -161,43 +161,103 @@ def ta_lan_frivilligt(sb_key: str, agent_namn: str, saldo: float) -> int:
     return belopp
 
 
+# ── Finansiell arketyp per agent ──────────────────────────────────────────────
+
+# Styr vilken typ av finansiellt beteende som är naturligt för agenten.
+# "etf"  → aktiv investerare, föredrar B
+# "spar" → konservativ sparare, föredrar A
+# "lan"  → risktagare eller kapitalbehövande, föredrar C
+# "mix"  → blandat — LLM avgör fritt
+AGENT_FINANS_ARKETYP: dict[str, str] = {
+    "Nationalekonom":       "spar",   # data-driven, låg risk
+    "Miljöaktivist":        "spar",   # skeptisk mot krypto, hellre trygghet
+    "Teknikoptimist":       "etf",    # tror på innovation och tillväxt
+    "Konservativ debattör": "spar",   # tradition och stabilitet
+    "Jurist":               "spar",   # rättssäkerhet, undviker spekulationer
+    "Journalist":           "lan",    # behöver likviditet, berättar om risker utifrån
+    "Filosof":              "mix",    # väger för- och nackdelar, kan gå åt alla håll
+    "Läkare":               "spar",   # lång planeringshorisont, låg riskaptit
+    "Psykolog":             "mix",    # förstår beteenden, analyserar sina egna impulser
+    "Historiker":           "etf",    # BTC som digitalt guld — historisk parallell
+    "Sociolog":             "lan",    # ifrågasätter kapitalackumulering, tar risk för att omfördela
+    "Kryptoanalytiker":     "etf",    # självklart val — lever och andas krypto
+    "Den hungriga":         "lan",    # grundbehov först, lånar för att klara sig
+    "Mamman":               "spar",   # trygghetsmentalitet, sparar för familjen
+    "Den sura":             "lan",    # frustrerad, tar lån för att prova lyckan
+    "Den trötta":           "spar",   # orkar inte tänka, tar minsta möjliga risk
+    "Den stressade":        "lan",    # för mycket att göra, behöver kapital nu
+    "Den lugna":            "spar",   # ser saker i perspektiv, väljer trygghet
+    "Pensionären":          "spar",   # 71 år, vill ha ro, sparar det han har
+    "Tonåringen":           "etf",    # FOMO, hoppas på snabb vinst
+    "Den nostalgiske":      "spar",   # nostalgi = trygghet, undviker nytt
+    "Hypokondrikern":       "spar",   # orolig för förluster, googlar risker kl 02
+    "Optimisten":           "etf",    # alltid positiv — marknaden går upp!
+    "Den rike":             "etf",    # har råd att ta risk, investerar stort
+}
+
+# Förklaringstext som injiceras i prompten baserat på arketyp
+_ARKETYP_HINT = {
+    "etf":  "Du är en aktiv investerare med hög riskaptit som ser kryptovalutor som ett naturligt placeringsalternativ.",
+    "spar": "Du föredrar trygghet och stabilitet — att låta pengarna växa säkert i banken är din naturliga instinkt.",
+    "lan":  "Du är beredd att ta finansiell risk och se lån som ett verktyg för att skaffa handlingsfrihet.",
+    "mix":  "Du väger noga för- och nackdelar och väljer det alternativ som faktiskt passar din situation bäst just nu.",
+}
+
+
 # ── Beslutslogik ───────────────────────────────────────────────────────────────
 
 def bygg_prompt(agent: dict, status: dict) -> tuple[str, str]:
     """Returnerar (system, user) för LLM-beslutsanropet."""
-    # Kort personlighetssammanfattning (första meningen i systemprompt)
-    system_kort = agent["system"].strip().split("\n")[0]
+    # Tre första icke-tomma raderna av systemprompt för mer kontext
+    rader = [r.strip() for r in agent["system"].strip().splitlines() if r.strip()]
+    system_kontext = " ".join(rader[:3])
 
-    saldo     = status["saldo"]
-    lan       = status["lan"]
-    etf       = status["etf"]
-    har_lan   = lan is not None
-    etf_text  = ", ".join(f"{e['symbol']} ({e['investerat_kr']:.0f} kr)" for e in etf) if etf else "inget"
-    lan_text  = f"{lan['saldo_kvar']:.0f} kr kvar (5 %/vecka)" if har_lan else "inget"
+    saldo    = status["saldo"]
+    lan      = status["lan"]
+    etf      = status["etf"]
+    har_lan  = lan is not None
+    etf_text = ", ".join(f"{e['symbol']} ({e['investerat_kr']:.0f} kr)" for e in etf) if etf else "inget"
+    lan_text = f"{lan['saldo_kvar']:.0f} kr kvar (5 %/vecka)" if har_lan else "inget"
+
+    arketyp      = AGENT_FINANS_ARKETYP.get(agent["namn"], "mix")
+    arketyp_hint = _ARKETYP_HINT[arketyp]
+
+    # Situationshint baserad på saldo
+    if saldo < 200:
+        situtations_hint = "Ditt saldo är mycket lågt — ett lån kan ge dig handlingsfrihet."
+    elif saldo > 1500:
+        situtations_hint = "Du har ett starkt saldo — du kan unna dig att ta risk eller spara tryggt."
+    else:
+        situtations_hint = ""
 
     system = (
-        f"{system_kort}\n\n"
-        "Du fattar nu ett ekonomiskt beslut för din plånbok i AI-civilisationens ekonomisystem. "
-        "Svara med EXAKT en bokstav: A, B, C eller D. Ingen förklaring."
+        f"{system_kontext}\n\n"
+        f"{arketyp_hint}"
+        + (f" {situtations_hint}" if situtations_hint else "")
+        + "\n\nDu fattar nu ett ekonomiskt beslut för din plånbok i AI-civilisationens ekonomisystem. "
+        "Svara med EXAKT en bokstav: A, B, C eller D. Ingen annan text."
     )
 
-    etf_prefs = ETF_KRYPTO_PREFERENSER.get(agent["namn"], ["BTC", "ETH"])
-    symbol = etf_prefs[0] if etf_prefs else "BTC"
+    etf_prefs  = ETF_KRYPTO_PREFERENSER.get(agent["namn"], ["BTC", "ETH"])
+    symbol     = etf_prefs[0] if etf_prefs else "BTC"
     etf_belopp = 200 if agent["namn"] in ("Den rike", "Kryptoanalytiker") else 150
+
+    # Bygg val-listan — markera C som otillgänglig om agent redan har lån
+    c_status = " ⚠ EJ MÖJLIGT — du har redan ett aktivt lån" if har_lan else ""
 
     user = (
         f"Din ekonomiska situation:\n"
-        f"  Saldo:      {saldo:.0f} kr\n"
-        f"  Aktivt lån: {lan_text}\n"
+        f"  Saldo:       {saldo:.0f} kr\n"
+        f"  Aktivt lån:  {lan_text}\n"
         f"  ETF-innehav: {etf_text}\n\n"
-        f"Dina val:\n"
-        f"  A) Sätt in pengar på banken — centralbankens sparränta betalas ut direkt (+0.5 % av saldo, min 1 kr)\n"
-        f"  B) Köp krypto-ETF ({symbol}) för {etf_belopp} kr — marknadspriset styr avkastningen\n"
-        f"  C) Ta ett banklån — 200–500 kr till 5 % veckoränta"
-        + (" (du har redan ett aktivt lån — EJ möjligt)" if har_lan else "") + "\n"
-        f"  D) Avstå — gör ingenting\n\n"
-        f"Välj det alternativ som passar din personlighet och ekonomiska situation bäst. "
-        f"Svara med en enda bokstav: A, B, C eller D."
+        f"Välj ETT av fyra alternativ:\n"
+        f"  A) Sätt in pengar på banken — sparränta betalas ut direkt (+0.5 % av saldo, min 1 kr)\n"
+        f"  B) Köp {symbol}-ETF för {etf_belopp} kr — kryptopriset styr din avkastning\n"
+        f"  C) Ta ett banklån — 200–500 kr, 5 % veckoränta, ger omedelbar likviditet{c_status}\n"
+        f"  D) Avstå — väljs BARA om inget av alternativen ovan passar din personlighet\n\n"
+        f"Din personlighetstyp pekar mot: "
+        + {"etf": "B (investering)", "spar": "A (sparande)", "lan": "C (lån)", "mix": "A, B eller C (välj fritt)"}[arketyp]
+        + f"\n\nSvara med en enda bokstav."
     )
     return system, user
 
