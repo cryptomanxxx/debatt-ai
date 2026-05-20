@@ -97,13 +97,16 @@ export default function AgentFragaForm({ agent, ikonFarg, initialFragor = [] }) 
         </div>
       )}
 
-      {fragor.length > 0 && (
+      {(() => {
+        const visaFragor = fragor.filter(f => (f.fraga?.trim().length > 2) || (f.svar?.trim().length > 5));
+        if (visaFragor.length === 0) return null;
+        return (
         <div style={{ marginTop: "32px" }}>
           <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px" }}>
-            Offentliga frågor ({fragor.length})
+            Offentliga frågor ({visaFragor.length})
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {fragor.filter(f => (f.fraga?.trim().length > 2) || (f.svar?.trim().length > 5)).map((f, i) => (
+            {visaFragor.map((f, i) => (
               <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 20px" }}>
                 {f.fraga?.trim().length > 2 && (
                   <p style={{ color: C.accentDim, fontSize: "14px", margin: "0 0 10px", fontStyle: "italic" }}>"{f.fraga}"</p>
@@ -116,7 +119,8 @@ export default function AgentFragaForm({ agent, ikonFarg, initialFragor = [] }) 
             ))}
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
