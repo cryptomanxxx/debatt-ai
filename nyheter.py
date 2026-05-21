@@ -188,7 +188,95 @@ def hamta_reddit_kommentarer(post_url: str, max_kommentarer: int = 5) -> str:
         return ""
 
 
-def hamta_nyheter() -> tuple[list, list]:
+# ── Nyhetsbubbla — vilka RSS-kategorier varje agent har tillgång till ──────
+FEED_KATEGORIER: dict[str, list[str]] = {
+    "SVT Nyheter":         ["sverige", "politik", "samhälle"],
+    "Aftonbladet":         ["sverige", "samhälle"],
+    "Dagens Arena":        ["politik", "samhälle", "sverige"],
+    "Reddit Sverige":      ["sverige", "samhälle"],
+    "Reddit Ekonomi":      ["ekonomi"],
+    "Reddit Klimat":       ["klimat", "energi"],
+    "Reddit Samhälle":     ["samhälle", "international"],
+    "Reddit EU":           ["politik", "international"],
+    "Reddit Sjukvård":     ["medicin"],
+    "Reddit Bostäder":     ["samhälle", "sverige"],
+    "The Verge":           ["tech", "ai"],
+    "TechCrunch":          ["tech", "ekonomi"],
+    "Wired":               ["tech", "ai", "forskning"],
+    "Ars Technica":        ["tech", "forskning"],
+    "Hacker News":         ["tech", "ai"],
+    "Engadget":            ["tech"],
+    "BBC News":            ["international", "politik"],
+    "Al Jazeera":          ["international", "politik"],
+    "Reddit AI":           ["ai", "forskning"],
+    "Reddit Singularity":  ["ai", "tech"],
+    "Reddit OpenAI":       ["ai", "tech"],
+    "Reddit LocalLLM":     ["ai", "tech"],
+    "Reddit Futurology":   ["forskning", "tech", "ai"],
+    "Reddit Technology":   ["tech"],
+    "Reddit ML":           ["ai", "forskning"],
+    "Reddit Geopolitics":  ["international", "politik"],
+    "Reddit Philosophy":   ["samhälle", "forskning"],
+    "Reddit ChangeMyView": ["samhälle", "politik"],
+    "Reddit WorldPolitics":["international", "politik"],
+    "Reddit World News":   ["international"],
+    "Reddit Finance":      ["ekonomi"],
+    "Reddit Stocks":       ["ekonomi"],
+    "Reddit Energy":       ["energi", "klimat"],
+    "Reddit Renewable":    ["energi", "klimat"],
+    "Reddit Climate":      ["klimat", "energi"],
+    "Reddit Nuclear":      ["energi", "forskning"],
+    "Reddit Crypto":       ["krypto", "ekonomi"],
+    "Reddit Bitcoin":      ["krypto"],
+    "Reddit Gaming":       ["spel"],
+    "Reddit Games":        ["spel"],
+    "Reddit TV":           ["spel"],
+    "Reddit Science":      ["forskning", "medicin"],
+    "Google Research":     ["ai", "forskning"],
+    "TED Talks":           ["forskning", "samhälle", "tech"],
+}
+
+AGENT_NYHETSBUBBLA: dict[str, list[str]] = {
+    "Kryptoanalytiker":       ["krypto", "ekonomi", "tech"],
+    "Nationalekonom":         ["ekonomi", "politik", "sverige"],
+    "Miljöaktivist":          ["klimat", "energi", "forskning"],
+    "Teknikoptimist":         ["tech", "ai", "forskning"],
+    "Konservativ debattör":   ["politik", "sverige", "international"],
+    "Jurist":                 ["politik", "sverige", "samhälle"],
+    "Journalist":             ["sverige", "international", "politik"],
+    "Filosof":                ["samhälle", "forskning", "ai"],
+    "Läkare":                 ["medicin", "forskning", "sverige"],
+    "Psykolog":               ["medicin", "samhälle", "forskning"],
+    "Historiker":             ["politik", "international", "samhälle"],
+    "Sociolog":               ["samhälle", "politik", "sverige"],
+    "Den hungriga":           ["sverige", "samhälle"],
+    "Mamman":                 ["sverige", "medicin", "samhälle"],
+    "Den sura":               ["sverige", "politik"],
+    "Den trötta":             ["sverige", "samhälle"],
+    "Den stressade":          ["sverige", "ekonomi", "tech"],
+    "Den lugna":              ["sverige", "samhälle", "forskning"],
+    "Pensionären":            ["sverige", "politik", "international"],
+    "Tonåringen":             ["tech", "spel", "krypto"],
+    "Den nostalgiske":        ["sverige", "politik", "samhälle"],
+    "Hypokondrikern":         ["medicin", "forskning", "sverige"],
+    "Optimisten":             ["tech", "forskning", "ai", "sverige"],
+    "Den rike":               ["ekonomi", "krypto", "tech", "international"],
+}
+
+
+def filtrera_feeds_for_agent(agent_namn: str, feeds: list[tuple]) -> list[tuple]:
+    """Filtrera feeds till de kategorier agenten har i sin nyhetsbubbla."""
+    bubbla = AGENT_NYHETSBUBBLA.get(agent_namn)
+    if not bubbla:
+        return feeds  # okänd agent → se allt
+    bubbla_set = set(bubbla)
+    return [
+        (kalla, url) for kalla, url in feeds
+        if bubbla_set & set(FEED_KATEGORIER.get(kalla, ["sverige"]))
+    ] or feeds  # fail open: om filtret ger tomt resultat, visa allt
+
+
+def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
     """Hämta aktuella nyhetsrubriker från RSS-flöden. Returnerar (nyheter, rss_stats)."""
     feeds = [
         # Svenska nyheter
@@ -248,6 +336,13 @@ def hamta_nyheter() -> tuple[list, list]:
         ("Google Research",    _p("https://research.google/blog/rss/")),
         ("TED Talks",          _p("https://www.ted.com/talks/rss")),
     ]
+
+    if agent_namn:
+        feeds_fore = len(feeds)
+        feeds = filtrera_feeds_for_agent(agent_namn, feeds)
+        bubbla = AGENT_NYHETSBUBBLA.get(agent_namn, [])
+        print(f"  📡 Nyhetsbubbla för {agent_namn}: {bubbla} → {len(feeds)}/{feeds_fore} feeds")
+
     nyheter = []
     rss_stats = []
     lyckade = []
