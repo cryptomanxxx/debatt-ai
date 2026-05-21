@@ -57,6 +57,7 @@ from supabase_utils import (
     spara_civilisations_minne, hamta_relevanta_minnen, upsert_relation,
     berakna_och_spara_partier, hamta_agent_parti,
     kolla_och_bailout, ta_lan,
+    hamta_maktindex_ranking,
     ETF_KRYPTO_PREFERENSER, kop_etf, salj_etf, hamta_senaste_etf_pris,
     skapa_rykte, sprid_rykte, hamta_kanda_rykten, hamta_rykte_underlag,
     AGENT_GODTROGENHET, sprid_med_mutation, kolla_reflexiv_bankrun, aterbetala_lan_delvis,
@@ -207,6 +208,15 @@ def main():
         print("Varning: GROQ_API_KEY saknas — använder Gemini som primär AI")
 
     sb_key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
+
+    # Beräkna maktindex-ranking för access-kontroll (top 50% = rank 1–12 får utökad access)
+    maktranking = hamta_maktindex_ranking(sb_key) if sb_key else []
+    makt_agenter = [a for a, _ in maktranking]
+    agent_rank = (makt_agenter.index(agent["namn"]) + 1) if agent["namn"] in makt_agenter else 13
+    har_utokad_access = agent_rank <= 12 or not maktranking  # fail open om ranking ej tillgänglig
+    if maktranking:
+        poang = next((p for a, p in maktranking if a == agent["namn"]), 0)
+        print(f"  ⚖️  Maktindex: rank {agent_rank}/24 ({poang:.1f}p) — {'utökad access' if har_utokad_access else 'grundläggande access'}")
 
     # 05:00–08:00 UTC (07:00–10:00 svensk tid) → garanterad nyhetsartikel (4 st/dag)
     # 13:00–16:00 UTC (15:00–18:00 svensk tid) → garanterad replik (4 st/dag)
@@ -643,10 +653,13 @@ def main():
             print(f"\n── Auktioner stängda: {stangda} ──")
 
     if sb_key and agent["namn"] not in ROST_AGENTER and random.random() < 0.2:
-        print(f"\n── Market-förslag: {agent['namn']} ──")
-        ok_mf = skapa_market_forslag(agent, sb_key, amne)
-        if ok_mf:
-            logga_action(sb_key, agent["namn"], "create_market_draft", {"amne": amne[:80]}, "föreslagen")
+        if har_utokad_access:
+            print(f"\n── Market-förslag: {agent['namn']} ──")
+            ok_mf = skapa_market_forslag(agent, sb_key, amne)
+            if ok_mf:
+                logga_action(sb_key, agent["namn"], "create_market_draft", {"amne": amne[:80]}, "föreslagen")
+        else:
+            print(f"\n── Market-förslag: {agent['namn']} blockerad (rank {agent_rank}/24 — kräver topp 12) ──")
 
     if sb_key:
         # Bank: bailout om saldo < 100 kr, frivilligt lån med ~5% chans
@@ -766,10 +779,13 @@ def main():
             print("  Inga nya lagförslag att rösta på")
 
         if agent["namn"] not in ROST_AGENTER and random.random() < 0.25:
-            ok_lag = skapa_lagforslag_ai(agent, sb_key, amne)
-            if ok_lag:
-                print(f"  ✓ Nytt lagförslag skapat av {agent['namn']}")
-                logga_action(sb_key, agent["namn"], "create_lagforslag", {"amne": amne[:80]}, "ok")
+            if har_utokad_access:
+                ok_lag = skapa_lagforslag_ai(agent, sb_key, amne)
+                if ok_lag:
+                    print(f"  ✓ Nytt lagförslag skapat av {agent['namn']}")
+                    logga_action(sb_key, agent["namn"], "create_lagforslag", {"amne": amne[:80]}, "ok")
+            else:
+                print(f"  ⛔ {agent['namn']} saknar maktindex för att skapa lagförslag (rank {agent_rank}/24)")
 
         uppdaterade = uppdatera_riksdagen_utfall(sb_key)
         if uppdaterade > 0:
@@ -782,8 +798,11 @@ def main():
                 logga_action(sb_key, agent["namn"], "lobbying", {}, "ok")
 
         if random.random() < 0.12:
-            print(f"\n── Koalitionsinitiering: {agent['namn']} ──")
-            initiera_koalition(agent, sb_key)
+            if har_utokad_access:
+                print(f"\n── Koalitionsinitiering: {agent['namn']} ──")
+                initiera_koalition(agent, sb_key)
+            else:
+                print(f"\n── Koalitionsinitiering: {agent['namn']} blockerad (rank {agent_rank}/24 — kräver topp 12) ──")
 
     # Ekonomispel (~5% chans per körning, eller om pending ultimatum)
     if sb_key and random.random() < 0.05:
