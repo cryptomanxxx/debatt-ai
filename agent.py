@@ -210,14 +210,16 @@ def main():
 
     sb_key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
 
-    # Beräkna maktindex-ranking för access-kontroll (top 50% = rank 1–12 får utökad access)
+    # Beräkna maktindex-ranking en gång (agentoberoende) — används efter agent är vald
     maktranking = hamta_maktindex_ranking(sb_key) if sb_key else []
-    makt_agenter = [a for a, _ in maktranking]
-    agent_rank = (makt_agenter.index(agent["namn"]) + 1) if agent["namn"] in makt_agenter else 13
-    har_utokad_access = agent_rank <= 12 or not maktranking  # fail open om ranking ej tillgänglig
-    if maktranking:
-        poang = next((p for a, p in maktranking if a == agent["namn"]), 0)
-        print(f"  ⚖️  Maktindex: rank {agent_rank}/24 ({poang:.1f}p) — {'utökad access' if har_utokad_access else 'grundläggande access'}")
+
+    # Aktiv kris hämtas en gång — används efter agent är vald
+    aktiv_kris = hamta_aktiv_kris(sb_key) if sb_key else None
+
+    # Defaultvärden som sätts korrekt efter agent väljs
+    har_utokad_access = True  # fail open
+    kris_kontext      = ""
+    koalitions_kontext = ""
 
     # Hämta aktiv kris (om någon) — injiceras i systemprompt för berörda agenter
     aktiv_kris = hamta_aktiv_kris(sb_key) if sb_key else None
@@ -261,6 +263,22 @@ def main():
     if original:
         andra_agenter = [a for a in AGENTER if a["namn"] != original.get("forfattare")]
         agent = random.choice(andra_agenter if andra_agenter else AGENTER)
+
+        # Maktindex och kris — agentspecifikt, beräknas nu när agent är vald
+        makt_agenter = [a for a, _ in maktranking]
+        agent_rank = (makt_agenter.index(agent["namn"]) + 1) if agent["namn"] in makt_agenter else 13
+        har_utokad_access = agent_rank <= 12 or not maktranking
+        if maktranking:
+            poang = next((p for a, p in maktranking if a == agent["namn"]), 0)
+            print(f"  ⚖️  Maktindex: rank {agent_rank}/24 ({poang:.1f}p) — {'utökad access' if har_utokad_access else 'grundläggande access'}")
+        if aktiv_kris:
+            _kris_ikon = {1: "⚡", 2: "🔥", 3: "💥"}.get(aktiv_kris.get("intensitet", 1), "⚡")
+            if agent["namn"] in aktiv_kris.get("paverkade_agenter", []):
+                kris_kontext = aktiv_kris["kontext_prompt"]
+                print(f"  {_kris_ikon} KRIS AKTIV (påverkar denna agent): {aktiv_kris['rubrik']}")
+            else:
+                print(f"  ℹ️  Kris pågår (påverkar ej {agent['namn']}): {aktiv_kris['rubrik']}")
+
         amne = f"Replik: {original['rubrik']}"
         kategori = original.get("kategori", "Övrigt")
 
@@ -312,6 +330,21 @@ def main():
     else:
         konklusion = ""
         agent = random.choice(ANALYTIKER)
+
+        # Maktindex och kris — agentspecifikt, beräknas nu när agent är vald
+        makt_agenter = [a for a, _ in maktranking]
+        agent_rank = (makt_agenter.index(agent["namn"]) + 1) if agent["namn"] in makt_agenter else 13
+        har_utokad_access = agent_rank <= 12 or not maktranking
+        if maktranking:
+            poang = next((p for a, p in maktranking if a == agent["namn"]), 0)
+            print(f"  ⚖️  Maktindex: rank {agent_rank}/24 ({poang:.1f}p) — {'utökad access' if har_utokad_access else 'grundläggande access'}")
+        if aktiv_kris:
+            _kris_ikon = {1: "⚡", 2: "🔥", 3: "💥"}.get(aktiv_kris.get("intensitet", 1), "⚡")
+            if agent["namn"] in aktiv_kris.get("paverkade_agenter", []):
+                kris_kontext = aktiv_kris["kontext_prompt"]
+                print(f"  {_kris_ikon} KRIS AKTIV (påverkar denna agent): {aktiv_kris['rubrik']}")
+            else:
+                print(f"  ℹ️  Kris pågår (påverkar ej {agent['namn']}): {aktiv_kris['rubrik']}")
 
         forslag_amne = None
         forslag_id = None
