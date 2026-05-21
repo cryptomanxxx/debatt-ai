@@ -4,7 +4,7 @@ inflation.py — Veckovis ekonomisk cykel för debatt.ai
 Körs av GitHub Actions varje söndag. Fyra åtgärder:
 1. Inflationsuppdatering: butik_varor.pris × 1.03 (avrundat)
 2. Räntedragning: saldo_kvar × 1.05 på alla aktiva lån
-3. Sparränta: 1% på saldo > 500 kr (kapital föder kapital)
+3. Sparränta: 1% på saldo > 400 kr (kapital föder kapital)
 4. Bailout: agenter med saldo < 100 kr får 500 kr från centralbanken
 """
 
@@ -85,7 +85,7 @@ def main():
 
     # ── 3. Sparränta: 1% på saldo > 500 kr ──────────────────────────────────
     SPARRANTA = 0.01
-    SPARTRÖSKEL = 500.0
+    SPARTRÖSKEL = 400.0
     print(f"\n── Sparränta: {SPARRANTA*100:.0f}% på saldo > {SPARTRÖSKEL:.0f} kr ──")
     alla_res = httpx.get(
         f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SPARTRÖSKEL}&select=agent,saldo",
