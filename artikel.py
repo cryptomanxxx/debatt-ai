@@ -249,6 +249,7 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
                         f"Artikelns inledning:\n{artikel[:600]}\n\n"
                         "Regler:\n"
                         "- Max 12 ord\n"
+                        "- Skriv på svenska\n"
                         f"- {rubrik_tips}\n"
                         "- Antyda konsekvenser eller vad som står på spel\n"
                         "- Påståenden är stärkare än frågor\n"
