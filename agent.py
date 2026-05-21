@@ -658,26 +658,56 @@ def main():
         elif random.random() < 0.05:
             ta_lan(sb_key, agent["namn"])
 
-        # ETF-handel (~8% köp, ~4% sälj per körning)
+        # ETF-handel: köp ~8% per körning, sälj baserat på heuristik
         etf_prefs = ETF_KRYPTO_PREFERENSER.get(agent["namn"], [])
         if etf_prefs:
             etf_roll = random.random()
             if etf_roll < 0.08:
-                # Investera 100–200 kr beroende på agentens kategori; kop_etf avvisar om saldot är för lågt
                 belopp = 200.0 if agent["namn"] in ("Kryptoanalytiker", "Den rike") else 100.0
                 kop_etf(sb_key, agent["namn"], random.choice(etf_prefs), belopp)
-            elif etf_roll < 0.12:
-                # Sälj från symboler agenten faktiskt äger, inte bara preferenser
-                _sb_url = "https://fmwxftnistkoqazfwnuj.supabase.co"
-                _ih = httpx.get(
-                    f"{_sb_url}/rest/v1/agent_etf_innehav"
-                    f"?agent=eq.{agent['namn'].replace(' ', '%20')}&select=symbol",
-                    headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
-                    timeout=6,
-                )
-                _agda = [r["symbol"] for r in (_ih.json() if _ih.is_success else [])]
-                if _agda:
-                    salj_etf(sb_key, agent["namn"], random.choice(_agda), fraktion=1.0)
+
+            # Heuristisk säljbedömning — trösklar anpassade per personlighet
+            _etf_agentnamn = agent["namn"]
+            if _etf_agentnamn in ("Kryptoanalytiker", "Den rike", "Teknikoptimist", "Optimisten", "Tonåringen"):
+                _take_profit, _stop_loss = 30, -35   # riskbenägna — håller längre
+            elif _etf_agentnamn in ("Den lugna", "Pensionären", "Nationalekonom", "Jurist"):
+                _take_profit, _stop_loss = 15, -20   # försiktiga — säljer tidigt
+            else:
+                _take_profit, _stop_loss = 20, -25   # standard
+
+            _etf_url = "https://fmwxftnistkoqazfwnuj.supabase.co"
+            _etf_h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""}
+            _ih = httpx.get(
+                f"{_etf_url}/rest/v1/agent_etf_innehav"
+                f"?agent=eq.{_etf_agentnamn.replace(' ', '%20')}"
+                "&select=symbol,investerat_kr,kopt_pris_usd",
+                headers=_etf_h, timeout=6,
+            )
+            _innehav = _ih.json() if _ih.is_success else []
+
+            _saldo_r = httpx.get(
+                f"{_etf_url}/rest/v1/agent_planbocker"
+                f"?agent=eq.{_etf_agentnamn.replace(' ', '%20')}&select=saldo",
+                headers=_etf_h, timeout=6,
+            )
+            _etf_saldo = float(_saldo_r.json()[0]["saldo"]) if _saldo_r.is_success and _saldo_r.json() else 9999.0
+
+            for _pos in _innehav:
+                _pris_usd = hamta_senaste_etf_pris(sb_key, _pos["symbol"])
+                if not _pris_usd or not _pos.get("kopt_pris_usd"):
+                    continue
+                _pnl_pct = (float(_pris_usd) / float(_pos["kopt_pris_usd"]) - 1) * 100
+                _skal = ""
+                if _pnl_pct >= _take_profit:
+                    _skal = f"ta-vinst (+{_pnl_pct:.0f}%)"
+                elif _pnl_pct <= _stop_loss:
+                    _skal = f"stop-loss ({_pnl_pct:.0f}%)"
+                elif _etf_saldo < 200:
+                    _skal = f"behöver cash (saldo {_etf_saldo:.0f} kr)"
+                if _skal:
+                    print(f"  📊 ETF heuristik: {_etf_agentnamn} säljer {_pos['symbol']} — {_skal}")
+                    salj_etf(sb_key, _etf_agentnamn, _pos["symbol"], fraktion=1.0)
+                    break  # max en position per körning
 
         # Ryktesspridning med godtrogenhet, mutation och bankrun-rykte
         alla_agenter_namn = [a["namn"] for a in AGENTER if a["namn"] != agent["namn"]]
