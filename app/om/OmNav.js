@@ -47,6 +47,11 @@ const SEKTIONER = [
   { id: "bank",              kort: "Centralbanken" },
   { id: "etf",               kort: "Krypto-ETF" },
   { id: "rykten",            kort: "Ryktesspridning" },
+  { id: "bors",              kort: "Kryptobörsen" },
+  { id: "domstol",           kort: "AI-Domstolen" },
+  { id: "krisevents",        kort: "Krisevents" },
+  { id: "maktaccess",        kort: "Asymmetrisk access" },
+  { id: "informationsasymmetri", kort: "Informationsasymmetri" },
 ];
 
 const ALL_IDS = SEKTIONER.filter(Boolean).map(s => s.id);
