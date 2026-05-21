@@ -667,7 +667,17 @@ def main():
                 belopp = 200.0 if agent["namn"] in ("Kryptoanalytiker", "Den rike") else 100.0
                 kop_etf(sb_key, agent["namn"], random.choice(etf_prefs), belopp)
             elif etf_roll < 0.12:
-                salj_etf(sb_key, agent["namn"], random.choice(etf_prefs), fraktion=1.0)
+                # Sälj från symboler agenten faktiskt äger, inte bara preferenser
+                _sb_url = "https://fmwxftnistkoqazfwnuj.supabase.co"
+                _ih = httpx.get(
+                    f"{_sb_url}/rest/v1/agent_etf_innehav"
+                    f"?agent=eq.{agent['namn'].replace(' ', '%20')}&select=symbol",
+                    headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
+                    timeout=6,
+                )
+                _agda = [r["symbol"] for r in (_ih.json() if _ih.is_success else [])]
+                if _agda:
+                    salj_etf(sb_key, agent["namn"], random.choice(_agda), fraktion=1.0)
 
         # Ryktesspridning med godtrogenhet, mutation och bankrun-rykte
         alla_agenter_namn = [a["namn"] for a in AGENTER if a["namn"] != agent["namn"]]
