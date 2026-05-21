@@ -3,7 +3,7 @@ name: Kryptoborsen
 on:
   workflow_dispatch:
   schedule:
-    - cron: "30 6 * * *"   # 08:30 svensk tid (sommartid UTC+2)
+    - cron: "30 8 * * *"   # 10:30 svensk tid (sommartid UTC+2)
     - cron: "15 13 * * *"  # 15:15 svensk tid (sommartid UTC+2)
 
 jobs:
