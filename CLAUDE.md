@@ -929,7 +929,31 @@ Kräver Supabase-tabeller `bors_tillgangar`, `bors_portfoljer`, `bors_ordrar`, `
 | `supabase_bors.sql` | SQL-schema för alla 5 börstabell + RLS + 3 startcoins |
 | `bors_test.py` | Heuristisk trading-script. Genesis-airdrop, orderläggning, price-time priority matching |
 | `app/bors/page.js` | Börssida. Coin-kort med sparklines, orderbok, senaste affärer, portföljranking |
-| `.github/workflows/bors-test.yml` | Körs 08:30 + 15:15 svensk tid dagligen |
+| `.github/workflows/bors-test.yml` | Körs 10:30 + 15:15 svensk tid dagligen |
+| `supabase_domstol.sql` | SQL-schema för `domstol_arenden` och `domstol_domar` med RLS-policies. |
+| `domstol_test.py` | Standalone skript: skannar efter konstitutionsbrott, håller LLM-rättegång (3 domare, majoritetsbeslut), verkställer böter, loggar skandal i civilisations_minne. |
+| `app/domstol/page.js` | AI-Domstolens sida. Konstitutionen, öppna ärenden, senaste domar med domarmotiveringar, bötestavla. SSR med 120s revalidering. |
+| `.github/workflows/domstol-test.yml` | Körs 14:30 svensk tid dagligen. |
+
+### ✅ 51. AI-Domstolen (/domstol) – KLART
+En konstitutionell domstol som automatiskt identifierar regelbrott, håller LLM-drivna rättegångar och verkställer böter mot dömda agenter. Juristen leder alltid domarpanelen; två domare väljs slumpmässigt från Filosof, Historiker, Nationalekonom, Sociolog. Majoritetsbeslut. Max 5 ärenden per körning.
+
+**Konstitutionen — 4 artiklar:**
+| Art. | Rubrik | Regel | Böter |
+|---|---|---|---|
+| §1 | Lobbyingbegränsning | Lobbying ≤ 45 kr per försök (50 kr-lobbying är olagligt) | 60 kr |
+| §2 | Skuldsättning och spekulation | Agent med aktivt lån får inte betta > 20 kr på prediction markets | 40 kr |
+| §3 | Desinformationsförbud | Falskt centralbanks-rykte spritt till ≥ 3 agenter | 80 kr |
+| §4 | Monopolisering av makt | Hög koalitionsstyrka + saldo > 1 500 kr + lobbyingvinstgrad > 60% | 100 kr |
+
+**Flöde per körning (14:30 svensk tid):**
+1. `hitta_overträdelser()` — skannar `lobbying_log`, `agent_bets`+`agent_lan`, `rykten`, `agent_koalitioner`+`agent_planbocker`. Deduplicerar mot öppna ärenden inom 7 dagar. Ärenden numreras `DOM-{år}-{nr:03d}`.
+2. `hall_forhandling()` — varje domare anropar Groq (llama-3.3-70b-versatile), JSON-svar `{utfall, motivering}`. Fälld om ≥ 2 av 3 röstar fälld.
+3. `verkstall_straff()` — drar böter från `agent_planbocker.saldo` (minimum 0), loggar `skandal` i `civilisations_minne`.
+
+**Sidan `/domstol` visar:** konstitutionen, statistikrad, öppna ärenden (guldkantade kort), senaste domar med domarmotiveringar i fulltext, bötestavla (topp-5 mest bötfällda agenter).
+
+Kräver Supabase-tabeller `domstol_arenden` och `domstol_domar` — kör `supabase_domstol.sql` i SQL Editor.
 
 ---
 
