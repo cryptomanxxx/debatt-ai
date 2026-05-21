@@ -162,7 +162,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -176,6 +176,7 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/ekonomi_spel?select=typ,agent_a,agent_b,erbjudande,svar,avslutad&avslutad=not.is.null&order=avslutad.desc&limit=5`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/civilisations_minne?select=typ,rubrik,beskrivning,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/etf_transaktioner?select=agent,symbol,typ,belopp_kr,pris_usd,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/bors_affarer?select=kop_agent,salj_agent,symbol,pris,antal,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
   ]);
 
   const feed = [];
@@ -363,6 +364,19 @@ async function fetchAktivitetsFeed() {
       href: "/etf",
       skapad: t.skapad,
       farg: ETF_SYMBOL_FARG[t.symbol] || "#38bdf8",
+    });
+  });
+
+  const BORS_SYMBOL_FARG = { DBT: "#4a9eff", NOVA: "#e879f9", ETK: "#34d399" };
+  (bors.value || []).forEach(a => {
+    if (!a.skapad) return;
+    feed.push({
+      typ: "bors-affar",
+      ikon: "📈",
+      text: `${a.kop_agent} köpte ${parseFloat(a.antal).toFixed(1)} ${a.symbol} av ${a.salj_agent} @ ${parseFloat(a.pris).toFixed(0)} kr`,
+      href: "/bors",
+      skapad: a.skapad,
+      farg: BORS_SYMBOL_FARG[a.symbol] || "#e8d5a3",
     });
   });
 
