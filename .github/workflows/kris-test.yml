@@ -1,0 +1,21 @@
+name: Krisevents
+
+on:
+  schedule:
+    # 04:30 UTC = 06:30 svensk sommartid — körs dagligen
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  kris:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install httpx
+      - name: Kör kris_test.py
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python kris_test.py

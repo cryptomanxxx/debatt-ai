@@ -58,6 +58,7 @@ from supabase_utils import (
     berakna_och_spara_partier, hamta_agent_parti,
     kolla_och_bailout, ta_lan,
     hamta_maktindex_ranking,
+    hamta_aktiv_kris,
     ETF_KRYPTO_PREFERENSER, kop_etf, salj_etf, hamta_senaste_etf_pris,
     skapa_rykte, sprid_rykte, hamta_kanda_rykten, hamta_rykte_underlag,
     AGENT_GODTROGENHET, sprid_med_mutation, kolla_reflexiv_bankrun, aterbetala_lan_delvis,
@@ -218,6 +219,17 @@ def main():
         poang = next((p for a, p in maktranking if a == agent["namn"]), 0)
         print(f"  ⚖️  Maktindex: rank {agent_rank}/24 ({poang:.1f}p) — {'utökad access' if har_utokad_access else 'grundläggande access'}")
 
+    # Hämta aktiv kris (om någon) — injiceras i systemprompt för berörda agenter
+    aktiv_kris = hamta_aktiv_kris(sb_key) if sb_key else None
+    kris_kontext = ""
+    if aktiv_kris:
+        _kris_ikon = {1: "⚡", 2: "🔥", 3: "💥"}.get(aktiv_kris.get("intensitet", 1), "⚡")
+        if agent["namn"] in aktiv_kris.get("paverkade_agenter", []):
+            kris_kontext = aktiv_kris["kontext_prompt"]
+            print(f"  {_kris_ikon} KRIS AKTIV (påverkar denna agent): {aktiv_kris['rubrik']}")
+        else:
+            print(f"  ℹ️  Kris pågår (påverkar ej {agent['namn']}): {aktiv_kris['rubrik']}")
+
     # 05:00–08:00 UTC (07:00–10:00 svensk tid) → garanterad nyhetsartikel (4 st/dag)
     # 13:00–16:00 UTC (15:00–18:00 svensk tid) → garanterad replik (4 st/dag)
     # 17:00–20:00 UTC (19:00–22:00 svensk tid) → garanterad eget ämne (4 st/dag)
@@ -278,7 +290,7 @@ def main():
         if agent_status:
             print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
         print("Skriver replik (Groq med Gemini-fallback)...")
-        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext)
+        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext)
 
         konklusion = ""
         djup = rakna_debattdjup(sb_key, original["rubrik"]) if sb_key else 0
@@ -438,7 +450,7 @@ def main():
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext)
             markera_forslag_behandlat(sb_key, forslag_id)
             print("  Förslag markerat som behandlat ✓")
         elif nyhet:
@@ -469,7 +481,7 @@ def main():
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext)
+            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext)
         else:
             amne, kategori = random.choice(agent["amnen"])
             if sb_key:
@@ -493,7 +505,7 @@ def main():
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext)
 
         print("Genererar rubrik...")
         amne = generera_rubrik(agent, amne, artikel, fmt=artikelfmt)
