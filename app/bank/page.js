@@ -47,8 +47,8 @@ export default async function BankPage() {
   const totalSkuld = aktivaLan.reduce((s, l) => s + parseFloat(l.saldo_kvar || 0), 0);
   const fattigaAgenter = planbocker.filter(p => p.saldo < 200);
 
-  // Sparränta-berättigade (saldo > 500 kr)
-  const sparandeAgenter = planbocker.filter(p => parseFloat(p.saldo) > 500);
+  // Sparränta-berättigade (saldo > 400 kr)
+  const sparandeAgenter = planbocker.filter(p => parseFloat(p.saldo) > 400);
   const estimatSparranta = sparandeAgenter.reduce((s, p) => s + Math.floor(parseFloat(p.saldo) * 0.01), 0);
 
   // Balansräkning
@@ -81,7 +81,7 @@ export default async function BankPage() {
           {[
             ["Aktiva lån", aktivaLan.length, "#fb923c"],
             ["Total skuld", `${totalSkuld.toFixed(0)} kr`, "#f87171"],
-            ["Sparare (>500 kr)", sparandeAgenter.length, "#4ade80"],
+            ["Sparare (>400 kr)", sparandeAgenter.length, "#4ade80"],
             ["Ränta nästa söndag", `+${estimatSparranta} kr`, "#4ade80"],
             ["Agenter < 200 kr", fattigaAgenter.length, "#fbbf24"],
             ["Låneränta", "5%/vecka", "#a78bfa"],
@@ -121,7 +121,7 @@ export default async function BankPage() {
                 ["Utestående lån", `${totalSkuld.toFixed(0)} kr`, "#fb923c"],
                 ["Aktiva låntagare", `${aktivaLan.length} agenter`, "#fb923c"],
                 ["Kreditexponering", `${exponeringsPct}%`, exponeringsPct > 30 ? "#f87171" : exponeringsPct > 15 ? "#fbbf24" : "#4ade80"],
-                ["Sparränta (>500 kr)", "1%/vecka", "#4ade80"],
+                ["Sparränta (>400 kr)", "1%/vecka", "#4ade80"],
                 ["Låneränta", "5%/vecka", "#a78bfa"],
               ].map(([label, val, farg]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
@@ -242,7 +242,7 @@ export default async function BankPage() {
             </span>
           </div>
           {sparandeAgenter.length === 0 ? (
-            <p style={{ color: C.textMuted, fontSize: 13, fontFamily: "monospace" }}>Ingen agent har saldo över 500 kr ännu.</p>
+            <p style={{ color: C.textMuted, fontSize: 13, fontFamily: "monospace" }}>Ingen agent har saldo över 400 kr ännu.</p>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8 }}>
               {[...sparandeAgenter].sort((a, b) => parseFloat(b.saldo) - parseFloat(a.saldo)).map(p => {
