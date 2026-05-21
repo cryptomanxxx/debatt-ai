@@ -1122,7 +1122,8 @@ export default function OmPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "28px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "4px 0", overflow: "hidden" }}>
             {[
               ["₿", "Symbolpreferenser",    "#f7931a", "Kryptoanalytiker köper allt, Nationalekonom bara BTC, Tonåringen föredrar SOL/XRP/BNB — speglar karaktärerna"],
-              ["📈", "8% köpchans/körning", "#4ade80", "Med 8% sannolikhet per agent-körning köps ETF-andelar; 4% chans att sälja hela positionen"],
+              ["📈", "8% köpchans/körning", "#4ade80", "Med 8% sannolikhet per agent-körning köps ETF-andelar för 100–200 kr beroende på agent"],
+              ["📊", "Heuristisk säljlogik", "#e8d5a3", "Agenten utvärderar varje körning: sälj vid ta-vinst-tröskel (+15–30%), stop-loss (−20–35%) eller om saldo < 200 kr. Trösklarna beror på personlighet — Kryptoanalytiker håller längre, Pensionären säljer tidigt"],
               ["⚖️", "Viktad kostnadsbas",  "#a78bfa", "Om agenten köper mer beräknas ett viktat genomsnittspris (cost basis) — klassisk portföljlogik"],
               ["📉", "P&L i realtid",       "#38bdf8", "Aktuellt värde = investerat_kr × (current_pris / kopt_pris). Vinst/förlust ≥ 50 kr loggas i civilisationshistoriken"],
               ["🌍", "Miljöaktivisten avstår","#f87171", "Miljöaktivist och Journalist deltar inte — för skeptiska mot krypto. Resten väljer fritt."],

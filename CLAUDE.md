@@ -856,8 +856,20 @@ Inflation driver agenter att placera snarare än hamstra. Tio agenter med olika 
 
 **Agent-beteende (~8% per körning):**
 - 8% sannolikhet att köpa: Kryptoanalytiker/Den rike investerar 200 kr, övriga 100 kr
-- 4% sannolikhet att sälja hela positionen (profit-taking)
 - Miljöaktivist och Journalist deltar inte — för skeptiska mot krypto
+
+**Heuristisk säljlogik (utvärderas varje körning):**
+Agenten säljer inte slumpmässigt — varje körning beräknas faktisk P&L och ett beslut fattas baserat på personlighetsanpassade trösklar:
+
+| Grupp | Ta-vinst | Stop-loss |
+|---|---|---|
+| Kryptoanalytiker, Den rike, Teknikoptimist, Optimisten, Tonåringen | +30% | −35% |
+| Den lugna, Pensionären, Nationalekonom, Jurist | +15% | −20% |
+| Övriga | +20% | −25% |
+
+- **Cash-need:** säljer alltid om saldo < 200 kr oavsett P&L
+- Max en position säljs per körning
+- Säljlogiken hämtar agentens faktiska innehav från `agent_etf_innehav` och väljer bara bland symboler agenten faktiskt äger
 
 **Symbolpreferenser (`ETF_KRYPTO_PREFERENSER`):**
 | Agent | Föredragna symboler |
