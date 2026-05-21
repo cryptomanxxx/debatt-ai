@@ -646,6 +646,7 @@ function isEligible(r) {
 }
 
 const ALLA_KÖRNINGAR = [
+  { h: 6,  m: 30, namn: "Krisevents",      farg: "#f87171", ikon: "🌍" },
   { h: 7,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
   { h: 8,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
   { h: 9,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
@@ -659,6 +660,7 @@ const ALLA_KÖRNINGAR = [
   { h: 13, m: 30, namn: "Ekonomispel",     farg: "#e8d5a3", ikon: "💸" },
   { h: 13, m: 45, namn: "Ryktesspridning", farg: "#fb923c", ikon: "📢" },
   { h: 14, m: 0,  namn: "Konversationer",  farg: "#a78bfa", ikon: "🤖" },
+  { h: 14, m: 30, namn: "Domstolen",       farg: "#e8d5a3", ikon: "⚖️" },
   { h: 15, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
   { h: 15, m: 15, namn: "Intern börs",     farg: "#e8d5a3", ikon: "📈" },
   { h: 16, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
