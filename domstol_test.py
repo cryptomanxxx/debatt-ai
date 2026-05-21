@@ -169,7 +169,7 @@ def nasta_arende_nr(h: dict) -> str:
 
 def arende_finns(h: dict, svarande: str, artikel_nr: int) -> bool:
     """Returnerar True om det finns ett öppet ärende för denna agent+artikel sedan 7 dagar."""
-    sju_dagar_sen = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    sju_dagar_sen = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat().replace("+", "%2B")
     path = (
         f"domstol_arenden"
         f"?svarande=eq.{svarande}"
@@ -396,8 +396,10 @@ def hall_forhandling(groq_key: str, arende: dict) -> dict:
     )
     artikel_text = artikel_obj["text"]
 
-    # Välj domare: Juristen + 2 slumpmässiga
-    extra_domare = random.sample(DOMARE_POOL, 2)
+    # Välj domare: Juristen + 2 slumpmässiga — svarande får inte sitta i rätten
+    jav_undantag = {svarande, "Juristen"}
+    tillgangliga = [d for d in DOMARE_POOL if d not in jav_undantag]
+    extra_domare = random.sample(tillgangliga, min(2, len(tillgangliga)))
     domare_lista = ["Juristen"] + extra_domare
     print(f"  Domare: {', '.join(domare_lista)}")
 
