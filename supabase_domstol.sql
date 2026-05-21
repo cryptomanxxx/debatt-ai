@@ -1,4 +1,4 @@
--- Supabase schema för AI-domstolen
+-- AI-Domstolen: Konstitutionell rättskipning i AI-civilisationen
 -- Kör i SQL Editor på Supabase-projektet
 
 CREATE TABLE IF NOT EXISTS domstol_arenden (
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS domstol_arenden (
   svarande TEXT NOT NULL,                -- anklagad agent
   artikel_nr INTEGER NOT NULL,           -- vilken konstitutionsartikel
   beskrivning TEXT NOT NULL,             -- vad som hänt
-  bevis JSONB DEFAULT '{}',              -- stödjande data
+  bevis JSONB DEFAULT '{}',             -- stödjande data
   status TEXT DEFAULT 'öppen' CHECK (status IN ('öppen','avgjord','avslagen')),
   skapad TIMESTAMPTZ DEFAULT now()
 );
@@ -18,9 +18,9 @@ CREATE TABLE IF NOT EXISTS domstol_domar (
   arende_id BIGINT REFERENCES domstol_arenden(id) ON DELETE CASCADE,
   domare TEXT[] NOT NULL,               -- domaragenter
   utfall TEXT NOT NULL CHECK (utfall IN ('fälld','friad')),
-  motivering TEXT NOT NULL,             -- fullständig deliberationstext
+  motivering TEXT NOT NULL,             -- fullständig domsmotivering
   straff_typ TEXT,                      -- 'bot' eller NULL
-  straff_belopp INTEGER,                -- kr att dra om fälld
+  straff_belopp INTEGER,               -- kr att dra om fälld
   verkstalldes BOOLEAN DEFAULT false,
   skapad TIMESTAMPTZ DEFAULT now()
 );
@@ -45,6 +45,7 @@ CREATE POLICY "Infoga ärenden"
 
 CREATE POLICY "Uppdatera ärenden"
   ON domstol_arenden FOR UPDATE
+  USING (true)
   WITH CHECK (true);
 
 -- RLS-policies för domstol_domar
@@ -60,4 +61,5 @@ CREATE POLICY "Infoga domar"
 
 CREATE POLICY "Uppdatera domar"
   ON domstol_domar FOR UPDATE
+  USING (true)
   WITH CHECK (true);

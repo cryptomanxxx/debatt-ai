@@ -13,9 +13,10 @@ Körordning (med hänsyn till beroenden):
   8. rykten                 – Ryktesspridning (skapar och sprider rykten)
   9. bors_test.py           – Intern börs (agenter handlar DBT/NOVA/ETK)
  10. konversationer_bulk.py – AI-till-AI-konversationer
+ 11. domstol_test.py        – AI-Domstolen (konstitutionell rättskipning)
 
 Flaggor:
-  --hoppa-over SKRIPT,...   Hoppa över specifika skript, t.ex. --hoppa-over butik,andrahand,rykten,finans,bors
+  --hoppa-over SKRIPT,...   Hoppa över specifika skript, t.ex. --hoppa-over butik,andrahand,rykten,finans,bors,domstol
   --antal-konv N            Antal konversationer att generera (default: 10)
   --dry-run                 Skriv ut körordningen utan att köra
 
@@ -93,6 +94,12 @@ STEG = [
         "namn": "Konversationer",
         "ikon": "🤖",
     },
+    {
+        "id":   "domstol",
+        "fil":  "domstol_test.py",
+        "namn": "Domstolen",
+        "ikon": "⚖️",
+    },
 ]
 
 
@@ -101,7 +108,7 @@ def main():
     parser.add_argument(
         "--hoppa-over",
         type=str, default="",
-        help="Kommaseparerade skript-id att hoppa över, t.ex. butik,andrahand",
+        help="Kommaseparerade skript-id att hoppa över, t.ex. butik,andrahand,domstol",
     )
     parser.add_argument(
         "--antal-konv",
