@@ -646,6 +646,7 @@ function isEligible(r) {
 }
 
 const ALLA_KÖRNINGAR = [
+  { h: 5,  m: 30, namn: "Riksdagsval",     farg: "#e8d5a3", ikon: "🗳️" },
   { h: 6,  m: 30, namn: "Krisevents",      farg: "#f87171", ikon: "🌍" },
   { h: 7,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
   { h: 8,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },

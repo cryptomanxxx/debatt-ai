@@ -3032,6 +3032,23 @@ def hamta_maktindex_ranking(sb_key: str) -> list[tuple[str, float]]:
             if r.get("resultat") == "accepterat":
                 lob_vunna[a] = lob_vunna.get(a, 0) + 1
 
+        # Riksdagsval — vinnande partiledare får 1.5× maktindex-bonus
+        val_r = httpx.get(
+            f"{SB_URL}/rest/v1/riksdagsval"
+            "?status=eq.avgjort&order=avgjord.desc&limit=1"
+            "&select=vinnare_ledare,bonus_aktiv_till",
+            headers=h, timeout=5,
+        )
+        val_vinnare: str | None = None
+        if val_r.is_success and val_r.json():
+            vd = val_r.json()[0]
+            bonus_till = vd.get("bonus_aktiv_till")
+            if bonus_till:
+                import datetime as _dt
+                bonus_ts = _dt.datetime.fromisoformat(bonus_till.replace("Z", "+00:00"))
+                if bonus_ts > _dt.datetime.now(_dt.timezone.utc):
+                    val_vinnare = vd.get("vinnare_ledare")
+
         max_saldo = max(saldon.values(), default=1) or 1
         max_sym   = max(symbol_count.values(), default=1) or 1
         max_koa   = max(koa_styrka.values(), default=1) or 1
@@ -3045,7 +3062,10 @@ def hamta_maktindex_ranking(sb_key: str) -> list[tuple[str, float]]:
             tot     = lob_total.get(agent, 0)
             win     = lob_vunna.get(agent, 0) / tot if tot > 0 else 0.5
             lob_p   = win * 15
-            ranking.append((agent, round(saldo_p + sym_p + koa_p + lob_p, 2)))
+            poang   = round(saldo_p + sym_p + koa_p + lob_p, 2)
+            if val_vinnare and agent == val_vinnare:
+                poang = round(poang * 1.5, 2)
+            ranking.append((agent, poang))
 
         ranking.sort(key=lambda x: x[1], reverse=True)
         return ranking

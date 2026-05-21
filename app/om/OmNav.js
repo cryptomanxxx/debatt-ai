@@ -50,6 +50,7 @@ const SEKTIONER = [
   { id: "bors",              kort: "Kryptobörsen" },
   { id: "domstol",           kort: "AI-Domstolen" },
   { id: "krisevents",        kort: "Krisevents" },
+  { id: "riksdagsval",       kort: "Riksdagsval" },
   { id: "maktaccess",        kort: "Asymmetrisk access" },
   { id: "informationsasymmetri", kort: "Informationsasymmetri" },
 ];
