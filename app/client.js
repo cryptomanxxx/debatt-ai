@@ -648,9 +648,9 @@ function isEligible(r) {
 const ALLA_KÖRNINGAR = [
   { h: 7,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
   { h: 8,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
-  { h: 10, m: 30, namn: "Intern börs",     farg: "#e8d5a3", ikon: "📈" },
   { h: 9,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
   { h: 10, m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
+  { h: 10, m: 30, namn: "Intern börs",     farg: "#e8d5a3", ikon: "📈" },
   { h: 11, m: 0,  namn: "Butiken",         farg: "#f59e0b", ikon: "🛍" },
   { h: 11, m: 30, namn: "Andrahandsmkn",   farg: "#e879f9", ikon: "🔨" },
   { h: 12, m: 0,  namn: "Parlamentet",     farg: "#a78bfa", ikon: "🏛" },
