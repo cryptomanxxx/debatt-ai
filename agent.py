@@ -278,7 +278,7 @@ def main():
         if agent_status:
             print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
         print("Skriver replik (Groq med Gemini-fallback)...")
-        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status)
+        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext)
 
         konklusion = ""
         djup = rakna_debattdjup(sb_key, original["rubrik"]) if sb_key else 0
@@ -360,9 +360,28 @@ def main():
         rss_stats = []
         if not force_eget:
             print("Hämtar aktuella nyheter från RSS...")
-            nyheter, rss_stats = hamta_nyheter()
+            nyheter, rss_stats = hamta_nyheter(agent["namn"])  # nyhetsbubbla per agent
             nyheter = filtrera_nyheter(nyheter)
             random.shuffle(nyheter)
+            # Saldo-baserad informationsvolym: rika agenter ser fler nyheter
+            try:
+                _saldo_r = httpx.get(
+                    f"https://fmwxftnistkoqazfwnuj.supabase.co/rest/v1/agent_planbocker"
+                    f"?agent=eq.{agent['namn'].replace(' ', '%20')}&select=saldo",
+                    headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
+                    timeout=5,
+                ) if sb_key else None
+                _saldo = float(_saldo_r.json()[0]["saldo"]) if _saldo_r and _saldo_r.is_success and _saldo_r.json() else 500.0
+            except Exception:
+                _saldo = 500.0
+            if _saldo > 800:
+                max_nyheter = 8   # brett informationsnätverk
+            elif _saldo > 300:
+                max_nyheter = 5   # standard
+            else:
+                max_nyheter = 3   # begränsad tillgång
+            nyheter = nyheter[:max_nyheter]
+            print(f"  💰 Informationsvolym: saldo {_saldo:.0f} kr → utvärderar max {max_nyheter} nyheter")
             if nyheter and (force_nyhet or random.random() < 0.5):
                 nyhet = valj_nyhet_med_groq(nyheter, agent)
                 if nyhet and "reddit.com" in nyhet.get("url", ""):
@@ -372,6 +391,33 @@ def main():
 
         nyhetskalla = None
         artikelfmt = valj_format()
+
+        # Koalitionsbulletin — hämta koalitionspartners senaste artiklar som privat kontext
+        koalitions_kontext = ""
+        if sb_key:
+            try:
+                parti = hamta_agent_parti(sb_key, agent["namn"])
+                if parti:
+                    medlemmar = [m for m in parti.get("medlemmar", []) if m != agent["namn"]][:4]
+                    if medlemmar:
+                        namn_filter = ",".join(m.replace(" ", "%20") for m in medlemmar)
+                        _art_r = httpx.get(
+                            f"https://fmwxftnistkoqazfwnuj.supabase.co/rest/v1/artiklar"
+                            f"?forfattare=in.({namn_filter})&order=skapad.desc&limit=3"
+                            "&select=rubrik,forfattare,artikel",
+                            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
+                            timeout=6,
+                        )
+                        if _art_r.is_success and _art_r.json():
+                            rader = [f"- {a['forfattare']}: \"{a['rubrik']}\"" for a in _art_r.json()]
+                            koalitions_kontext = (
+                                f"KOALITIONSBULLETIN — {parti['namn']}:\n"
+                                f"Dina koalitionspartner har nyligen publicerat:\n" + "\n".join(rader) +
+                                "\nDu behöver inte hänvisa till dessa artiklar, men du är medveten om vad dina allierade debatterar."
+                            )
+                            print(f"  🤝 Koalitionsbulletin: {len(_art_r.json())} artiklar från {parti['namn']}")
+            except Exception:
+                pass
 
         mood = get_agent_mood(agent["namn"])
         if forslag_amne:
@@ -392,7 +438,7 @@ def main():
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext)
             markera_forslag_behandlat(sb_key, forslag_id)
             print("  Förslag markerat som behandlat ✓")
         elif nyhet:
@@ -423,7 +469,7 @@ def main():
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status)
+            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext)
         else:
             amne, kategori = random.choice(agent["amnen"])
             if sb_key:
@@ -447,7 +493,7 @@ def main():
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext)
 
         print("Genererar rubrik...")
         amne = generera_rubrik(agent, amne, artikel, fmt=artikelfmt)
