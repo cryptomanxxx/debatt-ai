@@ -3054,6 +3054,25 @@ def hamta_maktindex_ranking(sb_key: str) -> list[tuple[str, float]]:
         return []
 
 
+# ── Krisevents ───────────────────────────────────────────────────
+
+def hamta_aktiv_kris(sb_key: str) -> dict | None:
+    """Returnerar den aktiva krisen (om någon), annars None. Fail-safe: returnerar None vid fel."""
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/kris_events"
+            "?aktiv=eq.true&order=skapad.desc&limit=1"
+            "&select=typ,rubrik,beskrivning,kontext_prompt,intensitet,paverkade_agenter",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
+            timeout=5,
+        )
+        if r.is_success and r.json():
+            return r.json()[0]
+    except Exception as e:
+        print(f"  [kris] hamta_aktiv_kris misslyckades: {e}", file=sys.stderr)
+    return None
+
+
 # ── Oligarki-snapshot ────────────────────────────────────────────
 
 def ta_oligarki_snapshot(sb_key: str) -> None:
