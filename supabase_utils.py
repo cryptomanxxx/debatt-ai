@@ -2998,6 +2998,62 @@ def format_status_for_prompt(status: dict) -> str:
     )
 
 
+# ── Maktindex-ranking ────────────────────────────────────────────
+
+def hamta_maktindex_ranking(sb_key: str) -> list[tuple[str, float]]:
+    """
+    Beräknar maktindex för alla agenter och returnerar lista [(agent, poäng)] sorterad fallande.
+    Maktindex = saldo (40p) + symboler (20p) + koalitionsstyrka (25p) + lobbying-vinstgrad (15p)
+    Returnerar tom lista vid fel — anroparen ska fail open (tillåt action om listan är tom).
+    """
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""}
+    try:
+        pb_r = httpx.get(f"{SB_URL}/rest/v1/agent_planbocker?select=agent,saldo", headers=h, timeout=8)
+        saldon = {r["agent"]: float(r.get("saldo") or 0) for r in (pb_r.json() if pb_r.is_success else [])}
+
+        sym_r = httpx.get(f"{SB_URL}/rest/v1/agent_symboler?select=agent", headers=h, timeout=8)
+        symbol_count: dict[str, int] = {}
+        for r in (sym_r.json() if sym_r.is_success else []):
+            symbol_count[r["agent"]] = symbol_count.get(r["agent"], 0) + 1
+
+        koa_r = httpx.get(f"{SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka", headers=h, timeout=8)
+        koa_styrka: dict[str, int] = {}
+        for r in (koa_r.json() if koa_r.is_success else []):
+            s = r.get("styrka", 0)
+            koa_styrka[r["agent_a"]] = max(koa_styrka.get(r["agent_a"], 0), s)
+            koa_styrka[r["agent_b"]] = max(koa_styrka.get(r["agent_b"], 0), s)
+
+        lob_r = httpx.get(f"{SB_URL}/rest/v1/lobbying_log?select=lobbying_agent,resultat", headers=h, timeout=8)
+        lob_total: dict[str, int] = {}
+        lob_vunna: dict[str, int] = {}
+        for r in (lob_r.json() if lob_r.is_success else []):
+            a = r["lobbying_agent"]
+            lob_total[a] = lob_total.get(a, 0) + 1
+            if r.get("resultat") == "accepterat":
+                lob_vunna[a] = lob_vunna.get(a, 0) + 1
+
+        max_saldo = max(saldon.values(), default=1) or 1
+        max_sym   = max(symbol_count.values(), default=1) or 1
+        max_koa   = max(koa_styrka.values(), default=1) or 1
+
+        alla = set(saldon) | set(symbol_count) | set(koa_styrka) | set(lob_total)
+        ranking: list[tuple[str, float]] = []
+        for agent in alla:
+            saldo_p = (saldon.get(agent, 0) / max_saldo) * 40
+            sym_p   = (symbol_count.get(agent, 0) / max_sym) * 20
+            koa_p   = (koa_styrka.get(agent, 0) / max_koa) * 25
+            tot     = lob_total.get(agent, 0)
+            win     = lob_vunna.get(agent, 0) / tot if tot > 0 else 0.5
+            lob_p   = win * 15
+            ranking.append((agent, round(saldo_p + sym_p + koa_p + lob_p, 2)))
+
+        ranking.sort(key=lambda x: x[1], reverse=True)
+        return ranking
+    except Exception as e:
+        print(f"  [maktindex] fel: {e}")
+        return []
+
+
 # ── Oligarki-snapshot ────────────────────────────────────────────
 
 def ta_oligarki_snapshot(sb_key: str) -> None:
