@@ -221,17 +221,6 @@ def main():
     kris_kontext      = ""
     koalitions_kontext = ""
 
-    # Hämta aktiv kris (om någon) — injiceras i systemprompt för berörda agenter
-    aktiv_kris = hamta_aktiv_kris(sb_key) if sb_key else None
-    kris_kontext = ""
-    if aktiv_kris:
-        _kris_ikon = {1: "⚡", 2: "🔥", 3: "💥"}.get(aktiv_kris.get("intensitet", 1), "⚡")
-        if agent["namn"] in aktiv_kris.get("paverkade_agenter", []):
-            kris_kontext = aktiv_kris["kontext_prompt"]
-            print(f"  {_kris_ikon} KRIS AKTIV (påverkar denna agent): {aktiv_kris['rubrik']}")
-        else:
-            print(f"  ℹ️  Kris pågår (påverkar ej {agent['namn']}): {aktiv_kris['rubrik']}")
-
     # 05:00–08:00 UTC (07:00–10:00 svensk tid) → garanterad nyhetsartikel (4 st/dag)
     # 13:00–16:00 UTC (15:00–18:00 svensk tid) → garanterad replik (4 st/dag)
     # 17:00–20:00 UTC (19:00–22:00 svensk tid) → garanterad eget ämne (4 st/dag)
