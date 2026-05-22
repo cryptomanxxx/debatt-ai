@@ -1416,7 +1416,8 @@ export default function DebattClient({ initialArticleCount = null }) {
               <div style={{ marginBottom: "24px", background: "#0a0a0f", border: "1px solid #1a1a1a", borderRadius: "8px", overflow: "hidden" }}>
                 <div style={{ padding: "12px 16px", borderBottom: "1px solid #1a1a1a", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Senaste aktivitet</span>
-                  <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <a href="/historia" style={{ fontSize: "11px", color: "#4a9eff", textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.06em" }}>Se alla →</a>
                     {nyaHändelser > 0 && (
                       <span
                         onClick={() => setNyaHändelser(0)}
