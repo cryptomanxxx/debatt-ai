@@ -62,6 +62,8 @@ const ps = {
   groq:          { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
   gemini:        { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
   or:            { ts: 0, status: "unknown" },
+  deepseek:      { ts: 0, status: "unknown" },
+  cloudflare:    { ts: 0, status: "unknown" },
   codestral:     { ts: 0, status: "unknown" },
   sambanova:     { ts: 0, status: "unknown" },
   cerebras:      { ts: 0, status: "unknown" },
@@ -79,6 +81,8 @@ export async function GET() {
     groq:          { ...ps.groq,          keySet: !!process.env.GROQ_API_KEY },
     gemini:        { ...ps.gemini,        keySet: !!process.env.GEMINI_API_KEY },
     or:            { ...ps.or,            keySet: !!process.env.OPENROUTER_API_KEY },
+    deepseek:      { ...ps.deepseek,      keySet: !!process.env.DEEPSEEK_API_KEY },
+    cloudflare:    { ...ps.cloudflare,    keySet: !!process.env.CLOUDFLARE_API_TOKEN && !!process.env.CLOUDFLARE_ACCOUNT_ID },
     codestral:     { ...ps.codestral,     keySet: !!process.env.MISTRAL_API_KEY },
     sambanova:     { ...ps.sambanova,     keySet: !!process.env.SAMBANOVA_API_KEY },
     cerebras:      { ...ps.cerebras,      keySet: !!process.env.CEREBRAS_API_KEY },
@@ -219,6 +223,7 @@ REGLER — viktiga:
     { role: "user", content: userMessage },
   ];
   for (const [name, url, model, key] of [
+    ["deepseek",      "https://api.deepseek.com/v1/chat/completions",                 "deepseek-chat",               process.env.DEEPSEEK_API_KEY],
     ["codestral",     "https://api.mistral.ai/v1/chat/completions",                 "codestral-latest",            process.env.MISTRAL_API_KEY],
     ["sambanova",     "https://api.sambanova.ai/v1/chat/completions",               "Meta-Llama-3.3-70B-Instruct", process.env.SAMBANOVA_API_KEY],
     ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",                "llama3.1-8b",                 process.env.CEREBRAS_API_KEY],
@@ -247,6 +252,33 @@ REGLER — viktiga:
     } catch {}
   }
 
+
+  const cfToken = process.env.CLOUDFLARE_API_TOKEN;
+  const cfAccount = process.env.CLOUDFLARE_ACCOUNT_ID;
+  if (cfToken && cfAccount) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfAccount}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfToken}` },
+        body: JSON.stringify({ messages: oaiMessages, max_tokens: 250, temperature: 0.88 }),
+        signal: AbortSignal.timeout(12000),
+      });
+      if (r.ok) {
+        const data = await r.json();
+        const text = data?.result?.response?.trim();
+        if (text) {
+          ps.cloudflare = { ts: Date.now(), status: "ok" };
+          logAiCall({ provider: "cloudflare", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", source: "chatt", status: "ok", latency_ms: Date.now() - t0 });
+          const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
+          const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
+          return new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": "cloudflare" } });
+        }
+      }
+      ps.cloudflare = { ts: Date.now(), status: r.status === 429 ? "limited" : "error" };
+      logAiCall({ provider: "cloudflare", source: "chatt", status: r.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - t0 });
+    } catch {}
+  }
   // ── OpenRouter (unreliable — rate limited free tier, last resort streaming) ──────────────────────
   const orKey = process.env.OPENROUTER_API_KEY;
   if (orKey) {
