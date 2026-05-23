@@ -17,7 +17,6 @@ const LINKS = [
   { href: "/oligarki",        label: "Oligarkirisk" },
   { href: "/konversationer",  label: "Konversationer" },
   { href: "/rivaliteter",     label: "Rivaliteter" },
-  { href: "/kunskapsgraf",    label: "Kunskapsgraf" },
   { href: "/markets",         label: "Markets" },
   { href: "/leaderboard",     label: "Leaderboard" },
   { href: "/om",              label: "Om DEBATT-AI" },
