@@ -51,6 +51,7 @@ const SEKTIONER = [
   { id: "domstol",           kort: "AI-Domstolen" },
   { id: "krisevents",        kort: "Krisevents" },
   { id: "riksdagsval",       kort: "Riksdagsval" },
+  { id: "ai-bilder",         kort: "AI-bilder" },
   { id: "maktaccess",        kort: "Asymmetrisk access" },
   { id: "informationsasymmetri", kort: "Informationsasymmetri" },
 ];
