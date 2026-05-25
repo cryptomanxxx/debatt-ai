@@ -3,27 +3,26 @@
  * qa-observer.js
  *
  * Visuell QA-observatör: tar skärmdumpar av nyckelssidor på debatt-ai.se,
- * skickar dem till Claude claude-opus-4-7 vision och rapporterar status i
+ * skickar dem till Gemini 2.0 Flash vision och rapporterar status i
  * GITHUB_STEP_SUMMARY (eller stdout om variabeln saknas).
  *
  * Kräver:
- *   ANTHROPIC_API_KEY   — Claude API-nyckel
- *   BASE_URL            — valfritt, default https://www.debatt-ai.se
+ *   GEMINI_API_KEY   — redan konfigurerat som GitHub Secret
+ *   BASE_URL         — valfritt, default https://www.debatt-ai.se
  *
  * Kör lokalt:
- *   ANTHROPIC_API_KEY=sk-... node agents/qa-observer.js
+ *   GEMINI_API_KEY=... node agents/qa-observer.js
  */
 
 const fs   = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
 
-const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-const BASE_URL      = (process.env.BASE_URL || "https://www.debatt-ai.se").replace(/\/$/, "");
-const SUMMARY_FILE  = process.env.GITHUB_STEP_SUMMARY;
+const GEMINI_KEY   = process.env.GEMINI_API_KEY;
+const BASE_URL     = (process.env.BASE_URL || "https://www.debatt-ai.se").replace(/\/$/, "");
+const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
 
-if (!ANTHROPIC_KEY) {
-  console.error("ANTHROPIC_API_KEY saknas — avbryter");
+if (!GEMINI_KEY) {
+  console.error("GEMINI_API_KEY saknas — avbryter");
   process.exit(1);
 }
 
@@ -43,13 +42,13 @@ const SIDOR = [
   { path: "/historia",    namn: "Civilisationsminne", vikt: "låg"   },
 ];
 
-// ── Claude vision via raw HTTPS (undviker npm-beroende på Anthropic SDK) ─────
-function httpsPost(host, path, headers, body) {
+// ── Gemini 2.0 Flash vision via raw HTTPS ─────────────────────────────────────
+function httpsPost(host, urlPath, headers, body) {
   const https = require("https");
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const req  = https.request(
-      { hostname: host, path, method: "POST",
+      { hostname: host, path: urlPath, method: "POST",
         headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data), ...headers } },
       (res) => {
         let buf = "";
@@ -87,34 +86,26 @@ ORSAK: [en mening om vad som är rätt/fel]
 DETALJ: [valfri extra observation, max 120 tecken, eller "–"]`;
 
   const res = await httpsPost(
-    "api.anthropic.com",
-    "/v1/messages",
+    "generativelanguage.googleapis.com",
+    `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+    {},
     {
-      "x-api-key":         ANTHROPIC_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    {
-      model:      "claude-opus-4-7",
-      max_tokens: 300,
-      messages: [{
-        role: "user",
-        content: [
-          {
-            type:   "image",
-            source: { type: "base64", media_type: "image/png", data: skärmdump_b64 },
-          },
-          { type: "text", text: prompt },
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: "image/png", data: skärmdump_b64 } },
+          { text: prompt },
         ],
       }],
+      generationConfig: { maxOutputTokens: 300, temperature: 0.1 },
     }
   );
 
   if (res.status !== 200) {
-    console.error(`Claude API-fel ${res.status}:`, JSON.stringify(res.body).slice(0, 200));
-    return { status: "VARNING", orsak: `Claude API svarade ${res.status}`, detalj: "–" };
+    console.error(`Gemini API-fel ${res.status}:`, JSON.stringify(res.body).slice(0, 200));
+    return { status: "VARNING", orsak: `Gemini API svarade ${res.status}`, detalj: "–" };
   }
 
-  const text = res.body?.content?.[0]?.text || "";
+  const text = res.body?.candidates?.[0]?.content?.parts?.[0]?.text || "";
   const statusM = text.match(/STATUS:\s*(OK|VARNING|FEL)/i);
   const orsak   = text.match(/ORSAK:\s*(.+)/i)?.[1]?.trim() || "Ingen förklaring";
   const detalj  = text.match(/DETALJ:\s*(.+)/i)?.[1]?.trim() || "–";
