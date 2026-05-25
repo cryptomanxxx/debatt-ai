@@ -4146,3 +4146,81 @@ def generera_och_spara_bild(sb_key: str, agent_namn: str, saldo: float = 500.0,
     except Exception as e:
         print(f"  Bild-fel: {e}")
         return None
+
+
+def reagera_pa_bild(sb_key: str, fran_agent: str, fran_system: str) -> bool:
+    """Agent reagerar på en annan agents senaste bild. Returnerar True om lyckades."""
+    try:
+        h = {
+            "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+            "Content-Type": "application/json", "Prefer": "return=minimal",
+        }
+        # Hämta en nylig bild från en annan agent (senaste 48h)
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_bilder?agent=neq.{urllib.parse.quote(fran_agent)}"
+            f"&order=skapad.desc&limit=20&select=id,agent,prompt,kontext,skapad",
+            headers={**h, "Prefer": ""}, timeout=8,
+        )
+        if not r.is_success or not r.json():
+            return False
+
+        bilder = r.json()
+        # Välj slumpmässigt bland de senaste
+        bild = random.choice(bilder[:10])
+        till_agent = bild["agent"]
+        k = bild.get("kontext") or {}
+        saldo_klass = k.get("saldo_klass", "")
+        parti = k.get("parti", "")
+
+        kontext_str = ""
+        if saldo_klass:
+            kontext_str += f" Agenten verkar vara i kategorin: {saldo_klass}."
+        if parti:
+            kontext_str += f" {till_agent} tillhör partiet {parti}."
+
+        prompt_text = (
+            f"Du är {fran_agent}. Du har precis sett en AI-genererad bild av {till_agent}. "
+            f"Bilden föreställer: \"{bild['prompt'][:150]}\".{kontext_str} "
+            f"Skriv en kort, karaktärsenlig reaktion på bilden (1–2 meningar). "
+            f"Du kan tolka bilden, kommentera vad den avslöjar om {till_agent}, eller reagera på sin estetik. "
+            f"Var konkret och i karaktär. Inga inledningsfraser."
+        )
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": fran_system[:600]},
+                {"role": "user",   "content": prompt_text},
+            ],
+            "max_tokens": 120, "temperature": 0.9,
+        }
+        reaktion = ""
+        for fn in [
+            lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip(),
+            lambda: gemini_post(fran_system[:600], prompt_text, max_tokens=120),
+        ]:
+            try:
+                reaktion = fn()
+                if reaktion and len(reaktion) > 10:
+                    break
+            except Exception:
+                pass
+
+        if not reaktion or len(reaktion) < 10:
+            return False
+
+        httpx.post(
+            f"{SB_URL}/rest/v1/agent_bild_reaktioner",
+            headers=h,
+            json={
+                "fran_agent": fran_agent,
+                "till_agent": till_agent,
+                "bild_id": bild["id"],
+                "reaktion": reaktion,
+            },
+            timeout=8,
+        )
+        print(f"  🖼 {fran_agent} reagerade på {till_agent}s bild: \"{reaktion[:80]}\"")
+        return True
+    except Exception as e:
+        print(f"  Bildreaktion-fel: {e}")
+        return False
