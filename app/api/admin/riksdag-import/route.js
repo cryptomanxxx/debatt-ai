@@ -72,6 +72,12 @@ async function hämtaViaApi() {
     hämtaDoktyp("prop"),
     hämtaDoktyp("mot"),
   ]);
+
+  // Om båda misslyckas — kasta så att HTML-fallbacken i POST aktiveras
+  if (propositioner.status === "rejected" && motioner.status === "rejected") {
+    throw new Error(`prop: ${propositioner.reason?.message} | mot: ${motioner.reason?.message}`);
+  }
+
   const forslag = [
     ...(propositioner.status === "fulfilled" ? propositioner.value : []),
     ...(motioner.status === "fulfilled" ? motioner.value : []),
