@@ -383,10 +383,17 @@ async function fetchAktivitetsFeed() {
   });
 
   const BILDTYP_FEED = {
-    tillstand:  { ikon: "🎨", farg: "#e879f9", verb: "skapade en ny bild" },
-    meme:       { ikon: "📢", farg: "#f59e0b", verb: "skapade ett meme" },
-    propaganda: { ikon: "📣", farg: "#f87171", verb: "publicerade ett propagandaposter" },
-    valkampanj: { ikon: "🗳️", farg: "#4ade80", verb: "lanserade en valkampanjaffisch" },
+    tillstand:      { ikon: "🎨", farg: "#e879f9", verb: "skapade en ny bild" },
+    meme:           { ikon: "📢", farg: "#f59e0b", verb: "skapade ett meme" },
+    propaganda:     { ikon: "📣", farg: "#f87171", verb: "publicerade ett propagandaposter" },
+    valkampanj:     { ikon: "🗳️", farg: "#4ade80", verb: "lanserade en valkampanjaffisch" },
+    portratt:       { ikon: "🖼️", farg: "#60a5fa", verb: "genererade ett karaktärsporträtt" },
+    utopi_dystopi:  { ikon: "🌆", farg: "#a78bfa", verb: "visualiserade sin framtidsvision" },
+    kris:           { ikon: "🌋", farg: "#fb923c", verb: "dokumenterade en krissituation" },
+    koalition:      { ikon: "🤝", farg: "#facc15", verb: "firade en ny politisk allians" },
+    domstolsdom:    { ikon: "⚖️", farg: "#94a3b8", verb: "fick sin dom avbildad" },
+    "borshändelse": { ikon: "📊", farg: "#34d399", verb: "dokumenterade ett börsevent" },
+    oligarki:       { ikon: "👑", farg: "#fbbf24", verb: "avbildades som oligark" },
   };
   (bilder.value || []).forEach(b => {
     if (!b.skapad) return;

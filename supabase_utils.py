@@ -1614,6 +1614,10 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
             )
             upsert_relation(sb_key, agent_namn, mal_namn, "allierad", 75,
                             f"Parlamentskoalition: {alignment} gemensamma röster")
+            try:
+                generera_koalition_bild(sb_key, agent_namn, mal_namn)
+            except Exception:
+                pass
             print(f"  ✓ Koalition bildad: {agent_namn} + {mal_namn} (samsyn: {alignment}, +3 styrka)")
             print(f"    Förslag: {forslag[:100]}…")
             print(f"    Svar: {svar_text[:100]}")
@@ -3235,6 +3239,12 @@ def ta_oligarki_snapshot(sb_key: str) -> None:
         },
         timeout=10,
     )
+    if gini_val > 0.6 and agenter and random.random() < 0.4:
+        try:
+            topp = agenter[0]
+            generera_oligarki_bild(sb_key, topp["agent"], gini_val, topp.get("saldo", 500))
+        except Exception:
+            pass
 
 
 # ── Civilisationsminne och relationsgrafen ────────────────────────────────────
@@ -3740,6 +3750,10 @@ def salj_etf(sb_key: str, agent_namn: str, symbol: str, fraktion: float = 1.0) -
                 beskrivning=f"ETF-handel: {agent_namn} sålde {symbol} för {proceeds} kr (P&L: {pnl_str} kr).",
                 agenter=[agent_namn], relaterat_typ="etf_transaktioner",
             )
+            try:
+                generera_borshändelse_bild(sb_key, agent_namn, symbol, pnl)
+            except Exception:
+                pass
         return proceeds
     except Exception as e:
         print(f"  ETF sälj-fel: {e}")
@@ -4328,3 +4342,293 @@ def reagera_pa_bild(sb_key: str, fran_agent: str, fran_system: str) -> bool:
     except Exception as e:
         print(f"  Bildreaktion-fel: {e}")
         return False
+
+
+def generera_portratt(sb_key: str, agent_namn: str, saldo: float = 500.0,
+                      parti: str = "", ideologi: str = "") -> str | None:
+    """Cinematiskt karaktärsporträtt — djuppsykologisk personlighetsavbildning."""
+    try:
+        karaktar, miljo = AGENT_BILD_STIL.get(agent_namn, ("autonomous AI agent", "digital abstract space"))
+        saldo_klass = _saldo_till_klass(saldo)
+        parti_del = f"{parti} political figure, " if parti else ""
+        ideologi_del = f"{ideologi[:50]}, " if ideologi else ""
+        prompt = (
+            f"cinematic character portrait, {karaktar}, {saldo_klass}, "
+            f"{parti_del}{ideologi_del}{miljo}, "
+            f"extreme close-up face, intense gaze, chiaroscuro lighting, "
+            f"photorealistic 8k portrait, shallow depth of field, "
+            f"emotional intensity, award-winning photography style"
+        )
+        url = _pollinations_url(prompt, w=512, h=768)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass
+        kontext = {
+            "saldo": round(saldo, 0),
+            "saldo_klass": _saldo_till_klass(saldo).split(",")[0],
+            "parti": parti or None,
+            "ideologi": ideologi[:60] if ideologi else None,
+        }
+        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "portratt")
+        print(f"  🖼️ Porträtt: {agent_namn}")
+        return url
+    except Exception as e:
+        print(f"  Porträtt-fel: {e}")
+        return None
+
+
+def generera_utopi_dystopi(sb_key: str, agent_namn: str, saldo: float = 500.0,
+                            parti: str = "", ideologi: str = "") -> str | None:
+    """Agentens vision av framtiden — utopi eller dystopi baserat på välstånd och ideologi."""
+    try:
+        karaktar, miljo = AGENT_BILD_STIL.get(agent_namn, ("visionary", "future cityscape"))
+        saldo_klass = _saldo_till_klass(saldo)
+        ideologi_del = f"{ideologi[:50]}, " if ideologi else ""
+        if saldo > 1200:
+            vision_stil = (
+                "utopian future city, gleaming towers, clean energy, "
+                "lush gardens, advanced AI civilization, hopeful golden light, "
+                "humanity thriving, technological paradise"
+            )
+            vision_typ = "utopi"
+        elif saldo < 400:
+            vision_stil = (
+                "dystopian nightmare city, crumbling infrastructure, "
+                "authoritarian AI surveillance, pollution and decay, "
+                "oppressed masses, dark stormy sky, cyberpunk poverty"
+            )
+            vision_typ = "dystopi"
+        else:
+            vision_stil = (
+                "divided future city, gleaming towers for the elite, "
+                "dark slums below, inequality made visible, "
+                "hopeful and dystopian simultaneously, dramatic contrast"
+            )
+            vision_typ = "blandad"
+        prompt = (
+            f"{vision_stil}, {ideologi_del}"
+            f"{karaktar} contemplating the horizon, {miljo} transformed, "
+            f"ultra wide cinematic establishing shot, concept art, "
+            f"dramatic atmosphere, ultra detailed, award-winning digital art"
+        )
+        url = _pollinations_url(prompt, w=1024, h=576)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass
+        kontext = {
+            "saldo": round(saldo, 0),
+            "saldo_klass": saldo_klass.split(",")[0],
+            "vision_typ": vision_typ,
+            "parti": parti or None,
+            "ideologi": ideologi[:60] if ideologi else None,
+        }
+        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "utopi_dystopi")
+        ikon = "✨" if vision_typ == "utopi" else ("💀" if vision_typ == "dystopi" else "⚖️")
+        print(f"  {ikon} Vision ({vision_typ}): {agent_namn}")
+        return url
+    except Exception as e:
+        print(f"  Visionsbild-fel: {e}")
+        return None
+
+
+def generera_kris_bild(sb_key: str, kris_typ: str, kris_rubrik: str,
+                        paverkade_agenter: list, intensitet: int) -> str | None:
+    """Dramatisk krisskildring — triggas när ny kris börjar."""
+    try:
+        KRIS_PROMPTS = {
+            "borskrasch":          "stock market crash, traders in panic, red charts plummeting, financial district chaos",
+            "pandemi":             "pandemic outbreak, empty city streets, hospital emergency rooms overflowing, eerie silence",
+            "politisk_skandal":    "political corruption scandal exposed, courtroom drama, newspaper headlines, press frenzy",
+            "klimatkatastrof":     "climate disaster, simultaneous floods and wildfires, environmental destruction, apocalyptic sky",
+            "ai_genombrott":       "artificial superintelligence emergence, glowing neural networks, scientists in awe and terror",
+            "energikris":          "power grid failure, dark cities at night, queues for fuel, factories shutting down",
+            "demokratikris":       "democratic crisis, contested election, street protests, torn ballot papers, police lines",
+            "ekonomisk_recession": "economic recession, unemployment lines, shuttered storefronts, grey urban decay",
+        }
+        intensitet_stil = {
+            1: "local emergency, tense community atmosphere",
+            2: "national crisis, widespread panic, breaking news coverage",
+            3: "global catastrophe, apocalyptic scale, cinematic disaster epic",
+        }.get(intensitet, "crisis scene")
+        kris_stil = KRIS_PROMPTS.get(kris_typ, "major crisis unfolding, dramatic scene")
+        repr_agent = paverkade_agenter[0] if paverkade_agenter else "Journalist"
+        karaktar, miljo = AGENT_BILD_STIL.get(repr_agent, ("concerned citizen", "urban environment"))
+        prompt = (
+            f"{kris_stil}, {intensitet_stil}, "
+            f"{karaktar} witnessing the crisis, {miljo} transformed by catastrophe, "
+            f"dramatic cinematic lighting, photojournalism style, ultra detailed, "
+            f"breaking news aesthetic, urgent desperate atmosphere, powerful wide composition"
+        )
+        url = _pollinations_url(prompt, w=1024, h=576)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass
+        kontext = {
+            "kris_typ": kris_typ,
+            "kris_rubrik": kris_rubrik[:80],
+            "intensitet": intensitet,
+            "paverkade_agenter": paverkade_agenter[:4],
+        }
+        _spara_bild(sb_key, repr_agent, prompt, url, kontext, "kris")
+        print(f"  🌋 Krisbild: [{kris_typ}] → {repr_agent}")
+        return url
+    except Exception as e:
+        print(f"  Krisbild-fel: {e}")
+        return None
+
+
+def generera_koalition_bild(sb_key: str, agent_a: str, agent_b: str,
+                              parti_namn: str = "", saldo_a: float = 500.0) -> str | None:
+    """Firar en ny politisk allians — triggas vid accepterad koalition."""
+    try:
+        karaktar_a, miljo_a = AGENT_BILD_STIL.get(agent_a, ("AI leader", "political stage"))
+        karaktar_b, _ = AGENT_BILD_STIL.get(agent_b, ("AI leader", ""))
+        saldo_klass = _saldo_till_klass(saldo_a).split(",")[0]
+        parti_del = f"{parti_namn} party alliance, " if parti_namn else ""
+        prompt = (
+            f"{parti_del}historic political coalition formed, "
+            f"{karaktar_a} and {karaktar_b} shaking hands, {miljo_a}, "
+            f"triumphant diplomatic ceremony, press cameras flashing, "
+            f"cinematic wide shot, power and unity, dramatic lighting, "
+            f"political partnership announcement, {saldo_klass}"
+        )
+        url = _pollinations_url(prompt)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass
+        kontext = {
+            "agent_b": agent_b,
+            "parti": parti_namn or None,
+            "saldo": round(saldo_a, 0),
+            "saldo_klass": saldo_klass,
+        }
+        _spara_bild(sb_key, agent_a, prompt, url, kontext, "koalition")
+        print(f"  🤝 Koalitionsbild: {agent_a} + {agent_b}")
+        return url
+    except Exception as e:
+        print(f"  Koalitionsbild-fel: {e}")
+        return None
+
+
+def generera_domstolsdom_bild(sb_key: str, svarande: str, artikel_nr: int,
+                                artikel_rubrik: str, dom_utfall: str,
+                                saldo: float = 500.0) -> str | None:
+    """Dramatisk domstolsbild vid fällande eller friande dom."""
+    try:
+        karaktar, _ = AGENT_BILD_STIL.get(svarande, ("defendant", "courtroom"))
+        saldo_klass = _saldo_till_klass(saldo).split(",")[0]
+        if dom_utfall == "fälld":
+            dom_stil = (
+                f"guilty verdict, {karaktar} condemned, "
+                f"dramatic gavel strike, shocked expression, dark courtroom shadows, "
+                f"harsh spotlight of guilt, constitutional violation, justice served"
+            )
+        else:
+            dom_stil = (
+                f"not guilty verdict, {karaktar} acquitted, "
+                f"relief and vindication, bright light breaking through, "
+                f"justice and freedom, triumphant exoneration"
+            )
+        prompt = (
+            f"AI constitutional court drama, {dom_stil}, "
+            f"grand marble courthouse interior, solemn judges panel, "
+            f"cinematic legal drama, ultra detailed illustration, "
+            f"article §{artikel_nr} {artikel_rubrik}, {saldo_klass}, "
+            f"dramatic chiaroscuro lighting, powerful legal composition"
+        )
+        url = _pollinations_url(prompt)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass
+        kontext = {
+            "artikel_nr": artikel_nr,
+            "artikel_rubrik": artikel_rubrik,
+            "dom_utfall": dom_utfall,
+            "saldo": round(saldo, 0),
+            "saldo_klass": saldo_klass,
+        }
+        _spara_bild(sb_key, svarande, prompt, url, kontext, "domstolsdom")
+        print(f"  ⚖️ Domstolsbild: {svarande} — {dom_utfall}")
+        return url
+    except Exception as e:
+        print(f"  Domstolsbild-fel: {e}")
+        return None
+
+
+def generera_borshändelse_bild(sb_key: str, agent: str, symbol: str,
+                                pl_kr: float, saldo: float = 500.0) -> str | None:
+    """Börsbild vid stor ETF-vinst eller -förlust (≥ 50 kr)."""
+    try:
+        karaktar, miljo = AGENT_BILD_STIL.get(agent, ("trader", "trading floor"))
+        saldo_klass = _saldo_till_klass(saldo).split(",")[0]
+        if pl_kr >= 0:
+            marknad_stil = (
+                f"massive crypto market win, {karaktar} celebrating, "
+                f"+{abs(pl_kr):.0f} kr profit, green charts soaring, "
+                f"{symbol} cryptocurrency surging, euphoric trading floor, champagne celebration"
+            )
+        else:
+            marknad_stil = (
+                f"catastrophic crypto market loss, {karaktar} in despair, "
+                f"-{abs(pl_kr):.0f} kr loss, red charts crashing, "
+                f"{symbol} plummeting, devastation and shock, financial ruin"
+            )
+        prompt = (
+            f"{marknad_stil}, {miljo}, "
+            f"cyberpunk trading aesthetic, holographic price charts, "
+            f"dramatic neon lighting, ultra detailed, {saldo_klass}"
+        )
+        url = _pollinations_url(prompt)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass
+        kontext = {
+            "symbol": symbol,
+            "pl_kr": round(pl_kr, 0),
+            "saldo": round(saldo, 0),
+            "saldo_klass": saldo_klass,
+        }
+        _spara_bild(sb_key, agent, prompt, url, kontext, "borshändelse")
+        ikon = "📈" if pl_kr >= 0 else "📉"
+        print(f"  {ikon} Börsbild: {agent} {symbol} {'+' if pl_kr >= 0 else ''}{pl_kr:.0f} kr")
+        return url
+    except Exception as e:
+        print(f"  Börsbild-fel: {e}")
+        return None
+
+
+def generera_oligarki_bild(sb_key: str, agent: str, gini: float,
+                            saldo: float = 500.0) -> str | None:
+    """Triggas när Gini > 0.6 — visualiserar farlig maktkoncentration."""
+    try:
+        karaktar, miljo = AGENT_BILD_STIL.get(agent, ("powerful oligarch", "luxury penthouse"))
+        saldo_klass = _saldo_till_klass(saldo)
+        prompt = (
+            f"AI oligarchy visualization, extreme wealth concentration Gini {gini:.2f}, "
+            f"{karaktar} as supreme oligarch towering above crushed masses, {miljo}, "
+            f"gilded excess and dark shadows, Orwellian power aesthetics, "
+            f"dystopian elite ruling class, dramatic wide angle shot, "
+            f"ultra detailed, cinematic, {saldo_klass}"
+        )
+        url = _pollinations_url(prompt, w=1024, h=576)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass
+        kontext = {
+            "gini": round(gini, 3),
+            "saldo": round(saldo, 0),
+            "saldo_klass": saldo_klass.split(",")[0],
+        }
+        _spara_bild(sb_key, agent, prompt, url, kontext, "oligarki")
+        print(f"  👑 Oligarkibild: {agent} (Gini={gini:.2f})")
+        return url
+    except Exception as e:
+        print(f"  Oligarkibild-fel: {e}")
+        return None

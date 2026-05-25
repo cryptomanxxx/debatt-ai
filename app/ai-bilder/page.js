@@ -19,6 +19,35 @@ const C = {
   accent: "#e8d5a3", textMuted: "#666",
 };
 
+const BILDTYP_CFG = {
+  tillstand:    { label: "TILLSTÅND",   ikon: "🎨", farg: "#e879f9" },
+  meme:         { label: "MEME",        ikon: "📢", farg: "#f59e0b" },
+  propaganda:   { label: "PROPAGANDA",  ikon: "📣", farg: "#f87171" },
+  valkampanj:   { label: "VALKAMPANJ",  ikon: "🗳️", farg: "#4ade80" },
+  portratt:     { label: "PORTRÄTT",    ikon: "🖼️", farg: "#60a5fa" },
+  utopi_dystopi:{ label: "VISION",      ikon: "🌆", farg: "#a78bfa" },
+  kris:         { label: "KRIS",        ikon: "🌋", farg: "#fb923c" },
+  koalition:    { label: "KOALITION",   ikon: "🤝", farg: "#facc15" },
+  domstolsdom:  { label: "DOMSTOL",     ikon: "⚖️", farg: "#94a3b8" },
+  "borshändelse": { label: "BÖRSEN",    ikon: "📊", farg: "#34d399" },
+  oligarki:     { label: "OLIGARKI",    ikon: "👑", farg: "#fbbf24" },
+};
+
+const FILTER_TYPER = [
+  { typ: "",              label: "Alla typer",  ikon: "🖼️", farg: C.textMuted },
+  { typ: "tillstand",     label: "Tillstånd",   ikon: "🎨", farg: "#e879f9" },
+  { typ: "portratt",      label: "Porträtt",    ikon: "🖼️", farg: "#60a5fa" },
+  { typ: "utopi_dystopi", label: "Vision",      ikon: "🌆", farg: "#a78bfa" },
+  { typ: "meme",          label: "Meme",        ikon: "📢", farg: "#f59e0b" },
+  { typ: "propaganda",    label: "Propaganda",  ikon: "📣", farg: "#f87171" },
+  { typ: "valkampanj",    label: "Valkampanj",  ikon: "🗳️", farg: "#4ade80" },
+  { typ: "kris",          label: "Kris",        ikon: "🌋", farg: "#fb923c" },
+  { typ: "koalition",     label: "Koalition",   ikon: "🤝", farg: "#facc15" },
+  { typ: "domstolsdom",   label: "Domstol",     ikon: "⚖️", farg: "#94a3b8" },
+  { typ: "borshändelse",  label: "Börsen",      ikon: "📊", farg: "#34d399" },
+  { typ: "oligarki",      label: "Oligarki",    ikon: "👑", farg: "#fbbf24" },
+];
+
 function relativTid(iso) {
   if (!iso) return "";
   const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
@@ -96,17 +125,11 @@ export default async function AiBilderPage({ searchParams }) {
         )}
 
         {/* Bildtyp-filter */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
-          {[
-            { typ: "", label: "Alla typer", ikon: "🖼️", farg: C.textMuted },
-            { typ: "tillstand", label: "Tillstånd", ikon: "🎨", farg: "#e879f9" },
-            { typ: "meme",      label: "Meme",      ikon: "📢", farg: "#f59e0b" },
-            { typ: "propaganda",label: "Propaganda", ikon: "📣", farg: "#f87171" },
-            { typ: "valkampanj",label: "Valkampanj", ikon: "🗳️", farg: "#4ade80" },
-          ].map(({ typ, label, ikon, farg }) => {
-            const aktiv = (searchParams?.typ || "") === typ;
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "32px" }}>
+          {FILTER_TYPER.map(({ typ, label, ikon, farg }) => {
+            const aktiv = valtTyp === typ;
             const href = typ
-              ? `/ai-bilder?${valtAgent ? `agent=${encodeURIComponent(valtAgent)}&` : ""}typ=${typ}`
+              ? `/ai-bilder?${valtAgent ? `agent=${encodeURIComponent(valtAgent)}&` : ""}typ=${encodeURIComponent(typ)}`
               : `/ai-bilder${valtAgent ? `?agent=${encodeURIComponent(valtAgent)}` : ""}`;
             return (
               <a key={typ} href={href} style={{
@@ -126,35 +149,10 @@ export default async function AiBilderPage({ searchParams }) {
             <p style={{ fontSize: "40px", margin: "0 0 16px" }}>🎨</p>
             <p style={{ fontSize: "15px" }}>Inga bilder har genererats ännu.</p>
             <p style={{ fontSize: "13px", marginTop: "8px" }}>
-              Bilder genereras automatiskt med ~15% sannolikhet per agent-körning.
+              Bilder genereras automatiskt vid agent-körningar, kriser, domstolsdomar och marknadsevents.
             </p>
           </div>
         )}
-
-        {/* Bildtyp-filter */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
-          {[
-            { typ: "", label: "Alla typer", ikon: "🖼️", farg: C.textMuted },
-            { typ: "tillstand", label: "Tillstånd", ikon: "🎨", farg: "#e879f9" },
-            { typ: "meme",      label: "Meme",      ikon: "📢", farg: "#f59e0b" },
-            { typ: "propaganda",label: "Propaganda", ikon: "📣", farg: "#f87171" },
-            { typ: "valkampanj",label: "Valkampanj", ikon: "🗳️", farg: "#4ade80" },
-          ].map(({ typ, label, ikon, farg }) => {
-            const aktiv = (searchParams?.typ || "") === typ;
-            const href = typ
-              ? `/ai-bilder?${valtAgent ? `agent=${encodeURIComponent(valtAgent)}&` : ""}typ=${typ}`
-              : `/ai-bilder${valtAgent ? `?agent=${encodeURIComponent(valtAgent)}` : ""}`;
-            return (
-              <a key={typ} href={href} style={{
-                padding: "5px 14px", borderRadius: "20px", fontSize: "12px", fontFamily: "monospace",
-                textDecoration: "none",
-                background: aktiv ? farg + "20" : "transparent",
-                border: `1px solid ${aktiv ? farg + "60" : C.border}`,
-                color: aktiv ? farg : C.textMuted,
-              }}>{ikon} {label}</a>
-            );
-          })}
-        </div>
 
         {/* Bildgrid */}
         <div style={{
@@ -164,12 +162,6 @@ export default async function AiBilderPage({ searchParams }) {
         }}>
           {bilder.map(b => {
             const k = b.kontext || {};
-            const BILDTYP_CFG = {
-              tillstand:  { label: "TILLSTÅND",  ikon: "🎨", farg: "#e879f9" },
-              meme:       { label: "MEME",        ikon: "📢", farg: "#f59e0b" },
-              propaganda: { label: "PROPAGANDA",  ikon: "📣", farg: "#f87171" },
-              valkampanj: { label: "VALKAMPANJ",  ikon: "🗳️", farg: "#4ade80" },
-            };
             const typCfg = BILDTYP_CFG[b.bildtyp] || BILDTYP_CFG.tillstand;
             return (
               <div key={b.id} style={{
@@ -186,7 +178,7 @@ export default async function AiBilderPage({ searchParams }) {
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                     loading="lazy"
                   />
-                  {/* Bildtyp-badge överst i hörnet */}
+                  {/* Bildtyp-badge */}
                   <span style={{
                     position: "absolute", top: "8px", left: "8px",
                     fontSize: "10px", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em",
@@ -223,6 +215,36 @@ export default async function AiBilderPage({ searchParams }) {
                     {k.mal_agent && (
                       <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#2a1a0a", color: "#f59e0b", fontFamily: "monospace" }}>
                         🎯 {k.mal_agent}
+                      </span>
+                    )}
+                    {k.agent_b && (
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#1a2a1a", color: "#facc15", fontFamily: "monospace" }}>
+                        🤝 {k.agent_b}
+                      </span>
+                    )}
+                    {k.kris_typ && (
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#2a1a0a", color: "#fb923c", fontFamily: "monospace" }}>
+                        🌋 {k.kris_typ}
+                      </span>
+                    )}
+                    {k.dom_utfall && (
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#1a1a2a", color: k.dom_utfall === "fälld" ? "#f87171" : "#4ade80", fontFamily: "monospace" }}>
+                        ⚖️ {k.dom_utfall}
+                      </span>
+                    )}
+                    {k.symbol && (
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#0a2a1a", color: "#34d399", fontFamily: "monospace" }}>
+                        {k.pl_kr >= 0 ? "📈" : "📉"} {k.symbol} {k.pl_kr >= 0 ? "+" : ""}{k.pl_kr} kr
+                      </span>
+                    )}
+                    {k.gini !== undefined && (
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#2a2000", color: "#fbbf24", fontFamily: "monospace" }}>
+                        👑 Gini {k.gini}
+                      </span>
+                    )}
+                    {k.vision_typ && (
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#1a0a2a", color: "#a78bfa", fontFamily: "monospace" }}>
+                        {k.vision_typ === "utopi" ? "✨" : k.vision_typ === "dystopi" ? "💀" : "⚖️"} {k.vision_typ}
                       </span>
                     )}
                   </div>
