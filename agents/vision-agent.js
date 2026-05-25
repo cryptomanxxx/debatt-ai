@@ -28,6 +28,10 @@ function dagensDatum() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function tidsstämpel() {
+  return new Date().toISOString().slice(0, 16).replace("T", "-").replace(":", "");
+}
+
 function lastNVisions(n = 3) {
   if (!fs.existsSync(DISCUSSIONS_DIR)) return [];
   return fs.readdirSync(DISCUSSIONS_DIR)
@@ -91,12 +95,7 @@ async function callCerebras(prompt) {
 
 async function main() {
   const datum = dagensDatum();
-  const utfil = path.join(DISCUSSIONS_DIR, `${datum}-vision.md`);
-
-  if (fs.existsSync(utfil)) {
-    console.log(`Vision för ${datum} finns redan — hoppar över.`);
-    return;
-  }
+  const utfil = path.join(DISCUSSIONS_DIR, `${tidsstämpel()}-vision.md`);
 
   if (!fs.existsSync(DISCUSSIONS_DIR)) fs.mkdirSync(DISCUSSIONS_DIR, { recursive: true });
 
