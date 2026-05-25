@@ -1,0 +1,38 @@
+name: Visuell QA-observatör
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "URL att testa (default: https://www.debatt-ai.se)"
+        required: false
+        default: "https://www.debatt-ai.se"
+  schedule:
+    # Kör varje måndag 10:00 svensk tid (08:00 UTC)
+    - cron: "0 8 * * 1"
+
+jobs:
+  qa-observer:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checka ut koden
+        uses: actions/checkout@v4
+
+      - name: Installera Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Installera beroenden
+        run: |
+          npm install playwright
+          npx playwright install chromium --with-deps
+
+      - name: Kör QA-observatören
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://www.debatt-ai.se' }}
+        run: node agents/qa-observer.js
