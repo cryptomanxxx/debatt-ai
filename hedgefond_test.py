@@ -28,7 +28,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 
 from agenter import AGENTER
-from supabase_utils import SB_URL, spara_civilisations_minne
+from supabase_utils import SB_URL, spara_civilisations_minne, kolla_och_bailout
 from ai_klient import groq_post, gemini_post, github_models_post
 
 # ─── Konstanter ───────────────────────────────────────────────────────────────
@@ -626,6 +626,10 @@ def main():
 
     print("=== Hedgefond körning startar ===")
     agenter = [a for a in AGENTER if a["namn"] not in [f["förvaltare"] for f in FONDER.values()]]
+
+    # Säkerställ att fondförvaltare inte är bankrutta inför bootstrap
+    for conf in FONDER.values():
+        kolla_och_bailout(sb_key, conf["förvaltare"])
 
     # 1. Investeringsrunda
     print("\n--- Investeringsrunda ---")
