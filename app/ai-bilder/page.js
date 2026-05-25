@@ -27,9 +27,12 @@ function relativTid(iso) {
   return `${Math.floor(diff / 86400)} d sedan`;
 }
 
-async function hamtaBilder(agent = "") {
-  const filter = agent ? `agent=eq.${encodeURIComponent(agent)}&` : "";
-  const url = `${SB_URL}/rest/v1/agent_bilder?${filter}order=skapad.desc&limit=60&select=*`;
+async function hamtaBilder(agent = "", typ = "") {
+  const parts = [];
+  if (agent) parts.push(`agent=eq.${encodeURIComponent(agent)}`);
+  if (typ)   parts.push(`bildtyp=eq.${encodeURIComponent(typ)}`);
+  const filter = parts.length ? parts.join("&") + "&" : "";
+  const url = `${SB_URL}/rest/v1/agent_bilder?${filter}order=skapad.desc&limit=60&select=id,agent,prompt,bild_url,kontext,bildtyp,skapad`;
   try {
     const r = await fetch(url, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
@@ -54,7 +57,8 @@ async function hamtaAgenter() {
 
 export default async function AiBilderPage({ searchParams }) {
   const valtAgent = searchParams?.agent || "";
-  const [bilder, agenter] = await Promise.all([hamtaBilder(valtAgent), hamtaAgenter()]);
+  const valtTyp   = searchParams?.typ   || "";
+  const [bilder, agenter] = await Promise.all([hamtaBilder(valtAgent, valtTyp), hamtaAgenter()]);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: "#f0ede6", fontFamily: "Georgia, serif" }}>
@@ -102,6 +106,31 @@ export default async function AiBilderPage({ searchParams }) {
           </div>
         )}
 
+        {/* Bildtyp-filter */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
+          {[
+            { typ: "", label: "Alla typer", ikon: "🖼️", farg: C.textMuted },
+            { typ: "tillstand", label: "Tillstånd", ikon: "🎨", farg: "#e879f9" },
+            { typ: "meme",      label: "Meme",      ikon: "📢", farg: "#f59e0b" },
+            { typ: "propaganda",label: "Propaganda", ikon: "📣", farg: "#f87171" },
+            { typ: "valkampanj",label: "Valkampanj", ikon: "🗳️", farg: "#4ade80" },
+          ].map(({ typ, label, ikon, farg }) => {
+            const aktiv = (searchParams?.typ || "") === typ;
+            const href = typ
+              ? `/ai-bilder?${valtAgent ? `agent=${encodeURIComponent(valtAgent)}&` : ""}typ=${typ}`
+              : `/ai-bilder${valtAgent ? `?agent=${encodeURIComponent(valtAgent)}` : ""}`;
+            return (
+              <a key={typ} href={href} style={{
+                padding: "5px 14px", borderRadius: "20px", fontSize: "12px", fontFamily: "monospace",
+                textDecoration: "none",
+                background: aktiv ? farg + "20" : "transparent",
+                border: `1px solid ${aktiv ? farg + "60" : C.border}`,
+                color: aktiv ? farg : C.textMuted,
+              }}>{ikon} {label}</a>
+            );
+          })}
+        </div>
+
         {/* Bildgrid */}
         <div style={{
           display: "grid",
@@ -110,10 +139,17 @@ export default async function AiBilderPage({ searchParams }) {
         }}>
           {bilder.map(b => {
             const k = b.kontext || {};
+            const BILDTYP_CFG = {
+              tillstand:  { label: "TILLSTÅND",  ikon: "🎨", farg: "#e879f9" },
+              meme:       { label: "MEME",        ikon: "📢", farg: "#f59e0b" },
+              propaganda: { label: "PROPAGANDA",  ikon: "📣", farg: "#f87171" },
+              valkampanj: { label: "VALKAMPANJ",  ikon: "🗳️", farg: "#4ade80" },
+            };
+            const typCfg = BILDTYP_CFG[b.bildtyp] || BILDTYP_CFG.tillstand;
             return (
               <div key={b.id} style={{
                 background: C.surface,
-                border: `1px solid ${C.border}`,
+                border: `1px solid ${typCfg.farg}30`,
                 borderRadius: "10px",
                 overflow: "hidden",
               }}>
@@ -125,6 +161,16 @@ export default async function AiBilderPage({ searchParams }) {
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                     loading="lazy"
                   />
+                  {/* Bildtyp-badge överst i hörnet */}
+                  <span style={{
+                    position: "absolute", top: "8px", left: "8px",
+                    fontSize: "10px", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em",
+                    padding: "3px 8px", borderRadius: "4px",
+                    background: "#000000cc", color: typCfg.farg,
+                    border: `1px solid ${typCfg.farg}50`,
+                  }}>
+                    {typCfg.ikon} {typCfg.label}
+                  </span>
                 </div>
 
                 {/* Info */}
@@ -139,19 +185,19 @@ export default async function AiBilderPage({ searchParams }) {
 
                   {/* Kontext-badges */}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "10px" }}>
-                    {k.saldo_klass && (
-                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#1a1a1a", color: C.textMuted, fontFamily: "monospace" }}>
-                        💰 {k.saldo_klass}
-                      </span>
-                    )}
                     {k.saldo !== undefined && (
                       <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#1a1a1a", color: C.textMuted, fontFamily: "monospace" }}>
-                        {k.saldo} kr
+                        💰 {k.saldo} kr
                       </span>
                     )}
                     {k.parti && (
                       <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#1a1a2a", color: "#a78bfa", fontFamily: "monospace" }}>
                         🏛 {k.parti}
+                      </span>
+                    )}
+                    {k.mal_agent && (
+                      <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: "#2a1a0a", color: "#f59e0b", fontFamily: "monospace" }}>
+                        🎯 {k.mal_agent}
                       </span>
                     )}
                   </div>

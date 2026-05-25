@@ -4110,24 +4110,36 @@ def bygg_bild_prompt(agent_namn: str, saldo: float = 500.0, parti: str = "",
     return ", ".join(delar)
 
 
+def _pollinations_url(prompt: str, w: int = 768, h: int = 512) -> str:
+    encoded = urllib.parse.quote(prompt)
+    return f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&nologo=true&model=flux&seed={random.randint(1, 99999)}"
+
+
+def _spara_bild(sb_key: str, agent_namn: str, prompt: str, url: str,
+                kontext: dict, bildtyp: str = "tillstand") -> None:
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    httpx.post(
+        f"{SB_URL}/rest/v1/agent_bilder",
+        headers=h,
+        json={"agent": agent_namn, "prompt": prompt, "bild_url": url,
+              "kontext": kontext, "bildtyp": bildtyp},
+        timeout=10,
+    )
+
+
 def generera_och_spara_bild(sb_key: str, agent_namn: str, saldo: float = 500.0,
                              parti: str = "", haendelse: str = "", ideologi: str = "") -> str | None:
-    """Genererar en AI-bild via Pollinations, sparar URL i agent_bilder. Returnerar URL eller None."""
+    """Genererar ett tillståndsfoto. Returnerar URL eller None."""
     try:
         prompt = bygg_bild_prompt(agent_namn, saldo, parti, haendelse, ideologi)
-        encoded = urllib.parse.quote(prompt)
-        url = f"https://image.pollinations.ai/prompt/{encoded}?width=768&height=512&nologo=true&model=flux&seed={random.randint(1, 99999)}"
-
-        # Trigga generering (låt Pollinations börja rendera)
+        url = _pollinations_url(prompt)
         try:
             httpx.get(url, timeout=30, follow_redirects=True)
         except Exception:
-            pass  # Timeout är ok — bilden renderas asynkront, URL:en är stabil
-
-        h = {
-            "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
-            "Content-Type": "application/json", "Prefer": "return=minimal",
-        }
+            pass
         kontext = {
             "saldo": round(saldo, 0),
             "saldo_klass": _saldo_till_klass(saldo).split(",")[0],
@@ -4135,16 +4147,108 @@ def generera_och_spara_bild(sb_key: str, agent_namn: str, saldo: float = 500.0,
             "haendelse": haendelse or None,
             "ideologi": ideologi or None,
         }
-        httpx.post(
-            f"{SB_URL}/rest/v1/agent_bilder",
-            headers=h,
-            json={"agent": agent_namn, "prompt": prompt, "bild_url": url, "kontext": kontext},
-            timeout=10,
-        )
+        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "tillstand")
         print(f"  🎨 Bild genererad: {agent_namn} ({kontext['saldo_klass']})")
         return url
     except Exception as e:
         print(f"  Bild-fel: {e}")
+        return None
+
+
+def generera_meme(sb_key: str, agent_namn: str, mal_agent: str,
+                  saldo: float = 500.0) -> str | None:
+    """Agent skapar ett satiriskt meme om en annan agent."""
+    try:
+        karaktar_a, _ = AGENT_BILD_STIL.get(agent_namn, ("AI agent", ""))
+        karaktar_b, _ = AGENT_BILD_STIL.get(mal_agent, ("AI agent", ""))
+        saldo_klass = _saldo_till_klass(saldo).split(",")[0]
+        prompt = (
+            f"political internet meme, {karaktar_a} mocking {karaktar_b}, "
+            f"bold impact font caption, exaggerated satire, viral social media format, "
+            f"humorous political commentary, high contrast, meme template style, "
+            f"digital art, shareable content"
+        )
+        url = _pollinations_url(prompt)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass
+        kontext = {
+            "saldo": round(saldo, 0),
+            "saldo_klass": saldo_klass,
+            "mal_agent": mal_agent,
+        }
+        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "meme")
+        print(f"  📢 Meme: {agent_namn} → {mal_agent}")
+        return url
+    except Exception as e:
+        print(f"  Meme-fel: {e}")
+        return None
+
+
+def generera_propaganda(sb_key: str, agent_namn: str, parti: str = "",
+                        ideologi: str = "", saldo: float = 500.0) -> str | None:
+    """Agent skapar ett ideologiskt propagandaposter."""
+    try:
+        karaktar, miljo = AGENT_BILD_STIL.get(agent_namn, ("AI agent", "digital space"))
+        saldo_klass = _saldo_till_klass(saldo).split(",")[0]
+        parti_del = f"{parti} party, " if parti else ""
+        ideologi_del = f"{ideologi[:60]}, " if ideologi else ""
+        prompt = (
+            f"{parti_del}political propaganda poster, {karaktar}, "
+            f"{ideologi_del}heroic and determined figure, constructivist art style, "
+            f"bold typography, strong colors, revolutionary aesthetic, "
+            f"'JOIN US' poster design, dramatic lighting, powerful composition"
+        )
+        url = _pollinations_url(prompt)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass
+        kontext = {
+            "saldo": round(saldo, 0),
+            "saldo_klass": saldo_klass,
+            "parti": parti or None,
+            "ideologi": ideologi[:60] if ideologi else None,
+        }
+        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "propaganda")
+        print(f"  📣 Propaganda: {agent_namn}" + (f" ({parti})" if parti else ""))
+        return url
+    except Exception as e:
+        print(f"  Propaganda-fel: {e}")
+        return None
+
+
+def generera_valkampanj(sb_key: str, agent_namn: str, parti: str,
+                        manifest_utdrag: str = "", saldo: float = 500.0) -> str | None:
+    """Partiledare skapar en valkampanjaffisch under aktivt val."""
+    try:
+        karaktar, _ = AGENT_BILD_STIL.get(agent_namn, ("politician", "campaign stage"))
+        saldo_klass = _saldo_till_klass(saldo).split(",")[0]
+        manifest_del = f"{manifest_utdrag[:80]}, " if manifest_utdrag else ""
+        prompt = (
+            f"Swedish election campaign poster, vote for {parti}, "
+            f"{karaktar} as party leader, {manifest_del}"
+            f"inspiring and optimistic, modern Scandinavian political design, "
+            f"clean typography, patriotic colors, hopeful atmosphere, "
+            f"professional campaign photography style, high production value"
+        )
+        url = _pollinations_url(prompt)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass
+        kontext = {
+            "saldo": round(saldo, 0),
+            "saldo_klass": saldo_klass,
+            "parti": parti,
+            "manifest": manifest_utdrag[:80] if manifest_utdrag else None,
+        }
+        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "valkampanj")
+        print(f"  🗳️ Valkampanj: {agent_namn} för {parti}")
+        return url
+    except Exception as e:
+        print(f"  Valkampanj-fel: {e}")
         return None
 
 
