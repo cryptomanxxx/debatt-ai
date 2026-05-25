@@ -103,7 +103,7 @@ Diff att granska:
 ${diff}`;
 
   const { status, data } = await httpJson(
-    "https://codestral.mistral.ai/v1/chat/completions",
+    "https://api.mistral.ai/v1/chat/completions",
     {
       method: "POST",
       headers: {
