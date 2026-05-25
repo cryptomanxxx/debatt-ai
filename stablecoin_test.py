@@ -9,7 +9,7 @@ Flöde per körning:
   2. Mint (~8% per agent): lås 150 SEK collateral → utfärda 100 STAB
   3. Redeem (~5% av vault-ägare): lös in STAB → frigör collateral
   4. Likvidation: vault med collateral_ratio < 110% likvideras
-  5. Peg-mekanism: om STAB-pris > 105 → mint-incitament, om < 95 → köpordrar
+  5. Peg-mekanism: om STAB-pris > 1.05 → mint-incitament, om < 0.95 → köpordrar
 
 Kör via GitHub Actions (.github/workflows/stablecoin-test.yml) dagligen 13:30 svensk tid.
 """
@@ -27,7 +27,7 @@ from supabase_utils import SB_URL, spara_civilisations_minne
 
 # ─── Konstanter ───────────────────────────────────────────────────────────────
 
-TARGET_PRIS = 100.0
+TARGET_PRIS = 1.0          # 1 STAB = 1 SEK (som DAI = $1)
 COLLATERAL_SEK = 150.0   # Låst per 100 STAB (150% collateral ratio)
 STAB_PER_VAULT = 100.0   # Tokens utfärdade per vault
 MIN_COLLATERAL_RATIO = 1.10  # Likvideras om under 110%
@@ -175,29 +175,21 @@ def upsert_vault(sb_key: str, agent: str, collateral: float, stab_utfardat: floa
 # ─── Initialisering: STAB i bors_tillgangar ───────────────────────────────────
 
 def initiera_stab(sb_key: str) -> None:
-    """Lägger till STAB i bors_tillgangar om det inte finns."""
-    try:
-        url = f"{SB_URL}/rest/v1/bors_tillgangar?symbol=eq.STAB&select=symbol"
-        r = httpx.get(url, headers=_h(sb_key), timeout=8)
-        if r.is_success and r.json():
-            return  # Redan finns
-    except Exception as e:
-        print(f"  [initiera_stab] kontroll: {e}")
-        return
+    """Upsert STAB i bors_tillgangar med korrekt TARGET_PRIS."""
 
-    print("  Skapar STAB i bors_tillgangar...")
+    print("  Skapar/uppdaterar STAB i bors_tillgangar...")
     try:
-        h_post = {**_h(sb_key), "Prefer": "return=minimal"}
-        httpx.post(f"{SB_URL}/rest/v1/bors_tillgangar", headers=h_post, json={
+        h_upsert = {**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"}
+        httpx.post(f"{SB_URL}/rest/v1/bors_tillgangar", headers=h_upsert, json={
             "symbol": "STAB",
             "namn": "Stable Token",
-            "beskrivning": "Collateral-backed stablecoin. Target-pris 100 SEK. Backas av agent-saldo som collateral (150% ratio).",
+            "beskrivning": "Collateral-backed stablecoin. Target-pris 1 SEK (1 STAB = 1 SEK). Backas av agent-saldo som collateral (150% ratio).",
             "senaste_pris": TARGET_PRIS,
             "forandring_pct": 0.0,
             "volym_24h": 0.0,
             "antal_affarer": 0,
         }, timeout=8)
-        print("  STAB skapad i bors_tillgangar")
+        print(f"  STAB i bors_tillgangar (pris: {TARGET_PRIS} SEK)")
     except Exception as e:
         print(f"  [initiera_stab] skapande: {e}")
 
@@ -325,12 +317,12 @@ def likvidations_runda(sb_key: str) -> None:
 def peg_mekanism(sb_key: str) -> None:
     """
     Om STAB-priset avviker från 100 SEK:
-    - Pris > 105: uppmuntra minting (mer supply → sänker priset)
-    - Pris < 95: köpordrar (minskar supply → höjer priset)
+    - Pris > 1.05 SEK: uppmuntra minting (mer supply → sänker priset)
+    - Pris < 0.95 SEK: köpordrar (minskar supply → höjer priset)
     """
     stab_pris = hamta_stab_pris(sb_key)
 
-    if stab_pris > 105:
+    if stab_pris > 1.05:
         # Hitta agenter utan vault som kan minta
         for agent_obj in AGENTER[:6]:  # Begränsa till 6 agenter
             agent = agent_obj["namn"]
@@ -346,7 +338,7 @@ def peg_mekanism(sb_key: str) -> None:
             print(f"  PEG: {agent} lägger säljorder (STAB={stab_pris:.2f})")
             break
 
-    elif stab_pris < 95:
+    elif stab_pris < 0.95:
         # Vault-ägare köper tillbaka STAB för att skydda peggen
         vaults = hamta_alla_vaults(sb_key)
         for vault in vaults[:3]:
