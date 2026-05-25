@@ -2,25 +2,25 @@
 /**
  * vision-agent.js
  *
- * Kallar Gemini dagligen och genererar en visionär text om nya funktioner
- * och idéer för att uppfylla Debatt-AI:s syfte.
+ * Kallar Cerebras (Qwen 3 235B) dagligen och genererar en visionär text
+ * om nya funktioner och idéer för att uppfylla Debatt-AI:s syfte.
  *
  * Sparar till ai-bus/discussions/YYYY-MM-DD-vision.md
  *
  * Körs av GitHub Actions (daily-vision.yml) eller manuellt:
- *   GEMINI_API_KEY=xxx node agents/vision-agent.js
+ *   CEREBRAS_API_KEY=xxx node agents/vision-agent.js
  */
 
 const fs   = require("fs");
 const path = require("path");
 const https = require("https");
 
-const GEMINI_API_KEY   = process.env.GEMINI_API_KEY;
+const CEREBRAS_API_KEY = process.env.CEREBRAS_API_KEY;
 const DISCUSSIONS_DIR  = path.join(__dirname, "../ai-bus/discussions");
 const GOAL_PATH        = path.join(__dirname, "../ai-bus/goal.md");
 
-if (!GEMINI_API_KEY) {
-  console.error("GEMINI_API_KEY saknas — avbryter");
+if (!CEREBRAS_API_KEY) {
+  console.error("CEREBRAS_API_KEY saknas — avbryter");
   process.exit(1);
 }
 
@@ -46,34 +46,47 @@ function readGoal() {
   catch { return "Målet med Debatt-AI är att bygga världens bästa AI-socialsimulering och testa ekonomisk civilisationsteori på autonoma AI-samhällen."; }
 }
 
-async function callGemini(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-  const body = JSON.stringify({
-    contents: [{ parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 1200, temperature: 0.9 },
-  });
-
+function httpPost(url, headers, body) {
   return new Promise((resolve, reject) => {
-    const req = https.request(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) },
-    }, (res) => {
-      let data = "";
-      res.on("data", c => data += c);
-      res.on("end", () => {
-        try {
-          const parsed = JSON.parse(data);
-          const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (!text) reject(new Error("Gemini returnerade ingen text: " + data.slice(0, 200)));
-          else resolve(text.trim());
-        } catch (e) { reject(e); }
-      });
-    });
+    const u = new URL(url);
+    const buf = Buffer.from(body);
+    const req = https.request(
+      { hostname: u.hostname, path: u.pathname + u.search, method: "POST",
+        headers: { ...headers, "Content-Length": buf.length } },
+      (res) => {
+        let data = "";
+        res.on("data", c => data += c);
+        res.on("end", () => {
+          try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
+          catch { resolve({ status: res.statusCode, data }); }
+        });
+      }
+    );
     req.on("error", reject);
-    req.setTimeout(30000, () => { req.destroy(); reject(new Error("Gemini timeout")); });
-    req.write(body);
+    req.setTimeout(60000, () => { req.destroy(); reject(new Error("Cerebras timeout")); });
+    req.write(buf);
     req.end();
   });
+}
+
+async function callCerebras(prompt) {
+  const body = JSON.stringify({
+    model: "qwen-3-235b-a22b-instruct-2507",
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: 1200,
+    temperature: 0.9,
+  });
+
+  const { status, data } = await httpPost(
+    "https://api.cerebras.ai/v1/chat/completions",
+    { Authorization: `Bearer ${CEREBRAS_API_KEY}`, "Content-Type": "application/json" },
+    body
+  );
+
+  if (status !== 200) throw new Error(`Cerebras API ${status}: ${JSON.stringify(data).slice(0, 200)}`);
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error("Cerebras returnerade ingen text");
+  return text.trim();
 }
 
 async function main() {
@@ -126,16 +139,16 @@ Formatet ska vara:
 ## Prioritet och komplexitet
 (Hög/Medel/Låg prioritet, Hög/Medel/Låg komplexitet)`;
 
-  console.log(`Kallar Gemini för vision ${datum}…`);
+  console.log(`Kallar Cerebras (Qwen 3 235B) för vision ${datum}…`);
   let vision;
   try {
-    vision = await callGemini(prompt);
+    vision = await callCerebras(prompt);
   } catch (e) {
-    console.error("Gemini misslyckades:", e.message);
+    console.error("Cerebras misslyckades:", e.message);
     process.exit(1);
   }
 
-  const innehall = `${vision}\n\n---\n*Genererad av vision-agent.js med Gemini 2.0 Flash, ${datum}*\n`;
+  const innehall = `${vision}\n\n---\n*Genererad av vision-agent.js med Cerebras Qwen 3 235B, ${datum}*\n`;
   fs.writeFileSync(utfil, innehall, "utf8");
   console.log(`Vision sparad: ${utfil}`);
 }

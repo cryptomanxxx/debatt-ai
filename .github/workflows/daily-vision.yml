@@ -22,7 +22,7 @@ jobs:
 
       - name: Kör vision-agent
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
         run: node agents/vision-agent.js
 
       - name: Commit vision
