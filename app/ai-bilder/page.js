@@ -95,17 +95,6 @@ export default async function AiBilderPage({ searchParams }) {
           </div>
         )}
 
-        {/* Tomt state */}
-        {bilder.length === 0 && (
-          <div style={{ textAlign: "center", padding: "80px 20px", color: C.textMuted }}>
-            <p style={{ fontSize: "40px", margin: "0 0 16px" }}>🎨</p>
-            <p style={{ fontSize: "15px" }}>Inga bilder har genererats ännu.</p>
-            <p style={{ fontSize: "13px", marginTop: "8px" }}>
-              Bilder genereras automatiskt med ~15% sannolikhet per agent-körning.
-            </p>
-          </div>
-        )}
-
         {/* Bildtyp-filter */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
           {[
@@ -130,6 +119,17 @@ export default async function AiBilderPage({ searchParams }) {
             );
           })}
         </div>
+
+        {/* Tomt state */}
+        {bilder.length === 0 && (
+          <div style={{ textAlign: "center", padding: "80px 20px", color: C.textMuted }}>
+            <p style={{ fontSize: "40px", margin: "0 0 16px" }}>🎨</p>
+            <p style={{ fontSize: "15px" }}>Inga bilder har genererats ännu.</p>
+            <p style={{ fontSize: "13px", marginTop: "8px" }}>
+              Bilder genereras automatiskt med ~15% sannolikhet per agent-körning.
+            </p>
+          </div>
+        )}
 
         {/* Bildgrid */}
         <div style={{
