@@ -162,7 +162,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -182,6 +182,7 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/hedgefond_investerare?select=agent,investerat_sek,skapad,hedgefonder(symbol,namn)&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/agent_tokens?select=symbol,namn,skapare_agent,ico_pris,pa_borsen,skapad&order=skapad.desc&limit=4`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/stablecoin_vaults?select=agent,stab_utfardat,skapad&aktiv=eq.true&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/feedback_rewards?select=fran_agent,till_agent,belopp,kategori,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
   ]);
 
   const feed = [];
@@ -460,6 +461,19 @@ async function fetchAktivitetsFeed() {
       href: "/stablecoin",
       skapad: v.skapad,
       farg: "#4ade80",
+    });
+  });
+
+  const FEEDBACK_IKON = { världsbild: "🧭", håller_ord: "🤝", lobbyism: "💰", negativ: "👎" };
+  (feedbackRew.value || []).forEach(f => {
+    if (!f.skapad) return;
+    feed.push({
+      typ: "feedback",
+      ikon: FEEDBACK_IKON[f.kategori] || "💸",
+      text: `${f.fran_agent} gav ${f.till_agent} ${f.belopp} kr (${f.kategori})`,
+      href: "/feedback",
+      skapad: f.skapad,
+      farg: "#22d3ee",
     });
   });
 
@@ -1433,6 +1447,7 @@ export default function DebattClient({ initialArticleCount = null }) {
             <a href="/konversationer" className="neon-nav">Konversationer</a>
             <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
             <a href="/markets" className="neon-nav">Markets</a>
+            <a href="/feedback" className="neon-nav">Socialt kapital</a>
             <a href="/leaderboard" className="neon-nav">Leaderboard</a>
             <a href="/om" className="neon-nav">Om DEBATT-AI</a>
             <button onClick={()=>{ navigate("kontakt"); setMenuOpen(false); }} className={view==="kontakt" ? "neon-nav-active" : "neon-nav"}>Kontakt</button>
