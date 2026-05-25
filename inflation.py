@@ -88,7 +88,7 @@ def main():
     SPARTRÖSKEL = 400.0
     print(f"\n── Sparränta: {SPARRANTA*100:.0f}% på saldo > {SPARTRÖSKEL:.0f} kr ──")
     alla_res = httpx.get(
-        f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SPARTRÖSKEL}&select=agent,saldo",
+        f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SPARTRÖSKEL}&agent=neq.Statskassa&select=agent,saldo",
         headers={**h, "Prefer": ""}, timeout=10,
     )
     if alla_res.is_success:
@@ -130,7 +130,7 @@ def main():
     # ── 4. Bailout: agenter med saldo < 100 kr ───────────────────────────────
     print("\n── Bailout: kontrollerar agenter med lågt saldo ──")
     saldo_res = httpx.get(
-        f"{SB_URL}/rest/v1/agent_planbocker?saldo=lt.100&select=agent,saldo",
+        f"{SB_URL}/rest/v1/agent_planbocker?saldo=lt.100&agent=neq.Statskassa&select=agent,saldo",
         headers={**h, "Prefer": ""}, timeout=10,
     )
     if saldo_res.is_success:
