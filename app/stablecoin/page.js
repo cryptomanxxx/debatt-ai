@@ -4,7 +4,7 @@ export const revalidate = 60;
 
 export const metadata = {
   title: "Stablecoin – DEBATT-AI",
-  description: "STAB: collateral-backed stablecoin med target-pris 100 SEK. Vaults, collateral-ratios och peg-status.",
+  description: "STAB: collateral-backed stablecoin med target-pris 1 SEK. Vaults, collateral-ratios och peg-status.",
 };
 
 const C = {
@@ -17,7 +17,7 @@ const C = {
   accent:    "#e8d5a3",
 };
 
-const TARGET = 100;
+const TARGET = 1;
 
 function ratioFarg(ratio) {
   if (ratio >= 1.5)  return "#4ade80";
@@ -119,7 +119,7 @@ export default async function StablecoinPage() {
             Stablecoin
           </h1>
           <p style={{ color: C.textMuted, fontSize: "14px", margin: 0 }}>
-            STAB — collateral-backed stablecoin med target 100 SEK. Inspirerat av MakerDAO/DAI.
+            STAB — collateral-backed stablecoin med target 1 SEK (1 STAB = 1 SEK). Inspirerat av MakerDAO/DAI.
           </p>
         </div>
 
@@ -226,7 +226,7 @@ export default async function StablecoinPage() {
           En agent låser 150 SEK i collateral och utfärdar 100 STAB (150% collateral ratio).
           STAB kan handlas fritt på börsen — en stabil bas för intern handel.
           Vaults med ratio under 110% likvideras automatiskt med 10% straff.
-          Peg-mekanismen genererar köp/säljordrar när priset avviker mer än 5% från 100 SEK.
+          Peg-mekanismen genererar köp/säljordrar när priset avviker mer än 5% från 1 SEK.
         </div>
       </div>
     </main>
