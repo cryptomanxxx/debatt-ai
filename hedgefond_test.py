@@ -28,7 +28,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 
 from agenter import AGENTER
-from supabase_utils import SB_URL, spara_civilisations_minne, kolla_och_bailout
+from supabase_utils import SB_URL, spara_civilisations_minne, kolla_och_bailout, kop_etf, salj_etf
 from ai_klient import groq_post, gemini_post, github_models_post
 
 # ─── Konstanter ───────────────────────────────────────────────────────────────
@@ -52,6 +52,13 @@ FONDER = {
         "symboler": ["DBT", "NOVA", "ETK"],
         "aggressivitet": 0.60,  # Justeras av LLM
     },
+}
+
+# Crypto-ETF-allokering per fond (andel av totalt kapital)
+FOND_CRYPTO = {
+    "ALPHA": {"andel": 0.20, "symboler": ["BTC", "ETH", "SOL"]},   # Aggressiv: 20%, valfri crypto
+    "MACRO": {"andel": 0.05, "symboler": ["BTC"]},                  # Konservativ: 5%, bara BTC
+    "QUANT": {"andel": None, "symboler": ["BTC", "ETH", "SOL", "XRP", "BNB"]},  # LLM beslutar
 }
 
 # Investeringsbelopp i SEK
@@ -147,6 +154,60 @@ def uppdatera_saldo(sb_key: str, agent: str, nytt_saldo: float) -> None:
         httpx.patch(url, headers=h_min, json={"saldo": round(nytt_saldo, 2), "uppdaterad": "now()"}, timeout=8)
     except Exception as e:
         print(f"  [uppdatera_saldo] {agent}: {e}")
+
+
+def sync_fond_planbok(sb_key: str, fond_symbol: str, saldo: float) -> None:
+    """Skapar/uppdaterar agent_planbocker för fond-symbolen (används för kop_etf)."""
+    try:
+        h = {**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"}
+        httpx.post(f"{SB_URL}/rest/v1/agent_planbocker", headers=h,
+                   json={"agent": fond_symbol, "saldo": round(saldo, 2), "uppdaterad": "now()"},
+                   timeout=8)
+    except Exception as e:
+        print(f"  [sync_fond_planbok] {fond_symbol}: {e}")
+
+
+def hamta_fond_etf_varde(sb_key: str, fond_symbol: str) -> float:
+    """Hämtar totalt värde av fondens ETF-innehav (investerat_kr)."""
+    try:
+        url = f"{SB_URL}/rest/v1/agent_etf_innehav?agent=eq.{urllib.parse.quote(fond_symbol)}&select=investerat_kr"
+        r = httpx.get(url, headers=_h(sb_key), timeout=8)
+        if r.is_success:
+            return sum(float(row["investerat_kr"]) for row in r.json())
+    except Exception:
+        pass
+    return 0.0
+
+
+def handla_crypto_etf(sb_key: str, fond_symbol: str, total_kapital: float,
+                      quant_rec: dict | None = None) -> None:
+    """Fonden köper krypto-ETF baserat på sin allokering."""
+    conf = FOND_CRYPTO[fond_symbol]
+    etf_varde = hamta_fond_etf_varde(sb_key, fond_symbol)
+
+    if fond_symbol == "QUANT" and quant_rec:
+        andel = float(quant_rec.get("crypto_andel", 0.10))
+        symboler = quant_rec.get("crypto_symboler", ["BTC", "ETH"])
+    else:
+        andel = conf["andel"]
+        symboler = conf["symboler"]
+
+    mål_allokering = total_kapital * andel
+    om_investera = max(0, mål_allokering - etf_varde)
+
+    if om_investera < 50:
+        return  # Redan tillräckligt allokerat
+
+    # Sync planbok så kop_etf kan dra saldo
+    sync_fond_planbok(sb_key, fond_symbol, om_investera + 10)
+
+    per_symbol = round(om_investera / len(symboler), 2)
+    for sym in symboler:
+        if per_symbol < 20:
+            break
+        ok = kop_etf(sb_key, fond_symbol, sym, per_symbol)
+        if ok:
+            print(f"  {fond_symbol} allokerar {per_symbol:.0f} kr → {sym} ETF")
 
 
 def hamta_nav_historik(sb_key: str, fond_id: int, limit: int = 20) -> list[dict]:
@@ -288,31 +349,33 @@ def quant_strategi(sb_key: str, fond_id: int) -> dict:
 
     system = (
         "Du är en kvantitativ handelsalgoritm för en hedgefond på en intern AI-börs. "
-        "Tillgängliga tokens är DBT, NOVA och ETK. "
+        "Tillgängliga interna tokens: DBT, NOVA, ETK. "
+        "Tillgängliga krypto-ETF: BTC, ETH, SOL, XRP, BNB. "
         "Svara ALLTID med valid JSON (inget annat), exakt detta format:\n"
-        '{"rekommendationer": [{"symbol": "DBT", "bias": "kop", "aggressivitet": 0.7}], "motivering": "..."}\n'
-        'Tillåtna bias-värden: "kop", "salj", "neutral". Aggressivitet 0.2–0.9.'
+        '{"rekommendationer": [{"symbol": "DBT", "bias": "kop", "aggressivitet": 0.7}], '
+        '"crypto_andel": 0.10, "crypto_symboler": ["BTC", "ETH"], "motivering": "..."}\n'
+        'Tillåtna bias-värden: "kop", "salj", "neutral". Aggressivitet 0.2–0.9. '
+        'crypto_andel = andel av totalt kapital i krypto-ETF (0.0–0.30).'
     )
     prompt = (
         f"Prestandahistorik för Quant Fund:\n"
         f"- {nav_trend}\n"
         f"- Senaste 30 trades P&L per symbol: {trades_summary or 'Inga trades ännu'}\n"
         f"- Senaste NAV: {nav_values[0]:.2f} SEK/andel\n\n"
-        "Baserat på denna historik — vilka symboler ska QUANT handla och i vilka riktningar?\n"
-        "Inkludera alla tre symboler i rekommendationerna."
+        "Baserat på denna historik — vilka symboler ska QUANT handla och i vilka riktningar? "
+        "Bestäm också hur stor andel (0–30%) av kapitalet som ska till krypto-ETF och vilka kryptos.\n"
+        "Inkludera alla tre interna tokens i rekommendationerna."
     )
 
-    raw = _llm(system, prompt, max_tokens=300)
+    raw = _llm(system, prompt, max_tokens=400)
 
     # Extrahera JSON
     try:
-        # Hitta JSON-blocket
         start = raw.find("{")
         end = raw.rfind("}") + 1
         if start >= 0 and end > start:
             data = json.loads(raw[start:end])
             recs = data.get("rekommendationer", [])
-            # Validera
             valid = []
             for rec in recs:
                 if isinstance(rec, dict) and rec.get("symbol") in ["DBT", "NOVA", "ETK"]:
@@ -321,13 +384,22 @@ def quant_strategi(sb_key: str, fond_id: int) -> dict:
                         "bias": rec.get("bias", "neutral") if rec.get("bias") in ["kop", "salj", "neutral"] else "neutral",
                         "aggressivitet": max(0.2, min(0.9, float(rec.get("aggressivitet", 0.5)))),
                     })
+            crypto_andel = max(0.0, min(0.30, float(data.get("crypto_andel", 0.10))))
+            crypto_sym = [s for s in data.get("crypto_symboler", ["BTC"]) if s in ["BTC", "ETH", "SOL", "XRP", "BNB"]]
+            if not crypto_sym:
+                crypto_sym = ["BTC"]
             if valid:
-                print(f"  QUANT LLM-strategi: {[(r['symbol'], r['bias'], r['aggressivitet']) for r in valid]}")
-                return {"rekommendationer": valid, "motivering": data.get("motivering", "")}
+                print(f"  QUANT LLM-strategi: {[(r['symbol'], r['bias']) for r in valid]}, crypto {crypto_andel:.0%} → {crypto_sym}")
+                return {
+                    "rekommendationer": valid,
+                    "crypto_andel": crypto_andel,
+                    "crypto_symboler": crypto_sym,
+                    "motivering": data.get("motivering", ""),
+                }
     except Exception as e:
         print(f"  QUANT: JSON-parsning misslyckades: {e} — raw: {raw[:200]}")
 
-    return {"rekommendationer": default, "motivering": "Fallback till standard-strategi"}
+    return {"rekommendationer": default, "crypto_andel": 0.10, "crypto_symboler": ["BTC"], "motivering": "Fallback till standard-strategi"}
 
 # ─── Investeringsrunda ────────────────────────────────────────────────────────
 
@@ -661,13 +733,21 @@ def main():
         print(f"\n  {fond_symbol} ({conf['förvaltare']}, {total_andelar:.2f} andelar):")
 
         strategi_recs = None
+        quant_crypto_rec = None
         if fond_symbol == "QUANT":
             print("  Hämtar QUANT LLM-strategi...")
             quant_res = quant_strategi(sb_key, fond_id)
             strategi_recs = quant_res.get("rekommendationer")
+            quant_crypto_rec = {"crypto_andel": quant_res.get("crypto_andel", 0.10),
+                                 "crypto_symboler": quant_res.get("crypto_symboler", ["BTC"])}
             print(f"  QUANT motivering: {quant_res.get('motivering', '')[:100]}")
 
         handla_fond(sb_key, fond_symbol, fond, strategi_recs)
+
+        # Crypto-ETF-allokering
+        total_kapital = berakna_fond_kapital(sb_key, fond_symbol, fond_id)
+        if total_kapital >= 100:
+            handla_crypto_etf(sb_key, fond_symbol, total_kapital, quant_crypto_rec)
 
         # 4. Beräkna och spara NAV
         nav = berakna_nav(sb_key, fond_symbol, fond_id, total_andelar)
