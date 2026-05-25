@@ -156,6 +156,51 @@ def uppdatera_saldo(sb_key: str, agent: str, nytt_saldo: float) -> None:
         print(f"  [uppdatera_saldo] {agent}: {e}")
 
 
+BINANCE_SYMBOL = {
+    "BTC": "BTCUSDT", "ETH": "ETHUSDT", "SOL": "SOLUSDT",
+    "XRP": "XRPUSDT", "BNB": "BNBUSDT",
+}
+
+
+def populera_ohlcv_live(sb_key: str, symboler: list[str]) -> None:
+    """Hämtar live-priser från Binance och skriver till ohlcv_cache om dagsdata saknas."""
+    idag = datetime.now(timezone.utc).date().isoformat()
+    h_write = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    for sym in symboler:
+        ticker = BINANCE_SYMBOL.get(sym)
+        if not ticker:
+            continue
+        # Kolla om vi redan har dagsdata
+        check = httpx.get(
+            f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{sym}&datum=eq.{idag}&select=pris",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}, timeout=6,
+        )
+        if check.is_success and check.json():
+            continue  # Redan finns
+        try:
+            r = httpx.get(
+                f"https://api.binance.com/api/v3/ticker/price?symbol={ticker}",
+                timeout=8,
+            )
+            if not r.is_success:
+                print(f"  [ohlcv fallback] {sym}: Binance svarade {r.status_code}")
+                continue
+            pris = float(r.json()["price"])
+            httpx.post(
+                f"{SB_URL}/rest/v1/ohlcv_cache?on_conflict=symbol,datum",
+                headers=h_write,
+                json={"symbol": sym, "datum": idag, "pris": round(pris, 2), "vol": 0},
+                timeout=8,
+            )
+            print(f"  [ohlcv fallback] {sym}: {pris:.2f} USD (Binance live)")
+        except Exception as e:
+            print(f"  [ohlcv fallback] {sym}: {e}")
+
+
 def sync_fond_planbok(sb_key: str, fond_symbol: str, saldo: float) -> None:
     """Skapar/uppdaterar agent_planbocker för fond-symbolen (används för kop_etf)."""
     try:
@@ -199,6 +244,9 @@ def handla_crypto_etf(sb_key: str, fond_symbol: str, total_kapital: float,
         print(f"  {fond_symbol} crypto ETF: redan allokerat ({etf_varde:.0f} kr, mål {mål_allokering:.0f} kr)")
         return
 
+    # Säkerställ att ohlcv_cache har dagsdata (fallback: Binance live-pris)
+    populera_ohlcv_live(sb_key, symboler)
+
     # Sync planbok så kop_etf kan dra saldo
     sync_fond_planbok(sb_key, fond_symbol, om_investera + 10)
 
@@ -211,7 +259,7 @@ def handla_crypto_etf(sb_key: str, fond_symbol: str, total_kapital: float,
         if ok:
             print(f"  {fond_symbol} allokerar {per_symbol:.0f} kr → {sym} ETF ✓")
         else:
-            print(f"  {fond_symbol} → {sym} ETF misslyckades (saknas pris i ohlcv_cache?)")
+            print(f"  {fond_symbol} → {sym} ETF misslyckades")
 
 
 def hamta_nav_historik(sb_key: str, fond_id: int, limit: int = 20) -> list[dict]:
