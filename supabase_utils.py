@@ -3724,11 +3724,13 @@ def salj_etf(sb_key: str, agent_namn: str, symbol: str, fraktion: float = 1.0) -
             f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo",
             headers={**h, "Prefer": ""}, timeout=6,
         )
+        saldo_efter = 500.0
         if saldo_r.is_success and saldo_r.json():
             saldo = float(saldo_r.json()[0]["saldo"])
+            saldo_efter = round(saldo + proceeds, 2)
             httpx.patch(
                 f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-                headers=h, json={"saldo": round(saldo + proceeds, 2), "uppdaterad": "now()"}, timeout=8,
+                headers=h, json={"saldo": saldo_efter, "uppdaterad": "now()"}, timeout=8,
             )
 
         # Logga
@@ -3751,7 +3753,7 @@ def salj_etf(sb_key: str, agent_namn: str, symbol: str, fraktion: float = 1.0) -
                 agenter=[agent_namn], relaterat_typ="etf_transaktioner",
             )
             try:
-                generera_borshändelse_bild(sb_key, agent_namn, symbol, pnl)
+                generera_borshändelse_bild(sb_key, agent_namn, symbol, pnl, saldo=saldo_efter)
             except Exception:
                 pass
         return proceeds

@@ -1197,7 +1197,7 @@ def main():
                 try:
                     v_r = httpx.get(
                         f"https://fmwxftnistkoqazfwnuj.supabase.co/rest/v1/riksdagsval"
-                        f"?status=eq.aktivt&order=skapad.desc&limit=1&select=id,manifest",
+                        f"?status=eq.aktiv&order=skapad.desc&limit=1&select=id,partier",
                         headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
                         timeout=6,
                     )
@@ -1207,7 +1207,11 @@ def main():
                     pass
 
             if aktiv_val and tärning < 0.25:
-                manifest_utdrag = (aktiv_val.get("manifest") or {}).get(parti_namn, "")[:80]
+                parti_entry = next(
+                    (p for p in (aktiv_val.get("partier") or []) if p.get("namn") == parti_namn),
+                    {}
+                )
+                manifest_utdrag = parti_entry.get("manifesto", "")[:80]
                 generera_valkampanj(sb_key, agent["namn"], parti_namn,
                                     manifest_utdrag=manifest_utdrag,
                                     saldo=saldo_för_bild)

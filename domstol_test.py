@@ -627,9 +627,13 @@ def main():
             try:
                 planbok = sb_get(h, f"agent_planbocker?agent=eq.{svarande}&select=saldo")
                 saldo_nu = planbok[0].get("saldo", 500) if planbok else 500
+                konst_artikel = next(
+                    (a for a in AI_KONSTITUTION if a["artikel"] == arende.get("artikel_nr", 1)),
+                    {"rubrik": "konstitutionsbrott"}
+                )
                 generera_domstolsdom_bild(
                     sb_key, svarande, arende.get("artikel_nr", 1),
-                    dom.get("artikel_rubrik", "konstitutionsbrott"), "fälld", saldo_nu
+                    konst_artikel["rubrik"], "fälld", saldo_nu
                 )
             except Exception as e:
                 print(f"  [VARNING] Domstolsbild misslyckades: {e}")
