@@ -64,6 +64,7 @@ from supabase_utils import (
     AGENT_GODTROGENHET, sprid_med_mutation, kolla_reflexiv_bankrun, aterbetala_lan_delvis,
     generera_och_spara_bild, reagera_pa_bild,
     generera_meme, generera_propaganda, generera_valkampanj,
+    generera_portratt, generera_utopi_dystopi,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -1210,22 +1211,34 @@ def main():
                 generera_valkampanj(sb_key, agent["namn"], parti_namn,
                                     manifest_utdrag=manifest_utdrag,
                                     saldo=saldo_för_bild)
-            elif tärning < 0.05:
-                # Meme — välj slumpmässig motståndare
+            elif tärning < 0.03:
+                # Meme (~3%) — välj slumpmässig motståndare
                 andra = [a for a in AGENTER if a["namn"] != agent["namn"]]
                 if andra:
                     mal = random.choice(andra)
                     generera_meme(sb_key, agent["namn"], mal["namn"], saldo=saldo_för_bild)
-            elif tärning < 0.10:
-                # Propaganda
+            elif tärning < 0.06:
+                # Propaganda (~3%)
                 generera_propaganda(sb_key, agent["namn"], parti=parti_namn,
                                     ideologi=ideologi, saldo=saldo_för_bild)
-            elif tärning < 0.25:
-                # Tillståndsfoto
+            elif tärning < 0.13:
+                # Tillståndsfoto (~7%)
                 generera_och_spara_bild(sb_key, agent["namn"],
                                         saldo=saldo_för_bild,
                                         parti=parti_namn,
                                         ideologi=ideologi)
+            elif tärning < 0.19:
+                # Porträtt (~6%)
+                generera_portratt(sb_key, agent["namn"],
+                                  saldo=saldo_för_bild,
+                                  parti=parti_namn,
+                                  ideologi=ideologi)
+            elif tärning < 0.25:
+                # Utopi/dystopi-vision (~6%)
+                generera_utopi_dystopi(sb_key, agent["namn"],
+                                       saldo=saldo_för_bild,
+                                       parti=parti_namn,
+                                       ideologi=ideologi)
         except Exception as e:
             print(f"  ✗ Bildgenerering: {e}", file=sys.stderr)
 

@@ -23,6 +23,8 @@ from datetime import datetime, timezone, timedelta
 
 import httpx
 
+from supabase_utils import generera_domstolsdom_bild
+
 # ---------------------------------------------------------------------------
 # Konstanter
 # ---------------------------------------------------------------------------
@@ -622,6 +624,15 @@ def main():
                     bote_totalt += belopp
             else:
                 print(f"  [INFO] Ingen bot att verkställa (dom_id={dom_id}, belopp={belopp})")
+            try:
+                planbok = sb_get(h, f"agent_planbocker?agent=eq.{svarande}&select=saldo")
+                saldo_nu = planbok[0].get("saldo", 500) if planbok else 500
+                generera_domstolsdom_bild(
+                    sb_key, svarande, arende.get("artikel_nr", 1),
+                    dom.get("artikel_rubrik", "konstitutionsbrott"), "fälld", saldo_nu
+                )
+            except Exception as e:
+                print(f"  [VARNING] Domstolsbild misslyckades: {e}")
         else:
             friada_count += 1
             print(f"  → {svarande} FRIAD.")

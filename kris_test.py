@@ -14,6 +14,8 @@ import datetime
 import json
 import httpx
 
+from supabase_utils import generera_kris_bild
+
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "").strip()
 
@@ -286,6 +288,11 @@ def trigga_ny_kris() -> bool:
         ),
         mall["paverkade_agenter"],
     )
+    try:
+        generera_kris_bild(SB_KEY, mall["typ"], mall["rubrik"],
+                           mall["paverkade_agenter"], mall["intensitet"])
+    except Exception as e:
+        print(f"  [VARNING] Krisbild misslyckades: {e}")
     return True
 
 
