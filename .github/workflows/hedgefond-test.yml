@@ -1,0 +1,29 @@
+name: Hedgefond
+
+on:
+  schedule:
+    # 11:00 svensk tid (09:00 UTC sommartid, 10:00 UTC vintertid)
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+jobs:
+  hedgefond:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install httpx
+
+      - name: Run hedgefond_test.py
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python hedgefond_test.py

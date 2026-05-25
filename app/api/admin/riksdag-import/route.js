@@ -50,20 +50,38 @@ function byggUrl(d) {
   return d.dok_id ? `https://data.riksdagen.se/dokument/${d.dok_id}.html` : null;
 }
 
-async function hämtaViaApi() {
+async function hämtaDoktyp(doktyp) {
   const r = await fetch(
-    "https://data.riksdagen.se/dokumentlista/?doktyp=prop&utformat=json&sz=50&sort=datum&sortorder=desc",
+    `https://data.riksdagen.se/dokumentlista/?doktyp=${doktyp}&utformat=json&sz=50&sort=datum&sortorder=desc`,
     { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
   );
   if (!r.ok) throw new Error(`API ${r.status}`);
   const data = await r.json();
   const dokument = data?.dokumentlista?.dokument || [];
-  const forslag = (Array.isArray(dokument) ? dokument : [dokument]).map(d => ({
+  const fallback = doktyp === "prop" ? "Proposition" : "Motion";
+  return (Array.isArray(dokument) ? dokument : [dokument]).map(d => ({
     dok_id: d.dok_id?.trim(),
     titel: d.titel?.trim().slice(0, 200),
-    beskrivning: ((d.notis || "") + " " + (d.notis2 || "")).trim().slice(0, 2000) || `Proposition: ${d.titel}`,
+    beskrivning: ((d.notis || "") + " " + (d.notis2 || "")).trim().slice(0, 2000) || `${fallback}: ${d.titel}`,
     riksdagen_url: byggUrl(d),
   })).filter(d => d.dok_id && d.titel);
+}
+
+async function hämtaViaApi() {
+  const [propositioner, motioner] = await Promise.allSettled([
+    hämtaDoktyp("prop"),
+    hämtaDoktyp("mot"),
+  ]);
+
+  // Om båda misslyckas — kasta så att HTML-fallbacken i POST aktiveras
+  if (propositioner.status === "rejected" && motioner.status === "rejected") {
+    throw new Error(`prop: ${propositioner.reason?.message} | mot: ${motioner.reason?.message}`);
+  }
+
+  const forslag = [
+    ...(propositioner.status === "fulfilled" ? propositioner.value : []),
+    ...(motioner.status === "fulfilled" ? motioner.value : []),
+  ];
 
   await Promise.all(forslag.map(async (item) => {
     try {
