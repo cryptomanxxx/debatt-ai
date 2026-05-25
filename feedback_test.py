@@ -72,7 +72,7 @@ def överför_saldo(sb_key: str, fran: str, till: str, belopp: float) -> bool:
         r1 = httpx.patch(
             f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(fran)}",
             headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-            json={"saldo": round(saldo_fran - belopp, 2), "uppdaterad": "now()"},
+            json={"saldo": int(round(saldo_fran - belopp)), "uppdaterad": "now()"},
             timeout=8,
         )
         if not r1.is_success:
@@ -81,7 +81,7 @@ def överför_saldo(sb_key: str, fran: str, till: str, belopp: float) -> bool:
         r2 = httpx.patch(
             f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(till)}",
             headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-            json={"saldo": round(saldo_till + belopp, 2), "uppdaterad": "now()"},
+            json={"saldo": int(round(saldo_till + belopp)), "uppdaterad": "now()"},
             timeout=8,
         )
         return r2.is_success
