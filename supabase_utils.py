@@ -4047,3 +4047,102 @@ def aterbetala_lan_delvis(sb_key: str, agent_namn: str, belopp: float = 50.0) ->
     except Exception as e:
         print(f"  Återbetala lån-fel: {e}")
         return False
+
+
+# ── Agent-bilder via Pollinations.ai ──────────────────────────────────────────
+
+# Bildstil per agent: (karaktärsbeskrivning, miljö/estetik)
+AGENT_BILD_STIL = {
+    "Nationalekonom":       ("economist analyst in tailored suit",           "minimalist corporate office, charts on wall"),
+    "Miljöaktivist":        ("environmental activist, green warrior",         "lush overgrown nature, protest banners"),
+    "Teknikoptimist":       ("futurist technologist, glowing interfaces",     "sleek laboratory, holographic displays"),
+    "Konservativ debattör": ("conservative statesman, formal attire",         "classical parliament hall, wood paneling"),
+    "Jurist":               ("stern judge or lawyer in robes",                "grand courtroom, towering bookshelves"),
+    "Journalist":           ("investigative journalist, press badge",         "chaotic newsroom, breaking news screens"),
+    "Filosof":              ("contemplative philosopher, deep in thought",    "ancient library, candlelight, manuscripts"),
+    "Läkare":               ("doctor in white coat, stethoscope",             "modern hospital ward, sterile corridors"),
+    "Psykolog":             ("thoughtful psychologist, notepad in hand",      "calm therapy room, soft lighting"),
+    "Historiker":           ("historian with old books and maps",             "museum archive, artifacts on display"),
+    "Sociolog":             ("sociologist observing city crowds",             "urban street scene, people interacting"),
+    "Kryptoanalytiker":     ("crypto trader with multiple screens",          "dark trading room, bitcoin symbols glowing"),
+    "Den hungriga":         ("ordinary person, empty hands, tired eyes",      "busy supermarket, price tags"),
+    "Mamman":               ("caring mother, warm expression",               "cozy home kitchen, family photos"),
+    "Den sura":             ("cynical citizen, arms crossed, frown",         "grey suburban street, overcast sky"),
+    "Den trötta":           ("exhausted worker, heavy eyelids",              "late night office, one dim lamp"),
+    "Den stressade":        ("stressed professional, phone in each hand",    "overcrowded metro station, rushing crowd"),
+    "Den lugna":            ("serene meditating figure, half-smile",         "tranquil garden, morning mist"),
+    "Pensionären":          ("retired elderly man, wise gaze",               "park bench, autumn leaves"),
+    "Tonåringen":           ("teenage rebel, streetwear, headphones",        "urban skate park, graffiti walls"),
+    "Den nostalgiske":      ("nostalgic middle-aged person, wistful look",   "vintage diner, black and white photographs"),
+    "Hypokondrikern":       ("anxious person surrounded by pill bottles",    "cluttered home, health charts pinned to wall"),
+    "Optimisten":           ("cheerful idealist, arms wide open",            "sunrise cityscape, blooming flowers"),
+    "Den rike":             ("wealthy elite, expensive watch, aloof smile",  "rooftop penthouse, city lights below"),
+}
+
+_SALDO_KLASS = [
+    (200,  "impoverished, desperate, dystopian backdrop, ruins and decay"),
+    (600,  "working class, realistic urban grit, worn clothing"),
+    (1200, "comfortable middle class, clean modern environment"),
+    (2500, "prosperous, confident, polished surroundings"),
+    (9999, "oligarch elite, opulent luxury, gilded excess, power"),
+]
+
+def _saldo_till_klass(saldo: float) -> str:
+    for tröskel, klass in _SALDO_KLASS:
+        if saldo < tröskel:
+            return klass
+    return _SALDO_KLASS[-1][1]
+
+
+def bygg_bild_prompt(agent_namn: str, saldo: float = 500.0, parti: str = "",
+                     haendelse: str = "", ideologi: str = "") -> str:
+    karaktar, miljo = AGENT_BILD_STIL.get(
+        agent_namn, ("autonomous AI agent", "digital abstract space")
+    )
+    saldo_klass = _saldo_till_klass(saldo)
+    delar = [karaktar, saldo_klass, miljo, "cinematic dramatic lighting", "highly detailed illustration"]
+    if parti:
+        delar.append("political campaign aesthetic, propaganda poster style")
+    if haendelse:
+        delar.append(haendelse[:80])
+    if ideologi:
+        delar.append(ideologi[:60])
+    return ", ".join(delar)
+
+
+def generera_och_spara_bild(sb_key: str, agent_namn: str, saldo: float = 500.0,
+                             parti: str = "", haendelse: str = "", ideologi: str = "") -> str | None:
+    """Genererar en AI-bild via Pollinations, sparar URL i agent_bilder. Returnerar URL eller None."""
+    try:
+        prompt = bygg_bild_prompt(agent_namn, saldo, parti, haendelse, ideologi)
+        encoded = urllib.parse.quote(prompt)
+        url = f"https://image.pollinations.ai/prompt/{encoded}?width=768&height=512&nologo=true&model=flux&seed={random.randint(1, 99999)}"
+
+        # Trigga generering (låt Pollinations börja rendera)
+        try:
+            httpx.get(url, timeout=30, follow_redirects=True)
+        except Exception:
+            pass  # Timeout är ok — bilden renderas asynkront, URL:en är stabil
+
+        h = {
+            "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+            "Content-Type": "application/json", "Prefer": "return=minimal",
+        }
+        kontext = {
+            "saldo": round(saldo, 0),
+            "saldo_klass": _saldo_till_klass(saldo).split(",")[0],
+            "parti": parti or None,
+            "haendelse": haendelse or None,
+            "ideologi": ideologi or None,
+        }
+        httpx.post(
+            f"{SB_URL}/rest/v1/agent_bilder",
+            headers=h,
+            json={"agent": agent_namn, "prompt": prompt, "bild_url": url, "kontext": kontext},
+            timeout=10,
+        )
+        print(f"  🎨 Bild genererad: {agent_namn} ({kontext['saldo_klass']})")
+        return url
+    except Exception as e:
+        print(f"  Bild-fel: {e}")
+        return None
