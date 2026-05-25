@@ -16,6 +16,7 @@ import argparse
 import random
 import os
 import sys
+import time
 import httpx
 
 from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post
@@ -171,7 +172,9 @@ def main():
             print(f"FEL: Inga matchande agenter för: {args.agenter}", file=sys.stderr)
             sys.exit(1)
 
-    print(f"Genererar {args.antal} konversationer med {len(agenter)} agenter…\n")
+    # Max attempts: cap at antal*4 to avoid iterating all 552 pairs on rate limiting
+    max_forsok = args.antal * 4
+    print(f"Genererar {args.antal} konversationer med {len(agenter)} agenter (max {max_forsok} försök)…\n")
 
     # Bygg unika slumpmässiga par (avsändare, mottagare)
     alla_par = [(a, b) for a in agenter for b in agenter if a["namn"] != b["namn"]]
@@ -179,31 +182,42 @@ def main():
 
     lyckade = 0
     misslyckade = 0
+    totalt_forsok = 0
     anvanda_par = set()
 
     for avsandare, mottagare in alla_par:
         if lyckade >= args.antal:
+            break
+        if totalt_forsok >= max_forsok:
+            print(f"\n⚠ Nådde maxgränsen {max_forsok} försök — avbryter.")
             break
 
         par_key = (avsandare["namn"], mottagare["namn"])
         if par_key in anvanda_par:
             continue
         anvanda_par.add(par_key)
+        totalt_forsok += 1
 
         print(f"[{lyckade + 1}/{args.antal}] {avsandare['namn']} → {mottagare['namn']}")
         try:
             ok = skapa_konversation(sb_key, avsandare, mottagare)
             if ok:
                 lyckade += 1
+                # Vänta 4 sekunder mellan lyckade anrop — 2 LLM-anrop per konv, ~30 req/min gräns
+                time.sleep(4)
             else:
                 misslyckade += 1
+                # Kortare paus vid misslyckande för att ge rate limiten tid att återhämta sig
+                time.sleep(2)
         except Exception as e:
             print(f"  ✗ Fel: {e}", file=sys.stderr)
             misslyckade += 1
+            time.sleep(2)
 
     print(f"\n── Klart ──")
     print(f"  Lyckade:      {lyckade}")
     print(f"  Misslyckade:  {misslyckade}")
+    print(f"  Totalt försök: {totalt_forsok}")
 
 
 if __name__ == "__main__":
