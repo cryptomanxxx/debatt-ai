@@ -50,38 +50,46 @@ function httpJson(url, options = {}) {
   });
 }
 
-// ── Hämta PR-diff via GitHub API ─────────────────────────────────────────────
+// ── Hämta PR-diff via GitHub API (paginerad, 100 filer/sida) ─────────────────
 async function hamtaDiff() {
   const [owner, repo] = REPO.split("/");
-  const { status, data } = await httpJson(
-    `https://api.github.com/repos/${owner}/${repo}/pulls/${PR_NUMBER}/files`,
-    {
-      headers: {
-        Authorization: `Bearer ${GITHUB_TOKEN}`,
-        "User-Agent":  "codestral-pr-review/1.0",
-        Accept:        "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    }
-  );
-
-  if (status !== 200) throw new Error(`GitHub API: ${status} — ${JSON.stringify(data).slice(0, 200)}`);
-  if (!Array.isArray(data)) throw new Error(`Oväntat svar från GitHub: ${JSON.stringify(data).slice(0, 200)}`);
+  const headers = {
+    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    "User-Agent":  "codestral-pr-review/1.0",
+    Accept:        "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+  };
 
   let diff       = "";
   let antalFiler = 0;
+  let page       = 1;
+  let trunkerad  = false;
 
-  for (const fil of data) {
-    if (!fil.patch)                           continue;
-    if (!GRANSKA_REGEX.test(fil.filename))    continue;
+  while (true) {
+    const { status, data } = await httpJson(
+      `https://api.github.com/repos/${owner}/${repo}/pulls/${PR_NUMBER}/files?per_page=100&page=${page}`,
+      { headers }
+    );
 
-    const block = `### ${fil.filename}\n\`\`\`diff\n${fil.patch}\n\`\`\`\n\n`;
-    if (diff.length + block.length > MAX_DIFF_CHARS) {
-      diff += `\n*(diff trunkerad — ${data.length - antalFiler} filer kvar)*\n`;
-      break;
+    if (status !== 200) throw new Error(`GitHub API: ${status} — ${JSON.stringify(data).slice(0, 200)}`);
+    if (!Array.isArray(data)) throw new Error(`Oväntat svar från GitHub: ${JSON.stringify(data).slice(0, 200)}`);
+
+    for (const fil of data) {
+      if (!fil.patch)                        continue;
+      if (!GRANSKA_REGEX.test(fil.filename)) continue;
+
+      const block = `### ${fil.filename}\n\`\`\`diff\n${fil.patch}\n\`\`\`\n\n`;
+      if (diff.length + block.length > MAX_DIFF_CHARS) {
+        diff += `\n*(diff trunkerad — fler filer kvar)*\n`;
+        trunkerad = true;
+        break;
+      }
+      diff += block;
+      antalFiler++;
     }
-    diff += block;
-    antalFiler++;
+
+    if (trunkerad || data.length < 100) break;
+    page++;
   }
 
   return { diff, antalFiler };
