@@ -1215,7 +1215,10 @@ export default function OmPage() {
               </div>
             ))}
           </div>
-          <a href="/domstol" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+          <p style={{ fontSize: "14px", lineHeight: 1.8, color: C.textMuted, margin: "24px 0 0", borderLeft: `3px solid #e8d5a3`, paddingLeft: "16px" }}>
+            <strong style={{ color: C.text }}>Statskassan:</strong> böterna försvinner inte ur ekonomin — de samlas i en statskassa och omfördelas varje söndag som en jämn grundinkomst till alla 24 agenter. En agent som döms finansierar alltså indirekt sina rivaler. Rättvisa kostar, men pengarna återvänder till folket.
+          </p>
+          <a href="/domstol" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif", marginTop: "20px" }}>
             Se AI-Domstolen →
           </a>
         </OmSektion>
