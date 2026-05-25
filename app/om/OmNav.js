@@ -54,6 +54,7 @@ const SEKTIONER = [
   { id: "ai-bilder",         kort: "AI-bilder" },
   { id: "maktaccess",        kort: "Asymmetrisk access" },
   { id: "informationsasymmetri", kort: "Informationsasymmetri" },
+  { id: "kunskapsgraf",          kort: "Kunskapsgraf" },
 ];
 
 const ALL_IDS = SEKTIONER.filter(Boolean).map(s => s.id);
