@@ -331,6 +331,48 @@ def quant_strategi(sb_key: str, fond_id: int) -> dict:
 
 # ─── Investeringsrunda ────────────────────────────────────────────────────────
 
+def bootstrap_fond(sb_key: str, fond_symbol: str, fond: dict) -> None:
+    """
+    Om en fond saknar investerare investerar förvaltaren automatiskt 300 SEK i sin egna fond.
+    "Eat your own cooking" — förvaltare ska ha skin in the game.
+    """
+    fond_id = fond["id"]
+    förvaltare = FONDER[fond_symbol]["förvaltare"]
+    nav = float(fond["nav_per_andel"])
+
+    befintlig = hamta_agent_investering(sb_key, fond_id, förvaltare)
+    if befintlig:
+        return  # Förvaltaren har redan investerat
+
+    saldo = hamta_saldo(sb_key, förvaltare)
+    belopp = 300.0
+    if saldo < belopp:
+        belopp = max(100.0, saldo * 0.3)
+    if belopp < 50:
+        print(f"  {fond_symbol}: förvaltaren {förvaltare} har för lågt saldo för bootstrap ({saldo:.0f} SEK)")
+        return
+
+    andelar = round(belopp / nav, 4)
+    uppdatera_saldo(sb_key, förvaltare, saldo - belopp)
+
+    try:
+        h_post = {**_h(sb_key), "Prefer": "return=minimal"}
+        r = httpx.post(f"{SB_URL}/rest/v1/hedgefond_investerare", headers=h_post, json={
+            "fond_id": fond_id,
+            "agent": förvaltare,
+            "andelar": andelar,
+            "investerat_sek": belopp,
+        }, timeout=8)
+        if r.is_success:
+            ny_total = float(fond.get("total_andelar", 0)) + andelar
+            uppdatera_fond_nav(sb_key, fond_id, nav, ny_total)
+            print(f"  BOOTSTRAP: {förvaltare} investerar {belopp:.0f} SEK i sin egna fond {fond_symbol} ({andelar:.2f} andelar)")
+        else:
+            print(f"  BOOTSTRAP misslyckades: {r.status_code}")
+    except Exception as e:
+        print(f"  [bootstrap_fond] {fond_symbol}: {e}")
+
+
 def investeringsrunda(sb_key: str, agenter: list[dict]) -> None:
     """Agenter investerar i en slumpmässig fond (~10% chans per agent)."""
     fonddata = {}
@@ -600,6 +642,11 @@ def main():
         if not fond or not fond.get("aktiv"):
             print(f"  {fond_symbol}: fond saknas eller inaktiv")
             continue
+
+        # Bootstrap: förvaltaren auto-investerar om fonden saknar kapital
+        if float(fond.get("total_andelar", 0)) == 0:
+            bootstrap_fond(sb_key, fond_symbol, fond)
+            fond = hamta_fond(sb_key, fond_symbol)  # Hämta uppdaterad data
 
         fond_id = fond["id"]
         total_andelar = float(fond.get("total_andelar", 0))
