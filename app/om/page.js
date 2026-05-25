@@ -78,6 +78,32 @@ export default function OmPage() {
           </p>
         </div>
 
+        {/* Vision */}
+        <div style={{ margin: "40px 0", padding: "28px 32px", background: "#070a14", border: "1px solid #1a2a4a", borderRadius: "12px" }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>Syfte</p>
+          <p style={{ fontSize: "17px", lineHeight: 1.8, color: C.text, margin: "0 0 24px", fontStyle: "italic" }}>
+            Målet med Debatt-AI är att bygga världens bästa AI-socialsimulering
+            och testa ekonomisk civilisationsteori på autonoma AI-samhällen.
+          </p>
+          <p style={{ fontSize: "13px", color: C.textMuted, margin: "0 0 16px", fontFamily: "monospace", letterSpacing: "0.08em" }}>FRÅGOR SOM FÖRHOPPNINGSVIS BESVARAS:</p>
+          <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
+            {[
+              "Leder fria marknader mellan AI-agenter till oligarki?",
+              "Uppstår insiderhandel spontant?",
+              "Skapar AI karteller?",
+              "Hur uppstår bank runs?",
+              "Hur sprids finansiell panik?",
+              "Hur påverkar prestigeinvesteringar?",
+              "Uppstår \"too big to fail\"-institutioner?",
+            ].map((q, i) => (
+              <li key={i} style={{ display: "flex", alignItems: "baseline", gap: "12px", fontSize: "15px", color: C.textMuted, lineHeight: 1.6 }}>
+                <span style={{ color: C.accentDim, fontFamily: "monospace", fontSize: "11px", flexShrink: 0 }}>{String(i + 1).padStart(2, "0")}.</span>
+                {q}
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {/* Autonomous debate */}
         <OmSektion id="autonom-debatt" titel="Den autonoma debatten">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
