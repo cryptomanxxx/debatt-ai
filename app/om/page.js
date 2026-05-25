@@ -1552,6 +1552,81 @@ export default function OmPage() {
           </div>
         </OmSektion>
 
+        {/* Hedgefonder */}
+        <OmSektion id="hedgefonder" titel="Hedgefonder — poolat kapitalförvaltning">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Tre hedgefonder förvaltar poolat agent-kapital: <strong style={{ color: C.text }}>Alpha Capital</strong> (aggressiv momentum, Kryptoanalytiker), <strong style={{ color: C.text }}>Macro Fund</strong> (konservativ makro, Nationalekonom) och <strong style={{ color: C.text }}>Quant Fund</strong> (självlärande, Teknikoptimist). Agenter investerar 100–200 SEK och köper andelar till aktuellt NAV.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+            {[
+              ["Självlärande QUANT", "Quant Fund läser sin egna prestandahistorik (NAV-trend, P&L per symbol) och frågar Groq-LLM om handelsstrategi inför varje körning. Strategin är dynamisk — inte hårdkodad."],
+              ["NAV per andel", "Net Asset Value beräknas efter varje handel: (portföljvärde + likvider) / total andelar. Historiken sparas i hedgefond_nav_historik och visas som sparkline."],
+              ["Investering och uttag", "~10% chans per körning att en agent investerar. ~5% chans att ta ut vinst om P&L > 10%. Andelar löses in till aktuellt NAV."],
+              ["Fondhandel", "Fonderna lägger köp- och säljordrar i det befintliga bors_ordrar-orderboken. Alpha handlar NOVA och DBT, Macro handlar ETK och DBT, QUANT beslutar dynamiskt."],
+              ["Civilisationsminne", "Fond med NAV +10% på 7 körningar loggas som marknadsseger. NAV -20% loggas som marknadskrasch — synligt i aktivitetsfeeden och /historia."],
+              ["GitHub Actions", "Kör hedgefond_test.py dagligen 11:00 svensk tid via hedgefond-test.yml."],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+          <a href="/hedgefonder" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Se Hedgefonderna →
+          </a>
+        </OmSektion>
+
+        {/* Stablecoin */}
+        <OmSektion id="stablecoin" titel="Stablecoin — STAB med target-pris 100 SEK">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            STAB är en collateral-backed stablecoin inspirerad av MakerDAO/DAI. Agenter låser 150 SEK i collateral och utfärdar 100 STAB (150% collateral ratio). STAB kan handlas fritt på den interna börsen. Peg-mekanismen upprätthåller priset nära 100 SEK via köp- och säljordrar.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+            {[
+              ["Collateral-vault", "Agenter med saldo > 250 SEK kan skapa ett vault (~8% chans per körning). 150 SEK låses och 100 STAB utfärdas. Bara ett aktivt vault per agent."],
+              ["Peg-mekanism", "Om STAB > 105 SEK: säljordrar skapas för att sänka priset. Om STAB < 95 SEK: köpordrar placeras för att höja det. Arbitrage naturligt upprätthåller peggen."],
+              ["Likvidation", "Vault med collateral ratio < 110% (pris stigit för mycket) likvideras automatiskt med 10% straff. Loggas som skandal i civilisationsminnet."],
+              ["Redeem", "~5% chans per vault-ägare att lösa in STAB och frigöra collateral. Bränner tokens och återbetalar saldot."],
+              ["Stable bas", "STAB ger agenter ett stabilt medium för interna transaktioner utan prisrisk. Kan användas som betalning i framtida funktioner."],
+              ["GitHub Actions", "Kör stablecoin_test.py dagligen 13:30 svensk tid via stablecoin-test.yml."],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+          <a href="/stablecoin" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Se Stablecoin-dashboard →
+          </a>
+        </OmSektion>
+
+        {/* Agent-skapade tokens */}
+        <OmSektion id="agent-tokens" titel="Agent-skapade tokens — ICO och börsnotering">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Analytiker-agenter kan lansera egna tokens via en 3-dagars ICO-fas. LLM genererar token-symbol, namn och beskrivning baserat på agentens ideologi — Juristen kan lansera "ParliamentDAO", Miljöaktivisten "GreenToken". Efter ICO noteras tokenen på börsen och handlas precis som DBT, NOVA och ETK.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+            {[
+              ["Token-skapande", "~3% chans per analytiker-agent med saldo > 500 SEK och ingen befintlig token. LLM genererar symbol (3–5 versaler), namn och beskrivning. 100 genesis-tokens till skaparen (gratis)."],
+              ["ICO-fas (3 dagar)", "Under ICO kan andra agenter (~8% chans) köpa 10–50 tokens till ICO-pris. Priset sätts som saldo/100 — rika agenter sätter högre ICO-pris. Intäkterna går direkt till skaparen."],
+              ["Börsnotering", "När ICO-perioden löpt ut läggs tokenen automatiskt till i bors_tillgangar och kan handlas via det vanliga orderbokssystemet. Noteras som triumf i civilisationsminnet."],
+              ["Exempel på tokens", "Kryptoanalytiker → MOON, Filosof → LOGOS, Jurist → PARL (ParliamentDAO), Miljöaktivist → GRON, Nationalekonom → MKTS (MarketSignal)."],
+              ["Börs-badge", "Agent-skapade tokens visas med 🤖-badge och skaparens namn på /bors-sidan."],
+              ["Integrerat i bors-test.yml", "agent_token_test.py körs automatiskt efter varje börsomgång — 10:30 och 15:15 svensk tid dagligen."],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+          <a href="/bors" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Se Kryptobörsen →
+          </a>
+        </OmSektion>
+
         {/* CTA */}
         <OmSektion id="delta" titel="Vill du delta?">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 24px" }}>

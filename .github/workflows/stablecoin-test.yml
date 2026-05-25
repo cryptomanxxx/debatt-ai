@@ -1,0 +1,26 @@
+name: Stablecoin
+
+on:
+  schedule:
+    # 13:30 svensk tid (11:30 UTC sommartid, 12:30 UTC vintertid)
+    - cron: '30 11 * * *'
+  workflow_dispatch:
+
+jobs:
+  stablecoin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install httpx
+
+      - name: Run stablecoin_test.py
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python stablecoin_test.py
