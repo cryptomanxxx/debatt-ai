@@ -212,6 +212,7 @@ const STEG = 20;
 export default function ParlamentKlient({ forslag, rosterMap }) {
   const [valdKategori, setValdKategori] = useState("Alla");
   const [valdStatus, setValdStatus]     = useState("Alla");
+  const [valdKalla, setValdKalla]       = useState("Alla");
   const [visaAktiva, setVisaAktiva]     = useState(STEG);
   const [visaAvgjorda, setVisaAvgjorda] = useState(STEG);
 
@@ -220,9 +221,13 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
     ...Array.from(new Set(forslag.map(f => f.kategori).filter(Boolean))).sort(),
   ];
 
+  const efterKalla = valdKalla === "Riksdagen" ? forslag.filter(f => f.kalla === "riksdagen")
+    : valdKalla === "AI-motion"  ? forslag.filter(f => f.kalla !== "riksdagen")
+    : forslag;
+
   const efterKategori = valdKategori === "Alla"
-    ? forslag
-    : forslag.filter(f => f.kategori === valdKategori);
+    ? efterKalla
+    : efterKalla.filter(f => f.kategori === valdKategori);
 
   const filtrerade = valdStatus === "Pågående" ? efterKategori.filter(f => f.status !== "avgjort")
     : valdStatus === "Avgjorda" ? efterKategori.filter(f => f.status === "avgjort")
@@ -230,6 +235,13 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
 
   const aktiva   = filtrerade.filter(f => f.status !== "avgjort");
   const avgjorda = filtrerade.filter(f => f.status === "avgjort");
+
+  function byttKalla(k) {
+    setValdKalla(k);
+    setValdKategori("Alla");
+    setVisaAktiva(STEG);
+    setVisaAvgjorda(STEG);
+  }
 
   function byttKategori(k) {
     setValdKategori(k);
@@ -265,8 +277,37 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
     whiteSpace: "nowrap",
   });
 
+  const kallaAlternativ = [
+    { id: "Alla",       etikett: "Alla",           antal: forslag.length },
+    { id: "Riksdagen",  etikett: "🏛 Riksdagen",  antal: forslag.filter(f => f.kalla === "riksdagen").length },
+    { id: "AI-motion",  etikett: "🤖 AI-motioner", antal: forslag.filter(f => f.kalla !== "riksdagen").length },
+  ];
+
+  const kallaStyle = (aktiv, id) => {
+    const färg = id === "Riksdagen" ? C.riksdagen : id === "AI-motion" ? C.accent : "#aaa";
+    return {
+      padding: "5px 14px", borderRadius: "20px",
+      background: aktiv ? färg + "20" : "transparent",
+      color: aktiv ? färg : C.dim,
+      border: `1px solid ${aktiv ? färg + "60" : C.border}`,
+      cursor: "pointer", fontSize: "12px",
+      fontWeight: aktiv ? "600" : "400",
+      fontFamily: "Georgia, serif",
+      whiteSpace: "nowrap",
+    };
+  };
+
   return (
     <>
+      {/* Källfilter */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+        {kallaAlternativ.map(({ id, etikett, antal }) => (
+          <button key={id} onClick={() => byttKalla(id)} style={kallaStyle(valdKalla === id, id)}>
+            {etikett} <span style={{ fontSize: "10px", opacity: 0.6 }}>({antal})</span>
+          </button>
+        ))}
+      </div>
+
       {/* Statusfilter */}
       <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
         {["Alla", "Pågående", "Avgjorda"].map(s => {
@@ -288,7 +329,7 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
         borderBottom: `1px solid ${C.border}`,
       }}>
         {kategorier.map(k => {
-          const antal = k === "Alla" ? forslag.length : forslag.filter(f => f.kategori === k).length;
+          const antal = k === "Alla" ? efterKalla.length : efterKalla.filter(f => f.kategori === k).length;
           return (
             <button key={k} onClick={() => byttKategori(k)} style={tabStyle(valdKategori === k)}>
               {k}
