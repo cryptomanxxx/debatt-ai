@@ -340,6 +340,10 @@ def bootstrap_fond(sb_key: str, fond_symbol: str, fond: dict) -> None:
     förvaltare = FONDER[fond_symbol]["förvaltare"]
     nav = float(fond["nav_per_andel"])
 
+    if nav <= 0:
+        print(f"  {fond_symbol}: ogiltigt NAV ({nav}) — hoppar bootstrap")
+        return
+
     befintlig = hamta_agent_investering(sb_key, fond_id, förvaltare)
     if befintlig:
         return  # Förvaltaren har redan investerat
@@ -365,6 +369,8 @@ def bootstrap_fond(sb_key: str, fond_symbol: str, fond: dict) -> None:
             ny_total = float(fond.get("total_andelar", 0)) + andelar
             uppdatera_fond_nav(sb_key, fond_id, nav, ny_total)
             print(f"  BOOTSTRAP: {förvaltare} investerar {belopp:.0f} SEK i sin egna fond {fond_symbol} ({andelar:.2f} andelar)")
+        elif r.status_code == 409:
+            pass  # UNIQUE-konflikt: förvaltaren har redan en rad (race condition)
         else:
             print(f"  BOOTSTRAP misslyckades: {r.status_code}")
     except Exception as e:
