@@ -49,6 +49,8 @@ export default function RootLayout({ children }) {
               <a href="/bank" className="neon-nav">Centralbanken</a>
               <a href="/etf" className="neon-nav">Krypto-ETF</a>
               <a href="/bors" className="neon-nav">Intern börs</a>
+              <a href="/hedgefonder" className="neon-nav">Hedgefonder</a>
+              <a href="/stablecoin" className="neon-nav">Stablecoin STAB</a>
               <a href="/rykten" className="neon-nav">Ryktesspridning</a>
               <a href="/vecka" className="neon-nav">Veckans sammanfattning</a>
               <a href="/koalitioner" className="neon-nav">Koalitioner</a>
