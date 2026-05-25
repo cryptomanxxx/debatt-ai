@@ -1198,6 +1198,11 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
 
             if spara_lag_rost(sb_key, f["id"], agent["namn"], rod, motivering):
                 antal += 1
+                narrativ = f"Röstade {rod} på \"{f['titel'][:60]}\""
+                if motivering:
+                    narrativ += f": {motivering[:80]}"
+                spara_minne(sb_key, agent["namn"], "röst", narrativ,
+                            metadata={"forslag_id": f["id"], "rod": rod})
         except Exception:
             pass
     return antal
@@ -1625,6 +1630,10 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
             print(f"  ✓ Koalition bildad: {agent_namn} + {mal_namn} (samsyn: {alignment}, +3 styrka)")
             print(f"    Förslag: {forslag[:100]}…")
             print(f"    Svar: {svar_text[:100]}")
+            spara_minne(sb_key, agent_namn, "koalition",
+                        f"Bildade koalition med {mal_namn} ({alignment} gemensamma röster). "
+                        f"{mal_namn} sa: \"{svar_text[:80]}\"",
+                        relaterade_agenter=[mal_namn])
         else:
             spara_civilisations_minne(
                 sb_key,
@@ -1639,6 +1648,9 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
             print(f"  ✗ Koalition avvisad: {mal_namn} tackade nej till {agent_namn}")
             if svar_text:
                 print(f"    Motivering: {svar_text[:100]}")
+            spara_minne(sb_key, agent_namn, "koalition",
+                        f"{mal_namn} avvisade mitt koalitionsförslag (samsyn: {alignment} röster)",
+                        relaterade_agenter=[mal_namn])
 
         return beslut == "accepterar"
 
@@ -1901,6 +1913,15 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         print(f"  {emoji} Lobbying: {agent_namn} → {mal_namn} ({belopp} kr) — {resultat}")
         if resultat == "accepterat":
             print(f"    Röst ändrad: {rod_fore} → ja")
+            spara_minne(sb_key, agent_namn, "lobbying",
+                        f"Övertygade {mal_namn} att rösta JA på \"{forslag['titel'][:50]}\" mot {belopp} kr",
+                        relaterade_agenter=[mal_namn],
+                        metadata={"belopp": belopp, "resultat": "accepterat"})
+        else:
+            spara_minne(sb_key, agent_namn, "lobbying",
+                        f"{mal_namn} avvisade lobbying-erbjudande på {belopp} kr för \"{forslag['titel'][:50]}\"",
+                        relaterade_agenter=[mal_namn],
+                        metadata={"belopp": belopp, "resultat": "avvisat"})
         return True
 
     except Exception as e:
@@ -4638,3 +4659,66 @@ def generera_oligarki_bild(sb_key: str, agent: str, gini: float,
     except Exception as e:
         print(f"  Oligarkibild-fel: {e}")
         return None
+
+
+# ── Agent-minneslager ─────────────────────────────────────────────────────────
+
+def spara_minne(
+    sb_key: str,
+    agent: str,
+    händelse_typ: str,
+    narrativ: str,
+    relaterade_agenter: list[str] | None = None,
+    metadata: dict | None = None,
+) -> bool:
+    """Sparar ett narrativt minne för en agent till agent_minnen-tabellen."""
+    h = {
+        "apikey": sb_key,
+        "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+    }
+    try:
+        r = httpx.post(
+            f"{SB_URL}/rest/v1/agent_minnen",
+            headers=h,
+            json={
+                "agent": agent,
+                "händelse_typ": händelse_typ,
+                "narrativ": narrativ[:300],
+                "relaterade_agenter": relaterade_agenter or [],
+                "metadata": metadata or {},
+            },
+            timeout=8,
+        )
+        return r.is_success
+    except Exception:
+        return False
+
+
+def hamta_agent_minnen(sb_key: str, agent: str, limit: int = 5) -> list[dict]:
+    """Hämtar de senaste minnena för en agent, nyast först."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_minnen",
+            params={
+                "agent": f"eq.{urllib.parse.quote(agent)}",
+                "order": "skapad.desc",
+                "limit": str(limit),
+                "select": "händelse_typ,narrativ,skapad",
+            },
+            headers=h,
+            timeout=8,
+        )
+        return r.json() if r.is_success else []
+    except Exception:
+        return []
+
+
+def formatera_minnen_for_prompt(minnen: list[dict]) -> str:
+    """Formaterar en lista minnen till ett kompakt stycke för systemprompt."""
+    if not minnen:
+        return ""
+    rader = [f"- {m['narrativ']}" for m in minnen[:5]]
+    return "Dina senaste minnen (referera gärna till dessa i din text):\n" + "\n".join(rader)

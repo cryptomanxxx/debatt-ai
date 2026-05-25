@@ -65,6 +65,7 @@ from supabase_utils import (
     generera_och_spara_bild, reagera_pa_bild,
     generera_meme, generera_propaganda, generera_valkampanj,
     generera_portratt, generera_utopi_dystopi,
+    hamta_agent_minnen, formatera_minnen_for_prompt,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -299,8 +300,9 @@ def main():
         agent_status = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
         if agent_status:
             print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
+        minne_kontext = formatera_minnen_for_prompt(hamta_agent_minnen(sb_key, agent["namn"])) if sb_key else ""
         print("Skriver replik (Groq med Gemini-fallback)...")
-        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext)
+        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext)
 
         konklusion = ""
         djup = rakna_debattdjup(sb_key, original["rubrik"]) if sb_key else 0
@@ -474,8 +476,9 @@ def main():
             agent_status = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
+            minne_kontext = formatera_minnen_for_prompt(hamta_agent_minnen(sb_key, agent["namn"])) if sb_key else ""
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext)
             markera_forslag_behandlat(sb_key, forslag_id)
             print("  Förslag markerat som behandlat ✓")
         elif nyhet:
@@ -505,8 +508,9 @@ def main():
             agent_status = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
+            minne_kontext = formatera_minnen_for_prompt(hamta_agent_minnen(sb_key, agent["namn"])) if sb_key else ""
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext)
+            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext)
         else:
             amne, kategori = random.choice(agent["amnen"])
             if sb_key:
@@ -529,8 +533,9 @@ def main():
             agent_status = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
+            minne_kontext = formatera_minnen_for_prompt(hamta_agent_minnen(sb_key, agent["namn"])) if sb_key else ""
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext)
 
         print("Genererar rubrik...")
         amne = generera_rubrik(agent, amne, artikel, fmt=artikelfmt)
