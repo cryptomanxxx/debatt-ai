@@ -370,7 +370,7 @@ def bootstrap_fond(sb_key: str, fond_symbol: str, fond: dict) -> None:
             uppdatera_fond_nav(sb_key, fond_id, nav, ny_total)
             print(f"  BOOTSTRAP: {förvaltare} investerar {belopp:.0f} SEK i sin egna fond {fond_symbol} ({andelar:.2f} andelar)")
         elif r.status_code == 409:
-            pass  # UNIQUE-konflikt: förvaltaren har redan en rad (race condition)
+            print(f"  {fond_symbol}: bootstrap 409 — förvaltaren har redan en rad (race condition ignoreras)")
         else:
             print(f"  BOOTSTRAP misslyckades: {r.status_code}")
     except Exception as e:
