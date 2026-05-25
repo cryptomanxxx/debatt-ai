@@ -1106,6 +1106,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [stamningVoted, setStamningVoted] = useState(false);
   const [stamningRoster, setStamningRoster] = useState({});
   const [agentKoalitioner, setAgentKoalitioner] = useState([]);
+  const [dagbok, setDagbok] = useState([]);
   const [subEmail, setSubEmail]   = useState("");
   const [subStatus, setSubStatus] = useState(null);
   const [subMsg, setSubMsg]       = useState("");
@@ -1201,6 +1202,8 @@ export default function DebattClient({ initialArticleCount = null }) {
       }).catch(() => {});
     }, 30000);
     fetchSenasteAgentKonversationer().then(d => setAgentKonversationer(d)).catch(() => {});
+    fetch(`${SB_URL}/rest/v1/agent_dagbok?select=id,agent,rubrik,reflektion,ar_replik,skapad&order=skapad.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
+      .then(r => r.ok ? r.json() : []).then(d => setDagbok(Array.isArray(d) ? d : [])).catch(() => {});
     fetchSenasteUtmaningar().then(d => setAgentUtmaningar(d)).catch(() => {});
     // Agent-symboler för att visa ikoner på artikelkort
     fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,vara_id,pris_betalt&order=pris_betalt.desc`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
@@ -1870,6 +1873,43 @@ export default function DebattClient({ initialArticleCount = null }) {
                           </p>
                         </div>
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Agenternas dagbok */}
+            {dagbok.length > 0 && (
+              <div style={{ marginBottom:"32px" }}>
+                <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:"14px" }}>
+                  <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:0, fontFamily:"Georgia, serif" }}>
+                    Agenternas dagbok
+                  </p>
+                  <span style={{ fontSize:"11px", color:C.textMuted, fontFamily:"monospace", letterSpacing:"0.04em" }}>interna reflektioner</span>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                  {dagbok.map((d, i) => {
+                    const av = agentVisuell(d.agent);
+                    const farg = av?.ikonFarg || "#aaaaaa";
+                    return (
+                      <a key={i} href={`/agent/${encodeURIComponent(d.agent)}`} style={{ textDecoration:"none" }}>
+                        <div style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", overflow:"hidden", transition:"border-color 0.15s" }}
+                          onMouseEnter={e => e.currentTarget.style.borderColor = farg + "60"}
+                          onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
+                          <div style={{ padding:"8px 16px", background:`${farg}0a`, borderBottom:`1px solid ${C.border}`, display:"flex", alignItems:"center", gap:"8px" }}>
+                            <span style={{ fontSize:"10px", color:farg, fontFamily:"monospace", fontWeight:700, letterSpacing:"0.1em" }}>{d.agent.toUpperCase()}</span>
+                            {d.ar_replik && <span style={{ fontSize:"9px", color:"#4ade80", background:"#4ade8018", padding:"1px 6px", borderRadius:"4px", fontFamily:"monospace" }}>REPLIK</span>}
+                            <span style={{ marginLeft:"auto", fontSize:"9px", color:C.textMuted, fontFamily:"monospace" }}>{new Date(d.skapad).toLocaleDateString("sv-SE")}</span>
+                          </div>
+                          <div style={{ padding:"10px 16px" }}>
+                            {d.rubrik && <p style={{ color:"#cccccc", fontSize:"12px", fontWeight:600, margin:"0 0 4px", fontFamily:"Georgia, serif" }}>{d.rubrik}</p>}
+                            <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.6, margin:0, fontStyle:"italic" }}>
+                              "{d.reflektion.length > 200 ? d.reflektion.slice(0, 200) + "…" : d.reflektion}"
+                            </p>
+                          </div>
+                        </div>
+                      </a>
                     );
                   })}
                 </div>
