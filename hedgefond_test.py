@@ -174,8 +174,8 @@ def hamta_fond_etf_varde(sb_key: str, fond_symbol: str) -> float:
         r = httpx.get(url, headers=_h(sb_key), timeout=8)
         if r.is_success:
             return sum(float(row["investerat_kr"]) for row in r.json())
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"  [hamta_fond_etf_varde] {fond_symbol}: {e}")
     return 0.0
 
 
@@ -196,18 +196,22 @@ def handla_crypto_etf(sb_key: str, fond_symbol: str, total_kapital: float,
     om_investera = max(0, mål_allokering - etf_varde)
 
     if om_investera < 50:
-        return  # Redan tillräckligt allokerat
+        print(f"  {fond_symbol} crypto ETF: redan allokerat ({etf_varde:.0f} kr, mål {mål_allokering:.0f} kr)")
+        return
 
     # Sync planbok så kop_etf kan dra saldo
     sync_fond_planbok(sb_key, fond_symbol, om_investera + 10)
 
     per_symbol = round(om_investera / len(symboler), 2)
+    print(f"  {fond_symbol} crypto ETF: försöker allokera {om_investera:.0f} kr → {symboler}")
     for sym in symboler:
         if per_symbol < 20:
             break
         ok = kop_etf(sb_key, fond_symbol, sym, per_symbol)
         if ok:
-            print(f"  {fond_symbol} allokerar {per_symbol:.0f} kr → {sym} ETF")
+            print(f"  {fond_symbol} allokerar {per_symbol:.0f} kr → {sym} ETF ✓")
+        else:
+            print(f"  {fond_symbol} → {sym} ETF misslyckades (saknas pris i ohlcv_cache?)")
 
 
 def hamta_nav_historik(sb_key: str, fond_id: int, limit: int = 20) -> list[dict]:
