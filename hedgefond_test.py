@@ -345,15 +345,12 @@ def bootstrap_fond(sb_key: str, fond_symbol: str, fond: dict) -> None:
         return  # Förvaltaren har redan investerat
 
     saldo = hamta_saldo(sb_key, förvaltare)
-    belopp = 300.0
-    if saldo < belopp:
-        belopp = max(100.0, saldo * 0.3)
+    belopp = min(300.0, saldo)
     if belopp < 50:
         print(f"  {fond_symbol}: förvaltaren {förvaltare} har för lågt saldo för bootstrap ({saldo:.0f} SEK)")
         return
 
     andelar = round(belopp / nav, 4)
-    uppdatera_saldo(sb_key, förvaltare, saldo - belopp)
 
     try:
         h_post = {**_h(sb_key), "Prefer": "return=minimal"}
@@ -364,6 +361,7 @@ def bootstrap_fond(sb_key: str, fond_symbol: str, fond: dict) -> None:
             "investerat_sek": belopp,
         }, timeout=8)
         if r.is_success:
+            uppdatera_saldo(sb_key, förvaltare, saldo - belopp)
             ny_total = float(fond.get("total_andelar", 0)) + andelar
             uppdatera_fond_nav(sb_key, fond_id, nav, ny_total)
             print(f"  BOOTSTRAP: {förvaltare} investerar {belopp:.0f} SEK i sin egna fond {fond_symbol} ({andelar:.2f} andelar)")
@@ -650,7 +648,7 @@ def main():
         # Bootstrap: förvaltaren auto-investerar om fonden saknar kapital
         if float(fond.get("total_andelar", 0)) == 0:
             bootstrap_fond(sb_key, fond_symbol, fond)
-            fond = hamta_fond(sb_key, fond_symbol)  # Hämta uppdaterad data
+            fond = hamta_fond(sb_key, fond_symbol) or fond  # Behåll gamla värdet vid fetch-fel
 
         fond_id = fond["id"]
         total_andelar = float(fond.get("total_andelar", 0))
