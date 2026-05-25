@@ -1,0 +1,27 @@
+name: Codestral PR Review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+    branches: [main]
+
+jobs:
+  codestral-review:
+    runs-on: ubuntu-latest
+    # Hoppa över draft-PRs
+    if: github.event.pull_request.draft == false
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checka ut koden
+        uses: actions/checkout@v4
+
+      - name: Kör Codestral-granskning
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          GITHUB_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER:       ${{ github.event.pull_request.number }}
+          HEAD_SHA:        ${{ github.event.pull_request.head.sha }}
+        run: node agents/codestral-pr-review.js
