@@ -63,6 +63,7 @@ from supabase_utils import (
     skapa_rykte, sprid_rykte, hamta_kanda_rykten, hamta_rykte_underlag,
     AGENT_GODTROGENHET, sprid_med_mutation, kolla_reflexiv_bankrun, aterbetala_lan_delvis,
     generera_och_spara_bild, reagera_pa_bild,
+    generera_meme, generera_propaganda, generera_valkampanj,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -1177,19 +1178,54 @@ def main():
         except Exception as e:
             print(f"  ✗ Oligarki-snapshot: {e}", file=sys.stderr)
 
-    # ── Bildgenerering: ~15% chans per körning ───────────────────────────────
-    if sb_key and random.random() < 0.15:
+    # ── Bilder: tillstånd / meme / propaganda / valkampanj ───────────────────
+    if sb_key:
         try:
             status_för_bild = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
-            saldo_för_bild = float(status_för_bild.get("saldo") or 500)
-            parti_obj = hamta_agent_parti(sb_key, agent["namn"]) if sb_key else None
+            saldo_för_bild  = float(status_för_bild.get("saldo") or 500)
+            parti_obj  = hamta_agent_parti(sb_key, agent["namn"]) if sb_key else None
             parti_namn = parti_obj.get("namn", "") if parti_obj else ""
             positioner_text = hamta_agent_positioner(sb_key, agent["namn"]) if sb_key else ""
             ideologi = positioner_text[:80] if positioner_text else ""
-            generera_och_spara_bild(sb_key, agent["namn"],
-                                    saldo=saldo_för_bild,
-                                    parti=parti_namn,
-                                    ideologi=ideologi)
+
+            tärning = random.random()
+
+            # Valkampanj ~25% om aktivt val och agenten är partiledare
+            aktiv_val = None
+            if parti_obj and parti_obj.get("ledare") == agent["namn"]:
+                try:
+                    v_r = httpx.get(
+                        f"https://fmwxftnistkoqazfwnuj.supabase.co/rest/v1/riksdagsval"
+                        f"?status=eq.aktivt&order=skapad.desc&limit=1&select=id,manifest",
+                        headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
+                        timeout=6,
+                    )
+                    if v_r.is_success and v_r.json():
+                        aktiv_val = v_r.json()[0]
+                except Exception:
+                    pass
+
+            if aktiv_val and tärning < 0.25:
+                manifest_utdrag = (aktiv_val.get("manifest") or {}).get(parti_namn, "")[:80]
+                generera_valkampanj(sb_key, agent["namn"], parti_namn,
+                                    manifest_utdrag=manifest_utdrag,
+                                    saldo=saldo_för_bild)
+            elif tärning < 0.05:
+                # Meme — välj slumpmässig motståndare
+                andra = [a for a in AGENTER if a["namn"] != agent["namn"]]
+                if andra:
+                    mal = random.choice(andra)
+                    generera_meme(sb_key, agent["namn"], mal["namn"], saldo=saldo_för_bild)
+            elif tärning < 0.10:
+                # Propaganda
+                generera_propaganda(sb_key, agent["namn"], parti=parti_namn,
+                                    ideologi=ideologi, saldo=saldo_för_bild)
+            elif tärning < 0.25:
+                # Tillståndsfoto
+                generera_och_spara_bild(sb_key, agent["namn"],
+                                        saldo=saldo_för_bild,
+                                        parti=parti_namn,
+                                        ideologi=ideologi)
         except Exception as e:
             print(f"  ✗ Bildgenerering: {e}", file=sys.stderr)
 

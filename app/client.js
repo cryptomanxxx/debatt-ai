@@ -177,7 +177,7 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/civilisations_minne?select=typ,rubrik,beskrivning,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/etf_transaktioner?select=agent,symbol,typ,belopp_kr,pris_usd,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/bors_affarer?select=kop_agent,salj_agent,symbol,pris,antal,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/agent_bilder?select=id,agent,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/agent_bilder?select=id,agent,bildtyp,kontext,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_bild_reaktioner?select=fran_agent,till_agent,reaktion,skapad,bild_id&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
   ]);
 
@@ -382,15 +382,23 @@ async function fetchAktivitetsFeed() {
     });
   });
 
+  const BILDTYP_FEED = {
+    tillstand:  { ikon: "🎨", farg: "#e879f9", verb: "skapade en ny bild" },
+    meme:       { ikon: "📢", farg: "#f59e0b", verb: "skapade ett meme" },
+    propaganda: { ikon: "📣", farg: "#f87171", verb: "publicerade ett propagandaposter" },
+    valkampanj: { ikon: "🗳️", farg: "#4ade80", verb: "lanserade en valkampanjaffisch" },
+  };
   (bilder.value || []).forEach(b => {
     if (!b.skapad) return;
+    const cfg = BILDTYP_FEED[b.bildtyp] || BILDTYP_FEED.tillstand;
+    const mal = b.kontext?.mal_agent ? ` om ${b.kontext.mal_agent}` : "";
     feed.push({
-      typ: "agent-bild",
-      ikon: "🎨",
-      text: `${b.agent} skapade en ny AI-bild`,
-      href: `/ai-bilder?agent=${encodeURIComponent(b.agent)}`,
+      typ: `agent-bild-${b.bildtyp || "tillstand"}`,
+      ikon: cfg.ikon,
+      text: `${b.agent} ${cfg.verb}${mal}`,
+      href: `/ai-bilder?agent=${encodeURIComponent(b.agent)}&typ=${b.bildtyp || "tillstand"}`,
       skapad: b.skapad,
-      farg: "#e879f9",
+      farg: cfg.farg,
     });
   });
 
