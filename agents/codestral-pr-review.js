@@ -64,8 +64,9 @@ async function hamtaDiff() {
   let antalFiler = 0;
   let page       = 1;
   let trunkerad  = false;
+  const MAX_PAGES = 10; // max 1 000 filer
 
-  while (true) {
+  while (page <= MAX_PAGES) {
     const { status, data } = await httpJson(
       `https://api.github.com/repos/${owner}/${repo}/pulls/${PR_NUMBER}/files?per_page=100&page=${page}`,
       { headers }
