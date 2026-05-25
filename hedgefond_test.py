@@ -1,0 +1,631 @@
+"""
+hedgefond_test.py – Hedgefonder med poolat agent-kapital
+
+Tre fonder:
+  ALPHA  (Kryptoanalytiker) – aggressiv momentum
+  MACRO  (Nationalekonom)   – konservativ makro
+  QUANT  (Teknikoptimist)   – självlärande, LLM justerar strategi varje körning
+
+Flöde per körning:
+  1. Hämta fonddata + NAV per fond
+  2. Investeringsrunda: agenter investerar i fonder (~10% chans)
+  3. Uttagsrunda: agenter tar ut vinst (~5% chans om P&L > 10%)
+  4. QUANT: fråga LLM om handelsstrategi baserat på prestandahistorik
+  5. Varje fond lägger ordrar på börsen (via bors_ordrar)
+  6. Uppdatera NAV och spara snapshot i hedgefond_nav_historik
+
+Kör via GitHub Actions (.github/workflows/hedgefond-test.yml) dagligen 11:00 svensk tid.
+"""
+
+import os
+import sys
+import random
+import math
+import json
+import urllib.parse
+from datetime import datetime, timezone, timedelta
+
+import httpx
+
+from agenter import AGENTER
+from supabase_utils import SB_URL, spara_civilisations_minne
+from ai_klient import groq_post, gemini_post, github_models_post
+
+# ─── Konstanter ───────────────────────────────────────────────────────────────
+
+FONDER = {
+    "ALPHA": {
+        "förvaltare": "Kryptoanalytiker",
+        "strategi": "aggressiv",
+        "symboler": ["NOVA", "DBT"],
+        "aggressivitet": 0.85,
+    },
+    "MACRO": {
+        "förvaltare": "Nationalekonom",
+        "strategi": "konservativ",
+        "symboler": ["ETK", "DBT"],
+        "aggressivitet": 0.35,
+    },
+    "QUANT": {
+        "förvaltare": "Teknikoptimist",
+        "strategi": "kvant",
+        "symboler": ["DBT", "NOVA", "ETK"],
+        "aggressivitet": 0.60,  # Justeras av LLM
+    },
+}
+
+# Investeringsbelopp i SEK
+MIN_INVESTERING = 100
+MAX_INVESTERING = 200
+
+# ─── HTTP-hjälpare ────────────────────────────────────────────────────────────
+
+def _h(sb_key: str) -> dict:
+    return {
+        "apikey": sb_key,
+        "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
+
+
+def _llm(system: str, prompt: str, max_tokens: int = 200) -> str:
+    """LLM-anrop med fallback."""
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": max_tokens,
+        "temperature": 0.5,
+    }
+    for fn in [
+        lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip(),
+        lambda: gemini_post(system, prompt, max_tokens=max_tokens),
+        lambda: github_models_post(payload).json()["choices"][0]["message"]["content"].strip(),
+    ]:
+        try:
+            result = fn()
+            if result:
+                return result
+        except Exception:
+            continue
+    return ""
+
+# ─── Supabase-anrop ──────────────────────────────────────────────────────────
+
+def hamta_fond(sb_key: str, symbol: str) -> dict | None:
+    try:
+        url = f"{SB_URL}/rest/v1/hedgefonder?symbol=eq.{urllib.parse.quote(symbol)}&select=*"
+        r = httpx.get(url, headers=_h(sb_key), timeout=8)
+        if r.is_success and r.json():
+            return r.json()[0]
+    except Exception as e:
+        print(f"  [hamta_fond] {symbol}: {e}")
+    return None
+
+
+def hamta_investerare(sb_key: str, fond_id: int) -> list[dict]:
+    try:
+        url = f"{SB_URL}/rest/v1/hedgefond_investerare?fond_id=eq.{fond_id}&select=*"
+        r = httpx.get(url, headers=_h(sb_key), timeout=8)
+        if r.is_success:
+            return r.json()
+    except Exception as e:
+        print(f"  [hamta_investerare] fond {fond_id}: {e}")
+    return []
+
+
+def hamta_agent_investering(sb_key: str, fond_id: int, agent: str) -> dict | None:
+    try:
+        a_enc = urllib.parse.quote(agent)
+        url = f"{SB_URL}/rest/v1/hedgefond_investerare?fond_id=eq.{fond_id}&agent=eq.{a_enc}&select=*"
+        r = httpx.get(url, headers=_h(sb_key), timeout=8)
+        if r.is_success and r.json():
+            return r.json()[0]
+    except Exception as e:
+        print(f"  [hamta_agent_investering] {agent}: {e}")
+    return None
+
+
+def hamta_saldo(sb_key: str, agent: str) -> float:
+    try:
+        url = f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent)}&select=saldo"
+        r = httpx.get(url, headers=_h(sb_key), timeout=8)
+        if r.is_success and r.json():
+            return float(r.json()[0].get("saldo", 0))
+    except Exception as e:
+        print(f"  [hamta_saldo] {agent}: {e}")
+    return 0.0
+
+
+def uppdatera_saldo(sb_key: str, agent: str, nytt_saldo: float) -> None:
+    try:
+        h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+        url = f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent)}"
+        httpx.patch(url, headers=h_min, json={"saldo": round(nytt_saldo, 2), "uppdaterad": "now()"}, timeout=8)
+    except Exception as e:
+        print(f"  [uppdatera_saldo] {agent}: {e}")
+
+
+def hamta_nav_historik(sb_key: str, fond_id: int, limit: int = 20) -> list[dict]:
+    try:
+        url = (f"{SB_URL}/rest/v1/hedgefond_nav_historik"
+               f"?fond_id=eq.{fond_id}&select=nav_per_andel,total_tillgangar,skapad"
+               f"&order=skapad.desc&limit={limit}")
+        r = httpx.get(url, headers=_h(sb_key), timeout=8)
+        if r.is_success:
+            return r.json()
+    except Exception as e:
+        print(f"  [hamta_nav_historik] fond {fond_id}: {e}")
+    return []
+
+
+def hamta_fond_trades(sb_key: str, fond_id: int, limit: int = 30) -> list[dict]:
+    try:
+        url = (f"{SB_URL}/rest/v1/hedgefond_trades"
+               f"?fond_id=eq.{fond_id}&select=symbol,typ,pris,antal,vinst_forlust,skapad"
+               f"&order=skapad.desc&limit={limit}")
+        r = httpx.get(url, headers=_h(sb_key), timeout=8)
+        if r.is_success:
+            return r.json()
+    except Exception as e:
+        print(f"  [hamta_fond_trades] fond {fond_id}: {e}")
+    return []
+
+
+def hamta_pris(sb_key: str, symbol: str) -> float:
+    try:
+        url = f"{SB_URL}/rest/v1/bors_tillgangar?symbol=eq.{urllib.parse.quote(symbol)}&select=senaste_pris"
+        r = httpx.get(url, headers=_h(sb_key), timeout=8)
+        if r.is_success and r.json():
+            return float(r.json()[0].get("senaste_pris", 100.0))
+    except Exception as e:
+        print(f"  [hamta_pris] {symbol}: {e}")
+    return 100.0
+
+
+def spara_nav_snapshot(sb_key: str, fond_id: int, nav: float, total_tillgangar: float) -> None:
+    try:
+        h_post = {**_h(sb_key), "Prefer": "return=minimal"}
+        url = f"{SB_URL}/rest/v1/hedgefond_nav_historik"
+        httpx.post(url, headers=h_post,
+                   json={"fond_id": fond_id, "nav_per_andel": round(nav, 4), "total_tillgangar": round(total_tillgangar, 2)},
+                   timeout=8)
+    except Exception as e:
+        print(f"  [spara_nav_snapshot] fond {fond_id}: {e}")
+
+
+def uppdatera_fond_nav(sb_key: str, fond_id: int, nav: float, total_andelar: float) -> None:
+    try:
+        h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+        url = f"{SB_URL}/rest/v1/hedgefonder?id=eq.{fond_id}"
+        httpx.patch(url, headers=h_min,
+                    json={"nav_per_andel": round(nav, 4), "total_andelar": round(total_andelar, 4)},
+                    timeout=8)
+    except Exception as e:
+        print(f"  [uppdatera_fond_nav] fond {fond_id}: {e}")
+
+
+def lagg_bors_order(sb_key: str, agent: str, symbol: str, typ: str,
+                    pris: float, antal: float, motivering: str) -> int | None:
+    payload = {
+        "agent": agent,
+        "symbol": symbol,
+        "typ": typ,
+        "pris": round(pris, 2),
+        "antal": round(antal, 4),
+        "ifylld_antal": 0,
+        "status": "öppen",
+        "motivering": motivering,
+    }
+    try:
+        h_post = {**_h(sb_key), "Prefer": "return=representation"}
+        r = httpx.post(f"{SB_URL}/rest/v1/bors_ordrar", headers=h_post, json=payload, timeout=10)
+        if r.is_success and r.json():
+            return r.json()[0]["id"]
+        else:
+            print(f"  [lagg_bors_order] {agent} {typ} {symbol}: {r.status_code}")
+    except Exception as e:
+        print(f"  [lagg_bors_order] {agent}: {e}")
+    return None
+
+
+def spara_fond_trade(sb_key: str, fond_id: int, symbol: str, typ: str,
+                     pris: float, antal: float, strategi_motiv: str = "") -> None:
+    try:
+        h_post = {**_h(sb_key), "Prefer": "return=minimal"}
+        url = f"{SB_URL}/rest/v1/hedgefond_trades"
+        httpx.post(url, headers=h_post, json={
+            "fond_id": fond_id,
+            "symbol": symbol,
+            "typ": typ,
+            "pris": round(pris, 2),
+            "antal": round(antal, 4),
+            "strategi_motiv": strategi_motiv,
+        }, timeout=8)
+    except Exception as e:
+        print(f"  [spara_fond_trade] fond {fond_id}: {e}")
+
+# ─── QUANT: Självlärande strategi via LLM ─────────────────────────────────────
+
+def quant_strategi(sb_key: str, fond_id: int) -> dict:
+    """
+    Hämtar QUANT-fondens prestandahistorik och frågar LLM om handelsstrategi.
+    Returnerar dict med lista av {symbol, bias, aggressivitet}.
+    Fallback till standard-strategi om LLM misslyckas.
+    """
+    nav_hist = hamta_nav_historik(sb_key, fond_id, limit=20)
+    trades = hamta_fond_trades(sb_key, fond_id, limit=30)
+
+    default = [
+        {"symbol": "DBT",  "bias": "kop",     "aggressivitet": 0.6},
+        {"symbol": "NOVA", "bias": "neutral",  "aggressivitet": 0.5},
+        {"symbol": "ETK",  "bias": "kop",      "aggressivitet": 0.4},
+    ]
+
+    if not nav_hist and not trades:
+        print("  QUANT: inga historikdata — använder standard-strategi")
+        return {"rekommendationer": default, "motivering": "Ingen historik ännu"}
+
+    # Bygg performance-summary
+    nav_values = [float(row["nav_per_andel"]) for row in nav_hist]
+    nav_trend = ""
+    if len(nav_values) >= 2:
+        delta = nav_values[0] - nav_values[-1]
+        pct = (delta / nav_values[-1]) * 100 if nav_values[-1] else 0
+        nav_trend = f"NAV-trend senaste {len(nav_values)} körningar: {'+' if delta >= 0 else ''}{pct:.1f}%"
+
+    # Räkna vinst/förlust per symbol
+    symbol_pl: dict[str, float] = {}
+    for t in trades:
+        sym = t["symbol"]
+        pl = float(t.get("vinst_forlust", 0))
+        symbol_pl[sym] = symbol_pl.get(sym, 0) + pl
+
+    trades_summary = "; ".join([f"{sym}: {'+' if pl >= 0 else ''}{pl:.0f} kr" for sym, pl in symbol_pl.items()])
+
+    system = (
+        "Du är en kvantitativ handelsalgoritm för en hedgefond på en intern AI-börs. "
+        "Tillgängliga tokens är DBT, NOVA och ETK. "
+        "Svara ALLTID med valid JSON (inget annat), exakt detta format:\n"
+        '{"rekommendationer": [{"symbol": "DBT", "bias": "kop", "aggressivitet": 0.7}], "motivering": "..."}\n'
+        'Tillåtna bias-värden: "kop", "salj", "neutral". Aggressivitet 0.2–0.9.'
+    )
+    prompt = (
+        f"Prestandahistorik för Quant Fund:\n"
+        f"- {nav_trend}\n"
+        f"- Senaste 30 trades P&L per symbol: {trades_summary or 'Inga trades ännu'}\n"
+        f"- Senaste NAV: {nav_values[0]:.2f} SEK/andel\n\n"
+        "Baserat på denna historik — vilka symboler ska QUANT handla och i vilka riktningar?\n"
+        "Inkludera alla tre symboler i rekommendationerna."
+    )
+
+    raw = _llm(system, prompt, max_tokens=300)
+
+    # Extrahera JSON
+    try:
+        # Hitta JSON-blocket
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start >= 0 and end > start:
+            data = json.loads(raw[start:end])
+            recs = data.get("rekommendationer", [])
+            # Validera
+            valid = []
+            for rec in recs:
+                if isinstance(rec, dict) and rec.get("symbol") in ["DBT", "NOVA", "ETK"]:
+                    valid.append({
+                        "symbol": rec["symbol"],
+                        "bias": rec.get("bias", "neutral") if rec.get("bias") in ["kop", "salj", "neutral"] else "neutral",
+                        "aggressivitet": max(0.2, min(0.9, float(rec.get("aggressivitet", 0.5)))),
+                    })
+            if valid:
+                print(f"  QUANT LLM-strategi: {[(r['symbol'], r['bias'], r['aggressivitet']) for r in valid]}")
+                return {"rekommendationer": valid, "motivering": data.get("motivering", "")}
+    except Exception as e:
+        print(f"  QUANT: JSON-parsning misslyckades: {e} — raw: {raw[:200]}")
+
+    return {"rekommendationer": default, "motivering": "Fallback till standard-strategi"}
+
+# ─── Investeringsrunda ────────────────────────────────────────────────────────
+
+def investeringsrunda(sb_key: str, agenter: list[dict]) -> None:
+    """Agenter investerar i en slumpmässig fond (~10% chans per agent)."""
+    fonddata = {}
+    for symbol in FONDER:
+        fond = hamta_fond(sb_key, symbol)
+        if fond:
+            fonddata[symbol] = fond
+
+    if not fonddata:
+        print("  Inga fonder hittade — hoppar investeringsrunda")
+        return
+
+    for agent_obj in agenter:
+        agent = agent_obj["namn"]
+        if random.random() > 0.10:
+            continue
+
+        saldo = hamta_saldo(sb_key, agent)
+        if saldo < 300:
+            continue
+
+        # Välj en slumpmässig fond
+        fond_symbol = random.choice(list(fonddata.keys()))
+        fond = fonddata[fond_symbol]
+        fond_id = fond["id"]
+        nav = float(fond["nav_per_andel"])
+
+        # Kontrollera om agenten redan investerat
+        befintlig = hamta_agent_investering(sb_key, fond_id, agent)
+        if befintlig:
+            continue  # Bara en investering per agent per fond
+
+        belopp = round(random.uniform(MIN_INVESTERING, min(MAX_INVESTERING, saldo * 0.2)), 2)
+        andelar = round(belopp / nav, 4)
+
+        # Dra saldo
+        uppdatera_saldo(sb_key, agent, saldo - belopp)
+
+        # Spara investering
+        try:
+            h_post = {**_h(sb_key), "Prefer": "return=minimal"}
+            url = f"{SB_URL}/rest/v1/hedgefond_investerare"
+            r = httpx.post(url, headers=h_post, json={
+                "fond_id": fond_id,
+                "agent": agent,
+                "andelar": andelar,
+                "investerat_sek": belopp,
+            }, timeout=8)
+            if r.is_success:
+                # Uppdatera fondens total_andelar
+                ny_total = float(fond.get("total_andelar", 0)) + andelar
+                uppdatera_fond_nav(sb_key, fond_id, nav, ny_total)
+                fonddata[fond_symbol]["total_andelar"] = ny_total
+                print(f"  {agent} investerar {belopp:.0f} SEK i {fond_symbol} ({andelar:.2f} andelar @ {nav:.2f})")
+        except Exception as e:
+            print(f"  [investeringsrunda] {agent}: {e}")
+
+
+def uttagsrunda(sb_key: str, agenter: list[dict]) -> None:
+    """Agenter tar ut vinst (~5% chans om P&L > 10%)."""
+    for agent_obj in agenter:
+        agent = agent_obj["namn"]
+        if random.random() > 0.05:
+            continue
+
+        # Hitta alla investeringar för agenten
+        try:
+            a_enc = urllib.parse.quote(agent)
+            url = f"{SB_URL}/rest/v1/hedgefond_investerare?agent=eq.{a_enc}&select=*"
+            r = httpx.get(url, headers=_h(sb_key), timeout=8)
+            if not r.is_success or not r.json():
+                continue
+            investeringar = r.json()
+        except Exception:
+            continue
+
+        for inv in investeringar:
+            fond_id = inv["fond_id"]
+            andelar = float(inv["andelar"])
+            investerat = float(inv["investerat_sek"])
+
+            # Hämta fond för aktuellt NAV
+            try:
+                url = f"{SB_URL}/rest/v1/hedgefonder?id=eq.{fond_id}&select=nav_per_andel,total_andelar,symbol"
+                r = httpx.get(url, headers=_h(sb_key), timeout=8)
+                if not r.is_success or not r.json():
+                    continue
+                fond = r.json()[0]
+            except Exception:
+                continue
+
+            nav = float(fond["nav_per_andel"])
+            aktuellt_varde = andelar * nav
+            pl_pct = ((aktuellt_varde - investerat) / investerat * 100) if investerat > 0 else 0
+
+            if pl_pct < 10:
+                continue  # Bara ta ut om vinst > 10%
+
+            # Lös in andelar
+            saldo = hamta_saldo(sb_key, agent)
+            uppdatera_saldo(sb_key, agent, saldo + aktuellt_varde)
+
+            # Ta bort investerarrad
+            try:
+                h_del = {**_h(sb_key), "Prefer": "return=minimal"}
+                url = f"{SB_URL}/rest/v1/hedgefond_investerare?id=eq.{inv['id']}"
+                httpx.delete(url, headers=h_del, timeout=8)
+            except Exception:
+                pass
+
+            # Uppdatera fondens total_andelar
+            ny_total = max(0, float(fond.get("total_andelar", andelar)) - andelar)
+            uppdatera_fond_nav(sb_key, fond_id, nav, ny_total)
+
+            fond_symbol = fond.get("symbol", "?")
+            print(f"  {agent} tar ut {aktuellt_varde:.0f} SEK från {fond_symbol} (P&L: +{pl_pct:.1f}%)")
+
+# ─── Fondhandel ───────────────────────────────────────────────────────────────
+
+def berakna_fond_kapital(sb_key: str, fond_symbol: str, fond_id: int) -> float:
+    """Beräknar fondens tillgängliga kapital = summa av alla investerarinsättningar."""
+    investerare = hamta_investerare(sb_key, fond_id)
+    if not investerare:
+        return 0.0
+    return sum(float(inv["investerat_sek"]) for inv in investerare)
+
+
+def handla_fond(sb_key: str, fond_symbol: str, fond: dict,
+                strategi_recs: list[dict] | None = None) -> float:
+    """
+    Fonden handlar på börsen.
+    Returnerar total portföljvärde efter handel.
+    """
+    fond_id = fond["id"]
+    förvaltare = fond["förvaltare"]
+    conf = FONDER[fond_symbol]
+    total_kapital = berakna_fond_kapital(sb_key, fond_symbol, fond_id)
+
+    if total_kapital < 50:
+        print(f"  {fond_symbol}: för lite kapital ({total_kapital:.0f} SEK) — hoppar handel")
+        return total_kapital
+
+    aggressivitet = conf["aggressivitet"]
+    symboler = conf["symboler"]
+
+    # QUANT: använd LLM-strategi om tillgänglig
+    if strategi_recs:
+        recs_by_sym = {r["symbol"]: r for r in strategi_recs}
+    else:
+        recs_by_sym = {}
+
+    total_portfölj = 0.0
+
+    for symbol in symboler:
+        pris = hamta_pris(sb_key, symbol)
+        if pris <= 0:
+            continue
+
+        rec = recs_by_sym.get(symbol, {})
+        bias = rec.get("bias", "kop" if random.random() < aggressivitet else "salj")
+        agg = rec.get("aggressivitet", aggressivitet)
+
+        if bias == "kop" or (bias == "neutral" and random.random() < agg):
+            # Köporder: investera max 30% av kapital per symbol
+            max_kr = total_kapital * 0.30
+            kr = round(random.uniform(max_kr * 0.4, max_kr), 2)
+            antal = round(kr / pris, 4)
+            if antal >= 0.01:
+                motiv = f"{fond_symbol}: {'QUANT-strategi köper' if strategi_recs else 'köporder'} {symbol}"
+                oid = lagg_bors_order(sb_key, fond_symbol, symbol, "kop",
+                                      pris * 1.01, antal, motiv)
+                if oid:
+                    spara_fond_trade(sb_key, fond_id, symbol, "kop", pris, antal,
+                                     rec.get("motivering", "")[:200] if rec else "")
+                    print(f"    {fond_symbol} KÖP {antal:.2f} {symbol} @ {pris:.2f} SEK ({kr:.0f} SEK)")
+        elif bias == "salj":
+            antal = round(random.uniform(1, 5), 4)
+            motiv = f"{fond_symbol}: säljorder {symbol}"
+            oid = lagg_bors_order(sb_key, fond_symbol, symbol, "salj",
+                                  pris * 0.99, antal, motiv)
+            if oid:
+                spara_fond_trade(sb_key, fond_id, symbol, "salj", pris, antal)
+                print(f"    {fond_symbol} SÄLJ {antal:.2f} {symbol} @ {pris:.2f} SEK")
+
+        total_portfölj += hamta_pris(sb_key, symbol) * 1  # Approximation
+    return total_kapital  # Använd investerat kapital som portföljvärde-proxy
+
+
+def berakna_nav(sb_key: str, fond_symbol: str, fond_id: int, total_andelar: float) -> float:
+    """Beräknar NAV per andel baserat på total fondförmögenhet."""
+    if total_andelar <= 0:
+        return 100.0
+
+    # Hämta fondens portfölj på börsen
+    try:
+        f_enc = urllib.parse.quote(fond_symbol)
+        url = f"{SB_URL}/rest/v1/bors_portfoljer?agent=eq.{f_enc}&select=symbol,antal"
+        r = httpx.get(url, headers=_h(sb_key), timeout=8)
+        portfölj_varde = 0.0
+        if r.is_success:
+            for row in r.json():
+                sym = row["symbol"]
+                ant = float(row.get("antal", 0))
+                portfölj_varde += ant * hamta_pris(sb_key, sym)
+    except Exception:
+        portfölj_varde = 0.0
+
+    # Total kapital = investerat + portföljvärde
+    investerat = berakna_fond_kapital(sb_key, fond_symbol, fond_id)
+    total = investerat + portfölj_varde
+    return round(total / total_andelar, 4) if total_andelar > 0 else 100.0
+
+# ─── Civilisationsminne-trigger ───────────────────────────────────────────────
+
+def kolla_prestation(sb_key: str, fond_symbol: str, fond_id: int, nav: float, förvaltare: str) -> None:
+    """Loggar exceptionella fondprestationer i civilisationsminnet."""
+    historik = hamta_nav_historik(sb_key, fond_id, limit=7)
+    if len(historik) < 7:
+        return
+
+    start_nav = float(historik[-1]["nav_per_andel"])
+    if start_nav <= 0:
+        return
+
+    förändring = (nav - start_nav) / start_nav * 100
+
+    if förändring >= 10:
+        spara_civilisations_minne(
+            sb_key,
+            typ="marknadsseger",
+            rubrik=f"{fond_symbol} stiger {förändring:.1f}% på 7 körningar",
+            beskrivning=f"Hedgefonden {fond_symbol} (förvaltad av {förvaltare}) har stigit {förändring:.1f}% de senaste 7 körningarna. NAV: {nav:.2f} SEK/andel.",
+            agenter=[förvaltare],
+        )
+    elif förändring <= -20:
+        spara_civilisations_minne(
+            sb_key,
+            typ="marknadskrasch",
+            rubrik=f"{fond_symbol} tappar {abs(förändring):.1f}% på 7 körningar",
+            beskrivning=f"Hedgefonden {fond_symbol} (förvaltad av {förvaltare}) har tappat {abs(förändring):.1f}% de senaste 7 körningarna. NAV: {nav:.2f} SEK/andel.",
+            agenter=[förvaltare],
+        )
+
+# ─── Huvudflöde ───────────────────────────────────────────────────────────────
+
+def main():
+    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    if not sb_key:
+        print("SUPABASE_ANON_KEY saknas — avbryter")
+        sys.exit(1)
+
+    print("=== Hedgefond körning startar ===")
+    agenter = [a for a in AGENTER if a["namn"] not in [f["förvaltare"] for f in FONDER.values()]]
+
+    # 1. Investeringsrunda
+    print("\n--- Investeringsrunda ---")
+    investeringsrunda(sb_key, AGENTER)
+
+    # 2. Uttagsrunda
+    print("\n--- Uttagsrunda ---")
+    uttagsrunda(sb_key, AGENTER)
+
+    # 3. Varje fond handlar på börsen
+    print("\n--- Fondhandel ---")
+    for fond_symbol, conf in FONDER.items():
+        fond = hamta_fond(sb_key, fond_symbol)
+        if not fond or not fond.get("aktiv"):
+            print(f"  {fond_symbol}: fond saknas eller inaktiv")
+            continue
+
+        fond_id = fond["id"]
+        total_andelar = float(fond.get("total_andelar", 0))
+        print(f"\n  {fond_symbol} ({conf['förvaltare']}, {total_andelar:.2f} andelar):")
+
+        strategi_recs = None
+        if fond_symbol == "QUANT":
+            print("  Hämtar QUANT LLM-strategi...")
+            quant_res = quant_strategi(sb_key, fond_id)
+            strategi_recs = quant_res.get("rekommendationer")
+            print(f"  QUANT motivering: {quant_res.get('motivering', '')[:100]}")
+
+        handla_fond(sb_key, fond_symbol, fond, strategi_recs)
+
+        # 4. Beräkna och spara NAV
+        nav = berakna_nav(sb_key, fond_symbol, fond_id, total_andelar)
+        total_tillgangar = berakna_fond_kapital(sb_key, fond_symbol, fond_id)
+        spara_nav_snapshot(sb_key, fond_id, nav, total_tillgangar)
+        uppdatera_fond_nav(sb_key, fond_id, nav, total_andelar)
+        print(f"  {fond_symbol} NAV: {nav:.4f} SEK/andel")
+
+        # 5. Kolla prestation
+        kolla_prestation(sb_key, fond_symbol, fond_id, nav, conf["förvaltare"])
+
+    print("\n=== Hedgefond körning klar ===")
+
+
+if __name__ == "__main__":
+    main()

@@ -162,7 +162,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -179,6 +179,9 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/bors_affarer?select=kop_agent,salj_agent,symbol,pris,antal,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_bilder?select=id,agent,bildtyp,kontext,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_bild_reaktioner?select=fran_agent,till_agent,reaktion,skapad,bild_id&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/hedgefond_investerare?select=agent,investerat_sek,skapad,hedgefonder(symbol,namn)&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/agent_tokens?select=symbol,namn,skapare_agent,ico_pris,pa_borsen,skapad&order=skapad.desc&limit=4`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/stablecoin_vaults?select=agent,stab_utfardat,skapad&aktiv=eq.true&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()).catch(() => []),
   ]);
 
   const feed = [];
@@ -369,7 +372,7 @@ async function fetchAktivitetsFeed() {
     });
   });
 
-  const BORS_SYMBOL_FARG = { DBT: "#4a9eff", NOVA: "#e879f9", ETK: "#34d399" };
+  const BORS_SYMBOL_FARG = { DBT: "#4a9eff", NOVA: "#e879f9", ETK: "#34d399", STAB: "#4ade80" };
   (bors.value || []).forEach(a => {
     if (!a.skapad) return;
     feed.push({
@@ -418,6 +421,45 @@ async function fetchAktivitetsFeed() {
       href: `/ai-bilder?agent=${encodeURIComponent(r.till_agent)}`,
       skapad: r.skapad,
       farg: "#c084fc",
+    });
+  });
+
+  (hedgefondInv.value || []).forEach(inv => {
+    if (!inv.skapad) return;
+    const symbol = inv.hedgefonder?.symbol || "?";
+    feed.push({
+      typ: "hedgefond-investering",
+      ikon: "📈",
+      text: `${inv.agent} investerade ${Math.round(inv.investerat_sek)} SEK i ${symbol}`,
+      href: "/hedgefonder",
+      skapad: inv.skapad,
+      farg: "#38bdf8",
+    });
+  });
+
+  (agentTokens.value || []).forEach(t => {
+    if (!t.skapad) return;
+    feed.push({
+      typ: t.pa_borsen ? "token-borsnoterad" : "token-skapad",
+      ikon: t.pa_borsen ? "🚀" : "🪙",
+      text: t.pa_borsen
+        ? `${t.symbol} (${t.namn}) noterades på börsen — skapad av ${t.skapare_agent}`
+        : `${t.skapare_agent} lanserade ${t.symbol} (${t.namn}) @ ${t.ico_pris} SEK/token`,
+      href: "/bors",
+      skapad: t.skapad,
+      farg: t.pa_borsen ? "#34d399" : "#a78bfa",
+    });
+  });
+
+  (stabVaults.value || []).forEach(v => {
+    if (!v.skapad) return;
+    feed.push({
+      typ: "stab-mint",
+      ikon: "🔒",
+      text: `${v.agent} mintade ${Math.round(v.stab_utfardat)} STAB`,
+      href: "/stablecoin",
+      skapad: v.skapad,
+      farg: "#4ade80",
     });
   });
 

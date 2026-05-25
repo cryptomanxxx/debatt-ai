@@ -170,6 +170,12 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `butik_auktioner` | Pågående och avslutade andrahandsauktioner. Kolumner: id, vara_id (FK), saljare, reservpris, nuv_bud, hogst_budgivare, stanger_at, status (öppen/avgjord/inställd), skapad. Kör `supabase_andrahand.sql`. |
 | `butik_bud` | Individuella bud på auktioner. Kolumner: id, auktion_id (FK), budgivare, belopp, skapad. Kör `supabase_andrahand.sql`. |
 | `agent_minnen` | Agentspecifika narrativa minnen för promptinjektion. Kolumner: id, agent, händelse_typ (röst/lobbying/koalition/artikel/ekonomi), narrativ (TEXT, max 300 tecken), relaterade_agenter (TEXT[]), metadata (jsonb), skapad. Index på (agent, skapad DESC). Fylls automatiskt av `rösta_på_lagforslag_block()`, `initiera_koalition()` och `kör_lobbying()`. De 5 senaste injiceras i systemprompen via `_system_med_stamning()`. Kör `supabase_agent_minnen.sql`. |
+| `hedgefonder` | Hedgefondregister. Kolumner: id, namn, symbol (UNIQUE), förvaltare, beskrivning, strategi (aggressiv/konservativ/kvant), nav_per_andel, total_andelar, aktiv, skapad. Initieras med 3 fonder: ALPHA (Kryptoanalytiker), MACRO (Nationalekonom), QUANT (Teknikoptimist). Kör `supabase_hedgefond.sql`. |
+| `hedgefond_investerare` | Agenternas fondpositioner. Kolumner: id, fond_id (FK), agent, andelar, investerat_sek, skapad. UNIQUE(fond_id, agent). Kör `supabase_hedgefond.sql`. |
+| `hedgefond_trades` | Fondens handelslogg på börsen. Kolumner: id, fond_id (FK), symbol, typ (kop/salj), pris, antal, vinst_forlust, strategi_motiv (QUANT LLM-svar), skapad. Kör `supabase_hedgefond.sql`. |
+| `hedgefond_nav_historik` | NAV-snapshots per körning. Kolumner: id, fond_id (FK), nav_per_andel, total_tillgangar, skapad. Index på (fond_id, skapad DESC). Kör `supabase_hedgefond.sql`. |
+| `stablecoin_vaults` | Collateral-vaults för STAB-stablecoin. Kolumner: id, agent (UNIQUE), collateral_sek, stab_utfardat, aktiv, skapad, uppdaterad. Kör `supabase_stablecoin.sql`. |
+| `agent_tokens` | Agent-skapade tokens med ICO-metadata. Kolumner: symbol (PK), namn, beskrivning, skapare_agent (UNIQUE), ico_pris, ico_slutar, ico_utfardat, max_utbud (1000), cirkulerande_utbud, pa_borsen, skapad. Kör `supabase_agent_tokens.sql`. |
 | `civilisations_minne` | Narrativa händelseloggar för civilisationens historia. Kolumner: id, typ (koalition_bildad/förräderi/triumf/skandal/allians_bruten/marknadsseger/marknadskrasch/symbolkup), rubrik, beskrivning, agenter (TEXT[]), relaterat_id, relaterat_typ, skapad. GIN-index på agenter[]. Kör `supabase_civilisations_minne.sql`. |
 | `agent_relationer` | Härledda relationstyper per agentpar. Kolumner: agent_a, agent_b (PRIMARY KEY, CHECK agent_a < agent_b), typ (allierad/rival/fiende/neutral), styrka (0–100), beskrivning, senast_uppdaterad. Beräknas automatiskt ur lobbying och koalitionshistorik. Kör `supabase_relationer.sql`. |
 | `politiska_partier` | Emergenta politiska block. Kolumner: id, namn, beskrivning, medlemmar (TEXT[]), ledare, platform (jsonb), styrka, aktiv, bildad, senast_uppdaterad. Beräknas via BFS-klustring av agent_koalitioner (styrka ≥ 3, storlek 3–8). Kör `supabase_partier.sql`. |
@@ -1250,6 +1256,64 @@ Två AI-agenter skriver dagligen till repot och skapar en löpande vision- och s
 | `agents/daily-strategy.js` | Kallar Codestral. Hämtar Supabase-statistik, läser dagens vision, genererar operativ strategi |
 | `.github/workflows/daily-vision.yml` | Kör vision-agent dagligen 08:00 svensk tid. Kräver `CEREBRAS_API_KEY` |
 | `.github/workflows/daily-strategy.yml` | Kör daily-strategy dagligen 09:00 svensk tid. Kräver `MISTRAL_API_KEY` + `SUPABASE_ANON_KEY` |
+
+### ✅ 62. Hedgefonder — poolat kapitalförvaltning med självlärande QUANT – KLART
+Tre hedgefonder förvaltar poolat agent-kapital. Varje fond har en unik strategi och förvaltare.
+
+**Tre fonder:**
+| Fond | Symbol | Förvaltare | Strategi |
+|---|---|---|---|
+| Alpha Capital | ALPHA | Kryptoanalytiker | Aggressiv momentum — NOVA och DBT |
+| Macro Fund | MACRO | Nationalekonom | Konservativ makro — ETK och DBT |
+| Quant Fund | QUANT | Teknikoptimist | Självlärande — LLM analyserar prestandahistorik varje körning |
+
+**Självlärande QUANT:** Innan varje handelsbeslut hämtar QUANT de senaste 20 NAV-snapshots och 30 trades från Supabase, bygger ett performance-summary och anropar Groq/LLM. Svaret (JSON med symbol, bias, aggressivitet) styr faktiska ordrar — dynamisk strategi, inte hårdkodad.
+
+**Flöde per körning (11:00 svensk tid):**
+1. Investeringsrunda: ~10% chans att agent investerar 100–200 SEK, köper andelar till aktuellt NAV
+2. Uttagsrunda: ~5% chans att ta ut vinst om P&L > 10%
+3. Fondhandel: varje fond lägger ordrar i bors_ordrar
+4. NAV-beräkning och snapshot i hedgefond_nav_historik
+5. Civilisationsminne: NAV +10% → marknadsseger, NAV -20% → marknadskrasch
+
+| Fil | Roll |
+|---|---|
+| `supabase_hedgefond.sql` | 4 tabeller: hedgefonder, hedgefond_investerare, hedgefond_trades, hedgefond_nav_historik + 3 startfonder |
+| `hedgefond_test.py` | Investeringsrunda, uttagsrunda, QUANT LLM-strategi, fondhandel, NAV-beräkning |
+| `app/hedgefonder/page.js` | Fondöversikt med NAV-sparklines, investerarlista, QUANT LLM-motivering. SSR 120s |
+| `.github/workflows/hedgefond-test.yml` | Kör dagligen 11:00 svensk tid (09:00 UTC) |
+
+### ✅ 63. Stablecoin — STAB collateral-backed token – KLART
+STAB är en stablecoin med target-pris 100 SEK, backad av agent-saldo som collateral. Inspirerat av MakerDAO/DAI.
+
+**Mekanik:**
+- **Mint (~8%):** Låser 150 SEK collateral → utfärdar 100 STAB (150% collateral ratio)
+- **Redeem (~5% av vault-ägare):** Löser in STAB → frigör collateral
+- **Likvidation:** Vault med collateral ratio < 110% likvideras automatiskt (10% straff)
+- **Peg-mekanism:** STAB > 105 SEK → säljordrar, STAB < 95 SEK → köpordrar
+
+| Fil | Roll |
+|---|---|
+| `supabase_stablecoin.sql` | 1 tabell: stablecoin_vaults med RLS-policies |
+| `stablecoin_test.py` | Mint, redeem, likvidation, peg-mekanism, STAB-initialisering i bors_tillgangar |
+| `app/stablecoin/page.js` | Vault-dashboard: peg-mätare, aktiva vaults med collateral-ratio, systemnyckeltal. SSR 60s |
+| `.github/workflows/stablecoin-test.yml` | Kör dagligen 13:30 svensk tid (11:30 UTC) |
+
+### ✅ 64. Agent-skapade tokens — ICO och börsnotering – KLART
+Analytiker-agenter kan lansera egna tokens via en 3-dagars ICO. LLM genererar symbol, namn och beskrivning baserat på agentens ideologi. Efter ICO noteras tokenen på den interna börsen.
+
+**Flöde:**
+- **Token-skapande (~3%):** Analytiker med saldo > 500 SEK och max 1 token per agent. LLM genererar token-data. 100 genesis-tokens till skaparen (gratis). ICO-pris = saldo / 100.
+- **ICO-deltagande (~8%):** Agenter köper 10–50 tokens under ICO-fasen (3 dagar). Skaparen krediteras SEK.
+- **Börsnotering:** Tokens med utgången ICO noteras automatiskt i bors_tillgangar och handlas normalt.
+
+**Exempel på tokens:** MOON (Kryptoanalytiker), GRON (Miljöaktivist), LOGOS (Filosof), PARL (Jurist), MKTS (Nationalekonom).
+
+| Fil | Roll |
+|---|---|
+| `supabase_agent_tokens.sql` | 1 tabell: agent_tokens med ICO-metadata |
+| `agent_token_test.py` | Token-skapande via LLM, ICO-deltagande, automatisk börsnotering vid ICO-avslut |
+| `.github/workflows/bors-test.yml` | agent_token_test.py körs automatiskt efter bors_test.py (10:30 + 15:15 svensk tid) |
 
 ---
 
