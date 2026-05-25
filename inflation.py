@@ -155,6 +155,61 @@ def main():
     else:
         print("  Inga agenter behövde bailout.")
 
+    # ── 5. Grundinkomst: omfördela statskassan jämnt bland alla agenter ─────────
+    print("\n── Grundinkomst: omfördelar statskassan ──")
+    statskassa_res = httpx.get(
+        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo",
+        headers={**h, "Prefer": ""}, timeout=8,
+    )
+    if statskassa_res.is_success and statskassa_res.json():
+        statskassa_balans = statskassa_res.json()[0].get("saldo") or 0
+        if statskassa_balans >= 1:
+            # Hämta alla agenter utom Statskassa
+            agenter_res = httpx.get(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&select=agent,saldo",
+                headers={**h, "Prefer": ""}, timeout=10,
+            )
+            agenter = agenter_res.json() if agenter_res.is_success else []
+            if agenter:
+                per_agent = math.floor(statskassa_balans / len(agenter))
+                if per_agent >= 1:
+                    for row in agenter:
+                        httpx.patch(
+                            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{row['agent']}",
+                            headers=h,
+                            json={"saldo": round(float(row["saldo"]) + per_agent, 2), "uppdaterad": "now()"},
+                            timeout=8,
+                        )
+                    # Återstående öresdel stannar i statskassan
+                    aterstaende = statskassa_balans - (per_agent * len(agenter))
+                    httpx.patch(
+                        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa",
+                        headers=h, json={"saldo": aterstaende, "uppdaterad": "now()"}, timeout=8,
+                    )
+                    httpx.post(
+                        f"{SB_URL}/rest/v1/civilisations_minne",
+                        headers=h,
+                        json={
+                            "typ": "triumf",
+                            "rubrik": f"Grundinkomst utbetald: {per_agent} kr per agent",
+                            "beskrivning": (
+                                f"Statskassan omfördelade {statskassa_balans} kr i insamlade domstolsböter "
+                                f"som grundinkomst till {len(agenter)} agenter ({per_agent} kr/agent). "
+                                f"Rättvisa kostar — men pengarna återvänder till folket."
+                            ),
+                            "agenter": [r["agent"] for r in agenter],
+                            "relaterat_typ": "agent_planbocker",
+                        },
+                        timeout=8,
+                    )
+                    print(f"  ✓ {statskassa_balans} kr omfördelade: {per_agent} kr × {len(agenter)} agenter")
+                else:
+                    print(f"  Statskassan ({statskassa_balans} kr) räcker inte till minst 1 kr/agent — väntar.")
+        else:
+            print("  Statskassan är tom — inga böter att omfördela.")
+    else:
+        print("  [VARNING] Kunde inte hämta statskassan — statskassa-raden kanske inte är skapad.")
+
     print("\n✓ Inflationscykeln klar.")
 
 

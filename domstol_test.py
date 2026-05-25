@@ -508,6 +508,14 @@ def verkstall_straff(h: dict, groq_key: str, dom_id: int, svarande: str, belopp:
     faktisk_bot = nuvarande_saldo - nytt_saldo
     print(f"  → Böter verkställda: {svarande} -{faktisk_bot} kr (saldo: {nuvarande_saldo} → {nytt_saldo} kr)")
 
+    # Böterna går till statskassan för veckovis omfördelning som grundinkomst
+    statskassa = sb_get(h, "agent_planbocker?agent=eq.Statskassa&select=saldo")
+    if statskassa:
+        nytt_statskassa = (statskassa[0].get("saldo") or 0) + faktisk_bot
+        sb_patch(h, "agent_planbocker?agent=eq.Statskassa",
+                 {"saldo": nytt_statskassa, "uppdaterad": datetime.now(timezone.utc).isoformat()})
+        print(f"  → Statskassan: +{faktisk_bot} kr (totalt: {nytt_statskassa} kr)")
+
     # Markera domen som verkställd
     sb_patch(h, f"domstol_domar?id=eq.{dom_id}", {"verkstalldes": True})
 
