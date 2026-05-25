@@ -714,18 +714,28 @@ function useNastaKorning() {
 
 function DagensSchema({ nextIdx }) {
   const [nowSec, setNowSec] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     setNowSec(svTidSek());
     const iv = setInterval(() => setNowSec(svTidSek()), 30000);
     return () => clearInterval(iv);
   }, []);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  const gridStyle = isMobile
+    ? { display: "grid", gridTemplateColumns: "1fr", gap: "3px" }
+    : { display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "repeat(13, auto)", gridAutoFlow: "column", gap: "3px 10px" };
   return (
     <div style={{ marginBottom: "24px", background: "#0a0a0f", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
         <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Dagens schema</span>
-        <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>22 körningar · svensk tid</span>
+        <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>25 körningar · svensk tid</span>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "repeat(10, auto)", gridAutoFlow: "column", gap: "3px 10px" }}>
+      <div style={gridStyle}>
         {ALLA_KÖRNINGAR.map((k, i) => {
           const eventSec = k.h * 3600 + k.m * 60;
           const past = nowSec !== null && eventSec < nowSec;
