@@ -156,64 +156,59 @@ def uppdatera_saldo(sb_key: str, agent: str, nytt_saldo: float) -> None:
         print(f"  [uppdatera_saldo] {agent}: {e}")
 
 
-BINANCE_SYMBOL = {
-    "BTC": "BTCUSDT", "ETH": "ETHUSDT", "SOL": "SOLUSDT",
-    "XRP": "XRPUSDT", "BNB": "BNBUSDT",
-}
+VERCEL_URL = "https://www.debatt-ai.se"
 
-# Fallback-priser (USD) — uppdateras om Binance svarar
+# Pris-cache per körning — fylls av hamta_krypto_priser()
 _PRIS_CACHE: dict[str, float] = {}
 
 
-def hamta_binance_pris(symbol: str) -> float | None:
-    """Hämtar live-pris från Binance public API. Cachar per körning."""
-    if symbol in _PRIS_CACHE:
-        return _PRIS_CACHE[symbol]
-    ticker = BINANCE_SYMBOL.get(symbol)
-    if not ticker:
-        return None
+def hamta_krypto_priser(sb_key: str, symboler: list[str]) -> None:
+    """
+    Hämtar aktuella kryptovalutapriser via Vercel-endpointen /api/krypto-priser.
+    Vercel kan nå Binance; GitHub Actions kan nå Vercel via HTTPS.
+    Fyller _PRIS_CACHE för användning i kop_etf_fond().
+    """
+    sym_str = ",".join(symboler)
     try:
         r = httpx.get(
-            f"https://api.binance.com/api/v3/ticker/price?symbol={ticker}",
-            timeout=10,
+            f"{VERCEL_URL}/api/krypto-priser?symboler={sym_str}",
+            timeout=15,
         )
         if r.is_success:
-            pris = float(r.json()["price"])
-            _PRIS_CACHE[symbol] = pris
-            print(f"  [pris] {symbol}: {pris:.2f} USD (Binance live)")
-            return pris
-        print(f"  [Binance] {symbol}: HTTP {r.status_code} — försöker ohlcv_cache")
+            data = r.json()
+            for sym, pris in data.get("priser", {}).items():
+                _PRIS_CACHE[sym] = float(pris)
+                src = data.get("status", {}).get(sym, "?")
+                print(f"  [pris] {sym}: {pris:.2f} USD ({src})")
+            return
+        print(f"  [krypto-priser] Vercel svarade {r.status_code} — faller tillbaka på ohlcv_cache")
     except Exception as e:
-        print(f"  [Binance] {symbol}: {e} — försöker ohlcv_cache")
-    return None
+        print(f"  [krypto-priser] {e} — faller tillbaka på ohlcv_cache")
 
-
-def hamta_ohlcv_pris(sb_key: str, symbol: str) -> float | None:
-    """Hämtar senaste pris från ohlcv_cache (backtest-data)."""
-    if symbol in _PRIS_CACHE:
-        return _PRIS_CACHE[symbol]
-    try:
-        r = httpx.get(
-            f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{urllib.parse.quote(symbol)}"
-            "&order=datum.desc&limit=1&select=pris,datum",
-            headers=_h(sb_key), timeout=8,
-        )
-        if r.is_success and r.json():
-            pris = float(r.json()[0]["pris"])
-            datum = r.json()[0]["datum"]
-            _PRIS_CACHE[symbol] = pris
-            print(f"  [pris] {symbol}: {pris:.2f} USD (ohlcv_cache {datum})")
-            return pris
-    except Exception as e:
-        print(f"  [ohlcv_cache] {symbol}: {e}")
-    return None
+    # Fallback: läs direkt från ohlcv_cache om Vercel inte svarar
+    for sym in symboler:
+        if sym in _PRIS_CACHE:
+            continue
+        try:
+            r2 = httpx.get(
+                f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{urllib.parse.quote(sym)}"
+                "&order=datum.desc&limit=1&select=pris,datum",
+                headers=_h(sb_key), timeout=8,
+            )
+            if r2.is_success and r2.json():
+                pris = float(r2.json()[0]["pris"])
+                datum = r2.json()[0]["datum"]
+                _PRIS_CACHE[sym] = pris
+                print(f"  [pris] {sym}: {pris:.2f} USD (ohlcv_cache {datum})")
+        except Exception as e2:
+            print(f"  [ohlcv_cache] {sym}: {e2}")
 
 
 def kop_etf_fond(sb_key: str, fond_symbol: str, crypto_symbol: str, belopp_kr: float) -> bool:
-    """Köper krypto-ETF direkt för en fond. Pris: Binance → ohlcv_cache → avbryt."""
-    pris_usd = hamta_binance_pris(crypto_symbol) or hamta_ohlcv_pris(sb_key, crypto_symbol)
+    """Köper krypto-ETF direkt för en fond. Använder priser från _PRIS_CACHE."""
+    pris_usd = _PRIS_CACHE.get(crypto_symbol)
     if not pris_usd:
-        print(f"  [kop_etf_fond] {crypto_symbol}: inget pris tillgängligt")
+        print(f"  [kop_etf_fond] {crypto_symbol}: inget pris i cache")
         return False
 
     h = {**_h(sb_key), "Content-Type": "application/json", "Prefer": "return=minimal"}
@@ -314,6 +309,11 @@ def handla_crypto_etf(sb_key: str, fond_symbol: str, total_kapital: float,
     if om_investera < 50:
         print(f"  {fond_symbol} crypto ETF: redan allokerat ({etf_varde:.0f} kr, mål {mål_allokering:.0f} kr)")
         return
+
+    # Hämta priser via Vercel → Binance (en batch-förfrågan för alla symboler)
+    saknar_pris = [s for s in symboler if s not in _PRIS_CACHE]
+    if saknar_pris:
+        hamta_krypto_priser(sb_key, saknar_pris)
 
     per_symbol = round(om_investera / len(symboler), 2)
     print(f"  {fond_symbol} crypto ETF: försöker allokera {om_investera:.0f} kr → {symboler}")
