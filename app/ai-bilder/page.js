@@ -95,6 +95,31 @@ export default async function AiBilderPage({ searchParams }) {
           </div>
         )}
 
+        {/* Bildtyp-filter */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "24px" }}>
+          {[
+            { typ: "", label: "Alla typer", ikon: "🖼️", farg: C.textMuted },
+            { typ: "tillstand", label: "Tillstånd", ikon: "🎨", farg: "#e879f9" },
+            { typ: "meme",      label: "Meme",      ikon: "📢", farg: "#f59e0b" },
+            { typ: "propaganda",label: "Propaganda", ikon: "📣", farg: "#f87171" },
+            { typ: "valkampanj",label: "Valkampanj", ikon: "🗳️", farg: "#4ade80" },
+          ].map(({ typ, label, ikon, farg }) => {
+            const aktiv = (searchParams?.typ || "") === typ;
+            const href = typ
+              ? `/ai-bilder?${valtAgent ? `agent=${encodeURIComponent(valtAgent)}&` : ""}typ=${typ}`
+              : `/ai-bilder${valtAgent ? `?agent=${encodeURIComponent(valtAgent)}` : ""}`;
+            return (
+              <a key={typ} href={href} style={{
+                padding: "5px 14px", borderRadius: "20px", fontSize: "12px", fontFamily: "monospace",
+                textDecoration: "none",
+                background: aktiv ? farg + "20" : "transparent",
+                border: `1px solid ${aktiv ? farg + "60" : C.border}`,
+                color: aktiv ? farg : C.textMuted,
+              }}>{ikon} {label}</a>
+            );
+          })}
+        </div>
+
         {/* Tomt state */}
         {bilder.length === 0 && (
           <div style={{ textAlign: "center", padding: "80px 20px", color: C.textMuted }}>
