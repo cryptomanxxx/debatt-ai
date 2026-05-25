@@ -1,0 +1,35 @@
+name: Daily Strategy Agent
+
+on:
+  schedule:
+    - cron: "0 7 * * *"  # 07:00 UTC = 09:00 svensk tid
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  strategy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Kör daily-strategy
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: node agents/daily-strategy.js
+
+      - name: Commit strategi
+        run: |
+          git config user.name "Strategy Agent"
+          git config user.email "noreply@debatt-ai.se"
+          git add ai-bus/discussions/
+          git diff --cached --quiet || git commit -m "strategy: Daglig strategi $(date +%Y-%m-%d)"
+          git push

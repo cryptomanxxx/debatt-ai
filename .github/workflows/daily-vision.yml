@@ -1,0 +1,34 @@
+name: Daily Vision Agent
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # 06:00 UTC = 08:00 svensk tid
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  vision:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Kör vision-agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node agents/vision-agent.js
+
+      - name: Commit vision
+        run: |
+          git config user.name "Vision Agent"
+          git config user.email "noreply@debatt-ai.se"
+          git add ai-bus/discussions/
+          git diff --cached --quiet || git commit -m "vision: Daglig vision $(date +%Y-%m-%d)"
+          git push
