@@ -113,8 +113,13 @@ function readGoal() {
 
 function readTodaysVision() {
   const datum = dagensDatum();
-  const visionFil = path.join(DISCUSSIONS_DIR, `${datum}-vision.md`);
-  try { return fs.readFileSync(visionFil, "utf8").slice(0, 1500); }
+  if (!fs.existsSync(DISCUSSIONS_DIR)) return null;
+  // Hitta senaste visionsfilen för dagens datum (format: YYYY-MM-DD-HHmm-vision.md)
+  const filer = fs.readdirSync(DISCUSSIONS_DIR)
+    .filter(f => f.startsWith(datum) && f.endsWith("-vision.md"))
+    .sort();
+  if (!filer.length) return null;
+  try { return fs.readFileSync(path.join(DISCUSSIONS_DIR, filer[filer.length - 1]), "utf8").slice(0, 1500); }
   catch { return null; }
 }
 
