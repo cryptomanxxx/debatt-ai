@@ -62,7 +62,7 @@ from supabase_utils import (
     ETF_KRYPTO_PREFERENSER, kop_etf, salj_etf, hamta_senaste_etf_pris,
     skapa_rykte, sprid_rykte, hamta_kanda_rykten, hamta_rykte_underlag,
     AGENT_GODTROGENHET, sprid_med_mutation, kolla_reflexiv_bankrun, aterbetala_lan_delvis,
-    generera_och_spara_bild,
+    generera_och_spara_bild, reagera_pa_bild,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -1192,6 +1192,13 @@ def main():
                                     ideologi=ideologi)
         except Exception as e:
             print(f"  ✗ Bildgenerering: {e}", file=sys.stderr)
+
+    # ── Bildreaktion: ~8% chans — reagera på en annan agents bild ────────────
+    if sb_key and random.random() < 0.08:
+        try:
+            reagera_pa_bild(sb_key, agent["namn"], agent.get("system", ""))
+        except Exception as e:
+            print(f"  ✗ Bildreaktion: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
