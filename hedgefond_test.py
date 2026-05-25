@@ -206,6 +206,8 @@ def hamta_krypto_priser(sb_key: str, symboler: list[str]) -> None:
 
 def kop_etf_fond(sb_key: str, fond_symbol: str, crypto_symbol: str, belopp_kr: float) -> bool:
     """Köper krypto-ETF direkt för en fond. Använder priser från _PRIS_CACHE."""
+    if belopp_kr <= 0:
+        return False
     pris_usd = _PRIS_CACHE.get(crypto_symbol)
     if not pris_usd:
         print(f"  [kop_etf_fond] {crypto_symbol}: inget pris i cache")

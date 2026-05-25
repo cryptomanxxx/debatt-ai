@@ -13,6 +13,8 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+const TILLÅTNA_SYMBOLER = new Set(["BTC", "ETH", "SOL", "XRP", "BNB"]);
+
 const BINANCE = {
   BTC: "BTCUSDT",
   ETH: "ETHUSDT",
@@ -53,17 +55,29 @@ async function sparaPris(symbol, datum, pris) {
     "Content-Type": "application/json",
     Prefer: "resolution=merge-duplicates,return=minimal",
   };
-  await fetch(`${SB_URL}/rest/v1/ohlcv_cache?on_conflict=symbol,datum`, {
-    method: "POST",
-    headers: h,
-    body: JSON.stringify({ symbol, datum, pris: Math.round(pris * 100) / 100, vol: 0 }),
-  });
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/ohlcv_cache?on_conflict=symbol,datum`, {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify({ symbol, datum, pris: Math.round(pris * 100) / 100, vol: 0 }),
+    });
+    if (!r.ok) console.error(`[krypto-priser] sparaPris ${symbol}: HTTP ${r.status}`);
+  } catch (e) {
+    console.error(`[krypto-priser] sparaPris ${symbol}:`, e);
+  }
 }
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const symbolerParam = searchParams.get("symboler") || "BTC,ETH,SOL,XRP,BNB";
-  const symboler = symbolerParam.split(",").map(s => s.trim().toUpperCase());
+  const symboler = symbolerParam
+    .split(",")
+    .map(s => s.trim().toUpperCase())
+    .filter(s => TILLÅTNA_SYMBOLER.has(s));
+
+  if (symboler.length === 0) {
+    return Response.json({ error: "Inga giltiga symboler. Tillåtna: BTC,ETH,SOL,XRP,BNB" }, { status: 400 });
+  }
   const refresh = searchParams.get("refresh") === "true";
 
   const idag = new Date().toISOString().slice(0, 10);
@@ -102,6 +116,13 @@ export async function GET(request) {
       }
     }
   }));
+
+  if (Object.keys(priser).length === 0) {
+    return Response.json(
+      { error: "Inga priser tillgängliga — varken Binance eller ohlcv_cache svarade", datum: idag },
+      { status: 503 }
+    );
+  }
 
   return Response.json({ priser, datum: idag, status });
 }
