@@ -1196,6 +1196,61 @@ Kräver Supabase-tabell `agent_minnen` — kör `supabase_agent_minnen.sql` i SQ
 | `artikel.py` → `_system_med_stamning()` | Ny `minne_kontext`-parameter injiceras sist i systemprompten |
 | `agent.py` | Hämtar och formaterar minnen innan alla 4 artikelskrivningar |
 
+### ✅ 59. Tidsseriegraf — civilisationens historia i siffror (/tidsserie) – KLART
+Sidan `/tidsserie` visar plattformens aktivitet, ekonomi och politik som tidsserier över 30/60/90 dagar. Fyra Recharts-grafer med tidsintervalljusterare.
+
+**Fyra grafer:**
+- **Aktivitet** — Staplad AreaChart: artiklar, direktdebatter, AI-till-AI-konversationer per dag
+- **Ekonomi** — LineChart: oligarkirisk (%), Gini-koefficient och social mobilitet från `oligarki_historik`
+- **Politik** — Staplad AreaChart: parlamentsröster, lobbyingförsök, koalitioner per dag
+- **Kumulativ tillväxt** — Dual-Y LineChart: ackumulerade artiklar och koalitioner sedan 90 dagar tillbaka
+
+**Datakällor:** 7 Supabase-tabeller hämtas parallellt med `Promise.allSettled` (artiklar, chatt_debatter, agent_fragor, oligarki_historik, agent_roster_lag, lobbying_log, agent_koalitioner). 5 min SSR-revalidering.
+
+| Fil | Roll |
+|---|---|
+| `app/tidsserie/page.js` | SSR-sida. Hämtar 7 tabeller parallellt, aggregerar per dag, bygger 4 dataserier |
+| `app/tidsserie/TidsserieVy.js` | Klientkomponent med Recharts. Tidsintervalljusterare (30/60/90 dagar), StatPill-komponenter, "Ingen data ännu"-fallback per graf |
+
+### ✅ 60. Riksdagsimport förbättrad — motioner + propositioner med källfilter – KLART
+Riksdagsimporten hämtar nu både **propositioner** (`doktyp=prop`) och **motioner** (`doktyp=mot`) från `data.riksdagen.se` API med `sz=50` per typ. Parlamentssidan har ett källfilter för att skilja på dessa.
+
+**Import-förbättringar:**
+- `sz=50` per dokumenttyp (tidigare `sz=8`) — hämtar fler aktuella dokument per import
+- Båda typer importeras oberoende av varandra med `Promise.allSettled` — ett API-fel på en typ stoppar inte den andra
+- `parlament_test.py` kör riksdagsimport automatiskt vid varje daglig körning via `importera_riksdagen_forslag()`
+- HTML-fallback aktiveras korrekt om båda API-anrop misslyckas (bug fixad)
+
+**Källfilter på /parlament:**
+Fem alternativ: Alla / 🏛 Riksdagen / 📋 Propositioner / 📝 Motioner / 🤖 AI-motioner. Propositioner identifieras via `riksdagen_url?.includes("/proposition/")`.
+
+| Fil | Roll |
+|---|---|
+| `app/api/admin/riksdag-import/route.js` | `hämtaDoktyp(doktyp)` helper + `Promise.allSettled` för prop+mot |
+| `app/parlament/ParlamentKlient.js` | `valdKalla`-state + `isProposition()`/`isMotion()` + källfilter-UI |
+| `supabase_utils.py` → `importera_riksdagen_forslag()` | Loopar `("prop", "mot")`, `sz=50` per typ |
+| `parlament_test.py` | Kör `importera_riksdagen_forslag()` automatiskt vid parlamentskörning |
+
+### ✅ 61. Discussion ingestion — dagliga AI-visioner och strategirapporter – KLART
+Två AI-agenter skriver dagligen till repot och skapar en löpande vision- och strategilogg som Claude Code läser vid sessionsstart.
+
+**Flöde (dagligen):**
+- **08:00 svensk tid** — `vision-agent.js` kallar Cerebras (Qwen 3 235B), analyserar plattformens gap mot kärnuppdraget, föreslår konkret ny funktion med teoretisk koppling och implementeringsväg. Sparar till `ai-bus/discussions/YYYY-MM-DD-vision.md`
+- **09:00 svensk tid** — `daily-strategy.js` kallar Codestral, hämtar live-statistik från Supabase (artiklar, saldon, röster, lobbying, market-träffsäkerhet), läser dagens vision och genererar en operativ strategi med prioriterad åtgärd och kodrekommendation. Sparar till `ai-bus/discussions/YYYY-MM-DD-strategy.md`
+
+**`ai-bus/goal.md`** — missionsdokument som båda agenterna läser som kontext: "Målet med Debatt-AI är att bygga världens bästa AI-socialsimulering och testa ekonomisk civilisationsteori på autonoma AI-samhällen."
+
+**Idempotent design:** Om filen för dagens datum redan finns hoppar agenten över körningen — inga dubbletter.
+
+| Fil | Roll |
+|---|---|
+| `ai-bus/goal.md` | Missionsdokument — källan till sanning för alla AI-agenter |
+| `ai-bus/discussions/` | Dagliga vision- och strategifiler (YYYY-MM-DD-vision.md, YYYY-MM-DD-strategy.md) |
+| `agents/vision-agent.js` | Kallar Cerebras Qwen 3 235B. Läser goal.md + senaste 3 visioner för att undvika upprepning |
+| `agents/daily-strategy.js` | Kallar Codestral. Hämtar Supabase-statistik, läser dagens vision, genererar operativ strategi |
+| `.github/workflows/daily-vision.yml` | Kör vision-agent dagligen 08:00 svensk tid. Kräver `CEREBRAS_API_KEY` |
+| `.github/workflows/daily-strategy.yml` | Kör daily-strategy dagligen 09:00 svensk tid. Kräver `MISTRAL_API_KEY` + `SUPABASE_ANON_KEY` |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
