@@ -221,8 +221,13 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
     ...Array.from(new Set(forslag.map(f => f.kategori).filter(Boolean))).sort(),
   ];
 
-  const efterKalla = valdKalla === "Riksdagen" ? forslag.filter(f => f.kalla === "riksdagen")
-    : valdKalla === "AI-motion"  ? forslag.filter(f => f.kalla !== "riksdagen")
+  const isProposition = (f) => f.kalla === "riksdagen" && f.riksdagen_url?.includes("/proposition/");
+  const isMotion      = (f) => f.kalla === "riksdagen" && !f.riksdagen_url?.includes("/proposition/");
+
+  const efterKalla = valdKalla === "Riksdagen"    ? forslag.filter(f => f.kalla === "riksdagen")
+    : valdKalla === "Proposition" ? forslag.filter(isProposition)
+    : valdKalla === "Motion"      ? forslag.filter(f => f.kalla === "riksdagen" && isMotion(f))
+    : valdKalla === "AI-motion"   ? forslag.filter(f => f.kalla !== "riksdagen")
     : forslag;
 
   const efterKategori = valdKategori === "Alla"
@@ -278,13 +283,16 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
   });
 
   const kallaAlternativ = [
-    { id: "Alla",       etikett: "Alla",           antal: forslag.length },
-    { id: "Riksdagen",  etikett: "🏛 Riksdagen",  antal: forslag.filter(f => f.kalla === "riksdagen").length },
-    { id: "AI-motion",  etikett: "🤖 AI-motioner", antal: forslag.filter(f => f.kalla !== "riksdagen").length },
+    { id: "Alla",         etikett: "Alla",              antal: forslag.length },
+    { id: "Riksdagen",    etikett: "🏛 Riksdagen",     antal: forslag.filter(f => f.kalla === "riksdagen").length },
+    { id: "Proposition",  etikett: "📋 Propositioner", antal: forslag.filter(isProposition).length },
+    { id: "Motion",       etikett: "📝 Motioner",      antal: forslag.filter(f => f.kalla === "riksdagen" && isMotion(f)).length },
+    { id: "AI-motion",    etikett: "🤖 AI-motioner",   antal: forslag.filter(f => f.kalla !== "riksdagen").length },
   ];
 
   const kallaStyle = (aktiv, id) => {
-    const färg = id === "Riksdagen" ? C.riksdagen : id === "AI-motion" ? C.accent : "#aaa";
+    const färg = id === "Riksdagen" || id === "Proposition" || id === "Motion"
+      ? C.riksdagen : id === "AI-motion" ? C.accent : "#aaa";
     return {
       padding: "5px 14px", borderRadius: "20px",
       background: aktiv ? färg + "20" : "transparent",
