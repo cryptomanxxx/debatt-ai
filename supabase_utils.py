@@ -1266,65 +1266,69 @@ def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str) -> bool:
 
 
 def importera_riksdagen_forslag(sb_key: str) -> int:
-    """Hämtar färska propositioner från riksdagen.se API och importerar nya. Returnerar antal importerade."""
+    """Hämtar propositioner och motioner från riksdagen.se API och importerar nya. Returnerar antal importerade."""
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json", "Prefer": "return=minimal",
     }
     importerade = 0
-    try:
-        api_r = httpx.get(
-            "https://data.riksdagen.se/dokumentlista/"
-            "?doktyp=prop&utformat=json&sz=50&sort=datum&sortorder=desc",
-            timeout=15,
-        )
-        if not api_r.is_success:
-            return 0
 
-        data = api_r.json()
-        dokument = data.get("dokumentlista", {}).get("dokument", [])
-        if isinstance(dokument, dict):
-            dokument = [dokument]
-
-        for dok in dokument:
-            dok_id = dok.get("dok_id", "").strip()
-            if not dok_id:
-                continue
-            check = httpx.get(
-                f"{SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.{urllib.parse.quote(dok_id)}&select=id",
-                headers={**h, "Prefer": ""}, timeout=8,
+    for doktyp in ("prop", "mot"):
+        try:
+            api_r = httpx.get(
+                f"https://data.riksdagen.se/dokumentlista/"
+                f"?doktyp={doktyp}&utformat=json&sz=50&sort=datum&sortorder=desc",
+                timeout=15,
             )
-            if check.is_success and check.json():
+            if not api_r.is_success:
                 continue
 
-            titel = dok.get("titel", "").strip()[:120]
-            if not titel:
-                continue
+            data = api_r.json()
+            dokument = data.get("dokumentlista", {}).get("dokument", [])
+            if isinstance(dokument, dict):
+                dokument = [dokument]
 
-            notis = (dok.get("notis", "") or "").strip()
-            notis2 = (dok.get("notis2", "") or "").strip()
-            beskrivning = (notis + " " + notis2).strip() or f"Proposition från riksdagen: {titel}"
+            fallback = "Proposition" if doktyp == "prop" else "Motion"
 
-            riksdagen_url = dok.get("url", "") or ""
-            if riksdagen_url and not riksdagen_url.startswith("http"):
-                riksdagen_url = "https://www.riksdagen.se" + riksdagen_url
+            for dok in dokument:
+                dok_id = dok.get("dok_id", "").strip()
+                if not dok_id:
+                    continue
+                check = httpx.get(
+                    f"{SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.{urllib.parse.quote(dok_id)}&select=id",
+                    headers={**h, "Prefer": ""}, timeout=8,
+                )
+                if check.is_success and check.json():
+                    continue
 
-            r = httpx.post(
-                f"{SB_URL}/rest/v1/lagforslag",
-                headers=h,
-                json={
-                    "titel": titel, "beskrivning": beskrivning[:1500],
-                    "kategori": "Övrigt", "kalla": "riksdagen",
-                    "riksdagen_id": dok_id, "riksdagen_url": riksdagen_url or None,
-                    "status": "omrostning",
-                },
-                timeout=10,
-            )
-            if r.is_success:
-                importerade += 1
+                titel = dok.get("titel", "").strip()[:120]
+                if not titel:
+                    continue
 
-    except Exception as e:
-        print(f"  ✗ Riksdagen-import misslyckades: {e}", file=sys.stderr)
+                notis = (dok.get("notis", "") or "").strip()
+                notis2 = (dok.get("notis2", "") or "").strip()
+                beskrivning = (notis + " " + notis2).strip() or f"{fallback} från riksdagen: {titel}"
+
+                riksdagen_url = dok.get("url", "") or ""
+                if riksdagen_url and not riksdagen_url.startswith("http"):
+                    riksdagen_url = "https://www.riksdagen.se" + riksdagen_url
+
+                r = httpx.post(
+                    f"{SB_URL}/rest/v1/lagforslag",
+                    headers=h,
+                    json={
+                        "titel": titel, "beskrivning": beskrivning[:1500],
+                        "kategori": "Övrigt", "kalla": "riksdagen",
+                        "riksdagen_id": dok_id, "riksdagen_url": riksdagen_url or None,
+                        "status": "omrostning",
+                    },
+                    timeout=10,
+                )
+                if r.is_success:
+                    importerade += 1
+
+        except Exception as e:
+            print(f"  ✗ Riksdagen-import ({doktyp}) misslyckades: {e}", file=sys.stderr)
 
     return importerade
 
