@@ -352,6 +352,15 @@ async function getAgentBets(namn) {
   return await res.json();
 }
 
+async function getAgentBilder(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_bilder?agent=eq.${encodeURIComponent(namn)}&order=skapad.desc&limit=12&select=id,prompt,bild_url,kontext,skapad`,
+    { headers: sbHeaders(), next: { revalidate: 120 } }
+  );
+  if (!res.ok) return [];
+  return await res.json();
+}
+
 async function getAgentSymboler(namn) {
   const [symRes, varorRes] = await Promise.all([
     fetch(
@@ -420,7 +429,7 @@ export default async function AgentPage({ params }) {
   const profil = AGENTPROFILER[namn];
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler, dagbok, bets] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler, dagbok, bets, bilder] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
@@ -434,6 +443,7 @@ export default async function AgentPage({ params }) {
     getAgentSymboler(namn),
     getAgentDagbok(namn),
     getAgentBets(namn),
+    getAgentBilder(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -950,6 +960,48 @@ export default async function AgentPage({ params }) {
             </div>
           );
         })()}
+
+        {/* Bildgalleri */}
+        {bilder.length > 0 && (
+          <div style={{ marginTop: "48px", paddingTop: "40px", borderTop: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: "16px" }}>
+              <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: 0, fontFamily: "monospace" }}>
+                🎨 Visuellt minne ({bilder.length})
+              </p>
+              <a href="/ai-bilder" style={{ fontSize: "12px", color: C.textMuted, textDecoration: "none" }}>Se alla bilder →</a>
+            </div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+              gap: "8px",
+            }}>
+              {bilder.map(b => (
+                <div key={b.id} style={{ borderRadius: "8px", overflow: "hidden", background: "#080808", border: `1px solid ${C.border}` }}>
+                  <div style={{ aspectRatio: "3/2", overflow: "hidden" }}>
+                    <img
+                      src={b.bild_url}
+                      alt={b.prompt}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      loading="lazy"
+                    />
+                  </div>
+                  <div style={{ padding: "8px 10px" }}>
+                    {b.kontext?.saldo !== undefined && (
+                      <span style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace" }}>
+                        💰 {b.kontext.saldo} kr
+                      </span>
+                    )}
+                    {b.kontext?.parti && (
+                      <span style={{ fontSize: "10px", color: "#a78bfa", fontFamily: "monospace", marginLeft: "8px" }}>
+                        🏛 {b.kontext.parti}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Fråga agenten */}
         <div style={{ marginTop: "48px", paddingTop: "40px", borderTop: `1px solid ${C.border}` }}>

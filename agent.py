@@ -62,6 +62,7 @@ from supabase_utils import (
     ETF_KRYPTO_PREFERENSER, kop_etf, salj_etf, hamta_senaste_etf_pris,
     skapa_rykte, sprid_rykte, hamta_kanda_rykten, hamta_rykte_underlag,
     AGENT_GODTROGENHET, sprid_med_mutation, kolla_reflexiv_bankrun, aterbetala_lan_delvis,
+    generera_och_spara_bild,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -1175,6 +1176,22 @@ def main():
             ta_oligarki_snapshot(sb_key)
         except Exception as e:
             print(f"  ✗ Oligarki-snapshot: {e}", file=sys.stderr)
+
+    # ── Bildgenerering: ~15% chans per körning ───────────────────────────────
+    if sb_key and random.random() < 0.15:
+        try:
+            status_för_bild = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
+            saldo_för_bild = float(status_för_bild.get("saldo") or 500)
+            parti_obj = hamta_agent_parti(sb_key, agent["namn"]) if sb_key else None
+            parti_namn = parti_obj.get("namn", "") if parti_obj else ""
+            positioner_text = hamta_agent_positioner(sb_key, agent["namn"]) if sb_key else ""
+            ideologi = positioner_text[:80] if positioner_text else ""
+            generera_och_spara_bild(sb_key, agent["namn"],
+                                    saldo=saldo_för_bild,
+                                    parti=parti_namn,
+                                    ideologi=ideologi)
+        except Exception as e:
+            print(f"  ✗ Bildgenerering: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
