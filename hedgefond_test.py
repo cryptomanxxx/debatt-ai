@@ -161,44 +161,115 @@ BINANCE_SYMBOL = {
     "XRP": "XRPUSDT", "BNB": "BNBUSDT",
 }
 
+# Fallback-priser (USD) — uppdateras om Binance svarar
+_PRIS_CACHE: dict[str, float] = {}
 
-def populera_ohlcv_live(sb_key: str, symboler: list[str]) -> None:
-    """Hämtar live-priser från Binance och skriver till ohlcv_cache om dagsdata saknas."""
-    idag = datetime.now(timezone.utc).date().isoformat()
-    h_write = {
-        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates,return=minimal",
-    }
-    for sym in symboler:
-        ticker = BINANCE_SYMBOL.get(sym)
-        if not ticker:
-            continue
-        # Kolla om vi redan har dagsdata
-        check = httpx.get(
-            f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{sym}&datum=eq.{idag}&select=pris",
-            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}, timeout=6,
+
+def hamta_binance_pris(symbol: str) -> float | None:
+    """Hämtar live-pris från Binance public API. Cachar per körning."""
+    if symbol in _PRIS_CACHE:
+        return _PRIS_CACHE[symbol]
+    ticker = BINANCE_SYMBOL.get(symbol)
+    if not ticker:
+        return None
+    try:
+        r = httpx.get(
+            f"https://api.binance.com/api/v3/ticker/price?symbol={ticker}",
+            timeout=10,
         )
-        if check.is_success and check.json():
-            continue  # Redan finns
-        try:
-            r = httpx.get(
-                f"https://api.binance.com/api/v3/ticker/price?symbol={ticker}",
-                timeout=8,
-            )
-            if not r.is_success:
-                print(f"  [ohlcv fallback] {sym}: Binance svarade {r.status_code}")
-                continue
+        if r.is_success:
             pris = float(r.json()["price"])
-            httpx.post(
-                f"{SB_URL}/rest/v1/ohlcv_cache?on_conflict=symbol,datum",
-                headers=h_write,
-                json={"symbol": sym, "datum": idag, "pris": round(pris, 2), "vol": 0},
+            _PRIS_CACHE[symbol] = pris
+            print(f"  [pris] {symbol}: {pris:.2f} USD (Binance live)")
+            return pris
+        print(f"  [Binance] {symbol}: HTTP {r.status_code} — försöker ohlcv_cache")
+    except Exception as e:
+        print(f"  [Binance] {symbol}: {e} — försöker ohlcv_cache")
+    return None
+
+
+def hamta_ohlcv_pris(sb_key: str, symbol: str) -> float | None:
+    """Hämtar senaste pris från ohlcv_cache (backtest-data)."""
+    if symbol in _PRIS_CACHE:
+        return _PRIS_CACHE[symbol]
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{urllib.parse.quote(symbol)}"
+            "&order=datum.desc&limit=1&select=pris,datum",
+            headers=_h(sb_key), timeout=8,
+        )
+        if r.is_success and r.json():
+            pris = float(r.json()[0]["pris"])
+            datum = r.json()[0]["datum"]
+            _PRIS_CACHE[symbol] = pris
+            print(f"  [pris] {symbol}: {pris:.2f} USD (ohlcv_cache {datum})")
+            return pris
+    except Exception as e:
+        print(f"  [ohlcv_cache] {symbol}: {e}")
+    return None
+
+
+def kop_etf_fond(sb_key: str, fond_symbol: str, crypto_symbol: str, belopp_kr: float) -> bool:
+    """Köper krypto-ETF direkt för en fond. Pris: Binance → ohlcv_cache → avbryt."""
+    pris_usd = hamta_binance_pris(crypto_symbol) or hamta_ohlcv_pris(sb_key, crypto_symbol)
+    if not pris_usd:
+        print(f"  [kop_etf_fond] {crypto_symbol}: inget pris tillgängligt")
+        return False
+
+    h = {**_h(sb_key), "Content-Type": "application/json", "Prefer": "return=minimal"}
+    idag = datetime.now(timezone.utc).date().isoformat()
+
+    # Hämta befintligt innehav
+    ih_r = httpx.get(
+        f"{SB_URL}/rest/v1/agent_etf_innehav"
+        f"?agent=eq.{urllib.parse.quote(fond_symbol)}&symbol=eq.{crypto_symbol}"
+        "&select=investerat_kr,kopt_pris_usd",
+        headers=_h(sb_key), timeout=8,
+    )
+    innehav = ih_r.json() if ih_r.is_success else []
+
+    try:
+        if innehav:
+            old_inv  = float(innehav[0]["investerat_kr"])
+            old_pris = float(innehav[0]["kopt_pris_usd"])
+            new_inv  = old_inv + belopp_kr
+            new_pris = (old_inv * old_pris + belopp_kr * pris_usd) / new_inv
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_etf_innehav"
+                f"?agent=eq.{urllib.parse.quote(fond_symbol)}&symbol=eq.{crypto_symbol}",
+                headers=h,
+                json={"investerat_kr": round(new_inv, 2), "kopt_pris_usd": round(new_pris, 4),
+                      "uppdaterad": "now()"},
                 timeout=8,
             )
-            print(f"  [ohlcv fallback] {sym}: {pris:.2f} USD (Binance live)")
-        except Exception as e:
-            print(f"  [ohlcv fallback] {sym}: {e}")
+        else:
+            httpx.post(
+                f"{SB_URL}/rest/v1/agent_etf_innehav",
+                headers=h,
+                json={"agent": fond_symbol, "symbol": crypto_symbol,
+                      "investerat_kr": round(belopp_kr, 2), "kopt_pris_usd": round(pris_usd, 4)},
+                timeout=8,
+            )
+        # Loggtransaktion
+        httpx.post(
+            f"{SB_URL}/rest/v1/etf_transaktioner",
+            headers=h,
+            json={"agent": fond_symbol, "symbol": crypto_symbol, "typ": "kop",
+                  "belopp_kr": round(belopp_kr, 2), "pris_usd": round(pris_usd, 4)},
+            timeout=8,
+        )
+        # Spara i ohlcv_cache så /etf-sidan kan beräkna P&L
+        httpx.post(
+            f"{SB_URL}/rest/v1/ohlcv_cache?on_conflict=symbol,datum",
+            headers={**h, "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={"symbol": crypto_symbol, "datum": idag,
+                  "pris": round(pris_usd, 2), "vol": 0},
+            timeout=8,
+        )
+        return True
+    except Exception as e:
+        print(f"  [kop_etf_fond] {fond_symbol} {crypto_symbol}: {e}")
+        return False
 
 
 def sync_fond_planbok(sb_key: str, fond_symbol: str, saldo: float) -> None:
@@ -244,18 +315,12 @@ def handla_crypto_etf(sb_key: str, fond_symbol: str, total_kapital: float,
         print(f"  {fond_symbol} crypto ETF: redan allokerat ({etf_varde:.0f} kr, mål {mål_allokering:.0f} kr)")
         return
 
-    # Säkerställ att ohlcv_cache har dagsdata (fallback: Binance live-pris)
-    populera_ohlcv_live(sb_key, symboler)
-
-    # Sync planbok så kop_etf kan dra saldo
-    sync_fond_planbok(sb_key, fond_symbol, om_investera + 10)
-
     per_symbol = round(om_investera / len(symboler), 2)
     print(f"  {fond_symbol} crypto ETF: försöker allokera {om_investera:.0f} kr → {symboler}")
     for sym in symboler:
         if per_symbol < 20:
             break
-        ok = kop_etf(sb_key, fond_symbol, sym, per_symbol)
+        ok = kop_etf_fond(sb_key, fond_symbol, sym, per_symbol)
         if ok:
             print(f"  {fond_symbol} allokerar {per_symbol:.0f} kr → {sym} ETF ✓")
         else:
