@@ -1275,7 +1275,7 @@ def importera_riksdagen_forslag(sb_key: str) -> int:
     try:
         api_r = httpx.get(
             "https://data.riksdagen.se/dokumentlista/"
-            "?doktyp=prop&utformat=json&sz=8&sort=datum&sortorder=desc",
+            "?doktyp=prop&utformat=json&sz=50&sort=datum&sortorder=desc",
             timeout=15,
         )
         if not api_r.is_success:
@@ -1286,7 +1286,7 @@ def importera_riksdagen_forslag(sb_key: str) -> int:
         if isinstance(dokument, dict):
             dokument = [dokument]
 
-        for dok in dokument[:3]:
+        for dok in dokument:
             dok_id = dok.get("dok_id", "").strip()
             if not dok_id:
                 continue
