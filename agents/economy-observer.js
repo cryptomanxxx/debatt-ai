@@ -8,7 +8,7 @@
  * Sparar till ai-bus/discussions/YYYY-MM-DD-HHmm-economy.md
  *
  * Körs av GitHub Actions (economy-observer.yml) eller manuellt:
- *   CEREBRAS_API_KEY=xxx NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx node agents/economy-observer.js
+ *   CEREBRAS_API_KEY=xxx SUPABASE_ANON_KEY=xxx node agents/economy-observer.js
  */
 
 const fs    = require("fs");
@@ -16,12 +16,12 @@ const path  = require("path");
 const https = require("https");
 
 const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
-const SB_KEY       = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_URL       = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const DISCUSSIONS  = path.join(__dirname, "../ai-bus/discussions");
 
 if (!CEREBRAS_KEY) { console.error("CEREBRAS_API_KEY saknas"); process.exit(1); }
-if (!SB_KEY)       { console.error("NEXT_PUBLIC_SUPABASE_ANON_KEY saknas"); process.exit(1); }
+if (!SB_KEY)       { console.error("SUPABASE_ANON_KEY saknas"); process.exit(1); }
 
 function tidsstämpel() {
   return new Date().toISOString().slice(0, 16).replace("T", "-").replace(":", "");
