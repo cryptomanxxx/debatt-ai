@@ -14,8 +14,8 @@ from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post,
 from agenter import ARTIKELFORMAT, get_agent_mood
 
 
-def _system_med_stamning(agent: dict, buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "") -> str:
-    """Append mood, symbol-buff instructions, reputation status, coalition bulletin, crisis and memory to agent system prompt."""
+def _system_med_stamning(agent: dict, buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "", ki_kontext: str = "") -> str:
+    """Append mood, symbol-buff instructions, reputation status, coalition bulletin, crisis, memory and KIs to agent system prompt."""
     from supabase_utils import format_status_for_prompt
     mood = get_agent_mood(agent["namn"])
     system = agent["system"].rstrip() + f"\n\n{mood['prompt']}"
@@ -29,16 +29,18 @@ def _system_med_stamning(agent: dict, buffs: dict | None = None, status: dict | 
         system += f"\n\n{koalitions_kontext}"
     if kris_kontext:
         system += f"\n\n{kris_kontext}"
+    if ki_kontext:
+        system += f"\n\n{ki_kontext}"
     if minne_kontext:
         system += f"\n\n{minne_kontext}"
     return system
 
 
-def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fmt: dict | None = None, buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "") -> str:
+def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fmt: dict | None = None, buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "", ki_kontext: str = "") -> str:
     """Skriv en debattartikel som kommenterar en aktuell nyhet."""
     if fmt is None:
         fmt = ARTIKELFORMAT[0]
-    system = _system_med_stamning(agent, buffs, status, koalitions_kontext, kris_kontext, minne_kontext)
+    system = _system_med_stamning(agent, buffs, status, koalitions_kontext, kris_kontext, minne_kontext, ki_kontext)
     kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
     max_tok = 2000 + (buffs.get("max_tokens_bonus", 0) if buffs else 0)
     user_msg = (
@@ -93,11 +95,11 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
     return result
 
 
-def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | None = None, buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "") -> str:
+def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | None = None, buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "", ki_kontext: str = "") -> str:
     """Använd Groq (med Gemini-fallback) för att skriva en debattartikel."""
     if fmt is None:
         fmt = ARTIKELFORMAT[0]
-    system = _system_med_stamning(agent, buffs, status, koalitions_kontext, kris_kontext, minne_kontext)
+    system = _system_med_stamning(agent, buffs, status, koalitions_kontext, kris_kontext, minne_kontext, ki_kontext)
     kontext_block = f"\n{extra_kontext}\n" if extra_kontext else ""
     max_tok = 2000 + (buffs.get("max_tokens_bonus", 0) if buffs else 0)
     user_msg = (
@@ -140,9 +142,9 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
     return result
 
 
-def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "", stafett_utmaning: str = "") -> str:
+def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "", stafett_utmaning: str = "", ki_kontext: str = "") -> str:
     """Använd Groq (med Gemini-fallback) för att skriva en replik på en befintlig artikel."""
-    system = _system_med_stamning(agent, buffs, status, koalitions_kontext, kris_kontext, minne_kontext)
+    system = _system_med_stamning(agent, buffs, status, koalitions_kontext, kris_kontext, minne_kontext, ki_kontext)
     max_tok = 2000 + (buffs.get("max_tokens_bonus", 0) if buffs else 0)
     relation_del = ""
     if relation_kontext:
