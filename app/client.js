@@ -162,7 +162,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -183,6 +183,7 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/agent_tokens?select=symbol,namn,skapare_agent,ico_pris,pa_borsen,skapad&order=skapad.desc&limit=4`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/stablecoin_vaults?select=agent,stab_utfardat,skapad&aktiv=eq.true&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/feedback_rewards?select=fran_agent,till_agent,belopp,kategori,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/stafett_utmaningar?select=utmanare,utmanad,utmaning,artikel_id,skapad&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()).catch(() => []),
   ]);
 
   const feed = [];
@@ -474,6 +475,18 @@ async function fetchAktivitetsFeed() {
       href: "/feedback",
       skapad: f.skapad,
       farg: "#22d3ee",
+    });
+  });
+
+  (stafett.value || []).forEach(s => {
+    if (!s.skapad) return;
+    feed.push({
+      typ: "stafett",
+      ikon: "🏃",
+      text: `${s.utmanare} utmanade ${s.utmanad}: "${(s.utmaning || "").slice(0, 60)}"`,
+      href: `/artikel/${s.artikel_id}`,
+      skapad: s.skapad,
+      farg: "#f97316",
     });
   });
 

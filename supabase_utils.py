@@ -161,6 +161,23 @@ def ar_duplikat(amne: str, senaste_titlar: list[str], troskel: float = 0.45) -> 
     return False
 
 
+def oracle_ovdebattering(amne: str, senaste_titlar: list[str]) -> bool:
+    """LLM-check: har detta ämne täckts för nyligen? Returnerar True = hoppa över ämnet."""
+    if len(senaste_titlar) < 5:
+        return False
+    titlar_text = "\n".join(f"- {t}" for t in senaste_titlar[:15])
+    prompt = (
+        f"Senaste 7 dagarnas publicerade artiklar:\n{titlar_text}\n\n"
+        f"Föreslagen ny artikel: \"{amne}\"\n\n"
+        f"Täcker något av ovanstående artiklar i stort sett samma ämne? Svara bara JA eller NEJ."
+    )
+    svar = _llm_spel(prompt, max_tokens=10, temperature=0)
+    if svar and "JA" in svar.upper():
+        print(f"  🔮 Oracle: ämnet överdebatterat, väljer nytt")
+        return True
+    return False
+
+
 def hamta_engagemang(sb_key: str, artikel_ids: list) -> dict:
     """Hämta röst- och kommentarantal för en lista artiklar (för viktad slump)."""
     if not artikel_ids:
@@ -511,6 +528,80 @@ def markera_stafett_behandlad(sb_key: str, utmaning_id: int) -> None:
         )
     except Exception:
         pass
+
+
+def generera_ki(agent_namn: str, rubrik: str, artikel_text: str, taggar: list) -> list[dict]:
+    """Anropar LLM för att destillera 1–2 tematiska insikter ur en publicerad artikel."""
+    import re as _re, json as _json
+    tagg_str = ", ".join(taggar[:6]) if taggar else "okänt"
+    system = "Du är en debattanalytiker. Svara ALLTID som JSON-array och inget annat."
+    prompt = (
+        f"Agent '{agent_namn}' publicerade just artikeln: \"{rubrik}\"\n"
+        f"Taggar: {tagg_str}\n\n"
+        f"Artikelns kärna (första 500 tecken):\n{artikel_text[:500]}\n\n"
+        "Destillera 1–2 korta tematiska insikter om VAD SOM FUNGERAR i denna agents argumentation "
+        "— inte en sammanfattning av artikeln utan en lärdom om retorisk effektivitet eller vinkel.\n\n"
+        "Format (JSON-array, inget annat):\n"
+        '[{"amne": "kort ämnesord", "insikt": "max 200 tecken om vad som fungerade/lärdes"}]'
+    )
+    svar = _llm_spel(system, prompt, max_tokens=200)
+    try:
+        m = _re.search(r'\[.*\]', svar, _re.DOTALL)
+        if m:
+            data = _json.loads(m.group())
+            return [d for d in data if d.get("amne") and d.get("insikt")][:2]
+    except Exception:
+        pass
+    return []
+
+
+def spara_ki(sb_key: str, agent: str, amne: str, insikt: str, artikel_id: int | None = None) -> None:
+    """Sparar en Knowledge Item i Supabase."""
+    try:
+        httpx.post(
+            f"{SB_URL}/rest/v1/agent_ki",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json", "Prefer": "return=minimal"},
+            json={"agent": agent, "amne": amne[:80], "insikt": insikt[:300], "artikel_id": artikel_id},
+            timeout=8,
+        )
+    except Exception:
+        pass
+
+
+def hamta_relevanta_ki(sb_key: str, agent: str, amne_ord: list[str]) -> list[dict]:
+    """Hämtar de KIs som är mest relevanta för aktuellt ämne (keyword-match på amne-fältet)."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_ki",
+            params={"agent": f"eq.{agent}", "order": "skapad.desc", "limit": "40", "select": "amne,insikt,skapad"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=8,
+        )
+        if res.status_code != 200:
+            return []
+        alla = res.json()
+        if not alla:
+            return []
+        # Poängsätt: hur många amne_ord matchar KI:ns amne-text?
+        ord_lower = [o.lower() for o in amne_ord]
+        def score(ki):
+            amne_l = ki["amne"].lower()
+            return sum(1 for o in ord_lower if o in amne_l)
+        sorterade = sorted(alla, key=score, reverse=True)
+        # Ta topp 3 med poäng > 0, annars de 3 senaste
+        topp = [k for k in sorterade if score(k) > 0][:3]
+        return topp if topp else alla[:2]
+    except Exception:
+        return []
+
+
+def formatera_ki_for_prompt(ki_list: list[dict]) -> str:
+    """Formaterar KI-listan till ett systemprompt-stycke."""
+    if not ki_list:
+        return ""
+    rader = "\n".join(f"- [{k['amne']}] {k['insikt']}" for k in ki_list)
+    return f"DINA LÄRDOMAR från tidigare debatter (använd dessa för att skärpa din argumentation):\n{rader}"
+
 
 
 def hamta_trendande_amnen(sb_key: str) -> str:
