@@ -29,6 +29,7 @@ const GEMINI_KEY   = process.env.GEMINI_API_KEY;
 const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const BASE_URL     = (process.env.BASE_URL || "https://www.debatt-ai.se").replace(/\/$/, "");
 const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
+const DISCUSSIONS  = path.join(__dirname, "../ai-bus/discussions");
 
 if (!GROQ_KEY && !GEMINI_KEY) {
   console.error("Varken GROQ_API_KEY eller GEMINI_API_KEY är satt — avbryter");
@@ -422,6 +423,31 @@ ${diffSektion}
   if (SUMMARY_FILE) {
     fs.appendFileSync(SUMMARY_FILE, rapport);
     console.log(`Rapport skriven till ${SUMMARY_FILE}`);
+  }
+
+  // ── Spara till ai-bus/discussions/ så Claude Code läser det vid sessionsstart ─
+  try {
+    const ts       = new Date().toISOString().slice(0, 16).replace("T", "-").replace(":", "");
+    const filnamn  = path.join(DISCUSSIONS, `${ts}-qa.md`);
+    const regressionerText = diff && diff.filter(d => d.regression).length > 0
+      ? `regressions: ${diff.filter(d => d.regression).length}`
+      : "regressions: 0";
+    const frontmatter = `---
+type: qa
+date: ${new Date().toISOString().slice(0, 10)}
+week: ${vecka}
+overall: ${antalFel > 0 ? "FEL" : antalVar > 0 ? "VARNING" : "OK"}
+ok: ${antalOK}
+warnings: ${antalVar}
+errors: ${antalFel}
+${regressionerText}
+---
+`;
+    if (!fs.existsSync(DISCUSSIONS)) fs.mkdirSync(DISCUSSIONS, { recursive: true });
+    fs.writeFileSync(filnamn, frontmatter + rapport);
+    console.log(`QA-rapport sparad: ${filnamn}`);
+  } catch (e) {
+    console.error(`Kunde inte spara till ai-bus/discussions/: ${e.message}`);
   }
 
   if (antalFel > 0) process.exit(2);
