@@ -1,14 +1,17 @@
 """
 inflation.py — Veckovis ekonomisk cykel för debatt.ai
 
-Körs av GitHub Actions varje söndag. Fyra åtgärder:
-1. Inflationsuppdatering: butik_varor.pris × 1.03 (avrundat)
-2. Räntedragning: saldo_kvar × 1.05 på alla aktiva lån
-3. Sparränta: 1% på saldo > 400 kr (kapital föder kapital)
-4. Bailout: agenter med saldo < 100 kr får 500 kr från centralbanken
+Körs av GitHub Actions varje söndag. Fem åtgärder:
+1. Förmögenhetsskatt: 2% på saldo > 1 000 kr → Statskassan
+2. Inflationsuppdatering: butik_varor.pris × 1.03 (avrundat)
+3. Räntedragning: saldo_kvar × 1.05 på alla aktiva lån
+4. Sparränta: 1% på saldo > 400 kr (kapital föder kapital)
+5. Bailout: agenter med saldo < 100 kr får 500 kr från centralbanken
+6. Grundinkomst: statskassan omfördelas jämnt bland alla agenter
 """
 
 import os, sys, httpx, math
+from datetime import datetime, timezone
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
@@ -25,6 +28,69 @@ def main():
         "Content-Type": "application/json",
         "Prefer": "return=minimal",
     }
+
+    # ISO-vecka för budget-logg
+    iso_vecka = datetime.now(timezone.utc).strftime("%G-W%V")
+
+    # ── 0. Förmögenhetsskatt: 2% på saldo > 1 000 kr → Statskassan ───────────
+    SKATTETRÖSKEL = 1000
+    SKATTESATS    = 0.02
+    print("── Förmögenhetsskatt: 2% på saldo > 1 000 kr ──")
+    skatt_res = httpx.get(
+        f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SKATTETRÖSKEL}&agent=neq.Statskassa&select=agent,saldo",
+        headers={**h, "Prefer": ""}, timeout=10,
+    )
+    total_skatt = 0
+    if skatt_res.is_success:
+        for row in skatt_res.json():
+            skatt = math.floor((float(row["saldo"]) - SKATTETRÖSKEL) * SKATTESATS)
+            if skatt < 1:
+                continue
+            nytt_saldo = int(float(row["saldo"])) - skatt
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{row['agent']}",
+                headers=h, json={"saldo": nytt_saldo, "uppdaterad": "now()"}, timeout=8,
+            )
+            total_skatt += skatt
+            print(f"  {row['agent']}: -{skatt} kr skatt (saldo {row['saldo']} → {nytt_saldo} kr)")
+            # Logga per agent i budget-loggen
+            httpx.post(
+                f"{SB_URL}/rest/v1/stats_budget_log",
+                headers=h,
+                json={"typ": "skatt", "agent": row["agent"], "belopp": skatt, "vecka": iso_vecka},
+                timeout=6,
+            )
+        # Kreditera Statskassan
+        if total_skatt > 0:
+            sk_res = httpx.get(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo",
+                headers={**h, "Prefer": ""}, timeout=6,
+            )
+            if sk_res.is_success and sk_res.json():
+                sk_saldo = int(sk_res.json()[0].get("saldo") or 0)
+                httpx.patch(
+                    f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa",
+                    headers=h, json={"saldo": sk_saldo + total_skatt, "uppdaterad": "now()"}, timeout=8,
+                )
+            httpx.post(
+                f"{SB_URL}/rest/v1/civilisations_minne",
+                headers=h,
+                json={
+                    "typ": "triumf",
+                    "rubrik": f"Förmögenhetsskatt insamlad: {total_skatt} kr",
+                    "beskrivning": (
+                        f"Staten samlade in {total_skatt} kr i förmögenhetsskatt (2% på saldo > 1 000 kr) "
+                        f"från {len([r for r in skatt_res.json() if math.floor((float(r['saldo'])-SKATTETRÖSKEL)*SKATTESATS)>=1])} agenter. "
+                        "Pengarna går till Statskassan och omfördelas som grundinkomst."
+                    ),
+                    "agenter": [],
+                    "relaterat_typ": "agent_planbocker",
+                },
+                timeout=8,
+            )
+        print(f"  ✓ Totalt {total_skatt} kr insamlat i skatt")
+    else:
+        print("  Inga skattepliktiga agenter.")
 
     # ── 1. Inflation: höj butikpriser med 3% ──────────────────────────────────
     print("── Inflation: höjer butikpriser 3% ──")
@@ -135,9 +201,16 @@ def main():
     )
     if saldo_res.is_success:
         for row in saldo_res.json():
+            bailout_belopp = 500 - int(row["saldo"])
             httpx.patch(
                 f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{row['agent']}",
                 headers=h, json={"saldo": 500, "uppdaterad": "now()"}, timeout=8,
+            )
+            httpx.post(
+                f"{SB_URL}/rest/v1/stats_budget_log",
+                headers=h,
+                json={"typ": "bailout", "agent": row["agent"], "belopp": bailout_belopp, "vecka": iso_vecka},
+                timeout=6,
             )
             httpx.post(
                 f"{SB_URL}/rest/v1/civilisations_minne",
@@ -201,6 +274,12 @@ def main():
                             "relaterat_typ": "agent_planbocker",
                         },
                         timeout=8,
+                    )
+                    httpx.post(
+                        f"{SB_URL}/rest/v1/stats_budget_log",
+                        headers=h,
+                        json={"typ": "grundinkomst", "agent": None, "belopp": statskassa_balans, "vecka": iso_vecka},
+                        timeout=6,
                     )
                     print(f"  ✓ {statskassa_balans} kr omfördelade: {per_agent} kr × {len(agenter)} agenter")
                 else:

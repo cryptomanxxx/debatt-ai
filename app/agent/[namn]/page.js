@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import AgentAvatar from "./AgentAvatar";
 import AgentFragaForm from "./AgentFragaForm";
 import AmnesPrenumerant from "../../artikel/[id]/AmnesPrenumerant";
@@ -427,6 +427,7 @@ const C = {
 export default async function AgentPage({ params }) {
   const namn = decodeURIComponent(params.namn);
   const profil = AGENTPROFILER[namn];
+  if (namn === "Statskassa") redirect("/staten");
   if (!profil) notFound();
 
   const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler, dagbok, bets, bilder] = await Promise.all([
