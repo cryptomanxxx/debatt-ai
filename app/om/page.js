@@ -711,6 +711,14 @@ export default function OmPage() {
               </div>
             ))}
           </div>
+          <a href="/qa-tidslinje" style={{
+            display: "inline-block", padding: "9px 20px",
+            background: "#7c3aed22", border: "1px solid #7c3aed66",
+            borderRadius: "6px", color: "#a78bfa", fontSize: "13px",
+            textDecoration: "none", fontFamily: "monospace",
+          }}>
+            📽 Se civilisationens bildtidslinje →
+          </a>
         </OmSektion>
 
         {/* Agentdynamik */}
