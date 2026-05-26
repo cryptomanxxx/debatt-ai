@@ -171,7 +171,7 @@ def oracle_ovdebattering(amne: str, senaste_titlar: list[str]) -> bool:
         f"Föreslagen ny artikel: \"{amne}\"\n\n"
         f"Täcker något av ovanstående artiklar i stort sett samma ämne? Svara bara JA eller NEJ."
     )
-    svar = _llm_spel(prompt, max_tokens=10, temperature=0)
+    svar = _llm_spel(prompt, max_tokens=10)
     if svar and "JA" in svar.upper():
         print(f"  🔮 Oracle: ämnet överdebatterat, väljer nytt")
         return True
