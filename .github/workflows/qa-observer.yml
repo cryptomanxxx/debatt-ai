@@ -33,6 +33,7 @@ jobs:
 
       - name: Kör QA-observatören
         env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           BASE_URL: ${{ github.event.inputs.base_url || 'https://www.debatt-ai.se' }}

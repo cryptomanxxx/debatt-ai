@@ -3,33 +3,40 @@
  * qa-observer.js
  *
  * Visuell QA-observatör: tar skärmdumpar av nyckelsidor på debatt-ai.se,
- * skickar dem till Gemini 2.0 Flash vision och rapporterar status.
+ * skickar dem till ett vision-LLM och rapporterar status.
+ *
+ * Primär: Groq (Llama 4 Scout) — generösa rate limits, 30 rpm.
+ * Fallback: Gemini 2.0 Flash — används om Groq saknas eller svarar 429.
  *
  * Sparar resultat till Supabase (qa_snapshots) för veckovis jämförelse.
  * Hämtar föregående veckas data och visar diff: "förra veckan OK → nu FEL".
  *
  * Kräver:
- *   GEMINI_API_KEY          — GitHub Secret
- *   SUPABASE_ANON_KEY       — GitHub Secret (valfritt, men aktiverar historik)
+ *   GROQ_API_KEY            — primär vision-provider (GitHub Secret)
+ *   GEMINI_API_KEY          — fallback vision-provider (GitHub Secret)
+ *   SUPABASE_ANON_KEY       — valfritt, aktiverar historik (GitHub Secret)
  *   BASE_URL                — valfritt, default https://www.debatt-ai.se
  *
  * Kör lokalt:
- *   GEMINI_API_KEY=... SUPABASE_ANON_KEY=... node agents/qa-observer.js
+ *   GROQ_API_KEY=... SUPABASE_ANON_KEY=... node agents/qa-observer.js
  */
 
 const fs   = require("fs");
 const path = require("path");
 
+const GROQ_KEY     = process.env.GROQ_API_KEY;
 const GEMINI_KEY   = process.env.GEMINI_API_KEY;
 const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const SB_URL       = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const BASE_URL     = (process.env.BASE_URL || "https://www.debatt-ai.se").replace(/\/$/, "");
 const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
 
-if (!GEMINI_KEY) {
-  console.error("GEMINI_API_KEY saknas — avbryter");
+if (!GROQ_KEY && !GEMINI_KEY) {
+  console.error("Varken GROQ_API_KEY eller GEMINI_API_KEY är satt — avbryter");
   process.exit(1);
 }
+
+const VISION_PROVIDER = GROQ_KEY ? "groq" : "gemini";
+console.log(`Vision-provider: ${VISION_PROVIDER}${GROQ_KEY && GEMINI_KEY ? " (Gemini som fallback)" : ""}`);
 
 // Sidor att granska
 const SIDOR = [
@@ -148,13 +155,14 @@ async function hämtaFörraVeckan(vecka) {
   }
 }
 
-// ── Gemini vision-analys ──────────────────────────────────────────────────────
-async function analysera(sidnamn, skärmdump_b64, konsolfEl) {
+// ── Vision-analys (Groq primär, Gemini fallback) ──────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function byggPrompt(sidnamn, konsolfEl) {
   const konsoltext = konsolfEl.length
     ? `Konsolfel:\n${konsolfEl.slice(0, 5).map(e => `  • ${e}`).join("\n")}`
     : "Inga konsolfel.";
-
-  const prompt = `Du är en QA-granskare för webbplatsen debatt-ai.se — en AI-socialsimulering med agenter, börser, hedgefonder och politiska system.
+  return `Du är en QA-granskare för webbplatsen debatt-ai.se — en AI-socialsimulering med agenter, börser, hedgefonder och politiska system.
 
 Granska skärmdumpen av sidan "${sidnamn}" och bedöm:
 1. Visas sidan korrekt? (ingen tom yta, inga brutna layoutelement)
@@ -168,33 +176,75 @@ Svara EXAKT i detta format (tre rader):
 STATUS: OK | VARNING | FEL
 ORSAK: [en mening om vad som är rätt/fel]
 DETALJ: [valfri extra observation, max 120 tecken, eller "–"]`;
+}
 
+function tolkSvar(text) {
+  const statusM = text.match(/STATUS:\s*(OK|VARNING|FEL)/i);
+  const orsak   = text.match(/ORSAK:\s*(.+)/i)?.[1]?.trim() || "Ingen förklaring";
+  const detalj  = text.match(/DETALJ:\s*(.+)/i)?.[1]?.trim() || "–";
+  return { status: statusM?.[1]?.toUpperCase() || "VARNING", orsak, detalj };
+}
+
+async function analyseraGroq(sidnamn, b64, konsolfEl) {
+  const res = await httpsPost(
+    "api.groq.com",
+    "/openai/v1/chat/completions",
+    { Authorization: `Bearer ${GROQ_KEY}` },
+    {
+      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image_url", image_url: { url: `data:image/png;base64,${b64}` } },
+          { type: "text", text: byggPrompt(sidnamn, konsolfEl) },
+        ],
+      }],
+      max_tokens: 300,
+      temperature: 0.1,
+    }
+  );
+  if (res.status === 429) return null; // rate-limited → fallback
+  if (res.status !== 200) {
+    console.error(`  Groq API-fel ${res.status}:`, JSON.stringify(res.body).slice(0, 150));
+    return null;
+  }
+  const text = res.body?.choices?.[0]?.message?.content || "";
+  return tolkSvar(text);
+}
+
+async function analyseraGemini(sidnamn, b64, konsolfEl) {
+  if (!GEMINI_KEY) return null;
   const res = await httpsPost(
     "generativelanguage.googleapis.com",
     `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
     {},
     {
-      contents: [{
-        parts: [
-          { inline_data: { mime_type: "image/png", data: skärmdump_b64 } },
-          { text: prompt },
-        ],
-      }],
+      contents: [{ parts: [
+        { inline_data: { mime_type: "image/png", data: b64 } },
+        { text: byggPrompt(sidnamn, konsolfEl) },
+      ]}],
       generationConfig: { maxOutputTokens: 300, temperature: 0.1 },
     }
   );
-
   if (res.status !== 200) {
-    console.error(`Gemini API-fel ${res.status}:`, JSON.stringify(res.body).slice(0, 200));
-    return { status: "VARNING", orsak: `Gemini API svarade ${res.status}`, detalj: "–" };
+    console.error(`  Gemini API-fel ${res.status}:`, JSON.stringify(res.body).slice(0, 150));
+    return null;
   }
+  const text = res.body?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  return tolkSvar(text);
+}
 
-  const text    = res.body?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  const statusM = text.match(/STATUS:\s*(OK|VARNING|FEL)/i);
-  const orsak   = text.match(/ORSAK:\s*(.+)/i)?.[1]?.trim() || "Ingen förklaring";
-  const detalj  = text.match(/DETALJ:\s*(.+)/i)?.[1]?.trim() || "–";
-
-  return { status: statusM?.[1]?.toUpperCase() || "VARNING", orsak, detalj };
+async function analysera(sidnamn, b64, konsolfEl) {
+  // Primär: Groq
+  if (GROQ_KEY) {
+    const r = await analyseraGroq(sidnamn, b64, konsolfEl);
+    if (r) return r;
+    console.log(`  ↩ Groq rate-limited — provar Gemini fallback för ${sidnamn}`);
+  }
+  // Fallback: Gemini
+  const r2 = await analyseraGemini(sidnamn, b64, konsolfEl);
+  if (r2) return r2;
+  return { status: "VARNING", orsak: "Alla vision-providers otillgängliga", detalj: "–" };
 }
 
 // ── Diff-tabell mot föregående vecka ─────────────────────────────────────────
@@ -278,6 +328,8 @@ async function kör() {
       const b64 = fs.readFileSync(skärmdumpPath).toString("base64");
       console.log(`  📸 Analyserar ${sida.namn}...`);
       try {
+        // 3s fördröjning håller oss under 20 rpm (Groq-gräns: 30 rpm)
+        await sleep(3000);
         analys = await analysera(sida.namn, b64, konsolfEl);
       } catch (e) {
         analys = { status: "VARNING", orsak: `Vision-anrop misslyckades: ${e.message.slice(0, 80)}`, detalj: "–" };
