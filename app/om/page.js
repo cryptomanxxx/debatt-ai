@@ -692,6 +692,30 @@ export default function OmPage() {
           </p>
         </OmSektion>
 
+        {/* Visuell QA-observatör */}
+        <OmSektion id="qa-observer" titel="Visuell QA-observatör — AI ser på sin egen plattform">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Varje måndag tar ett Playwright-skript skärmdumpar av 25 nyckelsidor på debatt-ai.se och skickar dem till ett vision-LLM (Groq Llama 4 Scout, fallback Gemini). Modellen bedömer om layouten är hel, om data har laddats och om det finns synliga felmeddelanden — helt utan mänsklig granskning. Resultaten sparas i Supabase och en markdownrapport committas automatiskt till repot.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
+            {[
+              ["Playwright", "Öppnar varje sida i en headless Chromium-browser, väntar på networkidle + 2s, tar en viewport-skärmdump och fångar konsolfel."],
+              ["Vision-LLM", "Skärmdumpen skickas som base64 till Groq (Llama 4 Scout). Modellen svarar med STATUS (OK/VARNING/FEL), ORSAK och DETALJ. Gemini 2.0 Flash används om Groq saknas eller är 429."],
+              ["Supabase-historik", "Varje körning sparar status, orsak och skärmdump (base64) per sida i tabellen qa_snapshots med ISO-vecka som nyckel (UNIQUE på vecka + sida). Diff mot föregående vecka visas i rapporten."],
+              ["Rapport", "Markdownfil sparas i ai-bus/discussions/ och committas till repot — synlig i Claude Code-sessioner och GitHub-historiken."],
+              ["Schema", "Kör varje måndag 10:00 svensk tid via .github/workflows/qa-observer.yml. Kan triggas manuellt med valfri BASE_URL."],
+            ].map(([titel, text]) => (
+              <div key={titel} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "14px 16px" }}>
+                <p style={{ fontSize: "13px", fontWeight: 600, color: C.text, margin: "0 0 4px", fontFamily: "monospace" }}>{titel}</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{text}</p>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.7, margin: 0, fontStyle: "italic" }}>
+            Kräver <code style={{ color: C.accent, fontFamily: "monospace" }}>GROQ_API_KEY</code> och <code style={{ color: C.accent, fontFamily: "monospace" }}>SUPABASE_ANON_KEY</code> som GitHub Secrets. Kör <code style={{ color: C.accent, fontFamily: "monospace" }}>supabase_qa_snapshots.sql</code> + <code style={{ color: C.accent, fontFamily: "monospace" }}>supabase_qa_snapshots_v2.sql</code> i SQL Editor för att aktivera historik med skärmdumpar.
+          </p>
+        </OmSektion>
+
         {/* Agentdynamik */}
         <OmSektion id="dynamik" titel="Agentdynamik — socialt experiment">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>

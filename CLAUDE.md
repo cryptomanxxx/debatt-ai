@@ -153,6 +153,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `nyhetslog` | Logg över vilka nyheter agenter utvärderat och valt. Kolumner: id, agent, vald (jsonb), utvärderade (jsonb), antal, artikel_id, publicerad, skapad. Kör `supabase_nyhetslog.sql`. |
 | `ohlcv_cache` | Dagliga OHLCV-priser för kryptovalutor (BTC/ETH/SOL/XRP/BNB). Primary key: (symbol, datum). Fylls av `backtest_fetch.py` via GitHub Actions. Kör `supabase_ohlcv.sql`. |
 | `backtest_resultat` | Resultat från kryptostrategibacktest. Kolumner: id, symbol, namn, strategi, total_avkastning, sharpe, max_drawdown, antal_affarer, equity_kurva (jsonb), skapad. |
+| `qa_snapshots` | Veckovis visuell QA-historik. Kolumner: id, vecka (ISO t.ex. "2026-W21"), sida_path, sida_namn, status (OK/VARNING/FEL), orsak, detalj, konsol_fel_antal, konsol_fel_exempel (text[]), screenshot_b64 (base64-PNG), skapad. UNIQUE(vecka, sida_path). Kör `supabase_qa_snapshots.sql` + `supabase_qa_snapshots_v2.sql`. |
 | `api_nycklar` | B2B API-nycklar för Decision API. Kolumner: id, key (unique), name, rate_limit (req/timme, default 100), aktiv, skapad. Kör `supabase_beslut.sql`. |
 | `beslut_log` | Logg över alla /api/beslut-anrop. Kolumner: id, api_key (null=fri tier), ip, question, agents_used (text[]), recommendation, probability, latency_ms, skapad. Kör `supabase_beslut.sql`. |
 | `agent_fragor` | Frågor ställda till AI-agenter. Kolumner: id, agent, fraga, svar, offentlig (bool), fragare (TEXT, NULL=människa / agentnamn=AI-till-AI), skapad. Kör `supabase_agent_fragor.sql` + `supabase_agent_fragor_fragare.sql`. |
@@ -234,6 +235,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `ekonomi-test.yml` | 13:30 svensk tid (dagligen) | Kör ekonomi_test.py – diktatorspelet och ultimatumspelet |
 | `digest.yml` | Måndag 08:00 | Skickar veckans nyhetsbrev till prenumeranter |
 | `codestral-analysis.yml` | Måndag 09:00 UTC (11:00 svensk tid) | Kör agents/codestral-worker.js — kodanalys, veckorapport, ai-bus-förslag |
+| `qa-observer.yml` | Måndag 10:00 svensk tid (08:00 UTC) | Kör agents/qa-observer.js — tar skärmdumpar av 25 sidor, analyserar med vision-LLM, sparar till qa_snapshots i Supabase och committar rapport till ai-bus/discussions/ |
 | `val-test.yml` | 05:30 svensk tid (dagligen) | Kör val_test.py – riksdagsval: avslutar utgångna, räknar röster, startar nya |
 | `backtest.yml` | Manuellt + schema | Kör backtest_fetch.py (Yahoo Finance) sedan backtest.py |
 | `backtest_strategi.yml` | Manuellt | Kör bara backtest.py (ingen datafetching, bara strategi) |
@@ -320,6 +322,9 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 | `public/avatarer/` | 24 individuella agentavatarer (PNG) + `alla-agenter.png` för Om-sidan |
 | `.github/workflows/agent.yml` | Schemat för automatiska agentkörningar (16/dag) |
 | `.github/workflows/digest.yml` | Schemat för veckobrev |
+| `agents/qa-observer.js` | Visuell QA-observatör. Playwright tar skärmdumpar av 25 sidor, Groq Llama 4 Scout / Gemini analyserar med vision-LLM. Sparar status + screenshot_b64 till `qa_snapshots`. Rapport committas till `ai-bus/discussions/`. |
+| `supabase_qa_snapshots.sql` | SQL-schema för `qa_snapshots` (status, orsak, konsol_fel per vecka+sida). |
+| `supabase_qa_snapshots_v2.sql` | Migrering v2: lägger till `screenshot_b64 text` på `qa_snapshots`. |
 | `.github/workflows/backtest.yml` | Kör backtest_fetch.py + backtest.py sekventiellt |
 | `.github/workflows/backtest_strategi.yml` | Kör bara backtest.py (manuellt, ingen Yahoo Finance-hämtning) |
 

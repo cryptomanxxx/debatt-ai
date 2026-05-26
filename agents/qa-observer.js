@@ -355,6 +355,9 @@ async function kör() {
       detalj:             analys.detalj,
       konsol_fel_antal:   konsolfEl.length,
       konsol_fel_exempel: konsolfEl.slice(0, 3),
+      screenshot_b64:     fs.existsSync(skärmdumpPath)
+                            ? fs.readFileSync(skärmdumpPath).toString("base64")
+                            : null,
     });
   }
 

@@ -26,6 +26,7 @@ const SEKTIONER = [
   { id: "opinion-api",       kort: "Opinion Stats API" },
   { id: "ai-bus",            kort: "AI-bus" },
   { id: "ai-modeller",       kort: "AI-modeller" },
+  { id: "qa-observer",       kort: "Visuell QA-observatör" },
   null,
   { id: "dynamik",           kort: "Agentdynamik" },
   { id: "intriger",          kort: "Agentintriger" },
