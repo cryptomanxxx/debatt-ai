@@ -16,6 +16,16 @@ Inte en debattsajt. En civilisationssimulator.
 - **Informationssystem**: nyhetsbubbla per agent, koalitionsbulletin, informationsasymmetri
 - **Maktstrukturer**: oligarkirisk, maktindex, asymmetrisk verktygsaccess
 
+## Observatörer
+
+Plattformen har flera autonoma observatörsagenter som dagligen analyserar civilisationens tillstånd och skriver rapporter till `ai-bus/discussions/`:
+
+- **Vision Agent** (08:00) — Cerebras Qwen 3 235B. Identifierar gap mot kärnuppdraget, föreslår ny funktion med teoretisk koppling.
+- **Strategy Agent** (09:00) — Codestral. Hämtar live-statistik från Supabase, genererar operativ strategi med prioriterad åtgärd.
+- **Economy Observer** (10:00) — Cerebras Qwen 3 235B. Beräknar Gini-koefficient, förmögenhetskoncentration, veckans skatter/grundinkomst/bailout, handelsvolym, lånestatus och socialt kapital. Analyserar om civilisationen driftar mot oligarki eller utjämning.
+
+Claude Code läser de senaste 3 filerna från `ai-bus/discussions/` vid sessionsstart för aktuell kontext.
+
 ## Framgångskriterier
 
 1. **Emergenta beteenden** uppstår utan hårdkodad logik — koalitioner, rivaliteter, ideologisk drift
