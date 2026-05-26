@@ -51,14 +51,34 @@ export default function NewsTicker() {
         }}>
           {items.map((n, i) => (
             <span key={i} style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
-              <span style={{
-                fontSize: "13px",
-                color: "#fef08a",
-                fontFamily: "Georgia, serif",
-                padding: "0 8px",
-              }}>
-                {n.rubrik}
-              </span>
+              {n.url ? (
+                <a
+                  href={n.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    fontSize: "13px",
+                    color: "#fef08a",
+                    fontFamily: "Georgia, serif",
+                    padding: "0 8px",
+                    textDecoration: "none",
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.textDecoration = "underline"}
+                  onMouseLeave={e => e.currentTarget.style.textDecoration = "none"}
+                >
+                  {n.rubrik}
+                </a>
+              ) : (
+                <span style={{
+                  fontSize: "13px",
+                  color: "#fef08a",
+                  fontFamily: "Georgia, serif",
+                  padding: "0 8px",
+                }}>
+                  {n.rubrik}
+                </span>
+              )}
               <span style={{
                 fontSize: "10px",
                 color: "#888",
