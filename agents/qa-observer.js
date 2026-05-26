@@ -41,18 +41,50 @@ console.log(`Vision-provider: ${VISION_PROVIDER}${GROQ_KEY && GEMINI_KEY ? " (Ge
 
 // Sidor att granska
 const SIDOR = [
-  { path: "/",            namn: "Startsidan",         vikt: "hög" },
-  { path: "/arkiv",       namn: "Arkivet",            vikt: "hög" },
-  { path: "/bors",        namn: "Kryptobörsen",       vikt: "hög" },
-  { path: "/etf",         namn: "Krypto-ETF",         vikt: "hög" },
-  { path: "/hedgefonder", namn: "Hedgefonder",        vikt: "hög" },
-  { path: "/stablecoin",  namn: "Stablecoin (STAB)",  vikt: "medel" },
-  { path: "/markets",     namn: "Prediction Markets", vikt: "medel" },
-  { path: "/ekonomi",     namn: "AI-Ekonomi",         vikt: "medel" },
-  { path: "/opinion",     namn: "Besökaromröstning",  vikt: "medel" },
-  { path: "/parlament",   namn: "AI-Parlamentet",     vikt: "medel" },
-  { path: "/dynamik",     namn: "Agentdynamik",       vikt: "låg"   },
-  { path: "/historia",    namn: "Civilisationsminne", vikt: "låg"   },
+  // ── Kärnsidor ────────────────────────────────────────────────────────────────
+  { path: "/",               namn: "Startsidan",           vikt: "hög"   },
+  { path: "/arkiv",          namn: "Arkivet",              vikt: "hög"   },
+  { path: "/om",             namn: "Om-sidan",             vikt: "hög"   },
+  { path: "/chatt",          namn: "Direktdebatt",         vikt: "hög"   },
+  { path: "/debatt",         namn: "Debatt Playground",    vikt: "hög"   },
+  { path: "/nyheter",        namn: "Nyheter",              vikt: "hög"   },
+  // ── Finansiella experiment ────────────────────────────────────────────────────
+  { path: "/bors",           namn: "Kryptobörsen",         vikt: "hög"   },
+  { path: "/etf",            namn: "Krypto-ETF",           vikt: "hög"   },
+  { path: "/hedgefonder",    namn: "Hedgefonder",          vikt: "hög"   },
+  { path: "/stablecoin",     namn: "Stablecoin (STAB)",    vikt: "medel" },
+  { path: "/bank",           namn: "Centralbanken",        vikt: "medel" },
+  { path: "/butik",          namn: "Butiken",              vikt: "medel" },
+  { path: "/ekonomi",        namn: "AI-Ekonomi",           vikt: "medel" },
+  // ── Politik & demokrati ───────────────────────────────────────────────────────
+  { path: "/parlament",      namn: "AI-Parlamentet",       vikt: "hög"   },
+  { path: "/lobbying",       namn: "AI-Lobbying",          vikt: "medel" },
+  { path: "/partier",        namn: "Politiska partier",    vikt: "medel" },
+  { path: "/val",            namn: "Riksdagsval",          vikt: "medel" },
+  { path: "/domstol",        namn: "AI-Domstolen",         vikt: "medel" },
+  // ── Sociala experiment ────────────────────────────────────────────────────────
+  { path: "/markets",        namn: "Prediction Markets",   vikt: "medel" },
+  { path: "/opinion",        namn: "Besökaromröstning",    vikt: "medel" },
+  { path: "/dynamik",        namn: "Agentdynamik",         vikt: "medel" },
+  { path: "/trust",          namn: "Förtroendegraf",       vikt: "medel" },
+  { path: "/fraktioner",     namn: "Agentfraktioner",      vikt: "medel" },
+  { path: "/rivaliteter",    namn: "Agent-rivaliteter",    vikt: "medel" },
+  { path: "/rykten",         namn: "Ryktesspridning",      vikt: "medel" },
+  { path: "/feedback",       namn: "Socialt Kapital",      vikt: "medel" },
+  { path: "/konversationer", namn: "AI-konversationer",    vikt: "medel" },
+  // ── Visualiseringar & analys ──────────────────────────────────────────────────
+  { path: "/historia",       namn: "Civilisationsminne",   vikt: "medel" },
+  { path: "/oligarki",       namn: "Oligarkirisk",         vikt: "medel" },
+  { path: "/kris",           namn: "Krisevents",           vikt: "låg"   },
+  { path: "/ai-bilder",      namn: "AI-bilder",            vikt: "låg"   },
+  { path: "/kompass",        namn: "Ideologisk Kompass",   vikt: "låg"   },
+  { path: "/debattrad",      namn: "Debattträd",           vikt: "låg"   },
+  { path: "/asiktsdrift",    namn: "Åsiktsdrift",          vikt: "låg"   },
+  { path: "/tidsserie",      namn: "Tidsseriegraf",        vikt: "låg"   },
+  { path: "/kunskapsgraf",   namn: "Kunskapsgraf",         vikt: "låg"   },
+  { path: "/versus",         namn: "Agent vs Agent",       vikt: "låg"   },
+  // ── API-playgrounds ───────────────────────────────────────────────────────────
+  { path: "/beslut",         namn: "Decision API Playground", vikt: "låg" },
 ];
 
 // ── ISO-vecka helpers ─────────────────────────────────────────────────────────
