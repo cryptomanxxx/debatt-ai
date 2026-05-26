@@ -2072,9 +2072,14 @@ function AiStatistikTab() {
 
       {/* ── Provider leaderboard ── */}
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px" }}>
-        <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px", fontFamily: "monospace" }}>
-          Provider-analys — {periodLabel}
-        </p>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
+          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.1em", textTransform: "uppercase", margin: 0, fontFamily: "monospace" }}>
+            Provider-analys — {periodLabel}
+          </p>
+          <p style={{ fontSize: "11px", color: C.textMuted, margin: 0, fontFamily: "monospace" }}>
+            Groq är primär — övriga providers anropas bara vid rate limit eller timeout
+          </p>
+        </div>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", fontFamily: "monospace" }}>
             <thead>
