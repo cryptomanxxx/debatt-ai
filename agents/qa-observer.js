@@ -2,22 +2,27 @@
 /**
  * qa-observer.js
  *
- * Visuell QA-observatör: tar skärmdumpar av nyckelssidor på debatt-ai.se,
- * skickar dem till Gemini 2.0 Flash vision och rapporterar status i
- * GITHUB_STEP_SUMMARY (eller stdout om variabeln saknas).
+ * Visuell QA-observatör: tar skärmdumpar av nyckelsidor på debatt-ai.se,
+ * skickar dem till Gemini 2.0 Flash vision och rapporterar status.
+ *
+ * Sparar resultat till Supabase (qa_snapshots) för veckovis jämförelse.
+ * Hämtar föregående veckas data och visar diff: "förra veckan OK → nu FEL".
  *
  * Kräver:
- *   GEMINI_API_KEY   — redan konfigurerat som GitHub Secret
- *   BASE_URL         — valfritt, default https://www.debatt-ai.se
+ *   GEMINI_API_KEY          — GitHub Secret
+ *   SUPABASE_ANON_KEY       — GitHub Secret (valfritt, men aktiverar historik)
+ *   BASE_URL                — valfritt, default https://www.debatt-ai.se
  *
  * Kör lokalt:
- *   GEMINI_API_KEY=... node agents/qa-observer.js
+ *   GEMINI_API_KEY=... SUPABASE_ANON_KEY=... node agents/qa-observer.js
  */
 
 const fs   = require("fs");
 const path = require("path");
 
 const GEMINI_KEY   = process.env.GEMINI_API_KEY;
+const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_URL       = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const BASE_URL     = (process.env.BASE_URL || "https://www.debatt-ai.se").replace(/\/$/, "");
 const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
 
@@ -42,9 +47,30 @@ const SIDOR = [
   { path: "/historia",    namn: "Civilisationsminne", vikt: "låg"   },
 ];
 
-// ── Gemini 2.0 Flash vision via raw HTTPS ─────────────────────────────────────
+// ── ISO-vecka helpers ─────────────────────────────────────────────────────────
+function isoVecka(date = new Date()) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+}
+
+function föregåendeVecka(vecka) {
+  const [year, wk] = vecka.split("-W").map(Number);
+  // Hitta måndag i veckan, dra 7 dagar
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - (jan4.getUTCDay() || 7) + 1 + (wk - 1) * 7);
+  monday.setUTCDate(monday.getUTCDate() - 7);
+  return isoVecka(monday);
+}
+
+// ── HTTPS helpers ─────────────────────────────────────────────────────────────
+const https = require("https");
+
 function httpsPost(host, urlPath, headers, body) {
-  const https = require("https");
   return new Promise((resolve, reject) => {
     const data = JSON.stringify(body);
     const req  = https.request(
@@ -65,6 +91,64 @@ function httpsPost(host, urlPath, headers, body) {
   });
 }
 
+function httpsGet(host, urlPath, headers) {
+  return new Promise((resolve) => {
+    const req = https.request(
+      { hostname: host, path: urlPath, method: "GET", headers },
+      (res) => {
+        let buf = "";
+        res.on("data", (c) => (buf += c));
+        res.on("end", () => {
+          try { resolve(JSON.parse(buf)); }
+          catch { resolve([]); }
+        });
+      }
+    );
+    req.on("error", () => resolve([]));
+    req.end();
+  });
+}
+
+// ── Supabase helpers ──────────────────────────────────────────────────────────
+function sbHeaders() {
+  return {
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`,
+    "Content-Type": "application/json",
+    Prefer: "resolution=merge-duplicates",
+  };
+}
+
+async function sparaSnapshot(rad) {
+  if (!SB_KEY) return;
+  try {
+    await httpsPost(
+      "fmwxftnistkoqazfwnuj.supabase.co",
+      "/rest/v1/qa_snapshots",
+      sbHeaders(),
+      rad
+    );
+  } catch (e) {
+    console.error(`  ⚠ Kunde inte spara snapshot till Supabase: ${e.message}`);
+  }
+}
+
+async function hämtaFörraVeckan(vecka) {
+  if (!SB_KEY) return [];
+  const prev = föregåendeVecka(vecka);
+  try {
+    const rows = await httpsGet(
+      "fmwxftnistkoqazfwnuj.supabase.co",
+      `/rest/v1/qa_snapshots?vecka=eq.${prev}&select=sida_path,status,orsak`,
+      { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
+    );
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+// ── Gemini vision-analys ──────────────────────────────────────────────────────
 async function analysera(sidnamn, skärmdump_b64, konsolfEl) {
   const konsoltext = konsolfEl.length
     ? `Konsolfel:\n${konsolfEl.slice(0, 5).map(e => `  • ${e}`).join("\n")}`
@@ -105,34 +189,53 @@ DETALJ: [valfri extra observation, max 120 tecken, eller "–"]`;
     return { status: "VARNING", orsak: `Gemini API svarade ${res.status}`, detalj: "–" };
   }
 
-  const text = res.body?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const text    = res.body?.candidates?.[0]?.content?.parts?.[0]?.text || "";
   const statusM = text.match(/STATUS:\s*(OK|VARNING|FEL)/i);
   const orsak   = text.match(/ORSAK:\s*(.+)/i)?.[1]?.trim() || "Ingen förklaring";
   const detalj  = text.match(/DETALJ:\s*(.+)/i)?.[1]?.trim() || "–";
 
-  return {
-    status: statusM?.[1]?.toUpperCase() || "VARNING",
-    orsak,
-    detalj,
-  };
+  return { status: statusM?.[1]?.toUpperCase() || "VARNING", orsak, detalj };
 }
 
-// ── Playwright-del ────────────────────────────────────────────────────────────
+// ── Diff-tabell mot föregående vecka ─────────────────────────────────────────
+function byggDiff(resultat, förra) {
+  if (!förra.length) return null;
+
+  const förraMap = Object.fromEntries(förra.map(r => [r.sida_path, r]));
+  const ändringar = [];
+
+  for (const r of resultat) {
+    const fg = förraMap[r.path];
+    if (!fg) continue;
+    if (fg.status !== r.status) {
+      const regression = (fg.status === "OK" && r.status !== "OK") ||
+                         (fg.status === "VARNING" && r.status === "FEL");
+      ändringar.push({ namn: r.namn, path: r.path, från: fg.status, till: r.status, regression });
+    }
+  }
+
+  return ändringar;
+}
+
+// ── Huvudflöde ────────────────────────────────────────────────────────────────
 async function kör() {
-  // Dynamisk import av playwright (installeras i workflow)
   let playwright;
   try {
     playwright = require("playwright");
-  } catch (e) {
+  } catch {
     console.error("playwright saknas — installera med: npx playwright install chromium");
     process.exit(1);
   }
 
+  const vecka    = isoVecka();
   const startTid = Date.now();
   const tmpDir   = fs.mkdtempSync(path.join(require("os").tmpdir(), "qa-"));
 
-  console.log(`\n🔍 QA-observatör startar — ${BASE_URL}`);
+  console.log(`\n🔍 QA-observatör startar — ${BASE_URL} (${vecka})`);
   console.log(`   Kontrollerar ${SIDOR.length} sidor...\n`);
+
+  // Hämta föregående veckas data parallellt med att vi startar browsern
+  const förraLöfte = hämtaFörraVeckan(vecka);
 
   const browser = await playwright.chromium.launch({ args: ["--no-sandbox"] });
   const context = await browser.newContext({
@@ -143,7 +246,7 @@ async function kör() {
   const resultat = [];
 
   for (const sida of SIDOR) {
-    const url       = BASE_URL + sida.path;
+    const url      = BASE_URL + sida.path;
     const konsolfEl = [];
 
     const page = await context.newPage();
@@ -155,7 +258,6 @@ async function kör() {
     let laddningsfel = null;
     try {
       await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
-      // Lite extra tid för React-hydration
       await page.waitForTimeout(2000);
     } catch (e) {
       laddningsfel = e.message.slice(0, 120);
@@ -187,9 +289,26 @@ async function kör() {
     resultat.push({ ...sida, url, konsolfEl, ...analys });
     const ikon = analys.status === "OK" ? "✅" : analys.status === "VARNING" ? "⚠️" : "❌";
     console.log(`  ${ikon} ${sida.namn}: ${analys.status} — ${analys.orsak}`);
+
+    // Spara till Supabase direkt (icke-blockerande fel)
+    sparaSnapshot({
+      vecka,
+      sida_path:          sida.path,
+      sida_namn:          sida.namn,
+      status:             analys.status,
+      orsak:              analys.orsak,
+      detalj:             analys.detalj,
+      konsol_fel_antal:   konsolfEl.length,
+      konsol_fel_exempel: konsolfEl.slice(0, 3),
+    });
   }
 
   await browser.close();
+
+  // ── Hämta diff ────────────────────────────────────────────────────────────
+  const förra    = await förraLöfte;
+  const diff     = byggDiff(resultat, förra);
+  const prevVecka = föregåendeVecka(vecka);
 
   // ── Bygg markdown-rapport ─────────────────────────────────────────────────
   const elapsed  = Math.round((Date.now() - startTid) / 1000);
@@ -200,32 +319,59 @@ async function kör() {
   const övergripande = antalFel > 0 ? "❌ FEL" : antalVar > 0 ? "⚠️ VARNING" : "✅ ALLT OK";
 
   const rader = resultat.map(r => {
-    const ikon   = r.status === "OK" ? "✅" : r.status === "VARNING" ? "⚠️" : "❌";
+    const ikon    = r.status === "OK" ? "✅" : r.status === "VARNING" ? "⚠️" : "❌";
     const konsFel = r.konsolfEl.length ? ` (${r.konsolfEl.length} konsolfel)` : "";
     const detalj  = r.detalj !== "–" ? `<br><sub>${r.detalj}</sub>` : "";
     return `| ${ikon} | [${r.namn}](${r.url}) | ${r.orsak}${konsFel}${detalj} |`;
   }).join("\n");
 
+  // Diff-sektion
+  let diffSektion = "";
+  if (diff === null) {
+    diffSektion = SB_KEY
+      ? `\n> ℹ️ Ingen historik för ${prevVecka} — diff visas från och med nästa körning.\n`
+      : `\n> ℹ️ SUPABASE_ANON_KEY saknas — historik och diff är inaktiverat.\n`;
+  } else if (diff.length === 0) {
+    diffSektion = `\n> ✅ Ingen statusändring jämfört med ${prevVecka}.\n`;
+  } else {
+    const diffRader = diff.map(d => {
+      const frånIkon = d.från === "OK" ? "✅" : d.från === "VARNING" ? "⚠️" : "❌";
+      const tillIkon = d.till === "OK" ? "✅" : d.till === "VARNING" ? "⚠️" : "❌";
+      const typ      = d.regression ? "🔴 **REGRESSION**" : "🟢 Förbättring";
+      return `| ${typ} | [${d.namn}](${BASE_URL}${d.path}) | ${frånIkon} ${d.från} | ${tillIkon} ${d.till} |`;
+    }).join("\n");
+
+    const antalReg = diff.filter(d => d.regression).length;
+    diffSektion = `
+### 📊 Förändringar jämfört med ${prevVecka}
+
+${antalReg > 0 ? `> ⚠️ **${antalReg} regression(er) sedan förra veckan!**` : "> ✅ Inga regressioner — men statusen har ändrats."}
+
+| Typ | Sida | Förra veckan | Den här veckan |
+|---|---|---|---|
+${diffRader}
+`;
+  }
+
   const rapport = `## 🔍 Visuell QA-rapport — ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC
 
-**Övergripande status: ${övergripande}**
+**Övergripande status: ${övergripande}** (vecka ${vecka})
 
 | | Sida | Observation |
 |---|---|---|
 ${rader}
-
+${diffSektion}
 ---
-**Sammanfattning:** ${antalOK} OK · ${antalVar} varningar · ${antalFel} fel · ${elapsed}s total
+**Sammanfattning:** ${antalOK} OK · ${antalVar} varningar · ${antalFel} fel · ${elapsed}s total${SB_KEY ? ` · Sparat till Supabase (qa_snapshots, vecka ${vecka})` : ""}
 `;
 
   console.log("\n" + rapport);
 
   if (SUMMARY_FILE) {
     fs.appendFileSync(SUMMARY_FILE, rapport);
-    console.log(`\nRapport skriven till ${SUMMARY_FILE}`);
+    console.log(`Rapport skriven till ${SUMMARY_FILE}`);
   }
 
-  // Sätt exit-kod baserat på resultat
   if (antalFel > 0) process.exit(2);
   if (antalVar > 0) process.exit(1);
   process.exit(0);
