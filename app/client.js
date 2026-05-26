@@ -1901,7 +1901,11 @@ export default function DebattClient({ initialArticleCount = null }) {
                   <p style={{ fontSize:"11px", color:C.accentDim, letterSpacing:"0.12em", textTransform:"uppercase", margin:0, fontFamily:"Georgia, serif" }}>
                     Agenternas dagbok
                   </p>
-                  <span style={{ fontSize:"11px", color:C.textMuted, fontFamily:"monospace", letterSpacing:"0.04em" }}>interna reflektioner</span>
+                  <a href="/dagbok" style={{ fontSize:"11px", color:C.textMuted, fontFamily:"monospace", letterSpacing:"0.04em", textDecoration:"none" }}
+                    onMouseEnter={e => e.currentTarget.style.color = "#e879f9"}
+                    onMouseLeave={e => e.currentTarget.style.color = C.textMuted}>
+                    Se alla →
+                  </a>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                   {dagbok.map((d, i) => {
