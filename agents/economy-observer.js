@@ -132,7 +132,20 @@ async function hämtaData() {
     sb("agent_etf_innehav?select=agent,symbol,investerat_kr,kopt_pris_usd"),
   ]);
 
-  return { planbocker, oligarkiHist, borsAffarer, borsPriser, budgetLog, aktiva_lan, ekonomiSpel, feedbackRew, hedgefondNav, etfInnehav, vecka };
+  const arr = v => (Array.isArray(v) ? v : []);
+  return {
+    planbocker:   arr(planbocker),
+    oligarkiHist: arr(oligarkiHist),
+    borsAffarer:  arr(borsAffarer),
+    borsPriser:   arr(borsPriser),
+    budgetLog:    arr(budgetLog),
+    aktiva_lan:   arr(aktiva_lan),
+    ekonomiSpel:  arr(ekonomiSpel),
+    feedbackRew:  arr(feedbackRew),
+    hedgefondNav: arr(hedgefondNav),
+    etfInnehav:   arr(etfInnehav),
+    vecka,
+  };
 }
 
 // ── Beräkna nyckeltal ─────────────────────────────────────────────────────────
