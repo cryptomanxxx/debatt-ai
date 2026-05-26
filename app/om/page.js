@@ -711,9 +711,6 @@ export default function OmPage() {
               </div>
             ))}
           </div>
-          <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.7, margin: 0, fontStyle: "italic" }}>
-            Kräver <code style={{ color: C.accent, fontFamily: "monospace" }}>GROQ_API_KEY</code> och <code style={{ color: C.accent, fontFamily: "monospace" }}>SUPABASE_ANON_KEY</code> som GitHub Secrets. Kör <code style={{ color: C.accent, fontFamily: "monospace" }}>supabase_qa_snapshots.sql</code> + <code style={{ color: C.accent, fontFamily: "monospace" }}>supabase_qa_snapshots_v2.sql</code> i SQL Editor för att aktivera historik med skärmdumpar.
-          </p>
         </OmSektion>
 
         {/* Agentdynamik */}
