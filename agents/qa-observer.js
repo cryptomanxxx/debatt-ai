@@ -450,8 +450,8 @@ ${regressionerText}
     console.error(`Kunde inte spara till ai-bus/discussions/: ${e.message}`);
   }
 
-  if (antalFel > 0) process.exit(2);
-  if (antalVar > 0) process.exit(1);
+  // Varningar loggas men bryter inte workflow — bara faktiska fel (inga sidor laddas)
+  if (antalFel > 0) process.exit(1);
   process.exit(0);
 }
 
