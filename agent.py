@@ -414,11 +414,11 @@ def main():
             except Exception:
                 _saldo = 500.0
             if _saldo > 800:
-                max_nyheter = 8   # brett informationsnätverk
+                max_nyheter = 20  # brett informationsnätverk
             elif _saldo > 300:
-                max_nyheter = 5   # standard
+                max_nyheter = 12  # standard
             else:
-                max_nyheter = 3   # begränsad tillgång
+                max_nyheter = 6   # begränsad tillgång
             nyheter = nyheter[:max_nyheter]
             print(f"  💰 Informationsvolym: saldo {_saldo:.0f} kr → utvärderar max {max_nyheter} nyheter")
             if nyheter and (force_nyhet or random.random() < 0.5):
