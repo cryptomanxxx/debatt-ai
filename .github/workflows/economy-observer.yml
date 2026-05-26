@@ -1,0 +1,35 @@
+name: Economy Observer
+
+on:
+  schedule:
+    - cron: "0 8 * * *"  # 08:00 UTC = 10:00 svensk tid
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  economy-observer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Kör economy-observer
+        env:
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: node agents/economy-observer.js
+
+      - name: Commit economy analysis
+        run: |
+          git config user.name "Economy Observer"
+          git config user.email "noreply@debatt-ai.se"
+          git add ai-bus/discussions/
+          git diff --cached --quiet || git commit -m "economy: Daglig ekonomianalys $(date +%Y-%m-%d)"
+          git push
