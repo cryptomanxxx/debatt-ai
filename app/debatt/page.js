@@ -150,6 +150,7 @@ export default function DebattPlaygroundPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(120_000),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Något gick fel."); return; }
