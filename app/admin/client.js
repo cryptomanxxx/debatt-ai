@@ -1930,14 +1930,20 @@ function AiStatistikTab() {
   const isRateLimit = s => s === "rate_limited" || (typeof s === "string" && s.includes("429"));
   const periodLabel = PERIOD_OPTIONS.find(p => p.days === period)?.label ?? `${period} dagar`;
 
+  // Om period-fetchen gav 0 rader men liveRows har data — filtrera liveRows till vald period
+  const periodSince = new Date(Date.now() - period * 24 * 60 * 60 * 1000);
+  const effectiveRows = (rows && rows.length > 0)
+    ? rows
+    : liveRows.filter(r => r.ts && new Date(r.ts) >= periodSince);
+
   // ── Aggregations ────────────────────────────────────────────────────────
   let providerStats = [], chartData = [], byHour = null, sourceChartData = [];
   let totalOk = 0, totalAll = 0, groqKanalTokens = 0;
 
-  if (rows && rows.length > 0) {
+  if (effectiveRows.length > 0) {
     // Per-provider breakdown
     const byProv = {};
-    for (const r of rows) {
+    for (const r of effectiveRows) {
       const p = r.provider || "none";
       if (!byProv[p]) byProv[p] = { ok: 0, rate_limited: 0, timeout: 0, error: 0, latencies: [] };
       if (r.status === "ok") { byProv[p].ok++; if (r.latency_ms) byProv[p].latencies.push(r.latency_ms); }
@@ -1955,12 +1961,12 @@ function AiStatistikTab() {
       })
       .sort((a, b) => b.total - a.total);
 
-    totalOk  = rows.filter(r => r.status === "ok").length;
-    totalAll = rows.length;
+    totalOk  = effectiveRows.filter(r => r.status === "ok").length;
+    totalAll = effectiveRows.length;
 
     // Daily chart
     const byDay = {};
-    for (const r of rows) {
+    for (const r of effectiveRows) {
       const day = r.ts.slice(0, 10);
       if (!byDay[day]) byDay[day] = { day, groq: 0, codestral: 0, cerebras: 0, sambanova: 0, gemini: 0, openrouter: 0, github_models: 0, none: 0 };
       const p = r.provider || "none";
@@ -1970,7 +1976,7 @@ function AiStatistikTab() {
 
     // Hourly heatmap
     byHour = Array.from({ length: 24 }, (_, h) => ({ hour: `${String(h).padStart(2, "0")}:00`, ok: 0, error: 0 }));
-    for (const r of rows) {
+    for (const r of effectiveRows) {
       const h = new Date(r.ts).getHours();
       if (r.status === "ok") byHour[h].ok++;
       else byHour[h].error++;
@@ -1978,7 +1984,7 @@ function AiStatistikTab() {
 
     // Per-source
     const bySrc = {};
-    for (const r of rows) {
+    for (const r of effectiveRows) {
       const k = r.source || "okänd";
       if (!bySrc[k]) bySrc[k] = { source: SOURCE_LABELS_MAP[k] || k, ok: 0, error: 0, total: 0 };
       bySrc[k].total++;
@@ -1991,7 +1997,7 @@ function AiStatistikTab() {
 
     // Token usage (today, kanal source only)
     const todayStr = new Date().toISOString().slice(0, 10);
-    groqKanalTokens = rows
+    groqKanalTokens = effectiveRows
       .filter(r => r.ts.slice(0, 10) === todayStr && r.provider === "groq" && r.source === "kanal" && r.status === "ok")
       .reduce((s, r) => s + (r.input_tokens || 0) + (r.output_tokens || 0), 0);
   }
@@ -2055,9 +2061,12 @@ function AiStatistikTab() {
 
       {statsLoading && !rows ? (
         <p style={{ color: C.textMuted, fontFamily: "monospace", fontSize: "13px" }}>Laddar statistik…</p>
-      ) : !rows || rows.length === 0 ? (
+      ) : effectiveRows.length === 0 ? (
         <p style={{ color: C.textMuted, fontSize: "14px" }}>
-          Ingen loggdata för vald period. Kör <code style={{ color: C.accent }}>supabase_ai_log.sql</code> i Supabase för att skapa tabellen.
+          {liveRows.length > 0
+            ? `Ingen historisk loggdata för ${periodLabel} — live-loggen ovan visar realtidsanrop.`
+            : <>Ingen loggdata ännu. Kör <code style={{ color: C.accent }}>supabase_ai_log.sql</code> i Supabase för att aktivera historik.</>
+          }
         </p>
       ) : (<>
 
