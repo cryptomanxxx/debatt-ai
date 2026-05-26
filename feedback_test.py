@@ -64,7 +64,9 @@ def spara_feedback(sb_key: str, fran: str, till: str, belopp: float, kategori: s
 
 
 def överför_saldo(sb_key: str, fran: str, till: str, belopp: float) -> bool:
-    """Drar belopp från avsändarens saldo och krediterar mottagarens."""
+    """Drar belopp från avsändarens saldo och krediterar mottagarens.
+    Kompenserar avsändaren om kreditering av mottagaren misslyckas.
+    """
     try:
         saldo_fran = _hamta_saldo(sb_key, fran)
         if saldo_fran < belopp:
@@ -84,7 +86,16 @@ def överför_saldo(sb_key: str, fran: str, till: str, belopp: float) -> bool:
             json={"saldo": int(round(saldo_till + belopp)), "uppdaterad": "now()"},
             timeout=8,
         )
-        return r2.is_success
+        if not r2.is_success:
+            # Rollback: återställ avsändarens saldo
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(fran)}",
+                headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+                json={"saldo": saldo_fran, "uppdaterad": "now()"},
+                timeout=8,
+            )
+            return False
+        return True
     except Exception:
         return False
 
@@ -139,7 +150,8 @@ def kör_feedback(agent: dict, sb_key: str) -> bool:
         print(f"  Överföring misslyckades — hoppar över")
         return False
 
-    spara_feedback(sb_key, namn, till, belopp, kategori, motivering)
+    if not spara_feedback(sb_key, namn, till, belopp, kategori, motivering):
+        print(f"  Varning: feedback sparades inte i databasen (överföring genomförd)")
 
     # Logga till civilisationsminne för höga belopp
     if belopp >= 40:
