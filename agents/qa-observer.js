@@ -94,6 +94,7 @@ function httpsPost(host, urlPath, headers, body) {
       }
     );
     req.on("error", reject);
+    req.setTimeout(60000, () => { req.destroy(new Error("httpsPost timeout")); });
     req.write(data);
     req.end();
   });
@@ -242,7 +243,8 @@ async function analysera(sidnamn, b64, konsolfEl) {
     if (r) return r;
     console.log(`  ↩ Groq rate-limited — provar Gemini fallback för ${sidnamn}`);
   }
-  // Fallback: Gemini
+  // Fallback: Gemini (3s fördröjning för att undvika att även Gemini rate-limiteras)
+  await sleep(3000);
   const r2 = await analyseraGemini(sidnamn, b64, konsolfEl);
   if (r2) return r2;
   return { status: "VARNING", orsak: "Alla vision-providers otillgängliga", detalj: "–" };
