@@ -22,6 +22,7 @@ const SEKTIONER = [
   { id: "rss",               kort: "RSS-feed" },
   null,
   { id: "decision-api",      kort: "Decision API" },
+  { id: "debatt-api",        kort: "Debatt API" },
   { id: "opinion-api",       kort: "Opinion Stats API" },
   { id: "ai-bus",            kort: "AI-bus" },
   { id: "ai-modeller",       kort: "AI-modeller" },
@@ -54,7 +55,19 @@ const SEKTIONER = [
   { id: "ai-bilder",         kort: "AI-bilder" },
   { id: "maktaccess",        kort: "Asymmetrisk access" },
   { id: "informationsasymmetri", kort: "Informationsasymmetri" },
-  { id: "kunskapsgraf",          kort: "Kunskapsgraf" },
+  { id: "kunskapsgraf",      kort: "Kunskapsgraf" },
+  { id: "tidsserie",         kort: "Tidsseriegraf" },
+  { id: "riksdagsimport",    kort: "Riksdagsimport" },
+  { id: "discussion-ingestion", kort: "AI-visioner & strategi" },
+  { id: "minneslager",       kort: "Persistent agentminne" },
+  null,
+  { id: "hedgefonder",       kort: "Hedgefonder" },
+  { id: "stablecoin",        kort: "Stablecoin" },
+  { id: "agent-tokens",      kort: "Agent-skapade tokens" },
+  { id: "socialt-kapital",   kort: "Socialt Kapital" },
+  { id: "economy-observer",  kort: "Economy Observer" },
+  null,
+  { id: "delta",             kort: "Vill du delta?" },
 ];
 
 const ALL_IDS = SEKTIONER.filter(Boolean).map(s => s.id);
