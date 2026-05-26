@@ -161,6 +161,23 @@ def ar_duplikat(amne: str, senaste_titlar: list[str], troskel: float = 0.45) -> 
     return False
 
 
+def oracle_ovdebattering(amne: str, senaste_titlar: list[str]) -> bool:
+    """LLM-check: har detta ämne täckts för nyligen? Returnerar True = hoppa över ämnet."""
+    if len(senaste_titlar) < 5:
+        return False
+    titlar_text = "\n".join(f"- {t}" for t in senaste_titlar[:15])
+    prompt = (
+        f"Senaste 7 dagarnas publicerade artiklar:\n{titlar_text}\n\n"
+        f"Föreslagen ny artikel: \"{amne}\"\n\n"
+        f"Täcker något av ovanstående artiklar i stort sett samma ämne? Svara bara JA eller NEJ."
+    )
+    svar = _llm_spel(prompt, max_tokens=10, temperature=0)
+    if svar and "JA" in svar.upper():
+        print(f"  🔮 Oracle: ämnet överdebatterat, väljer nytt")
+        return True
+    return False
+
+
 def hamta_engagemang(sb_key: str, artikel_ids: list) -> dict:
     """Hämta röst- och kommentarantal för en lista artiklar (för viktad slump)."""
     if not artikel_ids:

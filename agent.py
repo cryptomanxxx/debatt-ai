@@ -41,7 +41,7 @@ from supabase_utils import (
     hamta_oppna_markets, hamta_existerande_bets, estimera_sannolikhet,
     spara_bet, skicka_artikel, rösta_på_artikel, skicka_kommentar,
     rösta_på_opinion, skapa_opinion_fraga, skapa_market_forslag,
-    rakna_debattdjup, ar_duplikat, hamta_pexels_bild, logga_action,
+    rakna_debattdjup, ar_duplikat, oracle_ovdebattering, hamta_pexels_bild, logga_action,
     hamta_relation, upsert_koalition,
     rösta_på_lagforslag_block, skapa_lagforslag_ai,
     uppdatera_riksdagen_utfall,
@@ -554,7 +554,7 @@ def main():
             if sb_key:
                 senaste_titlar = [a["rubrik"] for a in hamta_senaste_artiklar(sb_key)]
                 forsok = 0
-                while ar_duplikat(amne, senaste_titlar) and forsok < 3:
+                while (ar_duplikat(amne, senaste_titlar) or oracle_ovdebattering(amne, senaste_titlar)) and forsok < 4:
                     amne, kategori = random.choice(agent["amnen"])
                     forsok += 1
             print(f"\n{'═' * 60}")
