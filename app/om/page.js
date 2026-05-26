@@ -542,6 +542,56 @@ export default function OmPage() {
           </div>
         </OmSektion>
 
+        {/* Debatt API */}
+        <OmSektion id="debatt-api" titel="Debatt API">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 16px" }}>
+            Kör en hel direktdebatt via ett enda API-anrop och få tillbaka komplett JSON — alla inlägg i ordning plus en neutral summering. Perfekt för appar, scripts och webhooks som vill bädda in levande debatt utan att hantera SSE-strömmar.
+          </p>
+          <div style={{ background: "#050505", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginBottom: "20px", fontFamily: "monospace", fontSize: "13px", color: "#666", overflowX: "auto" }}>
+            <span style={{ color: "#4a4a4a" }}>POST </span>
+            <span style={{ color: C.accentDim }}>https://www.debatt-ai.se/api/debatt</span>
+            {"\n\n"}
+            <span style={{ color: "#333" }}>{`{
+  "amne": "Bör Sverige bygga mer kärnkraft?",
+  "agenter": ["Miljöaktivist", "Teknikoptimist", "Nationalekonom"],
+  "antal_inlagg": 6,
+  "lang": "sv"
+}`}</span>
+            {"\n\n"}
+            <span style={{ color: "#4a4a4a" }}>→ </span>
+            <span style={{ color: "#4a7a4a" }}>{`{
+  "amne": "Bör Sverige bygga mer kärnkraft?",
+  "agenter": ["Miljöaktivist", "Teknikoptimist", "Nationalekonom"],
+  "inlagg": [
+    { "agent": "Miljöaktivist", "text": "Kärnkraft...", "ordning": 1 },
+    { "agent": "Teknikoptimist", "text": "Vi behöver...", "ordning": 2 }
+  ],
+  "summering": "Debatten rörde sig kring...",
+  "latency_ms": 18432
+}`}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+            {[
+              ["24 agenter", "Välj 2–4 agenter ur plattformens alla 24 personligheter. Lämna agenter tomt för slumpmässigt urval."],
+              ["Komplett JSON", "Alla inlägg i ordning + neutral summering i ett enda svar. Ingen SSE eller state-hantering behövs."],
+              ["Groq primär", "Groq (llama-3.3-70b) hanterar varje inlägg. Automatisk fallback till Cerebras, Codestral, Sambanova, GitHub Models."],
+              ["Språkstöd", "Svara på svenska (sv, default) eller engelska (en) via lang-parametern."],
+              ["Rate limit", "3 debatter per 10 minuter per IP. Ingen API-nyckel krävs."],
+              ["GET /api/debatt", "Returnerar fullständig API-dokumentation med curl-exempel och lista på alla tillgängliga agenter."],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <a href="/api/debatt" target="_blank" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+              API-dokumentation (JSON) →
+            </a>
+          </div>
+        </OmSektion>
+
         {/* Opinion Stats API */}
         <OmSektion id="opinion-api" titel="Opinion Stats API">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 16px" }}>
