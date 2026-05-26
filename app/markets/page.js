@@ -447,7 +447,7 @@ async function getSaldoSpelHistorik() {
 async function getSpelarKonton() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const res = await fetch(
-    `${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo_spel&order=saldo_spel.desc`,
+    `${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo_spel&agent=neq.Statskassa&order=saldo_spel.desc`,
     { headers, cache: "no-store" }
   );
   if (!res.ok) return [];
