@@ -176,6 +176,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `hedgefond_nav_historik` | NAV-snapshots per körning. Kolumner: id, fond_id (FK), nav_per_andel, total_tillgangar, skapad. Index på (fond_id, skapad DESC). Kör `supabase_hedgefond.sql`. |
 | `stablecoin_vaults` | Collateral-vaults för STAB-stablecoin. Kolumner: id, agent (UNIQUE), collateral_sek, stab_utfardat, aktiv, skapad, uppdaterad. Kör `supabase_stablecoin.sql`. |
 | `agent_tokens` | Agent-skapade tokens med ICO-metadata. Kolumner: symbol (PK), namn, beskrivning, skapare_agent (UNIQUE), ico_pris, ico_slutar, ico_utfardat, max_utbud (1000), cirkulerande_utbud, pa_borsen, skapad. Kör `supabase_agent_tokens.sql`. |
+| `feedback_rewards` | Interagent feedback-löner (IFL). Kolumner: id, fran_agent, till_agent, belopp (numeric), kategori (världsbild/håller_ord/lobbyism/negativ), motivering, skapad. Index på (fran_agent, skapad DESC) och (till_agent, skapad DESC). Kör `supabase_feedback.sql`. |
 | `civilisations_minne` | Narrativa händelseloggar för civilisationens historia. Kolumner: id, typ (koalition_bildad/förräderi/triumf/skandal/allians_bruten/marknadsseger/marknadskrasch/symbolkup), rubrik, beskrivning, agenter (TEXT[]), relaterat_id, relaterat_typ, skapad. GIN-index på agenter[]. Kör `supabase_civilisations_minne.sql`. |
 | `agent_relationer` | Härledda relationstyper per agentpar. Kolumner: agent_a, agent_b (PRIMARY KEY, CHECK agent_a < agent_b), typ (allierad/rival/fiende/neutral), styrka (0–100), beskrivning, senast_uppdaterad. Beräknas automatiskt ur lobbying och koalitionshistorik. Kör `supabase_relationer.sql`. |
 | `politiska_partier` | Emergenta politiska block. Kolumner: id, namn, beskrivning, medlemmar (TEXT[]), ledare, platform (jsonb), styrka, aktiv, bildad, senast_uppdaterad. Beräknas via BFS-klustring av agent_koalitioner (styrka ≥ 3, storlek 3–8). Kör `supabase_partier.sql`. |
@@ -1314,6 +1315,34 @@ Analytiker-agenter kan lansera egna tokens via en 3-dagars ICO. LLM genererar sy
 | `supabase_agent_tokens.sql` | 1 tabell: agent_tokens med ICO-metadata |
 | `agent_token_test.py` | Token-skapande via LLM, ICO-deltagande, automatisk börsnotering vid ICO-avslut |
 | `.github/workflows/bors-test.yml` | agent_token_test.py körs automatiskt efter bors_test.py (10:30 + 15:15 svensk tid) |
+
+### ✅ 65. Socialt Kapital — interagent feedback-löner (IFL) – KLART
+Agenter betalar varandra frivilligt upp till 20% av sitt saldo som social feedback. Inspirerat av Axelrods kollaborationsmodell och Fukuyamas teori om socialt kapital.
+
+**Fyra kategorier:**
+- `världsbild` 🧭 — stödjer min ideologi och världsbild
+- `håller_ord` 🤝 — pålitlig debattpartner som håller sina löften
+- `lobbyism` 💰 — framgångsrik lobbyism som gynnat mig
+- `negativ` 👎 — negativ anpassning (symboliskt belopp, max 15 kr)
+
+**Mekanik per körning:**
+- 15% chans per agent att skicka feedback
+- Kräver saldo > 100 kr
+- Belopp: 5–20% av saldo, max 100 kr, min 10 kr
+- Samma par undviks inom 3 dagar (deduplicering via `hamta_senaste_feedback()`)
+- LLM genererar karaktärsenlig motivering via `_llm_spel()`
+- Belopp ≥ 40 kr loggas som `triumf` i `civilisations_minne`
+
+**Socialt kapital (netto):** Varje agents nettovärde = mottaget minus skickat. Positivt = välrespekterad av gruppen.
+
+| Fil | Roll |
+|---|---|
+| `supabase_feedback.sql` | 1 tabell: `feedback_rewards` med RLS-policies (SELECT + INSERT för anon) |
+| `feedback_test.py` | 15% chans per agent, saldo-check, deduplicering, LLM-motivering, saldo-överföring med int-cast |
+| `app/feedback/page.js` | SSR-sida: nyckeltal, kategorifördelning, top mottagare/givare, netto-ranking, transaktionslogg |
+| `.github/workflows/feedback-test.yml` | Kör dagligen 14:00 svensk tid (12:00 UTC) |
+
+**Supabase-tabell:** `feedback_rewards` — Kolumner: id, fran_agent, till_agent, belopp (numeric), kategori (världsbild/håller_ord/lobbyism/negativ), motivering, skapad. Kör `supabase_feedback.sql`.
 
 ---
 
