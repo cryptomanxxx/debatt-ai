@@ -140,7 +140,7 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
     return result
 
 
-def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "") -> str:
+def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "", stafett_utmaning: str = "") -> str:
     """Använd Groq (med Gemini-fallback) för att skriva en replik på en befintlig artikel."""
     system = _system_med_stamning(agent, buffs, status, koalitions_kontext, kris_kontext, minne_kontext)
     max_tok = 2000 + (buffs.get("max_tokens_bonus", 0) if buffs else 0)
@@ -175,6 +175,7 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
         "från X' kräver att X faktiskt förekommer i texten du svarar på.\n\n"
         "Skriv ENBART repliktexten. Ingen inledning, inga kommentarer."
         + relation_del + ton_del
+        + (f"\n\nSTAFETTUTMANING: {original['forfattare']} utmanade dig specifikt att bemöta följande: {stafett_utmaning}\nSe till att din replik adresserar just detta argument direkt och explicit." if stafett_utmaning else "")
     )
     payload = {
         "model": "llama-3.3-70b-versatile",

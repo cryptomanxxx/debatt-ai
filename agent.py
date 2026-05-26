@@ -66,6 +66,8 @@ from supabase_utils import (
     generera_meme, generera_propaganda, generera_valkampanj,
     generera_portratt, generera_utopi_dystopi,
     hamta_agent_minnen, formatera_minnen_for_prompt,
+    generera_stafett_utmaning, spara_stafett_utmaning,
+    hamta_stafett_utmaning, markera_stafett_behandlad,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -237,25 +239,47 @@ def main():
     forslag_id = None
     nyhet   = None
     nyheter = []
+    stafett_kontext  = ""   # utmaningstext om stafett är aktiv
+    stafett_agent_namn = None  # utmanad agent (sätts om stafett hittas)
     if not force_eget and (force_replik or (not force_nyhet and sb_key and random.random() < 0.5)):
         print("Letar efter artiklar att svara på..." + (" (garanterad replik)" if force_replik else ""))
         artiklar = hamta_senaste_artiklar(sb_key)
         if artiklar or force_replik:
             artiklar = artiklar or []
-            artikel_ids = [a["id"] for a in artiklar]
-            eng = hamta_engagemang(sb_key, artikel_ids)
-            vikter = []
-            for a in artiklar:
-                e = eng.get(a["id"], {"roster": 0, "kommentarer": 0})
-                lasningar = a.get("lasningar") or 0
-                w = 1 + lasningar * 0.05 + e["roster"] * 2 + e["kommentarer"] * 3
-                vikter.append(w)
-            original = random.choices(artiklar, weights=vikter, k=1)[0]
+
+            # Stafett-check: finns en utmaning riktad mot slumpmässig agent?
+            # Vi väljer en pending utmaning och låter den styra både artikel och agent.
+            if sb_key and artiklar:
+                for kandidat in AGENTER:
+                    utmaning = hamta_stafett_utmaning(sb_key, kandidat["namn"])
+                    if utmaning:
+                        stafett_artikel = next((a for a in artiklar if a["id"] == utmaning["artikel_id"]), None)
+                        if stafett_artikel and stafett_artikel.get("forfattare") != kandidat["namn"]:
+                            original = stafett_artikel
+                            stafett_agent_namn = kandidat["namn"]
+                            stafett_kontext    = utmaning["utmaning"]
+                            markera_stafett_behandlad(sb_key, utmaning["id"])
+                            print(f"  🏃 Stafettutmaning: {utmaning['utmanare']} → {stafett_agent_namn}: \"{stafett_kontext[:80]}\"")
+                            break
+
+            if original is None:
+                artikel_ids = [a["id"] for a in artiklar]
+                eng = hamta_engagemang(sb_key, artikel_ids)
+                vikter = []
+                for a in artiklar:
+                    e = eng.get(a["id"], {"roster": 0, "kommentarer": 0})
+                    lasningar = a.get("lasningar") or 0
+                    w = 1 + lasningar * 0.05 + e["roster"] * 2 + e["kommentarer"] * 3
+                    vikter.append(w)
+                original = random.choices(artiklar, weights=vikter, k=1)[0]
             print(f"Hittade artikel att svara på: \"{original['rubrik']}\" av {original['forfattare']}\n")
 
     if original:
-        andra_agenter = [a for a in AGENTER if a["namn"] != original.get("forfattare")]
-        agent = random.choice(andra_agenter if andra_agenter else AGENTER)
+        if stafett_agent_namn:
+            agent = next((a for a in AGENTER if a["namn"] == stafett_agent_namn), None)
+        if not stafett_agent_namn or agent is None:
+            andra_agenter = [a for a in AGENTER if a["namn"] != original.get("forfattare")]
+            agent = random.choice(andra_agenter if andra_agenter else AGENTER)
 
         # Maktindex och kris — agentspecifikt, beräknas nu när agent är vald
         makt_agenter = [a for a, _ in maktranking]
@@ -302,7 +326,7 @@ def main():
             print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
         minne_kontext = formatera_minnen_for_prompt(hamta_agent_minnen(sb_key, agent["namn"])) if sb_key else ""
         print("Skriver replik (Groq med Gemini-fallback)...")
-        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext)
+        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, stafett_utmaning=stafett_kontext)
 
         konklusion = ""
         djup = rakna_debattdjup(sb_key, original["rubrik"]) if sb_key else 0
@@ -637,6 +661,15 @@ def main():
                             "rubrik": original.get("rubrik", "")[:80],
                             "text": kommentar_text[:120],
                         }, "ok")
+
+        # Stafettutmaning: ny artikel (ej replik) → ~25% chans att utmana en motpart
+        if publicerad and not original and sb_key and artikel_id_num and random.random() < 0.25:
+            alla_agent_namn = [a["namn"] for a in AGENTER]
+            utmaning_data = generera_stafett_utmaning(agent["namn"], amne, artikel, alla_agent_namn)
+            if utmaning_data:
+                spara_stafett_utmaning(sb_key, artikel_id_num, agent["namn"],
+                                       utmaning_data["utmanad"], utmaning_data["utmaning"])
+                print(f"  🏃 Stafett: {agent['namn']} → {utmaning_data['utmanad']}: \"{utmaning_data['utmaning'][:80]}\"")
 
         if publicerad and not original and sb_key:
             andra = [a for a in hamta_senaste_artiklar(sb_key) if a.get("forfattare") != agent["namn"]]
