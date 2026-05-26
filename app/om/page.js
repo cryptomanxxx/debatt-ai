@@ -586,6 +586,9 @@ export default function OmPage() {
             ))}
           </div>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <a href="/debatt" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: C.accent, color: "#0a0a0a", borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif", fontWeight: 700 }}>
+              Testa i playground →
+            </a>
             <a href="/api/debatt" target="_blank" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
               API-dokumentation (JSON) →
             </a>
