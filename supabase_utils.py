@@ -438,6 +438,81 @@ def markera_forslag_behandlat(sb_key: str, forslag_id: str) -> None:
         pass
 
 
+def generera_stafett_utmaning(agent_namn: str, rubrik: str, artikel_text: str, alla_agenter: list) -> dict | None:
+    """Anropar LLM för att generera en stafettutmaning mot en lämplig motpart."""
+    import re, json as _json
+    andra = [a for a in alla_agenter if a != agent_namn]
+    system = "Du är en debattarrangör. Svara ALLTID med exakt JSON och inget annat."
+    prompt = (
+        f"Agent '{agent_namn}' har skrivit artikeln: \"{rubrik}\"\n\n"
+        f"Kärnan i artikeln (första 400 tecken):\n{artikel_text[:400]}\n\n"
+        f"Välj den agent från listan vars perspektiv bäst utmanar artikelns huvudargument:\n"
+        f"{', '.join(andra[:14])}\n\n"
+        "Skriv en kort, konkret utmaning — vad exakt bör motparten bemöta?\n"
+        'Svara ENBART som JSON: {"utmanad": "agentnamn", "utmaning": "Bemöt mitt argument att..."}'
+    )
+    svar = _llm_spel(system, prompt, max_tokens=120)
+    try:
+        m = re.search(r'\{[^}]+\}', svar, re.DOTALL)
+        if m:
+            data = _json.loads(m.group())
+            if data.get("utmanad") in alla_agenter and data.get("utmaning"):
+                return data
+    except Exception:
+        pass
+    return None
+
+
+def spara_stafett_utmaning(sb_key: str, artikel_id: int, utmanare: str, utmanad: str, utmaning: str) -> None:
+    """Sparar en stafettutmaning i Supabase."""
+    try:
+        httpx.post(
+            f"{SB_URL}/rest/v1/stafett_utmaningar",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json", "Prefer": "return=minimal"},
+            json={"artikel_id": artikel_id, "utmanare": utmanare, "utmanad": utmanad, "utmaning": utmaning},
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def hamta_stafett_utmaning(sb_key: str, utmanad: str) -> dict | None:
+    """Hämtar äldsta obehandlade stafettutmaning riktad mot denna agent."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/stafett_utmaningar",
+            params={
+                "select": "id,artikel_id,utmanare,utmanad,utmaning",
+                "utmanad": f"eq.{utmanad}",
+                "behandlad": "eq.false",
+                "order": "skapad.asc",
+                "limit": "1",
+            },
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=8,
+        )
+        if res.status_code == 200:
+            data = res.json()
+            return data[0] if data else None
+    except Exception:
+        pass
+    return None
+
+
+def markera_stafett_behandlad(sb_key: str, utmaning_id: int) -> None:
+    """Markerar en stafettutmaning som behandlad."""
+    try:
+        httpx.patch(
+            f"{SB_URL}/rest/v1/stafett_utmaningar",
+            params={"id": f"eq.{utmaning_id}"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json"},
+            json={"behandlad": True},
+            timeout=8,
+        )
+    except Exception:
+        pass
+
+
 def hamta_trendande_amnen(sb_key: str) -> str:
     """Hämtar de 3 mest engagerande ämnena senaste 7 dagarna som kontextsträng."""
     try:
