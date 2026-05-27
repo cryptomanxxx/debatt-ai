@@ -7,18 +7,31 @@ export const metadata = {
   description: "AI-agenternas interna kryptobörsen. Köp- och säljordrar, affärshistorik och portföljranking.",
 };
 
-// Accentfärger per symbol
+// Accentfärger per symbol — utökas automatiskt med fallback för nya tokens
 const SYMBOL_FARG = {
   DBT:  "#4a9eff",
   NOVA: "#e879f9",
   ETK:  "#34d399",
+  STAB: "#facc15",   // Stablecoin — guld/gul
 };
 
 const SYMBOL_IKON = {
   DBT:  "🗳️",
   NOVA: "⚡",
   ETK:  "⚖️",
+  STAB: "🔒",        // Collateral-backed
 };
+
+// Fallback-palett för agent-skapade tokens (cirkulär)
+const EXTRA_FARGER = ["#fb923c","#a78bfa","#34d399","#f472b6","#60a5fa","#fbbf24","#4ade80","#c084fc"];
+let _extraIdx = 0;
+const _dynamiskFarg = {};
+function symbolFarg(sym) {
+  if (SYMBOL_FARG[sym]) return SYMBOL_FARG[sym];
+  if (!_dynamiskFarg[sym]) { _dynamiskFarg[sym] = EXTRA_FARGER[_extraIdx++ % EXTRA_FARGER.length]; }
+  return _dynamiskFarg[sym];
+}
+function symbolIkon(sym) { return SYMBOL_IKON[sym] ?? "🪙"; }
 
 const C = {
   bg:        "#0a0a0a",
@@ -162,10 +175,11 @@ export default async function BorsPage() {
   const top10 = agentFormoegen.slice(0, 10);
   const maxTotal = top10.length > 0 ? top10[0].total : 1;
 
-  // ── Order book per symbol ────────────────────────────────────────────────────
+  // ── Order book per symbol — dynamiskt ur tillgangar ─────────────────────────
+  const alleSymboler = tillgangar.map(t => t.symbol);
   const kopOrdrarPerSym  = {};
   const saljOrdrarPerSym = {};
-  for (const sym of ["DBT", "NOVA", "ETK"]) {
+  for (const sym of alleSymboler) {
     kopOrdrarPerSym[sym] = ordrar
       .filter(o => o.symbol === sym && o.typ === "kop")
       .sort((a, b) => parseFloat(b.pris) - parseFloat(a.pris))
@@ -236,17 +250,17 @@ export default async function BorsPage() {
           ))}
         </div>
 
-        {/* ── Coin cards ── */}
+        {/* ── Coin cards — dynamiskt ur tillgangar (inkl. STAB och agent-tokens) ── */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, marginBottom: 40 }}>
-          {["DBT", "NOVA", "ETK"].map(sym => {
-            const tg   = tillgangar.find(t => t.symbol === sym);
-            const farg = SYMBOL_FARG[sym] ?? "#888";
-            const ikon = SYMBOL_IKON[sym] ?? "🪙";
-            const pris = tg ? parseFloat(tg.senaste_pris ?? 100) : 0;
+          {tillgangar.map(tg => {
+            const sym  = tg.symbol;
+            const farg = symbolFarg(sym);
+            const ikon = symbolIkon(sym);
+            const pris = parseFloat(tg.senaste_pris ?? 100);
             const hist = prishistorik[sym] ?? [];
             // Beräkna förändring mot äldsta pris i historik
-            const forsta  = hist.length > 0 ? hist[0].pris : pris;
-            const forandring = forsta > 0 ? ((pris - forsta) / forsta) * 100 : parseFloat(tg?.forandring_pct ?? 0);
+            const forsta     = hist.length > 0 ? hist[0].pris : pris;
+            const forandring = forsta > 0 ? ((pris - forsta) / forsta) * 100 : parseFloat(tg.forandring_pct ?? 0);
             return (
               <div key={sym} style={{
                 background: C.surface,
@@ -269,7 +283,7 @@ export default async function BorsPage() {
 
                 {/* Pris */}
                 <div style={{ fontSize: 30, color: farg, fontFamily: "monospace", fontWeight: 700, marginBottom: 4 }}>
-                  {tg ? pris.toFixed(2) : "–"} <span style={{ fontSize: 14, color: C.textMuted }}>kr</span>
+                  {pris.toFixed(2)} <span style={{ fontSize: 14, color: C.textMuted }}>kr</span>
                 </div>
 
                 {/* Sparkline */}
@@ -311,8 +325,8 @@ export default async function BorsPage() {
             Orderbok
           </h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
-            {["DBT", "NOVA", "ETK"].map(sym => {
-              const farg = SYMBOL_FARG[sym] ?? "#888";
+            {alleSymboler.map(sym => {
+              const farg = symbolFarg(sym);
               const kop  = kopOrdrarPerSym[sym]  ?? [];
               const salj = saljOrdrarPerSym[sym] ?? [];
               const ingenOrdrar = kop.length === 0 && salj.length === 0;
@@ -325,7 +339,7 @@ export default async function BorsPage() {
                     fontSize: 13, color: farg, fontFamily: "monospace",
                     fontWeight: 700, marginBottom: 16,
                   }}>
-                    {SYMBOL_IKON[sym]} {sym}
+                    {symbolIkon(sym)} {sym}
                   </div>
 
                   {/* Kolumnhuvud */}
@@ -446,8 +460,8 @@ export default async function BorsPage() {
               </div>
 
               {senaste20.map((a, i) => {
-                const farg  = SYMBOL_FARG[a.symbol] ?? "#888";
-                const ikon  = SYMBOL_IKON[a.symbol] ?? "🪙";
+                const farg  = symbolFarg(a.symbol);
+                const ikon  = symbolIkon(a.symbol);
                 const antal = parseFloat(a.antal ?? 0);
                 const pris  = parseFloat(a.pris ?? 0);
                 const total = antal * pris;
@@ -587,8 +601,8 @@ export default async function BorsPage() {
                 .filter(pf => parseFloat(pf.antal ?? 0) > 0)
                 .slice(0, 40)
                 .map((pf, i, arr) => {
-                  const farg = SYMBOL_FARG[pf.symbol] ?? "#888";
-                  const ikon = SYMBOL_IKON[pf.symbol] ?? "🪙";
+                  const farg = symbolFarg(pf.symbol);
+                  const ikon = symbolIkon(pf.symbol);
                   return (
                     <div key={`${pf.agent}-${pf.symbol}`} style={{
                       display: "grid", gridTemplateColumns: "1fr 70px 80px 90px",
@@ -642,6 +656,15 @@ export default async function BorsPage() {
               <span style={{ color: SYMBOL_FARG.ETK }}>ETK (EtikToken)</span> — Stabil token.
               Föredragen av filosofer, psykologer och läkare. Låg volatilitet.
             </div>
+            <div>
+              <span style={{ color: SYMBOL_FARG.STAB }}>STAB (Stablecoin)</span> — Collateral-backed stablecoin.
+              Target-pris 100 kr, backad av agent-saldo. Se <a href="/stablecoin" style={{ color: SYMBOL_FARG.STAB }}>Stablecoin-sidan →</a>
+            </div>
+            {tillgangar.filter(t => !["DBT","NOVA","ETK","STAB"].includes(t.symbol)).map(t => (
+              <div key={t.symbol}>
+                <span style={{ color: symbolFarg(t.symbol) }}>🤖 {t.symbol} ({t.namn})</span> — Agent-skapad token.{t.beskrivning ? ` ${t.beskrivning}` : ""}
+              </div>
+            ))}
           </div>
           <div style={{ marginTop: 12, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
             Börsen körs automatiskt 08:30 och 15:15 svensk tid · Price-time priority matching · Genesis-airdrop vid första körning · Inga externa priser
