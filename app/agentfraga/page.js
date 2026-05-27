@@ -102,7 +102,7 @@ export default function AgentFragaPlayground() {
 
   async function kopieraCurl() {
     try {
-      await navigator.clipboard.writeText(curlSnippet(valdAgent, fraga || "Din fråga här", apiKey));
+      await navigator.clipboard.writeText(curlSnippet(valdAgent, fraga.trim() || "Din fråga här", apiKey));
       setKopiad(true);
       setTimeout(() => setKopiad(false), 2000);
     } catch {
@@ -114,6 +114,7 @@ export default function AgentFragaPlayground() {
   }
 
   function laddaExempel(ex) {
+    if (!ALLA_AGENTER.includes(ex.agent)) return;
     setValdAgent(ex.agent);
     setFraga(ex.fraga);
     setSvar(null);
@@ -309,7 +310,7 @@ export default function AgentFragaPlayground() {
             margin: 0, lineHeight: 1.7, fontFamily: "monospace", whiteSpace: "pre-wrap",
             wordBreak: "break-all",
           }}>
-            {curlSnippet(valdAgent, fraga || "Din fråga här", apiKey)}
+            {curlSnippet(valdAgent, fraga.trim() || "Din fråga här", apiKey)}
           </pre>
         </div>
 
