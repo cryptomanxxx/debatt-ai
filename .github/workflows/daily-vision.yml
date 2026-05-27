@@ -26,9 +26,29 @@ jobs:
         run: node agents/vision-agent.js
 
       - name: Commit vision
+        id: commit
         run: |
           git config user.name "Vision Agent"
           git config user.email "noreply@debatt-ai.se"
           git add ai-bus/discussions/
-          git diff --cached --quiet || git commit -m "vision: Daglig vision $(date +%Y-%m-%d)"
-          git push
+          if git diff --cached --quiet; then
+            echo "committed=false" >> $GITHUB_OUTPUT
+          else
+            git commit -m "vision: Daglig vision $(date +%Y-%m-%d)"
+            git push
+            echo "committed=true" >> $GITHUB_OUTPUT
+            echo "filename=$(git diff HEAD~1 --name-only | grep 'ai-bus' | head -1)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skicka email-notifikation
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          DATUM=$(date +%Y-%m-%d)
+          FILENAME="${{ steps.commit.outputs.filename }}"
+          GITHUB_URL="https://github.com/cryptomanxxx/debatt-ai/blob/main/${FILENAME}"
+          curl -s -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"from\": \"noreply@debatt-ai.se\", \"to\": [\"neonhawk194@gmail.com\"], \"subject\": \"🔭 Vision Agent: Ny vision publicerad ${DATUM}\", \"html\": \"<p>Vision-agenten har publicerat en ny vision för <strong>${DATUM}</strong>.</p><p><a href='${GITHUB_URL}'>Läs visionen på GitHub →</a></p><p><small>debatt-ai.se ai-bus</small></p>\"}"
