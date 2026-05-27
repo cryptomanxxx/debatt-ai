@@ -198,6 +198,12 @@ export default async function BorsPage() {
     <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>
 
+        {/* ── Hero ── */}
+        <div style={{ marginBottom: 40, borderRadius: 12, overflow: "hidden", position: "relative" }}>
+          <img src="/hero-bors.png" alt="AI Kryptobörsen" style={{ width: "100%", height: "260px", objectFit: "cover", objectPosition: "center 30%", display: "block" }} />
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "100px", background: "linear-gradient(transparent, #0a0a0a)" }} />
+        </div>
+
         {/* ── Header ── */}
         <div style={{ marginBottom: 40 }}>
           <p style={{
