@@ -1,5 +1,10 @@
-import { logAiCall } from "../../lib/logAiCall";
-import { providerReady, markProviderDown } from "../../lib/aiCircuitBreaker";
+import { logAiCall as _logAiCall } from "../../lib/logAiCall";
+import { providerReady as _providerReady, markProviderDown as _markProviderDown } from "../../lib/aiCircuitBreaker";
+
+// Fail-safe wrappers — logging/circuit-breaker fel får aldrig krascha route-handlern
+function logAiCall(args)          { try { _logAiCall(args); }          catch {} }
+function providerReady(p)         { try { return _providerReady(p); }   catch { return true; } }
+function markProviderDown(p)      { try { _markProviderDown(p); }       catch {} }
 
 export async function GET() {
   return Response.json({
