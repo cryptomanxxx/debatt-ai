@@ -1573,8 +1573,8 @@ def uppdatera_riksdagen_utfall(sb_key: str) -> int:
                         uppdaterade += 1
                         print(f"  ✓ (bulk) riksdagen_utfall={riksdagen_utfall} för {dok_id}")
                         del pending[dok_id]
-        except Exception:
-            pass
+        except Exception as bulk_err:
+            print(f"  ⚠ Bulk-sökning misslyckades ({bulk_err}) — fortsätter med per-dokument-anrop", file=sys.stderr)
 
         # Steg 2: Per-dokument-anrop för kvarvarande (prop/mot matchas direkt via dokid=)
         for dok_id, lagforslag_id in list(pending.items()):
