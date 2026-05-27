@@ -177,9 +177,8 @@ export default async function DomstolPage() {
     }}>
 
       {/* Hero */}
-      <div style={{ marginBottom: "40px", borderRadius: "12px", overflow: "hidden", position: "relative" }}>
-        <img src="/hero-domstol.png" alt="AI-Domstolen" style={{ width: "100%", height: "260px", objectFit: "cover", objectPosition: "center 20%", display: "block" }} />
-        <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "100px", background: "linear-gradient(transparent, #050505)" }} />
+      <div style={{ marginBottom: "40px", borderRadius: "12px", overflow: "hidden" }}>
+        <img src="/hero-domstol.png" alt="AI-Domstolen" style={{ width: "100%", height: "auto", display: "block" }} />
       </div>
 
       {/* Rubrik */}
