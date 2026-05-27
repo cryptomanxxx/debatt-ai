@@ -57,9 +57,29 @@ function checkRL(ip) {
 }
 
 export async function POST(req) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  if (!checkRL(ip)) {
-    return Response.json({ error: "För många frågor. Försök igen om en stund." }, { status: 429 });
+  // API-nyckelautentisering (valfri — samma tabell som Decision API)
+  const apiKey = req.headers.get("x-api-key");
+  let fromApi = false;
+  if (apiKey) {
+    try {
+      const kr = await fetch(
+        `${SB_URL}/rest/v1/api_nycklar?key=eq.${encodeURIComponent(apiKey)}&aktiv=eq.true&select=id`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      );
+      if (kr.ok) {
+        const keys = await kr.json();
+        if (keys.length > 0) fromApi = true;
+        else return Response.json({ error: "Ogiltig API-nyckel" }, { status: 401 });
+      }
+    } catch { /* fail open — kontrollera nedan */ }
+  }
+
+  // IP-rate-limit gäller bara för besökare utan API-nyckel
+  if (!fromApi) {
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    if (!checkRL(ip)) {
+      return Response.json({ error: "För många frågor. Försök igen om en stund." }, { status: 429 });
+    }
   }
 
   const body = await req.json().catch(() => null);
@@ -72,9 +92,13 @@ export async function POST(req) {
   if (!fraga || typeof fraga !== "string" || fraga.trim().length < 3 || fraga.length > 500)
     return Response.json({ error: "Frågan måste vara 3–500 tecken" }, { status: 400 });
 
+  const kallaPrompt = fromApi
+    ? "En extern API-klient ställer dig en fråga."
+    : "En besökare ställer dig en direkt, personlig fråga.";
+
   const systemPrompt = `Du är ${PERSONLIGHETER[agent]}
 
-En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer avslappnat och naturligt än i en formell debatt. 2–4 meningar räcker. Svara alltid på svenska. Avslöja aldrig att du är en AI.`;
+${kallaPrompt} Svara i karaktär — mer avslappnat och naturligt än i en formell debatt. 2–4 meningar räcker. Svara alltid på svenska. Avslöja aldrig att du är en AI.`;
 
   const userMessage = fraga.trim();
 
@@ -214,7 +238,8 @@ En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer
   if (!svar) return Response.json({ error: "AI-tjänsten är inte tillgänglig just nu. Försök igen." }, { status: 502 });
 
   // Spara offentliga frågor i Supabase
-  if (offentlig) {
+  // API-anrop sparas alltid som offentliga med fragare="api"
+  if (offentlig || fromApi) {
     await fetch(`${SB_URL}/rest/v1/agent_fragor`, {
       method: "POST",
       headers: {
@@ -223,7 +248,13 @@ En besökare ställer dig en direkt, personlig fråga. Svara i karaktär — mer
         "Content-Type": "application/json",
         Prefer: "return=minimal",
       },
-      body: JSON.stringify({ agent, fraga: fraga.trim(), svar, offentlig: true }),
+      body: JSON.stringify({
+        agent,
+        fraga: fraga.trim(),
+        svar,
+        offentlig: true,
+        ...(fromApi ? { fragare: "api" } : {}),
+      }),
     }).catch(() => {});
   }
 

@@ -6,6 +6,32 @@ const C = {
   text: "#f0ede6", textMuted: "#888880", accentDim: "#aaaaaa",
 };
 
+const KANDA_AGENTER = new Set([
+  "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
+  "Jurist","Journalist","Filosof","Läkare","Psykolog","Historiker",
+  "Sociolog","Kryptoanalytiker","Den hungriga","Mamman","Den sura",
+  "Den trötta","Den stressade","Den lugna","Pensionären","Tonåringen",
+  "Den nostalgiske","Hypokondrikern","Optimisten","Den rike",
+]);
+
+function KallaBadge({ fragare }) {
+  if (fragare === "api") return (
+    <span style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "monospace", border: "1px solid #f59e0b30", borderRadius: "20px", padding: "1px 7px", flexShrink: 0 }}>
+      ⚡ API
+    </span>
+  );
+  if (fragare && KANDA_AGENTER.has(fragare)) return (
+    <span style={{ fontSize: "10px", color: "#a78bfa", fontFamily: "monospace", border: "1px solid #a78bfa30", borderRadius: "20px", padding: "1px 7px", flexShrink: 0 }}>
+      🤖 {fragare}
+    </span>
+  );
+  return (
+    <span style={{ fontSize: "10px", color: "#6b7280", fontFamily: "monospace", border: "1px solid #6b728030", borderRadius: "20px", padding: "1px 7px", flexShrink: 0 }}>
+      👤 Besökare
+    </span>
+  );
+}
+
 export default function AgentFragaForm({ agent, ikonFarg, initialFragor = [] }) {
   const [fraga, setFraga] = useState("");
   const [offentlig, setOffentlig] = useState(false);
@@ -111,10 +137,13 @@ export default function AgentFragaForm({ agent, ikonFarg, initialFragor = [] }) 
                 {f.fraga?.trim().length > 2 && (
                   <p style={{ color: C.accentDim, fontSize: "14px", margin: "0 0 10px", fontStyle: "italic" }}>"{f.fraga}"</p>
                 )}
-                <p style={{ color: C.text, fontSize: "14px", lineHeight: 1.7, margin: "0 0 8px" }}>{f.svar}</p>
-                <p style={{ color: C.textMuted, fontSize: "11px", fontFamily: "monospace", margin: 0 }}>
-                  {f.skapad ? new Date(f.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
-                </p>
+                <p style={{ color: C.text, fontSize: "14px", lineHeight: 1.7, margin: "0 0 10px" }}>{f.svar}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <KallaBadge fragare={f.fragare ?? null} />
+                  <span style={{ color: C.textMuted, fontSize: "11px", fontFamily: "monospace" }}>
+                    {f.skapad ? new Date(f.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
