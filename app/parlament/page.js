@@ -65,9 +65,8 @@ export default async function ParlamentPage() {
       <div style={{ maxWidth: "900px", margin: "0 auto" }}>
 
         {/* Hero */}
-        <div style={{ marginBottom: "40px", borderRadius: "12px", overflow: "hidden", position: "relative" }}>
-          <img src="/hero-parlament.png" alt="AI-Parlamentet" style={{ width: "100%", height: "280px", objectFit: "cover", objectPosition: "center 15%", display: "block" }} />
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "110px", background: `linear-gradient(transparent, ${C.bg})` }} />
+        <div style={{ marginBottom: "40px", borderRadius: "12px", overflow: "hidden" }}>
+          <img src="/hero-parlament.png" alt="AI-Parlamentet" style={{ width: "100%", height: "auto", display: "block" }} />
         </div>
 
         {/* Header */}
