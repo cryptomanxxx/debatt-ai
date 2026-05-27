@@ -308,7 +308,7 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
   return (
     <>
       {/* Källfilter */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+      <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
         {kallaAlternativ.map(({ id, etikett, antal }) => (
           <button key={id} onClick={() => byttKalla(id)} style={kallaStyle(valdKalla === id, id)}>
             {etikett} <span style={{ fontSize: "10px", opacity: 0.6 }}>({antal})</span>
@@ -317,7 +317,7 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
       </div>
 
       {/* Statusfilter */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+      <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
         {["Alla", "Pågående", "Avgjorda"].map(s => {
           const antal = s === "Alla" ? efterKategori.length
             : s === "Pågående" ? efterKategori.filter(f => f.status !== "avgjort").length
