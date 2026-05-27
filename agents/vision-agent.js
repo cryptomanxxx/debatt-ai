@@ -15,9 +15,11 @@ const fs   = require("fs");
 const path = require("path");
 const https = require("https");
 
-const CEREBRAS_API_KEY = process.env.CEREBRAS_API_KEY;
-const DISCUSSIONS_DIR  = path.join(__dirname, "../ai-bus/discussions");
-const GOAL_PATH        = path.join(__dirname, "../ai-bus/goal.md");
+const CEREBRAS_API_KEY  = process.env.CEREBRAS_API_KEY;
+const DISCUSSIONS_DIR   = path.join(__dirname, "../ai-bus/discussions");
+const GOAL_PATH         = path.join(__dirname, "../ai-bus/goal.md");
+const REJECTED_DIR      = path.join(__dirname, "../ai-bus/rejected");
+const IMPLEMENTED_DIR   = path.join(__dirname, "../ai-bus/implemented");
 
 if (!CEREBRAS_API_KEY) {
   console.error("CEREBRAS_API_KEY saknas — avbryter");
@@ -48,6 +50,70 @@ function lastNVisions(n = 3) {
 function readGoal() {
   try { return fs.readFileSync(GOAL_PATH, "utf8").slice(0, 2000); }
   catch { return "Målet med Debatt-AI är att bygga världens bästa AI-socialsimulering och testa ekonomisk civilisationsteori på autonoma AI-samhällen."; }
+}
+
+/**
+ * Läser beslutshistorik ur rejected/ och implemented/
+ * Returnerar ett formaterat stycke för promptinjicering.
+ */
+function readDecisionHistory() {
+  function parseFrontmatter(content) {
+    const match = content.match(/^---\n([\s\S]+?)\n---/);
+    if (!match) return {};
+    const fm = {};
+    for (const line of match[1].split("\n")) {
+      const kv = line.match(/^(\w+):\s*"?(.*?)"?\s*$/);
+      if (kv) fm[kv[1]] = kv[2];
+    }
+    return fm;
+  }
+
+  function readDir(dir, filterType) {
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+      .filter(f => f.endsWith(".md"))
+      .sort()
+      .slice(-15)
+      .map(f => {
+        try {
+          const content = fs.readFileSync(path.join(dir, f), "utf8");
+          return parseFrontmatter(content);
+        } catch { return null; }
+      })
+      .filter(fm => fm && fm.title && (!filterType || fm.type === filterType));
+  }
+
+  const rejectedVisions  = readDir(REJECTED_DIR, "vision");
+  const rejectedOther    = readDir(REJECTED_DIR, null).filter(fm => fm.type !== "vision").slice(-5);
+  const implemented      = readDir(IMPLEMENTED_DIR, null).slice(-8);
+
+  const parts = [];
+
+  if (rejectedVisions.length > 0) {
+    parts.push("### Avfärdade vision-förslag (föreslå INTE dessa igen utan ny motivering)");
+    for (const fm of rejectedVisions) {
+      parts.push(`- **${fm.title}** — ${fm.rationale || "ingen rationale angiven"}`);
+    }
+  }
+
+  if (implemented.length > 0) {
+    parts.push("\n### Nyligen implementerat (bygg PÅ detta, upprepa det inte)");
+    for (const fm of implemented) {
+      const extra = fm.impact ? ` → ${fm.impact}` : "";
+      parts.push(`- ${fm.title}${extra}`);
+    }
+  }
+
+  if (rejectedOther.length > 0) {
+    parts.push("\n### Övriga avfärdade förslag (kontext)");
+    for (const fm of rejectedOther) {
+      parts.push(`- ${fm.title} [${fm.type || "?"}]${fm.rationale ? `: ${fm.rationale.slice(0, 100)}…` : ""}`);
+    }
+  }
+
+  return parts.length > 0
+    ? `\n\n## Besluthistorik — undvik cirkeltänkande\n\n${parts.join("\n")}`
+    : "";
 }
 
 function httpPost(url, headers, body) {
@@ -104,13 +170,14 @@ async function main() {
   const tidigareKontext = tidigareVisioner.length > 0
     ? `\n\nSenaste visionerna (undvik att upprepa samma idéer):\n${tidigareVisioner.map((v, i) => `--- Vision ${i + 1} ---\n${v}`).join("\n\n")}`
     : "";
+  const beslutHistorik = readDecisionHistory();
 
   const prompt = `Du är en visionär AI-arkitekt med djup insikt i AI-simuleringar, civilisationsteori och social dynamik. Du analyserar plattformen Debatt-AI och genererar konkreta, innovativa idéer för att ta den till nästa nivå.
 
 ## Plattformens uppdrag och vision
 
 ${goal}
-${tidigareKontext}
+${tidigareKontext}${beslutHistorik}
 
 ## Din uppgift idag (${datum})
 
@@ -137,6 +204,9 @@ Formatet ska vara:
 
 ## Prioritet och komplexitet
 (Hög/Medel/Låg prioritet, Hög/Medel/Låg komplexitet)`;
+
+  const avfardade = readDecisionHistory().match(/\*\*/g)?.length ?? 0;
+  if (avfardade > 0) console.log(`  📚 Läser beslutshistorik: injicerar kontext från ai-bus/rejected/ och ai-bus/implemented/`);
 
   console.log(`Kallar Cerebras (Qwen 3 235B) för vision ${datum}…`);
   let vision;
