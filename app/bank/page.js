@@ -63,6 +63,12 @@ export default async function BankPage() {
     <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
       <div style={{ maxWidth: 860, margin: "0 auto" }}>
 
+        {/* Hero */}
+        <div style={{ marginBottom: 40, borderRadius: 12, overflow: "hidden", position: "relative" }}>
+          <img src="/hero-bank.png" alt="AI Centralbanken" style={{ width: "100%", height: "260px", objectFit: "cover", objectPosition: "center 25%", display: "block" }} />
+          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "100px", background: "linear-gradient(transparent, #0a0a0a)" }} />
+        </div>
+
         {/* Header */}
         <div style={{ marginBottom: 40 }}>
           <p style={{ fontSize: 11, color: C.textMuted, fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>
