@@ -275,7 +275,7 @@ async function getAgentDebatter(namn) {
 
 async function getAgentFragor(namn) {
   const res = await fetch(
-    `${SB_URL}/rest/v1/agent_fragor?agent=eq.${encodeURIComponent(namn)}&offentlig=eq.true&order=skapad.desc&limit=10&select=fraga,svar,skapad`,
+    `${SB_URL}/rest/v1/agent_fragor?agent=eq.${encodeURIComponent(namn)}&offentlig=eq.true&order=skapad.desc&limit=10&select=fraga,svar,fragare,skapad`,
     { headers: sbHeaders(), cache: "no-store" }
   );
   if (!res.ok) return [];
