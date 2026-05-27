@@ -58,29 +58,59 @@ export default function AgentFragaPlayground() {
   const agentFarg = AGENT_FARGER[valdAgent] || C.accent;
 
   async function skicka() {
-    if (!fraga.trim() || loading) return;
+    if (loading) return;
+
+    // Validera frågetext (3–500 tecken)
+    const fragaTrimmed = fraga.trim();
+    if (fragaTrimmed.length < 3) { setFel("Frågan måste vara minst 3 tecken."); return; }
+    if (fragaTrimmed.length > 500) { setFel("Frågan får vara max 500 tecken."); return; }
+
+    // Validera agentnamn
+    if (!ALLA_AGENTER.includes(valdAgent)) { setFel("Ogiltigt agentnamn."); return; }
+
+    // Validera API-nyckel (om angiven — får inte vara bara mellanslag)
+    const nyckel = apiKey.trim();
+    if (apiKey && !nyckel) { setFel("API-nyckeln verkar tom. Ta bort den eller ange en giltig nyckel."); return; }
+
     setLoading(true);
     setFel("");
     setSvar(null);
     const headers = { "Content-Type": "application/json" };
-    if (apiKey.trim()) headers["X-API-Key"] = apiKey.trim();
+    if (nyckel) headers["X-API-Key"] = nyckel;
     try {
       const res = await fetch("/api/agent-fraga", {
         method: "POST",
         headers,
-        body: JSON.stringify({ agent: valdAgent, fraga: fraga.trim(), offentlig: !apiKey.trim() }),
+        body: JSON.stringify({ agent: valdAgent, fraga: fragaTrimmed, offentlig: !nyckel }),
       });
       const data = await res.json();
-      if (!res.ok) { setFel(data.error || "Något gick fel."); return; }
+      if (!res.ok) {
+        const STATUS_MSG = {
+          400: "Ogiltig förfrågan — kontrollera agent och frågetext.",
+          401: "Ogiltig API-nyckel.",
+          404: "Agenten hittades inte.",
+          429: "För många förfrågningar. Vänta en stund och försök igen.",
+          500: "Serverfel. Försök igen om en liten stund.",
+        };
+        setFel(STATUS_MSG[res.status] || data.error || `Något gick fel (HTTP ${res.status}).`);
+        return;
+      }
       setSvar(data.svar);
-    } catch { setFel("Nätverksfel. Försök igen."); }
+    } catch { setFel("Nätverksfel. Kontrollera din anslutning och försök igen."); }
     finally { setLoading(false); }
   }
 
-  function kopieraCurl() {
-    navigator.clipboard.writeText(curlSnippet(valdAgent, fraga || "Din fråga här", apiKey));
-    setKopiad(true);
-    setTimeout(() => setKopiad(false), 2000);
+  async function kopieraCurl() {
+    try {
+      await navigator.clipboard.writeText(curlSnippet(valdAgent, fraga || "Din fråga här", apiKey));
+      setKopiad(true);
+      setTimeout(() => setKopiad(false), 2000);
+    } catch {
+      // Clipboard-åtkomst nekad — visa tillfälligt felmeddelande i knappen
+      setKopiad(false);
+      setFel("Kunde inte kopiera — tillåt clipboard-åtkomst i webbläsaren eller kopiera manuellt.");
+      setTimeout(() => setFel(""), 4000);
+    }
   }
 
   function laddaExempel(ex) {
@@ -216,12 +246,12 @@ export default function AgentFragaPlayground() {
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <button
               onClick={skicka}
-              disabled={loading || !fraga.trim()}
+              disabled={loading || fraga.trim().length < 3}
               style={{
                 padding: "10px 24px", background: loading ? C.surface : agentFarg,
                 color: loading ? C.textMuted : "#0a0a0a", border: "none", borderRadius: "6px",
-                fontSize: "14px", fontWeight: 700, cursor: (loading || !fraga.trim()) ? "default" : "pointer",
-                fontFamily: "Georgia, serif", opacity: !fraga.trim() ? 0.5 : 1, transition: "all 0.15s",
+                fontSize: "14px", fontWeight: 700, cursor: (loading || fraga.trim().length < 3) ? "default" : "pointer",
+                fontFamily: "Georgia, serif", opacity: fraga.trim().length < 3 ? 0.5 : 1, transition: "all 0.15s",
               }}
             >
               {loading ? "Väntar på svar…" : `Fråga ${valdAgent} →`}
