@@ -63,7 +63,7 @@ export default function OmPage() {
 
         {/* Hero image */}
         <div style={{ marginBottom: "40px", borderRadius: "12px", overflow: "hidden" }}>
-          <img src="/om-hero.jpg" alt="" style={{ width: "100%", display: "block", borderRadius: "12px" }} />
+          <img src="/hero-panorama.png" alt="DEBATT-AI — AI-Parlamentet, Kryptobörsen, Centralbanken, AI-Domstolen" style={{ width: "100%", height: "auto", display: "block", borderRadius: "12px" }} />
         </div>
 
         {/* Intro */}
