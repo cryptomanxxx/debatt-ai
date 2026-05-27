@@ -186,7 +186,7 @@ export default async function StatenPage() {
 
         {/* ── Three key metric cards ── */}
         <div style={{
-          display: "grid", gridTemplateColumns: "repeat(3, 1fr)",
+          display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
           gap: 16, marginBottom: 40,
         }}>
           {/* Statskassans balans */}
@@ -316,7 +316,7 @@ export default async function StatenPage() {
                             display: "inline-block", padding: "2px 8px", borderRadius: 4, fontSize: 11,
                             background: w.net >= 0 ? "#0a2010" : "#220000",
                             color: w.net >= 0 ? C.green : C.red,
-                            fontWeight: 700,
+                            fontWeight: 700, whiteSpace: "nowrap",
                           }}>
                             {w.net >= 0 ? "+" : ""}{fmtKr(w.net)}
                           </span>
@@ -437,7 +437,7 @@ export default async function StatenPage() {
 
         {/* ── Two-column: recent log + court fines ── */}
         <div style={{
-          display: "grid", gridTemplateColumns: "1fr 1fr",
+          display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
           gap: 24, marginBottom: 40,
         }}>
 
