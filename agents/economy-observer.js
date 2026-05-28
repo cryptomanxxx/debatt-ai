@@ -302,7 +302,7 @@ Var analytisk och specifik. Referera till faktiska siffror. Jämför med ekonomi
 // ── Kalla Cerebras ────────────────────────────────────────────────────────────
 async function kallaCerebras(prompt) {
   const body = JSON.stringify({
-    model: "llama-3.3-70b",
+    model: "llama3.3-70b",
     messages: [{ role: "user", content: prompt }],
     max_tokens: 1400,
     temperature: 0.7,

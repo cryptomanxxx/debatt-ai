@@ -33,7 +33,7 @@ export async function POST(request) {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-      body: JSON.stringify({ ...oaiBody, model: "llama-3.3-70b-versatile" }),
+      body: JSON.stringify({ ...oaiBody, model: "llama3.3-70b-versatile" }),
       signal: AbortSignal.timeout(10000),
     }).catch(() => null);
     if (res?.status === 429) markProviderDown("groq");
@@ -49,7 +49,7 @@ export async function POST(request) {
     const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CEREBRAS_API_KEY}` },
-      body: JSON.stringify({ ...oaiBody, model: "llama-3.3-70b" }),
+      body: JSON.stringify({ ...oaiBody, model: "llama3.3-70b" }),
       signal: AbortSignal.timeout(8000),
     }).catch(() => null);
     if (res?.status === 429) markProviderDown("cerebras");

@@ -98,7 +98,7 @@ async function genereraKommentar(agentNamn, artikel) {
   const user    = `Artikelns rubrik: "${artikel.rubrik}"\n\nKärna (första 300 tecken): ${(artikel.artikel || "").slice(0, 300)}\n\nGe din reaktion som ${agentNamn}.`;
 
   const body = {
-    model: "llama-3.3-70b-versatile",
+    model: "llama3.3-70b-versatile",
     messages: [{ role: "system", content: system }, { role: "user", content: user }],
     max_tokens: 120,
     temperature: 0.85,

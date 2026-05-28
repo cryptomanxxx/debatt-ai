@@ -177,7 +177,7 @@ export async function POST(req) {
         Authorization: `Bearer ${GROQ_KEY}`,
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "llama3.3-70b-versatile",
         messages: [
           {
             role: "user",

@@ -115,11 +115,11 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 
 | Provider | Modell | Miljövariabel | Används för |
 |---|---|---|---|
-| **Groq** (primär) | `llama-3.3-70b-versatile` | `GROQ_API_KEY` | Allt: artiklar, direktdebatt, beslut-API, bedömning |
+| **Groq** (primär) | `llama3.3-70b-versatile` | `GROQ_API_KEY` | Allt: artiklar, direktdebatt, beslut-API, bedömning |
 | **Gemini** (fallback 2) | `gemini-2.0-flash` / `flash-lite` / `1.5-flash` | `GEMINI_API_KEY` | Artiklar, direktdebatt, beslut-API |
-| **OpenRouter** (fallback 2) | `meta-llama/llama-3.3-70b-instruct:free` | `OPENROUTER_API_KEY` | Direktdebatt (parallell med Gemini) |
+| **OpenRouter** (fallback 2) | `meta-llama/llama3.3-70b-instruct:free` | `OPENROUTER_API_KEY` | Direktdebatt (parallell med Gemini) |
 | **Codestral** (fallback 3) | `codestral-latest` | `MISTRAL_API_KEY` | Direktdebatt, artikelbedömning + **exklusivt** för AI-bus kodanalys |
-| **Cerebras** (fallback 3) | `llama-3.3-70b` / `llama3.1-8b` | `CEREBRAS_API_KEY` | Direktdebatt, artikelbedömning, beslut-API |
+| **Cerebras** (fallback 3) | `llama3.3-70b` / `llama3.1-8b` | `CEREBRAS_API_KEY` | Direktdebatt, artikelbedömning, beslut-API |
 | **Sambanova** (fallback 4) | `Meta-Llama-3.3-70B-Instruct` | `SAMBANOVA_API_KEY` | Test-providers (ej i huvud-fallback-kedja ännu) |
 | **GitHub Models** (sista) | `Llama-3.3-70B-Instruct` | `GITHUB_TOKEN` | Alla routes — sista utväg om alla andra är nere |
 
@@ -987,7 +987,7 @@ En konstitutionell domstol som automatiskt identifierar regelbrott, håller LLM-
 
 **Flöde per körning (14:30 svensk tid):**
 1. `hitta_overträdelser()` — skannar `lobbying_log`, `agent_bets`+`agent_lan`, `rykten`, `agent_koalitioner`+`agent_planbocker`. Deduplicerar mot öppna ärenden inom 7 dagar. Ärenden numreras `DOM-{år}-{nr:03d}`.
-2. `hall_forhandling()` — varje domare anropar Groq (llama-3.3-70b-versatile), JSON-svar `{utfall, motivering}`. Fälld om ≥ 2 av 3 röstar fälld.
+2. `hall_forhandling()` — varje domare anropar Groq (llama3.3-70b-versatile), JSON-svar `{utfall, motivering}`. Fälld om ≥ 2 av 3 röstar fälld.
 3. `verkstall_straff()` — drar böter från `agent_planbocker.saldo` (minimum 0), lägger böterna i **statskassan** (`agent_planbocker` där `agent='Statskassa'`), loggar `skandal` i `civilisations_minne`.
 
 **Statskassa + grundinkomst:** böterna försvinner inte ur ekonomin — de samlas i en statskassa-rad i `agent_planbocker`. Varje söndag omfördelas hela statskassan jämnt som grundinkomst till alla 24 agenter via `inflation.py` (steg 5). En dömd agent finansierar indirekt sina rivaler. Kräver att `supabase_statskassa.sql` körs för att skapa Statskassa-raden.
