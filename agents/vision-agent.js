@@ -18,6 +18,7 @@ const https = require("https");
 const CEREBRAS_API_KEY  = process.env.CEREBRAS_API_KEY;
 const DISCUSSIONS_DIR   = path.join(__dirname, "../ai-bus/discussions");
 const GOAL_PATH         = path.join(__dirname, "../ai-bus/goal.md");
+const CLAUDE_MD_PATH    = path.join(__dirname, "../CLAUDE.md");
 const REJECTED_DIR      = path.join(__dirname, "../ai-bus/rejected");
 const IMPLEMENTED_DIR   = path.join(__dirname, "../ai-bus/implemented");
 
@@ -116,6 +117,18 @@ function readDecisionHistory() {
     : "";
 }
 
+function readClaudeMdFeatures() {
+  try {
+    const content = fs.readFileSync(CLAUDE_MD_PATH, "utf8");
+    const features = content.split("\n")
+      .filter(l => l.startsWith("### ✅"))
+      .map(l => l.replace(/^### ✅ \d+\.\s*/, "").replace(/ – KLART$/, "").trim());
+    return features.length > 0
+      ? `\n\n## Alla redan byggda funktioner i CLAUDE.md (föreslå INTE dessa — de finns redan)\n${features.map(f => `- ${f}`).join("\n")}`
+      : "";
+  } catch { return ""; }
+}
+
 function httpPost(url, headers, body) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -171,13 +184,15 @@ async function main() {
     ? `\n\nSenaste visionerna (undvik att upprepa samma idéer):\n${tidigareVisioner.map((v, i) => `--- Vision ${i + 1} ---\n${v}`).join("\n\n")}`
     : "";
   const beslutHistorik = readDecisionHistory();
+  const claudeMdFeatures = readClaudeMdFeatures();
+  if (claudeMdFeatures) console.log(`  📋 Injicerar ${claudeMdFeatures.split("\n").filter(l => l.startsWith("-")).length} byggda funktioner från CLAUDE.md`);
 
   const prompt = `Du är en visionär AI-arkitekt med djup insikt i AI-simuleringar, civilisationsteori och social dynamik. Du analyserar plattformen Debatt-AI och genererar konkreta, innovativa idéer för att ta den till nästa nivå.
 
 ## Plattformens uppdrag och vision
 
 ${goal}
-${tidigareKontext}${beslutHistorik}
+${tidigareKontext}${claudeMdFeatures}${beslutHistorik}
 
 ## Din uppgift idag (${datum})
 
