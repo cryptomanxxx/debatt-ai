@@ -20,6 +20,7 @@ const SUPABASE_URL     = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SUPABASE_KEY     = process.env.SUPABASE_ANON_KEY;
 const DISCUSSIONS_DIR  = path.join(__dirname, "../ai-bus/discussions");
 const GOAL_PATH        = path.join(__dirname, "../ai-bus/goal.md");
+const CLAUDE_MD_PATH   = path.join(__dirname, "../CLAUDE.md");
 const IMPLEMENTED_DIR  = path.join(__dirname, "../ai-bus/implemented");
 const REJECTED_DIR     = path.join(__dirname, "../ai-bus/rejected");
 
@@ -138,6 +139,18 @@ function readRecentVisions(n = 3) {
     .filter(Boolean);
 }
 
+function readClaudeMdFeatures() {
+  try {
+    const content = fs.readFileSync(CLAUDE_MD_PATH, "utf8");
+    const features = content.split("\n")
+      .filter(l => l.startsWith("### ✅"))
+      .map(l => l.replace(/^### ✅ \d+\.\s*/, "").replace(/ – KLART$/, "").trim());
+    return features.length > 0
+      ? `\n\n## Alla redan byggda funktioner i CLAUDE.md (föreslå INTE dessa igen)\n${features.map(f => `- ${f}`).join("\n")}`
+      : "";
+  } catch { return ""; }
+}
+
 function parseFrontmatter(content) {
   const match = content.match(/^---\n([\s\S]+?)\n---/);
   if (!match) return {};
@@ -234,6 +247,8 @@ async function main() {
         const visioner = readRecentVisions(2);
         return visioner.length > 0 ? `\n\n## Senaste visioner\n${visioner.join("\n---\n")}` : "";
       })();
+  const claudeMdFeatures = readClaudeMdFeatures();
+  if (claudeMdFeatures) console.log(`  📋 Injicerar ${claudeMdFeatures.split("\n").filter(l => l.startsWith("-")).length} byggda funktioner från CLAUDE.md`);
   const beslutHistorik = readImplementedHistory();
   if (beslutHistorik) console.log("  📚 Injicerar besluthistorik från ai-bus/implemented/ och ai-bus/rejected/");
 
@@ -242,7 +257,7 @@ async function main() {
 ## Plattformens uppdrag
 
 ${goal}
-${visionKontext}${beslutHistorik}
+${visionKontext}${claudeMdFeatures}${beslutHistorik}
 
 ## Aktuell plattformsstatistik (${datum})
 
