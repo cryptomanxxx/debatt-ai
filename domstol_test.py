@@ -135,7 +135,7 @@ def groq_anrop(groq_key: str, system: str, prompt: str, max_tokens: int = 200) -
                 "Content-Type": "application/json",
             },
             json={
-                "model": "llama-3.3-70b-versatile",
+                "model": "llama3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": prompt},

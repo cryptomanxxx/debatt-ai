@@ -114,7 +114,7 @@ def cloudflare_post(system_prompt: str, user_message: str, max_tokens: int = 200
     if not account_id or not api_token:
         _nere.add("cloudflare")
         raise Exception("CF_ACCOUNT_ID eller CF_API_TOKEN saknas")
-    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/meta/llama3.3-70b-instruct-fp8-fast"
     headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
     payload = {
         "messages": [

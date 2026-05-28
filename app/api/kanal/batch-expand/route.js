@@ -51,7 +51,7 @@ Exempel:
       const r = await fetch(GROQ_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 1200, temperature: 0.3 }),
+        body: JSON.stringify({ model: "llama3.3-70b-versatile", messages: msgs, max_tokens: 1200, temperature: 0.3 }),
         signal: AbortSignal.timeout(12000),
       });
       if (r.ok) {
@@ -59,16 +59,16 @@ Exempel:
         const text = json.choices[0].message.content.trim();
         const parsed = parseNumberedList(text, items.length);
         if (parsed) {
-          logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
+          logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
           return Response.json({ expanded: parsed });
         }
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
+        logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
       } else {
         if (r.status === 429) markProviderDown("groq_kanal");
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+        logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
       }
     } catch {
-      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
+      logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 
@@ -132,7 +132,7 @@ Exempel:
       const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${cbKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama-3.3-70b", messages: msgs, max_tokens: 1200, temperature: 0.3 }),
+        body: JSON.stringify({ model: "llama3.3-70b", messages: msgs, max_tokens: 1200, temperature: 0.3 }),
         signal: AbortSignal.timeout(12000),
       });
       if (r.ok) {
@@ -140,16 +140,16 @@ Exempel:
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         const parsed = parseNumberedList(text, items.length);
         if (parsed) {
-          logAiCall({ provider: "cerebras", model: "llama-3.3-70b", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
+          logAiCall({ provider: "cerebras", model: "llama3.3-70b", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
           return Response.json({ expanded: parsed });
         }
-        logAiCall({ provider: "cerebras", model: "llama-3.3-70b", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
+        logAiCall({ provider: "cerebras", model: "llama3.3-70b", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
       } else {
         if (r.status === 429) markProviderDown("cerebras");
-        logAiCall({ provider: "cerebras", model: "llama-3.3-70b", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+        logAiCall({ provider: "cerebras", model: "llama3.3-70b", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
       }
     } catch {
-      logAiCall({ provider: "cerebras", model: "llama-3.3-70b", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
+      logAiCall({ provider: "cerebras", model: "llama3.3-70b", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 

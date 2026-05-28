@@ -2,7 +2,7 @@ import { logAiCall } from "../../../lib/logAiCall";
 import { providerReady, markProviderDown } from "../../../lib/aiCircuitBreaker";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = "llama3.3-70b-versatile";
 
 async function groqOrGemini({ messages, max_tokens, temperature, json = false }) {
   const oaiBody = { model: GROQ_MODEL, messages, max_tokens, temperature, ...(json ? { response_format: { type: "json_object" } } : {}) };
@@ -28,7 +28,7 @@ async function groqOrGemini({ messages, max_tokens, temperature, json = false })
     const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${cerebrasKey}` },
-      body: JSON.stringify({ ...oaiBody, model: "llama-3.3-70b" }),
+      body: JSON.stringify({ ...oaiBody, model: "llama3.3-70b" }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -143,6 +143,6 @@ export async function POST(request) {
     scores = null;
   }
 
-  logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt-summering", status: summering ? "ok" : "error", latency_ms: Date.now() - t0 });
+  logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "chatt-summering", status: summering ? "ok" : "error", latency_ms: Date.now() - t0 });
   return Response.json({ summering, scores });
 }

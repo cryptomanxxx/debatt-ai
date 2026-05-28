@@ -4,13 +4,13 @@ import { useState } from "react";
 const PROVIDERS = ["groq", "deepseek", "github_models", "cloudflare", "cerebras", "sambanova", "openrouter", "codestral", "gemini"];
 
 const LABELS = {
-  groq:         "Groq — llama-3.3-70b-versatile",
+  groq:         "Groq — llama3.3-70b-versatile",
   deepseek:     "DeepSeek — deepseek-chat (V3)",
   github_models:"GitHub Models — Llama-3.3-70B-Instruct",
-  cloudflare:   "Cloudflare Workers AI — llama-3.3-70b-fp8-fast",
-  cerebras:     "Cerebras — llama-3.3-70b",
+  cloudflare:   "Cloudflare Workers AI — llama3.3-70b-fp8-fast",
+  cerebras:     "Cerebras — llama3.3-70b",
   sambanova:    "Sambanova — Meta-Llama-3.3-70B",
-  openrouter:   "OpenRouter — llama-3.3-70b (free)",
+  openrouter:   "OpenRouter — llama3.3-70b (free)",
   codestral:    "Codestral — codestral-latest",
   gemini:       "Gemini — gemini-2.0-flash-lite",
 };

@@ -10,7 +10,7 @@ function makeMessages(providerName) {
 async function testGroq() {
   const key = process.env.GROQ_API_KEY;
   if (!key) return { ok: false, error: "GROQ_API_KEY saknas" };
-  const model = "llama-3.3-70b-versatile";
+  const model = "llama3.3-70b-versatile";
   const t0 = Date.now();
   try {
     const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -79,7 +79,7 @@ async function testCerebras() {
     }
   } catch {}
 
-  const model = "llama-3.3-70b";
+  const model = "llama3.3-70b";
   const t0 = Date.now();
   try {
     const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
@@ -128,7 +128,7 @@ async function testSambanova() {
 async function testOpenRouter() {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) return { ok: false, error: "OPENROUTER_API_KEY saknas" };
-  const model = "meta-llama/llama-3.3-70b-instruct:free";
+  const model = "meta-llama/llama3.3-70b-instruct:free";
   const t0 = Date.now();
   try {
     const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -235,7 +235,7 @@ async function testCloudflare() {
   const accountId = process.env.CF_ACCOUNT_ID;
   const token = process.env.CF_API_TOKEN;
   if (!accountId || !token) return { ok: false, error: "CF_ACCOUNT_ID eller CF_API_TOKEN saknas" };
-  const model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+  const model = "@cf/meta/llama3.3-70b-instruct-fp8-fast";
   const t0 = Date.now();
   try {
     const r = await fetch(

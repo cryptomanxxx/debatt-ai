@@ -101,7 +101,7 @@ reasoning: din kortaste möjliga motivering`;
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_KEY}` },
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "llama3.3-70b-versatile",
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: question }],
           max_tokens: 150,
           temperature: 0.7,
