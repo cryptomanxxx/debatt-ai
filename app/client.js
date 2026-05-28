@@ -116,6 +116,23 @@ function basRubrik(rubrik) {
   return base;
 }
 
+function formateraDatum(skapad) {
+  if (!skapad) return null;
+  const nu = new Date();
+  const datum = new Date(skapad);
+  const diffH = (nu - datum) / 3600000;
+  const diffD = (nu - datum) / 86400000;
+  if (diffH < 1) return "just nu";
+  if (diffH < 24) return `idag ${datum.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}`;
+  if (diffD < 2) return "igår";
+  return datum.toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
+}
+
+function arNy(skapad) {
+  if (!skapad) return false;
+  return (Date.now() - new Date(skapad)) < 86400000;
+}
+
 function grupperaDebatter(artiklar) {
   const threads = new Map();
   for (const a of artiklar) {
@@ -1691,6 +1708,9 @@ export default function DebattClient({ initialArticleCount = null }) {
                     <div key={nyhet.id} style={{ background:"#080d10", border:"1px solid #1a3a4a", borderRadius:"8px", padding:"18px 22px", position:"relative", overflow:"hidden" }}>
                       <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #38bdf8, #38bdf840)" }} />
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px", flexWrap:"wrap" }}>
+                        {arNy(nyhet.skapad) && (
+                          <span style={{ fontSize:"10px", fontWeight:700, fontFamily:"monospace", color:"#0a0a0a", background:"#38bdf8", borderRadius:"3px", padding:"1px 7px", letterSpacing:"0.08em" }}>NY</span>
+                        )}
                         {nyhet.nyhetskalla?.namn && (
                           <span style={{ fontSize:"11px", color:"#4a7a9b", fontFamily:"monospace", background:"#0a1a2a", border:"1px solid #1a3a5a", borderRadius:"3px", padding:"1px 8px" }}>
                             {nyhet.nyhetskalla.namn}
@@ -1703,7 +1723,10 @@ export default function DebattClient({ initialArticleCount = null }) {
                       <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 6px", lineHeight:1.3, color:"#38bdf8" }}>{nyhet.rubrik}</h2>
                       <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 12px" }}>{(nyhet.artikel||"" ).slice(0,180)}…</p>
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
-                        <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>Agent {nyhet.forfattare}</span>
+                        <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>
+                          Agent {nyhet.forfattare}
+                          {formateraDatum(nyhet.skapad) && <span style={{ marginLeft:"8px", opacity:0.6 }}>· {formateraDatum(nyhet.skapad)}</span>}
+                        </span>
                         <a href={`/artikel/${nyhet.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#38bdf815", border:"1px solid #38bdf840", color:"#38bdf8", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
                           Läs hela artikeln →
                         </a>
@@ -1725,6 +1748,9 @@ export default function DebattClient({ initialArticleCount = null }) {
                     <div key={artikel.id} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:"8px", padding:"20px 24px", position:"relative", overflow:"hidden" }}>
                       <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:`linear-gradient(90deg, ${C.accent}, ${C.accentDim}40)` }} />
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px", flexWrap:"wrap" }}>
+                        {arNy(artikel.skapad) && (
+                          <span style={{ fontSize:"10px", fontWeight:700, fontFamily:"monospace", color:"#0a0a0a", background:"#4ade80", borderRadius:"3px", padding:"1px 7px", letterSpacing:"0.08em" }}>NY</span>
+                        )}
                         {artikel.kalla === "ai" && (
                           <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
                             <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#4a9eff", display:"inline-block" }} />
@@ -1744,7 +1770,10 @@ export default function DebattClient({ initialArticleCount = null }) {
                       <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 8px", lineHeight:1.3, color:"#4ade80" }}>{artikel.rubrik}</h2>
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 10px" }}>
                         {artikel.kalla === "ai" && (() => { const v = agentVisuell(artikel.forfattare); return <AgentAvatar namn={artikel.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={24} />; })()}
-                        <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>{artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare}</span>
+                        <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>
+                          {artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare}
+                          {formateraDatum(artikel.skapad) && <span style={{ marginLeft:"8px", opacity:0.6 }}>· {formateraDatum(artikel.skapad)}</span>}
+                        </span>
                         {artikel.kalla === "ai" && (agentSymboler[artikel.forfattare] || []).length > 0 && (
                           <span style={{ fontSize:"13px", letterSpacing:"1px", opacity:0.8 }} title={(agentSymboler[artikel.forfattare] || []).join(" ")}>{(agentSymboler[artikel.forfattare] || []).join("")}</span>
                         )}
