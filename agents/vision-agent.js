@@ -70,18 +70,20 @@ function readDecisionHistory() {
   }
 
   function readDir(dir, filterType) {
-    if (!fs.existsSync(dir)) return [];
-    return fs.readdirSync(dir)
-      .filter(f => f.endsWith(".md"))
-      .sort()
-      .slice(-15)
-      .map(f => {
-        try {
-          const content = fs.readFileSync(path.join(dir, f), "utf8");
-          return parseFrontmatter(content);
-        } catch { return null; }
-      })
-      .filter(fm => fm && fm.title && (!filterType || fm.type === filterType));
+    try {
+      if (!fs.existsSync(dir)) return [];
+      return fs.readdirSync(dir)
+        .filter(f => f.endsWith(".md"))
+        .sort()
+        .slice(-15)
+        .map(f => {
+          try {
+            const content = fs.readFileSync(path.join(dir, f), "utf8");
+            return parseFrontmatter(content);
+          } catch { return null; }
+        })
+        .filter(fm => fm && fm.title && (!filterType || fm.type === filterType));
+    } catch { return []; }
   }
 
   const rejectedVisions  = readDir(REJECTED_DIR, "vision");
