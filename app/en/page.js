@@ -128,7 +128,7 @@ export default function EnPage() {
         {/* Hero image */}
         <div style={{ marginBottom: "40px", borderRadius: "12px", overflow: "hidden" }}>
           <img
-            src="/hero-panorama.png"
+            src="/hero-panorama-en.png"
             alt="DEBATT-AI — AI Parliament, Stock Exchange, Central Bank, Constitutional Court"
             style={{ width: "100%", height: "auto", display: "block" }}
           />
