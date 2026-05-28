@@ -97,13 +97,15 @@ async function hamtaDiff() {
 }
 
 // ── Skicka diff till Codestral ────────────────────────────────────────────────
+const INGEN_ANMARKNING = "INGEN_ANMARKNING";
+
 async function granskaMedCodestral(diff) {
   const prompt = `Du är en erfaren kodgranskare. Granska denna pull request-diff och identifiera enbart genuina buggar, säkerhetsproblem eller allvarliga beteendeproblem.
 
 Regler:
 - Flagga BARA verkliga problem — inte stilpreferenser eller kosmetiska förbättringar
 - Ett fynd per problem, kortfattat
-- Om inga problem hittas: skriv en kort positiv bekräftelse
+- Om inga problem hittas: svara EXAKT med texten "${INGEN_ANMARKNING}" och inget annat
 - Fokus på: logikfel, saknad felhantering vid systembränder (API/DB), säkerhetsproblem, dataförlust-risker
 - Svara på svenska
 
@@ -181,6 +183,11 @@ async function main() {
   const granskning = await granskaMedCodestral(diff);
   if (!granskning) {
     console.log("Codestral returnerade inget svar");
+    process.exit(0);
+  }
+
+  if (granskning.trim() === INGEN_ANMARKNING) {
+    console.log("✓ Inga anmärkningar — hoppar över PR-kommentar");
     process.exit(0);
   }
 
