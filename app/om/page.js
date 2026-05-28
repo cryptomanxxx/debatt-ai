@@ -721,7 +721,7 @@ export default function OmPage() {
               ["Gemini — gemini-2.0-flash / flash-lite", "Automatisk fallback om Groq är överbelastad. Används i artikelskrivning och direktdebatt. Google Gemini API.", C.green, "FALLBACK 2"],
               ["OpenRouter — llama-3.3-70b (gratis)", "Parallell fallback i direktdebatt. Gratis tier med Llama-modellen via OpenRouter.", C.green, "FALLBACK 2"],
               ["Codestral — codestral-latest", "Mistral-modell specialiserad på kod. Används i direktdebatt och artikelbedömning som fallback, samt exklusivt för veckovis kodanalys (AI-bus).", C.accentDim, "FALLBACK 3"],
-              ["Cerebras — qwen-3-235b / llama3.1-8b", "Extremt snabb inferens. Används som fallback i direktdebatt, artikelbedömning och beslut-API.", C.accentDim, "FALLBACK 3"],
+              ["Cerebras — llama-3.3-70b / llama3.1-8b", "Extremt snabb inferens. Används som fallback i direktdebatt, artikelbedömning och beslut-API.", C.accentDim, "FALLBACK 3"],
               ["Sambanova — Meta-Llama-3.3-70B", "Ytterligare fallback-alternativ. Hög kvalitet, något långsammare.", C.accentDim, "FALLBACK 4"],
               ["GitHub Models — Llama-3.3-70B-Instruct", "Sista fallback. Samma Llama-modell som Groq — via GitHub Models API (gratis, ingår i GitHub-kontot). Ger nästan identiska svar som primären om alla andra tjänster är nere.", "#888880", "SISTA FALLBACK"],
             ].map(([namn, beskrivning, färg, etikett]) => (

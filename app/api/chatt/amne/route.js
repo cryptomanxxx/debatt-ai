@@ -49,7 +49,7 @@ export async function POST(request) {
     const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CEREBRAS_API_KEY}` },
-      body: JSON.stringify({ ...oaiBody, model: "qwen-3-235b-a22b-instruct-2507" }),
+      body: JSON.stringify({ ...oaiBody, model: "llama-3.3-70b" }),
       signal: AbortSignal.timeout(8000),
     }).catch(() => null);
     if (res?.status === 429) markProviderDown("cerebras");
