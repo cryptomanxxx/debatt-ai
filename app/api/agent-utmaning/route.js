@@ -113,14 +113,14 @@ export async function POST(req) {
       const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${cbKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama3.3-70b", messages: msgs, max_tokens: 200, temperature: 0.9 }),
+        body: JSON.stringify({ model: "gpt-oss-120b", messages: msgs, max_tokens: 200, temperature: 0.9 }),
         signal: AbortSignal.timeout(8000),
       });
       if (r.ok) {
         const json = await r.json();
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         if (text) {
-          logAiCall({ provider: "cerebras", model: "llama3.3-70b", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
+          logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
           await sparaUtmaning(agent, tesTrimmed, text);
           return Response.json({ motargument: text });
         }

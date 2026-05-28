@@ -28,7 +28,7 @@ async function groqOrGemini({ messages, max_tokens, temperature, json = false })
     const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${cerebrasKey}` },
-      body: JSON.stringify({ ...oaiBody, model: "llama3.3-70b" }),
+      body: JSON.stringify({ ...oaiBody, model: "gpt-oss-120b" }),
     });
     if (res.ok) {
       const data = await res.json();

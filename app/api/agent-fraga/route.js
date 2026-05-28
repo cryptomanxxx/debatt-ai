@@ -187,7 +187,7 @@ ${kallaPrompt} Svara i karaktär — mer avslappnat och naturligt än i en forme
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CEREBRAS_API_KEY}` },
         body: JSON.stringify({
-          model: "llama3.3-70b",
+          model: "gpt-oss-120b",
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
           max_tokens: 300,
           temperature: 0.9,
@@ -196,13 +196,13 @@ ${kallaPrompt} Svara i karaktär — mer avslappnat och naturligt än i en forme
       if (r.ok) {
         const data = await r.json();
         svar = data.choices?.[0]?.message?.content?.trim() ?? "";
-        logAiCall({ provider: "cerebras", model: "llama3.3-70b", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
+        logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
       } else {
         if (r.status === 429) markProviderDown("cerebras");
-        logAiCall({ provider: "cerebras", model: "llama3.3-70b", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+        logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
       }
     } catch {
-      logAiCall({ provider: "cerebras", model: "llama3.3-70b", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
+      logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 

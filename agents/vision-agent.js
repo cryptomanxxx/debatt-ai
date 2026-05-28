@@ -156,7 +156,7 @@ function httpPost(url, headers, body) {
 
 async function callCerebras(prompt) {
   const body = JSON.stringify({
-    model: "llama3.3-70b",
+    model: "gpt-oss-120b",
     messages: [{ role: "user", content: prompt }],
     max_tokens: 1200,
     temperature: 0.9,

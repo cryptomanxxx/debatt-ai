@@ -113,12 +113,12 @@ export async function POST(req) {
     const t0 = Date.now();
     try {
       const r = await fetch("https://api.cerebras.ai/v1/chat/completions", { method: "POST", headers: { Authorization: `Bearer ${cbKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama3.3-70b", messages: msgs, max_tokens: 250, temperature: 1.0 }),
+        body: JSON.stringify({ model: "gpt-oss-120b", messages: msgs, max_tokens: 250, temperature: 1.0 }),
         signal: AbortSignal.timeout(8000) });
       if (r.ok) {
         const json = await r.json();
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-        if (text) { logAiCall({ provider: "cerebras", model: "llama3.3-70b", source: "labb", status: "ok", latency_ms: Date.now() - t0 }); await logLabb({ amne: amne.trim(), aggressivitet: Number(aggressivitet)||50, faktafokus: Number(faktafokus)||50, humor: Number(humor)||50, optimism: Number(optimism)||50, provider: "cerebras" }); return Response.json({ svar: text }); }
+        if (text) { logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "labb", status: "ok", latency_ms: Date.now() - t0 }); await logLabb({ amne: amne.trim(), aggressivitet: Number(aggressivitet)||50, faktafokus: Number(faktafokus)||50, humor: Number(humor)||50, optimism: Number(optimism)||50, provider: "cerebras" }); return Response.json({ svar: text }); }
       }
       if (r.status === 429) markProviderDown("cerebras");
     } catch {}
