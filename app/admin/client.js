@@ -824,7 +824,7 @@ function ApiStatusTab() {
           <ProviderCard name="Groq" model="llama-3.3-70b-versatile · primär" p={health?.groq} />
           <ProviderCard name="DeepSeek" model="deepseek-chat (V3) · fallback 1" p={health?.deepseek} />
           <ProviderCard name="Codestral" model="codestral-latest · fallback 2" p={health?.codestral} />
-          <ProviderCard name="Cerebras" model="qwen-3-235b · fallback 3" p={health?.cerebras} />
+          <ProviderCard name="Cerebras" model="llama-3.3-70b · fallback 3" p={health?.cerebras} />
           <ProviderCard name="OpenRouter" model="llama-3.3-70b (free) · fallback 4 / nyhetskanal" p={health?.or} />
           <ProviderCard name="GitHub Models" model="Llama-3.3-70B-Instruct · fallback 5" p={health?.github_models} />
           <ProviderCard name="Cloudflare" model="llama-3.3-70b-fp8-fast · fallback 6" p={health?.cloudflare} />

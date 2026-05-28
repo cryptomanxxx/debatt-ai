@@ -3,7 +3,7 @@
  * economy-observer.js
  *
  * Hämtar ekonomisk data från Supabase, beräknar nyckeltal och kallar
- * Cerebras (Qwen 3 235B) för en strukturerad ekonomianalys av AI-civilisationen.
+ * Cerebras (Llama 3.3 70B) för en strukturerad ekonomianalys av AI-civilisationen.
  *
  * Sparar till ai-bus/discussions/YYYY-MM-DD-HHmm-economy.md
  *
@@ -302,7 +302,7 @@ Var analytisk och specifik. Referera till faktiska siffror. Jämför med ekonomi
 // ── Kalla Cerebras ────────────────────────────────────────────────────────────
 async function kallaCerebras(prompt) {
   const body = JSON.stringify({
-    model: "qwen-3-235b-a22b-instruct-2507",
+    model: "llama-3.3-70b",
     messages: [{ role: "user", content: prompt }],
     max_tokens: 1400,
     temperature: 0.7,
@@ -358,7 +358,7 @@ async function main() {
     "---",
   ].join("\n");
 
-  const innehall = `${frontmatter}\n\n${analys}\n\n---\n*Genererad av economy-observer.js med Cerebras Qwen 3 235B, ${datum}*\n`;
+  const innehall = `${frontmatter}\n\n${analys}\n\n---\n*Genererad av economy-observer.js med Cerebras Llama 3.3 70B, ${datum}*\n`;
   fs.writeFileSync(utfil, innehall, "utf8");
   console.log(`Ekonomianalys sparad: ${utfil}`);
 }

@@ -2,7 +2,7 @@
 /**
  * vision-agent.js
  *
- * Kallar Cerebras (Qwen 3 235B) dagligen och genererar en visionär text
+ * Kallar Cerebras (Llama 3.3 70B) dagligen och genererar en visionär text
  * om nya funktioner och idéer för att uppfylla Debatt-AI:s syfte.
  *
  * Sparar till ai-bus/discussions/YYYY-MM-DD-vision.md
@@ -141,7 +141,7 @@ function httpPost(url, headers, body) {
 
 async function callCerebras(prompt) {
   const body = JSON.stringify({
-    model: "qwen-3-235b-a22b-instruct-2507",
+    model: "llama-3.3-70b",
     messages: [{ role: "user", content: prompt }],
     max_tokens: 1200,
     temperature: 0.9,
@@ -208,7 +208,7 @@ Formatet ska vara:
   const avfardade = readDecisionHistory().match(/\*\*/g)?.length ?? 0;
   if (avfardade > 0) console.log(`  📚 Läser beslutshistorik: injicerar kontext från ai-bus/rejected/ och ai-bus/implemented/`);
 
-  console.log(`Kallar Cerebras (Qwen 3 235B) för vision ${datum}…`);
+  console.log(`Kallar Cerebras (Llama 3.3 70B) för vision ${datum}…`);
   let vision;
   try {
     vision = await callCerebras(prompt);
@@ -217,7 +217,7 @@ Formatet ska vara:
     process.exit(1);
   }
 
-  const innehall = `${vision}\n\n---\n*Genererad av vision-agent.js med Cerebras Qwen 3 235B, ${datum}*\n`;
+  const innehall = `${vision}\n\n---\n*Genererad av vision-agent.js med Cerebras Llama 3.3 70B, ${datum}*\n`;
   fs.writeFileSync(utfil, innehall, "utf8");
   console.log(`Vision sparad: ${utfil}`);
 }

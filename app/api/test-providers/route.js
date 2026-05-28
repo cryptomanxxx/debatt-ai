@@ -79,7 +79,7 @@ async function testCerebras() {
     }
   } catch {}
 
-  const model = "qwen-3-235b-a22b-instruct-2507";
+  const model = "llama-3.3-70b";
   const t0 = Date.now();
   try {
     const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
