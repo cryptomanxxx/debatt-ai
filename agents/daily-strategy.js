@@ -164,16 +164,18 @@ function parseFrontmatter(content) {
 
 function readImplementedHistory() {
   function readDir(dir) {
-    if (!fs.existsSync(dir)) return [];
-    return fs.readdirSync(dir)
-      .filter(f => f.endsWith(".md"))
-      .sort()
-      .slice(-20)
-      .map(f => {
-        try { return parseFrontmatter(fs.readFileSync(path.join(dir, f), "utf8")); }
-        catch { return null; }
-      })
-      .filter(fm => fm && fm.title);
+    try {
+      if (!fs.existsSync(dir)) return [];
+      return fs.readdirSync(dir)
+        .filter(f => f.endsWith(".md"))
+        .sort()
+        .slice(-20)
+        .map(f => {
+          try { return parseFrontmatter(fs.readFileSync(path.join(dir, f), "utf8")); }
+          catch { return null; }
+        })
+        .filter(fm => fm && fm.title);
+    } catch { return []; }
   }
 
   const implemented = readDir(IMPLEMENTED_DIR);
