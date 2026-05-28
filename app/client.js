@@ -1720,13 +1720,19 @@ export default function DebattClient({ initialArticleCount = null }) {
                           <span key={t} style={{ fontSize:"11px", color:"#4a6a7a", border:"1px solid #1a3a4a", borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
                         ))}
                       </div>
-                      <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 6px", lineHeight:1.3, color:"#38bdf8" }}>{nyhet.rubrik}</h2>
-                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 12px" }}>{(nyhet.artikel||"" ).slice(0,180)}…</p>
-                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
-                        <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>
+                      <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 8px", lineHeight:1.3, color:"#38bdf8" }}>{nyhet.rubrik}</h2>
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 10px" }}>
+                        {(() => { const v = agentVisuell(nyhet.forfattare); return <AgentAvatar namn={nyhet.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={24} />; })()}
+                        <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>
                           Agent {nyhet.forfattare}
                           {formateraDatum(nyhet.skapad) && <span style={{ marginLeft:"8px", opacity:0.6 }}>· {formateraDatum(nyhet.skapad)}</span>}
                         </span>
+                        {(agentSymboler[nyhet.forfattare] || []).length > 0 && (
+                          <span style={{ fontSize:"13px", letterSpacing:"1px", opacity:0.8 }} title={(agentSymboler[nyhet.forfattare] || []).join(" ")}>{(agentSymboler[nyhet.forfattare] || []).join("")}</span>
+                        )}
+                      </div>
+                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 12px" }}>{(nyhet.artikel||"" ).slice(0,180)}…</p>
+                      <div style={{ display:"flex", justifyContent:"flex-end" }}>
                         <a href={`/artikel/${nyhet.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#38bdf815", border:"1px solid #38bdf840", color:"#38bdf8", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
                           Läs hela artikeln →
                         </a>
