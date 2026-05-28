@@ -8,7 +8,7 @@ const LABELS = {
   deepseek:     "DeepSeek — deepseek-chat (V3)",
   github_models:"GitHub Models — Llama-3.3-70B-Instruct",
   cloudflare:   "Cloudflare Workers AI — llama3.3-70b-fp8-fast",
-  cerebras:     "Cerebras — llama3.3-70b",
+  cerebras:     "Cerebras — gpt-oss-120b",
   sambanova:    "Sambanova — Meta-Llama-3.3-70B",
   openrouter:   "OpenRouter — llama3.3-70b (free)",
   codestral:    "Codestral — codestral-latest",
