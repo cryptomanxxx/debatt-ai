@@ -189,6 +189,10 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("FEL:", err.message);
-  process.exit(1);
+  // Sanera felmeddelandet — HTML-svar från API:er innehåller <-tecken
+  // som GitHub Actions-loggen renderar som HTML och gömmer.
+  const msg = (err.message || String(err)).replace(/</g, "&lt;").slice(0, 500);
+  console.error("FEL:", msg);
+  // Avsluta med 0 — granskningen är informativ och ska inte blockera PR:ar
+  process.exit(0);
 });
