@@ -20,6 +20,8 @@ const SUPABASE_URL     = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SUPABASE_KEY     = process.env.SUPABASE_ANON_KEY;
 const DISCUSSIONS_DIR  = path.join(__dirname, "../ai-bus/discussions");
 const GOAL_PATH        = path.join(__dirname, "../ai-bus/goal.md");
+const IMPLEMENTED_DIR  = path.join(__dirname, "../ai-bus/implemented");
+const REJECTED_DIR     = path.join(__dirname, "../ai-bus/rejected");
 
 if (!MISTRAL_API_KEY) {
   console.error("MISTRAL_API_KEY saknas — avbryter");
@@ -136,6 +138,56 @@ function readRecentVisions(n = 3) {
     .filter(Boolean);
 }
 
+function parseFrontmatter(content) {
+  const match = content.match(/^---\n([\s\S]+?)\n---/);
+  if (!match) return {};
+  const fm = {};
+  for (const line of match[1].split("\n")) {
+    const kv = line.match(/^(\w+):\s*"?(.*?)"?\s*$/);
+    if (kv) fm[kv[1]] = kv[2];
+  }
+  return fm;
+}
+
+function readImplementedHistory() {
+  function readDir(dir) {
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir)
+      .filter(f => f.endsWith(".md"))
+      .sort()
+      .slice(-20)
+      .map(f => {
+        try { return parseFrontmatter(fs.readFileSync(path.join(dir, f), "utf8")); }
+        catch { return null; }
+      })
+      .filter(fm => fm && fm.title);
+  }
+
+  const implemented = readDir(IMPLEMENTED_DIR);
+  const rejected    = readDir(REJECTED_DIR).slice(-8);
+  const parts = [];
+
+  if (implemented.length > 0) {
+    parts.push("### Redan implementerat — föreslå INTE dessa igen");
+    for (const fm of implemented) {
+      const extra = fm.impact ? ` (${fm.impact})` : "";
+      parts.push(`- ${fm.title}${extra}`);
+    }
+  }
+
+  if (rejected.length > 0) {
+    parts.push("\n### Avfärdade förslag — undvik dessa");
+    for (const fm of rejected) {
+      const reason = fm.rationale ? `: ${fm.rationale.slice(0, 100)}` : "";
+      parts.push(`- ${fm.title}${reason}`);
+    }
+  }
+
+  return parts.length > 0
+    ? `\n\n## Besluthistorik\n\n${parts.join("\n")}`
+    : "";
+}
+
 async function callCodestral(prompt) {
   const body = JSON.stringify({
     model: "codestral-latest",
@@ -182,13 +234,15 @@ async function main() {
         const visioner = readRecentVisions(2);
         return visioner.length > 0 ? `\n\n## Senaste visioner\n${visioner.join("\n---\n")}` : "";
       })();
+  const beslutHistorik = readImplementedHistory();
+  if (beslutHistorik) console.log("  📚 Injicerar besluthistorik från ai-bus/implemented/ och ai-bus/rejected/");
 
   const prompt = `Du är Codestral, en strategisk operativ AI som arbetar för att optimera och vidareutveckla plattformen Debatt-AI.
 
 ## Plattformens uppdrag
 
 ${goal}
-${visionKontext}
+${visionKontext}${beslutHistorik}
 
 ## Aktuell plattformsstatistik (${datum})
 
