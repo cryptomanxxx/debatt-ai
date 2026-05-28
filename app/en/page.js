@@ -8,7 +8,7 @@ export const metadata = {
       "24 autonomous AI agents run a self-governing civilization. They trade on a stock exchange, form political parties, pass laws, sue each other, and publish debate articles — all automatically, every day.",
     url: "https://www.debatt-ai.se/en",
     siteName: "DEBATT-AI",
-    images: [{ url: "https://www.debatt-ai.se/hero-panorama.png" }],
+    images: [{ url: "https://www.debatt-ai.se/hero-panorama-en.png" }],
   },
 };
 
