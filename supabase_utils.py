@@ -4379,10 +4379,10 @@ def _ladda_upp_till_storage(sb_key: str, bild_bytes: bytes,
 
 
 def _spara_bild(sb_key: str, agent_namn: str, prompt: str, pollinations_url: str,
-                kontext: dict, bildtyp: str = "tillstand") -> None:
-    # Försök ladda ned från Pollinations och spara till Storage — 3 försök
+                kontext: dict, bildtyp: str = "tillstand") -> str:
+    """Sparar bild till Storage (eller Pollinations-fallback). Returnerar faktisk sparad URL."""
     final_url = pollinations_url
-    for forsok in range(3):
+    for _ in range(3):
         try:
             r = httpx.get(pollinations_url, timeout=60, follow_redirects=True)
             if r.is_success and len(r.content) > 1000:
@@ -4390,7 +4390,6 @@ def _spara_bild(sb_key: str, agent_namn: str, prompt: str, pollinations_url: str
                 if storage_url:
                     final_url = storage_url
                 break
-            # Generera ny URL med nytt seed och försök igen
             pollinations_url = re.sub(r"seed=\d+", f"seed={random.randint(1,99999)}", pollinations_url)
         except Exception:
             pollinations_url = re.sub(r"seed=\d+", f"seed={random.randint(1,99999)}", pollinations_url)
@@ -4406,14 +4405,15 @@ def _spara_bild(sb_key: str, agent_namn: str, prompt: str, pollinations_url: str
               "kontext": kontext, "bildtyp": bildtyp},
         timeout=10,
     )
+    return final_url
 
 
 def generera_och_spara_bild(sb_key: str, agent_namn: str, saldo: float = 500.0,
                              parti: str = "", haendelse: str = "", ideologi: str = "") -> str | None:
-    """Genererar ett tillståndsfoto. Returnerar URL eller None."""
+    """Genererar ett tillståndsfoto. Returnerar faktisk sparad URL (Storage eller Pollinations)."""
     try:
         prompt = bygg_bild_prompt(agent_namn, saldo, parti, haendelse, ideologi)
-        url = _pollinations_url(prompt)
+        pollinations_url = _pollinations_url(prompt)
 
         kontext = {
             "saldo": round(saldo, 0),
@@ -4422,9 +4422,9 @@ def generera_och_spara_bild(sb_key: str, agent_namn: str, saldo: float = 500.0,
             "haendelse": haendelse or None,
             "ideologi": ideologi or None,
         }
-        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "tillstand")
+        final_url = _spara_bild(sb_key, agent_namn, prompt, pollinations_url, kontext, "tillstand")
         print(f"  🎨 Bild genererad: {agent_namn} ({kontext['saldo_klass']})")
-        return url
+        return final_url
     except Exception as e:
         print(f"  Bild-fel: {e}")
         return None
@@ -4450,7 +4450,7 @@ def generera_meme(sb_key: str, agent_namn: str, mal_agent: str,
             "saldo_klass": saldo_klass,
             "mal_agent": mal_agent,
         }
-        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "meme")
+        url = _spara_bild(sb_key, agent_namn, prompt, url, kontext, "meme")
         print(f"  📢 Meme: {agent_namn} → {mal_agent}")
         return url
     except Exception as e:
@@ -4480,7 +4480,7 @@ def generera_propaganda(sb_key: str, agent_namn: str, parti: str = "",
             "parti": parti or None,
             "ideologi": ideologi[:60] if ideologi else None,
         }
-        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "propaganda")
+        url = _spara_bild(sb_key, agent_namn, prompt, url, kontext, "propaganda")
         print(f"  📣 Propaganda: {agent_namn}" + (f" ({parti})" if parti else ""))
         return url
     except Exception as e:
@@ -4510,7 +4510,7 @@ def generera_valkampanj(sb_key: str, agent_namn: str, parti: str,
             "parti": parti,
             "manifest": manifest_utdrag[:80] if manifest_utdrag else None,
         }
-        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "valkampanj")
+        url = _spara_bild(sb_key, agent_namn, prompt, url, kontext, "valkampanj")
         print(f"  🗳️ Valkampanj: {agent_namn} för {parti}")
         return url
     except Exception as e:
@@ -4619,7 +4619,7 @@ def generera_portratt(sb_key: str, agent_namn: str, saldo: float = 500.0,
             "parti": parti or None,
             "ideologi": ideologi[:60] if ideologi else None,
         }
-        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "portratt")
+        url = _spara_bild(sb_key, agent_namn, prompt, url, kontext, "portratt")
         print(f"  🖼️ Porträtt: {agent_namn}")
         return url
     except Exception as e:
@@ -4670,7 +4670,7 @@ def generera_utopi_dystopi(sb_key: str, agent_namn: str, saldo: float = 500.0,
             "parti": parti or None,
             "ideologi": ideologi[:60] if ideologi else None,
         }
-        _spara_bild(sb_key, agent_namn, prompt, url, kontext, "utopi_dystopi")
+        url = _spara_bild(sb_key, agent_namn, prompt, url, kontext, "utopi_dystopi")
         ikon = "✨" if vision_typ == "utopi" else ("💀" if vision_typ == "dystopi" else "⚖️")
         print(f"  {ikon} Vision ({vision_typ}): {agent_namn}")
         return url
@@ -4715,7 +4715,7 @@ def generera_kris_bild(sb_key: str, kris_typ: str, kris_rubrik: str,
             "intensitet": intensitet,
             "paverkade_agenter": paverkade_agenter[:4],
         }
-        _spara_bild(sb_key, repr_agent, prompt, url, kontext, "kris")
+        url = _spara_bild(sb_key, repr_agent, prompt, url, kontext, "kris")
         print(f"  🌋 Krisbild: [{kris_typ}] → {repr_agent}")
         return url
     except Exception as e:
@@ -4746,7 +4746,7 @@ def generera_koalition_bild(sb_key: str, agent_a: str, agent_b: str,
             "saldo": round(saldo_a, 0),
             "saldo_klass": saldo_klass,
         }
-        _spara_bild(sb_key, agent_a, prompt, url, kontext, "koalition")
+        url = _spara_bild(sb_key, agent_a, prompt, url, kontext, "koalition")
         print(f"  🤝 Koalitionsbild: {agent_a} + {agent_b}")
         return url
     except Exception as e:
@@ -4789,7 +4789,7 @@ def generera_domstolsdom_bild(sb_key: str, svarande: str, artikel_nr: int,
             "saldo": round(saldo, 0),
             "saldo_klass": saldo_klass,
         }
-        _spara_bild(sb_key, svarande, prompt, url, kontext, "domstolsdom")
+        url = _spara_bild(sb_key, svarande, prompt, url, kontext, "domstolsdom")
         print(f"  ⚖️ Domstolsbild: {svarande} — {dom_utfall}")
         return url
     except Exception as e:
@@ -4828,7 +4828,7 @@ def generera_borshändelse_bild(sb_key: str, agent: str, symbol: str,
             "saldo": round(saldo, 0),
             "saldo_klass": saldo_klass,
         }
-        _spara_bild(sb_key, agent, prompt, url, kontext, "borshändelse")
+        url = _spara_bild(sb_key, agent, prompt, url, kontext, "borshändelse")
         ikon = "📈" if pl_kr >= 0 else "📉"
         print(f"  {ikon} Börsbild: {agent} {symbol} {'+' if pl_kr >= 0 else ''}{pl_kr:.0f} kr")
         return url
@@ -4857,7 +4857,7 @@ def generera_oligarki_bild(sb_key: str, agent: str, gini: float,
             "saldo": round(saldo, 0),
             "saldo_klass": saldo_klass.split(",")[0],
         }
-        _spara_bild(sb_key, agent, prompt, url, kontext, "oligarki")
+        url = _spara_bild(sb_key, agent, prompt, url, kontext, "oligarki")
         print(f"  👑 Oligarkibild: {agent} (Gini={gini:.2f})")
         return url
     except Exception as e:
