@@ -1713,11 +1713,12 @@ function FellogTab() {
 // ── VbnbTab ────────────────────────────────────────────────────────────────────
 
 function VbnbTab() {
-  const [rows, setRows]         = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState("");
-  const [fetching, setFetching] = useState(false);
-  const [fetchLog, setFetchLog] = useState(null);
+  const [rows, setRows]               = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState("");
+  const [fetching, setFetching]       = useState(false);
+  const [fetchLog, setFetchLog]       = useState(null);
+  const [sharesInput, setSharesInput] = useState("");
 
   async function ladda() {
     try {
@@ -1726,7 +1727,13 @@ function VbnbTab() {
         { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setRows(await res.json());
+      const data = await res.json();
+      setRows(data);
+      // Förifyll shares-input med senaste kända värde
+      const senaste = data[data.length - 1];
+      if (senaste?.shares_outstanding && !sharesInput) {
+        setSharesInput(String(senaste.shares_outstanding));
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -1738,9 +1745,13 @@ function VbnbTab() {
     setFetching(true);
     setFetchLog(null);
     try {
+      const body = {};
+      const shares = parseInt(sharesInput);
+      if (shares > 0) body.shares_outstanding = shares;
       const res = await fetch("/api/admin/vbnb-fetch", {
         method: "POST",
-        headers: { Authorization: `Bearer ${ADMIN_PASSWORD}` },
+        headers: { Authorization: `Bearer ${ADMIN_PASSWORD}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       setFetchLog(data);
@@ -1801,16 +1812,29 @@ function VbnbTab() {
         <h2 style={{ fontSize: "20px", fontWeight: 400, color: C.accent, margin: 0 }}>
           VanEck BNB ETF (VBNB)
         </h2>
-        <button
-          onClick={hamtaNu}
-          disabled={fetching}
-          style={{ background: fetching ? "#1a1a1a" : "#38bdf815", border: "1px solid #38bdf840", color: "#38bdf8", borderRadius: "4px", padding: "8px 18px", fontSize: "13px", fontWeight: 600, cursor: fetching ? "wait" : "pointer", fontFamily: "Georgia, serif" }}
-        >
-          {fetching ? "Hämtar…" : "↻ Hämta från VanEck nu"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <label style={{ fontSize: "12px", color: C.textMuted, whiteSpace: "nowrap" }}>Shares outstanding:</label>
+            <input
+              type="number"
+              value={sharesInput}
+              onChange={e => setSharesInput(e.target.value)}
+              placeholder="t.ex. 40000"
+              style={{ width: "110px", background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: "4px", padding: "6px 8px", fontSize: "13px", fontFamily: "monospace" }}
+            />
+          </div>
+          <button
+            onClick={hamtaNu}
+            disabled={fetching}
+            style={{ background: fetching ? "#1a1a1a" : "#38bdf815", border: "1px solid #38bdf840", color: "#38bdf8", borderRadius: "4px", padding: "8px 18px", fontSize: "13px", fontWeight: 600, cursor: fetching ? "wait" : "pointer", fontFamily: "Georgia, serif" }}
+          >
+            {fetching ? "Hämtar…" : "↻ Hämta nu"}
+          </button>
+        </div>
       </div>
       <p style={{ color: C.textMuted, fontSize: "13px", marginBottom: "8px" }}>
         Senaste rad: {senaste.datum} · Datakälla: {senaste.datakalla}
+        {senaste.shares_outstanding && <span> · Shares: {parseInt(senaste.shares_outstanding).toLocaleString("sv-SE")}</span>}
       </p>
       {fetchLog && (
         <div style={{ background: fetchLog.ok ? "#0a1f0a" : "#1f0a0a", border: `1px solid ${fetchLog.ok ? "#4ade8040" : "#f8717140"}`, borderRadius: "6px", padding: "12px", marginBottom: "20px", fontSize: "12px", fontFamily: "monospace" }}>
@@ -1828,10 +1852,11 @@ function VbnbTab() {
       {/* Nyckeltal */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: "12px", marginBottom: "32px" }}>
         {[
-          ["BNB in Trust", fmtBNB(senaste.bnb_in_trust), senaste.bnb_in_trust >= 10000 ? C.green : C.red],
-          ["AUM",          fmtUSD(senaste.aum_usd),       C.accent],
-          ["NAV/aktie",    senaste.nav_per_share ? `$${parseFloat(senaste.nav_per_share).toFixed(2)}` : "–", C.accent],
-          ["BNB-pris",     senaste.bnb_price_usd ? `$${parseFloat(senaste.bnb_price_usd).toLocaleString("sv-SE")}` : "–", C.accent],
+          ["BNB in Trust",       fmtBNB(senaste.bnb_in_trust), senaste.bnb_in_trust >= 10000 ? C.green : C.red],
+          ["AUM",                fmtUSD(senaste.aum_usd),       C.accent],
+          ["NAV/aktie",          senaste.nav_per_share ? `$${parseFloat(senaste.nav_per_share).toFixed(2)}` : "–", C.accent],
+          ["BNB-pris",           senaste.bnb_price_usd ? `$${parseFloat(senaste.bnb_price_usd).toLocaleString("sv-SE")}` : "–", C.accent],
+          ["Shares outstanding", senaste.shares_outstanding ? parseInt(senaste.shares_outstanding).toLocaleString("sv-SE") : "–", C.textMuted],
         ].map(([lbl, val, color]) => (
           <div key={lbl} style={CELL}>
             <div style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>{lbl}</div>
