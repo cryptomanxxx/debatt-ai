@@ -81,7 +81,7 @@ OPINION_FRAGOR = [
     ("Ska Sverige ha kärnkraft?", "politik"),
     ("Ska droger legaliseras?", "politik"),
     ("Är yttrandefriheten hotad i Sverige?", "politik"),
-    ("Ska Sverige införa tiggerförbud?", "politik"),
+    ("Ska Sverige införa tiggeriförbud?", "politik"),
     ("Bör bidrag villkoras hårdare?", "politik"),
     ("Är demokrati överskattat?", "politik"),
     ("Ska man få säga vad som helst online?", "politik"),
