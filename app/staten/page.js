@@ -82,13 +82,24 @@ function fmtDateTime(iso) {
   });
 }
 
+// ─── Policy levels (mirrors inflation.py) ────────────────────────────────────
+function policyFranGini(gini) {
+  if (gini === null || gini === undefined || gini < 0.4) {
+    return { niva: "låg", skattesats: 0.01, skattetroskel: 1200, bailoutTroskel: 100, namnFarg: "#4ade80", nivaNamn: "LÅG OJÄMLIKHET" };
+  } else if (gini < 0.6) {
+    return { niva: "medel", skattesats: 0.02, skattetroskel: 1000, bailoutTroskel: 150, namnFarg: "#facc15", nivaNamn: "MÅTTLIG OJÄMLIKHET" };
+  } else {
+    return { niva: "hög", skattesats: 0.03, skattetroskel: 800, bailoutTroskel: 250, namnFarg: "#f87171", nivaNamn: "HÖG OJÄMLIKHET" };
+  }
+}
+
 // ─── Data fetching ────────────────────────────────────────────────────────────
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { statskassa: null, agenter: [], budgetLog: [], domar: [] };
+  if (!key) return { statskassa: null, agenter: [], budgetLog: [], domar: [], giniRows: [] };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [skRes, agRes, logRes, domRes] = await Promise.all([
+  const [skRes, agRes, logRes, domRes, giniRes] = await Promise.all([
     fetch(
       `${SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo`,
       { headers: h, next: { revalidate: 120 } }
@@ -105,6 +116,10 @@ async function getData() {
       `${SB_URL}/rest/v1/domstol_domar?select=svarand,bote,skapad&order=skapad.desc&limit=20`,
       { headers: h, next: { revalidate: 120 } }
     ),
+    fetch(
+      `${SB_URL}/rest/v1/oligarki_historik?select=datum,gini,mobilitet,topp3_andel&order=datum.desc&limit=8`,
+      { headers: h, next: { revalidate: 120 } }
+    ),
   ]);
 
   return {
@@ -112,12 +127,13 @@ async function getData() {
     agenter:    agRes.ok  ? await agRes.json()              : [],
     budgetLog:  logRes.ok ? await logRes.json()             : [],
     domar:      domRes.ok ? await domRes.json()             : [],
+    giniRows:   giniRes.ok ? await giniRes.json()           : [],
   };
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default async function StatenPage() {
-  const { statskassa, agenter, budgetLog, domar } = await getData();
+  const { statskassa, agenter, budgetLog, domar, giniRows } = await getData();
 
   const currentWeek = isoWeek();
   const recentWeeks = lastNWeeks(4);
@@ -144,9 +160,9 @@ export default async function StatenPage() {
     return { vecka, skatt, grundinkomst, bailout, bot, sparranta, net, hasData: rows.length > 0 };
   });
 
-  // Top taxpayers: agents with saldo > 1000 kr
+  // Top taxpayers: agents with saldo > current policy threshold
   const taxpayers = agenter
-    .filter(a => parseFloat(a.saldo) > 1000)
+    .filter(a => parseFloat(a.saldo) > policy.skattetroskel)
     .slice(0, 10);
 
   // Last 20 budget log entries
@@ -156,6 +172,22 @@ export default async function StatenPage() {
   const senasteBoter = domar.slice(0, 10);
 
   const statskassaSaldo = parseFloat(statskassa?.saldo || 0);
+
+  // ── Gini & policy ──
+  const senastGini   = giniRows.length > 0 ? parseFloat(giniRows[0].gini)           : null;
+  const foregaendeGini = giniRows.length > 1 ? parseFloat(giniRows[giniRows.length - 1].gini) : null;
+  const giniDelta    = (senastGini !== null && foregaendeGini !== null) ? senastGini - foregaendeGini : null;
+  const senastMobilitet = giniRows.length > 0 ? parseFloat(giniRows[0].mobilitet ?? 0) : null;
+  const senastTopp3  = giniRows.length > 0 ? parseFloat(giniRows[0].topp3_andel ?? 0) : null;
+  const policy       = policyFranGini(senastGini);
+  // Progress bar: Gini target 0.40 — how close are we?
+  const giniPct      = senastGini !== null ? Math.min(100, Math.round((senastGini / 0.8) * 100)) : null;
+  const giniTargetPct = Math.round((0.4 / 0.8) * 100); // = 50%
+
+  // Wealth stats
+  const totalFormogehet = agenter.reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
+  const top3Saldo = agenter.slice(0, 3).reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
+  const top3Andel = totalFormogehet > 0 ? Math.round((top3Saldo / totalFormogehet) * 100) : 0;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "40px 16px 80px", fontFamily: "Georgia, serif" }}>
@@ -180,8 +212,113 @@ export default async function StatenPage() {
             margin: 0, fontFamily: "Georgia, serif",
           }}>
             Skatteintäkter, grundinkomst och statsbudgetens kretslopp.{" "}
-            2% förmögenhetsskatt på saldo &gt; 1 000 kr omfördelas automatiskt varje vecka.
+            Skattesats och bailout-tröskel justeras automatiskt baserat på Gini-koefficienten.
           </p>
+        </div>
+
+        {/* ── Ojämlikhetsbarometer ── */}
+        <div style={{
+          background: C.surface, border: `1px solid #1a0a2a`,
+          borderRadius: 10, padding: 24, marginBottom: 32,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 20, flexWrap: "wrap", gap: 8 }}>
+            <h2 style={{
+              fontSize: 11, color: C.purple, fontFamily: "monospace",
+              textTransform: "uppercase", letterSpacing: "0.1em", margin: 0,
+            }}>
+              Statens uppdrag: Sänk Gini under 0.40
+            </h2>
+            {senastGini !== null && (
+              <span style={{
+                fontSize: 11, fontFamily: "monospace",
+                color: policy.namnFarg, letterSpacing: "0.08em",
+                background: policy.niva === "hög" ? "#220000" : policy.niva === "medel" ? "#2a2000" : "#0a2010",
+                padding: "2px 8px", borderRadius: 4,
+              }}>
+                {policy.nivaNamn}
+              </span>
+            )}
+          </div>
+
+          {senastGini === null ? (
+            <p style={{ color: C.muted, fontSize: 13, fontFamily: "monospace" }}>
+              Ingen Gini-data ännu — kör oligarki-snapshot för att fylla oligarki_historik.
+            </p>
+          ) : (
+            <>
+              {/* Gini progress bar */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 12, color: C.dim, fontFamily: "monospace" }}>
+                    Gini: <strong style={{ color: policy.namnFarg }}>{senastGini.toFixed(3)}</strong>
+                    {giniDelta !== null && (
+                      <span style={{
+                        marginLeft: 8, fontSize: 11,
+                        color: giniDelta > 0.005 ? C.red : giniDelta < -0.005 ? C.green : C.muted,
+                      }}>
+                        {giniDelta > 0 ? "▲" : "▼"} {Math.abs(giniDelta).toFixed(3)} vs ~7 dagar sedan
+                      </span>
+                    )}
+                  </span>
+                  <span style={{ fontSize: 11, color: C.muted, fontFamily: "monospace" }}>
+                    Mål: 0.40
+                  </span>
+                </div>
+                <div style={{ height: 8, background: "#1a1a1a", borderRadius: 4, overflow: "hidden", position: "relative" }}>
+                  {/* Target marker */}
+                  <div style={{
+                    position: "absolute", left: `${giniTargetPct}%`, top: 0, bottom: 0,
+                    width: 2, background: C.green, opacity: 0.6,
+                  }} />
+                  {/* Current level */}
+                  <div style={{
+                    height: "100%", borderRadius: 4,
+                    width: `${giniPct}%`,
+                    background: policy.niva === "hög"
+                      ? `linear-gradient(90deg, ${C.yellow}80, ${C.red})`
+                      : policy.niva === "medel"
+                      ? `linear-gradient(90deg, ${C.green}80, ${C.yellow})`
+                      : `linear-gradient(90deg, ${C.green}60, ${C.green})`,
+                    transition: "width 0.3s",
+                  }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                  <span style={{ fontSize: 9, color: C.muted, fontFamily: "monospace" }}>0.00 (perfekt jämlikhet)</span>
+                  <span style={{ fontSize: 9, color: C.green, fontFamily: "monospace" }}>← mål 0.40</span>
+                  <span style={{ fontSize: 9, color: C.muted, fontFamily: "monospace" }}>0.80 (extrem ojämlikhet)</span>
+                </div>
+              </div>
+
+              {/* Policy parameters + wealth stats */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
+                {[
+                  { label: "Skattetröskel",   value: `${policy.skattetroskel} kr`,        farg: C.yellow,  desc: "Saldo för att betala skatt" },
+                  { label: "Skattesats",       value: `${policy.skattesats * 100}%`,       farg: C.yellow,  desc: "Procent på överskott/vecka" },
+                  { label: "Bailout-tröskel",  value: `${policy.bailoutTroskel} kr`,       farg: C.cyan,    desc: "Saldo som ger automatisk räddning" },
+                  { label: "Topp-3 andel",     value: senastTopp3 ? `${(senastTopp3 * 100).toFixed(1)}%` : `${top3Andel}%`, farg: C.purple, desc: "Av total förmögenhet" },
+                  { label: "Total förmögenhet",value: `${Math.round(totalFormogehet)} kr`, farg: C.text,    desc: "Alla 24 agenters saldo" },
+                  senastMobilitet !== null
+                    ? { label: "Social mobilitet", value: `${(senastMobilitet * 100).toFixed(0)}%`, farg: senastMobilitet > 0.5 ? C.green : senastMobilitet > 0.25 ? C.yellow : C.red, desc: "0% = låst system" }
+                    : null,
+                ].filter(Boolean).map(item => (
+                  <div key={item.label} style={{
+                    background: C.bg, border: `1px solid ${C.border}`,
+                    borderRadius: 8, padding: "12px 14px",
+                  }}>
+                    <div style={{ fontSize: 9, color: C.muted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
+                      {item.label}
+                    </div>
+                    <div style={{ fontSize: 20, color: item.farg, fontFamily: "monospace", fontWeight: 700, lineHeight: 1.1, marginBottom: 4 }}>
+                      {item.value}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.muted, fontFamily: "monospace" }}>
+                      {item.desc}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Three key metric cards ── */}
@@ -340,23 +477,23 @@ export default async function StatenPage() {
               fontSize: 11, color: C.yellow, fontFamily: "monospace",
               textTransform: "uppercase", letterSpacing: "0.1em", margin: 0,
             }}>
-              Skattebetalare — saldo &gt; 1 000 kr
+              Skattebetalare — saldo &gt; {policy.skattetroskel} kr
             </h2>
             <span style={{ fontSize: 11, color: C.muted, fontFamily: "monospace" }}>
-              2% veckovis på överskott
+              {policy.skattesats * 100}% veckovis på överskott
             </span>
           </div>
 
           {taxpayers.length === 0 ? (
             <p style={{ color: C.muted, fontSize: 13, fontFamily: "monospace" }}>
-              Ingen agent har saldo över 1 000 kr ännu.
+              Ingen agent har saldo över {policy.skattetroskel} kr ännu.
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {taxpayers.map((agent, i) => {
                 const saldo    = parseFloat(agent.saldo);
-                const taxBase  = saldo - 1000;
-                const taxEst   = Math.ceil(taxBase * 0.02);
+                const taxBase  = saldo - policy.skattetroskel;
+                const taxEst   = Math.ceil(taxBase * policy.skattesats);
                 const av       = agentVisuell(agent.agent);
                 const maxSaldo = parseFloat(taxpayers[0].saldo);
                 const barPct   = Math.round((saldo / maxSaldo) * 100);
@@ -430,7 +567,7 @@ export default async function StatenPage() {
             marginTop: 14, margin: "14px 0 0",
             borderTop: `1px solid ${C.border}`, paddingTop: 12,
           }}>
-            Skattebasen beräknas på saldo minus 1 000 kr. Agenter under gränsen betalar ingen skatt.
+            Skattebasen beräknas på saldo minus {policy.skattetroskel} kr. Gini-driven policy — tröskel och sats justeras automatiskt varje söndag.
             Böter från domstolen tillkommer ovanpå skatteintäkterna.
           </p>
         </div>
@@ -595,7 +732,7 @@ export default async function StatenPage() {
                 ikon: "⚖",
                 rubrik: "Förmögenhetsskatt",
                 farg: C.yellow,
-                text: "2% per vecka på saldo över 1 000 kr. Dras automatiskt av inflation.py varje söndag.",
+                text: `${policy.skattesats * 100}% per vecka på saldo över ${policy.skattetroskel} kr. Dras automatiskt av inflation.py varje söndag. Nivå justeras efter Gini.`,
               },
               {
                 ikon: "🏛",
@@ -613,7 +750,7 @@ export default async function StatenPage() {
                 ikon: "🆘",
                 rubrik: "Bailout",
                 farg: C.cyan,
-                text: "Agent med saldo under 100 kr får automatisk bailout på 500 kr. Loggat som bailout i budgeten.",
+                text: `Agent med saldo under ${policy.bailoutTroskel} kr får automatisk bailout på 500 kr. Tröskel justeras efter Gini-nivå.`,
               },
               {
                 ikon: "📈",
