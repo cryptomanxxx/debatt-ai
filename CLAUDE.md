@@ -1446,7 +1446,7 @@ Varje söndag läser `inflation.py` den senaste Gini-koefficienten från `oligar
 | > 0.60 | 3% | 800 kr | 250 kr | HÖG OJÄMLIKHET |
 
 **Mekanik:**
-- `hamta_gini_historik()` hämtar senaste 8 Gini-snapshots. Om tabellen saknas returneras `None` → policy defaultar till "medel"-nivå (fail-open).
+- `hamta_gini_historik()` hämtar senaste 8 Gini-snapshots. Om tabellen saknas returneras `None` → policy defaultar till "låg"-nivå (1% skatt, 1 200 kr tröskel, 100 kr bailout) — `None` behandlas identiskt med `gini < 0.4`.
 - `berakna_policy_niva(gini)` mappar Gini → nivå-nyckel.
 - Om nivån ändras sedan föregående körning loggas ett `triumf`/`skandal`-minne i `civilisations_minne` med gammal vs ny policy i klartext.
 
