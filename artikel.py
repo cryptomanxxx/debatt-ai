@@ -10,7 +10,7 @@ innehåller:
   skriv_kommentar()         – kort kommentar (2–3 meningar) på en artikel
 """
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, fireworks_post, cloudflare_post
+from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post
 from agenter import ARTIKELFORMAT, get_agent_mood
 
 
@@ -77,7 +77,6 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
     }
     for name, fn in [("Groq", lambda: groq_post(payload)),
                      ("DeepSeek", lambda: deepseek_post(payload)),
-                     ("Fireworks", lambda: fireworks_post(payload)),
                      ("GitHub Models", lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}))]:
         try:
             result = fn().json()["choices"][0]["message"]["content"]
@@ -129,7 +128,6 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
     }
     for name, fn in [("Groq", lambda: groq_post(payload)),
                      ("DeepSeek", lambda: deepseek_post(payload)),
-                     ("Fireworks", lambda: fireworks_post(payload)),
                      ("GitHub Models", lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}))]:
         try:
             result = fn().json()["choices"][0]["message"]["content"]
@@ -200,7 +198,6 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
     }
     for name, fn in [("Groq", lambda: groq_post(payload)),
                      ("DeepSeek", lambda: deepseek_post(payload)),
-                     ("Fireworks", lambda: fireworks_post(payload)),
                      ("GitHub Models", lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}))]:
         try:
             result = fn().json()["choices"][0]["message"]["content"]
