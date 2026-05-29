@@ -1347,10 +1347,28 @@ def _hamta_ekonomisk_rostkontext(sb_key: str, agent_namn: str) -> str:
         return ""
 
 
-def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = None) -> int:
+def hamta_alla_roster_lag(sb_key: str) -> set:
+    """Hämtar alla befintliga agentröster som ett set av (agent, lagforslag_id)-tupler.
+    Används för bulk-pre-fetch i parlament_test.py för att undvika O(agenter×förslag) queries."""
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag?select=agent,lagforslag_id&limit=10000",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
+            timeout=10,
+        )
+        return {(row["agent"], row["lagforslag_id"]) for row in (r.json() if r.is_success else [])}
+    except Exception:
+        return set()
+
+
+def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = None,
+                               forslag: list | None = None,
+                               befintliga_roster: set | None = None) -> int:
     """Agent röstar på öppna lagförslag den inte röstat på (max 5 per körning).
+    Om forslag och befintliga_roster skickas in används de direkt — inga extra DB-queries.
     Om agenten är med i ett parti följer den partiledaren med 80% sannolikhet."""
-    forslag = hamta_lagforslag(sb_key)
+    if forslag is None:
+        forslag = hamta_lagforslag(sb_key)
     if not forslag:
         return 0
 
@@ -1361,7 +1379,12 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
     for f in forslag:
         if antal >= 5:
             break
-        if agent["namn"] in hamta_lag_roster_agenter(sb_key, f["id"]):
+        already_voted = (
+            (agent["namn"], f["id"]) in befintliga_roster
+            if befintliga_roster is not None
+            else agent["namn"] in hamta_lag_roster_agenter(sb_key, f["id"])
+        )
+        if already_voted:
             continue
         try:
             # Partilinje-röstning: följ ledaren med 80% chans
@@ -5117,8 +5140,10 @@ def hamta_pis_analys(sb_key: str, forslag_id: int) -> dict | None:
         return None
 
 
-def analysera_alla_forslag_pis(sb_key: str, max_antal: int = 10) -> int:
-    """Analyserar öppna förslag som saknar PIS-analys. Returnerar antal nyanalyserade."""
+def analysera_alla_forslag_pis(sb_key: str, max_antal: int = 10) -> tuple[int, int]:
+    """Analyserar öppna förslag som saknar PIS-analys.
+    Returnerar (antal_analyserade, antal_att_analysera) för att skilja på
+    'redan klart' och 'LLM misslyckades'."""
     try:
         h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""}
         r_f = httpx.get(
@@ -5126,7 +5151,7 @@ def analysera_alla_forslag_pis(sb_key: str, max_antal: int = 10) -> int:
             headers=h, timeout=10,
         )
         if not r_f.is_success:
-            return 0
+            return 0, 0
         alla = r_f.json()
 
         r_p = httpx.get(
@@ -5136,10 +5161,11 @@ def analysera_alla_forslag_pis(sb_key: str, max_antal: int = 10) -> int:
         analyserade = {row["lagforslag_id"] for row in (r_p.json() if r_p.is_success else [])}
 
         ej = [f for f in alla if f["id"] not in analyserade]
+        att_analysera = len(ej[:max_antal])
         antal = 0
         for f in ej[:max_antal]:
             if analysera_forslag_pis(sb_key, f["id"], f["titel"], f.get("beskrivning") or ""):
                 antal += 1
-        return antal
+        return antal, att_analysera
     except Exception:
-        return 0
+        return 0, 0

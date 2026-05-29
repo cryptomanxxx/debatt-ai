@@ -1,9 +1,8 @@
 """
-Kör parlamentsröstning för ALLA agenter direkt.
-Ingen artikelpublicering — bara för att kickstarta AI-Parlamentet.
+Kör parlamentsröstning för ALLA agenter.
 
-Alla 24 agenter röstar på alla öppna lagförslag de inte röstat på ännu.
-Analytiker-agenter kan dessutom skapa ett nytt lagförslag.
+Optimerad: pre-fetchas alla befintliga röster i en enda query i början,
+så att agenter som redan röstat på allt hoppas över utan extra DB-anrop.
 """
 import os
 import sys
@@ -13,9 +12,11 @@ from supabase_utils import (
     rösta_på_lagforslag_block,
     skapa_lagforslag_ai,
     hamta_lagforslag,
+    hamta_alla_roster_lag,
     importera_riksdagen_forslag,
     uppdatera_riksdagen_utfall,
     analysera_alla_forslag_pis,
+    hamta_agent_parti,
 )
 from agent import AGENTER, ANALYTIKER
 
@@ -25,42 +26,62 @@ if not SB_KEY:
     print("SUPABASE_ANON_KEY saknas", file=sys.stderr)
     sys.exit(1)
 
-# Importera nya propositioner från riksdagen.se (deduplicering inbyggd)
+# Importera nya propositioner från riksdagen.se
 print("── Importerar från riksdagen.se ──")
 importerade = importera_riksdagen_forslag(SB_KEY)
-if importerade:
-    print(f"  ✓ {importerade} nya propositioner importerade")
-else:
-    print("  – Inga nya propositioner")
+print(f"  {'✓ ' + str(importerade) + ' nya propositioner importerade' if importerade else '– Inga nya propositioner'}")
 
 # Uppdatera utfall på avgjorda riksdagsförslag
 uppdaterade = uppdatera_riksdagen_utfall(SB_KEY)
 if uppdaterade:
-    print(f"  ✓ {uppdaterade} riksdagsförslag fick uppdaterat utfall\n")
+    print(f"  ✓ {uppdaterade} riksdagsförslag fick uppdaterat utfall")
 
 # PIS — analysera förslag som saknar ekonomisk analys
-print("── PIS: analyserar nya förslag ──")
-pis_nya = analysera_alla_forslag_pis(SB_KEY, max_antal=8)
-if pis_nya:
-    print(f"  ✓ {pis_nya} förslag fick PIS-analys")
-else:
+print("\n── PIS: analyserar nya förslag ──")
+pis_nya, pis_totalt = analysera_alla_forslag_pis(SB_KEY, max_antal=8)
+if pis_totalt == 0:
     print("  – Alla förslag är redan analyserade")
+elif pis_nya == 0:
+    print(f"  ✗ {pis_totalt} förslag saknar analys men LLM misslyckades — försöker igen nästa körning")
+else:
+    print(f"  ✓ {pis_nya}/{pis_totalt} förslag fick PIS-analys")
 
+# Pre-fetcha allt vi behöver för röstningen — EN query för alla röster
 forslag = hamta_lagforslag(SB_KEY)
-print(f"\n=== AI-Parlamentet testkörning ({len(AGENTER)} agenter, {len(forslag)} öppna förslag) ===\n")
+alle_roster = hamta_alla_roster_lag(SB_KEY)
+
+print(f"\n=== AI-Parlamentet ({len(AGENTER)} agenter, {len(forslag)} öppna förslag) ===\n")
 
 if not forslag:
-    print("Inga öppna lagförslag hittades — skapa förslag i admin eller vänta på nästa agent-körning.")
+    print("Inga öppna lagförslag — skapa förslag i admin eller vänta på nästa agent-körning.")
     sys.exit(0)
 
 for agent in AGENTER:
     namn = agent["namn"]
-    print(f"── {namn}: röstar ──")
-    antal = rösta_på_lagforslag_block(agent, SB_KEY)
+
+    # Filtrera bort förslag agenten redan röstat på — ingen extra DB-query
+    ej_rostade = [f for f in forslag if (namn, f["id"]) not in alle_roster]
+
+    if not ej_rostade:
+        print(f"── {namn}: redan röstat på allt ──")
+        continue
+
+    print(f"── {namn}: röstar på {len(ej_rostade)} förslag ──")
+    parti = hamta_agent_parti(SB_KEY, namn)
+    antal = rösta_på_lagforslag_block(
+        agent, SB_KEY,
+        parti=parti,
+        forslag=ej_rostade,
+        befintliga_roster=alle_roster,
+    )
     if antal:
         print(f"  ✓ Röstade på {antal} förslag")
+        # Uppdatera lokalt cache för att undvika dubbelröster inom samma körning
+        # (osannolikt men defensivt)
+        for f in ej_rostade[:antal]:
+            alle_roster.add((namn, f["id"]))
     else:
-        print(f"  – Inga nya förslag att rösta på")
+        print(f"  – Inga nya röster registrerade")
 
 # Analytiker kan skapa nya lagförslag
 print("\n── Skapar nya lagförslag ──")
