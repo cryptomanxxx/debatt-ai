@@ -666,8 +666,9 @@ export default async function StatenPage() {
                   const bote = parseFloat(dom.straff_belopp || 0);
                   return (
                     <div key={i} style={{
-                      display: "flex", alignItems: "center", gap: 10,
+                      display: "flex", alignItems: "center", gap: 8,
                       padding: "10px 0", borderBottom: `1px solid ${C.border}`,
+                      overflow: "hidden",
                     }}>
                       {/* Mini avatar */}
                       <div style={{
@@ -683,20 +684,21 @@ export default async function StatenPage() {
                       {/* Defendant */}
                       <a href={`/agent/${encodeURIComponent(svarand)}`} style={{
                         fontSize: 12, color: C.text, fontFamily: "Georgia, serif",
-                        textDecoration: "none", flex: 1,
+                        textDecoration: "none", flex: 1, minWidth: 0,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
                         {svarand || "—"}
                       </a>
 
-                      {/* Date */}
-                      <span style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", flexShrink: 0 }}>
-                        {fmtDate(dom.skapad)}
+                      {/* Date — compact */}
+                      <span style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", flexShrink: 0, whiteSpace: "nowrap" }}>
+                        {new Date(dom.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short" })}
                       </span>
 
                       {/* Fine */}
                       <span style={{
                         fontSize: 13, color: C.red, fontFamily: "monospace",
-                        fontWeight: 700, flexShrink: 0, minWidth: 56, textAlign: "right",
+                        fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap",
                       }}>
                         {fmtKr(bote)}
                       </span>
