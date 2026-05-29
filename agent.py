@@ -1073,7 +1073,7 @@ def main():
                 + relation_tillagg + drama_tillagg
             )
             fraga_payload = {
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": agent.get("system", "")[:600]},
                     {"role": "user", "content": fraga_prompt},
@@ -1097,7 +1097,7 @@ def main():
                 )
             )
             svar_payload = {
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": mottagare.get("system", "")[:600]},
                     {"role": "user", "content": svar_innehall},
@@ -1158,7 +1158,7 @@ def main():
                 f"Svara ENBART med frågan, inga inledningsfraser."
             )
             fraga_payload2 = {
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": agent.get("system", "")[:600]},
                     {"role": "user", "content": fraga_prompt2},
@@ -1174,7 +1174,7 @@ def main():
                 f"Svara kort och i karaktär (2–3 meningar)."
             )
             svar_payload2 = {
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": mottagare2.get("system", "")[:600]},
                     {"role": "user", "content": svar_innehall2},
