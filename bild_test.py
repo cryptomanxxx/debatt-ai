@@ -13,6 +13,7 @@ import argparse
 import os
 import random
 import sys
+import urllib.parse
 
 import httpx
 
@@ -28,6 +29,68 @@ from supabase_utils import (
 )
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
+
+# Minimal giltig JPEG (1×1 pixel, svart) för direkttest av Storage
+MINIMAL_JPEG = bytes([
+    0xFF,0xD8,0xFF,0xE0,0x00,0x10,0x4A,0x46,0x49,0x46,0x00,0x01,0x01,0x00,0x00,0x01,
+    0x00,0x01,0x00,0x00,0xFF,0xDB,0x00,0x43,0x00,0x08,0x06,0x06,0x07,0x06,0x05,0x08,
+    0x07,0x07,0x07,0x09,0x09,0x08,0x0A,0x0C,0x14,0x0D,0x0C,0x0B,0x0B,0x0C,0x19,0x12,
+    0x13,0x0F,0x14,0x1D,0x1A,0x1F,0x1E,0x1D,0x1A,0x1C,0x1C,0x20,0x24,0x2E,0x27,0x20,
+    0x22,0x2C,0x23,0x1C,0x1C,0x28,0x37,0x29,0x2C,0x30,0x31,0x34,0x34,0x34,0x1F,0x27,
+    0x39,0x3D,0x38,0x32,0x3C,0x2E,0x33,0x34,0x32,0xFF,0xC0,0x00,0x0B,0x08,0x00,0x01,
+    0x00,0x01,0x01,0x01,0x11,0x00,0xFF,0xC4,0x00,0x1F,0x00,0x00,0x01,0x05,0x01,0x01,
+    0x01,0x01,0x01,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x02,0x03,0x04,
+    0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0xFF,0xDA,0x00,0x08,0x01,0x01,0x00,0x00,0x3F,
+    0x00,0xFB,0xD3,0xFF,0xD9,
+])
+
+
+def testa_storage_direkt(sb_key: str) -> bool:
+    """Testar Storage-uppladdning direkt med minimal JPEG. Returnerar True om OK."""
+    print("\n── Storage-uppladdningstest ─────────────────────────────────")
+    filename = f"_test_{random.randint(10000,99999)}.jpg"
+    try:
+        r = httpx.put(
+            f"{SB_URL}/storage/v1/object/agent-bilder/{filename}",
+            headers={
+                "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                "Content-Type": "image/jpeg", "x-upsert": "true",
+            },
+            content=MINIMAL_JPEG, timeout=15,
+        )
+        if r.is_success:
+            pub_url = f"{SB_URL}/storage/v1/object/public/agent-bilder/{filename}"
+            print(f"  ✅ PUT lyckades (HTTP {r.status_code})")
+            print(f"  URL: {pub_url}")
+            httpx.delete(
+                f"{SB_URL}/storage/v1/object/agent-bilder/{filename}",
+                headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+                timeout=10,
+            )
+            return True
+        else:
+            print(f"  ✗ PUT misslyckades: HTTP {r.status_code}")
+            print(f"  Svar: {r.text[:400]}")
+            return False
+    except Exception as e:
+        print(f"  ✗ Exception: {e}")
+        return False
+
+
+def testa_pollinations_download(url: str) -> bool:
+    """Testar att Pollinations svarar med bilddata."""
+    print("\n── Pollinations download-test ───────────────────────────────")
+    try:
+        r = httpx.get(url, timeout=60, follow_redirects=True)
+        if r.is_success and len(r.content) > 1000:
+            print(f"  ✅ HTTP {r.status_code}, {len(r.content):,} bytes")
+            return True
+        else:
+            print(f"  ✗ HTTP {r.status_code}, {len(r.content)} bytes — för litet svar")
+            return False
+    except Exception as e:
+        print(f"  ✗ Timeout/fel: {e}")
+        return False
 
 
 def url_typ(url: str) -> str:
@@ -87,7 +150,16 @@ def main():
 
     print(f"  Saldo:    {saldo} kr")
     print(f"  Parti:    {parti_namn or '(inget)'}")
-    print(f"  Ideologi: {ideologi[:60] or '(ingen)'}\n")
+    print(f"  Ideologi: {ideologi[:60] or '(ingen)'}")
+
+    # ── Förtester ────────────────────────────────────────────────────────────
+    if not testa_storage_direkt(sb_key):
+        print("\n  ⛔ Storage fungerar INTE — avslutar.")
+        sys.exit(1)
+
+    test_url = "https://image.pollinations.ai/prompt/red%20circle?width=64&height=64&nologo=true&model=flux&seed=1"
+    testa_pollinations_download(test_url)
+    print()
 
     resultat = []
 
