@@ -4380,16 +4380,20 @@ def _ladda_upp_till_storage(sb_key: str, bild_bytes: bytes,
 
 def _spara_bild(sb_key: str, agent_namn: str, prompt: str, pollinations_url: str,
                 kontext: dict, bildtyp: str = "tillstand") -> None:
-    # Försök ladda ned från Pollinations och spara till Storage
+    # Försök ladda ned från Pollinations och spara till Storage — 3 försök
     final_url = pollinations_url
-    try:
-        r = httpx.get(pollinations_url, timeout=45, follow_redirects=True)
-        if r.is_success and r.content:
-            storage_url = _ladda_upp_till_storage(sb_key, r.content, agent_namn, bildtyp)
-            if storage_url:
-                final_url = storage_url
-    except Exception:
-        pass
+    for forsok in range(3):
+        try:
+            r = httpx.get(pollinations_url, timeout=60, follow_redirects=True)
+            if r.is_success and len(r.content) > 1000:
+                storage_url = _ladda_upp_till_storage(sb_key, r.content, agent_namn, bildtyp)
+                if storage_url:
+                    final_url = storage_url
+                break
+            # Generera ny URL med nytt seed och försök igen
+            pollinations_url = re.sub(r"seed=\d+", f"seed={random.randint(1,99999)}", pollinations_url)
+        except Exception:
+            pollinations_url = re.sub(r"seed=\d+", f"seed={random.randint(1,99999)}", pollinations_url)
 
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
