@@ -30,10 +30,13 @@ function dagensDatum() {
   return new Date().toISOString().slice(0, 10);
 }
 function isoVecka() {
-  const d = new Date();
-  const jan4 = new Date(d.getFullYear(), 0, 4);
-  const wk = Math.ceil(((d - jan4) / 86400000 + jan4.getDay() + 1) / 7);
-  return `${d.getFullYear()}-W${String(wk).padStart(2, "0")}`;
+  // Korrekt ISO 8601: vecka innehållande närmaste torsdag, vecka 1 = Jan 4
+  const date = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const wk = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+  return `${date.getUTCFullYear()}-W${String(wk).padStart(2, "0")}`;
 }
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
