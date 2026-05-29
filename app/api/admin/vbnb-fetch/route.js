@@ -119,12 +119,35 @@ async function sparaVbnbData(row) {
   throw new Error(`Supabase insert ${ins.status}: ${await ins.text()}`);
 }
 
+// ── Hämta senaste kända shares_outstanding från historiken ────────────────────
+async function hamtaSenasteShares() {
+  try {
+    const r = await fetch(
+      `${SB_URL}/rest/v1/vbnb_data?select=shares_outstanding&shares_outstanding=not.is.null&order=datum.desc&limit=1`,
+      { headers: sbHeaders() }
+    );
+    if (r.ok) {
+      const rows = await r.json();
+      if (rows?.[0]?.shares_outstanding) return parseInt(rows[0].shares_outstanding);
+    }
+  } catch {}
+  return null;
+}
+
 // ── POST /api/admin/vbnb-fetch ─────────────────────────────────────────────────
+// Body (valfri JSON): { shares_outstanding: 40000 }  — manuell override
 export async function POST(req) {
   const auth = req.headers.get("authorization") || "";
   if (auth.replace("Bearer ", "") !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: "Ej autentiserad" }, { status: 401 });
   }
+
+  // Valfri body med manuellt shares_outstanding
+  let manuellaShares = null;
+  try {
+    const body = await req.json();
+    if (body?.shares_outstanding) manuellaShares = parseInt(body.shares_outstanding);
+  } catch {}
 
   const datum = new Date().toISOString().slice(0, 10);
   const log = [`Datum: ${datum}`];
@@ -136,30 +159,41 @@ export async function POST(req) {
   // 2. VBNB-data från Yahoo Finance
   const yfData = await hamtaYahooData(log);
 
-  // 3. BNB in Trust = AUM / BNB-pris (om båda finns)
+  // 3. Shares outstanding — prioritet: manuell > Yahoo Finance > historik
+  let sharesOutstanding = manuellaShares ?? yfData.shares_outstanding ?? null;
+  if (!sharesOutstanding) {
+    sharesOutstanding = await hamtaSenasteShares();
+    if (sharesOutstanding) log.push(`Shares outstanding (historik): ${sharesOutstanding.toLocaleString()}`);
+  } else if (manuellaShares) {
+    log.push(`Shares outstanding (manuell): ${sharesOutstanding.toLocaleString()}`);
+  }
+
+  // 4. Beräkna BNB in Trust och AUM
   let bnbInTrust = null;
+  let aumUsd = yfData.aum_usd ?? null;
   let datakalla = "yfinance";
 
-  if (yfData.aum_usd && bnbPris && bnbPris > 0) {
-    bnbInTrust = yfData.aum_usd / bnbPris;
+  if (aumUsd && bnbPris && bnbPris > 0) {
+    bnbInTrust = aumUsd / bnbPris;
     datakalla = "beraknad";
-    log.push(`Beräknad BNB in Trust: ${bnbInTrust.toFixed(0)} (${yfData.aum_usd.toFixed(0)} / ${bnbPris.toFixed(2)})`);
-  } else if (yfData.shares_outstanding && yfData.nav_per_share && bnbPris && bnbPris > 0) {
-    // Alternativ: shares × (NAV/BNB-pris) = total BNB
-    bnbInTrust = yfData.shares_outstanding * (yfData.nav_per_share / bnbPris);
+    log.push(`BNB in Trust (AUM/pris): ${bnbInTrust.toFixed(0)}`);
+  } else if (sharesOutstanding && yfData.nav_per_share && bnbPris && bnbPris > 0) {
+    bnbInTrust = sharesOutstanding * (yfData.nav_per_share / bnbPris);
+    aumUsd = sharesOutstanding * yfData.nav_per_share;
     datakalla = "beraknad";
-    log.push(`Beräknad BNB in Trust: ${bnbInTrust.toFixed(0)} (aktier × NAV/BNB-pris)`);
+    log.push(`BNB in Trust (aktier×NAV/BNB): ${bnbInTrust.toFixed(0)}`);
+    log.push(`AUM (aktier×NAV): $${Math.round(aumUsd).toLocaleString()}`);
   } else {
-    log.push("BNB in Trust: kan inte beräknas (AUM och shares_outstanding saknas)");
+    log.push("BNB in Trust: kan inte beräknas (saknar shares_outstanding eller NAV)");
   }
 
   const row = {
     datum,
     bnb_in_trust:       bnbInTrust ? Math.round(bnbInTrust * 100) / 100 : null,
-    aum_usd:            yfData.aum_usd ? Math.round(yfData.aum_usd) : null,
+    aum_usd:            aumUsd ? Math.round(aumUsd) : null,
     nav_per_share:      yfData.nav_per_share ? Math.round(yfData.nav_per_share * 10000) / 10000 : null,
     bnb_price_usd:      bnbPris ? Math.round(bnbPris * 10000) / 10000 : null,
-    shares_outstanding: yfData.shares_outstanding ?? null,
+    shares_outstanding: sharesOutstanding ?? null,
     datakalla,
   };
 
@@ -178,7 +212,7 @@ export async function POST(req) {
 
   const status = bnbInTrust
     ? `BNB in Trust: ${Math.round(bnbInTrust).toLocaleString("sv-SE")} (${bnbInTrust >= 10000 ? "ÖVER" : "UNDER"} 10 000-gränsen)`
-    : "BNB in Trust: saknas — yfinance har inte totalAssets för VBNB ännu";
+    : "BNB in Trust: saknas — shares_outstanding behöver anges manuellt";
 
   return NextResponse.json({ ok: true, datum, row, status, log });
 }
