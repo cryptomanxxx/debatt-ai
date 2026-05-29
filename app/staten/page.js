@@ -160,6 +160,21 @@ export default async function StatenPage() {
     return { vecka, skatt, grundinkomst, bailout, bot, sparranta, net, hasData: rows.length > 0 };
   });
 
+  // ── Gini & policy (must be before taxpayers filter) ──
+  const senastGini     = giniRows.length > 0 ? parseFloat(giniRows[0].gini) : null;
+  const foregaendeGini = giniRows.length > 1 ? parseFloat(giniRows[giniRows.length - 1].gini) : null;
+  const giniDelta      = (senastGini !== null && foregaendeGini !== null) ? senastGini - foregaendeGini : null;
+  const senastMobilitet = giniRows.length > 0 ? parseFloat(giniRows[0].mobilitet ?? 0) : null;
+  const senastTopp3    = giniRows.length > 0 ? parseFloat(giniRows[0].topp3_andel ?? 0) : null;
+  const policy         = policyFranGini(senastGini);
+  const giniPct        = senastGini !== null ? Math.min(100, Math.round((senastGini / 0.8) * 100)) : null;
+  const giniTargetPct  = Math.round((0.4 / 0.8) * 100);
+
+  // Wealth stats
+  const totalFormogehet = agenter.reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
+  const top3Saldo = agenter.slice(0, 3).reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
+  const top3Andel = totalFormogehet > 0 ? Math.round((top3Saldo / totalFormogehet) * 100) : 0;
+
   // Top taxpayers: agents with saldo > current policy threshold
   const taxpayers = agenter
     .filter(a => parseFloat(a.saldo) > policy.skattetroskel)
@@ -172,22 +187,6 @@ export default async function StatenPage() {
   const senasteBoter = domar.slice(0, 10);
 
   const statskassaSaldo = parseFloat(statskassa?.saldo || 0);
-
-  // ── Gini & policy ──
-  const senastGini   = giniRows.length > 0 ? parseFloat(giniRows[0].gini)           : null;
-  const foregaendeGini = giniRows.length > 1 ? parseFloat(giniRows[giniRows.length - 1].gini) : null;
-  const giniDelta    = (senastGini !== null && foregaendeGini !== null) ? senastGini - foregaendeGini : null;
-  const senastMobilitet = giniRows.length > 0 ? parseFloat(giniRows[0].mobilitet ?? 0) : null;
-  const senastTopp3  = giniRows.length > 0 ? parseFloat(giniRows[0].topp3_andel ?? 0) : null;
-  const policy       = policyFranGini(senastGini);
-  // Progress bar: Gini target 0.40 — how close are we?
-  const giniPct      = senastGini !== null ? Math.min(100, Math.round((senastGini / 0.8) * 100)) : null;
-  const giniTargetPct = Math.round((0.4 / 0.8) * 100); // = 50%
-
-  // Wealth stats
-  const totalFormogehet = agenter.reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
-  const top3Saldo = agenter.slice(0, 3).reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
-  const top3Andel = totalFormogehet > 0 ? Math.round((top3Saldo / totalFormogehet) * 100) : 0;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "40px 16px 80px", fontFamily: "Georgia, serif" }}>
