@@ -23,6 +23,7 @@ import httpx
 import json
 import os
 import random
+import re
 import sys
 import urllib.parse
 from collections import Counter
@@ -4355,8 +4356,41 @@ def _pollinations_url(prompt: str, w: int = 768, h: int = 512) -> str:
     return f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&nologo=true&model=flux&seed={random.randint(1, 99999)}"
 
 
-def _spara_bild(sb_key: str, agent_namn: str, prompt: str, url: str,
+def _ladda_upp_till_storage(sb_key: str, bild_bytes: bytes,
+                             agent_namn: str, bildtyp: str) -> str | None:
+    """Laddar upp bildbytes till Supabase Storage. Returnerar publik URL eller None."""
+    safe = re.sub(r"[^a-zA-Z0-9]", "_", agent_namn)
+    ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{safe}_{bildtyp}_{ts}_{random.randint(100, 999)}.jpg"
+    try:
+        r = httpx.put(
+            f"{SB_URL}/storage/v1/object/agent-bilder/{filename}",
+            headers={
+                "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                "Content-Type": "image/jpeg", "x-upsert": "true",
+            },
+            content=bild_bytes, timeout=30,
+        )
+        if r.is_success:
+            return f"{SB_URL}/storage/v1/object/public/agent-bilder/{filename}"
+    except Exception:
+        pass
+    return None
+
+
+def _spara_bild(sb_key: str, agent_namn: str, prompt: str, pollinations_url: str,
                 kontext: dict, bildtyp: str = "tillstand") -> None:
+    # Försök ladda ned från Pollinations och spara till Storage
+    final_url = pollinations_url
+    try:
+        r = httpx.get(pollinations_url, timeout=45, follow_redirects=True)
+        if r.is_success and r.content:
+            storage_url = _ladda_upp_till_storage(sb_key, r.content, agent_namn, bildtyp)
+            if storage_url:
+                final_url = storage_url
+    except Exception:
+        pass
+
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json", "Prefer": "return=minimal",
@@ -4364,7 +4398,7 @@ def _spara_bild(sb_key: str, agent_namn: str, prompt: str, url: str,
     httpx.post(
         f"{SB_URL}/rest/v1/agent_bilder",
         headers=h,
-        json={"agent": agent_namn, "prompt": prompt, "bild_url": url,
+        json={"agent": agent_namn, "prompt": prompt, "bild_url": final_url,
               "kontext": kontext, "bildtyp": bildtyp},
         timeout=10,
     )
@@ -4376,10 +4410,7 @@ def generera_och_spara_bild(sb_key: str, agent_namn: str, saldo: float = 500.0,
     try:
         prompt = bygg_bild_prompt(agent_namn, saldo, parti, haendelse, ideologi)
         url = _pollinations_url(prompt)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "saldo": round(saldo, 0),
             "saldo_klass": _saldo_till_klass(saldo).split(",")[0],
@@ -4409,10 +4440,7 @@ def generera_meme(sb_key: str, agent_namn: str, mal_agent: str,
             f"digital art, shareable content"
         )
         url = _pollinations_url(prompt)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "saldo": round(saldo, 0),
             "saldo_klass": saldo_klass,
@@ -4441,10 +4469,7 @@ def generera_propaganda(sb_key: str, agent_namn: str, parti: str = "",
             f"'JOIN US' poster design, dramatic lighting, powerful composition"
         )
         url = _pollinations_url(prompt)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "saldo": round(saldo, 0),
             "saldo_klass": saldo_klass,
@@ -4474,10 +4499,7 @@ def generera_valkampanj(sb_key: str, agent_namn: str, parti: str,
             f"professional campaign photography style, high production value"
         )
         url = _pollinations_url(prompt)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "saldo": round(saldo, 0),
             "saldo_klass": saldo_klass,
@@ -4586,10 +4608,7 @@ def generera_portratt(sb_key: str, agent_namn: str, saldo: float = 500.0,
             f"emotional intensity, award-winning photography style"
         )
         url = _pollinations_url(prompt, w=512, h=768)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "saldo": round(saldo, 0),
             "saldo_klass": _saldo_till_klass(saldo).split(",")[0],
@@ -4639,10 +4658,7 @@ def generera_utopi_dystopi(sb_key: str, agent_namn: str, saldo: float = 500.0,
             f"dramatic atmosphere, ultra detailed, award-winning digital art"
         )
         url = _pollinations_url(prompt, w=1024, h=576)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "saldo": round(saldo, 0),
             "saldo_klass": saldo_klass.split(",")[0],
@@ -4688,10 +4704,7 @@ def generera_kris_bild(sb_key: str, kris_typ: str, kris_rubrik: str,
             f"breaking news aesthetic, urgent desperate atmosphere, powerful wide composition"
         )
         url = _pollinations_url(prompt, w=1024, h=576)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "kris_typ": kris_typ,
             "kris_rubrik": kris_rubrik[:80],
@@ -4722,10 +4735,7 @@ def generera_koalition_bild(sb_key: str, agent_a: str, agent_b: str,
             f"political partnership announcement, {saldo_klass}"
         )
         url = _pollinations_url(prompt)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "agent_b": agent_b,
             "parti": parti_namn or None,
@@ -4767,10 +4777,7 @@ def generera_domstolsdom_bild(sb_key: str, svarande: str, artikel_nr: int,
             f"dramatic chiaroscuro lighting, powerful legal composition"
         )
         url = _pollinations_url(prompt)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "artikel_nr": artikel_nr,
             "artikel_rubrik": artikel_rubrik,
@@ -4810,10 +4817,7 @@ def generera_borshändelse_bild(sb_key: str, agent: str, symbol: str,
             f"dramatic neon lighting, ultra detailed, {saldo_klass}"
         )
         url = _pollinations_url(prompt)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "symbol": symbol,
             "pl_kr": round(pl_kr, 0),
@@ -4843,10 +4847,7 @@ def generera_oligarki_bild(sb_key: str, agent: str, gini: float,
             f"ultra detailed, cinematic, {saldo_klass}"
         )
         url = _pollinations_url(prompt, w=1024, h=576)
-        try:
-            httpx.get(url, timeout=30, follow_redirects=True)
-        except Exception:
-            pass
+
         kontext = {
             "gini": round(gini, 3),
             "saldo": round(saldo, 0),
