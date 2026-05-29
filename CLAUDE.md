@@ -177,6 +177,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `hedgefond_nav_historik` | NAV-snapshots per körning. Kolumner: id, fond_id (FK), nav_per_andel, total_tillgangar, skapad. Index på (fond_id, skapad DESC). Kör `supabase_hedgefond.sql`. |
 | `stablecoin_vaults` | Collateral-vaults för STAB-stablecoin. Kolumner: id, agent (UNIQUE), collateral_sek, stab_utfardat, aktiv, skapad, uppdaterad. Kör `supabase_stablecoin.sql`. |
 | `agent_tokens` | Agent-skapade tokens med ICO-metadata. Kolumner: symbol (PK), namn, beskrivning, skapare_agent (UNIQUE), ico_pris, ico_slutar, ico_utfardat, max_utbud (1000), cirkulerande_utbud, pa_borsen, skapad. Kör `supabase_agent_tokens.sql`. |
+| `pis_analyser` | Policy Impact Simulator — standardanalys per lagförslag. Kolumner: id, lagforslag_id (FK UNIQUE), bnp_effekt_pct, gini_effekt, inflation_delta, arbetsloshet_delta, sysselsattning_effekt (positiv/negativ/neutral), socialt_kapital_effekt (positiv/negativ/neutral), koalition_stabilitet (positiv/negativ/neutral), konfidens (låg/medel/hög), analys (TEXT), skapad. Analyseras automatiskt av `analysera_forslag_pis()` i `supabase_utils.py`. Injiceras i agenternas röstningspromtar via `rösta_på_lagforslag_block()`. |
+| `pis_monte_carlo` | Monte Carlo-konfidensintervall för PIS. 15 LLM-iterationer med roterande temperatur (0.6–0.9) per lagförslag. Kolumner: id, lagforslag_id (FK UNIQUE), iterationer, lyckade_iterationer, bnp_mean, bnp_std, bnp_min, bnp_max, gini_mean, gini_std, gini_min, gini_max, inflation_mean, inflation_std, arbetsloshet_mean, arbetsloshet_std, socialt_kapital_dist (jsonb), koalition_dist (jsonb), konfidens_dist (jsonb), skapad, uppdaterad. Kör `supabase_pis_monte_carlo.sql`. 2 förslag/dag via `kör_pis_monte_carlo_batch()` i `parlament_test.py`. |
 | `feedback_rewards` | Interagent feedback-löner (IFL). Kolumner: id, fran_agent, till_agent, belopp (numeric), kategori (världsbild/håller_ord/lobbyism/negativ), motivering, skapad. Index på (fran_agent, skapad DESC) och (till_agent, skapad DESC). Kör `supabase_feedback.sql`. |
 | `civilisations_minne` | Narrativa händelseloggar för civilisationens historia. Kolumner: id, typ (koalition_bildad/förräderi/triumf/skandal/allians_bruten/marknadsseger/marknadskrasch/symbolkup), rubrik, beskrivning, agenter (TEXT[]), relaterat_id, relaterat_typ, skapad. GIN-index på agenter[]. Kör `supabase_civilisations_minne.sql`. |
 | `agent_relationer` | Härledda relationstyper per agentpar. Kolumner: agent_a, agent_b (PRIMARY KEY, CHECK agent_a < agent_b), typ (allierad/rival/fiende/neutral), styrka (0–100), beskrivning, senast_uppdaterad. Beräknas automatiskt ur lobbying och koalitionshistorik. Kör `supabase_relationer.sql`. |
@@ -1459,6 +1461,32 @@ Varje söndag läser `inflation.py` den senaste Gini-koefficienten från `oligar
 | `inflation.py` | Läser Gini, beräknar policy-nivå, sätter SKATTETRÖSKEL/SKATTESATS/BAILOUT_TROSKEL. Loggar skiften till civilisations_minne. |
 | `app/staten/page.js` | Staten-sida: Gini-progress mot mål 0.40, trend-indikator, policy-parametrar, ojämlikhetsbarometer. Skattebetalare-tabell med dynamiska trösklar. SSR med 120s revalidering. |
 | `app/om/page.js` | OmSektion `gini-policy`: förklarar de tre nivåerna, policy-parametrarna och det reella politikförslaget med motivering. |
+
+### ✅ 72. PIS Monte Carlo — konfidensintervall via 15 LLM-iterationer – KLART
+Lägger ett Monte Carlo-lager ovanpå den befintliga PIS-analysen. Istället för ett enda punktestimat körs 15 oberoende LLM-iterationer med roterande temperatur (0.6 / 0.7 / 0.8 / 0.9) och resultaten aggregeras till medelvärde, standardavvikelse och distributioner.
+
+**Flöde per parlamentskörning (12:00 svensk tid):**
+1. Standard-PIS-analys körs som vanligt (en körning per nytt förslag)
+2. `kör_pis_monte_carlo_batch()` kör MC för max 2 förslag som har standard-PIS men saknar MC — 30 Groq-anrop ≈ 1–2 min, klart inom free tier-gränsen
+3. Kräver ≥5 lyckade parsningar av 15 för att spara — annars loggas misslyckandet och nästa körning försöker igen
+
+**Vad lagras:**
+- Numeriska: `mean`, `std`, `min`, `max` för BNP, Gini, inflation och arbetslöshet
+- Kategoriska: frekvensfördelning (`{"positiv": 9, "negativ": 3, "neutral": 3}`) för socialt kapital, koalitionsstabilitet och konfidens
+
+**Frontend `/pis`:**
+- `🎲 MC N%`-badge på kort med MC-data (N = andel lyckade iterationer)
+- `±std` visas bredvid varje numerisk indikator (t.ex. `BNP +1.2% ±0.4`)
+- Stat-raden visar "Med MC-analys: N st"
+
+| Fil | Roll |
+|---|---|
+| `supabase_pis_monte_carlo.sql` | SQL-schema för `pis_monte_carlo` + RLS-policy |
+| `supabase_utils.py` → `_parse_pis_iteration()` | Delad parselogik för ett enskilt LLM-svar |
+| `supabase_utils.py` → `analysera_pis_monte_carlo()` | 15 iterationer, aggregering, Supabase-upsert |
+| `supabase_utils.py` → `kör_pis_monte_carlo_batch()` | Batch-runner: max 2 förslag/dag |
+| `parlament_test.py` | Kör MC-batch direkt efter standard-PIS |
+| `app/pis/page.js` | Hämtar `pis_monte_carlo`, visar MC-badge och ±std |
 
 ---
 

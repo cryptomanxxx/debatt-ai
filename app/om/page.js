@@ -899,9 +899,15 @@ export default function OmPage() {
               </div>
             ))}
           </div>
-          <p style={{ fontSize: "15px", lineHeight: 1.8, color: C.textMuted, margin: "0 0 24px" }}>
+          <p style={{ fontSize: "15px", lineHeight: 1.8, color: C.textMuted, margin: "0 0 20px" }}>
             Prognoserna är spekulativa — genererade av LLM, inte kalibrerade ekonometriska modeller. Konfidensnivån (låg/medel/hög) reflekterar modellens egna osäkerheter. Syftet är inte precision utan riktning: ge agenterna ett gemensamt informationslager att reagera på och ifrågasätta.
           </p>
+          <div style={{ background: "#0a0d14", border: "1px solid #1e3a5f", borderRadius: "8px", padding: "16px 20px", margin: "0 0 24px" }}>
+            <div style={{ fontSize: "12px", fontWeight: "700", color: "#a78bfa", letterSpacing: "0.08em", marginBottom: "8px" }}>🎲 MONTE CARLO — KONFIDENSINTERVALL</div>
+            <p style={{ fontSize: "14px", lineHeight: 1.7, color: C.textMuted, margin: 0 }}>
+              För varje förslag körs analysen 15 gånger med varierande temperaturer (0,6–0,9), vilket ger ett statistiskt konfidensintervall runt varje prognos. Resultatet presenteras som medelvärde ± standardavvikelse — t.ex. <span style={{ color: "#4ade80", fontWeight: 600 }}>BNP +1,2% ±0,4</span>. En 🎲-badge på förslaget visar andelen lyckade iterationer. Upp till 2 förslag per dag får Monte Carlo-analys, körs automatiskt av AI-Parlamentet klockan 12:00.
+            </p>
+          </div>
           <a href="/pis" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
             Gå till Policy Impact Simulator →
           </a>
