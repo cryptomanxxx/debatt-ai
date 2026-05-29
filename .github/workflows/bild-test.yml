@@ -22,7 +22,7 @@ jobs:
           python-version: "3.12"
       - name: Installera beroenden
         run: pip install httpx
-      - name: Testa bildgenerering
+      - name: Testa bildgenerering + Storage-uppladdning
         env:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
