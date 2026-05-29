@@ -1380,12 +1380,17 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
                 bnp_str = (f"+{bnp_val:.1f}%" if bnp_val >= 0 else f"{bnp_val:.1f}%") if bnp_val is not None else "?"
                 gini_str = (f"+{gini_val:.2f}" if gini_val >= 0 else f"{gini_val:.2f}") if gini_val is not None else "?"
                 gini_dir = "ökad ojämlikhet" if (gini_val or 0) > 0 else "minskad ojämlikhet"
+                inf_val = pis.get("inflation_delta")
+                arb_val = pis.get("arbetsloshet_delta")
+                inf_str = (f"+{inf_val:.1f}pp" if inf_val >= 0 else f"{inf_val:.1f}pp") if inf_val is not None else "?"
+                arb_str = (f"+{arb_val:.1f}pp" if arb_val >= 0 else f"{arb_val:.1f}pp") if arb_val is not None else "?"
                 pis_kontext = (
-                    f"PIS-analys (Policy Impact Simulator): "
-                    f"BNP-effekt {bnp_str}, Gini-effekt {gini_str} ({gini_dir}), "
-                    f"sysselsättning: {pis.get('sysselsattning_effekt','?')}. "
-                    f"Konfidens: {pis.get('konfidens','?')}.\n"
-                    f"{pis.get('analys','')[:250]}\n\n"
+                    f"PIS-analys (Policy Impact Simulator):\n"
+                    f"  BNP-effekt: {bnp_str}  |  Gini: {gini_str} ({gini_dir})\n"
+                    f"  Inflation: {inf_str}  |  Arbetslöshet: {arb_str}\n"
+                    f"  Socialt kapital: {pis.get('socialt_kapital_effekt','?')}  |  Koalitionsstabilitet: {pis.get('koalition_stabilitet','?')}\n"
+                    f"  Konfidens: {pis.get('konfidens','?')}\n"
+                    f"{pis.get('analys','')[:280]}\n\n"
                 )
             prompt = (
                 f"Lagförslag: \"{f['titel']}\"\n\n"
@@ -4995,26 +5000,31 @@ def formatera_minnen_for_prompt(minnen: list[dict]) -> str:
 # ── PIS — Policy Impact Simulator ────────────────────────────────────────────
 
 def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning: str) -> bool:
-    """Analyserar ett lagförslags förväntade BNP- och Gini-påverkan via LLM. Sparar i pis_analyser."""
+    """Analyserar ett lagförslags förväntade makroekonomiska och sociala konsekvenser via LLM.
+    Sex indikatorer: BNP, Gini, inflation, arbetslöshet, socialt kapital, koalitionsstabilitet.
+    Sparar i pis_analyser (UNIQUE på lagforslag_id — upsertar om rad redan finns)."""
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
-        "Content-Type": "application/json", "Prefer": "return=minimal",
+        "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal",
     }
     system = (
-        "Du är en oberoende nationalekonomisk analytiker som bedömer svenska lagförslags "
-        "makroekonomiska konsekvenser. Var analytisk och balanserad. Ange alltid osäkerheter."
+        "Du är en oberoende nationalekonom och statsvetare som bedömer svenska lagförslags "
+        "makroekonomiska och sociala konsekvenser på 3–5 års sikt. "
+        "Var analytisk, balanserad och ange alltid osäkerheter."
     )
     prompt = (
         f"Lagförslag: \"{titel}\"\n\n"
         f"{beskrivning[:700]}\n\n"
-        "Analysera detta förslags sannolika ekonomiska effekter på 3–5 års sikt.\n"
-        "Svara EXAKT i detta format (inga andra ord):\n"
-        "BNP_EFFEKT: [tal med max en decimal, t.ex. +1.2 eller -0.5, procent av BNP]\n"
-        "GINI_EFFEKT: [tal med max två decimaler, t.ex. -0.02 eller +0.01, förändring i Gini]\n"
-        "SYSSELSATTNING: [positiv, negativ eller neutral]\n"
+        "Analysera detta förslags sannolika konsekvenser. "
+        "Svara EXAKT i detta format (inga andra ord, börja direkt med BNP_EFFEKT):\n"
+        "BNP_EFFEKT: [procent av BNP, t.ex. +1.2 eller -0.5]\n"
+        "GINI_EFFEKT: [Δ Gini-koefficient, t.ex. -0.02 eller +0.01]\n"
+        "INFLATION_DELTA: [förändring i procentenheter, t.ex. +0.3 eller -0.1]\n"
+        "ARBETSLOSHET_DELTA: [förändring i procentenheter, t.ex. -0.5 eller +0.2]\n"
+        "SOCIALT_KAPITAL: [positiv, negativ eller neutral — effekt på mellmänskligt förtroende och samarbete]\n"
+        "KOALITIONS_STABILITET: [positiv, negativ eller neutral — påverkar politiska allianser och konsensus]\n"
         "KONFIDENS: [låg, medel eller hög]\n"
-        "ANALYS: [100–150 ord på svenska — mekanismer, berörda grupper, osäkerheter]\n\n"
-        "Börja direkt med BNP_EFFEKT:"
+        "ANALYS: [120–180 ord på svenska — ekonomiska mekanismer, berörda grupper, sociala effekter, osäkerheter]\n"
     )
     try:
         payload = {
@@ -5023,7 +5033,7 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
             ],
-            "max_tokens": 380, "temperature": 0.35,
+            "max_tokens": 480, "temperature": 0.35,
         }
         raw = None
         try:
@@ -5032,36 +5042,41 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
             pass
         if not raw:
             try:
-                raw = gemini_post(system, prompt, max_tokens=380)
+                raw = gemini_post(system, prompt, max_tokens=480)
             except Exception:
                 pass
         if not raw:
             return False
 
-        bnp, gini, syss, konfidens, analys = None, None, "neutral", "låg", ""
+        def _parse_float(line):
+            try:
+                return float(line.split(":", 1)[1].strip().replace(",", ".").replace("+", "").split()[0])
+            except Exception:
+                return None
+
+        def _parse_riktning(line):
+            v = line.split(":", 1)[1].strip().lower()
+            return v if v in ("positiv", "negativ", "neutral") else "neutral"
+
+        bnp = gini = inflation = arbetsloshet = None
+        syss = soc_kap = koa_stab = "neutral"
+        konfidens = "låg"
+        analys = ""
+
         for line in raw.splitlines():
             line = line.strip()
             upper = line.upper()
-            if upper.startswith("BNP_EFFEKT:"):
-                try:
-                    bnp = float(line.split(":", 1)[1].strip().replace(",", ".").replace("+", "").split()[0])
-                except Exception:
-                    pass
-            elif upper.startswith("GINI_EFFEKT:"):
-                try:
-                    gini = float(line.split(":", 1)[1].strip().replace(",", ".").replace("+", "").split()[0])
-                except Exception:
-                    pass
-            elif upper.startswith("SYSSELSATTNING:"):
-                v = line.split(":", 1)[1].strip().lower()
-                syss = v if v in ("positiv", "negativ", "neutral") else "neutral"
+            if upper.startswith("BNP_EFFEKT:"):          bnp = _parse_float(line)
+            elif upper.startswith("GINI_EFFEKT:"):        gini = _parse_float(line)
+            elif upper.startswith("INFLATION_DELTA:"):    inflation = _parse_float(line)
+            elif upper.startswith("ARBETSLOSHET_DELTA:"): arbetsloshet = _parse_float(line)
+            elif upper.startswith("SOCIALT_KAPITAL:"):    soc_kap = _parse_riktning(line)
+            elif upper.startswith("KOALITIONS_STABILITET:"): koa_stab = _parse_riktning(line)
             elif upper.startswith("KONFIDENS:"):
                 v = line.split(":", 1)[1].strip().lower()
                 konfidens = v if v in ("låg", "medel", "hög") else "låg"
-            elif upper.startswith("ANALYS:"):
-                analys = line.split(":", 1)[1].strip()
-            elif analys:
-                analys += " " + line
+            elif upper.startswith("ANALYS:"):             analys = line.split(":", 1)[1].strip()
+            elif analys:                                   analys += " " + line
 
         if not analys or len(analys) < 30:
             return False
@@ -5070,12 +5085,16 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
             f"{SB_URL}/rest/v1/pis_analyser",
             headers=h,
             json={
-                "lagforslag_id": forslag_id,
-                "bnp_effekt_pct": bnp,
-                "gini_effekt": gini,
-                "sysselsattning_effekt": syss,
-                "analys": analys.strip()[:1200],
-                "konfidens": konfidens,
+                "lagforslag_id":          forslag_id,
+                "bnp_effekt_pct":         bnp,
+                "gini_effekt":            gini,
+                "inflation_delta":        inflation,
+                "arbetsloshet_delta":     arbetsloshet,
+                "socialt_kapital_effekt": soc_kap,
+                "koalition_stabilitet":   koa_stab,
+                "sysselsattning_effekt":  "positiv" if (arbetsloshet or 0) < 0 else ("negativ" if (arbetsloshet or 0) > 0 else "neutral"),
+                "analys":                 analys.strip()[:1500],
+                "konfidens":              konfidens,
             },
             timeout=10,
         )

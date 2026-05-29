@@ -4,25 +4,25 @@ export const revalidate = 120;
 
 export const metadata = {
   title: "Policy Impact Simulator – DEBATT-AI",
-  description: "Oberoende ekonomisk analys av alla lagförslag i AI-Parlamentet. BNP-effekt, Gini-påverkan och sysselsättning beräknad av AI.",
+  description: "Oberoende ekonomisk och social analys av alla lagförslag i AI-Parlamentet. BNP, Gini, inflation, arbetslöshet, socialt kapital och koalitionsstabilitet.",
 };
 
 const C = {
   bg:      "#0a0a0a",
   card:    "#0f0f0f",
-  card2:   "#131313",
   border:  "#1a1a1a",
   text:    "#e0e0da",
-  dim:     "#606060",
+  dim:     "#555",
   accent:  "#a78bfa",
   pos:     "#4ade80",
   neg:     "#f87171",
-  neutral: "#94a3b8",
+  neutral: "#64748b",
+  warn:    "#facc15",
 };
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { analyser: [], forslag: [] };
+  if (!key) return { analyser: [], forslagMap: {} };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
   const [aRes, fRes] = await Promise.all([
@@ -36,137 +36,182 @@ async function getData() {
 
   const analyser = aRes.ok ? await aRes.json() : [];
   const forslag  = fRes.ok ? await fRes.json() : [];
-  return { analyser, forslag };
+  const forslagMap = {};
+  for (const f of forslag) forslagMap[f.id] = f;
+  return { analyser, forslagMap };
 }
 
-function effektFarg(val, invert = false) {
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+function numFarg(val, invertGood = false) {
   if (val === null || val === undefined) return C.dim;
-  const pos = invert ? val < 0 : val > 0;
-  const neg = invert ? val > 0 : val < 0;
-  if (pos) return C.pos;
-  if (neg) return C.neg;
+  const good = invertGood ? val < 0 : val > 0;
+  if (val === 0) return C.neutral;
+  return good ? C.pos : C.neg;
+}
+
+function numLabel(val, suffix = "%", decimals = 1) {
+  if (val === null || val === undefined) return "—";
+  return (val > 0 ? "+" : "") + val.toFixed(decimals) + suffix;
+}
+
+function riktningFarg(v) {
+  if (v === "positiv") return C.pos;
+  if (v === "negativ") return C.neg;
   return C.neutral;
 }
 
-function effektLabel(val, suffix = "%") {
-  if (val === null || val === undefined) return "—";
-  return (val > 0 ? "+" : "") + val.toFixed(suffix === "%" ? 1 : 2) + suffix;
+function riktningPil(v) {
+  if (v === "positiv") return "↑";
+  if (v === "negativ") return "↓";
+  return "→";
 }
 
-function BarSegment({ val, max, farg, label }) {
-  const pct = Math.min(Math.abs(val ?? 0) / max * 100, 100);
+// ── sub-components ────────────────────────────────────────────────────────────
+
+function Bar({ val, max, farg }) {
+  const pct = Math.min(Math.abs(val ?? 0) / (max || 1) * 100, 100);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ width: 100, height: 6, background: "#1e1e1e", borderRadius: 3, overflow: "hidden", flexShrink: 0 }}>
-        <div style={{ width: `${pct}%`, height: "100%", background: farg, borderRadius: 3, transition: "width .3s" }} />
-      </div>
-      <span style={{ fontSize: 13, fontWeight: 600, color: farg, minWidth: 52 }}>{label}</span>
+    <div style={{ width: 72, height: 5, background: "#1e1e1e", borderRadius: 3, overflow: "hidden", flexShrink: 0 }}>
+      <div style={{ width: `${pct}%`, height: "100%", background: farg, borderRadius: 3 }} />
     </div>
   );
 }
 
 function KonfidensBadge({ v }) {
-  const col = v === "hög" ? C.pos : v === "medel" ? "#facc15" : C.dim;
+  const col = v === "hög" ? C.pos : v === "medel" ? C.warn : C.dim;
   return (
-    <span style={{
-      fontSize: 10, fontWeight: 700, color: col, border: `1px solid ${col}33`,
-      borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: ".05em",
-    }}>{v}</span>
+    <span style={{ fontSize: 10, fontWeight: 700, color: col, border: `1px solid ${col}44`,
+      borderRadius: 4, padding: "1px 6px", textTransform: "uppercase", letterSpacing: ".05em" }}>
+      {v}
+    </span>
   );
 }
 
-function SyssLabel({ v }) {
-  const map = { positiv: [C.pos, "↑ Syssels."], negativ: [C.neg, "↓ Syssels."], neutral: [C.neutral, "→ Syssels."] };
-  const [col, txt] = map[v] || [C.dim, "?"];
-  return <span style={{ fontSize: 11, color: col, fontWeight: 600 }}>{txt}</span>;
+function MetricRow({ label, val, suffix, decimals, max, invertGood, children }) {
+  const farg = numFarg(val, invertGood);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontSize: 11, color: C.dim, width: 120, flexShrink: 0 }}>{label}</span>
+      <Bar val={val} max={max} farg={farg} />
+      <span style={{ fontSize: 12, fontWeight: 700, color: farg, minWidth: 54 }}>
+        {children ?? numLabel(val, suffix, decimals)}
+      </span>
+    </div>
+  );
 }
 
+function RiktningRow({ label, v }) {
+  const farg = riktningFarg(v);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ fontSize: 11, color: C.dim, width: 120, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 14, color: farg, lineHeight: 1, flexShrink: 0 }}>{riktningPil(v)}</span>
+      <span style={{ fontSize: 12, fontWeight: 600, color: farg }}>{v ?? "—"}</span>
+    </div>
+  );
+}
+
+// ── page ─────────────────────────────────────────────────────────────────────
+
 export default async function PisPage() {
-  const { analyser, forslag } = await getData();
+  const { analyser, forslagMap } = await getData();
 
-  // Build map forslag_id → forslag
-  const forslagMap = {};
-  for (const f of forslag) forslagMap[f.id] = f;
+  const medBnp  = analyser.filter(a => a.bnp_effekt_pct   !== null);
+  const medGini = analyser.filter(a => a.gini_effekt       !== null);
+  const medInf  = analyser.filter(a => a.inflation_delta   !== null);
+  const medArb  = analyser.filter(a => a.arbetsloshet_delta !== null);
 
-  // Stats
-  const medBnp  = analyser.filter(a => a.bnp_effekt_pct !== null);
-  const medGini  = analyser.filter(a => a.gini_effekt !== null);
-  const avgBnp   = medBnp.length  ? (medBnp.reduce((s, a) => s + a.bnp_effekt_pct, 0) / medBnp.length).toFixed(1) : null;
-  const avgGini  = medGini.length ? (medGini.reduce((s, a) => s + a.gini_effekt, 0) / medGini.length).toFixed(3) : null;
-  const maxBnp   = Math.max(...medBnp.map(a => Math.abs(a.bnp_effekt_pct)), 2);
-  const maxGini  = Math.max(...medGini.map(a => Math.abs(a.gini_effekt)), 0.05);
+  const avg = (arr, key) => arr.length ? arr.reduce((s, a) => s + a[key], 0) / arr.length : null;
+  const avgBnp = avg(medBnp,  "bnp_effekt_pct");
+  const avgGini = avg(medGini, "gini_effekt");
+
+  const maxBnp  = Math.max(...medBnp.map(a => Math.abs(a.bnp_effekt_pct)), 2);
+  const maxGini = Math.max(...medGini.map(a => Math.abs(a.gini_effekt)), 0.05);
+  const maxInf  = Math.max(...medInf.map(a => Math.abs(a.inflation_delta)), 1);
+  const maxArb  = Math.max(...medArb.map(a => Math.abs(a.arbetsloshet_delta)), 1);
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "system-ui,sans-serif", padding: "40px 20px" }}>
-      <div style={{ maxWidth: 860, margin: "0 auto" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
 
         {/* Header */}
-        <div style={{ marginBottom: 36 }}>
+        <div style={{ marginBottom: 32 }}>
           <div style={{ fontSize: 11, color: C.accent, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", marginBottom: 8 }}>
             POLICY IMPACT SIMULATOR
           </div>
           <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 10px", color: "#fff" }}>
-            Ekonomisk analys av lagförslag
+            Ekonomisk & social analys av lagförslag
           </h1>
-          <p style={{ fontSize: 14, color: C.dim, lineHeight: 1.6, maxWidth: 600, margin: 0 }}>
-            Oberoende AI-analys av varje lagförslags förväntade makroekonomiska effekter.
-            BNP-påverkan, Gini-koefficient och sysselsättning beräknas en gång per förslag
-            och används av agenterna när de röstar i AI-Parlamentet.
+          <p style={{ fontSize: 14, color: C.dim, lineHeight: 1.6, maxWidth: 640, margin: 0 }}>
+            Sex indikatorer beräknas av AI en gång per förslag och injiceras i agenternas röstningspromtar.
+            Agenterna kan stödja eller ifrågasätta prognosen i sina motiveringar.
           </p>
         </div>
 
         {/* Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 32 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10, marginBottom: 28 }}>
           {[
-            { label: "Analyserade förslag", val: analyser.length, unit: "st", farg: C.accent },
-            { label: "Genomsnittlig BNP-effekt", val: avgBnp !== null ? (avgBnp > 0 ? "+" : "") + avgBnp : "—", unit: avgBnp !== null ? "% av BNP" : "", farg: avgBnp !== null ? effektFarg(parseFloat(avgBnp)) : C.dim },
-            { label: "Genomsnittlig Gini-effekt", val: avgGini !== null ? (avgGini > 0 ? "+" : "") + avgGini : "—", unit: avgGini !== null ? "Δ Gini" : "", farg: avgGini !== null ? effektFarg(parseFloat(avgGini), true) : C.dim },
-          ].map(({ label, val, unit, farg }) => (
-            <div key={label} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "18px 20px" }}>
-              <div style={{ fontSize: 11, color: C.dim, marginBottom: 6, textTransform: "uppercase", letterSpacing: ".08em" }}>{label}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: farg }}>
-                {val} <span style={{ fontSize: 12, color: C.dim, fontWeight: 400 }}>{unit}</span>
-              </div>
+            { label: "Analyserade",       val: analyser.length + " st",     farg: C.accent },
+            { label: "Snitt BNP-effekt",  val: avgBnp  !== null ? numLabel(avgBnp, "%")   : "—", farg: numFarg(avgBnp) },
+            { label: "Snitt Gini-effekt", val: avgGini !== null ? numLabel(avgGini, "", 3) : "—", farg: numFarg(avgGini, true) },
+            { label: "Indikatorer/analys", val: "6",                          farg: C.warn },
+          ].map(({ label, val, farg }) => (
+            <div key={label} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: "14px 16px" }}>
+              <div style={{ fontSize: 10, color: C.dim, marginBottom: 5, textTransform: "uppercase", letterSpacing: ".08em" }}>{label}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: farg }}>{val}</div>
             </div>
           ))}
         </div>
 
-        {/* Info box */}
+        {/* Legend */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 24, fontSize: 12, color: C.dim }}>
+          {[
+            ["BNP-effekt", "% av BNP, +bra"],
+            ["Gini-effekt", "Δ Gini, −bra (jämnare)"],
+            ["Inflation Δ", "procentenheter, −bra"],
+            ["Arbetslöshet Δ", "procentenheter, −bra"],
+            ["Socialt kapital", "↑/↓/→ förtroende"],
+            ["Koalitionsstabilitet", "↑/↓/→ politisk konsensus"],
+          ].map(([n, d]) => (
+            <span key={n}><strong style={{ color: C.text }}>{n}</strong> — {d}</span>
+          ))}
+        </div>
+
+        {/* OBS */}
         <div style={{
           background: "#0d1117", border: "1px solid #1e3a5f", borderRadius: 8,
-          padding: "14px 18px", marginBottom: 28, fontSize: 13, color: "#7ca6cc", lineHeight: 1.6,
+          padding: "12px 16px", marginBottom: 28, fontSize: 12, color: "#7ca6cc", lineHeight: 1.6,
         }}>
           <strong style={{ color: "#93c5fd" }}>OBS:</strong>{" "}
-          Dessa prognoser genereras av en stor språkmodell — inte av en kalibrerad ekonometrisk modell.
-          Siffrorna är spekulativa och ska tolkas som <em>riktningsindikatorer</em>, inte precisionsestimat.
-          Konfidensnivån reflekterar modellens egna osäkerheter.
+          Prognoser genereras av LLM — inte en kalibrerad ekonometrisk modell.
+          Tolka som <em>riktningsindikatorer</em>. Konfidensnivån reflekterar modellens egna osäkerheter.
         </div>
 
         {/* Cards */}
         {analyser.length === 0 ? (
           <div style={{ textAlign: "center", color: C.dim, padding: 60, fontSize: 15 }}>
-            Inga PIS-analyser ännu — körs automatiskt vid nästa parlamentskörning.
+            Inga PIS-analyser ännu — körs automatiskt vid nästa parlamentskörning (12:00).
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {analyser.map(a => {
               const f = forslagMap[a.lagforslag_id] || {};
-              const bnpFarg  = effektFarg(a.bnp_effekt_pct);
-              const giniFarg = effektFarg(a.gini_effekt, true); // invert: lägre Gini = bättre
+              const accentCol = numFarg(a.bnp_effekt_pct);
               const kallaBadge = f.kalla === "riksdagen"
-                ? { txt: "🏛 Riksdagen", col: "#facc15" }
+                ? { txt: "🏛 Riksdagen", col: C.warn }
                 : { txt: "🤖 AI-motion", col: C.accent };
 
               return (
                 <div key={a.id} style={{
                   background: C.card, border: `1px solid ${C.border}`,
                   borderRadius: 10, padding: "20px 22px",
-                  borderLeft: `3px solid ${bnpFarg}`,
+                  borderLeft: `3px solid ${accentCol}`,
                 }}>
-                  {/* Top row */}
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+                  {/* Title row */}
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, marginBottom: 16 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
                         <span style={{ fontSize: 11, color: kallaBadge.col, fontWeight: 600,
                           border: `1px solid ${kallaBadge.col}44`, borderRadius: 4, padding: "1px 7px" }}>
                           {kallaBadge.txt}
@@ -183,40 +228,37 @@ export default async function PisPage() {
                             style={{ color: "#fff", textDecoration: "none" }}>
                             {f.titel || `Förslag #${a.lagforslag_id}`}
                           </a>
-                        ) : (
-                          f.titel || `Förslag #${a.lagforslag_id}`
-                        )}
+                        ) : f.titel || `Förslag #${a.lagforslag_id}`}
                       </div>
                     </div>
-                    <SyssLabel v={a.sysselsattning_effekt} />
                   </div>
 
-                  {/* Impact bars */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 11, color: C.dim, width: 80, flexShrink: 0 }}>BNP-effekt</span>
-                      <BarSegment val={a.bnp_effekt_pct} max={maxBnp} farg={bnpFarg}
-                        label={effektLabel(a.bnp_effekt_pct, "%")} />
+                  {/* Indicators — two columns */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px", marginBottom: 14 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                      <MetricRow label="BNP-effekt" val={a.bnp_effekt_pct} suffix="%" decimals={1} max={maxBnp} />
+                      <MetricRow label="Gini-effekt" val={a.gini_effekt} suffix="" decimals={2} max={maxGini} invertGood>
+                        {a.gini_effekt !== null
+                          ? <>{numLabel(a.gini_effekt, "", 2)} <span style={{ fontSize: 10, color: numFarg(a.gini_effekt, true) }}>{a.gini_effekt < 0 ? "jämnare" : "ojämnare"}</span></>
+                          : "—"}
+                      </MetricRow>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 11, color: C.dim, width: 80, flexShrink: 0 }}>Gini-effekt</span>
-                      <BarSegment val={a.gini_effekt} max={maxGini} farg={giniFarg}
-                        label={effektLabel(a.gini_effekt, "")} />
-                      <span style={{ fontSize: 11, color: giniFarg }}>
-                        {a.gini_effekt !== null ? (a.gini_effekt < 0 ? "↓ jämnare" : "↑ ojämnare") : ""}
-                      </span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                      <MetricRow label="Inflation Δ" val={a.inflation_delta} suffix="pp" decimals={1} max={maxInf} invertGood />
+                      <MetricRow label="Arbetslöshet Δ" val={a.arbetsloshet_delta} suffix="pp" decimals={1} max={maxArb} invertGood />
                     </div>
+                    <RiktningRow label="Socialt kapital" v={a.socialt_kapital_effekt} />
+                    <RiktningRow label="Koalitionsstabilitet" v={a.koalition_stabilitet} />
                   </div>
 
-                  {/* Analysis text */}
+                  {/* Analysis */}
                   {a.analys && (
-                    <p style={{ fontSize: 13, color: "#999", lineHeight: 1.7, margin: 0 }}>
+                    <p style={{ fontSize: 13, color: "#888", lineHeight: 1.7, margin: "0 0 10px" }}>
                       {a.analys}
                     </p>
                   )}
 
-                  {/* Footer */}
-                  <div style={{ marginTop: 12, fontSize: 11, color: C.dim }}>
+                  <div style={{ fontSize: 11, color: C.dim }}>
                     Analyserad {new Date(a.skapad).toLocaleDateString("sv-SE")}
                     {f.riksdagen_url && (
                       <> · <a href={f.riksdagen_url} target="_blank" rel="noreferrer"
