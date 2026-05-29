@@ -106,7 +106,7 @@ def deepseek_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
 
 
 def fireworks_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
-    """Fireworks AI — OpenAI-kompatibel, Llama 3.3 70B."""
+    """Fireworks AI — OpenAI-kompatibel, Qwen2.5 72B Instruct."""
     if "fireworks" in _nere:
         raise Exception("Fireworks markerad som nere denna körning")
     api_key = os.environ.get("FIREWORKS_API_KEY")
@@ -115,7 +115,7 @@ def fireworks_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
         raise Exception("FIREWORKS_API_KEY saknas")
     url = "https://api.fireworks.ai/inference/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {**json_payload, "model": "accounts/fireworks/models/llama-v3p3-70b-instruct"}
+    payload = {**json_payload, "model": "accounts/fireworks/models/qwen2p5-72b-instruct"}
     r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
     if r.status_code == 429:
         _nere.add("fireworks")
