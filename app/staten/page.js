@@ -113,7 +113,7 @@ async function getData() {
       { headers: h, next: { revalidate: 120 } }
     ),
     fetch(
-      `${SB_URL}/rest/v1/domstol_domar?select=svarand,bote,skapad&order=skapad.desc&limit=20`,
+      `${SB_URL}/rest/v1/domstol_domar?select=straff_belopp,skapad,domstol_arenden!arende_id(svarande)&utfall=eq.fälld&order=skapad.desc&limit=20`,
       { headers: h, next: { revalidate: 120 } }
     ),
     fetch(
@@ -661,8 +661,9 @@ export default async function StatenPage() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                 {senasteBoter.map((dom, i) => {
-                  const av   = agentVisuell(dom.svarand ?? "");
-                  const bote = parseFloat(dom.bote || 0);
+                  const svarand = dom.domstol_arenden?.svarande ?? "";
+                  const av   = agentVisuell(svarand);
+                  const bote = parseFloat(dom.straff_belopp || 0);
                   return (
                     <div key={i} style={{
                       display: "flex", alignItems: "center", gap: 10,
@@ -680,11 +681,11 @@ export default async function StatenPage() {
                       </div>
 
                       {/* Defendant */}
-                      <a href={`/agent/${encodeURIComponent(dom.svarand ?? "")}`} style={{
+                      <a href={`/agent/${encodeURIComponent(svarand)}`} style={{
                         fontSize: 12, color: C.text, fontFamily: "Georgia, serif",
                         textDecoration: "none", flex: 1,
                       }}>
-                        {dom.svarand ?? "—"}
+                        {svarand || "—"}
                       </a>
 
                       {/* Date */}
