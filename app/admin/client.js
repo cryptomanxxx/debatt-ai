@@ -1713,9 +1713,44 @@ function FellogTab() {
 // ── VbnbTab ────────────────────────────────────────────────────────────────────
 
 function VbnbTab() {
-  const [rows, setRows]       = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState("");
+  const [rows, setRows]         = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [fetchLog, setFetchLog] = useState(null);
+
+  async function ladda() {
+    try {
+      const res = await fetch(
+        `${SB_URL}/rest/v1/vbnb_data?select=*&order=datum.asc&limit=365`,
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setRows(await res.json());
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function hamtaNu() {
+    setFetching(true);
+    setFetchLog(null);
+    try {
+      const res = await fetch("/api/admin/vbnb-fetch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${ADMIN_PASSWORD}` },
+      });
+      const data = await res.json();
+      setFetchLog(data);
+      if (data.ok) await ladda();
+    } catch (e) {
+      setFetchLog({ error: e.message });
+    } finally {
+      setFetching(false);
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -1762,12 +1797,33 @@ function VbnbTab() {
 
   return (
     <div>
-      <h2 style={{ fontSize: "20px", fontWeight: 400, color: C.accent, marginBottom: "8px" }}>
-        VanEck BNB ETF (VBNB)
-      </h2>
-      <p style={{ color: C.textMuted, fontSize: "13px", marginBottom: "24px" }}>
-        Källa: yfinance + VanEck · Senaste rad: {senaste.datum} · Datakälla: {senaste.datakalla}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", marginBottom: "8px" }}>
+        <h2 style={{ fontSize: "20px", fontWeight: 400, color: C.accent, margin: 0 }}>
+          VanEck BNB ETF (VBNB)
+        </h2>
+        <button
+          onClick={hamtaNu}
+          disabled={fetching}
+          style={{ background: fetching ? "#1a1a1a" : "#38bdf815", border: "1px solid #38bdf840", color: "#38bdf8", borderRadius: "4px", padding: "8px 18px", fontSize: "13px", fontWeight: 600, cursor: fetching ? "wait" : "pointer", fontFamily: "Georgia, serif" }}
+        >
+          {fetching ? "Hämtar…" : "↻ Hämta från VanEck nu"}
+        </button>
+      </div>
+      <p style={{ color: C.textMuted, fontSize: "13px", marginBottom: "8px" }}>
+        Senaste rad: {senaste.datum} · Datakälla: {senaste.datakalla}
       </p>
+      {fetchLog && (
+        <div style={{ background: fetchLog.ok ? "#0a1f0a" : "#1f0a0a", border: `1px solid ${fetchLog.ok ? "#4ade8040" : "#f8717140"}`, borderRadius: "6px", padding: "12px", marginBottom: "20px", fontSize: "12px", fontFamily: "monospace" }}>
+          <div style={{ color: fetchLog.ok ? C.green : C.red, fontWeight: 600, marginBottom: "6px" }}>
+            {fetchLog.ok ? `✓ ${fetchLog.status}` : `✗ ${fetchLog.error}`}
+          </div>
+          {fetchLog.log && (
+            <div style={{ color: C.textMuted, lineHeight: 1.6 }}>
+              {fetchLog.log.map((l, i) => <div key={i}>{l}</div>)}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Nyckeltal */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: "12px", marginBottom: "32px" }}>
