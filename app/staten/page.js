@@ -120,10 +120,6 @@ async function getData() {
       `${SB_URL}/rest/v1/oligarki_historik?select=datum,gini,mobilitet,top3_andel&order=datum.desc&limit=8`,
       { headers: h, next: { revalidate: 120 } }
     ),
-    fetch(
-      `${SB_URL}/rest/v1/oligarki_historik?select=datum,gini,mobilitet,topp3_andel&order=datum.desc&limit=8`,
-      { headers: h, next: { revalidate: 120 } }
-    ),
   ]);
 
   return {
@@ -178,7 +174,6 @@ export default async function StatenPage() {
   const totalFormogehet = agenter.reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
   const top3Saldo = agenter.slice(0, 3).reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
   const top3Andel = totalFormogehet > 0 ? Math.round((top3Saldo / totalFormogehet) * 100) : 0;
-
 
   // Top taxpayers: agents with saldo > current policy threshold
   const taxpayers = agenter
