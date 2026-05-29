@@ -3421,9 +3421,14 @@ def ta_oligarki_snapshot(sb_key: str) -> None:
     """Sparar dagens oligarki-mätvärden till oligarki_historik (upsert per datum)."""
     if not sb_key:
         return
+    import os
     from datetime import date
 
     hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    # Skrivoperationer kräver service-role-nyckeln — anon-nyckeln är publik och
+    # får inte ha INSERT/UPDATE-privilegier på denna tabell.
+    write_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+    write_hdrs = {"apikey": write_key, "Authorization": f"Bearer {write_key}"}
 
     def get(path):
         r = httpx.get(f"{SB_URL}/rest/v1/{path}", headers=hdrs, timeout=15)
@@ -3540,7 +3545,7 @@ def ta_oligarki_snapshot(sb_key: str) -> None:
 
     httpx.post(
         f"{SB_URL}/rest/v1/oligarki_historik",
-        headers={**hdrs, "Content-Type": "application/json",
+        headers={**write_hdrs, "Content-Type": "application/json",
                  "Prefer": "resolution=merge-duplicates,return=minimal"},
         params={"on_conflict": "datum"},
         json={
