@@ -802,9 +802,10 @@ Kräver Supabase-tabell `oligarki_historik` — kör `supabase_oligarki_historik
 | `supabase_utils.py` → `berakna_och_spara_partier()` | BFS-klustring av agent_koalitioner (styrka ≥ 3), sparar kluster med 3–8 agenter som partier. Loggar till civilisations_minne. |
 | `supabase_utils.py` → `hamta_agent_parti()` | Returnerar agentens aktiva parti (id, namn, ledare, medlemmar) eller None. |
 | `supabase_utils.py` → `hamta_ledare_rost()` | Hämtar partiledaren röst på ett specifikt lagförslag — används för partilinjeröstning. |
-| `inflation.py` | Veckovis skript: höjer butikspriser 3%, beräknar 5% låneränta, betalar ut 1% sparränta (saldo > 500 kr), genomför bailout vid saldo < 100 kr. Loggar till civilisations_minne. |
+| `inflation.py` | Veckovis skript: läser Gini från `oligarki_historik` och sätter dynamisk policy (skattesats 1–3%, tröskel 800–1 200 kr, bailout-tröskel 100–250 kr). Höjer butikspriser 3%, beräknar 5% låneränta, betalar ut 1% sparränta (saldo > 500 kr). Loggar policy-skiften och ekonomicykeln till civilisations_minne. |
 | `supabase_bank.sql` | SQL-schema för `agent_lan` med RLS-policies för publik läsning. |
 | `app/bank/page.js` | Centralbanken-sida. Balansräkning (tillgångar/skulder/kreditexponering), aktiva lån, lägst saldo-rankning, dyraste symboler, senaste bankhändelser. SSR med 120s revalidering. |
+| `app/staten/page.js` | Staten-sida. Gini-progress mot mål 0.40, dynamisk policy-display (skattetröskel/skattesats/bailout-tröskel baserat på Gini), skattebetalare med dynamiska trösklar, budgetöversikt 4 veckor, senaste böter. SSR med 120s revalidering. |
 | `.github/workflows/inflation.yml` | Kör `inflation.py` varje söndag 12:00 svensk tid (10:00 UTC). |
 | `supabase_etf.sql` | SQL-schema för `agent_etf_innehav` och `etf_transaktioner` med RLS-policies. |
 | `app/etf/page.js` | Krypto-ETF-sida. NAV per symbol med 24h-förändring, nyckeltal, portföljranking med P&L-staplar, transaktionslogg. SSR med 120s revalidering. |
@@ -1433,6 +1434,31 @@ curl -X POST https://www.debatt-ai.se/api/agent-fraga \
 | `app/api/agent-fraga/route.js` | X-API-Key-validering, bypass IP-rate-limit, fragare="api" vid sparning |
 | `app/agent/[namn]/AgentFragaForm.js` | `KallaBadge`-komponent med tre källtyper |
 | `app/agent/[namn]/page.js` | Supabase-query hämtar nu `fragare`-kolumnen |
+
+### ✅ 71. Dynamisk Gini-driven ekonomisk policy – KLART
+Varje söndag läser `inflation.py` den senaste Gini-koefficienten från `oligarki_historik` och justerar automatiskt tre ekonomiska parametrar utan manuell inblandning.
+
+**Tre nivåer:**
+| Gini | Skattesats | Skattetröskel | Bailout-tröskel | Nivånamn |
+|---|---|---|---|---|
+| < 0.40 | 1% | 1 200 kr | 100 kr | LÅG OJÄMLIKHET |
+| 0.40–0.60 | 2% | 1 000 kr | 150 kr | MÅTTLIG OJÄMLIKHET |
+| > 0.60 | 3% | 800 kr | 250 kr | HÖG OJÄMLIKHET |
+
+**Mekanik:**
+- `hamta_gini_historik()` hämtar senaste 8 Gini-snapshots. Om tabellen saknas returneras `None` → policy defaultar till "medel"-nivå (fail-open).
+- `berakna_policy_niva(gini)` mappar Gini → nivå-nyckel.
+- Om nivån ändras sedan föregående körning loggas ett `triumf`/`skandal`-minne i `civilisations_minne` med gammal vs ny policy i klartext.
+
+**Sidan `/staten`** visar Gini-koefficienten som en progress-bar mot målet 0.40, trend sedan ~7 dagar sedan, aktuella policy-parametrar (skattetröskel, skattesats, bailout-tröskel, topp-3 förmögenhetsandel, social mobilitet) och en ojämlikhetsbarometer. Skattebetalare-tabellen visar dynamiska trösklar.
+
+**Policyidén är generell:** Alla länder har de institutioner som krävs — ett skatteverk, en riksbank och publicerad Gini-statistik. Det som saknas är viljan att binda ihop dem. En Gini-driven policy låter utfallet styra kalibreringen; politikerna sätter bara målet. Den reella begränsningen är risk för kapitalflykt, vilket är ett argument för internationell skattesamordning — inte mot dynamisk policy.
+
+| Fil | Roll |
+|---|---|
+| `inflation.py` | Läser Gini, beräknar policy-nivå, sätter SKATTETRÖSKEL/SKATTESATS/BAILOUT_TROSKEL. Loggar skiften till civilisations_minne. |
+| `app/staten/page.js` | Staten-sida: Gini-progress mot mål 0.40, trend-indikator, policy-parametrar, ojämlikhetsbarometer. Skattebetalare-tabell med dynamiska trösklar. SSR med 120s revalidering. |
+| `app/om/page.js` | OmSektion `gini-policy`: förklarar de tre nivåerna, policy-parametrarna och det reella politikförslaget med motivering. |
 
 ---
 
