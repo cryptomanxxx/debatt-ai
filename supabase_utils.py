@@ -36,7 +36,7 @@ from agenter import OPINION_FRAGOR
 def _llm_spel(system: str, prompt: str, max_tokens: int = 80) -> str:
     """Kort LLM-anrop för ekonomispel med full fallback-kedja."""
     payload = {
-        "model": "llama3.3-70b-versatile",
+        "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         "max_tokens": max_tokens, "temperature": 0.7,
     }
@@ -867,7 +867,7 @@ def rösta_på_opinion(agent: dict, sb_key: str) -> int:
             svar_raw = ""
             try:
                 r = groq_post({
-                    "model": "llama3.3-70b-versatile",
+                    "model": "llama-3.3-70b-versatile",
                     "messages": [{"role": "user", "content": prompt}],
                     "max_tokens": 5,
                     "temperature": 0.3,
@@ -962,7 +962,7 @@ def skapa_opinion_fraga(agent: dict, sb_key: str, amne: str, rubrik: str = "") -
         svar_raw = ""
         try:
             r = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 80,
                 "temperature": 0.9,
@@ -1033,7 +1033,7 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
         )
         svar_raw = ""
         _market_payload = {
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 150,
             "temperature": 0.85,
@@ -1177,7 +1177,7 @@ Välj den indikator som just nu är mest politiskt relevant. typ ska vara 'line'
 
     try:
         response = groq_post({
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 250,
             "temperature": 0.7,
@@ -1211,7 +1211,7 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "") -> tup
         '{"sannolikhet": <heltal 0-100>, "motivering": "<1-2 meningar>"}'
     )
     _payload = {
-        "model": "llama3.3-70b-versatile",
+        "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
         "max_tokens": 120,
         "temperature": 0.4,
@@ -1428,7 +1428,7 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
                 "Välj RÖST: ja, nej eller avstar"
             )
             payload = {
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": agent["system"][:600]},
                     {"role": "user", "content": prompt},
@@ -1490,7 +1490,7 @@ def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str) -> bool:
             "Inga andra ord. Ingen inledning."
         )
         payload = {
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {"role": "system", "content": agent["system"][:600]},
                 {"role": "user", "content": prompt},
@@ -1815,7 +1815,7 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
         forslag = None
         try:
             forslag = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "system", "content": forslag_system}, {"role": "user", "content": forslag_prompt}],
                 "max_tokens": 120, "temperature": 0.8,
             }).json()["choices"][0]["message"]["content"].strip()
@@ -1850,7 +1850,7 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
         svar = None
         try:
             svar = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "system", "content": svar_system}, {"role": "user", "content": svar_prompt}],
                 "max_tokens": 100, "temperature": 0.8,
             }).json()["choices"][0]["message"]["content"].strip()
@@ -2046,7 +2046,7 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         argument = None
         try:
             argument = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "system", "content": lobby_system}, {"role": "user", "content": lobby_user}],
                 "max_tokens": 120, "temperature": 0.7,
             }).json()["choices"][0]["message"]["content"].strip()
@@ -2092,7 +2092,7 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         mal_svar = None
         try:
             mal_svar = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "system", "content": mal_system}, {"role": "user", "content": mal_prompt}],
                 "max_tokens": 80, "temperature": 0.7,
             }).json()["choices"][0]["message"]["content"].strip()
@@ -2344,7 +2344,7 @@ def uppdatera_agent_positioner(sb_key: str, agent: dict) -> None:
         _system = "Du extraherar ståndpunkter ur debattartiklar."
         try:
             r = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": _system},
                     {"role": "user", "content": prompt},
@@ -4247,7 +4247,7 @@ def mutera_rykte_innehall(groq_key: str, original: str) -> str | None:
         import groq as groq_lib
         client = groq_lib.Groq(api_key=groq_key)
         resp = client.chat.completions.create(
-            model="llama3.3-70b-versatile",
+            model="llama-3.3-70b-versatile",
             messages=[{
                 "role": "user",
                 "content": (
@@ -4650,7 +4650,7 @@ def reagera_pa_bild(sb_key: str, fran_agent: str, fran_system: str) -> bool:
             f"Var konkret och i karaktär. Inga inledningsfraser."
         )
         payload = {
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {"role": "system", "content": fran_system[:600]},
                 {"role": "user",   "content": prompt_text},
@@ -5053,7 +5053,7 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
     )
     try:
         payload = {
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},

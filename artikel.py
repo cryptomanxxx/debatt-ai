@@ -67,7 +67,7 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
         "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
     )
     payload = {
-        "model": "llama3.3-70b-versatile",
+        "model": "llama-3.3-70b-versatile",
         "max_tokens": max_tok,
         "temperature": 0.8,
         "messages": [
@@ -119,7 +119,7 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
         "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
     )
     payload = {
-        "model": "llama3.3-70b-versatile",
+        "model": "llama-3.3-70b-versatile",
         "max_tokens": max_tok,
         "temperature": 0.8,
         "messages": [
@@ -190,7 +190,7 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
         + (f"\n\nSTAFETTUTMANING: {original['forfattare']} utmanade dig specifikt att bemöta följande: {stafett_utmaning}\nSe till att din replik adresserar just detta argument direkt och explicit." if stafett_utmaning else "")
     )
     payload = {
-        "model": "llama3.3-70b-versatile",
+        "model": "llama-3.3-70b-versatile",
         "max_tokens": max_tok,
         "temperature": 0.8,
         "messages": [
@@ -227,7 +227,7 @@ def generera_konklusion(original: dict, replik_text: str) -> str:
     """Generera en neutral redaktionell slutsats om debatten."""
     try:
         response = groq_post({
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "max_tokens": 300,
             "temperature": 0.4,
             "messages": [
@@ -261,7 +261,7 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
     rubrik_tips = fmt["rubrik_tips"] if fmt else "Ska innehålla en konflikt eller ett kontroversiellt påstående"
     try:
         response = groq_post({
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "max_tokens": 60,
             "temperature": 0.7,
             "messages": [
@@ -293,7 +293,7 @@ def skriv_kommentar(agent: dict, original: dict, relation_kontext: str = "") -> 
     relation_del = f"\nRELATIONSKONTEXT: {relation_kontext} Låt detta synas i tonen." if relation_kontext else ""
     try:
         response = groq_post({
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "max_tokens": 150,
             "temperature": 0.9,
             "messages": [
@@ -335,7 +335,7 @@ def skriv_dagboksinlagg(agent: dict, rubrik: str, artikel_text: str, ar_replik: 
     )
     try:
         res = groq_post({
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "max_tokens": 180,
             "temperature": 1.0,
             "messages": [

@@ -45,7 +45,7 @@ def groq_anrop(system: str, user: str, max_tokens: int = 200) -> str:
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"},
             json={
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "max_tokens": max_tokens,
                 "temperature": 0.85,
                 "messages": [

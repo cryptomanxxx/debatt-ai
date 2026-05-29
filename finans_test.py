@@ -30,7 +30,7 @@ from ai_klient import groq_post, gemini_post, github_models_post
 
 def _llm(system: str, prompt: str, max_tokens: int = 60) -> str:
     payload = {
-        "model": "llama3.3-70b-versatile",
+        "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "system", "content": system},
                      {"role": "user",   "content": prompt}],
         "max_tokens": max_tokens, "temperature": 0.8,
