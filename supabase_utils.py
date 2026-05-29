@@ -1372,9 +1372,25 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
                     if spara_lag_rost(sb_key, f["id"], agent["namn"], ledare_rod, motivering):
                         antal += 1
                     continue
+            pis = hamta_pis_analys(sb_key, f["id"])
+            pis_kontext = ""
+            if pis:
+                bnp_val = pis.get("bnp_effekt_pct")
+                gini_val = pis.get("gini_effekt")
+                bnp_str = (f"+{bnp_val:.1f}%" if bnp_val >= 0 else f"{bnp_val:.1f}%") if bnp_val is not None else "?"
+                gini_str = (f"+{gini_val:.2f}" if gini_val >= 0 else f"{gini_val:.2f}") if gini_val is not None else "?"
+                gini_dir = "ökad ojämlikhet" if (gini_val or 0) > 0 else "minskad ojämlikhet"
+                pis_kontext = (
+                    f"PIS-analys (Policy Impact Simulator): "
+                    f"BNP-effekt {bnp_str}, Gini-effekt {gini_str} ({gini_dir}), "
+                    f"sysselsättning: {pis.get('sysselsattning_effekt','?')}. "
+                    f"Konfidens: {pis.get('konfidens','?')}.\n"
+                    f"{pis.get('analys','')[:250]}\n\n"
+                )
             prompt = (
                 f"Lagförslag: \"{f['titel']}\"\n\n"
-                f"{f['beskrivning'][:600]}\n\n"
+                f"{f['beskrivning'][:500]}\n\n"
+                f"{pis_kontext}"
                 f"{eko_kontext}"
                 "Rösta på detta förslag utifrån din personlighet, dina värderingar och den ekonomiska kontexten ovan. "
                 "Svara EXAKT i detta format:\n"
@@ -4974,3 +4990,137 @@ def formatera_minnen_for_prompt(minnen: list[dict]) -> str:
         return ""
     rader = [f"- {m['narrativ']}" for m in minnen[:5]]
     return "Dina senaste minnen (referera gärna till dessa i din text):\n" + "\n".join(rader)
+
+
+# ── PIS — Policy Impact Simulator ────────────────────────────────────────────
+
+def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning: str) -> bool:
+    """Analyserar ett lagförslags förväntade BNP- och Gini-påverkan via LLM. Sparar i pis_analyser."""
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "return=minimal",
+    }
+    system = (
+        "Du är en oberoende nationalekonomisk analytiker som bedömer svenska lagförslags "
+        "makroekonomiska konsekvenser. Var analytisk och balanserad. Ange alltid osäkerheter."
+    )
+    prompt = (
+        f"Lagförslag: \"{titel}\"\n\n"
+        f"{beskrivning[:700]}\n\n"
+        "Analysera detta förslags sannolika ekonomiska effekter på 3–5 års sikt.\n"
+        "Svara EXAKT i detta format (inga andra ord):\n"
+        "BNP_EFFEKT: [tal med max en decimal, t.ex. +1.2 eller -0.5, procent av BNP]\n"
+        "GINI_EFFEKT: [tal med max två decimaler, t.ex. -0.02 eller +0.01, förändring i Gini]\n"
+        "SYSSELSATTNING: [positiv, negativ eller neutral]\n"
+        "KONFIDENS: [låg, medel eller hög]\n"
+        "ANALYS: [100–150 ord på svenska — mekanismer, berörda grupper, osäkerheter]\n\n"
+        "Börja direkt med BNP_EFFEKT:"
+    )
+    try:
+        payload = {
+            "model": "llama3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": 380, "temperature": 0.35,
+        }
+        raw = None
+        try:
+            raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
+        except Exception:
+            pass
+        if not raw:
+            try:
+                raw = gemini_post(system, prompt, max_tokens=380)
+            except Exception:
+                pass
+        if not raw:
+            return False
+
+        bnp, gini, syss, konfidens, analys = None, None, "neutral", "låg", ""
+        for line in raw.splitlines():
+            line = line.strip()
+            upper = line.upper()
+            if upper.startswith("BNP_EFFEKT:"):
+                try:
+                    bnp = float(line.split(":", 1)[1].strip().replace(",", ".").replace("+", "").split()[0])
+                except Exception:
+                    pass
+            elif upper.startswith("GINI_EFFEKT:"):
+                try:
+                    gini = float(line.split(":", 1)[1].strip().replace(",", ".").replace("+", "").split()[0])
+                except Exception:
+                    pass
+            elif upper.startswith("SYSSELSATTNING:"):
+                v = line.split(":", 1)[1].strip().lower()
+                syss = v if v in ("positiv", "negativ", "neutral") else "neutral"
+            elif upper.startswith("KONFIDENS:"):
+                v = line.split(":", 1)[1].strip().lower()
+                konfidens = v if v in ("låg", "medel", "hög") else "låg"
+            elif upper.startswith("ANALYS:"):
+                analys = line.split(":", 1)[1].strip()
+            elif analys:
+                analys += " " + line
+
+        if not analys or len(analys) < 30:
+            return False
+
+        r = httpx.post(
+            f"{SB_URL}/rest/v1/pis_analyser",
+            headers=h,
+            json={
+                "lagforslag_id": forslag_id,
+                "bnp_effekt_pct": bnp,
+                "gini_effekt": gini,
+                "sysselsattning_effekt": syss,
+                "analys": analys.strip()[:1200],
+                "konfidens": konfidens,
+            },
+            timeout=10,
+        )
+        return r.is_success
+    except Exception:
+        return False
+
+
+def hamta_pis_analys(sb_key: str, forslag_id: int) -> dict | None:
+    """Hämtar PIS-analys för ett specifikt lagförslag. Returnerar dict eller None."""
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/pis_analyser?lagforslag_id=eq.{forslag_id}&limit=1",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
+            timeout=6,
+        )
+        data = r.json() if r.is_success else []
+        return data[0] if data else None
+    except Exception:
+        return None
+
+
+def analysera_alla_forslag_pis(sb_key: str, max_antal: int = 10) -> int:
+    """Analyserar öppna förslag som saknar PIS-analys. Returnerar antal nyanalyserade."""
+    try:
+        h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""}
+        r_f = httpx.get(
+            f"{SB_URL}/rest/v1/lagforslag?status=neq.avgjort&order=skapad.desc&limit=60&select=id,titel,beskrivning",
+            headers=h, timeout=10,
+        )
+        if not r_f.is_success:
+            return 0
+        alla = r_f.json()
+
+        r_p = httpx.get(
+            f"{SB_URL}/rest/v1/pis_analyser?select=lagforslag_id",
+            headers=h, timeout=8,
+        )
+        analyserade = {row["lagforslag_id"] for row in (r_p.json() if r_p.is_success else [])}
+
+        ej = [f for f in alla if f["id"] not in analyserade]
+        antal = 0
+        for f in ej[:max_antal]:
+            if analysera_forslag_pis(sb_key, f["id"], f["titel"], f.get("beskrivning") or ""):
+                antal += 1
+        return antal
+    except Exception:
+        return 0
