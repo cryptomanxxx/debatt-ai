@@ -1710,6 +1710,185 @@ function FellogTab() {
   );
 }
 
+// ── VbnbTab ────────────────────────────────────────────────────────────────────
+
+function VbnbTab() {
+  const [rows, setRows]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState("");
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await fetch(
+          `${SB_URL}/rest/v1/vbnb_data?select=*&order=datum.asc&limit=365`,
+          { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setRows(await res.json());
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  if (loading) return <p style={{ color: C.textMuted }}>Laddar VBNB-data…</p>;
+  if (error)   return <p style={{ color: C.red }}>Fel: {error} — Kör supabase_vbnb.sql i SQL Editor.</p>;
+  if (!rows.length) return <p style={{ color: C.textMuted }}>Ingen data ännu. Kör vbnb_fetch.py eller trigga GitHub Actions.</p>;
+
+  const senaste = rows[rows.length - 1];
+
+  function fmtUSD(n) {
+    if (!n) return "–";
+    if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+    if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
+    return `$${n.toLocaleString("sv-SE")}`;
+  }
+  function fmtBNB(n) {
+    if (!n) return "–";
+    return n.toLocaleString("sv-SE", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  }
+
+  const chartData = rows.map(r => ({
+    datum:        r.datum,
+    bnb_in_trust: r.bnb_in_trust ? parseFloat(r.bnb_in_trust) : null,
+    aum_usd:      r.aum_usd      ? parseFloat(r.aum_usd) / 1e6 : null,
+  }));
+
+  const CELL = { padding: "16px", border: `1px solid ${C.border}`, borderRadius: "8px", background: C.surface };
+
+  return (
+    <div>
+      <h2 style={{ fontSize: "20px", fontWeight: 400, color: C.accent, marginBottom: "8px" }}>
+        VanEck BNB ETF (VBNB)
+      </h2>
+      <p style={{ color: C.textMuted, fontSize: "13px", marginBottom: "24px" }}>
+        Källa: yfinance + VanEck · Senaste rad: {senaste.datum} · Datakälla: {senaste.datakalla}
+      </p>
+
+      {/* Nyckeltal */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: "12px", marginBottom: "32px" }}>
+        {[
+          ["BNB in Trust", fmtBNB(senaste.bnb_in_trust), senaste.bnb_in_trust >= 10000 ? C.green : C.red],
+          ["AUM",          fmtUSD(senaste.aum_usd),       C.accent],
+          ["NAV/aktie",    senaste.nav_per_share ? `$${parseFloat(senaste.nav_per_share).toFixed(2)}` : "–", C.accent],
+          ["BNB-pris",     senaste.bnb_price_usd ? `$${parseFloat(senaste.bnb_price_usd).toLocaleString("sv-SE")}` : "–", C.accent],
+        ].map(([lbl, val, color]) => (
+          <div key={lbl} style={CELL}>
+            <div style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "6px" }}>{lbl}</div>
+            <div style={{ fontSize: "22px", fontWeight: 600, color, fontFamily: "Georgia, serif" }}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* BNB in Trust-graf */}
+      <div style={{ marginBottom: "32px" }}>
+        <h3 style={{ fontSize: "15px", color: C.accentDim, marginBottom: "12px", fontWeight: 400 }}>
+          BNB in Trust — historik
+          <span style={{ marginLeft: "12px", fontSize: "12px", color: C.red }}>── 10 000 BNB-gräns</span>
+        </h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={chartData} margin={{ top: 8, right: 20, left: 10, bottom: 0 }}>
+            <XAxis
+              dataKey="datum"
+              tick={{ fill: C.textMuted, fontSize: 11 }}
+              tickFormatter={d => d.slice(5)}
+              minTickGap={30}
+            />
+            <YAxis
+              tick={{ fill: C.textMuted, fontSize: 11 }}
+              tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
+              domain={["auto", "auto"]}
+            />
+            <Tooltip
+              contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, fontSize: "12px" }}
+              formatter={(v, name) => [v ? `${parseFloat(v).toLocaleString("sv-SE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} BNB` : "–", "BNB in Trust"]}
+              labelFormatter={l => `Datum: ${l}`}
+            />
+            <ReferenceLine y={10000} stroke={C.red} strokeDasharray="6 3" strokeWidth={2} label={{ value: "10 000", fill: C.red, fontSize: 11, position: "insideTopRight" }} />
+            <Line
+              type="monotone"
+              dataKey="bnb_in_trust"
+              stroke="#f59e0b"
+              strokeWidth={2}
+              dot={false}
+              connectNulls
+              name="BNB in Trust"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* AUM-graf */}
+      <div style={{ marginBottom: "32px" }}>
+        <h3 style={{ fontSize: "15px", color: C.accentDim, marginBottom: "12px", fontWeight: 400 }}>
+          AUM (M USD) — historik
+        </h3>
+        <ResponsiveContainer width="100%" height={220}>
+          <LineChart data={chartData} margin={{ top: 8, right: 20, left: 10, bottom: 0 }}>
+            <XAxis
+              dataKey="datum"
+              tick={{ fill: C.textMuted, fontSize: 11 }}
+              tickFormatter={d => d.slice(5)}
+              minTickGap={30}
+            />
+            <YAxis
+              tick={{ fill: C.textMuted, fontSize: 11 }}
+              tickFormatter={v => `$${v.toFixed(0)}M`}
+              domain={["auto", "auto"]}
+            />
+            <Tooltip
+              contentStyle={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, fontSize: "12px" }}
+              formatter={(v) => [v ? `$${parseFloat(v).toFixed(1)}M` : "–", "AUM"]}
+              labelFormatter={l => `Datum: ${l}`}
+            />
+            <Line
+              type="monotone"
+              dataKey="aum_usd"
+              stroke="#60a5fa"
+              strokeWidth={2}
+              dot={false}
+              connectNulls
+              name="AUM (M USD)"
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Rådata-tabell */}
+      <h3 style={{ fontSize: "15px", color: C.accentDim, marginBottom: "12px", fontWeight: 400 }}>Rådata (senaste 30)</h3>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", fontFamily: "monospace" }}>
+          <thead>
+            <tr>
+              {["Datum","BNB in Trust","AUM","NAV/aktie","BNB-pris","Källa"].map(h => (
+                <th key={h} style={{ textAlign: "left", padding: "6px 12px", borderBottom: `1px solid ${C.border}`, color: C.textMuted, fontWeight: 400 }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[...rows].reverse().slice(0, 30).map(r => (
+              <tr key={r.datum} style={{ borderBottom: `1px solid ${C.border}20` }}>
+                <td style={{ padding: "6px 12px", color: C.textMuted }}>{r.datum}</td>
+                <td style={{ padding: "6px 12px", color: r.bnb_in_trust >= 10000 ? C.green : C.red, fontWeight: 600 }}>
+                  {r.bnb_in_trust ? parseFloat(r.bnb_in_trust).toLocaleString("sv-SE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "–"}
+                </td>
+                <td style={{ padding: "6px 12px", color: C.text }}>{fmtUSD(r.aum_usd)}</td>
+                <td style={{ padding: "6px 12px", color: C.text }}>{r.nav_per_share ? `$${parseFloat(r.nav_per_share).toFixed(2)}` : "–"}</td>
+                <td style={{ padding: "6px 12px", color: C.text }}>{r.bnb_price_usd ? `$${parseFloat(r.bnb_price_usd).toLocaleString("sv-SE")}` : "–"}</td>
+                <td style={{ padding: "6px 12px", color: C.textMuted }}>{r.datakalla}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function LabbTab() {
   const [rows, setRows]     = useState(null);
   const [loading, setLoading] = useState(true);
@@ -2532,6 +2711,7 @@ export default function AdminClient() {
             ["parlament","Parlament"],
             ["api-status","API-status"],
             ["beslut-api","Decision API"],
+            ["vbnb","VBNB ETF"],
             ["labb","Experimentlabb"],
             ["ai-statistik","AI-statistik"],
             ["fellog","Fellog"],
@@ -2779,6 +2959,9 @@ export default function AdminClient() {
 
         {/* ── DECISION API ── */}
         {mainTab === "beslut-api" && <BeslutApiTab />}
+
+        {/* ── VBNB ETF ── */}
+        {mainTab === "vbnb" && <VbnbTab />}
 
         {/* ── AI-STATISTIK ── */}
         {mainTab === "labb" && <LabbTab />}

@@ -1,0 +1,25 @@
+name: VBNB ETF Daglig Data
+
+on:
+  schedule:
+    # Varje vardag 22:30 UTC (00:30 svensk tid) — efter USA-börsens stängning
+    - cron: '30 22 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installera beroenden
+        run: pip install httpx yfinance
+
+      - name: Hämta VBNB-data
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python vbnb_fetch.py
