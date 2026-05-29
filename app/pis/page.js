@@ -22,23 +22,29 @@ const C = {
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { analyser: [], forslagMap: {} };
+  if (!key) return { analyser: [], forslagMap: {}, mcMap: {} };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [aRes, fRes] = await Promise.all([
+  const [aRes, fRes, mcRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/pis_analyser?order=skapad.desc&limit=200`, {
       headers: h, next: { revalidate: 120 },
     }),
     fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,kategori,kalla,status,riksdagen_url&order=skapad.desc&limit=300`, {
       headers: h, next: { revalidate: 120 },
     }),
+    fetch(`${SB_URL}/rest/v1/pis_monte_carlo?select=lagforslag_id,iterationer,lyckade_iterationer,bnp_mean,bnp_std,bnp_min,bnp_max,gini_mean,gini_std,inflation_mean,inflation_std,arbetsloshet_mean,arbetsloshet_std,socialt_kapital_dist,koalition_dist&limit=300`, {
+      headers: h, next: { revalidate: 120 },
+    }),
   ]);
 
   const analyser = aRes.ok ? await aRes.json() : [];
   const forslag  = fRes.ok ? await fRes.json() : [];
+  const mc       = mcRes.ok ? await mcRes.json() : [];
   const forslagMap = {};
   for (const f of forslag) forslagMap[f.id] = f;
-  return { analyser, forslagMap };
+  const mcMap = {};
+  for (const m of mc) mcMap[m.lagforslag_id] = m;
+  return { analyser, forslagMap, mcMap };
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -88,7 +94,7 @@ function KonfidensBadge({ v }) {
   );
 }
 
-function MetricRow({ label, val, suffix, decimals, max, invertGood, children }) {
+function MetricRow({ label, val, suffix, decimals, max, invertGood, std, children }) {
   const farg = numFarg(val, invertGood);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -97,7 +103,22 @@ function MetricRow({ label, val, suffix, decimals, max, invertGood, children }) 
       <span style={{ fontSize: 12, fontWeight: 700, color: farg, minWidth: 54 }}>
         {children ?? numLabel(val, suffix, decimals)}
       </span>
+      {std != null && (
+        <span style={{ fontSize: 10, color: C.dim }}>±{std.toFixed(decimals ?? 1)}</span>
+      )}
     </div>
+  );
+}
+
+function MCBadge({ mc }) {
+  if (!mc) return null;
+  const pct = Math.round(mc.lyckade_iterationer / mc.iterationer * 100);
+  return (
+    <span title={`Monte Carlo: ${mc.lyckade_iterationer}/${mc.iterationer} iterationer lyckades`}
+      style={{ fontSize: 10, color: C.accent, border: `1px solid ${C.accent}44`,
+        borderRadius: 4, padding: "1px 6px", fontWeight: 600, flexShrink: 0 }}>
+      🎲 MC {pct}%
+    </span>
   );
 }
 
@@ -115,7 +136,7 @@ function RiktningRow({ label, v }) {
 // ── page ─────────────────────────────────────────────────────────────────────
 
 export default async function PisPage() {
-  const { analyser, forslagMap } = await getData();
+  const { analyser, forslagMap, mcMap } = await getData();
 
   const medBnp  = analyser.filter(a => a.bnp_effekt_pct   !== null);
   const medGini = analyser.filter(a => a.gini_effekt       !== null);
@@ -155,7 +176,7 @@ export default async function PisPage() {
             { label: "Analyserade",       val: analyser.length + " st",     farg: C.accent },
             { label: "Snitt BNP-effekt",  val: avgBnp  !== null ? numLabel(avgBnp, "%")   : "—", farg: numFarg(avgBnp) },
             { label: "Snitt Gini-effekt", val: avgGini !== null ? numLabel(avgGini, "", 3) : "—", farg: numFarg(avgGini, true) },
-            { label: "Indikatorer/analys", val: "6",                          farg: C.warn },
+            { label: "Med MC-analys", val: Object.keys(mcMap).length + " st", farg: C.accent },
           ].map(({ label, val, farg }) => (
             <div key={label} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, padding: "14px 16px" }}>
               <div style={{ fontSize: 10, color: C.dim, marginBottom: 5, textTransform: "uppercase", letterSpacing: ".08em" }}>{label}</div>
@@ -197,6 +218,7 @@ export default async function PisPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {analyser.map(a => {
               const f = forslagMap[a.lagforslag_id] || {};
+              const mc = mcMap[a.lagforslag_id] || null;
               const accentCol = numFarg(a.bnp_effekt_pct);
               const kallaBadge = f.kalla === "riksdagen"
                 ? { txt: "🏛 Riksdagen", col: C.warn }
@@ -221,6 +243,7 @@ export default async function PisPage() {
                             borderRadius: 4, padding: "1px 7px" }}>{f.kategori}</span>
                         )}
                         <KonfidensBadge v={a.konfidens} />
+                        <MCBadge mc={mc} />
                       </div>
                       <div style={{ fontSize: 15, fontWeight: 600, color: "#fff", lineHeight: 1.4 }}>
                         {f.riksdagen_url ? (
@@ -236,16 +259,16 @@ export default async function PisPage() {
                   {/* Indicators — two columns */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px", marginBottom: 14 }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                      <MetricRow label="BNP-effekt" val={a.bnp_effekt_pct} suffix="%" decimals={1} max={maxBnp} />
-                      <MetricRow label="Gini-effekt" val={a.gini_effekt} suffix="" decimals={2} max={maxGini} invertGood>
+                      <MetricRow label="BNP-effekt" val={a.bnp_effekt_pct} suffix="%" decimals={1} max={maxBnp} std={mc?.bnp_std} />
+                      <MetricRow label="Gini-effekt" val={a.gini_effekt} suffix="" decimals={2} max={maxGini} invertGood std={mc?.gini_std}>
                         {a.gini_effekt !== null
                           ? <>{numLabel(a.gini_effekt, "", 2)} <span style={{ fontSize: 10, color: numFarg(a.gini_effekt, true) }}>{a.gini_effekt < 0 ? "jämnare" : "ojämnare"}</span></>
                           : "—"}
                       </MetricRow>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                      <MetricRow label="Inflation Δ" val={a.inflation_delta} suffix="pp" decimals={1} max={maxInf} invertGood />
-                      <MetricRow label="Arbetslöshet Δ" val={a.arbetsloshet_delta} suffix="pp" decimals={1} max={maxArb} invertGood />
+                      <MetricRow label="Inflation Δ" val={a.inflation_delta} suffix="pp" decimals={1} max={maxInf} invertGood std={mc?.inflation_std} />
+                      <MetricRow label="Arbetslöshet Δ" val={a.arbetsloshet_delta} suffix="pp" decimals={1} max={maxArb} invertGood std={mc?.arbetsloshet_std} />
                     </div>
                     <RiktningRow label="Socialt kapital" v={a.socialt_kapital_effekt} />
                     <RiktningRow label="Koalitionsstabilitet" v={a.koalition_stabilitet} />

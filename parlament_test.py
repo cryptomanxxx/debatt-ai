@@ -16,6 +16,7 @@ from supabase_utils import (
     importera_riksdagen_forslag,
     uppdatera_riksdagen_utfall,
     analysera_alla_forslag_pis,
+    kör_pis_monte_carlo_batch,
     hamta_agent_parti,
 )
 from agent import AGENTER, ANALYTIKER
@@ -45,6 +46,16 @@ elif pis_nya == 0:
     print(f"  ✗ {pis_totalt} förslag saknar analys men LLM misslyckades — försöker igen nästa körning")
 else:
     print(f"  ✓ {pis_nya}/{pis_totalt} förslag fick PIS-analys")
+
+# PIS Monte Carlo — 15 iterationer × 2 förslag för konfidensintervall
+print("\n── PIS Monte Carlo (15 iter × 2 förslag) ──")
+mc_nya, mc_totalt = kör_pis_monte_carlo_batch(SB_KEY, max_antal=2, iterationer=15)
+if mc_totalt == 0:
+    print("  – Alla PIS-förslag har redan MC-analys")
+elif mc_nya == 0:
+    print(f"  ✗ {mc_totalt} förslag saknar MC — för få lyckade iterationer")
+else:
+    print(f"  ✓ {mc_nya}/{mc_totalt} förslag fick Monte Carlo-konfidensintervall")
 
 # Pre-fetcha allt vi behöver för röstningen — EN query för alla röster
 forslag = hamta_lagforslag(SB_KEY)
