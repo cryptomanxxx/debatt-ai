@@ -8,7 +8,7 @@ import os, sys
 from supabase_utils import ta_oligarki_snapshot
 
 def main():
-    sb_key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    sb_key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     if not sb_key:
         print("Saknar Supabase-nyckel.", file=sys.stderr)
         sys.exit(1)
