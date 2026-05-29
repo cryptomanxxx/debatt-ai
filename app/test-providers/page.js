@@ -1,12 +1,11 @@
 "use client";
 import { useState } from "react";
 
-const PROVIDERS = ["groq", "deepseek", "fireworks", "github_models", "cloudflare", "cerebras", "sambanova", "openrouter", "codestral", "gemini"];
+const PROVIDERS = ["groq", "deepseek", "github_models", "cloudflare", "cerebras", "sambanova", "openrouter", "codestral", "gemini"];
 
 const LABELS = {
   groq:         "Groq — llama-3.3-70b-versatile",
   deepseek:     "DeepSeek — deepseek-chat (V3)",
-  fireworks:    "Fireworks AI — qwen2p5-72b-instruct",
   github_models:"GitHub Models — Llama-3.3-70B-Instruct",
   cloudflare:   "Cloudflare Workers AI — llama-3.3-70b-fp8-fast",
   cerebras:     "Cerebras — gpt-oss-120b",
@@ -37,7 +36,7 @@ export default function TestProviders() {
     <main style={{ maxWidth: 700, margin: "40px auto", padding: "0 16px", fontFamily: "monospace" }}>
       <h1 style={{ fontSize: 22, marginBottom: 8 }}>AI Provider-test</h1>
       <p style={{ color: "#888", marginBottom: 24, fontSize: 14 }}>
-        Testar alla 10 providers parallellt — i fallback-ordning: Groq → DeepSeek → Fireworks → GitHub Models → Cloudflare → Gemini m.fl.
+        Testar alla 9 providers parallellt — i fallback-ordning: Groq → DeepSeek → GitHub Models → Cloudflare → Gemini m.fl.
       </p>
 
       <button
