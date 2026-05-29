@@ -14,6 +14,7 @@ import os
 import random
 import sys
 import urllib.parse
+from datetime import datetime, timezone
 
 import httpx
 
@@ -103,14 +104,16 @@ def url_typ(url: str) -> str:
     return "✗  MISSLYCKADES"
 
 
-def hamta_senaste_bilder(sb_key: str, agent: str, antal: int = 5) -> list:
+def hamta_senaste_bilder(sb_key: str, agent: str, antal: int = 5,
+                         skapad_efter: str = "") -> list:
     try:
-        r = httpx.get(
-            f"{SB_URL}/rest/v1/agent_bilder"
-            f"?agent=eq.{agent}&order=skapad.desc&limit={antal}&select=bild_url,bildtyp,skapad",
-            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
-            timeout=10,
-        )
+        url = (f"{SB_URL}/rest/v1/agent_bilder"
+               f"?agent=eq.{agent}&order=skapad.desc&limit={antal}"
+               f"&select=bild_url,bildtyp,skapad")
+        if skapad_efter:
+            url += f"&skapad=gte.{urllib.parse.quote(skapad_efter)}"
+        r = httpx.get(url, headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+                      timeout=10)
         return r.json() if r.is_success else []
     except Exception:
         return []
@@ -161,6 +164,7 @@ def main():
     testa_pollinations_download(test_url)
     print()
 
+    run_start = datetime.now(timezone.utc).isoformat()
     resultat = []
 
     # ── 1. Tillståndsfoto ────────────────────────────────────────────────────
@@ -228,7 +232,7 @@ def main():
 
     # ── Verifiera sparade bilder i Supabase ──────────────────────────────────
     print(f"\n── Verifierar sparade bilder i Supabase ────────────────────")
-    sparade = hamta_senaste_bilder(sb_key, agent["namn"], antal=4)
+    sparade = hamta_senaste_bilder(sb_key, agent["namn"], antal=4, skapad_efter=run_start)
     if sparade:
         storage_antal = sum(1 for b in sparade if SB_URL in (b.get("bild_url") or "") and "storage" in (b.get("bild_url") or ""))
         pollen_antal  = len(sparade) - storage_antal
