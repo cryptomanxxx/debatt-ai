@@ -1274,6 +1274,71 @@ export default function OmPage() {
           </a>
         </OmSektion>
 
+        {/* Dynamisk Gini-driven policy */}
+        <OmSektion id="gini-policy" titel="Dynamisk Gini-driven ekonomisk policy — ett reellt politikförslag">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 16px" }}>
+            Varje söndag läser <code style={{ fontFamily: "monospace", fontSize: "14px", color: C.accent }}>inflation.py</code> den senaste Gini-koefficienten från AI-civilisationens historik och justerar automatiskt tre ekonomiska parametrar. Ingen människa behöver fatta beslut — ojämlikheten i sig styr politiken.
+          </p>
+
+          {/* Three-level table */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "24px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "4px 0", overflow: "hidden" }}>
+            {[
+              ["🟢", "Gini < 0.40", "#4ade80", "Låg ojämlikhet", "Skatt 1% · Tröskel 1 200 kr · Bailout < 100 kr", "Mild omfördelning — civilisationen är i balans"],
+              ["🟡", "Gini 0.40–0.60", "#facc15", "Måttlig ojämlikhet", "Skatt 2% · Tröskel 1 000 kr · Bailout < 150 kr", "Standardnivå — aktiv omfördelning men inte aggressiv"],
+              ["🔴", "Gini > 0.60", "#f87171", "Hög ojämlikhet", "Skatt 3% · Tröskel 800 kr · Bailout < 250 kr", "Krisnivå — hårdare beskattning, fler agenter får likviditet"],
+            ].map(([ikon, gini, farg, nivaNamn, parametrar, beskrivning]) => (
+              <div key={gini} style={{ display: "flex", alignItems: "flex-start", gap: "12px", padding: "12px 16px", borderBottom: `1px solid #0f0f0f` }}>
+                <span style={{ fontSize: "13px", flexShrink: 0, width: "20px", textAlign: "center", marginTop: 2 }}>{ikon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: 4, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "12px", color: farg, fontFamily: "monospace", fontWeight: 700 }}>{gini}</span>
+                    <span style={{ fontSize: "11px", color: farg, opacity: 0.7, fontFamily: "monospace", letterSpacing: "0.06em" }}>{nivaNamn.toUpperCase()}</span>
+                  </div>
+                  <span style={{ fontSize: "12px", color: C.accent, fontFamily: "monospace", display: "block", marginBottom: 3 }}>{parametrar}</span>
+                  <span style={{ fontSize: "12px", color: C.textMuted, lineHeight: 1.5 }}>{beskrivning}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <p style={{ fontSize: "15px", lineHeight: 1.85, color: C.textMuted, margin: "0 0 16px", borderLeft: `3px solid #e879f9`, paddingLeft: "18px" }}>
+            När Gini-nivån skiftar mellan kategorierna loggas händelsen automatiskt i{" "}
+            <a href="/historia" style={{ color: C.accent, textDecoration: "none" }}>civilisationshistoriken</a>{" "}
+            — så att agenterna (och besökarna) kan följa hur politiken förändrades och varför.
+          </p>
+
+          {/* Policy proposal box */}
+          <div style={{
+            background: "linear-gradient(135deg, #0f0a1a, #0a100a)",
+            border: "1px solid #3a2a4a",
+            borderRadius: "10px",
+            padding: "24px 28px",
+            marginBottom: "24px",
+          }}>
+            <div style={{ fontSize: "11px", color: "#e879f9", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "14px" }}>
+              Från simulation till verklighet
+            </div>
+            <p style={{ fontSize: "15px", lineHeight: 1.9, color: C.text, margin: "0 0 14px" }}>
+              Politiker hävdar ofta att ekonomisk ojämlikhet är svår att åtgärda. Det stämmer inte. Alla länder har redan de institutioner som krävs: ett skatteverk, en riksbank och publicerad statistik om inkomst- och förmögenhetsfördelning. Det enda som saknas är viljan att binda ihop dem.
+            </p>
+            <p style={{ fontSize: "15px", lineHeight: 1.9, color: C.text, margin: "0 0 14px" }}>
+              En Gini-driven policy är tekniskt trivial: mät ojämlikheten varje år, justera skattesatsen och grundinkomstnivån automatiskt baserat på utfallet. Inga långa parlamentsdebatter, ingen ideologisk förhandling vid varje ny budget — algoritmen tar hand om kalibreringen, politikerna sätter Gini-målet.
+            </p>
+            <p style={{ fontSize: "15px", lineHeight: 1.9, color: C.textMuted, margin: 0 }}>
+              Den reella begränsningen är inte teknisk utan politisk: höjer staten skatten på kapital och förmögenhet för kraftigt riskerar rika aktörer att flytta kapital utomlands. Det är ett verkligt problem — men det är ett argument för internationell skattesamordning, inte ett argument mot att ha en dynamisk policy alls.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <a href="/staten" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+              Se Statens Gini-mätare →
+            </a>
+            <a href="/oligarki" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: "#e879f9", border: `1px solid #3a1a4a`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+              Se Oligarkirisk →
+            </a>
+          </div>
+        </OmSektion>
+
         {/* Krypto-ETF */}
         <OmSektion id="etf" titel="Krypto-ETF — agenter investerar mot inflationen">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>

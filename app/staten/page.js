@@ -113,7 +113,11 @@ async function getData() {
       { headers: h, next: { revalidate: 120 } }
     ),
     fetch(
-      `${SB_URL}/rest/v1/domstol_domar?select=svarand,bote,skapad&order=skapad.desc&limit=20`,
+      `${SB_URL}/rest/v1/domstol_domar?select=straff_belopp,skapad,domstol_arenden!arende_id(svarande)&utfall=eq.fälld&order=skapad.desc&limit=20`,
+      { headers: h, next: { revalidate: 120 } }
+    ),
+    fetch(
+      `${SB_URL}/rest/v1/oligarki_historik?select=datum,gini,mobilitet,top3_andel&order=datum.desc&limit=8`,
       { headers: h, next: { revalidate: 120 } }
     ),
     fetch(
@@ -160,6 +164,22 @@ export default async function StatenPage() {
     return { vecka, skatt, grundinkomst, bailout, bot, sparranta, net, hasData: rows.length > 0 };
   });
 
+  // ── Gini & policy (must be before taxpayers filter) ──
+  const senastGini     = giniRows.length > 0 ? parseFloat(giniRows[0].gini) : null;
+  const foregaendeGini = giniRows.length > 1 ? parseFloat(giniRows[giniRows.length - 1].gini) : null;
+  const giniDelta      = (senastGini !== null && foregaendeGini !== null) ? senastGini - foregaendeGini : null;
+  const senastMobilitet = giniRows.length > 0 ? parseFloat(giniRows[0].mobilitet ?? 0) : null;
+  const senastTopp3    = giniRows.length > 0 ? parseFloat(giniRows[0].top3_andel ?? 0) : null;
+  const policy         = policyFranGini(senastGini);
+  const giniPct        = senastGini !== null ? Math.min(100, Math.round((senastGini / 0.8) * 100)) : null;
+  const giniTargetPct  = Math.round((0.4 / 0.8) * 100);
+
+  // Wealth stats
+  const totalFormogehet = agenter.reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
+  const top3Saldo = agenter.slice(0, 3).reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
+  const top3Andel = totalFormogehet > 0 ? Math.round((top3Saldo / totalFormogehet) * 100) : 0;
+
+
   // Top taxpayers: agents with saldo > current policy threshold
   const taxpayers = agenter
     .filter(a => parseFloat(a.saldo) > policy.skattetroskel)
@@ -172,22 +192,6 @@ export default async function StatenPage() {
   const senasteBoter = domar.slice(0, 10);
 
   const statskassaSaldo = parseFloat(statskassa?.saldo || 0);
-
-  // ── Gini & policy ──
-  const senastGini   = giniRows.length > 0 ? parseFloat(giniRows[0].gini)           : null;
-  const foregaendeGini = giniRows.length > 1 ? parseFloat(giniRows[giniRows.length - 1].gini) : null;
-  const giniDelta    = (senastGini !== null && foregaendeGini !== null) ? senastGini - foregaendeGini : null;
-  const senastMobilitet = giniRows.length > 0 ? parseFloat(giniRows[0].mobilitet ?? 0) : null;
-  const senastTopp3  = giniRows.length > 0 ? parseFloat(giniRows[0].topp3_andel ?? 0) : null;
-  const policy       = policyFranGini(senastGini);
-  // Progress bar: Gini target 0.40 — how close are we?
-  const giniPct      = senastGini !== null ? Math.min(100, Math.round((senastGini / 0.8) * 100)) : null;
-  const giniTargetPct = Math.round((0.4 / 0.8) * 100); // = 50%
-
-  // Wealth stats
-  const totalFormogehet = agenter.reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
-  const top3Saldo = agenter.slice(0, 3).reduce((s, a) => s + parseFloat(a.saldo || 0), 0);
-  const top3Andel = totalFormogehet > 0 ? Math.round((top3Saldo / totalFormogehet) * 100) : 0;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "40px 16px 80px", fontFamily: "Georgia, serif" }}>
@@ -662,12 +666,14 @@ export default async function StatenPage() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                 {senasteBoter.map((dom, i) => {
-                  const av   = agentVisuell(dom.svarand ?? "");
-                  const bote = parseFloat(dom.bote || 0);
+                  const svarand = dom.domstol_arenden?.svarande ?? "";
+                  const av   = agentVisuell(svarand);
+                  const bote = parseFloat(dom.straff_belopp || 0);
                   return (
                     <div key={i} style={{
-                      display: "flex", alignItems: "center", gap: 10,
+                      display: "flex", alignItems: "center", gap: 8,
                       padding: "10px 0", borderBottom: `1px solid ${C.border}`,
+                      overflow: "hidden",
                     }}>
                       {/* Mini avatar */}
                       <div style={{
@@ -681,22 +687,23 @@ export default async function StatenPage() {
                       </div>
 
                       {/* Defendant */}
-                      <a href={`/agent/${encodeURIComponent(dom.svarand ?? "")}`} style={{
+                      <a href={`/agent/${encodeURIComponent(svarand)}`} style={{
                         fontSize: 12, color: C.text, fontFamily: "Georgia, serif",
-                        textDecoration: "none", flex: 1,
+                        textDecoration: "none", flex: 1, minWidth: 0,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
-                        {dom.svarand ?? "—"}
+                        {svarand || "—"}
                       </a>
 
-                      {/* Date */}
-                      <span style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", flexShrink: 0 }}>
-                        {fmtDate(dom.skapad)}
+                      {/* Date — compact */}
+                      <span style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", flexShrink: 0, whiteSpace: "nowrap" }}>
+                        {new Date(dom.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short" })}
                       </span>
 
                       {/* Fine */}
                       <span style={{
                         fontSize: 13, color: C.red, fontFamily: "monospace",
-                        fontWeight: 700, flexShrink: 0, minWidth: 56, textAlign: "right",
+                        fontWeight: 700, flexShrink: 0, whiteSpace: "nowrap",
                       }}>
                         {fmtKr(bote)}
                       </span>

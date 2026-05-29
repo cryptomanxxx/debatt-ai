@@ -32,7 +32,7 @@ function icoProgress(utfardat, max) {
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { tokens: [], borsTokens: [], portfoljer: [] };
+  if (!key) return { tokens: [], borsData: [], portfoljer: [] };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
   const [tokRes, pfRes] = await Promise.all([

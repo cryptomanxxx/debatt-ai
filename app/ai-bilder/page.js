@@ -1,3 +1,5 @@
+import BildKortImg from "./BildKortImg";
+
 export const revalidate = 120;
 
 export const metadata = {
@@ -172,11 +174,9 @@ export default async function AiBilderPage({ searchParams }) {
               }}>
                 {/* Bild */}
                 <div style={{ position: "relative", aspectRatio: "3/2", background: "#080808" }}>
-                  <img
+                  <BildKortImg
                     src={b.bild_url}
-                    alt={b.prompt}
-                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                    loading="lazy"
+                    alt={`${b.agent} – ${b.bildtyp}`}
                   />
                   {/* Bildtyp-badge */}
                   <span style={{
