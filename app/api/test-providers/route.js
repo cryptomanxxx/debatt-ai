@@ -234,7 +234,7 @@ async function testDeepSeek() {
 async function testFireworks() {
   const key = process.env.FIREWORKS_API_KEY;
   if (!key) return { ok: false, error: "FIREWORKS_API_KEY saknas" };
-  const model = "accounts/fireworks/models/llama-v3p3-70b-instruct";
+  const model = "accounts/fireworks/models/qwen2p5-72b-instruct";
   const t0 = Date.now();
   try {
     const r = await fetch("https://api.fireworks.ai/inference/v1/chat/completions", {
