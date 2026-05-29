@@ -90,9 +90,13 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
         return result
     except Exception as e:
         print(f"  Cloudflare misslyckades ({e}) — försöker Gemini...")
-    result = gemini_post(system, user_msg, max_tokens=max_tok)
-    print("  ✓ Gemini: artikel klar")
-    return result
+    try:
+        result = gemini_post(system, user_msg, max_tokens=max_tok)
+        print("  ✓ Gemini: artikel klar")
+        return result
+    except Exception as e:
+        print(f"  Gemini misslyckades ({e}) — alla providers uttömda")
+    return None
 
 
 def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | None = None, buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "", ki_kontext: str = "") -> str:
@@ -137,9 +141,13 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
         return result
     except Exception as e:
         print(f"  Cloudflare misslyckades ({e}) — försöker Gemini...")
-    result = gemini_post(system, user_msg, max_tokens=max_tok)
-    print("  ✓ Gemini: artikel klar")
-    return result
+    try:
+        result = gemini_post(system, user_msg, max_tokens=max_tok)
+        print("  ✓ Gemini: artikel klar")
+        return result
+    except Exception as e:
+        print(f"  Gemini misslyckades ({e}) — alla providers uttömda")
+    return None
 
 
 def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "", stafett_utmaning: str = "", ki_kontext: str = "") -> str:
@@ -203,9 +211,13 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
         return result
     except Exception as e:
         print(f"  Cloudflare misslyckades ({e}) — försöker Gemini...")
-    result = gemini_post(system, user_msg, max_tokens=max_tok)
-    print("  ✓ Gemini: replik klar")
-    return result
+    try:
+        result = gemini_post(system, user_msg, max_tokens=max_tok)
+        print("  ✓ Gemini: replik klar")
+        return result
+    except Exception as e:
+        print(f"  Gemini misslyckades ({e}) — alla providers uttömda")
+    return None
 
 
 def generera_konklusion(original: dict, replik_text: str) -> str:
