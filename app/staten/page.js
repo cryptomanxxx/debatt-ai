@@ -117,7 +117,7 @@ async function getData() {
       { headers: h, next: { revalidate: 120 } }
     ),
     fetch(
-      `${SB_URL}/rest/v1/oligarki_historik?select=datum,gini,mobilitet,topp3_andel&order=datum.desc&limit=8`,
+      `${SB_URL}/rest/v1/oligarki_historik?select=datum,gini,mobilitet,top3_andel&order=datum.desc&limit=8`,
       { headers: h, next: { revalidate: 120 } }
     ),
   ]);
@@ -165,7 +165,7 @@ export default async function StatenPage() {
   const foregaendeGini = giniRows.length > 1 ? parseFloat(giniRows[giniRows.length - 1].gini) : null;
   const giniDelta      = (senastGini !== null && foregaendeGini !== null) ? senastGini - foregaendeGini : null;
   const senastMobilitet = giniRows.length > 0 ? parseFloat(giniRows[0].mobilitet ?? 0) : null;
-  const senastTopp3    = giniRows.length > 0 ? parseFloat(giniRows[0].topp3_andel ?? 0) : null;
+  const senastTopp3    = giniRows.length > 0 ? parseFloat(giniRows[0].top3_andel ?? 0) : null;
   const policy         = policyFranGini(senastGini);
   const giniPct        = senastGini !== null ? Math.min(100, Math.round((senastGini / 0.8) * 100)) : null;
   const giniTargetPct  = Math.round((0.4 / 0.8) * 100);
