@@ -333,6 +333,9 @@ def main():
             print(f"  📚 KIs injicerade: {len(ki_list)} st")
         print("Skriver replik (Groq med Gemini-fallback)...")
         artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, stafett_utmaning=stafett_kontext, ki_kontext=ki_kontext)
+        if not artikel:
+            print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
+            sys.exit(1)
 
         konklusion = ""
         djup = rakna_debattdjup(sb_key, original["rubrik"]) if sb_key else 0
@@ -513,6 +516,9 @@ def main():
                 print(f"  📚 KIs injicerade: {len(ki_list)} st")
             print("Skriver artikel (Groq med Gemini-fallback)...")
             artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext)
+            if not artikel:
+                print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
+                sys.exit(1)
             markera_forslag_behandlat(sb_key, forslag_id)
             print("  Förslag markerat som behandlat ✓")
         elif nyhet:
@@ -549,6 +555,9 @@ def main():
                 print(f"  📚 KIs injicerade: {len(ki_list)} st")
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
             artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext)
+            if not artikel:
+                print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
+                sys.exit(1)
         else:
             amne, kategori = random.choice(agent["amnen"])
             if sb_key:
@@ -578,6 +587,9 @@ def main():
                 print(f"  📚 KIs injicerade: {len(ki_list)} st")
             print("Skriver artikel (Groq med Gemini-fallback)...")
             artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext)
+            if not artikel:
+                print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
+                sys.exit(1)
 
         print("Genererar rubrik...")
         amne = generera_rubrik(agent, amne, artikel, fmt=artikelfmt)
