@@ -1,0 +1,25 @@
+name: Cleanup gamla AI-bilder
+
+on:
+  schedule:
+    - cron: "0 2 * * 0"   # Söndagar 04:00 svensk tid (02:00 UTC)
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Rensa gamla bilder
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          PYTHONUNBUFFERED: "1"
+        run: python -u cleanup_bilder.py
