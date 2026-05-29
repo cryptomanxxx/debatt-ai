@@ -1,12 +1,13 @@
 """
 inflation.py — Veckovis ekonomisk cykel för debatt.ai
 
-Körs av GitHub Actions varje söndag. Fem åtgärder:
-1. Förmögenhetsskatt: 2% på saldo > 1 000 kr → Statskassan
+Körs av GitHub Actions varje söndag. Sex åtgärder:
+0. Dynamisk policy: Gini-koefficienten från oligarki_historik styr skattenivå och bailout
+1. Förmögenhetsskatt: 1–3% på saldo > 800–1 200 kr (beroende på Gini) → Statskassan
 2. Inflationsuppdatering: butik_varor.pris × 1.03 (avrundat)
 3. Räntedragning: saldo_kvar × 1.05 på alla aktiva lån
 4. Sparränta: 1% på saldo > 400 kr (kapital föder kapital)
-5. Bailout: agenter med saldo < 100 kr får 500 kr från centralbanken
+5. Bailout: agenter med saldo < 100–250 kr får 500 kr från centralbanken
 6. Grundinkomst: statskassan omfördelas jämnt bland alla agenter
 """
 
@@ -14,6 +15,38 @@ import os, sys, httpx, math
 from datetime import datetime, timezone
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
+
+
+# ── Gini-baserad policy ───────────────────────────────────────────────────────
+POLICY_NIVA = {
+    "låg":    {"skattesats": 0.01, "skattetroskel": 1200, "bailout_troskel": 100,  "niva_namn": "LÅG OJÄMLIKHET"},
+    "medel":  {"skattesats": 0.02, "skattetroskel": 1000, "bailout_troskel": 150,  "niva_namn": "MÅTTLIG OJÄMLIKHET"},
+    "hög":    {"skattesats": 0.03, "skattetroskel": 800,  "bailout_troskel": 250,  "niva_namn": "HÖG OJÄMLIKHET"},
+}
+
+def hamta_gini_historik(h):
+    """Hämtar senaste Gini-snapshots för att bestämma policy-nivå."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/oligarki_historik?select=datum,gini&order=datum.desc&limit=8",
+            headers={**h, "Prefer": ""}, timeout=8,
+        )
+        if res.is_success and res.json():
+            rows = res.json()
+            senaste = float(rows[0]["gini"]) if rows else None
+            foregaende = float(rows[-1]["gini"]) if len(rows) > 1 else None
+            return senaste, foregaende
+    except Exception as e:
+        print(f"  [VARNING] Kunde inte hämta Gini: {e}")
+    return None, None
+
+def berakna_policy_niva(gini):
+    if gini is None or gini < 0.4:
+        return "låg"
+    elif gini < 0.6:
+        return "medel"
+    else:
+        return "hög"
 
 
 def main():
@@ -32,10 +65,45 @@ def main():
     # ISO-vecka för budget-logg
     iso_vecka = datetime.now(timezone.utc).strftime("%G-W%V")
 
-    # ── 0. Förmögenhetsskatt: 2% på saldo > 1 000 kr → Statskassan ───────────
-    SKATTETRÖSKEL = 1000
-    SKATTESATS    = 0.02
-    print("── Förmögenhetsskatt: 2% på saldo > 1 000 kr ──")
+    # ── Policy: läs Gini och sätt dynamiska parametrar ────────────────────────
+    print("── Dynamisk policy: läser Gini från oligarki_historik ──")
+    senaste_gini, foregaende_gini = hamta_gini_historik(h)
+    niva = berakna_policy_niva(senaste_gini)
+    foregaende_niva = berakna_policy_niva(foregaende_gini) if foregaende_gini is not None else None
+    policy = POLICY_NIVA[niva]
+
+    SKATTETRÖSKEL   = policy["skattetroskel"]
+    SKATTESATS      = policy["skattesats"]
+    BAILOUT_TROSKEL = policy["bailout_troskel"]
+
+    gini_str = f"{senaste_gini:.3f}" if senaste_gini is not None else "okänd"
+    print(f"  Gini: {gini_str} → {policy['niva_namn']}")
+    print(f"  Skatt: {SKATTESATS*100:.0f}% på saldo > {SKATTETRÖSKEL} kr | Bailout-tröskel: {BAILOUT_TROSKEL} kr")
+
+    # Logga nivåskifte i civilisationsminnet
+    if foregaende_niva and foregaende_niva != niva:
+        fore_policy = POLICY_NIVA[foregaende_niva]
+        httpx.post(
+            f"{SB_URL}/rest/v1/civilisations_minne",
+            headers=h,
+            json={
+                "typ": "triumf" if niva in ("låg", "medel") else "skandal",
+                "rubrik": f"Ekonomisk policy skiftade: {fore_policy['niva_namn']} → {policy['niva_namn']}",
+                "beskrivning": (
+                    f"Staten justerade sin omfördelningspolitik baserat på Gini-koefficienten ({gini_str}). "
+                    f"Skattetröskel: {fore_policy['skattetroskel']} → {SKATTETRÖSKEL} kr | "
+                    f"Skattesats: {fore_policy['skattesats']*100:.0f}% → {SKATTESATS*100:.0f}% | "
+                    f"Bailout-tröskel: {fore_policy['bailout_troskel']} → {BAILOUT_TROSKEL} kr."
+                ),
+                "agenter": [],
+                "relaterat_typ": "agent_planbocker",
+            },
+            timeout=8,
+        )
+        print(f"  ✓ Policy-skifte loggat i civilisationsminnet")
+
+    # ── 0. Förmögenhetsskatt ──────────────────────────────────────────────────
+    print(f"\n── Förmögenhetsskatt: {SKATTESATS*100:.0f}% på saldo > {SKATTETRÖSKEL} kr ──")
     skatt_res = httpx.get(
         f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SKATTETRÖSKEL}&agent=neq.Statskassa&select=agent,saldo",
         headers={**h, "Prefer": ""}, timeout=10,
@@ -193,10 +261,10 @@ def main():
     else:
         print("  Inga agenter över spargränsen.")
 
-    # ── 4. Bailout: agenter med saldo < 100 kr ───────────────────────────────
-    print("\n── Bailout: kontrollerar agenter med lågt saldo ──")
+    # ── 4. Bailout: agenter med saldo < BAILOUT_TROSKEL ─────────────────────
+    print(f"\n── Bailout: kontrollerar agenter med saldo < {BAILOUT_TROSKEL} kr ──")
     saldo_res = httpx.get(
-        f"{SB_URL}/rest/v1/agent_planbocker?saldo=lt.100&agent=neq.Statskassa&select=agent,saldo",
+        f"{SB_URL}/rest/v1/agent_planbocker?saldo=lt.{BAILOUT_TROSKEL}&agent=neq.Statskassa&select=agent,saldo",
         headers={**h, "Prefer": ""}, timeout=10,
     )
     if saldo_res.is_success:
