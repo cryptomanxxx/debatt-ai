@@ -1304,12 +1304,59 @@ def spara_lag_rost(sb_key: str, lagforslag_id: int, agent_namn: str, rod: str, m
         return False
 
 
+def _hamta_ekonomisk_rostkontext(sb_key: str, agent_namn: str) -> str:
+    """Hämtar aktuell ekonomisk kontext för att injiceras i röstningsprompt."""
+    try:
+        headers = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+        # Senaste oligarki-snapshot
+        r_eko = httpx.get(
+            f"{SB_URL}/rest/v1/oligarki_historik?order=skapad.desc&limit=1&select=gini,oligarki_risk,mobilitet",
+            headers=headers, timeout=6,
+        )
+        eko = r_eko.json()[0] if r_eko.is_success and r_eko.json() else {}
+
+        # Agentens eget saldo + genomsnittssaldo
+        r_saldo = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?select=agent,saldo",
+            headers=headers, timeout=6,
+        )
+        saldon = r_saldo.json() if r_saldo.is_success else []
+        agent_saldo = next((int(a["saldo"]) for a in saldon if a["agent"] == agent_namn), None)
+        genomsnitt = int(sum(a["saldo"] for a in saldon) / len(saldon)) if saldon else None
+
+        delar = []
+        if eko.get("gini") is not None:
+            gini = float(eko["gini"])
+            niva = "låg ojämlikhet" if gini < 0.4 else ("måttlig ojämlikhet" if gini < 0.6 else "hög ojämlikhet")
+            delar.append(f"Gini = {gini:.2f} ({niva})")
+        if eko.get("oligarki_risk") is not None:
+            delar.append(f"oligarkirisk = {int(eko['oligarki_risk'])}/100")
+        if eko.get("mobilitet") is not None:
+            delar.append(f"social mobilitet = {int(eko['mobilitet'])}%")
+
+        saldo_text = ""
+        if agent_saldo is not None and genomsnitt is not None:
+            jämförelse = "över genomsnittet" if agent_saldo > genomsnitt else "under genomsnittet"
+            saldo_text = f" Ditt saldo: {agent_saldo} kr (genomsnitt: {genomsnitt} kr — du är {jämförelse})."
+
+        if not delar and not saldo_text:
+            return ""
+        eko_str = ", ".join(delar) if delar else ""
+        return f"Ekonomisk kontext för din röst: {eko_str}.{saldo_text}\n\n"
+    except Exception:
+        return ""
+
+
 def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = None) -> int:
     """Agent röstar på öppna lagförslag den inte röstat på (max 5 per körning).
     Om agenten är med i ett parti följer den partiledaren med 80% sannolikhet."""
     forslag = hamta_lagforslag(sb_key)
     if not forslag:
         return 0
+
+    # Hämta ekonomisk kontext en gång för alla röster i denna körning
+    eko_kontext = _hamta_ekonomisk_rostkontext(sb_key, agent["namn"])
+
     antal = 0
     for f in forslag:
         if antal >= 5:
@@ -1328,7 +1375,8 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
             prompt = (
                 f"Lagförslag: \"{f['titel']}\"\n\n"
                 f"{f['beskrivning'][:600]}\n\n"
-                "Rösta på detta förslag utifrån din personlighet och dina värderingar. "
+                f"{eko_kontext}"
+                "Rösta på detta förslag utifrån din personlighet, dina värderingar och den ekonomiska kontexten ovan. "
                 "Svara EXAKT i detta format:\n"
                 "RÖST: ja\n"
                 "MOTIVERING: Din motivering på svenska, 1–2 meningar.\n\n"
