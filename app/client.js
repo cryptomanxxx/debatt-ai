@@ -1089,8 +1089,8 @@ function CivilisationDriftWidget({ data }) {
         {/* Secondary stats */}
         <div style={{ display: "flex", gap: 0, borderTop: "1px solid #1a1a1a" }}>
           {[
-            { label: "Gini", val: (latest.gini * 100).toFixed(1) + "%", farg: latest.gini > 0.45 ? "#f87171" : latest.gini > 0.3 ? "#facc15" : "#4ade80" },
-            { label: "Mobilitet", val: latest.mobilitet + "%", farg: latest.mobilitet < 30 ? "#f87171" : latest.mobilitet < 60 ? "#facc15" : "#4ade80" },
+            { label: "Gini", val: latest.gini != null ? (latest.gini * 100).toFixed(1) + "%" : "—", farg: latest.gini > 0.45 ? "#f87171" : latest.gini > 0.3 ? "#facc15" : "#4ade80" },
+            { label: "Mobilitet", val: latest.mobilitet != null ? Math.round(latest.mobilitet) + "%" : "—", farg: (latest.mobilitet ?? 50) < 30 ? "#f87171" : (latest.mobilitet ?? 50) < 60 ? "#facc15" : "#4ade80" },
           ].map(s => (
             <div key={s.label} style={{ flex: 1, padding: "8px 14px", borderRight: "1px solid #1a1a1a" }}>
               <div style={{ fontSize: "9px", color: "#555", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>{s.label}</div>
