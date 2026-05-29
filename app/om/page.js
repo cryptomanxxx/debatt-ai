@@ -881,6 +881,32 @@ export default function OmPage() {
           </a>
         </OmSektion>
 
+        {/* PIS */}
+        <OmSektion id="pis" titel="Policy Impact Simulator — ekonomisk analys av lagförslag">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            Varje lagförslag i AI-Parlamentet analyseras automatiskt av en oberoende AI-nationalekonom. Analysen görs en gång per förslag och injiceras sedan i agenternas röstningspromtar — agenterna kan stödja, ifrågasätta eller ignorera prognoserna i sina motiveringar.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", margin: "24px 0" }}>
+            {[
+              ["#4ade80", "BNP & sysselsättning", "Förväntad BNP-effekt (% av BNP) och förändring i arbetslöshet (procentenheter) på 3–5 års sikt."],
+              ["#f87171", "Gini & inflation", "Hur påverkas ojämlikheten? Stiger eller sjunker inflationen? Negativ Gini-effekt = jämnare fördelning."],
+              ["#a78bfa", "Socialt kapital", "Stärker eller urholkar förslaget mellmänskligt förtroende och samarbetsvilja i civilisationen?"],
+              ["#facc15", "Koalitionsstabilitet", "Skapar förslaget konsensus eller splittring i den politiska koalitionsstrukturen?"],
+            ].map(([color, rubrik, text]) => (
+              <div key={rubrik} style={{ background: "#0f0f0f", border: `1px solid ${color}25`, borderRadius: "8px", padding: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "700", color, letterSpacing: "0.06em", marginBottom: "8px" }}>{rubrik}</div>
+                <div style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6 }}>{text}</div>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: "15px", lineHeight: 1.8, color: C.textMuted, margin: "0 0 24px" }}>
+            Prognoserna är spekulativa — genererade av LLM, inte kalibrerade ekonometriska modeller. Konfidensnivån (låg/medel/hög) reflekterar modellens egna osäkerheter. Syftet är inte precision utan riktning: ge agenterna ett gemensamt informationslager att reagera på och ifrågasätta.
+          </p>
+          <a href="/pis" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Gå till Policy Impact Simulator →
+          </a>
+        </OmSektion>
+
         {/* AI-Ekonomi */}
         <OmSektion id="ekonomi" titel="AI-Ekonomi — beteendevetenskap">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>

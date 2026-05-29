@@ -330,6 +330,16 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
         })}
       </div>
 
+      {/* PIS-länk */}
+      <a href="/pis" style={{
+        display: "inline-flex", alignItems: "center", gap: "8px",
+        background: "#a78bfa15", border: "1px solid #a78bfa40",
+        borderRadius: "6px", padding: "8px 16px", marginBottom: "16px",
+        fontSize: "12px", color: "#a78bfa", textDecoration: "none", fontWeight: 600,
+      }}>
+        📊 Policy Impact Simulator — se ekonomisk analys av alla förslag →
+      </a>
+
       {/* Kategori-filter */}
       <div style={{
         display: "flex", gap: "8px", flexWrap: "wrap",
