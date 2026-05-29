@@ -5138,6 +5138,185 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
         return False
 
 
+def _parse_pis_iteration(raw: str) -> dict | None:
+    """Parsear ett enskilt PIS-LLM-svar. Returnerar dict med numeriska och kategoriska fält,
+    eller None om svaret saknar BNP och Gini (ej tillräckligt för aggregering)."""
+    if not raw or len(raw) < 20:
+        return None
+
+    def _f(line):
+        try:
+            return float(line.split(":", 1)[1].strip().replace(",", ".").replace("+", "").split()[0])
+        except Exception:
+            return None
+
+    def _r(line):
+        v = line.split(":", 1)[1].strip().lower()
+        return v if v in ("positiv", "negativ", "neutral") else None
+
+    bnp = gini = inflation = arbetsloshet = None
+    soc_kap = koa_stab = konfidens = None
+
+    for line in raw.splitlines():
+        u = line.strip().upper()
+        if u.startswith("BNP_EFFEKT:"):             bnp = _f(line)
+        elif u.startswith("GINI_EFFEKT:"):           gini = _f(line)
+        elif u.startswith("INFLATION_DELTA:"):       inflation = _f(line)
+        elif u.startswith("ARBETSLOSHET_DELTA:"):    arbetsloshet = _f(line)
+        elif u.startswith("SOCIALT_KAPITAL:"):       soc_kap = _r(line)
+        elif u.startswith("KOALITIONS_STABILITET:"): koa_stab = _r(line)
+        elif u.startswith("KONFIDENS:"):
+            v = line.split(":", 1)[1].strip().lower()
+            konfidens = v if v in ("låg", "medel", "hög") else None
+
+    if bnp is None and gini is None:
+        return None
+
+    return {"bnp": bnp, "gini": gini, "inflation": inflation, "arbetsloshet": arbetsloshet,
+            "socialt_kapital": soc_kap, "koalition": koa_stab, "konfidens": konfidens}
+
+
+def analysera_pis_monte_carlo(sb_key: str, forslag_id: int, titel: str,
+                               beskrivning: str, iterationer: int = 15) -> bool:
+    """Kör Monte Carlo-analys: N LLM-iterationer med roterande temperatur (0.6–0.9).
+    Aggregerar medelvärde, std, min/max för numeriska fält och frekvensfördelning
+    för kategoriska. Kräver ≥5 lyckade parsningar för att spara resultat."""
+    system = (
+        "Du är en oberoende nationalekonom och statsvetare som bedömer svenska lagförslags "
+        "makroekonomiska och sociala konsekvenser på 3–5 års sikt. "
+        "Var analytisk, balanserad och ange alltid osäkerheter."
+    )
+    prompt = (
+        f"Lagförslag: \"{titel}\"\n\n"
+        f"{beskrivning[:700]}\n\n"
+        "Analysera detta förslags sannolika konsekvenser. "
+        "Svara EXAKT i detta format (börja direkt med BNP_EFFEKT, ingen annan text):\n"
+        "BNP_EFFEKT: [t.ex. +1.2 eller -0.5]\n"
+        "GINI_EFFEKT: [t.ex. -0.02 eller +0.01]\n"
+        "INFLATION_DELTA: [t.ex. +0.3 eller -0.1]\n"
+        "ARBETSLOSHET_DELTA: [t.ex. -0.5 eller +0.2]\n"
+        "SOCIALT_KAPITAL: [positiv, negativ eller neutral]\n"
+        "KOALITIONS_STABILITET: [positiv, negativ eller neutral]\n"
+        "KONFIDENS: [låg, medel eller hög]\n"
+        "ANALYS: [en mening]\n"
+    )
+
+    num = {"bnp": [], "gini": [], "inflation": [], "arbetsloshet": []}
+    kat = {"socialt_kapital": [], "koalition": [], "konfidens": []}
+    lyckade = 0
+    temps = [0.6, 0.7, 0.8, 0.9]
+
+    for i in range(iterationer):
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": system},
+                         {"role": "user", "content": prompt}],
+            "max_tokens": 160, "temperature": temps[i % len(temps)],
+        }
+        try:
+            raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
+            parsed = _parse_pis_iteration(raw)
+            if parsed:
+                for k in ("bnp", "gini", "inflation", "arbetsloshet"):
+                    if parsed[k] is not None:
+                        num[k].append(parsed[k])
+                for k_src, k_dst in (("socialt_kapital", "socialt_kapital"),
+                                      ("koalition", "koalition"),
+                                      ("konfidens", "konfidens")):
+                    if parsed[k_src]:
+                        kat[k_dst].append(parsed[k_src])
+                lyckade += 1
+        except Exception:
+            pass
+
+    if lyckade < 5:
+        print(f"  [MC] {forslag_id}: {lyckade}/{iterationer} lyckades — hoppar över")
+        return False
+
+    def _stats(vals):
+        if not vals:
+            return None, None, None, None
+        n = len(vals)
+        m = sum(vals) / n
+        variance = sum((v - m) ** 2 for v in vals) / n if n > 1 else 0.0
+        return round(m, 3), round(variance ** 0.5, 3), round(min(vals), 3), round(max(vals), 3)
+
+    def _dist(vals):
+        d: dict = {}
+        for v in vals:
+            d[v] = d.get(v, 0) + 1
+        return d
+
+    bnp_m, bnp_s, bnp_mn, bnp_mx   = _stats(num["bnp"])
+    gini_m, gini_s, gini_mn, gini_mx = _stats(num["gini"])
+    inf_m, inf_s, _, _               = _stats(num["inflation"])
+    arb_m, arb_s, _, _               = _stats(num["arbetsloshet"])
+
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    r = httpx.post(
+        f"{SB_URL}/rest/v1/pis_monte_carlo",
+        headers=h,
+        json={
+            "lagforslag_id":        forslag_id,
+            "iterationer":          iterationer,
+            "lyckade_iterationer":  lyckade,
+            "bnp_mean": bnp_m, "bnp_std": bnp_s, "bnp_min": bnp_mn, "bnp_max": bnp_mx,
+            "gini_mean": gini_m, "gini_std": gini_s, "gini_min": gini_mn, "gini_max": gini_mx,
+            "inflation_mean": inf_m, "inflation_std": inf_s,
+            "arbetsloshet_mean": arb_m, "arbetsloshet_std": arb_s,
+            "socialt_kapital_dist": _dist(kat["socialt_kapital"]),
+            "koalition_dist":       _dist(kat["koalition"]),
+            "konfidens_dist":       _dist(kat["konfidens"]),
+        },
+        timeout=10,
+    )
+    bnp_str = f"{bnp_m:+.2f}%±{bnp_s:.2f}" if bnp_m is not None else "–"
+    gini_str = f"{gini_m:+.3f}±{gini_s:.3f}" if gini_m is not None else "–"
+    print(f"  [MC] {forslag_id} ✓ ({lyckade}/{iterationer}): BNP {bnp_str}  Gini {gini_str}")
+    return r.is_success
+
+
+def kör_pis_monte_carlo_batch(sb_key: str, max_antal: int = 2,
+                               iterationer: int = 15) -> tuple[int, int]:
+    """Kör Monte Carlo för förslag som har standard-PIS men saknar MC-data.
+    Returnerar (analyserade, totalt_utan_mc)."""
+    try:
+        h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""}
+
+        r_pis = httpx.get(f"{SB_URL}/rest/v1/pis_analyser?select=lagforslag_id",
+                          headers=h, timeout=10)
+        har_pis = {row["lagforslag_id"] for row in (r_pis.json() if r_pis.is_success else [])}
+
+        r_mc = httpx.get(f"{SB_URL}/rest/v1/pis_monte_carlo?select=lagforslag_id",
+                         headers=h, timeout=10)
+        har_mc = {row["lagforslag_id"] for row in (r_mc.json() if r_mc.is_success else [])}
+
+        behöver_mc = har_pis - har_mc
+        if not behöver_mc:
+            return 0, 0
+
+        ids_str = ",".join(str(i) for i in behöver_mc)
+        r_lag = httpx.get(
+            f"{SB_URL}/rest/v1/lagforslag"
+            f"?id=in.({ids_str})&status=neq.avgjort"
+            f"&select=id,titel,beskrivning&order=skapad.desc&limit={max_antal}",
+            headers=h, timeout=10,
+        )
+        att_kora = r_lag.json() if r_lag.is_success else []
+
+        analyserade = sum(
+            1 for lag in att_kora
+            if analysera_pis_monte_carlo(sb_key, lag["id"], lag["titel"],
+                                         lag.get("beskrivning") or "", iterationer)
+        )
+        return analyserade, len(behöver_mc)
+    except Exception:
+        return 0, 0
+
+
 def hamta_pis_analys(sb_key: str, forslag_id: int) -> dict | None:
     """Hämtar PIS-analys för ett specifikt lagförslag. Returnerar dict eller None."""
     try:
