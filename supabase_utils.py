@@ -4478,17 +4478,24 @@ def _ladda_upp_till_storage(sb_key: str, bild_bytes: bytes,
 def _spara_bild(sb_key: str, agent_namn: str, prompt: str, pollinations_url: str,
                 kontext: dict, bildtyp: str = "tillstand") -> str:
     """Sparar bild till Storage (eller Pollinations-fallback). Returnerar faktisk sparad URL."""
+    BILD_MAGIC = (b"\xff\xd8", b"\x89PNG")  # JPEG / PNG magic bytes
     final_url = pollinations_url
-    for _ in range(3):
+    for forsok in range(3):
         try:
             r = httpx.get(pollinations_url, timeout=60, follow_redirects=True)
-            if r.is_success and len(r.content) > 1000:
+            giltig = (r.is_success
+                      and len(r.content) > 1000
+                      and any(r.content.startswith(m) for m in BILD_MAGIC))
+            if giltig:
                 storage_url = _ladda_upp_till_storage(sb_key, r.content, agent_namn, bildtyp)
                 if storage_url:
                     final_url = storage_url
                 break
+            print(f"  [bild] försök {forsok+1}/3 ogiltigt svar ({bildtyp}): "
+                  f"HTTP {r.status_code}, {len(r.content)} bytes")
             pollinations_url = re.sub(r"seed=\d+", f"seed={random.randint(1,99999)}", pollinations_url)
-        except Exception:
+        except Exception as e:
+            print(f"  [bild] försök {forsok+1}/3 fel ({bildtyp}): {e!r}")
             pollinations_url = re.sub(r"seed=\d+", f"seed={random.randint(1,99999)}", pollinations_url)
 
     h = {
