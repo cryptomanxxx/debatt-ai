@@ -53,9 +53,9 @@ def sb_upsert(table: str, row: dict) -> None:
 def hamta_bnb_pris() -> float | None:
     """Hämtar senaste BNB-pris från ohlcv_cache (fylls av backtest_fetch.py)."""
     try:
-        rows = sb_get("ohlcv_cache?select=close&symbol=eq.BNB&order=datum.desc&limit=1")
+        rows = sb_get("ohlcv_cache?select=pris&symbol=eq.BNB&order=datum.desc&limit=1")
         if rows:
-            return float(rows[0]["close"])
+            return float(rows[0]["pris"])
     except Exception as e:
         print(f"  ohlcv_cache-fel: {e}")
     # Fallback: hämta från Yahoo Finance direkt
@@ -158,17 +158,27 @@ def hamta_yfinance() -> dict:
             or info.get("regularMarketPrice")
         )
 
-        # AUM (totalAssets är det bästa fältet för ETF:er)
-        aum = info.get("totalAssets")
-        if not aum:
-            # Fallback: market cap
-            aum = info.get("marketCap")
-        if not aum and result.get("nav_per_share") and info.get("sharesOutstanding"):
-            aum = result["nav_per_share"] * info["sharesOutstanding"]
-        result["aum_usd"] = aum
+        # Aktier utestående — prova info och fast_info
+        shares = info.get("sharesOutstanding")
+        if not shares:
+            try:
+                fi = ticker.fast_info
+                shares = getattr(fi, "shares", None)
+            except Exception:
+                pass
+        result["shares_outstanding"] = shares
 
-        # Aktier utestående
-        result["shares_outstanding"] = info.get("sharesOutstanding")
+        # AUM: totalAssets → marketCap → NAV × aktier
+        aum = info.get("totalAssets") or info.get("marketCap")
+        if not aum:
+            try:
+                fi = ticker.fast_info
+                aum = getattr(fi, "market_cap", None)
+            except Exception:
+                pass
+        if not aum and result.get("nav_per_share") and shares:
+            aum = result["nav_per_share"] * shares
+        result["aum_usd"] = aum
 
         # Senaste stängningskurs (kan skilja från NAV)
         hist = ticker.history(period="2d")
@@ -217,8 +227,9 @@ def main():
             print("  Varning: kunde inte beräkna BNB in Trust")
             datakalla = "yfinance"
 
-    if not bnb_in_trust and not yf_data.get("aum_usd"):
-        print("FEL: ingen data hämtad — hoppar över sparning")
+    # Spara så länge vi har minst NAV eller BNB-pris
+    if not yf_data.get("nav_per_share") and not bnb_pris:
+        print("FEL: ingen användbar data hämtad — hoppar över sparning")
         sys.exit(1)
 
     row = {
