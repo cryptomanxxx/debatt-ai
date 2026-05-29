@@ -10,16 +10,23 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Installera beroenden
-        run: pip install httpx yfinance
-
-      - name: Hämta VBNB-data
+      - name: Anropa Vercel-endpoint för VanEck-data
         env:
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: python vbnb_fetch.py
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          echo "Anropar /api/admin/vbnb-fetch via Vercel..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" \
+            -X POST https://www.debatt-ai.se/api/admin/vbnb-fetch \
+            -H "Authorization: Bearer $ADMIN_PASSWORD" \
+            -H "Content-Type: application/json")
+
+          HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:")
+
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Svar: $BODY"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "FEL: Endpoint returnerade $HTTP_STATUS"
+            exit 1
+          fi
