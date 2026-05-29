@@ -15,6 +15,7 @@ from supabase_utils import (
     hamta_lagforslag,
     importera_riksdagen_forslag,
     uppdatera_riksdagen_utfall,
+    analysera_alla_forslag_pis,
 )
 from agent import AGENTER, ANALYTIKER
 
@@ -37,8 +38,16 @@ uppdaterade = uppdatera_riksdagen_utfall(SB_KEY)
 if uppdaterade:
     print(f"  ✓ {uppdaterade} riksdagsförslag fick uppdaterat utfall\n")
 
+# PIS — analysera förslag som saknar ekonomisk analys
+print("── PIS: analyserar nya förslag ──")
+pis_nya = analysera_alla_forslag_pis(SB_KEY, max_antal=8)
+if pis_nya:
+    print(f"  ✓ {pis_nya} förslag fick PIS-analys")
+else:
+    print("  – Alla förslag är redan analyserade")
+
 forslag = hamta_lagforslag(SB_KEY)
-print(f"=== AI-Parlamentet testkörning ({len(AGENTER)} agenter, {len(forslag)} öppna förslag) ===\n")
+print(f"\n=== AI-Parlamentet testkörning ({len(AGENTER)} agenter, {len(forslag)} öppna förslag) ===\n")
 
 if not forslag:
     print("Inga öppna lagförslag hittades — skapa förslag i admin eller vänta på nästa agent-körning.")
