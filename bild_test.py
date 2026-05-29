@@ -241,9 +241,19 @@ def main():
         print("  (inga bilder funna i DB)")
 
     # ── Sammanfattning ────────────────────────────────────────────────────────
-    storage_ok  = sum(1 for _, u in resultat if u and SB_URL in u and "storage" in u)
-    pollen_fall = sum(1 for _, u in resultat if u and "pollinations" in u)
-    missade     = sum(1 for _, u in resultat if not u)
+    # Prioritera DB-rader för korrekt räkning — täcker även fallback där
+    # _spara_bild returnerade Storage-URL men DB-INSERT misslyckades.
+    if sparade:
+        storage_ok  = sum(1 for b in sparade
+                          if SB_URL in (b.get("bild_url") or "")
+                          and "storage" in (b.get("bild_url") or ""))
+        pollen_fall = sum(1 for b in sparade
+                          if "pollinations" in (b.get("bild_url") or ""))
+        missade     = max(0, 4 - len(sparade))
+    else:
+        storage_ok  = sum(1 for _, u in resultat if u and SB_URL in u and "storage" in u)
+        pollen_fall = sum(1 for _, u in resultat if u and "pollinations" in u)
+        missade     = sum(1 for _, u in resultat if not u)
 
     print(f"\n{'='*62}")
     print(f"  RESULTAT: {storage_ok}/4 sparade i Supabase Storage")
