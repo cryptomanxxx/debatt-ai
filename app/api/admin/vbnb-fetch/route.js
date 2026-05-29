@@ -95,12 +95,28 @@ async function hamtaYahooData(log) {
 
 // ── Spara till Supabase ────────────────────────────────────────────────────────
 async function sparaVbnbData(row) {
-  const r = await fetch(`${SB_URL}/rest/v1/vbnb_data`, {
+  // INSERT first; if datum-constraint fires (409), fall back to PATCH (UPDATE)
+  const ins = await fetch(`${SB_URL}/rest/v1/vbnb_data`, {
     method: "POST",
-    headers: { ...sbHeaders(), Prefer: "resolution=merge-duplicates,return=minimal" },
+    headers: { ...sbHeaders(), Prefer: "return=minimal" },
     body: JSON.stringify(row),
   });
-  if (!r.ok) throw new Error(`Supabase upsert ${r.status}: ${await r.text()}`);
+  if (ins.ok) return;
+
+  if (ins.status === 409) {
+    const upd = await fetch(
+      `${SB_URL}/rest/v1/vbnb_data?datum=eq.${row.datum}`,
+      {
+        method: "PATCH",
+        headers: { ...sbHeaders(), Prefer: "return=minimal" },
+        body: JSON.stringify(row),
+      }
+    );
+    if (!upd.ok) throw new Error(`Supabase update ${upd.status}: ${await upd.text()}`);
+    return;
+  }
+
+  throw new Error(`Supabase insert ${ins.status}: ${await ins.text()}`);
 }
 
 // ── POST /api/admin/vbnb-fetch ─────────────────────────────────────────────────
