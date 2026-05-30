@@ -122,6 +122,7 @@ def hamta_alla_forslag_utan_mc(max_antal: int, min_iterationer: int = 0) -> list
 # ── STEG 1: PIS-analys ──────────────────────────────────────────────────────
 print(f"\n{'═'*60}")
 print(f"  PIS Backfill — max {MAX_PIS} PIS + max {MAX_MC} MC")
+print(f"  sleep_pis={SLEEP_PIS}s  sleep_mc={SLEEP_MC}s  mc_iter={MC_ITERATIONER}  min_iter={MIN_ITERATIONER}")
 print(f"{'═'*60}\n")
 
 print(f"── Steg 1: PIS-analys (max {MAX_PIS} förslag) ──")
