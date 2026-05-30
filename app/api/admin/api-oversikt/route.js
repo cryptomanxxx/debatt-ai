@@ -29,7 +29,8 @@ export async function GET(req) {
   if (action === "stats") {
     const [beslutAll, beslutToday, beslutWeek,
            pisAll,    pisToday,    pisWeek,
-           fragaAll,  fragaToday,  fragaWeek] = await Promise.all([
+           fragaAll,  fragaToday,  fragaWeek,
+           debattAll, debattToday, debattWeek] = await Promise.all([
       sbFetch("beslut_log?select=id"),
       sbFetch(`beslut_log?select=id&skapad=gte.${encodeURIComponent(today)}`),
       sbFetch(`beslut_log?select=id,latency_ms&skapad=gte.${encodeURIComponent(week)}`),
@@ -39,6 +40,9 @@ export async function GET(req) {
       sbFetch("agent_fragor?select=id&fragare=eq.api"),
       sbFetch(`agent_fragor?select=id&fragare=eq.api&skapad=gte.${encodeURIComponent(today)}`),
       sbFetch(`agent_fragor?select=id&fragare=eq.api&skapad=gte.${encodeURIComponent(week)}`),
+      sbFetch("debatt_log?select=id"),
+      sbFetch(`debatt_log?select=id&skapad=gte.${encodeURIComponent(today)}`),
+      sbFetch(`debatt_log?select=id&skapad=gte.${encodeURIComponent(week)}`),
     ]);
 
     const latencies = beslutWeek.map(r => r.latency_ms).filter(Boolean);
@@ -47,17 +51,19 @@ export async function GET(req) {
       : null;
 
     return Response.json({
-      beslut:  { total: beslutAll.length, today: beslutToday.length, week: beslutWeek.length, avg_latency_ms: avgMs },
-      pis:     { total: pisAll.length,    today: pisToday.length,    week: pisWeek.length },
-      fraga:   { total: fragaAll.length,  today: fragaToday.length,  week: fragaWeek.length },
+      beslut:  { total: beslutAll.length,  today: beslutToday.length,  week: beslutWeek.length, avg_latency_ms: avgMs },
+      pis:     { total: pisAll.length,     today: pisToday.length,     week: pisWeek.length },
+      fraga:   { total: fragaAll.length,   today: fragaToday.length,   week: fragaWeek.length },
+      debatt:  { total: debattAll.length,  today: debattToday.length,  week: debattWeek.length },
     });
   }
 
   if (action === "log") {
-    const [beslutLog, pisLog, fragaLog] = await Promise.all([
+    const [beslutLog, pisLog, fragaLog, debattLog] = await Promise.all([
       sbFetch("beslut_log?select=id,api_key,question,recommendation,probability,latency_ms,skapad&order=skapad.desc&limit=50"),
       sbFetch("lagforslag?select=id,titel,skapad&kalla=eq.api&order=skapad.desc&limit=50"),
       sbFetch("agent_fragor?select=id,agent,fraga,skapad&fragare=eq.api&order=skapad.desc&limit=50"),
+      sbFetch("debatt_log?select=id,ip,amne,agenter,antal_inlagg,latency_ms,skapad&order=skapad.desc&limit=50"),
     ]);
 
     const entries = [
@@ -78,6 +84,12 @@ export async function GET(req) {
         key: "nyckel",
         content: `${r.agent}: ${r.fraga?.slice(0, 80) ?? ""}`,
         meta: "agent question",
+      })),
+      ...debattLog.map(r => ({
+        id: `d-${r.id}`, api: "Debatt API", skapad: r.skapad,
+        key: "fri",
+        content: r.amne?.slice(0, 100) ?? "—",
+        meta: `${r.agenter?.join(", ") ?? "—"} · ${r.antal_inlagg} inlägg · ${r.latency_ms}ms`,
       })),
     ];
 
