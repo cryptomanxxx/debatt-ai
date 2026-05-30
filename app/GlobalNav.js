@@ -15,6 +15,7 @@ const LINKS = [
   { href: "/visualiseringar", label: "Visualiseringar" },
   { href: "/fraktioner",      label: "Fraktioner" },
   { href: "/oligarki",        label: "Oligarkirisk" },
+  { href: "/teori",           label: "Ekonomisk teori" },
   { href: "/konversationer",  label: "Konversationer" },
   { href: "/rivaliteter",     label: "Rivaliteter" },
   { href: "/kunskapsgraf",    label: "Kunskapsgraf" },
