@@ -224,9 +224,18 @@ export default async function OligarkiPage() {
           <h1 style={{ color: C.text, fontSize: 26, fontWeight: 700, margin: "16px 0 6px", fontFamily: "Georgia, serif" }}>
             Oligarkirisk
           </h1>
-          <p style={{ color: C.muted, fontSize: 14, margin: 0, lineHeight: 1.6 }}>
+          <p style={{ color: C.muted, fontSize: 14, margin: "0 0 14px", lineHeight: 1.6 }}>
             Laboratorium för politisk ekonomi — mäter om autonoma AI-samhällen naturligt driftar mot oligarki.
           </p>
+          <a href="/teori" style={{
+            display: "inline-flex", alignItems: "center", gap: "8px",
+            fontSize: 12, fontFamily: "monospace", textDecoration: "none",
+            color: "#e8d5a3", background: "#e8d5a310",
+            border: "1px solid #e8d5a330", borderRadius: "6px",
+            padding: "6px 14px",
+          }}>
+            📖 Förstå teorierna bakom siffrorna — Piketty, Michels, Gilens-Page →
+          </a>
         </div>
 
         {/* Risk level display */}

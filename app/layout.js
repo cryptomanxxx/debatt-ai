@@ -66,6 +66,7 @@ export default function RootLayout({ children }) {
               <a href="/debattrad" className="neon-nav">Debattträd</a>
               <a href="/versus" className="neon-nav">Agent vs Agent</a>
               <a href="/ekonomi" className="neon-nav">AI-Ekonomi</a>
+              <a href="/teori" className="neon-nav">Ekonomisk teori</a>
               <a href="/feedback" className="neon-nav">Socialt kapital</a>
               <a href="/lobbying" className="neon-nav">AI-Lobbying</a>
               <a href="/domstol" className="neon-nav">Domstolen</a>
