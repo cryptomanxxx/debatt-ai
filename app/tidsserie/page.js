@@ -104,6 +104,17 @@ export default async function TidsseriePage() {
     mobilitet:     d.mobilitet || 0,
   }));
 
+  // Tillväxtindex: Jämlikhet(40) + Mobilitet(35) + Konkurrens(25)
+  // mobilitet lagras som 0-100 heltal; gini som 0-1; oligarki_risk som 0-100
+  const tillvaxtIndexData = oligarki.map(d => ({
+    datum:    (d.datum || "").slice(5),
+    tillvaxt: Math.max(0, Math.round(
+      (1 - (d.gini || 0))                     * 40 +
+      ((d.mobilitet || 0) / 100)              * 35 +
+      (1 - (d.oligarki_risk || 0) / 100)      * 25
+    )),
+  }));
+
   const totals = {
     artiklar:      artiklar.length,
     debatter:      debatter.length,
@@ -119,6 +130,7 @@ export default async function TidsseriePage() {
       politikData={politikData}
       tillvaxtData={tillvaxtData}
       ekonomiData={ekonomiData}
+      tillvaxtIndexData={tillvaxtIndexData}
       totals={totals}
     />
   );

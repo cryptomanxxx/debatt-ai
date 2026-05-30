@@ -57,13 +57,14 @@ function ingenData() {
 const xTickStyle = { fill: "#444", fontSize: 9, fontFamily: "monospace" };
 const yTickStyle = { fill: "#444", fontSize: 9, fontFamily: "monospace" };
 
-export default function TidsserieVy({ aktivitetsData, politikData, tillvaxtData, ekonomiData, totals }) {
+export default function TidsserieVy({ aktivitetsData, politikData, tillvaxtData, ekonomiData, tillvaxtIndexData = [], totals }) {
   const [dagar, setDagar] = useState(90);
 
   const aktSlice  = aktivitetsData.slice(-dagar);
   const polSlice  = politikData.slice(-dagar);
   const tillSlice = tillvaxtData.slice(-dagar);
   const ekoSlice  = ekonomiData.slice(-dagar);
+  const txSlice   = tillvaxtIndexData.slice(-dagar);
 
   const harAktivitet = aktSlice.some(d => d.artiklar + d.debatter + d.konversationer > 0);
   const harPolitik   = polSlice.some(d => d.roster + d.lobbying + d.koalitioner > 0);
@@ -195,6 +196,43 @@ export default function TidsserieVy({ aktivitetsData, politikData, tillvaxtData,
         </Sektion>
 
       </div>
+
+      {/* 5. Tillväxtindex — full width below grid */}
+      {txSlice.length > 0 && (
+        <div style={{ marginTop: 20 }}>
+          <Sektion
+            titel="Tillväxtindex"
+            undertitel="Emergent mått 0–100: Jämlikhet (40p) + Mobilitet (35p) + Konkurrens (25p) — metodologi på /teori"
+          >
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={txSlice} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
+                <XAxis dataKey="datum" tick={xTickStyle} interval="preserveStartEnd" />
+                <YAxis domain={[0, 100]} tick={yTickStyle} />
+                <Tooltip content={<TT formatter={(k, v) => v + "/100"} />} />
+                <defs>
+                  <linearGradient id="txGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#e879f9" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="#e879f9" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Line type="monotone" dataKey="tillvaxt" stroke="#e879f9" dot={false} strokeWidth={2.5} name="Tillväxtindex" />
+              </LineChart>
+            </ResponsiveContainer>
+            <div style={{ display: "flex", gap: 24, marginTop: 10, flexWrap: "wrap" }}>
+              {[
+                { label: "< 40",  färg: "#f87171", text: "Stagnation — ojämlikhet och maktkoncentration dominerar" },
+                { label: "40–65", färg: "#facc15", text: "Måttlig potential — tillväxt möjlig men hämmad" },
+                { label: "> 65",  färg: "#4ade80", text: "Gynnsamt klimat — jämlikhet, öppenhet och konkurrens samverkar" },
+              ].map(({ label, färg, text }) => (
+                <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 10, fontFamily: "monospace", color: "#555" }}>
+                  <span style={{ color: färg, fontWeight: 700 }}>{label}</span>
+                  <span>{text}</span>
+                </div>
+              ))}
+            </div>
+          </Sektion>
+        </div>
+      )}
 
       <div style={{ fontFamily: "monospace", fontSize: 9, color: "#333", textAlign: "center", marginTop: 40 }}>
         Data uppdateras var 5:e minut · Senaste 90 dagarna · debatt.ai

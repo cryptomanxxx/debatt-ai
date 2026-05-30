@@ -127,11 +127,11 @@ export default async function TeoriPage() {
   const d = await fetchData();
 
   const s = d?.senaste;
-  const giniPct     = s ? `${(s.gini * 100).toFixed(1)}%`           : "–";
-  const riskPct     = s ? `${Math.round(s.oligarki_risk)}%`          : "–";
-  const mobPct      = s ? `${Math.round(s.mobilitet * 100)}%`        : "–";
-  const dynastiPct  = s ? `${Math.round(s.dynasti_index * 100)}%`    : "–";
-  const top3Pct     = s ? `${(s.top3_andel * 100).toFixed(1)}%`      : "–";
+  const giniPct     = s ? `${(s.gini * 100).toFixed(1)}%`      : "–";
+  const riskPct     = s ? `${Math.round(s.oligarki_risk)}%`    : "–";
+  const mobPct      = s ? `${Math.round(s.mobilitet)}%`        : "–";
+  const dynastiPct  = s ? `${Math.round(s.dynasti_index)}%`    : "–";
+  const top3Pct     = s ? `${(s.top3_andel * 100).toFixed(1)}%` : "–";
 
   const planbocker  = d?.planbocker ?? [];
   const rikaste     = planbocker[0]?.agent ?? "–";
@@ -185,6 +185,14 @@ export default async function TeoriPage() {
   const hirshmanBevis = planbocker.length > 0
     ? `Rika agenter (topp ${eHalf}): genomsnittlig optionalitet ${avgExitTop}/100. Fattiga (botten ${botHalfExit.length}): ${avgExitBot}/100. Gap: +${avgExitTop - avgExitBot} poäng — systemet ger fler val till dem som redan har resurser.`
     : "Samlar data…";
+
+  // Tillväxtindex — emergent composite: Equality(40) + Mobility(35) + Competition(25)
+  // mobilitet och dynasti_index lagras som 0-100 heltal i oligarki_historik
+  const tillvaxtIndex = s ? Math.max(0, Math.round(
+    (1 - s.gini)                   * 40 +
+    (s.mobilitet / 100)            * 35 +
+    (1 - s.oligarki_risk / 100)    * 25
+  )) : null;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
@@ -364,6 +372,63 @@ export default async function TeoriPage() {
             bevis={hirshmanBevis}
           />
 
+        </div>
+
+        {/* Tillväxtindex */}
+        <div style={{
+          background: C.surface, border: `1px solid ${C.accent}18`,
+          borderRadius: "12px", padding: "28px 32px", marginBottom: "40px",
+        }}>
+          <h2 style={{ margin: "0 0 6px", fontSize: "18px", fontWeight: 600, color: C.accent }}>
+            Tillväxtindex — emergent ur civilisationens data
+          </h2>
+          <p style={{ fontSize: "13px", color: C.muted, margin: "0 0 24px", fontFamily: "monospace", lineHeight: 1.7, maxWidth: "640px" }}>
+            Ekonomisk tillväxt kan inte simuleras direkt utan nya mekanismer — men förutsättningarna
+            för tillväxt kan mätas från det vi redan spårar. ChatGPT:s insikt: Tillväxt = Kunskap ×
+            Tillit × Innovation × Kapital. Vi approximerar med tre faktorer ur befintlig data:
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px", marginBottom: "24px" }}>
+            {[
+              { etikett: "JÄMLIKHET", formel: "(1 − Gini) × 40p", farg: C.red,    val: s ? ((1 - s.gini) * 40).toFixed(1) : "–", desc: "Hög ojämlikhet kväver dynamik och rörlighet" },
+              { etikett: "MOBILITET", formel: "Mobilitet × 35p",   farg: C.green,  val: s ? ((s.mobilitet / 100) * 35).toFixed(1) : "–", desc: "Öppna system låter de bästa idéerna vinna" },
+              { etikett: "KONKURRENS", formel: "(1 − Risk) × 25p", farg: C.blue,   val: s ? ((1 - s.oligarki_risk / 100) * 25).toFixed(1) : "–", desc: "Maktkoncentration minskar innovation" },
+            ].map(({ etikett, formel, farg, val, desc }) => (
+              <div key={etikett} style={{ background: "#0d0d0d", border: `1px solid ${farg}20`, borderRadius: "8px", padding: "16px 18px" }}>
+                <div style={{ fontSize: "10px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "6px" }}>{etikett}</div>
+                <div style={{ fontSize: "13px", fontFamily: "monospace", color: "#ddd", marginBottom: "6px" }}>{formel}</div>
+                <div style={{ fontSize: "20px", fontWeight: 700, fontFamily: "monospace", color: farg, marginBottom: "6px" }}>{val}<span style={{ fontSize: 11, color: C.muted }}> p</span></div>
+                <p style={{ margin: 0, fontSize: "11px", color: C.muted, lineHeight: 1.6 }}>{desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {tillvaxtIndex !== null && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", flexWrap: "wrap" }}>
+              <div style={{
+                background: "#0d0d0d", border: `1px solid ${tillvaxtIndex < 40 ? C.red : tillvaxtIndex < 65 ? C.yellow : C.green}40`,
+                borderRadius: "10px", padding: "16px 24px", flexShrink: 0,
+              }}>
+                <div style={{ fontSize: "10px", color: C.muted, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "4px" }}>NULÄGE</div>
+                <div style={{ fontSize: "40px", fontWeight: 700, fontFamily: "monospace", color: tillvaxtIndex < 40 ? C.red : tillvaxtIndex < 65 ? C.yellow : C.green, lineHeight: 1 }}>
+                  {tillvaxtIndex}
+                </div>
+                <div style={{ fontSize: "11px", color: C.muted, fontFamily: "monospace", marginTop: "4px" }}>av 100</div>
+              </div>
+              <div style={{ flex: 1, minWidth: "240px" }}>
+                <p style={{ margin: "0 0 12px", fontSize: "13px", color: "#999", lineHeight: 1.75 }}>
+                  {tillvaxtIndex < 40
+                    ? "Kritisk nivå. Hög ojämlikhet och stark maktkoncentration motverkar tillväxt mer än mobilitet hjälper. Det klassiska oligarkifällan: toppen låser systemet, botten saknar resurser att konkurrera."
+                    : tillvaxtIndex < 65
+                    ? "Måttlig tillväxtpotential. Systemet fungerar men är inte optimalt — Gini och oligarkirisk håller tillbaka den dynamik som mobilitet skapar."
+                    : "Gynnsamt klimat. Jämlikhet, öppenhet och konkurrens samverkar. Historiskt ovanligt i agentsimulationer med fri kapitalrörelse."}
+                </p>
+                <a href="/tidsserie" style={{ fontSize: "12px", fontFamily: "monospace", color: C.accent, textDecoration: "none", border: `1px solid ${C.accent}30`, borderRadius: "6px", padding: "6px 14px", background: `${C.accent}08` }}>
+                  Se historisk trend på /tidsserie →
+                </a>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Prediktion */}
