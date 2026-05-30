@@ -1,6 +1,12 @@
 """
 ai_klient.py – AI-provider-anrop för debatt.ai
-Fallback-kedja (Python): Groq → DeepSeek → GitHub Models → Cloudflare → Gemini
+Fallback-kedja (Python): Groq → Sambanova → Cerebras → GitHub Models → Gemini
+Rate limits (free tier):
+  Groq:         30 RPM,  1 000 RPD, ~144k TPD
+  Sambanova:    20 RPM,    20M TPD  ← bäst för batch
+  Cerebras:     30 RPM,     1M TPD  ← näst bäst
+  GitHub Models: ~10 RPM,  ~50 RPD
+  Gemini Flash:  15 RPM,   250 RPD
 """
 
 import httpx
@@ -96,6 +102,64 @@ def github_models_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
         return r
     _nere.add("github_models")
     raise Exception(f"GitHub Models rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
+
+
+def sambanova_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
+    """Sambanova Cloud — 20M tokens/dag gratis, 20 RPM. OpenAI-kompatibel."""
+    if "sambanova" in _nere:
+        raise Exception("Sambanova markerad som nere denna körning — hoppar direkt till fallback")
+    api_key = os.environ.get("SAMBANOVA_API_KEY")
+    if not api_key:
+        _nere.add("sambanova")
+        raise Exception("SAMBANOVA_API_KEY saknas")
+    url = "https://api.sambanova.ai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {**json_payload, "model": "Meta-Llama-3.3-70B-Instruct"}
+    last_r = None
+    for attempt in range(3):
+        r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+        last_r = r
+        if r.status_code == 429:
+            wait = min(int(r.headers.get("retry-after", 15)) + 2, 60)
+            print(f"  Sambanova rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
+            time.sleep(wait)
+            continue
+        if r.status_code in (401, 403):
+            _nere.add("sambanova")
+            raise Exception(f"Sambanova autentiseringsfel: {r.status_code}")
+        r.raise_for_status()
+        return r
+    _nere.add("sambanova")
+    raise Exception(f"Sambanova rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
+
+
+def cerebras_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
+    """Cerebras — 1M tokens/dag gratis, 30 RPM. OpenAI-kompatibel."""
+    if "cerebras" in _nere:
+        raise Exception("Cerebras markerad som nere denna körning — hoppar direkt till fallback")
+    api_key = os.environ.get("CEREBRAS_API_KEY")
+    if not api_key:
+        _nere.add("cerebras")
+        raise Exception("CEREBRAS_API_KEY saknas")
+    url = "https://api.cerebras.ai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {**json_payload, "model": "llama-3.3-70b"}
+    last_r = None
+    for attempt in range(3):
+        r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+        last_r = r
+        if r.status_code == 429:
+            wait = min(int(r.headers.get("retry-after", 10)) + 2, 60)
+            print(f"  Cerebras rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
+            time.sleep(wait)
+            continue
+        if r.status_code in (401, 403):
+            _nere.add("cerebras")
+            raise Exception(f"Cerebras autentiseringsfel: {r.status_code}")
+        r.raise_for_status()
+        return r
+    _nere.add("cerebras")
+    raise Exception(f"Cerebras rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
 
 
 def deepseek_post(json_payload: dict, timeout: int = 60) -> httpx.Response:

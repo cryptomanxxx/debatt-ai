@@ -1,0 +1,49 @@
+name: Provider Benchmark (manuell)
+
+on:
+  workflow_dispatch:
+    inputs:
+      providers:
+        description: "Providers att testa (kommaseparerat, tomt = alla)"
+        required: false
+        default: "groq,sambanova,cerebras,github_models,gemini"
+        type: string
+      anrop_per_provider:
+        description: "Antal testanrop per provider"
+        required: false
+        default: "10"
+        type: string
+      sleep_mellan:
+        description: "Sekunder mellan anrop"
+        required: false
+        default: "1"
+        type: string
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      models: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Kör provider benchmark
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PROVIDERS: ${{ inputs.providers }}
+          ANROP_PER_PROVIDER: ${{ inputs.anrop_per_provider }}
+          SLEEP_MELLAN: ${{ inputs.sleep_mellan }}
+          PYTHONUNBUFFERED: "1"
+        run: python -u provider_benchmark.py

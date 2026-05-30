@@ -29,7 +29,7 @@ import urllib.parse
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post
+from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, sambanova_post, cerebras_post
 from agenter import OPINION_FRAGOR
 
 
@@ -5077,6 +5077,16 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
             pass
         if not raw:
             try:
+                raw = sambanova_post(payload).json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                pass
+        if not raw:
+            try:
+                raw = cerebras_post(payload).json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                pass
+        if not raw:
+            try:
                 gh_payload = {**payload, "model": "Llama-3.3-70B-Instruct"}
                 raw = github_models_post(gh_payload).json()["choices"][0]["message"]["content"].strip()
             except Exception:
@@ -5220,6 +5230,16 @@ def analysera_pis_monte_carlo(sb_key: str, forslag_id: int, titel: str,
                 raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
             except Exception:
                 pass
+            if not raw:
+                try:
+                    raw = sambanova_post(payload).json()["choices"][0]["message"]["content"].strip()
+                except Exception:
+                    pass
+            if not raw:
+                try:
+                    raw = cerebras_post(payload).json()["choices"][0]["message"]["content"].strip()
+                except Exception:
+                    pass
             if not raw:
                 try:
                     gh_payload = {**payload, "model": "Llama-3.3-70B-Instruct"}
