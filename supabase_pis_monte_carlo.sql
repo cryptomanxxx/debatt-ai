@@ -35,3 +35,9 @@ ALTER TABLE pis_monte_carlo ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "public read pis_monte_carlo"
   ON pis_monte_carlo FOR SELECT USING (true);
+
+CREATE POLICY "public insert pis_monte_carlo"
+  ON pis_monte_carlo FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "public update pis_monte_carlo"
+  ON pis_monte_carlo FOR UPDATE USING (true);
