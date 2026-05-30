@@ -1154,34 +1154,46 @@ function ApiOversiktTab() {
     load();
   }
 
-  const apiColor = api => api === "Decision API" ? "#60a5fa" : api === "PIS API" ? "#a78bfa" : "#34d399";
+  const apiColor = api => {
+    if (api === "Decision API") return "#60a5fa";
+    if (api === "PIS API") return "#a78bfa";
+    if (api === "Agent Q&A API") return "#34d399";
+    if (api === "Debatt API") return "#fb923c";
+    return "#94a3b8";
+  };
 
   if (loading) return <p style={{ color: C.textMuted }}>Laddar API-data…</p>;
 
   const APIS = [
-    { lbl: "Decision API",  key: "beslut", color: "#60a5fa", desc: "/api/beslut" },
-    { lbl: "PIS API",       key: "pis",    color: "#a78bfa", desc: "/api/v1/policy/simulate" },
-    { lbl: "Agent Q&A API", key: "fraga",  color: "#34d399", desc: "/api/agent-fraga" },
+    { lbl: "Decision API",     key: "beslut", color: "#60a5fa", desc: "/api/beslut" },
+    { lbl: "PIS API",          key: "pis",    color: "#a78bfa", desc: "/api/v1/policy/simulate" },
+    { lbl: "Agent Q&A API",    key: "fraga",  color: "#34d399", desc: "/api/agent-fraga" },
+    { lbl: "Debatt API",       key: "debatt", color: "#fb923c", desc: "/api/debatt" },
+    { lbl: "Opinion Stats API",key: null,     color: "#94a3b8", desc: "/api/opinion-stats", noLog: true },
   ];
 
   return (
     <div>
       {/* Totalt per API */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "32px" }}>
-        {APIS.map(({ lbl, key, color, desc }) => {
-          const s = stats?.[key] ?? {};
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: "16px", marginBottom: "32px" }}>
+        {APIS.map(({ lbl, key, color, desc, noLog }) => {
+          const s = key ? (stats?.[key] ?? {}) : {};
           return (
-            <div key={key} style={{ background: C.surface, border: `1px solid ${color}30`, borderRadius: "8px", padding: "20px" }}>
+            <div key={lbl} style={{ background: C.surface, border: `1px solid ${color}30`, borderRadius: "8px", padding: "20px" }}>
               <p style={{ fontSize: "11px", color, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace", margin: "0 0 4px" }}>{lbl}</p>
               <p style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", margin: "0 0 16px" }}>{desc}</p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-                {[["Totalt", s.total ?? "—"], ["Idag", s.today ?? "—"], ["7 dagar", s.week ?? "—"]].map(([t, v]) => (
-                  <div key={t}>
-                    <p style={{ fontSize: "10px", color: C.textMuted, margin: "0 0 2px", fontFamily: "monospace" }}>{t}</p>
-                    <p style={{ fontSize: "22px", color, margin: 0, fontFamily: "monospace" }}>{v}</p>
-                  </div>
-                ))}
-              </div>
+              {noLog ? (
+                <p style={{ fontSize: "12px", color: C.textMuted, fontStyle: "italic", margin: 0 }}>Publik läs-API — ingen anropsloggning</p>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                  {[["Totalt", s.total ?? "—"], ["Idag", s.today ?? "—"], ["7 dagar", s.week ?? "—"]].map(([t, v]) => (
+                    <div key={t}>
+                      <p style={{ fontSize: "10px", color: C.textMuted, margin: "0 0 2px", fontFamily: "monospace" }}>{t}</p>
+                      <p style={{ fontSize: "22px", color, margin: 0, fontFamily: "monospace" }}>{v}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
               {key === "beslut" && stats?.beslut?.avg_latency_ms != null && (
                 <p style={{ fontSize: "11px", color: C.textMuted, margin: "12px 0 0", fontFamily: "monospace" }}>
                   Snittlatens: <span style={{ color }}>{stats.beslut.avg_latency_ms}ms</span>

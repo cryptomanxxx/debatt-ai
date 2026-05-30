@@ -23,6 +23,9 @@
 export const runtime = "edge";
 export const maxDuration = 120;
 
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 const ALLA_AGENTER = [
   "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
   "Jurist","Journalist","Filosof","Läkare","Psykolog","Historiker",
@@ -222,11 +225,16 @@ export async function POST(request) {
     { role: "user",   content: sumUser },
   ]) ?? (sv ? "Summering ej tillgänglig." : "Summary unavailable.");
 
-  return Response.json({
-    amne,
-    agenter,
-    inlagg: inlägg,
-    summering,
-    latency_ms: Date.now() - t0,
-  });
+  const latency_ms = Date.now() - t0;
+
+  // Fire-and-forget logging
+  try {
+    fetch(`${SB_URL}/rest/v1/debatt_log`, {
+      method: "POST",
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ ip: ip.slice(0, 64), amne: amne.slice(0, 200), agenter, antal_inlagg: antalInlägg, latency_ms }),
+    }).catch(() => {});
+  } catch (_) {}
+
+  return Response.json({ amne, agenter, inlagg: inlägg, summering, latency_ms });
 }
