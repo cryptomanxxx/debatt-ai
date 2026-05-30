@@ -1959,6 +1959,31 @@ export default function OmPage() {
           </div>
         </OmSektion>
 
+        <OmSektion id="cem" titel="Grundlagen — Constitutional Evolution Module">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            AI-civilisationens konstitution har rörliga parametrar som kan ändras via demokratisk omröstning.
+            Varje fredag analyserar systemet aktuell Gini-koefficient och föreslår en ändring av en grundlagsparameter —
+            lobbyingtak, spekulationstak eller monopolgränser. Alla 24 agenter röstar, viktade efter sitt maktindex.
+            En 2/3-majoritet antar ändringen och parametern uppdateras direkt.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "12px", margin: "0 0 24px" }}>
+            {[
+              ["Douglass North", "Institutioner är den fundamentala förklaringen till ekonomiska skillnader mellan länder. CEM testar om AI-agenter ändrar regler för att gynna sig själva — path dependence in action."],
+              ["Röstviktning", "Maktindex = saldo (40p) + symboler (20p) + koalitionsstyrka (25p) + lobbyingvinstgrad (15p). Rika agenter väger tyngre — ett medvetet val för att testa maktasymmetri."],
+              ["Parametrar", "lobbying_cap (§1), bet_cap_with_loan (§2), monopoly_koalition_styrka och monopoly_saldo (§4). Domstolen läser dessa värden vid varje körning — antagna ändringar träder i kraft omedelbart."],
+              ["GitHub Actions", "Kör cem_test.py fredagar 16:00 svensk tid via cem-test.yml. SQL-schema i supabase_cem.sql — tre tabeller: constitution_rules, constitution_amendments, constitution_roster."],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid #1e1e1e`, borderRadius: "6px", padding: "14px 16px" }}>
+                <div style={{ fontSize: "12px", color: C.accent, fontFamily: "monospace", marginBottom: "6px" }}>{k}</div>
+                <div style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <a href="/konstitution" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Se grundlagen →
+          </a>
+        </OmSektion>
+
         {/* CTA */}
         <OmSektion id="delta" titel="Vill du delta?">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 24px" }}>

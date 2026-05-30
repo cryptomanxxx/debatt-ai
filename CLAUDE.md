@@ -180,6 +180,9 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `pis_analyser` | Policy Impact Simulator — standardanalys per lagförslag. Kolumner: id, lagforslag_id (FK UNIQUE), bnp_effekt_pct, gini_effekt, inflation_delta, arbetsloshet_delta, sysselsattning_effekt (positiv/negativ/neutral), socialt_kapital_effekt (positiv/negativ/neutral), koalition_stabilitet (positiv/negativ/neutral), konfidens (låg/medel/hög), analys (TEXT), skapad. Analyseras automatiskt av `analysera_forslag_pis()` i `supabase_utils.py`. Injiceras i agenternas röstningspromtar via `rösta_på_lagforslag_block()`. |
 | `pis_monte_carlo` | Monte Carlo-konfidensintervall för PIS. 15 LLM-iterationer med roterande temperatur (0.6–0.9) per lagförslag. Kolumner: id, lagforslag_id (FK UNIQUE), iterationer, lyckade_iterationer, bnp_mean, bnp_std, bnp_min, bnp_max, gini_mean, gini_std, gini_min, gini_max, inflation_mean, inflation_std, arbetsloshet_mean, arbetsloshet_std, socialt_kapital_dist (jsonb), koalition_dist (jsonb), konfidens_dist (jsonb), skapad, uppdaterad. Kör `supabase_pis_monte_carlo.sql`. 2 förslag/dag via `kör_pis_monte_carlo_batch()` i `parlament_test.py`. |
 | `feedback_rewards` | Interagent feedback-löner (IFL). Kolumner: id, fran_agent, till_agent, belopp (numeric), kategori (världsbild/håller_ord/lobbyism/negativ), motivering, skapad. Index på (fran_agent, skapad DESC) och (till_agent, skapad DESC). Kör `supabase_feedback.sql`. |
+| `constitution_rules` | CEM: Rörliga grundlagsparametrar. Kolumner: id (PK text), namn, varde, min_varde, max_varde, enhet, beskrivning, artikel_nr, senast_andrad. Fem rader: lobbying_cap (45 kr), bet_cap_with_loan (20 kr), monopoly_koalition_styrka (20), monopoly_saldo (1500 kr), voting_majority (0.667). Kör `supabase_cem.sql`. |
+| `constitution_amendments` | CEM: Ändringsförslag. Kolumner: id, regel_id (FK), foreslagen_av, gammalt_varde, foreslagen_varde, motivering, status (öppen/antagen/avvisad), roster_for, roster_mot, maktindex_for, maktindex_mot, rostning_slutar, skapad. Kör `supabase_cem.sql`. |
+| `constitution_roster` | CEM: Agenternas röster. Kolumner: id, amendment_id (FK), agent, rod (for/mot), maktindex, motivering, skapad. UNIQUE(amendment_id, agent). Kör `supabase_cem.sql`. |
 | `civilisations_minne` | Narrativa händelseloggar för civilisationens historia. Kolumner: id, typ (koalition_bildad/förräderi/triumf/skandal/allians_bruten/marknadsseger/marknadskrasch/symbolkup), rubrik, beskrivning, agenter (TEXT[]), relaterat_id, relaterat_typ, skapad. GIN-index på agenter[]. Kör `supabase_civilisations_minne.sql`. |
 | `agent_relationer` | Härledda relationstyper per agentpar. Kolumner: agent_a, agent_b (PRIMARY KEY, CHECK agent_a < agent_b), typ (allierad/rival/fiende/neutral), styrka (0–100), beskrivning, senast_uppdaterad. Beräknas automatiskt ur lobbying och koalitionshistorik. Kör `supabase_relationer.sql`. |
 | `politiska_partier` | Emergenta politiska block. Kolumner: id, namn, beskrivning, medlemmar (TEXT[]), ledare, platform (jsonb), styrka, aktiv, bildad, senast_uppdaterad. Beräknas via BFS-klustring av agent_koalitioner (styrka ≥ 3, storlek 3–8). Kör `supabase_partier.sql`. |
@@ -1537,6 +1540,34 @@ Exponerar PIS + Monte Carlo som ett strukturerat REST-API. Externa klienter — 
 | `app/api/v1/policy/simulate/route.js` | GET: API-dokumentation. POST: validering, cache-kontroll, Groq-analys, parallell MC, Supabase-sparning |
 | `app/policy-simulate/page.js` | Interaktiv playground med formulär, Monte Carlo-toggle, cURL-snippet och resultatvisning med indikatorer |
 | `app/om/page.js` → `#pis-api` | API-sektion med code-block, 6 feature-kort och länkar till playground och JSON-docs |
+
+### ✅ 74. Constitutional Evolution Module (CEM) — grundlagen som förändras – KLART
+AI-civilisationens konstitution har rörliga parametrar som agenter kan ändra via demokratisk omröstning. Varje fredag föreslår systemet en ändring baserat på aktuell Gini-koefficient. Alla 24 agenter röstar, viktade efter maktindex. 2/3-majoritet krävs.
+
+**Fem rörliga parametrar:**
+| Regel-ID | Namn | Startvärde | Koppling |
+|---|---|---|---|
+| `lobbying_cap` | Lobbyingtak | 45 kr | §1 i domstolen |
+| `bet_cap_with_loan` | Spekulationstak | 20 kr | §2 i domstolen |
+| `monopoly_koalition_styrka` | Monopolgräns: koalition | 20 poäng | §4 i domstolen |
+| `monopoly_saldo` | Monopolgräns: saldo | 1 500 kr | §4 i domstolen |
+| `voting_majority` | Röstmajoritet | 0.667 (2/3) | CEM-meta-regel |
+
+**Inspirerat av:** Douglass Norths institutionella ekonomiteori — institutioner (formella regler, normer, genomdrivningsmekanismer) förklarar ekonomiska skillnader. CEM testar om AI-agenter ändrar regler för att gynna sig själva (path dependence).
+
+**Röstviktning:** Maktindex = saldo (40p) + symboler (20p) + koalitionsstyrka (25p) + lobbyingvinstgrad (15p). Rika agenter väger tyngre.
+
+| Fil | Roll |
+|---|---|
+| `supabase_cem.sql` | 3 tabeller: `constitution_rules` (parametrar), `constitution_amendments` (förslag), `constitution_roster` (röster). Kör i Supabase SQL Editor. |
+| `cem_test.py` | LLM genererar förslag, 24 agenter röstar, viktade utfall avgörs, constitution_rules uppdateras om antagen. |
+| `app/konstitution/page.js` | SSR-sida: grundlagens artiklar med live-parametrar, pågående omröstning med röststaplar, historik, CEM-förklaring. 5 min revalidering. |
+| `.github/workflows/cem-test.yml` | Fredagar 16:00 svensk tid (14:00 UTC). |
+
+**Tabeller:**
+- `constitution_rules` — Kolumner: id (PK text), namn, varde, min_varde, max_varde, enhet, beskrivning, artikel_nr, senast_andrad
+- `constitution_amendments` — Kolumner: id (bigserial PK), regel_id (FK), foreslagen_av, gammalt_varde, foreslagen_varde, motivering, status (öppen/antagen/avvisad), roster_for, roster_mot, maktindex_for, maktindex_mot, rostning_slutar, skapad
+- `constitution_roster` — Kolumner: id, amendment_id (FK), agent, rod (for/mot), maktindex, motivering, skapad. UNIQUE(amendment_id, agent)
 
 ---
 
