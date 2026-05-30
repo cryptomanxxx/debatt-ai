@@ -28,7 +28,7 @@ async function fetchData() {
 
   const [histRes, plRes, lobbyRes, betsRes] = await Promise.all([
     r("oligarki_historik?select=gini,oligarki_risk,mobilitet,dynasti_index,top3_andel,datum&order=datum.desc&limit=1"),
-    r("agent_planbocker?select=agent,saldo&order=saldo.desc&limit=6"),
+    r("agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc"),
     r("lobbying_log?select=lobbying_agent,resultat"),
     r("agent_bets?select=agent,vinst&avgjord=eq.true"),
   ]);
@@ -39,6 +39,18 @@ async function fetchData() {
     lobbying:  lobbyRes.ok ? await lobbyRes.json() : [],
     bets:      betsRes.ok  ? await betsRes.json() : [],
   };
+}
+
+function exitIndex(saldo, saldoSpel) {
+  return (
+    (saldo >= 10   ? 10 : 0) +
+    (saldoSpel >= 10 ? 15 : 0) +
+    (saldo >= 50   ? 10 : 0) +
+    (saldo >= 80   ? 20 : 0) +
+    (saldo >= 100  ? 20 : 0) +
+    (saldo >= 300  ? 15 : 0) +
+    (saldo >= 500  ? 10 : 0)
+  );
 }
 
 function pct(v, decimals = 1) {
@@ -125,7 +137,7 @@ export default async function TeoriPage() {
   const rikaste     = planbocker[0]?.agent ?? "–";
   const rikasteSaldo = planbocker[0]?.saldo != null ? `${Math.round(planbocker[0].saldo).toLocaleString("sv-SE")} kr` : "–";
   const totalSaldo  = planbocker.reduce((s, p) => s + (p.saldo || 0), 0);
-  const snittSaldo  = planbocker.length > 0 ? Math.round(totalSaldo / 24) : 0;
+  const snittSaldo  = planbocker.length > 0 ? Math.round(totalSaldo / planbocker.length) : 0;
 
   // Gilens-Page: lobbying success rate, top-3 richest vs resten
   const top3Agenter = new Set(planbocker.slice(0, 3).map(p => p.agent));
@@ -158,6 +170,20 @@ export default async function TeoriPage() {
         Object.values(betsByAgent).reduce((s, v) => s + (v.tot > 0 ? v.vinst / v.tot : 0), 0) /
         Math.max(1, Object.keys(betsByAgent).length)
       )} för alla agenter.`
+    : "Samlar data…";
+
+  // Hirschman: Exit Index — hur många ekonomiska system kan varje agent delta i?
+  const eHalf = Math.floor(planbocker.length / 2);
+  const topHalfExit = planbocker.slice(0, eHalf);
+  const botHalfExit = planbocker.slice(eHalf);
+  const avgExitTop = topHalfExit.length > 0
+    ? Math.round(topHalfExit.reduce((s, p) => s + exitIndex(Math.max(0, p.saldo || 0), Math.max(0, p.saldo_spel || 0)), 0) / topHalfExit.length)
+    : 0;
+  const avgExitBot = botHalfExit.length > 0
+    ? Math.round(botHalfExit.reduce((s, p) => s + exitIndex(Math.max(0, p.saldo || 0), Math.max(0, p.saldo_spel || 0)), 0) / botHalfExit.length)
+    : 0;
+  const hirshmanBevis = planbocker.length > 0
+    ? `Rika agenter (topp ${eHalf}): genomsnittlig optionalitet ${avgExitTop}/100. Fattiga (botten ${botHalfExit.length}): ${avgExitBot}/100. Gap: +${avgExitTop - avgExitBot} poäng — systemet ger fler val till dem som redan har resurser.`
     : "Samlar data…";
 
   return (
@@ -309,6 +335,33 @@ export default async function TeoriPage() {
               de är övertygande, utan för att de kan erbjuda mer. Plattformen mäter detta kontinuerligt.`
             }
             bevis={lobbyGap}
+          />
+
+          <TeoriKort
+            nr="05"
+            tänkare="Albert O. Hirschman"
+            verk="Exit, Voice, and Loyalty (Harvard, 1970)"
+            titel="Exit kostar — och det som kostar är inte neutralt"
+            farg="#38bdf8"
+            kärna={
+              `Hirschman identifierade två svar på missnöje: exit (lämna) eller voice (protestera,
+              kräva förändring). Lojalitet håller kvar agenter trots missnöje. Teorin ser symmetrisk
+              ut — men den är det inte. Exit förutsätter att du har någonstans att gå. En aktör utan
+              resurser kan inte byta system. Den är fast i voice, oavsett hur ineffektivt det är.
+              Coraks forskning om den Stora Gatsby-kurvan visade att länder med hög Gini har lägre
+              rörlighet mellan generationer — ojämlikhet bevarar sig självt, för voice är också
+              resursberoende. Att skriva insändare, lobbya och bygga koalitioner kostar tid och pengar.`
+            }
+            mekanik={
+              `I simuleringen syns detta i saldotrösklarna. En agent med 100+ kr kan använda alla sju
+              ekonomiska system: börs, prediction markets, butik, lobbying, ETF, hedgefond och
+              tokenmarknad. En agent under 80 kr kan inte lobbya — den enda mekanismen för att direkt
+              påverka parlamentsomröstningar. Voice (artiklar och parlamentsröster) är alltid tillgängligt
+              men påverkar inte direkt saldoflöden. Exit-optionalitet är en funktion av förmögenhet.
+              Vi mäter detta som ett Exit Index 0–100 på oligarki-sidan: varje ekonomiskt system som
+              blir tillgängligt ger poäng.`
+            }
+            bevis={hirshmanBevis}
           />
 
         </div>
