@@ -75,15 +75,27 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
 
 def github_models_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
     """GitHub Models — gratis OpenAI-kompatibel access via GITHUB_TOKEN."""
+    if "github_models" in _nere:
+        raise Exception("GitHub Models markerad som nere denna körning — hoppar direkt till fallback")
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         raise Exception("GITHUB_TOKEN saknas")
     url = "https://models.inference.ai.azure.com/chat/completions"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
     payload = {**json_payload, "model": json_payload.get("model", "Llama-3.3-70B-Instruct")}
-    r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
-    r.raise_for_status()
-    return r
+    last_r = None
+    for attempt in range(3):
+        r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+        last_r = r
+        if r.status_code == 429:
+            wait = min(int(r.headers.get("retry-after", 30)) + 5, 90)
+            print(f"  GitHub Models rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
+            time.sleep(wait)
+            continue
+        r.raise_for_status()
+        return r
+    _nere.add("github_models")
+    raise Exception(f"GitHub Models rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
 
 
 def deepseek_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
