@@ -29,7 +29,7 @@ import urllib.parse
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, sambanova_post, cerebras_post
+from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, sambanova_post, cerebras_post, mistral_post
 from agenter import OPINION_FRAGOR
 
 
@@ -5072,7 +5072,7 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
         }
         raw = None
         try:
-            raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
+            raw = mistral_post(payload).json()["choices"][0]["message"]["content"].strip()
         except Exception:
             pass
         if not raw:
@@ -5082,13 +5082,12 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
                 pass
         if not raw:
             try:
-                raw = cerebras_post(payload).json()["choices"][0]["message"]["content"].strip()
+                raw = deepseek_post(payload).json()["choices"][0]["message"]["content"].strip()
             except Exception:
                 pass
         if not raw:
             try:
-                gh_payload = {**payload, "model": "Llama-3.3-70B-Instruct"}
-                raw = github_models_post(gh_payload).json()["choices"][0]["message"]["content"].strip()
+                raw = cloudflare_post(system, prompt, max_tokens=480)
             except Exception:
                 pass
         if not raw:
@@ -5227,7 +5226,7 @@ def analysera_pis_monte_carlo(sb_key: str, forslag_id: int, titel: str,
         try:
             raw = None
             try:
-                raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
+                raw = mistral_post(payload).json()["choices"][0]["message"]["content"].strip()
             except Exception:
                 pass
             if not raw:
@@ -5237,13 +5236,12 @@ def analysera_pis_monte_carlo(sb_key: str, forslag_id: int, titel: str,
                     pass
             if not raw:
                 try:
-                    raw = cerebras_post(payload).json()["choices"][0]["message"]["content"].strip()
+                    raw = deepseek_post(payload).json()["choices"][0]["message"]["content"].strip()
                 except Exception:
                     pass
             if not raw:
                 try:
-                    gh_payload = {**payload, "model": "Llama-3.3-70B-Instruct"}
-                    raw = github_models_post(gh_payload).json()["choices"][0]["message"]["content"].strip()
+                    raw = cloudflare_post(system, prompt, max_tokens=160)
                 except Exception:
                     pass
             if not raw:
