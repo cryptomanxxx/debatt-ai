@@ -183,6 +183,35 @@ def deepseek_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
 
 
 
+def mistral_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
+    """Mistral/Codestral — OpenAI-kompatibel, `codestral-latest`."""
+    if "mistral" in _nere:
+        raise Exception("Mistral markerad som nere denna körning")
+    api_key = os.environ.get("MISTRAL_API_KEY")
+    if not api_key:
+        _nere.add("mistral")
+        raise Exception("MISTRAL_API_KEY saknas")
+    url = "https://api.mistral.ai/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    payload = {**json_payload, "model": "codestral-latest"}
+    last_r = None
+    for attempt in range(3):
+        r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+        last_r = r
+        if r.status_code == 429:
+            wait = min(int(r.headers.get("retry-after", 10)) + 2, 60)
+            print(f"  Mistral rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
+            time.sleep(wait)
+            continue
+        if r.status_code in (401, 403):
+            _nere.add("mistral")
+            raise Exception(f"Mistral autentiseringsfel: {r.status_code}")
+        r.raise_for_status()
+        return r
+    _nere.add("mistral")
+    raise Exception(f"Mistral rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
+
+
 def cloudflare_post(system_prompt: str, user_message: str, max_tokens: int = 2000, timeout: int = 60) -> str:
     """Cloudflare Workers AI — helt gratis, Llama 3.3 70B. Returnerar textsvar."""
     if "cloudflare" in _nere:

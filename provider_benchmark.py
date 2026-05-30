@@ -135,6 +135,23 @@ def _gemini(n: int) -> str:
     return r.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 
+def _mistral(n: int) -> str:
+    key = os.environ.get("MISTRAL_API_KEY")
+    if not key:
+        raise Exception("MISTRAL_API_KEY saknas")
+    r = httpx.post(
+        "https://api.mistral.ai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        json={"model": "codestral-latest",
+              "messages": [{"role": "system", "content": SYSTEM},
+                           {"role": "user", "content": PROMPT}],
+              "max_tokens": 200, "temperature": 0.35},
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"]
+
+
 def _deepseek(n: int) -> str:
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
@@ -178,6 +195,7 @@ PROVIDERS = {
     "cerebras":      ("Cerebras llama-3.3-70b",            _cerebras),
     "github_models": ("GitHub Models Llama-3.3-70B",       _github_models),
     "gemini":        ("Gemini 2.0 Flash-Lite",             _gemini),
+    "mistral":       ("Mistral Codestral-latest",          _mistral),
     "deepseek":      ("DeepSeek V3 (deepseek-chat)",       _deepseek),
     "cloudflare":    ("Cloudflare Llama-3.3-70B",          _cloudflare),
 }
