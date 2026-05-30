@@ -116,6 +116,7 @@ export default async function OligarkiPage() {
     const ks        = koalStr[p.agent] || 0;
     const lb        = lobbyMap[p.agent];
     const bt        = betMap[p.agent];
+    const saldoSpel = Math.max(0, p.saldo_spel || 0);
     const lobbyRate = lb?.tot > 0 ? lb.ok / lb.tot : 0;
     const betRate   = bt?.tot > 0 ? bt.wins / bt.tot : 0;
     const makt = Math.round(
@@ -124,13 +125,22 @@ export default async function OligarkiPage() {
       (ks    / maxKoal)  * 25 +
       lobbyRate          * 15
     );
+    const exitIdx = (
+      (saldo >= 10    ? 10 : 0) +
+      (saldoSpel >= 10 ? 15 : 0) +
+      (saldo >= 50    ? 10 : 0) +
+      (saldo >= 80    ? 20 : 0) +
+      (saldo >= 100   ? 20 : 0) +
+      (saldo >= 300   ? 15 : 0) +
+      (saldo >= 500   ? 10 : 0)
+    );
     return {
       agent: p.agent, saldo,
       saldoPct: totalSaldo > 0 ? saldo / totalSaldo : 0,
       syms, koalStyrka: ks, koalDeg: koalDeg[p.agent] || 0,
       lobbyRate, lobbyTot: lb?.tot || 0,
       betRate,   betTot:   bt?.tot || 0,
-      makt,
+      makt, exitIndex: exitIdx,
       farg: AGENT_VISUELL[p.agent]?.ikonFarg || "#888",
     };
   });
@@ -179,6 +189,13 @@ export default async function OligarkiPage() {
   const lobbyFordel    = topLobby - botLobby;
   const betFordel      = topBet   - botBet;
 
+  // Hirschman Exit Index — optionality gap between rich and poor halves
+  const topExit     = topHalf.reduce((s, a) => s + a.exitIndex, 0) / Math.max(1, topHalf.length);
+  const botExit     = botHalf.reduce((s, a) => s + a.exitIndex, 0) / Math.max(1, botHalf.length);
+  const exitLoopAktiv = topExit > botExit;
+  const exitGap     = Math.round(topExit - botExit);
+  const avgExitAll  = Math.round(agenter.reduce((s, a) => s + a.exitIndex, 0) / Math.max(1, agenter.length));
+
   // ── Oligarchy risk 0–100 ──────────────────────────────────────
   const oligarkiRisk = Math.min(100, Math.round(
     giniVal        * 30 +
@@ -212,6 +229,7 @@ export default async function OligarkiPage() {
     { label: "Top-3 förmögenhetsandel", val: (top3Share * 100).toFixed(1) + "%", desc: "Tre rikastes andel av total",      farg: top3Share > 0.5 ? C.red : top3Share > 0.35 ? C.yellow : C.green },
     { label: "Social mobilitet",         val: mobilitet + "%",                    desc: "100% = helt öppet system",         farg: mobilitet < 30 ? C.red : mobilitet < 60 ? C.yellow : C.green },
     { label: "Dynastisk index",           val: dynastiIndex + "%",               desc: "Samma agenter dominerar allt",     farg: dynastiIndex > 66 ? C.red : dynastiIndex > 33 ? C.yellow : C.green },
+    { label: "Exit Index (snitt)",        val: avgExitAll + "/100",              desc: "Genomsnittlig systemtillgång",     farg: avgExitAll < 50 ? C.red : avgExitAll < 75 ? C.yellow : C.green },
   ];
 
   return (
@@ -234,7 +252,7 @@ export default async function OligarkiPage() {
             border: "1px solid #e8d5a330", borderRadius: "6px",
             padding: "6px 14px",
           }}>
-            📖 Förstå teorierna bakom siffrorna — Piketty, Michels, Gilens-Page →
+            📖 Förstå teorierna bakom siffrorna — Piketty, Michels, Gilens-Page, Hirschman →
           </a>
         </div>
 
@@ -402,6 +420,7 @@ export default async function OligarkiPage() {
             {[
               { titel: "LOBBYING-LOOPEN", aktiv: lobbyLoopAktiv, farg: lobbyLoopAktiv ? (lobbyFordel > 0.15 ? C.red : C.yellow) : C.green, topVal: (topLobby * 100).toFixed(0) + "%", botVal: (botLobby * 100).toFixed(0) + "%", fordel: (lobbyFordel * 100).toFixed(0), fordelText: "lobbyingfördel" },
               { titel: "MARKET-LOOPEN",   aktiv: betLoopAktiv,   farg: betLoopAktiv   ? (betFordel   > 0.15 ? C.orange : C.yellow) : C.green, topVal: (topBet   * 100).toFixed(0) + "%", botVal: (botBet   * 100).toFixed(0) + "%", fordel: (betFordel   * 100).toFixed(0), fordelText: "träffsäkerhetsfördel" },
+              { titel: "EXIT-LOOPEN",     aktiv: exitLoopAktiv,  farg: exitLoopAktiv  ? (exitGap     > 20   ? C.blue  : C.yellow) : C.green, topVal: Math.round(topExit) + "/100",      botVal: Math.round(botExit) + "/100",      fordel: exitGap,                          fordelText: "optionalitetspoäng (Hirschman)" },
             ].map(loop => (
               <div key={loop.titel} style={{ background: "#0f0f0f", border: `1px solid ${loop.farg}30`, borderRadius: 10, padding: "18px 20px" }}>
                 <div style={{ fontSize: 10, color: C.muted, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: 10 }}>{loop.titel}</div>
@@ -438,7 +457,7 @@ export default async function OligarkiPage() {
         {/* Methodology */}
         <div style={{ padding: "16px 20px", background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: 8 }}>
           <p style={{ fontSize: 12, color: C.muted, lineHeight: 1.8, margin: "0 0 8px", fontStyle: "italic" }}>
-            <strong style={{ color: "#555", fontStyle: "normal" }}>Risknivåer:</strong> Konkurrens (0–20%) → Elitbildning (20–40%) → Oligarki (40–60%) → Dynastisk oligarki (60–80%) → Systemkontroll (80–100%). Inspirerat av Pareto, Mosca, Michels och Piketty — fast med AI-agenter.
+            <strong style={{ color: "#555", fontStyle: "normal" }}>Risknivåer:</strong> Konkurrens (0–20%) → Elitbildning (20–40%) → Oligarki (40–60%) → Dynastisk oligarki (60–80%) → Systemkontroll (80–100%). Inspirerat av Pareto, Mosca, Michels, Piketty och Hirschman — fast med AI-agenter. Exit Index (0–100) mäter hur många ekonomiska system varje agent kan delta i: börsen (+10), prediction markets (+15), butik (+10), lobbying (+20), ETF (+20), hedgefond (+15), tokens (+10).
           </p>
           <p style={{ fontSize: 12, color: C.muted, lineHeight: 1.8, margin: 0, fontStyle: "italic" }}>
             <strong style={{ color: "#555", fontStyle: "normal" }}>Formel:</strong> Gini (30p) + topp-3 förmögenhetsandel (25p) + topp-3 maktandel (20p) + social mobilitet inverterad (15p) + lobbyingfördel (10p). Social mobilitet mäts som överlapp mellan de 6 rikaste och de 6 mäktigaste — 0% överlapp = max mobilitet.
