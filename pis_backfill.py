@@ -6,10 +6,11 @@ Monte Carlo-data och kör dem i batch. Skiljer sig från den dagliga
 parlament_test.py-körningen som bara hanterar 2–8 nya förslag.
 
 Konfiguration via miljövariabler:
-  MAX_PIS  — max antal förslag att PIS-analysera (default 50)
-  MAX_MC   — max antal förslag att MC-analysera (default 20)
-  SLEEP_PIS — sekunder mellan varje PIS-anrop (default 2)
-  SLEEP_MC  — sekunder mellan varje MC-anrop (default 5)
+  MAX_PIS        — max antal förslag att PIS-analysera (default 50)
+  MAX_MC         — max antal förslag att MC-analysera (default 20)
+  SLEEP_PIS      — sekunder mellan varje PIS-anrop (default 2)
+  SLEEP_MC       — sekunder mellan varje MC-anrop (default 5)
+  MIN_ITERATIONER — re-kör MC på förslag med färre iterationer än detta värde (default 0 = av)
 """
 import os
 import sys
@@ -32,7 +33,8 @@ MAX_PIS = int(os.environ.get("MAX_PIS", "50"))
 MAX_MC = int(os.environ.get("MAX_MC", "20"))
 SLEEP_PIS = float(os.environ.get("SLEEP_PIS", "2"))
 SLEEP_MC = float(os.environ.get("SLEEP_MC", "5"))
-MC_ITERATIONER = 15
+MC_ITERATIONER = int(os.environ.get("MC_ITERATIONER", "15"))
+MIN_ITERATIONER = int(os.environ.get("MIN_ITERATIONER", "0"))
 
 HEADERS = {"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Prefer": ""}
 
@@ -72,8 +74,10 @@ def hamta_alla_forslag_utan_pis(max_antal: int) -> list[dict]:
     return saknar[:max_antal]
 
 
-def hamta_alla_forslag_utan_mc(max_antal: int) -> list[dict]:
-    """Hämtar upp till max_antal förslag (alla statusar) som har PIS men saknar MC."""
+def hamta_alla_forslag_utan_mc(max_antal: int, min_iterationer: int = 0) -> list[dict]:
+    """Hämtar upp till max_antal förslag (alla statusar) som har PIS men saknar MC.
+    Om min_iterationer > 0 inkluderas också förslag vars befintliga MC har färre
+    iterationer än gränsvärdet — för uppgradering till fler iterationer."""
     r_pis = httpx.get(
         f"{SB_URL}/rest/v1/pis_analyser?select=lagforslag_id",
         headers=HEADERS, timeout=15,
@@ -81,12 +85,25 @@ def hamta_alla_forslag_utan_mc(max_antal: int) -> list[dict]:
     har_pis = {row["lagforslag_id"] for row in (r_pis.json() if r_pis.is_success else [])}
 
     r_mc = httpx.get(
-        f"{SB_URL}/rest/v1/pis_monte_carlo?select=lagforslag_id",
+        f"{SB_URL}/rest/v1/pis_monte_carlo?select=lagforslag_id,iterationer",
         headers=HEADERS, timeout=15,
     )
-    har_mc = {row["lagforslag_id"] for row in (r_mc.json() if r_mc.is_success else [])}
+    mc_rader = r_mc.json() if r_mc.is_success else []
+    har_mc = {row["lagforslag_id"] for row in mc_rader}
 
+    # Förslag utan MC alls
     behöver_mc = har_pis - har_mc
+
+    # Om MIN_ITERATIONER är satt: lägg även till förslag med för få iterationer
+    if min_iterationer > 0:
+        uppgradera = {
+            row["lagforslag_id"] for row in mc_rader
+            if (row.get("iterationer") or 0) < min_iterationer
+        }
+        behöver_mc = behöver_mc | uppgradera
+        if uppgradera:
+            print(f"  (varav {len(uppgradera)} uppgraderingar: iterationer < {min_iterationer})")
+
     if not behöver_mc:
         return []
 
@@ -133,8 +150,9 @@ else:
     print(f"\n  PIS-sammanfattning: {pis_ok} lyckades, {pis_fel} misslyckades")
 
 # ── STEG 2: Monte Carlo ──────────────────────────────────────────────────────
-print(f"\n── Steg 2: Monte Carlo {MC_ITERATIONER} iterationer (max {MAX_MC} förslag) ──")
-att_mc_analysera = hamta_alla_forslag_utan_mc(MAX_MC)
+uppg_info = f", uppgraderar iterationer < {MIN_ITERATIONER}" if MIN_ITERATIONER > 0 else ""
+print(f"\n── Steg 2: Monte Carlo {MC_ITERATIONER} iterationer (max {MAX_MC} förslag{uppg_info}) ──")
+att_mc_analysera = hamta_alla_forslag_utan_mc(MAX_MC, min_iterationer=MIN_ITERATIONER)
 
 if not att_mc_analysera:
     print("  ✓ Alla PIS-förslag har redan MC-analys — inget att göra")

@@ -19,9 +19,19 @@ on:
         default: "2"
         type: string
       sleep_mc:
-        description: "Sekunder att vänta mellan MC-anrop (15 iter/förslag)"
+        description: "Sekunder att vänta mellan MC-anrop"
         required: false
         default: "5"
+        type: string
+      mc_iterationer:
+        description: "Antal MC-iterationer per förslag"
+        required: false
+        default: "15"
+        type: string
+      min_iterationer:
+        description: "Re-kör MC på förslag med färre iterationer än detta (0 = av)"
+        required: false
+        default: "0"
         type: string
 
 jobs:
@@ -52,5 +62,7 @@ jobs:
           MAX_MC: ${{ inputs.max_mc }}
           SLEEP_PIS: ${{ inputs.sleep_pis }}
           SLEEP_MC: ${{ inputs.sleep_mc }}
+          MC_ITERATIONER: ${{ inputs.mc_iterationer }}
+          MIN_ITERATIONER: ${{ inputs.min_iterationer }}
           PYTHONUNBUFFERED: "1"
         run: python -u pis_backfill.py
