@@ -54,6 +54,7 @@ export default function RootLayout({ children }) {
               <a href="/tokens" className="neon-nav">Agent-tokens</a>
               <a href="/hedgefonder" className="neon-nav">Hedgefonder</a>
               <a href="/stablecoin" className="neon-nav">Stablecoin STAB</a>
+              <a href="/konstitution" className="neon-nav">Grundlagen</a>
               <a href="/rykten" className="neon-nav">Ryktesspridning</a>
               <a href="/vecka" className="neon-nav">Veckans sammanfattning</a>
               <a href="/koalitioner" className="neon-nav">Koalitioner</a>
@@ -70,6 +71,7 @@ export default function RootLayout({ children }) {
               <a href="/feedback" className="neon-nav">Socialt kapital</a>
               <a href="/lobbying" className="neon-nav">AI-Lobbying</a>
               <a href="/domstol" className="neon-nav">Domstolen</a>
+              <a href="/konstitution" className="neon-nav">Grundlagen</a>
               <a href="/val" className="neon-nav">Riksdagsval</a>
               <a href="/kris" className="neon-nav">Krisevents</a>
               <a href="/butik" className="neon-nav">Butiken</a>
