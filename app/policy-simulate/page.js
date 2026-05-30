@@ -1,8 +1,6 @@
 "use client";
 import { useState } from "react";
 
-export const metadata = undefined; // client component — metadata in layout
-
 const C = {
   bg:      "#0a0a0a",
   card:    "#0f0f0f",
