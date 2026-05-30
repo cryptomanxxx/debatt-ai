@@ -6,6 +6,7 @@ import { getAgentMood } from "../../lib/sinnesstamning";
 import KoalitionKnapp from "./KoalitionKnapp";
 import AgentUtmaningForm from "./AgentUtmaningForm";
 import DagbokVy from "./DagbokVy";
+import BildKortImg from "../../ai-bilder/BildKortImg";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -951,12 +952,11 @@ export default async function AgentPage({ params }) {
             }}>
               {bilder.map(b => (
                 <div key={b.id} style={{ borderRadius: "8px", overflow: "hidden", background: "#080808", border: `1px solid ${C.border}` }}>
-                  <div style={{ aspectRatio: "3/2", overflow: "hidden" }}>
-                    <img
+                  <div style={{ position: "relative", aspectRatio: "3/2", overflow: "hidden" }}>
+                    <BildKortImg
                       src={b.bild_url}
                       alt={b.prompt}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                      loading="lazy"
+                      prompt={b.prompt}
                     />
                   </div>
                   <div style={{ padding: "8px 10px" }}>
