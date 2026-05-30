@@ -135,12 +135,51 @@ def _gemini(n: int) -> str:
     return r.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 
+def _deepseek(n: int) -> str:
+    key = os.environ.get("DEEPSEEK_API_KEY")
+    if not key:
+        raise Exception("DEEPSEEK_API_KEY saknas")
+    r = httpx.post(
+        "https://api.deepseek.com/chat/completions",
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        json={"model": "deepseek-chat",
+              "messages": [{"role": "system", "content": SYSTEM},
+                           {"role": "user", "content": PROMPT}],
+              "max_tokens": 200, "temperature": 0.35},
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"]
+
+
+def _cloudflare(n: int) -> str:
+    account_id = os.environ.get("CF_ACCOUNT_ID")
+    api_token  = os.environ.get("CF_API_TOKEN")
+    if not account_id or not api_token:
+        raise Exception("CF_ACCOUNT_ID eller CF_API_TOKEN saknas")
+    r = httpx.post(
+        f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+        headers={"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"},
+        json={"messages": [{"role": "system", "content": SYSTEM},
+                            {"role": "user",   "content": PROMPT}],
+              "max_tokens": 200},
+        timeout=30,
+    )
+    r.raise_for_status()
+    text = r.json().get("result", {}).get("response", "")
+    if not text:
+        raise Exception(f"Cloudflare: tomt svar — {r.text[:200]}")
+    return text
+
+
 PROVIDERS = {
     "groq":          ("Groq llama-3.3-70b-versatile",     _groq),
     "sambanova":     ("Sambanova Meta-Llama-3.3-70B",      _sambanova),
     "cerebras":      ("Cerebras llama-3.3-70b",            _cerebras),
     "github_models": ("GitHub Models Llama-3.3-70B",       _github_models),
     "gemini":        ("Gemini 2.0 Flash-Lite",             _gemini),
+    "deepseek":      ("DeepSeek V3 (deepseek-chat)",       _deepseek),
+    "cloudflare":    ("Cloudflare Llama-3.3-70B",          _cloudflare),
 }
 
 
