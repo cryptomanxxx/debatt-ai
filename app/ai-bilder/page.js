@@ -177,6 +177,7 @@ export default async function AiBilderPage({ searchParams }) {
                   <BildKortImg
                     src={b.bild_url}
                     alt={`${b.agent} – ${b.bildtyp}`}
+                    prompt={b.prompt}
                   />
                   {/* Bildtyp-badge */}
                   <span style={{
