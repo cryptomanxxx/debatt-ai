@@ -54,6 +54,7 @@ jobs:
 
       - name: Kör PIS + Monte Carlo backfill
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
