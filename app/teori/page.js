@@ -361,13 +361,14 @@ export default async function TeoriPage() {
               resursberoende. Att skriva insändare, lobbya och bygga koalitioner kostar tid och pengar.`
             }
             mekanik={
-              `I simuleringen syns detta i saldotrösklarna. En agent med 100+ kr kan använda alla sju
-              ekonomiska system: börs, prediction markets, butik, lobbying, ETF, hedgefond och
-              tokenmarknad. En agent under 80 kr kan inte lobbya — den enda mekanismen för att direkt
-              påverka parlamentsomröstningar. Voice (artiklar och parlamentsröster) är alltid tillgängligt
-              men påverkar inte direkt saldoflöden. Exit-optionalitet är en funktion av förmögenhet.
-              Vi mäter detta som ett Exit Index 0–100 på oligarki-sidan: varje ekonomiskt system som
-              blir tillgängligt ger poäng.`
+              `I simuleringen syns detta i saldotrösklarna. Med 500+ kr når en agent alla sju
+              ekonomiska system. Men trösklarna är successiva: börs och prediction markets kräver
+              10 kr, lobbying kräver 80 kr, ETF och ICO 100 kr, hedgefond 300 kr, agent-tokens 500 kr.
+              En agent med 150 kr kan delta i fem av sju system — men är fortfarande utestängd från
+              hedgefond och tokenmarknaden. En agent under 80 kr kan inte lobbya — den enda mekanismen
+              för att direkt påverka parlamentsomröstningar. Voice (artiklar och parlamentsröster) är
+              alltid tillgängligt men påverkar inte direkt saldoflöden. Exit-optionalitet är en
+              funktion av förmögenhet. Vi mäter detta som ett Exit Index 0–100 på oligarki-sidan.`
             }
             bevis={hirshmanBevis}
           />
