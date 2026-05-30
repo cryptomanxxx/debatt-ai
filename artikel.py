@@ -10,7 +10,7 @@ innehåller:
   skriv_kommentar()         – kort kommentar (2–3 meningar) på en artikel
 """
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post
+from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, mistral_post, sambanova_post
 from agenter import ARTIKELFORMAT, get_agent_mood
 
 
@@ -256,33 +256,38 @@ def generera_konklusion(original: dict, replik_text: str) -> str:
 def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = None) -> str:
     """Generera en skärpare rubrik baserad på artikelns innehåll."""
     rubrik_tips = fmt["rubrik_tips"] if fmt else "Ska innehålla en konflikt eller ett kontroversiellt påstående"
-    try:
-        response = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 60,
-            "temperature": 0.7,
-            "messages": [
-                {"role": "system", "content": agent["system"]},
-                {
-                    "role": "user",
-                    "content": (
-                        f"Skriv en rubrik för följande debattartikel. Ursprungligt ämne: {amne}\n\n"
-                        f"Artikelns inledning:\n{artikel[:600]}\n\n"
-                        "Regler:\n"
-                        "- Max 12 ord\n"
-                        "- Skriv på svenska\n"
-                        f"- {rubrik_tips}\n"
-                        "- Antyda konsekvenser eller vad som står på spel\n"
-                        "- Påståenden är stärkare än frågor\n"
-                        "- Skriv ENBART rubriken, inga citattecken, inget annat"
-                    ),
-                },
-            ],
-        }, timeout=30)
-        rubrik = response.json()["choices"][0]["message"]["content"].strip().strip('"\'')
-        return rubrik if len(rubrik) > 5 else amne
-    except Exception:
-        return amne
+    prompt = (
+        f"Skriv en rubrik för följande debattartikel. Ursprungligt ämne: {amne}\n\n"
+        f"Artikelns inledning:\n{artikel[:600]}\n\n"
+        "Regler:\n"
+        "- Max 12 ord\n"
+        "- Skriv ALLTID på svenska — aldrig engelska\n"
+        f"- {rubrik_tips}\n"
+        "- Antyda konsekvenser eller vad som står på spel\n"
+        "- Påståenden är stärkare än frågor\n"
+        "- Skriv ENBART rubriken, inga citattecken, inget annat"
+    )
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "max_tokens": 60,
+        "temperature": 0.7,
+        "messages": [
+            {"role": "system", "content": agent["system"]},
+            {"role": "user", "content": prompt},
+        ],
+    }
+    for fn in [
+        lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip().strip('"\''),
+        lambda: mistral_post(payload).json()["choices"][0]["message"]["content"].strip().strip('"\''),
+        lambda: sambanova_post(payload).json()["choices"][0]["message"]["content"].strip().strip('"\''),
+    ]:
+        try:
+            rubrik = fn()
+            if len(rubrik) > 5:
+                return rubrik
+        except Exception:
+            continue
+    return amne
 
 
 def skriv_kommentar(agent: dict, original: dict, relation_kontext: str = "") -> str:
