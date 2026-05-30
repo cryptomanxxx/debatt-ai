@@ -10,7 +10,7 @@ function makeMessages(providerName) {
 async function testGroq() {
   const key = process.env.GROQ_API_KEY;
   if (!key) return { ok: false, error: "GROQ_API_KEY saknas" };
-  const model = "llama3.3-70b-versatile";
+  const model = "llama-3.3-70b-versatile";
   const t0 = Date.now();
   try {
     const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -125,35 +125,6 @@ async function testSambanova() {
   }
 }
 
-async function testOpenRouter() {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return { ok: false, error: "OPENROUTER_API_KEY saknas" };
-  const model = "meta-llama/llama3.3-70b-instruct:free";
-  const t0 = Date.now();
-  try {
-    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://www.debatt-ai.se",
-        "X-Title": "debatt.ai",
-      },
-      body: JSON.stringify({ model, messages: makeMessages("OpenRouter"), max_tokens: 30 }),
-      signal: AbortSignal.timeout(20000),
-    });
-    const latency = Date.now() - t0;
-    if (!r.ok) {
-      const err = await r.text();
-      return { ok: false, status: r.status, error: err.slice(0, 200), latency };
-    }
-    const json = await r.json();
-    const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-    return { ok: true, text, latency, model: json.model };
-  } catch (e) {
-    return { ok: false, error: e.message, latency: Date.now() - t0 };
-  }
-}
 
 async function testCodestral() {
   const key = process.env.MISTRAL_API_KEY;
@@ -235,7 +206,7 @@ async function testCloudflare() {
   const accountId = process.env.CF_ACCOUNT_ID;
   const token = process.env.CF_API_TOKEN;
   if (!accountId || !token) return { ok: false, error: "CF_ACCOUNT_ID eller CF_API_TOKEN saknas" };
-  const model = "@cf/meta/llama3.3-70b-instruct-fp8-fast";
+  const model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
   const t0 = Date.now();
   try {
     const r = await fetch(
@@ -261,19 +232,18 @@ async function testCloudflare() {
 }
 
 export async function GET() {
-  const [groq, gemini, cerebras, sambanova, openrouter, codestral, github_models, deepseek, cloudflare] = await Promise.all([
+  const [groq, gemini, cerebras, sambanova, codestral, github_models, deepseek, cloudflare] = await Promise.all([
     testGroq(),
     testGemini(),
     testCerebras(),
     testSambanova(),
-    testOpenRouter(),
     testCodestral(),
     testGithubModels(),
     testDeepSeek(),
     testCloudflare(),
   ]);
   return Response.json(
-    { groq, gemini, cerebras, sambanova, openrouter, codestral, github_models, deepseek, cloudflare },
+    { groq, gemini, cerebras, sambanova, codestral, github_models, deepseek, cloudflare },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

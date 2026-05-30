@@ -482,7 +482,7 @@ def valj_nyhet_med_groq(nyheter: list, agent: dict) -> dict:
     )
     try:
         r = groq_post({
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "max_tokens": 5,
             "temperature": 0.2,
             "messages": [{"role": "user", "content": prompt}],

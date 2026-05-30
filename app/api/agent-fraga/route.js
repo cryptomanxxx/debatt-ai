@@ -161,7 +161,7 @@ ${kallaPrompt} Svara i karaktär — mer avslappnat och naturligt än i en forme
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
         body: JSON.stringify({
-          model: "llama3.3-70b-versatile",
+          model: "llama-3.3-70b-versatile",
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
           max_tokens: 300,
           temperature: 0.9,
@@ -170,13 +170,13 @@ ${kallaPrompt} Svara i karaktär — mer avslappnat och naturligt än i en forme
       if (res.ok) {
         const data = await res.json();
         svar = data.choices?.[0]?.message?.content?.trim() ?? "";
-        logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
       } else {
         if (res.status === 429) markProviderDown("groq");
-        logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "agent-fraga", status: `error_${res.status}`, latency_ms: Date.now() - t0 });
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: `error_${res.status}`, latency_ms: Date.now() - t0 });
       }
     } catch {
-      logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
+      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 

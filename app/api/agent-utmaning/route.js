@@ -90,14 +90,14 @@ export async function POST(req) {
       const r = await fetch(GROQ_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama3.3-70b-versatile", messages: msgs, max_tokens: 200, temperature: 0.9 }),
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 200, temperature: 0.9 }),
         signal: AbortSignal.timeout(6000),
       });
       if (r.ok) {
         const json = await r.json();
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         if (text) {
-          logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
+          logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
           await sparaUtmaning(agent, tesTrimmed, text);
           return Response.json({ motargument: text });
         }

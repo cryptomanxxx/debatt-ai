@@ -11,7 +11,7 @@ export async function POST(req) {
       method: "POST",
       headers: { "Authorization": `Bearer ${groqKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "llama3.3-70b-versatile",
+        model: "llama-3.3-70b-versatile",
         messages: [
           { role: "system", content: "Translate the following Swedish text to fluent, natural English. Return ONLY the translated text, nothing else." },
           { role: "user", content: text },

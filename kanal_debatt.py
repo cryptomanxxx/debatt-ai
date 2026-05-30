@@ -12,7 +12,7 @@ import httpx
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
-GROQ_MODEL = "llama3.3-70b-versatile"
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 RSS_FEEDS = [
     ("SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml"),

@@ -61,7 +61,6 @@ function consumeRateLimit(ip) {
 const ps = {
   groq:          { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
   gemini:        { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
-  or:            { ts: 0, status: "unknown" },
   codestral:     { ts: 0, status: "unknown" },
   sambanova:     { ts: 0, status: "unknown" },
   cerebras:      { ts: 0, status: "unknown" },
@@ -78,7 +77,6 @@ export async function GET() {
   return Response.json({
     groq:          { ...ps.groq,          keySet: !!process.env.GROQ_API_KEY },
     gemini:        { ...ps.gemini,        keySet: !!process.env.GEMINI_API_KEY },
-    or:            { ...ps.or,            keySet: !!process.env.OPENROUTER_API_KEY },
     codestral:     { ...ps.codestral,     keySet: !!process.env.MISTRAL_API_KEY },
     sambanova:     { ...ps.sambanova,     keySet: !!process.env.SAMBANOVA_API_KEY },
     cerebras:      { ...ps.cerebras,      keySet: !!process.env.CEREBRAS_API_KEY },
@@ -183,7 +181,7 @@ REGLER — viktiga:
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
         signal: groqAbort.signal,
         body: JSON.stringify({
-          model: "llama3.3-70b-versatile",
+          model: "llama-3.3-70b-versatile",
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
           max_tokens: 250,
           temperature: 0.88,
@@ -196,19 +194,19 @@ REGLER — viktiga:
       const rst = groqRes.headers.get("x-ratelimit-reset-requests");
       if (groqRes.ok) {
         ps.groq = { remaining: rem >= 0 ? rem : ps.groq.remaining, limit: 30, resetAt: rst, ts: Date.now(), status: rem <= 5 ? "warn" : "ok" };
-        logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "chatt", status: "ok", latency_ms: Date.now() - groqT0 });
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "ok", latency_ms: Date.now() - groqT0 });
         return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
       }
       if (groqRes.status === 429) {
         ps.groq = { remaining: 0, limit: 30, resetAt: rst, ts: Date.now(), status: "limited" };
-        logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "chatt", status: "rate_limited", latency_ms: Date.now() - groqT0 });
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "rate_limited", latency_ms: Date.now() - groqT0 });
       } else {
-        logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "chatt", status: "error", latency_ms: Date.now() - groqT0 });
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "error", latency_ms: Date.now() - groqT0 });
       }
       groqFailReason = `Groq HTTP ${groqRes.status}`;
     } catch (e) {
       clearTimeout(groqTimeout);
-      logAiCall({ provider: "groq", model: "llama3.3-70b-versatile", source: "chatt", status: e.name === "AbortError" ? "timeout" : "error", latency_ms: Date.now() - groqT0 });
+      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: e.name === "AbortError" ? "timeout" : "error", latency_ms: Date.now() - groqT0 });
       groqFailReason = e.name === "AbortError" ? "Groq timeout (5s)" : `Groq fel: ${e.message}`;
     }
   }
@@ -244,27 +242,6 @@ REGLER — viktiga:
         }
       }
       logAiCall({ provider: name, model, source: "chatt", status: r.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - t0 });
-    } catch {}
-  }
-
-  // ── OpenRouter (unreliable — rate limited free tier, last resort streaming) ──────────────────────
-  const orKey = process.env.OPENROUTER_API_KEY;
-  if (orKey) {
-    const orT0 = Date.now();
-    try {
-      const orRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${orKey}`, "HTTP-Referer": "https://www.debatt-ai.se", "X-Title": "Debatt AI" },
-        body: JSON.stringify({ model: "meta-llama/llama3.3-70b-instruct:free", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }], max_tokens: 250, temperature: 0.88, stream: true }),
-        signal: AbortSignal.timeout(10000),
-      });
-      if (orRes.ok) {
-        ps.or = { ts: Date.now(), status: "ok" };
-        logAiCall({ provider: "openrouter", model: "llama3.3-70b-instruct:free", source: "chatt", status: "ok", latency_ms: Date.now() - orT0 });
-        return new Response(orRes.body, { headers: { ...rlHeaders, "X-Provider": "openrouter" } });
-      }
-      ps.or = { ts: Date.now(), status: orRes.status === 429 ? "limited" : "error" };
-      logAiCall({ provider: "openrouter", source: "chatt", status: orRes.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - orT0 });
     } catch {}
   }
 
