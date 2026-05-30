@@ -5077,7 +5077,8 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
             pass
         if not raw:
             try:
-                raw = gemini_post(system, prompt, max_tokens=480)
+                gh_payload = {**payload, "model": "Llama-3.3-70B-Instruct"}
+                raw = github_models_post(gh_payload).json()["choices"][0]["message"]["content"].strip()
             except Exception:
                 pass
         if not raw:
@@ -5221,7 +5222,8 @@ def analysera_pis_monte_carlo(sb_key: str, forslag_id: int, titel: str,
                 pass
             if not raw:
                 try:
-                    raw = gemini_post(system, prompt, max_tokens=160)
+                    gh_payload = {**payload, "model": "Llama-3.3-70B-Instruct"}
+                    raw = github_models_post(gh_payload).json()["choices"][0]["message"]["content"].strip()
                 except Exception:
                     pass
             if not raw:
