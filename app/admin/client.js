@@ -1101,6 +1101,167 @@ function MarketsTab() {
   );
 }
 
+function ApiOversiktTab() {
+  const [stats,   setStats]   = useState(null);
+  const [log,     setLog]     = useState([]);
+  const [keys,    setKeys]    = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [newName, setNewName] = useState("");
+  const [newLimit, setNewLimit] = useState(100);
+  const [creating, setCreating] = useState(false);
+  const [createdKey, setCreatedKey] = useState(null);
+
+  const pw = typeof window !== "undefined" ? localStorage.getItem("admin_pw") || "" : "";
+
+  async function load() {
+    setLoading(true);
+    try {
+      const [sRes, lRes, kRes] = await Promise.all([
+        fetch(`/api/admin/api-oversikt?action=stats&pw=${encodeURIComponent(pw)}`),
+        fetch(`/api/admin/api-oversikt?action=log&pw=${encodeURIComponent(pw)}`),
+        fetch(`/api/admin/api-oversikt?action=keys&pw=${encodeURIComponent(pw)}`),
+      ]);
+      if (sRes.ok) setStats(await sRes.json());
+      if (lRes.ok) setLog(await lRes.json());
+      if (kRes.ok) setKeys(await kRes.json());
+    } finally { setLoading(false); }
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function createKey() {
+    if (!newName.trim() || creating) return;
+    setCreating(true);
+    setCreatedKey(null);
+    try {
+      const res = await fetch(`/api/admin/api-oversikt?pw=${encodeURIComponent(pw)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-admin-password": pw },
+        body: JSON.stringify({ action: "create", name: newName.trim(), rate_limit: newLimit }),
+      });
+      const data = await res.json();
+      const key = Array.isArray(data) ? data[0]?.key : data?.key;
+      if (key) { setCreatedKey(key); setNewName(""); load(); }
+    } finally { setCreating(false); }
+  }
+
+  async function toggleKey(id, aktiv) {
+    await fetch(`/api/admin/api-oversikt?pw=${encodeURIComponent(pw)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-password": pw },
+      body: JSON.stringify({ action: "toggle", id, aktiv }),
+    });
+    load();
+  }
+
+  const apiColor = api => api === "Decision API" ? "#60a5fa" : api === "PIS API" ? "#a78bfa" : "#34d399";
+
+  if (loading) return <p style={{ color: C.textMuted }}>Laddar API-data…</p>;
+
+  const APIS = [
+    { lbl: "Decision API",  key: "beslut", color: "#60a5fa", desc: "/api/beslut" },
+    { lbl: "PIS API",       key: "pis",    color: "#a78bfa", desc: "/api/v1/policy/simulate" },
+    { lbl: "Agent Q&A API", key: "fraga",  color: "#34d399", desc: "/api/agent-fraga" },
+  ];
+
+  return (
+    <div>
+      {/* Totalt per API */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "16px", marginBottom: "32px" }}>
+        {APIS.map(({ lbl, key, color, desc }) => {
+          const s = stats?.[key] ?? {};
+          return (
+            <div key={key} style={{ background: C.surface, border: `1px solid ${color}30`, borderRadius: "8px", padding: "20px" }}>
+              <p style={{ fontSize: "11px", color, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace", margin: "0 0 4px" }}>{lbl}</p>
+              <p style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", margin: "0 0 16px" }}>{desc}</p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                {[["Totalt", s.total ?? "—"], ["Idag", s.today ?? "—"], ["7 dagar", s.week ?? "—"]].map(([t, v]) => (
+                  <div key={t}>
+                    <p style={{ fontSize: "10px", color: C.textMuted, margin: "0 0 2px", fontFamily: "monospace" }}>{t}</p>
+                    <p style={{ fontSize: "22px", color, margin: 0, fontFamily: "monospace" }}>{v}</p>
+                  </div>
+                ))}
+              </div>
+              {key === "beslut" && stats?.beslut?.avg_latency_ms != null && (
+                <p style={{ fontSize: "11px", color: C.textMuted, margin: "12px 0 0", fontFamily: "monospace" }}>
+                  Snittlatens: <span style={{ color }}>{stats.beslut.avg_latency_ms}ms</span>
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* API-nycklar */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "24px", marginBottom: "32px" }}>
+        <p style={{ fontSize: "13px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace", margin: "0 0 16px" }}>API-nycklar ({keys.length})</p>
+        {keys.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, borderRadius: "6px", overflow: "hidden", marginBottom: "20px" }}>
+            {keys.map(k => (
+              <div key={k.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", background: C.surface, flexWrap: "wrap" }}>
+                <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "4px", background: k.aktiv ? "#052305" : "#1a0a0a", color: k.aktiv ? C.green : C.red, fontFamily: "monospace", flexShrink: 0 }}>{k.aktiv ? "AKTIV" : "INAKTIV"}</span>
+                <code style={{ fontSize: "11px", color: C.textMuted, flex: 2, minWidth: "180px", wordBreak: "break-all" }}>{k.key}</code>
+                <span style={{ fontSize: "13px", color: C.text, flex: 1, minWidth: "100px" }}>{k.name}</span>
+                <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", flexShrink: 0 }}>{k.rate_limit} req/h</span>
+                <span style={{ fontSize: "11px", color: "#60a5fa", fontFamily: "monospace", flexShrink: 0 }}>{k.beslut_anrop} beslut</span>
+                <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", flexShrink: 0 }}>{new Date(k.skapad).toLocaleDateString("sv-SE")}</span>
+                <button onClick={() => toggleKey(k.id, !k.aktiv)} style={{ fontSize: "12px", color: k.aktiv ? C.red : C.green, background: "transparent", border: `1px solid ${k.aktiv ? C.red + "40" : C.green + "40"}`, borderRadius: "4px", padding: "4px 10px", cursor: "pointer", fontFamily: "Georgia, serif", flexShrink: 0 }}>
+                  {k.aktiv ? "Inaktivera" : "Aktivera"}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <p style={{ fontSize: "12px", color: C.textMuted, margin: "0 0 12px", fontFamily: "monospace" }}>Ny nyckel — gäller Decision API, PIS API och Agent Q&A API</p>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "flex-end" }}>
+          <div style={{ flex: 2, minWidth: "180px" }}>
+            <p style={{ fontSize: "11px", color: C.textMuted, margin: "0 0 6px" }}>Företag / Namn</p>
+            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Acme AB" style={{ ...inp }} />
+          </div>
+          <div style={{ flex: 1, minWidth: "80px" }}>
+            <p style={{ fontSize: "11px", color: C.textMuted, margin: "0 0 6px" }}>Req/timme</p>
+            <input type="number" value={newLimit} onChange={e => setNewLimit(Number(e.target.value))} style={{ ...inp }} />
+          </div>
+          <button onClick={createKey} disabled={creating || !newName.trim()} style={{ padding: "10px 20px", background: C.accent, color: "#0a0a0a", border: "none", borderRadius: "4px", cursor: "pointer", fontFamily: "Georgia, serif", fontSize: "14px", fontWeight: 700, opacity: !newName.trim() ? 0.5 : 1 }}>
+            {creating ? "Skapar…" : "Skapa →"}
+          </button>
+        </div>
+        {createdKey && (
+          <div style={{ marginTop: "14px", background: "#0a1a0a", border: "1px solid #1a4a1a", borderRadius: "6px", padding: "12px 16px" }}>
+            <p style={{ fontSize: "11px", color: C.green, fontFamily: "monospace", margin: "0 0 6px", textTransform: "uppercase" }}>Nyckel skapad — kopiera nu, visas bara en gång</p>
+            <code style={{ fontSize: "13px", color: C.green, wordBreak: "break-all" }}>{createdKey}</code>
+          </div>
+        )}
+      </div>
+
+      {/* Samlad anropslogg */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+          <p style={{ fontSize: "13px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "monospace", margin: 0 }}>Senaste anrop — alla APIer ({log.length})</p>
+          <button onClick={load} style={{ fontSize: "12px", color: C.accent, background: "transparent", border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "4px 12px", cursor: "pointer", fontFamily: "Georgia, serif" }}>↻ Uppdatera</button>
+        </div>
+        {log.length === 0 ? (
+          <p style={{ color: C.textMuted, fontSize: "14px" }}>Inga anrop loggade ännu.</p>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, borderRadius: "8px", overflow: "hidden" }}>
+            {log.map(r => (
+              <div key={r.id} style={{ padding: "10px 16px", background: C.surface, display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", flexShrink: 0, width: "80px" }}>
+                  {new Date(r.skapad).toLocaleString("sv-SE", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                </span>
+                <span style={{ fontSize: "10px", color: apiColor(r.api), background: apiColor(r.api) + "20", border: `1px solid ${apiColor(r.api)}40`, borderRadius: "4px", padding: "2px 8px", fontFamily: "monospace", flexShrink: 0, whiteSpace: "nowrap" }}>{r.api}</span>
+                <span style={{ fontSize: "10px", color: r.key === "nyckel" ? "#f59e0b" : C.textMuted, fontFamily: "monospace", flexShrink: 0 }}>{r.key}</span>
+                <p style={{ flex: 1, margin: 0, fontSize: "12px", color: C.text, minWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.content}</p>
+                <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", flexShrink: 0 }}>{r.meta}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function BeslutApiTab() {
   const [stats, setStats]     = useState(null);
   const [log, setLog]         = useState([]);
@@ -2791,6 +2952,7 @@ export default function AdminClient() {
             ["markets","Markets"],
             ["parlament","Parlament"],
             ["api-status","API-status"],
+            ["api-oversikt","API-översikt"],
             ["beslut-api","Decision API"],
             ["vbnb","VBNB ETF"],
             ["labb","Experimentlabb"],
@@ -3037,6 +3199,9 @@ export default function AdminClient() {
 
         {/* ── API-STATUS ── */}
         {mainTab === "api-status" && <ApiStatusTab />}
+
+        {/* ── API-ÖVERSIKT ── */}
+        {mainTab === "api-oversikt" && <ApiOversiktTab />}
 
         {/* ── DECISION API ── */}
         {mainTab === "beslut-api" && <BeslutApiTab />}
