@@ -1,0 +1,68 @@
+name: PIS Backfill (manuell)
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_pis:
+        description: "Max antal förslag att PIS-analysera"
+        required: false
+        default: "50"
+        type: string
+      max_mc:
+        description: "Max antal förslag att Monte Carlo-analysera"
+        required: false
+        default: "20"
+        type: string
+      sleep_pis:
+        description: "Sekunder att vänta mellan PIS-anrop"
+        required: false
+        default: "2"
+        type: string
+      sleep_mc:
+        description: "Sekunder att vänta mellan MC-anrop"
+        required: false
+        default: "5"
+        type: string
+      mc_iterationer:
+        description: "Antal MC-iterationer per förslag"
+        required: false
+        default: "15"
+        type: string
+      min_iterationer:
+        description: "Re-kör MC på förslag med färre iterationer än detta (0 = av)"
+        required: false
+        default: "0"
+        type: string
+
+jobs:
+  pis-backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      models: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Kör PIS + Monte Carlo backfill
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          MAX_PIS: ${{ inputs.max_pis }}
+          MAX_MC: ${{ inputs.max_mc }}
+          SLEEP_PIS: ${{ inputs.sleep_pis }}
+          SLEEP_MC: ${{ inputs.sleep_mc }}
+          MC_ITERATIONER: ${{ inputs.mc_iterationer }}
+          MIN_ITERATIONER: ${{ inputs.min_iterationer }}
+          PYTHONUNBUFFERED: "1"
+        run: python -u pis_backfill.py

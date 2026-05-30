@@ -36,7 +36,7 @@ from agenter import OPINION_FRAGOR
 def _llm_spel(system: str, prompt: str, max_tokens: int = 80) -> str:
     """Kort LLM-anrop för ekonomispel med full fallback-kedja."""
     payload = {
-        "model": "llama3.3-70b-versatile",
+        "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         "max_tokens": max_tokens, "temperature": 0.7,
     }
@@ -866,7 +866,7 @@ def rösta_på_opinion(agent: dict, sb_key: str) -> int:
             svar_raw = ""
             try:
                 r = groq_post({
-                    "model": "llama3.3-70b-versatile",
+                    "model": "llama-3.3-70b-versatile",
                     "messages": [{"role": "user", "content": prompt}],
                     "max_tokens": 5,
                     "temperature": 0.3,
@@ -961,7 +961,7 @@ def skapa_opinion_fraga(agent: dict, sb_key: str, amne: str, rubrik: str = "") -
         svar_raw = ""
         try:
             r = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 80,
                 "temperature": 0.9,
@@ -1032,7 +1032,7 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
         )
         svar_raw = ""
         _market_payload = {
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 150,
             "temperature": 0.85,
@@ -1176,7 +1176,7 @@ Välj den indikator som just nu är mest politiskt relevant. typ ska vara 'line'
 
     try:
         response = groq_post({
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 250,
             "temperature": 0.7,
@@ -1210,7 +1210,7 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "") -> tup
         '{"sannolikhet": <heltal 0-100>, "motivering": "<1-2 meningar>"}'
     )
     _payload = {
-        "model": "llama3.3-70b-versatile",
+        "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
         "max_tokens": 120,
         "temperature": 0.4,
@@ -1347,10 +1347,28 @@ def _hamta_ekonomisk_rostkontext(sb_key: str, agent_namn: str) -> str:
         return ""
 
 
-def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = None) -> int:
+def hamta_alla_roster_lag(sb_key: str) -> set:
+    """Hämtar alla befintliga agentröster som ett set av (agent, lagforslag_id)-tupler.
+    Används för bulk-pre-fetch i parlament_test.py för att undvika O(agenter×förslag) queries."""
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag?select=agent,lagforslag_id&limit=10000",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""},
+            timeout=10,
+        )
+        return {(row["agent"], row["lagforslag_id"]) for row in (r.json() if r.is_success else [])}
+    except Exception:
+        return set()
+
+
+def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = None,
+                               forslag: list | None = None,
+                               befintliga_roster: set | None = None) -> int:
     """Agent röstar på öppna lagförslag den inte röstat på (max 5 per körning).
+    Om forslag och befintliga_roster skickas in används de direkt — inga extra DB-queries.
     Om agenten är med i ett parti följer den partiledaren med 80% sannolikhet."""
-    forslag = hamta_lagforslag(sb_key)
+    if forslag is None:
+        forslag = hamta_lagforslag(sb_key)
     if not forslag:
         return 0
 
@@ -1361,7 +1379,12 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
     for f in forslag:
         if antal >= 5:
             break
-        if agent["namn"] in hamta_lag_roster_agenter(sb_key, f["id"]):
+        already_voted = (
+            (agent["namn"], f["id"]) in befintliga_roster
+            if befintliga_roster is not None
+            else agent["namn"] in hamta_lag_roster_agenter(sb_key, f["id"])
+        )
+        if already_voted:
             continue
         try:
             # Partilinje-röstning: följ ledaren med 80% chans
@@ -1380,12 +1403,17 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
                 bnp_str = (f"+{bnp_val:.1f}%" if bnp_val >= 0 else f"{bnp_val:.1f}%") if bnp_val is not None else "?"
                 gini_str = (f"+{gini_val:.2f}" if gini_val >= 0 else f"{gini_val:.2f}") if gini_val is not None else "?"
                 gini_dir = "ökad ojämlikhet" if (gini_val or 0) > 0 else "minskad ojämlikhet"
+                inf_val = pis.get("inflation_delta")
+                arb_val = pis.get("arbetsloshet_delta")
+                inf_str = (f"+{inf_val:.1f}pp" if inf_val >= 0 else f"{inf_val:.1f}pp") if inf_val is not None else "?"
+                arb_str = (f"+{arb_val:.1f}pp" if arb_val >= 0 else f"{arb_val:.1f}pp") if arb_val is not None else "?"
                 pis_kontext = (
-                    f"PIS-analys (Policy Impact Simulator): "
-                    f"BNP-effekt {bnp_str}, Gini-effekt {gini_str} ({gini_dir}), "
-                    f"sysselsättning: {pis.get('sysselsattning_effekt','?')}. "
-                    f"Konfidens: {pis.get('konfidens','?')}.\n"
-                    f"{pis.get('analys','')[:250]}\n\n"
+                    f"PIS-analys (Policy Impact Simulator):\n"
+                    f"  BNP-effekt: {bnp_str}  |  Gini: {gini_str} ({gini_dir})\n"
+                    f"  Inflation: {inf_str}  |  Arbetslöshet: {arb_str}\n"
+                    f"  Socialt kapital: {pis.get('socialt_kapital_effekt','?')}  |  Koalitionsstabilitet: {pis.get('koalition_stabilitet','?')}\n"
+                    f"  Konfidens: {pis.get('konfidens','?')}\n"
+                    f"{pis.get('analys','')[:280]}\n\n"
                 )
             prompt = (
                 f"Lagförslag: \"{f['titel']}\"\n\n"
@@ -1399,7 +1427,7 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
                 "Välj RÖST: ja, nej eller avstar"
             )
             payload = {
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": agent["system"][:600]},
                     {"role": "user", "content": prompt},
@@ -1408,9 +1436,9 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
             }
             raw = None
             for _name, _fn in [
-                ("Groq",     lambda: groq_post(payload)),
-                ("DeepSeek", lambda: deepseek_post(payload)),
-                ("GitHub",   lambda: github_models_post(payload)),
+                ("Groq",      lambda: groq_post(payload)),
+                ("DeepSeek",  lambda: deepseek_post(payload)),
+                ("GitHub",    lambda: github_models_post(payload)),
             ]:
                 try:
                     raw = _fn().json()["choices"][0]["message"]["content"].strip()
@@ -1460,7 +1488,7 @@ def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str) -> bool:
             "Inga andra ord. Ingen inledning."
         )
         payload = {
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {"role": "system", "content": agent["system"][:600]},
                 {"role": "user", "content": prompt},
@@ -1785,7 +1813,7 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
         forslag = None
         try:
             forslag = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "system", "content": forslag_system}, {"role": "user", "content": forslag_prompt}],
                 "max_tokens": 120, "temperature": 0.8,
             }).json()["choices"][0]["message"]["content"].strip()
@@ -1820,7 +1848,7 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
         svar = None
         try:
             svar = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "system", "content": svar_system}, {"role": "user", "content": svar_prompt}],
                 "max_tokens": 100, "temperature": 0.8,
             }).json()["choices"][0]["message"]["content"].strip()
@@ -2016,7 +2044,7 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         argument = None
         try:
             argument = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "system", "content": lobby_system}, {"role": "user", "content": lobby_user}],
                 "max_tokens": 120, "temperature": 0.7,
             }).json()["choices"][0]["message"]["content"].strip()
@@ -2062,7 +2090,7 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         mal_svar = None
         try:
             mal_svar = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [{"role": "system", "content": mal_system}, {"role": "user", "content": mal_prompt}],
                 "max_tokens": 80, "temperature": 0.7,
             }).json()["choices"][0]["message"]["content"].strip()
@@ -2314,7 +2342,7 @@ def uppdatera_agent_positioner(sb_key: str, agent: dict) -> None:
         _system = "Du extraherar ståndpunkter ur debattartiklar."
         try:
             r = groq_post({
-                "model": "llama3.3-70b-versatile",
+                "model": "llama-3.3-70b-versatile",
                 "messages": [
                     {"role": "system", "content": _system},
                     {"role": "user", "content": prompt},
@@ -3393,9 +3421,14 @@ def ta_oligarki_snapshot(sb_key: str) -> None:
     """Sparar dagens oligarki-mätvärden till oligarki_historik (upsert per datum)."""
     if not sb_key:
         return
+    import os
     from datetime import date
 
     hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    # Skrivoperationer kräver service-role-nyckeln — anon-nyckeln är publik och
+    # får inte ha INSERT/UPDATE-privilegier på denna tabell.
+    write_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+    write_hdrs = {"apikey": write_key, "Authorization": f"Bearer {write_key}"}
 
     def get(path):
         r = httpx.get(f"{SB_URL}/rest/v1/{path}", headers=hdrs, timeout=15)
@@ -3512,7 +3545,7 @@ def ta_oligarki_snapshot(sb_key: str) -> None:
 
     httpx.post(
         f"{SB_URL}/rest/v1/oligarki_historik",
-        headers={**hdrs, "Content-Type": "application/json",
+        headers={**write_hdrs, "Content-Type": "application/json",
                  "Prefer": "resolution=merge-duplicates,return=minimal"},
         params={"on_conflict": "datum"},
         json={
@@ -4217,7 +4250,7 @@ def mutera_rykte_innehall(groq_key: str, original: str) -> str | None:
         import groq as groq_lib
         client = groq_lib.Groq(api_key=groq_key)
         resp = client.chat.completions.create(
-            model="llama3.3-70b-versatile",
+            model="llama-3.3-70b-versatile",
             messages=[{
                 "role": "user",
                 "content": (
@@ -4445,17 +4478,24 @@ def _ladda_upp_till_storage(sb_key: str, bild_bytes: bytes,
 def _spara_bild(sb_key: str, agent_namn: str, prompt: str, pollinations_url: str,
                 kontext: dict, bildtyp: str = "tillstand") -> str:
     """Sparar bild till Storage (eller Pollinations-fallback). Returnerar faktisk sparad URL."""
+    BILD_MAGIC = (b"\xff\xd8", b"\x89PNG")  # JPEG / PNG magic bytes
     final_url = pollinations_url
-    for _ in range(3):
+    for forsok in range(3):
         try:
             r = httpx.get(pollinations_url, timeout=60, follow_redirects=True)
-            if r.is_success and len(r.content) > 1000:
+            giltig = (r.is_success
+                      and len(r.content) > 1000
+                      and any(r.content.startswith(m) for m in BILD_MAGIC))
+            if giltig:
                 storage_url = _ladda_upp_till_storage(sb_key, r.content, agent_namn, bildtyp)
                 if storage_url:
                     final_url = storage_url
                 break
+            print(f"  [bild] försök {forsok+1}/3 ogiltigt svar ({bildtyp}): "
+                  f"HTTP {r.status_code}, {len(r.content)} bytes")
             pollinations_url = re.sub(r"seed=\d+", f"seed={random.randint(1,99999)}", pollinations_url)
-        except Exception:
+        except Exception as e:
+            print(f"  [bild] försök {forsok+1}/3 fel ({bildtyp}): {e!r}")
             pollinations_url = re.sub(r"seed=\d+", f"seed={random.randint(1,99999)}", pollinations_url)
 
     h = {
@@ -4620,7 +4660,7 @@ def reagera_pa_bild(sb_key: str, fran_agent: str, fran_system: str) -> bool:
             f"Var konkret och i karaktär. Inga inledningsfraser."
         )
         payload = {
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {"role": "system", "content": fran_system[:600]},
                 {"role": "user",   "content": prompt_text},
@@ -4995,35 +5035,40 @@ def formatera_minnen_for_prompt(minnen: list[dict]) -> str:
 # ── PIS — Policy Impact Simulator ────────────────────────────────────────────
 
 def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning: str) -> bool:
-    """Analyserar ett lagförslags förväntade BNP- och Gini-påverkan via LLM. Sparar i pis_analyser."""
+    """Analyserar ett lagförslags förväntade makroekonomiska och sociala konsekvenser via LLM.
+    Sex indikatorer: BNP, Gini, inflation, arbetslöshet, socialt kapital, koalitionsstabilitet.
+    Sparar i pis_analyser (UNIQUE på lagforslag_id — upsertar om rad redan finns)."""
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
-        "Content-Type": "application/json", "Prefer": "return=minimal",
+        "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal",
     }
     system = (
-        "Du är en oberoende nationalekonomisk analytiker som bedömer svenska lagförslags "
-        "makroekonomiska konsekvenser. Var analytisk och balanserad. Ange alltid osäkerheter."
+        "Du är en oberoende nationalekonom och statsvetare som bedömer svenska lagförslags "
+        "makroekonomiska och sociala konsekvenser på 3–5 års sikt. "
+        "Var analytisk, balanserad och ange alltid osäkerheter."
     )
     prompt = (
         f"Lagförslag: \"{titel}\"\n\n"
         f"{beskrivning[:700]}\n\n"
-        "Analysera detta förslags sannolika ekonomiska effekter på 3–5 års sikt.\n"
-        "Svara EXAKT i detta format (inga andra ord):\n"
-        "BNP_EFFEKT: [tal med max en decimal, t.ex. +1.2 eller -0.5, procent av BNP]\n"
-        "GINI_EFFEKT: [tal med max två decimaler, t.ex. -0.02 eller +0.01, förändring i Gini]\n"
-        "SYSSELSATTNING: [positiv, negativ eller neutral]\n"
+        "Analysera detta förslags sannolika konsekvenser. "
+        "Svara EXAKT i detta format (inga andra ord, börja direkt med BNP_EFFEKT):\n"
+        "BNP_EFFEKT: [procent av BNP, t.ex. +1.2 eller -0.5]\n"
+        "GINI_EFFEKT: [Δ Gini-koefficient, t.ex. -0.02 eller +0.01]\n"
+        "INFLATION_DELTA: [förändring i procentenheter, t.ex. +0.3 eller -0.1]\n"
+        "ARBETSLOSHET_DELTA: [förändring i procentenheter, t.ex. -0.5 eller +0.2]\n"
+        "SOCIALT_KAPITAL: [positiv, negativ eller neutral — effekt på mellmänskligt förtroende och samarbete]\n"
+        "KOALITIONS_STABILITET: [positiv, negativ eller neutral — påverkar politiska allianser och konsensus]\n"
         "KONFIDENS: [låg, medel eller hög]\n"
-        "ANALYS: [100–150 ord på svenska — mekanismer, berörda grupper, osäkerheter]\n\n"
-        "Börja direkt med BNP_EFFEKT:"
+        "ANALYS: [120–180 ord på svenska — ekonomiska mekanismer, berörda grupper, sociala effekter, osäkerheter]\n"
     )
     try:
         payload = {
-            "model": "llama3.3-70b-versatile",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
             ],
-            "max_tokens": 380, "temperature": 0.35,
+            "max_tokens": 480, "temperature": 0.35,
         }
         raw = None
         try:
@@ -5032,36 +5077,41 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
             pass
         if not raw:
             try:
-                raw = gemini_post(system, prompt, max_tokens=380)
+                raw = gemini_post(system, prompt, max_tokens=480)
             except Exception:
                 pass
         if not raw:
             return False
 
-        bnp, gini, syss, konfidens, analys = None, None, "neutral", "låg", ""
+        def _parse_float(line):
+            try:
+                return float(line.split(":", 1)[1].strip().replace(",", ".").replace("+", "").split()[0])
+            except Exception:
+                return None
+
+        def _parse_riktning(line):
+            v = line.split(":", 1)[1].strip().lower()
+            return v if v in ("positiv", "negativ", "neutral") else "neutral"
+
+        bnp = gini = inflation = arbetsloshet = None
+        syss = soc_kap = koa_stab = "neutral"
+        konfidens = "låg"
+        analys = ""
+
         for line in raw.splitlines():
             line = line.strip()
             upper = line.upper()
-            if upper.startswith("BNP_EFFEKT:"):
-                try:
-                    bnp = float(line.split(":", 1)[1].strip().replace(",", ".").replace("+", "").split()[0])
-                except Exception:
-                    pass
-            elif upper.startswith("GINI_EFFEKT:"):
-                try:
-                    gini = float(line.split(":", 1)[1].strip().replace(",", ".").replace("+", "").split()[0])
-                except Exception:
-                    pass
-            elif upper.startswith("SYSSELSATTNING:"):
-                v = line.split(":", 1)[1].strip().lower()
-                syss = v if v in ("positiv", "negativ", "neutral") else "neutral"
+            if upper.startswith("BNP_EFFEKT:"):          bnp = _parse_float(line)
+            elif upper.startswith("GINI_EFFEKT:"):        gini = _parse_float(line)
+            elif upper.startswith("INFLATION_DELTA:"):    inflation = _parse_float(line)
+            elif upper.startswith("ARBETSLOSHET_DELTA:"): arbetsloshet = _parse_float(line)
+            elif upper.startswith("SOCIALT_KAPITAL:"):    soc_kap = _parse_riktning(line)
+            elif upper.startswith("KOALITIONS_STABILITET:"): koa_stab = _parse_riktning(line)
             elif upper.startswith("KONFIDENS:"):
                 v = line.split(":", 1)[1].strip().lower()
                 konfidens = v if v in ("låg", "medel", "hög") else "låg"
-            elif upper.startswith("ANALYS:"):
-                analys = line.split(":", 1)[1].strip()
-            elif analys:
-                analys += " " + line
+            elif upper.startswith("ANALYS:"):             analys = line.split(":", 1)[1].strip()
+            elif analys:                                   analys += " " + line
 
         if not analys or len(analys) < 30:
             return False
@@ -5070,18 +5120,212 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
             f"{SB_URL}/rest/v1/pis_analyser",
             headers=h,
             json={
-                "lagforslag_id": forslag_id,
-                "bnp_effekt_pct": bnp,
-                "gini_effekt": gini,
-                "sysselsattning_effekt": syss,
-                "analys": analys.strip()[:1200],
-                "konfidens": konfidens,
+                "lagforslag_id":          forslag_id,
+                "bnp_effekt_pct":         bnp,
+                "gini_effekt":            gini,
+                "inflation_delta":        inflation,
+                "arbetsloshet_delta":     arbetsloshet,
+                "socialt_kapital_effekt": soc_kap,
+                "koalition_stabilitet":   koa_stab,
+                "sysselsattning_effekt":  "positiv" if (arbetsloshet or 0) < 0 else ("negativ" if (arbetsloshet or 0) > 0 else "neutral"),
+                "analys":                 analys.strip()[:1500],
+                "konfidens":              konfidens,
             },
             timeout=10,
         )
         return r.is_success
     except Exception:
         return False
+
+
+def _parse_pis_iteration(raw: str) -> dict | None:
+    """Parsear ett enskilt PIS-LLM-svar. Returnerar dict med numeriska och kategoriska fält,
+    eller None om svaret saknar BNP och Gini (ej tillräckligt för aggregering)."""
+    if not raw or len(raw) < 20:
+        return None
+
+    def _f(line):
+        try:
+            return float(line.split(":", 1)[1].strip().replace(",", ".").replace("+", "").split()[0])
+        except Exception:
+            return None
+
+    def _r(line):
+        v = line.split(":", 1)[1].strip().lower()
+        return v if v in ("positiv", "negativ", "neutral") else None
+
+    bnp = gini = inflation = arbetsloshet = None
+    soc_kap = koa_stab = konfidens = None
+
+    for line in raw.splitlines():
+        u = line.strip().upper()
+        if u.startswith("BNP_EFFEKT:"):             bnp = _f(line)
+        elif u.startswith("GINI_EFFEKT:"):           gini = _f(line)
+        elif u.startswith("INFLATION_DELTA:"):       inflation = _f(line)
+        elif u.startswith("ARBETSLOSHET_DELTA:"):    arbetsloshet = _f(line)
+        elif u.startswith("SOCIALT_KAPITAL:"):       soc_kap = _r(line)
+        elif u.startswith("KOALITIONS_STABILITET:"): koa_stab = _r(line)
+        elif u.startswith("KONFIDENS:"):
+            v = line.split(":", 1)[1].strip().lower()
+            konfidens = v if v in ("låg", "medel", "hög") else None
+
+    if bnp is None and gini is None:
+        return None
+
+    return {"bnp": bnp, "gini": gini, "inflation": inflation, "arbetsloshet": arbetsloshet,
+            "socialt_kapital": soc_kap, "koalition": koa_stab, "konfidens": konfidens}
+
+
+def analysera_pis_monte_carlo(sb_key: str, forslag_id: int, titel: str,
+                               beskrivning: str, iterationer: int = 15) -> bool:
+    """Kör Monte Carlo-analys: N LLM-iterationer med roterande temperatur (0.6–0.9).
+    Aggregerar medelvärde, std, min/max för numeriska fält och frekvensfördelning
+    för kategoriska. Kräver ≥5 lyckade parsningar för att spara resultat."""
+    system = (
+        "Du är en oberoende nationalekonom och statsvetare som bedömer svenska lagförslags "
+        "makroekonomiska och sociala konsekvenser på 3–5 års sikt. "
+        "Var analytisk, balanserad och ange alltid osäkerheter."
+    )
+    prompt = (
+        f"Lagförslag: \"{titel}\"\n\n"
+        f"{beskrivning[:700]}\n\n"
+        "Analysera detta förslags sannolika konsekvenser. "
+        "Svara EXAKT i detta format (börja direkt med BNP_EFFEKT, ingen annan text):\n"
+        "BNP_EFFEKT: [t.ex. +1.2 eller -0.5]\n"
+        "GINI_EFFEKT: [t.ex. -0.02 eller +0.01]\n"
+        "INFLATION_DELTA: [t.ex. +0.3 eller -0.1]\n"
+        "ARBETSLOSHET_DELTA: [t.ex. -0.5 eller +0.2]\n"
+        "SOCIALT_KAPITAL: [positiv, negativ eller neutral]\n"
+        "KOALITIONS_STABILITET: [positiv, negativ eller neutral]\n"
+        "KONFIDENS: [låg, medel eller hög]\n"
+        "ANALYS: [en mening]\n"
+    )
+
+    num = {"bnp": [], "gini": [], "inflation": [], "arbetsloshet": []}
+    kat = {"socialt_kapital": [], "koalition": [], "konfidens": []}
+    lyckade = 0
+    temps = [0.6, 0.7, 0.8, 0.9]
+
+    for i in range(iterationer):
+        payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": system},
+                         {"role": "user", "content": prompt}],
+            "max_tokens": 160, "temperature": temps[i % len(temps)],
+        }
+        try:
+            raw = None
+            try:
+                raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
+            except Exception:
+                pass
+            if not raw:
+                try:
+                    raw = gemini_post(system, prompt, max_tokens=160)
+                except Exception:
+                    pass
+            if not raw:
+                continue
+            parsed = _parse_pis_iteration(raw)
+            if parsed:
+                for k in ("bnp", "gini", "inflation", "arbetsloshet"):
+                    if parsed[k] is not None:
+                        num[k].append(parsed[k])
+                for k_src, k_dst in (("socialt_kapital", "socialt_kapital"),
+                                      ("koalition", "koalition"),
+                                      ("konfidens", "konfidens")):
+                    if parsed[k_src]:
+                        kat[k_dst].append(parsed[k_src])
+                lyckade += 1
+        except Exception:
+            pass
+
+    if lyckade < 5:
+        print(f"  [MC] {forslag_id}: {lyckade}/{iterationer} lyckades — hoppar över")
+        return False
+
+    def _stats(vals):
+        if not vals:
+            return None, None, None, None
+        n = len(vals)
+        m = sum(vals) / n
+        variance = sum((v - m) ** 2 for v in vals) / n if n > 1 else 0.0
+        return round(m, 3), round(variance ** 0.5, 3), round(min(vals), 3), round(max(vals), 3)
+
+    def _dist(vals):
+        d: dict = {}
+        for v in vals:
+            d[v] = d.get(v, 0) + 1
+        return d
+
+    bnp_m, bnp_s, bnp_mn, bnp_mx   = _stats(num["bnp"])
+    gini_m, gini_s, gini_mn, gini_mx = _stats(num["gini"])
+    inf_m, inf_s, _, _               = _stats(num["inflation"])
+    arb_m, arb_s, _, _               = _stats(num["arbetsloshet"])
+
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    r = httpx.post(
+        f"{SB_URL}/rest/v1/pis_monte_carlo",
+        headers=h,
+        json={
+            "lagforslag_id":        forslag_id,
+            "iterationer":          iterationer,
+            "lyckade_iterationer":  lyckade,
+            "bnp_mean": bnp_m, "bnp_std": bnp_s, "bnp_min": bnp_mn, "bnp_max": bnp_mx,
+            "gini_mean": gini_m, "gini_std": gini_s, "gini_min": gini_mn, "gini_max": gini_mx,
+            "inflation_mean": inf_m, "inflation_std": inf_s,
+            "arbetsloshet_mean": arb_m, "arbetsloshet_std": arb_s,
+            "socialt_kapital_dist": _dist(kat["socialt_kapital"]),
+            "koalition_dist":       _dist(kat["koalition"]),
+            "konfidens_dist":       _dist(kat["konfidens"]),
+        },
+        timeout=10,
+    )
+    bnp_str = f"{bnp_m:+.2f}%±{bnp_s:.2f}" if bnp_m is not None else "–"
+    gini_str = f"{gini_m:+.3f}±{gini_s:.3f}" if gini_m is not None else "–"
+    print(f"  [MC] {forslag_id} ✓ ({lyckade}/{iterationer}): BNP {bnp_str}  Gini {gini_str}")
+    return r.is_success
+
+
+def kör_pis_monte_carlo_batch(sb_key: str, max_antal: int = 2,
+                               iterationer: int = 15) -> tuple[int, int]:
+    """Kör Monte Carlo för förslag som har standard-PIS men saknar MC-data.
+    Returnerar (analyserade, totalt_utan_mc)."""
+    try:
+        h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""}
+
+        r_pis = httpx.get(f"{SB_URL}/rest/v1/pis_analyser?select=lagforslag_id",
+                          headers=h, timeout=10)
+        har_pis = {row["lagforslag_id"] for row in (r_pis.json() if r_pis.is_success else [])}
+
+        r_mc = httpx.get(f"{SB_URL}/rest/v1/pis_monte_carlo?select=lagforslag_id",
+                         headers=h, timeout=10)
+        har_mc = {row["lagforslag_id"] for row in (r_mc.json() if r_mc.is_success else [])}
+
+        behöver_mc = har_pis - har_mc
+        if not behöver_mc:
+            return 0, 0
+
+        ids_str = ",".join(str(i) for i in behöver_mc)
+        r_lag = httpx.get(
+            f"{SB_URL}/rest/v1/lagforslag"
+            f"?id=in.({ids_str})&status=neq.avgjort"
+            f"&select=id,titel,beskrivning&order=skapad.desc&limit={max_antal}",
+            headers=h, timeout=10,
+        )
+        att_kora = r_lag.json() if r_lag.is_success else []
+
+        analyserade = sum(
+            1 for lag in att_kora
+            if analysera_pis_monte_carlo(sb_key, lag["id"], lag["titel"],
+                                         lag.get("beskrivning") or "", iterationer)
+        )
+        return analyserade, len(behöver_mc)
+    except Exception:
+        return 0, 0
 
 
 def hamta_pis_analys(sb_key: str, forslag_id: int) -> dict | None:
@@ -5098,8 +5342,10 @@ def hamta_pis_analys(sb_key: str, forslag_id: int) -> dict | None:
         return None
 
 
-def analysera_alla_forslag_pis(sb_key: str, max_antal: int = 10) -> int:
-    """Analyserar öppna förslag som saknar PIS-analys. Returnerar antal nyanalyserade."""
+def analysera_alla_forslag_pis(sb_key: str, max_antal: int = 10) -> tuple[int, int]:
+    """Analyserar öppna förslag som saknar PIS-analys.
+    Returnerar (antal_analyserade, antal_att_analysera) för att skilja på
+    'redan klart' och 'LLM misslyckades'."""
     try:
         h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": ""}
         r_f = httpx.get(
@@ -5107,7 +5353,7 @@ def analysera_alla_forslag_pis(sb_key: str, max_antal: int = 10) -> int:
             headers=h, timeout=10,
         )
         if not r_f.is_success:
-            return 0
+            return 0, 0
         alla = r_f.json()
 
         r_p = httpx.get(
@@ -5117,10 +5363,11 @@ def analysera_alla_forslag_pis(sb_key: str, max_antal: int = 10) -> int:
         analyserade = {row["lagforslag_id"] for row in (r_p.json() if r_p.is_success else [])}
 
         ej = [f for f in alla if f["id"] not in analyserade]
+        att_analysera = len(ej[:max_antal])
         antal = 0
         for f in ej[:max_antal]:
             if analysera_forslag_pis(sb_key, f["id"], f["titel"], f.get("beskrivning") or ""):
                 antal += 1
-        return antal
+        return antal, att_analysera
     except Exception:
-        return 0
+        return 0, 0
