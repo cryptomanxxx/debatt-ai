@@ -133,6 +133,8 @@ else:
     print(f"  {len(att_pis_analysera)} förslag saknar PIS — börjar analysera…")
     pis_ok = 0
     pis_fel = 0
+    pis_consecutive_fel = 0
+    PIS_MAX_CONSECUTIVE = 5
     for i, lag in enumerate(att_pis_analysera, 1):
         titel_kort = lag["titel"][:60] + ("…" if len(lag["titel"]) > 60 else "")
         print(f"  [{i:3d}/{len(att_pis_analysera)}] id={lag['id']} — {titel_kort}")
@@ -141,10 +143,15 @@ else:
         )
         if ok:
             pis_ok += 1
+            pis_consecutive_fel = 0
             print(f"          ✓ PIS klar")
         else:
             pis_fel += 1
+            pis_consecutive_fel += 1
             print(f"          ✗ Misslyckades (LLM-fel) — försöks igen nästa körning")
+            if pis_consecutive_fel >= PIS_MAX_CONSECUTIVE:
+                print(f"\n  ⚠ {PIS_MAX_CONSECUTIVE} fel i rad — LLM verkar nere, avbryter PIS-batch")
+                break
         if i < len(att_pis_analysera):
             time.sleep(SLEEP_PIS)
     print(f"\n  PIS-sammanfattning: {pis_ok} lyckades, {pis_fel} misslyckades")
@@ -160,6 +167,8 @@ else:
     print(f"  {len(att_mc_analysera)} förslag saknar MC — börjar analysera…")
     mc_ok = 0
     mc_fel = 0
+    mc_consecutive_fel = 0
+    MC_MAX_CONSECUTIVE = 3
     for i, lag in enumerate(att_mc_analysera, 1):
         titel_kort = lag["titel"][:60] + ("…" if len(lag["titel"]) > 60 else "")
         print(f"  [{i:3d}/{len(att_mc_analysera)}] id={lag['id']} — {titel_kort}")
@@ -170,10 +179,15 @@ else:
         )
         if ok:
             mc_ok += 1
+            mc_consecutive_fel = 0
             print(f"          ✓ MC klar")
         else:
             mc_fel += 1
+            mc_consecutive_fel += 1
             print(f"          ✗ Misslyckades (< 5 lyckade iterationer) — försöks igen nästa körning")
+            if mc_consecutive_fel >= MC_MAX_CONSECUTIVE:
+                print(f"\n  ⚠ {MC_MAX_CONSECUTIVE} MC-fel i rad — LLM verkar nere, avbryter MC-batch")
+                break
         if i < len(att_mc_analysera):
             time.sleep(SLEEP_MC)
     print(f"\n  MC-sammanfattning: {mc_ok} lyckades, {mc_fel} misslyckades")
