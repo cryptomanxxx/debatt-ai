@@ -1,11 +1,9 @@
-// No edge runtime — Node.js enables Cerebras fallback
+// No edge runtime — Node.js enables full provider set
 
 import { logAiCall } from "../../../lib/logAiCall";
 import { checkRateLimit } from "../../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../../lib/logFel";
 import { providerReady, markProviderDown } from "../../../lib/aiCircuitBreaker";
-
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 function parseNumberedList(text, count) {
   const lines = text.split("\n");
@@ -39,39 +37,14 @@ Exempel:
   const user = items.map((item, i) => `${i + 1}. [${item.kalla || ""}] ${item.rubrik}`).join("\n");
   const msgs = [{ role: "system", content: system }, { role: "user", content: user }];
 
-  const gemKey  = process.env.GEMINI_API_KEY;
+  const csKey  = process.env.MISTRAL_API_KEY;
+  const sbKey  = process.env.SAMBANOVA_API_KEY;
+  const dsKey  = process.env.DEEPSEEK_API_KEY;
+  const cfAcc  = process.env.CF_ACCOUNT_ID;
+  const cfTok  = process.env.CF_API_TOKEN;
   const groqKey = process.env.GROQ_API_KEY_KANAL;
-  const csKey   = process.env.MISTRAL_API_KEY;
-  const sbKey   = process.env.SAMBANOVA_API_KEY;
-  const cbKey   = process.env.CEREBRAS_API_KEY;
 
-  if (groqKey && providerReady("groq_kanal")) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch(GROQ_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 1200, temperature: 0.3 }),
-        signal: AbortSignal.timeout(12000),
-      });
-      if (r.ok) {
-        const json = await r.json();
-        const text = json.choices[0].message.content.trim();
-        const parsed = parseNumberedList(text, items.length);
-        if (parsed) {
-          logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
-          return Response.json({ expanded: parsed });
-        }
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
-      } else {
-        if (r.status === 429) markProviderDown("groq_kanal");
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
+  // 1. Mistral/Codestral — 10/10, 0.97s
   if (csKey && providerReady("mistral")) {
     const t0 = Date.now();
     try {
@@ -99,6 +72,7 @@ Exempel:
     }
   }
 
+  // 2. Sambanova — 10/10, 1.41s
   if (sbKey && providerReady("sambanova")) {
     const t0 = Date.now();
     try {
@@ -126,83 +100,87 @@ Exempel:
     }
   }
 
-  if (cbKey && providerReady("cerebras")) {
+  // 3. DeepSeek — 10/10, 2.67s
+  if (dsKey && providerReady("deepseek")) {
     const t0 = Date.now();
     try {
-      const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
+      const r = await fetch("https://api.deepseek.com/chat/completions", {
         method: "POST",
-        headers: { Authorization: `Bearer ${cbKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "gpt-oss-120b", messages: msgs, max_tokens: 1200, temperature: 0.3 }),
+        headers: { Authorization: `Bearer ${dsKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "deepseek-chat", messages: msgs, max_tokens: 1200, temperature: 0.3 }),
+        signal: AbortSignal.timeout(18000),
+      });
+      if (r.ok) {
+        const json = await r.json();
+        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+        const parsed = parseNumberedList(text, items.length);
+        if (parsed) {
+          logAiCall({ provider: "deepseek", model: "deepseek-chat", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
+          return Response.json({ expanded: parsed });
+        }
+        logAiCall({ provider: "deepseek", model: "deepseek-chat", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
+      } else {
+        if (r.status === 429) markProviderDown("deepseek");
+        logAiCall({ provider: "deepseek", model: "deepseek-chat", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+      }
+    } catch {
+      logAiCall({ provider: "deepseek", model: "deepseek-chat", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
+  // 4. Cloudflare — 10/10, 4.86s
+  if (cfAcc && cfTok && providerReady("cloudflare")) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfAcc}/ai/run/@cf/meta/llama-3.3-70b-instruct`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${cfTok}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: msgs, max_tokens: 1200 }),
+        signal: AbortSignal.timeout(25000),
+      });
+      if (r.ok) {
+        const json = await r.json();
+        const text = json?.result?.response?.trim() ?? "";
+        const parsed = parseNumberedList(text, items.length);
+        if (parsed) {
+          logAiCall({ provider: "cloudflare", model: "llama-3.3-70b-instruct", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0 });
+          return Response.json({ expanded: parsed });
+        }
+        logAiCall({ provider: "cloudflare", model: "llama-3.3-70b-instruct", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
+      } else {
+        if (r.status === 429) markProviderDown("cloudflare");
+        logAiCall({ provider: "cloudflare", model: "llama-3.3-70b-instruct", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+      }
+    } catch {
+      logAiCall({ provider: "cloudflare", model: "llama-3.3-70b-instruct", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
+    }
+  }
+
+  // 5. Groq — 7/10, 0.75s (sista utväg)
+  if (groqKey && providerReady("groq_kanal")) {
+    const t0 = Date.now();
+    try {
+      const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 1200, temperature: 0.3 }),
         signal: AbortSignal.timeout(12000),
       });
       if (r.ok) {
         const json = await r.json();
-        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
+        const text = json.choices[0].message.content.trim();
         const parsed = parseNumberedList(text, items.length);
         if (parsed) {
-          logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
+          logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
           return Response.json({ expanded: parsed });
         }
-        logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
       } else {
-        if (r.status === 429) markProviderDown("cerebras");
-        logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+        if (r.status === 429) markProviderDown("groq_kanal");
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
       }
     } catch {
-      logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
-  const ghKey = process.env.GITHUB_TOKEN;
-  if (ghKey) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://models.inference.ai.azure.com/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${ghKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "Llama-3.3-70B-Instruct", messages: msgs, max_tokens: 1200, temperature: 0.3 }),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (r.ok) {
-        const json = await r.json();
-        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-        const parsed = parseNumberedList(text, items.length);
-        if (parsed) {
-          logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0 });
-          return Response.json({ expanded: parsed });
-        }
-        logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
-      } else {
-        logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
-  // Gemini (sista utväg — ofta rate-limitad)
-  if (gemKey && providerReady("gemini")) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: user }] }], systemInstruction: { parts: [{ text: system }] }, generationConfig: { maxOutputTokens: 1200, temperature: 0.3 } }), signal: AbortSignal.timeout(15000) }
-      );
-      if (r.ok) {
-        const json = await r.json();
-        const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-        const parsed = parseNumberedList(text, items.length);
-        if (parsed) {
-          logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usageMetadata?.promptTokenCount ?? null, output_tokens: json.usageMetadata?.candidatesTokenCount ?? null });
-          return Response.json({ expanded: parsed });
-        }
-        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch", status: "parse_fail", latency_ms: Date.now() - t0 });
-      } else {
-        if (r.status === 429) markProviderDown("gemini");
-        logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
+      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal-batch", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 
