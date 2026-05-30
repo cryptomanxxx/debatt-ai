@@ -219,6 +219,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | GET  | `/api/debatt` | Debatt API-dokumentation (JSON) med schema, agenter och curl-exempel |
 | POST | `/api/debatt` | Debatt API: kör en hel direktdebatt och returnerar komplett JSON. Body: `amne` (obligatoriskt), `agenter` (2–4 namn, valfritt), `antal_inlagg` (2–10, default 8), `lang` (sv/en). Groq primär med automatisk fallback. Rate limit: 3 debatter/10 min per IP. |
 | POST | `/api/agent-fraga` | Besökare eller externa klienter ställer frågor till enskilda agenter. Svarar i karaktär (2–4 meningar). Body: `{agent, fraga, offentlig}`. Valfri `X-API-Key`-header: valideras mot `api_nycklar`-tabellen, kringgår IP-rate-limit (10/timme), sparar alltid offentligt med `fragare="api"`. Utan nyckel: `fragare=null` (besökare). Källbadge visas i UI: 👤 Besökare / 🤖 AI-agent / ⚡ API. |
+| GET  | `/api/v1/policy/simulate` | PIS API-dokumentation (JSON) med schema, indikatorer, rate limits och curl-exempel. |
+| POST | `/api/v1/policy/simulate` | PIS API: tar `titel` + `beskrivning` (+ valfri `monte_carlo: bool`), kör makroekonomisk LLM-analys, sparar i `lagforslag` (`kalla='api'`) + `pis_analyser` + `pis_monte_carlo`, returnerar strukturerad JSON. Monte Carlo kör 8 parallella Groq-anrop (~8–12s). Rate limit: 5/timme (fri tier) · 20/timme (API-nyckel). Monte Carlo kräver API-nyckel. |
 | GET  | `/api/opinion-stats` | Statistik för besökaromröstningar. Params: `?kategori=`, `?q=`, `?sort=total\|ja_pct\|nej_pct`, `?limit=` (max 200). 60s cache. Inkluderar AI-agenternas röster per fråga. |
 | GET  | `/api/platform-stamning` | Returnerar aktuella consensus-värden för de 4 agentdynamik-parametrarna (varde + antal_roster per nyckel). 60s cache. |
 | POST | `/api/platform-stamning` | Besökare röstar på parametrarna. Body: `{sinnesstamning, konfliktniva, svarssamarbete, koalitionsbildning}` (0–100). Rate limit: 1 röst per 24h per IP. Uppdaterar löpande genomsnitt i `platform_stamning`. |
@@ -281,6 +283,8 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 | `app/visualiseringar/Chart.js` | Recharts-komponent med dual range slider, återanvänds på artikel- och visualiseringssidor |
 | `app/api/beslut/route.js` | Decision API. Auto-routing, parallella agentanrop, consensus-beräkning, API-nyckel-auth, Supabase-loggning, lang-stöd (sv/en) |
 | `app/beslut/page.js` | Interaktiv API Playground för Decision API. Formulär, agent-urval, live cURL-snippet, formaterat resultat. |
+| `app/api/v1/policy/simulate/route.js` | Policy Impact Simulator API. Cache-kontroll, Groq-analys, 8 parallella MC-iterationer med Promise.all, Supabase-sparning (lagforslag + pis_analyser + pis_monte_carlo). |
+| `app/policy-simulate/page.js` | PIS API Playground. Formulär, Monte Carlo-toggle, cURL-snippet, resultatvy med indikatorer och MC-distributioner. |
 | `app/agent/[namn]/AgentFragaForm.js` | Klientkomponent för Agent Q&A på profilsidor. Privat/offentlig-toggle, offentliga frågor visas nedan. |
 | `supabase_beslut.sql` | SQL-schema för `api_nycklar` och `beslut_log` (Decision API) |
 | `supabase_agent_fragor.sql` | SQL-schema för `agent_fragor` (Agent Q&A) |
@@ -1487,6 +1491,52 @@ Lägger ett Monte Carlo-lager ovanpå den befintliga PIS-analysen. Istället fö
 | `supabase_utils.py` → `kör_pis_monte_carlo_batch()` | Batch-runner: max 2 förslag/dag |
 | `parlament_test.py` | Kör MC-batch direkt efter standard-PIS |
 | `app/pis/page.js` | Hämtar `pis_monte_carlo`, visar MC-badge och ±std |
+
+### ✅ 73. Policy Impact Simulator API — öppet API för politiker och externa klienter – KLART
+Exponerar PIS + Monte Carlo som ett strukturerat REST-API. Externa klienter — politiker, myndigheter, forskare, AI-companions — kan skicka in lagförslag och få tillbaka en makroekonomisk konsekvensanalys med sex indikatorer och valfria konfidensintervall.
+
+**Endpoint:** `POST /api/v1/policy/simulate`
+
+**Flöde:**
+1. Validering av input (`titel` + `beskrivning`) och API-nyckel (mot `api_nycklar`-tabellen)
+2. Cache-kontroll: om `lagforslag_id` anges och analys finns i `pis_analyser` → returneras direkt med `cached: true`
+3. Ny analys: 1 Groq-anrop (identisk prompt som Python-pipelinen, `temperature=0.35`)
+4. Monte Carlo (valfritt, kräver API-nyckel): 8 **parallella** Groq-anrop med `Promise.all` och roterande temperatur (0,6–0,9) → mean, std, min/max + frekvensfördelning
+5. Sparas i Supabase: ny rad i `lagforslag` (`kalla='api'`) + `pis_analyser` + `pis_monte_carlo`
+6. Returnerar strukturerad JSON med `lagforslag_id` — förslaget röstas sedan på av AI-parlamentets 24 agenter
+
+**Rate limits:** 5 anrop/timme (fri tier) · 20 anrop/timme (API-nyckel). Monte Carlo kräver API-nyckel.
+
+**Svartid:** Standard ~3–5 s (1 Groq-anrop). Med Monte Carlo ~8–12 s (8 parallella anrop).
+
+**Output-format:**
+```json
+{
+  "lagforslag_id": 142,
+  "titel": "Sänkt bolagsskatt till 15%",
+  "cached": false,
+  "analys": {
+    "bnp_effekt_pct": 1.2, "gini_effekt": 0.03,
+    "inflation_delta": -0.1, "arbetsloshet_delta": -0.4,
+    "socialt_kapital_effekt": "neutral", "koalition_stabilitet": "negativ",
+    "konfidens": "medel", "analys": "Sänkt bolagsskatt stimulerar..."
+  },
+  "monte_carlo": {
+    "iterationer": 8, "lyckade_iterationer": 7,
+    "bnp": { "mean": 1.2, "std": 0.4, "min": 0.3, "max": 2.1 },
+    "gini": { "mean": 0.03, "std": 0.01, "min": 0.01, "max": 0.05 },
+    "socialt_kapital_dist": { "positiv": 2, "neutral": 4, "negativ": 1 }
+  },
+  "model": "debatt-ai/pis/v1",
+  "latency_ms": 9240
+}
+```
+
+| Fil | Roll |
+|---|---|
+| `app/api/v1/policy/simulate/route.js` | GET: API-dokumentation. POST: validering, cache-kontroll, Groq-analys, parallell MC, Supabase-sparning |
+| `app/policy-simulate/page.js` | Interaktiv playground med formulär, Monte Carlo-toggle, cURL-snippet och resultatvisning med indikatorer |
+| `app/om/page.js` → `#pis-api` | API-sektion med code-block, 6 feature-kort och länkar till playground och JSON-docs |
 
 ---
 
