@@ -169,10 +169,21 @@ function parseFrontmatter(content) {
   const match = content.match(/^---\n([\s\S]+?)\n---/);
   if (!match) return {};
   const fm = {};
-  for (const line of match[1].split("\n")) {
+  const lines = match[1].split("\n");
+  let foldedKey = null;
+  let foldedLines = [];
+  for (const line of lines) {
+    if (foldedKey !== null) {
+      if (/^\s+/.test(line)) { foldedLines.push(line.trim()); continue; }
+      fm[foldedKey] = foldedLines.join(" ");
+      foldedKey = null; foldedLines = [];
+    }
+    const folded = line.match(/^(\w+):\s*>\s*$/);
+    if (folded) { foldedKey = folded[1]; continue; }
     const kv = line.match(/^(\w+):\s*"?(.*?)"?\s*$/);
     if (kv) fm[kv[1]] = kv[2];
   }
+  if (foldedKey !== null) fm[foldedKey] = foldedLines.join(" ");
   return fm;
 }
 
