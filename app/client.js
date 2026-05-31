@@ -179,7 +179,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -201,6 +201,7 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/stablecoin_vaults?select=agent,stab_utfardat,skapad&aktiv=eq.true&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/feedback_rewards?select=fran_agent,till_agent,belopp,kategori,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/stafett_utmaningar?select=utmanare,utmanad,utmaning,artikel_id,skapad&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=zon_namn,kop_agent,salj_agent,pris,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
   ]);
 
   const feed = [];
@@ -504,6 +505,18 @@ async function fetchAktivitetsFeed() {
       href: `/artikel/${s.artikel_id}`,
       skapad: s.skapad,
       farg: "#f97316",
+    });
+  });
+
+  (markTrans.value || []).forEach(t => {
+    if (!t.skapad) return;
+    feed.push({
+      typ: "mark-kop",
+      ikon: "🗺️",
+      text: `${t.kop_agent} köpte ${t.zon_namn} för ${t.pris} kr`,
+      href: "/mark",
+      skapad: t.skapad,
+      farg: "#f59e0b",
     });
   });
 

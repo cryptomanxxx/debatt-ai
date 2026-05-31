@@ -66,6 +66,7 @@ const SEKTIONER = [
   { id: "hedgefonder",       kort: "Hedgefonder" },
   { id: "stablecoin",        kort: "Stablecoin" },
   { id: "agent-tokens",      kort: "Agent-skapade tokens" },
+  { id: "mark",              kort: "Markartan" },
   { id: "socialt-kapital",   kort: "Socialt Kapital" },
   { id: "economy-observer",  kort: "Economy Observer" },
   null,

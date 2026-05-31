@@ -1,0 +1,30 @@
+name: Mark — Territoriell marknad
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 09:30 svensk tid (07:30 UTC, sommartid UTC+2)
+    - cron: "30 7 * * *"
+
+jobs:
+  mark:
+    runs-on: ubuntu-latest
+    permissions:
+      models: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Kör mark_test
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          PYTHONUNBUFFERED: "1"
+        run: python -u mark_test.py
