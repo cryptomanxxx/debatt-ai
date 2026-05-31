@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/podd",            label: "Videopodden" },
   { href: "/opinion",         label: "Vad tycker du?" },
   { href: "/visualiseringar", label: "Visualiseringar" },
+  { href: "/mark",             label: "Markartan" },
   { href: "/fraktioner",      label: "Fraktioner" },
   { href: "/oligarki",        label: "Oligarkirisk" },
   { href: "/teori",           label: "Ekonomisk teori" },

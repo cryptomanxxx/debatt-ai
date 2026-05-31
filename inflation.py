@@ -1,14 +1,15 @@
 """
 inflation.py — Veckovis ekonomisk cykel för debatt.ai
 
-Körs av GitHub Actions varje söndag. Sex åtgärder:
+Körs av GitHub Actions varje söndag. Sju åtgärder:
 0. Dynamisk policy: Gini-koefficienten från oligarki_historik styr skattenivå och bailout
 1. Förmögenhetsskatt: 1–3% på saldo > 800–1 200 kr (beroende på Gini) → Statskassan
 2. Inflationsuppdatering: butik_varor.pris × 1.03 (avrundat)
 3. Räntedragning: saldo_kvar × 1.05 på alla aktiva lån
 4. Sparränta: 1% på saldo > 400 kr (kapital föder kapital)
 5. Bailout: agenter med saldo < 100–250 kr får 500 kr från centralbanken
-6. Grundinkomst: statskassan omfördelas jämnt bland alla agenter
+6. Markinkomst: veckovis inkomst till markägare baserat på zoners veckoinkomst
+7. Grundinkomst: statskassan omfördelas jämnt bland alla agenter
 """
 
 import os, sys, httpx, math
@@ -356,6 +357,44 @@ def main():
             print("  Statskassan är tom — inga böter att omfördela.")
     else:
         print("  [VARNING] Kunde inte hämta statskassan — statskassa-raden kanske inte är skapad.")
+
+    # ── 6. Markinkomst: veckovis intäkt till markägare ────────────────────────
+    print("\n── Markinkomst: veckovis intäkt till markägare ──")
+    try:
+        agare_res = httpx.get(
+            f"{SB_URL}/rest/v1/mark_agare?select=agent,mark_zoner(veckoinkomst,namn)",
+            headers={**h, "Prefer": ""}, timeout=12,
+        )
+        agare_rows = agare_res.json() if agare_res.is_success else []
+
+        if not agare_rows:
+            print("  Inga markägare ännu — inga inkomster att betala ut.")
+        else:
+            inkomst = {}
+            for row in agare_rows:
+                zon = row.get("mark_zoner") or {}
+                agent = row["agent"]
+                inkomst[agent] = inkomst.get(agent, 0) + int(zon.get("veckoinkomst") or 0)
+
+            pb_res = httpx.get(
+                f"{SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&agent=neq.Statskassa",
+                headers={**h, "Prefer": ""}, timeout=10,
+            )
+            saldon = {r["agent"]: float(r.get("saldo") or 0) for r in (pb_res.json() if pb_res.is_success else [])}
+
+            for agent, ink in inkomst.items():
+                saldo = saldon.get(agent, 0)
+                nytt = round(saldo + ink, 2)
+                httpx.patch(
+                    f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent.replace(' ', '%20')}",
+                    headers=h, json={"saldo": nytt, "uppdaterad": "now()"}, timeout=8,
+                )
+                print(f"  ✓ {agent}: +{ink} kr markinkomst → saldo {nytt:.0f} kr")
+
+            total = sum(inkomst.values())
+            print(f"  Totalt utbetalt: {total} kr till {len(inkomst)} markägare")
+    except Exception as e:
+        print(f"  [VARNING] Markinkomst misslyckades: {e}")
 
     print("\n✓ Inflationscykeln klar.")
 

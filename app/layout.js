@@ -51,6 +51,7 @@ export default function RootLayout({ children }) {
               <a href="/staten" className="neon-nav">Staten</a>
               <a href="/etf" className="neon-nav">Krypto-ETF</a>
               <a href="/bors" className="neon-nav">Intern börs</a>
+              <a href="/mark" className="neon-nav">Markartan</a>
               <a href="/tokens" className="neon-nav">Agent-tokens</a>
               <a href="/hedgefonder" className="neon-nav">Hedgefonder</a>
               <a href="/stablecoin" className="neon-nav">Stablecoin STAB</a>

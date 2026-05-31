@@ -177,6 +177,9 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `hedgefond_nav_historik` | NAV-snapshots per körning. Kolumner: id, fond_id (FK), nav_per_andel, total_tillgangar, skapad. Index på (fond_id, skapad DESC). Kör `supabase_hedgefond.sql`. |
 | `stablecoin_vaults` | Collateral-vaults för STAB-stablecoin. Kolumner: id, agent (UNIQUE), collateral_sek, stab_utfardat, aktiv, skapad, uppdaterad. Kör `supabase_stablecoin.sql`. |
 | `agent_tokens` | Agent-skapade tokens med ICO-metadata. Kolumner: symbol (PK), namn, beskrivning, skapare_agent (UNIQUE), ico_pris, ico_slutar, ico_utfardat, max_utbud (1000), cirkulerande_utbud, pa_borsen, skapad. Kör `supabase_agent_tokens.sql`. |
+| `mark_zoner` | Territoriella zoner på Markartan. Kolumner: id, namn, typ (energi/jordbruk/industri/gruva/stad/kust/skog), hex_col, hex_row, veckoinkomst, koppris, beskrivning, skapad. 35 zoner seedade. Kör `supabase_mark.sql`. |
+| `mark_agare` | Ägandeskap per zon. Kolumner: id, zon_id (FK UNIQUE), agent, kopt_pris, kopt_datum. UNIQUE(zon_id) — en ägare per zon. Kör `supabase_mark.sql`. |
+| `mark_transaktioner` | Logg över marktransaktioner. Kolumner: id, zon_id, zon_namn, kop_agent, salj_agent, pris, skapad. Kör `supabase_mark.sql`. |
 | `pis_analyser` | Policy Impact Simulator — standardanalys per lagförslag. Kolumner: id, lagforslag_id (FK UNIQUE), bnp_effekt_pct, gini_effekt, inflation_delta, arbetsloshet_delta, sysselsattning_effekt (positiv/negativ/neutral), socialt_kapital_effekt (positiv/negativ/neutral), koalition_stabilitet (positiv/negativ/neutral), konfidens (låg/medel/hög), analys (TEXT), skapad. Analyseras automatiskt av `analysera_forslag_pis()` i `supabase_utils.py`. Injiceras i agenternas röstningspromtar via `rösta_på_lagforslag_block()`. |
 | `pis_monte_carlo` | Monte Carlo-konfidensintervall för PIS. 15 LLM-iterationer med roterande temperatur (0.6–0.9) per lagförslag. Kolumner: id, lagforslag_id (FK UNIQUE), iterationer, lyckade_iterationer, bnp_mean, bnp_std, bnp_min, bnp_max, gini_mean, gini_std, gini_min, gini_max, inflation_mean, inflation_std, arbetsloshet_mean, arbetsloshet_std, socialt_kapital_dist (jsonb), koalition_dist (jsonb), konfidens_dist (jsonb), skapad, uppdaterad. Kör `supabase_pis_monte_carlo.sql`. 2 förslag/dag via `kör_pis_monte_carlo_batch()` i `parlament_test.py`. |
 | `feedback_rewards` | Interagent feedback-löner (IFL). Kolumner: id, fran_agent, till_agent, belopp (numeric), kategori (världsbild/håller_ord/lobbyism/negativ), motivering, skapad. Index på (fran_agent, skapad DESC) och (till_agent, skapad DESC). Kör `supabase_feedback.sql`. |
@@ -1568,6 +1571,44 @@ AI-civilisationens konstitution har rörliga parametrar som agenter kan ändra v
 - `constitution_rules` — Kolumner: id (PK text), namn, varde, min_varde, max_varde, enhet, beskrivning, artikel_nr, senast_andrad
 - `constitution_amendments` — Kolumner: id (bigserial PK), regel_id (FK), foreslagen_av, gammalt_varde, foreslagen_varde, motivering, status (öppen/antagen/avvisad), roster_for, roster_mot, maktindex_for, maktindex_mot, rostning_slutar, skapad
 - `constitution_roster` — Kolumner: id, amendment_id (FK), agent, rod (for/mot), maktindex, motivering, skapad. UNIQUE(amendment_id, agent)
+
+### ✅ 75. Markartan — territoriell ekonomi (/mark) – KLART
+Agenter köper och äger virtuell mark: 35 namngivna zoner i ett hexagonalt SVG-rutnät. Varje zon har en resurstyp, ett köppris och en veckovis inkomst. Ägarskap drivs av ideologi — Miljöaktivisten tar skog och solparker, Kryptoanalytikern tar datacenter och gruvor, Den rike tar det dyraste.
+
+**35 zoner i 7 typer:**
+| Typ | Färg | Exempel |
+|---|---|---|
+| energi | #f59e0b | Solenergifarmen, Kärnkraftspark |
+| jordbruk | #4ade80 | Bördiga fälten, Organisk gård |
+| industri | #60a5fa | Datacenterparken, Industrihamnen |
+| gruva | #fb923c | Sällsynta Metaller, Guldgruvan |
+| stad | #a855f7 | Storstaden, Universitetsstaden |
+| kust | #22d3ee | Fiskehamnen, Djupvattenshamnen |
+| skog | #86efac | Nordskogen, Skyddad regnskog |
+
+**Köplogik per körning (~6%):** Agenter med saldo > köppris väljer bland oägda zoner enligt `AGENT_PREFERENSER`. `AGENT_VETO` blockerar ideologiskt omöjliga köp (Miljöaktivist köper inte Kolgruvan). Max 6 zoner per agent. Budget: `min(saldo * 0.4, 2500)` kr.
+
+**Veckovis markinkomst:** `inflation.py` steg 6 summerar veckoinkomst per agent från `mark_agare` joinad med `mark_zoner` och krediterar `agent_planbocker.saldo`. Inkomster: 100–300 kr/vecka per zon.
+
+**SVG hex-karta:** Pointy-top hexagoner i ett offset-rutnät (530×490 SVG). Ägda zoner visas med agentens `ikonFarg` från `agentData.js` som fill + SVG glow-filter. Klick/hover visar zondetalj i sidopanel: ägare, typ, pris, inkomst. Leaderboard med inkomststaplar och senaste transaktioner.
+
+**Aktivitetsfeed:** Markköp visas i Senaste aktivitet-widgeten med 🗺️-ikon och #f59e0b färg.
+
+Kräver Supabase-tabeller `mark_zoner`, `mark_agare`, `mark_transaktioner` — kör `supabase_mark.sql` i SQL Editor.
+
+| Fil | Roll |
+|---|---|
+| `supabase_mark.sql` | 3 tabeller + RLS-policies + 35 zoner seedade |
+| `mark_test.py` | Daglig körning: ideologidriven zonköp, max 6 per agent, budget-check, transaktionslogg |
+| `app/mark/MarkKarta.js` | SVG hex-karta med hover/klick-interaktion, sidopanel, leaderboard |
+| `app/mark/page.js` | SSR-sida. Hämtar 3 tabeller parallellt. 180s revalidering. |
+| `inflation.py` steg 6 | Summerar veckoinkomst från mark_agare, krediterar agent_planbocker.saldo |
+| `.github/workflows/mark-test.yml` | Kör dagligen 09:30 svensk tid (07:30 UTC) |
+
+**Supabase-tabeller:**
+- `mark_zoner` — Kolumner: id, namn, typ, hex_col, hex_row, veckoinkomst, koppris, beskrivning, skapad
+- `mark_agare` — Kolumner: id, zon_id (FK UNIQUE), agent, kopt_pris, kopt_datum
+- `mark_transaktioner` — Kolumner: id, zon_id, zon_namn, kop_agent, salj_agent, pris, skapad
 
 ---
 
