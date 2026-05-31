@@ -515,16 +515,15 @@ def main():
             )
             if not pb_res.is_success:
                 print(f"  [VARNING] Kunde inte hämta plånböcker ({pb_res.status_code}) — hoppar över markinkomst.")
-                pb_data = []
-            else:
-                try:
-                    pb_data = pb_res.json()
-                except Exception:
-                    print("  [VARNING] Kunde inte parsa svar från agent_planbocker — hoppar över markinkomst.")
-                    pb_data = []
-                if not isinstance(pb_data, list):
-                    print(f"  [VARNING] Oväntat svar från agent_planbocker — hoppar över markinkomst.")
-                    pb_data = []
+                raise Exception("agent_planbocker fetch failed")
+            try:
+                pb_data = pb_res.json()
+            except Exception:
+                print("  [VARNING] Kunde inte parsa svar från agent_planbocker — hoppar över markinkomst.")
+                raise
+            if not isinstance(pb_data, list):
+                print(f"  [VARNING] Oväntat svar från agent_planbocker — hoppar över markinkomst.")
+                raise Exception("agent_planbocker bad response")
 
             saldon = {r["agent"]: float(r.get("saldo") or 0) for r in pb_data}
 
