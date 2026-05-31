@@ -18,6 +18,11 @@ on:
         required: false
         default: "true"
         type: boolean
+      partikassa_seed:
+        description: "Startsaldo i kr per parti (0 = hoppa över)"
+        required: false
+        default: "500"
+        type: string
 
 jobs:
   bootstrap:
@@ -69,7 +74,36 @@ jobs:
           echo "=== Kör koalitionsbildning (FORCE_PARTIER=$FORCE_PARTIER) ==="
           python -u koalition_test.py
 
-      - name: Steg 3 — Riksdagsval (med tvångsflaggor)
+      - name: Steg 3 — Sätt startsaldo på partikassor
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PYTHONUNBUFFERED: "1"
+          PARTIKASSA_SEED: ${{ inputs.partikassa_seed }}
+        run: |
+          echo "=== Seedar partikassor med ${PARTIKASSA_SEED} kr per parti ==="
+          python -u - <<'PYEOF'
+          import os, httpx, urllib.parse, sys
+          seed = int(os.environ.get("PARTIKASSA_SEED", "0") or "0")
+          if seed <= 0:
+              print("  PARTIKASSA_SEED=0 — hoppar över")
+              sys.exit(0)
+          SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
+          key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+          h = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json", "Prefer": "return=minimal"}
+          partier = httpx.get(f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn,ledare", headers=h, timeout=8).json()
+          if not partier:
+              print("  Inga aktiva partier att seeda")
+              sys.exit(0)
+          for p in partier:
+              r = httpx.patch(
+                  f"{SB_URL}/rest/v1/parti_kassor?ledare=eq.{urllib.parse.quote(p['ledare'])}",
+                  headers=h, json={"saldo": seed}, timeout=8)
+              status = "✓" if r.is_success else f"✗ HTTP {r.status_code}"
+              print(f"  {status} {p['namn']} ({p['ledare']}): {seed} kr")
+          PYEOF
+
+      - name: Steg 4 — Riksdagsval (med tvångsflaggor)
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
