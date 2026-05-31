@@ -380,7 +380,13 @@ def main():
                 f"{SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&agent=neq.Statskassa",
                 headers={**h, "Prefer": ""}, timeout=10,
             )
-            saldon = {r["agent"]: float(r.get("saldo") or 0) for r in (pb_res.json() if pb_res.is_success else [])}
+            if not pb_res.is_success:
+                print(f"  [VARNING] Kunde inte hämta plånböcker ({pb_res.status_code}) — hoppar över markinkomst.")
+                raise Exception(f"agent_planbocker fetch failed: {pb_res.status_code}")
+            pb_data = pb_res.json()
+            if not isinstance(pb_data, list):
+                raise Exception(f"Oväntat svar från agent_planbocker: {pb_data}")
+            saldon = {r["agent"]: float(r.get("saldo") or 0) for r in pb_data}
 
             for agent, ink in inkomst.items():
                 saldo = saldon.get(agent, 0)
