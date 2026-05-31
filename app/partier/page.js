@@ -165,7 +165,7 @@ export default async function PartierPage() {
                   {/* Medlemmar */}
                   <div style={{ marginBottom: 0 }}>
                     <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                      Medlemmar ({p.medlemmar.length})
+                      Medlemmar ({p.medlemmar.filter(m => m !== p.ledare).length}) + ledare
                     </span>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
                       {p.medlemmar.filter(m => m !== p.ledare).map(m => (
