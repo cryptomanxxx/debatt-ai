@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { AGENT_VISUELL } from "../agentData";
 
-// Rikare, mer mättade terrainfarger
 const TYP_FARG = {
   energi:   "#f59e0b",
   jordbruk: "#22c55e",
@@ -33,7 +32,7 @@ const TYP_NAMN = {
   skog:     "Skog",
 };
 
-// Tre-stegs terraingradienter: [highlight, midtone, skugga]
+// Tre-stegs terraingradienter
 const TERRAIN_STOPS = {
   energi:   [["#fef08a", 0.82], ["#f59e0b", 0.44], ["#92400e", 0.08]],
   jordbruk: [["#bbf7d0", 0.80], ["#22c55e", 0.44], ["#14532d", 0.08]],
@@ -77,12 +76,12 @@ function relativeTime(ts) {
   return `${Math.floor(diff / 86400)}d sedan`;
 }
 
-// Deterministisk bakgrundsprickar
-const BG_DOTS = Array.from({ length: 45 }, (_, i) => ({
+// Deterministisk stjärnbakgrund
+const BG_DOTS = Array.from({ length: 55 }, (_, i) => ({
   x: parseFloat(((i * 137.508) % SVG_W).toFixed(1)),
   y: parseFloat(((i * 97.314 + 13) % SVG_H).toFixed(1)),
-  r: [0.6, 0.9, 1.3][i % 3],
-  op: 0.03 + (i % 5) * 0.014,
+  r: [0.5, 0.8, 1.2][i % 3],
+  op: 0.03 + (i % 5) * 0.012,
 }));
 
 export default function MarkKarta({ zoner, agare, transaktioner }) {
@@ -135,14 +134,14 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
           style={{
             display: "block",
             maxWidth: "100%",
-            borderRadius: "14px",
+            borderRadius: "16px",
             background: "#030c18",
             border: "1px solid #0d1f35",
-            boxShadow: "0 0 60px rgba(0,20,60,0.6), 0 0 120px rgba(0,0,0,0.9)",
+            boxShadow: "0 0 80px rgba(0,20,60,0.7), 0 0 30px rgba(0,0,0,0.95), inset 0 0 60px rgba(0,10,30,0.5)",
           }}
         >
           <defs>
-            {/* Terrain radial gradients — highlight / midtone / deep shadow */}
+            {/* ── Terrain radial gradients ── */}
             {Object.entries(TERRAIN_STOPS).map(([typ, stops]) => (
               <radialGradient key={typ} id={`grad-${typ}`} cx="28%" cy="22%" r="82%">
                 <stop offset="0%"   stopColor={stops[0][0]} stopOpacity={stops[0][1]} />
@@ -151,7 +150,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
               </radialGradient>
             ))}
 
-            {/* Agent ownership gradients */}
+            {/* ── Agent ownership gradients ── */}
             {agentGrads.map(({ name, farg }) => (
               <radialGradient key={name} id={`grad-ag-${name.replace(/[^a-zA-Z]/g, "")}`} cx="32%" cy="25%" r="78%">
                 <stop offset="0%"   stopColor={farg} stopOpacity="0.68" />
@@ -160,20 +159,92 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
               </radialGradient>
             ))}
 
-            {/* Surface light — simulates light from top-left for 3D depth */}
+            {/* ── Ytbelysning (3D-djup) ── */}
             <linearGradient id="hex-light" x1="20%" y1="0%" x2="80%" y2="100%">
-              <stop offset="0%"   stopColor="white" stopOpacity="0.10" />
+              <stop offset="0%"   stopColor="white" stopOpacity="0.11" />
               <stop offset="40%"  stopColor="white" stopOpacity="0.02" />
-              <stop offset="100%" stopColor="black" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="black" stopOpacity="0.24" />
             </linearGradient>
 
-            {/* Hover overlay */}
+            {/* ── Hover overlay ── */}
             <radialGradient id="grad-hover" cx="50%" cy="38%" r="68%">
               <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.18" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0.00" />
             </radialGradient>
 
-            {/* Glow filters */}
+            {/* ── Landbas-gradienter ── */}
+            <radialGradient id="land-inner" cx="48%" cy="45%" r="55%">
+              <stop offset="0%"   stopColor="#0d2510" stopOpacity="1" />
+              <stop offset="45%"  stopColor="#081a10" stopOpacity="1" />
+              <stop offset="100%" stopColor="#040d08" stopOpacity="1" />
+            </radialGradient>
+            <radialGradient id="coast-glow" cx="50%" cy="50%" r="50%">
+              <stop offset="30%"  stopColor="#0d4a6e" stopOpacity="0" />
+              <stop offset="75%"  stopColor="#0d4a6e" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#051520" stopOpacity="0.8" />
+            </radialGradient>
+
+            {/* ── Terrainmönster per zontyp ── */}
+            {/* Skog: tall träd-trianglar */}
+            <pattern id="pat-skog" patternUnits="userSpaceOnUse" width="22" height="22">
+              <polygon points="11,3 6,16 16,16" fill="#4ade80" opacity="0.18"/>
+              <rect x="9.5" y="16" width="3" height="3.5" fill="#15803d" opacity="0.14"/>
+              <polygon points="5,9 1,18 9,18" fill="#22c55e" opacity="0.12"/>
+              <polygon points="18,11 14,19 22,19" fill="#16a34a" opacity="0.10"/>
+            </pattern>
+
+            {/* Kust: våglinjer */}
+            <pattern id="pat-kust" patternUnits="userSpaceOnUse" width="32" height="14">
+              <path d="M0,7 Q8,3 16,7 Q24,11 32,7" fill="none" stroke="#22d3ee" strokeWidth="1.5" opacity="0.28"/>
+              <path d="M0,11 Q8,8 16,11 Q24,14 32,11" fill="none" stroke="#0891b2" strokeWidth="1" opacity="0.18"/>
+            </pattern>
+
+            {/* Jordbruk: odlingsrader */}
+            <pattern id="pat-jordbruk" patternUnits="userSpaceOnUse" width="22" height="9">
+              <line x1="0" y1="4.5" x2="22" y2="4.5" stroke="#86efac" strokeWidth="1.2" opacity="0.22"/>
+              <line x1="0" y1="8.5" x2="22" y2="8.5" stroke="#4ade80" strokeWidth="0.7" opacity="0.14"/>
+            </pattern>
+
+            {/* Gruva: bergskristaller */}
+            <pattern id="pat-gruva" patternUnits="userSpaceOnUse" width="20" height="20">
+              <polygon points="10,3 14,10 10,14 6,10" fill="#fb923c" opacity="0.16"/>
+              <polygon points="4,12 7,17 1,17" fill="#ea580c" opacity="0.12"/>
+              <polygon points="16,13 19,18 13,18" fill="#c2410c" opacity="0.10"/>
+            </pattern>
+
+            {/* Stad: byggnadssilhuetter */}
+            <pattern id="pat-stad" patternUnits="userSpaceOnUse" width="26" height="22">
+              <rect x="1"  y="10" width="6" height="12" fill="#a855f7" opacity="0.20"/>
+              <rect x="9"  y="5"  width="5" height="17" fill="#9333ea" opacity="0.18"/>
+              <rect x="16" y="8"  width="4" height="14" fill="#7c3aed" opacity="0.15"/>
+              <rect x="22" y="12" width="4" height="10" fill="#a855f7" opacity="0.12"/>
+              <line x1="0" y1="22" x2="26" y2="22" stroke="#7c3aed" strokeWidth="1" opacity="0.20"/>
+            </pattern>
+
+            {/* Energi: elektrisk strålning */}
+            <pattern id="pat-energi" patternUnits="userSpaceOnUse" width="22" height="22">
+              <path d="M11,2 L8,11 L13,11 L10,20" fill="none" stroke="#fbbf24" strokeWidth="1.8" opacity="0.24"/>
+              <circle cx="11" cy="11" r="2.5" fill="#f59e0b" opacity="0.14"/>
+            </pattern>
+
+            {/* Industri: kretskort-mönster */}
+            <pattern id="pat-industri" patternUnits="userSpaceOnUse" width="20" height="20">
+              <circle cx="4"  cy="4"  r="1.2" fill="#60a5fa" opacity="0.20"/>
+              <circle cx="10" cy="4"  r="1.2" fill="#60a5fa" opacity="0.16"/>
+              <circle cx="16" cy="4"  r="1.2" fill="#60a5fa" opacity="0.14"/>
+              <circle cx="4"  cy="10" r="1.2" fill="#60a5fa" opacity="0.16"/>
+              <circle cx="10" cy="10" r="2.0" fill="#93c5fd" opacity="0.20"/>
+              <circle cx="16" cy="10" r="1.2" fill="#60a5fa" opacity="0.16"/>
+              <circle cx="4"  cy="16" r="1.2" fill="#60a5fa" opacity="0.14"/>
+              <circle cx="10" cy="16" r="1.2" fill="#60a5fa" opacity="0.16"/>
+              <circle cx="16" cy="16" r="1.2" fill="#60a5fa" opacity="0.14"/>
+              <line x1="4"  y1="4"  x2="16" y2="4"  stroke="#3b82f6" strokeWidth="0.6" opacity="0.14"/>
+              <line x1="4"  y1="10" x2="16" y2="10" stroke="#3b82f6" strokeWidth="0.6" opacity="0.12"/>
+              <line x1="4"  y1="4"  x2="4"  y2="16" stroke="#3b82f6" strokeWidth="0.6" opacity="0.12"/>
+              <line x1="10" y1="4"  x2="10" y2="16" stroke="#3b82f6" strokeWidth="0.6" opacity="0.10"/>
+            </pattern>
+
+            {/* ── Glow-filter ── */}
             <filter id="hexglow" x="-70%" y="-70%" width="240%" height="240%">
               <feGaussianBlur stdDeviation="5.5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
@@ -186,43 +257,74 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
               <feGaussianBlur stdDeviation="2.2" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
+            <filter id="landglow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="12" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
 
-            {/* Fog of war — radial mask som tonar ut kanterna till mörker */}
+            {/* ── Fog of war mask ── */}
             <radialGradient id="fog-grad" cx="50%" cy="50%" r="52%">
-              <stop offset="15%" stopColor="white" stopOpacity="1.00" />
-              <stop offset="52%" stopColor="white" stopOpacity="0.92" />
-              <stop offset="76%" stopColor="white" stopOpacity="0.52" />
+              <stop offset="18%" stopColor="white" stopOpacity="1.00" />
+              <stop offset="55%" stopColor="white" stopOpacity="0.92" />
+              <stop offset="78%" stopColor="white" stopOpacity="0.50" />
               <stop offset="100%" stopColor="white" stopOpacity="0.00" />
             </radialGradient>
             <mask id="fog-mask">
               <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="url(#fog-grad)" />
             </mask>
+
+            {/* ── Kustlinje-clip för landbas ── */}
+            <clipPath id="land-clip">
+              <path d="M 195 48 C 268 18, 400 38, 468 102 C 530 162, 524 282, 494 368 C 462 452, 372 492, 270 480 C 162 468, 82 414, 62 328 C 38 238, 66 138, 128 90 C 152 68, 174 55, 195 48 Z" />
+            </clipPath>
           </defs>
 
-          {/* ── Bakgrund: djup ocean-atmosfär ── */}
-          {/* Stjärnprickar */}
+          {/* ── BAKGRUND: djup ocean ── */}
           {BG_DOTS.map((s, i) => (
             <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#a0c4ff" opacity={s.op} />
           ))}
 
-          {/* Animerade atmosfärringar — ocean shimmer */}
+          {/* Animerade havsringar */}
           {[1, 2, 3].map(i => (
             <ellipse key={i}
               cx={SVG_W * 0.5} cy={SVG_H * 0.5}
-              rx={SVG_W * 0.20 * i} ry={SVG_H * 0.19 * i}
-              fill="none" stroke="#0a2a50" strokeWidth="0.7"
-              opacity="0"
+              rx={SVG_W * 0.22 * i} ry={SVG_H * 0.20 * i}
+              fill="none" stroke="#0a2848" strokeWidth="0.8" opacity="0"
             >
               <animate attributeName="opacity"
                 values={`0;${0.18 / i};0`}
-                dur={`${5.5 + i * 2.8}s`}
-                begin={`${i * 1.4}s`}
+                dur={`${5.5 + i * 2.8}s`} begin={`${i * 1.4}s`}
                 repeatCount="indefinite"
               />
             </ellipse>
           ))}
 
-          {/* ── ALLA HEXAGONER — inlindade i fog-of-war-mask ── */}
+          {/* ── KUSTLJUS runt landmassan ── */}
+          <path
+            d="M 195 48 C 268 18, 400 38, 468 102 C 530 162, 524 282, 494 368 C 462 452, 372 492, 270 480 C 162 468, 82 414, 62 328 C 38 238, 66 138, 128 90 C 152 68, 174 55, 195 48 Z"
+            fill="none"
+            stroke="#0d4a6e"
+            strokeWidth="28"
+            opacity="0.55"
+            filter="url(#landglow)"
+          />
+
+          {/* ── LANDBAS (organisk blob) ── */}
+          <path
+            d="M 195 48 C 268 18, 400 38, 468 102 C 530 162, 524 282, 494 368 C 462 452, 372 492, 270 480 C 162 468, 82 414, 62 328 C 38 238, 66 138, 128 90 C 152 68, 174 55, 195 48 Z"
+            fill="url(#land-inner)"
+          />
+
+          {/* Kustlinje: subtil ljusrand */}
+          <path
+            d="M 195 48 C 268 18, 400 38, 468 102 C 530 162, 524 282, 494 368 C 462 452, 372 492, 270 480 C 162 468, 82 414, 62 328 C 38 238, 66 138, 128 90 C 152 68, 174 55, 195 48 Z"
+            fill="none"
+            stroke="#1a5070"
+            strokeWidth="2.5"
+            opacity="0.6"
+          />
+
+          {/* ── ALLA HEXAGONER: fog-of-war mask ── */}
           <g mask="url(#fog-mask)">
             {zoner.map(zon => {
               const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
@@ -241,7 +343,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
 
               const strokeCol = agFarg
                 ? rgba(agFarg,  isAct ? 1.0 : 0.58)
-                : rgba(typFarg, isAct ? 0.82 : 0.28);
+                : rgba(typFarg, isAct ? 0.85 : 0.30);
 
               const pts = hexPts(cx, cy);
 
@@ -253,7 +355,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                   onMouseLeave={() => setHover(null)}
                   onClick={() => setSelected(s => s?.id === zon.id ? null : zon)}
                 >
-                  {/* Yttre pulserande glöd för ägda zoner */}
+                  {/* Yttre pulsglöd för ägda zoner */}
                   {agFarg && (
                     <polygon
                       points={hexPts(cx, cy, HEX + 7)}
@@ -262,27 +364,28 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                       strokeWidth={isAct ? 4.5 : 2.8}
                       filter="url(#hexglow)"
                     >
-                      <animate
-                        attributeName="opacity"
-                        values="0.08;0.48;0.08"
-                        dur="3.4s"
+                      <animate attributeName="opacity"
+                        values="0.08;0.50;0.08" dur="3.4s"
                         repeatCount="indefinite"
                       />
                     </polygon>
                   )}
 
-                  {/* Mörk basfyllning — ger djup och förhindrar bleed */}
+                  {/* Mörk basfyllning */}
                   <polygon points={pts} fill="#060e14" stroke="none" />
 
-                  {/* Terrainlager med rik gradient */}
+                  {/* Terrainlager */}
                   <polygon points={pts} fill={`url(#grad-${zon.typ})`} stroke="none" />
 
-                  {/* Agentfärglager (om ägt) */}
+                  {/* Terrainmönster-textur */}
+                  <polygon points={pts} fill={`url(#pat-${zon.typ})`} stroke="none" />
+
+                  {/* Agentfärglager */}
                   {agGradId && (
                     <polygon points={pts} fill={`url(#${agGradId})`} stroke="none" />
                   )}
 
-                  {/* Ytbelysning — 3D-djup uppifrån-vänster */}
+                  {/* Ytbelysning 3D */}
                   <polygon points={pts} fill="url(#hex-light)" stroke="none" />
 
                   {/* Hover/select-overlay */}
@@ -298,7 +401,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                     strokeWidth={isAct ? 2.2 : agFarg ? 1.5 : 0.7}
                   />
 
-                  {/* Inre kantkant för extra djup */}
+                  {/* Inre kant */}
                   <polygon
                     points={hexPts(cx, cy, HEX - 4)}
                     fill="none"
@@ -311,8 +414,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                   {/* Resurs-ikon */}
                   <text
                     x={cx} y={agName ? cy - 11 : cy - 6}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
+                    textAnchor="middle" dominantBaseline="middle"
                     fontSize={isAct ? 20 : 16}
                     filter={isAct ? "url(#textglow)" : undefined}
                     style={{ userSelect: "none", pointerEvents: "none" }}
@@ -323,8 +425,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                   {/* Inkomstetikett */}
                   <text
                     x={cx} y={agName ? cy + 4 : cy + 9}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
+                    textAnchor="middle" dominantBaseline="middle"
                     fontSize="8"
                     fill={agFarg
                       ? rgba(agFarg, isAct ? 1 : 0.84)
@@ -341,12 +442,10 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                   {agName && (
                     <text
                       x={cx} y={cy + 18}
-                      textAnchor="middle"
-                      dominantBaseline="middle"
+                      textAnchor="middle" dominantBaseline="middle"
                       fontSize="6.5"
                       fill={agFarg}
-                      fontFamily="monospace"
-                      fontWeight="700"
+                      fontFamily="monospace" fontWeight="700"
                       filter={isAct ? "url(#softglow)" : undefined}
                       style={{ userSelect: "none", pointerEvents: "none" }}
                     >
@@ -358,29 +457,21 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
             })}
           </g>
 
-          {/* Flytande inkomstbadgar (utanför fog-masken så de alltid syns) */}
+          {/* Flytande inkomstbadgar */}
           {floats.map(f => (
             <text
               key={f.id}
-              x={f.cx}
-              y={f.cy - 20}
+              x={f.cx} y={f.cy - 20}
               textAnchor="middle"
-              fill="#fbbf24"
-              fontSize="12"
-              fontFamily="monospace"
-              fontWeight="700"
+              fill="#fbbf24" fontSize="12"
+              fontFamily="monospace" fontWeight="700"
               filter="url(#softglow)"
               style={{ pointerEvents: "none" }}
             >
               +{f.ink}kr/v
               <animate attributeName="opacity" from="1" to="0" dur="1.5s" fill="freeze" />
-              <animateTransform
-                attributeName="transform"
-                type="translate"
-                from="0 0"
-                to="0 -52"
-                dur="1.5s"
-                fill="freeze"
+              <animateTransform attributeName="transform" type="translate"
+                from="0 0" to="0 -52" dur="1.5s" fill="freeze"
               />
             </text>
           ))}
