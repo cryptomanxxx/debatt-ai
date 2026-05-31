@@ -48,8 +48,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYTHONUNBUFFERED: "1"
+          SKIP_PIS: "true"
         run: |
-          echo "=== Kör parlamentsröstning ==="
+          echo "=== Kör parlamentsröstning (PIS hoppas över) ==="
           python -u parlament_test.py
 
       - name: Steg 2 — Koalitionsbildning och partiuppdatering
