@@ -32,19 +32,25 @@ const TYP_NAMN = {
   skog:     "Skog",
 };
 
-// Pollinations.ai fotorealistisk terrängbakgrund
-// Prompt matchar kartans geografiska layout: berg norr, skog i hörnen, hav väster/söder, stad centrum
-const TERRAIN_BG = "https://image.pollinations.ai/prompt/fantasy%20hexagonal%20territory%20map%20top-down%20aerial%20view%2C%20island%20continent%20surrounded%20by%20dark%20deep%20ocean%2C%20snow-capped%20rocky%20mountains%20in%20north%2C%20dense%20ancient%20forests%20in%20northwest%20and%20northeast%20corners%2C%20glowing%20purple%20city%20center%2C%20golden%20farmlands%20western%20plains%2C%20amber%20volcanic%20energy%20fields%20east%20side%2C%20blue%20coastal%20waters%20west%20and%20south%2C%20Civilization%206%20game%20art%2C%20dramatic%20cinematic%20lighting%2C%20ultra%20vivid%20photorealistic%20terrain%2C%20no%20text%20no%20hexagons%20no%20labels%20no%20UI%20elements?width=530&height=490&nologo=true&seed=1337&model=flux";
+// Pollinations.ai fotorealistisk terrängbakgrund — Civ VI-stil, ljus och färgrik
+// Geografisk logik matchar exakta zonpositioner:
+//   Norr: grå berg med snötoppar (gruva rad 0-1)
+//   NV+NO: tät grön skog (skog i hörnen)
+//   Centrum: lysande lila-violett stad (stad rad 1-3)
+//   Väster: gyllene jordbruksslätter (jordbruk rad 4-5)
+//   Öster: orange-amber vulkanisk energizon (energi rad 0-4)
+//   Väster+Söder: blå kustvatten med hamnar (kust col 0, rad 6)
+const TERRAIN_BG = "https://image.pollinations.ai/prompt/bright%20colorful%20hexagonal%20strategy%20game%20world%20map%20top-down%20view%2C%20Civilization%20VI%20art%20style%2C%20organic%20island%20landmass%20surrounded%20by%20calm%20ocean%20water%2C%20grey%20snow-capped%20mountain%20range%20in%20north-center%2C%20dense%20lush%20green%20ancient%20forest%20in%20northwest%20corner%2C%20bright%20green%20forest%20patch%20in%20northeast%2C%20glowing%20violet%20purple%20city%20district%20in%20center%2C%20golden%20yellow%20wheat%20farmland%20plains%20in%20west-center%2C%20amber%20orange%20volcanic%20geothermal%20energy%20terrain%20in%20east%2C%20blue%20coastal%20water%20and%20harbor%20on%20west%20and%20south%20edges%2C%20small%20forest%20in%20south-center%2C%20vibrant%20saturated%20colors%2C%20bright%20dramatic%20game%20art%20lighting%20from%20above%2C%20highly%20detailed%20photorealistic%20terrain%20texture%2C%20no%20text%20no%20hexagons%20no%20UI%20no%20labels?width=530&height=490&nologo=true&seed=2048&model=flux";
 
-// Subtila terrainöverlager — mycket låg opacitet, låter fotorealistisk bakgrund synas igenom
+// Terrainöverlager — tillräckligt synliga för zonidentitet, låter bakgrunden dominera
 const TERRAIN_STOPS = {
-  energi:   [["#fef08a", 0.18], ["#f59e0b", 0.10], ["#78350f", 0.02]],
-  jordbruk: [["#bbf7d0", 0.16], ["#22c55e", 0.10], ["#14532d", 0.02]],
-  industri: [["#bfdbfe", 0.16], ["#3b82f6", 0.09], ["#1e3a8a", 0.02]],
-  gruva:    [["#fed7aa", 0.16], ["#ea580c", 0.10], ["#7c2d12", 0.02]],
-  stad:     [["#f3e8ff", 0.16], ["#9333ea", 0.09], ["#3b0764", 0.02]],
-  kust:     [["#cffafe", 0.16], ["#0891b2", 0.10], ["#0c4a6e", 0.02]],
-  skog:     [["#dcfce7", 0.16], ["#16a34a", 0.10], ["#14532d", 0.02]],
+  energi:   [["#fef08a", 0.28], ["#f59e0b", 0.16], ["#78350f", 0.04]],
+  jordbruk: [["#bbf7d0", 0.26], ["#22c55e", 0.14], ["#14532d", 0.04]],
+  industri: [["#bfdbfe", 0.24], ["#3b82f6", 0.13], ["#1e3a8a", 0.03]],
+  gruva:    [["#fed7aa", 0.26], ["#ea580c", 0.14], ["#7c2d12", 0.03]],
+  stad:     [["#f3e8ff", 0.28], ["#9333ea", 0.16], ["#3b0764", 0.04]],
+  kust:     [["#cffafe", 0.26], ["#0891b2", 0.14], ["#0c4a6e", 0.04]],
+  skog:     [["#dcfce7", 0.26], ["#16a34a", 0.14], ["#14532d", 0.04]],
 };
 
 const HEX = 40;
