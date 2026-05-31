@@ -35,10 +35,24 @@ function tidsstämpel() {
   return new Date().toISOString().slice(0, 16).replace("T", "-").replace(":", "");
 }
 
+function toSlug(text) {
+  return text
+    .toLowerCase()
+    .replace(/[åä]/g, "a").replace(/ö/g, "o").replace(/é/g, "e")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+function extractVisionTitle(content) {
+  const m = content.match(/^#\s+Vision:\s*(.+)$/m);
+  return m ? m[1].trim() : null;
+}
+
 function lastNVisions(n = 3) {
   if (!fs.existsSync(DISCUSSIONS_DIR)) return [];
   return fs.readdirSync(DISCUSSIONS_DIR)
-    .filter(f => f.endsWith("-vision.md"))
+    .filter(f => f.includes("-vision"))
     .sort()
     .slice(-n)
     .map(f => {
@@ -176,7 +190,8 @@ async function callCerebras(prompt) {
 
 async function main() {
   const datum = dagensDatum();
-  const utfil = path.join(DISCUSSIONS_DIR, `${tidsstämpel()}-vision.md`);
+  const stämpel = tidsstämpel();
+  let utfil = path.join(DISCUSSIONS_DIR, `${stämpel}-vision.md`);
 
   if (!fs.existsSync(DISCUSSIONS_DIR)) fs.mkdirSync(DISCUSSIONS_DIR, { recursive: true });
 
@@ -232,6 +247,11 @@ Formatet ska vara:
   } catch (e) {
     console.error("Cerebras misslyckades:", e.message);
     process.exit(1);
+  }
+
+  const rubrik = extractVisionTitle(vision);
+  if (rubrik) {
+    utfil = path.join(DISCUSSIONS_DIR, `${stämpel}-vision-${toSlug(rubrik)}.md`);
   }
 
   const innehall = `${vision}\n\n---\n*Genererad av vision-agent.js med Cerebras Llama 3.3 70B, ${datum}*\n`;
