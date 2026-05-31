@@ -19,11 +19,37 @@ SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 
 # ── Gini-baserad policy ───────────────────────────────────────────────────────
+# Brackets: (från_saldo, till_saldo_eller_None, skattesats)
 POLICY_NIVA = {
-    "låg":    {"skattesats": 0.01, "skattetroskel": 1200, "bailout_troskel": 100,  "niva_namn": "LÅG OJÄMLIKHET"},
-    "medel":  {"skattesats": 0.02, "skattetroskel": 1000, "bailout_troskel": 150,  "niva_namn": "MÅTTLIG OJÄMLIKHET"},
-    "hög":    {"skattesats": 0.03, "skattetroskel": 800,  "bailout_troskel": 250,  "niva_namn": "HÖG OJÄMLIKHET"},
+    "låg": {
+        "skattetroskel": 1200,
+        "bailout_troskel": 100,
+        "niva_namn": "LÅG OJÄMLIKHET",
+        "skattebrackets": [(1200, 2000, 0.01), (2000, 5000, 0.02), (5000, None, 0.04)],
+    },
+    "medel": {
+        "skattetroskel": 1000,
+        "bailout_troskel": 150,
+        "niva_namn": "MÅTTLIG OJÄMLIKHET",
+        "skattebrackets": [(1000, 2000, 0.02), (2000, 5000, 0.04), (5000, None, 0.07)],
+    },
+    "hög": {
+        "skattetroskel": 800,
+        "bailout_troskel": 250,
+        "niva_namn": "HÖG OJÄMLIKHET",
+        "skattebrackets": [(800, 2000, 0.03), (2000, 5000, 0.06), (5000, None, 0.10)],
+    },
 }
+
+def berakna_progressiv_skatt(saldo, brackets):
+    """Beräknar progressiv skatt. Brackets: [(från, till_eller_None, sats), ...]."""
+    skatt = 0.0
+    for fran, till, sats in brackets:
+        if saldo <= fran:
+            break
+        topp = min(saldo, till) if till is not None else saldo
+        skatt += (topp - fran) * sats
+    return math.floor(skatt)
 
 def hamta_gini_historik(h):
     """Hämtar senaste Gini-snapshots för att bestämma policy-nivå."""
@@ -74,16 +100,21 @@ def main():
     policy = POLICY_NIVA[niva]
 
     SKATTETRÖSKEL   = policy["skattetroskel"]
-    SKATTESATS      = policy["skattesats"]
+    SKATTEBRACKETS  = policy["skattebrackets"]
     BAILOUT_TROSKEL = policy["bailout_troskel"]
+    brackets_str    = "/".join(f"{int(s*100)}%" for _, _, s in policy["skattebrackets"])
 
     gini_str = f"{senaste_gini:.3f}" if senaste_gini is not None else "okänd"
+    bracket_str = " / ".join(
+        f"{int(s*100)}% >{fran}kr" for fran, _, s in SKATTEBRACKETS
+    )
     print(f"  Gini: {gini_str} → {policy['niva_namn']}")
-    print(f"  Skatt: {SKATTESATS*100:.0f}% på saldo > {SKATTETRÖSKEL} kr | Bailout-tröskel: {BAILOUT_TROSKEL} kr")
+    print(f"  Progressiv skatt: {bracket_str} | Bailout-tröskel: {BAILOUT_TROSKEL} kr")
 
     # Logga nivåskifte i civilisationsminnet
     if foregaende_niva and foregaende_niva != niva:
         fore_policy = POLICY_NIVA[foregaende_niva]
+        fore_brackets_str = "/".join(f"{int(s*100)}%" for _, _, s in fore_policy["skattebrackets"])
         httpx.post(
             f"{SB_URL}/rest/v1/civilisations_minne",
             headers=h,
@@ -93,7 +124,7 @@ def main():
                 "beskrivning": (
                     f"Staten justerade sin omfördelningspolitik baserat på Gini-koefficienten ({gini_str}). "
                     f"Skattetröskel: {fore_policy['skattetroskel']} → {SKATTETRÖSKEL} kr | "
-                    f"Skattesats: {fore_policy['skattesats']*100:.0f}% → {SKATTESATS*100:.0f}% | "
+                    f"Skattesatser: {fore_brackets_str} → {brackets_str} | "
                     f"Bailout-tröskel: {fore_policy['bailout_troskel']} → {BAILOUT_TROSKEL} kr."
                 ),
                 "agenter": [],
@@ -104,7 +135,7 @@ def main():
         print(f"  ✓ Policy-skifte loggat i civilisationsminnet")
 
     # ── 0. Förmögenhetsskatt ──────────────────────────────────────────────────
-    print(f"\n── Förmögenhetsskatt: {SKATTESATS*100:.0f}% på saldo > {SKATTETRÖSKEL} kr ──")
+    print(f"\n── Förmögenhetsskatt (progressiv): {bracket_str} ──")
     skatt_res = httpx.get(
         f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SKATTETRÖSKEL}&agent=neq.Statskassa&select=agent,saldo",
         headers={**h, "Prefer": ""}, timeout=10,
@@ -112,7 +143,7 @@ def main():
     total_skatt = 0
     if skatt_res.is_success:
         for row in skatt_res.json():
-            skatt = math.floor((float(row["saldo"]) - SKATTETRÖSKEL) * SKATTESATS)
+            skatt = berakna_progressiv_skatt(float(row["saldo"]), SKATTEBRACKETS)
             if skatt < 1:
                 continue
             nytt_saldo = int(float(row["saldo"])) - skatt
@@ -148,8 +179,8 @@ def main():
                     "typ": "triumf",
                     "rubrik": f"Förmögenhetsskatt insamlad: {total_skatt} kr",
                     "beskrivning": (
-                        f"Staten samlade in {total_skatt} kr i förmögenhetsskatt (2% på saldo > 1 000 kr) "
-                        f"från {len([r for r in skatt_res.json() if math.floor((float(r['saldo'])-SKATTETRÖSKEL)*SKATTESATS)>=1])} agenter. "
+                        f"Staten samlade in {total_skatt} kr i progressiv förmögenhetsskatt ({bracket_str}) "
+                        f"från {len([r for r in skatt_res.json() if berakna_progressiv_skatt(float(r['saldo']), SKATTEBRACKETS) >= 1])} agenter. "
                         "Pengarna går till Statskassan och omfördelas som grundinkomst."
                     ),
                     "agenter": [],
@@ -160,6 +191,108 @@ def main():
         print(f"  ✓ Totalt {total_skatt} kr insamlat i skatt")
     else:
         print("  Inga skattepliktiga agenter.")
+
+    # ── 0.5. Partistöd: 30% av statskassan fördelas till aktiva partier ─────────
+    print("\n── Partistöd: 30% av statskassan till aktiva partier ──")
+    try:
+        import urllib.parse as _urllib_parse
+        sk_res2 = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo",
+            headers={**h, "Prefer": ""}, timeout=6,
+        )
+        sk_saldo_nu = 0
+        if sk_res2.is_success and sk_res2.json():
+            sk_saldo_nu = int(float(sk_res2.json()[0].get("saldo") or 0))
+
+        partistod_pool = math.floor(sk_saldo_nu * 0.30)
+
+        if partistod_pool < 1:
+            print(f"  Statskassan för liten ({sk_saldo_nu} kr) — hoppar över partistöd.")
+        else:
+            partier_res = httpx.get(
+                f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn,ledare,medlemmar",
+                headers={**h, "Prefer": ""}, timeout=8,
+            )
+            partier = partier_res.json() if partier_res.is_success else []
+
+            if not partier:
+                print("  Inga aktiva partier — hoppar över partistöd.")
+            else:
+                # Hämta röstandelar från senaste avgjorda val
+                roster_per_parti: dict[str, int] = {}
+                total_roster = 0
+                senaste_val_res = httpx.get(
+                    f"{SB_URL}/rest/v1/riksdagsval?status=eq.avgjort&order=avgjord.desc&limit=1&select=partier",
+                    headers={**h, "Prefer": ""}, timeout=8,
+                )
+                if senaste_val_res.is_success and senaste_val_res.json():
+                    for vp in (senaste_val_res.json()[0].get("partier") or []):
+                        r_count = int(vp.get("roster", 0))
+                        roster_per_parti[vp["namn"]] = r_count
+                        total_roster += r_count
+
+                utdelat = 0
+                for parti in partier:
+                    kassa_res = httpx.get(
+                        f"{SB_URL}/rest/v1/parti_kassor?ledare=eq.{_urllib_parse.quote(parti['ledare'])}&select=saldo",
+                        headers={**h, "Prefer": ""}, timeout=6,
+                    )
+                    if not kassa_res.is_success or not kassa_res.json():
+                        httpx.post(
+                            f"{SB_URL}/rest/v1/parti_kassor",
+                            headers=h,
+                            json={"parti_namn": parti["namn"], "ledare": parti["ledare"], "saldo": 0},
+                            timeout=8,
+                        )
+                        gammalt_saldo = 0
+                    else:
+                        gammalt_saldo = int(float(kassa_res.json()[0].get("saldo") or 0))
+
+                    if total_roster > 0 and parti["namn"] in roster_per_parti:
+                        andel = roster_per_parti[parti["namn"]] / total_roster
+                    else:
+                        andel = 1.0 / len(partier)
+
+                    belopp = math.floor(partistod_pool * andel)
+                    if belopp < 1:
+                        continue
+
+                    httpx.patch(
+                        f"{SB_URL}/rest/v1/parti_kassor?ledare=eq.{_urllib_parse.quote(parti['ledare'])}",
+                        headers=h,
+                        json={"saldo": gammalt_saldo + belopp, "uppdaterad": "now()"},
+                        timeout=8,
+                    )
+                    httpx.post(
+                        f"{SB_URL}/rest/v1/parti_utgifter",
+                        headers=h,
+                        json={
+                            "parti_namn": parti["namn"],
+                            "ledare": parti["ledare"],
+                            "typ": "partistod",
+                            "belopp": belopp,
+                            "beskrivning": f"Veckans partistöd ({andel*100:.1f}% av {partistod_pool} kr pool)",
+                        },
+                        timeout=6,
+                    )
+                    utdelat += belopp
+                    print(f"  {parti['namn']}: +{belopp} kr ({andel*100:.1f}% andel)")
+
+                if utdelat > 0:
+                    httpx.patch(
+                        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa",
+                        headers=h,
+                        json={"saldo": sk_saldo_nu - utdelat, "uppdaterad": "now()"},
+                        timeout=8,
+                    )
+                    # parti_utgifter already logs individual party disbursements;
+                    # stats_budget_log CHECK constraint only allows:
+                    # skatt, grundinkomst, bailout, bot, sparranta — skip aggregate row
+                    print(f"  ✓ Totalt {utdelat} kr partistöd fördelat bland {len(partier)} partier.")
+                else:
+                    print("  Ingen utdelning — alla andelar för små.")
+    except Exception as e:
+        print(f"  [VARNING] Partistöd misslyckades: {e}")
 
     # ── 1. Inflation: höj butikpriser med 3% ──────────────────────────────────
     print("── Inflation: höjer butikpriser 3% ──")
@@ -380,7 +513,19 @@ def main():
                 f"{SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&agent=neq.Statskassa",
                 headers={**h, "Prefer": ""}, timeout=10,
             )
-            saldon = {r["agent"]: float(r.get("saldo") or 0) for r in (pb_res.json() if pb_res.is_success else [])}
+            if not pb_res.is_success:
+                print(f"  [VARNING] Kunde inte hämta plånböcker ({pb_res.status_code}) — hoppar över markinkomst.")
+                raise Exception("agent_planbocker fetch failed")
+            try:
+                pb_data = pb_res.json()
+            except Exception:
+                print("  [VARNING] Kunde inte parsa svar från agent_planbocker — hoppar över markinkomst.")
+                raise
+            if not isinstance(pb_data, list):
+                print(f"  [VARNING] Oväntat svar från agent_planbocker — hoppar över markinkomst.")
+                raise Exception("agent_planbocker bad response")
+
+            saldon = {r["agent"]: float(r.get("saldo") or 0) for r in pb_data}
 
             for agent, ink in inkomst.items():
                 saldo = saldon.get(agent, 0)
