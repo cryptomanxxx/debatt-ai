@@ -3760,8 +3760,10 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
             headers={**h, "Prefer": ""}, timeout=8,
         )
         if not r.is_success:
+            print(f"  [FEL] Kunde inte läsa agent_koalitioner: HTTP {r.status_code}")
             return 0
         koalitioner = r.json()
+        print(f"  [DEBUG] Hittade {len(koalitioner)} koalitioner med styrka≥{min_styrka}")
         if not koalitioner:
             return 0
 
@@ -3800,6 +3802,7 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
             elif len(fraktion) >= min_kluster:
                 kluster.append(fraktion)
 
+        print(f"  [DEBUG] BFS: {len(kluster)} kluster bildade (storlekar: {[len(k) for k in kluster]})")
         if not kluster:
             return 0
 
@@ -3841,7 +3844,8 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
                     agenter=medlemmar, relaterat_typ="politiska_partier",
                 )
         return aktiva
-    except Exception:
+    except Exception as e:
+        print(f"  [FEL] berakna_och_spara_partier: {e}")
         return 0
 
 
