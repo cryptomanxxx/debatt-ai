@@ -2,14 +2,15 @@
 import { useState } from "react";
 import { AGENT_VISUELL } from "../agentData";
 
+// Rikare, mer mättade terrainfarger
 const TYP_FARG = {
   energi:   "#f59e0b",
-  jordbruk: "#4ade80",
-  industri: "#60a5fa",
-  gruva:    "#fb923c",
-  stad:     "#a855f7",
-  kust:     "#22d3ee",
-  skog:     "#86efac",
+  jordbruk: "#22c55e",
+  industri: "#3b82f6",
+  gruva:    "#ea580c",
+  stad:     "#9333ea",
+  kust:     "#0891b2",
+  skog:     "#16a34a",
 };
 
 const TYP_IKON = {
@@ -32,8 +33,21 @@ const TYP_NAMN = {
   skog:     "Skog",
 };
 
+// Tre-stegs terraingradienter: [highlight, midtone, skugga]
+const TERRAIN_STOPS = {
+  energi:   [["#fef08a", 0.82], ["#f59e0b", 0.44], ["#92400e", 0.08]],
+  jordbruk: [["#bbf7d0", 0.80], ["#22c55e", 0.44], ["#14532d", 0.08]],
+  industri: [["#bfdbfe", 0.78], ["#3b82f6", 0.42], ["#1e3a8a", 0.08]],
+  gruva:    [["#fcd34d", 0.80], ["#ea580c", 0.44], ["#7c2d12", 0.08]],
+  stad:     [["#f0abfc", 0.78], ["#9333ea", 0.42], ["#3b0764", 0.08]],
+  kust:     [["#a5f3fc", 0.80], ["#0891b2", 0.44], ["#0c4a6e", 0.08]],
+  skog:     [["#d1fae5", 0.80], ["#16a34a", 0.44], ["#14532d", 0.08]],
+};
+
 const HEX = 40;
 const SQRT3 = Math.sqrt(3);
+const SVG_W = 530;
+const SVG_H = 490;
 
 function hexCenter(col, row) {
   const x = HEX * SQRT3 * (col + (row % 2 === 1 ? 0.5 : 0)) + 52;
@@ -63,26 +77,23 @@ function relativeTime(ts) {
   return `${Math.floor(diff / 86400)}d sedan`;
 }
 
-// Deterministisk stjärnbakgrund — samma varje render
-const STARS = Array.from({ length: 55 }, (_, i) => ({
-  x: parseFloat(((i * 137.508) % 530).toFixed(1)),
-  y: parseFloat(((i * 97.314 + 13) % 490).toFixed(1)),
-  r: [0.6, 0.9, 1.2][i % 3],
-  op: 0.04 + (i % 5) * 0.018,
+// Deterministisk bakgrundsprickar
+const BG_DOTS = Array.from({ length: 45 }, (_, i) => ({
+  x: parseFloat(((i * 137.508) % SVG_W).toFixed(1)),
+  y: parseFloat(((i * 97.314 + 13) % SVG_H).toFixed(1)),
+  r: [0.6, 0.9, 1.3][i % 3],
+  op: 0.03 + (i % 5) * 0.014,
 }));
 
 export default function MarkKarta({ zoner, agare, transaktioner }) {
   const [hover, setHover]       = useState(null);
   const [selected, setSelected] = useState(null);
-  const [floats, setFloats]     = useState([]); // {id, cx, cy, ink}
+  const [floats, setFloats]     = useState([]);
 
   const agareMap = Object.fromEntries(agare.map(a => [a.zon_id, a]));
-
-  // Unika agentfärger för gradientdefinitioner
   const agentGrads = [...new Set(agare.map(a => a.agent))]
     .map(name => ({ name, farg: AGENT_VISUELL[name]?.ikonFarg || "#888" }));
 
-  // Leaderboard
   const leaderMap = {};
   agare.forEach(a => {
     const z = zoner.find(z => z.id === a.zon_id);
@@ -93,7 +104,6 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
   });
   const leaders = Object.entries(leaderMap).sort((a, b) => b[1].ink - a[1].ink).slice(0, 8);
   const maxInk = leaders[0]?.[1].ink || 1;
-
   const totalInk = agare.reduce((s, a) => {
     const z = zoner.find(z => z.id === a.zon_id);
     return s + (z?.veckoinkomst || 0);
@@ -119,204 +129,244 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
       {/* ── HEX MAP ── */}
       <div style={{ flex: "0 0 auto" }}>
         <svg
-          viewBox="0 0 530 490"
-          width="530"
-          height="490"
+          viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+          width={SVG_W}
+          height={SVG_H}
           style={{
             display: "block",
             maxWidth: "100%",
-            borderRadius: "12px",
-            background: "radial-gradient(ellipse at 40% 35%, #0a0f18 0%, #060606 70%)",
-            border: "1px solid #1e1e1e",
-            boxShadow: "0 0 40px rgba(0,0,0,0.8)",
+            borderRadius: "14px",
+            background: "#030c18",
+            border: "1px solid #0d1f35",
+            boxShadow: "0 0 60px rgba(0,20,60,0.6), 0 0 120px rgba(0,0,0,0.9)",
           }}
         >
           <defs>
-            {/* Radial gradient per typ — 3D kupol-effekt */}
-            {Object.entries(TYP_FARG).map(([typ, farg]) => (
-              <radialGradient key={typ} id={`grad-${typ}`} cx="35%" cy="28%" r="72%">
-                <stop offset="0%"   stopColor={farg} stopOpacity="0.38" />
-                <stop offset="60%"  stopColor={farg} stopOpacity="0.12" />
-                <stop offset="100%" stopColor={farg} stopOpacity="0.03" />
+            {/* Terrain radial gradients — highlight / midtone / deep shadow */}
+            {Object.entries(TERRAIN_STOPS).map(([typ, stops]) => (
+              <radialGradient key={typ} id={`grad-${typ}`} cx="28%" cy="22%" r="82%">
+                <stop offset="0%"   stopColor={stops[0][0]} stopOpacity={stops[0][1]} />
+                <stop offset="52%"  stopColor={stops[1][0]} stopOpacity={stops[1][1]} />
+                <stop offset="100%" stopColor={stops[2][0]} stopOpacity={stops[2][1]} />
               </radialGradient>
             ))}
 
-            {/* Radial gradient per agent — ägda zoner */}
+            {/* Agent ownership gradients */}
             {agentGrads.map(({ name, farg }) => (
-              <radialGradient key={name} id={`grad-ag-${name.replace(/[^a-zA-Z]/g, "")}`} cx="35%" cy="28%" r="72%">
-                <stop offset="0%"   stopColor={farg} stopOpacity="0.55" />
-                <stop offset="55%"  stopColor={farg} stopOpacity="0.22" />
+              <radialGradient key={name} id={`grad-ag-${name.replace(/[^a-zA-Z]/g, "")}`} cx="32%" cy="25%" r="78%">
+                <stop offset="0%"   stopColor={farg} stopOpacity="0.68" />
+                <stop offset="50%"  stopColor={farg} stopOpacity="0.30" />
                 <stop offset="100%" stopColor={farg} stopOpacity="0.06" />
               </radialGradient>
             ))}
 
-            {/* Hover-highlight gradient */}
-            <radialGradient id="grad-hover" cx="50%" cy="40%" r="70%">
-              <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.12" />
+            {/* Surface light — simulates light from top-left for 3D depth */}
+            <linearGradient id="hex-light" x1="20%" y1="0%" x2="80%" y2="100%">
+              <stop offset="0%"   stopColor="white" stopOpacity="0.10" />
+              <stop offset="40%"  stopColor="white" stopOpacity="0.02" />
+              <stop offset="100%" stopColor="black" stopOpacity="0.22" />
+            </linearGradient>
+
+            {/* Hover overlay */}
+            <radialGradient id="grad-hover" cx="50%" cy="38%" r="68%">
+              <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.18" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0.00" />
             </radialGradient>
 
-            {/* Glow filter */}
-            <filter id="hexglow" x="-60%" y="-60%" width="220%" height="220%">
-              <feGaussianBlur stdDeviation="4" result="blur" />
+            {/* Glow filters */}
+            <filter id="hexglow" x="-70%" y="-70%" width="240%" height="240%">
+              <feGaussianBlur stdDeviation="5.5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
             <filter id="softglow" x="-40%" y="-40%" width="180%" height="180%">
-              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
-            <filter id="textglow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="1.5" result="blur" />
+            <filter id="textglow" x="-25%" y="-25%" width="150%" height="150%">
+              <feGaussianBlur stdDeviation="2.2" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
+
+            {/* Fog of war — radial mask som tonar ut kanterna till mörker */}
+            <radialGradient id="fog-grad" cx="50%" cy="50%" r="52%">
+              <stop offset="15%" stopColor="white" stopOpacity="1.00" />
+              <stop offset="52%" stopColor="white" stopOpacity="0.92" />
+              <stop offset="76%" stopColor="white" stopOpacity="0.52" />
+              <stop offset="100%" stopColor="white" stopOpacity="0.00" />
+            </radialGradient>
+            <mask id="fog-mask">
+              <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="url(#fog-grad)" />
+            </mask>
           </defs>
 
-          {/* Stjärnbakgrund */}
-          {STARS.map((s, i) => (
-            <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#c8d8ff" opacity={s.op} />
+          {/* ── Bakgrund: djup ocean-atmosfär ── */}
+          {/* Stjärnprickar */}
+          {BG_DOTS.map((s, i) => (
+            <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#a0c4ff" opacity={s.op} />
           ))}
 
-          {/* Hexagoner */}
-          {zoner.map(zon => {
-            const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
-            const agInfo  = agareMap[zon.id];
-            const agName  = agInfo?.agent;
-            const agFarg  = agName ? (AGENT_VISUELL[agName]?.ikonFarg || "#888") : null;
-            const typFarg = TYP_FARG[zon.typ] || "#555";
+          {/* Animerade atmosfärringar — ocean shimmer */}
+          {[1, 2, 3].map(i => (
+            <ellipse key={i}
+              cx={SVG_W * 0.5} cy={SVG_H * 0.5}
+              rx={SVG_W * 0.20 * i} ry={SVG_H * 0.19 * i}
+              fill="none" stroke="#0a2a50" strokeWidth="0.7"
+              opacity="0"
+            >
+              <animate attributeName="opacity"
+                values={`0;${0.18 / i};0`}
+                dur={`${5.5 + i * 2.8}s`}
+                begin={`${i * 1.4}s`}
+                repeatCount="indefinite"
+              />
+            </ellipse>
+          ))}
 
-            const isHov = hover?.id === zon.id;
-            const isSel = selected?.id === zon.id;
-            const isAct = isHov || isSel;
+          {/* ── ALLA HEXAGONER — inlindade i fog-of-war-mask ── */}
+          <g mask="url(#fog-mask)">
+            {zoner.map(zon => {
+              const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
+              const agInfo  = agareMap[zon.id];
+              const agName  = agInfo?.agent;
+              const agFarg  = agName ? (AGENT_VISUELL[agName]?.ikonFarg || "#888") : null;
+              const typFarg = TYP_FARG[zon.typ] || "#555";
 
-            const agGradId = agName
-              ? `grad-ag-${agName.replace(/[^a-zA-Z]/g, "")}`
-              : null;
+              const isHov = hover?.id === zon.id;
+              const isSel = selected?.id === zon.id;
+              const isAct = isHov || isSel;
 
-            const strokeCol = agFarg
-              ? rgba(agFarg,  isAct ? 0.95 : 0.50)
-              : rgba(typFarg, isAct ? 0.70 : 0.24);
+              const agGradId = agName
+                ? `grad-ag-${agName.replace(/[^a-zA-Z]/g, "")}`
+                : null;
 
-            const pts = hexPts(cx, cy);
+              const strokeCol = agFarg
+                ? rgba(agFarg,  isAct ? 1.0 : 0.58)
+                : rgba(typFarg, isAct ? 0.82 : 0.28);
 
-            return (
-              <g
-                key={zon.id}
-                style={{ cursor: "pointer" }}
-                onMouseEnter={() => handleEnter(zon)}
-                onMouseLeave={() => setHover(null)}
-                onClick={() => setSelected(s => s?.id === zon.id ? null : zon)}
-              >
-                {/* Yttre glöd — pulsande för ägda zoner */}
-                {agFarg && (
-                  <polygon
-                    points={hexPts(cx, cy, HEX + 5)}
-                    fill="none"
-                    stroke={agFarg}
-                    strokeWidth={isAct ? 3.5 : 2}
-                    filter="url(#hexglow)"
-                  >
-                    <animate
-                      attributeName="opacity"
-                      values="0.12;0.40;0.12"
-                      dur="2.8s"
-                      repeatCount="indefinite"
-                    />
-                  </polygon>
-                )}
+              const pts = hexPts(cx, cy);
 
-                {/* Bas-fill: radial gradient för typ */}
-                <polygon
-                  points={pts}
-                  fill={`url(#grad-${zon.typ})`}
-                  stroke="none"
-                />
+              return (
+                <g
+                  key={zon.id}
+                  style={{ cursor: "pointer" }}
+                  onMouseEnter={() => handleEnter(zon)}
+                  onMouseLeave={() => setHover(null)}
+                  onClick={() => setSelected(s => s?.id === zon.id ? null : zon)}
+                >
+                  {/* Yttre pulserande glöd för ägda zoner */}
+                  {agFarg && (
+                    <polygon
+                      points={hexPts(cx, cy, HEX + 7)}
+                      fill="none"
+                      stroke={agFarg}
+                      strokeWidth={isAct ? 4.5 : 2.8}
+                      filter="url(#hexglow)"
+                    >
+                      <animate
+                        attributeName="opacity"
+                        values="0.08;0.48;0.08"
+                        dur="3.4s"
+                        repeatCount="indefinite"
+                      />
+                    </polygon>
+                  )}
 
-                {/* Agent-fill ovanpå (om ägs) */}
-                {agGradId && (
+                  {/* Mörk basfyllning — ger djup och förhindrar bleed */}
+                  <polygon points={pts} fill="#060e14" stroke="none" />
+
+                  {/* Terrainlager med rik gradient */}
+                  <polygon points={pts} fill={`url(#grad-${zon.typ})`} stroke="none" />
+
+                  {/* Agentfärglager (om ägt) */}
+                  {agGradId && (
+                    <polygon points={pts} fill={`url(#${agGradId})`} stroke="none" />
+                  )}
+
+                  {/* Ytbelysning — 3D-djup uppifrån-vänster */}
+                  <polygon points={pts} fill="url(#hex-light)" stroke="none" />
+
+                  {/* Hover/select-overlay */}
+                  {isAct && (
+                    <polygon points={pts} fill="url(#grad-hover)" stroke="none" />
+                  )}
+
+                  {/* Yttre kant */}
                   <polygon
                     points={pts}
-                    fill={`url(#${agGradId})`}
-                    stroke="none"
+                    fill="none"
+                    stroke={strokeCol}
+                    strokeWidth={isAct ? 2.2 : agFarg ? 1.5 : 0.7}
                   />
-                )}
 
-                {/* Hover/select overlay */}
-                {isAct && (
-                  <polygon points={pts} fill="url(#grad-hover)" stroke="none" />
-                )}
+                  {/* Inre kantkant för extra djup */}
+                  <polygon
+                    points={hexPts(cx, cy, HEX - 4)}
+                    fill="none"
+                    stroke={agFarg
+                      ? rgba(agFarg, isAct ? 0.38 : 0.15)
+                      : rgba(typFarg, isAct ? 0.22 : 0.10)}
+                    strokeWidth="0.8"
+                  />
 
-                {/* Kant */}
-                <polygon
-                  points={pts}
-                  fill="none"
-                  stroke={strokeCol}
-                  strokeWidth={isAct ? 1.8 : agFarg ? 1.2 : 0.6}
-                />
-
-                {/* Inre kant-highlight för djup */}
-                <polygon
-                  points={hexPts(cx, cy, HEX - 4)}
-                  fill="none"
-                  stroke={agFarg ? rgba(agFarg, isAct ? 0.30 : 0.12) : rgba(typFarg, 0.08)}
-                  strokeWidth="0.8"
-                />
-
-                {/* Resurs-ikon */}
-                <text
-                  x={cx} y={agName ? cy - 10 : cy - 6}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize={isAct ? 18 : 15}
-                  filter={isAct ? "url(#textglow)" : undefined}
-                  style={{ userSelect: "none", pointerEvents: "none" }}
-                >
-                  {TYP_IKON[zon.typ]}
-                </text>
-
-                {/* Inkomst */}
-                <text
-                  x={cx} y={agName ? cy + 4 : cy + 9}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fontSize="8"
-                  fill={agFarg ? rgba(agFarg, isAct ? 1 : 0.8) : rgba(typFarg, isAct ? 0.9 : 0.65)}
-                  fontFamily="monospace"
-                  fontWeight={agFarg ? "700" : "400"}
-                  filter={agFarg && isAct ? "url(#textglow)" : undefined}
-                  style={{ userSelect: "none", pointerEvents: "none" }}
-                >
-                  {zon.veckoinkomst}kr
-                </text>
-
-                {/* Agent-etikett */}
-                {agName && (
+                  {/* Resurs-ikon */}
                   <text
-                    x={cx} y={cy + 17}
+                    x={cx} y={agName ? cy - 11 : cy - 6}
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fontSize="6.5"
-                    fill={agFarg}
-                    fontFamily="monospace"
-                    fontWeight="700"
-                    filter={isAct ? "url(#softglow)" : undefined}
+                    fontSize={isAct ? 20 : 16}
+                    filter={isAct ? "url(#textglow)" : undefined}
                     style={{ userSelect: "none", pointerEvents: "none" }}
                   >
-                    {agName.slice(0, 6).toUpperCase()}
+                    {TYP_IKON[zon.typ]}
                   </text>
-                )}
-              </g>
-            );
-          })}
 
-          {/* Flytande inkomstbadgar */}
+                  {/* Inkomstetikett */}
+                  <text
+                    x={cx} y={agName ? cy + 4 : cy + 9}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="8"
+                    fill={agFarg
+                      ? rgba(agFarg, isAct ? 1 : 0.84)
+                      : rgba(typFarg, isAct ? 0.96 : 0.72)}
+                    fontFamily="monospace"
+                    fontWeight={agFarg ? "700" : "400"}
+                    filter={agFarg && isAct ? "url(#textglow)" : undefined}
+                    style={{ userSelect: "none", pointerEvents: "none" }}
+                  >
+                    {zon.veckoinkomst}kr
+                  </text>
+
+                  {/* Ägarnamn */}
+                  {agName && (
+                    <text
+                      x={cx} y={cy + 18}
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontSize="6.5"
+                      fill={agFarg}
+                      fontFamily="monospace"
+                      fontWeight="700"
+                      filter={isAct ? "url(#softglow)" : undefined}
+                      style={{ userSelect: "none", pointerEvents: "none" }}
+                    >
+                      {agName.slice(0, 6).toUpperCase()}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+
+          {/* Flytande inkomstbadgar (utanför fog-masken så de alltid syns) */}
           {floats.map(f => (
             <text
               key={f.id}
               x={f.cx}
               y={f.cy - 20}
               textAnchor="middle"
-              fill="#f59e0b"
-              fontSize="11"
+              fill="#fbbf24"
+              fontSize="12"
               fontFamily="monospace"
               fontWeight="700"
               filter="url(#softglow)"
@@ -328,15 +378,15 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                 attributeName="transform"
                 type="translate"
                 from="0 0"
-                to="0 -48"
+                to="0 -52"
                 dur="1.5s"
                 fill="freeze"
               />
             </text>
           ))}
 
-          {/* Kartans titel */}
-          <text x="12" y="18" fontSize="9" fill="#2a2a2a" fontFamily="monospace" letterSpacing="0.12em">
+          {/* Kartans titeletikett */}
+          <text x="12" y="18" fontSize="9" fill="#1a3050" fontFamily="monospace" letterSpacing="0.12em">
             MARKARTAN · {zoner.length} ZONER · {agare.length} ÄGDA
           </text>
         </svg>
@@ -345,7 +395,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "10px" }}>
           {Object.entries(TYP_FARG).map(([typ, farg]) => (
             <span key={typ} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "1px", background: farg, opacity: 0.7 }} />
+              <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "1px", background: farg, opacity: 0.75 }} />
               <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace" }}>
                 {TYP_IKON[typ]} {TYP_NAMN[typ]}
               </span>
