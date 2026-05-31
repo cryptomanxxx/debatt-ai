@@ -125,17 +125,16 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
   }
 
   return (
-    <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-start" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
-      {/* ── HEX MAP ── */}
-      <div style={{ flex: "0 0 auto" }}>
+      {/* ── HEX MAP ── full bredd */}
+      <div style={{ width: "100%" }}>
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-          width={SVG_W}
-          height={SVG_H}
           style={{
             display: "block",
-            maxWidth: "100%",
+            width: "100%",
+            height: "auto",
             borderRadius: "12px",
             background: "#060d18",
             border: "1px solid #0d1f2e",
@@ -381,15 +380,15 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
         </div>
       </div>
 
-      {/* ── SIDOPANEL ── */}
-      <div style={{ flex: 1, minWidth: "220px", maxWidth: "320px" }}>
+      {/* ── BOTTENPANEL ── 3 kolumner under kartan */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", alignItems: "start" }}>
 
         {/* Zondetalj */}
         {active ? (
           <div style={{
             background: "#0e0e0e",
             border: `1px solid ${rgba(TYP_FARG[active.typ] || "#333", 0.35)}`,
-            borderRadius: "8px", padding: "14px 16px", marginBottom: "16px",
+            borderRadius: "8px", padding: "14px 16px",
             boxShadow: `0 0 20px ${rgba(TYP_FARG[active.typ] || "#333", 0.08)}`,
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
@@ -433,60 +432,61 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
         ) : (
           <div style={{
             background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: "8px",
-            padding: "12px 14px", marginBottom: "16px",
+            padding: "12px 14px",
             fontSize: "11px", color: "#333", fontFamily: "monospace", textAlign: "center",
           }}>
             Hovra eller klicka på en zon
           </div>
         )}
 
-        {/* Statistik */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
-          {[
-            ["ZONER",     zoner.length,                "#666"],
-            ["ÄGDA",      agare.length,                "#4ade80"],
-            ["FRIA",      zoner.length - agare.length, "#38bdf8"],
-            ["VECKOINK.", `${totalInk} kr`,            "#f59e0b"],
-          ].map(([lbl, val, c]) => (
-            <div key={lbl} style={{ background: "#0d0d0d", border: "1px solid #181818", borderRadius: "6px", padding: "8px 10px" }}>
-              <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: "3px" }}>{lbl}</div>
-              <div style={{ fontSize: "17px", color: c, lineHeight: 1 }}>{val}</div>
+        {/* Statistik + Leaderboard i samma kolumn */}
+        <div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+            {[
+              ["ZONER",     zoner.length,                "#666"],
+              ["ÄGDA",      agare.length,                "#4ade80"],
+              ["FRIA",      zoner.length - agare.length, "#38bdf8"],
+              ["VECKOINK.", `${totalInk} kr`,            "#f59e0b"],
+            ].map(([lbl, val, c]) => (
+              <div key={lbl} style={{ background: "#0d0d0d", border: "1px solid #181818", borderRadius: "6px", padding: "8px 10px" }}>
+                <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: "3px" }}>{lbl}</div>
+                <div style={{ fontSize: "17px", color: c, lineHeight: 1 }}>{val}</div>
+              </div>
+            ))}
+          </div>
+
+          {leaders.length > 0 && (
+            <div>
+              <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>MARKÄGARE</p>
+              {leaders.map(([agent, stats], i) => {
+                const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
+                return (
+                  <div key={agent} style={{ marginBottom: "9px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                      <span style={{ fontSize: "11px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
+                      <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>{stats.antal} zon{stats.antal !== 1 ? "er" : ""}</span>
+                    </div>
+                    <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
+                      <div style={{
+                        height: "2px", background: af, borderRadius: "2px",
+                        width: `${(stats.ink / maxInk) * 100}%`,
+                        boxShadow: `0 0 6px ${rgba(af, 0.6)}`,
+                        transition: "width 0.5s ease",
+                      }} />
+                    </div>
+                    <div style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>{stats.ink} kr/vecka</div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          )}
         </div>
 
-        {/* Leaderboard */}
-        {leaders.length > 0 && (
-          <div style={{ marginBottom: "16px" }}>
-            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>MARKÄGARE</p>
-            {leaders.map(([agent, stats], i) => {
-              const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
-              return (
-                <div key={agent} style={{ marginBottom: "9px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                    <span style={{ fontSize: "11px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
-                    <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>{stats.antal} zon{stats.antal !== 1 ? "er" : ""}</span>
-                  </div>
-                  <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
-                    <div style={{
-                      height: "2px", background: af, borderRadius: "2px",
-                      width: `${(stats.ink / maxInk) * 100}%`,
-                      boxShadow: `0 0 6px ${rgba(af, 0.6)}`,
-                      transition: "width 0.5s ease",
-                    }} />
-                  </div>
-                  <div style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>{stats.ink} kr/vecka</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Senaste köp */}
+        {/* Senaste köp — egen kolumn */}
         {transaktioner.length > 0 && (
           <div>
             <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE KÖP</p>
-            {transaktioner.slice(0, 6).map((t, i) => {
+            {transaktioner.slice(0, 8).map((t, i) => {
               const af = AGENT_VISUELL[t.kop_agent]?.ikonFarg || "#888";
               return (
                 <div key={i} style={{
