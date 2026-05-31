@@ -21,6 +21,7 @@ from supabase_utils import (
 from agent import AGENTER, ANALYTIKER
 
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY")
+SKIP_PIS = os.environ.get("SKIP_PIS", "").lower() in ("true", "1", "yes")
 
 if not SB_KEY:
     print("SUPABASE_ANON_KEY saknas", file=sys.stderr)
@@ -34,25 +35,28 @@ uppdaterade = uppdatera_riksdagen_utfall(SB_KEY)
 if uppdaterade:
     print(f"  ✓ {uppdaterade} riksdagsförslag fick uppdaterat utfall")
 
-# PIS — analysera förslag som saknar ekonomisk analys
-print("\n── PIS: analyserar nya förslag ──")
-pis_nya, pis_totalt = analysera_alla_forslag_pis(SB_KEY, max_antal=8)
-if pis_totalt == 0:
-    print("  – Alla förslag är redan analyserade")
-elif pis_nya == 0:
-    print(f"  ✗ {pis_totalt} förslag saknar analys men LLM misslyckades — försöker igen nästa körning")
+if SKIP_PIS:
+    print("\n── PIS: hoppas över (SKIP_PIS=true) ──")
 else:
-    print(f"  ✓ {pis_nya}/{pis_totalt} förslag fick PIS-analys")
+    # PIS — analysera förslag som saknar ekonomisk analys
+    print("\n── PIS: analyserar nya förslag ──")
+    pis_nya, pis_totalt = analysera_alla_forslag_pis(SB_KEY, max_antal=8)
+    if pis_totalt == 0:
+        print("  – Alla förslag är redan analyserade")
+    elif pis_nya == 0:
+        print(f"  ✗ {pis_totalt} förslag saknar analys men LLM misslyckades — försöker igen nästa körning")
+    else:
+        print(f"  ✓ {pis_nya}/{pis_totalt} förslag fick PIS-analys")
 
-# PIS Monte Carlo — 15 iterationer × 2 förslag för konfidensintervall
-print("\n── PIS Monte Carlo (15 iter × 2 förslag) ──")
-mc_nya, mc_totalt = kör_pis_monte_carlo_batch(SB_KEY, max_antal=2, iterationer=15)
-if mc_totalt == 0:
-    print("  – Alla PIS-förslag har redan MC-analys")
-elif mc_nya == 0:
-    print(f"  ✗ {mc_totalt} förslag saknar MC — för få lyckade iterationer")
-else:
-    print(f"  ✓ {mc_nya}/{mc_totalt} förslag fick Monte Carlo-konfidensintervall")
+    # PIS Monte Carlo — 15 iterationer × 2 förslag för konfidensintervall
+    print("\n── PIS Monte Carlo (15 iter × 2 förslag) ──")
+    mc_nya, mc_totalt = kör_pis_monte_carlo_batch(SB_KEY, max_antal=2, iterationer=15)
+    if mc_totalt == 0:
+        print("  – Alla PIS-förslag har redan MC-analys")
+    elif mc_nya == 0:
+        print(f"  ✗ {mc_totalt} förslag saknar MC — för få lyckade iterationer")
+    else:
+        print(f"  ✓ {mc_nya}/{mc_totalt} förslag fick Monte Carlo-konfidensintervall")
 
 # Pre-fetcha allt vi behöver för röstningen — EN query för alla röster
 forslag = hamta_lagforslag(SB_KEY)
