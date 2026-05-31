@@ -9,21 +9,30 @@ export const metadata = {
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { partier: [], roster: [] };
+  if (!key) return { partier: [], roster: [], kassor: [], aktivtVal: null };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [pRes, rRes] = await Promise.all([
+  const [pRes, rRes, kRes, vRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&order=styrka.desc`, {
       headers: h, next: { revalidate: 300 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod&limit=5000`, {
       headers: h, next: { revalidate: 300 },
     }),
+    fetch(`${SB_URL}/rest/v1/parti_kassor?select=ledare,saldo,parti_namn`, {
+      headers: h, next: { revalidate: 300 },
+    }),
+    fetch(`${SB_URL}/rest/v1/riksdagsval?status=eq.aktiv&order=skapad.desc&limit=1&select=partier`, {
+      headers: h, next: { revalidate: 300 },
+    }),
   ]);
 
+  const valRows = vRes.ok ? await vRes.json() : [];
   return {
     partier: pRes.ok ? await pRes.json() : [],
     roster:  rRes.ok ? await rRes.json() : [],
+    kassor:  kRes.ok ? await kRes.json() : [],
+    aktivtVal: valRows.length > 0 ? valRows[0] : null,
   };
 }
 
@@ -33,7 +42,7 @@ const C = {
 };
 
 export default async function PartierPage() {
-  const { partier, roster } = await getData();
+  const { partier, roster, kassor, aktivtVal } = await getData();
 
   // Beräkna ja-röster per agent
   const jaPerAgent = {};
@@ -53,6 +62,19 @@ export default async function PartierPage() {
     : null;
 
   const totalMedlemmar = new Set(partier.flatMap(p => p.medlemmar)).size;
+
+  // Kassainfo per ledare
+  const kassorMap = {};
+  for (const k of kassor) kassorMap[k.ledare] = k.saldo;
+  const totalKassor = Object.values(kassorMap).reduce((s, v) => s + v, 0);
+
+  // Kampanjbonus från aktivt val (om det pågår)
+  const kampanjMap = {};
+  if (aktivtVal) {
+    for (const vp of aktivtVal.partier || []) {
+      kampanjMap[vp.namn] = vp.kampanj_bonus || 0;
+    }
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
@@ -77,6 +99,7 @@ export default async function PartierPage() {
             ["Aktiva partier", partier.length],
             ["Agenter i parti", totalMedlemmar],
             ["Isolerade agenter", 24 - totalMedlemmar],
+            ["Partikassor totalt", `${totalKassor.toLocaleString("sv-SE")} kr`],
           ].map(([label, val]) => (
             <div key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: "16px 24px", minWidth: 120 }}>
               <div style={{ fontSize: 24, color: C.accent, fontFamily: "monospace", fontWeight: 700 }}>{val}</div>
@@ -155,6 +178,27 @@ export default async function PartierPage() {
                         </a>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Partikassa */}
+                  <div style={{ marginTop: 14, borderTop: `1px solid ${C.border}`, paddingTop: 12, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                    <div>
+                      <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>Partikassa</span>
+                      <div style={{ fontSize: 18, color: "#4ade80", fontFamily: "monospace", fontWeight: 700, marginTop: 2 }}>
+                        {(kassorMap[p.ledare] ?? 0).toLocaleString("sv-SE")} kr
+                      </div>
+                    </div>
+                    {kampanjMap[p.namn] > 0 && (
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 4,
+                        background: "#1a1000", border: "1px solid #f59e0b55",
+                        borderRadius: 6, padding: "4px 10px", marginTop: 16,
+                      }}>
+                        <span style={{ fontSize: 11, color: "#f59e0b", fontFamily: "monospace" }}>
+                          🗳 +{kampanjMap[p.namn].toFixed(1)}% kampanjbonus
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

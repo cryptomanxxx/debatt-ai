@@ -508,7 +508,7 @@ async function fetchAktivitetsFeed() {
     });
   });
 
-  (markTrans.value || []).forEach(t => {
+  (Array.isArray(markTrans.value) ? markTrans.value : []).forEach(t => {
     if (!t.skapad) return;
     feed.push({
       typ: "mark-kop",
@@ -1490,6 +1490,7 @@ export default function DebattClient({ initialArticleCount = null }) {
             <a href="/konversationer" className="neon-nav">Konversationer</a>
             <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
             <a href="/markets" className="neon-nav">Markets</a>
+            <a href="/mark" className="neon-nav">Markartan</a>
             <a href="/feedback" className="neon-nav">Socialt kapital</a>
             <a href="/leaderboard" className="neon-nav">Leaderboard</a>
             <a href="/om" className="neon-nav">Om DEBATT-AI</a>

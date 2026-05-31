@@ -30,6 +30,8 @@ H = {
 }
 
 BONUS_DAGAR = 30  # vinnaren får maktbonus i 30 dagar
+FORCE_START = os.environ.get("FORCE_START", "").lower() in ("true", "1", "yes")
+FORCE_DECIDE = os.environ.get("FORCE_DECIDE", "").lower() in ("true", "1", "yes")
 
 
 def fetch(path: str) -> list:
@@ -116,6 +118,7 @@ def starta_val(partier: list) -> bool:
             "medlemmar": p.get("medlemmar", []),
             "manifesto": manifesto,
             "roster": 0,
+            "kampanj_bonus": 0.0,
         })
 
     slutar = (
@@ -157,9 +160,11 @@ def avgjor_val(val: dict) -> None:
         p = r["parti"]
         roster_count[p] = roster_count.get(p, 0) + 1
 
-    # Uppdatera röstantal i parti-listan
+    # Uppdatera röstantal i parti-listan, applicera kampanjbonus
     for p in partier:
-        p["roster"] = roster_count.get(p["namn"], 0)
+        raw = roster_count.get(p["namn"], 0)
+        bonus = min(float(p.get("kampanj_bonus", 0.0)), 15.0)
+        p["roster"] = round(raw * (1 + bonus / 100)) if raw > 0 else raw
 
     if not roster_count:
         # Inga röster — slumpmässig vinnare bland befintliga partier
@@ -211,6 +216,9 @@ def main() -> None:
     print("Riksdagsval — AI-civilisationens demokratiska val")
     print("=" * 60)
 
+    if FORCE_START:
+        print("\n[FORCE_START] Kringgår tidsgränser — tvångsstarter/avslutar val")
+
     # Kolla aktivt val
     aktiva = fetch("riksdagsval?status=eq.aktiv&order=skapad.desc&limit=1")
     if aktiva:
@@ -219,7 +227,7 @@ def main() -> None:
         alder_dagar = (datetime.datetime.now(datetime.timezone.utc) - startad).days
         print(f"\nAktivt val sedan {alder_dagar} dagar")
 
-        if alder_dagar >= 7:
+        if alder_dagar >= 7 or FORCE_DECIDE or FORCE_START:
             print("  Valperioden är slut — räknar röster...")
             avgjor_val(val)
         else:
@@ -232,9 +240,11 @@ def main() -> None:
         avgjord = datetime.datetime.fromisoformat(senaste[0]["avgjord"].replace("Z", "+00:00"))
         sedan_dagar = (datetime.datetime.now(datetime.timezone.utc) - avgjord).days
         print(f"\nSenaste val avgjordes för {sedan_dagar} dagar sedan")
-        if sedan_dagar < 90:
+        if sedan_dagar < 90 and not FORCE_START:
             print(f"  Nästa val om {90 - sedan_dagar} dagar")
             return
+        elif FORCE_START:
+            print("  [FORCE_START] Kringgår 90-dagarsspärr")
     else:
         print("\nInget tidigare val — startar det första!")
 

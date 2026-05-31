@@ -63,13 +63,26 @@ function relativeTime(ts) {
   return `${Math.floor(diff / 86400)}d sedan`;
 }
 
+// Deterministisk stjärnbakgrund — samma varje render
+const STARS = Array.from({ length: 55 }, (_, i) => ({
+  x: parseFloat(((i * 137.508) % 530).toFixed(1)),
+  y: parseFloat(((i * 97.314 + 13) % 490).toFixed(1)),
+  r: [0.6, 0.9, 1.2][i % 3],
+  op: 0.04 + (i % 5) * 0.018,
+}));
+
 export default function MarkKarta({ zoner, agare, transaktioner }) {
-  const [hover, setHover]     = useState(null);
+  const [hover, setHover]       = useState(null);
   const [selected, setSelected] = useState(null);
+  const [floats, setFloats]     = useState([]); // {id, cx, cy, ink}
 
   const agareMap = Object.fromEntries(agare.map(a => [a.zon_id, a]));
 
-  // Leaderboard: agent → {antal, veckoinkomst}
+  // Unika agentfärger för gradientdefinitioner
+  const agentGrads = [...new Set(agare.map(a => a.agent))]
+    .map(name => ({ name, farg: AGENT_VISUELL[name]?.ikonFarg || "#888" }));
+
+  // Leaderboard
   const leaderMap = {};
   agare.forEach(a => {
     const z = zoner.find(z => z.id === a.zon_id);
@@ -78,10 +91,13 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
     leaderMap[a.agent].antal++;
     leaderMap[a.agent].ink += z.veckoinkomst;
   });
-  const leaders = Object.entries(leaderMap)
-    .sort((a, b) => b[1].ink - a[1].ink)
-    .slice(0, 8);
+  const leaders = Object.entries(leaderMap).sort((a, b) => b[1].ink - a[1].ink).slice(0, 8);
   const maxInk = leaders[0]?.[1].ink || 1;
+
+  const totalInk = agare.reduce((s, a) => {
+    const z = zoner.find(z => z.id === a.zon_id);
+    return s + (z?.veckoinkomst || 0);
+  }, 0);
 
   const active = selected || hover;
   const activeAgare = active ? agareMap[active.id] : null;
@@ -89,10 +105,13 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
     ? (AGENT_VISUELL[activeAgare.agent]?.ikonFarg || "#888")
     : null;
 
-  const totalInk = agare.reduce((s, a) => {
-    const z = zoner.find(z => z.id === a.zon_id);
-    return s + (z?.veckoinkomst || 0);
-  }, 0);
+  function handleEnter(zon) {
+    setHover(zon);
+    const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
+    const id = Math.random();
+    setFloats(prev => [...prev.slice(-4), { id, cx, cy, ink: zon.veckoinkomst }]);
+    setTimeout(() => setFloats(prev => prev.filter(f => f.id !== id)), 1600);
+  }
 
   return (
     <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -103,51 +122,79 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
           viewBox="0 0 530 490"
           width="530"
           height="490"
-          style={{ display: "block", maxWidth: "100%", borderRadius: "10px", background: "#060606", border: "1px solid #1a1a1a" }}
+          style={{
+            display: "block",
+            maxWidth: "100%",
+            borderRadius: "12px",
+            background: "radial-gradient(ellipse at 40% 35%, #0a0f18 0%, #060606 70%)",
+            border: "1px solid #1e1e1e",
+            boxShadow: "0 0 40px rgba(0,0,0,0.8)",
+          }}
         >
           <defs>
-            <filter id="hexglow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
+            {/* Radial gradient per typ — 3D kupol-effekt */}
+            {Object.entries(TYP_FARG).map(([typ, farg]) => (
+              <radialGradient key={typ} id={`grad-${typ}`} cx="35%" cy="28%" r="72%">
+                <stop offset="0%"   stopColor={farg} stopOpacity="0.38" />
+                <stop offset="60%"  stopColor={farg} stopOpacity="0.12" />
+                <stop offset="100%" stopColor={farg} stopOpacity="0.03" />
+              </radialGradient>
+            ))}
+
+            {/* Radial gradient per agent — ägda zoner */}
+            {agentGrads.map(({ name, farg }) => (
+              <radialGradient key={name} id={`grad-ag-${name.replace(/[^a-zA-Z]/g, "")}`} cx="35%" cy="28%" r="72%">
+                <stop offset="0%"   stopColor={farg} stopOpacity="0.55" />
+                <stop offset="55%"  stopColor={farg} stopOpacity="0.22" />
+                <stop offset="100%" stopColor={farg} stopOpacity="0.06" />
+              </radialGradient>
+            ))}
+
+            {/* Hover-highlight gradient */}
+            <radialGradient id="grad-hover" cx="50%" cy="40%" r="70%">
+              <stop offset="0%"   stopColor="#ffffff" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.00" />
+            </radialGradient>
+
+            {/* Glow filter */}
+            <filter id="hexglow" x="-60%" y="-60%" width="220%" height="220%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
-            <filter id="softglow" x="-30%" y="-30%" width="160%" height="160%">
+            <filter id="softglow" x="-40%" y="-40%" width="180%" height="180%">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+            <filter id="textglow" x="-20%" y="-20%" width="140%" height="140%">
               <feGaussianBlur stdDeviation="1.5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
 
-          {/* Subtle grid atmosphere */}
-          {zoner.map(z => {
-            const [cx, cy] = hexCenter(z.hex_col, z.hex_row);
-            return (
-              <polygon
-                key={`bg-${z.id}`}
-                points={hexPts(cx, cy, HEX + 1)}
-                fill="none"
-                stroke="#111"
-                strokeWidth="1"
-              />
-            );
-          })}
+          {/* Stjärnbakgrund */}
+          {STARS.map((s, i) => (
+            <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#c8d8ff" opacity={s.op} />
+          ))}
 
-          {/* Hexagons */}
+          {/* Hexagoner */}
           {zoner.map(zon => {
             const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
-            const agInfo   = agareMap[zon.id];
-            const agName   = agInfo?.agent;
-            const agFarg   = agName ? (AGENT_VISUELL[agName]?.ikonFarg || "#888") : null;
-            const typFarg  = TYP_FARG[zon.typ] || "#555";
+            const agInfo  = agareMap[zon.id];
+            const agName  = agInfo?.agent;
+            const agFarg  = agName ? (AGENT_VISUELL[agName]?.ikonFarg || "#888") : null;
+            const typFarg = TYP_FARG[zon.typ] || "#555";
 
             const isHov = hover?.id === zon.id;
             const isSel = selected?.id === zon.id;
             const isAct = isHov || isSel;
 
-            const fillCol   = agFarg
-              ? rgba(agFarg,   isAct ? 0.30 : 0.16)
-              : rgba(typFarg,  isAct ? 0.16 : 0.06);
+            const agGradId = agName
+              ? `grad-ag-${agName.replace(/[^a-zA-Z]/g, "")}`
+              : null;
+
             const strokeCol = agFarg
-              ? rgba(agFarg,   isAct ? 1.0 : 0.55)
-              : rgba(typFarg,  isAct ? 0.75 : 0.28);
+              ? rgba(agFarg,  isAct ? 0.95 : 0.50)
+              : rgba(typFarg, isAct ? 0.70 : 0.24);
 
             const pts = hexPts(cx, cy);
 
@@ -155,79 +202,146 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
               <g
                 key={zon.id}
                 style={{ cursor: "pointer" }}
-                onMouseEnter={() => setHover(zon)}
+                onMouseEnter={() => handleEnter(zon)}
                 onMouseLeave={() => setHover(null)}
                 onClick={() => setSelected(s => s?.id === zon.id ? null : zon)}
               >
-                {/* Owned glow ring */}
+                {/* Yttre glöd — pulsande för ägda zoner */}
                 {agFarg && (
                   <polygon
-                    points={hexPts(cx, cy, HEX + 2)}
+                    points={hexPts(cx, cy, HEX + 5)}
                     fill="none"
                     stroke={agFarg}
-                    strokeWidth={isAct ? 3 : 1.5}
-                    opacity={isAct ? 0.5 : 0.2}
+                    strokeWidth={isAct ? 3.5 : 2}
                     filter="url(#hexglow)"
+                  >
+                    <animate
+                      attributeName="opacity"
+                      values="0.12;0.40;0.12"
+                      dur="2.8s"
+                      repeatCount="indefinite"
+                    />
+                  </polygon>
+                )}
+
+                {/* Bas-fill: radial gradient för typ */}
+                <polygon
+                  points={pts}
+                  fill={`url(#grad-${zon.typ})`}
+                  stroke="none"
+                />
+
+                {/* Agent-fill ovanpå (om ägs) */}
+                {agGradId && (
+                  <polygon
+                    points={pts}
+                    fill={`url(#${agGradId})`}
+                    stroke="none"
                   />
                 )}
 
-                {/* Main fill */}
+                {/* Hover/select overlay */}
+                {isAct && (
+                  <polygon points={pts} fill="url(#grad-hover)" stroke="none" />
+                )}
+
+                {/* Kant */}
                 <polygon
                   points={pts}
-                  fill={fillCol}
+                  fill="none"
                   stroke={strokeCol}
-                  strokeWidth={isAct ? 1.8 : (agFarg ? 1.3 : 0.7)}
+                  strokeWidth={isAct ? 1.8 : agFarg ? 1.2 : 0.6}
                 />
 
-                {/* Resource icon */}
+                {/* Inre kant-highlight för djup */}
+                <polygon
+                  points={hexPts(cx, cy, HEX - 4)}
+                  fill="none"
+                  stroke={agFarg ? rgba(agFarg, isAct ? 0.30 : 0.12) : rgba(typFarg, 0.08)}
+                  strokeWidth="0.8"
+                />
+
+                {/* Resurs-ikon */}
                 <text
-                  x={cx} y={cy - 9}
-                  textAnchor="middle" dominantBaseline="middle"
-                  fontSize={isAct ? 17 : 14}
+                  x={cx} y={agName ? cy - 10 : cy - 6}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize={isAct ? 18 : 15}
+                  filter={isAct ? "url(#textglow)" : undefined}
                   style={{ userSelect: "none", pointerEvents: "none" }}
                 >
                   {TYP_IKON[zon.typ]}
                 </text>
 
-                {/* Income */}
+                {/* Inkomst */}
                 <text
-                  x={cx} y={cy + 9}
-                  textAnchor="middle" dominantBaseline="middle"
-                  fontSize="8.5"
-                  fill={agFarg ? rgba(agFarg, 0.85) : rgba(typFarg, 0.75)}
+                  x={cx} y={agName ? cy + 4 : cy + 9}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize="8"
+                  fill={agFarg ? rgba(agFarg, isAct ? 1 : 0.8) : rgba(typFarg, isAct ? 0.9 : 0.65)}
                   fontFamily="monospace"
+                  fontWeight={agFarg ? "700" : "400"}
+                  filter={agFarg && isAct ? "url(#textglow)" : undefined}
                   style={{ userSelect: "none", pointerEvents: "none" }}
                 >
                   {zon.veckoinkomst}kr
                 </text>
 
-                {/* Agent label (max 5 chars) */}
+                {/* Agent-etikett */}
                 {agName && (
                   <text
-                    x={cx} y={cy + 22}
-                    textAnchor="middle" dominantBaseline="middle"
-                    fontSize="7"
+                    x={cx} y={cy + 17}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontSize="6.5"
                     fill={agFarg}
-                    opacity={isAct ? 1 : 0.8}
                     fontFamily="monospace"
                     fontWeight="700"
                     filter={isAct ? "url(#softglow)" : undefined}
                     style={{ userSelect: "none", pointerEvents: "none" }}
                   >
-                    {agName.slice(0, 5).toUpperCase()}
+                    {agName.slice(0, 6).toUpperCase()}
                   </text>
                 )}
               </g>
             );
           })}
 
-          {/* Title overlay */}
-          <text x="12" y="18" fontSize="10" fill="#333" fontFamily="monospace">
-            MARKARTAN — {zoner.length} ZONER
+          {/* Flytande inkomstbadgar */}
+          {floats.map(f => (
+            <text
+              key={f.id}
+              x={f.cx}
+              y={f.cy - 20}
+              textAnchor="middle"
+              fill="#f59e0b"
+              fontSize="11"
+              fontFamily="monospace"
+              fontWeight="700"
+              filter="url(#softglow)"
+              style={{ pointerEvents: "none" }}
+            >
+              +{f.ink}kr/v
+              <animate attributeName="opacity" from="1" to="0" dur="1.5s" fill="freeze" />
+              <animateTransform
+                attributeName="transform"
+                type="translate"
+                from="0 0"
+                to="0 -48"
+                dur="1.5s"
+                fill="freeze"
+              />
+            </text>
+          ))}
+
+          {/* Kartans titel */}
+          <text x="12" y="18" fontSize="9" fill="#2a2a2a" fontFamily="monospace" letterSpacing="0.12em">
+            MARKARTAN · {zoner.length} ZONER · {agare.length} ÄGDA
           </text>
         </svg>
 
-        {/* Legend */}
+        {/* Teckenförklaring */}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "10px" }}>
           {Object.entries(TYP_FARG).map(([typ, farg]) => (
             <span key={typ} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
@@ -240,36 +354,33 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
         </div>
       </div>
 
-      {/* ── SIDE PANEL ── */}
+      {/* ── SIDOPANEL ── */}
       <div style={{ flex: 1, minWidth: "220px", maxWidth: "320px" }}>
 
-        {/* Zone detail card */}
+        {/* Zondetalj */}
         {active ? (
           <div style={{
             background: "#0e0e0e",
             border: `1px solid ${rgba(TYP_FARG[active.typ] || "#333", 0.35)}`,
             borderRadius: "8px", padding: "14px 16px", marginBottom: "16px",
+            boxShadow: `0 0 20px ${rgba(TYP_FARG[active.typ] || "#333", 0.08)}`,
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
               <span style={{ fontSize: "20px" }}>{TYP_IKON[active.typ]}</span>
               <span style={{ fontSize: "15px", color: "#f0ede6", fontFamily: "Georgia, serif" }}>{active.namn}</span>
             </div>
-            <p style={{ fontSize: "11px", color: "#666", margin: "0 0 12px", lineHeight: 1.6 }}>
+            <p style={{ fontSize: "11px", color: "#555", margin: "0 0 12px", lineHeight: 1.6 }}>
               {active.beskrivning}
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
               <div>
-                <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>
-                  VECKOINKOMST
-                </div>
+                <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>VECKOINKOMST</div>
                 <div style={{ fontSize: "18px", color: TYP_FARG[active.typ] || "#fff", lineHeight: 1 }}>
                   {active.veckoinkomst} <span style={{ fontSize: "10px" }}>kr/v</span>
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>
-                  KÖPPRIS
-                </div>
+                <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>KÖPPRIS</div>
                 <div style={{ fontSize: "18px", color: "#f0ede6", lineHeight: 1 }}>
                   {active.koppris} <span style={{ fontSize: "10px" }}>kr</span>
                 </div>
@@ -287,41 +398,31 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                 </span>
               </div>
             ) : (
-              <div style={{
-                padding: "7px 10px", background: "#0a140a",
-                border: "1px solid #1a3a1a", borderRadius: "4px",
-              }}>
-                <span style={{ fontSize: "10px", color: "#4ade8077", fontFamily: "monospace" }}>
-                  ◯ TILLGÄNGLIG FÖR KÖP
-                </span>
+              <div style={{ padding: "7px 10px", background: "#0a140a", border: "1px solid #1a3a1a", borderRadius: "4px" }}>
+                <span style={{ fontSize: "10px", color: "#4ade8077", fontFamily: "monospace" }}>◯ TILLGÄNGLIG FÖR KÖP</span>
               </div>
             )}
           </div>
         ) : (
           <div style={{
-            background: "#0a0a0a", border: "1px solid #1a1a1a",
-            borderRadius: "8px", padding: "12px 14px", marginBottom: "16px",
-            fontSize: "11px", color: "#444", fontFamily: "monospace", textAlign: "center",
+            background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: "8px",
+            padding: "12px 14px", marginBottom: "16px",
+            fontSize: "11px", color: "#333", fontFamily: "monospace", textAlign: "center",
           }}>
-            Klicka på en zon för detaljer
+            Hovra eller klicka på en zon
           </div>
         )}
 
-        {/* Stats row */}
+        {/* Statistik */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
           {[
-            ["ZONER",       zoner.length,                   "#666"],
-            ["ÄGDA",        agare.length,                   "#4ade80"],
-            ["FRIA",        zoner.length - agare.length,    "#38bdf8"],
-            ["VECKOINK.",   `${totalInk} kr`,               "#f59e0b"],
+            ["ZONER",     zoner.length,                "#666"],
+            ["ÄGDA",      agare.length,                "#4ade80"],
+            ["FRIA",      zoner.length - agare.length, "#38bdf8"],
+            ["VECKOINK.", `${totalInk} kr`,            "#f59e0b"],
           ].map(([lbl, val, c]) => (
-            <div key={lbl} style={{
-              background: "#0d0d0d", border: "1px solid #181818",
-              borderRadius: "6px", padding: "8px 10px",
-            }}>
-              <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: "3px" }}>
-                {lbl}
-              </div>
+            <div key={lbl} style={{ background: "#0d0d0d", border: "1px solid #181818", borderRadius: "6px", padding: "8px 10px" }}>
+              <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: "3px" }}>{lbl}</div>
               <div style={{ fontSize: "17px", color: c, lineHeight: 1 }}>{val}</div>
             </div>
           ))}
@@ -330,44 +431,34 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
         {/* Leaderboard */}
         {leaders.length > 0 && (
           <div style={{ marginBottom: "16px" }}>
-            <p style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>
-              MARKÄGARE
-            </p>
+            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>MARKÄGARE</p>
             {leaders.map(([agent, stats], i) => {
               const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
               return (
                 <div key={agent} style={{ marginBottom: "9px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                    <span style={{ fontSize: "11px", color: af, fontFamily: "monospace" }}>
-                      {i + 1}. {agent}
-                    </span>
-                    <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace" }}>
-                      {stats.antal} zon{stats.antal !== 1 ? "er" : ""}
-                    </span>
+                    <span style={{ fontSize: "11px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
+                    <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>{stats.antal} zon{stats.antal !== 1 ? "er" : ""}</span>
                   </div>
                   <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
                     <div style={{
                       height: "2px", background: af, borderRadius: "2px",
                       width: `${(stats.ink / maxInk) * 100}%`,
-                      boxShadow: `0 0 4px ${rgba(af, 0.5)}`,
-                      transition: "width 0.4s ease",
+                      boxShadow: `0 0 6px ${rgba(af, 0.6)}`,
+                      transition: "width 0.5s ease",
                     }} />
                   </div>
-                  <div style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", marginTop: "2px" }}>
-                    {stats.ink} kr/vecka
-                  </div>
+                  <div style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>{stats.ink} kr/vecka</div>
                 </div>
               );
             })}
           </div>
         )}
 
-        {/* Recent transactions */}
+        {/* Senaste köp */}
         {transaktioner.length > 0 && (
           <div>
-            <p style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>
-              SENASTE KÖP
-            </p>
+            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE KÖP</p>
             {transaktioner.slice(0, 6).map((t, i) => {
               const af = AGENT_VISUELL[t.kop_agent]?.ikonFarg || "#888";
               return (
@@ -375,21 +466,15 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "6px 8px", background: "#0a0a0a",
                   borderLeft: `2px solid ${rgba(af, 0.4)}`,
-                  marginBottom: "4px",
+                  marginBottom: "4px", borderRadius: "0 4px 4px 0",
                 }}>
                   <div>
-                    <div style={{ fontSize: "10px", color: af, fontFamily: "monospace" }}>
-                      {t.kop_agent}
-                    </div>
+                    <div style={{ fontSize: "10px", color: af, fontFamily: "monospace" }}>{t.kop_agent}</div>
                     <div style={{ fontSize: "9px", color: "#444" }}>{t.zon_namn}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace" }}>
-                      {t.pris} kr
-                    </div>
-                    <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>
-                      {relativeTime(t.skapad)}
-                    </div>
+                    <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace" }}>{t.pris} kr</div>
+                    <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>{relativeTime(t.skapad)}</div>
                   </div>
                 </div>
               );
