@@ -33,6 +33,20 @@ function dagensDatum() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function toSlug(text) {
+  return text
+    .toLowerCase()
+    .replace(/[åä]/g, "a").replace(/ö/g, "o").replace(/é/g, "e")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+function extractStrategyTitle(content) {
+  const m = content.match(/^#\s+(?:Daglig strategi|Strategi|Daily Strategy[^:]*:?)\s*[:\-]?\s*(.+)$/im);
+  return m ? m[1].trim() : null;
+}
+
 function httpJson(url, opts = {}) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -119,7 +133,7 @@ function readTodaysVision() {
   if (!fs.existsSync(DISCUSSIONS_DIR)) return null;
   // Hitta senaste visionsfilen för dagens datum (format: YYYY-MM-DD-HHmm-vision.md)
   const filer = fs.readdirSync(DISCUSSIONS_DIR)
-    .filter(f => f.startsWith(datum) && f.endsWith("-vision.md"))
+    .filter(f => f.startsWith(datum) && f.includes("-vision"))
     .sort();
   if (!filer.length) return null;
   try { return fs.readFileSync(path.join(DISCUSSIONS_DIR, filer[filer.length - 1]), "utf8").slice(0, 1500); }
@@ -129,7 +143,7 @@ function readTodaysVision() {
 function readRecentVisions(n = 3) {
   if (!fs.existsSync(DISCUSSIONS_DIR)) return [];
   return fs.readdirSync(DISCUSSIONS_DIR)
-    .filter(f => f.endsWith("-vision.md"))
+    .filter(f => f.includes("-vision"))
     .sort()
     .slice(-n)
     .map(f => {
@@ -228,12 +242,16 @@ async function callCodestral(prompt) {
 
 async function main() {
   const datum = dagensDatum();
-  const utfil = path.join(DISCUSSIONS_DIR, `${datum}-strategy.md`);
 
-  if (fs.existsSync(utfil)) {
-    console.log(`Strategi för ${datum} finns redan — hoppar över.`);
+  // Idempotency: skip if any strategy file for today exists
+  const befintlig = fs.existsSync(DISCUSSIONS_DIR)
+    ? fs.readdirSync(DISCUSSIONS_DIR).find(f => f.startsWith(`${datum}-`) && f.includes("-strategy"))
+    : null;
+  if (befintlig) {
+    console.log(`Strategi för ${datum} finns redan (${befintlig}) — hoppar över.`);
     return;
   }
+  let utfil = path.join(DISCUSSIONS_DIR, `${datum}-strategy.md`);
 
   if (!fs.existsSync(DISCUSSIONS_DIR)) fs.mkdirSync(DISCUSSIONS_DIR, { recursive: true });
 
@@ -285,7 +303,8 @@ Skriv en Daily Civilization Strategy Report (400-500 ord) på svenska som:
 Var direkt och konkret. Undvik upprepning av vad som redan finns. Fokusera på nästa steg, inte på det som redan fungerar.
 
 Formatet:
-# Daily Strategy Report: ${datum}
+# Strategi: [Kort beskrivande rubrik för dagens prioritet, max 8 ord]
+**Datum:** ${datum}
 
 ## Systemhälsa
 
@@ -308,6 +327,11 @@ Formatet:
   } catch (e) {
     console.error("Codestral misslyckades:", e.message);
     process.exit(1);
+  }
+
+  const rubrik = extractStrategyTitle(strategi);
+  if (rubrik) {
+    utfil = path.join(DISCUSSIONS_DIR, `${datum}-strategy-${toSlug(rubrik)}.md`);
   }
 
   const innehall = `${strategi}\n\n---\n*Genererad av daily-strategy.js med Codestral, ${datum}*\n`;
