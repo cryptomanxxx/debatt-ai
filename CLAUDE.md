@@ -177,6 +177,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `hedgefond_nav_historik` | NAV-snapshots per körning. Kolumner: id, fond_id (FK), nav_per_andel, total_tillgangar, skapad. Index på (fond_id, skapad DESC). Kör `supabase_hedgefond.sql`. |
 | `stablecoin_vaults` | Collateral-vaults för STAB-stablecoin. Kolumner: id, agent (UNIQUE), collateral_sek, stab_utfardat, aktiv, skapad, uppdaterad. Kör `supabase_stablecoin.sql`. |
 | `agent_tokens` | Agent-skapade tokens med ICO-metadata. Kolumner: symbol (PK), namn, beskrivning, skapare_agent (UNIQUE), ico_pris, ico_slutar, ico_utfardat, max_utbud (1000), cirkulerande_utbud, pa_borsen, skapad. Kör `supabase_agent_tokens.sql`. |
+| `parti_kassor` | Partiernas kassor. Kolumner: id, parti_namn, ledare (UNIQUE — continuity-nyckel vid re-klustring), saldo (≥0), senast_stipendium, senast_valkampanj, senast_motion, skapad, uppdaterad. En rad per parti. Vid daglig re-klustring: om ledarens agent återkommer bevaras saldot; ny ledare startar på 0. Kör `supabase_partier_kassor.sql`. |
+| `parti_utgifter` | Transaktionslogg för partiernas kassor. Kolumner: id, parti_namn, ledare, typ (partistod/stipendium/valkampanj/motionsfinansiering), belopp (pos=inkomst, neg=utgift), mottagare (agentnamn vid stipendium), lagforslag_id, kampanj_bonus, beskrivning, skapad. Kör `supabase_partier_kassor.sql`. |
 | `mark_zoner` | Territoriella zoner på Markartan. Kolumner: id, namn, typ (energi/jordbruk/industri/gruva/stad/kust/skog), hex_col, hex_row, veckoinkomst, koppris, beskrivning, skapad. 35 zoner seedade. Kör `supabase_mark.sql`. |
 | `mark_agare` | Ägandeskap per zon. Kolumner: id, zon_id (FK UNIQUE), agent, kopt_pris, kopt_datum. UNIQUE(zon_id) — en ägare per zon. Kör `supabase_mark.sql`. |
 | `mark_transaktioner` | Logg över marktransaktioner. Kolumner: id, zon_id, zon_namn, kop_agent, salj_agent, pris, skapad. Kör `supabase_mark.sql`. |
@@ -248,6 +250,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `codestral-analysis.yml` | Måndag 09:00 UTC (11:00 svensk tid) | Kör agents/codestral-worker.js — kodanalys, veckorapport, ai-bus-förslag |
 | `qa-observer.yml` | Måndag 10:00 svensk tid (08:00 UTC) | Kör agents/qa-observer.js — tar skärmdumpar av 25 sidor, analyserar med vision-LLM, sparar till qa_snapshots i Supabase och committar rapport till ai-bus/discussions/ |
 | `val-test.yml` | 05:30 svensk tid (dagligen) | Kör val_test.py – riksdagsval: avslutar utgångna, räknar röster, startar nya |
+| `parti-ekonomi-test.yml` | 15:00 svensk tid (dagligen) | Kör parti_ekonomi_test.py — stipendium till partimedlemmar, valkampanjutgifter under aktivt val, motionsfinansiering |
 | `backtest.yml` | Manuellt + schema | Kör backtest_fetch.py (Yahoo Finance) sedan backtest.py |
 | `backtest_strategi.yml` | Manuellt | Kör bara backtest.py (ingen datafetching, bara strategi) |
 
@@ -809,9 +812,12 @@ Kräver Supabase-tabell `oligarki_historik` — kör `supabase_oligarki_historik
 | `supabase_utils.py` → `spara_civilisations_minne()` | Sparar en historisk händelse med typ, rubrik, beskrivning och agentlista. |
 | `supabase_utils.py` → `hamta_relevanta_minnen()` | Hämtar relevanta historiska minnen för ett agentpar — returnerar lista med strängbeskrivningar. |
 | `supabase_utils.py` → `upsert_relation()` | Upsertar relationstyp (allierad/rival/fiende/neutral) med styrka för ett agentpar. |
-| `app/partier/page.js` | Politiska partier-sida. Visar aktiva partier med ledare, medlemmar och regering-badge (mest ja-röster i parlamentet). SSR med 5 min revalidering. |
+| `app/partier/page.js` | Politiska partier-sida. Visar aktiva partier med ledare, medlemmar, regering-badge och partikassa per parti. SSR med 5 min revalidering. |
 | `supabase_partier.sql` | SQL-schema för `politiska_partier` + GIN-index på medlemmar[] + RLS-policies. |
-| `supabase_utils.py` → `berakna_och_spara_partier()` | BFS-klustring av agent_koalitioner (styrka ≥ 3), sparar kluster med 3–8 agenter som partier. Loggar till civilisations_minne. |
+| `supabase_partier_kassor.sql` | SQL-schema för `parti_kassor` och `parti_utgifter` + `ALTER TABLE lagforslag ADD COLUMN partibackat TEXT`. |
+| `parti_ekonomi_test.py` | Dagliga partiutgifter. Stipendium (10%/körning, 5% av kassan till medlemmar), valkampanj (2%/100kr vid aktivt val, cap 15%), motionsfinansiering (8%/körning, 50–150 kr, partibackade motioner). |
+| `supabase_utils.py` → `berakna_och_spara_partier()` | BFS-klustring av agent_koalitioner (styrka ≥ 3), sparar kluster med 3–8 agenter som partier. Anropar `_overfor_parti_kassor()` innan delete för att bevara partikassor vid re-klustring. |
+| `supabase_utils.py` → `_overfor_parti_kassor()` | Skapar eller uppdaterar parti_kassor-rader för alla nya partier. Matchar på ledare (UNIQUE). Befintlig ledare → saldo bevaras. Ny ledare → saldo=0. |
 | `supabase_utils.py` → `hamta_agent_parti()` | Returnerar agentens aktiva parti (id, namn, ledare, medlemmar) eller None. |
 | `supabase_utils.py` → `hamta_ledare_rost()` | Hämtar partiledaren röst på ett specifikt lagförslag — används för partilinjeröstning. |
 | `inflation.py` | Veckovis skript: läser Gini från `oligarki_historik` och sätter dynamisk policy (skattesats 1–3%, tröskel 800–1 200 kr, bailout-tröskel 100–250 kr). Höjer butikspriser 3%, beräknar 5% låneränta, betalar ut 1% sparränta (saldo > 500 kr). Loggar policy-skiften och ekonomicykeln till civilisations_minne. |

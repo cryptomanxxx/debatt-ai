@@ -116,6 +116,7 @@ def starta_val(partier: list) -> bool:
             "medlemmar": p.get("medlemmar", []),
             "manifesto": manifesto,
             "roster": 0,
+            "kampanj_bonus": 0.0,
         })
 
     slutar = (
@@ -157,9 +158,11 @@ def avgjor_val(val: dict) -> None:
         p = r["parti"]
         roster_count[p] = roster_count.get(p, 0) + 1
 
-    # Uppdatera röstantal i parti-listan
+    # Uppdatera röstantal i parti-listan, applicera kampanjbonus
     for p in partier:
-        p["roster"] = roster_count.get(p["namn"], 0)
+        raw = roster_count.get(p["namn"], 0)
+        bonus = min(float(p.get("kampanj_bonus", 0.0)), 15.0)
+        p["roster"] = round(raw * (1 + bonus / 100)) if raw > 0 else raw
 
     if not roster_count:
         # Inga röster — slumpmässig vinnare bland befintliga partier

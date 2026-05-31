@@ -1387,6 +1387,13 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
         if already_voted:
             continue
         try:
+            # Partibackad motion: rösta alltid ja (100% commitment, finansierad av partikassan)
+            if parti and f.get("partibackat") == parti.get("namn"):
+                motivering = f"[Partibackad motion — {parti['namn']}] Partiet har finansierat denna motion. Röstar ja."
+                if spara_lag_rost(sb_key, f["id"], agent["namn"], "ja", motivering):
+                    antal += 1
+                continue
+
             # Partilinje-röstning: följ ledaren med 80% chans
             if parti and parti.get("ledare") and parti["ledare"] != agent["namn"]:
                 ledare_rod = hamta_ledare_rost(sb_key, f["id"], parti["ledare"])
@@ -1470,11 +1477,14 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
     return antal
 
 
-def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str) -> bool:
-    """Agent formulerar ett nytt AI-lagförslag inspirerat av aktuellt ämne."""
+def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str, return_id: bool = False) -> bool | int | None:
+    """Agent formulerar ett nytt AI-lagförslag inspirerat av aktuellt ämne.
+    Om return_id=True returneras lagforslag-id (int) vid lyckat skapande, None vid fel.
+    Annars returneras bool."""
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
-        "Content-Type": "application/json", "Prefer": "return=minimal",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation" if return_id else "return=minimal",
     }
     kat_str = " / ".join(sorted(_PARLAMENT_KATEGORIER))
     try:
@@ -1527,9 +1537,13 @@ def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str) -> bool:
             },
             timeout=10,
         )
+        if return_id:
+            if r.is_success and r.json():
+                return r.json()[0]["id"]
+            return None
         return r.is_success
     except Exception:
-        return False
+        return None if return_id else False
 
 
 def importera_riksdagen_forslag(sb_key: str) -> int:
@@ -3650,6 +3664,48 @@ _AMNE_PARTINAMN = {
 }
 
 
+def _overfor_parti_kassor(sb_key: str, nya_partier: list[dict]) -> None:
+    """
+    Säkerställer att parti_kassor-rader finns för alla nya partier.
+    Matchar på 'ledare' (UNIQUE). Om ledaren redan har en kassa — uppdatera
+    parti_namn (saldo bevaras). Om ledaren är ny — skapa rad med saldo=0.
+    Rader vars ledare inte återkommer lämnas orörda (fryst kapital tills
+    ledaren reappears i ett nytt kluster).
+    """
+    h_r = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    h_w = {**h_r, "Content-Type": "application/json", "Prefer": "return=minimal"}
+
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/parti_kassor?select=ledare,parti_namn",
+            headers=h_r, timeout=8,
+        )
+        befintliga = {row["ledare"]: row for row in (r.json() if r.is_success else [])}
+    except Exception:
+        befintliga = {}
+
+    for parti in nya_partier:
+        ledare = parti["ledare"]
+        namn = parti["namn"]
+        try:
+            if ledare in befintliga:
+                httpx.patch(
+                    f"{SB_URL}/rest/v1/parti_kassor?ledare=eq.{urllib.parse.quote(ledare)}",
+                    headers=h_w,
+                    json={"parti_namn": namn, "uppdaterad": "now()"},
+                    timeout=8,
+                )
+            else:
+                httpx.post(
+                    f"{SB_URL}/rest/v1/parti_kassor",
+                    headers=h_w,
+                    json={"parti_namn": namn, "ledare": ledare, "saldo": 0},
+                    timeout=8,
+                )
+        except Exception:
+            pass
+
+
 def _parti_namn_fran_positioner(sb_key: str, medlemmar: list[str]) -> str:
     """Härleder partinamn från medlemmarnas starkaste gemensamma ämnespositioner."""
     h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
@@ -3739,6 +3795,13 @@ def berakna_och_spara_partier(sb_key: str) -> int:
 
         if not kluster:
             return 0
+
+        # Bygg lista med kommande partier för kassaöverföring
+        kommande_partier = [
+            {"ledare": _hamta_ledare(sb_key, m), "namn": _parti_namn_fran_positioner(sb_key, m)}
+            for m in kluster
+        ]
+        _overfor_parti_kassor(sb_key, kommande_partier)
 
         # Ta bort gamla partier
         httpx.delete(f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true", headers=h, timeout=8)
