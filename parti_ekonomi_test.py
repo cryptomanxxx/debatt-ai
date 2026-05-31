@@ -138,11 +138,14 @@ def kör_stipendium(items: list[dict]) -> None:
             utbetalt += per_medlem
 
         if utbetalt > 0:
+            ny_saldo = max(0, saldo - utbetalt)
             uppdatera_kassa(
                 parti["ledare"],
-                max(0, saldo - utbetalt),
+                ny_saldo,
                 {"senast_stipendium": NOW.isoformat()},
             )
+            # Keep in-memory balance in sync so later phases don't overwrite this debit
+            item["kassa"]["saldo"] = ny_saldo
             print(f"  [Stipendium] {parti['namn']}: -{utbetalt} kr → {len(medlemmar)} medlemmar × {per_medlem} kr")
 
 
@@ -171,7 +174,10 @@ def kör_valkampanj(items: list[dict]) -> None:
             continue
 
         val_parti = next((p for p in val_partier if p["namn"] == parti["namn"]), None)
-        befintlig_bonus = float(val_parti.get("kampanj_bonus", 0.0)) if val_parti else 0.0
+        if val_parti is None:
+            continue  # party not in this election snapshot — skip campaign spending
+
+        befintlig_bonus = float(val_parti.get("kampanj_bonus", 0.0))
 
         max_ytterligare = 15.0 - befintlig_bonus
         if max_ytterligare <= 0:

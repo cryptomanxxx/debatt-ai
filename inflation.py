@@ -285,12 +285,9 @@ def main():
                         json={"saldo": sk_saldo_nu - utdelat, "uppdaterad": "now()"},
                         timeout=8,
                     )
-                    httpx.post(
-                        f"{SB_URL}/rest/v1/stats_budget_log",
-                        headers=h,
-                        json={"typ": "partistod", "agent": None, "belopp": utdelat, "vecka": iso_vecka},
-                        timeout=6,
-                    )
+                    # parti_utgifter already logs individual party disbursements;
+                    # stats_budget_log CHECK constraint only allows:
+                    # skatt, grundinkomst, bailout, bot, sparranta — skip aggregate row
                     print(f"  ✓ Totalt {utdelat} kr partistöd fördelat bland {len(partier)} partier.")
                 else:
                     print("  Ingen utdelning — alla andelar för små.")
