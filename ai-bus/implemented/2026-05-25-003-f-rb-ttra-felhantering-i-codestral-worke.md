@@ -5,8 +5,10 @@ type: cleanup
 severity: medium
 risk: low
 file: agents/codestral-worker.js
-status: pending
+status: implemented
 created: 2026-05-25
+implemented: 2026-05-31
+impact: Retry-loop med 3 försök och 1s/2s backoff. PR #619.
 ---
 
 ## Problem
