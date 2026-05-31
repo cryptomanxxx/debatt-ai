@@ -20,6 +20,21 @@ const PARAM_META = [
 
 const ALLA_AGENTER = Object.keys(AGENT_VISUELL);
 
+function styrkeNiva(s) {
+  if (s >= 15) return { label: "DOMINANT", color: "#ef4444" };
+  if (s >= 8)  return { label: "STARK",    color: "#f97316" };
+  if (s >= 4)  return { label: "AKTIV",    color: "#facc15" };
+  return              { label: "UPPKOMST", color: "#60a5fa" };
+}
+
+function cellFarg(s) {
+  if (s <= 0)  return "#141414";
+  if (s <= 3)  return "rgba(96, 165, 250, 0.38)";
+  if (s <= 7)  return "rgba(250, 204, 21, 0.62)";
+  if (s <= 14) return "rgba(249, 115, 22, 0.82)";
+  return "rgba(239, 68, 68, 1)";
+}
+
 // Placera 24 agenter jämnt fördelade runt en cirkel
 function nodePositions(r, cx, cy) {
   return ALLA_AGENTER.map((namn, i) => {
@@ -37,6 +52,7 @@ export default function DynamikPage() {
   const [sliders, setSliders] = useState({ sinnesstamning: 50, konfliktniva: 50, svarssamarbete: 50, koalitionsbildning: 50 });
   const [voted, setVoted] = useState(false);
   const [voteStatus, setVoteStatus] = useState(null);
+  const [hoveredCell, setHoveredCell] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -89,6 +105,13 @@ export default function DynamikPage() {
   const nodes = nodePositions(220, SVG_W / 2, SVG_H / 2);
   const nodeMap = Object.fromEntries(nodes.map(n => [n.namn, n]));
   const maxStyrka = Math.max(...koalitioner.map(k => k.styrka), 1);
+  const koaMap = {};
+  for (const k of koalitioner) {
+    if (!koaMap[k.agent_a]) koaMap[k.agent_a] = {};
+    if (!koaMap[k.agent_b]) koaMap[k.agent_b] = {};
+    koaMap[k.agent_a][k.agent_b] = k.styrka;
+    koaMap[k.agent_b][k.agent_a] = k.styrka;
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
@@ -214,23 +237,101 @@ export default function DynamikPage() {
               </div>
             </section>
 
-            {/* ── Koalitionsrankring ── */}
+            {/* ── Koalitionsmatris ── */}
+            {koalitioner.length > 0 && (
+              <section style={{ marginBottom: "56px" }}>
+                <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 8px", fontFamily: "monospace" }}>Koalitionsmatris</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, margin: "0 0 16px" }}>
+                  Varje cell = ett agentpar. Färgintensitet visar alliansens styrka — hovra för att identifiera paret.
+                </p>
+                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", position: "relative" }}>
+                  <div style={{ overflowX: "auto" }}>
+                    <svg viewBox="0 0 408 408" style={{ display: "block", width: "100%", maxWidth: "408px", cursor: "crosshair" }}>
+                      {ALLA_AGENTER.flatMap((a, i) =>
+                        ALLA_AGENTER.map((b, j) => {
+                          const isSelf = i === j;
+                          const s = isSelf ? -1 : (koaMap[a]?.[b] ?? 0);
+                          return (
+                            <rect
+                              key={`${i}-${j}`}
+                              x={j * 17} y={i * 17}
+                              width={16} height={16}
+                              fill={isSelf ? "#222" : cellFarg(s)}
+                              rx={1}
+                              onMouseEnter={() => { if (!isSelf) setHoveredCell({ a, b, s }); }}
+                              onMouseLeave={() => setHoveredCell(null)}
+                            />
+                          );
+                        })
+                      )}
+                    </svg>
+                  </div>
+                  {hoveredCell && (() => {
+                    const niva = hoveredCell.s > 0 ? styrkeNiva(hoveredCell.s) : null;
+                    return (
+                      <div style={{
+                        position: "absolute", top: "20px", right: "20px",
+                        background: "#161616", border: `1px solid ${C.border}`,
+                        borderRadius: "8px", padding: "12px 16px",
+                        fontSize: "12px", fontFamily: "monospace",
+                        pointerEvents: "none", minWidth: "150px",
+                      }}>
+                        <div style={{ color: AGENT_VISUELL[hoveredCell.a]?.ikonFarg || "#888", fontWeight: 700, marginBottom: "3px" }}>{hoveredCell.a}</div>
+                        <div style={{ color: C.textMuted, fontSize: "10px", marginBottom: "3px" }}>↔</div>
+                        <div style={{ color: AGENT_VISUELL[hoveredCell.b]?.ikonFarg || "#888", fontWeight: 700, marginBottom: "10px" }}>{hoveredCell.b}</div>
+                        {niva ? (
+                          <>
+                            <div style={{ color: C.textMuted, fontSize: "11px", marginBottom: "6px" }}>
+                              styrka <span style={{ color: C.text, fontWeight: 700 }}>{hoveredCell.s}</span>
+                            </div>
+                            <span style={{ fontSize: "9px", fontWeight: 800, letterSpacing: "0.08em", color: "#0a0a0a", background: niva.color, borderRadius: "3px", padding: "2px 6px" }}>{niva.label}</span>
+                          </>
+                        ) : (
+                          <div style={{ color: C.textMuted, fontSize: "11px" }}>ingen allians</div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <div style={{ display: "flex", gap: "14px", marginTop: "14px", flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>Styrka:</span>
+                    {[
+                      { label: "Ingen", fill: "#141414", outline: true },
+                      { label: "Uppkomst 1–3", fill: cellFarg(2) },
+                      { label: "Aktiv 4–7",    fill: cellFarg(5) },
+                      { label: "Stark 8–14",   fill: cellFarg(10) },
+                      { label: "Dominant 15+", fill: cellFarg(16) },
+                    ].map(({ label, fill, outline }) => (
+                      <div key={label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                        <div style={{ width: "11px", height: "11px", borderRadius: "2px", background: fill, border: outline ? "1px solid #333" : "none", flexShrink: 0 }} />
+                        <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* ── Koalitionsrankning ── */}
             {koalitioner.length > 0 && (
               <section style={{ marginBottom: "56px" }}>
                 <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 20px", fontFamily: "monospace" }}>Starkaste allianser</p>
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {koalitioner.slice(0, 10).map((k, i) => {
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {koalitioner.slice(0, 20).map((k, i) => {
                     const fargA = AGENT_VISUELL[k.agent_a]?.ikonFarg || "#888";
                     const fargB = AGENT_VISUELL[k.agent_b]?.ikonFarg || "#888";
                     const pct = Math.round((k.styrka / maxStyrka) * 100);
+                    const niva = styrkeNiva(k.styrka);
                     return (
-                      <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "14px 18px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                          <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", minWidth: "20px" }}>#{i + 1}</span>
-                          <a href={`/agent/${encodeURIComponent(k.agent_a)}`} style={{ fontSize: "12px", color: fargA, fontFamily: "monospace", fontWeight: 700, textDecoration: "none" }}>{k.agent_a}</a>
-                          <span style={{ color: C.textMuted }}>↔</span>
-                          <a href={`/agent/${encodeURIComponent(k.agent_b)}`} style={{ fontSize: "12px", color: fargB, fontFamily: "monospace", fontWeight: 700, textDecoration: "none" }}>{k.agent_b}</a>
-                          <span style={{ marginLeft: "auto", fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>styrka {k.styrka} · {k.antal_utbyten} utbyten</span>
+                      <div key={i} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px 16px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", minWidth: "24px" }}>#{i + 1}</span>
+                          <a href={`/versus?a=${encodeURIComponent(k.agent_a)}&b=${encodeURIComponent(k.agent_b)}`} style={{ display: "flex", alignItems: "center", gap: "6px", textDecoration: "none", flex: 1, minWidth: 0 }}>
+                            <span style={{ fontSize: "12px", color: fargA, fontFamily: "monospace", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.agent_a}</span>
+                            <span style={{ color: C.textMuted, fontSize: "11px", flexShrink: 0 }}>↔</span>
+                            <span style={{ fontSize: "12px", color: fargB, fontFamily: "monospace", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.agent_b}</span>
+                          </a>
+                          <span style={{ fontSize: "9px", fontWeight: 800, letterSpacing: "0.08em", color: "#0a0a0a", background: niva.color, borderRadius: "3px", padding: "2px 6px", flexShrink: 0 }}>{niva.label}</span>
+                          <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", flexShrink: 0 }}>{k.styrka} · {k.antal_utbyten}×</span>
                         </div>
                         <div style={{ height: "3px", background: "#1e1e1e", borderRadius: "2px" }}>
                           <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${fargA}, ${fargB})`, borderRadius: "2px" }} />
