@@ -13,7 +13,6 @@ from supabase_utils import (
     skapa_lagforslag_ai,
     hamta_lagforslag,
     hamta_alla_roster_lag,
-    importera_riksdagen_forslag,
     uppdatera_riksdagen_utfall,
     analysera_alla_forslag_pis,
     kör_pis_monte_carlo_batch,
@@ -27,10 +26,8 @@ if not SB_KEY:
     print("SUPABASE_ANON_KEY saknas", file=sys.stderr)
     sys.exit(1)
 
-# Importera nya propositioner från riksdagen.se
-print("── Importerar från riksdagen.se ──")
-importerade = importera_riksdagen_forslag(SB_KEY)
-print(f"  {'✓ ' + str(importerade) + ' nya propositioner importerade' if importerade else '– Inga nya propositioner'}")
+# Riksdag-import sker via riksdag-import.yml (Vercel-proxy) — inte direkt härifrån
+# (data.riksdagen.se blockerar GitHub Actions IPs med 403 "Host not in allowlist")
 
 # Uppdatera utfall på avgjorda riksdagsförslag
 uppdaterade = uppdatera_riksdagen_utfall(SB_KEY)
