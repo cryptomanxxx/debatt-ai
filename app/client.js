@@ -508,7 +508,7 @@ async function fetchAktivitetsFeed() {
     });
   });
 
-  (markTrans.value || []).forEach(t => {
+  (Array.isArray(markTrans.value) ? markTrans.value : []).forEach(t => {
     if (!t.skapad) return;
     feed.push({
       typ: "mark-kop",
