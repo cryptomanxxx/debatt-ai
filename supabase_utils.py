@@ -3744,9 +3744,9 @@ def _hamta_ledare(sb_key: str, medlemmar: list[str]) -> str:
     return sorted(medlemmar)[0]
 
 
-def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3) -> int:
+def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int = 3) -> int:
     """
-    Beräknar politiska partier från agent_koalitioner (BFS, styrka ≥ min_styrka, storlek 3–8).
+    Beräknar politiska partier från agent_koalitioner (BFS, styrka ≥ min_styrka, storlek min_kluster–8).
     Rensar befintliga partier och sparar nya. Returnerar antal aktiva partier.
     """
     h = {
@@ -3790,7 +3790,7 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3) -> int:
                 for granne in grannar.get(nod, []):
                     if granne not in besokt:
                         ko.append(granne)
-            if 3 <= len(fraktion) <= 8:
+            if min_kluster <= len(fraktion) <= 8:
                 kluster.append(sorted(fraktion))
 
         if not kluster:

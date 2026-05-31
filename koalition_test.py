@@ -38,9 +38,10 @@ print(f"\n=== Klar: {lyckade}/{len(ANALYTIKER)} koalitioner initierade ===")
 # Beräkna partier direkt efter koalitionsbildning
 print("\n── Partiuppdatering ──")
 min_styrka = 1 if FORCE_PARTIER else 3
+min_kluster = 2 if FORCE_PARTIER else 3
 if FORCE_PARTIER:
-    print(f"  [FORCE_PARTIER] Använder min_styrka={min_styrka}")
-n_partier = berakna_och_spara_partier(SB_KEY, min_styrka=min_styrka)
+    print(f"  [FORCE_PARTIER] Använder min_styrka={min_styrka}, min_kluster={min_kluster}")
+n_partier = berakna_och_spara_partier(SB_KEY, min_styrka=min_styrka, min_kluster=min_kluster)
 if n_partier > 0:
     print(f"  ✓ {n_partier} aktiva partier beräknade och sparade")
 else:
