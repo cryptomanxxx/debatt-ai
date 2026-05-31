@@ -34,13 +34,13 @@ const TYP_NAMN = {
 
 // Ljusa terraingradienter — synliga på mörk bakgrund
 const TERRAIN_STOPS = {
-  energi:   [["#fef08a", 0.96], ["#f59e0b", 0.72], ["#78350f", 0.20]],
-  jordbruk: [["#bbf7d0", 0.94], ["#22c55e", 0.70], ["#14532d", 0.20]],
-  industri: [["#bfdbfe", 0.92], ["#3b82f6", 0.65], ["#1e3a8a", 0.18]],
-  gruva:    [["#fed7aa", 0.94], ["#ea580c", 0.70], ["#7c2d12", 0.18]],
-  stad:     [["#f3e8ff", 0.92], ["#9333ea", 0.65], ["#3b0764", 0.18]],
-  kust:     [["#cffafe", 0.94], ["#0891b2", 0.70], ["#0c4a6e", 0.18]],
-  skog:     [["#dcfce7", 0.94], ["#16a34a", 0.70], ["#14532d", 0.20]],
+  energi:   [["#fef08a", 0.60], ["#f59e0b", 0.38], ["#78350f", 0.08]],
+  jordbruk: [["#bbf7d0", 0.58], ["#22c55e", 0.36], ["#14532d", 0.08]],
+  industri: [["#bfdbfe", 0.56], ["#3b82f6", 0.32], ["#1e3a8a", 0.07]],
+  gruva:    [["#fed7aa", 0.58], ["#ea580c", 0.36], ["#7c2d12", 0.07]],
+  stad:     [["#f3e8ff", 0.56], ["#9333ea", 0.32], ["#3b0764", 0.07]],
+  kust:     [["#cffafe", 0.58], ["#0891b2", 0.36], ["#0c4a6e", 0.07]],
+  skog:     [["#dcfce7", 0.58], ["#16a34a", 0.36], ["#14532d", 0.08]],
 };
 
 const HEX = 40;
@@ -403,7 +403,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                   )}
 
                   {/* Mörk basfyllning — mindre dominans */}
-                  <polygon points={pts} fill="#0a1410" stroke="none" />
+                  <polygon points={pts} fill="rgba(5,12,8,0.18)" stroke="none" />
 
                   {/* Terrainlager — ljust och tydligt */}
                   <polygon points={pts} fill={`url(#grad-${zon.typ})`} stroke="none" />
@@ -426,7 +426,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                     points={pts}
                     fill="none"
                     stroke={strokeCol}
-                    strokeWidth={isAct ? 2.2 : agFarg ? 1.6 : 0.8}
+                    strokeWidth={isAct ? 2.5 : agFarg ? 1.8 : 1.2}
                   />
 
                   {/* Inre kant */}
