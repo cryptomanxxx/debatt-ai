@@ -3744,9 +3744,9 @@ def _hamta_ledare(sb_key: str, medlemmar: list[str]) -> str:
     return sorted(medlemmar)[0]
 
 
-def berakna_och_spara_partier(sb_key: str) -> int:
+def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3) -> int:
     """
-    Beräknar politiska partier från agent_koalitioner (BFS, styrka ≥ 3, storlek 3–8).
+    Beräknar politiska partier från agent_koalitioner (BFS, styrka ≥ min_styrka, storlek 3–8).
     Rensar befintliga partier och sparar nya. Returnerar antal aktiva partier.
     """
     h = {
@@ -3754,9 +3754,9 @@ def berakna_och_spara_partier(sb_key: str) -> int:
         "Content-Type": "application/json", "Prefer": "return=minimal",
     }
     try:
-        # Hämta koalitioner med styrka ≥ 3
+        # Hämta koalitioner med styrka ≥ min_styrka
         r = httpx.get(
-            f"{SB_URL}/rest/v1/agent_koalitioner?styrka=gte.3&select=agent_a,agent_b,styrka,antal_utbyten",
+            f"{SB_URL}/rest/v1/agent_koalitioner?styrka=gte.{min_styrka}&select=agent_a,agent_b,styrka,antal_utbyten",
             headers={**h, "Prefer": ""}, timeout=8,
         )
         if not r.is_success:

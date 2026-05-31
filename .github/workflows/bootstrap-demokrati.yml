@@ -13,6 +13,11 @@ on:
         required: false
         default: "false"
         type: boolean
+      force_partier:
+        description: "Bilda partier med min_styrka=1 (bootstrap när inga partier finns ännu)"
+        required: false
+        default: "true"
+        type: boolean
 
 jobs:
   bootstrap:
@@ -58,8 +63,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PYTHONUNBUFFERED: "1"
+          FORCE_PARTIER: ${{ inputs.force_partier }}
         run: |
-          echo "=== Kör koalitionsbildning ==="
+          echo "=== Kör koalitionsbildning (FORCE_PARTIER=$FORCE_PARTIER) ==="
           python -u koalition_test.py
 
       - name: Steg 3 — Riksdagsval (med tvångsflaggor)
