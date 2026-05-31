@@ -102,6 +102,7 @@ def main():
     SKATTETRÖSKEL   = policy["skattetroskel"]
     SKATTEBRACKETS  = policy["skattebrackets"]
     BAILOUT_TROSKEL = policy["bailout_troskel"]
+    brackets_str    = "/".join(f"{int(s*100)}%" for _, _, s in policy["skattebrackets"])
 
     gini_str = f"{senaste_gini:.3f}" if senaste_gini is not None else "okänd"
     bracket_str = " / ".join(
@@ -113,6 +114,7 @@ def main():
     # Logga nivåskifte i civilisationsminnet
     if foregaende_niva and foregaende_niva != niva:
         fore_policy = POLICY_NIVA[foregaende_niva]
+        fore_brackets_str = "/".join(f"{int(s*100)}%" for _, _, s in fore_policy["skattebrackets"])
         httpx.post(
             f"{SB_URL}/rest/v1/civilisations_minne",
             headers=h,
@@ -122,6 +124,7 @@ def main():
                 "beskrivning": (
                     f"Staten justerade sin omfördelningspolitik baserat på Gini-koefficienten ({gini_str}). "
                     f"Skattetröskel: {fore_policy['skattetroskel']} → {SKATTETRÖSKEL} kr | "
+                    f"Skattesatser: {fore_brackets_str} → {brackets_str} | "
                     f"Bailout-tröskel: {fore_policy['bailout_troskel']} → {BAILOUT_TROSKEL} kr."
                 ),
                 "agenter": [],
