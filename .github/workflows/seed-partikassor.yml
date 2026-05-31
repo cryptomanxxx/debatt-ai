@@ -1,0 +1,43 @@
+name: Seed Partikassor (Manuell)
+
+on:
+  workflow_dispatch:
+    inputs:
+      belopp:
+        description: "Startsaldo i kr per parti"
+        required: false
+        default: "500"
+        type: string
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Sätt startsaldo på aktiva partikassor
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BELOPP: ${{ inputs.belopp }}
+        run: |
+          python -u - <<'PYEOF'
+          import os, httpx, urllib.parse, sys
+          seed = int(os.environ.get("BELOPP", "500") or "500")
+          SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
+          key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+          h = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json", "Prefer": "return=minimal"}
+          partier = httpx.get(f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn,ledare", headers=h, timeout=8).json()
+          if not partier:
+              print("Inga aktiva partier att seeda")
+              sys.exit(0)
+          print(f"Seedar {len(partier)} partikassor med {seed} kr var:")
+          for p in partier:
+              r = httpx.patch(
+                  f"{SB_URL}/rest/v1/parti_kassor?ledare=eq.{urllib.parse.quote(p['ledare'])}",
+                  headers=h, json={"saldo": seed}, timeout=8)
+              status = "✓" if r.is_success else f"✗ HTTP {r.status_code}"
+              print(f"  {status} {p['namn']} ({p['ledare']}): {seed} kr")
+          PYEOF
