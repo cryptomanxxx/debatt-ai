@@ -1,0 +1,80 @@
+name: Bootstrap Demokrati (Manuell)
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_val:
+        description: "Tvångsstarta val direkt (hoppar över 90-dagarsspärr)"
+        required: false
+        default: "true"
+        type: boolean
+      force_decide:
+        description: "Avsluta pågående val omedelbart (räkna röster nu)"
+        required: false
+        default: "false"
+        type: boolean
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    permissions:
+      models: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Steg 1 — Parlamentsröstning
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          echo "=== Kör parlamentsröstning ==="
+          python -u parlament_test.py
+
+      - name: Steg 2 — Koalitionsbildning och partiuppdatering
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONUNBUFFERED: "1"
+        run: |
+          echo "=== Kör koalitionsbildning ==="
+          python -u koalition_test.py
+
+      - name: Steg 3 — Riksdagsval (med tvångsflaggor)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONUNBUFFERED: "1"
+          FORCE_START: ${{ inputs.force_val }}
+          FORCE_DECIDE: ${{ inputs.force_decide }}
+        run: |
+          echo "=== Kör riksdagsval (FORCE_START=$FORCE_START, FORCE_DECIDE=$FORCE_DECIDE) ==="
+          python -u val_test.py
