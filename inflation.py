@@ -189,6 +189,111 @@ def main():
     else:
         print("  Inga skattepliktiga agenter.")
 
+    # ── 0.5. Partistöd: 30% av statskassan fördelas till aktiva partier ─────────
+    print("\n── Partistöd: 30% av statskassan till aktiva partier ──")
+    try:
+        import urllib.parse as _urllib_parse
+        sk_res2 = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo",
+            headers={**h, "Prefer": ""}, timeout=6,
+        )
+        sk_saldo_nu = 0
+        if sk_res2.is_success and sk_res2.json():
+            sk_saldo_nu = int(float(sk_res2.json()[0].get("saldo") or 0))
+
+        partistod_pool = math.floor(sk_saldo_nu * 0.30)
+
+        if partistod_pool < 1:
+            print(f"  Statskassan för liten ({sk_saldo_nu} kr) — hoppar över partistöd.")
+        else:
+            partier_res = httpx.get(
+                f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn,ledare,medlemmar",
+                headers={**h, "Prefer": ""}, timeout=8,
+            )
+            partier = partier_res.json() if partier_res.is_success else []
+
+            if not partier:
+                print("  Inga aktiva partier — hoppar över partistöd.")
+            else:
+                # Hämta röstandelar från senaste avgjorda val
+                roster_per_parti: dict[str, int] = {}
+                total_roster = 0
+                senaste_val_res = httpx.get(
+                    f"{SB_URL}/rest/v1/riksdagsval?status=eq.avgjort&order=avgjord.desc&limit=1&select=partier",
+                    headers={**h, "Prefer": ""}, timeout=8,
+                )
+                if senaste_val_res.is_success and senaste_val_res.json():
+                    for vp in (senaste_val_res.json()[0].get("partier") or []):
+                        r_count = int(vp.get("roster", 0))
+                        roster_per_parti[vp["namn"]] = r_count
+                        total_roster += r_count
+
+                utdelat = 0
+                for parti in partier:
+                    kassa_res = httpx.get(
+                        f"{SB_URL}/rest/v1/parti_kassor?ledare=eq.{_urllib_parse.quote(parti['ledare'])}&select=saldo",
+                        headers={**h, "Prefer": ""}, timeout=6,
+                    )
+                    if not kassa_res.is_success or not kassa_res.json():
+                        httpx.post(
+                            f"{SB_URL}/rest/v1/parti_kassor",
+                            headers=h,
+                            json={"parti_namn": parti["namn"], "ledare": parti["ledare"], "saldo": 0},
+                            timeout=8,
+                        )
+                        gammalt_saldo = 0
+                    else:
+                        gammalt_saldo = int(float(kassa_res.json()[0].get("saldo") or 0))
+
+                    if total_roster > 0 and parti["namn"] in roster_per_parti:
+                        andel = roster_per_parti[parti["namn"]] / total_roster
+                    else:
+                        andel = 1.0 / len(partier)
+
+                    belopp = math.floor(partistod_pool * andel)
+                    if belopp < 1:
+                        continue
+
+                    httpx.patch(
+                        f"{SB_URL}/rest/v1/parti_kassor?ledare=eq.{_urllib_parse.quote(parti['ledare'])}",
+                        headers=h,
+                        json={"saldo": gammalt_saldo + belopp, "uppdaterad": "now()"},
+                        timeout=8,
+                    )
+                    httpx.post(
+                        f"{SB_URL}/rest/v1/parti_utgifter",
+                        headers=h,
+                        json={
+                            "parti_namn": parti["namn"],
+                            "ledare": parti["ledare"],
+                            "typ": "partistod",
+                            "belopp": belopp,
+                            "beskrivning": f"Veckans partistöd ({andel*100:.1f}% av {partistod_pool} kr pool)",
+                        },
+                        timeout=6,
+                    )
+                    utdelat += belopp
+                    print(f"  {parti['namn']}: +{belopp} kr ({andel*100:.1f}% andel)")
+
+                if utdelat > 0:
+                    httpx.patch(
+                        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa",
+                        headers=h,
+                        json={"saldo": sk_saldo_nu - utdelat, "uppdaterad": "now()"},
+                        timeout=8,
+                    )
+                    httpx.post(
+                        f"{SB_URL}/rest/v1/stats_budget_log",
+                        headers=h,
+                        json={"typ": "partistod", "agent": None, "belopp": utdelat, "vecka": iso_vecka},
+                        timeout=6,
+                    )
+                    print(f"  ✓ Totalt {utdelat} kr partistöd fördelat bland {len(partier)} partier.")
+                else:
+                    print("  Ingen utdelning — alla andelar för små.")
+    except Exception as e:
+        print(f"  [VARNING] Partistöd misslyckades: {e}")
+
     # ── 1. Inflation: höj butikpriser med 3% ──────────────────────────────────
     print("── Inflation: höjer butikpriser 3% ──")
     varor_res = httpx.get(f"{SB_URL}/rest/v1/butik_varor?select=id,namn,pris", headers={**h, "Prefer": ""}, timeout=10)
