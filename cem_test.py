@@ -131,9 +131,9 @@ def hamta_ekonomisk_status(h: dict) -> dict:
         status["mobilitet"] = s.get("mobilitet") or 50
         status["topp3_andel"] = s.get("top3_andel") or 0.5
 
-    planbocker = sb_get(h, "agent_planbocker?select=saldo")
+    planbocker = sb_get(h, "agent_planbocker?select=saldo&agent=neq.Statskassa")
     if planbocker:
-        saldos = [max(0, p.get("saldo") or 0) for p in planbocker if p.get("agent") != "Statskassa"]
+        saldos = [max(0, p.get("saldo") or 0) for p in planbocker]
         if saldos:
             status["snitt_saldo"] = round(sum(saldos) / len(saldos))
     return status
