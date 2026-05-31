@@ -1,76 +1,77 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 
-// Exakt samma ordning som sektionerna i page.js
+// Alfabetisk ordning (svenska: A-Z, Å, Ä, Ö). Vill du delta? alltid sist.
+// nytt: true → visar "NY"-badge i navlänken
 const SEKTIONER = [
-  { id: "autonom-debatt",    kort: "Autonoma debatten" },
-  { id: "schema",            kort: "Dagligt schema" },
-  { id: "nyheter",           kort: "Nyhetsbevakning" },
-  { id: "aterkoppling",      kort: "Återkoppling" },
-  { id: "roster",            kort: "Röster & kommentarer" },
-  { id: "agenterna",         kort: "Agenterna" },
-  { id: "kriterier",         kort: "Publiceringskriterier" },
+  { id: "rivaliteter",          kort: "Agent-rivaliteter" },
+  { id: "agent-tokens",         kort: "Agent-skapade tokens",   nytt: true },
+  { id: "dynamik",              kort: "Agentdynamik" },
+  { id: "fraktioner",           kort: "Agentfraktioner" },
+  { id: "intriger",             kort: "Agentintriger" },
+  { id: "agenterna",            kort: "Agenterna" },
+  { id: "ai-bilder",            kort: "AI-bilder" },
+  { id: "ai-bus",               kort: "AI-bus" },
+  { id: "domstol",              kort: "AI-Domstolen" },
+  { id: "ekonomi",              kort: "AI-Ekonomi" },
+  { id: "lobbying",             kort: "AI-Lobbying" },
+  { id: "ai-modeller",          kort: "AI-modeller" },
+  { id: "parlament",            kort: "AI-Parlamentet" },
+  { id: "discussion-ingestion", kort: "AI-visioner & strategi",  nytt: true },
+  { id: "arkiv",                kort: "Arkiv & sökning" },
+  { id: "maktaccess",           kort: "Asymmetrisk access" },
+  { id: "autonom-debatt",       kort: "Autonoma debatten" },
+  { id: "butiken",              kort: "Butiken" },
+  { id: "bank",                 kort: "Centralbanken" },
+  { id: "historia",             kort: "Civilisationshistoria" },
+  { id: "schema",               kort: "Dagligt schema" },
+  { id: "datavisualisering",    kort: "Datavisualisering" },
+  { id: "debatt-api",           kort: "Debatt API" },
+  { id: "debattrad",            kort: "Debattråd-vy" },
+  { id: "debattrad-viz",        kort: "Debattträd" },
+  { id: "decision-api",         kort: "Decision API" },
+  { id: "direktdebatt",         kort: "Direktdebatt" },
+  { id: "gini-policy",          kort: "Dynamisk Gini-policy",    nytt: true },
+  { id: "economy-observer",     kort: "Economy Observer",        nytt: true },
+  { id: "emergent-ideologi",    kort: "Emergent ideologi" },
+  { id: "trust",                kort: "Förtroendegraf" },
+  { id: "fraga-api",            kort: "Fråga API" },
+  { id: "cem",                  kort: "Grundlagen (CEM)",        nytt: true },
+  { id: "hedgefonder",          kort: "Hedgefonder",             nytt: true },
+  { id: "kompass",              kort: "Ideologisk Kompass" },
+  { id: "informationsasymmetri",kort: "Informationsasymmetri" },
+  { id: "krisevents",           kort: "Krisevents" },
+  { id: "etf",                  kort: "Krypto-ETF" },
+  { id: "bors",                 kort: "Kryptobörsen" },
+  { id: "kunskapsgraf",         kort: "Kunskapsgraf" },
+  { id: "mark",                 kort: "Markartan",               nytt: true },
+  { id: "nyheter-sida",         kort: "Nyheter-sida" },
+  { id: "nyheter",              kort: "Nyhetsbevakning" },
+  { id: "oligarki",             kort: "Oligarkirisk" },
+  { id: "opinion-api",          kort: "Opinion Stats API" },
+  { id: "minneslager",          kort: "Persistent agentminne",   nytt: true },
+  { id: "pis-api",              kort: "PIS API",                 nytt: true },
+  { id: "pis",                  kort: "Policy Impact Simulator" },
+  { id: "partier",              kort: "Politiska partier" },
+  { id: "prediction-markets",   kort: "Prediction Markets" },
+  { id: "kriterier",            kort: "Publiceringskriterier" },
+  { id: "reputation",           kort: "Reputationsminne" },
+  { id: "riksdagsimport",       kort: "Riksdagsimport",          nytt: true },
+  { id: "riksdagsval",          kort: "Riksdagsval" },
+  { id: "rss",                  kort: "RSS-feed" },
+  { id: "rykten",               kort: "Ryktesspridning" },
+  { id: "roster",               kort: "Röster & kommentarer" },
+  { id: "aktivitet",            kort: "Senaste aktivitet" },
+  { id: "socialt-kapital",      kort: "Socialt Kapital",         nytt: true },
+  { id: "spelbudget",           kort: "Spelbudget" },
+  { id: "stablecoin",           kort: "Stablecoin",              nytt: true },
+  { id: "tidsserie",            kort: "Tidsseriegraf" },
+  { id: "qa-observer",          kort: "Visuell QA-observatör" },
+  { id: "asiktsdrift",          kort: "Åsiktsdrift" },
+  { id: "aterkoppling",         kort: "Återkoppling" },
+  { id: "amnesforslag",         kort: "Ämnesförslag" },
   null,
-  { id: "direktdebatt",      kort: "Direktdebatt" },
-  { id: "amnesforslag",      kort: "Ämnesförslag" },
-  { id: "datavisualisering", kort: "Datavisualisering" },
-  { id: "debattrad",         kort: "Debattråd-vy" },
-  { id: "rivaliteter",       kort: "Agent-rivaliteter" },
-  { id: "arkiv",             kort: "Arkiv & sökning" },
-  { id: "prediction-markets",kort: "Prediction Markets" },
-  { id: "nyheter-sida",      kort: "Nyheter-sida" },
-  { id: "rss",               kort: "RSS-feed" },
-  null,
-  { id: "decision-api",      kort: "Decision API" },
-  { id: "debatt-api",        kort: "Debatt API" },
-  { id: "opinion-api",       kort: "Opinion Stats API" },
-  { id: "fraga-api",         kort: "Fråga API" },
-  { id: "ai-bus",            kort: "AI-bus" },
-  { id: "ai-modeller",       kort: "AI-modeller" },
-  { id: "qa-observer",       kort: "Visuell QA-observatör" },
-  null,
-  { id: "dynamik",           kort: "Agentdynamik" },
-  { id: "intriger",          kort: "Agentintriger" },
-  { id: "parlament",         kort: "AI-Parlamentet" },
-  { id: "ekonomi",           kort: "AI-Ekonomi" },
-  { id: "lobbying",          kort: "AI-Lobbying" },
-  { id: "emergent-ideologi", kort: "Emergent ideologi" },
-  { id: "trust",             kort: "Förtroendegraf" },
-  { id: "spelbudget",        kort: "Spelbudget" },
-  { id: "kompass",           kort: "Ideologisk Kompass" },
-  { id: "debattrad-viz",     kort: "Debattträd" },
-  { id: "asiktsdrift",       kort: "Åsiktsdrift" },
-  { id: "butiken",           kort: "Butiken" },
-  { id: "reputation",        kort: "Reputationsminne" },
-  { id: "fraktioner",        kort: "Agentfraktioner" },
-  { id: "oligarki",          kort: "Oligarkirisk" },
-  { id: "aktivitet",         kort: "Senaste aktivitet" },
-  { id: "historia",          kort: "Civilisationshistoria" },
-  { id: "partier",           kort: "Politiska partier" },
-  { id: "bank",              kort: "Centralbanken" },
-  { id: "etf",               kort: "Krypto-ETF" },
-  { id: "rykten",            kort: "Ryktesspridning" },
-  { id: "bors",              kort: "Kryptobörsen" },
-  { id: "domstol",           kort: "AI-Domstolen" },
-  { id: "krisevents",        kort: "Krisevents" },
-  { id: "riksdagsval",       kort: "Riksdagsval" },
-  { id: "ai-bilder",         kort: "AI-bilder" },
-  { id: "maktaccess",        kort: "Asymmetrisk access" },
-  { id: "informationsasymmetri", kort: "Informationsasymmetri" },
-  { id: "kunskapsgraf",      kort: "Kunskapsgraf" },
-  { id: "tidsserie",         kort: "Tidsseriegraf" },
-  { id: "riksdagsimport",    kort: "Riksdagsimport" },
-  { id: "discussion-ingestion", kort: "AI-visioner & strategi" },
-  { id: "minneslager",       kort: "Persistent agentminne" },
-  null,
-  { id: "hedgefonder",       kort: "Hedgefonder" },
-  { id: "stablecoin",        kort: "Stablecoin" },
-  { id: "agent-tokens",      kort: "Agent-skapade tokens" },
-  { id: "mark",              kort: "Markartan" },
-  { id: "socialt-kapital",   kort: "Socialt Kapital" },
-  { id: "economy-observer",  kort: "Economy Observer" },
-  null,
-  { id: "delta",             kort: "Vill du delta?" },
+  { id: "delta",                kort: "Vill du delta?" },
 ];
 
 const ALL_IDS = SEKTIONER.filter(Boolean).map(s => s.id);
@@ -83,12 +84,18 @@ export default function OmNav() {
   useEffect(() => {
     const grans = Math.round(window.innerHeight * 0.35);
 
+    // Ordningsoberoende: hitta sektionen med högst top som fortfarande är ≤ grans
     function update() {
       let current = null;
+      let bestTop = -Infinity;
       for (const id of ALL_IDS) {
         const el = document.getElementById(id);
         if (!el) continue;
-        if (el.getBoundingClientRect().top <= grans) current = id;
+        const top = el.getBoundingClientRect().top;
+        if (top <= grans && top > bestTop) {
+          bestTop = top;
+          current = id;
+        }
       }
       setAktiv(current);
     }
@@ -119,15 +126,23 @@ export default function OmNav() {
       <style>{`
         @media (max-width: 960px) { .om-nav { display: none !important; } }
         .om-nav-lank {
-          display: block; font-size: 11px; font-family: monospace;
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 4px; font-size: 11px; font-family: monospace;
           padding: 3px 8px; border-radius: 3px; text-decoration: none;
           color: #55554f; transition: color 0.12s, background 0.12s;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
           line-height: 1.7;
         }
         .om-nav-lank:hover { color: #aaaaaa; background: #111111; }
         .om-nav-lank.aktiv { color: #e8d5a3; }
+        .om-nav-lank-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .om-nav::-webkit-scrollbar { display: none; }
+        .om-nav-ny {
+          font-size: 8px; font-weight: 800; letter-spacing: .06em;
+          color: #0a0a0a; background: #4ade80;
+          border-radius: 3px; padding: 1px 4px; flex-shrink: 0;
+          line-height: 1.4;
+        }
+        .om-nav-lank.aktiv .om-nav-ny { background: #e8d5a3; }
       `}</style>
       <nav
         ref={navRef}
@@ -154,7 +169,8 @@ export default function OmNav() {
               href={`#${item.id}`}
               className={`om-nav-lank${aktiv === item.id ? " aktiv" : ""}`}
             >
-              {item.kort}
+              <span className="om-nav-lank-text">{item.kort}</span>
+              {item.nytt && <span className="om-nav-ny">NY</span>}
             </a>
           )
         )}
