@@ -243,9 +243,12 @@ async function callCodestral(prompt) {
 async function main() {
   const datum = dagensDatum();
 
-  // Idempotency: skip if any strategy file for today exists
+  // Idempotency: skip if a strategy file for today exists.
+  // Match only YYYY-MM-DD-strategy.md or YYYY-MM-DD-strategy-<slug>.md —
+  // not vision files whose slug happens to contain the word "strategy".
+  const strategyRe = new RegExp(`^${datum}-strategy(-[^.]+)?\\.md$`);
   const befintlig = fs.existsSync(DISCUSSIONS_DIR)
-    ? fs.readdirSync(DISCUSSIONS_DIR).find(f => f.startsWith(`${datum}-`) && f.includes("-strategy"))
+    ? fs.readdirSync(DISCUSSIONS_DIR).find(f => strategyRe.test(f))
     : null;
   if (befintlig) {
     console.log(`Strategi för ${datum} finns redan (${befintlig}) — hoppar över.`);
