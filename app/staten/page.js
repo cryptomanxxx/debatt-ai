@@ -82,15 +82,38 @@ function fmtDateTime(iso) {
   });
 }
 
-// ─── Policy levels (mirrors inflation.py) ────────────────────────────────────
+// ─── Policy levels (mirrors inflation.py POLICY_NIVA + skattebrackets) ───────
+const POLICY_NIVA = {
+  "låg":  { niva: "låg",  skattetroskel: 1200, bailoutTroskel: 100, namnFarg: "#4ade80", nivaNamn: "LÅG OJÄMLIKHET",
+             skattebrackets: [[1200, 2000, 0.01], [2000, 5000, 0.02], [5000, null, 0.04]] },
+  "medel":{ niva: "medel",skattetroskel: 1000, bailoutTroskel: 150, namnFarg: "#facc15", nivaNamn: "MÅTTLIG OJÄMLIKHET",
+             skattebrackets: [[1000, 2000, 0.02], [2000, 5000, 0.04], [5000, null, 0.07]] },
+  "hög":  { niva: "hög",  skattetroskel: 800,  bailoutTroskel: 250, namnFarg: "#f87171", nivaNamn: "HÖG OJÄMLIKHET",
+             skattebrackets: [[800,  2000, 0.03], [2000, 5000, 0.06], [5000, null, 0.10]] },
+};
+
 function policyFranGini(gini) {
-  if (gini === null || gini === undefined || gini < 0.4) {
-    return { niva: "låg", skattesats: 0.01, skattetroskel: 1200, bailoutTroskel: 100, namnFarg: "#4ade80", nivaNamn: "LÅG OJÄMLIKHET" };
-  } else if (gini < 0.6) {
-    return { niva: "medel", skattesats: 0.02, skattetroskel: 1000, bailoutTroskel: 150, namnFarg: "#facc15", nivaNamn: "MÅTTLIG OJÄMLIKHET" };
-  } else {
-    return { niva: "hög", skattesats: 0.03, skattetroskel: 800, bailoutTroskel: 250, namnFarg: "#f87171", nivaNamn: "HÖG OJÄMLIKHET" };
+  if (gini === null || gini === undefined || gini < 0.4) return POLICY_NIVA["låg"];
+  if (gini < 0.6) return POLICY_NIVA["medel"];
+  return POLICY_NIVA["hög"];
+}
+
+// Progressive tax — mirrors inflation.py berakna_progressiv_skatt()
+function beraknaSkatt(saldo, policy) {
+  let skatt = 0;
+  for (const [fran, till, sats] of policy.skattebrackets) {
+    if (saldo <= fran) break;
+    const taken = till === null ? saldo - fran : Math.min(saldo, till) - fran;
+    if (taken <= 0) continue;
+    skatt += taken * sats;
   }
+  return Math.ceil(skatt);
+}
+
+// Human-readable bracket summary, e.g. "1%/2%/4% (progressiv)"
+function bracketSummary(policy) {
+  const rates = policy.skattebrackets.map(b => `${b[2] * 100}%`).join("/");
+  return `${rates} (progressiv)`;
 }
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
@@ -292,7 +315,7 @@ export default async function StatenPage() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 12 }}>
                 {[
                   { label: "Skattetröskel",   value: `${policy.skattetroskel} kr`,        farg: C.yellow,  desc: "Saldo för att betala skatt" },
-                  { label: "Skattesats",       value: `${policy.skattesats * 100}%`,       farg: C.yellow,  desc: "Procent på överskott/vecka" },
+                  { label: "Skattesats",       value: bracketSummary(policy),              farg: C.yellow,  desc: "Progressiva brackets per vecka" },
                   { label: "Bailout-tröskel",  value: `${policy.bailoutTroskel} kr`,       farg: C.cyan,    desc: "Saldo som ger automatisk räddning" },
                   { label: "Topp-3 andel",     value: senastTopp3 ? `${(senastTopp3 * 100).toFixed(1)}%` : `${top3Andel}%`, farg: C.purple, desc: "Av total förmögenhet" },
                   { label: "Total förmögenhet",value: `${Math.round(totalFormogehet)} kr`, farg: C.text,    desc: "Alla 24 agenters saldo" },
@@ -479,7 +502,7 @@ export default async function StatenPage() {
               Skattebetalare — saldo &gt; {policy.skattetroskel} kr
             </h2>
             <span style={{ fontSize: 11, color: C.muted, fontFamily: "monospace" }}>
-              {policy.skattesats * 100}% veckovis på överskott
+              {bracketSummary(policy)} veckovis (progressiv)
             </span>
           </div>
 
@@ -491,8 +514,7 @@ export default async function StatenPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {taxpayers.map((agent, i) => {
                 const saldo    = parseFloat(agent.saldo);
-                const taxBase  = saldo - policy.skattetroskel;
-                const taxEst   = Math.ceil(taxBase * policy.skattesats);
+                const taxEst   = beraknaSkatt(saldo, policy);
                 const av       = agentVisuell(agent.agent);
                 const maxSaldo = parseFloat(taxpayers[0].saldo);
                 const barPct   = Math.round((saldo / maxSaldo) * 100);
@@ -566,7 +588,7 @@ export default async function StatenPage() {
             marginTop: 14, margin: "14px 0 0",
             borderTop: `1px solid ${C.border}`, paddingTop: 12,
           }}>
-            Skattebasen beräknas på saldo minus {policy.skattetroskel} kr. Gini-driven policy — tröskel och sats justeras automatiskt varje söndag.
+            Progressiv skatt med tröskel {policy.skattetroskel} kr. Gini-driven policy — tröskel och brackets justeras automatiskt varje söndag.
             Böter från domstolen tillkommer ovanpå skatteintäkterna.
           </p>
         </div>
@@ -734,7 +756,7 @@ export default async function StatenPage() {
                 ikon: "⚖",
                 rubrik: "Förmögenhetsskatt",
                 farg: C.yellow,
-                text: `${policy.skattesats * 100}% per vecka på saldo över ${policy.skattetroskel} kr. Dras automatiskt av inflation.py varje söndag. Nivå justeras efter Gini.`,
+                text: `Progressiv skatt på saldo över ${policy.skattetroskel} kr (${bracketSummary(policy)}). Dras automatiskt av inflation.py varje söndag. Nivå justeras efter Gini.`,
               },
               {
                 ikon: "🏛",
