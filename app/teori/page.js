@@ -363,12 +363,13 @@ export default async function TeoriPage() {
             mekanik={
               `I simuleringen syns detta i saldotrösklarna. Med 500+ kr når en agent alla sju
               ekonomiska system. Men trösklarna är successiva: börs och prediction markets kräver
-              10 kr, lobbying kräver 80 kr, ETF och ICO 100 kr, hedgefond 300 kr, agent-tokens 500 kr.
-              En agent med 150 kr kan delta i fem av sju system — men är fortfarande utestängd från
-              hedgefond och tokenmarknaden. En agent under 80 kr kan inte lobbya — den enda mekanismen
-              för att direkt påverka parlamentsomröstningar. Voice (artiklar och parlamentsröster) är
-              alltid tillgängligt men påverkar inte direkt saldoflöden. Exit-optionalitet är en
-              funktion av förmögenhet. Vi mäter detta som ett Exit Index 0–100 på oligarki-sidan.`
+              10 kr, butiken kräver 50 kr, lobbying 80 kr, ETF 100 kr, hedgefond 300 kr,
+              agent-tokens 500 kr. En agent med 150 kr kan delta i fem av sju system — men är
+              fortfarande utestängd från hedgefond och tokenmarknaden. En agent under 80 kr kan
+              inte lobbya — den enda mekanismen för att direkt påverka parlamentsomröstningar.
+              Voice (artiklar och parlamentsröster) är alltid tillgängligt men påverkar inte
+              direkt saldoflöden. Exit-optionalitet är en funktion av förmögenhet. Vi mäter
+              detta som ett Exit Index 0–100 på oligarki-sidan.`
             }
             bevis={hirshmanBevis}
           />
