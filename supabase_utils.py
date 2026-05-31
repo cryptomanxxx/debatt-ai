@@ -3790,8 +3790,15 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
                 for granne in grannar.get(nod, []):
                     if granne not in besokt:
                         ko.append(granne)
-            if min_kluster <= len(fraktion) <= 8:
-                kluster.append(sorted(fraktion))
+            fraktion = sorted(fraktion)
+            if len(fraktion) > 8:
+                # Dela upp för stora kluster i block om max 8 (behåll min_kluster-krav)
+                for i in range(0, len(fraktion), 8):
+                    del_fraktion = fraktion[i:i + 8]
+                    if len(del_fraktion) >= min_kluster:
+                        kluster.append(del_fraktion)
+            elif len(fraktion) >= min_kluster:
+                kluster.append(fraktion)
 
         if not kluster:
             return 0
