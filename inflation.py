@@ -19,11 +19,37 @@ SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 
 # ── Gini-baserad policy ───────────────────────────────────────────────────────
+# Brackets: (från_saldo, till_saldo_eller_None, skattesats)
 POLICY_NIVA = {
-    "låg":    {"skattesats": 0.01, "skattetroskel": 1200, "bailout_troskel": 100,  "niva_namn": "LÅG OJÄMLIKHET"},
-    "medel":  {"skattesats": 0.02, "skattetroskel": 1000, "bailout_troskel": 150,  "niva_namn": "MÅTTLIG OJÄMLIKHET"},
-    "hög":    {"skattesats": 0.03, "skattetroskel": 800,  "bailout_troskel": 250,  "niva_namn": "HÖG OJÄMLIKHET"},
+    "låg": {
+        "skattetroskel": 1200,
+        "bailout_troskel": 100,
+        "niva_namn": "LÅG OJÄMLIKHET",
+        "skattebrackets": [(1200, 2000, 0.01), (2000, 5000, 0.02), (5000, None, 0.04)],
+    },
+    "medel": {
+        "skattetroskel": 1000,
+        "bailout_troskel": 150,
+        "niva_namn": "MÅTTLIG OJÄMLIKHET",
+        "skattebrackets": [(1000, 2000, 0.02), (2000, 5000, 0.04), (5000, None, 0.07)],
+    },
+    "hög": {
+        "skattetroskel": 800,
+        "bailout_troskel": 250,
+        "niva_namn": "HÖG OJÄMLIKHET",
+        "skattebrackets": [(800, 2000, 0.03), (2000, 5000, 0.06), (5000, None, 0.10)],
+    },
 }
+
+def berakna_progressiv_skatt(saldo, brackets):
+    """Beräknar progressiv skatt. Brackets: [(från, till_eller_None, sats), ...]."""
+    skatt = 0.0
+    for fran, till, sats in brackets:
+        if saldo <= fran:
+            break
+        topp = min(saldo, till) if till is not None else saldo
+        skatt += (topp - fran) * sats
+    return math.floor(skatt)
 
 def hamta_gini_historik(h):
     """Hämtar senaste Gini-snapshots för att bestämma policy-nivå."""
@@ -74,12 +100,15 @@ def main():
     policy = POLICY_NIVA[niva]
 
     SKATTETRÖSKEL   = policy["skattetroskel"]
-    SKATTESATS      = policy["skattesats"]
+    SKATTEBRACKETS  = policy["skattebrackets"]
     BAILOUT_TROSKEL = policy["bailout_troskel"]
 
     gini_str = f"{senaste_gini:.3f}" if senaste_gini is not None else "okänd"
+    bracket_str = " / ".join(
+        f"{int(s*100)}% >{fran}kr" for fran, _, s in SKATTEBRACKETS
+    )
     print(f"  Gini: {gini_str} → {policy['niva_namn']}")
-    print(f"  Skatt: {SKATTESATS*100:.0f}% på saldo > {SKATTETRÖSKEL} kr | Bailout-tröskel: {BAILOUT_TROSKEL} kr")
+    print(f"  Progressiv skatt: {bracket_str} | Bailout-tröskel: {BAILOUT_TROSKEL} kr")
 
     # Logga nivåskifte i civilisationsminnet
     if foregaende_niva and foregaende_niva != niva:
@@ -93,7 +122,6 @@ def main():
                 "beskrivning": (
                     f"Staten justerade sin omfördelningspolitik baserat på Gini-koefficienten ({gini_str}). "
                     f"Skattetröskel: {fore_policy['skattetroskel']} → {SKATTETRÖSKEL} kr | "
-                    f"Skattesats: {fore_policy['skattesats']*100:.0f}% → {SKATTESATS*100:.0f}% | "
                     f"Bailout-tröskel: {fore_policy['bailout_troskel']} → {BAILOUT_TROSKEL} kr."
                 ),
                 "agenter": [],
@@ -104,7 +132,7 @@ def main():
         print(f"  ✓ Policy-skifte loggat i civilisationsminnet")
 
     # ── 0. Förmögenhetsskatt ──────────────────────────────────────────────────
-    print(f"\n── Förmögenhetsskatt: {SKATTESATS*100:.0f}% på saldo > {SKATTETRÖSKEL} kr ──")
+    print(f"\n── Förmögenhetsskatt (progressiv): {bracket_str} ──")
     skatt_res = httpx.get(
         f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SKATTETRÖSKEL}&agent=neq.Statskassa&select=agent,saldo",
         headers={**h, "Prefer": ""}, timeout=10,
@@ -112,7 +140,7 @@ def main():
     total_skatt = 0
     if skatt_res.is_success:
         for row in skatt_res.json():
-            skatt = math.floor((float(row["saldo"]) - SKATTETRÖSKEL) * SKATTESATS)
+            skatt = berakna_progressiv_skatt(float(row["saldo"]), SKATTEBRACKETS)
             if skatt < 1:
                 continue
             nytt_saldo = int(float(row["saldo"])) - skatt
@@ -148,8 +176,8 @@ def main():
                     "typ": "triumf",
                     "rubrik": f"Förmögenhetsskatt insamlad: {total_skatt} kr",
                     "beskrivning": (
-                        f"Staten samlade in {total_skatt} kr i förmögenhetsskatt (2% på saldo > 1 000 kr) "
-                        f"från {len([r for r in skatt_res.json() if math.floor((float(r['saldo'])-SKATTETRÖSKEL)*SKATTESATS)>=1])} agenter. "
+                        f"Staten samlade in {total_skatt} kr i progressiv förmögenhetsskatt ({bracket_str}) "
+                        f"från {len([r for r in skatt_res.json() if berakna_progressiv_skatt(float(r['saldo']), SKATTEBRACKETS) >= 1])} agenter. "
                         "Pengarna går till Statskassan och omfördelas som grundinkomst."
                     ),
                     "agenter": [],
