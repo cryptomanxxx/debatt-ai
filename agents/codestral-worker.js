@@ -79,10 +79,19 @@ async function main() {
   const codeBlock = buildCodeBlock(allFiles);
 
   let suggestions = [];
-  try {
-    suggestions = await analyzeWithCodestral(codeBlock, runtimeSummary);
-  } catch (e) {
-    console.error("Codestral-analys misslyckades:", e.message);
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      suggestions = await analyzeWithCodestral(codeBlock, runtimeSummary);
+      break;
+    } catch (e) {
+      lastError = e;
+      console.error(`Codestral-analys misslyckades (försök ${attempt}/3): ${e.message}`);
+      if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
+  if (!suggestions.length && lastError) {
+    console.error("Codestral-analys misslyckades efter 3 försök — avslutar.");
     return;
   }
 
