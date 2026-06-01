@@ -1,6 +1,6 @@
 {
   "week": "2026-W23",
-  "generated": "2026-06-01T15:29:11.701Z",
+  "generated": "2026-06-01T15:30:46.127Z",
   "ai_providers": {},
   "plattform": {
     "artiklar_publicerade": 75,
@@ -57,17 +57,9 @@
     ]
   },
   "ai_bus": {
-    "pending": 3,
+    "pending": 6,
     "implemented": 11,
     "rejected": 12
   },
-  "vs_prev_week": {
-    "rate_limited_delta": 0,
-    "kritiska_fel_delta": 0,
-    "artiklar_delta": -12,
-    "direktdebatter_delta": -2,
-    "prenumeranter_delta": 0,
-    "api_anrop_delta": 0,
-    "agent_fragor_delta": 29
-  }
+  "vs_prev_week": null
 }
