@@ -180,9 +180,6 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
               <stop offset="65%" stopColor="#060d18" stopOpacity="0" />
               <stop offset="100%" stopColor="#060d18" stopOpacity="0.88" />
             </radialGradient>
-            <filter id="hexglow" x="-70%" y="-70%" width="240%" height="240%">
-              <feGaussianBlur stdDeviation="10" />
-            </filter>
             <filter id="softglow" x="-40%" y="-40%" width="180%" height="180%">
               <feGaussianBlur stdDeviation="2.5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
@@ -233,12 +230,6 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
                     </>
                   )}
 
-                  {agFarg && (
-                    <polygon points={hexPts(cx, cy, HEX + 8)} fill="none" stroke={agFarg}
-                      strokeWidth={isAct ? 5 : 3} filter="url(#hexglow)">
-                      <animate attributeName="opacity" values="0.08;0.60;0.08" dur="3.2s" repeatCount="indefinite" />
-                    </polygon>
-                  )}
                   <polygon points={pts} fill="rgba(0,0,0,0)" stroke="none" />
                   <polygon points={pts} fill={`url(#grad-${zon.typ})`} stroke="none" />
                   {agGradId && <polygon points={pts} fill={`url(#${agGradId})`} stroke="none" />}
