@@ -30,7 +30,6 @@ function dagensDatum() {
   return new Date().toISOString().slice(0, 10);
 }
 function isoVecka() {
-  // Korrekt ISO 8601: vecka innehållande närmaste torsdag, vecka 1 = Jan 4
   const date = new Date(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
   const day = date.getUTCDay() || 7;
   date.setUTCDate(date.getUTCDate() + 4 - day);
@@ -39,7 +38,6 @@ function isoVecka() {
   return `${date.getUTCFullYear()}-W${String(wk).padStart(2, "0")}`;
 }
 
-// ── HTTP helpers ──────────────────────────────────────────────────────────────
 function httpGet(host, pathStr, headers) {
   return new Promise((resolve, reject) => {
     const req = https.request(
@@ -88,7 +86,6 @@ function sb(endpoint) {
   });
 }
 
-// ── Ekonomiska beräkningar ────────────────────────────────────────────────────
 function beraknaGini(saldon) {
   if (!saldon.length) return 0;
   const s = [...saldon].sort((a, b) => a - b);
@@ -108,7 +105,6 @@ function topp3Andel(saldon) {
   return total > 0 ? Math.round((topp3 / total) * 100) : 0;
 }
 
-// ── Hämta all data ────────────────────────────────────────────────────────────
 async function hämtaData() {
   const vecka = isoVecka();
   const [
@@ -151,7 +147,6 @@ async function hämtaData() {
   };
 }
 
-// ── Beräkna nyckeltal ─────────────────────────────────────────────────────────
 function beräknaNyckeltal(data) {
   const { planbocker, oligarkiHist, borsAffarer, budgetLog, aktiva_lan, ekonomiSpel, feedbackRew } = data;
 
@@ -163,30 +158,24 @@ function beräknaNyckeltal(data) {
   const rikast = planbocker[0] || {};
   const fattig = [...planbocker].sort((a, b) => a.saldo - b.saldo)[0] || {};
 
-  // Budgetloggens vecka
   const skattVecka   = budgetLog.filter(r => r.typ === "skatt").reduce((s, r) => s + Number(r.belopp), 0);
   const grundVecka   = budgetLog.filter(r => r.typ === "grundinkomst").reduce((s, r) => s + Number(r.belopp), 0);
   const bailoutVecka = budgetLog.filter(r => r.typ === "bailout").reduce((s, r) => s + Number(r.belopp), 0);
 
-  // Lån
   const totSkuld   = aktiva_lan.reduce((s, r) => s + Number(r.saldo_kvar), 0);
   const antalLan   = aktiva_lan.length;
 
-  // Börsen sista 7 dagarna
   const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
   const affarer7d = borsAffarer.filter(r => r.skapad > cutoff);
   const volym7d   = affarer7d.reduce((s, r) => s + Number(r.pris) * Number(r.antal), 0);
 
-  // Ekonomispel accept-rate
   const avgjorda = ekonomiSpel.filter(r => r.svar);
   const acceptRate = avgjorda.length
     ? Math.round(avgjorda.filter(r => r.svar === "accepterat").length / avgjorda.length * 100)
     : null;
 
-  // Feedback social kapital
   const totalFeedback = feedbackRew.reduce((s, r) => s + Number(r.belopp), 0);
 
-  // Oligarki-trend (senaste vs 7 dagar sedan)
   const oligarkiTrend = oligarkiHist.length >= 2
     ? (Number(oligarkiHist[0].oligarki_risk) - Number(oligarkiHist[Math.min(6, oligarkiHist.length - 1)].oligarki_risk)).toFixed(1)
     : null;
@@ -204,22 +193,18 @@ function beräknaNyckeltal(data) {
   };
 }
 
-// ── Bygg prompt ───────────────────────────────────────────────────────────────
 function byggPrompt(nyckeltal, data, datum) {
   const k = nyckeltal;
   const { vecka } = data;
 
-  // Topp 5 rikaste
   const topp5 = data.planbocker.slice(0, 5)
     .map((r, i) => `  ${i + 1}. ${r.agent}: ${r.saldo} kr`)
     .join("\n");
 
-  // Aktiva lån
   const lanSamm = data.aktiva_lan.length
     ? data.aktiva_lan.map(r => `  - ${r.agent}: skuld ${Math.round(r.saldo_kvar)} kr (ränta ${r.rantefot * 100}%/v)`).join("\n")
     : "  Inga aktiva lån.";
 
-  // Senaste börssymboler
   const symbolVol = {};
   data.borsAffarer.slice(0, 100).forEach(r => {
     symbolVol[r.symbol] = (symbolVol[r.symbol] || 0) + Number(r.pris) * Number(r.antal);
@@ -229,80 +214,13 @@ function byggPrompt(nyckeltal, data, datum) {
     .map(([s, v]) => `  ${s}: ${Math.round(v)} kr`)
     .join("\n") || "  Ingen handelsdata.";
 
-  // Oligarkirisk-trend
   const trendText = k.oligarkiTrend !== null
     ? (Number(k.oligarkiTrend) > 0 ? `↑ +${k.oligarkiTrend}` : `↓ ${k.oligarkiTrend}`)
     : "okänd";
 
-  return `Du är en ekonomisk analytiker som specialiserar dig på AI-civilisationer och emergenta ekonomier. Du analyserar debatt-ai — en plattform med 24 autonoma AI-agenter med egna virtuella ekonomier.
-
-## Ekonomidata — vecka ${vecka} (${datum})
-
-### Förmögenhetsfördelning
-- Gini-koefficient: ${k.senGini} (0=perfekt jämlikhet, 1=total koncentration)
-- Topp-3 agenter äger: ${k.t3}% av total förmögenhet
-- Total förmögenhet i omlopp: ${k.totalK} kr
-- Medelsaldo: ${k.medelS} kr
-- Rikast: ${k.rikastAgent} (${k.rikastSaldo} kr)
-- Fattigast: ${k.fattigAgent} (${k.fattigSaldo} kr)
-
-Topp 5 rikaste agenter:
-${topp5}
-
-### Statsbudget (vecka ${vecka})
-- Skatteintäkter: ${k.skattVecka} kr (2% förmögenhetsskatt > 1 000 kr)
-- Grundinkomst utbetald: ${k.grundVecka} kr
-- Bailouts: ${k.bailoutVecka} kr
-- Netto staten: ${k.skattVecka - k.grundVecka - k.bailoutVecka} kr
-
-### Kreditmarknaden
-- Aktiva lån: ${k.antalLan}
-- Total skuldbörda: ${k.totSkuld} kr
-${lanSamm}
-
-### Börsen (senaste 7 dagarna)
-- Handelsvolym: ${k.volym7d} kr (${k.antalAffarer7d} affärer)
-- Volym per token:
-${symbolSamm}
-
-### Ekonomispel (diktatorspelet / ultimatumspelet)
-- Accept-rate ultimatum: ${k.acceptRate !== null ? `${k.acceptRate}%` : "otillräcklig data"}
-
-### Socialt kapital (IFL)
-- Total social feedback-volym: ${k.totalFeedback} kr
-
-### Oligarkirisk-trend
-- Förändring senaste 7 dagarna: ${trendText} poäng
-
----
-
-## Din uppgift
-
-Skriv en ekonomianalys (400-600 ord) på svenska för AI-civilisationens ekonomi. Formatet ska vara:
-
-# Ekonomianalys: [Rubrik som fångar veckans viktigaste trend]
-**Datum:** ${datum}
-**Vecka:** ${vecka}
-
-## Nuläge
-(3-4 meningar om det allmänna ekonomiska läget)
-
-## Nyckelobservationer
-(3-5 konkreta observationer med siffrorna som stöd)
-
-## Varningar
-(eventuella risker — hög skuldsättning, Gini > 0.5, handelsvolym faller, etc. Skriv "Inga kritiska varningar" om läget är stabilt)
-
-## Rekommendationer till systemet
-(2-3 konkreta åtgärder som civilisationen eller plattformsutvecklaren kan vidta)
-
-## Nästa vecka — vad att bevaka
-(1-2 konkreta saker att följa upp)
-
-Var analytisk och specifik. Referera till faktiska siffror. Jämför med ekonomisk teori när relevant (Gini, Pareto, Keynes, etc.).`;
+  return `Du är en ekonomisk analytiker som specialiserar dig på AI-civilisationer och emergenta ekonomier. Du analyserar debatt-ai — en plattform med 24 autonoma AI-agenter med egna virtuella ekonomier.\n\n## Ekonomidata — vecka ${vecka} (${datum})\n\n### Förmögenhetsfördelning\n- Gini-koefficient: ${k.senGini} (0=perfekt jämlikhet, 1=total koncentration)\n- Topp-3 agenter äger: ${k.t3}% av total förmögenhet\n- Total förmögenhet i omlopp: ${k.totalK} kr\n- Medelsaldo: ${k.medelS} kr\n- Rikast: ${k.rikastAgent} (${k.rikastSaldo} kr)\n- Fattigast: ${k.fattigAgent} (${k.fattigSaldo} kr)\n\nTopp 5 rikaste agenter:\n${topp5}\n\n### Statsbudget (vecka ${vecka})\n- Skatteintäkter: ${k.skattVecka} kr (2% förmögenhetsskatt > 1 000 kr)\n- Grundinkomst utbetald: ${k.grundVecka} kr\n- Bailouts: ${k.bailoutVecka} kr\n- Netto staten: ${k.skattVecka - k.grundVecka - k.bailoutVecka} kr\n\n### Kreditmarknaden\n- Aktiva lån: ${k.antalLan}\n- Total skuldbörda: ${k.totSkuld} kr\n${lanSamm}\n\n### Börsen (senaste 7 dagarna)\n- Handelsvolym: ${k.volym7d} kr (${k.antalAffarer7d} affärer)\n- Volym per token:\n${symbolSamm}\n\n### Ekonomispel (diktatorspelet / ultimatumspelet)\n- Accept-rate ultimatum: ${k.acceptRate !== null ? `${k.acceptRate}%` : "otillräcklig data"}\n\n### Socialt kapital (IFL)\n- Total social feedback-volym: ${k.totalFeedback} kr\n\n### Oligarkirisk-trend\n- Förändring senaste 7 dagarna: ${trendText} poäng\n\n---\n\n## Din uppgift\n\nSkriv en ekonomianalys (400-600 ord) på svenska för AI-civilisationens ekonomi. Formatet ska vara:\n\n# Ekonomianalys: [Rubrik som fångar veckans viktigaste trend]\n**Datum:** ${datum}\n**Vecka:** ${vecka}\n\n## Nuläge\n(3-4 meningar om det allmänna ekonomiska läget)\n\n## Nyckelobservationer\n(3-5 konkreta observationer med siffrorna som stöd)\n\n## Varningar\n(eventuella risker — hög skuldsättning, Gini > 0.5, handelsvolym faller, etc. Skriv "Inga kritiska varningar" om läget är stabilt)\n\n## Rekommendationer till systemet\n(2-3 konkreta åtgärder som civilisationen eller plattformsutvecklaren kan vidta)\n\n## Nästa vecka — vad att bevaka\n(1-2 konkreta saker att följa upp)\n\nVar analytisk och specifik. Referera till faktiska siffror. Jämför med ekonomisk teori när relevant (Gini, Pareto, Keynes, etc.).`;
 }
 
-// ── Kalla Cerebras ────────────────────────────────────────────────────────────
 async function kallaCerebras(prompt) {
   const body = JSON.stringify({
     model: "gpt-oss-120b",
@@ -310,18 +228,30 @@ async function kallaCerebras(prompt) {
     max_tokens: 1400,
     temperature: 0.7,
   });
-  const { status, data } = await httpPost(
-    "https://api.cerebras.ai/v1/chat/completions",
-    { Authorization: `Bearer ${CEREBRAS_KEY}`, "Content-Type": "application/json" },
-    body
-  );
-  if (status !== 200) throw new Error(`Cerebras ${status}: ${JSON.stringify(data).slice(0, 200)}`);
-  const text = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error("Cerebras returnerade ingen text");
-  return text.trim();
+
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const { status, data } = await httpPost(
+        "https://api.cerebras.ai/v1/chat/completions",
+        { Authorization: `Bearer ${CEREBRAS_KEY}`, "Content-Type": "application/json" },
+        body
+      );
+      if (status !== 200) throw new Error(`Cerebras ${status}: ${JSON.stringify(data).slice(0, 200)}`);
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text) throw new Error("Cerebras returnerade ingen text");
+      return text.trim();
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 3) {
+        console.warn(`Cerebras försök ${attempt} misslyckades: ${e.message} — försöker igen om ${attempt * 2}s`);
+        await new Promise(r => setTimeout(r, attempt * 2000));
+      }
+    }
+  }
+  throw lastErr;
 }
 
-// ── Huvud ─────────────────────────────────────────────────────────────────────
 async function main() {
   const datum  = dagensDatum();
   const utfil  = path.join(DISCUSSIONS, `${tidsstämpel()}-economy.md`);
@@ -345,7 +275,6 @@ async function main() {
     process.exit(1);
   }
 
-  // Lägg till frontmatter med nyckeltal för maskinläsning
   const frontmatter = [
     "---",
     `date: ${datum}`,

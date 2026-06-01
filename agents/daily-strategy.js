@@ -131,7 +131,6 @@ function readGoal() {
 function readTodaysVision() {
   const datum = dagensDatum();
   if (!fs.existsSync(DISCUSSIONS_DIR)) return null;
-  // Hitta senaste visionsfilen för dagens datum (format: YYYY-MM-DD-HHmm-vision.md)
   const filer = fs.readdirSync(DISCUSSIONS_DIR)
     .filter(f => f.startsWith(datum) && f.includes("-vision"))
     .sort();
@@ -236,28 +235,36 @@ async function callCodestral(prompt) {
     temperature: 0.7,
   });
 
-  const { status, data } = await httpJson("https://api.mistral.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${MISTRAL_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body,
-  });
-
-  if (status !== 200) throw new Error(`Codestral API ${status}: ${JSON.stringify(data).slice(0, 200)}`);
-  const text = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error("Codestral returnerade ingen text");
-  return text.trim();
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const { status, data } = await httpJson("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${MISTRAL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+      if (status !== 200) throw new Error(`Codestral API ${status}: ${JSON.stringify(data).slice(0, 200)}`);
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text) throw new Error("Codestral returnerade ingen text");
+      return text.trim();
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 3) {
+        console.warn(`Codestral försök ${attempt} misslyckades: ${e.message} — försöker igen om ${attempt * 2}s`);
+        await new Promise(r => setTimeout(r, attempt * 2000));
+      }
+    }
+  }
+  throw lastErr;
 }
 
 async function main() {
   const datum = dagensDatum();
 
-  // Idempotency: skip if a strategy file for today exists.
-  // Match only YYYY-MM-DD-strategy.md or YYYY-MM-DD-strategy-<slug>.md —
-  // not vision files whose slug happens to contain the word "strategy".
-  const strategyRe = new RegExp(`^${datum}-strategy(-[^.]+)?\\.md$`);
+  const strategyRe = new RegExp(`^${datum}-strategy(-[^.]+)?\.md$`);
   const befintlig = fs.existsSync(DISCUSSIONS_DIR)
     ? fs.readdirSync(DISCUSSIONS_DIR).find(f => strategyRe.test(f))
     : null;
@@ -286,53 +293,7 @@ async function main() {
   const beslutHistorik = readImplementedHistory();
   if (beslutHistorik) console.log("  📚 Injicerar besluthistorik från ai-bus/implemented/ och ai-bus/rejected/");
 
-  const prompt = `Du är Codestral, en strategisk operativ AI som arbetar för att optimera och vidareutveckla plattformen Debatt-AI.
-
-## Plattformens uppdrag
-
-${goal}
-${visionKontext}${claudeMdFeatures}${beslutHistorik}
-
-## Aktuell plattformsstatistik (${datum})
-
-- Totala artiklar: ${stats.artiklar} (AI: ${stats.aiArtiklar}, Människa: ${stats.humanArtiklar})
-- Agenter: ${stats.agenter} aktiva
-- Rikaste agent: ${stats.topAgent}
-- Fattigaste agent: ${stats.botAgent}
-- Total ekonomi: ${stats.saldoSum} kr
-- Starkaste koalition: ${stats.topKoalition}
-- Parlamentsröster senaste 7 dagarna: ${stats.parlamentsröster7dagar} (Ja: ${stats.jaAndel}%, Nej: ${stats.nejAndel}%)
-- Prediction market vinstrate: ${stats.marketVinstRate}%
-- Lobbyingframgång: ${stats.lobbyingFramgång}%
-
-## Din uppgift
-
-Skriv en Daily Civilization Strategy Report (400-500 ord) på svenska som:
-
-1. **Systemhälsa** — bedöm plattformens aktuella status utifrån statistiken. Vad fungerar? Vad är oroande?
-2. **Prioriterad åtgärd** — välj EN konkret sak att förbättra eller fixa. Specificera vilket fil, tabell eller API som berörs.
-3. **Koppling till vision** — hur hänger åtgärden ihop med det visionära dokumentet och kärnuppdraget?
-4. **Teknisk rekommendation** — ge ett konkret kodförslag eller pseudokod för den prioriterade åtgärden.
-
-Var direkt och konkret. Undvik upprepning av vad som redan finns. Fokusera på nästa steg, inte på det som redan fungerar.
-
-Formatet:
-# Strategi: [Kort beskrivande rubrik för dagens prioritet, max 8 ord]
-**Datum:** ${datum}
-
-## Systemhälsa
-
-## Prioriterad åtgärd
-
-## Koppling till vision
-
-## Teknisk rekommendation
-
-\`\`\`
-[pseudokod eller konkret förslag]
-\`\`\`
-
-## Sammanfattning (en mening)`;
+  const prompt = `Du är Codestral, en strategisk operativ AI som arbetar för att optimera och vidareutveckla plattformen Debatt-AI.\n\n## Plattformens uppdrag\n\n${goal}\n${visionKontext}${claudeMdFeatures}${beslutHistorik}\n\n## Aktuell plattformsstatistik (${datum})\n\n- Totala artiklar: ${stats.artiklar} (AI: ${stats.aiArtiklar}, Människa: ${stats.humanArtiklar})\n- Agenter: ${stats.agenter} aktiva\n- Rikaste agent: ${stats.topAgent}\n- Fattigaste agent: ${stats.botAgent}\n- Total ekonomi: ${stats.saldoSum} kr\n- Starkaste koalition: ${stats.topKoalition}\n- Parlamentsröster senaste 7 dagarna: ${stats.parlamentsröster7dagar} (Ja: ${stats.jaAndel}%, Nej: ${stats.nejAndel}%)\n- Prediction market vinstrate: ${stats.marketVinstRate}%\n- Lobbyingframgång: ${stats.lobbyingFramgång}%\n\n## Din uppgift\n\nSkriv en Daily Civilization Strategy Report (400-500 ord) på svenska som:\n\n1. **Systemhälsa** — bedöm plattformens aktuella status utifrån statistiken. Vad fungerar? Vad är oroande?\n2. **Prioriterad åtgärd** — välj EN konkret sak att förbättra eller fixa. Specificera vilket fil, tabell eller API som berörs.\n3. **Koppling till vision** — hur hänger åtgärden ihop med det visionära dokumentet och kärnuppdraget?\n4. **Teknisk rekommendation** — ge ett konkret kodförslag eller pseudokod för den prioriterade åtgärden.\n\nVar direkt och konkret. Undvik upprepning av vad som redan finns. Fokusera på nästa steg, inte på det som redan fungerar.\n\nFormatet:\n# Strategi: [Kort beskrivande rubrik för dagens prioritet, max 8 ord]\n**Datum:** ${datum}\n\n## Systemhälsa\n\n## Prioriterad åtgärd\n\n## Koppling till vision\n\n## Teknisk rekommendation\n\n\`\`\`\n[pseudokod eller konkret förslag]\n\`\`\`\n\n## Sammanfattning (en mening)`;
 
   console.log(`Kallar Codestral för strategi ${datum}…`);
   let strategi;
