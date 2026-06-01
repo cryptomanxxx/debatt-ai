@@ -28,3 +28,9 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           PYTHONUNBUFFERED: "1"
         run: python -u mark_test.py
+
+      - name: Kör mark_andrahand_test
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          PYTHONUNBUFFERED: "1"
+        run: python -u mark_andrahand_test.py
