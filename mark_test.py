@@ -11,7 +11,7 @@ SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ["SUPABASE_ANON_KEY"]
 
 MAX_ZONER_PER_AGENT = 6   # Förhindrar tidig monopolisering
-KOP_SANNOLIKHET = 0.06    # 6% chans per agent per körning
+KOP_SANNOLIKHET = 0.25    # 25% chans per agent per körning
 
 AGENTER = [
     "Nationalekonom", "Miljöaktivist", "Teknikoptimist", "Konservativ debattör",
