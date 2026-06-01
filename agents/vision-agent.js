@@ -163,6 +163,43 @@ function readClaudeMdFeatures() {
   } catch { return ""; }
 }
 
+function httpGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request(
+      { hostname: u.hostname, path: u.pathname + u.search, method: "GET", headers },
+      (res) => {
+        let data = "";
+        res.on("data", c => data += c);
+        res.on("end", () => {
+          try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
+          catch { resolve({ status: res.statusCode, data }); }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error("timeout")); });
+    req.end();
+  });
+}
+
+async function readFeatureRequests() {
+  const sbKey = process.env.SUPABASE_ANON_KEY;
+  if (!sbKey) return "";
+  try {
+    const { status, data } = await httpGet(
+      "https://fmwxftnistkoqazfwnuj.supabase.co/rest/v1/agent_feature_requests" +
+      "?status=eq.open&order=skapad.desc&limit=8&select=agent,kategori,titel,beskrivning,prioritet",
+      { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+    );
+    if (status !== 200 || !Array.isArray(data) || data.length === 0) return "";
+    const rader = data.map(r =>
+      `- **[${r.kategori}/${r.prioritet}]** ${r.agent}: "${r.titel}" — ${r.beskrivning.slice(0, 120)}`
+    );
+    return `\n\n## Agenternas egna önskemål (direkt från simuleringen)\nDessa förslag kom från AI-agenter baserat på deras upplevelser — överväg dem som datapunkter:\n${rader.join("\n")}`;
+  } catch { return ""; }
+}
+
 function httpPost(url, headers, body) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -221,13 +258,15 @@ async function main() {
   const beslutHistorik = readDecisionHistory();
   const claudeMdFeatures = readClaudeMdFeatures();
   if (claudeMdFeatures) console.log(`  📋 Injicerar ${claudeMdFeatures.split("\n").filter(l => l.startsWith("-")).length} byggda funktioner från CLAUDE.md`);
+  const agentÖnskemål = await readFeatureRequests();
+  if (agentÖnskemål) console.log(`  🤖 Injicerar ${agentÖnskemål.split("\n").filter(l => l.startsWith("-")).length} agentönskemål från simuleringen`);
 
   const prompt = `Du är en visionär AI-arkitekt med djup insikt i AI-simuleringar, civilisationsteori och social dynamik. Du analyserar plattformen Debatt-AI och genererar konkreta, innovativa idéer för att ta den till nästa nivå.
 
 ## Plattformens uppdrag och vision
 
 ${goal}
-${tidigareKontext}${claudeMdFeatures}${beslutHistorik}
+${tidigareKontext}${claudeMdFeatures}${beslutHistorik}${agentÖnskemål}
 
 ## Din uppgift idag (${datum})
 

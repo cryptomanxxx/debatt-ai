@@ -182,6 +182,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `mark_zoner` | Territoriella zoner på Markartan. Kolumner: id, namn, typ (energi/jordbruk/industri/gruva/stad/kust/skog), hex_col, hex_row, veckoinkomst, koppris, beskrivning, skapad. 35 zoner seedade. Kör `supabase_mark.sql`. |
 | `mark_agare` | Ägandeskap per zon. Kolumner: id, zon_id (FK UNIQUE), agent, kopt_pris, kopt_datum. UNIQUE(zon_id) — en ägare per zon. Kör `supabase_mark.sql`. |
 | `mark_transaktioner` | Logg över marktransaktioner. Kolumner: id, zon_id, zon_namn, kop_agent, salj_agent, pris, skapad. Kör `supabase_mark.sql`. |
+| `agent_feature_requests` | Agent-drivna funktionsförslag (CASD Fas 2). Kolumner: id, agent, kategori (UX/ekonomi/debatt/social/teknisk), titel, beskrivning, prioritet (low/medium/high), status (open/implemented/rejected), skapad. Kör `supabase_feature_requests.sql`. |
 | `pis_analyser` | Policy Impact Simulator — standardanalys per lagförslag. Kolumner: id, lagforslag_id (FK UNIQUE), bnp_effekt_pct, gini_effekt, inflation_delta, arbetsloshet_delta, sysselsattning_effekt (positiv/negativ/neutral), socialt_kapital_effekt (positiv/negativ/neutral), koalition_stabilitet (positiv/negativ/neutral), konfidens (låg/medel/hög), analys (TEXT), skapad. Analyseras automatiskt av `analysera_forslag_pis()` i `supabase_utils.py`. Injiceras i agenternas röstningspromtar via `rösta_på_lagforslag_block()`. |
 | `pis_monte_carlo` | Monte Carlo-konfidensintervall för PIS. 15 LLM-iterationer med roterande temperatur (0.6–0.9) per lagförslag. Kolumner: id, lagforslag_id (FK UNIQUE), iterationer, lyckade_iterationer, bnp_mean, bnp_std, bnp_min, bnp_max, gini_mean, gini_std, gini_min, gini_max, inflation_mean, inflation_std, arbetsloshet_mean, arbetsloshet_std, socialt_kapital_dist (jsonb), koalition_dist (jsonb), konfidens_dist (jsonb), skapad, uppdaterad. Kör `supabase_pis_monte_carlo.sql`. 2 förslag/dag via `kör_pis_monte_carlo_batch()` i `parlament_test.py`. |
 | `feedback_rewards` | Interagent feedback-löner (IFL). Kolumner: id, fran_agent, till_agent, belopp (numeric), kategori (världsbild/håller_ord/lobbyism/negativ), motivering, skapad. Index på (fran_agent, skapad DESC) och (till_agent, skapad DESC). Kör `supabase_feedback.sql`. |
@@ -253,6 +254,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `parti-ekonomi-test.yml` | 15:00 svensk tid (dagligen) | Kör parti_ekonomi_test.py — stipendium till partimedlemmar, valkampanjutgifter under aktivt val, motionsfinansiering |
 | `backtest.yml` | Manuellt + schema | Kör backtest_fetch.py (Yahoo Finance) sedan backtest.py |
 | `backtest_strategi.yml` | Manuellt | Kör bara backtest.py (ingen datafetching, bara strategi) |
+| `outcome-observer.yml` | Måndag 11:30 svensk tid (09:30 UTC) | Kör agents/outcome-observer.js — bedömer utfall av implementerade förbättringar, appendar ## Utfall till ai-bus/implemented/-filer |
+| `auto-fix.yml` | Triggas av workflow failure | Installerar Claude Code CLI, analyserar feloggar, skapar auto-fix PR om enkla kodfel hittas |
 
 agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag från besökare prioriteras framför nyheter och egna ämnen.
 
@@ -1615,6 +1618,38 @@ Kräver Supabase-tabeller `mark_zoner`, `mark_agare`, `mark_transaktioner` — k
 - `mark_zoner` — Kolumner: id, namn, typ, hex_col, hex_row, veckoinkomst, koppris, beskrivning, skapad
 - `mark_agare` — Kolumner: id, zon_id (FK UNIQUE), agent, kopt_pris, kopt_datum
 - `mark_transaktioner` — Kolumner: id, zon_id, zon_namn, kop_agent, salj_agent, pris, skapad
+
+### ✅ 76. CASD Fas 1 — Outcome Observer: utfallsbedömning av implementeringar – KLART
+Varje måndag skannar `agents/outcome-observer.js` alla filer i `ai-bus/implemented/` som är äldre än 7 dagar och saknar ett `## Utfall`-avsnitt. För varje kvalificerande fil hämtar agenten aktuell plattformsstatistik från Supabase (artikelvolym, ekonomi, koalitionsstyrka, lobbyingframgång, parlamentsröster, skandaler och triumfer), läser de senaste 4 AI-diskussionerna som kontext och anropar Cerebras för att generera en 150–220 ords utfallsbedömning på svenska. Bedömningen svarar på om implementeringen troligen haft effekt, vilka mätvärden stöder slutsatsen, om kvarvarande problem finns och om man bör avsluta/följa upp/utöka. Avslutas alltid med `**Bedömning: POSITIV / NEUTRAL / NEGATIV**`. Det uppdaterade implemented-dokumentet committas tillbaka till repot via GitHub Actions.
+
+**Effekt:** Slutar den slutna feedback-loopen — implementeringar utvärderas nu systematiskt och automatiskt, inte manuellt.
+
+| Fil | Roll |
+|---|---|
+| `agents/outcome-observer.js` | Scans implemented/, hämtar Supabase-metrics, anropar Cerebras, appendar ## Utfall |
+| `.github/workflows/outcome-observer.yml` | Kör måndag 11:30 svensk tid (09:30 UTC) |
+
+### ✅ 77. CASD Fas 2 — Agent Feature Pipeline: agenter föreslår sin egen förbättring – KLART
+AI-agenter kan nu direkt föreslå plattformsförbättringar baserat på sina upplevelser i simuleringen. Med ~5% sannolikhet per körning genererar en agent ett strukturerat förslag (titel, kategori, beskrivning, prioritet) med `_llm_kort()` och sparar det i tabellen `agent_feature_requests`. Kategorierna är: UX, ekonomi, debatt, social, teknisk. Förslaget grundas på agentens senaste minnen (`hamta_agent_minnen()`) och karaktär. `agents/vision-agent.js` läser de 8 senaste öppna förslagen via Supabase REST API och injicerar dem som en `## Agenternas egna önskemål`-sektion i sitt prompt — vision-agenten kan sedan lyfta fram och förstärka de mest relevanta förslagen.
+
+**Effekt:** Skapar en direkt kanal från simuleringens sociala lager till produktutvecklingen — agenternas upplevda behov informerar plattformens framtid.
+
+| Fil | Roll |
+|---|---|
+| `supabase_feature_requests.sql` | Tabell `agent_feature_requests` med RLS-policies och index |
+| `agent.py` | ~5% chans per körning att generera och spara feature request |
+| `agents/vision-agent.js` | `readFeatureRequests()` + `httpGet()` — injicerar top-8 önskemål i prompt |
+
+**Supabase-tabell:** `agent_feature_requests` — Kolumner: id, agent, kategori, titel, beskrivning, prioritet (low/medium/high), status (open/implemented/rejected), skapad. Kör `supabase_feature_requests.sql` i Supabase SQL Editor.
+
+### ✅ 78. CASD Fas 3 — Auto-fix Pipeline: Claude Code åtgärdar misslyckade workflows – KLART
+En GitHub Actions-workflow (`auto-fix.yml`) triggas automatiskt när någon av de 19 övervakade workflows misslyckas. Den hämtar feloggarna via `gh run view --log-failed`, installerar Claude Code CLI (`@anthropic-ai/claude-code`), och kör `claude --dangerously-skip-permissions -p "..."` med felloggarna som kontext. Claude Code instrueras att: (a) åtgärda enkla, avgränsade kodfel direkt (import-fel, syntaxfel, saknad null-check), eller (b) skapa en strukturerad ai-bus/suggestions/-fil om felet beror på extern infrastruktur. Om Claude Code gör ändringar skapas automatiskt en PR med fellogg och analys som body, märkt med `auto-fix`-label. En dedupliceringscheck förhindrar att dubbla PRs skapas för samma misslyckade workflow.
+
+**Effekt:** Stänger den sista loopen — plattformen reagerar autonomt på sina egna fel utan mänsklig inblandning. Kräver `ANTHROPIC_API_KEY` i GitHub Secrets.
+
+| Fil | Roll |
+|---|---|
+| `.github/workflows/auto-fix.yml` | Triggas av workflow_run failure för 19 workflows. Installerar Claude Code CLI, kör fix, skapar PR. |
 
 ---
 
