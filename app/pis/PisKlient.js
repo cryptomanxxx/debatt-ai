@@ -1,6 +1,6 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 
 const C = {
   bg:      "#0a0a0a",
@@ -99,24 +99,19 @@ function RiktningRow({ label, v }) {
   );
 }
 
-export default function PisKlient({ analyser, forslagMap, mcMap, maxBnp, maxGini, maxInf, maxArb }) {
-  const searchParams = useSearchParams();
+export default function PisKlient({ analyser, forslagMap, mcMap, maxBnp, maxGini, maxInf, maxArb, initialQ = "" }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [visade, setVisade] = useState(PER_PAGE);
   const [baramc, setBaraMc] = useState(false);
-  const [sok, setSok] = useState(() => searchParams.get("q") || "");
-
-  useEffect(() => {
-    const q = searchParams.get("q") || "";
-    setSok(q);
-  }, [searchParams]);
+  const [sok, setSok] = useState(initialQ);
 
   function handleSok(val) {
     setSok(val);
     setVisade(PER_PAGE);
-    const params = new URLSearchParams(searchParams.toString());
-    if (val) params.set("q", val); else params.delete("q");
-    router.replace(`?${params.toString()}`, { scroll: false });
+    const params = new URLSearchParams();
+    if (val) params.set("q", val);
+    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
   }
 
   const sokLower = sok.trim().toLowerCase();

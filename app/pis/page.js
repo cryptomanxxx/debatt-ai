@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import PisKlient from "./PisKlient";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
@@ -62,7 +61,8 @@ function numLabel(val, suffix = "%", decimals = 1) {
   return (val > 0 ? "+" : "") + val.toFixed(decimals) + suffix;
 }
 
-export default async function PisPage() {
+export default async function PisPage({ searchParams }) {
+  const initialQ = searchParams?.q || "";
   const { analyser, forslagMap, mcMap } = await getData();
 
   const medBnp  = analyser.filter(a => a.bnp_effekt_pct   !== null);
@@ -142,17 +142,16 @@ export default async function PisPage() {
             Inga PIS-analyser ännu — körs automatiskt vid nästa parlamentskörning (12:00).
           </div>
         ) : (
-          <Suspense fallback={null}>
-            <PisKlient
-              analyser={analyser}
-              forslagMap={forslagMap}
-              mcMap={mcMap}
-              maxBnp={maxBnp}
-              maxGini={maxGini}
-              maxInf={maxInf}
-              maxArb={maxArb}
-            />
-          </Suspense>
+          <PisKlient
+            analyser={analyser}
+            forslagMap={forslagMap}
+            mcMap={mcMap}
+            maxBnp={maxBnp}
+            maxGini={maxGini}
+            maxInf={maxInf}
+            maxArb={maxArb}
+            initialQ={initialQ}
+          />
         )}
       </div>
     </div>
