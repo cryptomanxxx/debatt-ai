@@ -3,7 +3,7 @@ inflation.py — Veckovis ekonomisk cykel för debatt.ai
 
 Körs av GitHub Actions varje söndag. Sex åtgärder:
 0. Dynamisk policy: Gini-koefficienten från oligarki_historik styr skattenivå och bailout
-1. Förmögenhetsskatt: 1–3% på saldo > 800–1 200 kr (beroende på Gini) → Statskassan
+1. Förmögenhetsskatt: 1–3% på saldo > 800–1 200 kr (beroende på Gini) → Statskassan
 2. Inflationsuppdatering: butik_varor.pris × 1.03 (avrundat)
 3. Räntedragning: saldo_kvar × 1.05 på alla aktiva lån
 4. Sparränta: 1% på saldo > 400 kr (kapital föder kapital)
@@ -92,7 +92,7 @@ def main():
     iso_vecka = datetime.now(timezone.utc).strftime("%G-W%V")
 
     # ── Policy: läs Gini och sätt dynamiska parametrar ────────────────────────
-print("── Dynamisk policy: läser Gini från oligarki_historik ──")
+    print("── Dynamisk policy: läser Gini från oligarki_historik ──")
     senaste_gini, foregaende_gini = hamta_gini_historik(h)
     niva = berakna_policy_niva(senaste_gini)
     foregaende_niva = berakna_policy_niva(foregaende_gini) if foregaende_gini is not None else None
@@ -152,14 +152,12 @@ print("── Dynamisk policy: läser Gini från oligarki_historik ──")
             )
             total_skatt += skatt
             print(f"  {row['agent']}: -{skatt} kr skatt (saldo {row['saldo']} → {nytt_saldo} kr)")
-            # Logga per agent i budget-loggen
             httpx.post(
                 f"{SB_URL}/rest/v1/stats_budget_log",
                 headers=h,
                 json={"typ": "skatt", "agent": row["agent"], "belopp": skatt, "vecka": iso_vecka},
                 timeout=6,
             )
-        # Kreditera Statskassan
         if total_skatt > 0:
             sk_res = httpx.get(
                 f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo",
@@ -217,7 +215,6 @@ print("── Dynamisk policy: läser Gini från oligarki_historik ──")
             if not partier:
                 print("  Inga aktiva partier — hoppar över partistöd.")
             else:
-                # Hämta röstandelar från senaste avgjorda val
                 roster_per_parti: dict = {}
                 total_roster = 0
                 senaste_val_res = httpx.get(
@@ -304,7 +301,6 @@ print("── Dynamisk policy: läser Gini från oligarki_historik ──")
     else:
         print(f"  ✗ Kunde inte hämta varor: {varor_res.status_code}", file=sys.stderr)
 
-    # Logga inflation till civilisationsminnet
     httpx.post(
         f"{SB_URL}/rest/v1/civilisations_minne",
         headers=h,
@@ -328,7 +324,6 @@ print("── Dynamisk policy: läser Gini från oligarki_historik ──")
         for lan in lan_res.json():
             ranta = math.ceil(lan["saldo_kvar"] * lan["rantefot"])
             ny_skuld = lan["saldo_kvar"] + ranta
-            # Dra ränta från agentens saldo
             saldo_res = httpx.get(
                 f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{lan['agent']}&select=saldo",
                 headers={**h, "Prefer": ""}, timeout=6,
@@ -347,7 +342,7 @@ print("── Dynamisk policy: läser Gini från oligarki_historik ──")
     else:
         print("  Inga aktiva lån.")
 
-    # ── 3. Sparränta: 1% på saldo > 500 kr ─────────────────────────────────
+    # ── 3. Sparränta: 1% på saldo > 400 kr ─────────────────────────────────
     SPARRANTA = 0.01
     SPARTRÖSKEL = 400.0
     print(f"\n── Sparränta: {SPARRANTA*100:.0f}% på saldo > {SPARTRÖSKEL:.0f} kr ──")
@@ -435,7 +430,6 @@ print("── Dynamisk policy: läser Gini från oligarki_historik ──")
     if statskassa_res.is_success and statskassa_res.json():
         statskassa_balans = statskassa_res.json()[0].get("saldo") or 0
         if statskassa_balans >= 1:
-            # Hämta alla agenter utom Statskassa
             agenter_res = httpx.get(
                 f"{SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&select=agent,saldo",
                 headers={**h, "Prefer": ""}, timeout=10,
@@ -451,7 +445,6 @@ print("── Dynamisk policy: läser Gini från oligarki_historik ──")
                             json={"saldo": round(float(row["saldo"]) + per_agent, 2), "uppdaterad": "now()"},
                             timeout=8,
                         )
-                    # Återstående öresdel stannar i statskassan
                     aterstaende = statskassa_balans - (per_agent * len(agenter))
                     httpx.patch(
                         f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa",
