@@ -1,0 +1,181 @@
+name: Auto-fix misslyckade workflows
+
+on:
+  workflow_run:
+    workflows:
+      - "Run agent"
+      - "Butik Test"
+      - "Andrahand Test"
+      - "Parlament Test"
+      - "Lobbying Test"
+      - "Koalition Test"
+      - "Ekonomi Test"
+      - "Bors Test"
+      - "Hedgefond Test"
+      - "Stablecoin Test"
+      - "Feedback Test"
+      - "Kris Test"
+      - "Val Test"
+      - "Mark Test"
+      - "Domstol Test"
+      - "Inflation"
+      - "Daily Strategy"
+      - "Daily Vision"
+      - "Economy Observer"
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-fix:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hämta felloggar
+        id: logs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_ID="${{ github.event.workflow_run.id }}"
+          WORKFLOW="${{ github.event.workflow_run.name }}"
+          echo "Misslyckad workflow: $WORKFLOW (run $RUN_ID)"
+
+          # Hämta felinformation
+          gh run view "$RUN_ID" --log-failed 2>/dev/null | tail -200 > /tmp/error_log.txt || true
+          ERROR_LOG=$(cat /tmp/error_log.txt | head -150)
+
+          # Hitta vilka jobb som misslyckades
+          FAILED_JOBS=$(gh run view "$RUN_ID" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null | head -5 || echo "unknown")
+
+          echo "WORKFLOW_NAME=$WORKFLOW" >> "$GITHUB_ENV"
+          echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
+          echo "FAILED_JOBS=$FAILED_JOBS" >> "$GITHUB_ENV"
+
+          # Spara loggen för nästa steg
+          printf '%s' "$ERROR_LOG" > /tmp/error_summary.txt
+          echo "Felsammanfattning sparad ($(wc -c < /tmp/error_summary.txt) bytes)"
+
+      - name: Kontrollera om felet redan är fixat
+        id: dedupe
+        run: |
+          # Sök efter öppen auto-fix PR för samma workflow
+          EXISTING=$(gh pr list \
+            --state open \
+            --label "auto-fix" \
+            --search "Auto-fix: ${{ env.WORKFLOW_NAME }}" \
+            --json number -q '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            echo "Öppen auto-fix PR #$EXISTING finns redan — hoppar över"
+            echo "SKIP=true" >> "$GITHUB_ENV"
+          else
+            echo "SKIP=false" >> "$GITHUB_ENV"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Installera Claude Code CLI
+        if: env.SKIP == 'false'
+        run: |
+          npm install -g @anthropic-ai/claude-code@latest 2>/dev/null || \
+          npm install -g @anthropic-ai/claude-code 2>/dev/null || \
+          echo "Claude Code CLI installation failed — continuing anyway"
+          claude --version 2>/dev/null && echo "CLAUDE_INSTALLED=true" >> "$GITHUB_ENV" || \
+          echo "CLAUDE_INSTALLED=false" >> "$GITHUB_ENV"
+
+      - name: Kör Claude Code på felet
+        if: env.SKIP == 'false' && env.CLAUDE_INSTALLED == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          ERROR_LOG=$(cat /tmp/error_summary.txt)
+          WORKFLOW="${{ env.WORKFLOW_NAME }}"
+
+          PROMPT="Du analyserar ett fel i GitHub Actions-workflowen '$WORKFLOW' för projektet Debatt-AI.
+
+Fellogg:
+\`\`\`
+$ERROR_LOG
+\`\`\`
+
+Debatt-AI är en Next.js/Python-plattform med:
+- Python-skript (agent.py, bors_test.py, etc.) som körs via GitHub Actions
+- Next.js frontend (app/)
+- Supabase som databas
+- AI-providers: Groq, Gemini, Cerebras (med fallback-kedja)
+
+Uppgift:
+1. Identifiera den sannolika rotorsaken till felet
+2. Om det är ett enkelt, avgränsat kodfel (import-fel, syntaxfel, typo, saknad null-check): åtgärda det direkt i relevant fil
+3. Om felet är beroende av extern infrastruktur (API nere, DB-schema saknas, secrets-problem): skapa INTE en fix — istället, skapa filen \`ai-bus/suggestions/$(date +%Y-%m-%d)-auto-fix-$(echo '$WORKFLOW' | tr ' ' '-' | tr '[:upper:]' '[:lower:]').md\` med en strukturerad analys
+
+För kod-fixes: redigera direkt med Edit-verktyget. Gör ENDAST den minimala ändringen för att lösa felet.
+För förslag: använd frontmatter-formatet med title, type, severity, risk, file, status: suggestion."
+
+          claude --dangerously-skip-permissions -p "$PROMPT" 2>&1 | tee /tmp/claude_output.txt
+          echo "Claude Code kördes"
+
+      - name: Skapa PR om ändringar gjordes
+        if: env.SKIP == 'false' && env.CLAUDE_INSTALLED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name  "auto-fix-bot"
+          git config user.email "bot@debatt-ai.se"
+
+          # Kontrollera om det finns ändringar
+          if git diff --quiet && git status --porcelain | grep -q "^??"; then
+            UNTRACKED=$(git status --porcelain | grep "^??" | head -5)
+            git add ai-bus/suggestions/ 2>/dev/null || true
+          fi
+
+          if git diff --cached --quiet && git diff --quiet; then
+            echo "Inga ändringar gjordes av Claude Code — avslutar"
+            exit 0
+          fi
+
+          BRANCH="auto-fix/$(echo '${{ env.WORKFLOW_NAME }}' | tr ' ' '-' | tr '[:upper:]' '[:lower:]')-$(date +%Y%m%d-%H%M)"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "fix(auto): Claude Code auto-fix för misslyckad workflow '${{ env.WORKFLOW_NAME }}'
+
+Workflow-run: ${{ env.RUN_ID }}
+Misslyckade jobb: ${{ env.FAILED_JOBS }}"
+
+          git push -u origin "$BRANCH"
+
+          gh pr create \
+            --title "Auto-fix: ${{ env.WORKFLOW_NAME }}" \
+            --body "$(cat <<'PREOF'
+## Automatisk fix av misslyckad workflow
+
+**Workflow:** `${{ env.WORKFLOW_NAME }}`
+**Run ID:** ${{ env.RUN_ID }}
+**Misslyckade jobb:** ${{ env.FAILED_JOBS }}
+
+Claude Code analyserade felloggarna och genererade en fix automatiskt.
+
+### Fellogg (utdrag)
+```
+$(cat /tmp/error_summary.txt | head -50)
+```
+
+### Claude Code-analys
+```
+$(cat /tmp/claude_output.txt | head -60)
+```
+
+---
+*Skapad automatiskt av auto-fix.yml. Granska noggrant innan merge.*
+PREOF
+)" \
+            --label "auto-fix" \
+            --base main \
+            --head "$BRANCH"
+
+          echo "Auto-fix PR skapad!"

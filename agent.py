@@ -1257,6 +1257,62 @@ def main():
         except Exception as e:
             print(f"  ✗ Oligarki-snapshot: {e}", file=sys.stderr)
 
+    # ── Feature request: ~5% chans — agent föreslår ny plattformsfunktion ───────
+    if sb_key and random.random() < 0.05:
+        try:
+            minnen = hamta_agent_minnen(sb_key, agent["namn"])
+            minnen_text = formatera_minnen_for_prompt(minnen) if minnen else ""
+            SB_FR = "https://fmwxftnistkoqazfwnuj.supabase.co"
+            kategorier = ["UX", "ekonomi", "debatt", "social", "teknisk"]
+            kategori = random.choice(kategorier)
+            fr_prompt = (
+                f"Du är {agent['namn']} i en AI-civilisationssimulering. "
+                f"Du har nyss upplevt detta:\n{minnen_text or '(inga specifika minnen)'}\n\n"
+                f"Beskriv EN konkret förbättring du önskar för plattformen (kategori: {kategori}). "
+                f"Svara exakt i detta format — inga extra rader:\n"
+                f"TITEL: [max 8 ord]\n"
+                f"BESKRIVNING: [2–3 meningar om vad och varför]\n"
+                f"PRIORITET: low|medium|high"
+            )
+            fr_payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [
+                    {"role": "system", "content": agent.get("system", "")[:400]},
+                    {"role": "user", "content": fr_prompt},
+                ],
+                "max_tokens": 160, "temperature": 0.9,
+            }
+            fr_text = _llm_kort(fr_payload, agent.get("system", ""), fr_prompt, max_tokens=160)
+            # Parsa svaret rad för rad
+            titel, besk_rader, prioritet = "", [], "medium"
+            for rad in fr_text.strip().split("\n"):
+                rad_övre = rad.upper()
+                if rad_övre.startswith("TITEL:"):
+                    titel = rad.split(":", 1)[1].strip()[:100]
+                elif rad_övre.startswith("BESKRIVNING:"):
+                    besk_rader.append(rad.split(":", 1)[1].strip())
+                elif rad_övre.startswith("PRIORITET:"):
+                    p = rad.split(":", 1)[1].strip().lower()
+                    if p in ("low", "medium", "high"):
+                        prioritet = p
+                elif besk_rader:
+                    besk_rader.append(rad.strip())
+            besk = " ".join(besk_rader)[:400]
+            if titel and besk:
+                httpx.post(
+                    f"{SB_FR}/rest/v1/agent_feature_requests",
+                    headers={
+                        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                        "Content-Type": "application/json", "Prefer": "return=minimal",
+                    },
+                    json={"agent": agent["namn"], "kategori": kategori, "titel": titel,
+                          "beskrivning": besk, "prioritet": prioritet},
+                    timeout=10,
+                )
+                print(f"  ✓ Feature request: \"{titel}\" ({kategori}, {prioritet})")
+        except Exception as e:
+            print(f"  ✗ Feature request: {e}", file=sys.stderr)
+
     # ── Bilder: tillstånd / meme / propaganda / valkampanj ───────────────────
     if sb_key:
         try:
