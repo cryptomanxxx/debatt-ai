@@ -5,7 +5,7 @@
  * Visuell QA-observatör: tar skärmdumpar av nyckelsidor på debatt-ai.se,
  * skickar dem till ett vision-LLM och rapporterar status.
  *
- * Primär: Groq (Llama 4 Scout) — generösa rate limits, 30 rpm.
+ * Primär: Groq (Llama 4 Scout) — genrösa rate limits, 30 rpm.
  * Fallback: Gemini 2.0 Flash — används om Groq saknas eller svarar 429.
  *
  * Sparar resultat till Supabase (qa_snapshots) för veckovis jämförelse.
@@ -41,14 +41,14 @@ console.log(`Vision-provider: ${VISION_PROVIDER}${GROQ_KEY && GEMINI_KEY ? " (Ge
 
 // Sidor att granska
 const SIDOR = [
-  // ── Kärnsidor ────────────────────────────────────────────────────────────────
+  // ── Kärnsidor ──────────────────────────────────────────────────────────────────────────────
   { path: "/",               namn: "Startsidan",           vikt: "hög"   },
   { path: "/arkiv",          namn: "Arkivet",              vikt: "hög"   },
   { path: "/om",             namn: "Om-sidan",             vikt: "hög"   },
   { path: "/chatt",          namn: "Direktdebatt",         vikt: "hög"   },
   { path: "/debatt",         namn: "Debatt Playground",    vikt: "hög"   },
   { path: "/nyheter",        namn: "Nyheter",              vikt: "hög"   },
-  // ── Finansiella experiment ────────────────────────────────────────────────────
+  // ── Finansiella experiment ─────────────────────────────────────────────────────────────
   { path: "/bors",           namn: "Kryptobörsen",         vikt: "hög"   },
   { path: "/etf",            namn: "Krypto-ETF",           vikt: "hög"   },
   { path: "/hedgefonder",    namn: "Hedgefonder",          vikt: "hög"   },
@@ -56,13 +56,13 @@ const SIDOR = [
   { path: "/bank",           namn: "Centralbanken",        vikt: "medel" },
   { path: "/butik",          namn: "Butiken",              vikt: "medel" },
   { path: "/ekonomi",        namn: "AI-Ekonomi",           vikt: "medel" },
-  // ── Politik & demokrati ───────────────────────────────────────────────────────
+  // ── Politik & demokrati ──────────────────────────────────────────────────────────────────
   { path: "/parlament",      namn: "AI-Parlamentet",       vikt: "hög"   },
   { path: "/lobbying",       namn: "AI-Lobbying",          vikt: "medel" },
   { path: "/partier",        namn: "Politiska partier",    vikt: "medel" },
   { path: "/val",            namn: "Riksdagsval",          vikt: "medel" },
   { path: "/domstol",        namn: "AI-Domstolen",         vikt: "medel" },
-  // ── Sociala experiment ────────────────────────────────────────────────────────
+  // ── Sociala experiment ─────────────────────────────────────────────────────────────────────
   { path: "/markets",        namn: "Prediction Markets",   vikt: "medel" },
   { path: "/opinion",        namn: "Besökaromröstning",    vikt: "medel" },
   { path: "/dynamik",        namn: "Agentdynamik",         vikt: "medel" },
@@ -72,22 +72,22 @@ const SIDOR = [
   { path: "/rykten",         namn: "Ryktesspridning",      vikt: "medel" },
   { path: "/feedback",       namn: "Socialt Kapital",      vikt: "medel" },
   { path: "/konversationer", namn: "AI-konversationer",    vikt: "medel" },
-  // ── Visualiseringar & analys ──────────────────────────────────────────────────
+  // ── Visualiseringar & analys ────────────────────────────────────────────────────────────────
   { path: "/historia",       namn: "Civilisationsminne",   vikt: "medel" },
   { path: "/oligarki",       namn: "Oligarkirisk",         vikt: "medel" },
   { path: "/kris",           namn: "Krisevents",           vikt: "låg"   },
   { path: "/ai-bilder",      namn: "AI-bilder",            vikt: "låg"   },
   { path: "/kompass",        namn: "Ideologisk Kompass",   vikt: "låg"   },
-  { path: "/debattrad",      namn: "Debattträd",           vikt: "låg"   },
+  { path: "/debattrad",      namn: "Debatträd",           vikt: "låg"   },
   { path: "/asiktsdrift",    namn: "Åsiktsdrift",          vikt: "låg"   },
   { path: "/tidsserie",      namn: "Tidsseriegraf",        vikt: "låg"   },
   { path: "/kunskapsgraf",   namn: "Kunskapsgraf",         vikt: "låg"   },
   { path: "/versus",         namn: "Agent vs Agent",       vikt: "låg"   },
-  // ── API-playgrounds ───────────────────────────────────────────────────────────
+  // ── API-playgrounds ───────────────────────────────────────────────────────────────────────
   { path: "/beslut",         namn: "Decision API Playground", vikt: "låg" },
 ];
 
-// ── ISO-vecka helpers ─────────────────────────────────────────────────────────
+// ── ISO-vecka helpers ────────────────────────────────────────────────────────────────────
 function isoVecka(date = new Date()) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const day = d.getUTCDay() || 7;
@@ -107,7 +107,7 @@ function föregåendeVecka(vecka) {
   return isoVecka(monday);
 }
 
-// ── HTTPS helpers ─────────────────────────────────────────────────────────────
+// ── HTTPS helpers ──────────────────────────────────────────────────────────────────────
 const https = require("https");
 
 function httpsPost(host, urlPath, headers, body) {
@@ -150,7 +150,7 @@ function httpsGet(host, urlPath, headers) {
   });
 }
 
-// ── Supabase helpers ──────────────────────────────────────────────────────────
+// ── Supabase helpers ────────────────────────────────────────────────────────────────────
 function sbHeaders() {
   return {
     apikey: SB_KEY,
@@ -189,7 +189,7 @@ async function hämtaFörraVeckan(vecka) {
   }
 }
 
-// ── Vision-analys (Groq primär, Gemini fallback) ──────────────────────────────
+// ── Vision-analys (Groq primär, Gemini fallback) ────────────────────────────────────────────
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function byggPrompt(sidnamn, konsolfEl) {
@@ -282,7 +282,7 @@ async function analysera(sidnamn, b64, konsolfEl) {
   return { status: "VARNING", orsak: "Alla vision-providers otillgängliga", detalj: "–" };
 }
 
-// ── Diff-tabell mot föregående vecka ─────────────────────────────────────────
+// ── Diff-tabell mot föregående vecka ───────────────────────────────────────────────────────────────────
 function byggDiff(resultat, förra) {
   if (!förra.length) return null;
 
@@ -302,7 +302,7 @@ function byggDiff(resultat, förra) {
   return ändringar;
 }
 
-// ── Huvudflöde ────────────────────────────────────────────────────────────────
+// ── Huvudflöde ─────────────────────────────────────────────────────────────────────────────────
 async function kör() {
   let playwright;
   try {
@@ -395,12 +395,12 @@ async function kör() {
 
   await browser.close();
 
-  // ── Hämta diff ────────────────────────────────────────────────────────────
+  // ── Hämta diff ────────────────────────────────────────────────────────────────────────────
   const förra    = await förraLöfte;
   const diff     = byggDiff(resultat, förra);
   const prevVecka = föregåendeVecka(vecka);
 
-  // ── Bygg markdown-rapport ─────────────────────────────────────────────────
+  // ── Bygg markdown-rapport ───────────────────────────────────────────────────────────────────────
   const elapsed  = Math.round((Date.now() - startTid) / 1000);
   const antalOK  = resultat.filter(r => r.status === "OK").length;
   const antalVar = resultat.filter(r => r.status === "VARNING").length;
@@ -462,7 +462,7 @@ ${diffSektion}
     console.log(`Rapport skriven till ${SUMMARY_FILE}`);
   }
 
-  // ── Spara till ai-bus/discussions/ så Claude Code läser det vid sessionsstart ─
+  // ── Spara till ai-bus/discussions/ så Claude Code läser det vid sessionsstart ───────────
   try {
     const ts       = new Date().toISOString().slice(0, 16).replace("T", "-").replace(":", "");
     const filnamn  = path.join(DISCUSSIONS, `${ts}-qa.md`);
