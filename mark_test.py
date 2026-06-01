@@ -162,8 +162,8 @@ def main():
     fria = len(zoner) - len(agare_dict)
     print(f"Zoner: {len(zoner)}, Ägda: {len(agare_dict)}, Fria: {fria}")
 
-    rika = [(a, s) for a, s in saldon.items() if s >= 700]
-    print(f"Agenter med saldo ≥ 700 kr: {len(rika)}")
+    rika = [(a, s) for a, s in saldon.items() if s >= 400]
+    print(f"Agenter med saldo ≥ 400 kr: {len(rika)}")
     for ag, sal in sorted(rika, key=lambda x: -x[1])[:5]:
         print(f"  {ag}: {sal:.0f} kr")
 
@@ -178,9 +178,9 @@ def main():
             continue
 
         saldo = saldon.get(agent, 0)
-        if saldo < 700:
+        if saldo < 400:
             if force:
-                print(f"  {agent}: saldo {saldo:.0f} kr — för lågt (< 700 kr), hoppar över")
+                print(f"  {agent}: saldo {saldo:.0f} kr — för lågt (< 400 kr), hoppar över")
             continue
 
         if agent_zon_antal.get(agent, 0) >= MAX_ZONER_PER_AGENT:
@@ -195,10 +195,11 @@ def main():
             print("  Inga lediga zoner kvar")
             break
 
-        # Budget: max 40% av saldo, inte mer än 2500 kr per köp
-        budget = min(saldo * 0.4, 2500)
-        if budget < 700:
-            budget = saldo  # använd allt om under gränsen
+        # Rika agenter (>1000 kr): max 40% per köp. Fattigare: hela saldot tillgängligt.
+        if saldo <= 1000:
+            budget = saldo
+        else:
+            budget = min(saldo * 0.4, 2500)
 
         overkomliga = [z for z in lediga if z["koppris"] <= budget]
         if not overkomliga:

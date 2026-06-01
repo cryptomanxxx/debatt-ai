@@ -1,6 +1,6 @@
 -- === MARK: Territoriell ekonomi i AI-civilisationen ===
 -- Kör detta i Supabase SQL Editor
--- OBS: Befintlig data? Kör supabase_mark_v2.sql för att uppdatera veckoinkomst.
+-- OBS: Befintlig data? Kör supabase_mark_v2.sql + supabase_mark_v3.sql för att uppdatera.
 
 CREATE TABLE mark_zoner (
   id bigserial PRIMARY KEY,
@@ -54,16 +54,16 @@ CREATE POLICY "Publik insert mark_transaktioner" ON mark_transaktioner FOR INSER
 -- Daglig inkomst = veckoinkomst / 7 (betalas ut av mark_test.py)
 INSERT INTO mark_zoner (namn, typ, hex_col, hex_row, veckoinkomst, koppris, beskrivning) VALUES
 -- Row 0 (cols 1-4) — Skog 10%, Gruva 17-18%, Energi 15%
-('Nordskogen',          'skog',     1, 0,  80,  800, 'Tät barrskog i norr, levererar timmer och syre'),
+('Nordskogen',          'skog',     1, 0,  40,  400, 'Tät barrskog i norr, levererar timmer och syre'),
 ('Järngruvan',          'gruva',    2, 0, 320, 1800, 'Rik järnmalmsgruva, ryggraden i stålindustrin'),
 ('Koppargruvan',        'gruva',    3, 0, 270, 1600, 'Historisk koppargruva med djupa schakt'),
 ('Vindkraftpark Nord',  'energi',   4, 0, 195, 1300, 'Stormigt höjdläge, optimal för vindkraft'),
 -- Row 1 (cols 0-4) — Skog 10%, Stad 14%, Gruva 18-20%, Skog 10%
-('Gränsskogen',         'skog',     0, 1,  70,  700, 'Vildmark vid gränsen, rik biodiversitet'),
+('Gränsskogen',         'skog',     0, 1,  35,  350, 'Vildmark vid gränsen, rik biodiversitet'),
 ('Gruvstaden',          'stad',     1, 1, 155, 1100, 'Stad byggd kring gruvnäringen, råbarkad kultur'),
 ('Sällsynta Metaller',  'gruva',    2, 1, 440, 2200, 'Kritiska mineraler för batterier och elektronik'),
 ('Kolgruvan',           'gruva',    3, 1, 250, 1400, 'Kontroversiell kolgruva — hög inkomst, hög kostnad'),
-('Bergsplatån',         'skog',     4, 1,  85,  850, 'Kuperat skogslandskap, svårtillgängligt'),
+('Bergsplatån',         'skog',     4, 1,  50,  500, 'Kuperat skogslandskap, svårtillgängligt'),
 -- Row 2 (cols 0-5) — Industri 15-19%, Stad 15-17%, Energi 15%
 ('Industrihamnen',      'industri', 0, 2, 220, 1450, 'Stor industrihamn med containerterminal'),
 ('Stålverket',          'industri', 1, 2, 265, 1600, 'Tung metallindustri, slukar energi men ger avkastning'),
@@ -87,11 +87,11 @@ INSERT INTO mark_zoner (namn, typ, hex_col, hex_row, veckoinkomst, koppris, besk
 ('Havsenergi',          'kust',     5, 4, 200, 1400, 'Experimentell vågkraft och havsbaserad vindkraft'),
 -- Row 5 (cols 0-4) — Kust 12%, Jordbruk 10%, Industri 17%, Kust 12%
 ('Turistkust',          'kust',     0, 5, 140, 1100, 'Populärt turistmål, sommarsäsong exploderar'),
-('Betesmark',           'jordbruk', 1, 5,  75,  750, 'Extensiv djurhållning, fritt böljande marker'),
-('Fruktodlingar',       'jordbruk', 2, 5,  90,  850, 'Äpplen och bär, ekologiskt certifierat'),
+('Betesmark',           'jordbruk', 1, 5,  40,  400, 'Extensiv djurhållning, fritt böljande marker'),
+('Fruktodlingar',       'jordbruk', 2, 5,  55,  550, 'Äpplen och bär, ekologiskt certifierat'),
 ('Läkemedelsindustrin', 'industri', 3, 5, 290, 1700, 'Farmaceutisk produktion, patent-driven avkastning'),
 ('Marina',              'kust',     4, 5, 115,  950, 'Lyxmarina och seglarsällskap'),
 -- Row 6 (cols 1-3) — Kust 13%, Skog 10%, Energi 14%
 ('Vattenverket',        'kust',     1, 6, 165, 1250, 'Kommunalt vattenreningsverk, naturmonopol'),
-('Söderskogen',         'skog',     2, 6,  85,  850, 'Lövskog i söder, populärt strövområde'),
+('Söderskogen',         'skog',     2, 6,  50,  500, 'Lövskog i söder, populärt strövområde'),
 ('Bioenergiverket',     'energi',   3, 6, 155, 1100, 'Biogasproduktion från jordbruksrester');
