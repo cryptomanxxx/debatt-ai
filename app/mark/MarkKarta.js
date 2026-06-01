@@ -181,8 +181,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
               <stop offset="100%" stopColor="#060d18" stopOpacity="0.88" />
             </radialGradient>
             <filter id="hexglow" x="-70%" y="-70%" width="240%" height="240%">
-              <feGaussianBlur stdDeviation="5" result="blur" />
-              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              <feGaussianBlur stdDeviation="10" />
             </filter>
             <filter id="softglow" x="-40%" y="-40%" width="180%" height="180%">
               <feGaussianBlur stdDeviation="2.5" result="blur" />
