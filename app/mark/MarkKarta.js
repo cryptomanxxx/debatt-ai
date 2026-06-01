@@ -247,9 +247,11 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
                   {isAct && <polygon points={pts} fill="url(#grad-hover)" stroke="none" />}
                   <polygon points={pts} fill="none" stroke={strokeCol}
                     strokeWidth={isAct ? 2.8 : agFarg ? 2.0 : zon.typ === "stad" ? 2.2 : 1.4} />
-                  <polygon points={hexPts(cx, cy, HEX - 4)} fill="none"
-                    stroke={agFarg ? rgba(agFarg, isAct ? 0.45 : 0.18) : rgba(typFarg, isAct ? 0.28 : 0.14)}
-                    strokeWidth="0.8" />
+                  {isAct && (
+                    <polygon points={hexPts(cx, cy, HEX - 4)} fill="none"
+                      stroke={agFarg ? rgba(agFarg, 0.45) : rgba(typFarg, 0.28)}
+                      strokeWidth="0.8" />
+                  )}
                   <text x={cx} y={agName ? cy - 11 : cy - 6} textAnchor="middle" dominantBaseline="middle"
                     fontSize={isAct ? 20 : 16} filter={isAct ? "url(#textglow)" : undefined}
                     style={{ userSelect: "none", pointerEvents: "none" }}>
