@@ -64,7 +64,7 @@ async function hamtaDiff() {
   let antalFiler = 0;
   let page       = 1;
   let trunkerad  = false;
-  const MAX_PAGES = 10; // max 1 000 filer
+  const MAX_PAGES = 20; // max 2 000 filer
 
   while (page <= MAX_PAGES) {
     const { status, data } = await httpJson(
@@ -81,6 +81,7 @@ async function hamtaDiff() {
 
       const block = `### ${fil.filename}\n\`\`\`diff\n${fil.patch}\n\`\`\`\n\n`;
       if (diff.length + block.length > MAX_DIFF_CHARS) {
+        console.warn(`Diff för stor — avbryter vid sida ${page} (${diff.length} tecken)`);
         diff += `\n*(diff trunkerad — fler filer kvar)*\n`;
         trunkerad = true;
         break;
