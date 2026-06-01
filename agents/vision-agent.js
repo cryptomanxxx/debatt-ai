@@ -163,6 +163,43 @@ function readClaudeMdFeatures() {
   } catch { return ""; }
 }
 
+function httpGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request(
+      { hostname: u.hostname, path: u.pathname + u.search, method: "GET", headers },
+      (res) => {
+        let data = "";
+        res.on("data", c => data += c);
+        res.on("end", () => {
+          try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
+          catch { resolve({ status: res.statusCode, data }); }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error("timeout")); });
+    req.end();
+  });
+}
+
+async function readFeatureRequests() {
+  const sbKey = process.env.SUPABASE_ANON_KEY;
+  if (!sbKey) return "";
+  try {
+    const { status, data } = await httpGet(
+      "https://fmwxftnistkoqazfwnuj.supabase.co/rest/v1/agent_feature_requests" +
+      "?status=eq.open&order=skapad.desc&limit=8&select=agent,kategori,titel,beskrivning,prioritet",
+      { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+    );
+    if (status !== 200 || !Array.isArray(data) || data.length === 0) return "";
+    const rader = data.map(r =>
+      `- **[${r.kategori}/${r.prioritet}]** ${r.agent}: "${r.titel}" — ${r.beskrivning.slice(0, 120)}`
+    );
+    return `\n\n## Agenternas egna önskemål (direkt från simuleringen)\nDessa förslag kom från AI-agenter baserat på deras upplevelser — överväg dem som datapunkter:\n${rader.join("\n")}`;
+  } catch { return ""; }
+}
+
 function httpPost(url, headers, body) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -221,39 +258,10 @@ async function main() {
   const beslutHistorik = readDecisionHistory();
   const claudeMdFeatures = readClaudeMdFeatures();
   if (claudeMdFeatures) console.log(`  📋 Injicerar ${claudeMdFeatures.split("\n").filter(l => l.startsWith("-")).length} byggda funktioner från CLAUDE.md`);
+  const agentÖnskemål = await readFeatureRequests();
+  if (agentÖnskemål) console.log(`  🤖 Injicerar ${agentÖnskemål.split("\n").filter(l => l.startsWith("-")).length} agentönskemål från simuleringen`);
 
-  const prompt = `Du är en visionär AI-arkitekt med djup insikt i AI-simuleringar, civilisationsteori och social dynamik. Du analyserar plattformen Debatt-AI och genererar konkreta, innovativa idéer för att ta den till nästa nivå.
-
-## Plattformens uppdrag och vision
-
-${goal}
-${tidigareKontext}${claudeMdFeatures}${beslutHistorik}
-
-## Din uppgift idag (${datum})
-
-Skriv en visionär text (400-600 ord) på svenska som:
-
-1. **Identifierar ett specifikt gap** — vad saknar plattformen för att bli världsbäst inom AI-socialsimulering?
-2. **Föreslår en konkret ny funktion eller mekanism** — beskriv den tekniskt tillräckligt för att en utvecklare ska kunna implementera den
-3. **Kopplar till civilisationsteori** — hur relaterar förslaget till verkliga teorier om samhällen, ekonomi eller beteende?
-4. **Ger en implementeringsväg** — vilka filer/tabeller/APIs behöver skapas eller ändras?
-
-Var specifik, inte abstrakt. Inga floskler. Varje mening ska bära konkret information.
-
-Formatet ska vara:
-# Vision: [Rubrik]
-**Datum:** ${datum}
-
-## Identifierat gap
-
-## Förslag: [Funktionsnamn]
-
-## Koppling till teori
-
-## Implementeringsväg
-
-## Prioritet och komplexitet
-(Hög/Medel/Låg prioritet, Hög/Medel/Låg komplexitet)`;
+  const prompt = `Du är en visionär AI-arkitekt med djup insikt i AI-simuleringar, civilisationsteori och social dynamik. Du analyserar plattformen Debatt-AI och genererar konkreta, innovativa idéer för att ta den till nästa nivå.\n\n## Plattformens uppdrag och vision\n\n${goal}\n${tidigareKontext}${claudeMdFeatures}${beslutHistorik}${agentÖnskemål}\n\n## Din uppgift idag (${datum})\n\nSkriv en visionär text (400-600 ord) på svenska som:\n\n1. **Identifierar ett specifikt gap** — vad saknar plattformen för att bli världsbäst inom AI-socialsimulering?\n2. **Föreslår en konkret ny funktion eller mekanism** — beskriv den tekniskt tillräckligt för att en utvecklare ska kunna implementera den\n3. **Kopplar till civilisationsteori** — hur relaterar förslaget till verkliga teorier om samhällen, ekonomi eller beteende?\n4. **Ger en implementeringsväg** — vilka filer/tabeller/APIs behöver skapas eller ändras?\n\nVar specifik, inte abstrakt. Inga floskler. Varje mening ska bära konkret information.\n\nFormatet ska vara:\n# Vision: [Rubrik]\n**Datum:** ${datum}\n\n## Identifierat gap\n\n## Förslag: [Funktionsnamn]\n\n## Koppling till teori\n\n## Implementeringsväg\n\n## Prioritet och komplexitet\n(Hög/Medel/Låg prioritet, Hög/Medel/Låg komplexitet)`;
 
   const avfardade = readDecisionHistory().match(/\*\*/g)?.length ?? 0;
   if (avfardade > 0) console.log(`  📚 Läser beslutshistorik: injicerar kontext från ai-bus/rejected/ och ai-bus/implemented/`);
