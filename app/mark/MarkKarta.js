@@ -32,6 +32,14 @@ const TYP_NAMN = {
   skog:     "Skog",
 };
 
+// Fyra institutioner placerade på specifika zoner — synliga som glödande pins
+const INSTITUTIONS = {
+  "Storstaden":       { icon: "🏛", fullName: "AI-Parlamentet", color: "#c084fc" },
+  "Handelsstaden":    { icon: "🏦", fullName: "Centralbanken",  color: "#fbbf24" },
+  "Datacenterparken": { icon: "📈", fullName: "Kryptobörsen",   color: "#34d399" },
+  "Kulturcentrum":    { icon: "⚖️", fullName: "AI-Domstolen",  color: "#f87171" },
+};
+
 // Pollinations.ai — AI-parlament megacity i centrum, seed=7777
 const TERRAIN_BG = "https://image.pollinations.ai/prompt/bright%20colorful%20hexagonal%20strategy%20game%20world%20map%20top-down%20view%2C%20Civilization%20VI%20art%20style%2C%20organic%20island%20landmass%20surrounded%20by%20calm%20ocean%20water%2C%20snow-capped%20grey%20mountain%20peaks%20in%20north%2C%20dense%20lush%20green%20ancient%20forest%20in%20northwest%20and%20northeast%20corners%2C%20DRAMATIC%20GLOWING%20AI%20PARLIAMENT%20MEGACITY%20in%20exact%20center%20with%20towering%20violet%20spires%20of%20light%20and%20cyberpunk%20purple%20neon%20illumination%20visible%20from%20above%2C%20futuristic%20skyscrapers%20glowing%20windows%20capital%20city%2C%20golden%20wheat%20farmland%20in%20west%2C%20amber%20volcanic%20geothermal%20energy%20terrain%20in%20east%2C%20blue%20coastal%20harbors%20on%20west%20and%20south%20edges%2C%20small%20forest%20in%20south%2C%20vibrant%20saturated%20colors%2C%20epic%20dramatic%20top-down%20lighting%2C%20highly%20detailed%20photorealistic%20terrain%2C%20no%20text%20no%20hexagons%20no%20UI%20no%20labels?width=530&height=490&nologo=true&seed=7777&model=flux";
 
@@ -260,6 +268,27 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
             })}
           </g>
 
+          {/* Institution-pins — separat pass så de alltid syns ovanpå alla hexar */}
+          {zoner.filter(zon => INSTITUTIONS[zon.namn]).map(zon => {
+            const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
+            const inst = INSTITUTIONS[zon.namn];
+            return (
+              <g key={`inst-${zon.id}`} style={{ pointerEvents: "none" }}>
+                <line x1={cx} y1={cy - HEX} x2={cx} y2={cy - HEX - 2}
+                  stroke={inst.color} strokeWidth="1" strokeOpacity="0.55" />
+                <circle cx={cx} cy={cy - HEX - 12} r={11}
+                  fill="#060810" stroke={inst.color} strokeWidth="1.8"
+                  filter="url(#softglow)">
+                  <animate attributeName="opacity" values="0.65;1.0;0.65" dur="2.8s" repeatCount="indefinite" />
+                </circle>
+                <text x={cx} y={cy - HEX - 12} textAnchor="middle" dominantBaseline="middle"
+                  fontSize="11" style={{ userSelect: "none" }}>
+                  {inst.icon}
+                </text>
+              </g>
+            );
+          })}
+
           <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="url(#vignette)" style={{ pointerEvents: "none" }} />
 
           {floats.map(f => (
@@ -304,6 +333,19 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
               <span style={{ fontSize: "20px" }}>{TYP_IKON[active.typ]}</span>
               <span style={{ fontSize: "15px", color: "#f0ede6", fontFamily: "Georgia, serif" }}>{active.namn}</span>
             </div>
+            {INSTITUTIONS[active.namn] && (
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px",
+                padding: "5px 10px", borderRadius: "4px",
+                background: rgba(INSTITUTIONS[active.namn].color, 0.08),
+                border: `1px solid ${rgba(INSTITUTIONS[active.namn].color, 0.30)}` }}>
+                <span style={{ fontSize: "15px" }}>{INSTITUTIONS[active.namn].icon}</span>
+                <div>
+                  <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em" }}>INSTITUTIONSPLATS</div>
+                  <div style={{ fontSize: "12px", fontFamily: "monospace", fontWeight: "700",
+                    color: INSTITUTIONS[active.namn].color }}>{INSTITUTIONS[active.namn].fullName}</div>
+                </div>
+              </div>
+            )}
             <p style={{ fontSize: "11px", color: "#555", margin: "0 0 12px", lineHeight: 1.6 }}>{active.beskrivning}</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
               <div>
