@@ -32,14 +32,15 @@ const TYP_NAMN = {
   skog:     "Skog",
 };
 
-const TERRAIN_BG = "https://image.pollinations.ai/prompt/bright%20colorful%20hexagonal%20strategy%20game%20world%20map%20top-down%20view%2C%20Civilization%20VI%20art%20style%2C%20organic%20island%20landmass%20surrounded%20by%20calm%20ocean%20water%2C%20grey%20snow-capped%20mountain%20range%20in%20north-center%2C%20dense%20lush%20green%20ancient%20forest%20in%20northwest%20corner%2C%20bright%20green%20forest%20patch%20in%20northeast%2C%20glowing%20violet%20purple%20city%20district%20in%20center%2C%20golden%20yellow%20wheat%20farmland%20plains%20in%20west-center%2C%20amber%20orange%20volcanic%20geothermal%20energy%20terrain%20in%20east%2C%20blue%20coastal%20water%20and%20harbor%20on%20west%20and%20south%20edges%2C%20small%20forest%20in%20south-center%2C%20vibrant%20saturated%20colors%2C%20bright%20dramatic%20game%20art%20lighting%20from%20above%2C%20highly%20detailed%20photorealistic%20terrain%20texture%2C%20no%20text%20no%20hexagons%20no%20UI%20no%20labels?width=530&height=490&nologo=true&seed=2048&model=flux";
+// Pollinations.ai — AI-parlament megacity i centrum, seed=7777
+const TERRAIN_BG = "https://image.pollinations.ai/prompt/bright%20colorful%20hexagonal%20strategy%20game%20world%20map%20top-down%20view%2C%20Civilization%20VI%20art%20style%2C%20organic%20island%20landmass%20surrounded%20by%20calm%20ocean%20water%2C%20snow-capped%20grey%20mountain%20peaks%20in%20north%2C%20dense%20lush%20green%20ancient%20forest%20in%20northwest%20and%20northeast%20corners%2C%20DRAMATIC%20GLOWING%20AI%20PARLIAMENT%20MEGACITY%20in%20exact%20center%20with%20towering%20violet%20spires%20of%20light%20and%20cyberpunk%20purple%20neon%20illumination%20visible%20from%20above%2C%20futuristic%20skyscrapers%20glowing%20windows%20capital%20city%2C%20golden%20wheat%20farmland%20in%20west%2C%20amber%20volcanic%20geothermal%20energy%20terrain%20in%20east%2C%20blue%20coastal%20harbors%20on%20west%20and%20south%20edges%2C%20small%20forest%20in%20south%2C%20vibrant%20saturated%20colors%2C%20epic%20dramatic%20top-down%20lighting%2C%20highly%20detailed%20photorealistic%20terrain%2C%20no%20text%20no%20hexagons%20no%20UI%20no%20labels?width=530&height=490&nologo=true&seed=7777&model=flux";
 
 const TERRAIN_STOPS = {
   energi:   [["#fef08a", 0.28], ["#f59e0b", 0.16], ["#78350f", 0.04]],
   jordbruk: [["#bbf7d0", 0.26], ["#22c55e", 0.14], ["#14532d", 0.04]],
   industri: [["#bfdbfe", 0.24], ["#3b82f6", 0.13], ["#1e3a8a", 0.03]],
   gruva:    [["#fed7aa", 0.26], ["#ea580c", 0.14], ["#7c2d12", 0.03]],
-  stad:     [["#f3e8ff", 0.28], ["#9333ea", 0.16], ["#3b0764", 0.04]],
+  stad:     [["#f0e0ff", 0.50], ["#9333ea", 0.35], ["#3b0764", 0.12]],
   kust:     [["#cffafe", 0.26], ["#0891b2", 0.14], ["#0c4a6e", 0.04]],
   skog:     [["#dcfce7", 0.26], ["#16a34a", 0.14], ["#14532d", 0.04]],
 };
@@ -118,7 +119,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
-      {/* ── HEX MAP ── skalas responsivt, max 700px bred */}
+      {/* ── HEX MAP ── max 700px */}
       <div style={{ width: "100%" }}>
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -173,6 +174,11 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
               <feGaussianBlur stdDeviation="2" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
+            {/* Stark glöd specifikt för stadszonernas maktcentrum */}
+            <filter id="cityglow" x="-120%" y="-120%" width="340%" height="340%">
+              <feGaussianBlur stdDeviation="10" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
           </defs>
 
           <image href={TERRAIN_BG} x="0" y="0" width={SVG_W} height={SVG_H} preserveAspectRatio="xMidYMid slice" />
@@ -198,6 +204,20 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                   onMouseLeave={() => setHover(null)}
                   onClick={() => setSelected(s => s?.id === zon.id ? null : zon)}
                 >
+                  {/* Stad: permanent dubbel maktglow — ägt eller ej */}
+                  {zon.typ === "stad" && (
+                    <>
+                      <polygon points={hexPts(cx, cy, HEX + 14)} fill="none" stroke="#9333ea"
+                        strokeWidth="2" filter="url(#cityglow)">
+                        <animate attributeName="opacity" values="0.10;0.75;0.10" dur="2.2s" repeatCount="indefinite" />
+                      </polygon>
+                      <polygon points={hexPts(cx, cy, HEX + 5)} fill="none" stroke="#c084fc"
+                        strokeWidth="1.5" filter="url(#softglow)">
+                        <animate attributeName="opacity" values="0.20;0.90;0.20" dur="1.8s" repeatCount="indefinite" />
+                      </polygon>
+                    </>
+                  )}
+
                   {agFarg && (
                     <polygon points={hexPts(cx, cy, HEX + 8)} fill="none" stroke={agFarg}
                       strokeWidth={isAct ? 5 : 3} filter="url(#hexglow)">
@@ -209,7 +229,8 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                   {agGradId && <polygon points={pts} fill={`url(#${agGradId})`} stroke="none" />}
                   <polygon points={pts} fill="url(#hex-light)" stroke="none" />
                   {isAct && <polygon points={pts} fill="url(#grad-hover)" stroke="none" />}
-                  <polygon points={pts} fill="none" stroke={strokeCol} strokeWidth={isAct ? 2.8 : agFarg ? 2.0 : 1.4} />
+                  <polygon points={pts} fill="none" stroke={strokeCol}
+                    strokeWidth={isAct ? 2.8 : agFarg ? 2.0 : zon.typ === "stad" ? 2.2 : 1.4} />
                   <polygon points={hexPts(cx, cy, HEX - 4)} fill="none"
                     stroke={agFarg ? rgba(agFarg, isAct ? 0.45 : 0.18) : rgba(typFarg, isAct ? 0.28 : 0.14)}
                     strokeWidth="0.8" />
@@ -269,10 +290,9 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
         </div>
       </div>
 
-      {/* ── BOTTENPANEL ── 3 kolumner under kartan */}
+      {/* ── BOTTENPANEL ── 3 kolumner */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", alignItems: "start" }}>
 
-        {/* Zondetalj */}
         {active ? (
           <div style={{
             background: "#0e0e0e",
@@ -315,7 +335,6 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
           </div>
         )}
 
-        {/* Statistik + Leaderboard */}
         <div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
             {[
@@ -352,7 +371,6 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
           )}
         </div>
 
-        {/* Senaste köp */}
         {transaktioner.length > 0 && (
           <div>
             <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE KÖP</p>
