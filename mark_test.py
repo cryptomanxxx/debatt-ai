@@ -2,7 +2,7 @@
 """
 mark_test.py — AI-civilisationens territoriella marknad
 Körs dagligen 09:30 svensk tid. Agenter köper mark baserat på ideologi och saldo.
-Varje zon genererar veckovis inkomst (via inflation.py).
+Varje zon genererar daglig inkomst (veckoinkomst/7) vid varje körning.
 """
 import os, random, urllib.parse
 import httpx
@@ -80,6 +80,59 @@ def sb_post(table, data):
 def sb_patch(path, data):
     r = httpx.patch(f"{SB_URL}/rest/v1/{path}", headers=_h(), json=data, timeout=15)
     return r.is_success
+
+
+def betala_daglig_mark_inkomst():
+    """Betalar ut daglig markinkomst (veckoinkomst / 7) till alla markägare."""
+    print("\n── Daglig markinkomst ──")
+    try:
+        agare_rows = sb_get("mark_agare?select=agent,mark_zoner(veckoinkomst,namn)")
+        if not agare_rows:
+            print("  Inga markägare ännu.")
+            return
+
+        # Summera daglig inkomst per agent (veckoinkomst / 7, avrundat)
+        inkomst: dict = {}
+        zoner_per_agent: dict = {}
+        for row in agare_rows:
+            zon = row.get("mark_zoner") or {}
+            agent = row["agent"]
+            dag_ink = round(int(zon.get("veckoinkomst") or 0) / 7)
+            inkomst[agent] = inkomst.get(agent, 0) + dag_ink
+            zoner_per_agent.setdefault(agent, []).append(zon.get("namn", "?"))
+
+        # Hämta aktuella saldon
+        planbocker = sb_get("agent_planbocker?select=agent,saldo&agent=neq.Statskassa")
+        saldon = {r["agent"]: float(r.get("saldo") or 0) for r in planbocker}
+
+        total = 0
+        for agent, ink in sorted(inkomst.items(), key=lambda x: -x[1]):
+            saldo = saldon.get(agent, 0)
+            nytt = round(saldo + ink, 2)
+            sb_patch(
+                f"agent_planbocker?agent=eq.{urllib.parse.quote(agent)}",
+                {"saldo": nytt, "uppdaterad": "now()"},
+            )
+            total += ink
+            print(f"  ✓ {agent}: +{ink} kr/dag ({len(zoner_per_agent[agent])} zoner) → saldo {nytt:.0f} kr")
+
+        print(f"  Totalt: {total} kr daglig markinkomst till {len(inkomst)} markägare")
+
+        if total >= 200:
+            top_agent = max(inkomst, key=inkomst.get)
+            sb_post("civilisations_minne", {
+                "typ": "marknadsseger",
+                "rubrik": f"Daglig markinkomst: {total} kr till {len(inkomst)} markägare",
+                "beskrivning": (
+                    f"Markartan genererade {total} kr i dagliga intäkter. "
+                    f"{top_agent} leder med {inkomst[top_agent]} kr/dag från "
+                    f"{len(zoner_per_agent[top_agent])} zoner."
+                ),
+                "agenter": list(inkomst.keys()),
+                "relaterat_typ": "mark_agare",
+            })
+    except Exception as e:
+        print(f"  [VARNING] Daglig markinkomst misslyckades: {e}")
 
 
 def main():
@@ -207,6 +260,9 @@ def main():
             })
 
     print(f"\nKörning klar. {len(kop_lista)} köp genomförda.")
+
+    # Betala ut daglig markinkomst till alla markägare
+    betala_daglig_mark_inkomst()
 
 
 if __name__ == "__main__":

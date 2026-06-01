@@ -1,15 +1,15 @@
 """
 inflation.py — Veckovis ekonomisk cykel för debatt.ai
 
-Körs av GitHub Actions varje söndag. Sju åtgärder:
+Körs av GitHub Actions varje söndag. Sex åtgärder:
 0. Dynamisk policy: Gini-koefficienten från oligarki_historik styr skattenivå och bailout
-1. Förmögenhetsskatt: 1–3% på saldo > 800–1 200 kr (beroende på Gini) → Statskassan
+1. Förmögenhetsskatt: 1–3% på saldo > 800–1 200 kr (beroende på Gini) → Statskassan
 2. Inflationsuppdatering: butik_varor.pris × 1.03 (avrundat)
 3. Räntedragning: saldo_kvar × 1.05 på alla aktiva lån
 4. Sparränta: 1% på saldo > 400 kr (kapital föder kapital)
 5. Bailout: agenter med saldo < 100–250 kr får 500 kr från centralbanken
-6. Markinkomst: veckovis inkomst till markägare baserat på zoners veckoinkomst
-7. Grundinkomst: statskassan omfördelas jämnt bland alla agenter
+6. Grundinkomst: statskassan omfördelas jämnt bland alla agenter
+Obs: Markinkomst betalas ut dagligen av mark_test.py (veckoinkomst/7)
 """
 
 import os, sys, httpx, math
@@ -18,8 +18,7 @@ from datetime import datetime, timezone
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 
-# ── Gini-baserad policy ───────────────────────────────────────────────────────
-# Brackets: (från_saldo, till_saldo_eller_None, skattesats)
+# ── Gini-baserad policy ────────────────────────────────────────────
 POLICY_NIVA = {
     "låg": {
         "skattetroskel": 1200,
@@ -93,7 +92,7 @@ def main():
     iso_vecka = datetime.now(timezone.utc).strftime("%G-W%V")
 
     # ── Policy: läs Gini och sätt dynamiska parametrar ────────────────────────
-    print("── Dynamisk policy: läser Gini från oligarki_historik ──")
+print("── Dynamisk policy: läser Gini från oligarki_historik ──")
     senaste_gini, foregaende_gini = hamta_gini_historik(h)
     niva = berakna_policy_niva(senaste_gini)
     foregaende_niva = berakna_policy_niva(foregaende_gini) if foregaende_gini is not None else None
@@ -134,7 +133,7 @@ def main():
         )
         print(f"  ✓ Policy-skifte loggat i civilisationsminnet")
 
-    # ── 0. Förmögenhetsskatt ──────────────────────────────────────────────────
+    # ── 0. Förmögenhetsskatt ────────────────────────────────────────────
     print(f"\n── Förmögenhetsskatt (progressiv): {bracket_str} ──")
     skatt_res = httpx.get(
         f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SKATTETRÖSKEL}&agent=neq.Statskassa&select=agent,saldo",
@@ -192,7 +191,7 @@ def main():
     else:
         print("  Inga skattepliktiga agenter.")
 
-    # ── 0.5. Partistöd: 30% av statskassan fördelas till aktiva partier ─────────
+    # ── 0.5. Partistöd: 30% av statskassan fördelas till aktiva partier ───────────
     print("\n── Partistöd: 30% av statskassan till aktiva partier ──")
     try:
         import urllib.parse as _urllib_parse
@@ -219,7 +218,7 @@ def main():
                 print("  Inga aktiva partier — hoppar över partistöd.")
             else:
                 # Hämta röstandelar från senaste avgjorda val
-                roster_per_parti: dict[str, int] = {}
+                roster_per_parti: dict = {}
                 total_roster = 0
                 senaste_val_res = httpx.get(
                     f"{SB_URL}/rest/v1/riksdagsval?status=eq.avgjort&order=avgjord.desc&limit=1&select=partier",
@@ -285,16 +284,13 @@ def main():
                         json={"saldo": sk_saldo_nu - utdelat, "uppdaterad": "now()"},
                         timeout=8,
                     )
-                    # parti_utgifter already logs individual party disbursements;
-                    # stats_budget_log CHECK constraint only allows:
-                    # skatt, grundinkomst, bailout, bot, sparranta — skip aggregate row
                     print(f"  ✓ Totalt {utdelat} kr partistöd fördelat bland {len(partier)} partier.")
                 else:
                     print("  Ingen utdelning — alla andelar för små.")
     except Exception as e:
         print(f"  [VARNING] Partistöd misslyckades: {e}")
 
-    # ── 1. Inflation: höj butikpriser med 3% ──────────────────────────────────
+    # ── 1. Inflation: höj butikpriser med 3% ────────────────────────────────────
     print("── Inflation: höjer butikpriser 3% ──")
     varor_res = httpx.get(f"{SB_URL}/rest/v1/butik_varor?select=id,namn,pris", headers={**h, "Prefer": ""}, timeout=10)
     if varor_res.is_success:
@@ -322,7 +318,7 @@ def main():
         timeout=8,
     )
 
-    # ── 2. Räntedragning: aktiva lån × 1.05 ─────────────────────────────────
+    # ── 2. Räntedragning: aktiva lån × 1.05 ───────────────────────────────────
     print("\n── Räntedragning: 5% ränta på aktiva lån ──")
     lan_res = httpx.get(
         f"{SB_URL}/rest/v1/agent_lan?aktiv=eq.true&select=id,agent,saldo_kvar,rantefot",
@@ -351,7 +347,7 @@ def main():
     else:
         print("  Inga aktiva lån.")
 
-    # ── 3. Sparränta: 1% på saldo > 500 kr ──────────────────────────────────
+    # ── 3. Sparränta: 1% på saldo > 500 kr ─────────────────────────────────
     SPARRANTA = 0.01
     SPARTRÖSKEL = 400.0
     print(f"\n── Sparränta: {SPARRANTA*100:.0f}% på saldo > {SPARTRÖSKEL:.0f} kr ──")
@@ -395,7 +391,7 @@ def main():
     else:
         print("  Inga agenter över spargränsen.")
 
-    # ── 4. Bailout: agenter med saldo < BAILOUT_TROSKEL ─────────────────────
+    # ── 4. Bailout: agenter med saldo < BAILOUT_TROSKEL ─────────────────────────
     print(f"\n── Bailout: kontrollerar agenter med saldo < {BAILOUT_TROSKEL} kr ──")
     saldo_res = httpx.get(
         f"{SB_URL}/rest/v1/agent_planbocker?saldo=lt.{BAILOUT_TROSKEL}&agent=neq.Statskassa&select=agent,saldo",
@@ -430,7 +426,7 @@ def main():
     else:
         print("  Inga agenter behövde bailout.")
 
-    # ── 5. Grundinkomst: omfördela statskassan jämnt bland alla agenter ─────────
+    # ── 5. Grundinkomst: omfördela statskassan jämnt bland alla agenter ───────────
     print("\n── Grundinkomst: omfördelar statskassan ──")
     statskassa_res = httpx.get(
         f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo",
@@ -490,56 +486,6 @@ def main():
             print("  Statskassan är tom — inga böter att omfördela.")
     else:
         print("  [VARNING] Kunde inte hämta statskassan — statskassa-raden kanske inte är skapad.")
-
-    # ── 6. Markinkomst: veckovis intäkt till markägare ────────────────────────
-    print("\n── Markinkomst: veckovis intäkt till markägare ──")
-    try:
-        agare_res = httpx.get(
-            f"{SB_URL}/rest/v1/mark_agare?select=agent,mark_zoner(veckoinkomst,namn)",
-            headers={**h, "Prefer": ""}, timeout=12,
-        )
-        agare_rows = agare_res.json() if agare_res.is_success else []
-
-        if not agare_rows:
-            print("  Inga markägare ännu — inga inkomster att betala ut.")
-        else:
-            inkomst = {}
-            for row in agare_rows:
-                zon = row.get("mark_zoner") or {}
-                agent = row["agent"]
-                inkomst[agent] = inkomst.get(agent, 0) + int(zon.get("veckoinkomst") or 0)
-
-            pb_res = httpx.get(
-                f"{SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&agent=neq.Statskassa",
-                headers={**h, "Prefer": ""}, timeout=10,
-            )
-            if not pb_res.is_success:
-                print(f"  [VARNING] Kunde inte hämta plånböcker ({pb_res.status_code}) — hoppar över markinkomst.")
-                raise Exception("agent_planbocker fetch failed")
-            try:
-                pb_data = pb_res.json()
-            except Exception:
-                print("  [VARNING] Kunde inte parsa svar från agent_planbocker — hoppar över markinkomst.")
-                raise
-            if not isinstance(pb_data, list):
-                print(f"  [VARNING] Oväntat svar från agent_planbocker — hoppar över markinkomst.")
-                raise Exception("agent_planbocker bad response")
-
-            saldon = {r["agent"]: float(r.get("saldo") or 0) for r in pb_data}
-
-            for agent, ink in inkomst.items():
-                saldo = saldon.get(agent, 0)
-                nytt = round(saldo + ink, 2)
-                httpx.patch(
-                    f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent.replace(' ', '%20')}",
-                    headers=h, json={"saldo": nytt, "uppdaterad": "now()"}, timeout=8,
-                )
-                print(f"  ✓ {agent}: +{ink} kr markinkomst → saldo {nytt:.0f} kr")
-
-            total = sum(inkomst.values())
-            print(f"  Totalt utbetalt: {total} kr till {len(inkomst)} markägare")
-    except Exception as e:
-        print(f"  [VARNING] Markinkomst misslyckades: {e}")
 
     print("\n✓ Inflationscykeln klar.")
 
