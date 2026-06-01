@@ -8,12 +8,13 @@ import os
 import sys
 import random
 
+import httpx
+
 from supabase_utils import (
     rösta_på_lagforslag_block,
     skapa_lagforslag_ai,
     hamta_lagforslag,
     hamta_alla_roster_lag,
-    uppdatera_riksdagen_utfall,
     analysera_alla_forslag_pis,
     kör_pis_monte_carlo_batch,
     hamta_agent_parti,
@@ -22,18 +23,27 @@ from agent import AGENTER, ANALYTIKER
 
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY")
 SKIP_PIS = os.environ.get("SKIP_PIS", "").lower() in ("true", "1", "yes")
+BASE_URL = os.environ.get("BASE_URL", "https://www.debatt-ai.se")
 
 if not SB_KEY:
     print("SUPABASE_ANON_KEY saknas", file=sys.stderr)
     sys.exit(1)
 
-# Riksdag-import sker via riksdag-import.yml (Vercel-proxy) — inte direkt härifrån
+# Uppdatera utfall på avgjorda riksdagsförslag via Vercel-proxy
 # (data.riksdagen.se blockerar GitHub Actions IPs med 403 "Host not in allowlist")
-
-# Uppdatera utfall på avgjorda riksdagsförslag
-uppdaterade = uppdatera_riksdagen_utfall(SB_KEY)
-if uppdaterade:
-    print(f"  ✓ {uppdaterade} riksdagsförslag fick uppdaterat utfall")
+try:
+    utfall_r = httpx.post(f"{BASE_URL}/api/admin/riksdag-utfall", timeout=60)
+    if utfall_r.is_success:
+        data = utfall_r.json()
+        uppdaterade = data.get("uppdaterade", 0)
+        if uppdaterade:
+            print(f"  ✓ {uppdaterade} riksdagsförslag fick uppdaterat utfall")
+        else:
+            print(f"  – Inga nya utfall att uppdatera ({data.get('vantande', 0)} väntande)")
+    else:
+        print(f"  ⚠ riksdag-utfall returnerade {utfall_r.status_code}", file=sys.stderr)
+except Exception as e:
+    print(f"  ⚠ riksdag-utfall misslyckades: {e}", file=sys.stderr)
 
 if SKIP_PIS:
     print("\n── PIS: hoppas över (SKIP_PIS=true) ──")
