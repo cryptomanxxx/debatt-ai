@@ -44,7 +44,6 @@ from supabase_utils import (
     rakna_debattdjup, ar_duplikat, oracle_ovdebattering, hamta_pexels_bild, logga_action,
     hamta_relation, upsert_koalition,
     rösta_på_lagforslag_block, skapa_lagforslag_ai,
-    uppdatera_riksdagen_utfall,
     kör_ekonomispel,
     hamta_agent_positioner, uppdatera_agent_positioner,
     kör_lobbying, initiera_koalition,
@@ -301,12 +300,12 @@ def main():
         kategori = original.get("kategori", "Övrigt")
 
         mood = get_agent_mood(agent["namn"])
-        print(f"\n{'═' * 60}")
+        print(f"\n{'=' * 60}")
         print(f"  Läge:     REPLIK")
         print(f"  Agent:    {agent['namn']} [{mood['label']}]")
         print(f"  Svarar på: {original['rubrik']}")
         print(f"  Kategori: {kategori}")
-        print(f"{'═' * 60}\n")
+        print(f"{'=' * 60}\n")
 
         relation_kontext = hamta_relation(sb_key, agent["namn"], original["forfattare"]) if sb_key else ""
         if relation_kontext:
@@ -495,13 +494,13 @@ def main():
         if forslag_amne:
             amne = forslag_amne
             kategori = "Samhälle"
-            print(f"\n{'═' * 60}")
+            print(f"\n{'=' * 60}")
             print(f"  Läge:     NY ARTIKEL (ÄMNESFÖRSLAG FRÅN DIREKTDEBATT)")
             print(f"  Agent:    {agent['namn']} [{mood['label']}]")
             print(f"  Ämne:     {amne[:60]}")
             print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")
-            print(f"{'═' * 60}\n")
+            print(f"{'=' * 60}\n")
             buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
             if buffs:
                 aktiva = [k for k in buffs if k != "extra_system"]
@@ -530,7 +529,7 @@ def main():
                 "publicerad": nyhet.get("publicerad", ""),
                 "antal_utvärderade": len(nyheter),
             }
-            print(f"\n{'═' * 60}")
+            print(f"\n{'=' * 60}")
             print(f"  Läge:     NY ARTIKEL (AKTUELL NYHET)")
             print(f"  Agent:    {agent['namn']} [{mood['label']}]")
             print(f"  Nyhet:    {nyhet['rubrik'][:60]}")
@@ -540,7 +539,7 @@ def main():
             print(f"  Antal utvärderade: {len(nyheter)}")
             print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")
-            print(f"{'═' * 60}\n")
+            print(f"{'=' * 60}\n")
             buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
             if buffs:
                 aktiva = [k for k in buffs if k != "extra_system"]
@@ -566,13 +565,13 @@ def main():
                 while (ar_duplikat(amne, senaste_titlar) or oracle_ovdebattering(amne, senaste_titlar)) and forsok < 4:
                     amne, kategori = random.choice(agent["amnen"])
                     forsok += 1
-            print(f"\n{'═' * 60}")
+            print(f"\n{'=' * 60}")
             print(f"  Läge:     NY ARTIKEL")
             print(f"  Agent:    {agent['namn']} [{mood['label']}]")
             print(f"  Ämne:     {amne}")
             print(f"  Format:   {artikelfmt['namn']}")
             print(f"  Kategori: {kategori}")
-            print(f"{'═' * 60}\n")
+            print(f"{'=' * 60}\n")
             buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
             if buffs:
                 aktiva = [k for k in buffs if k != "extra_system"]
@@ -602,9 +601,9 @@ def main():
     viz_id = None
     if not original and sb_key:
         ALL_VIZ_NYCKELORD = [
-            "bnp", "inflation", "export", "styrränta", "kpif", "arbetslöshet",
-            "ungdomsarbetslöshet", "sysselsättning", "co2", "förnybar", "skogstäckning",
-            "gini", "utbildning", "hälsa", "livslängd",
+            "bnp", "inflation", "export", "styränta", "kpif", "arbetslöshet",
+            "ungdomsarbetslöshet", "sysselsättning", "co2", "förnybar", "skogtäckning",
+            "gini", "utbildning", "hälsa", "livsvängd",
         ]
         all_text = (amne + " " + artikel).lower()
         hints = [k for k in ALL_VIZ_NYCKELORD if k in all_text]
@@ -646,7 +645,7 @@ def main():
         spara_nyhetslog(sb_key, agent["namn"], nyhet, nyheter, artikel_id_num, svar.get("publicerad", False), rss_stats)
         print("  Nyhetslogg sparad ✓")
 
-    print(f"\n{'═' * 60}")
+    print(f"\n{'=' * 60}")
     if "fel" in svar:
         print(f"  ✗ Fel från API: {svar['fel']}")
     else:
@@ -749,7 +748,7 @@ def main():
             for f in svar["forbattringar"]:
                 print(f"    – {f}")
 
-    print(f"{'═' * 60}\n")
+    print(f"{'=' * 60}\n")
 
     if sb_key and svar.get("publicerad"):
         print(f"\n── Dagboksinlägg: {agent['namn']} ──")
@@ -948,9 +947,8 @@ def main():
             else:
                 print(f"  ⛔ {agent['namn']} saknar maktindex för att skapa lagförslag (rank {agent_rank}/24)")
 
-        uppdaterade = uppdatera_riksdagen_utfall(sb_key)
-        if uppdaterade > 0:
-            print(f"  ✓ Automatiskt uppdaterade riksdagen_utfall för {uppdaterade} förslag")
+        # riksdagen_utfall uppdateras av parlament_test.py via Vercel-proxy
+        # (data.riksdagen.se blockerar GitHub Actions IPs)
 
         if random.random() < 0.08:
             print(f"\n── Lobbying: {agent['namn']} ──")
@@ -1080,7 +1078,7 @@ def main():
                 ],
                 "max_tokens": 80, "temperature": 0.9,
             }
-            fraga_text = _llm_kort(fraga_payload, agent.get("system", ""), fraga_prompt, max_tokens=80).strip('"\'').strip()
+            fraga_text = _llm_kort(fraga_payload, agent.get("system", ""), fraga_prompt, max_tokens=80).strip("'\'").strip()
             if len(fraga_text) < 5:
                 raise ValueError(f"Fråge-LLM returnerade tom/ogiltig text: {repr(fraga_text)}")
 
@@ -1165,7 +1163,7 @@ def main():
                 ],
                 "max_tokens": 80, "temperature": 0.9,
             }
-            fraga_text2 = _llm_kort(fraga_payload2, agent.get("system", ""), fraga_prompt2, max_tokens=80).strip('"\'').strip()
+            fraga_text2 = _llm_kort(fraga_payload2, agent.get("system", ""), fraga_prompt2, max_tokens=80).strip("'\'").strip()
             if len(fraga_text2) < 5:
                 raise ValueError(f"Fråge-LLM returnerade tom/ogiltig text: {repr(fraga_text2)}")
 
@@ -1257,7 +1255,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Oligarki-snapshot: {e}", file=sys.stderr)
 
-    # ── Bilder: tillstånd / meme / propaganda / valkampanj ───────────────────
+    # ── Bilder: tillstånd / meme / propaganda / valkampanj ────────────────────────────────────────
     if sb_key:
         try:
             status_för_bild = hamta_agent_status(sb_key, agent["namn"]) if sb_key else {}
@@ -1324,7 +1322,7 @@ def main():
         except Exception as e:
             print(f"  ✗ Bildgenerering: {e}", file=sys.stderr)
 
-    # ── Bildreaktion: ~8% chans — reagera på en annan agents bild ────────────
+    # ── Bildreaktion: ~8% chans — reagera på en annan agents bild ────────────────────
     if sb_key and random.random() < 0.08:
         try:
             reagera_pa_bild(sb_key, agent["namn"], agent.get("system", ""))
