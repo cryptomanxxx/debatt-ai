@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import PisKlient from "./PisKlient";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
@@ -141,15 +142,17 @@ export default async function PisPage() {
             Inga PIS-analyser ännu — körs automatiskt vid nästa parlamentskörning (12:00).
           </div>
         ) : (
-          <PisKlient
-            analyser={analyser}
-            forslagMap={forslagMap}
-            mcMap={mcMap}
-            maxBnp={maxBnp}
-            maxGini={maxGini}
-            maxInf={maxInf}
-            maxArb={maxArb}
-          />
+          <Suspense fallback={null}>
+            <PisKlient
+              analyser={analyser}
+              forslagMap={forslagMap}
+              mcMap={mcMap}
+              maxBnp={maxBnp}
+              maxGini={maxGini}
+              maxInf={maxInf}
+              maxArb={maxArb}
+            />
+          </Suspense>
         )}
       </div>
     </div>
