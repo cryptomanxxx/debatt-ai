@@ -95,19 +95,20 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
   const agentGrads = [...new Set(agare.map(a => a.agent))]
     .map(name => ({ name, farg: AGENT_VISUELL[name]?.ikonFarg || "#888" }));
 
+  const dagInk = v => Math.round(v / 7);
   const leaderMap = {};
   agare.forEach(a => {
     const z = zoner.find(z => z.id === a.zon_id);
     if (!z) return;
     if (!leaderMap[a.agent]) leaderMap[a.agent] = { antal: 0, ink: 0 };
     leaderMap[a.agent].antal++;
-    leaderMap[a.agent].ink += z.veckoinkomst;
+    leaderMap[a.agent].ink += dagInk(z.veckoinkomst);
   });
   const leaders = Object.entries(leaderMap).sort((a, b) => b[1].ink - a[1].ink).slice(0, 8);
   const maxInk = leaders[0]?.[1].ink || 1;
   const totalInk = agare.reduce((s, a) => {
     const z = zoner.find(z => z.id === a.zon_id);
-    return s + (z?.veckoinkomst || 0);
+    return s + dagInk(z?.veckoinkomst || 0);
   }, 0);
 
   const active = selected || hover;
@@ -120,7 +121,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
     setHover(zon);
     const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
     const id = Math.random();
-    setFloats(prev => [...prev.slice(-4), { id, cx, cy, ink: zon.veckoinkomst }]);
+    setFloats(prev => [...prev.slice(-4), { id, cx, cy, ink: dagInk(zon.veckoinkomst) }]);
     setTimeout(() => setFloats(prev => prev.filter(f => f.id !== id)), 1600);
   }
 
@@ -182,7 +183,6 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
               <feGaussianBlur stdDeviation="2" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
-            {/* Glöd för stadszonernas maktcentrum — dämpad så terrängbilden syns */}
             <filter id="cityglow" x="-60%" y="-60%" width="220%" height="220%">
               <feGaussianBlur stdDeviation="5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
@@ -212,7 +212,6 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                   onMouseLeave={() => setHover(null)}
                   onClick={() => setSelected(s => s?.id === zon.id ? null : zon)}
                 >
-                  {/* Stad: dämpad maktglow — syns men blockerar inte terrängen */}
                   {zon.typ === "stad" && (
                     <>
                       <polygon points={hexPts(cx, cy, HEX + 8)} fill="none" stroke="#9333ea"
@@ -253,7 +252,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                     fontFamily="monospace" fontWeight={agFarg ? "700" : "400"}
                     filter={agFarg && isAct ? "url(#textglow)" : undefined}
                     style={{ userSelect: "none", pointerEvents: "none" }}>
-                    {zon.veckoinkomst}kr
+                    {dagInk(zon.veckoinkomst)}kr
                   </text>
                   {agName && (
                     <text x={cx} y={cy + 18} textAnchor="middle" dominantBaseline="middle"
@@ -268,7 +267,6 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
             })}
           </g>
 
-          {/* Institution-pins — separat pass så de alltid syns ovanpå alla hexar */}
           {zoner.filter(zon => INSTITUTIONS[zon.namn]).map(zon => {
             const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
             const inst = INSTITUTIONS[zon.namn];
@@ -295,7 +293,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
             <text key={f.id} x={f.cx} y={f.cy - 20} textAnchor="middle"
               fill="#fbbf24" fontSize="12" fontFamily="monospace" fontWeight="700"
               filter="url(#softglow)" style={{ pointerEvents: "none" }}>
-              +{f.ink}kr/v
+              +{f.ink}kr/dag
               <animate attributeName="opacity" from="1" to="0" dur="1.5s" fill="freeze" />
               <animateTransform attributeName="transform" type="translate" from="0 0" to="0 -52" dur="1.5s" fill="freeze" />
             </text>
@@ -306,7 +304,6 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
           </text>
         </svg>
 
-        {/* Teckenförklaring */}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "10px" }}>
           {Object.entries(TYP_FARG).map(([typ, farg]) => (
             <span key={typ} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
@@ -349,9 +346,9 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
             <p style={{ fontSize: "11px", color: "#555", margin: "0 0 12px", lineHeight: 1.6 }}>{active.beskrivning}</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
               <div>
-                <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>VECKOINKOMST</div>
+                <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>DAGSINKOMST</div>
                 <div style={{ fontSize: "18px", color: TYP_FARG[active.typ] || "#fff", lineHeight: 1 }}>
-                  {active.veckoinkomst} <span style={{ fontSize: "10px" }}>kr/v</span>
+                  {dagInk(active.veckoinkomst)} <span style={{ fontSize: "10px" }}>kr/dag</span>
                 </div>
               </div>
               <div>
@@ -380,10 +377,10 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
         <div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
             {[
-              ["ZONER",     zoner.length,                "#666"],
-              ["ÄGDA",      agare.length,                "#4ade80"],
-              ["FRIA",      zoner.length - agare.length, "#38bdf8"],
-              ["VECKOINK.", `${totalInk} kr`,            "#f59e0b"],
+              ["ZONER",       zoner.length,                "#666"],
+              ["ÄGDA",        agare.length,                "#4ade80"],
+              ["FRIA",        zoner.length - agare.length, "#38bdf8"],
+              ["DAGSINKOMST", `${totalInk} kr`,            "#f59e0b"],
             ].map(([lbl, val, c]) => (
               <div key={lbl} style={{ background: "#0d0d0d", border: "1px solid #181818", borderRadius: "6px", padding: "8px 10px" }}>
                 <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: "3px" }}>{lbl}</div>
@@ -405,7 +402,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
                     <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
                       <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(stats.ink / maxInk) * 100}%`, boxShadow: `0 0 6px ${rgba(af, 0.6)}`, transition: "width 0.5s ease" }} />
                     </div>
-                    <div style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>{stats.ink} kr/vecka</div>
+                    <div style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>{stats.ink} kr/dag</div>
                   </div>
                 );
               })}
