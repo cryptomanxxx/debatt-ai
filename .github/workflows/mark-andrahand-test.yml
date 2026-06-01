@@ -1,0 +1,19 @@
+name: Mark Andrahand Test
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # 10:00 svensk tid (08:00 UTC sommartid)
+  workflow_dispatch:
+
+jobs:
+  mark-andrahand:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install httpx
+      - run: python mark_andrahand_test.py
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}

@@ -86,7 +86,16 @@ function relativeTime(ts) {
   return `${Math.floor(diff / 86400)}d sedan`;
 }
 
-export default function MarkKarta({ zoner, agare, transaktioner }) {
+function timeLeft(ts) {
+  if (!ts) return "";
+  const diff = (new Date(ts) - Date.now()) / 1000;
+  if (diff <= 0) return "Avslutar...";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m kvar`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h kvar`;
+  return `${Math.floor(diff / 86400)}d kvar`;
+}
+
+export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] }) {
   const [hover, setHover]       = useState(null);
   const [selected, setSelected] = useState(null);
   const [floats, setFloats]     = useState([]);
@@ -430,6 +439,74 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
             })}
           </div>
         )}
+
+        {/* ── AUKTIONER ── */}
+        <div>
+          <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>
+            AUKTIONER{auktioner.length > 0 ? ` · ${auktioner.length} AKTIVA` : ""}
+          </p>
+          {auktioner.length === 0 ? (
+            <div style={{ fontSize: "11px", color: "#2a2a2a", fontFamily: "monospace", textAlign: "center", padding: "16px 0" }}>
+              Inga aktiva auktioner
+            </div>
+          ) : (
+            auktioner.map(a => {
+              const zon      = a.mark_zoner || {};
+              const typFarg  = TYP_FARG[zon.typ] || "#555";
+              const saljFarg = AGENT_VISUELL[a.saljare]?.ikonFarg || "#888";
+              const budFarg  = a.hogst_budgivare ? (AGENT_VISUELL[a.hogst_budgivare]?.ikonFarg || "#f59e0b") : null;
+              return (
+                <div key={a.id} style={{
+                  background: "#0a0a0a",
+                  borderLeft: `2px solid ${rgba(typFarg, 0.55)}`,
+                  borderRadius: "0 4px 4px 0",
+                  padding: "8px 10px",
+                  marginBottom: "6px",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
+                    <span style={{ fontSize: "11px", color: typFarg, fontFamily: "monospace", fontWeight: 700 }}>
+                      {TYP_IKON[zon.typ]} {zon.namn}
+                    </span>
+                    <span style={{ fontSize: "8px", color: "#444", fontFamily: "monospace" }}>
+                      {timeLeft(a.stanger_at)}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                    <div>
+                      <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>
+                        SÄLJS AV
+                      </div>
+                      <div style={{ fontSize: "10px", color: saljFarg, fontFamily: "monospace" }}>
+                        {a.saljare}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      {a.nuv_bud ? (
+                        <>
+                          <div style={{ fontSize: "12px", color: budFarg || "#f59e0b", fontFamily: "monospace", lineHeight: 1 }}>
+                            {a.nuv_bud} kr
+                          </div>
+                          <div style={{ fontSize: "8px", color: budFarg || "#888", fontFamily: "monospace" }}>
+                            {a.hogst_budgivare}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", lineHeight: 1 }}>
+                            {a.reservpris} kr
+                          </div>
+                          <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>
+                            reservpris
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
