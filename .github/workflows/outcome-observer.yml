@@ -1,0 +1,35 @@
+name: Outcome Observer
+
+on:
+  schedule:
+    - cron: "30 9 * * 1"   # Måndag 11:30 svensk tid (09:30 UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  assess:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run outcome-observer
+        env:
+          CEREBRAS_API_KEY:  ${{ secrets.CEREBRAS_API_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: node agents/outcome-observer.js
+
+      - name: Commit utfall
+        run: |
+          git config user.name  "outcome-observer"
+          git config user.email "bot@debatt-ai.se"
+          git add ai-bus/implemented/
+          if git diff --cached --quiet; then
+            echo "Inga ändringar att committa"
+          else
+            git commit -m "chore(ai-bus): utfallsbedömning för implementerade åtgärder [$(date +%Y-%m-%d)]"
+            git push
+          fi
