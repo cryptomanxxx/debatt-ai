@@ -83,6 +83,8 @@ def sb_patch(path, data):
 
 
 def main():
+    import sys
+    force = "--force" in sys.argv  # python mark_test.py --force → 100% köpchans
     print("=== MARK_TEST: Daglig körning ===")
 
     zoner = sb_get("mark_zoner?select=*&order=id.asc")
@@ -93,6 +95,11 @@ def main():
         print("Inga zoner hittades — kör supabase_mark.sql i Supabase SQL Editor")
         return
 
+    print(f"Planböcker hittade: {len(planbocker)} agenter")
+    if not planbocker:
+        print("  [VARNING] Tomma planböcker — alla agenter får saldo 0, inga köp möjliga")
+        print("  Kontrollera att agent_planbocker-tabellen finns och har RLS SELECT-policy")
+
     agare_dict = {r["zon_id"]: r["agent"] for r in agare_rows}
     saldon = {r["agent"]: float(r.get("saldo") or 0) for r in planbocker}
     agent_zon_antal = {}
@@ -102,15 +109,25 @@ def main():
     fria = len(zoner) - len(agare_dict)
     print(f"Zoner: {len(zoner)}, Ägda: {len(agare_dict)}, Fria: {fria}")
 
+    rika = [(a, s) for a, s in saldon.items() if s >= 700]
+    print(f"Agenter med saldo ≥ 700 kr: {len(rika)}")
+    for ag, sal in sorted(rika, key=lambda x: -x[1])[:5]:
+        print(f"  {ag}: {sal:.0f} kr")
+
+    if force:
+        print("  [--force] Kör med 100% köpchans")
+
     kop_lista = []
     random.shuffle(AGENTER)
 
     for agent in AGENTER:
-        if random.random() > KOP_SANNOLIKHET:
+        if not force and random.random() > KOP_SANNOLIKHET:
             continue
 
         saldo = saldon.get(agent, 0)
         if saldo < 700:
+            if force:
+                print(f"  {agent}: saldo {saldo:.0f} kr — för lågt (< 700 kr), hoppar över")
             continue
 
         if agent_zon_antal.get(agent, 0) >= MAX_ZONER_PER_AGENT:
