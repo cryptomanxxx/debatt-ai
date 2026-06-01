@@ -95,7 +95,7 @@ export default function MarkKarta({ zoner, agare, transaktioner }) {
   const agentGrads = [...new Set(agare.map(a => a.agent))]
     .map(name => ({ name, farg: AGENT_VISUELL[name]?.ikonFarg || "#888" }));
 
-  const dagInk = v => Math.round(v / 7);
+  const dagInk = v => Math.round(v / 3);
   const leaderMap = {};
   agare.forEach(a => {
     const z = zoner.find(z => z.id === a.zon_id);

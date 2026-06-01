@@ -2,7 +2,7 @@
 """
 mark_test.py — AI-civilisationens territoriella marknad
 Körs dagligen 09:30 svensk tid. Agenter köper mark baserat på ideologi och saldo.
-Varje zon genererar daglig inkomst (veckoinkomst/7) vid varje körning.
+Varje zon genererar daglig inkomst (veckoinkomst/3) vid varje körning.
 """
 import os, random, urllib.parse
 import httpx
@@ -83,7 +83,7 @@ def sb_patch(path, data):
 
 
 def betala_daglig_mark_inkomst():
-    """Betalar ut daglig markinkomst (veckoinkomst / 7) till alla markägare."""
+    """Betalar ut daglig markinkomst (veckoinkomst / 3) till alla markägare."""
     print("\n── Daglig markinkomst ──")
     try:
         agare_rows = sb_get("mark_agare?select=agent,mark_zoner(veckoinkomst,namn)")
@@ -91,13 +91,13 @@ def betala_daglig_mark_inkomst():
             print("  Inga markägare ännu.")
             return
 
-        # Summera daglig inkomst per agent (veckoinkomst / 7, avrundat)
+        # Summera daglig inkomst per agent (veckoinkomst / 3, avrundat)
         inkomst: dict = {}
         zoner_per_agent: dict = {}
         for row in agare_rows:
             zon = row.get("mark_zoner") or {}
             agent = row["agent"]
-            dag_ink = round(int(zon.get("veckoinkomst") or 0) / 7)
+            dag_ink = round(int(zon.get("veckoinkomst") or 0) / 3)
             inkomst[agent] = inkomst.get(agent, 0) + dag_ink
             zoner_per_agent.setdefault(agent, []).append(zon.get("namn", "?"))
 
