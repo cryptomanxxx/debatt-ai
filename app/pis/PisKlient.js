@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 const C = {
   bg:      "#0a0a0a",
@@ -99,17 +100,51 @@ function RiktningRow({ label, v }) {
 }
 
 export default function PisKlient({ analyser, forslagMap, mcMap, maxBnp, maxGini, maxInf, maxArb }) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [visade, setVisade] = useState(PER_PAGE);
   const [baramc, setBaraMc] = useState(false);
+  const [sok, setSok] = useState(() => searchParams.get("q") || "");
 
-  const filtrerade = baramc ? analyser.filter(a => mcMap[a.lagforslag_id]) : analyser;
+  useEffect(() => {
+    const q = searchParams.get("q") || "";
+    setSok(q);
+  }, [searchParams]);
+
+  function handleSok(val) {
+    setSok(val);
+    setVisade(PER_PAGE);
+    const params = new URLSearchParams(searchParams.toString());
+    if (val) params.set("q", val); else params.delete("q");
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }
+
+  const sokLower = sok.trim().toLowerCase();
+  const filtrerade = analyser
+    .filter(a => !baramc || mcMap[a.lagforslag_id])
+    .filter(a => {
+      if (!sokLower) return true;
+      const titel = (forslagMap[a.lagforslag_id]?.titel || "").toLowerCase();
+      return titel.includes(sokLower);
+    });
   const synliga = filtrerade.slice(0, visade);
   const kvar = filtrerade.length - visade;
 
   return (
     <>
       {/* Filter-rad */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: 18 }}>
+        <input
+          type="text"
+          value={sok}
+          onChange={e => handleSok(e.target.value)}
+          placeholder="Sök på titel…"
+          style={{
+            background: "#111", border: `1px solid ${C.border}`, borderRadius: 6,
+            padding: "5px 12px", fontSize: 12, color: C.text, outline: "none",
+            width: 220, flexShrink: 0,
+          }}
+        />
         <button
           onClick={() => { setBaraMc(b => !b); setVisade(PER_PAGE); }}
           style={{
@@ -117,7 +152,7 @@ export default function PisKlient({ analyser, forslagMap, mcMap, maxBnp, maxGini
             color: baramc ? "#000" : C.accent,
             border: `1px solid ${C.accent}`,
             borderRadius: 6, padding: "5px 14px", fontSize: 12,
-            fontWeight: 600, cursor: "pointer",
+            fontWeight: 600, cursor: "pointer", flexShrink: 0,
           }}>
           🎲 Bara med MC-analys
         </button>
