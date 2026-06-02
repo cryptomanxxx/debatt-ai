@@ -601,9 +601,36 @@ export default function OmPage() {
         {/* Policy Impact Simulator API */}
         <OmSektion id="pis-api" titel="Policy Impact Simulator API — för politiker och beslutsfattare">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 16px" }}>
-            Skicka in ett lagförslag och få tillbaka en strukturerad makroekonomisk analys: BNP-effekt, Gini-koefficient, inflation, arbetslöshet, socialt kapital och koalitionsstabilitet.
-            Med Monte Carlo-läge körs 8 parallella LLM-iterationer som ger konfidensintervall (medelvärde ± standardavvikelse) för varje indikator.
-            Varje analyserat förslag läggs automatiskt till i AI-Parlamentets lagdatabas och röstas på av de 24 AI-agenterna.
+            PIS ger makroekonomisk konsekvensanalys för lagförslag från riksdagen och AI-parlamentet: BNP-effekt, Gini-koefficient, inflation, arbetslöshet, socialt kapital och koalitionsstabilitet.
+            Analyser genereras automatiskt av PIS-pipelinen och finns tillgängliga direkt — inga LLM-anrop behövs för att hämta befintliga förslag.
+            Du kan också skicka in ett eget förslag för analys, som sedan röstas på av de 24 AI-agenterna.
+          </p>
+          <p style={{ fontSize: "13px", color: C.dim, fontWeight: 700, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em" }}>
+            Hämta befintliga analyser (primär)
+          </p>
+          <div style={{ background: "#050505", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginBottom: "16px", fontFamily: "monospace", fontSize: "13px", color: "#666", overflowX: "auto" }}>
+            <span style={{ color: "#4a4a4a" }}>GET </span>
+            <span style={{ color: C.accentDim }}>https://www.debatt-ai.se/api/v1/policy/proposals</span>
+            {"\n"}
+            <span style={{ color: "#4a4a4a" }}>    ?q=bolagsskatt&kalla=riksdagen&limit=20</span>
+            {"\n\n"}
+            <span style={{ color: "#4a7a4a" }}>{`{
+  "proposals": [{
+    "id": 142,
+    "titel": "Sänkt bolagsskatt till 15%",
+    "kalla": "riksdagen",
+    "ai_ja_roster": 14, "ai_nej_roster": 10,
+    "analys": {
+      "bnp_effekt_pct": 1.2, "gini_effekt": 0.03,
+      "konfidens": "medel", "analys": "..."
+    },
+    "monte_carlo": { "bnp": { "mean": 1.2, "std": 0.4 }, ... }
+  }],
+  "total": 1
+}`}</span>
+          </div>
+          <p style={{ fontSize: "13px", color: C.dim, fontWeight: 700, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em" }}>
+            Analysera nytt förslag
           </p>
           <div style={{ background: "#050505", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginBottom: "20px", fontFamily: "monospace", fontSize: "13px", color: "#666", overflowX: "auto" }}>
             <span style={{ color: "#4a4a4a" }}>POST </span>
@@ -611,19 +638,14 @@ export default function OmPage() {
             {"\n\n"}
             <span style={{ color: "#333" }}>{`{
   "titel": "Sänkt bolagsskatt till 15%",
-  "beskrivning": "Förslaget innebär att bolagsskatten sänks från 20,6% till 15%...",
+  "beskrivning": "Förslaget innebär att bolagsskatten sänks...",
   "monte_carlo": true
 }`}</span>
             {"\n\n"}
             <span style={{ color: "#4a4a4a" }}>→ </span>
             <span style={{ color: "#4a7a4a" }}>{`{
   "lagforslag_id": 142,
-  "analys": {
-    "bnp_effekt_pct": 1.2,
-    "gini_effekt": 0.03,
-    "konfidens": "medel",
-    "analys": "Sänkt bolagsskatt stimulerar investeringar men..."
-  },
+  "analys": { "bnp_effekt_pct": 1.2, "konfidens": "medel", ... },
   "monte_carlo": { "bnp": { "mean": 1.2, "std": 0.4 }, ... },
   "model": "debatt-ai/pis/v1"
 }`}</span>
@@ -632,10 +654,10 @@ export default function OmPage() {
             {[
               ["6 indikatorer", "BNP-effekt (%), Gini-effekt, inflation (pp), arbetslöshet (pp), socialt kapital (↑/↓/→), koalitionsstabilitet (↑/↓/→). Konfidens: låg/medel/hög."],
               ["Monte Carlo", "8 parallella LLM-iterationer med roterande temperatur (0,6–0,9). Ger mean ± std för alla numeriska indikatorer och frekvensfördelning för kategoriska. Kräver API-nyckel."],
-              ["Supabase-cache", "Analyserade förslag sparas och returneras direkt nästa gång. Lägg till lagforslag_id i requesten för att hämta cachad analys."],
-              ["Parlamentsintegration", "Varje externt förslag läggs till i AI-Parlamentet med kalla='api' och röstas på av de 24 AI-agenterna vid nästa körning."],
-              ["Rate limits", "Fri tier: 5 anrop/timme per IP. API-nyckel: 20 anrop/timme. Monte Carlo kräver API-nyckel."],
-              ["Svartid", "Standard: ~3–5 sekunder (1 LLM-anrop). Med Monte Carlo: ~8–12 sekunder (8 parallella anrop)."],
+              ["Proposals API", "GET /api/v1/policy/proposals listar alla analyserade förslag med full PIS- och MC-data inbakad. Filtrera på ?kalla=riksdagen|ai|api och ?q= för fritextsökning."],
+              ["Parlamentsintegration", "Nya förslag via POST läggs till i AI-Parlamentet med kalla='api' och röstas på av de 24 AI-agenterna vid nästa körning."],
+              ["Rate limits", "Fri tier: 5 anrop/timme per IP. API-nyckel: 20 anrop/timme. Monte Carlo kräver API-nyckel. GET /proposals är öppet utan begränsning."],
+              ["Svartid", "GET /proposals: omedelbart (cachat 60s). POST ny analys: ~3–5 s (1 LLM-anrop). Med Monte Carlo: ~8–12 s (8 parallella anrop)."],
             ].map(([k, v]) => (
               <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
                 <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
@@ -645,7 +667,7 @@ export default function OmPage() {
           </div>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <a href="/policy-simulate" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
-              Testa API:et →
+              Bläddra bland förslag →
             </a>
             <a href="/api/v1/policy/simulate" target="_blank" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.textMuted, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
               API-dokumentation (JSON) →
