@@ -14,7 +14,7 @@
 
 ## Git-arbetsflöde
 
-**Jobba alltid direkt på `main`** — inga feature-branches. Committa och pusha direkt till main.
+**Jobba alltid på `dev`-branchen** — committa och pusha dit. Skapa aldrig nya feature-branches. När ett arbete är klart: skapa en PR från `dev → main` via MCP och merga med squash. Synka sedan `dev` med `git reset --hard origin/main` så den är redo för nästa uppgift.
 
 ---
 
