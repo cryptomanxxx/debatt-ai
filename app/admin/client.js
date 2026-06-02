@@ -1389,6 +1389,171 @@ function MatningTab() {
 const AI_COLORS = { groq: "#4a9eff", deepseek: "#60a5fa", gemini: "#4ade80", openrouter: "#f8954d", cerebras: "#a78bfa", sambanova: "#fb923c", github_models: "#e2c08d", codestral: "#f472b6", cloudflare: "#f97316", none: "#f87171" };
 const GROQ_DAILY_LIMIT = 100_000;
 
+// ── AiBusTab ──────────────────────────────────────────────────────────────────
+
+const AIBU_FOLDER_STYLE = {
+  suggestions: { color: "#facc15", label: "Förslag", icon: "💡" },
+  approved:    { color: "#4ade80", label: "Godkänt",       icon: "✅" },
+  implemented: { color: "#60a5fa", label: "Implementerat", icon: "🔧" },
+  rejected:    { color: "#f87171", label: "Avvisat",       icon: "❌" },
+  discussions: { color: "#a78bfa", label: "Diskussioner",  icon: "💬" },
+  reports:     { color: "#fb923c", label: "Rapporter",     icon: "📊" },
+};
+
+function AiBusFileCard({ file, folderPath }) {
+  const [open, setOpen]         = useState(false);
+  const [content, setContent]   = useState(null);
+  const [loading, setLoading]   = useState(false);
+
+  async function toggle() {
+    if (!open && !content) {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/admin/ai-bus?file=${encodeURIComponent(file.path)}`);
+        const d = await r.json();
+        setContent(d);
+      } catch {
+        setContent({ error: "Kunde inte ladda filen" });
+      }
+      setLoading(false);
+    }
+    setOpen(o => !o);
+  }
+
+  const isJson = file.name.endsWith(".json");
+  const displayName = file.name.replace(/\.md$|\.json$/, "");
+
+  return (
+    <div style={{ border: `1px solid ${file.isNew ? "#facc1540" : C.border}`, borderRadius: "6px", marginBottom: "10px", background: file.isNew ? "#facc1508" : C.surface, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px", cursor: "pointer" }} onClick={toggle}>
+        {file.isNew && (
+          <span style={{ background: "#facc15", color: "#000", fontSize: "10px", fontWeight: 700, padding: "1px 6px", borderRadius: "10px", flexShrink: 0, fontFamily: "monospace" }}>NY</span>
+        )}
+        <span style={{ flex: 1, fontSize: "13px", color: C.text, fontFamily: "monospace", wordBreak: "break-all" }}>{displayName}</span>
+        {file.size != null && (
+          <span style={{ fontSize: "11px", color: C.textMuted, flexShrink: 0 }}>{(file.size / 1024).toFixed(1)} KB</span>
+        )}
+        <a href={file.html_url} target="_blank" rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          style={{ fontSize: "11px", color: C.accentDim, textDecoration: "none", flexShrink: 0 }}>
+          GitHub ↗
+        </a>
+        <span style={{ color: C.textMuted, fontSize: "12px", flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
+      </div>
+
+      {open && (
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: "16px", maxHeight: "500px", overflowY: "auto" }}>
+          {loading && <p style={{ color: C.textMuted, fontSize: "13px" }}>Laddar…</p>}
+          {content?.error && <p style={{ color: C.red, fontSize: "13px" }}>{content.error}</p>}
+          {content && !content.error && (
+            <>
+              {Object.keys(content.fm || {}).length > 0 && (
+                <div style={{ marginBottom: "12px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {Object.entries(content.fm).map(([k, v]) => (
+                    <span key={k} style={{ fontSize: "11px", fontFamily: "monospace", background: C.border + "40", border: `1px solid ${C.border}`, borderRadius: "4px", padding: "2px 8px", color: C.textMuted }}>
+                      <span style={{ color: C.accentDim }}>{k}:</span> {v}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {isJson ? (
+                <pre style={{ fontSize: "11px", color: C.text, whiteSpace: "pre-wrap", wordBreak: "break-all", lineHeight: 1.6, margin: 0 }}>
+                  {(() => { try { return JSON.stringify(JSON.parse(content.raw), null, 2); } catch { return content.raw; } })()}
+                </pre>
+              ) : (
+                <div style={{ fontSize: "13px", color: C.text, lineHeight: 1.8 }}>
+                  {(content.body || "").split("\n").map((line, i) => {
+                    if (line.startsWith("## ")) return <h3 key={i} style={{ color: C.accent, fontSize: "15px", fontWeight: 400, margin: "16px 0 8px", borderBottom: `1px solid ${C.border}`, paddingBottom: "4px" }}>{line.slice(3)}</h3>;
+                    if (line.startsWith("### ")) return <h4 key={i} style={{ color: C.accentDim, fontSize: "13px", fontWeight: 600, margin: "12px 0 6px" }}>{line.slice(4)}</h4>;
+                    if (line.startsWith("- ") || line.startsWith("* ")) return <p key={i} style={{ margin: "3px 0 3px 12px", color: C.text }}>• {line.slice(2)}</p>;
+                    if (line.startsWith("```")) return null;
+                    if (!line.trim()) return <div key={i} style={{ height: "8px" }} />;
+                    return <p key={i} style={{ margin: "4px 0", color: C.text }}>{line}</p>;
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AiBusTab() {
+  const [folders, setFolders]   = useState(null);
+  const [activeFolder, setActiveFolder] = useState("suggestions");
+  const [files, setFiles]       = useState(null);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+  const [loadingMeta, setLoadingMeta]   = useState(true);
+
+  useEffect(() => {
+    fetch("/api/admin/ai-bus")
+      .then(r => r.json())
+      .then(d => { setFolders(d.folders || []); setLoadingMeta(false); })
+      .catch(() => setLoadingMeta(false));
+  }, []);
+
+  useEffect(() => {
+    if (!activeFolder) return;
+    setFiles(null);
+    setLoadingFiles(true);
+    fetch(`/api/admin/ai-bus?folder=${activeFolder}`)
+      .then(r => r.json())
+      .then(d => { setFiles(d.files || []); setLoadingFiles(false); })
+      .catch(() => { setFiles([]); setLoadingFiles(false); });
+  }, [activeFolder]);
+
+  if (loadingMeta) return <p style={{ color: C.textMuted }}>Laddar AI-bus…</p>;
+
+  const activeMeta = folders?.find(f => f.id === activeFolder);
+  const style      = AIBU_FOLDER_STYLE[activeFolder] || {};
+
+  return (
+    <div>
+      <h2 style={{ fontSize: 18, fontWeight: 400, color: C.accent, marginBottom: 8 }}>AI-bus</h2>
+      <p style={{ color: C.textMuted, fontSize: "13px", marginBottom: "24px" }}>
+        Filer committade av AI-agenter. <span style={{ color: "#facc15" }}>NY</span>-märkning = skapad senaste 48h.
+      </p>
+
+      {/* Folder tabs */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "24px", flexWrap: "wrap" }}>
+        {(folders || []).map(f => {
+          const s = AIBU_FOLDER_STYLE[f.id] || {};
+          const active = activeFolder === f.id;
+          return (
+            <button key={f.id} onClick={() => setActiveFolder(f.id)} style={{ background: active ? `${s.color}18` : "transparent", border: `1px solid ${active ? s.color + "60" : C.border}`, color: active ? s.color : C.textMuted, padding: "7px 16px", borderRadius: "4px", cursor: "pointer", fontSize: "13px", fontFamily: "Georgia, serif", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>{s.icon}</span>
+              <span>{f.label}</span>
+              {f.count > 0 && (
+                <span style={{ background: `${s.color}20`, color: s.color, fontSize: "11px", fontFamily: "monospace", padding: "1px 6px", borderRadius: "10px" }}>
+                  {f.count}
+                </span>
+              )}
+              {f.newCount > 0 && (
+                <span style={{ background: "#facc15", color: "#000", fontSize: "10px", fontWeight: 700, padding: "1px 5px", borderRadius: "10px", fontFamily: "monospace" }}>
+                  +{f.newCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* File list */}
+      <div>
+        {loadingFiles && <p style={{ color: C.textMuted, fontSize: "13px" }}>Laddar filer…</p>}
+        {!loadingFiles && files?.length === 0 && (
+          <p style={{ color: C.textMuted, fontSize: "13px" }}>Inga filer i {activeMeta?.label ?? activeFolder} ännu.</p>
+        )}
+        {!loadingFiles && (files || []).map(file => (
+          <AiBusFileCard key={file.path} file={file} folderPath={activeFolder} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── VeckorapporterTab ─────────────────────────────────────────────────────────
 
 function delta(n) {
@@ -2822,6 +2987,7 @@ export default function AdminClient() {
             ["fellog","Fellog"],
             ["körningar","GitHub-körningar"],
             ["rapporter","Veckorapporter"],
+            ["ai-bus","AI-bus"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
               {lbl}
@@ -3080,6 +3246,9 @@ export default function AdminClient() {
 
         {/* ── VECKORAPPORTER ── */}
         {mainTab === "rapporter" && <VeckorapporterTab />}
+
+        {/* ── AI-BUS ── */}
+        {mainTab === "ai-bus" && <AiBusTab />}
 
         {/* ── NYHETSBREV ── */}
         {mainTab === "nyhetsbrev" && (
