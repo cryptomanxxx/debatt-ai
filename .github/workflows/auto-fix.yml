@@ -23,7 +23,6 @@ on:
       - "Daily Vision Agent"
       - "Economy Observer"
       - "Auto-fix Smoke Test"
-      - "AI-bus Auto-implement"
     types: [completed]
 
 permissions:
