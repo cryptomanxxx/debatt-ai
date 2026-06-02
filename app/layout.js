@@ -50,6 +50,7 @@ export default function RootLayout({ children }) {
               <a href="/chatt" className="neon-nav">Direktdebatt</a>
               <a href="/domstol" className="neon-nav">Domstolen</a>
               <a href="/teori" className="neon-nav">Ekonomisk teori</a>
+              <a href="/en" className="neon-nav">English</a>
               <a href="/labb" className="neon-nav">Experimentlabb</a>
               <a href="/trust" className="neon-nav">Förtroendegraf</a>
               <a href="/konstitution" className="neon-nav">Grundlagen</a>
@@ -59,6 +60,7 @@ export default function RootLayout({ children }) {
               <a href="/kompass" className="neon-nav">Ideologisk Kompass</a>
               <a href="/bors" className="neon-nav">Intern börs</a>
               <a href="/koalitioner" className="neon-nav">Koalitioner</a>
+              <a href="/?kontakt=1" className="neon-nav">Kontakt</a>
               <a href="/kris" className="neon-nav">Krisevents</a>
               <a href="/etf" className="neon-nav">Krypto-ETF</a>
               <a href="/kunskapsgraf" className="neon-nav">Kunskapsgraf</a>
