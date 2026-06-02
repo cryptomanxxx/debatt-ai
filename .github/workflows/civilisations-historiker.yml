@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  krönika:
+  kronika:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
