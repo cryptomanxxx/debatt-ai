@@ -1093,6 +1093,29 @@ export default async function TeoriPage() {
           </a>
         </div>
 
+        {/* Kontakt */}
+        <div style={{ marginTop: "48px", padding: "28px 32px", background: "#0c0c0c", border: "1px solid #222", borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+          <div>
+            <p style={{ margin: "0 0 6px", fontSize: "13px", color: C.muted, fontFamily: "monospace", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Frågor eller förslag?
+            </p>
+            <p style={{ margin: 0, fontSize: "15px", color: "#d0cdc6", lineHeight: 1.6 }}>
+              Intresserad av att diskutera experimenten, samarbeta eller bygga en ny civilisation?
+            </p>
+          </div>
+          <a
+            href="/?kontakt=1"
+            style={{
+              display: "inline-block", padding: "12px 24px", borderRadius: "8px",
+              background: "#181818", border: "1px solid #333",
+              fontSize: "13px", color: C.accent, textDecoration: "none",
+              fontFamily: "monospace", whiteSpace: "nowrap", flexShrink: 0,
+            }}
+          >
+            Kontaktformulär →
+          </a>
+        </div>
+
       </div>
     </div>
   );
