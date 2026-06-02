@@ -1,0 +1,12 @@
+name: Auto-fix Smoke Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Kör testskript med avsiktlig bugg
+        run: python3 auto_fix_test.py
