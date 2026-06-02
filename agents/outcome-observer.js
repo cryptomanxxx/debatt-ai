@@ -200,6 +200,8 @@ async function main() {
     if (content.includes("## Utfall")) continue;
 
     const fm = parseFrontmatter(content);
+    if (fm.status && fm.status !== "implemented") continue;
+
     const implDatum = fm.implemented || fm.created;
     if (!implDatum || daysSince(implDatum) < 7) continue;
 
