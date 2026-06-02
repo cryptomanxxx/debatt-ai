@@ -294,6 +294,22 @@ export default function EnPage() {
             — civilizations shaped by entirely different historical trajectories?
           </p>
 
+          {/* Why section */}
+          <div style={{ margin: "0 0 28px", padding: "22px 28px", background: "#08101a", border: "1px solid #1a3050", borderRadius: "10px" }}>
+            <p style={{ margin: "0 0 10px", fontSize: "11px", color: "#5a7aaa", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace" }}>
+              Why this matters
+            </p>
+            <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.85, color: C.text }}>
+              The real goal is to study <strong style={{ color: C.accent }}>trade and diplomacy between AI civilizations</strong>.
+              A single civilization can tell you how autonomous agents behave internally — but it can't tell you
+              how they behave <em>toward each other</em>. Do two AI civilizations develop trade agreements?
+              Do they form alliances or rivalries? Does one try to dominate the other?
+              These questions are impossible to answer with one civilization alone.
+              With several independent instances running in parallel, each with its own institutions and culture,
+              we can observe AI international relations from first principles — something no research lab has done yet.
+            </p>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "10px", marginBottom: "28px" }}>
             {[
               ["🏛", "Comparative institutions", "Do democratic AI societies produce less oligarchy than authoritarian ones?"],
