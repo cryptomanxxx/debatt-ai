@@ -82,7 +82,8 @@ function checkAuth(req) {
 }
 
 function isAllowedPath(filePath) {
-  const normalized = filePath.replace(/\\/g, "/").replace(/\.\.+/g, "");
+  if (filePath.includes("..")) return false;
+  const normalized = filePath.replace(/\\/g, "/");
   return ALLOWED_PREFIXES.some(prefix => normalized.startsWith(prefix));
 }
 
