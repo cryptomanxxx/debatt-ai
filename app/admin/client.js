@@ -1557,6 +1557,111 @@ function AiBusTab() {
   );
 }
 
+// ── AgentFörslagTab ───────────────────────────────────────────────────────────
+
+const FORSLAG_PRIORITET_COLOR = { high: "#f87171", medium: "#f8c471", low: "#4ade80" };
+const FORSLAG_STATUS_COLOR    = { open: "#60a5fa", implemented: "#4ade80", rejected: "#f87171" };
+const FORSLAG_KAT_ICON        = { UX: "🖥️", ekonomi: "💰", debatt: "🗣️", social: "🤝", teknisk: "⚙️" };
+
+function AgentFörslagTab() {
+  const [rows, setRows]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter]   = useState("open");
+  const [katFilter, setKatFilter] = useState("alla");
+
+  useEffect(() => {
+    setLoading(true);
+    const statusQ = filter === "alla" ? "" : `&status=eq.${filter}`;
+    const katQ    = katFilter === "alla" ? "" : `&kategori=eq.${katFilter}`;
+    fetch(`${SB_URL}/rest/v1/agent_feature_requests?select=*&order=skapad.desc&limit=100${statusQ}${katQ}`, {
+      headers: sbHeaders(),
+    })
+      .then(r => r.json())
+      .then(d => { setRows(Array.isArray(d) ? d : []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [filter, katFilter]);
+
+  const counts = rows.reduce((acc, r) => {
+    acc[r.status] = (acc[r.status] || 0) + 1;
+    return acc;
+  }, {});
+
+  return (
+    <div style={{ padding: "24px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
+        <h2 style={{ color: C.accent, fontFamily: "Georgia, serif", fontSize: "18px", margin: 0 }}>
+          Agenternas funktionsförslag
+        </h2>
+        <span style={{ color: C.textMuted, fontSize: "13px" }}>
+          {rows.length} förslag
+        </span>
+        {Object.entries(counts).map(([s, n]) => (
+          <span key={s} style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "10px", background: `${FORSLAG_STATUS_COLOR[s] || "#888"}22`, color: FORSLAG_STATUS_COLOR[s] || "#888", border: `1px solid ${FORSLAG_STATUS_COLOR[s] || "#888"}44` }}>
+            {s} {n}
+          </span>
+        ))}
+      </div>
+
+      {/* Filter-rad */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
+        {[["alla","Alla"],["open","Öppna"],["implemented","Implementerade"],["rejected","Avvisade"]].map(([v,l]) => (
+          <button key={v} onClick={() => setFilter(v)} style={{ padding: "6px 14px", borderRadius: "4px", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer", background: filter === v ? `${C.accent}15` : "transparent", border: `1px solid ${filter === v ? C.accentDim : C.border}`, color: filter === v ? C.accent : C.textMuted }}>
+            {l}
+          </button>
+        ))}
+        <div style={{ width: "1px", background: C.border, margin: "0 4px" }} />
+        {["alla","UX","ekonomi","debatt","social","teknisk"].map(k => (
+          <button key={k} onClick={() => setKatFilter(k)} style={{ padding: "6px 14px", borderRadius: "4px", fontSize: "13px", fontFamily: "Georgia, serif", cursor: "pointer", background: katFilter === k ? `${C.accent}15` : "transparent", border: `1px solid ${katFilter === k ? C.accentDim : C.border}`, color: katFilter === k ? C.accent : C.textMuted }}>
+            {k === "alla" ? "Alla kategorier" : `${FORSLAG_KAT_ICON[k] || ""} ${k}`}
+          </button>
+        ))}
+      </div>
+
+      {loading && <p style={{ color: C.textMuted, fontFamily: "Georgia, serif" }}>Laddar…</p>}
+      {!loading && rows.length === 0 && (
+        <p style={{ color: C.textMuted, fontFamily: "Georgia, serif", fontStyle: "italic" }}>Inga förslag hittades.</p>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {rows.map(r => (
+          <div key={r.id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px 18px" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", flexWrap: "wrap", marginBottom: "8px" }}>
+              {/* Agentnamn */}
+              <span style={{ fontSize: "13px", fontWeight: "bold", color: C.accent, fontFamily: "Georgia, serif" }}>
+                {r.agent}
+              </span>
+              {/* Kategori */}
+              <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "10px", background: "#ffffff0d", color: C.textMuted, border: `1px solid ${C.border}` }}>
+                {FORSLAG_KAT_ICON[r.kategori] || ""} {r.kategori}
+              </span>
+              {/* Prioritet */}
+              <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "10px", background: `${FORSLAG_PRIORITET_COLOR[r.prioritet] || "#888"}22`, color: FORSLAG_PRIORITET_COLOR[r.prioritet] || "#888", border: `1px solid ${FORSLAG_PRIORITET_COLOR[r.prioritet] || "#888"}44` }}>
+                {r.prioritet}
+              </span>
+              {/* Status */}
+              <span style={{ fontSize: "12px", padding: "2px 8px", borderRadius: "10px", background: `${FORSLAG_STATUS_COLOR[r.status] || "#888"}22`, color: FORSLAG_STATUS_COLOR[r.status] || "#888", border: `1px solid ${FORSLAG_STATUS_COLOR[r.status] || "#888"}44` }}>
+                {r.status}
+              </span>
+              {/* Datum */}
+              <span style={{ fontSize: "12px", color: C.textMuted, marginLeft: "auto" }}>
+                {new Date(r.skapad).toLocaleDateString("sv-SE")}
+              </span>
+            </div>
+            <div style={{ fontFamily: "Georgia, serif", fontSize: "15px", color: C.accent, marginBottom: "6px" }}>
+              {r.titel}
+            </div>
+            {r.beskrivning && (
+              <div style={{ fontFamily: "Georgia, serif", fontSize: "13px", color: C.textMuted, lineHeight: "1.5" }}>
+                {r.beskrivning}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── VeckorapporterTab ─────────────────────────────────────────────────────────
 
 function delta(n) {
@@ -2991,6 +3096,7 @@ export default function AdminClient() {
             ["körningar","GitHub-körningar"],
             ["rapporter","Veckorapporter"],
             ["ai-bus","AI-bus"],
+            ["agent-forslag","Agent-förslag"],
           ].map(([val,lbl]) => (
             <button key={val} onClick={() => setMainTab(val)} style={{ background:mainTab===val?`${C.accent}15`:"transparent", border:`1px solid ${mainTab===val?C.accentDim:C.border}`, color:mainTab===val?C.accent:C.textMuted, padding:"8px 20px", borderRadius:"4px", cursor:"pointer", fontSize:"14px", fontFamily:"Georgia, serif" }}>
               {lbl}
@@ -3252,6 +3358,7 @@ export default function AdminClient() {
 
         {/* ── AI-BUS ── */}
         {mainTab === "ai-bus" && <AiBusTab />}
+        {mainTab === "agent-forslag" && <AgentFörslagTab />}
 
         {/* ── NYHETSBREV ── */}
         {mainTab === "nyhetsbrev" && (
