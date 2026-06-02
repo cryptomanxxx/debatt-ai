@@ -154,7 +154,7 @@ jobs:
           } > /tmp/pr_body.txt
 
           gh label create "auto-fix" \
-            --color "#e11d48" \
+            --color "e11d48" \
             --description "Automatisk fix genererad av Claude Code" \
             2>/dev/null || true
 

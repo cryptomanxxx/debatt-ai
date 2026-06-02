@@ -122,7 +122,7 @@ REGLER:
           git push -u origin "$BRANCH"
 
           gh label create "auto-implement" \
-            --color "#22c55e" \
+            --color "22c55e" \
             --description "Automatisk implementering via Claude Code" \
             2>/dev/null || true
 
