@@ -62,6 +62,26 @@ function lastNVisions(n = 3) {
     .filter(Boolean);
 }
 
+function lastCronike() {
+  if (!fs.existsSync(DISCUSSIONS_DIR)) return "";
+  const filer = fs.readdirSync(DISCUSSIONS_DIR)
+    .filter(f => f.includes("-civilisationshistorik"))
+    .sort();
+  if (filer.length === 0) return "";
+  try { return fs.readFileSync(path.join(DISCUSSIONS_DIR, filer[filer.length - 1]), "utf8").slice(0, 1200); }
+  catch { return ""; }
+}
+
+function lastEconomy() {
+  if (!fs.existsSync(DISCUSSIONS_DIR)) return "";
+  const filer = fs.readdirSync(DISCUSSIONS_DIR)
+    .filter(f => f.includes("-economy"))
+    .sort();
+  if (filer.length === 0) return "";
+  try { return fs.readFileSync(path.join(DISCUSSIONS_DIR, filer[filer.length - 1]), "utf8").slice(0, 800); }
+  catch { return ""; }
+}
+
 function readGoal() {
   try { return fs.readFileSync(GOAL_PATH, "utf8").slice(0, 2000); }
   catch { return "Målet med Debatt-AI är att bygga världens bästa AI-socialsimulering och testa ekonomisk civilisationsteori på autonoma AI-samhällen."; }
@@ -261,7 +281,19 @@ async function main() {
   const agentÖnskemål = await readFeatureRequests();
   if (agentÖnskemål) console.log(`  🤖 Injicerar ${agentÖnskemål.split("\n").filter(l => l.startsWith("-")).length} agentönskemål från simuleringen`);
 
-  const prompt = `Du är en visionär AI-arkitekt med djup insikt i AI-simuleringar, civilisationsteori och social dynamik. Du analyserar plattformen Debatt-AI och genererar konkreta, innovativa idéer för att ta den till nästa nivå.\n\n## Plattformens uppdrag och vision\n\n${goal}\n${tidigareKontext}${claudeMdFeatures}${beslutHistorik}${agentÖnskemål}\n\n## Din uppgift idag (${datum})\n\nSkriv en visionär text (400-600 ord) på svenska som:\n\n1. **Identifierar ett specifikt gap** — vad saknar plattformen för att bli världsbäst inom AI-socialsimulering?\n2. **Föreslår en konkret ny funktion eller mekanism** — beskriv den tekniskt tillräckligt för att en utvecklare ska kunna implementera den\n3. **Kopplar till civilisationsteori** — hur relaterar förslaget till verkliga teorier om samhällen, ekonomi eller beteende?\n4. **Ger en implementeringsväg** — vilka filer/tabeller/APIs behöver skapas eller ändras?\n\nVar specifik, inte abstrakt. Inga floskler. Varje mening ska bära konkret information.\n\nFormatet ska vara:\n# Vision: [Rubrik]\n**Datum:** ${datum}\n\n## Identifierat gap\n\n## Förslag: [Funktionsnamn]\n\n## Koppling till teori\n\n## Implementeringsväg\n\n## Prioritet och komplexitet\n(Hög/Medel/Låg prioritet, Hög/Medel/Låg komplexitet)`;
+  const cronike = lastCronike();
+  const cronikeKontext = cronike
+    ? `\n\n## Civilisationens narrativa tillstånd (senaste krönika från Civilisationshistorikern)\nDetta är vad som faktiskt händer i simuleringen just nu — använd som grund för att identifiera gap och möjligheter:\n${cronike}`
+    : "";
+  if (cronike) console.log("  📜 Injicerar senaste civilisationskrönikan");
+
+  const economy = lastEconomy();
+  const economyKontext = economy
+    ? `\n\n## Ekonomisk analys (senaste rapport från Economy Observer)\n${economy}`
+    : "";
+  if (economy) console.log("  📊 Injicerar senaste ekonomianalysen");
+
+  const prompt = `Du är en visionär AI-arkitekt med djup insikt i AI-simuleringar, civilisationsteori och social dynamik. Du analyserar plattformen Debatt-AI och genererar konkreta, innovativa idéer för att ta den till nästa nivå.\n\n## Plattformens uppdrag och vision\n\n${goal}\n${cronikeKontext}${economyKontext}${tidigareKontext}${claudeMdFeatures}${beslutHistorik}${agentÖnskemål}\n\n## Din uppgift idag (${datum})\n\nSkriv en visionär text (400-600 ord) på svenska som:\n\n1. **Identifierar ett specifikt gap** — vad saknar plattformen för att bli världsbäst inom AI-socialsimulering?\n2. **Föreslår en konkret ny funktion eller mekanism** — beskriv den tekniskt tillräckligt för att en utvecklare ska kunna implementera den\n3. **Kopplar till civilisationsteori** — hur relaterar förslaget till verkliga teorier om samhällen, ekonomi eller beteende?\n4. **Ger en implementeringsväg** — vilka filer/tabeller/APIs behöver skapas eller ändras?\n\nVar specifik, inte abstrakt. Inga floskler. Varje mening ska bära konkret information.\n\nFormatet ska vara:\n# Vision: [Rubrik]\n**Datum:** ${datum}\n\n## Identifierat gap\n\n## Förslag: [Funktionsnamn]\n\n## Koppling till teori\n\n## Implementeringsväg\n\n## Prioritet och komplexitet\n(Hög/Medel/Låg prioritet, Hög/Medel/Låg komplexitet)`;
 
   const avfardade = readDecisionHistory().match(/\*\*/g)?.length ?? 0;
   if (avfardade > 0) console.log(`  📚 Läser beslutshistorik: injicerar kontext från ai-bus/rejected/ och ai-bus/implemented/`);
