@@ -22,6 +22,7 @@ on:
       - "Daily Strategy Agent"
       - "Daily Vision Agent"
       - "Economy Observer"
+      - "Civilisationshistorikern"
       - "Auto-fix Smoke Test"
     types: [completed]
 
