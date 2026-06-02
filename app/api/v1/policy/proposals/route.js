@@ -31,7 +31,7 @@ export async function GET(req) {
     fetch(
       `${SB_URL}/rest/v1/pis_monte_carlo` +
       `?select=lagforslag_id,iterationer,lyckade_iterationer` +
-      `,bnp_mean,bnp_std,bnp_min,bnp_max,gini_mean,gini_std` +
+      `,bnp_mean,bnp_std,bnp_min,bnp_max,gini_mean,gini_std,gini_min,gini_max` +
       `,inflation_mean,inflation_std,arbetsloshet_mean,arbetsloshet_std` +
       `,socialt_kapital_dist,koalition_dist,konfidens_dist`,
       { headers: H(), next: { revalidate: 60 } }
@@ -87,7 +87,7 @@ export async function GET(req) {
         iterationer:         mc.iterationer,
         lyckade_iterationer: mc.lyckade_iterationer,
         bnp:          mc.bnp_mean         !== null ? { mean: mc.bnp_mean,         std: mc.bnp_std,         min: mc.bnp_min,         max: mc.bnp_max         } : null,
-        gini:         mc.gini_mean        !== null ? { mean: mc.gini_mean,        std: mc.gini_std        } : null,
+        gini:         mc.gini_mean        !== null ? { mean: mc.gini_mean,        std: mc.gini_std,        min: mc.gini_min,        max: mc.gini_max        } : null,
         inflation:    mc.inflation_mean   !== null ? { mean: mc.inflation_mean,   std: mc.inflation_std   } : null,
         arbetsloshet: mc.arbetsloshet_mean !== null ? { mean: mc.arbetsloshet_mean, std: mc.arbetsloshet_std } : null,
         socialt_kapital_dist: mc.socialt_kapital_dist,
