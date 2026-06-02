@@ -69,13 +69,37 @@ async function listFolder(token, folderPath) {
     .sort((a, b) => b.name.localeCompare(a.name));
 }
 
+const ALLOWED_PREFIXES = FOLDERS.map(f => f.path + "/");
+
+function checkAuth(req) {
+  const secret = process.env.ADMIN_SECRET || process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+  if (!secret) return true; // no password configured → open dev environment
+  const auth = req.headers.get("authorization") || "";
+  const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+  const { searchParams } = new URL(req.url);
+  const qs = searchParams.get("secret");
+  return bearer === secret || qs === secret;
+}
+
+function isAllowedPath(filePath) {
+  const normalized = filePath.replace(/\\/g, "/").replace(/\.\.+/g, "");
+  return ALLOWED_PREFIXES.some(prefix => normalized.startsWith(prefix));
+}
+
 export async function GET(req) {
+  if (!checkAuth(req)) {
+    return NextResponse.json({ error: "Ej behörig" }, { status: 401 });
+  }
+
   const token = process.env.GITHUB_TOKEN;
   const { searchParams } = new URL(req.url);
   const folder = searchParams.get("folder");
   const file   = searchParams.get("file");
 
   if (file) {
+    if (!isAllowedPath(file)) {
+      return NextResponse.json({ error: "Otillåten sökväg" }, { status: 403 });
+    }
     const content = await readFile(token, file);
     if (!content) return NextResponse.json({ error: "Kunde inte läsa filen" }, { status: 404 });
     const fm = parseFrontmatter(content);

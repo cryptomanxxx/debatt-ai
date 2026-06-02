@@ -1409,7 +1409,9 @@ function AiBusFileCard({ file, folderPath }) {
     if (!open && !content) {
       setLoading(true);
       try {
-        const r = await fetch(`/api/admin/ai-bus?file=${encodeURIComponent(file.path)}`);
+        const r = await fetch(`/api/admin/ai-bus?file=${encodeURIComponent(file.path)}`, {
+          headers: { Authorization: `Bearer ${ADMIN_PASSWORD}` },
+        });
         const d = await r.json();
         setContent(d);
       } catch {
@@ -1488,7 +1490,8 @@ function AiBusTab() {
   const [loadingMeta, setLoadingMeta]   = useState(true);
 
   useEffect(() => {
-    fetch("/api/admin/ai-bus")
+    const authHeaders = { Authorization: `Bearer ${ADMIN_PASSWORD}` };
+    fetch("/api/admin/ai-bus", { headers: authHeaders })
       .then(r => r.json())
       .then(d => { setFolders(d.folders || []); setLoadingMeta(false); })
       .catch(() => setLoadingMeta(false));
@@ -1498,7 +1501,7 @@ function AiBusTab() {
     if (!activeFolder) return;
     setFiles(null);
     setLoadingFiles(true);
-    fetch(`/api/admin/ai-bus?folder=${activeFolder}`)
+    fetch(`/api/admin/ai-bus?folder=${activeFolder}`, { headers: { Authorization: `Bearer ${ADMIN_PASSWORD}` } })
       .then(r => r.json())
       .then(d => { setFiles(d.files || []); setLoadingFiles(false); })
       .catch(() => { setFiles([]); setLoadingFiles(false); });
