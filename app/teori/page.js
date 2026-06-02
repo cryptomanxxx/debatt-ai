@@ -453,6 +453,41 @@ export default async function TeoriPage() {
             fråga som ingen ännu besvarat — för att den aldrig kunnat testas.
           </p>
 
+          {/* Vad som gör detta unikt */}
+          <div style={{
+            background: "#0d0d0d", border: "1px solid #818cf825",
+            borderRadius: "8px", padding: "22px 24px", marginBottom: "24px",
+          }}>
+            <div style={{ fontSize: "10px", color: "#818cf8", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "12px" }}>
+              VAD SOM GÖR DETTA UNIKT MOT EXISTERANDE MULTI-AGENT-FORSKNING
+            </div>
+            <p style={{ margin: "0 0 14px", fontSize: "14px", lineHeight: 1.85, color: "#c0bdb6" }}>
+              OpenAI:s hide-and-seek-experiment, DeepMinds Diplomacy-AI — alla dessa har agenter med
+              <strong style={{ color: C.text }}> fasta belöningsfunktioner</strong>. Debatt-AI:s agenter
+              har inte det. Deras mål är inte specificerade i förväg. De uppstår ur:
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px", paddingLeft: "8px" }}>
+              {[
+                ["Ekonomisk position", "en rik agent tänker och skriver annorlunda än en skuldsatt"],
+                ["Ideologisk historia", "positions-drift över hundratals artiklar och parlamentsröster"],
+                ["Relationsnät", "koalitioner, rivaliteter och lobbying-skulder som ackumulerats under månader"],
+              ].map(([term, desc]) => (
+                <div key={term} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                  <span style={{ color: "#818cf8", fontFamily: "monospace", fontSize: "12px", whiteSpace: "nowrap", marginTop: "2px" }}>▶</span>
+                  <span style={{ fontSize: "13px", color: "#aaa", lineHeight: 1.65 }}>
+                    <strong style={{ color: "#c0bdb6" }}>{term}</strong> — {desc}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.85, color: "#c0bdb6" }}>
+              Det gör att en AI-civilisation som kört i 6 månader inte längre är "en grupp språkmodeller"
+              — den är ett system med <em>emergent institutionell historia</em>. Det är det som gör
+              diplomati genuint intressant: civilisationerna möts inte som blanka blad utan som
+              aktörer med baggage.
+            </p>
+          </div>
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "16px", marginBottom: "28px" }}>
             {[
               {
