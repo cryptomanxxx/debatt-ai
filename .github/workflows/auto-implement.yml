@@ -1,0 +1,159 @@
+name: AI-bus Auto-implement
+
+on:
+  push:
+    paths:
+      - 'ai-bus/suggestions/**'
+  schedule:
+    - cron: '0 8 * * *'  # 08:00 UTC = 10:00 svensk tid
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-implement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kontrollera väntande förslag
+        id: check
+        run: |
+          PENDING=$(find ai-bus/suggestions -name "*.md" -type f 2>/dev/null \
+            | xargs grep -l "status: pending" 2>/dev/null || true)
+          if [ -n "$PENDING" ]; then
+            COUNT=$(echo "$PENDING" | wc -l | tr -d ' ')
+          else
+            COUNT=0
+          fi
+          echo "PENDING_COUNT=$COUNT" >> "$GITHUB_ENV"
+          echo "Väntande förslag: $COUNT"
+          if [ -n "$PENDING" ]; then
+            echo "$PENDING"
+          fi
+
+      - name: Kontrollera om PR redan finns
+        id: dedupe
+        if: env.PENDING_COUNT != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh pr list \
+            --state open \
+            --label "auto-implement" \
+            --json number -q '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            echo "Öppen auto-implement PR #$EXISTING finns — hoppar över"
+            echo "SKIP=true" >> "$GITHUB_ENV"
+          else
+            echo "SKIP=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Installera Claude Code CLI
+        if: env.PENDING_COUNT != '0' && env.SKIP == 'false'
+        run: |
+          npm install -g @anthropic-ai/claude-code@latest 2>/dev/null || \
+          npm install -g @anthropic-ai/claude-code 2>/dev/null || true
+          claude --version 2>/dev/null && echo "CLAUDE_INSTALLED=true" >> "$GITHUB_ENV" || \
+          echo "CLAUDE_INSTALLED=false" >> "$GITHUB_ENV"
+
+      - name: Kör Claude Code — granska och implementera
+        if: env.PENDING_COUNT != '0' && env.SKIP == 'false' && env.CLAUDE_INSTALLED == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          {
+            echo 'Du är Claude Code och arbetar med Debatt-AI (Next.js App Router + Python + Supabase).'
+            echo ''
+            echo 'UPPGIFT: Granska och implementera förslag från ai-bus/suggestions/.'
+            echo ''
+            echo 'STEG:'
+            echo '1. Hitta alla .md-filer i ai-bus/suggestions/ som har status: pending i frontmatter'
+            echo '2. För varje sådan fil — läs noggrant:'
+            echo '   - file: vilken fil som berörs'
+            echo '   - type, severity, risk: karaktär och konsekvens'
+            echo '   - Problemet och föreslagna lösningen i filens brödtext'
+            echo '3. Gör en faktisk bedömning mot kodbasen (läs den berörda filen!)'
+            echo '4. Beslut och åtgärd:'
+            echo '   a. risk low eller medium + förslaget är korrekt och förbättrar koden:'
+            echo '      Implementera förändringen i angiven fil'
+            echo '      Flytta .md-filen till ai-bus/implemented/'
+            echo '      Uppdatera status till implemented'
+            echo '      Lägg till impact med kortfattad beskrivning av vad som faktiskt ändrades'
+            echo '   b. risk high + du är övertygad om att det är rätt:'
+            echo '      Implementera men dokumentera noggrant i impact-fältet'
+            echo '   c. Förslaget är felaktigt, redundant eller riskabelt utan tillräcklig kontext:'
+            echo '      Flytta till ai-bus/rejected/'
+            echo '      Uppdatera status till rejected'
+            echo '      Lägg till rationale med konkret motivering'
+            echo '5. Gör ENDAST minimala, fokuserade ändringar — en sak per förslag'
+            echo ''
+            echo 'REGLER:'
+            echo '- Läs agents/claude-review.md för filformat och katalogstruktur'
+            echo '- Läs CLAUDE.md för projektöversikt och teknisk stack'
+            echo '- Committa INTE — det hanteras av workflow:en'
+            echo '- Var konservativ: hellre avfärda tveksamma förslag än implementera fel saker'
+          } > /tmp/claude_prompt.txt
+
+          claude --dangerously-skip-permissions -p "$(cat /tmp/claude_prompt.txt)" 2>&1 | tee /tmp/claude_output.txt
+          echo "Claude Code kördes klart"
+
+      - name: Skapa PR med ändringar
+        if: env.PENDING_COUNT != '0' && env.SKIP == 'false' && env.CLAUDE_INSTALLED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name  "auto-implement-bot"
+          git config user.email "bot@debatt-ai.se"
+
+          # Staged untracked files i ai-bus/
+          if git status --porcelain | grep -q "^??.*ai-bus/"; then
+            git add ai-bus/ 2>/dev/null || true
+          fi
+
+          if git diff --cached --quiet && git diff --quiet; then
+            echo "Inga ändringar gjordes — avslutar"
+            exit 0
+          fi
+
+          BRANCH="auto-implement/$(date +%Y%m%d-%H%M)"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "feat(auto): Claude Code implementerar ai-bus-förslag $(date +%Y-%m-%d)"
+
+          git push -u origin "$BRANCH"
+
+          gh label create "auto-implement" \
+            --color "22c55e" \
+            --description "Automatisk implementering via Claude Code" \
+            2>/dev/null || true
+
+          {
+            echo "## Automatisk implementering av ai-bus-förslag"
+            echo ""
+            echo "Claude Code har granskat och implementerat förslag från \`ai-bus/suggestions/\`."
+            echo ""
+            echo "### Claude Code-analys"
+            echo '```'
+            head -80 /tmp/claude_output.txt
+            echo '```'
+            echo ""
+            echo "---"
+            echo "*Skapad automatiskt av auto-implement.yml. Granskas och auto-mergas om inga checks misslyckas.*"
+          } > /tmp/pr_body.txt
+
+          PR_URL=$(gh pr create \
+            --title "auto-implement: AI-bus-förslag $(date +%Y-%m-%d)" \
+            --body-file /tmp/pr_body.txt \
+            --label "auto-implement" \
+            --base main \
+            --head "$BRANCH")
+
+          echo "PR skapad: $PR_URL"
+
+          gh pr merge "$PR_URL" --auto --squash 2>/dev/null || \
+            echo "Auto-merge kunde inte aktiveras (aktivera i repo-inställningarna)"
