@@ -50,15 +50,12 @@ jobs:
           gh run view "$RUN_ID" --log-failed 2>/dev/null | tail -200 > /tmp/error_log.txt || true
           ERROR_LOG=$(cat /tmp/error_log.txt | head -150)
 
-          # Hitta vilka jobb som misslyckades
-          FAILED_JOBS=$(gh run view "$RUN_ID" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null | head -5 || echo "unknown")
+          # Hitta vilka jobb som misslyckades — joinade med komma för att hålla värdet enradigt
+          FAILED_JOBS=$(gh run view "$RUN_ID" --json jobs -q '.jobs[] | select(.conclusion == "failure") | .name' 2>/dev/null | head -5 | tr '\n' ',' | sed 's/,$//' || echo "unknown")
 
           echo "WORKFLOW_NAME=$WORKFLOW" >> "$GITHUB_ENV"
           echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
-          # Multiline-safe: använd EOF-delimiter för GITHUB_ENV
-          echo "FAILED_JOBS<<EOF" >> "$GITHUB_ENV"
-          echo "$FAILED_JOBS" >> "$GITHUB_ENV"
-          echo "EOF" >> "$GITHUB_ENV"
+          echo "FAILED_JOBS=$FAILED_JOBS" >> "$GITHUB_ENV"
 
           # Spara loggen för nästa steg
           printf '%s' "$ERROR_LOG" > /tmp/error_summary.txt
