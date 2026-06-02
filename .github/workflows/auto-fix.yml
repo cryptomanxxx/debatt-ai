@@ -127,31 +127,33 @@ jobs:
 
           git push -u origin "$BRANCH"
 
+          # Bygg PR-body i tempfil med korrekt indragning (undviker YAML-alias-fel från heredoc i kolumn 0)
+          {
+            echo "## Automatisk fix av misslyckad workflow"
+            echo ""
+            echo "**Workflow:** \`${{ env.WORKFLOW_NAME }}\`"
+            echo "**Run ID:** ${{ env.RUN_ID }}"
+            echo "**Misslyckade jobb:** ${{ env.FAILED_JOBS }}"
+            echo ""
+            echo "Claude Code analyserade felloggarna och genererade en fix automatiskt."
+            echo ""
+            echo "### Fellogg (utdrag)"
+            echo '```'
+            head -50 /tmp/error_summary.txt
+            echo '```'
+            echo ""
+            echo "### Claude Code-analys"
+            echo '```'
+            head -60 /tmp/claude_output.txt
+            echo '```'
+            echo ""
+            echo "---"
+            echo "*Skapad automatiskt av auto-fix.yml. Granska noggrant innan merge.*"
+          } > /tmp/pr_body.txt
+
           gh pr create \
             --title "Auto-fix: ${{ env.WORKFLOW_NAME }}" \
-            --body "$(cat <<'PREOF'
-## Automatisk fix av misslyckad workflow
-
-**Workflow:** \`${{ env.WORKFLOW_NAME }}\`
-**Run ID:** ${{ env.RUN_ID }}
-**Misslyckade jobb:** ${{ env.FAILED_JOBS }}
-
-Claude Code analyserade felloggarna och genererade en fix automatiskt.
-
-### Fellogg (utdrag)
-\`\`\`
-$(cat /tmp/error_summary.txt | head -50)
-\`\`\`
-
-### Claude Code-analys
-\`\`\`
-$(cat /tmp/claude_output.txt | head -60)
-\`\`\`
-
----
-*Skapad automatiskt av auto-fix.yml. Granska noggrant innan merge.*
-PREOF
-)" \
+            --body-file /tmp/pr_body.txt \
             --label "auto-fix" \
             --base main \
             --head "$BRANCH"
