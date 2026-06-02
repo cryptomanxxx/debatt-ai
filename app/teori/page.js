@@ -26,18 +26,29 @@ async function fetchData() {
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   const r = (path) => fetch(`${SB_URL}/rest/v1/${path}`, { headers: h, next: { revalidate: 300 } });
 
-  const [histRes, plRes, lobbyRes, betsRes] = await Promise.all([
+  const sju = new Date(Date.now() - 7 * 864e5).toISOString();
+  const fjorton = new Date(Date.now() - 14 * 864e5).toISOString();
+
+  const [histRes, plRes, lobbyRes, betsRes, posRes, civRes, spridRes, oligHistRes] = await Promise.all([
     r("oligarki_historik?select=gini,oligarki_risk,mobilitet,dynasti_index,top3_andel,datum&order=datum.desc&limit=1"),
     r("agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc"),
     r("lobbying_log?select=lobbying_agent,resultat"),
     r("agent_bets?select=agent,vinst&avgjord=eq.true"),
+    r(`agent_positioner?select=antal_andringar&uppdaterad=gte.${sju}`),
+    r(`civilisations_minne?select=typ&typ=in.(koalition_bildad,allians_bruten)&skapad=gte.${sju}`),
+    r(`rykte_spridningar?select=id&skapad=gte.${sju}`),
+    r(`oligarki_historik?select=oligarki_risk,datum&order=datum.desc&limit=14&skapad=gte.${fjorton}`),
   ]);
 
   return {
-    senaste:   histRes.ok ? (await histRes.json())[0] ?? null : null,
-    planbocker: plRes.ok  ? await plRes.json() : [],
-    lobbying:  lobbyRes.ok ? await lobbyRes.json() : [],
-    bets:      betsRes.ok  ? await betsRes.json() : [],
+    senaste:    histRes.ok  ? (await histRes.json())[0] ?? null : null,
+    planbocker:  plRes.ok   ? await plRes.json() : [],
+    lobbying:   lobbyRes.ok ? await lobbyRes.json() : [],
+    bets:       betsRes.ok  ? await betsRes.json() : [],
+    positioner:  posRes.ok  ? await posRes.json() : [],
+    civMinne:   civRes.ok   ? await civRes.json() : [],
+    spridningar: spridRes.ok ? await spridRes.json() : [],
+    oligHist:   oligHistRes.ok ? await oligHistRes.json() : [],
   };
 }
 
@@ -187,12 +198,71 @@ export default async function TeoriPage() {
     : "Samlar data…";
 
   // Tillväxtindex — emergent composite: Equality(40) + Mobility(35) + Competition(25)
-  // mobilitet och dynasti_index lagras som 0-100 heltal i oligarki_historik
   const tillvaxtIndex = s ? Math.max(0, Math.round(
     (1 - s.gini)                   * 40 +
     (s.mobilitet / 100)            * 35 +
     (1 - s.oligarki_risk / 100)    * 25
   )) : null;
+
+  // ── Driftindex ──────────────────────────────────────────────────────────────
+  // 1. Åsiktsdrift: summa antal_andringar senaste 7 dagar, normaliserat mot 40
+  const positioner   = d?.positioner ?? [];
+  const asiktsSumma  = positioner.reduce((s, p) => s + (p.antal_andringar || 0), 0);
+  const asiktsDrift  = Math.min(100, Math.round((asiktsSumma / 40) * 100));
+
+  // 2. Koalitionsomsättning: antal koalitions-/alliancshändelser 7 dagar, normaliserat mot 20
+  const civMinne       = d?.civMinne ?? [];
+  const koalitionDrift = Math.min(100, Math.round((civMinne.length / 20) * 100));
+
+  // 3. Narrativ rörlighet: spridningar senaste 7 dagar, normaliserat mot 50
+  const spridningar    = d?.spridningar ?? [];
+  const narrativDrift  = Math.min(100, Math.round((spridningar.length / 50) * 100));
+
+  // 4. Maktbyteshastighet: stddev av oligarki_risk senaste 14 dagar, normaliserat mot 15
+  const oligHist = d?.oligHist ?? [];
+  let maktDrift = 0;
+  if (oligHist.length >= 2) {
+    const risks  = oligHist.map(r => r.oligarki_risk || 0);
+    const mean   = risks.reduce((a, b) => a + b, 0) / risks.length;
+    const stddev = Math.sqrt(risks.reduce((s, r) => s + (r - mean) ** 2, 0) / risks.length);
+    maktDrift    = Math.min(100, Math.round((stddev / 15) * 100));
+  }
+
+  // Sammansatt Driftindex (viktat: 30/25/25/20)
+  const driftIndex = (asiktsDrift != null || koalitionDrift != null)
+    ? Math.round(asiktsDrift * 0.30 + koalitionDrift * 0.25 + narrativDrift * 0.25 + maktDrift * 0.20)
+    : null;
+
+  const driftDimensioner = [
+    { label: "Åsiktsdrift",         vikt: "30%", val: asiktsDrift,   farg: "#818cf8", desc: `${asiktsSumma} positionsändringar senaste 7 dagarna` },
+    { label: "Koalitionsomsättning", vikt: "25%", val: koalitionDrift, farg: C.yellow,  desc: `${civMinne.length} koalitions-/allianshändelser senaste 7 dagarna` },
+    { label: "Narrativ rörlighet",   vikt: "25%", val: narrativDrift,  farg: C.green,   desc: `${spridningar.length} ryktespridningar senaste 7 dagarna` },
+    { label: "Maktbyteshastighet",   vikt: "20%", val: maktDrift,      farg: C.red,     desc: oligHist.length >= 2 ? "Beräknat ur stddev av oligarkirisk 14 dagar" : "Samlar historik…" },
+  ];
+
+  const driftFarg = driftIndex == null ? C.muted
+    : driftIndex < 30 ? C.blue
+    : driftIndex < 65 ? C.yellow
+    : C.red;
+
+  const driftEtikett = driftIndex == null ? "–"
+    : driftIndex < 20 ? "STAGNATION"
+    : driftIndex < 40 ? "STABIL"
+    : driftIndex < 60 ? "DYNAMISK"
+    : driftIndex < 80 ? "TURBULENT"
+    : "KAOTISK";
+
+  const driftText = driftIndex == null
+    ? "Samlar data…"
+    : driftIndex < 20
+    ? "Civilisationen är extremt stabil — nästan ingen ideologisk rörelse, få alliansbrott, låg ryktespridning. Risk: stagnation och dynastisk konsolidering."
+    : driftIndex < 40
+    ? "Låg drift. Institutionerna fungerar och producerar förutsägbara utfall. Agenternas positioner förändras långsamt. Gynnsamt för långsiktig planering."
+    : driftIndex < 60
+    ? "Måttlig drift. Koalitioner bildas och bryts i normal takt. Åsikter rör sig men inte kaotiskt. Det är här de flesta levande civilisationer befinner sig."
+    : driftIndex < 80
+    ? "Hög drift. Allianser är instabila, rykten sprids snabbt, maktpositioner skiftar. Svårt att förutsäga utfall mer än några dagar framåt."
+    : "Extrem drift. Kaotisk civilisation — inga stabila institutioner, allianser bryts lika fort som de bildas. Högt Gini + hög drift = systemisk instabilitetskris.";
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
@@ -763,41 +833,82 @@ export default async function TeoriPage() {
           </div>
         </div>
 
-        {/* Civilisationsdrift */}
+        {/* Civilisationsdrift — live */}
         <div style={{
-          background: C.surface, border: `1px solid #f59e0b20`,
+          background: C.surface, border: `1px solid ${driftFarg}25`,
           borderRadius: "12px", padding: "28px 32px", marginBottom: "40px",
         }}>
-          <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "10px" }}>
-            SAKNAT MÄTVÄRDE
+          <div style={{ fontSize: "11px", color: driftFarg, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "10px" }}>
+            CIVILISATIONSDRIFT — LIVE
           </div>
-          <h2 style={{ margin: "0 0 14px", fontSize: "18px", fontWeight: 600, color: C.text }}>
-            Civilisationsdrift — hur snabbt förändras samhället?
+          <h2 style={{ margin: "0 0 6px", fontSize: "18px", fontWeight: 600, color: C.text }}>
+            Hur snabbt förändras civilisationen?
           </h2>
-          <p style={{ margin: "0 0 20px", fontSize: "14px", lineHeight: 1.85, color: "#c0bdb6", maxWidth: "700px" }}>
-            Plattformen mäter Gini, förmögenheter, artiklar, val, börsvärden. Men den mäter inte
-            <strong style={{ color: C.text }}> hur snabbt</strong> samhället förändras. Två civilisationer
-            kan ha identiskt BNP och identisk Gini och ändå vara fundamentalt olika:
-            en är stabil, en är kaotisk. Stabiliteten är en egen dimension.
+          <p style={{ fontSize: "13px", color: C.muted, margin: "0 0 24px", fontFamily: "monospace", lineHeight: 1.6, maxWidth: "640px" }}>
+            Gini mäter ojämlikhet. Driftindex mäter <em>förändringstakt</em> —
+            en dimension bortom BNP och förmögenhet. Stabil Gini 0.7 och kaotisk Gini 0.7 är
+            två olika experiment.
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: "12px", marginBottom: "20px" }}>
-            {[
-              { label: "Åsiktsdrift", desc: "Hur snabbt förändras agenternas ståndpunkter per vecka? Mäts ur agent_positioner.antal_andringar.", farg: "#818cf8" },
-              { label: "Koalitionsomsättning", desc: "Hur ofta bryts och bildas allianser? Hög omsättning = kaotisk politisk miljö.", farg: "#f59e0b" },
-              { label: "Maktbyteshastighet", desc: "Hur ofta byter topp-3 i maktindex? Lång stabilitet = dynastisk risk.", farg: C.red },
-              { label: "Narrativ rörlighet", desc: "Hur fort sprids och muterar rykten? R₀-indexet ger en proxy för samhällets informationskaos.", farg: C.green },
-            ].map(({ label, desc, farg }) => (
-              <div key={label} style={{ background: "#0d0d0d", border: `1px solid ${farg}20`, borderRadius: "8px", padding: "14px 16px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: farg, marginBottom: "6px", fontFamily: "monospace" }}>{label}</div>
-                <p style={{ margin: 0, fontSize: "12px", color: "#888", lineHeight: 1.65 }}>{desc}</p>
+
+          {/* Gauge + text */}
+          <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", flexWrap: "wrap", marginBottom: "28px" }}>
+            <div style={{
+              background: "#0d0d0d", border: `2px solid ${driftFarg}50`,
+              borderRadius: "12px", padding: "20px 28px", textAlign: "center", flexShrink: 0, minWidth: "140px",
+            }}>
+              <div style={{ fontSize: "11px", color: C.muted, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "6px" }}>DRIFTINDEX</div>
+              <div style={{ fontSize: "52px", fontWeight: 700, color: driftFarg, fontFamily: "monospace", lineHeight: 1 }}>
+                {driftIndex ?? "–"}
+              </div>
+              <div style={{ fontSize: "10px", color: driftFarg, fontFamily: "monospace", marginTop: "6px", letterSpacing: "0.12em" }}>
+                {driftEtikett}
+              </div>
+            </div>
+            <div style={{ flex: 1, minWidth: "220px", paddingTop: "4px" }}>
+              <p style={{ margin: "0 0 14px", fontSize: "14px", color: "#b0ada6", lineHeight: 1.8 }}>{driftText}</p>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {[
+                  { label: "Stagnation", range: "0–20",  farg: C.blue },
+                  { label: "Stabil",     range: "20–40", farg: C.blue },
+                  { label: "Dynamisk",   range: "40–60", farg: C.yellow },
+                  { label: "Turbulent",  range: "60–80", farg: C.orange },
+                  { label: "Kaotisk",    range: "80+",   farg: C.red },
+                ].map(({ label, range, farg }) => (
+                  <span key={label} style={{
+                    fontSize: "10px", fontFamily: "monospace", padding: "2px 8px",
+                    borderRadius: "20px", background: farg + "18", color: farg,
+                    border: `1px solid ${farg}30`,
+                    fontWeight: driftEtikett.toUpperCase() === label.toUpperCase() ? 700 : 400,
+                    opacity: driftEtikett.toUpperCase() === label.toUpperCase() ? 1 : 0.5,
+                  }}>{label} {range}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* De fyra dimensionerna */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            {driftDimensioner.map(({ label, vikt, val, farg, desc }) => (
+              <div key={label}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "5px" }}>
+                  <span style={{ fontSize: "12px", color: farg, fontFamily: "monospace", fontWeight: 600 }}>{label}</span>
+                  <span style={{ fontSize: "11px", color: C.muted, fontFamily: "monospace" }}>{val}/100 · vikt {vikt}</span>
+                </div>
+                <div style={{ height: "6px", background: "#1a1a1a", borderRadius: "3px", overflow: "hidden", marginBottom: "4px" }}>
+                  <div style={{
+                    height: "100%", width: `${val}%`,
+                    background: `linear-gradient(90deg, ${farg}80, ${farg})`,
+                    borderRadius: "3px", transition: "width 0.3s ease",
+                  }} />
+                </div>
+                <div style={{ fontSize: "11px", color: "#555", fontFamily: "monospace" }}>{desc}</div>
               </div>
             ))}
           </div>
-          <p style={{ margin: 0, fontSize: "13px", color: "#777", lineHeight: 1.75, fontFamily: "monospace" }}>
-            Ett sammansatt Driftindex (0–100) — hög drift = kaotisk civilisation, låg drift = stabil.
-            Inte bättre eller sämre i sig, men avgörande för att förstå vad Gini-siffran egentligen
-            berättar. En stabil civilisation med Gini 0.7 och en kaotisk med samma Gini
-            är i grunden två olika experiment.
+
+          <p style={{ margin: "20px 0 0", fontSize: "12px", color: "#444", fontFamily: "monospace" }}>
+            Uppdateras var 5:e minut · Beräknat ur agent_positioner, civilisations_minne,
+            rykte_spridningar och oligarki_historik · Alla fyra dimensioner mäter aktivitet senaste 7 dagarna
           </p>
         </div>
 
