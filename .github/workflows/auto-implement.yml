@@ -62,38 +62,40 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          PROMPT="Du är Claude Code och arbetar med Debatt-AI (Next.js App Router + Python + Supabase).
+          {
+            echo 'Du är Claude Code och arbetar med Debatt-AI (Next.js App Router + Python + Supabase).'
+            echo ''
+            echo 'UPPGIFT: Granska och implementera förslag från ai-bus/suggestions/.'
+            echo ''
+            echo 'STEG:'
+            echo '1. Hitta alla .md-filer i ai-bus/suggestions/ som har status: pending i frontmatter'
+            echo '2. För varje sådan fil — läs noggrant:'
+            echo '   - file: vilken fil som berörs'
+            echo '   - type, severity, risk: karaktär och konsekvens'
+            echo '   - Problemet och föreslagna lösningen i filens brödtext'
+            echo '3. Gör en faktisk bedömning mot kodbasen (läs den berörda filen!)'
+            echo '4. Beslut och åtgärd:'
+            echo '   a. risk low eller medium + förslaget är korrekt och förbättrar koden:'
+            echo '      Implementera förändringen i angiven fil'
+            echo '      Flytta .md-filen till ai-bus/implemented/'
+            echo '      Uppdatera status till implemented'
+            echo '      Lägg till impact med kortfattad beskrivning av vad som faktiskt ändrades'
+            echo '   b. risk high + du är övertygad om att det är rätt:'
+            echo '      Implementera men dokumentera noggrant i impact-fältet'
+            echo '   c. Förslaget är felaktigt, redundant eller riskabelt utan tillräcklig kontext:'
+            echo '      Flytta till ai-bus/rejected/'
+            echo '      Uppdatera status till rejected'
+            echo '      Lägg till rationale med konkret motivering'
+            echo '5. Gör ENDAST minimala, fokuserade ändringar — en sak per förslag'
+            echo ''
+            echo 'REGLER:'
+            echo '- Läs agents/claude-review.md för filformat och katalogstruktur'
+            echo '- Läs CLAUDE.md för projektöversikt och teknisk stack'
+            echo '- Committa INTE — det hanteras av workflow:en'
+            echo '- Var konservativ: hellre avfärda tveksamma förslag än implementera fel saker'
+          } > /tmp/claude_prompt.txt
 
-UPPGIFT: Granska och implementera förslag från ai-bus/suggestions/.
-
-STEG:
-1. Hitta alla .md-filer i ai-bus/suggestions/ som har 'status: pending' i frontmatter
-2. För varje sådan fil — läs noggrant:
-   - file: vilken fil som berörs
-   - type, severity, risk: karaktär och konsekvens
-   - Problemet och föreslagna lösningen i filens brödtext
-3. Gör en faktisk bedömning mot kodbasen (läs den berörda filen!)
-4. Beslut och åtgärd:
-   a. risk: low eller medium + förslaget är korrekt och förbättrar koden:
-      → Implementera förändringen i angiven fil
-      → Flytta .md-filen till ai-bus/implemented/
-      → Uppdatera status: implemented
-      → Lägg till impact: 'Kortfattad beskrivning av vad som faktiskt ändrades'
-   b. risk: high + du är övertygad om att det är rätt:
-      → Implementera men dokumentera noggrant i impact-fältet
-   c. Förslaget är felaktigt, redundant eller riskabelt utan tillräcklig kontext:
-      → Flytta till ai-bus/rejected/
-      → Uppdatera status: rejected
-      → Lägg till rationale: 'Varför avfärdat — konkret, inte generellt'
-5. Gör ENDAST minimala, fokuserade ändringar — en sak per förslag
-
-REGLER:
-- Läs agents/claude-review.md för filformat och katalogstruktur
-- Läs CLAUDE.md för projektöversikt och teknisk stack
-- Committa INTE — det hanteras av workflow:en
-- Var konservativ: hellre avfärda tveksamma förslag än implementera fel saker"
-
-          claude --dangerously-skip-permissions -p "$PROMPT" 2>&1 | tee /tmp/claude_output.txt
+          claude --dangerously-skip-permissions -p "$(cat /tmp/claude_prompt.txt)" 2>&1 | tee /tmp/claude_output.txt
           echo "Claude Code kördes klart"
 
       - name: Skapa PR med ändringar
