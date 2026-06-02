@@ -360,9 +360,18 @@ export default function EnPage() {
             >
               Read the theory →
             </a>
-            <span style={{ fontSize: "12px", color: "#3a4a6a", fontFamily: "monospace" }}>
-              Contact: neonhawk194@gmail.com
-            </span>
+            <a
+              href="/?kontakt=1"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "8px",
+                padding: "12px 22px", borderRadius: "8px",
+                background: "transparent", border: "1px solid #1a2a3a",
+                fontSize: "14px", color: C.textMuted, textDecoration: "none",
+                fontFamily: "monospace",
+              }}
+            >
+              Contact form →
+            </a>
           </div>
         </div>
 
