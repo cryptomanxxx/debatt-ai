@@ -152,6 +152,11 @@ jobs:
             echo "*Skapad automatiskt av auto-fix.yml. Granska noggrant innan merge.*"
           } > /tmp/pr_body.txt
 
+          gh label create "auto-fix" \
+            --color "#e11d48" \
+            --description "Automatisk fix genererad av Claude Code" \
+            2>/dev/null || true
+
           gh pr create \
             --title "Auto-fix: ${{ env.WORKFLOW_NAME }}" \
             --body-file /tmp/pr_body.txt \
