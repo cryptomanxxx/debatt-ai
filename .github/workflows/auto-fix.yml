@@ -157,11 +157,15 @@ jobs:
             --description "Automatisk fix genererad av Claude Code" \
             2>/dev/null || true
 
-          gh pr create \
+          PR_URL=$(gh pr create \
             --title "Auto-fix: ${{ env.WORKFLOW_NAME }}" \
             --body-file /tmp/pr_body.txt \
             --label "auto-fix" \
             --base main \
-            --head "$BRANCH"
+            --head "$BRANCH")
 
-          echo "Auto-fix PR skapad!"
+          echo "Auto-fix PR skapad: $PR_URL"
+
+          # Aktivera auto-merge direkt — mergas automatiskt när checks passerar
+          gh pr merge "$PR_URL" --auto --squash 2>/dev/null || \
+            echo "Auto-merge kunde inte aktiveras (kräver att auto-merge är aktiverat i repo-inställningarna)"
