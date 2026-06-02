@@ -32,7 +32,8 @@ export async function GET(req) {
       `${SB_URL}/rest/v1/pis_monte_carlo` +
       `?select=lagforslag_id,iterationer,lyckade_iterationer` +
       `,bnp_mean,bnp_std,bnp_min,bnp_max,gini_mean,gini_std` +
-      `,socialt_kapital_dist,koalition_dist`,
+      `,inflation_mean,inflation_std,arbetsloshet_mean,arbetsloshet_std` +
+      `,socialt_kapital_dist,koalition_dist,konfidens_dist`,
       { headers: H(), next: { revalidate: 60 } }
     ),
   ]);
@@ -85,10 +86,13 @@ export async function GET(req) {
       monte_carlo: mc ? {
         iterationer:         mc.iterationer,
         lyckade_iterationer: mc.lyckade_iterationer,
-        bnp:  mc.bnp_mean  !== null ? { mean: mc.bnp_mean,  std: mc.bnp_std,  min: mc.bnp_min,  max: mc.bnp_max  } : null,
-        gini: mc.gini_mean !== null ? { mean: mc.gini_mean, std: mc.gini_std } : null,
+        bnp:          mc.bnp_mean         !== null ? { mean: mc.bnp_mean,         std: mc.bnp_std,         min: mc.bnp_min,         max: mc.bnp_max         } : null,
+        gini:         mc.gini_mean        !== null ? { mean: mc.gini_mean,        std: mc.gini_std        } : null,
+        inflation:    mc.inflation_mean   !== null ? { mean: mc.inflation_mean,   std: mc.inflation_std   } : null,
+        arbetsloshet: mc.arbetsloshet_mean !== null ? { mean: mc.arbetsloshet_mean, std: mc.arbetsloshet_std } : null,
         socialt_kapital_dist: mc.socialt_kapital_dist,
         koalition_dist:       mc.koalition_dist,
+        konfidens_dist:       mc.konfidens_dist,
       } : null,
     };
   });
