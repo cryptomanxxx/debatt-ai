@@ -4,7 +4,7 @@
 
 import json
 
-def hamta_data()
+def hamta_data():
     data = {"status": "ok", "version": 1}
     return json.dumps(data)
 
