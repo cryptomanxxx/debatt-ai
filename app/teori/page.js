@@ -207,8 +207,8 @@ export default async function TeoriPage() {
   // ── Driftindex ──────────────────────────────────────────────────────────────
   // 1. Åsiktsdrift: summa antal_andringar senaste 7 dagar, normaliserat mot 40
   const positioner   = d?.positioner ?? [];
-  const asiktsSumma  = positioner.reduce((s, p) => s + (p.antal_andringar || 0), 0);
-  const asiktsDrift  = Math.min(100, Math.round((asiktsSumma / 40) * 100));
+  const asiktsSumma  = positioner.length;
+  const asiktsDrift  = Math.min(100, Math.round((asiktsSumma / 15) * 100));
 
   // 2. Koalitionsomsättning: antal koalitions-/alliancshändelser 7 dagar, normaliserat mot 20
   const civMinne       = d?.civMinne ?? [];
@@ -229,12 +229,12 @@ export default async function TeoriPage() {
   }
 
   // Sammansatt Driftindex (viktat: 30/25/25/20)
-  const driftIndex = (asiktsDrift != null || koalitionDrift != null)
-    ? Math.round(asiktsDrift * 0.30 + koalitionDrift * 0.25 + narrativDrift * 0.25 + maktDrift * 0.20)
-    : null;
+  const driftIndex = d === null
+    ? null
+    : Math.round(asiktsDrift * 0.30 + koalitionDrift * 0.25 + narrativDrift * 0.25 + maktDrift * 0.20);
 
   const driftDimensioner = [
-    { label: "Åsiktsdrift",         vikt: "30%", val: asiktsDrift,   farg: "#818cf8", desc: `${asiktsSumma} positionsändringar senaste 7 dagarna` },
+    { label: "Åsiktsdrift",         vikt: "30%", val: asiktsDrift,   farg: "#818cf8", desc: `${asiktsSumma} ämnespositioner uppdaterade senaste 7 dagarna` },
     { label: "Koalitionsomsättning", vikt: "25%", val: koalitionDrift, farg: C.yellow,  desc: `${civMinne.length} koalitions-/allianshändelser senaste 7 dagarna` },
     { label: "Narrativ rörlighet",   vikt: "25%", val: narrativDrift,  farg: C.green,   desc: `${spridningar.length} ryktespridningar senaste 7 dagarna` },
     { label: "Maktbyteshastighet",   vikt: "20%", val: maktDrift,      farg: C.red,     desc: oligHist.length >= 2 ? "Beräknat ur stddev av oligarkirisk 14 dagar" : "Samlar historik…" },
