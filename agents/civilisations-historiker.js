@@ -96,9 +96,9 @@ async function hämtaCivilisationsData() {
     artiklar,
   ] = await Promise.all([
     sb("civilisations_minne", `select=typ,rubrik,beskrivning,agenter,skapad&skapad=gte.${sjuDagarSen}&order=skapad.desc&limit=25`),
-    sb("domstol_domar",       `select=arendenummer,svarand,brott,utfall,boter,skapad&skapad=gte.${sjuDagarSen}&order=skapad.desc&limit=10`),
-    sb("kris_events",         `select=namn,typ,intensitet,beskrivning,paverkade_agenter,startade,slutar,aktiv&order=startade.desc&limit=5`),
-    sb("riksdagsval",         `select=status,vinnande_parti,totala_roster,avgjord_datum&order=skapad.desc&limit=3`),
+    sb("domstol_domar",       `select=utfall,straff_belopp,skapad,domstol_arenden(arende_nr,svarande,artikel_nr,beskrivning)&skapad=gte.${sjuDagarSen}&order=skapad.desc&limit=10`),
+    sb("kris_events",         `select=rubrik,typ,intensitet,beskrivning,paverkade_agenter,startat,slutar,aktiv&order=startat.desc&limit=5`),
+    sb("riksdagsval",         `select=status,vinnare_parti,vinnare_ledare,avgjord&order=skapad.desc&limit=3`),
     sb("politiska_partier",   `select=namn,ledare,styrka,aktiv&aktiv=eq.true&order=styrka.desc`),
     sb("agent_planbocker",    `select=agent,saldo&order=saldo.desc&limit=24`),
     sb("agent_koalitioner",   `select=agent_a,agent_b,styrka,antal_utbyten&skapad=gte.${sjuDagarSen}&order=styrka.desc&limit=10`),
@@ -159,7 +159,7 @@ function sammanfattaData(d) {
     const fällda = d.domar.filter(x => x.utfall === "fälld");
     const friats = d.domar.filter(x => x.utfall !== "fälld");
     if (fällda.length > 0) {
-      rader.push(`DOMSTOL: ${fällda.length} fälldes. ${fällda.map(x => `${x.svarand} (böter ${x.boter} kr för ${x.brott})`).join(", ")}. ${friats.length} frikändes.`);
+      rader.push(`DOMSTOL: ${fällda.length} fälldes. ${fällda.map(x => `${x.domstol_arenden?.svarande || "?"} (böter ${x.straff_belopp || 0} kr, §${x.domstol_arenden?.artikel_nr || "?"})`).join(", ")}. ${friats.length} frikändes.`);
     } else {
       rader.push(`DOMSTOL: ${d.domar.length} ärenden handlagda — alla frikändes.`);
     }
@@ -168,14 +168,14 @@ function sammanfattaData(d) {
   // Aktiv kris
   const aktivKris = d.kriser.find(k => k.aktiv);
   if (aktivKris) {
-    rader.push(`AKTIV KRIS: "${aktivKris.namn}" (intensitet ${aktivKris.intensitet}/3). Berörda agenter: ${(aktivKris.paverkade_agenter || []).join(", ")}.`);
+    rader.push(`AKTIV KRIS: "${aktivKris.rubrik}" (intensitet ${aktivKris.intensitet}/3). Berörda agenter: ${(aktivKris.paverkade_agenter || []).join(", ")}.`);
   }
 
   // Riksdagsval
   const senastVal = d.val[0];
-  if (senastVal?.status === "avgjort" && senastVal.vinnande_parti) {
-    rader.push(`VAL AVGJORT: ${senastVal.vinnande_parti} vann senaste riksdagsvalet.`);
-  } else if (senastVal?.status === "aktivt") {
+  if (senastVal?.status === "avgjort" && senastVal.vinnare_parti) {
+    rader.push(`VAL AVGJORT: ${senastVal.vinnare_parti} vann senaste riksdagsvalet.`);
+  } else if (senastVal?.status === "aktiv") {
     rader.push(`PÅGÅENDE VAL: Riksdagsval pågår just nu — partierna kampanjar.`);
   }
 
@@ -325,7 +325,7 @@ async function main() {
   const fälldaDomar = (data.domar || []).filter(x => x.utfall === "fälld");
   let rubrik;
   if (aktivKris) {
-    rubrik = `Civilisationens krönika ${vecka}: ${aktivKris.namn} skakar AI-samhället`;
+    rubrik = `Civilisationens krönika ${vecka}: ${aktivKris.rubrik} skakar AI-samhället`;
   } else if (fälldaDomar.length >= 2) {
     rubrik = `Civilisationens krönika ${vecka}: Domstolens vecka — ${fälldaDomar.length} agenter fälls`;
   } else if (toppParti) {
