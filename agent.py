@@ -1297,7 +1297,7 @@ def main():
                     besk_rader.append(rad.strip())
             besk = " ".join(besk_rader)[:400]
             if titel and besk:
-                httpx.post(
+                resp = httpx.post(
                     f"{SB_FR}/rest/v1/agent_feature_requests",
                     headers={
                         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
@@ -1307,7 +1307,10 @@ def main():
                           "beskrivning": besk, "prioritet": prioritet},
                     timeout=10,
                 )
-                print(f"  ✓ Feature request: \"{titel}\" ({kategori}, {prioritet})")
+                if resp.status_code in (200, 201):
+                    print(f"  ✓ Feature request: \"{titel}\" ({kategori}, {prioritet})")
+                else:
+                    print(f"  ✗ Feature request HTTP {resp.status_code}: {resp.text[:120]}", file=sys.stderr)
         except Exception as e:
             print(f"  ✗ Feature request: {e}", file=sys.stderr)
 

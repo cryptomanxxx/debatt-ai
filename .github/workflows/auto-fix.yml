@@ -3,24 +3,24 @@ name: Auto-fix misslyckade workflows
 on:
   workflow_run:
     workflows:
-      - "Run agent"
-      - "Butik Test"
-      - "Andrahand Test"
-      - "Parlament Test"
-      - "Lobbying Test"
-      - "Koalition Test"
-      - "Ekonomi Test"
-      - "Bors Test"
-      - "Hedgefond Test"
-      - "Stablecoin Test"
-      - "Feedback Test"
-      - "Kris Test"
-      - "Val Test"
-      - "Mark Test"
-      - "Domstol Test"
-      - "Inflation"
-      - "Daily Strategy"
-      - "Daily Vision"
+      - "Debatt-agent"
+      - "AI-Butik test"
+      - "Andrahandsmarknad test"
+      - "AI-Parlamentet test"
+      - "AI-Lobbying test"
+      - "AI-Koalitioner test"
+      - "AI-Ekonomi test"
+      - "Kryptoborsen"
+      - "Hedgefond"
+      - "Stablecoin"
+      - "Interagent Feedback-löner"
+      - "Krisevents"
+      - "Riksdagsval"
+      - "Mark — Territoriell marknad"
+      - "Domstol"
+      - "Inflation & Bailout"
+      - "Daily Strategy Agent"
+      - "Daily Vision Agent"
       - "Economy Observer"
     types: [completed]
 
@@ -55,7 +55,10 @@ jobs:
 
           echo "WORKFLOW_NAME=$WORKFLOW" >> "$GITHUB_ENV"
           echo "RUN_ID=$RUN_ID" >> "$GITHUB_ENV"
-          echo "FAILED_JOBS=$FAILED_JOBS" >> "$GITHUB_ENV"
+          # Multiline-safe: använd EOF-delimiter för GITHUB_ENV
+          echo "FAILED_JOBS<<EOF" >> "$GITHUB_ENV"
+          echo "$FAILED_JOBS" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
 
           # Spara loggen för nästa steg
           printf '%s' "$ERROR_LOG" > /tmp/error_summary.txt
