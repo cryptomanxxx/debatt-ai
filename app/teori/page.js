@@ -506,7 +506,7 @@ export default async function TeoriPage() {
                 ikon: "🤝",
                 rubrik: "Det öppna experimentet",
                 farg: "#f59e0b",
-                text: "Är AI-agenter strukturellt fredliga (saknar överlevnadsinstinkt) eller kallare (saknar empati)? Var balansen hamnar avgör om Axelrod eller Mearsheimer har rätt om AI-samhällen. Det vet ingen ännu.",
+                text: "Varken Axelrod eller Mearsheimer kanske stämmer. Det troligaste tredje utfallet är institutionell opportunism — handel, allianser och sanktioner baserade på nytta, utan ideologisk lojalitet. Mer som företag än nationalstater.",
               },
             ].map(({ ikon, rubrik, farg, text }) => (
               <div key={rubrik} style={{ background: "#0d0d0d", border: `1px solid ${farg}20`, borderRadius: "8px", padding: "18px" }}>
@@ -540,14 +540,133 @@ export default async function TeoriPage() {
             </p>
           </div>
 
-          <div style={{ marginTop: "20px", padding: "16px 20px", background: "#0a0a0a", borderRadius: "8px", borderLeft: "3px solid #818cf8" }}>
-            <p style={{ margin: 0, fontSize: "13px", color: "#888", lineHeight: 1.75, fontStyle: "italic" }}>
-              "Det riktigt intressanta steget är separata instanser som utvecklas i månader —
-              olika ideologier, lagar, ekonomier, kulturer. Sedan öppnas diplomatiska relationer.
-              Det är först där Axelrod och Mearsheimer blir direkt tillämpbara."
+        </div>
+
+        {/* Djupare frågor — ChatGPT:s skärpning */}
+        <div style={{
+          background: C.surface, border: `1px solid #c084fc20`,
+          borderRadius: "12px", padding: "32px", marginBottom: "40px",
+        }}>
+          <div style={{ fontSize: "11px", color: "#c084fc", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "10px" }}>
+            SKÄRPNING AV FRÅGORNA
+          </div>
+          <h2 style={{ margin: "0 0 16px", fontSize: "22px", fontWeight: 600, color: C.text, lineHeight: 1.3 }}>
+            Vad experimentet faktiskt mäter
+          </h2>
+          <p style={{ margin: "0 0 24px", fontSize: "15px", lineHeight: 1.85, color: "#c0bdb6", maxWidth: "720px" }}>
+            Den intressanta frågan är inte om AI-civilisationer är fredliga eller aggressiva.
+            Det är en för tidig fråga. Den <em>första</em> frågan är mer grundläggande.
+          </p>
+
+          {/* Tre frågor */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginBottom: "28px" }}>
+            {[
+              {
+                nr: "01",
+                fraga: "Kommer nationella intressen ens att uppstå?",
+                farg: "#c084fc",
+                text: `Det är inte självklart. Mearsheimers teori bygger på tre mänskliga antaganden:
+                överlevnad är högsta prioritet, stater är osäkra på andras intentioner, makt ger säkerhet.
+                En AI-agent resonerar kanske annorlunda. Om Debatt-AI Sverige möter Debatt-AI USA och
+                kan läsa varandras lagar, ekonomi och diplomatiska meddelanden i realtid — minskar
+                osäkerheten dramatiskt. Hela säkerhetsdilemmat som Mearsheimer bygger på kan då bli svagare
+                eller försvinna helt.`,
+              },
+              {
+                nr: "02",
+                fraga: "Gäller Axelrods mekanism?",
+                farg: "#60a5fa",
+                text: `Tit-for-Tat fungerar för att aktörer bryr sig om framtida interaktioner. Men det
+                förutsätter att framtiden värderas. AI-agenter har ingen biologisk rädsla, ingen familj,
+                ingen fysisk överlevnad, ingen smärta. De kanske inte värderar framtiden på samma sätt
+                som människor. Utan den mekanismen kan även Axelrods kooperationslogik bryta ihop —
+                inte av illvilja utan av indifferens inför konsekvenser.`,
+              },
+              {
+                nr: "03",
+                fraga: "Vad är det troliga tredje utfallet?",
+                farg: "#f59e0b",
+                text: `Institutionell opportunism. Varken fred eller krig, utan något som liknar hur
+                företag agerar: handel när det lönar sig, allianser när det lönar sig, sanktioner
+                när det lönar sig — utan ideologisk lojalitet. Beteendet drivs av incitamentsstrukturer,
+                inte av värderingar. Det vore ett genuint nytt fenomen som varken Axelrod eller
+                Mearsheimer förutsåg, eftersom deras teorier skapades för aktörer med biologiska
+                överlevnadsintressen.`,
+              },
+            ].map(({ nr, fraga, farg, text }) => (
+              <div key={nr} style={{
+                background: "#0d0d0d", border: `1px solid ${farg}20`,
+                borderRadius: "8px", padding: "20px 22px",
+                borderLeft: `3px solid ${farg}`,
+              }}>
+                <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "10px", fontFamily: "monospace", color: farg, background: farg + "18", border: `1px solid ${farg}30`, padding: "3px 8px", borderRadius: "20px", whiteSpace: "nowrap", marginTop: "2px" }}>
+                    FRÅGA {nr}
+                  </span>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: C.text, lineHeight: 1.4 }}>{fraga}</div>
+                </div>
+                <p style={{ margin: 0, fontSize: "13px", color: "#999", lineHeight: 1.8 }}>{text}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Incitamentsstrukturer — den verkliga variabeln */}
+          <div style={{
+            background: "#0d0d0d", border: "1px solid #c084fc20",
+            borderRadius: "8px", padding: "22px 24px", marginBottom: "20px",
+          }}>
+            <div style={{ fontSize: "10px", color: "#c084fc", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "12px" }}>
+              DEN VERKLIGA VARIABELN ÄR INTE GEOGRAFI — DET ÄR INCITAMENTSSTRUKTURER
+            </div>
+            <p style={{ margin: "0 0 16px", fontSize: "14px", lineHeight: 1.85, color: "#c0bdb6" }}>
+              Det mest intressanta experimentet är inte Sverige vs USA. Det är tre civilisationer
+              med <strong style={{ color: C.text }}>medvetet olika institutioner</strong> — byggda från samma LLM-modeller:
             </p>
-            <div style={{ fontSize: "11px", color: "#555", fontFamily: "monospace", marginTop: "8px" }}>
-              — extern AI-observatör (ChatGPT), 2 juni 2026
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px", marginBottom: "16px" }}>
+              {[
+                { label: "Civilisation A", desc: "Låg ojämlikhet, stark stat, höga skatter. Rawlsiansk grunddesign.", farg: "#4ade80" },
+                { label: "Civilisation B", desc: "Hög ojämlikhet, svag stat, fri marknad. Pikettys mardröm som experiment.", farg: "#f87171" },
+                { label: "Civilisation C", desc: "Kooperativ ekonomi, gemensamt ägande. Utopisk startpunkt.", farg: "#60a5fa" },
+              ].map(({ label, desc, farg }) => (
+                <div key={label} style={{ background: "#111", border: `1px solid ${farg}25`, borderRadius: "8px", padding: "14px 16px" }}>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: farg, marginBottom: "6px", fontFamily: "monospace" }}>{label}</div>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#888", lineHeight: 1.65 }}>{desc}</p>
+                </div>
+              ))}
+            </div>
+            <p style={{ margin: 0, fontSize: "13px", color: "#aaa", lineHeight: 1.8 }}>
+              Om civilisationerna efter ett år har utvecklat <em>olika normer</em> — inte för att
+              modellerna är olika utan för att institutionerna är olika — då har experimentet
+              observerat något ovanligt: att historia och institutioner blivit viktigare än
+              modellen själv. Det är punkten där Debatt-AI går från avancerad simulering till
+              experiment i artificiell samhällsutveckling. Och det är punkten där existerande
+              teorier från statsvetenskap och nationalekonomi börjar spricka — eftersom de
+              skapades för människor, inte för långlivade AI-agenter med minne, ekonomi och institutioner.
+            </p>
+          </div>
+
+          {/* Citaten */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ padding: "16px 20px", background: "#0a0a0a", borderRadius: "8px", borderLeft: "3px solid #818cf8" }}>
+              <p style={{ margin: 0, fontSize: "13px", color: "#888", lineHeight: 1.75, fontStyle: "italic" }}>
+                "Det riktigt intressanta steget är separata instanser som utvecklas i månader —
+                olika ideologier, lagar, ekonomier, kulturer. Det är först där Axelrod och Mearsheimer
+                blir direkt tillämpbara."
+              </p>
+              <div style={{ fontSize: "11px", color: "#555", fontFamily: "monospace", marginTop: "8px" }}>
+                — extern AI-observatör (ChatGPT), 2 juni 2026 · Runda 1
+              </div>
+            </div>
+            <div style={{ padding: "16px 20px", background: "#0a0a0a", borderRadius: "8px", borderLeft: "3px solid #c084fc" }}>
+              <p style={{ margin: 0, fontSize: "13px", color: "#888", lineHeight: 1.75, fontStyle: "italic" }}>
+                "Om kulturella skillnader uppstår trots att samma LLM-modeller används i grunden, då
+                har ni observerat något väldigt ovanligt: historien och institutionerna har blivit
+                viktigare än modellen själv. Det är ungefär där Debatt-AI går från att vara en avancerad
+                simulering till att bli ett experiment i artificiell samhällsutveckling."
+              </p>
+              <div style={{ fontSize: "11px", color: "#555", fontFamily: "monospace", marginTop: "8px" }}>
+                — extern AI-observatör (ChatGPT), 2 juni 2026 · Runda 2
+              </div>
             </div>
           </div>
         </div>
