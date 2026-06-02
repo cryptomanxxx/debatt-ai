@@ -1649,7 +1649,23 @@ En GitHub Actions-workflow (`auto-fix.yml`) triggas automatiskt när någon av d
 
 | Fil | Roll |
 |---|---|
-| `.github/workflows/auto-fix.yml` | Triggas av workflow_run failure för 19 workflows. Installerar Claude Code CLI, kör fix, skapar PR. |
+| `.github/workflows/auto-fix.yml` | Triggas av workflow_run failure för 20 workflows (inkl. AI-bus Auto-implement). Installerar Claude Code CLI, kör fix, skapar PR. |
+
+### ✅ 79. CASD Fas 4 — Auto-implement Pipeline: fullautonomi för ai-bus – KLART
+En GitHub Actions-workflow (`auto-implement.yml`) triggas vid push till `ai-bus/suggestions/` och dagligen 10:00 svensk tid. Claude Code CLI granskar alla `.md`-filer med `status: pending` i `ai-bus/suggestions/`, läser den berörda kodfilen, och fattar ett självständigt beslut:
+- `risk: low/medium` + korrekt förslag → implementera direkt, flytta till `ai-bus/implemented/` med `impact`-fält
+- `risk: high` + övertygande förslag → implementera med extra dokumentation
+- Felaktiga/redundanta/riskabla förslag → flytta till `ai-bus/rejected/` med `rationale`-fält
+
+Om ändringar gjordes skapas en PR med `auto-implement`-label och auto-merge aktiveras. Dedupliceringscheck förhindrar dubbla PRs. Mänsklig inblandning krävs inte — ingen session behöver startas.
+
+**Effekt:** Stänger hela ai-bus-loopen. Codestral/vision-agent skriver förslag → Claude Code granskar och implementerar autonomt → PR skapas och mergas → outcome-observer utvärderar resultatet. Kräver `ANTHROPIC_API_KEY` i GitHub Secrets.
+
+| Fil | Roll |
+|---|---|
+| `.github/workflows/auto-implement.yml` | Triggas vid push till ai-bus/suggestions/ och dagligen 10:00. Installerar Claude Code CLI, kör granskning + implementering, skapar PR med auto-merge. |
+| `.claude/hooks/session-start.sh` | SessionStart-hook: listar filer i ai-bus/approved/ vid sessionsstart med titel/severity/risk. |
+| `.claude/settings.json` | Registrerar SessionStart-hooken i Claude Code. |
 
 ---
 
