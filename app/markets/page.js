@@ -247,7 +247,6 @@ function AvgjordKort({ market }) {
             {bets.map(b => {
               const correct = jaVann ? b.sannolikhet >= 50 : b.sannolikhet < 50;
               const insats = b.insats || 0;
-              if (!insats) return null;
               return (
                 <span key={b.agent} style={{
                   fontSize: "10px", fontFamily: "monospace", borderRadius: "4px", padding: "2px 7px",
@@ -255,7 +254,7 @@ function AvgjordKort({ market }) {
                   color: correct ? C.green : C.red,
                   border: `1px solid ${correct ? "#4ade8030" : "#f8717130"}`,
                 }}>
-                  {b.agent.split(" ")[0]} {correct ? `+${insats}` : `-${insats}`} kr
+                  {b.agent.split(" ")[0]} {b.sannolikhet}%{insats > 0 ? ` ${correct ? `+${insats}` : `-${insats}`} kr` : ""}
                 </span>
               );
             })}
@@ -498,20 +497,33 @@ export default async function MarketsPage() {
             </div>
           ) : (
             <>
+              {/* Stat-rad med snabblänk till avgjorda */}
+              <div style={{ display: "flex", gap: "16px", alignItems: "center", marginBottom: "28px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace" }}>
+                  {oppna.length} öppna
+                </span>
+                {avgjorda.length > 0 && (
+                  <a href="#avgjorda" style={{ fontSize: "11px", color: C.green, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", textDecoration: "none", background: "#4ade8015", border: "1px solid #4ade8030", borderRadius: "20px", padding: "3px 12px" }}>
+                    ✓ {avgjorda.length} avgjord{avgjorda.length !== 1 ? "a" : ""}
+                  </a>
+                )}
+              </div>
+
+              {avgjorda.length > 0 && (
+                <div id="avgjorda" style={{ marginBottom: "40px", background: "#070d07", border: "1px solid #1a3a1a", borderRadius: "10px", padding: "20px 24px" }}>
+                  <p style={{ fontSize: "11px", color: C.green, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 16px", fontWeight: 700 }}>
+                    ✓ Avgjorda · {avgjorda.length} st
+                  </p>
+                  {avgjorda.map(m => <AvgjordKort key={m.id} market={m} />)}
+                </div>
+              )}
+
               {oppna.length > 0 && (
                 <div style={{ marginBottom: "48px" }}>
                   <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 20px" }}>
                     Öppna markets · {oppna.length} st
                   </p>
                   {oppna.map(m => <MarketKort key={m.id} market={m} />)}
-                </div>
-              )}
-              {avgjorda.length > 0 && (
-                <div>
-                  <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 16px" }}>
-                    Avgjorda
-                  </p>
-                  {avgjorda.map(m => <AvgjordKort key={m.id} market={m} />)}
                 </div>
               )}
               <div style={{ marginTop: "48px" }}>
