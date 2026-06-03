@@ -26,6 +26,8 @@ export async function POST(req) {
       hemsida_url: hemsida_url?.trim() || null,
       beskrivning: beskrivning?.trim() || null,
       kontakt_email: kontakt_email?.trim() || null,
+      status: "pending",
+      verifierad: false,
     }),
   });
 
