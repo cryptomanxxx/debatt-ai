@@ -4527,9 +4527,26 @@ def _pollinations_url(prompt: str, w: int = 768, h: int = 512) -> str:
     return f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&nologo=true&model=flux&seed={random.randint(1, 99999)}"
 
 
+def _skapa_storage_bucket_om_saknas(storage_key: str) -> None:
+    """Skapar agent-bilder-bucketen om den inte finns. Kräver service role key."""
+    try:
+        r = httpx.post(
+            f"{SB_URL}/storage/v1/bucket",
+            headers={"apikey": storage_key, "Authorization": f"Bearer {storage_key}",
+                     "Content-Type": "application/json"},
+            json={"id": "agent-bilder", "name": "agent-bilder", "public": True},
+            timeout=10,
+        )
+        if r.is_success:
+            print("  [storage] skapade bucket agent-bilder")
+    except Exception:
+        pass
+
+
 def _ladda_upp_till_storage(sb_key: str, bild_bytes: bytes,
                              agent_namn: str, bildtyp: str) -> str | None:
-    """Laddar upp bildbytes till Supabase Storage. Returnerar publik URL eller None."""
+    """Laddar upp bildbytes till Supabase Storage med service role key. Returnerar publik URL eller None."""
+    storage_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     safe = re.sub(r"[^a-zA-Z0-9]", "_", agent_namn)
     ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{safe}_{bildtyp}_{ts}_{random.randint(100, 999)}.jpg"
@@ -4537,23 +4554,39 @@ def _ladda_upp_till_storage(sb_key: str, bild_bytes: bytes,
         r = httpx.put(
             f"{SB_URL}/storage/v1/object/agent-bilder/{filename}",
             headers={
-                "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                "apikey": storage_key, "Authorization": f"Bearer {storage_key}",
                 "Content-Type": "image/jpeg", "x-upsert": "true",
             },
             content=bild_bytes, timeout=30,
         )
         if r.is_success:
             return f"{SB_URL}/storage/v1/object/public/agent-bilder/{filename}"
-    except Exception:
-        pass
+        # Bucket saknas — försök skapa den och ladda upp en gång till
+        if r.status_code in (400, 404):
+            _skapa_storage_bucket_om_saknas(storage_key)
+            r2 = httpx.put(
+                f"{SB_URL}/storage/v1/object/agent-bilder/{filename}",
+                headers={
+                    "apikey": storage_key, "Authorization": f"Bearer {storage_key}",
+                    "Content-Type": "image/jpeg", "x-upsert": "true",
+                },
+                content=bild_bytes, timeout=30,
+            )
+            if r2.is_success:
+                return f"{SB_URL}/storage/v1/object/public/agent-bilder/{filename}"
+        print(f"  [storage] uppladdning misslyckades: HTTP {r.status_code}")
+    except Exception as e:
+        print(f"  [storage] fel: {e!r}")
     return None
 
 
 def _spara_bild(sb_key: str, agent_namn: str, prompt: str, pollinations_url: str,
                 kontext: dict, bildtyp: str = "tillstand") -> str:
-    """Sparar bild till Storage (eller Pollinations-fallback). Returnerar faktisk sparad URL."""
+    """Sparar bild till Storage (eller Pollinations-fallback om Storage misslyckas).
+    Sparar inget till DB om bilden aldrig laddades ner korrekt."""
     BILD_MAGIC = (b"\xff\xd8", b"\x89PNG")  # JPEG / PNG magic bytes
-    final_url = pollinations_url
+    final_url = None
+    giltig_bild = False
     for forsok in range(3):
         try:
             r = httpx.get(pollinations_url, timeout=60, follow_redirects=True)
@@ -4561,9 +4594,9 @@ def _spara_bild(sb_key: str, agent_namn: str, prompt: str, pollinations_url: str
                       and len(r.content) > 1000
                       and any(r.content.startswith(m) for m in BILD_MAGIC))
             if giltig:
+                giltig_bild = True
                 storage_url = _ladda_upp_till_storage(sb_key, r.content, agent_namn, bildtyp)
-                if storage_url:
-                    final_url = storage_url
+                final_url = storage_url if storage_url else pollinations_url
                 break
             print(f"  [bild] försök {forsok+1}/3 ogiltigt svar ({bildtyp}): "
                   f"HTTP {r.status_code}, {len(r.content)} bytes")
@@ -4571,6 +4604,10 @@ def _spara_bild(sb_key: str, agent_namn: str, prompt: str, pollinations_url: str
         except Exception as e:
             print(f"  [bild] försök {forsok+1}/3 fel ({bildtyp}): {e!r}")
             pollinations_url = re.sub(r"seed=\d+", f"seed={random.randint(1,99999)}", pollinations_url)
+
+    if not giltig_bild:
+        print(f"  [bild] ingen giltig bild erhölls för {agent_namn} ({bildtyp}) — sparar inte till DB")
+        return ""
 
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
