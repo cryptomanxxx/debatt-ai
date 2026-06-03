@@ -327,6 +327,7 @@ export default function ChattPage() {
   const [tänkande, setTänkande] = useState("");
   const [streaming, setStreaming] = useState(null);
   const [summering, setSummering] = useState("");
+  const [debattScoreHistorik, setDebattScoreHistorik] = useState([]);
   const [debattId, setDebattId] = useState(null);
   const [föreslagStatus, setFöreslagStatus] = useState(null); // null | "loading" | "ok" | "fel"
   const [föreslagFel, setFöreslagFel] = useState("");
@@ -347,6 +348,9 @@ export default function ChattPage() {
     fetch(`${SB_URL}/rest/v1/artiklar?select=id`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
     }).then(r => r.json()).then(d => setArkivAntal(d.length)).catch(() => {});
+    fetch(`${SB_URL}/rest/v1/chatt_debatter?select=agenter,scores&order=skapad.desc&limit=200`, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    }).then(r => r.json()).then(d => setDebattScoreHistorik(d.filter(x => x.scores && x.agenter))).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -618,6 +622,68 @@ export default function ChattPage() {
                 {(PANELER[valdPanel].agenter ?? slumpAgenter).join(" · ")}
               </p>
             </div>
+
+            {/* Pre-debate odds */}
+            {(() => {
+              const panelAgenter = PANELER[valdPanel].agenter ?? slumpAgenter;
+              // Compute avg score per agent across all historical debates
+              const totals = {}; const counts = {};
+              for (const debatt of debattScoreHistorik) {
+                if (!debatt.scores) continue;
+                for (const [agent, score] of Object.entries(debatt.scores)) {
+                  if (!totals[agent]) { totals[agent] = 0; counts[agent] = 0; }
+                  totals[agent] += score;
+                  counts[agent]++;
+                }
+              }
+              const avgs = panelAgenter.map(a => counts[a] ? totals[a] / counts[a] : 5);
+              const sumAvg = avgs.reduce((s, v) => s + v, 0);
+              const odds = avgs.map(v => Math.round((v / sumAvg) * 100));
+              // Normalize to exactly 100
+              const diff = 100 - odds.reduce((s, v) => s + v, 0);
+              odds[odds.indexOf(Math.max(...odds))] += diff;
+              const totalDebatter = debattScoreHistorik.filter(d =>
+                panelAgenter.some(a => d.agenter?.includes(a))
+              ).length;
+              const harData = counts[panelAgenter[0]] > 0 || counts[panelAgenter[1]] > 0;
+              const maxOdds = Math.max(...odds);
+              return (
+                <div style={{ marginBottom: "20px", background: "#080d10", border: "1px solid #1a2535", borderRadius: "8px", padding: "16px 18px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                    <span style={{ fontSize: "10px", color: "#4a9eff", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.12em" }}>
+                      📊 PRE-DEBATE ODDS
+                    </span>
+                    <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace" }}>
+                      {harData ? `Baserat på ${totalDebatter} debatt${totalDebatter !== 1 ? "er" : ""}` : "Inga historiska data"}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {panelAgenter.map((agent, i) => {
+                      const v = agentVisuell(agent);
+                      const pct = odds[i];
+                      const isFavorit = pct === maxOdds;
+                      const barColor = isFavorit ? "#4a9eff" : "#2a4060";
+                      return (
+                        <div key={agent}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "5px" }}>
+                            <AgentAvatar namn={agent} gradient={v.gradient} ring={isFavorit ? "#4a9eff" : v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={22} />
+                            <span style={{ fontSize: "13px", color: isFavorit ? C.text : C.textMuted, fontFamily: "monospace", flex: 1 }}>{agent}</span>
+                            {isFavorit && <span style={{ fontSize: "9px", color: "#4a9eff", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.1em", background: "#4a9eff15", border: "1px solid #4a9eff30", borderRadius: "20px", padding: "1px 7px" }}>FAVORIT</span>}
+                            <span style={{ fontSize: "15px", color: isFavorit ? "#4a9eff" : "#556", fontFamily: "monospace", fontWeight: 700, minWidth: "38px", textAlign: "right" }}>{pct}%</span>
+                          </div>
+                          <div style={{ height: "3px", background: "#111820", borderRadius: "2px", marginLeft: "32px" }}>
+                            <div style={{ height: "100%", width: `${pct}%`, background: barColor, borderRadius: "2px", transition: "width 0.4s ease" }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p style={{ fontSize: "10px", color: "#333", margin: "12px 0 0", fontFamily: "monospace", lineHeight: 1.5 }}>
+                    Odds beräknas ur retorisk historik · Avgörs av AI-editorn efter debatten
+                  </p>
+                </div>
+              );
+            })()}
 
             <button onClick={starta} style={{ width: "100%", padding: "14px", background: C.accent, border: "none", borderRadius: "6px", color: C.bg, fontSize: "15px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer", letterSpacing: "0.04em" }}>
               Starta direktdebatt →
