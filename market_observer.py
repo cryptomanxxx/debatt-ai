@@ -261,9 +261,12 @@ def main() -> None:
     markets = hamta_utgangna_markets()
     if not markets:
         print("Inga utgångna markets att avgöra.")
-        reglerade = reglera_prediction_bets(SB_KEY)
-        if reglerade:
-            print(f"Reglerade bets: {reglerade} st.")
+        try:
+            reglerade = reglera_prediction_bets(SB_KEY)
+            if reglerade:
+                print(f"Reglerade bets: {reglerade} st.")
+        except Exception as e:
+            print(f"  Varning: reglera_prediction_bets misslyckades: {e}", file=sys.stderr)
         return
 
     print(f"Hittade {len(markets)} utgångna markets.\n")
@@ -298,9 +301,12 @@ def main() -> None:
     print(f"Avgjorda: {avgjorda}/{len(markets)} markets.")
 
     # Kör alltid — fångar upp obetalda bets från tidigare körningar
-    reglerade = reglera_prediction_bets(SB_KEY)
-    if reglerade:
-        print(f"Reglerade bets: {reglerade} st.")
+    try:
+        reglerade = reglera_prediction_bets(SB_KEY)
+        if reglerade:
+            print(f"Reglerade bets: {reglerade} st.")
+    except Exception as e:
+        print(f"  Varning: reglera_prediction_bets misslyckades: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
