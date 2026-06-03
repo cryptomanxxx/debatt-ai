@@ -4539,8 +4539,10 @@ def _skapa_storage_bucket_om_saknas(storage_key: str) -> None:
         )
         if r.is_success:
             print("  [storage] skapade bucket agent-bilder")
-    except Exception:
-        pass
+        else:
+            print(f"  [storage] kunde inte skapa bucket: HTTP {r.status_code} {r.text[:120]}")
+    except Exception as e:
+        print(f"  [storage] bucket-skapande fel: {e!r}")
 
 
 def _ladda_upp_till_storage(sb_key: str, bild_bytes: bytes,
