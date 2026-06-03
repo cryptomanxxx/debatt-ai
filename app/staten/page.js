@@ -164,9 +164,10 @@ export default async function StatenPage() {
   const veckorMedData = [...new Set(budgetLog.map(r => r.vecka))].sort().reverse();
   const recentWeeks = [...new Set([currentWeek, ...veckorMedData])].slice(0, 8);
 
-  // Use the most recent week that has actual budget data (inflation.py runs Sundays —
-  // earlier in the week the current week is empty, so fall back to last week's data)
-  const senastVeckamedData = budgetLog.length > 0 ? budgetLog[0].vecka : currentWeek;
+  // Use the most recent week that has skatt or grundinkomst rows — other types
+  // (bot, sparranta) can appear mid-week and would make budgetLog[0].vecka misleading
+  const senastVeckamedData =
+    budgetLog.find(r => r.typ === "skatt" || r.typ === "grundinkomst")?.vecka ?? currentWeek;
 
   // Metric: latest week's tax income
   const veckansSkatt = budgetLog
