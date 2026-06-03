@@ -1,0 +1,23 @@
+name: Market Observer
+
+on:
+  schedule:
+    # 07:00 UTC = 09:00 svensk sommartid — körs dagligen
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install httpx
+      - name: Avgör utgångna prediction markets
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python market_observer.py
