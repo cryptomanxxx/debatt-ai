@@ -129,7 +129,7 @@ def uppdatera_status(medd_id: int, status: str) -> None:
 
 def upsert_relation(civ_id: int, status: str, antal: int, senaste: str) -> None:
     httpx.post(
-        f"{SB_URL}/rest/v1/ud_relationer",
+        f"{SB_URL}/rest/v1/ud_relationer?on_conflict=civ_id",
         headers={**HDRS_WRITE, "Prefer": "resolution=merge-duplicates,return=minimal"},
         json={
             "civ_id": civ_id,
