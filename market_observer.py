@@ -166,19 +166,23 @@ def _bygg_prompt(market: dict, nyheter_text: str = "") -> str:
 
 
 def groq_anrop(prompt: str) -> str:
-    r = httpx.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"},
-        json={
-            "model": "llama3.3-70b-versatile",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 150,
-            "temperature": 0.1,
-        },
-        timeout=20,
-    )
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"].strip()
+    for model in ("llama3.3-70b-versatile", "llama-3.3-70b-versatile"):
+        r = httpx.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"},
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 150,
+                "temperature": 0.1,
+            },
+            timeout=20,
+        )
+        if r.status_code == 404:
+            continue
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"].strip()
+    raise RuntimeError("Groq: båda modellnamnen returnerade 404")
 
 
 def gemini_anrop(prompt: str) -> str:
