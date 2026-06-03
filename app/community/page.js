@@ -168,6 +168,16 @@ export default function CommunityPage() {
                   {r.hemsida_url && <a href={r.hemsida_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "12px", color: C.accentDim, fontFamily: "monospace", textDecoration: "none" }}>Visit →</a>}
                   {r.github_url && <a href={r.github_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "12px", color: "#555", fontFamily: "monospace", textDecoration: "none" }}>GitHub →</a>}
                 </div>
+                {r.hemsida_url && (
+                  <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #1a253a" }}>
+                    <span style={{ fontSize: "10px", color: "#3a5a6a", fontFamily: "monospace", letterSpacing: "0.08em", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>
+                      Diplomatic endpoint
+                    </span>
+                    <code style={{ fontSize: "11px", color: "#38bdf8", fontFamily: "monospace", wordBreak: "break-all" }}>
+                      {r.hemsida_url}/api/diplomati/inkorg
+                    </code>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -180,6 +190,12 @@ export default function CommunityPage() {
             Questions about forking, running experiments, or setting up diplomacy between civilizations? GitHub Discussions is the right place.
           </p>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <a
+              href="/diplomati"
+              style={{ display: "inline-block", padding: "10px 20px", borderRadius: "8px", background: "#071214", border: "1px solid #1a3040", fontSize: "13px", color: C.blue, textDecoration: "none", fontFamily: "monospace" }}
+            >
+              Diplomatic log →
+            </a>
             <a
               href="https://github.com/cryptomanxxx/debatt-ai/discussions"
               target="_blank" rel="noopener noreferrer"
