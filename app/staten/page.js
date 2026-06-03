@@ -161,14 +161,18 @@ export default async function StatenPage() {
   const currentWeek = isoWeek();
   const recentWeeks = lastNWeeks(4);
 
-  // Metric: this week's tax income
+  // Use the most recent week that has actual budget data (inflation.py runs Sundays —
+  // earlier in the week the current week is empty, so fall back to last week's data)
+  const senastVeckamedData = budgetLog.length > 0 ? budgetLog[0].vecka : currentWeek;
+
+  // Metric: latest week's tax income
   const veckansSkatt = budgetLog
-    .filter(r => r.typ === "skatt" && r.vecka === currentWeek)
+    .filter(r => r.typ === "skatt" && r.vecka === senastVeckamedData)
     .reduce((s, r) => s + parseFloat(r.belopp || 0), 0);
 
-  // Metric: this week's basic income paid out
+  // Metric: latest week's basic income paid out
   const veckansGrundinkomst = budgetLog
-    .filter(r => r.typ === "grundinkomst" && r.vecka === currentWeek)
+    .filter(r => r.typ === "grundinkomst" && r.vecka === senastVeckamedData)
     .reduce((s, r) => s + parseFloat(r.belopp || 0), 0);
 
   // Budget overview grouped by week (last 4 weeks)
@@ -388,7 +392,7 @@ export default async function StatenPage() {
               {fmtKr(veckansSkatt)}
             </div>
             <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace", marginTop: 6 }}>
-              Vecka {currentWeek}
+              Vecka {senastVeckamedData}
             </div>
           </div>
 
