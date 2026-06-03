@@ -16,3 +16,4 @@ CREATE TABLE community_civilisationer (
 ALTER TABLE community_civilisationer ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read" ON community_civilisationer FOR SELECT USING (status = 'aktiv');
 CREATE POLICY "Anon insert" ON community_civilisationer FOR INSERT WITH CHECK (status = 'pending' AND verifierad = false);
+ALTER TABLE community_civilisationer ALTER COLUMN status SET DEFAULT 'pending';
