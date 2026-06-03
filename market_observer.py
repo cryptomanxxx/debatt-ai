@@ -286,8 +286,9 @@ def main() -> None:
 
     print(f"Avgjorda: {avgjorda}/{len(markets)} markets.")
 
-    if avgjorda > 0:
-        reglerade = reglera_prediction_bets(SB_KEY)
+    # Kör alltid — fångar upp obetalda bets från tidigare körningar
+    reglerade = reglera_prediction_bets(SB_KEY)
+    if reglerade:
         print(f"Reglerade bets: {reglerade} st.")
 
 
