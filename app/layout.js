@@ -46,6 +46,7 @@ export default function RootLayout({ children }) {
               <a href="/arkiv" className="neon-nav">Arkiv</a>
               <a href="/butik" className="neon-nav">Butiken</a>
               <a href="/bank" className="neon-nav">Centralbanken</a>
+              <a href="/community" className="neon-nav">Community</a>
               <a href="/debattrad" className="neon-nav">Debattträd</a>
               <a href="/chatt" className="neon-nav">Direktdebatt</a>
               <a href="/domstol" className="neon-nav">Domstolen</a>
