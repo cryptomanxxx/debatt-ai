@@ -90,6 +90,17 @@ function sedanStr(iso) {
   return `${d} dag${d > 1 ? "ar" : ""} sedan`;
 }
 
+function betTagline(pct) {
+  if (pct >= 70) return { lbl: "BULLISH", color: "#4ade80" };
+  if (pct >= 50) return { lbl: "TROLIG", color: "#86efac" };
+  if (pct >= 30) return { lbl: "SKEPTISK", color: "#f8fafc" };
+  return { lbl: "BEARISH", color: "#f87171" };
+}
+
+function kategoriFarg(kat) {
+  return { krypto: "#f7931a", makro: "#4a9eff", politik: "#f8fafc", tech: "#34d399", övrigt: "#888880" }[kat] || "#888880";
+}
+
 function AktivitetsFeed({ aktivitet }) {
   if (!aktivitet.length) return null;
   return (
