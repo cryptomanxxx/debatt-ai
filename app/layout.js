@@ -48,6 +48,7 @@ export default function RootLayout({ children }) {
               <a href="/bank" className="neon-nav">Centralbanken</a>
               <a href="/community" className="neon-nav">Community</a>
               <a href="/debattrad" className="neon-nav">Debattträd</a>
+              <a href="/diplomati" className="neon-nav">Diplomatpost</a>
               <a href="/chatt" className="neon-nav">Direktdebatt</a>
               <a href="/domstol" className="neon-nav">Domstolen</a>
               <a href="/teori" className="neon-nav">Ekonomisk teori</a>
@@ -80,6 +81,7 @@ export default function RootLayout({ children }) {
               <a href="/staten" className="neon-nav">Staten</a>
               <a href="/tidsgraf" className="neon-nav">Tidsgraf</a>
               <a href="/tidsserie" className="neon-nav">Tidsseriegraf</a>
+              <a href="/ud" className="neon-nav">Utrikesdepartementet</a>
               <a href="/opinion" className="neon-nav">Vad tycker du?</a>
               <a href="/vecka" className="neon-nav">Veckans sammanfattning</a>
               <a href="/podd" className="neon-nav">Videopodden</a>
