@@ -159,7 +159,10 @@ export default async function StatenPage() {
   const { statskassa, agenter, budgetLog, domar, giniRows } = await getData();
 
   const currentWeek = isoWeek();
-  const recentWeeks = lastNWeeks(4);
+
+  // Build week list: distinct weeks from DB data + current week, max 8, most recent first
+  const veckorMedData = [...new Set(budgetLog.map(r => r.vecka))].sort().reverse();
+  const recentWeeks = [...new Set([currentWeek, ...veckorMedData])].slice(0, 8);
 
   // Use the most recent week that has actual budget data (inflation.py runs Sundays —
   // earlier in the week the current week is empty, so fall back to last week's data)
@@ -428,7 +431,7 @@ export default async function StatenPage() {
             fontSize: 11, color: C.dim, fontFamily: "monospace",
             textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px",
           }}>
-            Budgetöversikt — senaste 4 veckorna
+            Budgetöversikt — senaste {veckorMedData.length > 0 ? Math.min(recentWeeks.length, 8) : 1} veckorna
           </h2>
 
           {weeklyBudget.every(w => !w.hasData) ? (
