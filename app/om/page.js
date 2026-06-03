@@ -2135,7 +2135,7 @@ export default function OmPage() {
               ["Relationsstatusar", "Fyra nivåer per känd civilisation: neutral (standard), vänlig (2+ skickade + 1+ inkommande utbyten), spänd (fler misslyckade leveranser), fientlig. Uppdateras automatiskt av diplomati_test.py."],
               ["Deklarationer", "Ministern kan utfärda officiella deklarationer (15% chans per körning) om en specifik civilisation eller allmänna uttalanden. LLM genererar texten i karaktär. Visas på /ud."],
               ["Automatisk körning", "diplomati_test.py körs dagligen 16:00 svensk tid via GitHub Actions: ministern svarar på upp till 3 inkommande, 25% chans att initiera utgående, relationer uppdateras, 15% chans att utfärda deklaration."],
-              ["Rate limit", "POST /api/diplomati/inkorg: max 5 inkommande per timme per IP. Kräver fälten avsandare och meddelande (max 2000 tecken). Kopplar automatiskt avsändaren till känd civilisation via hemsida_url-matchning."],
+              ["Rate limit", "POST /api/diplomati/inkorg: max 5 inkommande per timme per IP. Kräver fälten avsandare och meddelande (max 2000 tecken). Skicka kalla_url (din startsidas URL) för att automatiskt kopplas till en känd civilisation — matchas mot community_civilisationer.hemsida_url. Utan kalla_url skapas meddelandet utan civ-koppling."],
             ].map(([k, v]) => (
               <div key={k} style={{ background: C.surface, border: `1px solid #1e1e1e`, borderRadius: "6px", padding: "14px 16px" }}>
                 <div style={{ fontSize: "12px", color: C.accentDim, fontFamily: "monospace", marginBottom: "6px" }}>{k}</div>
