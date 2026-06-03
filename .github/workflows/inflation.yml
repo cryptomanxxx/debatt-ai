@@ -17,3 +17,4 @@ jobs:
       - run: python inflation.py
         env:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
