@@ -196,12 +196,16 @@ def llm_anrop(prompt: str) -> tuple[str | None, str, str]:
     """Försöker Groq, sedan Gemini. Returnerar (utfall, konfidens, motivering)."""
     if GROQ_KEY:
         try:
-            return _parse_llm_svar(groq_anrop(prompt))
+            utfall, konfidens, motivering = _parse_llm_svar(groq_anrop(prompt))
+            if utfall:
+                return utfall, konfidens, motivering
         except Exception as e:
             print(f"  Groq-fel: {e}")
     if GEMINI_KEY:
         try:
-            return _parse_llm_svar(gemini_anrop(prompt))
+            utfall, konfidens, motivering = _parse_llm_svar(gemini_anrop(prompt))
+            if utfall:
+                return utfall, konfidens, motivering
         except Exception as e:
             print(f"  Gemini-fel: {e}")
     return None, "låg", ""
@@ -253,6 +257,9 @@ def main() -> None:
     markets = hamta_utgangna_markets()
     if not markets:
         print("Inga utgångna markets att avgöra.")
+        reglerade = reglera_prediction_bets(SB_KEY)
+        if reglerade:
+            print(f"Reglerade bets: {reglerade} st.")
         return
 
     print(f"Hittade {len(markets)} utgångna markets.\n")
