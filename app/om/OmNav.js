@@ -31,6 +31,7 @@ const SEKTIONER = [
   { id: "debattrad",            kort: "Debattråd-vy" },
   { id: "debattrad-viz",        kort: "Debattträd" },
   { id: "decision-api",         kort: "Decision API" },
+  { id: "diplomati",            kort: "Diplomati API",           nytt: true },
   { id: "direktdebatt",         kort: "Direktdebatt" },
   { id: "gini-policy",          kort: "Dynamisk Gini-policy",    nytt: true },
   { id: "economy-observer",     kort: "Economy Observer",        nytt: true },
