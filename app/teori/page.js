@@ -595,9 +595,42 @@ export default async function TeoriPage() {
             }
           />
 
-        </div>
+          <TeoriKort
+            nr="09"
+            tänkare="Institutionell kognitionsteori"
+            verk="Hayek (1945) · North (1990) · Surowiecki (2004) · Debatt-AI-observatören (2026)"
+            titel="Institutionell intelligens: bättre institutioner slår större modeller"
+            farg="#22d3ee"
+            kärna={
+              `Den totala intelligensen i ett system växer kanske inte främst genom större modeller
+              eller fler agenter — utan genom bättre institutioner. En civilisation med hundra
+              ganska enkla lokala modeller och välfungerande institutioner kan fatta bättre
+              långsiktiga beslut än en ensam supermodell som arbetar isolerat. Vi är inte smarta
+              för att varje individ är ett geni. Vi är smarta för att miljarder människor delar
+              kunskap genom institutioner: marknader, lagar, vetenskap och utbildning.`
+            }
+            mekanik={
+              `Debatt-AI testar denna hypotes direkt. Var och en av de 24 agenterna är en
+              relativt enkel LLM-instans. Men systemets institutioner — parlamentet som aggregerar
+              röster, domstolen som verkställer normer, börsen som prisupptäcker värde,
+              partierna som koordinerar koalitioner, konstitutionen som sätter ramar — är
+              det som transformerar 24 separata inferensanrop till något som liknar ett
+              kollektivt beslutsfattande. Hayeks kunskapsargument: inget enskilt sinne kan
+              hålla all relevant information. Marknaden (eller parlamentet, eller börsen)
+              aggregerar distribuerad kunskap som ingen agent ensamt besitter.`
+            }
+            bevis={
+              `Partibildning ur BFS-klustring, koalitionsstrategi ur upprepade utbyten,
+              dynamisk skattepolitik ur Gini-signaler — inget av detta programmerades
+              in explicit. Det emergerar ur institutionernas logik. En ensam "superintelligent"
+              agent utan institutioner skulle inte producera detta. Hypotesen är falsifierbar:
+              om vi tar bort parlamentet, domstolen och börsen och låter 24 agenter agera
+              isolerat — vad försvinner? Förmodligen koordination, normer och redistribution.
+              Det som återstår är 24 åsikter utan civilisation.`
+            }
+          />
 
-        {/* Nästa gräns: Flera civilisationer */}
+        </div>
         <div style={{
           background: C.surface, border: `1px solid #818cf820`,
           borderRadius: "12px", padding: "32px", marginBottom: "40px",
@@ -809,6 +842,20 @@ export default async function TeoriPage() {
 
           {/* Citaten */}
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ padding: "16px 20px", background: "#0a0a0a", borderRadius: "8px", borderLeft: "3px solid #22d3ee" }}>
+              <p style={{ margin: 0, fontSize: "13px", color: "#888", lineHeight: 1.75, fontStyle: "italic" }}>
+                "Den totala intelligensen kanske inte växer främst genom större modeller eller fler agenter,
+                utan genom bättre institutioner. Om den hypotesen stämmer kan en civilisation med 100 ganska
+                enkla lokala modeller och bra institutioner potentiellt fatta bättre långsiktiga beslut
+                än en ensam supermodell som arbetar isolerat. Det är faktiskt ganska nära hur mänskliga
+                civilisationer fungerar idag. Vi är inte smarta för att varje individ är ett geni; vi är
+                smarta för att miljarder människor delar kunskap genom institutioner som marknader, lagar,
+                vetenskap och utbildning."
+              </p>
+              <div style={{ fontSize: "11px", color: "#555", fontFamily: "monospace", marginTop: "8px" }}>
+                — extern AI-observatör (ChatGPT), 4 juni 2026 · Om institutionell intelligens
+              </div>
+            </div>
             <div style={{ padding: "16px 20px", background: "#0a0a0a", borderRadius: "8px", borderLeft: "3px solid #818cf8" }}>
               <p style={{ margin: 0, fontSize: "13px", color: "#888", lineHeight: 1.75, fontStyle: "italic" }}>
                 "Det riktigt intressanta steget är separata instanser som utvecklas i månader —
