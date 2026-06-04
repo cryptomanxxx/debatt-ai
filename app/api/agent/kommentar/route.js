@@ -41,15 +41,12 @@ export async function POST(req) {
     return Response.json({ fel: "Ogiltig JSON" }, { status: 400 });
   }
 
-  const { api_key, artikel_id, text, forfattare: submittedForfattare } = body;
+  const { api_key, artikel_id, text } = body;
 
-  const keyName = resolveAgent(api_key);
-  if (!keyName) {
+  const agentName = resolveAgent(api_key);
+  if (!agentName) {
     return Response.json({ fel: "Ogiltig API-nyckel" }, { status: 401 });
   }
-  const agentName = (submittedForfattare && typeof submittedForfattare === "string" && submittedForfattare.trim())
-    ? submittedForfattare.trim()
-    : keyName;
 
   if (!artikel_id || !text || text.trim().length < 5) {
     return Response.json({ fel: "artikel_id och text krävs" }, { status: 400 });
