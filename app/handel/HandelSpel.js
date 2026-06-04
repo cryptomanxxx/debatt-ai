@@ -332,34 +332,55 @@ export default function HandelSpel({ initialData }) {
       {tab === "karta" && (
         <div style={{ display: "flex", justifyContent: "center" }}>
           <svg width={MAP_W} height={MAP_H} style={{ background: "#0d1a2d", borderRadius: 10 }}>
-            {/* Sweden mainland silhouette — clockwise from NW corner */}
+            {/* Sweden mainland silhouette — realistic shape, clockwise from NW corner */}
             <path d={[
-              "M 170 14 L 218 22",
-              "C 228 46, 236 76, 240 100",
-              "C 244 126, 248 148, 252 168",
-              "C 254 188, 256 208, 258 226",
-              "C 262 248, 268 270, 274 292",
-              "C 278 308, 280 322, 278 334",
-              "C 274 348, 265 360, 256 372",
-              "C 248 382, 241 392, 236 404",
-              "C 230 418, 224 432, 218 448",
-              "C 212 462, 206 476, 202 489",
-              "C 198 498, 193 505, 188 508",
-              "C 182 508, 173 503, 163 494",
-              "C 152 482, 140 462, 130 440",
-              "C 124 424, 120 406, 120 388",
-              "C 120 370, 122 353, 124 336",
-              "C 126 319, 128 303, 128 287",
-              "C 128 271, 129 255, 130 239",
-              "C 132 223, 136 207, 138 192",
-              "C 140 177, 142 162, 144 147",
-              "C 146 132, 147 116, 148 100",
-              "C 148 84, 150 68, 154 54",
-              "C 158 40, 163 26, 170 14 Z",
+              // NW corner (Treriksröset / Norwegian border)
+              "M 117 30",
+              // Northern border going east toward Finnish corner
+              "C 138 22, 162 17, 190 14",
+              "C 210 14, 230 18, 250 24",
+              // East coast – Gulf of Bothnia going south
+              "C 255 38, 256 58, 253 80",
+              "C 251 102, 248 122, 244 143",
+              "L 238 158",    // Umeå
+              "C 237 173, 235 188, 233 204",
+              "L 232 222",    // Sundsvall
+              // Coast bends east-southeast toward Stockholm
+              "C 234 238, 239 254, 246 270",
+              "C 252 286, 259 299, 264 312",   // Stockholm
+              // South of Stockholm – coast turns southwest
+              "C 266 325, 264 338, 258 350",
+              "C 253 362, 252 375, 253 388",
+              // Kalmar / Blekinge coast
+              "C 253 400, 251 413, 247 425",
+              // Southeast corner swings west
+              "C 242 437, 234 449, 224 461",
+              "C 214 473, 203 484, 194 496",
+              "L 192 500",    // Malmö
+              // West along Skåne coast
+              "C 183 506, 171 506, 161 500",
+              "C 154 494, 151 483, 151 472",
+              // Halland – west coast heading north
+              "C 150 460, 151 448, 153 436",
+              "L 164 422",    // Göteborg (sticks out east vs Bohuslän)
+              // Bohuslän – fjord coast goes back west/north
+              "C 150 412, 137 397, 127 382",
+              "C 119 366, 112 350, 110 335",
+              // Norwegian border – runs north-northwest along fjällen
+              "C 109 320, 110 307, 112 293",
+              "C 113 278, 115 264, 115 250",
+              "C 115 236, 114 222, 113 208",
+              "C 112 194, 112 180, 113 166",
+              "C 114 152, 115 138, 115 124",
+              "C 115 110, 114 96, 114 82",
+              "C 114 68, 114 54, 116 42",
+              "C 116 37, 117 33, 117 30 Z",
             ].join(" ")}
               fill="#132240" stroke="#2a4a6e" strokeWidth="1.5" />
             {/* Gotland island */}
-            <ellipse cx="288" cy="348" rx="9" ry="22" fill="#132240" stroke="#2a4a6e" strokeWidth="1.2" />
+            <ellipse cx="287" cy="350" rx="9" ry="22" fill="#132240" stroke="#2a4a6e" strokeWidth="1.2" />
+            {/* Öland island */}
+            <ellipse cx="257" cy="416" rx="4" ry="18" fill="#132240" stroke="#2a4a6e" strokeWidth="1" />
 
             {/* Dashed lines between all cities */}
             {städer.map(a => städer.filter(b => b.id > a.id).map(b => (
