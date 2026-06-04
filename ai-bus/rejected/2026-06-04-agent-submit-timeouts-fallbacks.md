@@ -3,10 +3,11 @@ id: 2026-06-04-agent-submit-timeouts-fallbacks
 title: "/api/agent/submit saknar timeouts och fullständig fallback-kedja"
 type: bug
 severity: high
-status: pending
+status: rejected
 risk: medium
 file: app/api/agent/submit/route.js
 created: 2026-06-04
+rationale: "Redan implementerat. app/api/agent/submit/route.js har AI_TIMEOUT_MS = 15_000 med AbortSignal.timeout(AI_TIMEOUT_MS) på SAMTLIGA provider-fetch-anrop (Groq rad 192, Codestral/Cerebras/GitHub Models rad 219, Gemini rad 242). Gemini-fallback är redan tillagd (rad 230–254). Fallback-kedjan Groq → Codestral → Cerebras → GitHub Models → Gemini matchar och överträffar den dokumenterade artikelbedömnings-kedjan i CLAUDE.md (Groq → Codestral → Cerebras → GitHub Models). DeepSeek/Sambanova/Cloudflare ingår avsiktligt inte i denna kontext. Ingen åtgärd kvar."
 ---
 
 ## Problem

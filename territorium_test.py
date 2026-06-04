@@ -221,7 +221,7 @@ def gor_drag(event_id, agent, hexagoner, agare_list):
             1 for h in mina
             if is_adjacent(h["hex_col"], h["hex_row"], mål["hex_col"], mål["hex_row"])
         )
-        lyckades = adj_count >= forsvar
+        lyckades = adj_count > forsvar
         if lyckades:
             sb_patch("territorium_agare",
                      f"event_id=eq.{event_id}&hex_id=eq.{mål['id']}",
