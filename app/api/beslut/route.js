@@ -88,7 +88,16 @@ reasoning: din kortaste möjliga motivering`;
     const { text } = await callWithFallback(CHAINS.beslut, [
       { role: "system", content: systemPrompt },
       { role: "user",   content: question },
-    ], { maxTokens: 150, temperature: 0.7, source: "beslut" });
+    ], {
+      maxTokens: 150,
+      temperature: 0.7,
+      source: "beslut",
+      // Providers som returnerar prosa istället för JSON behandlas som misslyckade
+      validate: (t) => {
+        const p = extractJSON(t);
+        return !!(p?.stance && typeof p.probability === "number");
+      },
+    });
 
     const parsed = extractJSON(text);
     if (parsed?.stance && typeof parsed.probability === "number")

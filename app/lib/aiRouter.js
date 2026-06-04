@@ -188,11 +188,19 @@ export async function callProvider(name, messages, opts = {}) {
   return { text, provider: name, model: cfg.model };
 }
 
+// opts.validate — (text: string) => boolean
+// Om angiven: providers vars svar inte klarar validate() behandlas som misslyckade
+// och nästa provider i kedjan provas. Används t.ex. när svaret måste vara giltig JSON.
 export async function callWithFallback(chain, messages, opts = {}) {
   const errors = [];
   for (const name of chain) {
     try {
-      return await callProvider(name, messages, opts);
+      const result = await callProvider(name, messages, opts);
+      if (opts.validate && !opts.validate(result.text)) {
+        errors.push(`${name}: validation failed`);
+        continue;
+      }
+      return result;
     } catch (err) {
       errors.push(`${name}: ${err.message}`);
     }
