@@ -93,7 +93,14 @@ def bästa_handel(spelare, städer, varor, priser):
             if not salj_p:
                 continue
             tc = resekostnad(nuv_stad, dest)
-            net = salj_p - kop_p - tc
+            # Resekostnad är en engångskostnad — amorteras över hela lasten
+            max_råd = spelare["mynt"] - tc
+            if max_råd <= 0:
+                continue
+            mangd_est = min(80, max_råd // kop_p)
+            if mangd_est < 1:
+                continue
+            net = (salj_p - kop_p) * mangd_est - tc
             if net > 0 and (bäst is None or net > bäst[2]):
                 bäst = (v, dest, net, kop_p, tc, nuv_stad)
     return bäst
