@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import TeritoriumSpel from "./TeritoriumSpel";
 
 export const revalidate = 60;
@@ -8,34 +7,33 @@ export const metadata = {
   description: "Strategispel: erövra hexagoner, expandera ditt territorium och tävla mot AI-agenter. Ett drag per dag.",
 };
 
-const SB = createClient(
-  "https://fmwxftnistkoqazfwnuj.supabase.co",
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-);
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const H = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
 
 async function getData() {
-  const { data: events } = await SB
-    .from("territorium_events")
-    .select("*")
-    .eq("status", "aktiv")
-    .order("skapad", { ascending: false })
-    .limit(1);
+  const evRes = await fetch(
+    `${SB_URL}/rest/v1/territorium_events?status=eq.aktiv&order=skapad.desc&limit=1`,
+    { headers: H, next: { revalidate: 60 } },
+  ).catch(() => null);
 
-  if (!events?.length) return { event: null, hexagoner: [], agare: [], senasteDrag: [] };
+  const events = evRes?.ok ? await evRes.json() : [];
+  if (!events.length) return { event: null, hexagoner: [], agare: [], senasteDrag: [] };
   const event = events[0];
 
-  const [{ data: hexagoner }, { data: agare }, { data: senasteDrag }] = await Promise.all([
-    SB.from("territorium_hexagoner").select("*").eq("event_id", event.id).order("hex_row").order("hex_col"),
-    SB.from("territorium_agare").select("*").eq("event_id", event.id),
-    SB.from("territorium_drag").select("*").eq("event_id", event.id).order("skapad", { ascending: false }).limit(25),
+  const [hxRes, agRes, drRes] = await Promise.all([
+    fetch(`${SB_URL}/rest/v1/territorium_hexagoner?event_id=eq.${event.id}&order=hex_row.asc&order=hex_col.asc`, { headers: H }),
+    fetch(`${SB_URL}/rest/v1/territorium_agare?event_id=eq.${event.id}`, { headers: H }),
+    fetch(`${SB_URL}/rest/v1/territorium_drag?event_id=eq.${event.id}&order=skapad.desc&limit=25`, { headers: H }),
   ]);
 
-  return {
-    event,
-    hexagoner:  hexagoner  ?? [],
-    agare:      agare      ?? [],
-    senasteDrag: senasteDrag ?? [],
-  };
+  const [hexagoner, agare, senasteDrag] = await Promise.all([
+    hxRes.ok ? hxRes.json() : [],
+    agRes.ok ? agRes.json() : [],
+    drRes.ok ? drRes.json() : [],
+  ]);
+
+  return { event, hexagoner, agare, senasteDrag };
 }
 
 export default async function TeritoriumPage() {
