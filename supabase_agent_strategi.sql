@@ -12,6 +12,10 @@ CREATE TABLE IF NOT EXISTS agent_strategi (
 -- Publik läsning (anon-nyckeln räcker)
 ALTER TABLE agent_strategi ENABLE ROW LEVEL SECURITY;
 
+-- Rensa gamla permissiva policies om de finns (idempotent re-körning)
+DROP POLICY IF EXISTS "Anon update agent_strategi" ON agent_strategi;
+DROP POLICY IF EXISTS "Anon insert/update agent_strategi" ON agent_strategi;
+
 CREATE POLICY "Publik läsning agent_strategi"
   ON agent_strategi FOR SELECT
   USING (true);
