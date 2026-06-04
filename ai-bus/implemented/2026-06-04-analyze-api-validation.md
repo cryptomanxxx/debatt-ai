@@ -3,10 +3,11 @@ id: 2026-06-04-analyze-api-validation
 title: "/api/analyze tar emot rå messages-array och vidarebefordrar direkt till Groq"
 type: security
 severity: high
-status: pending
+status: implemented
 risk: medium
 file: app/api/analyze/route.js
 created: 2026-06-04
+impact: "Lade till IP-rate-limit (checkRateLimit, 5/timme), strukturvalidering av messages-arrayen (1–4 meddelanden, content måste vara icke-tom sträng), totallängdstak (12 000 tecken), AbortSignal.timeout(20000) på Groq-anropet och res.ok-kontroll som returnerar 502. AVVEK MEDVETET från förslagets kontraktsbyte ({title,author,text}): båda klienterna (app/client.js, app/skicka-in/SkickaInClient.js) skickar messages med SYSTEM_PROMPT byggd klientsidan — att byta kontrakt hade krävt att flytta SYSTEM_PROMPT serverside och ändra två klienter, vilket är bredare än en fokuserad ändring. Validering inom befintligt kontrakt täcker de faktiska säkerhetshålen (obegränsad input, ingen rate-limit, ingen res.ok)."
 ---
 
 ## Problem

@@ -3,10 +3,11 @@ id: 2026-06-04-race-conditions-atomic-updates
 title: "Race conditions i röst/räknar-endpoints — läs-modifiera-skriv utan atomicitet"
 type: bug
 severity: high
-status: pending
+status: rejected
 risk: medium
 file: app/api/koalition/route.js
 created: 2026-06-04
+rationale: "Race-condition-analysen är korrekt (getCount→setCount är icke-atomiskt), men den föreslagna fixen kan inte tillämpas säkert autonomt. Den kräver att Postgres-RPC:er (t.ex. increment_foljare) deployas i Supabase FÖRST — den här pipelinen kan inte köra SQL mot Supabase. Om route-koden ändras till att anropa /rpc/increment_foljare innan funktionen finns returnerar PostgREST 404 och koalition POST/DELETE går sönder i produktion. Förslaget är dessutom inte fokuserat: det spänner över flera endpoints (koalition.foljare, platform_stamning, argument_roster) = flera filer + flera SQL-funktioner. Faktisk påverkan är låg: berörda räknare är besökar-följarräknare skyddade av IP-rate-limit (10/timme), och en tappad inkrement är kosmetisk, inte datakorruption. Rekommendation: projektägaren skapar och kör en SQL-migration som definierar de atomiska increment-RPC:erna i Supabase, och DÄREFTER kan route-anropen växlas över i en separat, koordinerad ändring."
 ---
 
 ## Problem

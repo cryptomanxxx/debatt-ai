@@ -3,10 +3,11 @@ id: 2026-06-04-agent-submit-timeouts-fallbacks
 title: "/api/agent/submit saknar timeouts och fullständig fallback-kedja"
 type: bug
 severity: high
-status: pending
+status: implemented
 risk: medium
 file: app/api/agent/submit/route.js
 created: 2026-06-04
+impact: "Lade AbortSignal.timeout(15000) på Groq-bedömningen och alla fallback-fetch (codestral/cerebras/github_models) så en hängande provider inte längre blockerar publiceringsflödet. Lade Gemini (gemini-2.0-flash) som extra fallback med korrekt API-form (contents/generationConfig) efter de OpenAI-kompatibla providers, inklusive circuit-breaker markProviderDown vid 429. Återanvände inte en ännu icke-existerande app/lib/aiRouter.js — fokuserad ändring i route.js."
 ---
 
 ## Problem

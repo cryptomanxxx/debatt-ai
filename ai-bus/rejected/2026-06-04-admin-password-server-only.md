@@ -3,10 +3,11 @@ id: 2026-06-04-admin-password-server-only
 title: "NEXT_PUBLIC_ADMIN_PASSWORD exponeras i JS-bundeln — flytta till server-only ADMIN_SECRET"
 type: security
 severity: critical
-status: pending
+status: rejected
 risk: high
 file: app/admin/client.js
 created: 2026-06-04
+rationale: "Sårbarheten är reell och bör åtgärdas — men inte autonomt. Fixen kräver (1) att ADMIN_SECRET sätts manuellt i Vercel env (kan inte göras från denna pipeline), (2) en helt ny /api/admin/session-endpoint med httpOnly-cookie/token-infrastruktur, och (3) samtidig omskrivning av 9 filer (8 admin-routes + admin-klienten + podd-test). Förslaget noterar själv att 'befintliga admin-sessioner fallerar vid deploy' och rekommenderar deploy under lågtrafik med backup-åtkomst via Vercel Dashboard. En partiell auto-implementering riskerar att låsa ute admin eller skapa falsk säkerhet om env-variabeln saknas vid deploy. Detta är inte en minimal, fokuserad ändring utan en infra-koordinerad uppgift som projektägaren måste planera med ett deploy-fönster. Rekommendation: implementera manuellt — sätt ADMIN_SECRET i Vercel först, deploya session-endpoint + cookie-skydd, migrera klient och routes, ta sedan bort NEXT_PUBLIC_ADMIN_PASSWORD."
 ---
 
 ## Problem
