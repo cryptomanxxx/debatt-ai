@@ -84,6 +84,7 @@ export default function HandelSpel({ initialData }) {
   }
 
   // Best trade hints: buy good X here, travel to city Y, sell for net profit
+  // Travel cost is a one-time trip cost — amortize across the full cargo
   const handelTips = varor.flatMap(v => {
     const buyP = currentPriser.find(p => p.vara_id === v.id)?.kop_pris;
     if (!buyP) return [];
@@ -93,8 +94,10 @@ export default function HandelSpel({ initialData }) {
         const sp = priser.find(p => p.stad_id === s.id && p.vara_id === v.id);
         const tc = resekostnad(currentStad, s);
         if (!sp) return null;
-        const netPerUnit = sp.salj_pris - buyP - tc;
-        return netPerUnit > 0 ? { vara: v, stad: s, net: netPerUnit, tc } : null;
+        const mynt = spelare?.mynt ?? 1000;
+        const maxMangd = Math.min(80, Math.max(1, Math.floor((mynt - tc) / buyP)));
+        const netTotal = (sp.salj_pris - buyP) * maxMangd - tc;
+        return netTotal > 0 ? { vara: v, stad: s, net: netTotal, mangd: maxMangd, tc } : null;
       })
       .filter(Boolean);
   }).sort((a, b) => b.net - a.net).slice(0, 5);
@@ -310,11 +313,11 @@ export default function HandelSpel({ initialData }) {
                   <div key={i} style={{ borderBottom: "1px solid #111", padding: "5px 0",
                     fontSize: 12, display: "flex", justifyContent: "space-between" }}>
                     <span style={{ color: "#f0ede6" }}>{t.vara.ikon} {t.vara.namn} → {t.stad.namn}</span>
-                    <span style={{ color: "#4ade80", fontFamily: "monospace" }}>+{t.net}/st</span>
+                    <span style={{ color: "#4ade80", fontFamily: "monospace" }}>+{t.net} 🪙 ({t.mangd}st)</span>
                   </div>
                 ))}
                 <p style={{ color: "#444", fontSize: 11, margin: "8px 0 0" }}>
-                  (vinst per enhet efter resekostnad)
+                  (total nettovinst med maxlast, resekostnad inräknad)
                 </p>
               </div>
             )}
