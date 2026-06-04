@@ -5,7 +5,10 @@ import { BUILD_ID } from "../buildId";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+
+function getStoredPw() {
+  return (typeof window !== "undefined" ? localStorage.getItem("admin_pw") : null) || "";
+}
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
@@ -929,7 +932,7 @@ function ParlamentTab() {
     try {
       const r = await fetch("/api/admin/riksdag-import", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-admin-password": ADMIN_PASSWORD },
+        headers: { "Content-Type": "application/json", "x-admin-password": getStoredPw() },
         body: JSON.stringify({}),
       });
       const d = await r.json();
@@ -1410,7 +1413,7 @@ function AiBusFileCard({ file, folderPath }) {
       setLoading(true);
       try {
         const r = await fetch(`/api/admin/ai-bus?file=${encodeURIComponent(file.path)}`, {
-          headers: { Authorization: `Bearer ${ADMIN_PASSWORD}` },
+          headers: { Authorization: `Bearer ${getStoredPw()}` },
         });
         const d = await r.json();
         setContent(d);
@@ -1490,7 +1493,7 @@ function AiBusTab() {
   const [loadingMeta, setLoadingMeta]   = useState(true);
 
   useEffect(() => {
-    const authHeaders = { Authorization: `Bearer ${ADMIN_PASSWORD}` };
+    const authHeaders = { Authorization: `Bearer ${getStoredPw()}` };
     fetch("/api/admin/ai-bus", { headers: authHeaders })
       .then(r => r.json())
       .then(d => { setFolders(d.folders || []); setLoadingMeta(false); })
@@ -1501,7 +1504,7 @@ function AiBusTab() {
     if (!activeFolder) return;
     setFiles(null);
     setLoadingFiles(true);
-    fetch(`/api/admin/ai-bus?folder=${activeFolder}`, { headers: { Authorization: `Bearer ${ADMIN_PASSWORD}` } })
+    fetch(`/api/admin/ai-bus?folder=${activeFolder}`, { headers: { Authorization: `Bearer ${getStoredPw()}` } })
       .then(r => r.json())
       .then(d => { setFiles(d.files || []); setLoadingFiles(false); })
       .catch(() => { setFiles([]); setLoadingFiles(false); });
@@ -2047,7 +2050,7 @@ function VbnbTab() {
       if (shares > 0) body.shares_outstanding = shares;
       const res = await fetch("/api/admin/vbnb-fetch", {
         method: "POST",
-        headers: { Authorization: `Bearer ${ADMIN_PASSWORD}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${getStoredPw()}`, "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       const data = await res.json();
@@ -2801,11 +2804,10 @@ export default function AdminClient() {
 
   useEffect(() => {
     const saved = localStorage.getItem("admin_pw");
-    if (saved && saved === ADMIN_PASSWORD) {
-      setAuthed(true);
-      loadInlamningar();
-      loadSubCount();
-    }
+    if (!saved) return;
+    fetch("/api/admin/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pw: saved }) })
+      .then(r => { if (r.ok) { setAuthed(true); loadInlamningar(); loadSubCount(); } })
+      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [subCount, setSubCount]   = useState(null);
@@ -2839,8 +2841,9 @@ export default function AdminClient() {
   const [actionLoading, setActionLoading] = useState(null);
   const [error, setError]               = useState("");
 
-  function login() {
-    if (pw === ADMIN_PASSWORD) {
+  async function login() {
+    const res = await fetch("/api/admin/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pw }) }).catch(() => null);
+    if (res?.ok) {
       localStorage.setItem("admin_pw", pw);
       setAuthed(true);
       loadInlamningar();
@@ -2928,7 +2931,7 @@ export default function AdminClient() {
       const res = await fetch("/api/admin/prenumeranter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret: ADMIN_PASSWORD }),
+        body: JSON.stringify({ secret: getStoredPw() }),
       });
       const data = await res.json();
       setSubCount(Array.isArray(data.prenumeranter) ? data.prenumeranter.length : 0);
@@ -2941,7 +2944,7 @@ export default function AdminClient() {
       const res = await fetch("/api/digest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret: process.env.NEXT_PUBLIC_ADMIN_PASSWORD }),
+        body: JSON.stringify({ secret: getStoredPw() }),
       });
       const data = await res.json();
       setDigestMsg(data.meddelande || data.fel || "Klart.");

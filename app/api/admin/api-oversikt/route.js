@@ -1,6 +1,6 @@
 const SB_URL   = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY   = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const ADMIN_PW = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+const ADMIN_PW = process.env.ADMIN_SECRET || process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
 
 function authorized(req) {
   const pw = req.headers.get("x-admin-password") || new URL(req.url).searchParams.get("pw");

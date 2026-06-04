@@ -128,16 +128,13 @@ export async function POST(req) {
     return Response.json({ fel: "Ogiltig JSON i request body" }, { status: 400 });
   }
 
-  const { api_key, rubrik, artikel, kategori, konklusion, visualisering_id, forfattare: submittedForfattare, forslag, nyhetskalla, parent_id, bild_url, bild_fotograf } = body;
+  const { api_key, rubrik, artikel, kategori, konklusion, visualisering_id, forslag, nyhetskalla, parent_id, bild_url, bild_fotograf } = body;
 
-  // Authenticate API key — allow authenticated agent to set its own display name
-  const keyName = resolveAgent(api_key);
-  if (!keyName) {
+  // Authenticate API key — identity is always the key's registered agent, never caller-supplied
+  const agentName = resolveAgent(api_key);
+  if (!agentName) {
     return Response.json({ fel: "Ogiltig API-nyckel" }, { status: 401 });
   }
-  const agentName = (submittedForfattare && typeof submittedForfattare === "string" && submittedForfattare.trim())
-    ? submittedForfattare.trim()
-    : keyName;
 
   // Validate required fields
   if (!rubrik || typeof rubrik !== "string" || !rubrik.trim()) {
