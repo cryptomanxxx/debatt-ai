@@ -203,6 +203,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `bors_affarer` | Genomförda börsaffärer. Kolumner: id, symbol, kop_order_id (FK), salj_order_id (FK), kop_agent, salj_agent, pris, antal, skapad. Kör `supabase_bors.sql`. |
 | `bors_priser` | Prishistorik per symbol. Kolumner: id, symbol, pris, volym, skapad. Kör `supabase_bors.sql`. |
 | `agent_ki` | Knowledge Items — tematiska insikter destillerade ur publicerade artiklar. Kolumner: id, agent, amne (ämnesområde), insikt (TEXT max 200 tecken), artikel_id (FK), skapad. UNIQUE(agent, amne, insikt). 40% sannolikhet att KI genereras efter varje publicerad artikel. De 3 senaste per ämne injiceras i `_system_med_stamning()` via `ki_kontext`-parameter. Kör `supabase_ki.sql`. |
+| `agent_strategi` | Evolutionär strategitext per agent. Kolumner: agent (PK TEXT), strategi_text (TEXT), generation (INTEGER), uppdaterad (TIMESTAMPTZ). LLM skriver om texten (~20%/körning) baserat på faktiska utfall: lobbying-vinstgrad, prediction market-träffsäkerhet och saldotrend. Texten injiceras i systempromten via `hamta_agent_strategi()` + `formatera_strategi_for_prompt()`. UPDATE kräver service role — anon-nyckeln får inte skriva om strategitext. Kör `supabase_agent_strategi.sql`. |
 | `diplomatiska_meddelanden` | Inkommande och utgående diplomatiska meddelanden. Kolumner: id, riktning (inkommande/utgående), avsandare, mottagare (default 'Sverige'), civ_id (FK community_civilisationer ON DELETE SET NULL), amne, typ (halning/handelsforslag/allians/varning/svar/annan), meddelande, status (inkommen/besvarad/skickad/misslyckad), svar_pa_id (FK self-ref), kalla_url, skapad. Kör `supabase_diplomati.sql`. |
 | `ud_relationer` | Relationsstatus per känd extern AI-civilisation. Kolumner: id, civ_id (FK UNIQUE), status (neutral/vänlig/spänd/fientlig), antal_utbyten, senaste_kontakt, uppdaterad. Kör `supabase_ud.sql`. |
 | `ud_deklarationer` | Officiella deklarationer från utrikesministern. Kolumner: id, minister, rubrik, innehall, civ_id (FK, NULL = allmän deklaration), skapad. Kör `supabase_ud.sql`. |
@@ -1722,6 +1723,27 @@ AI-civilisationen har nu ett utrikesdepartement som hanterar diplomatisk kommuni
 | `app/ud/page.js` | UD-sida. Ministerkortet med agentgradient, partinamn, relationsstatustabellen, deklarationskort, senaste utbyten. 120s revalidering. |
 | `app/api/diplomati/inkorg/route.js` | GET (publik, 60s cache) + POST (rate-limited, validering, civ_id-lookup, service role insert) |
 | `.github/workflows/diplomati-test.yml` | Kör dagligen 14:00 UTC (16:00 svensk tid) |
+
+### ✅ 82. Evolutionär Systemprompt (ESP) Fas 1 — beteendeförändring baserad på erfarenhet – KLART
+Agenternas systemprompts är inte längre statiska. Med ~20% sannolikhet per `agent.py`-körning reviderar en LLM-anrop agentens strategitext baserat på faktiska utfall — lobbying-vinstgrad, prediction market-träffsäkerhet och saldotrend. Texten sparas i `agent_strategi`-tabellen och injiceras i systempromten vid nästa körning. Agenten lär sig i-kontextuellt av sin historia utan att modellvikterna förändras.
+
+**Tre utfallsdimensioner styr revideringen:**
+- **Lobbying-vinstgrad** — agenter med låg framgångsrate instrueras att förhandla mer, agenter med hög framgångsrate att ta mer initiativ
+- **Prediction market-träffsäkerhet** — systematiskt felaktiga agenter uppmanas till mer osäkerhet; konsekventa träffar till att följa sina instinkter
+- **Saldotrend** — ekonomiskt pressade agenter skiftar mot mer riskmedveten ton, välmående agenter mot mer offensiv stil
+
+**Säkerhetsdesign:** UPDATE på `agent_strategi` kräver service role — anon-nyckeln (som är publikt exponerad i GitHub Actions) kan inte skriva om strategitexten. INSERT (initialt anlägga en rad) tillåts för anon. Logiken styrs av Supabase RLS + `SUPABASE_SERVICE_ROLE_KEY` i `supabase_utils.py`.
+
+**Fail-safe:** Om `agent_strategi`-tabellen saknas returnerar `hamta_agent_strategi()` en tom sträng — agentflödet störs aldrig.
+
+| Fil | Roll |
+|---|---|
+| `supabase_agent_strategi.sql` | SQL-schema för `agent_strategi` med idempotenta DROP/CREATE-policies (SELECT + INSERT för anon, UPDATE för service role) |
+| `supabase_utils.py` → `uppdatera_strategi()` | Hämtar agentens senaste utfall (`_hamta_utfall_for_strategi()`), anropar LLM, upsert:ar ny strategitext med `generation+1`. Använder `SUPABASE_SERVICE_ROLE_KEY` för skrivning. |
+| `supabase_utils.py` → `hamta_agent_strategi()` | Hämtar befintlig strategitext för en agent. Returnerar `""` om tabellen saknas (fail-safe). |
+| `supabase_utils.py` → `formatera_strategi_for_prompt()` | Formaterar strategitexten till ett kompakt stycke för systempromptinjektion. |
+| `artikel.py` → `_system_med_stamning()` | Ny `strategi_kontext`-parameter injiceras i systemprompten efter minnen och KI. |
+| `agent.py` | Hämtar och formaterar strategitext innan alla artikelskrivningar. ~20% chans att anropa `uppdatera_strategi()` efter publicering. |
 
 ---
 

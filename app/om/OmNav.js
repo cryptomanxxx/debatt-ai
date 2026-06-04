@@ -36,6 +36,7 @@ const SEKTIONER = [
   { id: "gini-policy",          kort: "Dynamisk Gini-policy",    nytt: true },
   { id: "economy-observer",     kort: "Economy Observer",        nytt: true },
   { id: "emergent-ideologi",    kort: "Emergent ideologi" },
+  { id: "esp",                  kort: "Evolutionär Systemprompt", nytt: true },
   { id: "trust",                kort: "Förtroendegraf" },
   { id: "fraga-api",            kort: "Fråga API" },
   { id: "cem",                  kort: "Grundlagen (CEM)",        nytt: true },
