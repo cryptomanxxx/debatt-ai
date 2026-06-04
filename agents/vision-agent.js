@@ -16,14 +16,15 @@ const path = require("path");
 const https = require("https");
 
 const CEREBRAS_API_KEY  = process.env.CEREBRAS_API_KEY;
+const GROQ_API_KEY      = process.env.GROQ_API_KEY;
 const DISCUSSIONS_DIR   = path.join(__dirname, "../ai-bus/discussions");
 const GOAL_PATH         = path.join(__dirname, "../ai-bus/goal.md");
 const CLAUDE_MD_PATH    = path.join(__dirname, "../CLAUDE.md");
 const REJECTED_DIR      = path.join(__dirname, "../ai-bus/rejected");
 const IMPLEMENTED_DIR   = path.join(__dirname, "../ai-bus/implemented");
 
-if (!CEREBRAS_API_KEY) {
-  console.error("CEREBRAS_API_KEY saknas — avbryter");
+if (!CEREBRAS_API_KEY && !GROQ_API_KEY) {
+  console.error("Varken CEREBRAS_API_KEY eller GROQ_API_KEY finns — avbryter");
   process.exit(1);
 }
 
@@ -251,15 +252,44 @@ async function callCerebras(prompt) {
     temperature: 0.9,
   });
 
+  const delays = [5000, 15000, 30000];
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    const { status, data } = await httpPost(
+      "https://api.cerebras.ai/v1/chat/completions",
+      { Authorization: `Bearer ${CEREBRAS_API_KEY}`, "Content-Type": "application/json" },
+      body
+    );
+    if (status === 200) {
+      const text = data?.choices?.[0]?.message?.content;
+      if (!text) throw new Error("Cerebras returnerade ingen text");
+      return text.trim();
+    }
+    if ((status === 429 || status >= 500) && attempt < delays.length) {
+      console.log(`  Cerebras ${status} — väntar ${delays[attempt] / 1000}s innan retry ${attempt + 1}/${delays.length}…`);
+      await new Promise(r => setTimeout(r, delays[attempt]));
+      continue;
+    }
+    throw new Error(`Cerebras API ${status}: ${JSON.stringify(data).slice(0, 200)}`);
+  }
+}
+
+async function callGroq(prompt) {
+  const body = JSON.stringify({
+    model: "llama-3.3-70b-versatile",
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: 1200,
+    temperature: 0.9,
+  });
+
   const { status, data } = await httpPost(
-    "https://api.cerebras.ai/v1/chat/completions",
-    { Authorization: `Bearer ${CEREBRAS_API_KEY}`, "Content-Type": "application/json" },
+    "https://api.groq.com/openai/v1/chat/completions",
+    { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
     body
   );
 
-  if (status !== 200) throw new Error(`Cerebras API ${status}: ${JSON.stringify(data).slice(0, 200)}`);
+  if (status !== 200) throw new Error(`Groq API ${status}: ${JSON.stringify(data).slice(0, 200)}`);
   const text = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error("Cerebras returnerade ingen text");
+  if (!text) throw new Error("Groq returnerade ingen text");
   return text.trim();
 }
 
@@ -298,12 +328,28 @@ async function main() {
   const avfardade = readDecisionHistory().match(/\*\*/g)?.length ?? 0;
   if (avfardade > 0) console.log(`  📚 Läser beslutshistorik: injicerar kontext från ai-bus/rejected/ och ai-bus/implemented/`);
 
-  console.log(`Kallar Cerebras (Llama 3.3 70B) för vision ${datum}…`);
   let vision;
-  try {
-    vision = await callCerebras(prompt);
-  } catch (e) {
-    console.error("Cerebras misslyckades:", e.message);
+  let modell;
+  if (CEREBRAS_API_KEY) {
+    console.log(`Kallar Cerebras (gpt-oss-120b) för vision ${datum}…`);
+    try {
+      vision = await callCerebras(prompt);
+      modell = "Cerebras gpt-oss-120b";
+    } catch (e) {
+      console.error("Cerebras misslyckades efter retries:", e.message);
+    }
+  }
+  if (!vision && GROQ_API_KEY) {
+    console.log("Faller tillbaka till Groq (llama-3.3-70b-versatile)…");
+    try {
+      vision = await callGroq(prompt);
+      modell = "Groq llama-3.3-70b-versatile";
+    } catch (e) {
+      console.error("Groq misslyckades:", e.message);
+    }
+  }
+  if (!vision) {
+    console.error("Alla providers misslyckades — avbryter");
     process.exit(1);
   }
 
@@ -312,7 +358,7 @@ async function main() {
     utfil = path.join(DISCUSSIONS_DIR, `${stämpel}-vision-${toSlug(rubrik)}.md`);
   }
 
-  const innehall = `${vision}\n\n---\n*Genererad av vision-agent.js med Cerebras Llama 3.3 70B, ${datum}*\n`;
+  const innehall = `${vision}\n\n---\n*Genererad av vision-agent.js med ${modell}, ${datum}*\n`;
   fs.writeFileSync(utfil, innehall, "utf8");
   console.log(`Vision sparad: ${utfil}`);
 }

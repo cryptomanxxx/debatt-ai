@@ -3,6 +3,8 @@ id: 2026-06-04-auto-fix-daily-vision
 title: "Daily Vision Agent kraschar vid Cerebras 429 — saknar retry och fallback"
 type: bug
 severity: medium
+status: implemented
+impact: Vision-agenten överlever nu Cerebras-trafikToppar via retry (5s/15s/30s backoff) + Groq-fallback. Signaturraden reflekterar vilken provider som faktiskt användes.
 risk: low
 file: agents/vision-agent.js
 status: suggestion
