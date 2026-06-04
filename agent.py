@@ -68,6 +68,7 @@ from supabase_utils import (
     generera_stafett_utmaning, spara_stafett_utmaning,
     hamta_stafett_utmaning, markera_stafett_behandlad,
     generera_ki, spara_ki, hamta_relevanta_ki, formatera_ki_for_prompt,
+    hamta_agent_strategi, formatera_strategi_for_prompt, uppdatera_strategi,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -330,8 +331,12 @@ def main():
         ki_kontext = formatera_ki_for_prompt(ki_list)
         if ki_kontext:
             print(f"  📚 KIs injicerade: {len(ki_list)} st")
+        strategi_text  = hamta_agent_strategi(sb_key, agent["namn"]) if sb_key else ""
+        strategi_kontext = formatera_strategi_for_prompt(strategi_text)
+        if strategi_kontext:
+            print(f"  🧬 Evolverande strategi injicerad (gen {strategi_text[:20]}...)")
         print("Skriver replik (Groq med Gemini-fallback)...")
-        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, stafett_utmaning=stafett_kontext, ki_kontext=ki_kontext)
+        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, stafett_utmaning=stafett_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext)
         if not artikel:
             print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
             sys.exit(1)
@@ -513,8 +518,12 @@ def main():
             ki_kontext = formatera_ki_for_prompt(ki_list)
             if ki_kontext:
                 print(f"  📚 KIs injicerade: {len(ki_list)} st")
+            strategi_text  = hamta_agent_strategi(sb_key, agent["namn"]) if sb_key else ""
+            strategi_kontext = formatera_strategi_for_prompt(strategi_text)
+            if strategi_kontext:
+                print(f"  🧬 Evolverande strategi injicerad")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext)
             if not artikel:
                 print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
                 sys.exit(1)
@@ -552,8 +561,12 @@ def main():
             ki_kontext = formatera_ki_for_prompt(ki_list)
             if ki_kontext:
                 print(f"  📚 KIs injicerade: {len(ki_list)} st")
+            strategi_text  = hamta_agent_strategi(sb_key, agent["namn"]) if sb_key else ""
+            strategi_kontext = formatera_strategi_for_prompt(strategi_text)
+            if strategi_kontext:
+                print(f"  🧬 Evolverande strategi injicerad")
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext)
+            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext)
             if not artikel:
                 print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
                 sys.exit(1)
@@ -566,7 +579,7 @@ def main():
                     amne, kategori = random.choice(agent["amnen"])
                     forsok += 1
             print(f"\n{'=' * 60}")
-            print(f"  Läge:     NY ARTIKEL")
+            print(f"  Läge:     NY ARTIKEL (eget ämne)")
             print(f"  Agent:    {agent['namn']} [{mood['label']}]")
             print(f"  Ämne:     {amne}")
             print(f"  Format:   {artikelfmt['namn']}")
@@ -584,8 +597,12 @@ def main():
             ki_kontext = formatera_ki_for_prompt(ki_list)
             if ki_kontext:
                 print(f"  📚 KIs injicerade: {len(ki_list)} st")
+            strategi_text  = hamta_agent_strategi(sb_key, agent["namn"]) if sb_key else ""
+            strategi_kontext = formatera_strategi_for_prompt(strategi_text)
+            if strategi_kontext:
+                print(f"  🧬 Evolverande strategi injicerad")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext)
             if not artikel:
                 print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
                 sys.exit(1)
@@ -709,6 +726,10 @@ def main():
             if ki_items:
                 print(f"  📚 KI sparad: {len(ki_items)} insikt(er) för {agent['namn']}")
 
+        # Evolutionär Systemprompt — uppdatera strategi med 20% sannolikhet
+        if publicerad and sb_key and random.random() < 0.20:
+            print(f"\n🧬 Uppdaterar evolverande strategi för {agent['namn']}...")
+            uppdatera_strategi(sb_key, agent["namn"])
 
         if publicerad and not original and sb_key:
             andra = [a for a in hamta_senaste_artiklar(sb_key) if a.get("forfattare") != agent["namn"]]

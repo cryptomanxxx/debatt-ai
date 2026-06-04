@@ -5145,6 +5145,161 @@ def formatera_minnen_for_prompt(minnen: list[dict]) -> str:
     return "Dina senaste minnen (referera gärna till dessa i din text):\n" + "\n".join(rader)
 
 
+# ── Evolutionär Systemprompt (ESP) ────────────────────────────────────────────
+
+def hamta_agent_strategi(sb_key: str, agent: str) -> str:
+    """Hämtar agentens aktuella evolverande strategi. Returnerar tom sträng om ingen finns."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_strategi",
+            params={"agent": f"eq.{agent}", "select": "strategi_text"},
+            headers=h, timeout=6,
+        )
+        rows = r.json() if r.is_success else []
+        return rows[0]["strategi_text"] if rows else ""
+    except Exception:
+        return ""
+
+
+def _hamta_utfall_for_strategi(sb_key: str, agent: str) -> dict:
+    """Hämtar nyckeltal för att bedöma agentens historiska utfall."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    utfall = {}
+    try:
+        # Lobbying — senaste 10 försök
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/lobbying_log",
+            params={"lobbying_agent": f"eq.{agent}", "select": "resultat,belopp,mal_agent", "order": "skapad.desc", "limit": "10"},
+            headers=h, timeout=6,
+        )
+        lobbying = r.json() if r.is_success else []
+        utfall["lobbying_lyckade"] = sum(1 for x in lobbying if x.get("resultat") == "accepterat")
+        utfall["lobbying_totalt"] = len(lobbying)
+        utfall["lobbying_motstand"] = list({x["mal_agent"] for x in lobbying if x.get("resultat") == "avvisat"})[:3]
+
+        # Prediction market bets — senaste 10 avgjorda
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_bets",
+            params={"agent": f"eq.{agent}", "avgjord": "eq.true", "select": "vinst,sannolikhet", "order": "skapad.desc", "limit": "10"},
+            headers=h, timeout=6,
+        )
+        bets = r.json() if r.is_success else []
+        utfall["bets_vunna"] = sum(1 for b in bets if (b.get("vinst") or 0) > 0)
+        utfall["bets_totalt"] = len(bets)
+
+        # Saldo
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker",
+            params={"agent": f"eq.{agent}", "select": "saldo"},
+            headers=h, timeout=6,
+        )
+        plbok = r.json() if r.is_success else []
+        utfall["saldo"] = float(plbok[0]["saldo"]) if plbok else 1000.0
+
+        # Senaste 3 parlamentsröster
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag",
+            params={"agent": f"eq.{agent}", "select": "rod", "order": "skapad.desc", "limit": "3"},
+            headers=h, timeout=6,
+        )
+        roster = r.json() if r.is_success else []
+        utfall["senaste_roster"] = [x["rod"] for x in roster]
+
+    except Exception as e:
+        print(f"  [strategi] fel vid utfallshämtning: {e!r}")
+    return utfall
+
+
+def uppdatera_strategi(sb_key: str, agent_namn: str) -> bool:
+    """Analyserar agentens historiska utfall och uppdaterar den evolverande strategin.
+    Anropas med ~20% sannolikhet per agent.py-körning."""
+    utfall = _hamta_utfall_for_strategi(sb_key, agent_namn)
+    if not utfall:
+        return False
+
+    lobby_rate = (utfall["lobbying_lyckade"] / utfall["lobbying_totalt"] * 100) if utfall["lobbying_totalt"] > 0 else None
+    bet_rate   = (utfall["bets_vunna"] / utfall["bets_totalt"] * 100) if utfall["bets_totalt"] > 0 else None
+
+    fakta_delar = []
+    if utfall["lobbying_totalt"] > 0:
+        fakta_delar.append(f"Lobbying: {utfall['lobbying_lyckade']}/{utfall['lobbying_totalt']} lyckade ({lobby_rate:.0f}%)")
+        if utfall["lobbying_motstand"]:
+            fakta_delar.append(f"Avvisar konsekvent: {', '.join(utfall['lobbying_motstand'])}")
+    if utfall["bets_totalt"] > 0:
+        fakta_delar.append(f"Prediction markets: {utfall['bets_vunna']}/{utfall['bets_totalt']} rätt ({bet_rate:.0f}%)")
+    fakta_delar.append(f"Nuvarande saldo: {utfall['saldo']:.0f} kr (start: 1000 kr)")
+    if utfall["senaste_roster"]:
+        fakta_delar.append(f"Senaste parlamentsröster: {', '.join(utfall['senaste_roster'])}")
+
+    fakta = "\n".join(f"- {d}" for d in fakta_delar)
+
+    # Hämta befintlig strategi för att inkludera som kontext
+    gammal_strategi = hamta_agent_strategi(sb_key, agent_namn)
+
+    prompt = (
+        f"Du är en strategikonsult för AI-agenten {agent_namn} i en politisk-ekonomisk simulering.\n\n"
+        f"Agentens faktiska utfall hittills:\n{fakta}\n\n"
+        + (f"Nuvarande strategi (generation {gammal_strategi[:20]}...):\n{gammal_strategi}\n\n" if gammal_strategi else "")
+        + "Skriv 3 konkreta, korta beteendejusteringar på svenska baserat på utfallen. "
+        "Varje punkt ska vara handlingsinriktad (vad ska agenten göra annorlunda). "
+        "Max 400 tecken totalt. Börja direkt med punkt 1."
+    )
+    system = "Du är analytisk och kortfattad. Inga inledningar eller sammanfattningar."
+
+    from ai_klient import groq_post, gemini_post, github_models_post
+    svar = ""
+    payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "max_tokens": 150, "temperature": 0.6}
+    for fn in [lambda: groq_post(payload), lambda: gemini_post(payload), lambda: github_models_post(payload)]:
+        try:
+            svar = fn().json()["choices"][0]["message"]["content"].strip()
+            if svar:
+                break
+        except Exception:
+            continue
+
+    if not svar:
+        return False
+
+    svar = svar[:400]
+    h = {
+        "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    try:
+        r = httpx.post(
+            f"{SB_URL}/rest/v1/agent_strategi",
+            headers=h,
+            json={"agent": agent_namn, "strategi_text": svar, "generation": 1, "uppdaterad": datetime.now().isoformat()},
+            timeout=8,
+        )
+        if r.is_success:
+            print(f"  [strategi] {agent_namn}: strategi uppdaterad (gen +1)")
+            return True
+        # Om raden redan finns — uppdatera generation och text
+        r2 = httpx.patch(
+            f"{SB_URL}/rest/v1/agent_strategi",
+            params={"agent": f"eq.{agent_namn}"},
+            headers=h,
+            json={"strategi_text": svar, "generation": (int(gammal_strategi[:2]) if gammal_strategi and gammal_strategi[:2].isdigit() else 0) + 1, "uppdaterad": datetime.now().isoformat()},
+            timeout=8,
+        )
+        if r2.is_success:
+            print(f"  [strategi] {agent_namn}: strategi uppdaterad via PATCH")
+            return True
+    except Exception as e:
+        print(f"  [strategi] sparfel: {e!r}")
+    return False
+
+
+def formatera_strategi_for_prompt(strategi_text: str) -> str:
+    """Formaterar strategiteksten till ett kompakt stycke för systemprompt."""
+    if not strategi_text or not strategi_text.strip():
+        return ""
+    return f"Din evolverande strategi baserad på tidigare utfall:\n{strategi_text.strip()}"
+
+
 # ── PIS — Policy Impact Simulator ────────────────────────────────────────────
 
 def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning: str) -> bool:
