@@ -1,4 +1,4 @@
-const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export function logAiCall({ provider, model, source, status, latency_ms, input_tokens, output_tokens }) {

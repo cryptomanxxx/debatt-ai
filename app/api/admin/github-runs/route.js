@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 const REPO = "cryptomanxxx/debatt-ai";
 const GH   = "https://api.github.com";
 
+const ADMIN_PW = process.env.ADMIN_SECRET || process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+
 export async function GET(req) {
+  const pw = req.headers.get("x-admin-password") || new URL(req.url).searchParams.get("pw");
+  if (ADMIN_PW && pw !== ADMIN_PW) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const token = process.env.GITHUB_TOKEN;
   if (!token) return NextResponse.json({ error: "GITHUB_TOKEN saknas" }, { status: 500 });
 
