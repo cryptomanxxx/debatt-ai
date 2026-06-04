@@ -22,9 +22,9 @@ async function getData() {
   const event = events[0];
 
   const [hxRes, agRes, drRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/territorium_hexagoner?event_id=eq.${event.id}&order=hex_row.asc&order=hex_col.asc`, { headers: H }),
-    fetch(`${SB_URL}/rest/v1/territorium_agare?event_id=eq.${event.id}`, { headers: H }),
-    fetch(`${SB_URL}/rest/v1/territorium_drag?event_id=eq.${event.id}&order=skapad.desc&limit=25`, { headers: H }),
+    fetch(`${SB_URL}/rest/v1/territorium_hexagoner?event_id=eq.${event.id}&order=hex_row.asc&order=hex_col.asc`, { headers: H }).catch(() => null),
+    fetch(`${SB_URL}/rest/v1/territorium_agare?event_id=eq.${event.id}`, { headers: H }).catch(() => null),
+    fetch(`${SB_URL}/rest/v1/territorium_drag?event_id=eq.${event.id}&order=skapad.desc&limit=25`, { headers: H }).catch(() => null),
   ]);
 
   const [hexagoner, agare, senasteDrag] = await Promise.all([
