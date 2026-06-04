@@ -3,10 +3,11 @@ id: 2026-06-04-analyze-api-validation
 title: "/api/analyze tar emot rå messages-array och vidarebefordrar direkt till Groq"
 type: security
 severity: high
-status: pending
+status: rejected
 risk: medium
 file: app/api/analyze/route.js
 created: 2026-06-04
+rationale: "Redan åtgärdat. app/api/analyze/route.js har samtliga fyra säkerhetskontroller som förslaget efterlyser: (1) struktur-/schemavalidering av messages (Array.isArray + MAX_MESSAGES=4 + per-meddelande content-typkontroll), (2) maxlängd via MAX_TOTAL_CHARS=12_000, (3) IP-rate-limit 5/timme via checkRateLimit utöver Turnstile, (4) res.ok-kontroll som returnerar 502. Dessutom AbortSignal.timeout(20_000) på Groq-anropet. Den kvarvarande delen — att byta kontrakt från messages till {title,author,text} — är en designpreferens utan ytterligare säkerhetsvinst och skulle kräva ändring av klienten. Ingen säkerhetsåtgärd kvar."
 ---
 
 ## Problem
