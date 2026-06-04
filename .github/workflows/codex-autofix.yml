@@ -115,8 +115,7 @@ jobs:
           BRANCH_NAME: ${{ steps.data.outputs.branch }}
           PR_NUMBER:   ${{ steps.data.outputs.pr_number }}
         run: |
-          git diff --quiet && git diff --staged --quiet \
-            && echo "Inga ändringar gjorda." && exit 0
           git add -A
+          git diff --staged --quiet && echo "Inga ändringar gjorda." && exit 0
           git commit -m "fix(auto): adresserar Codex-granskning på PR #${PR_NUMBER}"
           git push origin "${BRANCH_NAME}"
