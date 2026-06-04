@@ -63,13 +63,15 @@ export async function POST(req) {
   const mina     = allHexes.filter(h => agaByHex[h.id]?.agare === agare);
   const målAgare = agaByHex[hex_id];
 
-  // Adjacency-krav (utom vid allra första hexen)
-  if (mina.length > 0) {
-    const adj = mina.some(h => isAdjacent(h.hex_col, h.hex_row, mål.hex_col, mål.hex_row));
-    if (!adj)
-      return Response.json({ error: "Hexagonen angränsar inte till dina territorier" }, { status: 400 });
-  } else if (drag_typ !== "expandera") {
-    return Response.json({ error: "Du måste erövra ett territorium först" }, { status: 400 });
+  // Adjacency-krav gäller bara expandera och attackera, inte forsvara
+  if (drag_typ !== "forsvara") {
+    if (mina.length > 0) {
+      const adj = mina.some(h => isAdjacent(h.hex_col, h.hex_row, mål.hex_col, mål.hex_row));
+      if (!adj)
+        return Response.json({ error: "Hexagonen angränsar inte till dina territorier" }, { status: 400 });
+    } else if (drag_typ !== "expandera") {
+      return Response.json({ error: "Du måste erövra ett territorium först" }, { status: 400 });
+    }
   }
 
   async function logDrag(resultat) {
@@ -117,7 +119,7 @@ export async function POST(req) {
       isAdjacent(h.hex_col, h.hex_row, mål.hex_col, mål.hex_row)
     ).length;
     const forsvar   = målAgare.forsvar ?? 1;
-    const lyckades  = adjCount >= forsvar;
+    const lyckades  = adjCount > forsvar;
 
     if (lyckades) {
       await fetch(`${SB_URL}/rest/v1/territorium_agare?event_id=eq.${event_id}&hex_id=eq.${hex_id}`, {
