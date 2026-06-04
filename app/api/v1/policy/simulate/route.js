@@ -10,10 +10,10 @@
  * Rate limit: 5 req/timme (fri tier) · 20 req/timme (API-nyckel).
  */
 
-const SB_URL   = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY   = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const GROQ_KEY = process.env.GROQ_API_KEY;
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
+import { callWithFallback, CHAINS } from "../../../../lib/aiRouter.js";
+
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // ── Rate limiting ──────────────────────────────────────────────────────────
 const rlStore = new Map();
@@ -38,42 +38,14 @@ async function validateApiKey(key) {
   } catch { return null; }
 }
 
-// ── Groq-anrop ─────────────────────────────────────────────────────────────
-async function groqCall(messages, maxTokens = 480, temperature = 0.35) {
-  if (!GROQ_KEY) return null;
+// ── AI-anrop via centraliserad router ─────────────────────────────────────
+async function pisCall(system, userPrompt, maxTokens = 480, temperature = 0.35) {
   try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_KEY}` },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages,
-        max_tokens: maxTokens,
-        temperature,
-      }),
-    });
-    if (!res.ok) return null;
-    return (await res.json())?.choices?.[0]?.message?.content?.trim() ?? null;
-  } catch { return null; }
-}
-
-async function geminiCall(system, userPrompt, maxTokens = 480) {
-  if (!GEMINI_KEY) return null;
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: system }] },
-          contents: [{ parts: [{ text: userPrompt }] }],
-          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.35 },
-        }),
-      }
-    );
-    if (!res.ok) return null;
-    return (await res.json())?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? null;
+    const { text } = await callWithFallback(CHAINS.pis, [
+      { role: "system", content: system },
+      { role: "user",   content: userPrompt },
+    ], { maxTokens, temperature, source: "pis" });
+    return text;
   } catch { return null; }
 }
 
@@ -184,12 +156,7 @@ function dist(vals) {
 
 // ── Kör standard PIS-analys ────────────────────────────────────────────────
 async function runPisAnalysis(titel, beskrivning) {
-  const messages = [
-    { role: "system", content: PIS_SYSTEM },
-    { role: "user",   content: buildPisPrompt(titel, beskrivning) },
-  ];
-  let raw = await groqCall(messages, 480, 0.35);
-  if (!raw) raw = await geminiCall(PIS_SYSTEM, buildPisPrompt(titel, beskrivning));
+  const raw = await pisCall(PIS_SYSTEM, buildPisPrompt(titel, beskrivning));
   return parsePisResponse(raw);
 }
 
@@ -199,11 +166,8 @@ async function runMonteCarlo(titel, beskrivning, iterationer = 8) {
   const prompt = buildPisPrompt(titel, beskrivning, true);
 
   const calls = Array.from({ length: iterationer }, (_, i) =>
-    groqCall(
-      [{ role: "system", content: PIS_SYSTEM }, { role: "user", content: prompt }],
-      160,
-      temps[i % temps.length]
-    ).then(raw => parseMcIteration(raw))
+    pisCall(PIS_SYSTEM, prompt, 160, temps[i % temps.length])
+      .then(raw => parseMcIteration(raw))
   );
 
   const results = await Promise.all(calls);

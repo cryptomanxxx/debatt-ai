@@ -1,0 +1,201 @@
+/**
+ * aiRouter.js — centraliserad AI-provider-router.
+ *
+ * Exporterar:
+ *   CHAINS                      — namngivna fallback-kedjor per use-case
+ *   callProvider(name, messages, opts) — anropa en specifik provider
+ *   callWithFallback(chain, messages, opts) — prova providers i tur och ordning
+ *
+ * Providers: groq | gemini | cerebras | sambanova | codestral | github
+ *
+ * opts:
+ *   maxTokens    (default 800)
+ *   temperature  (default 0.7)
+ *   timeout      (override per-provider default, ms)
+ *   source       (loggnamn för logAiCall)
+ *   json         (true → skickar response_format: json_object på OpenAI-providers)
+ */
+
+import { providerReady, markProviderDown } from "./aiCircuitBreaker.js";
+import { logAiCall as _log } from "./logAiCall.js";
+
+function log(args) { try { _log(args); } catch {} }
+
+const PROVIDERS = {
+  groq: {
+    url:     "https://api.groq.com/openai/v1/chat/completions",
+    model:   "llama-3.3-70b-versatile",
+    key:     () => process.env.GROQ_API_KEY,
+    timeout: 15_000,
+    cbKey:   "groq",
+    shape:   "openai",
+  },
+  gemini: {
+    url:     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+    model:   "gemini-2.0-flash",
+    key:     () => process.env.GEMINI_API_KEY,
+    timeout: 15_000,
+    cbKey:   "gemini",
+    shape:   "gemini",
+  },
+  cerebras: {
+    url:     "https://api.cerebras.ai/v1/chat/completions",
+    model:   "gpt-oss-120b",
+    key:     () => process.env.CEREBRAS_API_KEY,
+    timeout: 15_000,
+    cbKey:   "cerebras",
+    shape:   "openai",
+  },
+  sambanova: {
+    url:     "https://api.sambanova.ai/v1/chat/completions",
+    model:   "Meta-Llama-3.3-70B-Instruct",
+    key:     () => process.env.SAMBANOVA_API_KEY,
+    timeout: 15_000,
+    cbKey:   "sambanova",
+    shape:   "openai",
+  },
+  codestral: {
+    url:     "https://api.mistral.ai/v1/chat/completions",
+    model:   "codestral-latest",
+    key:     () => process.env.MISTRAL_API_KEY,
+    timeout: 15_000,
+    cbKey:   "mistral",
+    shape:   "openai",
+  },
+  // Sista utväg — ingen circuit breaker (GitHub Actions har alltid GITHUB_TOKEN)
+  github: {
+    url:     "https://models.inference.ai.azure.com/chat/completions",
+    model:   "Llama-3.3-70B-Instruct",
+    key:     () => process.env.GITHUB_TOKEN,
+    timeout: 20_000,
+    cbKey:   null,
+    shape:   "openai",
+  },
+};
+
+// Namngivna fallback-kedjor per use-case
+export const CHAINS = {
+  // Generellt: konversation, frågesvar, profilsidor
+  general:      ["groq", "gemini", "cerebras", "sambanova", "github"],
+  // Decision API: JSON-svar från agenter
+  beslut:       ["groq", "codestral", "cerebras", "gemini", "github"],
+  // Artikelbedömning och publicering
+  agent_submit: ["groq", "gemini", "codestral", "cerebras", "github"],
+  // Policy Impact Simulator (lägre temperatur, fler tokens)
+  pis:          ["groq", "gemini", "cerebras", "codestral", "github"],
+};
+
+function openAIBody(messages, model, opts) {
+  return {
+    model,
+    messages,
+    max_tokens:  opts.maxTokens ?? 800,
+    temperature: opts.temperature ?? 0.7,
+    ...(opts.json ? { response_format: { type: "json_object" } } : {}),
+  };
+}
+
+function geminiBody(messages, opts) {
+  const sys  = messages.find(m => m.role === "system");
+  const rest = messages.filter(m => m.role !== "system");
+  const body = {
+    contents: rest.map(m => ({
+      role:  m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    })),
+    generationConfig: {
+      maxOutputTokens: opts.maxTokens ?? 800,
+      temperature:     opts.temperature ?? 0.7,
+    },
+  };
+  if (sys) body.systemInstruction = { parts: [{ text: sys.content }] };
+  return body;
+}
+
+function extractText(json, shape) {
+  if (shape === "openai") return json.choices?.[0]?.message?.content?.trim() ?? null;
+  if (shape === "gemini") return json.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? null;
+  return null;
+}
+
+export async function callProvider(name, messages, opts = {}) {
+  const cfg = PROVIDERS[name];
+  if (!cfg) throw new Error(`Okänd provider: ${name}`);
+
+  const key = cfg.key();
+  if (!key) throw new Error(`Ingen API-nyckel för: ${name}`);
+
+  if (cfg.cbKey && !providerReady(cfg.cbKey))
+    throw new Error(`${name} är i circuit-breaker cooldown`);
+
+  const timeout = opts.timeout ?? cfg.timeout;
+  const t0 = Date.now();
+
+  let url = cfg.url;
+  const headers = { "Content-Type": "application/json" };
+  let body;
+
+  if (cfg.shape === "openai") {
+    headers["Authorization"] = `Bearer ${key}`;
+    body = openAIBody(messages, cfg.model, opts);
+  } else {
+    url = `${cfg.url}?key=${key}`;
+    body = geminiBody(messages, opts);
+  }
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeout),
+  });
+
+  const latency = Date.now() - t0;
+
+  if (res.status === 429) {
+    if (cfg.cbKey) markProviderDown(cfg.cbKey);
+    log({ provider: name, model: cfg.model, source: opts.source ?? "aiRouter", status: "rate_limit", latency_ms: latency });
+    throw new Error(`${name}: 429 rate-limited`);
+  }
+
+  if (!res.ok) {
+    log({ provider: name, model: cfg.model, source: opts.source ?? "aiRouter", status: `error_${res.status}`, latency_ms: latency });
+    throw new Error(`${name}: HTTP ${res.status}`);
+  }
+
+  const json = await res.json();
+  const text = extractText(json, cfg.shape);
+
+  if (!text) {
+    log({ provider: name, model: cfg.model, source: opts.source ?? "aiRouter", status: "empty", latency_ms: latency });
+    throw new Error(`${name}: tomt svar`);
+  }
+
+  log({
+    provider:      name,
+    model:         cfg.model,
+    source:        opts.source ?? "aiRouter",
+    status:        "ok",
+    latency_ms:    latency,
+    input_tokens:  cfg.shape === "openai"
+      ? json.usage?.prompt_tokens ?? null
+      : json.usageMetadata?.promptTokenCount ?? null,
+    output_tokens: cfg.shape === "openai"
+      ? json.usage?.completion_tokens ?? null
+      : json.usageMetadata?.candidatesTokenCount ?? null,
+  });
+
+  return { text, provider: name, model: cfg.model };
+}
+
+export async function callWithFallback(chain, messages, opts = {}) {
+  const errors = [];
+  for (const name of chain) {
+    try {
+      return await callProvider(name, messages, opts);
+    } catch (err) {
+      errors.push(`${name}: ${err.message}`);
+    }
+  }
+  throw new Error(`Alla providers misslyckades — ${errors.join(" | ")}`);
+}
