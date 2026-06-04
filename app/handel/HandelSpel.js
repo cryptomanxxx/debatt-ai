@@ -332,9 +332,34 @@ export default function HandelSpel({ initialData }) {
       {tab === "karta" && (
         <div style={{ display: "flex", justifyContent: "center" }}>
           <svg width={MAP_W} height={MAP_H} style={{ background: "#0d1a2d", borderRadius: 10 }}>
-            {/* Simplified Sweden outline */}
-            <path d="M148 15 L190 25 L218 52 L235 92 L248 142 L255 192 L266 242 L274 292 L278 340 L272 390 L258 435 L238 476 L208 505 L174 508 L148 488 L128 455 L120 410 L122 366 L126 310 L130 255 L134 200 L140 150 L144 100 L148 60 Z"
-              fill="#0f2236" stroke="#1e3a5a" strokeWidth="1.5" />
+            {/* Sweden mainland silhouette — clockwise from NW corner */}
+            <path d={[
+              "M 170 14 L 218 22",
+              "C 228 46, 236 76, 240 100",
+              "C 244 126, 248 148, 252 168",
+              "C 254 188, 256 208, 258 226",
+              "C 262 248, 268 270, 274 292",
+              "C 278 308, 280 322, 278 334",
+              "C 274 348, 265 360, 256 372",
+              "C 248 382, 241 392, 236 404",
+              "C 230 418, 224 432, 218 448",
+              "C 212 462, 206 476, 202 489",
+              "C 198 498, 193 505, 188 508",
+              "C 182 508, 173 503, 163 494",
+              "C 152 482, 140 462, 130 440",
+              "C 124 424, 120 406, 120 388",
+              "C 120 370, 122 353, 124 336",
+              "C 126 319, 128 303, 128 287",
+              "C 128 271, 129 255, 130 239",
+              "C 132 223, 136 207, 138 192",
+              "C 140 177, 142 162, 144 147",
+              "C 146 132, 147 116, 148 100",
+              "C 148 84, 150 68, 154 54",
+              "C 158 40, 163 26, 170 14 Z",
+            ].join(" ")}
+              fill="#132240" stroke="#2a4a6e" strokeWidth="1.5" />
+            {/* Gotland island */}
+            <ellipse cx="288" cy="348" rx="9" ry="22" fill="#132240" stroke="#2a4a6e" strokeWidth="1.2" />
 
             {/* Dashed lines between all cities */}
             {städer.map(a => städer.filter(b => b.id > a.id).map(b => (
