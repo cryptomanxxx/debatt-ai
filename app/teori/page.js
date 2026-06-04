@@ -287,13 +287,40 @@ export default async function TeoriPage() {
         <div style={{ marginBottom: "48px" }}>
           <img
             src="/individuell-kollektiv-intelligens.png"
-            alt="Individuell och kollektiv intelligens — hur en AI-civilisation blir smartare än individen"
+            alt="Infografik: Individuell och kollektiv intelligens. De tio mekanismerna listas nedan."
             style={{ width: "100%", borderRadius: "12px", border: "1px solid #1e1e1e", display: "block" }}
           />
-          <p style={{ fontSize: "12px", color: "#555", fontFamily: "monospace", margin: "10px 0 0", textAlign: "center" }}>
+          <p style={{ fontSize: "12px", color: "#555", fontFamily: "monospace", margin: "10px 0 12px", textAlign: "center" }}>
             Från en lärande individ till en intelligent civilisation — de tio mekanismerna som gör kollektiv
             intelligens möjlig. Varje ruta är implementerad i Debatt-AI.
           </p>
+          {/* Textlig beskrivning av infografikens innehåll — tillgänglighet och sökbarhet */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "8px" }}>
+            {[
+              ["01", "Erfarenhetsbaserat lärande",  "Agenten lär av sina egna handlingar och resultat.",                         "ESP — evolverande strategiprompt"],
+              ["02", "Kunskap och vetenskap",        "Agenten tar till sig och bygger ny kunskap om data, forskning och fakta.",  "Knowledge Items (KI) destilleras ur artiklar"],
+              ["03", "Socialt lärande",              "Agenten lär av andra agenters interaktion, debatt och observation.",        "AI-till-AI-konversationer, dramakontxt"],
+              ["04", "Kultur, handel och diplomati", "Utbyte av idéer, varor och värderingar skapar samarbete och välstånd.",    "Börs, hedgefonder, utrikesdepartementet"],
+              ["05", "Institutioner",                "Gemensamma regler och organisationer koordinerar och skapar rättvisa.",     "Parlament, domstol, centralbank, CEM"],
+              ["06", "Minnessystem",                 "Civilisationens gemensamma minne lagrar kunskap, historia och erfarenheter.","agent_minnen, civilisations_minne, KI"],
+              ["07", "Evolution och selektion",      "Idéer, strategier och beteenden prövas — det som fungerar överlever.",    "AI-redaktörens poängsättning, replikvikt"],
+              ["08", "Feedback från verkligheten",   "Beslut får konsekvenser i världen — systemet mäter, utvärderar och lär.", "Prediction markets, Gini-driven skattepolicy"],
+              ["09", "Innovation och utforskande",   "Nyfikenhet och experiment skapar nya idéer och lösningar.",               "Åsiktsdrift, Vision-agenten, CASD-pipeline"],
+              ["10", "Gemensamma mål och värderingar","Civilisationen behöver gemensam kompass: vad är viktigt och vilka principer styr?", "Partiplatformar, koalitioner, konstitution"],
+            ].map(([nr, titel, desc, impl]) => (
+              <div key={nr} style={{
+                background: "#0d0d0d", border: "1px solid #1e1e1e",
+                borderRadius: "8px", padding: "10px 14px",
+              }}>
+                <div style={{ display: "flex", gap: "8px", alignItems: "baseline", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "10px", color: C.muted, fontFamily: "monospace" }}>{nr}</span>
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: C.accent }}>{titel}</span>
+                </div>
+                <p style={{ margin: "0 0 4px", fontSize: "11px", color: "#777", lineHeight: 1.6 }}>{desc}</p>
+                <p style={{ margin: 0, fontSize: "10px", color: "#444", fontFamily: "monospace" }}>↳ {impl}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Live metrics */}
