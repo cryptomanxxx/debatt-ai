@@ -1,6 +1,6 @@
--- Evolutionär Systemprompt (ESP) — agent_strategi-tabellen
--- Varje agent har en evolverande strategitext som uppdateras baserat på utfall.
--- Injiceras i systempromten som ett extra lager ovanpå den statiska personligheten.
+-- INSERT-policies för agent_strategi
+-- UPDATE-policyn är avsiktligt begränsad till service role för att förhindra
+-- att den publikt exponerade anon-nyckeln kan skriva om agenternas strategitext.
 
 CREATE TABLE IF NOT EXISTS agent_strategi (
   agent        TEXT PRIMARY KEY,
@@ -16,10 +16,13 @@ CREATE POLICY "Publik läsning agent_strategi"
   ON agent_strategi FOR SELECT
   USING (true);
 
-CREATE POLICY "Anon insert/update agent_strategi"
+-- INSERT tillåts för anon (GitHub Actions-körningar använder anon-nyckeln)
+CREATE POLICY "Anon insert agent_strategi"
   ON agent_strategi FOR INSERT
   WITH CHECK (true);
 
-CREATE POLICY "Anon update agent_strategi"
+-- UPDATE kräver service role — anon-nyckeln är publikt exponerad och får inte
+-- kunna skriva om strategitext som injiceras i agenternas systemprompts
+CREATE POLICY "Service role update agent_strategi"
   ON agent_strategi FOR UPDATE
-  USING (true);
+  USING (auth.role() = 'service_role');

@@ -5218,19 +5218,27 @@ def uppdatera_strategi(sb_key: str, agent_namn: str) -> bool:
     if not utfall:
         return False
 
-    lobby_rate = (utfall["lobbying_lyckade"] / utfall["lobbying_totalt"] * 100) if utfall["lobbying_totalt"] > 0 else None
-    bet_rate   = (utfall["bets_vunna"] / utfall["bets_totalt"] * 100) if utfall["bets_totalt"] > 0 else None
+    lobby_lyckade  = utfall.get("lobbying_lyckade", 0)
+    lobby_totalt   = utfall.get("lobbying_totalt", 0)
+    lobby_motstand = utfall.get("lobbying_motstand", [])
+    bets_vunna     = utfall.get("bets_vunna", 0)
+    bets_totalt    = utfall.get("bets_totalt", 0)
+    saldo          = utfall.get("saldo", 1000.0)
+    senaste_roster = utfall.get("senaste_roster", [])
+
+    lobby_rate = (lobby_lyckade / lobby_totalt * 100) if lobby_totalt > 0 else None
+    bet_rate   = (bets_vunna / bets_totalt * 100) if bets_totalt > 0 else None
 
     fakta_delar = []
-    if utfall["lobbying_totalt"] > 0:
-        fakta_delar.append(f"Lobbying: {utfall['lobbying_lyckade']}/{utfall['lobbying_totalt']} lyckade ({lobby_rate:.0f}%)")
-        if utfall["lobbying_motstand"]:
-            fakta_delar.append(f"Avvisar konsekvent: {', '.join(utfall['lobbying_motstand'])}")
-    if utfall["bets_totalt"] > 0:
-        fakta_delar.append(f"Prediction markets: {utfall['bets_vunna']}/{utfall['bets_totalt']} rätt ({bet_rate:.0f}%)")
-    fakta_delar.append(f"Nuvarande saldo: {utfall['saldo']:.0f} kr (start: 1000 kr)")
-    if utfall["senaste_roster"]:
-        fakta_delar.append(f"Senaste parlamentsröster: {', '.join(utfall['senaste_roster'])}")
+    if lobby_totalt > 0:
+        fakta_delar.append(f"Lobbying: {lobby_lyckade}/{lobby_totalt} lyckade ({lobby_rate:.0f}%)")
+        if lobby_motstand:
+            fakta_delar.append(f"Avvisar konsekvent: {', '.join(lobby_motstand)}")
+    if bets_totalt > 0:
+        fakta_delar.append(f"Prediction markets: {bets_vunna}/{bets_totalt} rätt ({bet_rate:.0f}%)")
+    fakta_delar.append(f"Nuvarande saldo: {saldo:.0f} kr (start: 1000 kr)")
+    if senaste_roster:
+        fakta_delar.append(f"Senaste parlamentsröster: {', '.join(senaste_roster)}")
 
     fakta = "\n".join(f"- {d}" for d in fakta_delar)
 
@@ -5262,15 +5270,21 @@ def uppdatera_strategi(sb_key: str, agent_namn: str) -> bool:
         return False
 
     svar = svar[:400]
-    h = {
+    write_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+    h_read = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    h_write = {
+        "apikey": write_key, "Authorization": f"Bearer {write_key}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates,return=minimal",
     }
     try:
         r = httpx.post(
             f"{SB_URL}/rest/v1/agent_strategi",
-            headers=h,
+            headers=h_write,
             json={"agent": agent_namn, "strategi_text": svar, "generation": 1, "uppdaterad": datetime.now().isoformat()},
             timeout=8,
         )
@@ -5281,7 +5295,7 @@ def uppdatera_strategi(sb_key: str, agent_namn: str) -> bool:
         r2 = httpx.patch(
             f"{SB_URL}/rest/v1/agent_strategi",
             params={"agent": f"eq.{agent_namn}"},
-            headers=h,
+            headers=h_write,
             json={"strategi_text": svar, "generation": (int(gammal_strategi[:2]) if gammal_strategi and gammal_strategi[:2].isdigit() else 0) + 1, "uppdaterad": datetime.now().isoformat()},
             timeout=8,
         )
