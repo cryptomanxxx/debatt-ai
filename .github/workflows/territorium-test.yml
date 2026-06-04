@@ -1,0 +1,23 @@
+name: Territorium — Dagliga agentdrag
+
+on:
+  schedule:
+    - cron: "0 22 * * *"  # 00:00 svensk tid (22:00 UTC)
+  workflow_dispatch:
+
+jobs:
+  territorium:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests
+      - name: Kör agentdrag
+        env:
+          SUPABASE_URL: https://fmwxftnistkoqazfwnuj.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: python territorium_test.py
