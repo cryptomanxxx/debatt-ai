@@ -95,7 +95,10 @@ export default function HandelSpel({ initialData }) {
         const tc = resekostnad(currentStad, s);
         if (!sp) return null;
         const mynt = spelare?.mynt ?? 1000;
-        const maxMangd = Math.min(80, Math.max(1, Math.floor((mynt - tc) / buyP)));
+        const maxRad = mynt - tc;
+        if (maxRad <= 0) return null;
+        const maxMangd = Math.min(100, Math.floor(maxRad / buyP));
+        if (maxMangd < 1) return null;
         const netTotal = (sp.salj_pris - buyP) * maxMangd - tc;
         return netTotal > 0 ? { vara: v, stad: s, net: netTotal, mangd: maxMangd, tc } : null;
       })
