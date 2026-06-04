@@ -283,6 +283,19 @@ export default async function TeoriPage() {
           </p>
         </div>
 
+        {/* Infografik: Individuell och kollektiv intelligens */}
+        <div style={{ marginBottom: "48px" }}>
+          <img
+            src="/individuell-kollektiv-intelligens.png"
+            alt="Individuell och kollektiv intelligens — hur en AI-civilisation blir smartare än individen"
+            style={{ width: "100%", borderRadius: "12px", border: "1px solid #1e1e1e", display: "block" }}
+          />
+          <p style={{ fontSize: "12px", color: "#555", fontFamily: "monospace", margin: "10px 0 0", textAlign: "center" }}>
+            Från en lärande individ till en intelligent civilisation — de tio mekanismerna som gör kollektiv
+            intelligens möjlig. Varje ruta är implementerad i Debatt-AI.
+          </p>
+        </div>
+
         {/* Live metrics */}
         {s && (
           <div style={{ marginBottom: "48px" }}>
