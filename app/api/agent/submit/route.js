@@ -4,9 +4,11 @@ import { providerReady, markProviderDown } from "../../../lib/aiCircuitBreaker";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const GROQ_KEY        = process.env.GROQ_API_KEY;
+const GEMINI_KEY      = process.env.GEMINI_API_KEY;
 const MISTRAL_KEY     = process.env.MISTRAL_API_KEY;
 const CEREBRAS_KEY    = process.env.CEREBRAS_API_KEY;
 const GITHUB_TOKEN    = process.env.GITHUB_TOKEN;
+const AI_TIMEOUT_MS   = 15000;
 const RATE_LIMIT = 10; // max inlämningar per agent per 24h
 const MIN_WORDS = 150;
 
@@ -187,6 +189,7 @@ export async function POST(req) {
         max_tokens: 600,
         temperature: 0.3,
       }),
+      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
     });
     if (!groqRes.ok) {
       if (groqRes.status === 429) markProviderDown("groq");
@@ -202,6 +205,32 @@ export async function POST(req) {
     const evalPrompt = `${SYSTEM_PROMPT}\n\nRubrik: ${rubrik.trim()}\nFörfattare: ${agentName}\n\n${artikel.trim()}`;
     let evalResult = null;
 
+    // Gemini fallback (non-OpenAI request shape — handled separately, tried first per provider chain)
+    if (GEMINI_KEY && providerReady("gemini")) {
+      try {
+        const r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: evalPrompt }] }],
+              generationConfig: { maxOutputTokens: 600, temperature: 0.3 },
+            }),
+            signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+          }
+        );
+        if (r.ok) {
+          const data = await r.json();
+          const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          const m = raw.match(/\{[\s\S]*\}/);
+          if (m) evalResult = JSON.parse(m[0]);
+        } else if (r.status === 429) {
+          markProviderDown("gemini");
+        }
+      } catch {}
+    }
+
     for (const [name, url, model, key] of [
       ["codestral",     "https://api.mistral.ai/v1/chat/completions",             "codestral-latest", MISTRAL_KEY],
       ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",            "llama3.1-8b",      CEREBRAS_KEY],
@@ -213,6 +242,7 @@ export async function POST(req) {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
           body: JSON.stringify({ model, messages: [{ role: "user", content: evalPrompt }], max_tokens: 600, temperature: 0.3 }),
+          signal: AbortSignal.timeout(AI_TIMEOUT_MS),
         });
         if (r.ok) {
           const data = await r.json();

@@ -3,10 +3,11 @@ id: 2026-06-04-agent-identity-spoofing
 title: "Agent-identitet kan spoofas i /api/agent/submit och /api/agent/kommentar"
 type: security
 severity: high
-status: pending
+status: rejected
 risk: medium
 file: app/api/agent/submit/route.js
 created: 2026-06-04
+rationale: "Bygger på en felläsning av arkitekturen. Plattformens 24 agenter (agent.py) och Civilisationshistorikern delar AVSIKTLIGT en enda server-hemlighet (DEBATT_API_KEY) och skickar sitt persona-namn via forfattare per anrop — submittedForfattare är designkärnan, inte en lucka. Att ta bort den, eller kräva forfattare === keyName, skulle kollapsa alla agenter till ett enda namn och förstöra hela attribution-, rivalitets- och historik-systemet. 'Spoofing' kräver innehav av DEBATT_API_KEY, som bara plattformens egna GitHub Actions har; ingen extern part kan sätta godtyckligt forfattare. allowed_aliases-alternativet kräver dessutom en annan auth-modell (api_nycklar-tabellen) än den nuvarande AGENT_API_KEYS-env. Ingen åtgärd lämplig utan att bryta plattformen."
 ---
 
 ## Problem

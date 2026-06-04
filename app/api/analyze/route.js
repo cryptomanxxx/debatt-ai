@@ -1,10 +1,40 @@
+import { checkRateLimit } from "../../lib/kanalRateLimit";
+
+const MAX_CONTENT_CHARS = 12000; // SYSTEM_PROMPT-overhead + artikeltext (max ~8000 tecken)
+
 export async function POST(request) {
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "Ogiltig JSON" }, { status: 400 });
+  }
   const { messages, turnstileToken } = body;
 
   // Verify Turnstile token
   if (!turnstileToken) {
     return Response.json({ error: "CAPTCHA saknas" }, { status: 400 });
+  }
+
+  // IP-rate-limit utöver Turnstile: 5 anrop/timme
+  const rl = checkRateLimit(request, "analyze", 5, 60 * 60 * 1000);
+  if (!rl.ok) {
+    return Response.json({ error: "För många förfrågningar. Försök igen senare." }, { status: 429 });
+  }
+
+  // Schema- och längdvalidering av messages
+  if (!Array.isArray(messages) || messages.length === 0 || messages.length > 4) {
+    return Response.json({ error: "Ogiltigt format på messages" }, { status: 400 });
+  }
+  let totalChars = 0;
+  for (const m of messages) {
+    if (!m || typeof m.content !== "string" || (m.role && typeof m.role !== "string")) {
+      return Response.json({ error: "Ogiltigt meddelandeformat" }, { status: 400 });
+    }
+    totalChars += m.content.length;
+  }
+  if (totalChars > MAX_CONTENT_CHARS) {
+    return Response.json({ error: "Texten är för lång." }, { status: 413 });
   }
 
   const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
@@ -21,18 +51,27 @@ export async function POST(request) {
   }
 
   // Call Groq
-  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      messages,
-      max_tokens: 600,
-    }),
-  });
+  let res;
+  try {
+    res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages,
+        max_tokens: 600,
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+  } catch {
+    return Response.json({ error: "AI-tjänsten svarade inte" }, { status: 502 });
+  }
+  if (!res.ok) {
+    return Response.json({ error: "AI-utvärdering misslyckades" }, { status: 502 });
+  }
   const data = await res.json();
   return Response.json(data);
 }

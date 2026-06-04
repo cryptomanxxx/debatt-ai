@@ -3,10 +3,11 @@ id: 2026-06-04-race-conditions-atomic-updates
 title: "Race conditions i röst/räknar-endpoints — läs-modifiera-skriv utan atomicitet"
 type: bug
 severity: high
-status: pending
+status: rejected
 risk: medium
 file: app/api/koalition/route.js
 created: 2026-06-04
+rationale: "Den föreslagna lösningen (atomisk column-increment) kräver server-side Postgres-RPC-funktioner i Supabase (t.ex. increment_foljare) som måste deployas via SQL Editor — de finns inte i repot och kan inte skapas härifrån. Supabase REST PATCH stödjer inte kolumn-aritmetik, så att ändra route till .rpc('increment_foljare') skulle bryta /api/koalition (500) tills SQL körts manuellt = exakt den deploy-ordnings-fälla som gör autonom implementering osäker. Dessutom är platform-stamning POST ett löpande GENOMSNITT, inte en enkel inkrement — kan inte ersättas med en delta-kolumn utan omdesign. Konkurrensen är låg och påverkan (följarräknare) liten. Rekommenderat: projektägaren skapar SQL-migrationen (supabase_rpc_atomic.sql) och kör den i Supabase FÖRST, därefter kan route-ändringen göras säkert i ett uppföljande förslag."
 ---
 
 ## Problem

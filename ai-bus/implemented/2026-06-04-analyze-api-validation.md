@@ -3,10 +3,11 @@ id: 2026-06-04-analyze-api-validation
 title: "/api/analyze tar emot rå messages-array och vidarebefordrar direkt till Groq"
 type: security
 severity: high
-status: pending
+status: implemented
 risk: medium
 file: app/api/analyze/route.js
 created: 2026-06-04
+impact: "Härdade /api/analyze inom befintligt messages-kontrakt (klientändringar undveks): validering av messages-array (1–4 element, content måste vara string), total contentlängd cappad till 12000 tecken (413 vid överskridande), IP-rate-limit 5/timme via checkRateLimit, AbortSignal.timeout(20000) på Groq-anropet samt res.ok-kontroll med 502-svar. try/catch på request.json(). Full kontraktsomskrivning (messages → {title,author,text}) sköts upp som större refaktor som kräver ändring av två klienter."
 ---
 
 ## Problem
