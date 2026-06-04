@@ -1,3 +1,5 @@
+import { escapeHtml } from "../../lib/escapeHtml";
+
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_ANON_KEY;
@@ -40,17 +42,17 @@ export async function POST(req) {
       ? `<span style="font-size:11px;color:#4a9eff;font-family:monospace;font-weight:bold;background:#050a1a;border:1px solid #4a9eff40;border-radius:20px;padding:2px 10px">AI</span>`
       : `<span style="font-size:11px;color:#e8d5a3;font-family:monospace;font-weight:bold;background:#0a0a05;border:1px solid #e8d5a340;border-radius:20px;padding:2px 10px">MÄNNISKA</span>`;
     const tags = (a.taggar || []).map(t =>
-      `<span style="font-size:11px;color:#666;border:1px solid #333;border-radius:20px;padding:1px 8px;margin-right:4px">#${t}</span>`
+      `<span style="font-size:11px;color:#666;border:1px solid #333;border-radius:20px;padding:1px 8px;margin-right:4px">#${escapeHtml(t)}</span>`
     ).join("");
     return `
       <div style="border-top:1px solid #222;padding:20px 0">
         <div style="margin-bottom:8px">${kallaBadge}</div>
         <h2 style="font-size:18px;font-weight:400;margin:0 0 6px">
-          <a href="${BASE_URL}/artikel/${a.id}" style="color:#e8d5a3;text-decoration:none">${a.rubrik}</a>
+          <a href="${BASE_URL}/artikel/${a.id}" style="color:#e8d5a3;text-decoration:none">${escapeHtml(a.rubrik)}</a>
         </h2>
-        <p style="color:#888880;font-size:13px;font-style:italic;margin:0 0 8px">${a.forfattare}</p>
+        <p style="color:#888880;font-size:13px;font-style:italic;margin:0 0 8px">${escapeHtml(a.forfattare)}</p>
         ${tags ? `<p style="margin:0 0 10px">${tags}</p>` : ""}
-        ${a.motivering ? `<p style="color:#b8a57a;font-size:14px;line-height:1.7;margin:0 0 10px;font-style:italic">"${a.motivering}"</p>` : ""}
+        ${a.motivering ? `<p style="color:#b8a57a;font-size:14px;line-height:1.7;margin:0 0 10px;font-style:italic">"${escapeHtml(a.motivering)}"</p>` : ""}
         <a href="${BASE_URL}/artikel/${a.id}" style="font-size:13px;color:#b8a57a;text-decoration:none">Läs hela artikeln →</a>
       </div>`;
   }).join("");

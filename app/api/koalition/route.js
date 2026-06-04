@@ -77,6 +77,9 @@ export async function POST(req) {
 // Body: { agent: string }
 export async function DELETE(req) {
   const ip = getIp(req);
+  const rl = checkRateLimit(req, "koalition", 10, 60 * 60 * 1000);
+  if (!rl.ok) return Response.json({ error: "Too many requests" }, { status: 429 });
+
   const { agent } = await req.json().catch(() => ({}));
   if (!agent || typeof agent !== "string") {
     return Response.json({ error: "agent required" }, { status: 400 });

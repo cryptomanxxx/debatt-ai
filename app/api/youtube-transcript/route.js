@@ -6,7 +6,7 @@ export async function GET(req) {
   const videoId = searchParams.get("video_id");
   const secret = searchParams.get("secret") || req.headers.get("x-proxy-secret");
 
-  if (SECRET && secret !== SECRET) {
+  if (!SECRET || secret !== SECRET) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

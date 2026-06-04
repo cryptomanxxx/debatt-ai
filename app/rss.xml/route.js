@@ -13,12 +13,14 @@ function esc(str) {
 }
 
 export async function GET() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,motivering,artikel,kategori,kalla,skapad&order=skapad.desc&limit=50`,
-    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 3600 } }
-  );
-
-  const artiklar = res.ok ? await res.json() : [];
+  let artiklar = [];
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,motivering,artikel,kategori,kalla,skapad&order=skapad.desc&limit=50`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 3600 } }
+    );
+    if (res.ok) artiklar = await res.json();
+  } catch {}
 
   const items = artiklar.map(a => {
     const url = `${BASE_URL}/artikel/${a.id}`;

@@ -1,7 +1,12 @@
+import { checkRateLimit } from "../../lib/kanalRateLimit";
+
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function POST(req) {
+  const rl = checkRateLimit(req, "amnesforslag", 5, 60 * 60 * 1000);
+  if (!rl.ok) return Response.json({ fel: "För många förslag. Försök igen om en stund." }, { status: 429 });
+
   let body;
   try { body = await req.json(); }
   catch { return Response.json({ fel: "Ogiltig JSON" }, { status: 400 }); }

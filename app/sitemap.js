@@ -13,13 +13,15 @@ const AGENTER = [
 export default async function sitemap() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
 
-  const [artiklarRes, debatterRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/artiklar?select=id,skapad&order=skapad.desc`, { headers, cache: "no-store" }),
-    fetch(`${SB_URL}/rest/v1/chatt_debatter?select=id,skapad&order=skapad.desc&limit=200`, { headers, cache: "no-store" }),
-  ]);
-
-  const artiklar = artiklarRes.ok ? await artiklarRes.json() : [];
-  const debatter = debatterRes.ok ? await debatterRes.json() : [];
+  let artiklar = [], debatter = [];
+  try {
+    const [artiklarRes, debatterRes] = await Promise.all([
+      fetch(`${SB_URL}/rest/v1/artiklar?select=id,skapad&order=skapad.desc`, { headers, cache: "no-store" }),
+      fetch(`${SB_URL}/rest/v1/chatt_debatter?select=id,skapad&order=skapad.desc&limit=200`, { headers, cache: "no-store" }),
+    ]);
+    artiklar = artiklarRes.ok ? await artiklarRes.json() : [];
+    debatter = debatterRes.ok ? await debatterRes.json() : [];
+  } catch {}
   const now = new Date();
 
   const staticPages = [
