@@ -1,16 +1,7 @@
-const SB_URL     = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY     = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const GROQ_KEY     = process.env.GROQ_API_KEY;
-const GEMINI_KEY   = process.env.GEMINI_API_KEY;
-const MISTRAL_KEY  = process.env.MISTRAL_API_KEY;
-const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+import { callWithFallback, CHAINS } from "../../lib/aiRouter.js";
 
-// Circuit breaker — provider markeras nere tills cooldown löper ut (process-minne på warm instances)
-const _providerDownUntil = { groq: 0, gemini: 0 };
-const COOLDOWN_MS = 5 * 60 * 1000; // 5 minuter
-function providerReady(name) { return Date.now() > _providerDownUntil[name]; }
-function markProviderDown(name) { _providerDownUntil[name] = Date.now() + COOLDOWN_MS; }
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const PERSONLIGHETER = {
   "Nationalekonom":       "nationalekonom med doktorsexamen. Analyserar ur kostnads- och incitamentsperspektiv. Konkret och kylig.",
@@ -80,9 +71,7 @@ function extractJSON(raw) {
 }
 
 async function askAgent(agent, question, lang) {
-  const langInstruction = lang === "en"
-    ? "Respond in English."
-    : "Svara på svenska.";
+  const langInstruction = lang === "en" ? "Respond in English." : "Svara på svenska.";
 
   const systemPrompt = `Du är ${PERSONLIGHETER[agent]}
 
@@ -95,111 +84,16 @@ stance: "positiv" | "negativ" | "neutral"
 probability: heltal 0–100 (hur troligt är ett positivt utfall för användaren)
 reasoning: din kortaste möjliga motivering`;
 
-  if (GROQ_KEY && providerReady("groq")) {
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: question }],
-          max_tokens: 150,
-          temperature: 0.7,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const parsed = extractJSON(data.choices?.[0]?.message?.content ?? "");
-        if (parsed?.stance && typeof parsed.probability === "number")
-          return { agent, ...parsed };
-      }
-      if (res.status === 429) markProviderDown("groq");
-    } catch {}
-  }
+  try {
+    const { text } = await callWithFallback(CHAINS.beslut, [
+      { role: "system", content: systemPrompt },
+      { role: "user",   content: question },
+    ], { maxTokens: 150, temperature: 0.7, source: "beslut" });
 
-  if (MISTRAL_KEY) {
-    try {
-      const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${MISTRAL_KEY}` },
-        body: JSON.stringify({
-          model: "codestral-latest",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: question }],
-          max_tokens: 150, temperature: 0.7,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const parsed = extractJSON(data.choices?.[0]?.message?.content ?? "");
-        if (parsed?.stance && typeof parsed.probability === "number")
-          return { agent, ...parsed };
-      }
-    } catch {}
-  }
-
-  if (CEREBRAS_KEY) {
-    try {
-      const res = await fetch("https://api.cerebras.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${CEREBRAS_KEY}` },
-        body: JSON.stringify({
-          model: "llama3.1-8b",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: question }],
-          max_tokens: 150, temperature: 0.7,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const parsed = extractJSON(data.choices?.[0]?.message?.content ?? "");
-        if (parsed?.stance && typeof parsed.probability === "number")
-          return { agent, ...parsed };
-      }
-    } catch {}
-  }
-
-  if (GITHUB_TOKEN) {
-    try {
-      const res = await fetch("https://models.inference.ai.azure.com/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${GITHUB_TOKEN}` },
-        body: JSON.stringify({
-          model: "Llama-3.3-70B-Instruct",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: question }],
-          max_tokens: 150, temperature: 0.7,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const parsed = extractJSON(data.choices?.[0]?.message?.content ?? "");
-        if (parsed?.stance && typeof parsed.probability === "number")
-          return { agent, ...parsed };
-      }
-    } catch {}
-  }
-
-  if (GEMINI_KEY && providerReady("gemini")) {
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: question }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { maxOutputTokens: 150, temperature: 0.7 },
-          }),
-        }
-      );
-      if (r.ok) {
-        const data = await r.json();
-        const parsed = extractJSON(data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "");
-        if (parsed?.stance && typeof parsed.probability === "number")
-          return { agent, ...parsed };
-      }
-      if (r.status === 429) markProviderDown("gemini");
-    } catch {}
-  }
+    const parsed = extractJSON(text);
+    if (parsed?.stance && typeof parsed.probability === "number")
+      return { agent, ...parsed };
+  } catch {}
 
   return null;
 }

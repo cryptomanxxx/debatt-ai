@@ -17,6 +17,8 @@ const _downUntil = {
   mistral:    0,
   cerebras:   0,
   sambanova:  0,
+  deepseek:   0,
+  cloudflare: 0,
 };
 
 export function providerReady(name) {

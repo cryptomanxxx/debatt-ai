@@ -1,10 +1,4 @@
-import { logAiCall as _logAiCall } from "../../lib/logAiCall";
-import { providerReady as _providerReady, markProviderDown as _markProviderDown } from "../../lib/aiCircuitBreaker";
-
-// Fail-safe wrappers — logging/circuit-breaker fel får aldrig krascha route-handlern
-function logAiCall(args)          { try { _logAiCall(args); }          catch {} }
-function providerReady(p)         { try { return _providerReady(p); }   catch { return true; } }
-function markProviderDown(p)      { try { _markProviderDown(p); }       catch {} }
+import { callWithFallback, CHAINS } from "../../lib/aiRouter.js";
 
 export async function GET() {
   return Response.json({
@@ -154,136 +148,13 @@ ${kallaPrompt} Svara i karaktär — mer avslappnat och naturligt än i en forme
 
   let svar = "";
 
-  if (process.env.GROQ_API_KEY && providerReady("groq")) {
-    const t0 = Date.now();
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-        body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
-          max_tokens: 300,
-          temperature: 0.9,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        svar = data.choices?.[0]?.message?.content?.trim() ?? "";
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
-      } else {
-        if (res.status === 429) markProviderDown("groq");
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: `error_${res.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
-  if (!svar && process.env.CEREBRAS_API_KEY && providerReady("cerebras")) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.CEREBRAS_API_KEY}` },
-        body: JSON.stringify({
-          model: "gpt-oss-120b",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
-          max_tokens: 300,
-          temperature: 0.9,
-        }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        svar = data.choices?.[0]?.message?.content?.trim() ?? "";
-        logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
-      } else {
-        if (r.status === 429) markProviderDown("cerebras");
-        logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
-  if (!svar && process.env.SAMBANOVA_API_KEY && providerReady("sambanova")) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://api.sambanova.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.SAMBANOVA_API_KEY}` },
-        body: JSON.stringify({
-          model: "Meta-Llama-3.3-70B-Instruct",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
-          max_tokens: 300,
-          temperature: 0.9,
-        }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        svar = data.choices?.[0]?.message?.content?.trim() ?? "";
-        logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null });
-      } else {
-        if (r.status === 429) markProviderDown("sambanova");
-        logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
-  if (!svar && process.env.GEMINI_API_KEY && providerReady("gemini")) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts: [{ text: userMessage }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { maxOutputTokens: 300, temperature: 0.9 },
-          }),
-        }
-      );
-      if (r.ok) {
-        const data = await r.json();
-        svar = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-        logAiCall({ provider: "gemini", model: "gemini-2.0-flash-lite", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0, input_tokens: data.usageMetadata?.promptTokenCount ?? null, output_tokens: data.usageMetadata?.candidatesTokenCount ?? null });
-      } else {
-        if (r.status === 429) markProviderDown("gemini");
-        logAiCall({ provider: "gemini", model: "gemini-2.0-flash-lite", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "gemini", model: "gemini-2.0-flash-lite", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
-
-  if (!svar && process.env.GITHUB_TOKEN) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://models.inference.ai.azure.com/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GITHUB_TOKEN}` },
-        body: JSON.stringify({
-          model: "Llama-3.3-70B-Instruct",
-          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
-          max_tokens: 300,
-          temperature: 0.9,
-        }),
-      });
-      if (r.ok) {
-        const data = await r.json();
-        svar = data.choices?.[0]?.message?.content?.trim() ?? "";
-        logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "agent-fraga", status: "ok", latency_ms: Date.now() - t0 });
-      } else {
-        logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "agent-fraga", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "agent-fraga", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
+  try {
+    const { text } = await callWithFallback(CHAINS.general, [
+      { role: "system", content: systemPrompt },
+      { role: "user",   content: userMessage },
+    ], { maxTokens: 300, temperature: 0.9, source: "agent-fraga" });
+    svar = text;
+  } catch {}
 
   if (!svar) return Response.json({ error: "AI-tjänsten är inte tillgänglig just nu. Försök igen." }, { status: 502 });
 
