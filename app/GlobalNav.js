@@ -14,6 +14,7 @@ const LINKS = [
   { href: "/opinion",         label: "Vad tycker du?" },
   { href: "/visualiseringar", label: "Visualiseringar" },
   { href: "/territorium",       label: "Territorium 🎮" },
+  { href: "/handel",            label: "Handelsimperium 🚢" },
   { href: "/mark",             label: "Markartan" },
   { href: "/fraktioner",      label: "Fraktioner" },
   { href: "/oligarki",        label: "Oligarkirisk" },

@@ -80,6 +80,7 @@ export default function RootLayout({ children }) {
               <a href="/stablecoin" className="neon-nav">Stablecoin STAB</a>
               <a href="/staten" className="neon-nav">Staten</a>
               <a href="/territorium" className="neon-nav">Territorium 🎮</a>
+              <a href="/handel" className="neon-nav">Handelsimperium 🚢</a>
               <a href="/tidsgraf" className="neon-nav">Tidsgraf</a>
               <a href="/tidsserie" className="neon-nav">Tidsseriegraf</a>
               <a href="/ud" className="neon-nav">Utrikesdepartementet</a>
