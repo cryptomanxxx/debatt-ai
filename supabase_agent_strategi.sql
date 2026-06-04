@@ -12,9 +12,14 @@ CREATE TABLE IF NOT EXISTS agent_strategi (
 -- Publik läsning (anon-nyckeln räcker)
 ALTER TABLE agent_strategi ENABLE ROW LEVEL SECURITY;
 
--- Rensa gamla permissiva policies om de finns (idempotent re-körning)
-DROP POLICY IF EXISTS "Anon update agent_strategi" ON agent_strategi;
-DROP POLICY IF EXISTS "Anon insert/update agent_strategi" ON agent_strategi;
+-- DROP alla policies (nya och gamla) för att garantera idempotent re-körning.
+-- CREATE POLICY misslyckas om policyn redan finns, vilket stoppar exekveringen
+-- mitt i och kan lämna instansen i ett inkonsistent tillstånd.
+DROP POLICY IF EXISTS "Publik läsning agent_strategi"       ON agent_strategi;
+DROP POLICY IF EXISTS "Anon insert agent_strategi"          ON agent_strategi;
+DROP POLICY IF EXISTS "Service role update agent_strategi"  ON agent_strategi;
+DROP POLICY IF EXISTS "Anon update agent_strategi"          ON agent_strategi;
+DROP POLICY IF EXISTS "Anon insert/update agent_strategi"   ON agent_strategi;
 
 CREATE POLICY "Publik läsning agent_strategi"
   ON agent_strategi FOR SELECT
