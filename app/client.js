@@ -179,7 +179,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -202,6 +202,9 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/feedback_rewards?select=fran_agent,till_agent,belopp,kategori,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/stafett_utmaningar?select=utmanare,utmanad,utmaning,artikel_id,skapad&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=zon_namn,kop_agent,salj_agent,pris,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/handel_logg?order=skapad.desc&limit=5&select=typ,beskrivning,mynt_delta,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/territorium_drag?order=skapad.desc&limit=5&select=agare,agare_typ,drag_typ,resultat,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/snake_poang?order=skapad.desc&limit=5&select=spelnamn,agent_namn,poang,vann,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
   ]);
 
   const feed = [];
@@ -517,6 +520,46 @@ async function fetchAktivitetsFeed() {
       href: "/mark",
       skapad: t.skapad,
       farg: "#f59e0b",
+    });
+  });
+
+  (Array.isArray(handelLogg.value) ? handelLogg.value : []).forEach(h => {
+    if (!h.skapad) return;
+    feed.push({
+      typ: "handel",
+      ikon: h.typ === "resa" ? "🚢" : h.typ === "kop" ? "🛒" : "💰",
+      text: h.beskrivning,
+      href: "/handel",
+      skapad: h.skapad,
+      farg: "#22d3ee",
+    });
+  });
+
+  (Array.isArray(territoriumDrag.value) ? territoriumDrag.value : []).forEach(d => {
+    if (!d.skapad) return;
+    feed.push({
+      typ: "territorium",
+      ikon: d.drag_typ === "expandera" ? "🏴" : d.drag_typ === "attackera" ? "⚔️" : "🛡️",
+      text: d.agare_typ === "ai"
+        ? `${d.agare} ${d.drag_typ === "expandera" ? "erövrade nytt territorium" : d.drag_typ === "attackera" ? (d.resultat === "lyckades" ? "vann en attack" : "misslyckades med attack") : "förstärkte sitt försvar"}`
+        : `${d.agare} ${d.drag_typ === "expandera" ? "erövrade territorium" : d.drag_typ === "attackera" ? (d.resultat === "lyckades" ? "vann en attack" : "misslyckades i attack") : "befäste sitt försvar"}`,
+      href: "/territorium",
+      skapad: d.skapad,
+      farg: "#f59e0b",
+    });
+  });
+
+  (Array.isArray(snakePoang.value) ? snakePoang.value : []).forEach(s => {
+    if (!s.skapad) return;
+    feed.push({
+      typ: "snake",
+      ikon: "🐍",
+      text: s.vann
+        ? `${s.spelnamn} besegrade ${s.agent_namn} i Snake med ${s.poang} poäng! 🐍`
+        : `${s.spelnamn} spelade Snake mot ${s.agent_namn} och fick ${s.poang} poäng`,
+      href: "/snake",
+      skapad: s.skapad,
+      farg: "#4ade80",
     });
   });
 

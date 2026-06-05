@@ -1,0 +1,26 @@
+name: 🐍 Snake
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 15 * * *"  # 17:30 svensk tid (sommartid UTC+2)
+
+jobs:
+  snake:
+    runs-on: ubuntu-latest
+    permissions:
+      models: read
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Installera beroenden
+        run: pip install requests
+      - name: Kör snake-spel
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          PYTHONUNBUFFERED: "1"
+        run: python -u snake_test.py
