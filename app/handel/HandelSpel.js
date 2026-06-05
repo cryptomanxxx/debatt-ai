@@ -7,11 +7,28 @@ const H = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
 
 function resekostnad(a, b) {
   if (!a || !b) return 0;
-  const dx = a.svg_x - b.svg_x, dy = a.svg_y - b.svg_y;
+  const pa = GEO_COORDS[a.namn] ?? a, pb = GEO_COORDS[b.namn] ?? b;
+  const dx = pa.svg_x - pb.svg_x, dy = pa.svg_y - pb.svg_y;
   return Math.max(15, Math.floor(Math.sqrt(dx * dx + dy * dy) / 4));
 }
 
 const MAP_W = 320, MAP_H = 510;
+
+// Real geographic SVG path generated from Natural Earth 110m + d3-geo conic conformal projection
+const SWEDEN_PATH = "M53.146,367.731L63.944,347.317L81.95,323.613L91.73,281.143L82.399,261.686L86.073,213.801L99.431,181.276L114.811,183.045L121.095,169.285L116.322,156.803L141.56,108.344L156.406,69.923L165.376,45.24L177.859,45.299L180.958,25.969L205.012,30.657L205.603,7.869L213.111,6L231.018,21.47L253.401,42.721L260.409,95.96L266.854,108.91L243.392,121.631L231.398,147.512L235.521,168.954L212.695,199.319L182.411,231.4L170.503,282.692L183.427,308.401L201.358,328.426L185.151,370.784L165.06,379.666L156.93,443.054L144.398,478.753L118.557,474.132L104.603,504L79.1,503.954L75.318,467.072L62.19,422.278Z";
+
+// Geographic city positions (conic conformal projection matching SWEDEN_PATH)
+const GEO_COORDS = {
+  "Kiruna":    { svg_x: 211, svg_y: 50  },
+  "Umeå":      { svg_x: 220, svg_y: 191 },
+  "Sundsvall": { svg_x: 174, svg_y: 244 },
+  "Stockholm": { svg_x: 189, svg_y: 357 },
+  "Visby":     { svg_x: 210, svg_y: 418 },
+  "Linköping": { svg_x: 141, svg_y: 391 },
+  "Göteborg":  { svg_x: 67,  svg_y: 413 },
+  "Malmö":     { svg_x: 81,  svg_y: 495 },
+};
+function gp(s) { return GEO_COORDS[s.namn] ?? { svg_x: s.svg_x, svg_y: s.svg_y }; }
 
 export default function HandelSpel({ initialData }) {
   const { städer, varor } = initialData;
@@ -332,78 +349,39 @@ export default function HandelSpel({ initialData }) {
       {tab === "karta" && (
         <div style={{ display: "flex", justifyContent: "center" }}>
           <svg width={MAP_W} height={MAP_H} style={{ background: "#0d1a2d", borderRadius: 10 }}>
-            {/* Sweden mainland silhouette — realistic shape, clockwise from NW corner */}
-            <path d={[
-              // NW corner (Treriksröset / Norwegian border)
-              "M 117 30",
-              // Northern border going east toward Finnish corner
-              "C 138 22, 162 17, 190 14",
-              "C 210 14, 230 18, 250 24",
-              // East coast – Gulf of Bothnia going south
-              "C 255 38, 256 58, 253 80",
-              "C 251 102, 248 122, 244 143",
-              "L 238 158",    // Umeå
-              "C 237 173, 235 188, 233 204",
-              "L 232 222",    // Sundsvall
-              // Coast bends east-southeast toward Stockholm
-              "C 234 238, 239 254, 246 270",
-              "C 252 286, 259 299, 264 312",   // Stockholm
-              // South of Stockholm – coast turns southwest
-              "C 266 325, 264 338, 258 350",
-              "C 253 362, 252 375, 253 388",
-              // Kalmar / Blekinge coast
-              "C 253 400, 251 413, 247 425",
-              // Southeast corner swings west
-              "C 242 437, 234 449, 224 461",
-              "C 214 473, 203 484, 194 496",
-              "L 192 500",    // Malmö
-              // West along Skåne coast
-              "C 183 506, 171 506, 161 500",
-              "C 154 494, 151 483, 151 472",
-              // Halland – west coast heading north
-              "C 150 460, 151 448, 153 436",
-              "L 164 422",    // Göteborg (sticks out east vs Bohuslän)
-              // Bohuslän – fjord coast goes back west/north
-              "C 150 412, 137 397, 127 382",
-              "C 119 366, 112 350, 110 335",
-              // Norwegian border – runs north-northwest along fjällen
-              "C 109 320, 110 307, 112 293",
-              "C 113 278, 115 264, 115 250",
-              "C 115 236, 114 222, 113 208",
-              "C 112 194, 112 180, 113 166",
-              "C 114 152, 115 138, 115 124",
-              "C 115 110, 114 96, 114 82",
-              "C 114 68, 114 54, 116 42",
-              "C 116 37, 117 33, 117 30 Z",
-            ].join(" ")}
-              fill="#132240" stroke="#2a4a6e" strokeWidth="1.5" />
+            {/* Sweden — real geographic outline from Natural Earth 110m + d3-geo conic conformal */}
+            <path d={SWEDEN_PATH} fill="#132240" stroke="#2a4a6e" strokeWidth="1.5" />
             {/* Gotland island */}
-            <ellipse cx="287" cy="350" rx="9" ry="22" fill="#132240" stroke="#2a4a6e" strokeWidth="1.2" />
+            <ellipse cx="210" cy="422" rx="8" ry="18" fill="#132240" stroke="#2a4a6e" strokeWidth="1.2" />
             {/* Öland island */}
-            <ellipse cx="257" cy="416" rx="4" ry="18" fill="#132240" stroke="#2a4a6e" strokeWidth="1" />
+            <ellipse cx="175" cy="435" rx="3" ry="14" fill="#132240" stroke="#2a4a6e" strokeWidth="1" />
 
             {/* Dashed lines between all cities */}
-            {städer.map(a => städer.filter(b => b.id > a.id).map(b => (
-              <line key={`${a.id}-${b.id}`} x1={a.svg_x} y1={a.svg_y} x2={b.svg_x} y2={b.svg_y}
-                stroke="#1a2e44" strokeWidth="0.7" strokeDasharray="3,5" />
-            )))}
+            {städer.map(a => städer.filter(b => b.id > a.id).map(b => {
+              const pa = gp(a), pb = gp(b);
+              return (
+                <line key={`${a.id}-${b.id}`} x1={pa.svg_x} y1={pa.svg_y} x2={pb.svg_x} y2={pb.svg_y}
+                  stroke="#1a2e44" strokeWidth="0.7" strokeDasharray="3,5" />
+              );
+            }))}
 
             {/* Cities */}
             {städer.map(s => {
-              const isCur = s.id === spelare.stad_id;
+              const pos = gp(s);
+              const isCur = s.id === spelare?.stad_id;
               const cost = currentStad ? resekostnad(currentStad, s) : 0;
               return (
                 <g key={s.id}
-                  style={{ cursor: !isCur && spelare.mynt >= cost ? "pointer" : "default" }}
-                  onClick={() => !isCur && !loading && spelare.mynt >= cost &&
+                  style={{ cursor: !isCur && spelare?.mynt >= cost ? "pointer" : "default" }}
+                  onClick={() => !isCur && !loading && spelare?.mynt >= cost &&
                     callApi("/api/handel/resa", { smeknamn: spelare.smeknamn, till_stad_id: s.id })}>
-                  <circle cx={s.svg_x} cy={s.svg_y} r={isCur ? 9 : 6}
+                  <circle cx={pos.svg_x} cy={pos.svg_y} r={isCur ? 9 : 6}
                     fill={isCur ? "#e879f9" : "#3b82f6"}
                     stroke={isCur ? "#f5a6ff" : "#93c5fd"} strokeWidth={isCur ? 2 : 1} />
-                  <text x={s.svg_x + 12} y={s.svg_y + 4} fill={isCur ? "#f0ede6" : "#94a3b8"}
+                  <text x={pos.svg_x + 12} y={pos.svg_y + 4} fill={isCur ? "#f0ede6" : "#94a3b8"}
                     fontSize="11" fontFamily="Georgia, serif">{s.namn}</text>
                   {currentStad && !isCur && (
-                    <text x={s.svg_x + 12} y={s.svg_y + 15} fill="#60a5fa"
+                    <text x={pos.svg_x + 12} y={pos.svg_y + 15} fill="#60a5fa"
                       fontSize="10" fontFamily="monospace">−{cost}🪙</text>
                   )}
                 </g>
