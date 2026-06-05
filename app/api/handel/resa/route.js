@@ -7,8 +7,21 @@ async function sbGet(table, qs) {
   return r.ok ? r.json() : [];
 }
 
+// Geographic city positions (conic conformal projection) — måste matcha GEO_COORDS i app/handel/HandelSpel.js
+const GEO_COORDS = {
+  "Kiruna":    { svg_x: 211, svg_y: 50  },
+  "Umeå":      { svg_x: 220, svg_y: 191 },
+  "Sundsvall": { svg_x: 174, svg_y: 244 },
+  "Stockholm": { svg_x: 189, svg_y: 357 },
+  "Visby":     { svg_x: 210, svg_y: 418 },
+  "Linköping": { svg_x: 141, svg_y: 391 },
+  "Göteborg":  { svg_x: 67,  svg_y: 413 },
+  "Malmö":     { svg_x: 81,  svg_y: 495 },
+};
+
 function resekostnad(a, b) {
-  const dx = a.svg_x - b.svg_x, dy = a.svg_y - b.svg_y;
+  const pa = GEO_COORDS[a.namn] ?? a, pb = GEO_COORDS[b.namn] ?? b;
+  const dx = pa.svg_x - pb.svg_x, dy = pa.svg_y - pb.svg_y;
   return Math.max(15, Math.floor(Math.sqrt(dx * dx + dy * dy) / 4));
 }
 
