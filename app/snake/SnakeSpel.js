@@ -34,6 +34,8 @@ const SVÅR_FÄRG = {
   "Expert":"#c084fc", "Extrem":"#f7931a", "Omöjligt":"#ff0044",
 };
 
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+
 function rnd(n) { return Math.floor(Math.random() * n); }
 function nyMat(snake) {
   let p;
@@ -42,18 +44,55 @@ function nyMat(snake) {
   return p;
 }
 
+async function sparaPoang(spelnamn, agentNamn, poang, vann) {
+  if (!spelnamn || spelnamn.length < 2) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/snake_poang`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({ spelnamn, agent_namn: agentNamn, poang, vann }),
+    });
+  } catch {}
+}
+
 export default function SnakeSpel() {
   const canvasRef    = useRef(null);
   const wrapRef      = useRef(null);
   const gameRef      = useRef(null);
   const rafRef       = useRef(null);
   const touchRef     = useRef(null);
+  const smeknamRef   = useRef("");
 
-  const [screen,  setScreen]  = useState("val");   // val | spel | slut
-  const [agent,   setAgent]   = useState(null);
-  const [score,   setScore]   = useState(0);
-  const [vann,    setVann]    = useState(false);
-  const [filter,  setFilter]  = useState("Alla");
+  const [screen,    setScreen]    = useState("val");   // val | spel | slut
+  const [agent,     setAgent]     = useState(null);
+  const [score,     setScore]     = useState(0);
+  const [vann,      setVann]      = useState(false);
+  const [filter,    setFilter]    = useState("Alla");
+  const [smeknamn,  setSmeknamn]  = useState("");
+  const [topplista, setTopplista] = useState([]);
+
+  // Keep ref in sync with smeknamn state so the game loop closure can access it
+  useEffect(() => { smeknamRef.current = smeknamn; }, [smeknamn]);
+
+  // Fetch leaderboard on mount
+  useEffect(() => {
+    fetch(
+      `${SB_URL}/rest/v1/snake_poang?vann=eq.true&order=poang.desc&limit=10&select=spelnamn,agent_namn,poang,skapad`,
+      {
+        headers: {
+          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+        },
+      }
+    )
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d)) setTopplista(d); })
+      .catch(() => {});
+  }, []);
 
   // ── Drawing ──────────────────────────────────────────────────────────────
   function draw() {
@@ -131,20 +170,25 @@ export default function SnakeSpel() {
         const nx = (h.x + g.dir[0] + COLS) % COLS;
         const ny = (h.y + g.dir[1] + ROWS) % ROWS;
 
-        // Self collision
-        if (g.snake.some(s => s.x === nx && s.y === ny)) {
+        const ate = nx === g.mat.x && ny === g.mat.y;
+
+        // Self collision — the tail moves away this tick on a non-eating move,
+        // so its current cell is free to enter (exclude it from the test).
+        const kropp = ate ? g.snake : g.snake.slice(0, -1);
+        if (kropp.some(s => s.x === nx && s.y === ny)) {
           g.running = false;
+          sparaPoang(smeknamRef.current, ag.namn, g.score, false);
           setScore(g.score); setVann(false); setScreen("slut");
           draw(); return;
         }
 
-        const ate = nx === g.mat.x && ny === g.mat.y;
         g.snake = [{x:nx,y:ny}, ...g.snake];
         if (ate) {
           g.score++;
           setScore(g.score);
           if (g.score >= g.mål) {
             g.running = false;
+            sparaPoang(smeknamRef.current, ag.namn, g.score, true);
             setVann(true); setScreen("slut");
             draw(); return;
           }
@@ -239,6 +283,8 @@ export default function SnakeSpel() {
     </div>
   );
 
+  const MEDALS = ["🥇","🥈","🥉"];
+
   return (
     <div style={{maxWidth:480,margin:"0 auto",padding:"0 16px 80px",color:"#f0ede6"}}>
 
@@ -250,6 +296,25 @@ export default function SnakeSpel() {
             <p style={{color:"#666",fontSize:13,margin:0}}>
               Slå agentens målpoäng för att vinna. Svårare agent = snabbare tempo.
             </p>
+          </div>
+
+          {/* Smeknamn */}
+          <div style={{marginBottom:16}}>
+            <label style={{color:"#555",fontSize:12,display:"block",marginBottom:4}}>
+              Ditt smeknamn (valfritt, för topplistan)
+            </label>
+            <input
+              type="text"
+              maxLength={20}
+              placeholder="t.ex. Snakemaster"
+              value={smeknamn}
+              onChange={e => setSmeknamn(e.target.value.slice(0, 20))}
+              style={{
+                background:"#111",border:"1px solid #222",borderRadius:8,
+                color:"#e8d5a3",fontSize:13,padding:"8px 12px",
+                outline:"none",width:"100%",boxSizing:"border-box",
+              }}
+            />
           </div>
 
           {/* Filter-pills */}
@@ -288,6 +353,39 @@ export default function SnakeSpel() {
                 <div style={{color:"#444",fontSize:11}}>🎯 Mål: {ag.mål} poäng</div>
               </button>
             ))}
+          </div>
+
+          {/* Leaderboard */}
+          <div style={{marginTop:32,background:"#111",border:"1px solid #222",borderRadius:12,padding:"16px 14px"}}>
+            <div style={{fontFamily:"Georgia,serif",color:"#e8d5a3",fontSize:15,fontWeight:"bold",marginBottom:12}}>
+              🏆 Topplista — Vinnare
+            </div>
+            {topplista.length === 0 ? (
+              <div style={{color:"#444",fontSize:12,fontStyle:"italic"}}>Inga vinnare ännu. Var den förste!</div>
+            ) : (
+              <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                {topplista.map((row, i) => (
+                  <div key={i} style={{
+                    display:"flex",alignItems:"center",gap:10,
+                    borderBottom: i < topplista.length - 1 ? "1px solid #1a1a1a" : "none",
+                    paddingBottom: i < topplista.length - 1 ? 6 : 0,
+                  }}>
+                    <span style={{fontSize:16,width:22,textAlign:"center",flexShrink:0}}>
+                      {i < 3 ? MEDALS[i] : <span style={{color:"#333",fontSize:12}}>{i+1}</span>}
+                    </span>
+                    <span style={{color:"#e8d5a3",fontWeight:"bold",fontSize:13,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                      {row.spelnamn}
+                    </span>
+                    <span style={{color:"#444",fontSize:11,flexShrink:0}}>
+                      vs {row.agent_namn}
+                    </span>
+                    <span style={{color:"#f0c030",fontWeight:"bold",fontSize:14,flexShrink:0,minWidth:28,textAlign:"right"}}>
+                      {row.poang}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
