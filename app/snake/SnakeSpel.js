@@ -35,6 +35,8 @@ const SVÅR_FÄRG = {
 };
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_H   = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
 
 function rnd(n) { return Math.floor(Math.random() * n); }
 function nyMat(snake) {
@@ -49,11 +51,7 @@ async function sparaPoang(spelnamn, agentNamn, poang, vann) {
   try {
     await fetch(`${SB_URL}/rest/v1/snake_poang`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-      },
+      headers: { "Content-Type": "application/json", ...SB_H },
       body: JSON.stringify({ spelnamn, agent_namn: agentNamn, poang, vann }),
     });
   } catch {}
@@ -78,21 +76,18 @@ export default function SnakeSpel() {
   // Keep ref in sync with smeknamn state so the game loop closure can access it
   useEffect(() => { smeknamRef.current = smeknamn; }, [smeknamn]);
 
-  // Fetch leaderboard on mount
-  useEffect(() => {
+  function laddaTopplista() {
     fetch(
       `${SB_URL}/rest/v1/snake_poang?vann=eq.true&order=poang.desc&limit=10&select=spelnamn,agent_namn,poang,skapad`,
-      {
-        headers: {
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-        },
-      }
+      { headers: SB_H }
     )
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setTopplista(d); })
       .catch(() => {});
-  }, []);
+  }
+
+  // Fetch leaderboard on mount
+  useEffect(laddaTopplista, []);
 
   // ── Drawing ──────────────────────────────────────────────────────────────
   function draw() {
@@ -177,7 +172,8 @@ export default function SnakeSpel() {
         const kropp = ate ? g.snake : g.snake.slice(0, -1);
         if (kropp.some(s => s.x === nx && s.y === ny)) {
           g.running = false;
-          sparaPoang(smeknamRef.current, ag.namn, g.score, false);
+          sparaPoang(smeknamRef.current, ag.namn, g.score, false)
+            .then(() => setTimeout(laddaTopplista, 300));
           setScore(g.score); setVann(false); setScreen("slut");
           draw(); return;
         }
@@ -188,7 +184,8 @@ export default function SnakeSpel() {
           setScore(g.score);
           if (g.score >= g.mål) {
             g.running = false;
-            sparaPoang(smeknamRef.current, ag.namn, g.score, true);
+            sparaPoang(smeknamRef.current, ag.namn, g.score, true)
+              .then(() => setTimeout(laddaTopplista, 300));
             setVann(true); setScreen("slut");
             draw(); return;
           }
