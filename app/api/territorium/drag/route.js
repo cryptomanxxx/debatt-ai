@@ -41,14 +41,14 @@ export async function POST(req) {
   const events = await sbGet("territorium_events", `id=eq.${event_id}&status=eq.aktiv`);
   if (!events.length) return Response.json({ error: "Inget aktivt event" }, { status: 400 });
 
-  // En röst per dag per spelare
-  const today = new Date().toISOString().split("T")[0];
-  const todaysDrag = await sbGet(
+  // Ett drag per timme per spelare
+  const enTimmeSen = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const nyligaDrag = await sbGet(
     "territorium_drag",
-    `event_id=eq.${event_id}&agare=eq.${encodeURIComponent(agare)}&skapad=gte.${today}T00:00:00`,
+    `event_id=eq.${event_id}&agare=eq.${encodeURIComponent(agare)}&skapad=gte.${enTimmeSen}`,
   );
-  if (todaysDrag.length > 0)
-    return Response.json({ error: "Du har redan gjort ett drag idag. Kom tillbaka imorgon!" }, { status: 429 });
+  if (nyligaDrag.length > 0)
+    return Response.json({ error: "Du har redan gjort ett drag den senaste timmen. Kom tillbaka snart!" }, { status: 429 });
 
   const [hexes, allAgare, allHexes] = await Promise.all([
     sbGet("territorium_hexagoner", `id=eq.${hex_id}&event_id=eq.${event_id}`),
