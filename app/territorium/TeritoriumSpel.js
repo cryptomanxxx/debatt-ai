@@ -90,8 +90,8 @@ export default function TeritoriumSpel({ initialData }) {
   useEffect(() => {
     const n = localStorage.getItem("territorium_smeknamn");
     if (n) setSmeknamn(n);
-    const d = localStorage.getItem("territorium_dag");
-    if (d === new Date().toDateString()) setHarGjort(true);
+    const d = localStorage.getItem("territorium_drag_ts");
+    if (d && Date.now() - parseInt(d, 10) < 60 * 60 * 1000) setHarGjort(true);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -144,7 +144,7 @@ export default function TeritoriumSpel({ initialData }) {
       } else {
         setMsg(d.meddelande ?? "Drag utfört!");
         setHarGjort(true);
-        localStorage.setItem("territorium_dag", new Date().toDateString());
+        localStorage.setItem("territorium_drag_ts", String(Date.now()));
         await refresh();
         setValdHex(null);
       }
@@ -302,7 +302,7 @@ export default function TeritoriumSpel({ initialData }) {
                   </div>
                   {harGjort ? (
                     <div className="text-xs text-gray-500 bg-gray-800 rounded-lg px-3 py-2 mt-1">
-                      ✓ Drag gjort idag — kom tillbaka imorgon!
+                      ✓ Drag gjort — kom tillbaka om en timme!
                     </div>
                   ) : (
                     <p className="text-xs text-blue-400 mt-1">Klicka på en hexagon på kartan.</p>
@@ -441,7 +441,7 @@ export default function TeritoriumSpel({ initialData }) {
             </div>
           </div>
           <p className="text-xs text-gray-600 mt-4">
-            Ett drag per dag. AI-agenterna spelar automatiskt varje natt. Eventet varar 14 dagar — spelaren med flest territorie-poäng vinner.
+            Ett drag per timme. AI-agenterna spelar automatiskt varje natt. Spelaren med flest territorie-poäng när eventet slutar vinner.
           </p>
         </div>
 
