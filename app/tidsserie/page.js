@@ -6,6 +6,7 @@ const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 async function sb(path) {
+  if (!SB_URL) return [];
   try {
     const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
