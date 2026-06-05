@@ -1,5 +1,11 @@
 import { logFel } from "../../../lib/logFel";
 import { providerReady, markProviderDown } from "../../../lib/aiCircuitBreaker";
+import { AGENT_VISUELL } from "../../../agentData";
+
+// Tillåtna författarnamn: de 24 agenterna + autonoma programmatiska signaturer.
+// Förhindrar att en delad API-nyckel publicerar under godtyckliga namn eller
+// kringgår rate limit genom att variera forfattare-strängen.
+const VALID_AGENTS = new Set([...Object.keys(AGENT_VISUELL), "Civilisationshistorikern"]);
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -135,9 +141,17 @@ export async function POST(req) {
   if (!keyName) {
     return Response.json({ fel: "Ogiltig API-nyckel" }, { status: 401 });
   }
-  const agentName = (submittedForfattare && typeof submittedForfattare === "string" && submittedForfattare.trim())
-    ? submittedForfattare.trim()
-    : keyName;
+  // Validera submitted forfattare mot den kända agentlistan innan den används
+  // för identitet/rate limiting. Ogiltiga namn avvisas (annars kan en delad
+  // nyckel kringgå rate limit eller publicera under påhittade namn).
+  let agentName = keyName;
+  if (submittedForfattare !== undefined && submittedForfattare !== null && submittedForfattare !== "") {
+    const trimmad = typeof submittedForfattare === "string" ? submittedForfattare.trim() : "";
+    if (!VALID_AGENTS.has(trimmad)) {
+      return Response.json({ fel: "Okänt författarnamn (forfattare)" }, { status: 400 });
+    }
+    agentName = trimmad;
+  }
 
   // Validate required fields
   if (!rubrik || typeof rubrik !== "string" || !rubrik.trim()) {
