@@ -131,14 +131,17 @@ export default function SnakeSpel() {
         const nx = (h.x + g.dir[0] + COLS) % COLS;
         const ny = (h.y + g.dir[1] + ROWS) % ROWS;
 
-        // Self collision
-        if (g.snake.some(s => s.x === nx && s.y === ny)) {
+        const ate = nx === g.mat.x && ny === g.mat.y;
+
+        // Self collision — the tail moves away this tick on a non-eating move,
+        // so its current cell is free to enter (exclude it from the test).
+        const kropp = ate ? g.snake : g.snake.slice(0, -1);
+        if (kropp.some(s => s.x === nx && s.y === ny)) {
           g.running = false;
           setScore(g.score); setVann(false); setScreen("slut");
           draw(); return;
         }
 
-        const ate = nx === g.mat.x && ny === g.mat.y;
         g.snake = [{x:nx,y:ny}, ...g.snake];
         if (ate) {
           g.score++;
