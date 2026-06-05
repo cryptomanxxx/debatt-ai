@@ -94,6 +94,20 @@ export default function TeritoriumSpel({ initialData }) {
     if (d && Date.now() - parseInt(d, 10) < 60 * 60 * 1000) setHarGjort(true);
   }, []);
 
+  // Återaktivera drag automatiskt när timmens cooldown löpt ut — utan omladdning.
+  useEffect(() => {
+    if (!harGjort) return;
+    const d = localStorage.getItem("territorium_drag_ts");
+    if (!d) return;
+    const kvar = 60 * 60 * 1000 - (Date.now() - parseInt(d, 10));
+    if (kvar <= 0) {
+      setHarGjort(false);
+      return;
+    }
+    const t = setTimeout(() => setHarGjort(false), kvar);
+    return () => clearTimeout(t);
+  }, [harGjort]);
+
   const refresh = useCallback(async () => {
     if (!event) return;
     const r = await fetch(`/api/territorium/karta?event_id=${event.id}`);
