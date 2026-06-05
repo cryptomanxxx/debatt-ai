@@ -14,7 +14,11 @@ from collections import deque
 import requests
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
-SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+# Service role bypasses RLS — krävs för att kunna spara vinster (vann=true)
+SB_KEY = (
+    os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    or os.environ.get("SUPABASE_ANON_KEY", "")
+)
 
 COLS, ROWS = 20, 20
 

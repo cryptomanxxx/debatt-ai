@@ -49,9 +49,9 @@ function nyMat(snake) {
 async function sparaPoang(spelnamn, agentNamn, poang, vann) {
   if (!spelnamn || spelnamn.length < 2) return;
   try {
-    await fetch(`${SB_URL}/rest/v1/snake_poang`, {
+    await fetch("/api/snake-poang", {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...SB_H },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ spelnamn, agent_namn: agentNamn, poang, vann }),
     });
   } catch {}
