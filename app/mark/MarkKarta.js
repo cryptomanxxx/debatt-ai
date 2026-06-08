@@ -52,14 +52,15 @@ const TERRAIN_STOPS = {
   skog:     [["#dcfce7", 0.38], ["#16a34a", 0.20], ["#14532d", 0.05]],
 };
 
-const HEX = 33;
+const HEX = 33;        // polygonradie (visuell storlek på hexagonen)
+const HEX_SP = 40;     // gitteravstånd — frikopplat från radien så kartan inte komprimeras
 const SQRT3 = Math.sqrt(3);
 const SVG_W = 530;
 const SVG_H = 490;
 
 function hexCenter(col, row) {
-  const x = HEX * SQRT3 * (col + (row % 2 === 1 ? 0.5 : 0)) + 52;
-  const y = HEX * 1.5 * row + 50;
+  const x = HEX_SP * SQRT3 * (col + (row % 2 === 1 ? 0.5 : 0)) + 52;
+  const y = HEX_SP * 1.5 * row + 50;
   return [x, y];
 }
 
