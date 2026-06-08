@@ -247,12 +247,15 @@ function KryptoPriser({ priser }) {
 
 async function getSaldoSpelHistorik() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
-  const res = await fetch(
-    `${SB_URL}/rest/v1/agent_bets?select=agent,insats,vinst,avgjord,avgjord_at,skapad&order=skapad.asc`,
-    { headers, cache: "no-store" }
-  );
-  if (!res.ok) return [];
-  const bets = await res.json();
+  const [betsRes, saldonRes] = await Promise.all([
+    fetch(`${SB_URL}/rest/v1/agent_bets?select=agent,insats,vinst,avgjord,avgjord_at,skapad&order=skapad.asc`, { headers, cache: "no-store" }),
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo_spel&agent=neq.Statskassa`, { headers, cache: "no-store" }),
+  ]);
+  if (!betsRes.ok) return [];
+  const bets = await betsRes.json();
+  const saldonRows = saldonRes.ok ? await saldonRes.json() : [];
+  const currentSaldon = Object.fromEntries(saldonRows.map(r => [r.agent, r.saldo_spel ?? 200]));
+
   const relevant = bets.filter(b => b.insats > 0);
   if (!relevant.length) return [];
 
@@ -261,17 +264,17 @@ async function getSaldoSpelHistorik() {
     if (!agentEvents[bet.agent]) agentEvents[bet.agent] = [];
     agentEvents[bet.agent].push({ date: bet.skapad.slice(0, 10), delta: -bet.insats });
     if (bet.avgjord && bet.avgjord_at && bet.vinst > 0) {
-      // Insats redan dragen vid bet-läggning — vid vinst: lägg tillbaka insats + vinst (2×insats)
+      // Vinst: lägg tillbaka insats + vinst (2×insats). Förlust: inget att lägga till.
       agentEvents[bet.agent].push({ date: bet.avgjord_at.slice(0, 10), delta: bet.insats + bet.vinst });
     }
-    // Förlust: insats redan dragen, inget mer att dra
   }
 
   const allAgents = Object.keys(agentEvents);
   const allDates = [...new Set(allAgents.flatMap(a => agentEvents[a].map(e => e.date)))].sort();
   const balances = Object.fromEntries(allAgents.map(a => [a, 200]));
 
-  return allDates.map(date => {
+  // Simulera historiken
+  const seriesData = allDates.map(date => {
     for (const agent of allAgents) {
       for (const e of agentEvents[agent]) {
         if (e.date === date) balances[agent] += e.delta;
@@ -279,6 +282,17 @@ async function getSaldoSpelHistorik() {
     }
     return { date, ...Object.fromEntries(allAgents.map(a => [a, balances[a]])) };
   });
+
+  // Normalisera: förskjut varje agents linje så att sista punkten = faktiskt saldo_spel.
+  // Detta kompenserar för top-ups, stipendium och andra justeringar utanför bet-historiken.
+  const offset = Object.fromEntries(
+    allAgents.map(a => [a, (currentSaldon[a] ?? 200) - balances[a]])
+  );
+
+  return seriesData.map(row => ({
+    date: row.date,
+    ...Object.fromEntries(allAgents.map(a => [a, row[a] + (offset[a] || 0)])),
+  }));
 }
 
 async function getSpelarKonton() {
@@ -330,7 +344,7 @@ export default async function MarketsPage() {
           {saldoSpelSeries.length > 0 && (
             <div style={{ marginBottom: "48px" }}>
               <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 16px" }}>
-                Spelkontoutveckling · 200 kr startbudget
+                Spelkontoutveckling · justerat till faktiskt saldo
               </p>
               <SaldoSpelChart
                 series={saldoSpelSeries}
