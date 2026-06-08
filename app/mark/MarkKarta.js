@@ -260,7 +260,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
                       fontSize="6.5" fill={agFarg} fontFamily="monospace" fontWeight="700"
                       filter={isAct ? "url(#softglow)" : undefined}
                       style={{ userSelect: "none", pointerEvents: "none" }}>
-                      {agName.slice(0, 6).toUpperCase()}
+                      {agName.replace(/^Den /, "").slice(0, 7).toUpperCase()}
                     </text>
                   )}
                 </g>
@@ -371,7 +371,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
           </div>
         ) : (
           <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "12px 14px", fontSize: "11px", color: "#333", fontFamily: "monospace", textAlign: "center" }}>
-            Hovra eller klicka på en zon
+            Tryck på en zon för detaljer
           </div>
         )}
 
