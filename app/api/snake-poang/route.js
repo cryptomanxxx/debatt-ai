@@ -32,11 +32,11 @@ export async function POST(req) {
     return Response.json({ error: "Ogiltig poäng" }, { status: 400 });
   }
 
-  // Validera vinst-anspråket: kan bara vinna om poäng >= agentens mål
+  // Validera vinst-anspråket: spelet stannar exakt på target, aldrig högre
   const target = AGENT_MÅL[agent_namn];
   const claimedVann = Boolean(vann);
-  if (claimedVann && poang < target) {
-    return Response.json({ error: "Ogiltig vinst — poängen räcker inte" }, { status: 400 });
+  if (claimedVann && poang !== target) {
+    return Response.json({ error: "Ogiltig vinst — poängen stämmer inte med agentens mål" }, { status: 400 });
   }
 
   const r = await fetch(`${SB_URL}/rest/v1/snake_poang`, {
