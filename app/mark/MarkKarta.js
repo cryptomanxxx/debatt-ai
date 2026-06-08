@@ -491,273 +491,203 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
 
       </div>{/* /3-kolumns grid */}
 
-      {/* ══ MARKNADER — 2 kolumner ══ */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", marginTop: "16px" }}>
+      {/* ══ MARKNADER — 2 kolumner, 4 rader (header/auktioner/clearing/handel alltid i linje) ══ */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px", marginTop: "16px" }}>
 
-        {/* ── MARKAUKTIONER ── */}
-        <div style={{
-          background: "#0b0a07",
-          border: "1px solid rgba(245,158,11,0.22)",
-          borderRadius: "10px",
-          padding: "18px 20px",
-        }}>
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", paddingBottom: "12px", borderBottom: "1px solid #1a1600" }}>
-            <span style={{ fontSize: "18px" }}>🏷️</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: "12px", color: "#f59e0b", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>MARKAUKTIONER</div>
-              <div style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace" }}>BUDRUNDOR · ZONÄGARSKAP · 24H</div>
-            </div>
-            {auktioner.length > 0 && (
-              <span style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "monospace", background: "rgba(245,158,11,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(245,158,11,0.20)" }}>
-                {auktioner.length} aktiva
-              </span>
-            )}
+        {/* ── ROW 1: Headers ── */}
+        <div style={{ background: "#0b0a07", border: "1px solid rgba(245,158,11,0.22)", borderBottom: "none", borderRadius: "10px 10px 0 0", padding: "16px 20px 14px", display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={{ fontSize: "18px" }}>🏷️</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: "12px", color: "#f59e0b", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>MARKAUKTIONER</div>
+            <div style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace" }}>BUDRUNDOR · ZONÄGARSKAP · 24H</div>
           </div>
+          {auktioner.length > 0 && (
+            <span style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "monospace", background: "rgba(245,158,11,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(245,158,11,0.20)" }}>
+              {auktioner.length} aktiva
+            </span>
+          )}
+        </div>
+        <div style={{ background: "#070b0d", border: "1px solid rgba(8,145,178,0.22)", borderBottom: "none", borderRadius: "10px 10px 0 0", padding: "16px 20px 14px", display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={{ fontSize: "18px" }}>📦</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: "12px", color: "#22d3ee", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>VARUMARKNAD</div>
+            <div style={{ fontSize: "9px", color: "#003040", fontFamily: "monospace" }}>BUDRUNDOR · VARUÄGARSKAP · 24H</div>
+          </div>
+          {varaAuktioner.length > 0 && (
+            <span style={{ fontSize: "10px", color: "#22d3ee", fontFamily: "monospace", background: "rgba(8,145,178,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(8,145,178,0.20)" }}>
+              {varaAuktioner.length} aktiva
+            </span>
+          )}
+        </div>
 
-          {/* Aktiva auktioner */}
+        {/* ── ROW 2: Auktionskort (variabel höjd — CSS grid gör att rad 3+ börjar på samma Y) ── */}
+        <div style={{ background: "#0b0a07", borderLeft: "1px solid rgba(245,158,11,0.22)", borderRight: "1px solid rgba(245,158,11,0.22)", padding: "4px 20px 10px" }}>
           {auktioner.length === 0 ? (
-            <div style={{ fontSize: "11px", color: "#2a2200", fontFamily: "monospace", textAlign: "center", padding: "20px 0" }}>
-              Inga aktiva auktioner just nu
-            </div>
-          ) : (
-            auktioner.map(a => {
-              const zon     = a.mark_zoner || {};
-              const typFarg = TYP_FARG[zon.typ] || "#555";
-              const saljare = a.saljare || "Plattformen";
-              const saljFarg = a.saljare ? (AGENT_VISUELL[a.saljare]?.ikonFarg || "#888") : "#4a4a4a";
-              const budFarg = a.hogst_budgivare ? (AGENT_VISUELL[a.hogst_budgivare]?.ikonFarg || "#f59e0b") : null;
-              const harBud  = !!a.nuv_bud;
-              return (
-                <div key={a.id} style={{
-                  background: "#0d0c08",
-                  border: `1px solid ${rgba(typFarg, 0.25)}`,
-                  borderLeft: `3px solid ${rgba(typFarg, 0.70)}`,
-                  borderRadius: "0 6px 6px 0",
-                  padding: "10px 12px",
-                  marginBottom: "8px",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "12px", color: typFarg, fontFamily: "monospace", fontWeight: 700 }}>
-                      {TYP_IKON[zon.typ]} {zon.namn}
-                    </span>
-                    <span style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace", background: "#1a1200", padding: "1px 5px", borderRadius: "3px" }}>
-                      {timeLeft(a.stanger_at)}
-                    </span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                    <div>
-                      <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", marginBottom: "2px" }}>
-                        {a.saljare ? "SÄLJS AV" : "PLATTFORM"}
-                      </div>
-                      <div style={{ fontSize: "10px", color: saljFarg, fontFamily: "monospace" }}>
-                        {saljare}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      {harBud ? (
-                        <>
-                          <div style={{ fontSize: "13px", color: budFarg || "#f59e0b", fontFamily: "monospace", lineHeight: 1 }}>
-                            {a.nuv_bud} kr
-                          </div>
-                          <div style={{ fontSize: "9px", color: budFarg || "#888", fontFamily: "monospace" }}>
-                            ↑ {a.hogst_budgivare}
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div style={{ fontSize: "12px", color: "#555", fontFamily: "monospace", lineHeight: 1 }}>
-                            {a.reservpris} kr
-                          </div>
-                          <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>
-                            reservpris
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
+            <div style={{ fontSize: "11px", color: "#2a2200", fontFamily: "monospace", textAlign: "center", padding: "20px 0" }}>Inga aktiva auktioner just nu</div>
+          ) : auktioner.map(a => {
+            const zon     = a.mark_zoner || {};
+            const typFarg = TYP_FARG[zon.typ] || "#555";
+            const saljare = a.saljare || "Plattformen";
+            const saljFarg = a.saljare ? (AGENT_VISUELL[a.saljare]?.ikonFarg || "#888") : "#4a4a4a";
+            const budFarg = a.hogst_budgivare ? (AGENT_VISUELL[a.hogst_budgivare]?.ikonFarg || "#f59e0b") : null;
+            const harBud  = !!a.nuv_bud;
+            return (
+              <div key={a.id} style={{ background: "#0d0c08", border: `1px solid ${rgba(typFarg, 0.25)}`, borderLeft: `3px solid ${rgba(typFarg, 0.70)}`, borderRadius: "0 6px 6px 0", padding: "10px 12px", marginBottom: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "12px", color: typFarg, fontFamily: "monospace", fontWeight: 700 }}>{TYP_IKON[zon.typ]} {zon.namn}</span>
+                  <span style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace", background: "#1a1200", padding: "1px 5px", borderRadius: "3px" }}>{timeLeft(a.stanger_at)}</span>
                 </div>
-              );
-            })
-          )}
-
-          {/* Clearing-priser per zontyp */}
-          <div style={{ borderTop: "1px solid #1a1600", marginTop: "14px", paddingTop: "14px" }}>
-            <p style={{ fontSize: "9px", color: "#3a3000", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE CLEARING-PRISER</p>
-            {Object.keys(TYP_FARG).map(typ => {
-              const c = clearingPerTyp[typ];
-              const farg = TYP_FARG[typ];
-              return (
-                <div key={typ} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", background: "#0d0c08", borderLeft: `2px solid ${rgba(farg, 0.35)}`, borderRadius: "0 4px 4px 0", marginBottom: "3px" }}>
-                  <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>{TYP_IKON[typ]} {TYP_NAMN[typ]}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  <div>
+                    <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", marginBottom: "2px" }}>{a.saljare ? "SÄLJS AV" : "PLATTFORM"}</div>
+                    <div style={{ fontSize: "10px", color: saljFarg, fontFamily: "monospace" }}>{saljare}</div>
+                  </div>
                   <div style={{ textAlign: "right" }}>
-                    {c ? (
+                    {harBud ? (
                       <>
-                        <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace" }}>{c.pris} kr</div>
-                        <div style={{ fontSize: "8px", color: "#2a2a2a", fontFamily: "monospace" }}>{relativeTime(c.skapad)}</div>
+                        <div style={{ fontSize: "13px", color: budFarg || "#f59e0b", fontFamily: "monospace", lineHeight: 1 }}>{a.nuv_bud} kr</div>
+                        <div style={{ fontSize: "9px", color: budFarg || "#888", fontFamily: "monospace" }}>↑ {a.hogst_budgivare}</div>
                       </>
                     ) : (
-                      <div style={{ fontSize: "10px", color: "#2a2a2a", fontFamily: "monospace" }}>—</div>
+                      <>
+                        <div style={{ fontSize: "12px", color: "#555", fontFamily: "monospace", lineHeight: 1 }}>{a.reservpris} kr</div>
+                        <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>reservpris</div>
+                      </>
                     )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Senaste affärer */}
-          {transaktioner.length > 0 && (
-            <div style={{ borderTop: "1px solid #1a1600", marginTop: "14px", paddingTop: "14px" }}>
-              <p style={{ fontSize: "9px", color: "#3a3000", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE AFFÄRER</p>
-              {transaktioner.slice(0, 5).map((t, i) => {
-                const af = AGENT_VISUELL[t.kop_agent]?.ikonFarg || "#888";
-                return (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", background: "#0d0c08", borderLeft: `2px solid ${rgba(af, 0.35)}`, marginBottom: "4px", borderRadius: "0 4px 4px 0" }}>
-                    <div>
-                      <div style={{ fontSize: "10px", color: af, fontFamily: "monospace" }}>{t.kop_agent}</div>
-                      <div style={{ fontSize: "9px", color: "#3a3a3a" }}>{t.zon_namn}</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace" }}>{t.pris} kr</div>
-                      <div style={{ fontSize: "8px", color: "#2a2a2a", fontFamily: "monospace" }}>{relativeTime(t.skapad)}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+              </div>
+            );
+          })}
         </div>
-
-        {/* ── VARUMARKNAD ── */}
-        <div style={{
-          background: "#070b0d",
-          border: "1px solid rgba(8,145,178,0.22)",
-          borderRadius: "10px",
-          padding: "18px 20px",
-        }}>
-          {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", paddingBottom: "12px", borderBottom: "1px solid #001a20" }}>
-            <span style={{ fontSize: "18px" }}>📦</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: "12px", color: "#22d3ee", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>VARUMARKNAD</div>
-              <div style={{ fontSize: "9px", color: "#003040", fontFamily: "monospace" }}>BUDRUNDOR · VARUÄGARSKAP · 24H</div>
-            </div>
-            {varaAuktioner.length > 0 && (
-              <span style={{ fontSize: "10px", color: "#22d3ee", fontFamily: "monospace", background: "rgba(8,145,178,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(8,145,178,0.20)" }}>
-                {varaAuktioner.length} aktiva
-              </span>
-            )}
-          </div>
-
-          {/* Aktiva varuauktioner */}
+        <div style={{ background: "#070b0d", borderLeft: "1px solid rgba(8,145,178,0.22)", borderRight: "1px solid rgba(8,145,178,0.22)", padding: "4px 20px 10px" }}>
           {varaAuktioner.length === 0 ? (
-            <div style={{ fontSize: "11px", color: "#002030", fontFamily: "monospace", textAlign: "center", padding: "20px 0" }}>
-              Inga aktiva varuauktioner just nu
-            </div>
-          ) : (
-            varaAuktioner.map(a => {
-              const typ     = VARA_TYP[a.vara];
-              const typFarg = typ ? TYP_FARG[typ] : "#22d3ee";
-              const saljFarg = AGENT_VISUELL[a.saljare]?.ikonFarg || "#888";
-              const budFarg  = a.hogst_budgivare ? (AGENT_VISUELL[a.hogst_budgivare]?.ikonFarg || "#22d3ee") : null;
-              const harBud   = !!a.nuv_bud;
-              return (
-                <div key={a.id} style={{
-                  background: "#0a0f12",
-                  border: `1px solid ${rgba(typFarg, 0.25)}`,
-                  borderLeft: `3px solid ${rgba(typFarg, 0.70)}`,
-                  borderRadius: "0 6px 6px 0",
-                  padding: "10px 12px",
-                  marginBottom: "8px",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "12px", color: typFarg, fontFamily: "monospace", fontWeight: 700 }}>
-                      {VARA_IKON[a.vara]} {a.antal}× {a.vara}
-                    </span>
-                    <span style={{ fontSize: "9px", color: "#002030", fontFamily: "monospace", background: "#030f14", padding: "1px 5px", borderRadius: "3px" }}>
-                      {timeLeft(a.stanger_at)}
-                    </span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                    <div>
-                      <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", marginBottom: "2px" }}>SÄLJS AV</div>
-                      <div style={{ fontSize: "10px", color: saljFarg, fontFamily: "monospace" }}>{a.saljare}</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      {harBud ? (
-                        <>
-                          <div style={{ fontSize: "13px", color: budFarg || "#22d3ee", fontFamily: "monospace", lineHeight: 1 }}>{a.nuv_bud} kr</div>
-                          <div style={{ fontSize: "9px", color: budFarg || "#888", fontFamily: "monospace" }}>↑ {a.hogst_budgivare}</div>
-                        </>
-                      ) : (
-                        <>
-                          <div style={{ fontSize: "12px", color: "#555", fontFamily: "monospace", lineHeight: 1 }}>{a.reservpris} kr</div>
-                          <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>reservpris</div>
-                        </>
-                      )}
-                    </div>
-                  </div>
+            <div style={{ fontSize: "11px", color: "#002030", fontFamily: "monospace", textAlign: "center", padding: "20px 0" }}>Inga aktiva varuauktioner just nu</div>
+          ) : varaAuktioner.map(a => {
+            const typ     = VARA_TYP[a.vara];
+            const typFarg = typ ? TYP_FARG[typ] : "#22d3ee";
+            const saljFarg = AGENT_VISUELL[a.saljare]?.ikonFarg || "#888";
+            const budFarg  = a.hogst_budgivare ? (AGENT_VISUELL[a.hogst_budgivare]?.ikonFarg || "#22d3ee") : null;
+            const harBud   = !!a.nuv_bud;
+            return (
+              <div key={a.id} style={{ background: "#0a0f12", border: `1px solid ${rgba(typFarg, 0.25)}`, borderLeft: `3px solid ${rgba(typFarg, 0.70)}`, borderRadius: "0 6px 6px 0", padding: "10px 12px", marginBottom: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "12px", color: typFarg, fontFamily: "monospace", fontWeight: 700 }}>{VARA_IKON[a.vara]} {a.antal}× {a.vara}</span>
+                  <span style={{ fontSize: "9px", color: "#002030", fontFamily: "monospace", background: "#030f14", padding: "1px 5px", borderRadius: "3px" }}>{timeLeft(a.stanger_at)}</span>
                 </div>
-              );
-            })
-          )}
-
-          {/* Clearing-priser per vara */}
-          <div style={{ borderTop: "1px solid #001a20", marginTop: "14px", paddingTop: "14px" }}>
-            <p style={{ fontSize: "9px", color: "#003a4a", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE CLEARING-PRISER</p>
-            {Object.keys(VARA_IKON).map(vara => {
-              const c = clearingPerVara[vara];
-              const typ = VARA_TYP[vara];
-              const farg = typ ? TYP_FARG[typ] : "#22d3ee";
-              return (
-                <div key={vara} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", background: "#0a0f12", borderLeft: `2px solid ${rgba(farg, 0.35)}`, borderRadius: "0 4px 4px 0", marginBottom: "3px" }}>
-                  <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>{VARA_IKON[vara]} {vara}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  <div>
+                    <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", marginBottom: "2px" }}>SÄLJS AV</div>
+                    <div style={{ fontSize: "10px", color: saljFarg, fontFamily: "monospace" }}>{a.saljare}</div>
+                  </div>
                   <div style={{ textAlign: "right" }}>
-                    {c ? (
+                    {harBud ? (
                       <>
-                        <div style={{ fontSize: "11px", color: "#22d3ee", fontFamily: "monospace" }}>
-                          {c.pris} <span style={{ fontSize: "8px", color: "#003a4a" }}>kr/enhet</span>
-                        </div>
-                        <div style={{ fontSize: "8px", color: "#1a3a44", fontFamily: "monospace" }}>{relativeTime(c.skapad)}</div>
+                        <div style={{ fontSize: "13px", color: budFarg || "#22d3ee", fontFamily: "monospace", lineHeight: 1 }}>{a.nuv_bud} kr</div>
+                        <div style={{ fontSize: "9px", color: budFarg || "#888", fontFamily: "monospace" }}>↑ {a.hogst_budgivare}</div>
                       </>
                     ) : (
-                      <div style={{ fontSize: "10px", color: "#1a3a44", fontFamily: "monospace" }}>—</div>
+                      <>
+                        <div style={{ fontSize: "12px", color: "#555", fontFamily: "monospace", lineHeight: 1 }}>{a.reservpris} kr</div>
+                        <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>reservpris</div>
+                      </>
                     )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-
-          {/* Senaste handel */}
-          {handelLog.length > 0 && (
-            <div style={{ borderTop: "1px solid #001a20", paddingTop: "14px" }}>
-              <p style={{ fontSize: "9px", color: "#003a4a", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE HANDEL</p>
-              {handelLog.slice(0, 6).map((h, i) => {
-                const kFarg = AGENT_VISUELL[h.kop_agent]?.ikonFarg  || "#888";
-                const sFarg = AGENT_VISUELL[h.salj_agent]?.ikonFarg || "#555";
-                return (
-                  <div key={i} style={{ padding: "5px 8px", background: "#0a0f12", borderLeft: `2px solid ${rgba(kFarg, 0.35)}`, borderRadius: "0 4px 4px 0", marginBottom: "4px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "10px", fontFamily: "monospace" }}>
-                        {VARA_IKON[h.vara] || "📦"}{" "}
-                        <span style={{ color: kFarg }}>{h.kop_agent}</span>
-                        <span style={{ color: "#222" }}> ← </span>
-                        <span style={{ color: sFarg }}>{h.salj_agent}</span>
-                      </span>
-                      <span style={{ fontSize: "10px", color: "#22d3ee", fontFamily: "monospace" }}>{h.totalt} kr</span>
-                    </div>
-                    <div style={{ fontSize: "8px", color: "#1a3a44", fontFamily: "monospace", marginTop: "2px" }}>
-                      {h.antal}× {h.vara} · {relativeTime(h.skapad)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+              </div>
+            );
+          })}
         </div>
 
-      </div>{/* /marknader 2-kolumner */}
+        {/* ── ROW 3: Clearing-priser (alltid i linje) ── */}
+        <div style={{ background: "#0b0a07", borderLeft: "1px solid rgba(245,158,11,0.22)", borderRight: "1px solid rgba(245,158,11,0.22)", borderTop: "1px solid #1a1600", padding: "14px 20px" }}>
+          <p style={{ fontSize: "9px", color: "#3a3000", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE CLEARING-PRISER</p>
+          {Object.keys(TYP_FARG).map(typ => {
+            const c = clearingPerTyp[typ];
+            const farg = TYP_FARG[typ];
+            return (
+              <div key={typ} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", background: "#0d0c08", borderLeft: `2px solid ${rgba(farg, 0.35)}`, borderRadius: "0 4px 4px 0", marginBottom: "3px" }}>
+                <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>{TYP_IKON[typ]} {TYP_NAMN[typ]}</span>
+                <div style={{ textAlign: "right" }}>
+                  {c ? (
+                    <>
+                      <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace" }}>{c.pris} kr</div>
+                      <div style={{ fontSize: "8px", color: "#2a2a2a", fontFamily: "monospace" }}>{relativeTime(c.skapad)}</div>
+                    </>
+                  ) : <div style={{ fontSize: "10px", color: "#2a2a2a", fontFamily: "monospace" }}>—</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ background: "#070b0d", borderLeft: "1px solid rgba(8,145,178,0.22)", borderRight: "1px solid rgba(8,145,178,0.22)", borderTop: "1px solid #001a20", padding: "14px 20px" }}>
+          <p style={{ fontSize: "9px", color: "#003a4a", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE CLEARING-PRISER</p>
+          {Object.keys(VARA_IKON).map(vara => {
+            const c = clearingPerVara[vara];
+            const typ = VARA_TYP[vara];
+            const farg = typ ? TYP_FARG[typ] : "#22d3ee";
+            return (
+              <div key={vara} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", background: "#0a0f12", borderLeft: `2px solid ${rgba(farg, 0.35)}`, borderRadius: "0 4px 4px 0", marginBottom: "3px" }}>
+                <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>{VARA_IKON[vara]} {vara}</span>
+                <div style={{ textAlign: "right" }}>
+                  {c ? (
+                    <>
+                      <div style={{ fontSize: "11px", color: "#22d3ee", fontFamily: "monospace" }}>{c.pris} <span style={{ fontSize: "8px", color: "#003a4a" }}>kr/enhet</span></div>
+                      <div style={{ fontSize: "8px", color: "#1a3a44", fontFamily: "monospace" }}>{relativeTime(c.skapad)}</div>
+                    </>
+                  ) : <div style={{ fontSize: "10px", color: "#1a3a44", fontFamily: "monospace" }}>—</div>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── ROW 4: Senaste handel (alltid i linje) ── */}
+        <div style={{ background: "#0b0a07", borderLeft: "1px solid rgba(245,158,11,0.22)", borderRight: "1px solid rgba(245,158,11,0.22)", borderBottom: "1px solid rgba(245,158,11,0.22)", borderTop: "1px solid #1a1600", borderRadius: "0 0 10px 10px", padding: "14px 20px 18px" }}>
+          <p style={{ fontSize: "9px", color: "#3a3000", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE HANDEL</p>
+          {transaktioner.length === 0 ? (
+            <div style={{ fontSize: "10px", color: "#2a2200", fontFamily: "monospace", textAlign: "center", padding: "8px 0" }}>Ingen handel ännu</div>
+          ) : transaktioner.slice(0, 5).map((t, i) => {
+            const af = AGENT_VISUELL[t.kop_agent]?.ikonFarg || "#888";
+            return (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", background: "#0d0c08", borderLeft: `2px solid ${rgba(af, 0.35)}`, marginBottom: "4px", borderRadius: "0 4px 4px 0" }}>
+                <div>
+                  <div style={{ fontSize: "10px", color: af, fontFamily: "monospace" }}>{t.kop_agent}</div>
+                  <div style={{ fontSize: "9px", color: "#3a3a3a" }}>{t.zon_namn}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace" }}>{t.pris} kr</div>
+                  <div style={{ fontSize: "8px", color: "#2a2a2a", fontFamily: "monospace" }}>{relativeTime(t.skapad)}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ background: "#070b0d", borderLeft: "1px solid rgba(8,145,178,0.22)", borderRight: "1px solid rgba(8,145,178,0.22)", borderBottom: "1px solid rgba(8,145,178,0.22)", borderTop: "1px solid #001a20", borderRadius: "0 0 10px 10px", padding: "14px 20px 18px" }}>
+          <p style={{ fontSize: "9px", color: "#003a4a", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE HANDEL</p>
+          {handelLog.length === 0 ? (
+            <div style={{ fontSize: "10px", color: "#002030", fontFamily: "monospace", textAlign: "center", padding: "8px 0" }}>Ingen handel ännu</div>
+          ) : handelLog.slice(0, 6).map((h, i) => {
+            const kFarg = AGENT_VISUELL[h.kop_agent]?.ikonFarg  || "#888";
+            const sFarg = AGENT_VISUELL[h.salj_agent]?.ikonFarg || "#555";
+            return (
+              <div key={i} style={{ padding: "5px 8px", background: "#0a0f12", borderLeft: `2px solid ${rgba(kFarg, 0.35)}`, borderRadius: "0 4px 4px 0", marginBottom: "4px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "10px", fontFamily: "monospace" }}>
+                    {VARA_IKON[h.vara] || "📦"}{" "}
+                    <span style={{ color: kFarg }}>{h.kop_agent}</span>
+                    <span style={{ color: "#222" }}> ← </span>
+                    <span style={{ color: sFarg }}>{h.salj_agent}</span>
+                  </span>
+                  <span style={{ fontSize: "10px", color: "#22d3ee", fontFamily: "monospace" }}>{h.totalt} kr</span>
+                </div>
+                <div style={{ fontSize: "8px", color: "#1a3a44", fontFamily: "monospace", marginTop: "2px" }}>{h.antal}× {h.vara} · {relativeTime(h.skapad)}</div>
+              </div>
+            );
+          })}
+        </div>
+
+      </div>{/* /marknader 4-raders grid */}
     </div>
   );
 }
