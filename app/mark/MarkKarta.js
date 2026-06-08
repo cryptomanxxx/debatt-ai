@@ -640,7 +640,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             <span style={{ fontSize: "18px" }}>📦</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: "12px", color: "#22d3ee", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>VARUMARKNAD</div>
-              <div style={{ fontSize: "9px", color: "#003040", fontFamily: "monospace" }}>BUDRUNDOR · RÅVAROR · 24H</div>
+              <div style={{ fontSize: "9px", color: "#003040", fontFamily: "monospace" }}>BUDRUNDOR · VARUÄGARSKAP · 24H</div>
             </div>
             {varaAuktioner.length > 0 && (
               <span style={{ fontSize: "10px", color: "#22d3ee", fontFamily: "monospace", background: "rgba(8,145,178,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(8,145,178,0.20)" }}>
