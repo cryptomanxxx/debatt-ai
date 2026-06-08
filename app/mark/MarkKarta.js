@@ -40,8 +40,8 @@ const INSTITUTIONS = {
   "Kulturcentrum":    { icon: "⚖️", fullName: "AI-Domstolen",  color: "#f87171" },
 };
 
-// Pollinations.ai — AI-parlament megacity i centrum, seed=7777
-const TERRAIN_BG = "https://image.pollinations.ai/prompt/bright%20colorful%20hexagonal%20strategy%20game%20world%20map%20top-down%20view%2C%20Civilization%20VI%20art%20style%2C%20organic%20island%20landmass%20surrounded%20by%20calm%20ocean%20water%2C%20snow-capped%20grey%20mountain%20peaks%20in%20north%2C%20dense%20lush%20green%20ancient%20forest%20in%20northwest%20and%20northeast%20corners%2C%20DRAMATIC%20GLOWING%20AI%20PARLIAMENT%20MEGACITY%20in%20exact%20center%20with%20towering%20violet%20spires%20of%20light%20and%20cyberpunk%20purple%20neon%20illumination%20visible%20from%20above%2C%20futuristic%20skyscrapers%20glowing%20windows%20capital%20city%2C%20golden%20wheat%20farmland%20in%20west%2C%20amber%20volcanic%20geothermal%20energy%20terrain%20in%20east%2C%20blue%20coastal%20harbors%20on%20west%20and%20south%20edges%2C%20small%20forest%20in%20south%2C%20vibrant%20saturated%20colors%2C%20epic%20dramatic%20top-down%20lighting%2C%20highly%20detailed%20photorealistic%20terrain%2C%20no%20text%20no%20hexagons%20no%20UI%20no%20labels?width=530&height=490&nologo=true&seed=7777&model=flux";
+// Statisk tillgång — laddas ner av .github/workflows/download-terrain.yml
+const TERRAIN_BG = "/terrain-bg.jpg";
 
 const TERRAIN_STOPS = {
   energi:   [["#fef08a", 0.13], ["#f59e0b", 0.07], ["#78350f", 0.02]],
