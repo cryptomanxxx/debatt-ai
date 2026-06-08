@@ -164,6 +164,7 @@ jobs:
 
           git add -A
           git commit -m "fix(review): adresserar reviewkommentarer från $REVIEWER på PR $PR_NUM"
+          git pull --rebase origin "$BRANCH"
           git push origin "$BRANCH"
 
           # Kommentera på PR:n att fixes är pushade

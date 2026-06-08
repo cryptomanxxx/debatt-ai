@@ -31,7 +31,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Run Codestral analysis
         env:
@@ -48,4 +48,5 @@ jobs:
           git config user.email "noreply@debatt-ai.se"
           git add ai-bus/suggestions/ ai-bus/reports/
           git diff --cached --quiet || git commit -m "chore: Codestral-förslag $(date +%Y-%m-%d)"
+          git pull --rebase origin main
           git push

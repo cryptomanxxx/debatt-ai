@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS val_roster (
   UNIQUE(val_id, ip_hash)
 );
 
+-- Migrering: lägg till kalla på befintliga val_roster-tabeller (CREATE TABLE IF NOT EXISTS no-op:ar annars)
+ALTER TABLE val_roster ADD COLUMN IF NOT EXISTS kalla text not null default 'manniska';
+
 -- RLS
 ALTER TABLE riksdagsval ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Publik läsning val"    ON riksdagsval FOR SELECT USING (true);
