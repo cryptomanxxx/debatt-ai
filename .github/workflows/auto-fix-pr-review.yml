@@ -19,7 +19,15 @@ jobs:
         run: |
           REVIEWER="${{ github.event.review.user.login }}"
           STATE="${{ github.event.review.state }}"
-          echo "Reviewer: $REVIEWER, State: $STATE"
+          MERGED="${{ github.event.pull_request.merged }}"
+          echo "Reviewer: $REVIEWER, State: $STATE, Merged: $MERGED"
+
+          # Skippa om PR redan är mergad — review är på gammal kod
+          if [[ "$MERGED" == "true" ]]; then
+            echo "SKIP=true" >> "$GITHUB_ENV"
+            echo "Skippar — PR är redan mergad"
+            exit 0
+          fi
 
           # Skippa om det är auto-fix-boten själv (undvik loopar)
           if [[ "$REVIEWER" == "auto-fix-bot" ]] || [[ "$REVIEWER" == *"github-actions"* ]]; then
