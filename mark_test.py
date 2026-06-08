@@ -106,7 +106,7 @@ def sb_patch(path, data):
 def sb_upsert(table, data, on_conflict=None):
     url = f"{SB_URL}/rest/v1/{table}"
     if on_conflict:
-        url += f"?on_conflict={on_conflict}"
+        url += f"?on_conflict={urllib.parse.quote(on_conflict)}"
     r = httpx.post(
         url,
         headers={**_h(), "Prefer": "resolution=merge-duplicates"},
