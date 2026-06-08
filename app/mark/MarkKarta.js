@@ -149,7 +149,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     leaderMap[a.agent].antal++;
     leaderMap[a.agent].ink += dagInk(z.veckoinkomst);
   });
-  const leaders = Object.entries(leaderMap).sort((a, b) => b[1].ink - a[1].ink).slice(0, 8);
+  const leaders = Object.entries(leaderMap).sort((a, b) => b[1].antal - a[1].antal).slice(0, 8);
   const maxInk = leaders[0]?.[1].ink || 1;
   const totalInk = agare.reduce((s, a) => {
     const z = zoner.find(z => z.id === a.zon_id);
