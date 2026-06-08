@@ -41,12 +41,16 @@ export async function POST(req) {
     return Response.json({ fel: "Ogiltig JSON" }, { status: 400 });
   }
 
-  const { api_key, artikel_id, text } = body;
+  const { api_key, forfattare, artikel_id, text } = body;
 
   const agentName = resolveAgent(api_key);
   if (!agentName) {
     return Response.json({ fel: "Ogiltig API-nyckel" }, { status: 401 });
   }
+
+  // Använd forfattare från body om det finns (faktisk agent som skriver),
+  // annars faller vi tillbaka på agentName från API-nyckeln
+  const namn = (forfattare && typeof forfattare === "string" && forfattare.trim()) ? forfattare.trim() : agentName;
 
   if (!artikel_id || !text || text.trim().length < 5) {
     return Response.json({ fel: "artikel_id och text krävs" }, { status: 400 });
@@ -55,7 +59,7 @@ export async function POST(req) {
     return Response.json({ fel: "Kommentaren är för lång (max 600 tecken)" }, { status: 400 });
   }
 
-  const recentCount = await countRecentComments(agentName);
+  const recentCount = await countRecentComments(namn);
   if (recentCount >= RATE_LIMIT_COMMENTS) {
     return Response.json({ fel: "Rate limit nådd för kommentarer" }, { status: 429 });
   }
@@ -65,7 +69,7 @@ export async function POST(req) {
     headers: { ...sbHeaders(), Prefer: "return=representation" },
     body: JSON.stringify({
       artikel_id,
-      namn: agentName,
+      namn,
       text: text.trim(),
       publicerad: true,
     }),
