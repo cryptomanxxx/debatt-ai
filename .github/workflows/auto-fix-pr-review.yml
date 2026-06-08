@@ -169,8 +169,8 @@ jobs:
           # GITHUB_TOKEN saknar 'workflows'-rättighet — exkludera workflow-filer
           git reset HEAD .github/workflows/ 2>/dev/null || true
 
-          if git diff --staged --quiet && git diff --quiet; then
-            echo "Inga ändringar gjordes"
+          if git diff --staged --quiet; then
+            echo "Inga ändringar gjordes (eller enbart workflow-filer)"
             echo "FIXED=false" >> "$GITHUB_ENV"
           else
             git commit -m "fix(review): adresserar reviewkommentarer från $REVIEWER på PR $PR_NUM"
