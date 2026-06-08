@@ -83,21 +83,28 @@ def sb_patch(path, data):
 
 
 def betala_daglig_mark_inkomst():
-    """Betalar ut daglig markinkomst (= veckoinkomst) till alla markägare."""
+    """Betalar ut daglig markinkomst skalad med zontyp-prismodell (resurspriser)."""
     print("\n── Daglig markinkomst ──")
     try:
-        agare_rows = sb_get("mark_agare?select=agent,mark_zoner(veckoinkomst,namn)")
+        agare_rows = sb_get("mark_agare?select=agent,mark_zoner(veckoinkomst,namn,typ)")
         if not agare_rows:
             print("  Inga markägare ännu.")
             return
 
-        # Summera daglig inkomst per agent (= veckoinkomst)
+        # Hämta prismodell (multiplier per zontyp) — fail-open om tabellen saknas
+        resurs_rows = sb_get("resurspriser?select=typ,pris_multiplier") or []
+        multiplier: dict = {r["typ"]: float(r.get("pris_multiplier") or 1.0) for r in resurs_rows}
+
+        # Summera daglig inkomst per agent, skalad med prismodellen
         inkomst: dict = {}
         zoner_per_agent: dict = {}
         for row in agare_rows:
             zon = row.get("mark_zoner") or {}
             agent = row["agent"]
-            dag_ink = int(zon.get("veckoinkomst") or 0)
+            bas = int(zon.get("veckoinkomst") or 0)
+            typ = zon.get("typ", "")
+            mult = multiplier.get(typ, 1.0)
+            dag_ink = round(bas * mult)
             inkomst[agent] = inkomst.get(agent, 0) + dag_ink
             zoner_per_agent.setdefault(agent, []).append(zon.get("namn", "?"))
 
@@ -262,8 +269,12 @@ def main():
 
     print(f"\nKörning klar. {len(kop_lista)} köp genomförda.")
 
-    # Betala ut daglig markinkomst till alla markägare
+    # Betala ut daglig markinkomst till alla markägare (skalad med resurspriser)
     betala_daglig_mark_inkomst()
+
+    # Uppdatera dynamiska resurspriser för nästa körning
+    from supabase_utils import berakna_och_spara_resurspriser
+    berakna_och_spara_resurspriser(SB_KEY)
 
 
 if __name__ == "__main__":
