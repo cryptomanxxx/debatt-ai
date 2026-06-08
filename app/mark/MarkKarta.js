@@ -438,8 +438,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           </div>
         )}
 
-        {/* ── ETT GEMENSAMT KORT med stats + 2 kolumner ── */}
-        <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: "8px", overflow: "hidden", gridColumn: "span 2" }}>
+        {/* ── ETT GEMENSAMT KORT med stats + 2 kolumner (col 2, 2fr) ── */}
+        <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: "8px", overflow: "hidden" }}>
 
           {/* Statistikrad — header-rad i kortets topp */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", padding: "14px 16px", borderBottom: "1px solid #1e1e1e", background: "#111" }}>
