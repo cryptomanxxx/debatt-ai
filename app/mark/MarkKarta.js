@@ -284,7 +284,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           </g>
 
           {zoner.filter(zon => INSTITUTIONS[zon.namn]).map(zon => {
-            const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
+            const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row, OX, OY);
             const inst = INSTITUTIONS[zon.namn];
             return (
               <g key={`inst-${zon.id}`} style={{ pointerEvents: "none" }}>
