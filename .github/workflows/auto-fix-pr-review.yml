@@ -165,37 +165,46 @@ jobs:
           git config user.name  "auto-fix-bot"
           git config user.email "bot@debatt-ai.se"
 
-          if git diff --quiet && git diff --cached --quiet; then
-            echo "Inga ändringar gjordes — avslutar"
-            exit 0
-          fi
-
           git add -A
           # GITHUB_TOKEN saknar 'workflows'-rättighet — exkludera workflow-filer
           git reset HEAD .github/workflows/ 2>/dev/null || true
-          if git diff --staged --quiet; then
-            echo "Inga ändringar kvar efter exkludering av workflow-filer — avslutar"
-            exit 0
+
+          if git diff --staged --quiet && git diff --quiet; then
+            echo "Inga ändringar gjordes"
+            echo "FIXED=false" >> "$GITHUB_ENV"
+          else
+            git commit -m "fix(review): adresserar reviewkommentarer från $REVIEWER på PR $PR_NUM"
+            git pull --rebase origin "$BRANCH"
+            git push origin "$BRANCH"
+            echo "FIXED=true" >> "$GITHUB_ENV"
           fi
-          git commit -m "fix(review): adresserar reviewkommentarer från $REVIEWER på PR $PR_NUM"
-          git pull --rebase origin "$BRANCH"
-          git push origin "$BRANCH"
 
-          # Kommentera på PR:n att fixes är pushade
-          {
-            echo "🤖 **Auto-fix** har adresserat reviewkommentarerna från @${REVIEWER}."
-            echo ""
-            echo "### Vad som fixades"
-            echo '```'
-            head -40 /tmp/claude_review_output.txt
-            echo '```'
-            echo ""
-            echo "*Kontrollera gärna ändringarna innan merge.*"
-          } > /tmp/pr_comment.txt
-
+      - name: Posta statuskomentar på PR
+        if: env.SKIP == 'false' && env.CLAUDE_INSTALLED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "$FIXED" == "true" ]]; then
+            {
+              echo "✅ **Auto-fix** har adresserat reviewkommentarerna från @${REVIEWER} och pushade fixes till \`${BRANCH}\`."
+              echo ""
+              echo "### Vad som fixades"
+              echo '```'
+              head -40 /tmp/claude_review_output.txt
+              echo '```'
+              echo ""
+              echo "*Kontrollera gärna ändringarna innan merge.*"
+            } > /tmp/pr_comment.txt
+          else
+            {
+              echo "🔍 **Auto-fix** körde Claude Code på reviewkommentarerna från @${REVIEWER} — inga kodändringar behövdes."
+              echo ""
+              echo '```'
+              head -20 /tmp/claude_review_output.txt
+              echo '```'
+            } > /tmp/pr_comment.txt
+          fi
           gh pr comment "$PR_NUM" --body-file /tmp/pr_comment.txt
-
-          echo "Fixes pushade direkt till $BRANCH"
 
       - name: Sätt label auto-fix på PR
         if: env.SKIP == 'false' && env.CLAUDE_INSTALLED == 'true'
