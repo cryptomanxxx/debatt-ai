@@ -253,7 +253,8 @@ async function getSaldoSpelHistorik() {
   ]);
   if (!betsRes.ok) return [];
   const bets = await betsRes.json();
-  const saldonRows = saldonRes.ok ? await saldonRes.json() : [];
+  const saldonOk = saldonRes.ok;
+  const saldonRows = saldonOk ? await saldonRes.json() : [];
   const currentSaldon = Object.fromEntries(saldonRows.map(r => [r.agent, r.saldo_spel ?? 200]));
 
   const relevant = bets.filter(b => b.insats > 0);
@@ -285,7 +286,9 @@ async function getSaldoSpelHistorik() {
   });
 
   // Normalisera: förskjut varje agents linje så att sista punkten = faktiskt saldo_spel.
-  // Detta kompenserar för top-ups, stipendium och andra justeringar utanför bet-historiken.
+  // Hoppas över om saldo-hämtningen misslyckades — visa rå bet-historik istället för att förvränga den.
+  if (!saldonOk) return seriesData;
+
   const offset = Object.fromEntries(
     allAgents.map(a => [a, (currentSaldon[a] ?? 200) - balances[a]])
   );
