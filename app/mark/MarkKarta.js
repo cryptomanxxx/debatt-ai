@@ -140,21 +140,14 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const agentGrads = [...new Set(agare.map(a => a.agent))]
     .map(name => ({ name, farg: AGENT_VISUELL[name]?.ikonFarg || "#888" }));
 
-  const dagInk = v => Math.round(v);
   const leaderMap = {};
   agare.forEach(a => {
     const z = zoner.find(z => z.id === a.zon_id);
     if (!z) return;
-    if (!leaderMap[a.agent]) leaderMap[a.agent] = { antal: 0, ink: 0 };
+    if (!leaderMap[a.agent]) leaderMap[a.agent] = { antal: 0 };
     leaderMap[a.agent].antal++;
-    leaderMap[a.agent].ink += dagInk(z.veckoinkomst);
   });
   const leaders = Object.entries(leaderMap).sort((a, b) => b[1].antal - a[1].antal).slice(0, 8);
-  const maxInk = leaders[0]?.[1].ink || 1;
-  const totalInk = agare.reduce((s, a) => {
-    const z = zoner.find(z => z.id === a.zon_id);
-    return s + dagInk(z?.veckoinkomst || 0);
-  }, 0);
 
   // Resurspriser: map typ → { pris_multiplier, trend, uppdaterad }
   const resursMap = Object.fromEntries(resurspriser.map(r => [r.typ, r]));
@@ -207,7 +200,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     setHover(zon);
     const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row, OX, OY);
     const id = Math.random();
-    setFloats(prev => [...prev.slice(-4), { id, cx, cy, ink: dagInk(zon.veckoinkomst) }]);
+    setFloats(prev => [...prev.slice(-4), { id, cx, cy }]);
     setTimeout(() => setFloats(prev => prev.filter(f => f.id !== id)), 1600);
   }
 
@@ -355,13 +348,11 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="url(#vignette)" style={{ pointerEvents: "none" }} />
 
           {floats.map(f => (
-            <text key={f.id} x={f.cx} y={f.cy - 20} textAnchor="middle"
-              fill="#fbbf24" fontSize="12" fontFamily="monospace" fontWeight="700"
-              filter="url(#softglow)" style={{ pointerEvents: "none" }}>
-              +{f.ink}kr/dag
-              <animate attributeName="opacity" from="1" to="0" dur="1.5s" fill="freeze" />
-              <animateTransform attributeName="transform" type="translate" from="0 0" to="0 -52" dur="1.5s" fill="freeze" />
-            </text>
+            <circle key={f.id} cx={f.cx} cy={f.cy - 16} r="5"
+              fill="#fbbf24" filter="url(#softglow)" style={{ pointerEvents: "none" }}>
+              <animate attributeName="opacity" from="0.9" to="0" dur="1.2s" fill="freeze" />
+              <animateTransform attributeName="transform" type="translate" from="0 0" to="0 -36" dur="1.2s" fill="freeze" />
+            </circle>
           ))}
 
           <text x="12" y="18" fontSize="9" fill="#1a3050" fontFamily="monospace" letterSpacing="0.12em">
