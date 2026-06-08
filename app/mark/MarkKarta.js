@@ -432,9 +432,10 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           )}
         </div>
 
+        {/* ── KOL 3: RESURSPRISER ── */}
         {resurspriser.length > 0 && (
-          <div>
-            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>RESURSPRISER</p>
+          <div style={{ background: "#0a0a0a", border: "1px solid #161616", borderRadius: "8px", padding: "14px 16px" }}>
+            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 12px" }}>RESURSPRISER</p>
             {Object.keys(TYP_FARG).map(typ => {
               const r = resursMap[typ];
               if (!r) return null;
@@ -445,7 +446,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               const trendFarg = trend === "stigande" ? "#4ade80" : trend === "fallande" ? "#f87171" : "#666";
               const barW = Math.round(Math.min(100, (mult / 2.0) * 100));
               return (
-                <div key={typ} style={{ marginBottom: "7px" }}>
+                <div key={typ} style={{ marginBottom: "8px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
                     <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>
                       {TYP_IKON[typ]} {TYP_NAMN[typ]}
@@ -466,80 +467,84 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           </div>
         )}
 
-        {transaktioner.length > 0 && (
-          <div>
-            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE KÖP</p>
-            {transaktioner.slice(0, 8).map((t, i) => {
-              const af = AGENT_VISUELL[t.kop_agent]?.ikonFarg || "#888";
-              return (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 8px", background: "#0a0a0a", borderLeft: `2px solid ${rgba(af, 0.4)}`, marginBottom: "4px", borderRadius: "0 4px 4px 0" }}>
-                  <div>
-                    <div style={{ fontSize: "10px", color: af, fontFamily: "monospace" }}>{t.kop_agent}</div>
-                    <div style={{ fontSize: "9px", color: "#444" }}>{t.zon_namn}</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace" }}>{t.pris} kr</div>
-                    <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>{relativeTime(t.skapad)}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+      </div>{/* /3-kolumns grid */}
 
-        {/* ── AUKTIONER ── */}
-        <div>
-          <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>
-            AUKTIONER{auktioner.length > 0 ? ` · ${auktioner.length} AKTIVA` : ""}
-          </p>
+      {/* ══ MARKNADER — 2 kolumner ══ */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px", marginTop: "16px" }}>
+
+        {/* ── MARKAUKTIONER ── */}
+        <div style={{
+          background: "#0b0a07",
+          border: "1px solid rgba(245,158,11,0.22)",
+          borderRadius: "10px",
+          padding: "18px 20px",
+        }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", paddingBottom: "12px", borderBottom: "1px solid #1a1600" }}>
+            <span style={{ fontSize: "18px" }}>🏷️</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "12px", color: "#f59e0b", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>MARKAUKTIONER</div>
+              <div style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace" }}>BUDRUNDOR · ZONÄGARSKAP · 48H</div>
+            </div>
+            {auktioner.length > 0 && (
+              <span style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "monospace", background: "rgba(245,158,11,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(245,158,11,0.20)" }}>
+                {auktioner.length} aktiva
+              </span>
+            )}
+          </div>
+
+          {/* Aktiva auktioner */}
           {auktioner.length === 0 ? (
-            <div style={{ fontSize: "11px", color: "#2a2a2a", fontFamily: "monospace", textAlign: "center", padding: "16px 0" }}>
-              Inga aktiva auktioner
+            <div style={{ fontSize: "11px", color: "#2a2200", fontFamily: "monospace", textAlign: "center", padding: "20px 0" }}>
+              Inga aktiva auktioner just nu
             </div>
           ) : (
             auktioner.map(a => {
-              const zon      = a.mark_zoner || {};
-              const typFarg  = TYP_FARG[zon.typ] || "#555";
-              const saljFarg = AGENT_VISUELL[a.saljare]?.ikonFarg || "#888";
-              const budFarg  = a.hogst_budgivare ? (AGENT_VISUELL[a.hogst_budgivare]?.ikonFarg || "#f59e0b") : null;
+              const zon     = a.mark_zoner || {};
+              const typFarg = TYP_FARG[zon.typ] || "#555";
+              const saljare = a.saljare || "Plattformen";
+              const saljFarg = a.saljare ? (AGENT_VISUELL[a.saljare]?.ikonFarg || "#888") : "#4a4a4a";
+              const budFarg = a.hogst_budgivare ? (AGENT_VISUELL[a.hogst_budgivare]?.ikonFarg || "#f59e0b") : null;
+              const harBud  = !!a.nuv_bud;
               return (
                 <div key={a.id} style={{
-                  background: "#0a0a0a",
-                  borderLeft: `2px solid ${rgba(typFarg, 0.55)}`,
-                  borderRadius: "0 4px 4px 0",
-                  padding: "8px 10px",
-                  marginBottom: "6px",
+                  background: "#0d0c08",
+                  border: `1px solid ${rgba(typFarg, 0.25)}`,
+                  borderLeft: `3px solid ${rgba(typFarg, 0.70)}`,
+                  borderRadius: "0 6px 6px 0",
+                  padding: "10px 12px",
+                  marginBottom: "8px",
                 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
-                    <span style={{ fontSize: "11px", color: typFarg, fontFamily: "monospace", fontWeight: 700 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "12px", color: typFarg, fontFamily: "monospace", fontWeight: 700 }}>
                       {TYP_IKON[zon.typ]} {zon.namn}
                     </span>
-                    <span style={{ fontSize: "8px", color: "#444", fontFamily: "monospace" }}>
+                    <span style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace", background: "#1a1200", padding: "1px 5px", borderRadius: "3px" }}>
                       {timeLeft(a.stanger_at)}
                     </span>
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                     <div>
-                      <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>
-                        SÄLJS AV
+                      <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", marginBottom: "2px" }}>
+                        {a.saljare ? "SÄLJS AV" : "PLATTFORM"}
                       </div>
                       <div style={{ fontSize: "10px", color: saljFarg, fontFamily: "monospace" }}>
-                        {a.saljare}
+                        {saljare}
                       </div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      {a.nuv_bud ? (
+                      {harBud ? (
                         <>
-                          <div style={{ fontSize: "12px", color: budFarg || "#f59e0b", fontFamily: "monospace", lineHeight: 1 }}>
+                          <div style={{ fontSize: "13px", color: budFarg || "#f59e0b", fontFamily: "monospace", lineHeight: 1 }}>
                             {a.nuv_bud} kr
                           </div>
-                          <div style={{ fontSize: "8px", color: budFarg || "#888", fontFamily: "monospace" }}>
-                            {a.hogst_budgivare}
+                          <div style={{ fontSize: "9px", color: budFarg || "#888", fontFamily: "monospace" }}>
+                            ↑ {a.hogst_budgivare}
                           </div>
                         </>
                       ) : (
                         <>
-                          <div style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", lineHeight: 1 }}>
+                          <div style={{ fontSize: "12px", color: "#555", fontFamily: "monospace", lineHeight: 1 }}>
                             {a.reservpris} kr
                           </div>
                           <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace" }}>
@@ -553,115 +558,144 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               );
             })
           )}
+
+          {/* Avskiljare */}
+          {transaktioner.length > 0 && (
+            <div style={{ borderTop: "1px solid #1a1600", marginTop: "14px", paddingTop: "14px" }}>
+              <p style={{ fontSize: "9px", color: "#3a3000", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE AFFÄRER</p>
+              {transaktioner.slice(0, 6).map((t, i) => {
+                const af = AGENT_VISUELL[t.kop_agent]?.ikonFarg || "#888";
+                return (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", background: "#0d0c08", borderLeft: `2px solid ${rgba(af, 0.35)}`, marginBottom: "4px", borderRadius: "0 4px 4px 0" }}>
+                    <div>
+                      <div style={{ fontSize: "10px", color: af, fontFamily: "monospace" }}>{t.kop_agent}</div>
+                      <div style={{ fontSize: "9px", color: "#3a3a3a" }}>{t.zon_namn}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace" }}>{t.pris} kr</div>
+                      <div style={{ fontSize: "8px", color: "#2a2a2a", fontFamily: "monospace" }}>{relativeTime(t.skapad)}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* ── VARUMARKNAD ── */}
-        {(() => {
-          // Beräkna aktuella priser: BASPRIS × resurspriser-multiplier
-          const priser = Object.entries(TYP_VARA).map(([typ, vara]) => {
-            const r = resursMap[typ];
-            const mult = r ? parseFloat(r.pris_multiplier) || 1.0 : 1.0;
-            return { vara, typ, pris: Math.round(BASPRIS_VARA[vara] * mult * 10) / 10, mult };
-          });
-          return (
-            <div>
-              <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>
-                VARUMARKNAD
-              </p>
-              {priser.map(({ vara, typ, pris }) => {
-                const farg = TYP_FARG[typ] || "#888";
-                return (
-                  <div key={vara} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
-                    <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>
-                      {VARA_IKON[vara]} {vara}
-                    </span>
-                    <span style={{ fontSize: "11px", color: "#c8c4bc", fontFamily: "monospace" }}>
-                      {pris} kr
-                    </span>
-                  </div>
-                );
-              })}
+        <div style={{
+          background: "#070b0d",
+          border: "1px solid rgba(8,145,178,0.22)",
+          borderRadius: "10px",
+          padding: "18px 20px",
+        }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", paddingBottom: "12px", borderBottom: "1px solid #001a20" }}>
+            <span style={{ fontSize: "18px" }}>📦</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "12px", color: "#22d3ee", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>VARUMARKNAD</div>
+              <div style={{ fontSize: "9px", color: "#003040", fontFamily: "monospace" }}>RÅVARUHANDEL · PRODUCERADE VAROR</div>
             </div>
-          );
-        })()}
+          </div>
 
-        {/* ── AGENTLAGER ── */}
-        {lager.length > 0 && (() => {
-          // Summera lagervärde per agent
-          const varuMap = Object.fromEntries(
-            Object.entries(TYP_VARA).map(([typ, vara]) => {
+          {/* Varupriser */}
+          {(() => {
+            const priser = Object.entries(TYP_VARA).map(([typ, vara]) => {
               const r = resursMap[typ];
               const mult = r ? parseFloat(r.pris_multiplier) || 1.0 : 1.0;
-              return [vara, Math.round(BASPRIS_VARA[vara] * mult * 10) / 10];
-            })
-          );
-          const agentVarden = {};
-          for (const row of lager) {
-            const varde = (row.antal || 0) * (varuMap[row.vara] || 0);
-            agentVarden[row.agent] = (agentVarden[row.agent] || 0) + varde;
-          }
-          const topAgenter = Object.entries(agentVarden)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 5);
-          if (topAgenter.length === 0) return null;
-          const maxV = topAgenter[0][1] || 1;
-          return (
-            <div>
-              <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>
-                AGENTLAGER (värde)
-              </p>
-              {topAgenter.map(([agent, varde], i) => {
-                const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
-                return (
-                  <div key={agent} style={{ marginBottom: "7px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
-                      <span style={{ fontSize: "10px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
-                      <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace" }}>{Math.round(varde)} kr</span>
+              const trend = r?.trend;
+              return { vara, typ, pris: Math.round(BASPRIS_VARA[vara] * mult * 10) / 10, mult, trend };
+            });
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "16px" }}>
+                {priser.map(({ vara, typ, pris, trend }) => {
+                  const farg = TYP_FARG[typ] || "#888";
+                  const trendIkon = trend === "stigande" ? "↑" : trend === "fallande" ? "↓" : "";
+                  const trendFarg = trend === "stigande" ? "#4ade80" : trend === "fallande" ? "#f87171" : "#888";
+                  return (
+                    <div key={vara} style={{ background: "#0a0f12", border: `1px solid ${rgba(farg, 0.15)}`, borderRadius: "5px", padding: "7px 9px" }}>
+                      <div style={{ fontSize: "9px", color: farg, fontFamily: "monospace", marginBottom: "3px" }}>
+                        {VARA_IKON[vara]} {vara}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
+                        <span style={{ fontSize: "14px", color: "#c8c4bc", fontFamily: "monospace", lineHeight: 1 }}>{pris}</span>
+                        <span style={{ fontSize: "9px", color: "#444", fontFamily: "monospace" }}>kr</span>
+                        {trendIkon && <span style={{ fontSize: "9px", color: trendFarg, fontFamily: "monospace" }}>{trendIkon}</span>}
+                      </div>
                     </div>
-                    <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
-                      <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(varde / maxV) * 100}%`, opacity: 0.6 }} />
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Agentlager */}
+          {lager.length > 0 && (() => {
+            const varuMap = Object.fromEntries(
+              Object.entries(TYP_VARA).map(([typ, vara]) => {
+                const r = resursMap[typ];
+                const mult = r ? parseFloat(r.pris_multiplier) || 1.0 : 1.0;
+                return [vara, Math.round(BASPRIS_VARA[vara] * mult * 10) / 10];
+              })
+            );
+            const agentVarden = {};
+            for (const row of lager) {
+              const varde = (row.antal || 0) * (varuMap[row.vara] || 0);
+              agentVarden[row.agent] = (agentVarden[row.agent] || 0) + varde;
+            }
+            const topAgenter = Object.entries(agentVarden).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            if (topAgenter.length === 0) return null;
+            const maxV = topAgenter[0][1] || 1;
+            return (
+              <div style={{ borderTop: "1px solid #001a20", paddingTop: "14px", marginBottom: "14px" }}>
+                <p style={{ fontSize: "9px", color: "#003a4a", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>AGENTLAGER (värde)</p>
+                {topAgenter.map(([agent, varde], i) => {
+                  const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
+                  return (
+                    <div key={agent} style={{ marginBottom: "7px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
+                        <span style={{ fontSize: "10px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
+                        <span style={{ fontSize: "10px", color: "#2a4a55", fontFamily: "monospace" }}>{Math.round(varde)} kr</span>
+                      </div>
+                      <div style={{ height: "2px", background: "#0a1518", borderRadius: "2px" }}>
+                        <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(varde / maxV) * 100}%`, opacity: 0.6 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          {/* Senaste handel */}
+          {handelLog.length > 0 && (
+            <div style={{ borderTop: "1px solid #001a20", paddingTop: "14px" }}>
+              <p style={{ fontSize: "9px", color: "#003a4a", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE HANDEL</p>
+              {handelLog.slice(0, 6).map((h, i) => {
+                const kFarg = AGENT_VISUELL[h.kop_agent]?.ikonFarg  || "#888";
+                const sFarg = AGENT_VISUELL[h.salj_agent]?.ikonFarg || "#555";
+                return (
+                  <div key={i} style={{ padding: "5px 8px", background: "#0a0f12", borderLeft: `2px solid ${rgba(kFarg, 0.35)}`, borderRadius: "0 4px 4px 0", marginBottom: "4px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "10px", fontFamily: "monospace" }}>
+                        {VARA_IKON[h.vara] || "📦"}{" "}
+                        <span style={{ color: kFarg }}>{h.kop_agent}</span>
+                        <span style={{ color: "#222" }}> ← </span>
+                        <span style={{ color: sFarg }}>{h.salj_agent}</span>
+                      </span>
+                      <span style={{ fontSize: "10px", color: "#22d3ee", fontFamily: "monospace" }}>{h.totalt} kr</span>
+                    </div>
+                    <div style={{ fontSize: "8px", color: "#1a3a44", fontFamily: "monospace", marginTop: "2px" }}>
+                      {h.antal}× {h.vara} · {relativeTime(h.skapad)}
                     </div>
                   </div>
                 );
               })}
             </div>
-          );
-        })()}
+          )}
+        </div>
 
-        {/* ── SENASTE HANDEL ── */}
-        {handelLog.length > 0 && (
-          <div>
-            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>
-              SENASTE HANDEL
-            </p>
-            {handelLog.slice(0, 8).map((h, i) => {
-              const kFarg = AGENT_VISUELL[h.kop_agent]?.ikonFarg  || "#888";
-              const sFarg = AGENT_VISUELL[h.salj_agent]?.ikonFarg || "#555";
-              return (
-                <div key={i} style={{
-                  padding: "6px 8px", background: "#0a0a0a",
-                  borderLeft: `2px solid ${rgba(kFarg, 0.4)}`,
-                  borderRadius: "0 4px 4px 0", marginBottom: "4px",
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "10px", fontFamily: "monospace" }}>
-                      {VARA_IKON[h.vara] || "📦"}{" "}
-                      <span style={{ color: kFarg }}>{h.kop_agent}</span>
-                      <span style={{ color: "#333" }}> ← </span>
-                      <span style={{ color: sFarg }}>{h.salj_agent}</span>
-                    </span>
-                    <span style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "monospace" }}>{h.totalt} kr</span>
-                  </div>
-                  <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>
-                    {h.antal}× {h.vara} · {relativeTime(h.skapad)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-      </div>
+      </div>{/* /marknader 2-kolumner */}
     </div>
   );
 }
