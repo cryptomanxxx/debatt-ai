@@ -205,8 +205,88 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               <feGaussianBlur stdDeviation="5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
+            <filter id="terrain-noise" x="0%" y="0%" width="100%" height="100%" colorInterpolationFilters="sRGB">
+              <feTurbulence type="fractalNoise" baseFrequency="0.48" numOctaves="4" seed="11" />
+              <feColorMatrix type="matrix" values="0 0 0 0 0.04  0 0 0 0 0.08  0 0 0 0 0.02  0 0 0 0.20 0" />
+            </filter>
+            <filter id="water-noise" x="0%" y="0%" width="100%" height="100%" colorInterpolationFilters="sRGB">
+              <feTurbulence type="turbulence" baseFrequency="0.012 0.035" numOctaves="2" seed="3" />
+              <feColorMatrix type="matrix" values="0 0 0 0 0.01  0 0 0 0 0.05  0 0 0 0 0.14  0 0 0 0.28 0" />
+            </filter>
           </defs>
 
+          {/* ── TERRAIN BACKGROUND ── */}
+          <g style={{ pointerEvents: "none" }}>
+            {/* Deep ocean */}
+            <rect width={SVG_W} height={SVG_H} fill="#030c19" />
+            {/* Water shimmer */}
+            <rect width={SVG_W} height={SVG_H} filter="url(#water-noise)" />
+            {/* Shallow coastal shelf — south-west */}
+            <path d="M 0 340 C 25 310, 60 320, 55 370 C 50 410, 20 450, 0 470 Z"
+              fill="#071525" opacity="0.9" />
+            {/* Shallow coastal shelf — north-east */}
+            <path d="M 460 0 C 495 10, 525 40, 530 90 C 530 130, 510 150, 478 140
+              C 450 130, 440 95, 448 55 C 452 28, 460 0, 460 0 Z"
+              fill="#071525" opacity="0.8" />
+            {/* Main continental landmass */}
+            <path d="M 28 42 C 80 22, 190 14, 310 18 C 400 21, 468 38, 512 75
+              C 530 105, 527 185, 522 268 C 517 348, 502 408, 468 450
+              C 432 480, 366 490, 272 488 C 178 486, 92 474, 46 452
+              C 12 434, 3 398, 6 338 C 10 258, 16 148, 28 42 Z"
+              fill="#0d1b09" />
+            {/* Highland plateau — upper-center */}
+            <path d="M 148 28 C 198 14, 308 18, 378 50 C 418 72, 426 118, 398 155
+              C 366 196, 284 204, 210 186 C 148 170, 126 116, 136 66
+              C 140 46, 148 28, 148 28 Z"
+              fill="#111e0c" opacity="0.88" />
+            {/* Eastern ridge */}
+            <path d="M 430 185 C 478 170, 518 200, 520 258 C 522 316, 494 368, 452 382
+              C 408 396, 374 366, 372 316 C 370 260, 396 202, 430 185 Z"
+              fill="#101b0d" opacity="0.75" />
+            {/* Southern lowlands / coastal plain */}
+            <path d="M 52 440 C 105 420, 215 430, 285 452 C 348 470, 400 482, 348 488
+              C 264 492, 158 487, 82 478 C 32 470, 18 456, 52 440 Z"
+              fill="#0b1920" opacity="0.82" />
+            {/* Terrain fractal noise overlay */}
+            <rect width={SVG_W} height={SVG_H} filter="url(#terrain-noise)" opacity="0.9" />
+            {/* River — flows from highland south to coast */}
+            <path d="M 255 55 C 262 100, 248 155, 268 210 C 288 268, 322 306, 314 368
+              C 308 414, 286 448, 265 478"
+              fill="none" stroke="#0a1e32" strokeWidth="2.8" opacity="0.72" />
+            <path d="M 255 55 C 262 100, 248 155, 268 210 C 288 268, 322 306, 314 368
+              C 308 414, 286 448, 265 478"
+              fill="none" stroke="#0d2840" strokeWidth="1.2" opacity="0.5" />
+            {/* Mountain ridges in highland */}
+            {[
+              [162,95,18],[190,68,15],[218,88,17],[246,65,14],
+              [274,82,16],[302,62,13],[332,80,15],[358,70,13],[382,90,14],
+            ].map(([x,y,h],i) => (
+              <path key={i}
+                d={`M ${x-h*0.85} ${y+h*0.55} L ${x} ${y} L ${x+h*0.85} ${y+h*0.55} Z`}
+                fill="#192e12" stroke="#213d18" strokeWidth="0.6" opacity="0.78" />
+            ))}
+            {/* Smaller foothills */}
+            {[
+              [145,130,10],[175,142,9],[420,230,10],[445,260,9],[410,300,8],
+            ].map(([x,y,h],i) => (
+              <path key={`f${i}`}
+                d={`M ${x-h*0.9} ${y+h*0.5} L ${x} ${y} L ${x+h*0.9} ${y+h*0.5} Z`}
+                fill="#162610" stroke="#1e3214" strokeWidth="0.5" opacity="0.6" />
+            ))}
+            {/* Forest patches */}
+            {[
+              [75,200,14,9],[88,248,11,7],[460,340,13,8],[472,390,10,6],[105,380,12,7],
+            ].map(([x,y,rx,ry],i) => (
+              <ellipse key={`w${i}`} cx={x} cy={y} rx={rx} ry={ry}
+                fill="#0b1c08" opacity="0.65" />
+            ))}
+            {/* Coastline detail — thin lighter edge on land shapes */}
+            <path d="M 28 42 C 80 22, 190 14, 310 18 C 400 21, 468 38, 512 75
+              C 530 105, 527 185, 522 268 C 517 348, 502 408, 468 450
+              C 432 480, 366 490, 272 488 C 178 486, 92 474, 46 452
+              C 12 434, 3 398, 6 338 C 10 258, 16 148, 28 42 Z"
+              fill="none" stroke="#152e10" strokeWidth="2" opacity="0.5" />
+          </g>
 
           <g>
             {zoner.map(zon => {
