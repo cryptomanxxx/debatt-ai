@@ -23,9 +23,10 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/mark_lager?select=agent,vara,antal&order=antal.desc`, opts),
     fetch(`${SB_URL}/rest/v1/mark_handel_log?select=*&order=skapad.desc&limit=20`, opts),
     fetch(`${SB_URL}/rest/v1/mark_vara_auktioner?select=*&status=eq.%C3%B6ppen&order=stanger_at.asc&limit=20`, opts),
-    // Bredare fönster enbart för clearing-priser så att varje zontyp/vara hittar
-    // sitt senaste pris även om det inte ryms inom de 20 senaste affärerna ovan.
-    fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=zon_namn,pris,skapad&order=skapad.desc&limit=500`, opts),
+    // Bredare fönster enbart för clearing-priser — max 1000 rader (Supabase-tak)
+    // täcker månader av handel och säkerställer att alla 7 zontyper hittar ett pris.
+    // Saknade typer kompletteras i MarkKarta med resurspriser-fallback.
+    fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=zon_namn,pris,skapad&order=skapad.desc&limit=1000`, opts),
     fetch(`${SB_URL}/rest/v1/mark_handel_log?select=vara,pris_per_enhet,skapad&order=skapad.desc&limit=500`, opts),
   ]);
 
