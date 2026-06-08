@@ -9,7 +9,7 @@ Körs av GitHub Actions varje söndag. Sex åtgärder:
 4. Sparränta: 1% på saldo > 400 kr (kapital föder kapital)
 5. Bailout: agenter med saldo < 100–250 kr får 500 kr från centralbanken
 6. Grundinkomst: statskassan omfördelas jämnt bland alla agenter
-Obs: Markinkomst betalas ut dagligen av mark_test.py (veckoinkomst/7)
+Obs: Markinkomst genereras via varuauktioner (mark_test.py) — ingen fast veckoinkomst längre.
 """
 
 import os, sys, httpx, math
