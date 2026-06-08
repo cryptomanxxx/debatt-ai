@@ -260,9 +260,11 @@ async function getSaldoSpelHistorik() {
   for (const bet of relevant) {
     if (!agentEvents[bet.agent]) agentEvents[bet.agent] = [];
     agentEvents[bet.agent].push({ date: bet.skapad.slice(0, 10), delta: -bet.insats });
-    if (bet.avgjord && bet.avgjord_at) {
-      agentEvents[bet.agent].push({ date: bet.avgjord_at.slice(0, 10), delta: bet.vinst });
+    if (bet.avgjord && bet.avgjord_at && bet.vinst > 0) {
+      // Insats redan dragen vid bet-läggning — vid vinst: lägg tillbaka insats + vinst (2×insats)
+      agentEvents[bet.agent].push({ date: bet.avgjord_at.slice(0, 10), delta: bet.insats + bet.vinst });
     }
+    // Förlust: insats redan dragen, inget mer att dra
   }
 
   const allAgents = Object.keys(agentEvents);
