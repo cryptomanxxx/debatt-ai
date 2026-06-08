@@ -139,7 +139,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
 
       {/* ── HEX MAP ── max 700px */}
       <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "radial-gradient(ellipse at 50% 42%, #1a0f3d 0%, #0d1a40 10%, #0a1f12 26%, #061810 42%, #060d18 62%, #030b14 82%, #020810 100%)", border: "1px solid #0d1f2e", boxShadow: "0 4px 40px rgba(0,10,30,0.8)" }}>
-        <img src={TERRAIN_BG} alt="" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.75, pointerEvents: "none" }} />
+        <img src={TERRAIN_BG} alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.75, pointerEvents: "none" }} />
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           style={{
