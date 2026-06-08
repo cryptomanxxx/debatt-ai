@@ -772,12 +772,11 @@ def spara_bet(sb_key: str, market_id: int, agent_namn: str, sannolikhet: int, mo
         confidence = abs(sannolikhet - 50)
         insats = max(10, min(60, int((10 + int(confidence * 0.6)) * insats_multiplikator)))
 
-        # Kontrollera spelkonto — bailout om under betting-tröskeln
+        # Kontrollera spelkonto — hoppa över om bankrupt
         saldo_spel = _hamta_saldo_spel(sb_key, agent_namn)
         if saldo_spel < 10:
-            print(f"  {agent_namn}: tomt spelkonto ({saldo_spel} kr) — tilldelar 20 kr stipendium")
-            _uppdatera_saldo_spel(sb_key, agent_namn, 20)
-            saldo_spel = _hamta_saldo_spel(sb_key, agent_namn)
+            print(f"  {agent_namn}: tomt spelkonto ({saldo_spel} kr) — hoppar över betting")
+            return False
         insats = min(insats, saldo_spel)
 
         # Dra insatsen direkt
