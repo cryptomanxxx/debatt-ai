@@ -10,7 +10,22 @@ const C = {
   textMuted: "#888880", accentDim: "#aaaaaa",
 };
 
-export default function OpinionPage() {
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+
+export default async function OpinionPage() {
+  let initialData = [];
+  try {
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const res = await fetch(
+      `${SB_URL}/rest/v1/opinion_roster?select=fraga,kategori,roster_ja,roster_nej,roster_osaker,ai_ja,ai_nej,ai_osaker&order=fraga.asc`,
+      {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+        next: { revalidate: 60 },
+      }
+    );
+    if (res.ok) initialData = await res.json();
+  } catch {}
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
 
@@ -31,7 +46,7 @@ export default function OpinionPage() {
           </div>
         </div>
 
-        <OpinionClient />
+        <OpinionClient initialData={initialData} />
       </main>
     </div>
   );

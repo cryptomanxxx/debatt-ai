@@ -190,10 +190,18 @@ const HARDCODED_SET = new Set(ALLA_FRAGOR.map(f => f.fraga));
 
 const PAGE_SIZE = 10;
 
-export default function OpinionClient() {
+export default function OpinionClient({ initialData = [] }) {
   const [aktivKat, setAktivKat] = useState("alla");
-  const [rosterData, setRosterData] = useState({});
-  const [agentFragor, setAgentFragor] = useState([]);
+  const [rosterData, setRosterData] = useState(() => {
+    const map = {};
+    for (const r of initialData) map[r.fraga] = r;
+    return map;
+  });
+  const [agentFragor, setAgentFragor] = useState(() =>
+    initialData
+      .filter(r => !HARDCODED_SET.has(r.fraga))
+      .map(r => ({ fraga: r.fraga, kategori: r.kategori || "övrigt", isAgent: true }))
+  );
   const [visaAntal, setVisaAntal] = useState(PAGE_SIZE);
 
   useEffect(() => {
