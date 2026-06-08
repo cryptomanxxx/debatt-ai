@@ -360,8 +360,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           ))}
         </div>
 
-      {/* ── BOTTENPANEL ── 3 kolumner */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", alignItems: "start" }}>
+      {/* ── BOTTENPANEL ── detaljkort + (stats/markägare/resurspriser) */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "16px", alignItems: "start" }}>
 
         {active ? (
           <div style={{
@@ -418,47 +418,52 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           </div>
         )}
 
-        <div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+        {/* ── KOL 2 & 3: stats + MARKÄGARE | RESURSPRISER i ett eget 2-kolumns subgrid ── */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 0", gridColumn: "span 2" }}>
+
+          {/* Statistikrad — spänner båda kolumnerna */}
+          <div style={{ gridColumn: "span 2", display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "0", padding: "12px 16px", background: "#0a0a0a", border: "1px solid #161616", borderBottom: "none", borderRadius: "8px 8px 0 0" }}>
             {[
               ["ZONER",       zoner.length,                "#666"],
               ["ÄGDA",        agare.length,                "#4ade80"],
               ["FRIA",        zoner.length - agare.length, "#38bdf8"],
               ["DAGSINKOMST", `${totalInk} kr`,            "#f59e0b"],
             ].map(([lbl, val, c]) => (
-              <div key={lbl} style={{ background: "#0d0d0d", border: "1px solid #181818", borderRadius: "6px", padding: "8px 10px" }}>
+              <div key={lbl}>
                 <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: "3px" }}>{lbl}</div>
                 <div style={{ fontSize: "17px", color: c, lineHeight: 1 }}>{val}</div>
               </div>
             ))}
           </div>
-          {leaders.length > 0 && (
-            <div>
-              <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>MARKÄGARE</p>
-              {leaders.map(([agent, stats], i) => {
-                const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
-                return (
-                  <div key={agent} style={{ marginBottom: "9px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                      <span style={{ fontSize: "11px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
-                      <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>{stats.antal} zon{stats.antal !== 1 ? "er" : ""}</span>
-                    </div>
-                    <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
-                      <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(stats.ink / maxInk) * 100}%`, boxShadow: `0 0 6px ${rgba(af, 0.6)}`, transition: "width 0.5s ease" }} />
-                    </div>
-                    <div style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>{stats.ink} kr/dag</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* ── KOL 3: RESURSPRISER ── */}
-        {resurspriser.length > 0 && (
-          <div style={{ background: "#0a0a0a", border: "1px solid #161616", borderRadius: "8px", padding: "14px 16px" }}>
+          {/* MARKÄGARE */}
+          <div style={{ background: "#0a0a0a", borderLeft: "1px solid #161616", borderRight: "1px solid #0d0d0d", borderBottom: "1px solid #161616", borderRadius: "0 0 0 8px", padding: "14px 16px" }}>
+            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>MARKÄGARE</p>
+            {leaders.length === 0 ? (
+              <div style={{ fontSize: "10px", color: "#222", fontFamily: "monospace", textAlign: "center", padding: "10px 0" }}>Inga ägare ännu</div>
+            ) : leaders.map(([agent, stats], i) => {
+              const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
+              return (
+                <div key={agent} style={{ marginBottom: "9px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                    <span style={{ fontSize: "11px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
+                    <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>{stats.antal} zon{stats.antal !== 1 ? "er" : ""}</span>
+                  </div>
+                  <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
+                    <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(stats.ink / maxInk) * 100}%`, boxShadow: `0 0 6px ${rgba(af, 0.6)}`, transition: "width 0.5s ease" }} />
+                  </div>
+                  <div style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>{stats.ink} kr/dag</div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* RESURSPRISER */}
+          <div style={{ background: "#0a0a0a", borderLeft: "1px solid #0d0d0d", borderRight: "1px solid #161616", borderBottom: "1px solid #161616", borderRadius: "0 0 8px 0", padding: "14px 16px" }}>
             <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 12px" }}>RESURSPRISER</p>
-            {Object.keys(TYP_FARG).map(typ => {
+            {resurspriser.length === 0 ? (
+              <div style={{ fontSize: "10px", color: "#222", fontFamily: "monospace", textAlign: "center", padding: "10px 0" }}>Inga resurspriser ännu</div>
+            ) : Object.keys(TYP_FARG).map(typ => {
               const r = resursMap[typ];
               if (!r) return null;
               const mult = parseFloat(r.pris_multiplier) || 1.0;
@@ -470,24 +475,19 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               return (
                 <div key={typ} style={{ marginBottom: "8px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
-                    <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>
-                      {TYP_IKON[typ]} {TYP_NAMN[typ]}
-                    </span>
-                    <span style={{ fontSize: "10px", fontFamily: "monospace", color: trendFarg }}>
-                      {trendIkon} ×{mult.toFixed(2)}
-                    </span>
+                    <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>{TYP_IKON[typ]} {TYP_NAMN[typ]}</span>
+                    <span style={{ fontSize: "10px", fontFamily: "monospace", color: trendFarg }}>{trendIkon} ×{mult.toFixed(2)}</span>
                   </div>
                   <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
                     <div style={{ height: "2px", background: farg, borderRadius: "2px", width: `${barW}%`, opacity: 0.7 }} />
                   </div>
-                  <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", marginTop: "1px" }}>
-                    {r.antal_agda}/{r.antal_totala} zoner ägda
-                  </div>
+                  <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", marginTop: "1px" }}>{r.antal_agda}/{r.antal_totala} zoner ägda</div>
                 </div>
               );
             })}
           </div>
-        )}
+
+        </div>
 
       </div>{/* /3-kolumns grid */}
 
