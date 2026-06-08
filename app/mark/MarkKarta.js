@@ -43,13 +43,13 @@ const INSTITUTIONS = {
 const TERRAIN_BG = null; // ingen extern bild — använder CSS-gradient
 
 const TERRAIN_STOPS = {
-  energi:   [["#fef08a", 0.13], ["#f59e0b", 0.07], ["#78350f", 0.02]],
-  jordbruk: [["#bbf7d0", 0.12], ["#22c55e", 0.06], ["#14532d", 0.01]],
-  industri: [["#bfdbfe", 0.12], ["#3b82f6", 0.06], ["#1e3a8a", 0.01]],
-  gruva:    [["#fed7aa", 0.12], ["#ea580c", 0.07], ["#7c2d12", 0.01]],
-  stad:     [["#f0e0ff", 0.20], ["#9333ea", 0.12], ["#3b0764", 0.04]],
-  kust:     [["#cffafe", 0.12], ["#0891b2", 0.06], ["#0c4a6e", 0.01]],
-  skog:     [["#dcfce7", 0.12], ["#16a34a", 0.06], ["#14532d", 0.01]],
+  energi:   [["#fef08a", 0.40], ["#f59e0b", 0.22], ["#78350f", 0.06]],
+  jordbruk: [["#bbf7d0", 0.38], ["#22c55e", 0.20], ["#14532d", 0.05]],
+  industri: [["#bfdbfe", 0.38], ["#3b82f6", 0.20], ["#1e3a8a", 0.05]],
+  gruva:    [["#fed7aa", 0.40], ["#ea580c", 0.24], ["#7c2d12", 0.06]],
+  stad:     [["#f0e0ff", 0.52], ["#9333ea", 0.30], ["#3b0764", 0.10]],
+  kust:     [["#cffafe", 0.42], ["#0891b2", 0.22], ["#0c4a6e", 0.06]],
+  skog:     [["#dcfce7", 0.38], ["#16a34a", 0.20], ["#14532d", 0.05]],
 };
 
 const HEX = 40;
@@ -153,7 +153,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
       {/* ── HEX MAP ── max 700px */}
-      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: ["radial-gradient(circle at 62% 22%, rgba(20,83,45,0.55) 0%, transparent 28%)", "radial-gradient(circle at 18% 28%, rgba(20,83,45,0.45) 0%, transparent 22%)", "radial-gradient(circle at 14% 62%, rgba(180,83,9,0.38) 0%, transparent 22%)", "radial-gradient(circle at 82% 52%, rgba(146,64,14,0.32) 0%, transparent 20%)", "radial-gradient(circle at 28% 88%, rgba(7,89,133,0.45) 0%, transparent 18%)", "radial-gradient(circle at 72% 82%, rgba(7,89,133,0.38) 0%, transparent 16%)", "radial-gradient(circle at 50% 43%, rgba(109,40,217,0.70) 0%, rgba(67,56,202,0.35) 9%, transparent 22%)", "radial-gradient(ellipse at 50% 50%, #0d1b4a 0%, #060d18 58%, #020810 100%)"].join(","), border: "1px solid #0d1f2e", boxShadow: "0 4px 40px rgba(0,10,30,0.8)" }}>
+      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "linear-gradient(rgba(2,8,18,0.48),rgba(2,8,18,0.48)), url('https://image.pollinations.ai/prompt/aerial%20top%20down%20view%20dark%20fantasy%20strategy%20game%20terrain%20dense%20forest%20canopy%20rocky%20mountains%20rivers%20dark%20moody%20cinematic%20no%20text%20no%20labels%20no%20ui?width=800&height=740&seed=3721&nologo=true&model=flux') center/cover no-repeat, #030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)" }}>
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           style={{
@@ -163,6 +163,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             width: "100%",
             height: "auto",
             background: "transparent",
+            mixBlendMode: "normal",
           }}
         >
           <defs>
@@ -205,88 +206,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               <feGaussianBlur stdDeviation="5" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
-            <filter id="terrain-noise" x="0%" y="0%" width="100%" height="100%" colorInterpolationFilters="sRGB">
-              <feTurbulence type="fractalNoise" baseFrequency="0.48" numOctaves="4" seed="11" />
-              <feColorMatrix type="matrix" values="0 0 0 0 0.04  0 0 0 0 0.08  0 0 0 0 0.02  0 0 0 0.20 0" />
-            </filter>
-            <filter id="water-noise" x="0%" y="0%" width="100%" height="100%" colorInterpolationFilters="sRGB">
-              <feTurbulence type="turbulence" baseFrequency="0.012 0.035" numOctaves="2" seed="3" />
-              <feColorMatrix type="matrix" values="0 0 0 0 0.01  0 0 0 0 0.05  0 0 0 0 0.14  0 0 0 0.28 0" />
-            </filter>
           </defs>
-
-          {/* ── TERRAIN BACKGROUND ── */}
-          <g style={{ pointerEvents: "none" }}>
-            {/* Deep ocean */}
-            <rect width={SVG_W} height={SVG_H} fill="#030c19" />
-            {/* Water shimmer */}
-            <rect width={SVG_W} height={SVG_H} filter="url(#water-noise)" />
-            {/* Shallow coastal shelf — south-west */}
-            <path d="M 0 340 C 25 310, 60 320, 55 370 C 50 410, 20 450, 0 470 Z"
-              fill="#071525" opacity="0.9" />
-            {/* Shallow coastal shelf — north-east */}
-            <path d="M 460 0 C 495 10, 525 40, 530 90 C 530 130, 510 150, 478 140
-              C 450 130, 440 95, 448 55 C 452 28, 460 0, 460 0 Z"
-              fill="#071525" opacity="0.8" />
-            {/* Main continental landmass */}
-            <path d="M 28 42 C 80 22, 190 14, 310 18 C 400 21, 468 38, 512 75
-              C 530 105, 527 185, 522 268 C 517 348, 502 408, 468 450
-              C 432 480, 366 490, 272 488 C 178 486, 92 474, 46 452
-              C 12 434, 3 398, 6 338 C 10 258, 16 148, 28 42 Z"
-              fill="#0d1b09" />
-            {/* Highland plateau — upper-center */}
-            <path d="M 148 28 C 198 14, 308 18, 378 50 C 418 72, 426 118, 398 155
-              C 366 196, 284 204, 210 186 C 148 170, 126 116, 136 66
-              C 140 46, 148 28, 148 28 Z"
-              fill="#111e0c" opacity="0.88" />
-            {/* Eastern ridge */}
-            <path d="M 430 185 C 478 170, 518 200, 520 258 C 522 316, 494 368, 452 382
-              C 408 396, 374 366, 372 316 C 370 260, 396 202, 430 185 Z"
-              fill="#101b0d" opacity="0.75" />
-            {/* Southern lowlands / coastal plain */}
-            <path d="M 52 440 C 105 420, 215 430, 285 452 C 348 470, 400 482, 348 488
-              C 264 492, 158 487, 82 478 C 32 470, 18 456, 52 440 Z"
-              fill="#0b1920" opacity="0.82" />
-            {/* Terrain fractal noise overlay */}
-            <rect width={SVG_W} height={SVG_H} filter="url(#terrain-noise)" opacity="0.9" />
-            {/* River — flows from highland south to coast */}
-            <path d="M 255 55 C 262 100, 248 155, 268 210 C 288 268, 322 306, 314 368
-              C 308 414, 286 448, 265 478"
-              fill="none" stroke="#0a1e32" strokeWidth="2.8" opacity="0.72" />
-            <path d="M 255 55 C 262 100, 248 155, 268 210 C 288 268, 322 306, 314 368
-              C 308 414, 286 448, 265 478"
-              fill="none" stroke="#0d2840" strokeWidth="1.2" opacity="0.5" />
-            {/* Mountain ridges in highland */}
-            {[
-              [162,95,18],[190,68,15],[218,88,17],[246,65,14],
-              [274,82,16],[302,62,13],[332,80,15],[358,70,13],[382,90,14],
-            ].map(([x,y,h],i) => (
-              <path key={i}
-                d={`M ${x-h*0.85} ${y+h*0.55} L ${x} ${y} L ${x+h*0.85} ${y+h*0.55} Z`}
-                fill="#192e12" stroke="#213d18" strokeWidth="0.6" opacity="0.78" />
-            ))}
-            {/* Smaller foothills */}
-            {[
-              [145,130,10],[175,142,9],[420,230,10],[445,260,9],[410,300,8],
-            ].map(([x,y,h],i) => (
-              <path key={`f${i}`}
-                d={`M ${x-h*0.9} ${y+h*0.5} L ${x} ${y} L ${x+h*0.9} ${y+h*0.5} Z`}
-                fill="#162610" stroke="#1e3214" strokeWidth="0.5" opacity="0.6" />
-            ))}
-            {/* Forest patches */}
-            {[
-              [75,200,14,9],[88,248,11,7],[460,340,13,8],[472,390,10,6],[105,380,12,7],
-            ].map(([x,y,rx,ry],i) => (
-              <ellipse key={`w${i}`} cx={x} cy={y} rx={rx} ry={ry}
-                fill="#0b1c08" opacity="0.65" />
-            ))}
-            {/* Coastline detail — thin lighter edge on land shapes */}
-            <path d="M 28 42 C 80 22, 190 14, 310 18 C 400 21, 468 38, 512 75
-              C 530 105, 527 185, 522 268 C 517 348, 502 408, 468 450
-              C 432 480, 366 490, 272 488 C 178 486, 92 474, 46 452
-              C 12 434, 3 398, 6 338 C 10 258, 16 148, 28 42 Z"
-              fill="none" stroke="#152e10" strokeWidth="2" opacity="0.5" />
-          </g>
 
           <g>
             {zoner.map(zon => {
