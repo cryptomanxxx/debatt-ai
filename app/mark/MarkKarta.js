@@ -159,6 +159,21 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   // Resurspriser: map typ → { pris_multiplier, trend, bas_pris }
   const resursMap = Object.fromEntries(resurspriser.map(r => [r.typ, r]));
 
+  // Senaste clearing-pris per zontyp (från mark_transaktioner)
+  const zonNamnTypMap = Object.fromEntries(zoner.map(z => [z.namn, z.typ]));
+  const clearingPerTyp = {};
+  for (const t of transaktioner) {
+    const typ = zonNamnTypMap[t.zon_namn];
+    if (typ && !clearingPerTyp[typ]) clearingPerTyp[typ] = { pris: t.pris, skapad: t.skapad };
+  }
+
+  // Senaste clearing-pris per vara (från mark_handel_log)
+  const clearingPerVara = {};
+  for (const h of handelLog) {
+    if (h.pris_per_enhet && !clearingPerVara[h.vara])
+      clearingPerVara[h.vara] = { pris: h.pris_per_enhet, skapad: h.skapad };
+  }
+
   const active = selected || hover;
   const activeAgare = active ? agareMap[active.id] : null;
   const activeAgentFarg = activeAgare
@@ -564,11 +579,35 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             })
           )}
 
-          {/* Avskiljare */}
+          {/* Clearing-priser per zontyp */}
+          <div style={{ borderTop: "1px solid #1a1600", marginTop: "14px", paddingTop: "14px" }}>
+            <p style={{ fontSize: "9px", color: "#3a3000", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE CLEARING-PRISER</p>
+            {Object.keys(TYP_FARG).map(typ => {
+              const c = clearingPerTyp[typ];
+              const farg = TYP_FARG[typ];
+              return (
+                <div key={typ} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", background: "#0d0c08", borderLeft: `2px solid ${rgba(farg, 0.35)}`, borderRadius: "0 4px 4px 0", marginBottom: "3px" }}>
+                  <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>{TYP_IKON[typ]} {TYP_NAMN[typ]}</span>
+                  <div style={{ textAlign: "right" }}>
+                    {c ? (
+                      <>
+                        <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace" }}>{c.pris} kr</div>
+                        <div style={{ fontSize: "8px", color: "#2a2a2a", fontFamily: "monospace" }}>{relativeTime(c.skapad)}</div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: "10px", color: "#2a2a2a", fontFamily: "monospace" }}>—</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Senaste affärer */}
           {transaktioner.length > 0 && (
             <div style={{ borderTop: "1px solid #1a1600", marginTop: "14px", paddingTop: "14px" }}>
               <p style={{ fontSize: "9px", color: "#3a3000", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE AFFÄRER</p>
-              {transaktioner.slice(0, 6).map((t, i) => {
+              {transaktioner.slice(0, 5).map((t, i) => {
                 const af = AGENT_VISUELL[t.kop_agent]?.ikonFarg || "#888";
                 return (
                   <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 8px", background: "#0d0c08", borderLeft: `2px solid ${rgba(af, 0.35)}`, marginBottom: "4px", borderRadius: "0 4px 4px 0" }}>
@@ -661,43 +700,32 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             })
           )}
 
-          {/* Agentlager */}
-          {lager.length > 0 && (() => {
-            const varuMap = Object.fromEntries(
-              Object.entries(TYP_VARA).map(([typ, vara]) => {
-                const r = resursMap[typ];
-                const mult = r ? parseFloat(r.pris_multiplier) || 1.0 : 1.0;
-                return [vara, Math.round(BASPRIS_VARA[vara] * mult * 10) / 10];
-              })
-            );
-            const agentVarden = {};
-            for (const row of lager) {
-              const varde = (row.antal || 0) * (varuMap[row.vara] || 0);
-              agentVarden[row.agent] = (agentVarden[row.agent] || 0) + varde;
-            }
-            const topAgenter = Object.entries(agentVarden).sort((a, b) => b[1] - a[1]).slice(0, 5);
-            if (topAgenter.length === 0) return null;
-            const maxV = topAgenter[0][1] || 1;
-            return (
-              <div style={{ borderTop: "1px solid #001a20", paddingTop: "14px", marginBottom: "14px" }}>
-                <p style={{ fontSize: "9px", color: "#003a4a", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>AGENTLAGER (värde)</p>
-                {topAgenter.map(([agent, varde], i) => {
-                  const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
-                  return (
-                    <div key={agent} style={{ marginBottom: "7px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
-                        <span style={{ fontSize: "10px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
-                        <span style={{ fontSize: "10px", color: "#2a4a55", fontFamily: "monospace" }}>{Math.round(varde)} kr</span>
-                      </div>
-                      <div style={{ height: "2px", background: "#0a1518", borderRadius: "2px" }}>
-                        <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(varde / maxV) * 100}%`, opacity: 0.6 }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
+          {/* Clearing-priser per vara */}
+          <div style={{ borderTop: "1px solid #001a20", marginTop: "14px", paddingTop: "14px" }}>
+            <p style={{ fontSize: "9px", color: "#003a4a", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>SENASTE CLEARING-PRISER</p>
+            {Object.keys(VARA_IKON).map(vara => {
+              const c = clearingPerVara[vara];
+              const typ = VARA_TYP[vara];
+              const farg = typ ? TYP_FARG[typ] : "#22d3ee";
+              return (
+                <div key={vara} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 8px", background: "#0a0f12", borderLeft: `2px solid ${rgba(farg, 0.35)}`, borderRadius: "0 4px 4px 0", marginBottom: "3px" }}>
+                  <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>{VARA_IKON[vara]} {vara}</span>
+                  <div style={{ textAlign: "right" }}>
+                    {c ? (
+                      <>
+                        <div style={{ fontSize: "11px", color: "#22d3ee", fontFamily: "monospace" }}>
+                          {c.pris} <span style={{ fontSize: "8px", color: "#003a4a" }}>kr/enhet</span>
+                        </div>
+                        <div style={{ fontSize: "8px", color: "#1a3a44", fontFamily: "monospace" }}>{relativeTime(c.skapad)}</div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: "10px", color: "#1a3a44", fontFamily: "monospace" }}>—</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
           {/* Senaste handel */}
           {handelLog.length > 0 && (
