@@ -94,7 +94,20 @@ function timeLeft(ts) {
   return `${Math.floor(diff / 86400)}d kvar`;
 }
 
-export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [] }) {
+// Baspris per vara (kr) — speglar BASPRIS i mark_test.py
+const BASPRIS_VARA = {
+  el: 15, spannmål: 10, maskiner: 25, malm: 20, tjänster: 18, fisk: 12, virke: 14,
+};
+const VARA_IKON = {
+  el: "⚡", spannmål: "🌾", maskiner: "🏭", malm: "⛏️", tjänster: "🏙️", fisk: "🌊", virke: "🌲",
+};
+// Zontyp → vara
+const TYP_VARA = {
+  energi: "el", jordbruk: "spannmål", industri: "maskiner",
+  gruva: "malm", stad: "tjänster", kust: "fisk", skog: "virke",
+};
+
+export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [] }) {
   const [hover, setHover]       = useState(null);
   const [selected, setSelected] = useState(null);
   const [floats, setFloats]     = useState([]);
@@ -532,6 +545,113 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             })
           )}
         </div>
+
+        {/* ── VARUMARKNAD ── */}
+        {(() => {
+          // Beräkna aktuella priser: BASPRIS × resurspriser-multiplier
+          const priser = Object.entries(TYP_VARA).map(([typ, vara]) => {
+            const r = resursMap[typ];
+            const mult = r ? parseFloat(r.pris_multiplier) || 1.0 : 1.0;
+            return { vara, typ, pris: Math.round(BASPRIS_VARA[vara] * mult * 10) / 10, mult };
+          });
+          return (
+            <div>
+              <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>
+                VARUMARKNAD
+              </p>
+              {priser.map(({ vara, typ, pris }) => {
+                const farg = TYP_FARG[typ] || "#888";
+                return (
+                  <div key={vara} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "5px" }}>
+                    <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>
+                      {VARA_IKON[vara]} {vara}
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#c8c4bc", fontFamily: "monospace" }}>
+                      {pris} kr
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* ── AGENTLAGER ── */}
+        {lager.length > 0 && (() => {
+          // Summera lagervärde per agent
+          const varuMap = Object.fromEntries(
+            Object.entries(TYP_VARA).map(([typ, vara]) => {
+              const r = resursMap[typ];
+              const mult = r ? parseFloat(r.pris_multiplier) || 1.0 : 1.0;
+              return [vara, Math.round(BASPRIS_VARA[vara] * mult * 10) / 10];
+            })
+          );
+          const agentVarden = {};
+          for (const row of lager) {
+            const varde = (row.antal || 0) * (varuMap[row.vara] || 0);
+            agentVarden[row.agent] = (agentVarden[row.agent] || 0) + varde;
+          }
+          const topAgenter = Object.entries(agentVarden)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5);
+          if (topAgenter.length === 0) return null;
+          const maxV = topAgenter[0][1] || 1;
+          return (
+            <div>
+              <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>
+                AGENTLAGER (värde)
+              </p>
+              {topAgenter.map(([agent, varde], i) => {
+                const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
+                return (
+                  <div key={agent} style={{ marginBottom: "7px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
+                      <span style={{ fontSize: "10px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
+                      <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace" }}>{Math.round(varde)} kr</span>
+                    </div>
+                    <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
+                      <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(varde / maxV) * 100}%`, opacity: 0.6 }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* ── SENASTE HANDEL ── */}
+        {handelLog.length > 0 && (
+          <div>
+            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>
+              SENASTE HANDEL
+            </p>
+            {handelLog.slice(0, 8).map((h, i) => {
+              const kFarg = AGENT_VISUELL[h.kop_agent]?.ikonFarg  || "#888";
+              const sFarg = AGENT_VISUELL[h.salj_agent]?.ikonFarg || "#555";
+              return (
+                <div key={i} style={{
+                  padding: "6px 8px", background: "#0a0a0a",
+                  borderLeft: `2px solid ${rgba(kFarg, 0.4)}`,
+                  borderRadius: "0 4px 4px 0", marginBottom: "4px",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "10px", fontFamily: "monospace" }}>
+                      {VARA_IKON[h.vara] || "📦"}{" "}
+                      <span style={{ color: kFarg }}>{h.kop_agent}</span>
+                      <span style={{ color: "#333" }}> ← </span>
+                      <span style={{ color: sFarg }}>{h.salj_agent}</span>
+                    </span>
+                    <span style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "monospace" }}>{h.totalt} kr</span>
+                  </div>
+                  <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>
+                    {h.antal}× {h.vara} · {relativeTime(h.skapad)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
       </div>
     </div>
   );

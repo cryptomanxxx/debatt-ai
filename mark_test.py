@@ -13,6 +13,27 @@ SB_KEY = os.environ["SUPABASE_ANON_KEY"]
 MAX_ZONER_PER_AGENT = 6   # Förhindrar tidig monopolisering
 KOP_SANNOLIKHET = 0.25    # 25% chans per agent per körning
 
+# Varuproduktion: zontyp → vara som produceras
+VARA_PER_TYP = {
+    "energi":   "el",
+    "jordbruk": "spannmål",
+    "industri": "maskiner",
+    "gruva":    "malm",
+    "stad":     "tjänster",
+    "kust":     "fisk",
+    "skog":     "virke",
+}
+
+# Baspris per varuenhet (kr), skalas med resurspriser-multiplier
+BASPRIS = {
+    "el": 15, "spannmål": 10, "maskiner": 25,
+    "malm": 20, "tjänster": 18, "fisk": 12, "virke": 14,
+}
+
+PRODUKTION_PER_KOR = 2  # enheter per zon per körning
+SURPLUS_TROSKEL   = 6   # agenten säljer om antal > detta
+KOP_ANTAL         = 3   # enheter per köptransaktion
+
 AGENTER = [
     "Nationalekonom", "Miljöaktivist", "Teknikoptimist", "Konservativ debattör",
     "Jurist", "Journalist", "Filosof", "Läkare", "Psykolog", "Historiker",
@@ -82,6 +103,16 @@ def sb_patch(path, data):
     return r.is_success
 
 
+def sb_upsert(table, data):
+    r = httpx.post(
+        f"{SB_URL}/rest/v1/{table}",
+        headers={**_h(), "Prefer": "resolution=merge-duplicates"},
+        json=data,
+        timeout=15,
+    )
+    return r.is_success
+
+
 def betala_daglig_mark_inkomst():
     """Betalar ut daglig markinkomst skalad med zontyp-prismodell (resurspriser)."""
     print("\n── Daglig markinkomst ──")
@@ -140,6 +171,137 @@ def betala_daglig_mark_inkomst():
             })
     except Exception as e:
         print(f"  [VARNING] Daglig markinkomst misslyckades: {e}")
+
+
+def producera_varor():
+    """Varje ägd zon producerar sin vara (PRODUKTION_PER_KOR enheter). Upsertas i mark_lager."""
+    print("\n── Varuproduktion ──")
+    try:
+        agare_rows = sb_get("mark_agare?select=agent,mark_zoner(typ)")
+        if not agare_rows:
+            print("  Inga markägare — ingen produktion.")
+            return {}
+
+        # Beräkna produktion per agent
+        produktion: dict = {}
+        for row in agare_rows:
+            agent = row["agent"]
+            typ = (row.get("mark_zoner") or {}).get("typ", "")
+            vara = VARA_PER_TYP.get(typ)
+            if vara:
+                produktion.setdefault(agent, {})
+                produktion[agent][vara] = produktion[agent].get(vara, 0) + PRODUKTION_PER_KOR
+
+        # Hämta befintligt lager för att beräkna nya totaler
+        lager_rows = sb_get("mark_lager?select=agent,vara,antal")
+        lager: dict = {}
+        for r in lager_rows:
+            lager.setdefault(r["agent"], {})[r["vara"]] = r["antal"]
+
+        total = 0
+        for agent, varor in produktion.items():
+            for vara, ny_prod in varor.items():
+                gammalt = lager.get(agent, {}).get(vara, 0)
+                nytt = gammalt + ny_prod
+                sb_upsert("mark_lager", {
+                    "agent": agent, "vara": vara,
+                    "antal": nytt, "uppdaterad": "now()",
+                })
+                lager.setdefault(agent, {})[vara] = nytt
+                total += ny_prod
+
+        print(f"  {len(produktion)} agenter producerade {total} varuenheter totalt.")
+        return lager
+    except Exception as e:
+        print(f"  [VARNING] Varuproduktion misslyckades: {e}")
+        return {}
+
+
+def handel_varor(lager: dict, saldon: dict, resurspriser: dict):
+    """Agenter med överskott säljer till agenter med noll av en vara de inte producerar."""
+    print("\n── Varuhandel ──")
+    try:
+        # Vilka zontyper äger varje agent? (de vill köpa varor de inte producerar)
+        agare_rows = sb_get("mark_agare?select=agent,mark_zoner(typ)")
+        agent_typer: dict = {}
+        for row in agare_rows:
+            agent = row["agent"]
+            typ = (row.get("mark_zoner") or {}).get("typ", "")
+            if typ:
+                agent_typer.setdefault(agent, set()).add(typ)
+
+        affarer = 0
+        for zontyp, vara in VARA_PER_TYP.items():
+            mult = resurspriser.get(zontyp, 1.0)
+            pris = round(BASPRIS[vara] * mult, 2)
+
+            # Säljare: har mer än SURPLUS_TROSKEL enheter
+            sellers = sorted(
+                [(a, lager.get(a, {}).get(vara, 0)) for a in AGENTER
+                 if lager.get(a, {}).get(vara, 0) > SURPLUS_TROSKEL],
+                key=lambda x: -x[1],
+            )
+            if not sellers:
+                continue
+
+            # Köpare: har 0 enheter OCH äger ingen zon som producerar varan
+            buyers = [
+                a for a in AGENTER
+                if lager.get(a, {}).get(vara, 0) == 0
+                and zontyp not in agent_typer.get(a, set())
+                and random.random() < 0.4
+            ]
+            random.shuffle(buyers)
+
+            for seller, seller_antal in sellers:
+                if not buyers:
+                    break
+
+                buyer = buyers.pop(0)
+                if buyer == seller:
+                    continue
+
+                # Hur mycket kan säljaren avvara?
+                kan_salja = min(KOP_ANTAL, seller_antal - (SURPLUS_TROSKEL - 2))
+                if kan_salja <= 0:
+                    continue
+
+                total_pris = round(pris * kan_salja, 2)
+                if saldon.get(buyer, 0) < total_pris:
+                    continue
+
+                # Genomför affären
+                ny_seller = lager.get(seller, {}).get(vara, 0) - kan_salja
+                ny_buyer  = lager.get(buyer, {}).get(vara, 0) + kan_salja
+
+                sb_upsert("mark_lager", {"agent": seller, "vara": vara, "antal": ny_seller, "uppdaterad": "now()"})
+                sb_upsert("mark_lager", {"agent": buyer,  "vara": vara, "antal": ny_buyer,  "uppdaterad": "now()"})
+
+                ny_seller_saldo = round(saldon.get(seller, 0) + total_pris, 2)
+                ny_buyer_saldo  = round(saldon.get(buyer,  0) - total_pris, 2)
+                sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(seller)}", {"saldo": ny_seller_saldo, "uppdaterad": "now()"})
+                sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(buyer)}",  {"saldo": ny_buyer_saldo,  "uppdaterad": "now()"})
+
+                # Spara lokal state
+                lager.setdefault(seller, {})[vara] = ny_seller
+                lager.setdefault(buyer,  {})[vara] = ny_buyer
+                saldon[seller] = ny_seller_saldo
+                saldon[buyer]  = ny_buyer_saldo
+
+                sb_post("mark_handel_log", {
+                    "kop_agent": buyer, "salj_agent": seller,
+                    "vara": vara, "antal": kan_salja,
+                    "pris_per_enhet": pris, "totalt": total_pris,
+                })
+
+                affarer += 1
+                vara_ikon = {"el": "⚡", "spannmål": "🌾", "maskiner": "🏭", "malm": "⛏️",
+                             "tjänster": "🏙️", "fisk": "🌊", "virke": "🌲"}.get(vara, "📦")
+                print(f"  {vara_ikon} {buyer} köpte {kan_salja}×{vara} av {seller} — {total_pris} kr ({pris:.1f}/enhet)")
+
+        print(f"  Varuhandel: {affarer} affärer genomförda.")
+    except Exception as e:
+        print(f"  [VARNING] Varuhandel misslyckades: {e}")
 
 
 def main():
@@ -271,6 +433,16 @@ def main():
 
     # Betala ut daglig markinkomst till alla markägare (skalad med resurspriser)
     betala_daglig_mark_inkomst()
+
+    # Producera varor från ägda zoner
+    lager = producera_varor()
+
+    # Handel med varor (agenter med överskott säljer till de som saknar)
+    planbocker_ny = sb_get("agent_planbocker?select=agent,saldo&agent=neq.Statskassa")
+    saldon_ny = {r["agent"]: float(r.get("saldo") or 0) for r in planbocker_ny}
+    resurs_rows = sb_get("resurspriser?select=typ,pris_multiplier") or []
+    resurspriser_dict = {r["typ"]: float(r.get("pris_multiplier") or 1.0) for r in resurs_rows}
+    handel_varor(lager, saldon_ny, resurspriser_dict)
 
     # Uppdatera dynamiska resurspriser för nästa körning
     from supabase_utils import berakna_och_spara_resurspriser
