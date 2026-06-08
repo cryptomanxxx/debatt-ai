@@ -171,6 +171,12 @@ jobs:
           fi
 
           git add -A
+          # GITHUB_TOKEN saknar 'workflows'-rättighet — exkludera workflow-filer
+          git reset HEAD .github/workflows/ 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "Inga ändringar kvar efter exkludering av workflow-filer — avslutar"
+            exit 0
+          fi
           git commit -m "fix(review): adresserar reviewkommentarer från $REVIEWER på PR $PR_NUM"
           git pull --rebase origin "$BRANCH"
           git push origin "$BRANCH"
