@@ -14,7 +14,7 @@ async function getData() {
   const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const opts = { headers: h, next: { revalidate: 180 } };
 
-  const [zonerRes, agareRes, transRes, auktRes, resursRes, lagerRes, handelRes] = await Promise.all([
+  const [zonerRes, agareRes, transRes, auktRes, resursRes, lagerRes, handelRes, varaAuktRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/mark_zoner?select=*&order=id.asc`, opts),
     fetch(`${SB_URL}/rest/v1/mark_agare?select=zon_id,agent,kopt_pris,kopt_datum`, opts),
     fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=*&order=skapad.desc&limit=20`, opts),
@@ -22,23 +22,25 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/resurspriser?select=*`, opts),
     fetch(`${SB_URL}/rest/v1/mark_lager?select=agent,vara,antal&order=antal.desc`, opts),
     fetch(`${SB_URL}/rest/v1/mark_handel_log?select=*&order=skapad.desc&limit=20`, opts),
+    fetch(`${SB_URL}/rest/v1/mark_vara_auktioner?select=*&status=eq.%C3%B6ppen&order=stanger_at.asc&limit=20`, opts),
   ]);
 
   return {
-    zoner:        zonerRes.ok  ? await zonerRes.json()  : [],
-    agare:        agareRes.ok  ? await agareRes.json()  : [],
-    transaktioner: transRes.ok ? await transRes.json()  : [],
-    auktioner:    auktRes.ok   ? await auktRes.json()   : [],
-    resurspriser: resursRes.ok ? await resursRes.json() : [],
-    lager:        lagerRes.ok  ? await lagerRes.json()  : [],
-    handelLog:    handelRes.ok ? await handelRes.json() : [],
+    zoner:         zonerRes.ok     ? await zonerRes.json()     : [],
+    agare:         agareRes.ok     ? await agareRes.json()     : [],
+    transaktioner: transRes.ok     ? await transRes.json()     : [],
+    auktioner:     auktRes.ok      ? await auktRes.json()      : [],
+    resurspriser:  resursRes.ok    ? await resursRes.json()    : [],
+    lager:         lagerRes.ok     ? await lagerRes.json()     : [],
+    handelLog:     handelRes.ok    ? await handelRes.json()    : [],
+    varaAuktioner: varaAuktRes.ok  ? await varaAuktRes.json()  : [],
   };
 }
 
 const C = { bg: "#0a0a0a", text: "#f0ede6", muted: "#888880" };
 
 export default async function MarkPage() {
-  const { zoner, agare, transaktioner, auktioner, resurspriser, lager, handelLog } = await getData();
+  const { zoner, agare, transaktioner, auktioner, resurspriser, lager, handelLog, varaAuktioner } = await getData();
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
@@ -71,7 +73,7 @@ export default async function MarkPage() {
             </p>
           </div>
         ) : (
-          <MarkKarta zoner={zoner} agare={agare} transaktioner={transaktioner} auktioner={auktioner} resurspriser={resurspriser} lager={lager} handelLog={handelLog} />
+          <MarkKarta zoner={zoner} agare={agare} transaktioner={transaktioner} auktioner={auktioner} resurspriser={resurspriser} lager={lager} handelLog={handelLog} varaAuktioner={varaAuktioner} />
         )}
 
       </main>
