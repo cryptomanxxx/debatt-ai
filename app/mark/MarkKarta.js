@@ -241,8 +241,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               const isAct = isHov || isSel;
               const agGradId = agName ? `grad-ag-${agName.replace(/[^a-zA-Z]/g, "")}` : null;
               const strokeCol = agFarg
-                ? rgba(agFarg,  isAct ? 0.85 : 0.40)
-                : rgba(typFarg, isAct ? 0.70 : 0.22);
+                ? rgba(agFarg,  isAct ? 1.0 : 0.75)
+                : rgba(typFarg, isAct ? 0.90 : 0.55);
               const pts = hexPts(cx, cy);
               return (
                 <g key={zon.id} style={{ cursor: "pointer" }}
@@ -269,7 +269,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                   <polygon points={pts} fill="url(#hex-light)" stroke="none" />
                   {isAct && <polygon points={pts} fill="url(#grad-hover)" stroke="none" />}
                   <polygon points={pts} fill="none" stroke={strokeCol}
-                    strokeWidth={isAct ? 2.0 : agFarg ? 1.2 : zon.typ === "stad" ? 1.4 : 0.8} />
+                    strokeWidth={isAct ? 2.4 : agFarg ? 1.8 : zon.typ === "stad" ? 1.8 : 1.2}
+                    shapeRendering="crispEdges" />
                   {isAct && (
                     <polygon points={hexPts(cx, cy, HEX - 4)} fill="none"
                       stroke={agFarg ? rgba(agFarg, 0.45) : rgba(typFarg, 0.28)}
