@@ -163,18 +163,19 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const avgKopprisPerTyp = {};
   for (const z of zoner) {
     if (!avgKopprisPerTyp[z.typ]) avgKopprisPerTyp[z.typ] = { sum: 0, count: 0 };
-    avgKopprisPerTyp[z.typ].sum += Number(z.koppris || 0);
+    avgKopprisPerTyp[z.typ].sum += Number(z.koppris) || 0;
     avgKopprisPerTyp[z.typ].count++;
   }
   for (const [typ, d] of Object.entries(avgKopprisPerTyp)) {
     avgKopprisPerTyp[typ] = d.count > 0 ? Math.round(d.sum / d.count) : 0;
   }
 
-  // Senaste clearing-pris per zontyp (från mark_transaktioner, limit=1000 i page.js).
-  // Fallback: resurspriser × genomsnittligt listpris när ingen transaktion finns.
+  // Senaste clearing-pris per zontyp.
+  // Primär: transClearing (limit=1000). Fallback om fetch misslyckades: transaktioner (limit=20).
+  // Sista utväg: resurspriser × genomsnittligt listpris.
   const zonNamnTypMap = Object.fromEntries(zoner.map(z => [z.namn, z.typ]));
   const clearingPerTyp = {};
-  for (const t of transClearing) {
+  for (const t of (transClearing.length ? transClearing : transaktioner)) {
     const typ = zonNamnTypMap[t.zon_namn];
     if (typ && !clearingPerTyp[typ]) clearingPerTyp[typ] = { pris: t.pris, skapad: t.skapad, estimated: false };
   }
