@@ -269,14 +269,15 @@ async function getSaldoSpelHistorik() {
     }
   }
 
-  const allAgents = Object.keys(agentEvents);
-  const allDates = [...new Set(allAgents.flatMap(a => agentEvents[a].map(e => e.date)))].sort();
+  // Inkludera alla agenter med saldo_spel, även de utan betthistorik
+  const allAgents = [...new Set([...Object.keys(agentEvents), ...Object.keys(currentSaldon)])];
+  const allDates = [...new Set(allAgents.flatMap(a => (agentEvents[a] || []).map(e => e.date)))].sort();
   const balances = Object.fromEntries(allAgents.map(a => [a, 200]));
 
   // Simulera historiken
   const seriesData = allDates.map(date => {
     for (const agent of allAgents) {
-      for (const e of agentEvents[agent]) {
+      for (const e of (agentEvents[agent] || [])) {
         if (e.date === date) balances[agent] += e.delta;
       }
     }
