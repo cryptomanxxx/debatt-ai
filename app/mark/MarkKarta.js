@@ -147,7 +147,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
             maxWidth: "700px",
             height: "auto",
             borderRadius: "12px",
-            background: "#060d18",
+            background: `#060d18 url("${TERRAIN_BG}") center/cover no-repeat`,
             border: "1px solid #0d1f2e",
             boxShadow: "0 4px 40px rgba(0,10,30,0.8)",
           }}
@@ -194,7 +194,6 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
             </filter>
           </defs>
 
-          <image href={TERRAIN_BG} x="0" y="0" width={SVG_W} height={SVG_H} preserveAspectRatio="xMidYMid slice" />
 
           <g>
             {zoner.map(zon => {
