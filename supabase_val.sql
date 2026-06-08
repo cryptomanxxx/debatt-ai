@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS val_roster (
   val_id  bigint references riksdagsval(id) on delete cascade,
   parti   text not null,
   ip_hash text not null,
+  kalla   text not null default 'manniska',
   skapad  timestamptz not null default now(),
   UNIQUE(val_id, ip_hash)
 );

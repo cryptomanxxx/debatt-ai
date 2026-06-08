@@ -57,10 +57,10 @@ jobs:
         id: comments
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_BODY: ${{ github.event.review.body }}
         run: |
           PR_NUM="${{ github.event.pull_request.number }}"
           REVIEWER="${{ github.event.review.user.login }}"
-          REVIEW_BODY="${{ github.event.review.body }}"
           BRANCH="${{ github.event.pull_request.head.ref }}"
 
           echo "PR #$PR_NUM — review av $REVIEWER på branch $BRANCH"
@@ -112,43 +112,41 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          REVIEW_BODY=$(cat /tmp/review_body.txt)
-          INLINE=$(cat /tmp/inline_comments.txt)
-          DIFF=$(cat /tmp/pr_diff.txt)
+          # Bygg promptfil — undviker YAML-parsningsproblem med flerradiga bash-strängar
+          {
+            echo "Du analyserar en code review på en PR i projektet Debatt-AI (Next.js + Python + Supabase)."
+            echo ""
+            echo "Reviewer: $REVIEWER"
+            echo "PR $PR_NUM på branch: $BRANCH"
+            echo ""
+            echo "REVIEW-SAMMANFATTNING:"
+            cat /tmp/review_body.txt
+            echo ""
+            echo "INLINE-KOMMENTARER (fil/rad/text):"
+            cat /tmp/inline_comments.txt
+            echo ""
+            echo "PR-DIFF (utdrag):"
+            echo '```diff'
+            cat /tmp/pr_diff.txt
+            echo '```'
+            echo ""
+            echo "Debatt-AI är en plattform med:"
+            echo "- Next.js App Router frontend (app/)"
+            echo "- Python-agentskript (agent.py, supabase_utils.py, m.fl.)"
+            echo "- Supabase som databas"
+            echo "- AI-providers: Groq, Gemini, Cerebras (med fallback-kedja)"
+            echo ""
+            echo "Uppgift:"
+            echo "1. Läs igenom reviewkommentarerna noggrant"
+            echo "2. För varje konkret, genomförbar fix (buggar, style, typos, säkerhetsproblem, logikfel): åtgärda direkt i relevant fil med Edit-verktyget"
+            echo "3. Ignorera subjektiva preferenser och kommentarer om extern infrastruktur"
+            echo "4. Gör ENDAST de minimala ändringarna som kommentarerna kräver — lägg inte till orelaterade förbättringar"
+            echo "5. Om en kommentar är oklar eller kräver arkitektoniska beslut: hoppa över den"
+            echo ""
+            echo "Redigera filerna direkt. Skapa INGA nya filer om inte reviewen explicit ber om det."
+          } > /tmp/claude_prompt.txt
 
-          # Använd bash-variabler från GITHUB_ENV — inga ${{ }} inuti strängen
-          PROMPT="Du analyserar en code review på en PR i projektet Debatt-AI (Next.js + Python + Supabase).
-
-Reviewer: $REVIEWER
-PR $PR_NUM på branch: $BRANCH
-
-REVIEW-SAMMANFATTNING:
-$REVIEW_BODY
-
-INLINE-KOMMENTARER (fil/rad/text):
-$INLINE
-
-PR-DIFF (utdrag):
-\`\`\`diff
-$DIFF
-\`\`\`
-
-Debatt-AI är en plattform med:
-- Next.js App Router frontend (app/)
-- Python-agentskript (agent.py, supabase_utils.py, m.fl.)
-- Supabase som databas
-- AI-providers: Groq, Gemini, Cerebras (med fallback-kedja)
-
-Uppgift:
-1. Läs igenom reviewkommentarerna noggrant
-2. För varje konkret, genomförbar fix (buggar, style, typos, säkerhetsproblem, logikfel): åtgärda direkt i relevant fil med Edit-verktyget
-3. Ignorera subjektiva preferenser och kommentarer om extern infrastruktur
-4. Gör ENDAST de minimala ändringarna som kommentarerna kräver — lägg inte till orelaterade förbättringar
-5. Om en kommentar är oklar eller kräver arkitektoniska beslut: hoppa över den
-
-Redigera filerna direkt. Skapa INGA nya filer om inte reviewen explicit ber om det."
-
-          claude --dangerously-skip-permissions -p "$PROMPT" 2>&1 | tee /tmp/claude_review_output.txt
+          claude --dangerously-skip-permissions -p "$(cat /tmp/claude_prompt.txt)" 2>&1 | tee /tmp/claude_review_output.txt
           echo "Claude Code kördes på reviewkommentarerna"
 
       - name: Committa och pusha fixes
