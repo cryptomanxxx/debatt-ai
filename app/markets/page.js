@@ -349,6 +349,7 @@ export default async function MarketsPage() {
               <SaldoSpelChart
                 series={saldoSpelSeries}
                 highlighted={spelarKonton.map(k => k.agent)}
+                spelarKonton={spelarKonton}
               />
             </div>
           )}
