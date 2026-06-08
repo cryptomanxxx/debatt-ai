@@ -52,7 +52,7 @@ const TERRAIN_STOPS = {
   skog:     [["#dcfce7", 0.38], ["#16a34a", 0.20], ["#14532d", 0.05]],
 };
 
-const HEX = 40;
+const HEX = 33;
 const SQRT3 = Math.sqrt(3);
 const SVG_W = 530;
 const SVG_H = 490;
@@ -153,7 +153,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
       {/* ── HEX MAP ── max 700px */}
-      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "linear-gradient(rgba(2,8,18,0.42),rgba(2,8,18,0.42)), url('/mark-terrain.jpg') center/cover no-repeat, #030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)" }}>
+      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "linear-gradient(rgba(2,8,18,0.20),rgba(2,8,18,0.20)), url('/mark-terrain.jpg') center/cover no-repeat, #030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)" }}>
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           style={{
@@ -192,7 +192,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             </radialGradient>
             <radialGradient id="vignette" cx="50%" cy="50%" r="58%">
               <stop offset="65%" stopColor="#060d18" stopOpacity="0" />
-              <stop offset="100%" stopColor="#060d18" stopOpacity="0.88" />
+              <stop offset="100%" stopColor="#060d18" stopOpacity="0.60" />
             </radialGradient>
             <filter id="softglow" x="-40%" y="-40%" width="180%" height="180%">
               <feGaussianBlur stdDeviation="2.5" result="blur" />
@@ -254,27 +254,19 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                       stroke={agFarg ? rgba(agFarg, 0.45) : rgba(typFarg, 0.28)}
                       strokeWidth="0.8" />
                   )}
-                  <text x={cx} y={agName ? cy - 11 : cy - 6} textAnchor="middle" dominantBaseline="middle"
-                    fontSize={isAct ? 20 : 16} filter={isAct ? "url(#textglow)" : undefined}
+                  <text x={cx} y={cy - 6} textAnchor="middle" dominantBaseline="middle"
+                    fontSize={isAct ? 18 : 14} filter={isAct ? "url(#textglow)" : undefined}
                     style={{ userSelect: "none", pointerEvents: "none" }}>
                     {TYP_IKON[zon.typ]}
                   </text>
-                  <text x={cx} y={agName ? cy + 4 : cy + 9} textAnchor="middle" dominantBaseline="middle"
-                    fontSize="8"
+                  <text x={cx} y={cy + 9} textAnchor="middle" dominantBaseline="middle"
+                    fontSize="7.5"
                     fill={agFarg ? rgba(agFarg, isAct ? 1 : 0.95) : rgba(typFarg, isAct ? 1 : 0.85)}
                     fontFamily="monospace" fontWeight={agFarg ? "700" : "400"}
                     filter={agFarg && isAct ? "url(#textglow)" : undefined}
                     style={{ userSelect: "none", pointerEvents: "none" }}>
                     {dagInk(zon.veckoinkomst)}kr
                   </text>
-                  {agName && (
-                    <text x={cx} y={cy + 18} textAnchor="middle" dominantBaseline="middle"
-                      fontSize="6.5" fill={agFarg} fontFamily="monospace" fontWeight="700"
-                      filter={isAct ? "url(#softglow)" : undefined}
-                      style={{ userSelect: "none", pointerEvents: "none" }}>
-                      {agName.replace(/^Den /, "").slice(0, 7).toUpperCase()}
-                    </text>
-                  )}
                 </g>
               );
             })}
