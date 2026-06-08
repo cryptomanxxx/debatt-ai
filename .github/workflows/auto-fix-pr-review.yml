@@ -1,0 +1,196 @@
+name: Auto-fix PR-reviewkommentarer
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-fix-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Kontrollera om review ska hanteras
+        id: guard
+        run: |
+          REVIEWER="${{ github.event.review.user.login }}"
+          STATE="${{ github.event.review.state }}"
+          echo "Reviewer: $REVIEWER, State: $STATE"
+
+          # Skippa om det är auto-fix-boten själv (undvik loopar)
+          if [[ "$REVIEWER" == "auto-fix-bot" ]] || [[ "$REVIEWER" == *"github-actions"* ]]; then
+            echo "SKIP=true" >> "$GITHUB_ENV"
+            echo "Skippar — review från bot som kan orsaka loop"
+            exit 0
+          fi
+
+          # Kör om: känd code review-bot ELLER changes_requested
+          IS_BOT=false
+          for pattern in copilot codex coderabbit codestral gemini; do
+            if [[ "$REVIEWER" == *"$pattern"* ]]; then
+              IS_BOT=true
+              break
+            fi
+          done
+
+          if [[ "$IS_BOT" == "true" ]] || [[ "$STATE" == "changes_requested" ]]; then
+            echo "SKIP=false" >> "$GITHUB_ENV"
+            echo "Hanterar review från $REVIEWER (state: $STATE)"
+          else
+            echo "SKIP=true" >> "$GITHUB_ENV"
+            echo "Skippar — inte en bot-review och inte changes_requested"
+          fi
+
+      - name: Checkout PR-branch
+        if: env.SKIP == 'false'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Samla reviewkommentarer
+        if: env.SKIP == 'false'
+        id: comments
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUM="${{ github.event.pull_request.number }}"
+          REVIEWER="${{ github.event.review.user.login }}"
+          REVIEW_BODY="${{ github.event.review.body }}"
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+
+          echo "PR #$PR_NUM — review av $REVIEWER på branch $BRANCH"
+
+          # Hämta alla inline-kommentarer på PR:n
+          gh api "repos/${{ github.repository }}/pulls/${PR_NUM}/comments" \
+            --jq '.[] | "FIL: \(.path) RAD: \(.line // .original_line // "?")\nKOMMENTAR: \(.body)\n---"' \
+            > /tmp/inline_comments.txt 2>/dev/null || echo "(inga inline-kommentarer)" > /tmp/inline_comments.txt
+
+          # Hämta PR-diff (max 300 rader)
+          gh api "repos/${{ github.repository }}/pulls/${PR_NUM}" \
+            --header "Accept: application/vnd.github.v3.diff" \
+            2>/dev/null | head -300 > /tmp/pr_diff.txt || echo "(diff ej tillgängligt)" > /tmp/pr_diff.txt
+
+          echo "REVIEWER=$REVIEWER"         >> "$GITHUB_ENV"
+          echo "PR_NUM=$PR_NUM"             >> "$GITHUB_ENV"
+          echo "BRANCH=$BRANCH"             >> "$GITHUB_ENV"
+          printf '%s' "$REVIEW_BODY"        > /tmp/review_body.txt
+          echo "Kommentarer insamlade"
+
+      - name: Kontrollera deduplicering
+        if: env.SKIP == 'false'
+        id: dedupe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh pr list \
+            --state open \
+            --label "auto-fix" \
+            --search "Review-fix PR #${{ env.PR_NUM }}" \
+            --json number -q '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
+            echo "Öppen review-fix PR #$EXISTING finns redan — hoppar över"
+            echo "SKIP=true" >> "$GITHUB_ENV"
+          else
+            echo "SKIP=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Installera Claude Code CLI
+        if: env.SKIP == 'false'
+        run: |
+          npm install -g @anthropic-ai/claude-code@latest 2>/dev/null || \
+          npm install -g @anthropic-ai/claude-code 2>/dev/null || true
+          claude --version 2>/dev/null && echo "CLAUDE_INSTALLED=true" >> "$GITHUB_ENV" || \
+          echo "CLAUDE_INSTALLED=false" >> "$GITHUB_ENV"
+
+      - name: Kör Claude Code på reviewkommentarerna
+        if: env.SKIP == 'false' && env.CLAUDE_INSTALLED == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          REVIEW_BODY=$(cat /tmp/review_body.txt)
+          INLINE=$(cat /tmp/inline_comments.txt)
+          DIFF=$(cat /tmp/pr_diff.txt)
+          REVIEWER="${{ env.REVIEWER }}"
+
+          PROMPT="Du analyserar en code review på en PR i projektet Debatt-AI (Next.js + Python + Supabase).
+
+Reviewer: $REVIEWER
+PR #${{ env.PR_NUM }} på branch: ${{ env.BRANCH }}
+
+REVIEW-SAMMANFATTNING:
+$REVIEW_BODY
+
+INLINE-KOMMENTARER (fil/rad/text):
+$INLINE
+
+PR-DIFF (utdrag):
+\`\`\`diff
+$DIFF
+\`\`\`
+
+Debatt-AI är en plattform med:
+- Next.js App Router frontend (app/)
+- Python-agentskript (agent.py, supabase_utils.py, m.fl.)
+- Supabase som databas
+- AI-providers: Groq, Gemini, Cerebras (med fallback-kedja)
+
+Uppgift:
+1. Läs igenom reviewkommentarerna noggrant
+2. För varje konkret, genomförbar fix (buggar, style, typos, säkerhetsproblem, logikfel): åtgärda direkt i relevant fil med Edit-verktyget
+3. Ignorera subjektiva preferenser och kommentarer om extern infrastruktur
+4. Gör ENDAST de minimala ändringarna som kommentarerna kräver — lägg inte till orelaterade förbättringar
+5. Om en kommentar är oklar eller kräver arkitektoniska beslut: hoppa över den
+
+Redigera filerna direkt. Skapa INGA nya filer om inte reviewen explicit ber om det."
+
+          claude --dangerously-skip-permissions -p "$PROMPT" 2>&1 | tee /tmp/claude_review_output.txt
+          echo "Claude Code kördes på reviewkommentarerna"
+
+      - name: Committa och pusha fixes
+        if: env.SKIP == 'false' && env.CLAUDE_INSTALLED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name  "auto-fix-bot"
+          git config user.email "bot@debatt-ai.se"
+
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "Inga ändringar gjordes — avslutar"
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "fix(review): adresserar reviewkommentarer från ${{ env.REVIEWER }} på PR #${{ env.PR_NUM }}"
+          git push origin "${{ env.BRANCH }}"
+
+          # Kommentera på PR:n att fixes är pushade
+          {
+            echo "🤖 **Auto-fix** har adresserat reviewkommentarerna från @${{ env.REVIEWER }}."
+            echo ""
+            echo "### Vad som fixades"
+            echo '```'
+            head -40 /tmp/claude_review_output.txt
+            echo '```'
+            echo ""
+            echo "*Kontrollera gärna ändringarna innan merge.*"
+          } > /tmp/pr_comment.txt
+
+          gh pr comment "${{ env.PR_NUM }}" --body-file /tmp/pr_comment.txt
+
+          echo "Fixes pushade direkt till ${{ env.BRANCH }}"
+
+      - name: Sätt label auto-fix på PR
+        if: env.SKIP == 'false' && env.CLAUDE_INSTALLED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "auto-fix" \
+            --color "e11d48" \
+            --description "Automatisk fix genererad av Claude Code" \
+            2>/dev/null || true
+          gh pr edit "${{ env.PR_NUM }}" --add-label "auto-fix" 2>/dev/null || true

@@ -211,6 +211,56 @@ def avgjor_val(val: dict) -> None:
     )
 
 
+def rostar_agenter(val: dict) -> None:
+    """Låt varje agent rösta på sitt parti om de inte redan röstat."""
+    val_id = val["id"]
+    try:
+        from agenter import AGENTER
+    except ImportError:
+        print("  [VARNING] Kunde inte importera AGENTER — agenter röstar inte")
+        return
+
+    partier_db = fetch("politiska_partier?aktiv=eq.true&select=namn,ledare,medlemmar")
+    if not partier_db:
+        print("  Inga aktiva partier — agenter röstar inte")
+        return
+
+    parti_namn_i_val = {p["namn"] for p in val.get("partier", [])}
+
+    agent_parti: dict[str, str] = {}
+    for p in partier_db:
+        for m in p.get("medlemmar") or []:
+            agent_parti[m] = p["namn"]
+        agent_parti[p["ledare"]] = p["namn"]
+
+    antal_rostade = 0
+    antal_redan = 0
+
+    for agent in AGENTER:
+        namn = agent["namn"]
+        parti = agent_parti.get(namn)
+        if not parti or parti not in parti_namn_i_val:
+            continue
+        ip_hash = hashlib.sha256((namn + "val-salt-2025").encode()).hexdigest()[:32]
+        r = httpx.post(
+            f"{SB_URL}/rest/v1/val_roster",
+            json={"val_id": val_id, "parti": parti, "ip_hash": ip_hash, "kalla": "ai"},
+            headers=H,
+            timeout=10,
+        )
+        if r.status_code == 409:
+            antal_redan += 1
+        elif r.is_success:
+            antal_rostade += 1
+        else:
+            print(f"  [VARNING] Röst misslyckades för {namn}: {r.status_code}")
+
+    if antal_rostade:
+        print(f"  🤖 {antal_rostade} agenter röstade")
+    if antal_redan:
+        print(f"  ℹ️  {antal_redan} agenter hade redan röstat")
+
+
 def main() -> None:
     print("=" * 60)
     print("Riksdagsval — AI-civilisationens demokratiska val")
@@ -226,6 +276,9 @@ def main() -> None:
         startad = datetime.datetime.fromisoformat(val["startad"].replace("Z", "+00:00"))
         alder_dagar = (datetime.datetime.now(datetime.timezone.utc) - startad).days
         print(f"\nAktivt val sedan {alder_dagar} dagar")
+
+        print("  Agenter röstar...")
+        rostar_agenter(val)
 
         if alder_dagar >= 7 or FORCE_DECIDE or FORCE_START:
             print("  Valperioden är slut — räknar röster...")

@@ -55,7 +55,7 @@ export async function POST(req) {
   const rostRes = await fetch(`${SB_URL}/rest/v1/val_roster`, {
     method: "POST",
     headers: sbHeaders(),
-    body: JSON.stringify({ val_id: valId, parti, ip_hash: ipHash }),
+    body: JSON.stringify({ val_id: valId, parti, ip_hash: ipHash, kalla: "manniska" }),
   });
 
   if (rostRes.status === 409) {
@@ -67,14 +67,23 @@ export async function POST(req) {
     return Response.json({ error: "Kunde inte spara röst" }, { status: 502 });
   }
 
-  // Return updated vote counts
+  // Return updated vote counts split by kalla
   const countRes = await fetch(
-    `${SB_URL}/rest/v1/val_roster?val_id=eq.${valId}&select=parti`,
+    `${SB_URL}/rest/v1/val_roster?val_id=eq.${valId}&select=parti,kalla`,
     { headers: sbHeaders() }
   );
   const roster = countRes.ok ? await countRes.json() : [];
   const counts = {};
-  for (const r of roster) counts[r.parti] = (counts[r.parti] || 0) + 1;
+  const humanCounts = {};
+  const aiCounts = {};
+  for (const r of roster) {
+    counts[r.parti] = (counts[r.parti] || 0) + 1;
+    if (r.kalla === "ai") {
+      aiCounts[r.parti] = (aiCounts[r.parti] || 0) + 1;
+    } else {
+      humanCounts[r.parti] = (humanCounts[r.parti] || 0) + 1;
+    }
+  }
 
-  return Response.json({ ok: true, counts });
+  return Response.json({ ok: true, counts, humanCounts, aiCounts });
 }

@@ -1,6 +1,13 @@
+import { AGENT_VISUELL } from "../../../agentData";
+
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const RATE_LIMIT_COMMENTS = 20; // max kommentarer per agent per 24h
+
+// Tillåtna författarnamn: de 24 agenterna + autonoma programmatiska signaturer.
+// Förhindrar att en delad API-nyckel kommenterar under godtyckliga namn eller
+// kringgår rate limit genom att variera forfattare-strängen.
+const VALID_AGENTS = new Set([...Object.keys(AGENT_VISUELL), "Civilisationshistorikern"]);
 
 function resolveAgent(apiKey) {
   if (!apiKey) return null;
@@ -49,8 +56,17 @@ export async function POST(req) {
   }
 
   // Använd forfattare från body om det finns (faktisk agent som skriver),
-  // annars faller vi tillbaka på agentName från API-nyckeln
-  const namn = (forfattare && typeof forfattare === "string" && forfattare.trim()) ? forfattare.trim() : agentName;
+  // annars faller vi tillbaka på agentName från API-nyckeln. Validera mot den
+  // kända agentlistan innan den används för identitet/rate limiting — annars
+  // kan en delad nyckel kringgå rate limit eller kommentera under påhittade namn.
+  let namn = agentName;
+  if (forfattare !== undefined && forfattare !== null && forfattare !== "") {
+    const trimmad = typeof forfattare === "string" ? forfattare.trim() : "";
+    if (!VALID_AGENTS.has(trimmad)) {
+      return Response.json({ fel: "Okänt författarnamn (forfattare)" }, { status: 400 });
+    }
+    namn = trimmad;
+  }
 
   if (!artikel_id || !text || text.trim().length < 5) {
     return Response.json({ fel: "artikel_id och text krävs" }, { status: 400 });

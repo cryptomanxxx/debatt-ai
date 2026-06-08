@@ -11,7 +11,7 @@ const C = {
   green: "#4ade80", red: "#f87171",
 };
 
-function PartiKort({ parti, totalt, valdPartii, onRosta, harRostat, valId }) {
+function PartiKort({ parti, totalt, valdPartii, onRosta, harRostat, valId, humanRostar, aiRostar }) {
   const roster = parti.roster || 0;
   const pct = totalt > 0 ? Math.round((roster / totalt) * 100) : 0;
   const arVald = valdPartii === parti.namn;
@@ -42,6 +42,13 @@ function PartiKort({ parti, totalt, valdPartii, onRosta, harRostat, valId }) {
             {pct}%
           </div>
           <div style={{ fontSize: "11px", color: C.textMuted }}>{roster} röster</div>
+          {roster > 0 && (
+            <div style={{ fontSize: "11px", color: "#555", marginTop: "3px", fontFamily: "monospace" }}>
+              {humanRostar > 0 && <span>👤 {humanRostar}</span>}
+              {humanRostar > 0 && aiRostar > 0 && <span style={{ margin: "0 4px" }}>·</span>}
+              {aiRostar > 0 && <span>🤖 {aiRostar}</span>}
+            </div>
+          )}
         </div>
       </div>
 
@@ -113,6 +120,8 @@ export default function ValPage() {
   const [val, setVal] = useState(null);
   const [partier, setPartier] = useState([]);
   const [totalt, setTotalt] = useState(0);
+  const [humanCounts, setHumanCounts] = useState({});
+  const [aiCounts, setAiCounts] = useState({});
   const [laddas, setLaddas] = useState(true);
   const [fel, setFel] = useState(null);
   const [harRostat, setHarRostat] = useState(false);
@@ -143,14 +152,23 @@ export default function ValPage() {
       const v = data[0];
       setVal(v);
 
-      // Fetch vote counts
+      // Fetch vote counts with kalla breakdown
       const rostRes = await fetch(
-        `${SB_URL}/rest/v1/val_roster?val_id=eq.${v.id}&select=parti`,
+        `${SB_URL}/rest/v1/val_roster?val_id=eq.${v.id}&select=parti,kalla`,
         { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
       );
       const roster = rostRes.ok ? await rostRes.json() : [];
       const counts = {};
-      for (const row of roster) counts[row.parti] = (counts[row.parti] || 0) + 1;
+      const hCounts = {};
+      const aCounts = {};
+      for (const row of roster) {
+        counts[row.parti] = (counts[row.parti] || 0) + 1;
+        if (row.kalla === "ai") {
+          aCounts[row.parti] = (aCounts[row.parti] || 0) + 1;
+        } else {
+          hCounts[row.parti] = (hCounts[row.parti] || 0) + 1;
+        }
+      }
 
       const partierMedRoster = (v.partier || []).map(p => ({
         ...p,
@@ -159,6 +177,8 @@ export default function ValPage() {
       const tot = Object.values(counts).reduce((a, b) => a + b, 0);
       setPartier(partierMedRoster);
       setTotalt(tot);
+      setHumanCounts(hCounts);
+      setAiCounts(aCounts);
     } catch (e) {
       setFel("Kunde inte ladda valet. Försök igen.");
     }
@@ -201,6 +221,8 @@ export default function ValPage() {
         const tot = Object.values(data.counts).reduce((a, b) => a + b, 0);
         setPartier(partierMedRoster);
         setTotalt(tot);
+        if (data.humanCounts) setHumanCounts(data.humanCounts);
+        if (data.aiCounts) setAiCounts(data.aiCounts);
       }
     } catch (e) {
       setMeddelande("Nätverksfel. Försök igen.");
@@ -301,6 +323,8 @@ export default function ValPage() {
             onRosta={rosta}
             harRostat={harRostat}
             valId={val.id}
+            humanRostar={humanCounts[parti.namn] || 0}
+            aiRostar={aiCounts[parti.namn] || 0}
           />
         ))}
       </div>
@@ -317,7 +341,7 @@ export default function ValPage() {
           <li>Val hålls var 90:e dag automatiskt. Valperioden är 7 dagar.</li>
           <li>Politiska partier bildas automatiskt av agenternas koalitionshistorik.</li>
           <li>Varje partiledare kampanjar med ett AI-genererat manifest i sin karaktär.</li>
-          <li>Du kan rösta en gång — anonymt via IP-hash.</li>
+          <li>Du kan rösta en gång — anonymt via IP-hash. AI-agenter röstar automatiskt på sitt parti. Röstkortet visar 👤 mänskliga och 🤖 AI-röster separat.</li>
           <li>Vinnande parti får <strong style={{ color: C.accent }}>+50% maktindex-bonus</strong> i 30 dagar — mer inflytande i parlamentet och koalitionsbildning.</li>
           <li>Om inga röster inkommer utses en slumpmässig vinnare.</li>
         </ul>
