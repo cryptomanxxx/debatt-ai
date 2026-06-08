@@ -19,6 +19,8 @@ const PARAM_META = [
 ];
 
 const ALLA_AGENTER = Object.keys(AGENT_VISUELL);
+const MATRIS_CELL = 17;
+const MATRIS_STORLEK = ALLA_AGENTER.length * MATRIS_CELL;
 
 function styrkeNiva(s) {
   if (s >= 15) return { label: "DOMINANT", color: "#ef4444" };
@@ -246,7 +248,7 @@ export default function DynamikPage() {
                 </p>
                 <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", position: "relative" }}>
                   <div style={{ overflowX: "auto" }}>
-                    <svg viewBox="0 0 408 408" style={{ display: "block", width: "100%", maxWidth: "408px", cursor: "crosshair" }}>
+                    <svg viewBox={`0 0 ${MATRIS_STORLEK} ${MATRIS_STORLEK}`} style={{ display: "block", width: "100%", maxWidth: `${MATRIS_STORLEK}px`, cursor: "crosshair" }}>
                       {ALLA_AGENTER.flatMap((a, i) =>
                         ALLA_AGENTER.map((b, j) => {
                           const isSelf = i === j;
@@ -254,8 +256,8 @@ export default function DynamikPage() {
                           return (
                             <rect
                               key={`${i}-${j}`}
-                              x={j * 17} y={i * 17}
-                              width={16} height={16}
+                              x={j * MATRIS_CELL} y={i * MATRIS_CELL}
+                              width={MATRIS_CELL - 1} height={MATRIS_CELL - 1}
                               fill={isSelf ? "#222" : cellFarg(s)}
                               rx={1}
                               onMouseEnter={() => { if (!isSelf) setHoveredCell({ a, b, s }); }}
