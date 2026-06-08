@@ -17,7 +17,7 @@ SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ["SUPABASE_ANON_KEY"]
 
 MAX_ZONER_PER_AGENT = 6
-AUKTION_DURATION_H  = 48    # zonauktioner löper 48 timmar
+AUKTION_DURATION_H  = 24    # zonauktioner löper 24 timmar
 AUKTION_CHANS       = 0.40  # 40% chans per fri zon att öppna auktion per körning
 MAX_NYA_AUKTIONER   = 5     # max 5 nya zonauktioner per körning
 BUD_CHANS_PER_AGENT = 0.30  # 30% chans per agent per zonauktion att buda
@@ -222,7 +222,7 @@ def stang_avgjorda_auktioner(saldon, agent_zon_antal):
 
 
 def oppna_nya_auktioner(zoner, agare_dict, aktiva_zon_ids):
-    """Öppnar 48h-auktioner för oägda zoner som inte redan är i aktiv auktion."""
+    """Öppnar 24h-auktioner för oägda zoner som inte redan är i aktiv auktion."""
     print("\n── Öppnar nya auktioner ──")
 
     fria_kandidater = [

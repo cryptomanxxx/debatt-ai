@@ -506,7 +506,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             <span style={{ fontSize: "18px" }}>🏷️</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: "12px", color: "#f59e0b", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>MARKAUKTIONER</div>
-              <div style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace" }}>BUDRUNDOR · ZONÄGARSKAP · 48H</div>
+              <div style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace" }}>BUDRUNDOR · ZONÄGARSKAP · 24H</div>
             </div>
             {auktioner.length > 0 && (
               <span style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "monospace", background: "rgba(245,158,11,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(245,158,11,0.20)" }}>
