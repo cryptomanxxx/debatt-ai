@@ -21,7 +21,8 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-export default function SaldoSpelChart({ series, highlighted }) {
+export default function SaldoSpelChart({ series, highlighted, spelarKonton = [] }) {
+  const saldonMap = Object.fromEntries(spelarKonton.map(k => [k.agent, k.saldo_spel]));
   if (!series || series.length < 2) {
     return (
       <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "32px", textAlign: "center" }}>
@@ -54,7 +55,6 @@ export default function SaldoSpelChart({ series, highlighted }) {
             width={52}
           />
           <Tooltip content={<CustomTooltip />} />
-          <ReferenceLine y={200} stroke="#2a2a2a" strokeDasharray="4 4" label={{ value: "Start 200 kr", fill: "#444", fontSize: 9, fontFamily: "monospace" }} />
           {allAgents.map(agent => {
             const isHighlighted = highlighted.includes(agent);
             const av = AGENT_VISUELL[agent];
@@ -77,15 +77,14 @@ export default function SaldoSpelChart({ series, highlighted }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #1a1a1a" }}>
         {highlighted.map(agent => {
           const av = AGENT_VISUELL[agent];
-          const last = series[series.length - 1];
-          const bal = last?.[agent] ?? 200;
-          const delta = bal - 200;
+          const bal = saldonMap[agent] ?? 200;
+          const farg = bal >= 1100 ? "#4ade80" : bal >= 800 ? "#facc15" : "#f87171";
           return (
             <div key={agent} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
               <div style={{ width: "20px", height: "2px", background: av?.ikonFarg || "#888", borderRadius: "1px" }} />
               <span style={{ fontSize: "10px", color: "#888", fontFamily: "monospace" }}>{agent}</span>
-              <span style={{ fontSize: "10px", fontFamily: "monospace", color: delta > 0 ? "#4ade80" : delta < 0 ? "#f87171" : "#555" }}>
-                {delta > 0 ? `+${delta}` : delta} kr
+              <span style={{ fontSize: "10px", fontFamily: "monospace", color: farg, fontWeight: 700 }}>
+                {bal} kr
               </span>
             </div>
           );
