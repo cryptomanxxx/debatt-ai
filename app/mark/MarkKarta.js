@@ -43,13 +43,13 @@ const INSTITUTIONS = {
 const TERRAIN_BG = null; // ingen extern bild — använder CSS-gradient
 
 const TERRAIN_STOPS = {
-  energi:   [["#fef08a", 0.40], ["#f59e0b", 0.22], ["#78350f", 0.06]],
-  jordbruk: [["#bbf7d0", 0.38], ["#22c55e", 0.20], ["#14532d", 0.05]],
-  industri: [["#bfdbfe", 0.38], ["#3b82f6", 0.20], ["#1e3a8a", 0.05]],
-  gruva:    [["#fed7aa", 0.40], ["#ea580c", 0.24], ["#7c2d12", 0.06]],
-  stad:     [["#f0e0ff", 0.52], ["#9333ea", 0.30], ["#3b0764", 0.10]],
-  kust:     [["#cffafe", 0.42], ["#0891b2", 0.22], ["#0c4a6e", 0.06]],
-  skog:     [["#dcfce7", 0.38], ["#16a34a", 0.20], ["#14532d", 0.05]],
+  energi:   [["#fef08a", 0.16], ["#f59e0b", 0.08], ["#78350f", 0.02]],
+  jordbruk: [["#bbf7d0", 0.14], ["#22c55e", 0.07], ["#14532d", 0.01]],
+  industri: [["#bfdbfe", 0.14], ["#3b82f6", 0.07], ["#1e3a8a", 0.01]],
+  gruva:    [["#fed7aa", 0.16], ["#ea580c", 0.08], ["#7c2d12", 0.02]],
+  stad:     [["#f0e0ff", 0.20], ["#9333ea", 0.10], ["#3b0764", 0.03]],
+  kust:     [["#cffafe", 0.16], ["#0891b2", 0.08], ["#0c4a6e", 0.02]],
+  skog:     [["#dcfce7", 0.14], ["#16a34a", 0.07], ["#14532d", 0.01]],
 };
 
 const HEX = 33;        // polygonradie (visuell storlek på hexagonen)
@@ -195,9 +195,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             ))}
             {agentGrads.map(({ name, farg }) => (
               <radialGradient key={name} id={`grad-ag-${name.replace(/[^a-zA-Z]/g, "")}`} cx="32%" cy="25%" r="78%">
-                <stop offset="0%"   stopColor={farg} stopOpacity="0.38" />
-                <stop offset="50%"  stopColor={farg} stopOpacity="0.15" />
-                <stop offset="100%" stopColor={farg} stopOpacity="0.03" />
+                <stop offset="0%"   stopColor={farg} stopOpacity="0.14" />
+                <stop offset="50%"  stopColor={farg} stopOpacity="0.06" />
+                <stop offset="100%" stopColor={farg} stopOpacity="0.01" />
               </radialGradient>
             ))}
             <linearGradient id="hex-light" x1="20%" y1="0%" x2="80%" y2="100%">
@@ -239,8 +239,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               const isAct = isHov || isSel;
               const agGradId = agName ? `grad-ag-${agName.replace(/[^a-zA-Z]/g, "")}` : null;
               const strokeCol = agFarg
-                ? rgba(agFarg,  isAct ? 1.0 : 0.75)
-                : rgba(typFarg, isAct ? 0.95 : 0.50);
+                ? rgba(agFarg,  isAct ? 0.85 : 0.40)
+                : rgba(typFarg, isAct ? 0.70 : 0.22);
               const pts = hexPts(cx, cy);
               return (
                 <g key={zon.id} style={{ cursor: "pointer" }}
@@ -252,11 +252,11 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                     <>
                       <polygon points={hexPts(cx, cy, HEX + 8)} fill="none" stroke="#9333ea"
                         strokeWidth="1.5" filter="url(#cityglow)">
-                        <animate attributeName="opacity" values="0.05;0.40;0.05" dur="2.2s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.02;0.15;0.02" dur="2.2s" repeatCount="indefinite" />
                       </polygon>
                       <polygon points={hexPts(cx, cy, HEX + 3)} fill="none" stroke="#c084fc"
-                        strokeWidth="1" filter="url(#softglow)">
-                        <animate attributeName="opacity" values="0.10;0.55;0.10" dur="1.8s" repeatCount="indefinite" />
+                        strokeWidth="0.8" filter="url(#softglow)">
+                        <animate attributeName="opacity" values="0.04;0.22;0.04" dur="1.8s" repeatCount="indefinite" />
                       </polygon>
                     </>
                   )}
@@ -267,7 +267,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                   <polygon points={pts} fill="url(#hex-light)" stroke="none" />
                   {isAct && <polygon points={pts} fill="url(#grad-hover)" stroke="none" />}
                   <polygon points={pts} fill="none" stroke={strokeCol}
-                    strokeWidth={isAct ? 2.8 : agFarg ? 2.0 : zon.typ === "stad" ? 2.2 : 1.4} />
+                    strokeWidth={isAct ? 2.0 : agFarg ? 1.2 : zon.typ === "stad" ? 1.4 : 0.8} />
                   {isAct && (
                     <polygon points={hexPts(cx, cy, HEX - 4)} fill="none"
                       stroke={agFarg ? rgba(agFarg, 0.45) : rgba(typFarg, 0.28)}
