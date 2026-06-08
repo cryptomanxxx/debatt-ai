@@ -52,14 +52,15 @@ const TERRAIN_STOPS = {
   skog:     [["#dcfce7", 0.38], ["#16a34a", 0.20], ["#14532d", 0.05]],
 };
 
-const HEX = 33;
+const HEX = 33;        // polygonradie (visuell storlek på hexagonen)
+const HEX_SP = 40;     // gitteravstånd — frikopplat från radien så kartan inte komprimeras
 const SQRT3 = Math.sqrt(3);
 const SVG_W = 530;
 const SVG_H = 490;
 
-function hexCenter(col, row) {
-  const x = HEX * SQRT3 * (col + (row % 2 === 1 ? 0.5 : 0)) + 52;
-  const y = HEX * 1.5 * row + 50;
+function hexCenter(col, row, ox, oy) {
+  const x = HEX_SP * SQRT3 * (col + (row % 2 === 1 ? 0.5 : 0)) + ox;
+  const y = HEX_SP * 1.5 * row + oy;
   return [x, y];
 }
 
@@ -113,6 +114,24 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const [floats, setFloats]     = useState([]);
 
   const agareMap = Object.fromEntries(agare.map(a => [a.zon_id, a]));
+
+  // Centrera hexklustret dynamiskt i SVG
+  const [OX, OY] = (() => {
+    if (!zoner.length) return [52, 50];
+    const raw = zoner.map(z => [
+      HEX_SP * SQRT3 * (z.hex_col + (z.hex_row % 2 === 1 ? 0.5 : 0)),
+      HEX_SP * 1.5 * z.hex_row,
+    ]);
+    const minX = Math.min(...raw.map(c => c[0]));
+    const maxX = Math.max(...raw.map(c => c[0]));
+    const minY = Math.min(...raw.map(c => c[1]));
+    const maxY = Math.max(...raw.map(c => c[1]));
+    return [
+      (SVG_W - (maxX - minX + HEX_SP * SQRT3)) / 2 - minX + HEX_SP * SQRT3 / 2,
+      (SVG_H - (maxY - minY + HEX_SP * 2))      / 2 - minY + HEX_SP,
+    ];
+  })();
+
   const agentGrads = [...new Set(agare.map(a => a.agent))]
     .map(name => ({ name, farg: AGENT_VISUELL[name]?.ikonFarg || "#888" }));
 
@@ -143,7 +162,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
 
   function handleEnter(zon) {
     setHover(zon);
-    const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
+    const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row, OX, OY);
     const id = Math.random();
     setFloats(prev => [...prev.slice(-4), { id, cx, cy, ink: dagInk(zon.veckoinkomst) }]);
     setTimeout(() => setFloats(prev => prev.filter(f => f.id !== id)), 1600);
@@ -210,7 +229,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
 
           <g>
             {zoner.map(zon => {
-              const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row);
+              const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row, OX, OY);
               const agInfo  = agareMap[zon.id];
               const agName  = agInfo?.agent;
               const agFarg  = agName ? (AGENT_VISUELL[agName]?.ikonFarg || "#888") : null;
@@ -254,18 +273,10 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                       stroke={agFarg ? rgba(agFarg, 0.45) : rgba(typFarg, 0.28)}
                       strokeWidth="0.8" />
                   )}
-                  <text x={cx} y={cy - 6} textAnchor="middle" dominantBaseline="middle"
-                    fontSize={isAct ? 18 : 14} filter={isAct ? "url(#textglow)" : undefined}
+                  <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
+                    fontSize={isAct ? 20 : 16} filter={isAct ? "url(#textglow)" : undefined}
                     style={{ userSelect: "none", pointerEvents: "none" }}>
                     {TYP_IKON[zon.typ]}
-                  </text>
-                  <text x={cx} y={cy + 9} textAnchor="middle" dominantBaseline="middle"
-                    fontSize="7.5"
-                    fill={agFarg ? rgba(agFarg, isAct ? 1 : 0.95) : rgba(typFarg, isAct ? 1 : 0.85)}
-                    fontFamily="monospace" fontWeight={agFarg ? "700" : "400"}
-                    filter={agFarg && isAct ? "url(#textglow)" : undefined}
-                    style={{ userSelect: "none", pointerEvents: "none" }}>
-                    {dagInk(zon.veckoinkomst)}kr
                   </text>
                 </g>
               );
