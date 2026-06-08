@@ -5716,27 +5716,45 @@ def formatera_mark_for_prompt(zoner: list) -> str:
 def berakna_och_spara_resurspriser(sb_key: str) -> None:
     """Beräknar dynamiska resurspriser per zontyp och sparar i resurspriser-tabellen.
 
-    Prismodell (multiplikator mot baspriser):
-      - Om ägartäthet = halva zonerna av typen → multiplier 1.0 (normalt)
-      - Lägre ägartäthet (brist) → multiplier upp till 2.0
-      - Högre ägartäthet (överskott) → multiplier ned till 0.5
+    Prisupptäckt via auktioner (primär signal):
+      - Clearing-priser från avgjorda auktioner senaste 14 dagar (vikt 60%)
+    Fallback-formel när inga auktioner finns (vikt 40% vid mix, 100% annars):
+      1. Utbudsfaktor  [0.50, 2.00]: hög ägartäthet → lägre pris
+      2. Efterfrågefaktor [0.75, 1.50]: 24h varuhandelsvolym → högre pris
+      3. Lagerfaktor  [0.60, 1.00]: högt lager → lägre pris
+    Slutmultiplikator clampas till [0.40, 2.50].
     """
+    TYP_VARA = {
+        "energi": "el", "jordbruk": "spannmål", "industri": "maskiner",
+        "gruva": "malm", "stad": "tjänster", "kust": "fisk", "skog": "virke",
+    }
+    BASELINE_HANDEL = 5
+    NORMALLAGER = 30
+    CLEARING_VIKT = 0.60  # auktionsprisernas vikt när de finns
+
     try:
-        # Hämta alla zoner med typ
+        from datetime import timezone
+        import datetime as _dt
+        h_r = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+        h_w = {**h_r, "Content-Type": "application/json",
+               "Prefer": "resolution=merge-duplicates"}
+
+        # --- Utbud ---
         zoner = httpx.get(
-            f"{SB_URL}/rest/v1/mark_zoner?select=id,typ",
-            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
-            timeout=8,
+            f"{SB_URL}/rest/v1/mark_zoner?select=id,typ,koppris",
+            headers=h_r, timeout=8,
         ).json()
         totalt: dict = {}
+        listpris: dict = {}  # typ → snittlistpris
         for z in (zoner if isinstance(zoner, list) else []):
-            totalt[z["typ"]] = totalt.get(z["typ"], 0) + 1
+            t = z["typ"]
+            totalt[t] = totalt.get(t, 0) + 1
+            listpris.setdefault(t, []).append(float(z.get("koppris") or 0))
+        listpris = {t: sum(v) / len(v) for t, v in listpris.items() if v}
 
-        # Hämta ägda zoner med typ
         agda_rows = httpx.get(
             f"{SB_URL}/rest/v1/mark_agare?select=mark_zoner(typ)",
-            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
-            timeout=8,
+            headers=h_r, timeout=8,
         ).json()
         agda: dict = {}
         for r in (agda_rows if isinstance(agda_rows, list) else []):
@@ -5744,33 +5762,95 @@ def berakna_och_spara_resurspriser(sb_key: str) -> None:
             if t:
                 agda[t] = agda.get(t, 0) + 1
 
-        # Hämta nuvarande priser för trend-beräkning
+        # --- Auktions-clearing-priser senaste 14 dagar ---
+        since14 = (_dt.datetime.now(timezone.utc) - _dt.timedelta(days=14)).isoformat()
+        trans_rows = httpx.get(
+            f"{SB_URL}/rest/v1/mark_transaktioner"
+            f"?select=pris,mark_zoner(typ)&skapad=gte.{since14}&order=skapad.desc&limit=200",
+            headers=h_r, timeout=8,
+        ).json()
+        # Fallback: mark_transaktioner kanske inte har mark_zoner join — hämta via zon_id
+        clearing: dict = {}  # typ → [pris, ...]
+        for r in (trans_rows if isinstance(trans_rows, list) else []):
+            zon = r.get("mark_zoner") or {}
+            t = zon.get("typ")
+            p = r.get("pris")
+            if t and p:
+                clearing.setdefault(t, []).append(float(p))
+        clearing_mult: dict = {}
+        for t, priser in clearing.items():
+            bas = listpris.get(t, 1)
+            if bas > 0 and priser:
+                clearing_mult[t] = round(sum(priser) / len(priser) / bas, 3)
+
+        # --- Efterfrågan: varuhandel senaste 24h ---
+        since24 = (_dt.datetime.now(timezone.utc) - _dt.timedelta(hours=24)).isoformat()
+        handel_rows = httpx.get(
+            f"{SB_URL}/rest/v1/mark_handel_log?select=vara,antal&skapad=gte.{since24}",
+            headers=h_r, timeout=8,
+        ).json()
+        handel_vol: dict = {}
+        for r in (handel_rows if isinstance(handel_rows, list) else []):
+            v = r.get("vara")
+            if v:
+                handel_vol[v] = handel_vol.get(v, 0) + (r.get("antal") or 1)
+
+        # --- Lager ---
+        lager_rows = httpx.get(
+            f"{SB_URL}/rest/v1/mark_lager?select=vara,antal",
+            headers=h_r, timeout=8,
+        ).json()
+        lager_tot: dict = {}
+        for r in (lager_rows if isinstance(lager_rows, list) else []):
+            v = r.get("vara")
+            if v:
+                lager_tot[v] = lager_tot.get(v, 0) + (r.get("antal") or 0)
+
+        # --- Föregående multiplikatorer för trend ---
         prev_rows = httpx.get(
             f"{SB_URL}/rest/v1/resurspriser?select=typ,pris_multiplier",
-            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
-            timeout=8,
+            headers=h_r, timeout=8,
         ).json()
-        prev = {r["typ"]: float(r["pris_multiplier"]) for r in (prev_rows if isinstance(prev_rows, list) else [])}
-
-        h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
-             "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"}
+        prev = {r["typ"]: float(r["pris_multiplier"])
+                for r in (prev_rows if isinstance(prev_rows, list) else [])}
 
         for typ, total in totalt.items():
             antal_agda = agda.get(typ, 0)
-            # multiplier = 1 + (total - 2*agda) / total  →  intervall [0.5, 2.0]
-            mult = 1.0 + (total - 2 * antal_agda) / max(1, total)
-            mult = round(max(0.5, min(2.0, mult)), 3)
+            vara = TYP_VARA.get(typ, typ)
+
+            # Fallback-formel (tre faktorer)
+            utbud = 1.0 + (total - 2 * antal_agda) / max(1, total)
+            utbud = max(0.5, min(2.0, utbud))
+            vol = handel_vol.get(vara, 0)
+            efterfr = 0.75 + 0.75 * min(vol / BASELINE_HANDEL, 1.0)
+            lag = lager_tot.get(vara, 0)
+            lager_f = max(0.6, min(1.0, NORMALLAGER / max(NORMALLAGER * 0.5, lag + 1)))
+
+            formel_mult = round(max(0.4, min(2.5, utbud * efterfr * lager_f)), 3)
+
+            # Väg in clearing-priser om de finns
+            if typ in clearing_mult:
+                c = clearing_mult[typ]
+                mult = round(CLEARING_VIKT * c + (1 - CLEARING_VIKT) * formel_mult, 3)
+                mult = max(0.4, min(2.5, mult))
+                kalla = f"auktion({len(clearing.get(typ, []))})+formel"
+            else:
+                mult = formel_mult
+                kalla = "formel"
+
             gamla = prev.get(typ, 1.0)
-            trend = "stigande" if mult > gamla + 0.05 else ("fallande" if mult < gamla - 0.05 else "stabil")
+            trend = ("stigande" if mult > gamla + 0.05
+                     else "fallande" if mult < gamla - 0.05
+                     else "stabil")
 
             httpx.post(
                 f"{SB_URL}/rest/v1/resurspriser",
                 json={"typ": typ, "pris_multiplier": mult,
                       "antal_agda": antal_agda, "antal_totala": total,
                       "trend": trend, "uppdaterad": "now()"},
-                headers=h,
-                timeout=8,
+                headers=h_w, timeout=8,
             )
-        print(f"  Resurspriser uppdaterade för {len(totalt)} zontyper.")
+            print(f"    {typ}: ×{mult:.3f} ({trend}, källa: {kalla})")
+        print(f"  Resurspriser (auktion+formel) uppdaterade för {len(totalt)} zontyper.")
     except Exception as e:
         print(f"  [VARNING] Resurspriser misslyckades: {e}")
