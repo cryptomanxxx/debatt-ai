@@ -115,12 +115,12 @@ jobs:
           REVIEW_BODY=$(cat /tmp/review_body.txt)
           INLINE=$(cat /tmp/inline_comments.txt)
           DIFF=$(cat /tmp/pr_diff.txt)
-          REVIEWER="${{ env.REVIEWER }}"
 
+          # Använd bash-variabler från GITHUB_ENV — inga ${{ }} inuti strängen
           PROMPT="Du analyserar en code review på en PR i projektet Debatt-AI (Next.js + Python + Supabase).
 
 Reviewer: $REVIEWER
-PR #${{ env.PR_NUM }} på branch: ${{ env.BRANCH }}
+PR $PR_NUM på branch: $BRANCH
 
 REVIEW-SAMMANFATTNING:
 $REVIEW_BODY
@@ -165,12 +165,12 @@ Redigera filerna direkt. Skapa INGA nya filer om inte reviewen explicit ber om d
           fi
 
           git add -A
-          git commit -m "fix(review): adresserar reviewkommentarer från ${{ env.REVIEWER }} på PR #${{ env.PR_NUM }}"
-          git push origin "${{ env.BRANCH }}"
+          git commit -m "fix(review): adresserar reviewkommentarer från $REVIEWER på PR $PR_NUM"
+          git push origin "$BRANCH"
 
           # Kommentera på PR:n att fixes är pushade
           {
-            echo "🤖 **Auto-fix** har adresserat reviewkommentarerna från @${{ env.REVIEWER }}."
+            echo "🤖 **Auto-fix** har adresserat reviewkommentarerna från @${REVIEWER}."
             echo ""
             echo "### Vad som fixades"
             echo '```'
@@ -180,9 +180,9 @@ Redigera filerna direkt. Skapa INGA nya filer om inte reviewen explicit ber om d
             echo "*Kontrollera gärna ändringarna innan merge.*"
           } > /tmp/pr_comment.txt
 
-          gh pr comment "${{ env.PR_NUM }}" --body-file /tmp/pr_comment.txt
+          gh pr comment "$PR_NUM" --body-file /tmp/pr_comment.txt
 
-          echo "Fixes pushade direkt till ${{ env.BRANCH }}"
+          echo "Fixes pushade direkt till $BRANCH"
 
       - name: Sätt label auto-fix på PR
         if: env.SKIP == 'false' && env.CLAUDE_INSTALLED == 'true'
@@ -193,4 +193,4 @@ Redigera filerna direkt. Skapa INGA nya filer om inte reviewen explicit ber om d
             --color "e11d48" \
             --description "Automatisk fix genererad av Claude Code" \
             2>/dev/null || true
-          gh pr edit "${{ env.PR_NUM }}" --add-label "auto-fix" 2>/dev/null || true
+          gh pr edit "$PR_NUM" --add-label "auto-fix" 2>/dev/null || true
