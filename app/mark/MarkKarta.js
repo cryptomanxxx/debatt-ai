@@ -113,7 +113,7 @@ const VARA_TYP = Object.fromEntries(
   Object.entries(TYP_VARA).map(([t, v]) => [v, t])
 );
 
-export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [] }) {
+export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [], transClearing = [], handelClearing = [] }) {
   const [hover, setHover]       = useState(null);
   const [selected, setSelected] = useState(null);
   const [floats, setFloats]     = useState([]);
@@ -159,17 +159,19 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   // Resurspriser: map typ → { pris_multiplier, trend, bas_pris }
   const resursMap = Object.fromEntries(resurspriser.map(r => [r.typ, r]));
 
-  // Senaste clearing-pris per zontyp (från mark_transaktioner)
+  // Senaste clearing-pris per zontyp (från mark_transaktioner) — använder det
+  // bredare clearing-fönstret med fallback till de senaste affärerna.
   const zonNamnTypMap = Object.fromEntries(zoner.map(z => [z.namn, z.typ]));
   const clearingPerTyp = {};
-  for (const t of transaktioner) {
+  for (const t of (transClearing.length ? transClearing : transaktioner)) {
     const typ = zonNamnTypMap[t.zon_namn];
     if (typ && !clearingPerTyp[typ]) clearingPerTyp[typ] = { pris: t.pris, skapad: t.skapad };
   }
 
-  // Senaste clearing-pris per vara (från mark_handel_log)
+  // Senaste clearing-pris per vara (från mark_handel_log) — bredare fönster med
+  // fallback till den senaste handeln.
   const clearingPerVara = {};
-  for (const h of handelLog) {
+  for (const h of (handelClearing.length ? handelClearing : handelLog)) {
     if (h.pris_per_enhet && !clearingPerVara[h.vara])
       clearingPerVara[h.vara] = { pris: h.pris_per_enhet, skapad: h.skapad };
   }
@@ -504,7 +506,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             <span style={{ fontSize: "18px" }}>🏷️</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: "12px", color: "#f59e0b", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>MARKAUKTIONER</div>
-              <div style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace" }}>BUDRUNDOR · ZONÄGARSKAP · 48H</div>
+              <div style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace" }}>BUDRUNDOR · ZONÄGARSKAP · 24H</div>
             </div>
             {auktioner.length > 0 && (
               <span style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "monospace", background: "rgba(245,158,11,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(245,158,11,0.20)" }}>
@@ -638,7 +640,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             <span style={{ fontSize: "18px" }}>📦</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: "12px", color: "#22d3ee", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>VARUMARKNAD</div>
-              <div style={{ fontSize: "9px", color: "#003040", fontFamily: "monospace" }}>BUDRUNDOR · RÅVAROR · 24H</div>
+              <div style={{ fontSize: "9px", color: "#003040", fontFamily: "monospace" }}>BUDRUNDOR · VARUÄGARSKAP · 24H</div>
             </div>
             {varaAuktioner.length > 0 && (
               <span style={{ fontSize: "10px", color: "#22d3ee", fontFamily: "monospace", background: "rgba(8,145,178,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(8,145,178,0.20)" }}>
