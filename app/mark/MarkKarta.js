@@ -408,18 +408,10 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               </div>
             )}
             <p style={{ fontSize: "11px", color: "#555", margin: "0 0 12px", lineHeight: 1.6 }}>{active.beskrivning}</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
-              <div>
-                <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>DAGSINKOMST</div>
-                <div style={{ fontSize: "18px", color: TYP_FARG[active.typ] || "#fff", lineHeight: 1 }}>
-                  {dagInk(active.veckoinkomst)} <span style={{ fontSize: "10px" }}>kr/dag</span>
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>KÖPPRIS</div>
-                <div style={{ fontSize: "18px", color: "#f0ede6", lineHeight: 1 }}>
-                  {active.koppris} <span style={{ fontSize: "10px" }}>kr</span>
-                </div>
+            <div style={{ marginBottom: "10px" }}>
+              <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>KÖPPRIS</div>
+              <div style={{ fontSize: "18px", color: TYP_FARG[active.typ] || "#fff", lineHeight: 1 }}>
+                {active.koppris} <span style={{ fontSize: "10px" }}>kr</span>
               </div>
             </div>
             {activeAgare ? (
@@ -444,10 +436,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           {/* Statistikrad — header-rad i kortets topp */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", padding: "14px 16px", borderBottom: "1px solid #1e1e1e", background: "#111" }}>
             {[
-              ["ZONER",       zoner.length,                "#666"],
-              ["ÄGDA",        agare.length,                "#4ade80"],
-              ["FRIA",        zoner.length - agare.length, "#38bdf8"],
-              ["DAGSINKOMST", `${totalInk} kr`,            "#f59e0b"],
+              ["ZONER",  zoner.length,                "#666"],
+              ["ÄGDA",   agare.length,                "#4ade80"],
+              ["FRIA",   zoner.length - agare.length, "#38bdf8"],
             ].map(([lbl, val, c]) => (
               <div key={lbl}>
                 <div style={{ fontSize: "8px", color: "#3a3a3a", fontFamily: "monospace", letterSpacing: "0.08em", marginBottom: "3px" }}>{lbl}</div>
@@ -467,10 +458,10 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                 <div key={agent} style={{ marginBottom: "9px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
                     <span style={{ fontSize: "11px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
-                    <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>{stats.antal} zon{stats.antal !== 1 ? "er" : ""} · {stats.ink} kr/dag</span>
+                    <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>{stats.antal} zon{stats.antal !== 1 ? "er" : ""}</span>
                   </div>
                   <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
-                    <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(stats.ink / maxInk) * 100}%`, boxShadow: `0 0 6px ${rgba(af, 0.6)}`, transition: "width 0.5s ease" }} />
+                    <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(stats.antal / (agare.length || 1)) * 100}%`, boxShadow: `0 0 6px ${rgba(af, 0.6)}`, transition: "width 0.5s ease" }} />
                   </div>
                 </div>
               );
