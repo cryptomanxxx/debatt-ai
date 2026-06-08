@@ -172,7 +172,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
       {/* ── HEX MAP ── max 700px */}
-      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "url('/mark-terrain.jpg') center/cover no-repeat, #030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)" }}>
+      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "#030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)" }}>
+        {/* Terrängbild i egen div så brightness-filter inte påverkar SVG */}
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "url('/mark-terrain.jpg')", backgroundSize: "cover", backgroundPosition: "center", filter: "brightness(1.8)", zIndex: 0 }} />
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           style={{
