@@ -439,10 +439,10 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
         )}
 
         {/* ── ETT GEMENSAMT KORT med stats + 2 kolumner ── */}
-        <div style={{ background: "#0a0a0a", border: "1px solid #161616", borderRadius: "8px", padding: "14px 16px", gridColumn: "span 2" }}>
+        <div style={{ background: "#0d0d0d", border: "1px solid #2a2a2a", borderRadius: "8px", overflow: "hidden", gridColumn: "span 2" }}>
 
-          {/* Statistikrad */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", marginBottom: "14px", paddingBottom: "14px", borderBottom: "1px solid #161616" }}>
+          {/* Statistikrad — header-rad i kortets topp */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px", padding: "14px 16px", borderBottom: "1px solid #1e1e1e", background: "#111" }}>
             {[
               ["ZONER",       zoner.length,                "#666"],
               ["ÄGDA",        agare.length,                "#4ade80"],
@@ -457,7 +457,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           </div>
 
           {/* MARKÄGARE | RESURSPRISER */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0", padding: "14px 16px" }}>
 
             <div>
               <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>MARKÄGARE</p>
@@ -480,7 +480,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               })}
             </div>
 
-            <div style={{ borderLeft: "1px solid #161616", paddingLeft: "16px" }}>
+            <div style={{ borderLeft: "1px solid #1e1e1e", paddingLeft: "16px" }}>
               <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 12px" }}>RESURSPRISER</p>
               {resurspriser.length === 0 ? (
                 <div style={{ fontSize: "10px", color: "#222", fontFamily: "monospace", textAlign: "center", padding: "10px 0" }}>Inga resurspriser ännu</div>
