@@ -57,10 +57,10 @@ jobs:
         id: comments
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REVIEW_BODY: ${{ github.event.review.body }}
         run: |
           PR_NUM="${{ github.event.pull_request.number }}"
           REVIEWER="${{ github.event.review.user.login }}"
-          REVIEW_BODY="${{ github.event.review.body }}"
           BRANCH="${{ github.event.pull_request.head.ref }}"
 
           echo "PR #$PR_NUM — review av $REVIEWER på branch $BRANCH"
