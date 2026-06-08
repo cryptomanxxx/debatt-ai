@@ -791,22 +791,25 @@ def main():
     planbocker_ny = sb_get("agent_planbocker?select=agent,saldo&agent=neq.Statskassa")
     saldon_ny = {r["agent"]: float(r.get("saldo") or 0) for r in planbocker_ny}
 
-    # ── 7. Stäng avgjorda varuauktioner ──────────────────────────────────────
+    # ── 7. Uppdatera resurspriser (zon-clearing + utbud/efterfrågan) ─────────
+    # Körs FÖRE varuauktionsstängning så att varuauktionernas clearing-priser
+    # blandas in sist och inte skrivs över.
+    from supabase_utils import berakna_och_spara_resurspriser
+    berakna_och_spara_resurspriser(SB_KEY)
+
+    # ── 8. Stäng avgjorda varuauktioner ──────────────────────────────────────
+    # Blandar varuauktionens clearing-pris med det nu uppdaterade resurspriset.
     stang_avgjorda_vara_auktioner(saldon_ny, lager)
 
-    # ── 8. Öppna nya varuauktioner ───────────────────────────────────────────
+    # ── 9. Öppna nya varuauktioner ───────────────────────────────────────────
     oppna_vara_auktioner(lager, saldon_ny)
 
-    # ── 9. Bud på varuauktioner ──────────────────────────────────────────────
+    # ── 10. Bud på varuauktioner ─────────────────────────────────────────────
     aktiva_vara_auktioner = sb_get(
         "mark_vara_auktioner?select=*&status=eq.%C3%B6ppen&order=stanger_at.asc"
     )
     if aktiva_vara_auktioner:
         bud_pa_vara_auktioner(aktiva_vara_auktioner, saldon_ny, lager)
-
-    # ── 10. Uppdatera resurspriser (clearing-priser + utbud/efterfrågan) ──────
-    from supabase_utils import berakna_och_spara_resurspriser
-    berakna_och_spara_resurspriser(SB_KEY)
 
     print(f"\n=== Körning klar ===")
 
