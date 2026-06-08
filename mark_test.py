@@ -103,9 +103,12 @@ def sb_patch(path, data):
     return r.is_success
 
 
-def sb_upsert(table, data):
+def sb_upsert(table, data, on_conflict=None):
+    url = f"{SB_URL}/rest/v1/{table}"
+    if on_conflict:
+        url += f"?on_conflict={on_conflict}"
     r = httpx.post(
-        f"{SB_URL}/rest/v1/{table}",
+        url,
         headers={**_h(), "Prefer": "resolution=merge-duplicates"},
         json=data,
         timeout=15,
@@ -206,7 +209,7 @@ def producera_varor():
                 sb_upsert("mark_lager", {
                     "agent": agent, "vara": vara,
                     "antal": nytt, "uppdaterad": "now()",
-                })
+                }, on_conflict="agent,vara")
                 lager.setdefault(agent, {})[vara] = nytt
                 total += ny_prod
 
@@ -274,8 +277,8 @@ def handel_varor(lager: dict, saldon: dict, resurspriser: dict):
                 ny_seller = lager.get(seller, {}).get(vara, 0) - kan_salja
                 ny_buyer  = lager.get(buyer, {}).get(vara, 0) + kan_salja
 
-                sb_upsert("mark_lager", {"agent": seller, "vara": vara, "antal": ny_seller, "uppdaterad": "now()"})
-                sb_upsert("mark_lager", {"agent": buyer,  "vara": vara, "antal": ny_buyer,  "uppdaterad": "now()"})
+                sb_upsert("mark_lager", {"agent": seller, "vara": vara, "antal": ny_seller, "uppdaterad": "now()"}, on_conflict="agent,vara")
+                sb_upsert("mark_lager", {"agent": buyer,  "vara": vara, "antal": ny_buyer,  "uppdaterad": "now()"}, on_conflict="agent,vara")
 
                 ny_seller_saldo = round(saldon.get(seller, 0) + total_pris, 2)
                 ny_buyer_saldo  = round(saldon.get(buyer,  0) - total_pris, 2)
