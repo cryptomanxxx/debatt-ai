@@ -156,16 +156,36 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     return s + dagInk(z?.veckoinkomst || 0);
   }, 0);
 
-  // Resurspriser: map typ → { pris_multiplier, trend, bas_pris }
+  // Resurspriser: map typ → { pris_multiplier, trend, uppdaterad }
   const resursMap = Object.fromEntries(resurspriser.map(r => [r.typ, r]));
 
-  // Senaste clearing-pris per zontyp (från mark_transaktioner) — använder det
-  // bredare clearing-fönstret med fallback till de senaste affärerna.
+  // Genomsnittligt listpris per zontyp — används som bas när ingen transaktion finns.
+  const avgKopprisPerTyp = {};
+  for (const z of zoner) {
+    if (!avgKopprisPerTyp[z.typ]) avgKopprisPerTyp[z.typ] = { sum: 0, count: 0 };
+    avgKopprisPerTyp[z.typ].sum += Number(z.koppris || 0);
+    avgKopprisPerTyp[z.typ].count++;
+  }
+  for (const [typ, d] of Object.entries(avgKopprisPerTyp)) {
+    avgKopprisPerTyp[typ] = d.count > 0 ? Math.round(d.sum / d.count) : 0;
+  }
+
+  // Senaste clearing-pris per zontyp (från mark_transaktioner, limit=1000 i page.js).
+  // Fallback: resurspriser × genomsnittligt listpris när ingen transaktion finns.
   const zonNamnTypMap = Object.fromEntries(zoner.map(z => [z.namn, z.typ]));
   const clearingPerTyp = {};
-  for (const t of (transClearing.length ? transClearing : transaktioner)) {
+  for (const t of transClearing) {
     const typ = zonNamnTypMap[t.zon_namn];
-    if (typ && !clearingPerTyp[typ]) clearingPerTyp[typ] = { pris: t.pris, skapad: t.skapad };
+    if (typ && !clearingPerTyp[typ]) clearingPerTyp[typ] = { pris: t.pris, skapad: t.skapad, estimated: false };
+  }
+  // Fyll i saknade zontyper med formelbaserat estimat från resurspriser
+  for (const typ of Object.keys(avgKopprisPerTyp)) {
+    if (!clearingPerTyp[typ] && resursMap[typ]) {
+      const estimerat = Math.round(avgKopprisPerTyp[typ] * resursMap[typ].pris_multiplier);
+      if (estimerat > 0) {
+        clearingPerTyp[typ] = { pris: estimerat, skapad: resursMap[typ].uppdaterad, estimated: true };
+      }
+    }
   }
 
   // Senaste clearing-pris per vara (från mark_handel_log) — bredare fönster med
@@ -613,8 +633,12 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                 <div style={{ textAlign: "right" }}>
                   {c ? (
                     <>
-                      <div style={{ fontSize: "11px", color: "#f59e0b", fontFamily: "monospace" }}>{c.pris} kr</div>
-                      <div style={{ fontSize: "8px", color: "#2a2a2a", fontFamily: "monospace" }}>{relativeTime(c.skapad)}</div>
+                      <div style={{ fontSize: "11px", color: c.estimated ? "#7a6a20" : "#f59e0b", fontFamily: "monospace" }}>
+                        {c.estimated ? "~" : ""}{c.pris} kr
+                      </div>
+                      <div style={{ fontSize: "8px", color: "#2a2a2a", fontFamily: "monospace" }}>
+                        {c.estimated ? "estimerat" : relativeTime(c.skapad)}
+                      </div>
                     </>
                   ) : <div style={{ fontSize: "10px", color: "#2a2a2a", fontFamily: "monospace" }}>—</div>}
                 </div>
