@@ -17,10 +17,15 @@ SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ["SUPABASE_ANON_KEY"]
 
 MAX_ZONER_PER_AGENT = 6
-AUKTION_DURATION_H  = 48    # auktioner löper 48 timmar
+AUKTION_DURATION_H  = 48    # zonauktioner löper 48 timmar
 AUKTION_CHANS       = 0.40  # 40% chans per fri zon att öppna auktion per körning
-MAX_NYA_AUKTIONER   = 5     # max 5 nya auktioner per körning
-BUD_CHANS_PER_AGENT = 0.30  # 30% chans per agent per auktion att buda
+MAX_NYA_AUKTIONER   = 5     # max 5 nya zonauktioner per körning
+BUD_CHANS_PER_AGENT = 0.30  # 30% chans per agent per zonauktion att buda
+
+VARA_AUKTION_DURATION_H = 24   # varuauktioner löper 24 timmar
+VARA_AUKTION_CHANS      = 0.30  # 30% chans att lista ett överskott per agent per vara
+MAX_NYA_VARA_AUKTIONER  = 6    # max 6 nya varuauktioner per körning
+VARA_BUD_CHANS          = 0.35  # 35% chans per agent per varuauktion att buda
 
 VARA_PER_TYP = {
     "energi":   "el",
@@ -505,85 +510,222 @@ def producera_varor():
         return {}
 
 
-def handel_varor(lager: dict, saldon: dict, resurspriser: dict):
-    """Agenter med överskott säljer till agenter med noll av en vara de inte producerar."""
-    print("\n── Varuhandel ──")
-    try:
-        agare_rows = sb_get("mark_agare?select=agent,mark_zoner(typ)")
-        agent_typer: dict = {}
-        for row in agare_rows:
-            agent = row["agent"]
-            typ = (row.get("mark_zoner") or {}).get("typ", "")
-            if typ:
-                agent_typer.setdefault(agent, set()).add(typ)
+VARA_IKON_MAP = {
+    "el": "⚡", "spannmål": "🌾", "maskiner": "🏭", "malm": "⛏️",
+    "tjänster": "🏙️", "fisk": "🌊", "virke": "🌲",
+}
 
-        affarer = 0
-        for zontyp, vara in VARA_PER_TYP.items():
-            mult = resurspriser.get(zontyp, 1.0)
-            pris = round(BASPRIS[vara] * mult, 2)
 
-            sellers = sorted(
-                [(a, lager.get(a, {}).get(vara, 0)) for a in AGENTER
-                 if lager.get(a, {}).get(vara, 0) > SURPLUS_TROSKEL],
-                key=lambda x: -x[1],
-            )
-            if not sellers:
+def stang_avgjorda_vara_auktioner(saldon: dict, lager: dict):
+    """Stänger utgångna varuauktioner. Vinnaren tar varan, säljaren får betalt."""
+    print("\n── Stänger avgjorda varuauktioner ──")
+    now = datetime.now(timezone.utc).isoformat()
+
+    utgangna = sb_get(
+        f"mark_vara_auktioner?select=*&status=eq.%C3%B6ppen&stanger_at=lte.{now}"
+    )
+    if not utgangna:
+        print("  Inga utgångna varuauktioner.")
+        return 0
+
+    avgjorda = 0
+    for aukt in utgangna:
+        vara    = aukt["vara"]
+        antal   = aukt["antal"]
+        saljare = aukt["saljare"]
+        ikon    = VARA_IKON_MAP.get(vara, "📦")
+
+        if not aukt.get("hogst_budgivare") or not aukt.get("nuv_bud"):
+            sb_patch(f"mark_vara_auktioner?id=eq.{aukt['id']}", {"status": "inst%C3%A4lld"})
+            print(f"  ✗ {antal}×{vara} av {saljare} — inget bud → inställd")
+            continue
+
+        vinnare = aukt["hogst_budgivare"]
+        pris    = aukt["nuv_bud"]
+
+        if saldon.get(vinnare, 0) < pris:
+            sb_patch(f"mark_vara_auktioner?id=eq.{aukt['id']}", {"status": "inst%C3%A4lld"})
+            print(f"  ✗ {antal}×{vara} — {vinnare} har ej råd → inställd")
+            continue
+
+        seller_antal = lager.get(saljare, {}).get(vara, 0)
+        if seller_antal < antal:
+            sb_patch(f"mark_vara_auktioner?id=eq.{aukt['id']}", {"status": "inst%C3%A4lld"})
+            print(f"  ✗ {antal}×{vara} — {saljare} har ej lager ({seller_antal}) → inställd")
+            continue
+
+        # Flytta varor
+        ny_seller_antal = seller_antal - antal
+        ny_buyer_antal  = lager.get(vinnare, {}).get(vara, 0) + antal
+        sb_upsert("mark_lager", {"agent": saljare, "vara": vara, "antal": ny_seller_antal, "uppdaterad": "now()"}, on_conflict="agent,vara")
+        sb_upsert("mark_lager", {"agent": vinnare, "vara": vara, "antal": ny_buyer_antal,  "uppdaterad": "now()"}, on_conflict="agent,vara")
+        lager.setdefault(saljare, {})[vara] = ny_seller_antal
+        lager.setdefault(vinnare, {})[vara] = ny_buyer_antal
+
+        # Flytta krediter
+        nytt_vinnare_saldo = round(saldon.get(vinnare, 0) - pris, 2)
+        nytt_saljare_saldo = round(saldon.get(saljare, 0) + pris, 2)
+        sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(vinnare)}", {"saldo": nytt_vinnare_saldo})
+        sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(saljare)}", {"saldo": nytt_saljare_saldo})
+        saldon[vinnare] = nytt_vinnare_saldo
+        saldon[saljare] = nytt_saljare_saldo
+
+        sb_patch(f"mark_vara_auktioner?id=eq.{aukt['id']}", {"status": "avgjord"})
+
+        # Logga till mark_handel_log
+        pris_per_enhet = round(pris / antal, 2)
+        sb_post("mark_handel_log", {
+            "kop_agent": vinnare, "salj_agent": saljare,
+            "vara": vara, "antal": antal,
+            "pris_per_enhet": pris_per_enhet, "totalt": pris,
+        })
+
+        # Uppdatera resurspriser baserat på clearing-priset (50% blend)
+        typ = next((t for t, v in VARA_PER_TYP.items() if v == vara), None)
+        if typ:
+            clearing_mult = round(pris_per_enhet / BASPRIS[vara], 3)
+            r_rows = sb_get(f"resurspriser?select=pris_multiplier&typ=eq.{typ}")
+            befintlig = float((r_rows[0].get("pris_multiplier") or 1.0)) if r_rows else 1.0
+            ny_mult = round(0.5 * clearing_mult + 0.5 * befintlig, 3)
+            trend = "stigande" if ny_mult > befintlig else ("fallande" if ny_mult < befintlig else "stabil")
+            sb_upsert("resurspriser", {"typ": typ, "pris_multiplier": ny_mult, "trend": trend}, on_conflict="typ")
+
+        avgjorda += 1
+        print(f"  {ikon} {vinnare} vann {antal}×{vara} av {saljare} — {pris} kr ({pris_per_enhet:.1f}/enhet)")
+
+    print(f"  {avgjorda} varuauktioner avgjorda av {len(utgangna)} utgångna.")
+    return avgjorda
+
+
+def oppna_vara_auktioner(lager: dict, saldon: dict):
+    """Agenter med överskott öppnar 24h-auktioner för råvaror."""
+    print("\n── Öppnar varuauktioner ──")
+
+    befintliga = sb_get("mark_vara_auktioner?select=saljare,vara&status=eq.%C3%B6ppen")
+    aktiva_pairs = {(r["saljare"], r["vara"]) for r in befintliga}
+
+    resurs_rows = sb_get("resurspriser?select=typ,pris_multiplier") or []
+    mult_dict = {r["typ"]: float(r.get("pris_multiplier") or 1.0) for r in resurs_rows}
+
+    candidates = []
+    for agent in AGENTER:
+        for vara, baspris in BASPRIS.items():
+            if (agent, vara) in aktiva_pairs:
+                continue
+            antal = lager.get(agent, {}).get(vara, 0)
+            if antal <= SURPLUS_TROSKEL:
+                continue
+            if random.random() > VARA_AUKTION_CHANS:
+                continue
+            candidates.append((agent, vara))
+
+    random.shuffle(candidates)
+    oppnade = 0
+    for agent, vara in candidates:
+        if oppnade >= MAX_NYA_VARA_AUKTIONER:
+            break
+        typ = next((t for t, v in VARA_PER_TYP.items() if v == vara), None)
+        mult = mult_dict.get(typ, 1.0) if typ else 1.0
+        reservpris = int(BASPRIS[vara] * mult * KOP_ANTAL * 0.70)
+        stanger_at = (datetime.now(timezone.utc) + timedelta(hours=VARA_AUKTION_DURATION_H)).isoformat()
+
+        ok = sb_post("mark_vara_auktioner", {
+            "saljare":         agent,
+            "vara":            vara,
+            "antal":           KOP_ANTAL,
+            "reservpris":      reservpris,
+            "nuv_bud":         None,
+            "hogst_budgivare": None,
+            "stanger_at":      stanger_at,
+            "status":          "öppen",
+        })
+        if ok:
+            oppnade += 1
+            ikon = VARA_IKON_MAP.get(vara, "📦")
+            lager_antal = lager.get(agent, {}).get(vara, 0)
+            print(f"  {ikon} {agent} säljer {KOP_ANTAL}×{vara} (lager: {lager_antal}) → reservpris {reservpris} kr")
+
+    print(f"  {oppnade} nya varuauktioner öppnade.")
+    return oppnade
+
+
+def bud_pa_vara_auktioner(vara_auktioner: list, saldon: dict, lager: dict):
+    """Agenter budar på råvaruauktioner baserat på behov och ideologi."""
+    print("\n── Bud på varuauktioner ──")
+
+    if not vara_auktioner:
+        print("  Inga aktiva varuauktioner.")
+        return 0
+
+    agent_bud_denna_korn: dict = {}
+    totalt = 0
+
+    for aukt in vara_auktioner:
+        vara    = aukt["vara"]
+        antal   = aukt["antal"]
+        saljare = aukt["saljare"]
+        aktuellt = aukt.get("nuv_bud") or aukt["reservpris"]
+        hogst    = aukt.get("hogst_budgivare")
+        ikon     = VARA_IKON_MAP.get(vara, "📦")
+
+        agenter_shufflad = AGENTER[:]
+        random.shuffle(agenter_shufflad)
+
+        for agent in agenter_shufflad:
+            if agent == saljare or agent == hogst:
+                continue
+            if agent_bud_denna_korn.get(agent, 0) >= 2:
+                continue
+            if random.random() > VARA_BUD_CHANS:
                 continue
 
-            buyers = [
-                a for a in AGENTER
-                if lager.get(a, {}).get(vara, 0) == 0
-                and zontyp not in agent_typer.get(a, set())
-                and random.random() < 0.4
-            ]
-            random.shuffle(buyers)
+            saldo = saldon.get(agent, 0)
+            agent_lager = lager.get(agent, {}).get(vara, 0)
 
-            for seller, seller_antal in sellers:
-                if not buyers:
-                    break
+            # Väldigt intresserad om agenten saknar varan, annars låg chans
+            if agent_lager >= SURPLUS_TROSKEL and random.random() > 0.10:
+                continue
 
-                buyer = buyers.pop(0)
-                if buyer == seller:
-                    continue
+            # Ideologisk prisbias
+            prefs = AGENT_PREFERENSER.get(agent, [])
+            vara_prefs = [VARA_PER_TYP.get(t) for t in prefs if VARA_PER_TYP.get(t)]
+            intresse = 2 if vara in vara_prefs else 1
 
-                kan_salja = min(KOP_ANTAL, seller_antal - (SURPLUS_TROSKEL - 2))
-                if kan_salja <= 0:
-                    continue
+            baspris_lot = BASPRIS[vara] * antal
+            max_bud = int(min(
+                baspris_lot * (1.5 if intresse == 2 else 1.2),
+                saldo * 0.30,
+            ))
 
-                total_pris = round(pris * kan_salja, 2)
-                if saldon.get(buyer, 0) < total_pris:
-                    continue
+            min_bud = aktuellt + max(2, int(aktuellt * 0.05))
+            if min_bud > max_bud or saldo < min_bud:
+                continue
 
-                ny_seller = lager.get(seller, {}).get(vara, 0) - kan_salja
-                ny_buyer  = lager.get(buyer,  {}).get(vara, 0) + kan_salja
+            spread   = max_bud - aktuellt
+            mitt_bud = int(aktuellt + spread * random.uniform(0.10, 0.40))
+            mitt_bud = max(min_bud, min(mitt_bud, max_bud))
+            if mitt_bud > saldo:
+                continue
 
-                sb_upsert("mark_lager", {"agent": seller, "vara": vara, "antal": ny_seller, "uppdaterad": "now()"}, on_conflict="agent,vara")
-                sb_upsert("mark_lager", {"agent": buyer,  "vara": vara, "antal": ny_buyer,  "uppdaterad": "now()"}, on_conflict="agent,vara")
+            ok = sb_post("mark_vara_bud", {"auktion_id": aukt["id"], "budgivare": agent, "belopp": mitt_bud})
+            if not ok:
+                continue
 
-                ny_seller_saldo = round(saldon.get(seller, 0) + total_pris, 2)
-                ny_buyer_saldo  = round(saldon.get(buyer,  0) - total_pris, 2)
-                sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(seller)}", {"saldo": ny_seller_saldo, "uppdaterad": "now()"})
-                sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(buyer)}",  {"saldo": ny_buyer_saldo,  "uppdaterad": "now()"})
+            sb_patch(f"mark_vara_auktioner?id=eq.{aukt['id']}", {
+                "nuv_bud": mitt_bud,
+                "hogst_budgivare": agent,
+            })
+            aukt["nuv_bud"]          = mitt_bud
+            aukt["hogst_budgivare"]  = agent
+            aktuellt = mitt_bud
+            hogst    = agent
 
-                lager.setdefault(seller, {})[vara] = ny_seller
-                lager.setdefault(buyer,  {})[vara] = ny_buyer
-                saldon[seller] = ny_seller_saldo
-                saldon[buyer]  = ny_buyer_saldo
+            agent_bud_denna_korn[agent] = agent_bud_denna_korn.get(agent, 0) + 1
+            totalt += 1
+            print(f"  {ikon} {agent} budar {mitt_bud} kr på {antal}×{vara}")
 
-                sb_post("mark_handel_log", {
-                    "kop_agent": buyer, "salj_agent": seller,
-                    "vara": vara, "antal": kan_salja,
-                    "pris_per_enhet": pris, "totalt": total_pris,
-                })
-
-                affarer += 1
-                vara_ikon = {"el": "⚡", "spannmål": "🌾", "maskiner": "🏭", "malm": "⛏️",
-                             "tjänster": "🏙️", "fisk": "🌊", "virke": "🌲"}.get(vara, "📦")
-                print(f"  {vara_ikon} {buyer} köpte {kan_salja}×{vara} av {seller} — {total_pris} kr ({pris:.1f}/enhet)")
-
-        print(f"  Varuhandel: {affarer} affärer genomförda.")
-    except Exception as e:
-        print(f"  [VARNING] Varuhandel misslyckades: {e}")
+    print(f"  {totalt} varuauktionsbud lagda.")
+    return totalt
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -645,14 +787,24 @@ def main():
     # ── 6. Varuproduktion ────────────────────────────────────────────────────
     lager = producera_varor()
 
-    # ── 7. Varuhandel ────────────────────────────────────────────────────────
+    # Uppdatera saldon efter markinkomst
     planbocker_ny = sb_get("agent_planbocker?select=agent,saldo&agent=neq.Statskassa")
     saldon_ny = {r["agent"]: float(r.get("saldo") or 0) for r in planbocker_ny}
-    resurs_rows = sb_get("resurspriser?select=typ,pris_multiplier") or []
-    resurspriser_dict = {r["typ"]: float(r.get("pris_multiplier") or 1.0) for r in resurs_rows}
-    handel_varor(lager, saldon_ny, resurspriser_dict)
 
-    # ── 8. Uppdatera resurspriser (clearing-priser + utbud/efterfrågan) ───────
+    # ── 7. Stäng avgjorda varuauktioner ──────────────────────────────────────
+    stang_avgjorda_vara_auktioner(saldon_ny, lager)
+
+    # ── 8. Öppna nya varuauktioner ───────────────────────────────────────────
+    oppna_vara_auktioner(lager, saldon_ny)
+
+    # ── 9. Bud på varuauktioner ──────────────────────────────────────────────
+    aktiva_vara_auktioner = sb_get(
+        "mark_vara_auktioner?select=*&status=eq.%C3%B6ppen&order=stanger_at.asc"
+    )
+    if aktiva_vara_auktioner:
+        bud_pa_vara_auktioner(aktiva_vara_auktioner, saldon_ny, lager)
+
+    # ── 10. Uppdatera resurspriser (clearing-priser + utbud/efterfrågan) ──────
     from supabase_utils import berakna_och_spara_resurspriser
     berakna_och_spara_resurspriser(SB_KEY)
 
