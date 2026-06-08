@@ -138,18 +138,17 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
       {/* ── HEX MAP ── max 700px */}
-      <div style={{ width: "100%" }}>
+      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "#060d18", border: "1px solid #0d1f2e", boxShadow: "0 4px 40px rgba(0,10,30,0.8)" }}>
+        <img src={TERRAIN_BG} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.85, pointerEvents: "none" }} />
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           style={{
             display: "block",
+            position: "relative",
+            zIndex: 1,
             width: "100%",
-            maxWidth: "700px",
             height: "auto",
-            borderRadius: "12px",
-            background: `#060d18 url("${TERRAIN_BG}") center/cover no-repeat`,
-            border: "1px solid #0d1f2e",
-            boxShadow: "0 4px 40px rgba(0,10,30,0.8)",
+            background: "transparent",
           }}
         >
           <defs>
@@ -303,6 +302,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
             MARKARTAN · {zoner.length} ZONER · {agare.length} ÄGDA
           </text>
         </svg>
+      </div>
 
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "10px" }}>
           {Object.entries(TYP_FARG).map(([typ, farg]) => (
@@ -314,7 +314,6 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
             </span>
           ))}
         </div>
-      </div>
 
       {/* ── BOTTENPANEL ── 3 kolumner */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px", alignItems: "start" }}>
