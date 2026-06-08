@@ -40,8 +40,7 @@ const INSTITUTIONS = {
   "Kulturcentrum":    { icon: "⚖️", fullName: "AI-Domstolen",  color: "#f87171" },
 };
 
-// Statisk tillgång — laddas ner av .github/workflows/download-terrain.yml
-const TERRAIN_BG = "/terrain-bg.jpg";
+const TERRAIN_BG = null; // ingen extern bild — använder CSS-gradient
 
 const TERRAIN_STOPS = {
   energi:   [["#fef08a", 0.13], ["#f59e0b", 0.07], ["#78350f", 0.02]],
@@ -138,8 +137,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
       {/* ── HEX MAP ── max 700px */}
-      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "radial-gradient(ellipse at 50% 42%, #1a0f3d 0%, #0d1a40 10%, #0a1f12 26%, #061810 42%, #060d18 62%, #030b14 82%, #020810 100%)", border: "1px solid #0d1f2e", boxShadow: "0 4px 40px rgba(0,10,30,0.8)" }}>
-        <img src={TERRAIN_BG} alt="" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.75, pointerEvents: "none" }} />
+      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: ["radial-gradient(circle at 62% 22%, rgba(20,83,45,0.55) 0%, transparent 28%)", "radial-gradient(circle at 18% 28%, rgba(20,83,45,0.45) 0%, transparent 22%)", "radial-gradient(circle at 14% 62%, rgba(180,83,9,0.38) 0%, transparent 22%)", "radial-gradient(circle at 82% 52%, rgba(146,64,14,0.32) 0%, transparent 20%)", "radial-gradient(circle at 28% 88%, rgba(7,89,133,0.45) 0%, transparent 18%)", "radial-gradient(circle at 72% 82%, rgba(7,89,133,0.38) 0%, transparent 16%)", "radial-gradient(circle at 50% 43%, rgba(109,40,217,0.70) 0%, rgba(67,56,202,0.35) 9%, transparent 22%)", "radial-gradient(ellipse at 50% 50%, #0d1b4a 0%, #060d18 58%, #020810 100%)"].join(","), border: "1px solid #0d1f2e", boxShadow: "0 4px 40px rgba(0,10,30,0.8)" }}>
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           style={{
