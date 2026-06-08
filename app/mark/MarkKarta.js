@@ -94,7 +94,7 @@ function timeLeft(ts) {
   return `${Math.floor(diff / 86400)}d kvar`;
 }
 
-export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] }) {
+export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [] }) {
   const [hover, setHover]       = useState(null);
   const [selected, setSelected] = useState(null);
   const [floats, setFloats]     = useState([]);
@@ -118,6 +118,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
     const z = zoner.find(z => z.id === a.zon_id);
     return s + dagInk(z?.veckoinkomst || 0);
   }, 0);
+
+  // Resurspriser: map typ → { pris_multiplier, trend, bas_pris }
+  const resursMap = Object.fromEntries(resurspriser.map(r => [r.typ, r]));
 
   const active = selected || hover;
   const activeAgare = active ? agareMap[active.id] : null;
@@ -406,6 +409,40 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [] 
             </div>
           )}
         </div>
+
+        {resurspriser.length > 0 && (
+          <div>
+            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 8px" }}>RESURSPRISER</p>
+            {Object.keys(TYP_FARG).map(typ => {
+              const r = resursMap[typ];
+              if (!r) return null;
+              const mult = parseFloat(r.pris_multiplier) || 1.0;
+              const farg = TYP_FARG[typ];
+              const trend = r.trend;
+              const trendIkon = trend === "stigande" ? "↑" : trend === "fallande" ? "↓" : "→";
+              const trendFarg = trend === "stigande" ? "#4ade80" : trend === "fallande" ? "#f87171" : "#666";
+              const barW = Math.round(Math.min(100, (mult / 2.0) * 100));
+              return (
+                <div key={typ} style={{ marginBottom: "7px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
+                    <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>
+                      {TYP_IKON[typ]} {TYP_NAMN[typ]}
+                    </span>
+                    <span style={{ fontSize: "10px", fontFamily: "monospace", color: trendFarg }}>
+                      {trendIkon} ×{mult.toFixed(2)}
+                    </span>
+                  </div>
+                  <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
+                    <div style={{ height: "2px", background: farg, borderRadius: "2px", width: `${barW}%`, opacity: 0.7 }} />
+                  </div>
+                  <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", marginTop: "1px" }}>
+                    {r.antal_agda}/{r.antal_totala} zoner ägda
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {transaktioner.length > 0 && (
           <div>

@@ -1374,6 +1374,10 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
     # Hämta ekonomisk kontext en gång för alla röster i denna körning
     eko_kontext = _hamta_ekonomisk_rostkontext(sb_key, agent["namn"])
 
+    # Hämta markinnehav — påverkar agentens ekonomiska intressen vid röstning
+    mark_zoner = hamta_agent_mark(sb_key, agent["namn"])
+    mark_kontext = formatera_mark_for_prompt(mark_zoner)
+
     antal = 0
     for f in forslag:
         if antal >= 5:
@@ -1426,7 +1430,8 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
                 f"{f['beskrivning'][:500]}\n\n"
                 f"{pis_kontext}"
                 f"{eko_kontext}"
-                "Rösta på detta förslag utifrån din personlighet, dina värderingar och den ekonomiska kontexten ovan. "
+                + (f"DINA MARKÄGDA RESURSER: {mark_kontext}\n\n" if mark_kontext else "")
+                + "Rösta på detta förslag utifrån din personlighet, dina värderingar och den ekonomiska kontexten ovan. "
                 "Svara EXAKT i detta format:\n"
                 "RÖST: ja\n"
                 "MOTIVERING: Din motivering på svenska, 1–2 meningar.\n\n"
@@ -5672,3 +5677,100 @@ def analysera_alla_forslag_pis(sb_key: str, max_antal: int = 10) -> tuple[int, i
         return antal, att_analysera
     except Exception:
         return 0, 0
+
+
+# ─── Mark-ekonomi: ägande → kontext + resurspriser ───────────────────────────
+
+def hamta_agent_mark(sb_key: str, agent_namn: str) -> list:
+    """Hämtar agentens ägda zoner (namn + typ + veckoinkomst)."""
+    try:
+        rows = httpx.get(
+            f"{SB_URL}/rest/v1/mark_agare"
+            f"?agent=eq.{urllib.parse.quote(agent_namn)}"
+            f"&select=mark_zoner(namn,typ,veckoinkomst)",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=8,
+        ).json()
+        return [r["mark_zoner"] for r in (rows if isinstance(rows, list) else []) if r.get("mark_zoner")]
+    except Exception:
+        return []
+
+
+def formatera_mark_for_prompt(zoner: list) -> str:
+    """Formaterar agentens markinnehav till ett kompakt systemprompt-stycke."""
+    if not zoner:
+        return ""
+    grupper: dict = {}
+    for z in zoner:
+        typ = z.get("typ", "okänd")
+        grupper.setdefault(typ, []).append(z.get("namn", "?"))
+    delar = [f"{len(n)} {t}zon(er): {', '.join(n)}" for t, n in grupper.items()]
+    return (
+        "MARKINNEHAV (ekonomiska intressen): "
+        + "; ".join(delar)
+        + ". Ditt ägarskap formar dina ekonomiska intressen och tenderar att påverka "
+        "hur du resonerar om politiska förslag som berör dessa sektorer."
+    )
+
+
+def berakna_och_spara_resurspriser(sb_key: str) -> None:
+    """Beräknar dynamiska resurspriser per zontyp och sparar i resurspriser-tabellen.
+
+    Prismodell (multiplikator mot baspriser):
+      - Om ägartäthet = halva zonerna av typen → multiplier 1.0 (normalt)
+      - Lägre ägartäthet (brist) → multiplier upp till 2.0
+      - Högre ägartäthet (överskott) → multiplier ned till 0.5
+    """
+    try:
+        # Hämta alla zoner med typ
+        zoner = httpx.get(
+            f"{SB_URL}/rest/v1/mark_zoner?select=id,typ",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=8,
+        ).json()
+        totalt: dict = {}
+        for z in (zoner if isinstance(zoner, list) else []):
+            totalt[z["typ"]] = totalt.get(z["typ"], 0) + 1
+
+        # Hämta ägda zoner med typ
+        agda_rows = httpx.get(
+            f"{SB_URL}/rest/v1/mark_agare?select=mark_zoner(typ)",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=8,
+        ).json()
+        agda: dict = {}
+        for r in (agda_rows if isinstance(agda_rows, list) else []):
+            t = (r.get("mark_zoner") or {}).get("typ")
+            if t:
+                agda[t] = agda.get(t, 0) + 1
+
+        # Hämta nuvarande priser för trend-beräkning
+        prev_rows = httpx.get(
+            f"{SB_URL}/rest/v1/resurspriser?select=typ,pris_multiplier",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=8,
+        ).json()
+        prev = {r["typ"]: float(r["pris_multiplier"]) for r in (prev_rows if isinstance(prev_rows, list) else [])}
+
+        h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+             "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"}
+
+        for typ, total in totalt.items():
+            antal_agda = agda.get(typ, 0)
+            # multiplier = 1 + (total - 2*agda) / total  →  intervall [0.5, 2.0]
+            mult = 1.0 + (total - 2 * antal_agda) / max(1, total)
+            mult = round(max(0.5, min(2.0, mult)), 3)
+            gamla = prev.get(typ, 1.0)
+            trend = "stigande" if mult > gamla + 0.05 else ("fallande" if mult < gamla - 0.05 else "stabil")
+
+            httpx.post(
+                f"{SB_URL}/rest/v1/resurspriser",
+                json={"typ": typ, "pris_multiplier": mult,
+                      "antal_agda": antal_agda, "antal_totala": total,
+                      "trend": trend, "uppdaterad": "now()"},
+                headers=h,
+                timeout=8,
+            )
+        print(f"  Resurspriser uppdaterade för {len(totalt)} zontyper.")
+    except Exception as e:
+        print(f"  [VARNING] Resurspriser misslyckades: {e}")
