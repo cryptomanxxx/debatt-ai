@@ -23,6 +23,8 @@ INSERT INTO resurspriser (typ, bas_pris, antal_totala) VALUES
   ('skog',     100, 4)
 ON CONFLICT (typ) DO NOTHING;
 
--- RLS: publik läsning
+-- RLS: publik läsning + skrivning (mark_test.py upsertar dagligen via anon-nyckeln)
 ALTER TABLE resurspriser ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Publik läsning resurspriser" ON resurspriser FOR SELECT USING (true);
+CREATE POLICY "Publik insert resurspriser" ON resurspriser FOR INSERT WITH CHECK (true);
+CREATE POLICY "Publik update resurspriser" ON resurspriser FOR UPDATE USING (true);
