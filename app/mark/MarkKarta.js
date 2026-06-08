@@ -456,58 +456,25 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             ))}
           </div>
 
-          {/* MARKÄGARE | RESURSPRISER */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0", padding: "14px 16px" }}>
-
-            <div>
-              <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>MARKÄGARE</p>
-              {leaders.length === 0 ? (
-                <div style={{ fontSize: "10px", color: "#222", fontFamily: "monospace", textAlign: "center", padding: "10px 0" }}>Inga ägare ännu</div>
-              ) : leaders.map(([agent, stats], i) => {
-                const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
-                return (
-                  <div key={agent} style={{ marginBottom: "9px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
-                      <span style={{ fontSize: "11px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
-                      <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>{stats.antal} zon{stats.antal !== 1 ? "er" : ""}</span>
-                    </div>
-                    <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
-                      <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(stats.ink / maxInk) * 100}%`, boxShadow: `0 0 6px ${rgba(af, 0.6)}`, transition: "width 0.5s ease" }} />
-                    </div>
-                    <div style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>{stats.ink} kr/dag</div>
+          {/* MARKÄGARE — full bredd */}
+          <div style={{ padding: "14px 16px" }}>
+            <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 10px" }}>MARKÄGARE</p>
+            {leaders.length === 0 ? (
+              <div style={{ fontSize: "10px", color: "#222", fontFamily: "monospace", textAlign: "center", padding: "10px 0" }}>Inga ägare ännu</div>
+            ) : leaders.map(([agent, stats], i) => {
+              const af = AGENT_VISUELL[agent]?.ikonFarg || "#888";
+              return (
+                <div key={agent} style={{ marginBottom: "9px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
+                    <span style={{ fontSize: "11px", color: af, fontFamily: "monospace" }}>{i + 1}. {agent}</span>
+                    <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>{stats.antal} zon{stats.antal !== 1 ? "er" : ""} · {stats.ink} kr/dag</span>
                   </div>
-                );
-              })}
-            </div>
-
-            <div style={{ borderLeft: "1px solid #1e1e1e", paddingLeft: "16px" }}>
-              <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.1em", margin: "0 0 12px" }}>RESURSPRISER</p>
-              {resurspriser.length === 0 ? (
-                <div style={{ fontSize: "10px", color: "#222", fontFamily: "monospace", textAlign: "center", padding: "10px 0" }}>Inga resurspriser ännu</div>
-              ) : Object.keys(TYP_FARG).map(typ => {
-                const r = resursMap[typ];
-                if (!r) return null;
-                const mult = parseFloat(r.pris_multiplier) || 1.0;
-                const farg = TYP_FARG[typ];
-                const trend = r.trend;
-                const trendIkon = trend === "stigande" ? "↑" : trend === "fallande" ? "↓" : "→";
-                const trendFarg = trend === "stigande" ? "#4ade80" : trend === "fallande" ? "#f87171" : "#666";
-                const barW = Math.round(Math.min(100, (mult / 2.0) * 100));
-                return (
-                  <div key={typ} style={{ marginBottom: "8px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2px" }}>
-                      <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace" }}>{TYP_IKON[typ]} {TYP_NAMN[typ]}</span>
-                      <span style={{ fontSize: "10px", fontFamily: "monospace", color: trendFarg }}>{trendIkon} ×{mult.toFixed(2)}</span>
-                    </div>
-                    <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
-                      <div style={{ height: "2px", background: farg, borderRadius: "2px", width: `${barW}%`, opacity: 0.7 }} />
-                    </div>
-                    <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", marginTop: "1px" }}>{r.antal_agda}/{r.antal_totala} zoner ägda</div>
+                  <div style={{ height: "2px", background: "#181818", borderRadius: "2px" }}>
+                    <div style={{ height: "2px", background: af, borderRadius: "2px", width: `${(stats.ink / maxInk) * 100}%`, boxShadow: `0 0 6px ${rgba(af, 0.6)}`, transition: "width 0.5s ease" }} />
                   </div>
-                );
-              })}
-            </div>
-
+                </div>
+              );
+            })}
           </div>
         </div>
 
