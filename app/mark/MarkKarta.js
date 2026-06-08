@@ -153,7 +153,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
       {/* ── HEX MAP ── max 700px */}
-      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "linear-gradient(rgba(2,8,18,0.48),rgba(2,8,18,0.48)), url('https://image.pollinations.ai/prompt/aerial%20top%20down%20view%20dark%20fantasy%20strategy%20game%20terrain%20dense%20forest%20canopy%20rocky%20mountains%20rivers%20dark%20moody%20cinematic%20no%20text%20no%20labels%20no%20ui?width=800&height=740&seed=3721&nologo=true&model=flux') center/cover no-repeat, #030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)" }}>
+      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "linear-gradient(rgba(2,8,18,0.48),rgba(2,8,18,0.48)), url('https://fmwxftnistkoqazfwnuj.supabase.co/storage/v1/object/public/mark-assets/terrain.jpg') center/cover no-repeat, #030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)" }}>
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           style={{
