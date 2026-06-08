@@ -172,7 +172,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
       {/* ── HEX MAP ── max 700px */}
-      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "linear-gradient(rgba(2,8,18,0.20),rgba(2,8,18,0.20)), url('/mark-terrain.jpg') center/cover no-repeat, #030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)" }}>
+      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "url('/mark-terrain.jpg') center/cover no-repeat, #030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)" }}>
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
           style={{
@@ -210,8 +210,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0.00" />
             </radialGradient>
             <radialGradient id="vignette" cx="50%" cy="50%" r="58%">
-              <stop offset="65%" stopColor="#060d18" stopOpacity="0" />
-              <stop offset="100%" stopColor="#060d18" stopOpacity="0.60" />
+              <stop offset="72%" stopColor="#060d18" stopOpacity="0" />
+              <stop offset="100%" stopColor="#060d18" stopOpacity="0.40" />
             </radialGradient>
             <filter id="softglow" x="-40%" y="-40%" width="180%" height="180%">
               <feGaussianBlur stdDeviation="2.5" result="blur" />
