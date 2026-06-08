@@ -24,6 +24,7 @@ export const AGENT_VISUELL = {
   "Hypokondrikern":       { gradient: "radial-gradient(circle at 35% 35%, #0a1818 0%, #061010 40%, #0a0a0a 100%)", ring: "#104030", ikon: "?",  ikonFarg: "#40b890" },
   "Optimisten":           { gradient: "radial-gradient(circle at 35% 35%, #181400 0%, #100e00 40%, #0a0a0a 100%)", ring: "#3a3000", ikon: "☀",  ikonFarg: "#f0c030" },
   "Den rike":             { gradient: "radial-gradient(circle at 35% 35%, #181205 0%, #100d03 40%, #0a0a0a 100%)", ring: "#3a2808", ikon: "◈",  ikonFarg: "#d4a820" },
+  "Civilisationshistorikern": { gradient: "radial-gradient(circle at 35% 35%, #1a1205 0%, #120d04 40%, #0a0a0a 100%)", ring: "#4a3010", ikon: "📜", ikonFarg: "#d4a060" },
 };
 
 const FALLBACK = { gradient: "radial-gradient(circle at 35% 35%, #1a1a1a 0%, #111 40%, #0a0a0a 100%)", ring: "#333", ikon: "◈", ikonFarg: "#888880" };
