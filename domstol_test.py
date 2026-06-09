@@ -389,7 +389,18 @@ def hall_forhandling(groq_key: str, arende: dict) -> dict:
     svarande = arende.get("svarande", "?")
     artikel_nr = arende.get("artikel_nr", 0)
     beskrivning = arende.get("beskrivning", "")
-    bevis = arende.get("bevis", {})
+    bevis = arende.get("bevis") or {}
+
+    # Försvartal från anlitad advokatbyrå (om det finns)
+    forsvar_tal = bevis.get("forsvar_tal", "")
+    forsvar_sektion = ""
+    if forsvar_tal:
+        advokat_byra = bevis.get("advokat_byra", "advokatbyrå")
+        advokat      = bevis.get("advokat", "advokaten")
+        forsvar_sektion = (
+            f"\n\nFÖRSVARSTAL (från {advokat} på {advokat_byra}):\n{forsvar_tal}\n"
+        )
+        print(f"  🏛️  Försvartal ingivet av {advokat_byra} ({advokat})")
 
     # Hitta artikel-text
     artikel_obj = next(
@@ -417,8 +428,9 @@ def hall_forhandling(groq_key: str, arende: dict) -> dict:
             f"Svarande: {svarande}\n"
             f"Konstitutionsartikel {artikel_nr}: {artikel_text}\n\n"
             f"Åtal: {beskrivning}\n"
-            f"Bevis: {json.dumps(bevis, ensure_ascii=False)}\n\n"
-            f"Är den svarande skyldig? Svara med giltig JSON (enbart JSON, ingen annan text):\n"
+            f"Bevis: {json.dumps({k: v for k, v in bevis.items() if k not in ('forsvar_tal', 'advokat_byra', 'advokat')}, ensure_ascii=False)}\n"
+            f"{forsvar_sektion}"
+            f"\nÄr den svarande skyldig? Svara med giltig JSON (enbart JSON, ingen annan text):\n"
             '{{"utfall": "fälld" eller "friad", "motivering": "din juridiska analys på 2-3 meningar"}}'
         )
 
