@@ -422,7 +422,7 @@ def berakna_intakt_lobbybolag(h, foretag, anstallda_agenter, saldon):
         mal_rader = sb_get(h, f"agent_planbocker?agent=eq.{quote(mal)}&select=saldo")
         mal_saldo = float(mal_rader[0]["saldo"]) if mal_rader else 0.0
         rod_rader = sb_get(h, f"agent_roster_lag?lagforslag_id=eq.{fid}&agent=eq.{quote(mal)}&select=rod")
-        rod_fore  = rod_rader[0]["rod"] if rod_rader else "ej röstat"
+        rod_fore  = rod_rader[0]["rod"] if rod_rader else "nej"  # mal är alltid en nej-röstare
 
         # Motparten beslutar
         mal_system = "Du fattar politiska beslut."
