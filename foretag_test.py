@@ -87,10 +87,12 @@ def sb_get(h, path):
         return []
 
 def sb_post(h, table, data):
+    """Returns True on success (2xx), False otherwise."""
     try:
-        httpx.post(f"{SB_URL}/rest/v1/{table}", headers=h, json=data, timeout=8)
+        r = httpx.post(f"{SB_URL}/rest/v1/{table}", headers=h, json=data, timeout=8)
+        return r.is_success
     except Exception:
-        pass
+        return False
 
 def sb_patch(h, table, filter_str, data):
     try:
@@ -136,7 +138,15 @@ def berakna_intakt_flat(anstallda_agenter):
 # ── Grundande ────────────────────────────────────────────────────────────────
 
 def grundar_foretag(h, agent_namn, saldo, befintliga_grundare):
-    if agent_namn in befintliga_grundare:
+    # Kolla alla grundare (aktiva + inaktiva) för att respektera UNIQUE(grundare)
+    alla_grundare = set(befintliga_grundare)
+    try:
+        alla = sb_get(h, f"foretag?grundare=eq.{quote(agent_namn)}&aktiv=eq.false&select=grundare")
+        if alla:
+            alla_grundare.add(agent_namn)
+    except Exception:
+        pass
+    if agent_namn in alla_grundare:
         return False
     kandidat_sektorer = [s for s, lst in SEKTOR_GRUNDARE.items() if agent_namn in lst]
     if not kandidat_sektorer:
@@ -157,7 +167,7 @@ def grundar_foretag(h, agent_namn, saldo, befintliga_grundare):
         namn = f"{agent_namn}s {sektor.capitalize()}bolag"
         editorial_line = None
 
-    sb_post(h, "foretag", {
+    ok = sb_post(h, "foretag", {
         "namn": namn,
         "grundare": agent_namn,
         "sektor": sektor,
@@ -166,6 +176,9 @@ def grundar_foretag(h, agent_namn, saldo, befintliga_grundare):
         "startkapital": STARTKAPITAL,
         "aktiv": True,
     })
+    if not ok:
+        print(f"  ✗ INSERT foretag misslyckades — saldo oförändrat")
+        return False
     ny_saldo = round(float(saldo) - STARTKAPITAL, 2)
     sb_patch(h, "agent_planbocker", f"agent=eq.{quote(agent_namn)}", {"saldo": ny_saldo, "uppdaterad": "now()"})
     # Logga grundandet
