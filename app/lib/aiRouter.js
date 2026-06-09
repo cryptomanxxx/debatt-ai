@@ -133,7 +133,7 @@ export async function getDynamicChain(usecase = "general") {
   if (!_dynamicOrder) return base;
 
   // Filtrera till providers som finns i PROVIDERS, behåll github sist
-  const ranked = _dynamicOrder.filter(p => p in PROVIDERS && p !== "github");
+  const ranked = _dynamicOrder.map(p => p.replace('mistral', 'codestral')).filter(p => p in PROVIDERS && p !== "github");
   // Lägg till providers från statisk kedja som saknas i Supabase-ordningen
   for (const p of base) {
     if (!ranked.includes(p)) ranked.push(p);
@@ -264,62 +264,7 @@ export async function callWithFallback(chain, messages, opts = {}) {
 }
 
 
-import { providerReady, markProviderDown } from "./aiCircuitBreaker.js";
-import { logAiCall as _log } from "./logAiCall.js";
 
-function log(args) { try { _log(args); } catch {} }
-
-const PROVIDERS = {
-  groq: {
-    url:     "https://api.groq.com/openai/v1/chat/completions",
-    model:   "llama-3.3-70b-versatile",
-    key:     () => process.env.GROQ_API_KEY,
-    timeout: 15_000,
-    cbKey:   "groq",
-    shape:   "openai",
-  },
-  gemini: {
-    url:     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-    model:   "gemini-2.0-flash",
-    key:     () => process.env.GEMINI_API_KEY,
-    timeout: 15_000,
-    cbKey:   "gemini",
-    shape:   "gemini",
-  },
-  cerebras: {
-    url:     "https://api.cerebras.ai/v1/chat/completions",
-    model:   "gpt-oss-120b",
-    key:     () => process.env.CEREBRAS_API_KEY,
-    timeout: 15_000,
-    cbKey:   "cerebras",
-    shape:   "openai",
-  },
-  sambanova: {
-    url:     "https://api.sambanova.ai/v1/chat/completions",
-    model:   "Meta-Llama-3.3-70B-Instruct",
-    key:     () => process.env.SAMBANOVA_API_KEY,
-    timeout: 15_000,
-    cbKey:   "sambanova",
-    shape:   "openai",
-  },
-  codestral: {
-    url:     "https://api.mistral.ai/v1/chat/completions",
-    model:   "codestral-latest",
-    key:     () => process.env.MISTRAL_API_KEY,
-    timeout: 15_000,
-    cbKey:   "mistral",
-    shape:   "openai",
-  },
-  // Sista utväg — ingen circuit breaker (GitHub Actions har alltid GITHUB_TOKEN)
-  github: {
-    url:     "https://models.inference.ai.azure.com/chat/completions",
-    model:   "Llama-3.3-70B-Instruct",
-    key:     () => process.env.GITHUB_TOKEN,
-    timeout: 20_000,
-    cbKey:   null,
-    shape:   "openai",
-  },
-};
 
 // Namngivna fallback-kedjor per use-case
 export const CHAINS = {
