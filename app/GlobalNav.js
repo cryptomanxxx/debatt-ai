@@ -16,6 +16,7 @@ const LINKS = [
   { href: "/territorium",       label: "Territorium 🎮" },
   { href: "/handel",            label: "Handelsimperium 🚢" },
   { href: "/mark",             label: "Markartan" },
+  { href: "/marknad",          label: "Varumarknaden" },
   { href: "/fraktioner",      label: "Fraktioner" },
   { href: "/oligarki",        label: "Oligarkirisk" },
   { href: "/teori",           label: "Ekonomisk teori" },
