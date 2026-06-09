@@ -18,7 +18,7 @@ import os
 import sys
 from datetime import datetime, timezone
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post
+from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, hamta_kort_fns
 
 from agenter import (
     AGENTER, ANALYTIKER, ROST_AGENTER, MARKET_AGENTER,
@@ -74,22 +74,12 @@ from supabase_utils import (
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
-    """Försöker alla providers i ordning för korta LLM-anrop (frågor, svar, etc.)."""
-    for fn in [lambda: groq_post(payload),
-               lambda: deepseek_post(payload),
-               lambda: github_models_post(payload)]:
+    """Försöker alla providers i dynamisk rankad ordning för korta LLM-anrop."""
+    for _name, fn in hamta_kort_fns(payload, system, prompt, max_tokens):
         try:
-            return fn().json()["choices"][0]["message"]["content"].strip()
+            return fn()
         except Exception:
             pass
-    try:
-        return cloudflare_post(system[:600], prompt, max_tokens=max_tokens).strip()
-    except Exception:
-        pass
-    try:
-        return (gemini_post(system[:600], prompt, max_tokens=max_tokens) or "").strip()
-    except Exception:
-        pass
     return ""
 
 

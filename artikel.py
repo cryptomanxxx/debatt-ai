@@ -10,7 +10,7 @@ innehåller:
   skriv_kommentar()         – kort kommentar (2–3 meningar) på en artikel
 """
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, mistral_post, sambanova_post
+from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, mistral_post, sambanova_post, hamta_artikel_fns
 from agenter import ARTIKELFORMAT, get_agent_mood
 
 
@@ -81,27 +81,13 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
             {"role": "user", "content": user_msg},
         ],
     }
-    for name, fn in [("Groq", lambda: groq_post(payload)),
-                     ("DeepSeek", lambda: deepseek_post(payload)),
-                     ("GitHub Models", lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}))]:
+    for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok):
         try:
-            result = fn().json()["choices"][0]["message"]["content"]
+            result = fn()
             print(f"  ✓ {name}: artikel klar")
             return result
         except Exception as e:
             print(f"  {name} misslyckades ({e}) — försöker nästa...")
-    try:
-        result = cloudflare_post(system, user_msg, max_tokens=max_tok)
-        print("  ✓ Cloudflare: artikel klar")
-        return result
-    except Exception as e:
-        print(f"  Cloudflare misslyckades ({e}) — försöker Gemini...")
-    try:
-        result = gemini_post(system, user_msg, max_tokens=max_tok)
-        print("  ✓ Gemini: artikel klar")
-        return result
-    except Exception as e:
-        print(f"  Gemini misslyckades ({e}) — alla providers uttömda")
     return None
 
 
@@ -132,27 +118,13 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
             {"role": "user", "content": user_msg},
         ],
     }
-    for name, fn in [("Groq", lambda: groq_post(payload)),
-                     ("DeepSeek", lambda: deepseek_post(payload)),
-                     ("GitHub Models", lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}))]:
+    for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok):
         try:
-            result = fn().json()["choices"][0]["message"]["content"]
+            result = fn()
             print(f"  ✓ {name}: artikel klar")
             return result
         except Exception as e:
             print(f"  {name} misslyckades ({e}) — försöker nästa...")
-    try:
-        result = cloudflare_post(system, user_msg, max_tokens=max_tok)
-        print("  ✓ Cloudflare: artikel klar")
-        return result
-    except Exception as e:
-        print(f"  Cloudflare misslyckades ({e}) — försöker Gemini...")
-    try:
-        result = gemini_post(system, user_msg, max_tokens=max_tok)
-        print("  ✓ Gemini: artikel klar")
-        return result
-    except Exception as e:
-        print(f"  Gemini misslyckades ({e}) — alla providers uttömda")
     return None
 
 
@@ -202,27 +174,13 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
             {"role": "user", "content": user_msg},
         ],
     }
-    for name, fn in [("Groq", lambda: groq_post(payload)),
-                     ("DeepSeek", lambda: deepseek_post(payload)),
-                     ("GitHub Models", lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}))]:
+    for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok):
         try:
-            result = fn().json()["choices"][0]["message"]["content"]
+            result = fn()
             print(f"  ✓ {name}: replik klar")
             return result
         except Exception as e:
             print(f"  {name} misslyckades ({e}) — försöker nästa...")
-    try:
-        result = cloudflare_post(system, user_msg, max_tokens=max_tok)
-        print("  ✓ Cloudflare: replik klar")
-        return result
-    except Exception as e:
-        print(f"  Cloudflare misslyckades ({e}) — försöker Gemini...")
-    try:
-        result = gemini_post(system, user_msg, max_tokens=max_tok)
-        print("  ✓ Gemini: replik klar")
-        return result
-    except Exception as e:
-        print(f"  Gemini misslyckades ({e}) — alla providers uttömda")
     return None
 
 

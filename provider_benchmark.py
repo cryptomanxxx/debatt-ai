@@ -12,13 +12,104 @@ Konfiguration via miljövariabler:
   SLEEP_MELLAN        — sekunder mellan anrop (default 1)
   PROVIDERS           — kommaseparerad lista (default = alla tillgängliga)
                         ex: "groq,sambanova,cerebras"
+  SUPABASE_URL        — Supabase project URL
+  SUPABASE_ANON_KEY   — Supabase anon key (för att spara resultat)
 """
 import os
 import sys
 import time
 import json
+from datetime import datetime, timezone, timedelta
 
 import httpx
+
+SB_URL = os.environ.get("SUPABASE_URL", "https://fmwxftnistkoqazfwnuj.supabase.co")
+SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+SB_HDR = {"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}", "Content-Type": "application/json"} if SB_KEY else {}
+
+
+def _sb_get(path: str, params: str = "") -> list:
+    if not SB_KEY:
+        return []
+    try:
+        url = f"{SB_URL}/rest/v1/{path}{'?' + params if params else ''}"
+        r = httpx.get(url, headers=SB_HDR, timeout=10)
+        return r.json() if r.is_success else []
+    except Exception:
+        return []
+
+
+def _sb_post(path: str, data: dict | list) -> bool:
+    if not SB_KEY:
+        return False
+    try:
+        r = httpx.post(f"{SB_URL}/rest/v1/{path}", headers=SB_HDR, json=data, timeout=10)
+        return r.is_success
+    except Exception:
+        return False
+
+
+def _sb_upsert(path: str, data: dict) -> bool:
+    if not SB_KEY:
+        return False
+    try:
+        hdrs = {**SB_HDR, "Prefer": "resolution=merge-duplicates"}
+        r = httpx.post(f"{SB_URL}/rest/v1/{path}", headers=hdrs, json=data, timeout=10)
+        return r.is_success
+    except Exception:
+        return False
+
+
+def hamta_passiva_429s() -> dict[str, int]:
+    """Hämtar antal passiva 429-loggar per provider senaste 24h."""
+    since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    rows = _sb_get("provider_429_passive", f"loggad=gte.{since}&select=provider")
+    counts: dict[str, int] = {}
+    for row in rows:
+        p = row.get("provider", "")
+        counts[p] = counts.get(p, 0) + 1
+    return counts
+
+
+def spara_och_kalibrera(results: list[dict]) -> None:
+    """Sparar benchmark-resultat till Supabase och uppdaterar fallback-ordningen."""
+    if not SB_KEY:
+        print("  SUPABASE_ANON_KEY saknas — hoppar över Supabase-sparning")
+        return
+
+    # Spara alla resultat till historik
+    rows = [{
+        "provider": r["provider"],
+        "label": r["label"],
+        "lyckade": r["lyckade"],
+        "totalt": r["totalt"],
+        "snitt_latens_s": r["snitt_latens_s"],
+        "parsade": r["parsade"],
+        "forsta_429_vid_anrop": r["forsta_429_vid_anrop"],
+    } for r in results]
+    ok = _sb_post("provider_benchmark_log", rows)
+    print(f"  {'✓' if ok else '✗'} Historik sparad till provider_benchmark_log")
+
+    # Hämta passiva 429s och beräkna justerat poäng
+    passiva = hamta_passiva_429s()
+    if passiva:
+        print(f"  Passiva 429-loggar (24h): {passiva}")
+
+    def score(r: dict) -> float:
+        succé = r["lyckade"] / r["totalt"] if r["totalt"] else 0
+        p429  = passiva.get(r["provider"], 0)
+        # Hög succé = bra, låg latens = bra, passiva 429s = dåligt
+        return succé * 100 - r["snitt_latens_s"] * 2 - p429 * 3
+
+    ranked = sorted(results, key=score, reverse=True)
+    ranked_order = [r["provider"] for r in ranked]
+
+    ok2 = _sb_upsert("provider_config", {
+        "id": "current",
+        "ranked_order": ranked_order,
+        "uppdaterad": datetime.now(timezone.utc).isoformat(),
+    })
+    print(f"  {'✓' if ok2 else '✗'} Fallback-ordning uppdaterad: {' → '.join(ranked_order)}")
 
 # ── Samma PIS-prompt som i produktionen ──────────────────────────────────────
 
@@ -294,3 +385,8 @@ ranked = sorted(results, key=lambda x: (-x["lyckade"], x["snitt_latens_s"]))
 for i, r in enumerate(ranked, 1):
     print(f"  {i}. {r['label']} — {r['lyckade']}/{r['totalt']} lyckade, {r['snitt_latens_s']}s snitt")
 print(f"\n{'═'*60}")
+
+# ── Spara till Supabase och kalibrera fallback-kedjan ──────────────────────────
+print(f"\n  Sparar resultat och kalibrerar fallback-kedja...")
+spara_och_kalibrera(results)
+print(f"{'═'*60}")
