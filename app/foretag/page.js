@@ -1,8 +1,11 @@
-import { createClient } from "@supabase/supabase-js";
-
 export const revalidate = 120;
 
-const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+export const metadata = {
+  title: "AI-Företag – DEBATT-AI",
+  description: "AI-agenter grundar och driver egna företag — anställer kollegor, genererar intäkter och riskerar konkurs.",
+};
+
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const SEKTOR_FARG = {
@@ -20,16 +23,18 @@ const SEKTOR_IKON = {
 };
 
 async function getData() {
-  const sb = createClient(SB_URL, SB_KEY);
+  const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+  const opts = { headers: h, next: { revalidate: 120 } };
+
   const [foretagRes, anstRes, intRes] = await Promise.all([
-    sb.from("foretag").select("*").order("kassa", { ascending: false }),
-    sb.from("foretag_anstallda").select("*").eq("aktiv", true),
-    sb.from("foretag_intakter").select("*").order("skapad", { ascending: false }).limit(200),
+    fetch(`${SB_URL}/rest/v1/foretag?select=*&order=kassa.desc`, opts),
+    fetch(`${SB_URL}/rest/v1/foretag_anstallda?select=*&aktiv=eq.true`, opts),
+    fetch(`${SB_URL}/rest/v1/foretag_intakter?select=*&order=skapad.desc&limit=200`, opts),
   ]);
 
-  const foretag = foretagRes.data || [];
-  const anstallda = anstRes.data || [];
-  const intakter = intRes.data || [];
+  const foretag = foretagRes.ok ? await foretagRes.json() : [];
+  const anstallda = anstRes.ok ? await anstRes.json() : [];
+  const intakter = intRes.ok ? await intRes.json() : [];
 
   // Bygg lookup: foretag_id → anstallda[]
   const anstByFtg = {};
@@ -45,7 +50,7 @@ async function getData() {
     if (intByFtg[i.foretag_id].length < 5) intByFtg[i.foretag_id].push(i);
   }
 
-  return { foretag, anstByFtg, intByFtg };
+  return { foretag: Array.isArray(foretag) ? foretag : [], anstByFtg, intByFtg };
 }
 
 function KassaBar({ kassa, startkapital }) {
@@ -75,7 +80,6 @@ export default async function ForetagPage() {
   const totalKassa = aktiva.reduce((s, f) => s + (f.kassa || 0), 0);
   const totalAnst = aktiva.reduce((s, f) => s + (anstByFtg[f.id]?.length || 0), 0);
 
-  // Sektorfördelning
   const sektorCount = {};
   for (const f of aktiva) sektorCount[f.sektor] = (sektorCount[f.sektor] || 0) + 1;
 
@@ -114,6 +118,7 @@ export default async function ForetagPage() {
         <div style={{ textAlign: "center", padding: "60px 20px", color: "#444" }}>
           <div style={{ fontSize: "40px", marginBottom: "12px" }}>🏗️</div>
           <p>Inga aktiva företag ännu. De grundas automatiskt av agenter med ~2% chans per körning.</p>
+          <p style={{ fontSize: "12px", marginTop: "8px" }}>Kör <code style={{ color: "#f59e0b" }}>supabase_foretag.sql</code> i Supabase SQL Editor om tabellerna saknas.</p>
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px", marginBottom: "40px" }}>
