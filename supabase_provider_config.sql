@@ -49,7 +49,7 @@ create policy "anon insert provider_benchmark_log"
 create policy "anon insert provider_config"
   on provider_config for insert with check (true);
 create policy "anon update provider_config"
-  on provider_config for update with check (true);
+  on provider_config for update using (true);
 
 create policy "publik läsning provider_429_passive"
   on provider_429_passive for select using (true);
