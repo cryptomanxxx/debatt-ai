@@ -50,8 +50,8 @@ jobs:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           SUPABASE_URL: "https://fmwxftnistkoqazfwnuj.supabase.co"
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          PROVIDERS: ${{ inputs.providers }}
-          ANROP_PER_PROVIDER: ${{ inputs.anrop_per_provider }}
-          SLEEP_MELLAN: ${{ inputs.sleep_mellan }}
+          PROVIDERS: ${{ inputs.providers || 'groq,sambanova,cerebras,github_models,gemini,mistral,deepseek,cloudflare' }}
+          ANROP_PER_PROVIDER: ${{ inputs.anrop_per_provider || '10' }}
+          SLEEP_MELLAN: ${{ inputs.sleep_mellan || '1' }}
           PYTHONUNBUFFERED: "1"
         run: python -u provider_benchmark.py
