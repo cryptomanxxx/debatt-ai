@@ -3810,20 +3810,29 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
         if not kluster:
             return 0
 
+        def _unikt_namn(bas: str, ledare: str, anvanda: set) -> str:
+            """Returnerar ett unikt partinamn genom att prova förnamn, fullnamn, sedan räknare."""
+            kandidater = [
+                f"{bas} ({ledare.split()[0]})",
+                f"{bas} ({ledare})",
+                *[f"{bas} ({ledare}) {i}" for i in range(2, 10)],
+            ]
+            for k in kandidater:
+                if k not in anvanda:
+                    return k
+            return f"{bas} ({ledare}) x"
+
         # Bygg lista med kommande partier för kassaöverföring
         kommande_partier = [
             {"ledare": _hamta_ledare(sb_key, m), "namn": _parti_namn_fran_positioner(sb_key, m)}
             for m in kluster
         ]
-        # Deduplicera namn — om två partier får samma namn, lägg till ledarens förnamn
-        sedda_namn: dict[str, int] = {}
+        # Deduplicera namn — garanterat unika oavsett hur många delar samma basnamn
+        sedda_namn: set[str] = set()
         for p in kommande_partier:
-            n = p["namn"]
-            if n in sedda_namn:
-                # Ge det senare partiet ledarens förnamn som suffix
-                p["namn"] = f"{n} ({p['ledare'].split()[0]})"
-            else:
-                sedda_namn[n] = 1
+            if p["namn"] in sedda_namn:
+                p["namn"] = _unikt_namn(p["namn"], p["ledare"], sedda_namn)
+            sedda_namn.add(p["namn"])
         _overfor_parti_kassor(sb_key, kommande_partier)
 
         # Ta bort gamla partier
@@ -3836,7 +3845,7 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
             ledare = _hamta_ledare(sb_key, medlemmar)
             namn = _parti_namn_fran_positioner(sb_key, medlemmar)
             if namn in anvanda_namn:
-                namn = f"{namn} ({ledare.split()[0]})"
+                namn = _unikt_namn(namn, ledare, anvanda_namn)
             anvanda_namn.add(namn)
             intern_styrka = sum(
                 styrka_map.get(f"{a}||{b}", styrka_map.get(f"{b}||{a}", 0))
