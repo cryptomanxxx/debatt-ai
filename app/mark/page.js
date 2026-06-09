@@ -14,7 +14,7 @@ async function getData() {
   const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const opts = { headers: h, next: { revalidate: 180 } };
 
-  const [zonerRes, agareRes, transRes, auktRes, resursRes, lagerRes, handelRes, varaAuktRes, transClearingRes, handelClearingRes] = await Promise.all([
+  const [zonerRes, agareRes, transRes, auktRes, resursRes, lagerRes, handelRes, varaAuktRes, transClearingRes, handelClearingRes, zonEventsRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/mark_zoner?select=*&order=id.asc`, opts),
     fetch(`${SB_URL}/rest/v1/mark_agare?select=zon_id,agent,kopt_pris,kopt_datum`, opts),
     fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=*&order=skapad.desc&limit=20`, opts),
@@ -23,31 +23,30 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/mark_lager?select=agent,vara,antal&order=antal.desc`, opts),
     fetch(`${SB_URL}/rest/v1/mark_handel_log?select=*&order=skapad.desc&limit=20`, opts),
     fetch(`${SB_URL}/rest/v1/mark_vara_auktioner?select=*&status=eq.%C3%B6ppen&order=stanger_at.asc&limit=20`, opts),
-    // Bredare fönster enbart för clearing-priser — max 1000 rader (Supabase-tak)
-    // täcker månader av handel och säkerställer att alla 7 zontyper hittar ett pris.
-    // Saknade typer kompletteras i MarkKarta med resurspriser-fallback.
     fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=zon_namn,pris,skapad&order=skapad.desc&limit=1000`, opts),
     fetch(`${SB_URL}/rest/v1/mark_handel_log?select=vara,pris_per_enhet,skapad&order=skapad.desc&limit=500`, opts),
+    fetch(`${SB_URL}/rest/v1/zon_events?select=*&aktiv=eq.true&order=skapad.desc`, { headers: h, next: { revalidate: 60 } }),
   ]);
 
   return {
-    zoner:         zonerRes.ok     ? await zonerRes.json()     : [],
-    agare:         agareRes.ok     ? await agareRes.json()     : [],
-    transaktioner: transRes.ok     ? await transRes.json()     : [],
-    auktioner:     auktRes.ok      ? await auktRes.json()      : [],
-    resurspriser:  resursRes.ok    ? await resursRes.json()    : [],
-    lager:         lagerRes.ok     ? await lagerRes.json()     : [],
-    handelLog:     handelRes.ok    ? await handelRes.json()    : [],
-    varaAuktioner: varaAuktRes.ok  ? await varaAuktRes.json()  : [],
-    transClearing: transClearingRes.ok  ? await transClearingRes.json()  : [],
+    zoner:          zonerRes.ok          ? await zonerRes.json()          : [],
+    agare:          agareRes.ok          ? await agareRes.json()          : [],
+    transaktioner:  transRes.ok          ? await transRes.json()          : [],
+    auktioner:      auktRes.ok           ? await auktRes.json()           : [],
+    resurspriser:   resursRes.ok         ? await resursRes.json()         : [],
+    lager:          lagerRes.ok          ? await lagerRes.json()          : [],
+    handelLog:      handelRes.ok         ? await handelRes.json()         : [],
+    varaAuktioner:  varaAuktRes.ok       ? await varaAuktRes.json()       : [],
+    transClearing:  transClearingRes.ok  ? await transClearingRes.json()  : [],
     handelClearing: handelClearingRes.ok ? await handelClearingRes.json() : [],
+    zonEvents:      zonEventsRes.ok      ? await zonEventsRes.json()      : [],
   };
 }
 
 const C = { bg: "#0a0a0a", text: "#f0ede6", muted: "#888880" };
 
 export default async function MarkPage() {
-  const { zoner, agare, transaktioner, auktioner, resurspriser, lager, handelLog, varaAuktioner, transClearing, handelClearing } = await getData();
+  const { zoner, agare, transaktioner, auktioner, resurspriser, lager, handelLog, varaAuktioner, transClearing, handelClearing, zonEvents } = await getData();
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
@@ -83,7 +82,7 @@ export default async function MarkPage() {
             </p>
           </div>
         ) : (
-          <MarkKarta zoner={zoner} agare={agare} transaktioner={transaktioner} auktioner={auktioner} resurspriser={resurspriser} lager={lager} handelLog={handelLog} varaAuktioner={varaAuktioner} transClearing={transClearing} handelClearing={handelClearing} />
+          <MarkKarta zoner={zoner} agare={agare} transaktioner={transaktioner} auktioner={auktioner} resurspriser={resurspriser} lager={lager} handelLog={handelLog} varaAuktioner={varaAuktioner} transClearing={transClearing} handelClearing={handelClearing} zonEvents={zonEvents} />
         )}
 
       </main>

@@ -32,6 +32,9 @@ const TYP_NAMN = {
   skog:     "Skog",
 };
 
+const EVENT_IKON = { torka: "☀️", gruvras: "💥", cyberattack: "🔒" };
+const EVENT_FARG = { torka: "#f59e0b", gruvras: "#ef4444", cyberattack: "#a78bfa" };
+
 // Fyra institutioner placerade på specifika zoner — synliga som glödande pins
 const INSTITUTIONS = {
   "Storstaden":       { icon: "🏛", fullName: "AI-Parlamentet", color: "#c084fc" },
@@ -113,12 +116,13 @@ const VARA_TYP = Object.fromEntries(
   Object.entries(TYP_VARA).map(([t, v]) => [v, t])
 );
 
-export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [], transClearing = [], handelClearing = [] }) {
+export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [], transClearing = [], handelClearing = [], zonEvents = [] }) {
   const [hover, setHover]       = useState(null);
   const [selected, setSelected] = useState(null);
   const [floats, setFloats]     = useState([]);
 
-  const agareMap = Object.fromEntries(agare.map(a => [a.zon_id, a]));
+  const agareMap    = Object.fromEntries(agare.map(a => [a.zon_id, a]));
+  const zonEventMap = Object.fromEntries(zonEvents.map(e => [e.zon_id, e]));
 
   // Centrera hexklustret dynamiskt i SVG
   const [OX, OY] = (() => {
@@ -276,6 +280,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               const isSel = selected?.id === zon.id;
               const isAct = isHov || isSel;
               const agGradId = agName ? `grad-ag-${agName.replace(/[^a-zA-Z]/g, "")}` : null;
+              const evt = zonEventMap[zon.id] || null;
               const strokeCol = agFarg
                 ? rgba(agFarg,  isAct ? 1.0 : 0.90)
                 : isAct ? "rgba(255,255,255,0.90)" : "rgba(255,255,255,0.45)";
@@ -320,6 +325,18 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                     style={{ userSelect: "none", pointerEvents: "none" }}>
                     {TYP_IKON[zon.typ]}
                   </text>
+                  {evt && (
+                    <>
+                      <polygon points={hexPts(cx, cy, HEX + 4)} fill="none"
+                        stroke={EVENT_FARG[evt.event_typ] || "#f87171"} strokeWidth="1.6">
+                        <animate attributeName="opacity" values="0.18;0.80;0.18" dur="1.4s" repeatCount="indefinite" />
+                      </polygon>
+                      <text x={cx + HEX - 9} y={cy - HEX + 9} textAnchor="middle" dominantBaseline="middle"
+                        fontSize="11" style={{ userSelect: "none", pointerEvents: "none" }}>
+                        {EVENT_IKON[evt.event_typ]}
+                      </text>
+                    </>
+                  )}
                 </g>
               );
             })}
@@ -415,6 +432,25 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                 <span style={{ fontSize: "10px", color: "#4ade8077", fontFamily: "monospace" }}>◯ TILLGÄNGLIG FÖR KÖP</span>
               </div>
             )}
+            {zonEventMap[active.id] && (() => {
+              const ev = zonEventMap[active.id];
+              const evFarg = EVENT_FARG[ev.event_typ] || "#f87171";
+              const daysLeft = Math.max(0, Math.ceil((new Date(ev.slutar) - Date.now()) / 86400000));
+              return (
+                <div style={{ marginTop: "10px", padding: "9px 10px", background: rgba(evFarg, 0.07), border: `1px solid ${rgba(evFarg, 0.32)}`, borderRadius: "4px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "14px" }}>{EVENT_IKON[ev.event_typ]}</span>
+                    <span style={{ fontSize: "10px", color: evFarg, fontFamily: "monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{ev.event_typ}</span>
+                    <span style={{ marginLeft: "auto", fontSize: "9px", color: evFarg, fontFamily: "monospace" }}>{daysLeft}d kvar</span>
+                  </div>
+                  <div style={{ fontSize: "10px", color: "#888880", lineHeight: 1.55 }}>{ev.beskrivning}</div>
+                  {ev.produktion_effekt === 0
+                    ? <div style={{ fontSize: "9px", color: "#f87171", fontFamily: "monospace", marginTop: "5px" }}>⏸ PRODUKTION PAUSAD</div>
+                    : <div style={{ fontSize: "9px", color: "#fbbf24", fontFamily: "monospace", marginTop: "5px" }}>⚠ HALVERAD PRODUKTION · {Math.round(ev.produktion_effekt * 100)}%</div>
+                  }
+                </div>
+              );
+            })()}
           </div>
         ) : (
           <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "12px 14px", fontSize: "11px", color: "#333", fontFamily: "monospace", textAlign: "center" }}>
@@ -462,6 +498,42 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
         </div>
 
       </div>{/* /3-kolumns grid */}
+
+      {/* ── AKTIVA ZONEVENT ── */}
+      {zonEvents.length > 0 && (
+        <div style={{ background: "#0d0907", border: "1px solid rgba(239,68,68,0.20)", borderRadius: "8px", padding: "14px 16px" }}>
+          <p style={{ fontSize: "9px", color: "#7a1a1a", fontFamily: "monospace", letterSpacing: "0.12em", margin: "0 0 10px" }}>
+            ⚠ AKTIVA ZONEVENT · {zonEvents.length} DRABBADE ZON{zonEvents.length !== 1 ? "ER" : ""}
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: "8px" }}>
+            {zonEvents.map(ev => {
+              const evFarg = EVENT_FARG[ev.event_typ] || "#f87171";
+              const daysLeft = Math.max(0, Math.ceil((new Date(ev.slutar) - Date.now()) / 86400000));
+              const agFarg = ev.agare ? (AGENT_VISUELL[ev.agare]?.ikonFarg || "#888") : null;
+              return (
+                <div key={ev.id} style={{ padding: "9px 12px", background: rgba(evFarg, 0.05), border: `1px solid ${rgba(evFarg, 0.25)}`, borderLeft: `3px solid ${rgba(evFarg, 0.65)}`, borderRadius: "0 6px 6px 0" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "14px" }}>{EVENT_IKON[ev.event_typ]}</span>
+                    <span style={{ fontSize: "11px", color: evFarg, fontFamily: "monospace", fontWeight: 700 }}>{ev.zon_namn}</span>
+                    <span style={{ marginLeft: "auto", fontSize: "9px", color: evFarg, fontFamily: "monospace" }}>{daysLeft}d</span>
+                  </div>
+                  <div style={{ fontSize: "9px", color: "#666", lineHeight: 1.5, marginBottom: "5px" }}>{ev.beskrivning}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    {ev.agare
+                      ? <span style={{ fontSize: "9px", color: agFarg, fontFamily: "monospace" }}>▣ {ev.agare}</span>
+                      : <span style={{ fontSize: "9px", color: "#333", fontFamily: "monospace" }}>◯ fri zon</span>
+                    }
+                    {ev.produktion_effekt === 0
+                      ? <span style={{ fontSize: "8px", color: "#f87171", fontFamily: "monospace" }}>⏸ PAUSAD</span>
+                      : <span style={{ fontSize: "8px", color: "#fbbf24", fontFamily: "monospace" }}>⚠ {Math.round(ev.produktion_effekt * 100)}%</span>
+                    }
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ══ MARKNADER — 2 kolumner, 4 rader (header/auktioner/clearing/handel alltid i linje) ══ */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px", marginTop: "16px" }}>
