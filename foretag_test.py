@@ -278,10 +278,7 @@ def berakna_intakt_advokatbyra(h, foretag, anstallda_agenter, saldon):
         bevis["advokat_byra"] = foretag["namn"]
         bevis["advokat"]      = advokat
 
-        ok = sb_patch(h, "domstol_arenden", f"id=eq.{arende['id']}", {"bevis": bevis})
-        if not ok:
-            print(f"  ✗ PATCH domstol_arenden misslyckades för {arende_nr}")
-            continue
+        sb_patch(h, "domstol_arenden", f"id=eq.{arende['id']}", {"bevis": bevis})
 
         # Debitera arvode från klienten om de har råd (> 100 kr efter avgiften)
         klient_saldo = float(saldon.get(svarande, 0))
