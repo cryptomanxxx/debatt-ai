@@ -1,6 +1,8 @@
-name: Provider Benchmark (manuell)
+name: Provider Benchmark
 
 on:
+  schedule:
+    - cron: "0 3 * * *"  # 03:00 UTC dagligen (05:00 svensk tid) — innan agenter startar
   workflow_dispatch:
     inputs:
       providers:
@@ -46,6 +48,8 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          SUPABASE_URL: "https://fmwxftnistkoqazfwnuj.supabase.co"
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           PROVIDERS: ${{ inputs.providers }}
           ANROP_PER_PROVIDER: ${{ inputs.anrop_per_provider }}
           SLEEP_MELLAN: ${{ inputs.sleep_mellan }}

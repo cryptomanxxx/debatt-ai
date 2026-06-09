@@ -1,6 +1,8 @@
 """
 ai_klient.py – AI-provider-anrop för debatt.ai
-Fallback-kedja (Python): Groq → Sambanova → Cerebras → GitHub Models → Gemini
+Fallback-kedja laddas dynamiskt från Supabase (provider_config).
+Faller tillbaka på hårdkodad standardordning om Supabase är otillgänglig.
+
 Rate limits (free tier):
   Groq:         30 RPM,  1 000 RPD, ~144k TPD
   Sambanova:    20 RPM,    20M TPD  ← bäst för batch
@@ -12,10 +14,102 @@ Rate limits (free tier):
 import httpx
 import os
 import time
+import threading
 
 # Providers som misslyckats permanent under denna körning (TPD, saknad nyckel, etc.)
 # Återställs automatiskt nästa gång agent.py startas (ny process = nytt minne).
 _nere: set[str] = set()
+
+# ── Dynamisk fallback-ordning ──────────────────────────────────────────────────
+
+_DEFAULT_ORDER = ["groq", "mistral", "sambanova", "deepseek", "cloudflare", "gemini", "github_models", "cerebras"]
+_SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
+
+
+def _load_fallback_order() -> list[str]:
+    """Hämtar rankad provider-ordning från Supabase. Faller tillbaka på standardordning."""
+    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    if not sb_key:
+        return _DEFAULT_ORDER.copy()
+    try:
+        r = httpx.get(
+            f"{_SB_URL}/rest/v1/provider_config?id=eq.current&select=ranked_order",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=5,
+        )
+        if r.is_success:
+            data = r.json()
+            if data and data[0].get("ranked_order"):
+                order = data[0]["ranked_order"]
+                print(f"  ✓ Fallback-ordning laddad från Supabase: {' → '.join(order)}")
+                return order
+    except Exception:
+        pass
+    print("  Fallback-ordning: använder standardordning (Supabase otillgänglig)")
+    return _DEFAULT_ORDER.copy()
+
+
+# Laddas en gång vid modulimport
+_fallback_order: list[str] = _load_fallback_order()
+
+
+def hamta_fallback_ordning() -> list[str]:
+    """Returnerar aktuell rankad provider-ordning."""
+    return _fallback_order
+
+
+def logga_429_passivt(provider: str) -> None:
+    """Loggar ett 429-fel till Supabase i bakgrunden (fire-and-forget)."""
+    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    if not sb_key:
+        return
+
+    def _post():
+        try:
+            httpx.post(
+                f"{_SB_URL}/rest/v1/provider_429_passive",
+                headers={
+                    "apikey": sb_key,
+                    "Authorization": f"Bearer {sb_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"provider": provider},
+                timeout=5,
+            )
+        except Exception:
+            pass
+
+    threading.Thread(target=_post, daemon=True).start()
+
+
+def hamta_artikel_fns(payload: dict, system: str, user_msg: str, max_tokens: int) -> list[tuple[str, callable]]:
+    """Returnerar (namn, fn) i dynamisk rankad ordning för artikelskrivning."""
+    alla = {
+        "groq":          ("Groq",          lambda: groq_post(payload).json()["choices"][0]["message"]["content"]),
+        "mistral":       ("Mistral",        lambda: mistral_post(payload).json()["choices"][0]["message"]["content"]),
+        "sambanova":     ("Sambanova",      lambda: sambanova_post(payload).json()["choices"][0]["message"]["content"]),
+        "deepseek":      ("DeepSeek",       lambda: deepseek_post(payload).json()["choices"][0]["message"]["content"]),
+        "cerebras":      ("Cerebras",       lambda: cerebras_post(payload).json()["choices"][0]["message"]["content"]),
+        "github_models": ("GitHub Models",  lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]),
+        "cloudflare":    ("Cloudflare",     lambda: cloudflare_post(system, user_msg, max_tokens=max_tokens)),
+        "gemini":        ("Gemini",         lambda: gemini_post(system, user_msg, max_tokens=max_tokens)),
+    }
+    return [(alla[p][0], alla[p][1]) for p in _fallback_order if p in alla]
+
+
+def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int) -> list[tuple[str, callable]]:
+    """Returnerar (namn, fn) i dynamisk rankad ordning för korta LLM-anrop."""
+    alla = {
+        "groq":          ("Groq",         lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip()),
+        "mistral":       ("Mistral",       lambda: mistral_post(payload).json()["choices"][0]["message"]["content"].strip()),
+        "sambanova":     ("Sambanova",     lambda: sambanova_post(payload).json()["choices"][0]["message"]["content"].strip()),
+        "deepseek":      ("DeepSeek",      lambda: deepseek_post(payload).json()["choices"][0]["message"]["content"].strip()),
+        "cerebras":      ("Cerebras",      lambda: cerebras_post(payload).json()["choices"][0]["message"]["content"].strip()),
+        "github_models": ("GitHub Models", lambda: github_models_post(payload).json()["choices"][0]["message"]["content"].strip()),
+        "cloudflare":    ("Cloudflare",    lambda: cloudflare_post(system[:600], prompt, max_tokens=max_tokens).strip()),
+        "gemini":        ("Gemini",        lambda: (gemini_post(system[:600], prompt, max_tokens=max_tokens) or "").strip()),
+    }
+    return [(alla[p][0], alla[p][1]) for p in _fallback_order if p in alla]
 
 
 def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
@@ -42,6 +136,7 @@ def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
             continue
         r.raise_for_status()
         return r
+    logga_429_passivt("groq")
     _nere.add("groq")
     raise Exception(f"Groq rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
 
@@ -100,6 +195,7 @@ def github_models_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
             continue
         r.raise_for_status()
         return r
+    logga_429_passivt("github_models")
     _nere.add("github_models")
     raise Exception(f"GitHub Models rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
 
@@ -129,6 +225,7 @@ def sambanova_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
             raise Exception(f"Sambanova autentiseringsfel: {r.status_code}")
         r.raise_for_status()
         return r
+    logga_429_passivt("sambanova")
     _nere.add("sambanova")
     raise Exception(f"Sambanova rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
 
@@ -158,6 +255,7 @@ def cerebras_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
             raise Exception(f"Cerebras autentiseringsfel: {r.status_code}")
         r.raise_for_status()
         return r
+    logga_429_passivt("cerebras")
     _nere.add("cerebras")
     raise Exception(f"Cerebras rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
 
@@ -175,6 +273,7 @@ def deepseek_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
     payload = {**json_payload, "model": "deepseek-chat"}
     r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
     if r.status_code == 429:
+        logga_429_passivt("deepseek")
         _nere.add("deepseek")
         raise Exception(f"DeepSeek rate-limit: {r.text[:200]}")
     r.raise_for_status()
@@ -208,6 +307,7 @@ def mistral_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
             raise Exception(f"Mistral autentiseringsfel: {r.status_code}")
         r.raise_for_status()
         return r
+    logga_429_passivt("mistral")
     _nere.add("mistral")
     raise Exception(f"Mistral rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
 
@@ -232,6 +332,7 @@ def cloudflare_post(system_prompt: str, user_message: str, max_tokens: int = 200
     }
     r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
     if r.status_code == 429:
+        logga_429_passivt("cloudflare")
         _nere.add("cloudflare")
         raise Exception(f"Cloudflare rate-limit: {r.text[:200]}")
     r.raise_for_status()
