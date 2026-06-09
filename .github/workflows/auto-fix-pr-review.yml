@@ -103,7 +103,7 @@ jobs:
         run: |
           # Säkerhet: hämta alltid skriptet från main, aldrig från PR-branchen
           git fetch origin main
-          git checkout origin/main -- agents/autofix-review.js
+          git checkout FETCH_HEAD -- agents/autofix-review.js
           node agents/autofix-review.js 2>&1 | tee /tmp/autofix_run.txt
 
       - name: Committa och pusha fixes
