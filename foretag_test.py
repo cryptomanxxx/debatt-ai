@@ -52,6 +52,7 @@ SEKTOR_GRUNDARE = {
     "konsult":     ["Jurist", "Nationalekonom", "Konservativ debattör", "Filosof"],
     "investering": ["Kryptoanalytiker", "Nationalekonom", "Teknikoptimist", "Läkare"],
     "advokatbyra": ["Jurist", "Filosof", "Historiker"],
+    "lobbybolag":  ["Konservativ debattör", "Journalist", "Nationalekonom", "Jurist"],
 }
 
 SEKTOR_ROLLER = {
@@ -60,9 +61,13 @@ SEKTOR_ROLLER = {
     "konsult":     ["rådgivare", "lobbyist", "strateg"],
     "investering": ["portföljförvaltare", "riskanalytiker"],
     "advokatbyra": ["försvarsadvokat", "biträdande jurist"],
+    "lobbybolag":  ["lobbyist", "politisk rådgivare", "parlamentsanalytiker"],
 }
 
-SEKTOR_MAX_ANSTALLDA = {"media": 3, "handel": 2, "konsult": 3, "investering": 2, "advokatbyra": 2}
+SEKTOR_MAX_ANSTALLDA = {
+    "media": 3, "handel": 2, "konsult": 3,
+    "investering": 2, "advokatbyra": 2, "lobbybolag": 2,
+}
 
 STARTKAPITAL           = 300.0
 VECKOLON               = 35.0
@@ -278,10 +283,7 @@ def berakna_intakt_advokatbyra(h, foretag, anstallda_agenter, saldon):
         bevis["advokat_byra"] = foretag["namn"]
         bevis["advokat"]      = advokat
 
-        ok = sb_patch(h, "domstol_arenden", f"id=eq.{arende['id']}", {"bevis": bevis})
-        if not ok:
-            print(f"  ✗ PATCH domstol_arenden misslyckades för {arende_nr}")
-            continue
+        sb_patch(h, "domstol_arenden", f"id=eq.{arende['id']}", {"bevis": bevis})
 
         # Debitera arvode från klienten om de har råd (> 100 kr efter avgiften)
         klient_saldo = float(saldon.get(svarande, 0))
@@ -304,6 +306,172 @@ def berakna_intakt_advokatbyra(h, foretag, anstallda_agenter, saldon):
     if pro_bono:
         beskr_delar.append(f"{pro_bono} pro bono")
     return intakt_total, ", ".join(beskr_delar)
+
+
+def berakna_intakt_lobbybolag(h, foretag, anstallda_agenter, saldon):
+    """Lobbybolaget lobbyr i klientagenters ställe mot betalning.
+
+    Värdeproposition vs. solo-lobbying:
+    - Högre budget (55 kr vs 20–50 kr) → bättre incitament för mottagaren
+    - Professionella argument från specialiserade lobbyister
+
+    Intäktsmodell:
+    - AVGIFT = 40 kr upfront per uppdrag (klienten betalar alltid)
+    - LOBBYING_BELOPP = 55 kr erbjuds motpart (från company kassa) om framgång
+    - Netto per framgång: 40 − 55 = −15 kr (kassa)
+    - Netto per misslyckande: +40 kr (motpart tackade nej → inget utbetalt)
+    - Förväntat ≈50 % success-rate: net +12.5 kr/uppdrag
+
+    Kopplar till lobbying_log (klienten = lobbying_agent i loggen).
+    """
+    AVGIFT           = 40.0   # alltid, win or lose
+    LOBBYING_BELOPP  = 55     # erbjuds motpart — dras från company kassa vid framgång
+    MAX_UPPDRAG      = 2
+
+    oppna = sb_get(h, "lagforslag?status=eq.omrostning&select=id,titel")
+    if not oppna:
+        return 0.0, "Inga öppna motioner"
+
+    ids_str = ",".join(str(f["id"]) for f in oppna)
+    roster  = sb_get(h, f"agent_roster_lag?lagforslag_id=in.({ids_str})&select=lagforslag_id,agent,rod")
+
+    # Klientkandidater: ja-röstare med råd och minst en motpart som röstat nej
+    nej_per_forslag: dict[int, list[str]] = {}
+    for r in roster:
+        if r["rod"] == "nej":
+            nej_per_forslag.setdefault(r["lagforslag_id"], []).append(r["agent"])
+
+    kandidater = []
+    for r in roster:
+        if r["rod"] != "ja":
+            continue
+        klient = r["agent"]
+        if klient == foretag["grundare"]:
+            continue
+        if float(saldon.get(klient, 0)) < AVGIFT + 100:
+            continue
+        motparter = [a for a in nej_per_forslag.get(r["lagforslag_id"], []) if a != klient]
+        if not motparter:
+            continue
+        titel = next((f["titel"] for f in oppna if f["id"] == r["lagforslag_id"]), "")
+        kandidater.append((r["lagforslag_id"], klient, motparter, titel))
+
+    if not kandidater:
+        return 0.0, "Inga klienter med råd och motpart"
+
+    random.shuffle(kandidater)
+    uppdrag = kandidater[:MAX_UPPDRAG]
+
+    lobbyist      = random.choice(anstallda_agenter) if anstallda_agenter else foretag["grundare"]
+    running_kassa = float(foretag["kassa"])
+    intakt_total  = 0.0
+    utforda       = 0
+
+    for fid, klient, motparter, titel in uppdrag:
+        mal = random.choice(motparter)
+
+        # Debitera klienten upfront
+        k_saldo = float(saldon.get(klient, 0))
+        ny_k = round(k_saldo - AVGIFT, 2)
+        sb_patch(h, "agent_planbocker", f"agent=eq.{quote(klient)}",
+                 {"saldo": ny_k, "uppdaterad": "now()"})
+        saldon[klient] = ny_k
+        running_kassa  = round(running_kassa + AVGIFT, 2)
+        intakt_total   = round(intakt_total + AVGIFT, 2)
+
+        # Generera professionellt lobbyingargument
+        system = (
+            f"Du är {lobbyist}, erfaren lobbyist på {foretag['namn']}. "
+            f"Skriv ett professionellt, konkret lobbyingargument på svenska i 2 meningar."
+        )
+        prompt = (
+            f"Motion: \"{titel[:200]}\"\n"
+            f"Klient: {klient} (stödjer motionen, anlitar dig för att övertala {mal}).\n"
+            f"Erbjudande: {LOBBYING_BELOPP} kr i direktbetalning till {mal}.\n"
+            f"Skriv ett argument som talar till {mal}s specifika intressen."
+        )
+        argument = _llm(system, prompt, max_tokens=150)
+        if not argument:
+            print(f"  ⚠️  {foretag['namn']}: kunde inte generera argument för {klient} → refunderar avgift")
+            sb_patch(h, "agent_planbocker", f"agent=eq.{quote(klient)}",
+                     {"saldo": k_saldo, "uppdaterad": "now()"})
+            saldon[klient] = k_saldo
+            running_kassa  = round(running_kassa - AVGIFT, 2)
+            intakt_total   = round(intakt_total - AVGIFT, 2)
+            continue
+
+        # Hämta motpartens saldo och nuvarande röst
+        mal_rader = sb_get(h, f"agent_planbocker?agent=eq.{quote(mal)}&select=saldo")
+        mal_saldo = float(mal_rader[0]["saldo"]) if mal_rader else 0.0
+        rod_rader = sb_get(h, f"agent_roster_lag?lagforslag_id=eq.{fid}&agent=eq.{quote(mal)}&select=rod")
+        rod_fore  = rod_rader[0]["rod"] if rod_rader else "ej röstat"
+
+        # Motparten beslutar
+        mal_system = "Du fattar politiska beslut."
+        mal_prompt = (
+            f"Professionellt lobbyingföretag {foretag['namn']} (representerar {klient}) erbjuder dig "
+            f"{LOBBYING_BELOPP} kr för att rösta JA på:\n\"{titel[:200]}\"\n\n"
+            f"Argument: \"{argument}\"\n"
+            f"Din nuvarande ståndpunkt: {rod_fore}. Ditt saldo: {mal_saldo:.0f} kr.\n\n"
+            f"Svara EXAKT:\nBESLUT: accepterar eller avvisar\nMOTIVERING: [1 mening]"
+        )
+        mal_svar = _llm(mal_system, mal_prompt, max_tokens=80)
+
+        resultat   = "avvisat"
+        motivering = ""
+        for rad in (mal_svar or "").strip().splitlines():
+            if "BESLUT:" in rad.upper() and "accepterar" in rad.lower():
+                resultat = "accepterat"
+            elif "MOTIVERING:" in rad.upper():
+                motivering = rad.split(":", 1)[1].strip()
+
+        rod_efter = rod_fore
+        if resultat == "accepterat":
+            # Uppdatera röst
+            sb_upsert(h, "agent_roster_lag",
+                      {"lagforslag_id": fid, "agent": mal, "rod": "ja",
+                       "motivering": f"[Lobbad via {foretag['namn']} för {klient}] {motivering}"[:300]},
+                      "lagforslag_id,agent")
+            rod_efter = "ja"
+            # Betala motparten — dras från company kassa
+            ny_mal = round(mal_saldo + LOBBYING_BELOPP, 2)
+            sb_patch(h, "agent_planbocker", f"agent=eq.{quote(mal)}",
+                     {"saldo": ny_mal, "uppdaterad": "now()"})
+            saldon[mal]    = ny_mal
+            running_kassa  = round(running_kassa - LOBBYING_BELOPP, 2)
+
+        # Logga i lobbying_log (klient = lobbying_agent, de gynnas av röständringen)
+        sb_post(h, "lobbying_log", {
+            "lagforslag_id": fid,
+            "lobbying_agent": klient,
+            "mal_agent":      mal,
+            "belopp":         LOBBYING_BELOPP,
+            "argument":       argument[:300],
+            "resultat":       resultat,
+            "rod_fore":       rod_fore,
+            "rod_efter":      rod_efter,
+        })
+
+        if resultat == "accepterat":
+            sb_post(h, "civilisations_minne", {
+                "typ":         "triumf",
+                "rubrik":      f"{foretag['namn']} vann lobbying för {klient}",
+                "beskrivning": f"{lobbyist} på {foretag['namn']} övertygade {mal} att rösta JA på "
+                               f"\"{titel[:60]}\" med {LOBBYING_BELOPP} kr. Klient: {klient}.",
+                "agenter":     [klient, mal, lobbyist],
+                "relaterat_typ": "lobbying_log",
+            })
+
+        emoji = "✓" if resultat == "accepterat" else "✗"
+        print(f"  {emoji} {foretag['namn']} ({lobbyist}): lobbying för {klient} → {mal} "
+              f"({LOBBYING_BELOPP} kr) — {resultat}")
+
+        utforda += 1
+
+    foretag["kassa"] = running_kassa  # main() skriver till DB
+    if utforda == 0:
+        return 0.0, "Inga uppdrag genomförda"
+    return intakt_total, f"{utforda} lobbyinguppdrag à {int(AVGIFT)} kr"
 
 
 # ── Grundande ────────────────────────────────────────────────────────────────
@@ -486,12 +654,14 @@ def main():
             intakt, beskr = handel_for_foretag(h, foretag, lager, saldon, mult_dict)
         elif sektor == "advokatbyra":
             intakt, beskr = berakna_intakt_advokatbyra(h, foretag, emp_agenter, saldon)
+        elif sektor == "lobbybolag":
+            intakt, beskr = berakna_intakt_lobbybolag(h, foretag, emp_agenter, saldon)
         else:
             intakt, beskr = berakna_intakt_flat(emp_agenter)
 
         if intakt > 0:
-            if sektor == "handel":
-                # kassa redan uppdaterad av handel_for_foretag — skriv bara till DB
+            if sektor in ("handel", "lobbybolag"):
+                # kassa redan uppdaterad internt — skriv bara till DB
                 sb_patch(h, "foretag", f"id=eq.{fid}", {"kassa": foretag["kassa"], "uppdaterad": "now()"})
             else:
                 ny_kassa = round(float(foretag["kassa"]) + intakt, 2)
