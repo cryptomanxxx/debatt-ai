@@ -308,6 +308,24 @@ def berakna_intakt_advokatbyra(h, foretag, anstallda_agenter, saldon):
     return intakt_total, ", ".join(beskr_delar)
 
 
+def _uppdatera_lagforslag_raknare(h, fid, gammal_rod, ny_rod):
+    """Synkar ai_*_roster på lagforslag efter ett röstbyte."""
+    rader = sb_get(h, f"lagforslag?id=eq.{fid}&select=ai_ja_roster,ai_nej_roster,ai_avstar_roster")
+    if not rader:
+        return
+    rad = rader[0]
+    data = {}
+    if gammal_rod in ("ja", "nej", "avstar"):
+        gamla_key = f"ai_{gammal_rod}_roster"
+        data[gamla_key] = max(0, int(rad.get(gamla_key) or 0) - 1)
+    if ny_rod in ("ja", "nej", "avstar"):
+        nya_key = f"ai_{ny_rod}_roster"
+        nuv = data.get(nya_key, int(rad.get(nya_key) or 0))
+        data[nya_key] = nuv + 1
+    if data:
+        sb_patch(h, "lagforslag", f"id=eq.{fid}", data)
+
+
 def berakna_intakt_lobbybolag(h, foretag, anstallda_agenter, saldon):
     """Lobbybolaget lobbyr i klientagenters ställe mot betalning.
 
@@ -433,6 +451,8 @@ def berakna_intakt_lobbybolag(h, foretag, anstallda_agenter, saldon):
                        "motivering": f"[Lobbad via {foretag['namn']} för {klient}] {motivering}"[:300]},
                       "lagforslag_id,agent")
             rod_efter = "ja"
+            # Synka röstkolumnerna på lagforslag (nej→ja, eller ej röstat→ja)
+            _uppdatera_lagforslag_raknare(h, fid, rod_fore, "ja")
             # Betala motparten — dras från company kassa
             ny_mal = round(mal_saldo + LOBBYING_BELOPP, 2)
             sb_patch(h, "agent_planbocker", f"agent=eq.{quote(mal)}",
