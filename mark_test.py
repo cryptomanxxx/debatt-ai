@@ -48,6 +48,16 @@ FORADLINGS_KEDJOR = [
     {"ravara": "malm",     "produkt": "stål",   "krav_zon": "industri", "ratio": 2},
 ]
 
+# Zonevent — slumpmässiga störningar (25% chans per zon och vecka)
+ZON_EVENTS = {
+    "torka":       {"zontyp": "jordbruk", "effekt": 0.5, "dagar_min": 3, "dagar_max": 4, "ikon": "☀️", "beskrivning": "Torka slår mot skörden — produktion halverad."},
+    "gruvras":     {"zontyp": "gruva",    "effekt": 0.0, "dagar_min": 2, "dagar_max": 4, "ikon": "💥", "beskrivning": "Gruvras — utvinning pausad tills det är säkert."},
+    "cyberattack": {"zontyp": "industri", "effekt": 0.0, "dagar_min": 1, "dagar_max": 3, "ikon": "🔒", "beskrivning": "Cyberattack — industrin offline tills systemen är återställda."},
+}
+ZONTYP_TILL_EVENT = {v["zontyp"]: k for k, v in ZON_EVENTS.items()}
+# 25% per vecka → daglig sannolikhet ≈ 3.9%
+DAGLIG_EVENT_CHANS = 1 - (1 - 0.25) ** (1 / 7)
+
 PRODUKTION_PER_KOR = 2
 SURPLUS_TROSKEL    = 6
 KOP_ANTAL          = 3
@@ -420,22 +430,38 @@ def lista_zon_for_forsaljning(agare_dict, saldon, agent_zon_antal, zoner_dict):
 
 
 def producera_varor():
-    """Varje ägd zon producerar sin vara (PRODUKTION_PER_KOR enheter)."""
+    """Varje ägd zon producerar sin vara. Aktiva zonevent sänker/pausar produktionen."""
     print("\n── Varuproduktion ──")
     try:
-        agare_rows = sb_get("mark_agare?select=agent,mark_zoner(typ)")
+        agare_rows = sb_get("mark_agare?select=agent,zon_id,mark_zoner(typ,namn)")
         if not agare_rows:
             print("  Inga markägare — ingen produktion.")
             return {}
 
-        produktion: dict = {}
+        # Hämta aktiva zonevent och bygg effekt-map: zon_id → produktion_effekt
+        aktiva_events = sb_get("zon_events?select=zon_id,produktion_effekt,event_typ&aktiv=eq.true") or []
+        event_effekt  = {e["zon_id"]: e["produktion_effekt"] for e in aktiva_events}
+        if aktiva_events:
+            print(f"  ⚠ {len(aktiva_events)} aktiva zonevent påverkar produktionen")
+
+        produktion = {}
+        pausade = 0
         for row in agare_rows:
-            agent = row["agent"]
-            typ = (row.get("mark_zoner") or {}).get("typ", "")
-            vara = VARA_PER_TYP.get(typ)
-            if vara:
-                produktion.setdefault(agent, {})
-                produktion[agent][vara] = produktion[agent].get(vara, 0) + PRODUKTION_PER_KOR
+            agent  = row["agent"]
+            zon_id = row.get("zon_id")
+            typ    = (row.get("mark_zoner") or {}).get("typ", "")
+            vara   = VARA_PER_TYP.get(typ)
+            if not vara:
+                continue
+            effekt = event_effekt.get(zon_id, 1.0)
+            prod   = max(0, int(PRODUKTION_PER_KOR * effekt))
+            if effekt < 1.0:
+                namn = (row.get("mark_zoner") or {}).get("namn", zon_id)
+                status = "pausad" if effekt == 0 else f"{int(effekt*100)}% kapacitet"
+                print(f"    ↓ {namn} ({agent}): {status}")
+                pausade += 1
+            produktion.setdefault(agent, {})
+            produktion[agent][vara] = produktion[agent].get(vara, 0) + prod
 
         lager_rows = sb_get("mark_lager?select=agent,vara,antal")
         lager: dict = {}
@@ -679,6 +705,98 @@ def bud_pa_vara_auktioner(vara_auktioner: list, saldon: dict, lager: dict):
     return totalt
 
 
+def trigga_zon_events():
+    """Avslutar utgångna zonevent och triggar nya med 25%/vecka sannolikhet."""
+    print("\n── Zonevent ──")
+    nu = datetime.now(timezone.utc)
+
+    # 1. Avsluta utgångna events
+    aktiva = sb_get("zon_events?select=*&aktiv=eq.true") or []
+    utgangna = [
+        e for e in aktiva
+        if e.get("slutar") and datetime.fromisoformat(e["slutar"].replace("Z", "+00:00")) <= nu
+    ]
+    for e in utgangna:
+        sb_patch(f"zon_events?id=eq.{e['id']}", {"aktiv": False})
+        print(f"  ✓ {e['zon_namn']}: {e['event_typ']} avslutat")
+
+    aktiva_zon_ids = {e["zon_id"] for e in aktiva if e not in utgangna}
+
+    # 2. Kolla aktiv kris för att justtera sannolikhet
+    aktiv_kris_typ = None
+    try:
+        kris = sb_get("kris_events?select=typ&aktiv=eq.true&limit=1")
+        if kris:
+            aktiv_kris_typ = kris[0].get("typ", "")
+    except Exception:
+        pass
+
+    # 3. Hämta ägda zoner av relevant typ
+    agare_rows = sb_get("mark_agare?select=zon_id,agent,mark_zoner(namn,typ)") or []
+
+    nya = 0
+    for row in agare_rows:
+        zon    = row.get("mark_zoner") or {}
+        zontyp = zon.get("typ", "")
+        if zontyp not in ZONTYP_TILL_EVENT:
+            continue
+        zon_id = row.get("zon_id")
+        if zon_id in aktiva_zon_ids:
+            continue  # zonen redan drabbad
+
+        event_typ = ZONTYP_TILL_EVENT[zontyp]
+        chans = DAGLIG_EVENT_CHANS
+
+        # Aktiv kris ökar sannolikheten
+        if aktiv_kris_typ:
+            if "klimat" in aktiv_kris_typ and event_typ == "torka":
+                chans = min(chans * 2, 0.25)
+            elif "AI" in aktiv_kris_typ and event_typ == "cyberattack":
+                chans = min(chans * 2, 0.25)
+            elif "recession" in aktiv_kris_typ or "ekonomi" in aktiv_kris_typ:
+                chans = min(chans * 1.5, 0.20)
+
+        if random.random() > chans:
+            continue
+
+        ev     = ZON_EVENTS[event_typ]
+        dagar  = random.randint(ev["dagar_min"], ev["dagar_max"])
+        slutar = (nu + timedelta(days=dagar)).isoformat()
+        agent  = row["agent"]
+        namn   = zon.get("namn", "")
+
+        sb_post("zon_events", {
+            "zon_id":            zon_id,
+            "zon_namn":          namn,
+            "agare":             agent,
+            "event_typ":         event_typ,
+            "zontyp":            zontyp,
+            "produktion_effekt": ev["effekt"],
+            "aktiv":             True,
+            "slutar":            slutar,
+            "beskrivning":       ev["beskrivning"],
+        })
+
+        # Logga till civilisations_minne
+        try:
+            from supabase_utils import spara_civilisations_minne
+            spara_civilisations_minne(
+                sb_key=SB_KEY,
+                typ="skandal",
+                rubrik=f"{ev['ikon']} {event_typ.capitalize()} drabbar {namn}",
+                beskrivning=f"{ev['beskrivning']} Ägare: {agent}. Varaktighet: {dagar} dagar.",
+                agenter=[agent],
+            )
+        except Exception as ex:
+            print(f"  [VARNING] civilisations_minne: {ex}")
+
+        print(f"  {ev['ikon']} NYTT: {event_typ} i {namn} (ägare: {agent}, {dagar}d)")
+        aktiva_zon_ids.add(zon_id)
+        nya += 1
+
+    print(f"  {nya} nya event, {len(utgangna)} avslutade.")
+
+
 def foradla_varor(lager: dict) -> int:
     """Förädla råvaror till produkter för agenter med rätt zontyp."""
     agare_rows = sb_get("mark_agare?select=zon_id,agent")
@@ -782,10 +900,13 @@ def main():
     # ── 4. Andrahandsförsäljningar (rika agenter listar zoner) ───────────────
     lista_zon_for_forsaljning(agare_dict, saldon, agent_zon_antal, zoner_dict)
 
-    # ── 5. Varuproduktion ────────────────────────────────────────────────────
+    # ── 5. Slumpmässiga zonevent ─────────────────────────────────────────────
+    trigga_zon_events()
+
+    # ── 6. Varuproduktion (påverkas av aktiva zonevent) ──────────────────────
     lager = producera_varor()
 
-    # ── 6. Förädlingskedjor (spannmål→mjöl, malm→stål) ──────────────────────
+    # ── 7. Förädlingskedjor (spannmål→mjöl, malm→stål) ──────────────────────
     foradla_varor(lager)
 
     # Hämta aktuella saldon
