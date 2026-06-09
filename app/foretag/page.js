@@ -9,17 +9,21 @@ const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const SEKTOR_FARG = {
-  media:       "#60a5fa",
-  handel:      "#4ade80",
-  konsult:     "#f59e0b",
-  investering: "#a855f7",
+  media:        "#60a5fa",
+  handel:       "#4ade80",
+  konsult:      "#f59e0b",
+  investering:  "#a855f7",
+  advokatbyra:  "#e879f9",
+  lobbybolag:   "#fb923c",
 };
 
 const SEKTOR_IKON = {
-  media:       "📰",
-  handel:      "🏪",
-  konsult:     "💼",
-  investering: "📈",
+  media:        "📰",
+  handel:       "🏪",
+  konsult:      "💼",
+  investering:  "📈",
+  advokatbyra:  "⚖️",
+  lobbybolag:   "🤝",
 };
 
 async function getData() {
