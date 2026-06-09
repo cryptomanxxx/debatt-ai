@@ -17,16 +17,20 @@ jobs:
     steps:
       - name: Kontrollera om review ska hanteras
         id: guard
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           REVIEWER="${{ github.event.review.user.login }}"
           STATE="${{ github.event.review.state }}"
-          MERGED="${{ github.event.pull_request.merged }}"
-          echo "Reviewer: $REVIEWER, State: $STATE, Merged: $MERGED"
+          PR_NUM="${{ github.event.pull_request.number }}"
 
-          # Skippa om PR redan är mergad
-          if [[ "$MERGED" == "true" ]]; then
+          # Kontrollera om PR är mergad via gh (mer tillförlitligt än event-payload)
+          PR_STATE=$(gh pr view "$PR_NUM" --json state -q '.state' 2>/dev/null || echo "UNKNOWN")
+          echo "PR #$PR_NUM state: $PR_STATE, Reviewer: $REVIEWER, State: $STATE"
+
+          if [[ "$PR_STATE" == "MERGED" || "$PR_STATE" == "CLOSED" ]]; then
             echo "SKIP=true" >> "$GITHUB_ENV"
-            echo "Skippar — PR är redan mergad"
+            echo "Skippar — PR är redan $PR_STATE"
             exit 0
           fi
 
