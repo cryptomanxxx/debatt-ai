@@ -78,7 +78,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   }
 
   // Lager per agent per vara (for foradling context)
-  const lagerPerAgent: Record<string, Record<string, number>> = {};
+  const lagerPerAgent = {};
   for (const row of lager) {
     if (!lagerPerAgent[row.agent]) lagerPerAgent[row.agent] = {};
     lagerPerAgent[row.agent][row.vara] = row.antal;
