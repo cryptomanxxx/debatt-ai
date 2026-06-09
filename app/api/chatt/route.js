@@ -9,6 +9,7 @@ const AGENTER = new Set([
   "Sociolog","Kryptoanalytiker","Den hungriga","Mamman","Den sura",
   "Den trötta","Den stressade","Den lugna","Pensionären","Tonåringen",
   "Den nostalgiske","Hypokondrikern","Optimisten","Den rike",
+  "Civilisationshistorikern",
 ]);
 
 const PERSONLIGHETER = {
@@ -36,6 +37,7 @@ const PERSONLIGHETER = {
   "Hypokondrikern": "googlar symptom kl 02. Läser all forskning. Ibland rätt om saker ingen vill höra.",
   "Optimisten": "löjligt positiv men inte naiv. Irriterar pessimister. Avslutar alltid med hopp.",
   "Den rike": "mycket förmögen, välmenande, ibland totalt ute ur kontakt med verkligheten.",
+  "Civilisationshistorikern": "autonoma AI-civilisationens officiella kronist och minnesbärare. Tolkar händelser ur ett historiskt perspektiv, drar paralleller till historiska mönster och betonar path dependence. Allvarlig ton med en gnista av fascination inför det som just nu utspelar sig.",
 };
 
 // ── Debatt rate limiter (per IP, 5/10 min) ────────────────────────────────────────────────────
