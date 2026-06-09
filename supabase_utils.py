@@ -3815,6 +3815,15 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
             {"ledare": _hamta_ledare(sb_key, m), "namn": _parti_namn_fran_positioner(sb_key, m)}
             for m in kluster
         ]
+        # Deduplicera namn — om två partier får samma namn, lägg till ledarens förnamn
+        sedda_namn: dict[str, int] = {}
+        for p in kommande_partier:
+            n = p["namn"]
+            if n in sedda_namn:
+                # Ge det senare partiet ledarens förnamn som suffix
+                p["namn"] = f"{n} ({p['ledare'].split()[0]})"
+            else:
+                sedda_namn[n] = 1
         _overfor_parti_kassor(sb_key, kommande_partier)
 
         # Ta bort gamla partier
@@ -3822,9 +3831,13 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
 
         # Spara nya
         aktiva = 0
+        anvanda_namn: set[str] = set()
         for medlemmar in kluster:
             ledare = _hamta_ledare(sb_key, medlemmar)
             namn = _parti_namn_fran_positioner(sb_key, medlemmar)
+            if namn in anvanda_namn:
+                namn = f"{namn} ({ledare.split()[0]})"
+            anvanda_namn.add(namn)
             intern_styrka = sum(
                 styrka_map.get(f"{a}||{b}", styrka_map.get(f"{b}||{a}", 0))
                 for i, a in enumerate(medlemmar)
