@@ -102,7 +102,19 @@ def spara_och_kalibrera(results: list[dict]) -> None:
         return succé * 100 - r["snitt_latens_s"] * 2 - p429 * 3
 
     ranked = sorted(results, key=score, reverse=True)
-    ranked_order = [r["provider"] for r in ranked]
+    ranked_benchmarked = [r["provider"] for r in ranked]
+
+    # Hämta befintlig ordning och lägg till providers som inte ingick i körningen
+    existing_order = []
+    try:
+        res = _sb_get("provider_config?id=eq.current&select=ranked_order")
+        if res:
+            existing_order = res[0].get("ranked_order") or []
+    except Exception:
+        pass
+    _DEFAULT = ["mistral", "sambanova", "deepseek", "groq", "cloudflare", "gemini", "github_models", "cerebras"]
+    fallback = existing_order or _DEFAULT
+    ranked_order = ranked_benchmarked + [p for p in fallback if p not in ranked_benchmarked]
 
     ok2 = _sb_upsert("provider_config", {
         "id": "current",
