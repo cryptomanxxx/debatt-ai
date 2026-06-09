@@ -177,8 +177,8 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                 {handelLog.map((t, i) => {
                   const ikon = VARA_IKON[t.vara] || "📦";
                   const datum = new Date(t.skapad);
-                  const tid = datum.toLocaleDateString("sv-SE", { month: "short", day: "numeric" }) + " " +
-                    datum.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+                  const tid = datum.toLocaleDateString("sv-SE", { month: "short", day: "numeric", timeZone: "Europe/Stockholm" }) + " " +
+                    datum.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" });
                   const baspris = BASPRIS[t.vara] || 1;
                   const mult = t.pris_per_enhet / baspris;
                   const prisColor = mult > 1.05 ? "#4ade80" : mult < 0.95 ? "#f87171" : "#f0ede6";

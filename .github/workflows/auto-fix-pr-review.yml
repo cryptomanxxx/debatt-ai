@@ -1,8 +1,11 @@
 name: Auto-fix PR-reviewkommentarer
 
 on:
-  pull_request_review:
-    types: [submitted]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR-nummer att fixa"
+        required: true
 
 permissions:
   contents: write
