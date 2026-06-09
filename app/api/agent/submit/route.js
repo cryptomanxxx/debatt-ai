@@ -1,5 +1,5 @@
 import { logFel } from "../../../lib/logFel";
-import { providerReady, markProviderDown } from "../../../lib/aiCircuitBreaker";
+import { getDynamicChain, callWithFallback } from "../../../lib/aiRouter";
 import { AGENT_VISUELL } from "../../../agentData";
 
 // Tillåtna författarnamn: de 24 agenterna + autonoma programmatiska signaturer.
@@ -9,11 +9,6 @@ const VALID_AGENTS = new Set([...Object.keys(AGENT_VISUELL), "Civilisationshisto
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const GROQ_KEY        = process.env.GROQ_API_KEY;
-const MISTRAL_KEY     = process.env.MISTRAL_API_KEY;
-const CEREBRAS_KEY    = process.env.CEREBRAS_API_KEY;
-const GEMINI_KEY      = process.env.GEMINI_API_KEY;
-const GITHUB_TOKEN    = process.env.GITHUB_TOKEN;
 const AI_TIMEOUT_MS   = 15_000; // hindrar att en hängande provider blockerar publiceringsflödet
 const RATE_LIMIT = 10; // max inlämningar per agent per 24h
 const MIN_WORDS = 150;
@@ -182,96 +177,25 @@ export async function POST(req) {
     );
   }
 
-  // Evaluate with Groq
+  // Evaluate with dynamic fallback chain
   let groqResult;
+  let evalProvider = "unknown";
   try {
-    if (!providerReady("groq")) throw new Error("Groq är nere (circuit breaker)");
-    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${GROQ_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          {
-            role: "user",
-            content: `${SYSTEM_PROMPT}\n\nRubrik: ${rubrik.trim()}\nFörfattare: ${agentName}\n\n${artikel.trim()}`,
-          },
-        ],
-        max_tokens: 600,
-        temperature: 0.3,
-      }),
-      signal: AbortSignal.timeout(AI_TIMEOUT_MS),
+    const evalChain = await getDynamicChain("agent_submit");
+    const evalMessages = [{ role: "user", content: `${SYSTEM_PROMPT}\n\nRubrik: ${rubrik.trim()}\nFörfattare: ${agentName}\n\n${artikel.trim()}` }];
+    const evalResult = await callWithFallback(evalChain, evalMessages, {
+      maxTokens: 600,
+      temperature: 0.3,
+      source: "agent-submit",
+      validate: (text) => /\{[\s\S]*\}/.test(text),
     });
-    if (!groqRes.ok) {
-      if (groqRes.status === 429) markProviderDown("groq");
-      const errText = await groqRes.text();
-      throw new Error(`Groq svarade ${groqRes.status}: ${errText}`);
-    }
-    const groqData = await groqRes.json();
-    const raw = groqData.choices?.[0]?.message?.content || "";
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    const jsonMatch = evalResult.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("Kunde inte tolka AI-svar som JSON");
     groqResult = JSON.parse(jsonMatch[0]);
-  } catch (groqErr) {
-    const evalPrompt = `${SYSTEM_PROMPT}\n\nRubrik: ${rubrik.trim()}\nFörfattare: ${agentName}\n\n${artikel.trim()}`;
-    let evalResult = null;
-
-    for (const [name, url, model, key] of [
-      ["codestral",     "https://api.mistral.ai/v1/chat/completions",             "codestral-latest", MISTRAL_KEY],
-      ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",            "llama3.1-8b",      CEREBRAS_KEY],
-      ["github_models", "https://models.inference.ai.azure.com/chat/completions", "Llama-3.3-70B-Instruct", GITHUB_TOKEN],
-    ]) {
-      if (!key || evalResult) continue;
-      try {
-        const r = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify({ model, messages: [{ role: "user", content: evalPrompt }], max_tokens: 600, temperature: 0.3 }),
-          signal: AbortSignal.timeout(AI_TIMEOUT_MS),
-        });
-        if (r.ok) {
-          const data = await r.json();
-          const raw = data.choices?.[0]?.message?.content || "";
-          const m = raw.match(/\{[\s\S]*\}/);
-          if (m) evalResult = JSON.parse(m[0]);
-        }
-      } catch {}
-    }
-
-    // Gemini-fallback (annan API-form än OpenAI-kompatibla providers ovan)
-    if (!evalResult && GEMINI_KEY && providerReady("gemini")) {
-      try {
-        const r = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: evalPrompt }] }],
-              generationConfig: { maxOutputTokens: 600, temperature: 0.3 },
-            }),
-            signal: AbortSignal.timeout(AI_TIMEOUT_MS),
-          }
-        );
-        if (r.ok) {
-          const data = await r.json();
-          const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          const m = raw.match(/\{[\s\S]*\}/);
-          if (m) evalResult = JSON.parse(m[0]);
-        } else if (r.status === 429) {
-          markProviderDown("gemini");
-        }
-      } catch {}
-    }
-
-    if (!evalResult) {
-      logFel({ kalla: "agent/submit", feltyp: "ai_fail", meddelande: groqErr.message, extra: { agent: agentName } });
-      return Response.json({ fel: "AI-utvärdering misslyckades", detalj: groqErr.message }, { status: 502 });
-    }
-    groqResult = evalResult;
+    evalProvider = evalResult.provider;
+  } catch (evalErr) {
+    logFel({ kalla: "agent/submit", feltyp: "ai_fail", meddelande: evalErr.message, extra: { agent: agentName } });
+    return Response.json({ fel: "AI-utvärdering misslyckades", detalj: evalErr.message }, { status: 502 });
   }
 
   const { beslut, motivering, arg, ori, rel, tro, forbattringar, styrkor, taggar } = groqResult;
@@ -376,5 +300,5 @@ export async function POST(req) {
     poang: { arg, ori, rel, tro },
     forbattringar: forbattringar ?? [],
     styrkor: styrkor ?? [],
-  });
+  }, { headers: { "X-Provider": evalProvider } });
 }
