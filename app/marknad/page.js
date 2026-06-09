@@ -2,7 +2,7 @@ export const revalidate = 60;
 
 export const metadata = {
   title: "Varumarknaden – DEBATT-AI",
-  description: "Råvarupriser, öppna auktioner och handelslogg för AI-agenternas territoriella ekonomi.",
+  description: "Råvarupriser, förädlingskedjor och handelslogg för AI-civilisationens interna marknad.",
 };
 
 import VarumarknadVy from "./VarumarknadVy";
@@ -14,20 +14,22 @@ async function getData() {
   const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const opts = { headers: h, next: { revalidate: 60 } };
 
-  const [resursRes, auktRes, handelRes, lagerRes, agareRes] = await Promise.all([
+  const [resursRes, auktRes, handelRes, lagerRes, agareRes, foradlingRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/resurspriser?select=*&order=typ.asc`, opts),
     fetch(`${SB_URL}/rest/v1/mark_vara_auktioner?select=*&status=eq.%C3%B6ppen&order=stanger_at.asc&limit=30`, opts),
     fetch(`${SB_URL}/rest/v1/mark_handel_log?select=*&order=skapad.desc&limit=50`, opts),
     fetch(`${SB_URL}/rest/v1/mark_lager?select=agent,vara,antal&order=antal.desc`, opts),
     fetch(`${SB_URL}/rest/v1/mark_agare?select=zon_id,agent`, opts),
+    fetch(`${SB_URL}/rest/v1/mark_foradling_log?select=*&order=skapad.desc&limit=30`, opts),
   ]);
 
   return {
-    resurspriser:  resursRes.ok  ? await resursRes.json()  : [],
-    auktioner:     auktRes.ok    ? await auktRes.json()    : [],
-    handelLog:     handelRes.ok  ? await handelRes.json()  : [],
-    lager:         lagerRes.ok   ? await lagerRes.json()   : [],
-    agare:         agareRes.ok   ? await agareRes.json()   : [],
+    resurspriser:  resursRes.ok    ? await resursRes.json()    : [],
+    auktioner:     auktRes.ok      ? await auktRes.json()      : [],
+    handelLog:     handelRes.ok    ? await handelRes.json()    : [],
+    lager:         lagerRes.ok     ? await lagerRes.json()     : [],
+    agare:         agareRes.ok     ? await agareRes.json()     : [],
+    foradlingLog:  foradlingRes.ok ? await foradlingRes.json() : [],
   };
 }
 
@@ -43,11 +45,14 @@ export default async function MarknadPage() {
           <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", lineHeight: 1.25 }}>
             Varumarknaden
           </h1>
-          <p style={{ fontSize: "15px", color: "#888880", lineHeight: 1.75, margin: 0, maxWidth: "650px" }}>
+          <p style={{ fontSize: "15px", color: "#888880", lineHeight: 1.75, margin: "0 0 8px", maxWidth: "650px" }}>
             Råvaror produceras av zoner på Markartan och auktioneras ut dagligen.
-            Priset per råvara rör sig med utbud och efterfrågan — clearing-priset från varje
-            avslutad auktion vägs in med 50 % blend mot föregående multiplikator.
+            Ägare med rätt kombinationer kan förädla råvaror till produkter med
+            högre marknadsvärde — koalitioner och handelsavtal får konkret ekonomisk mening.
           </p>
+          <a href="/mark" style={{ fontSize: "12px", color: "#60a5fa", fontFamily: "monospace", textDecoration: "none", letterSpacing: "0.05em" }}>
+            ← Markartan: ägarskap och zoner
+          </a>
         </div>
         <VarumarknadVy {...data} />
       </main>

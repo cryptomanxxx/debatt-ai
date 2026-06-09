@@ -40,7 +40,13 @@ VARA_PER_TYP = {
 BASPRIS = {
     "el": 15, "spannmål": 10, "maskiner": 25,
     "malm": 20, "tjänster": 18, "fisk": 12, "virke": 14,
+    "mjöl": 15, "stål": 36,
 }
+
+FORADLINGS_KEDJOR = [
+    {"ravara": "spannmål", "produkt": "mjöl",  "krav_zon": "stad",     "ratio": 2},
+    {"ravara": "malm",     "produkt": "stål",   "krav_zon": "industri", "ratio": 2},
+]
 
 PRODUKTION_PER_KOR = 2
 SURPLUS_TROSKEL    = 6
@@ -673,6 +679,56 @@ def bud_pa_vara_auktioner(vara_auktioner: list, saldon: dict, lager: dict):
     return totalt
 
 
+def foradla_varor(lager: dict) -> int:
+    """Förädla råvaror till produkter för agenter med rätt zontyp."""
+    agare_rows = sb_get("mark_agare?select=zon_id,agent")
+    zon_rows   = sb_get("mark_zoner?select=id,typ")
+    if not agare_rows or not zon_rows:
+        return 0
+
+    zon_typ = {z["id"]: z["typ"] for z in zon_rows}
+    agent_zontyper: dict[str, set] = {}
+    for r in agare_rows:
+        a = r["agent"]; t = zon_typ.get(r["zon_id"])
+        if t:
+            agent_zontyper.setdefault(a, set()).add(t)
+
+    totalt = 0
+    for agent, zontyper in agent_zontyper.items():
+        for kedja in FORADLINGS_KEDJOR:
+            if kedja["krav_zon"] not in zontyper:
+                continue
+            ravara = kedja["ravara"]; produkt = kedja["produkt"]; ratio = kedja["ratio"]
+            lager_ravara = lager.get(agent, {}).get(ravara, 0)
+            if lager_ravara < ratio:
+                continue
+            if random.random() > 0.55:
+                continue
+            batchar = min(3, lager_ravara // ratio)
+            if batchar == 0:
+                continue
+            anvant = batchar * ratio; producerat = batchar
+
+            # Uppdatera lager
+            lager.setdefault(agent, {})[ravara] = lager_ravara - anvant
+            lager[agent][produkt] = lager[agent].get(produkt, 0) + producerat
+
+            sb_upsert("mark_lager", {"agent": agent, "vara": ravara, "antal": max(0, lager_ravara - anvant)},
+                      on_conflict="agent,vara")
+            sb_upsert("mark_lager", {"agent": agent, "vara": produkt, "antal": lager[agent][produkt]},
+                      on_conflict="agent,vara")
+            sb_post("mark_foradling_log", {
+                "agent": agent, "ravara": ravara, "ravara_antal": anvant,
+                "produkt": produkt, "produkt_antal": producerat,
+                "foradlings_zon": kedja["krav_zon"],
+            })
+            print(f"  ⚙️  {agent}: {anvant}× {ravara} → {producerat}× {produkt} ({kedja['krav_zon']})")
+            totalt += 1
+
+    print(f"  {totalt} förädlingar genomförda.")
+    return totalt
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -728,6 +784,9 @@ def main():
 
     # ── 5. Varuproduktion ────────────────────────────────────────────────────
     lager = producera_varor()
+
+    # ── 6. Förädlingskedjor (spannmål→mjöl, malm→stål) ──────────────────────
+    foradla_varor(lager)
 
     # Hämta aktuella saldon
     planbocker_ny = sb_get("agent_planbocker?select=agent,saldo&agent=neq.Statskassa")
