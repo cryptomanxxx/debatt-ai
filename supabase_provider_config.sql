@@ -44,6 +44,10 @@ create policy "publik läsning provider_config"
 
 create policy "anon insert provider_429_passive"
   on provider_429_passive for insert with check (true);
+create policy "anon insert provider_benchmark_log"
+  on provider_benchmark_log for insert with check (true);
+create policy "anon upsert provider_config"
+  on provider_config for insert, update with check (true);
 
 create policy "publik läsning provider_429_passive"
   on provider_429_passive for select using (true);
