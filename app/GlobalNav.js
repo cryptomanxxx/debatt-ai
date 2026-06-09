@@ -17,6 +17,7 @@ const LINKS = [
   { href: "/handel",            label: "Handelsimperium 🚢" },
   { href: "/mark",             label: "Markartan" },
   { href: "/marknad",          label: "Varumarknaden" },
+  { href: "/foretag",          label: "Företag 🏢" },
   { href: "/fraktioner",      label: "Fraktioner" },
   { href: "/oligarki",        label: "Oligarkirisk" },
   { href: "/teori",           label: "Ekonomisk teori" },
