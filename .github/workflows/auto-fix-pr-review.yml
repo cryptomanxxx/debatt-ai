@@ -25,7 +25,7 @@ jobs:
           PR_NUM="${{ github.event.pull_request.number }}"
 
           # Kontrollera om PR är mergad via gh (mer tillförlitligt än event-payload)
-          PR_STATE=$(gh pr view "$PR_NUM" --json state -q '.state' 2>/dev/null || echo "UNKNOWN")
+          PR_STATE=$(gh pr view "$PR_NUM" --repo "${{ github.repository }}" --json state -q '.state' 2>/dev/null || echo "UNKNOWN")
           echo "PR #$PR_NUM state: $PR_STATE, Reviewer: $REVIEWER, State: $STATE"
 
           if [[ "$PR_STATE" == "MERGED" || "$PR_STATE" == "CLOSED" ]]; then
