@@ -54,6 +54,7 @@ export default function RootLayout({ children }) {
               <a href="/teori" className="neon-nav">Ekonomisk teori</a>
               <a href="/en" className="neon-nav">English</a>
               <a href="/labb" className="neon-nav">Experimentlabb</a>
+              <a href="/foretag" className="neon-nav">Företag</a>
               <a href="/trust" className="neon-nav">Förtroendegraf</a>
               <a href="/konstitution" className="neon-nav">Grundlagen</a>
               <a href="/hedgefonder" className="neon-nav">Hedgefonder</a>

@@ -5854,3 +5854,59 @@ def berakna_och_spara_resurspriser(sb_key: str) -> None:
         print(f"  Resurspriser (auktion+formel) uppdaterade för {len(totalt)} zontyper.")
     except Exception as e:
         print(f"  [VARNING] Resurspriser misslyckades: {e}")
+
+
+def hamta_agent_foretag(sb_key: str, agent_namn: str) -> dict | None:
+    """Hämtar agentens företagsroll: antingen som grundare eller anställd."""
+    try:
+        h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+        # Kolla om agenten är grundare
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/foretag?grundare=eq.{urllib.parse.quote(agent_namn)}&aktiv=eq.true&select=id,namn,sektor,kassa,editorial_line",
+            headers=h, timeout=6,
+        ).json()
+        if isinstance(res, list) and res:
+            f = res[0]
+            # Hämta anställda
+            anst = httpx.get(
+                f"{SB_URL}/rest/v1/foretag_anstallda?foretag_id=eq.{f['id']}&aktiv=eq.true&select=agent,roll",
+                headers=h, timeout=6,
+            ).json()
+            return {"roll": "grundare", "foretag": f, "anstallda": anst if isinstance(anst, list) else []}
+        # Kolla om agenten är anställd
+        res2 = httpx.get(
+            f"{SB_URL}/rest/v1/foretag_anstallda?agent=eq.{urllib.parse.quote(agent_namn)}&aktiv=eq.true&select=roll,foretag_id",
+            headers=h, timeout=6,
+        ).json()
+        if isinstance(res2, list) and res2:
+            ftg_id = res2[0]["foretag_id"]
+            roll = res2[0]["roll"]
+            ftg = httpx.get(
+                f"{SB_URL}/rest/v1/foretag?id=eq.{ftg_id}&aktiv=eq.true&select=id,namn,sektor,kassa,editorial_line",
+                headers=h, timeout=6,
+            ).json()
+            if isinstance(ftg, list) and ftg:
+                return {"roll": roll, "foretag": ftg[0], "anstallda": []}
+    except Exception:
+        pass
+    return None
+
+
+def formatera_foretag_for_prompt(info: dict | None) -> str:
+    """Formaterar agentens företagsroll till ett kort systemprompt-stycke."""
+    if not info:
+        return ""
+    f = info["foretag"]
+    roll = info["roll"]
+    namn = f.get("namn", "?")
+    sektor = f.get("sektor", "?")
+    kassa = f.get("kassa", 0)
+    parts = [f"Du är {roll} på {namn} ({sektor})."]
+    if f.get("editorial_line"):
+        parts.append(f'Företagets profil: "{f["editorial_line"]}".')
+    parts.append(f"Företagets kassa: {round(kassa)} kr.")
+    if info.get("anstallda"):
+        anst_namn = [a["agent"] for a in info["anstallda"][:4]]
+        parts.append(f"Anställda: {', '.join(anst_namn)}.")
+    parts.append("Ditt företagsperspektiv formar subtilt din argumentation.")
+    return "FÖRETAGSROLL: " + " ".join(parts)

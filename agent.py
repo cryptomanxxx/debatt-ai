@@ -70,6 +70,7 @@ from supabase_utils import (
     generera_ki, spara_ki, hamta_relevanta_ki, formatera_ki_for_prompt,
     hamta_agent_strategi, formatera_strategi_for_prompt, uppdatera_strategi,
     hamta_agent_mark, formatera_mark_for_prompt,
+    hamta_agent_foretag, formatera_foretag_for_prompt,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -340,8 +341,12 @@ def main():
         mark_kontext = formatera_mark_for_prompt(mark_zoner)
         if mark_kontext:
             print(f"  🗺️  Markinnehav injicerat: {len(mark_zoner)} zoner")
+        foretag_info = hamta_agent_foretag(sb_key, agent["namn"]) if sb_key else None
+        foretag_kontext = formatera_foretag_for_prompt(foretag_info)
+        if foretag_kontext:
+            print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
         print("Skriver replik (Groq med Gemini-fallback)...")
-        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, stafett_utmaning=stafett_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext)
+        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, stafett_utmaning=stafett_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext)
         if not artikel:
             print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
             sys.exit(1)
@@ -531,8 +536,12 @@ def main():
             mark_kontext = formatera_mark_for_prompt(mark_zoner)
             if mark_kontext:
                 print(f"  🗺️  Markinnehav injicerat: {len(mark_zoner)} zoner")
+            foretag_info = hamta_agent_foretag(sb_key, agent["namn"]) if sb_key else None
+            foretag_kontext = formatera_foretag_for_prompt(foretag_info)
+            if foretag_kontext:
+                print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext)
             if not artikel:
                 print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
                 sys.exit(1)
@@ -578,8 +587,12 @@ def main():
             mark_kontext = formatera_mark_for_prompt(mark_zoner)
             if mark_kontext:
                 print(f"  🗺️  Markinnehav injicerat: {len(mark_zoner)} zoner")
+            foretag_info = hamta_agent_foretag(sb_key, agent["namn"]) if sb_key else None
+            foretag_kontext = formatera_foretag_for_prompt(foretag_info)
+            if foretag_kontext:
+                print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext)
+            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext)
             if not artikel:
                 print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
                 sys.exit(1)
@@ -618,8 +631,12 @@ def main():
             mark_kontext = formatera_mark_for_prompt(mark_zoner)
             if mark_kontext:
                 print(f"  🗺️  Markinnehav injicerat: {len(mark_zoner)} zoner")
+            foretag_info = hamta_agent_foretag(sb_key, agent["namn"]) if sb_key else None
+            foretag_kontext = formatera_foretag_for_prompt(foretag_info)
+            if foretag_kontext:
+                print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext)
             if not artikel:
                 print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
                 sys.exit(1)
