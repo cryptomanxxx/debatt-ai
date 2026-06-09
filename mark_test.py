@@ -751,7 +751,7 @@ def trigga_zon_events():
         if aktiv_kris_typ:
             if "klimat" in aktiv_kris_typ and event_typ == "torka":
                 chans = min(chans * 2, 0.25)
-            elif "AI" in aktiv_kris_typ and event_typ == "cyberattack":
+            elif "ai" in aktiv_kris_typ.lower() and event_typ == "cyberattack":
                 chans = min(chans * 2, 0.25)
             elif "recession" in aktiv_kris_typ or "ekonomi" in aktiv_kris_typ:
                 chans = min(chans * 1.5, 0.20)
