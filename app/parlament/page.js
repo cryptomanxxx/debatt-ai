@@ -13,10 +13,10 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=lagforslag_id,agent,rod,motivering&order=skapad.desc&limit=5000`, {
       headers: hdrs, next: { revalidate: 60 },
     }),
-    fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,motivering,skapad,lagforslag_id,lagforslag(titel)&order=skapad.desc&limit=12`, {
+    fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,motivering,skapad,lagforslag_id,lagforslag(titel)&order=skapad.desc&limit=30`, {
       headers: hdrs, next: { revalidate: 60 },
     }),
-    fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,kalla,skapad&order=skapad.desc&limit=6`, {
+    fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,kalla,skapad&order=skapad.desc&limit=30`, {
       headers: hdrs, next: { revalidate: 60 },
     }),
   ]);
