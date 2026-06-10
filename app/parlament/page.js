@@ -30,7 +30,11 @@ async function getData() {
   const alla = [
     ...rostvhändelser.map(r => ({ _typ: "röst", ...r })),
     ...forslagHändelser,
-  ].sort((a, b) => new Date(b.skapad) - new Date(a.skapad)).slice(0, 15);
+  ].sort((a, b) => {
+    const ta = a.skapad ? new Date(a.skapad).getTime() : 0;
+    const tb = b.skapad ? new Date(b.skapad).getTime() : 0;
+    return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
+  }).slice(0, 15);
 
   return {
     forslag:   fRes.ok ? await fRes.json() : [],
@@ -137,7 +141,7 @@ export default async function ParlamentPage() {
                   const ikon = isRiksdag ? "🏛" : "🤖";
                   const verb = isRiksdag ? "Riksdagen importerade" : "AI-agent föreslog";
                   const farg = isRiksdag ? C.riksdagen : C.accent;
-                  const titel = r.titel || `Förslag #${r.id}`;
+                  const titel = (r.titel || `Förslag #${r.id ?? "?"}`) + "";
                   return (
                     <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "9px 16px", borderBottom: i < aktivitet.length - 1 ? `1px solid #111` : "none" }}>
                       <span style={{ fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>{ikon}</span>
