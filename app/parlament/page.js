@@ -6,7 +6,7 @@ async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return { forslag: [], roster: [], aktivitet: [] };
   const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
-  const [fRes, rRes, aRes] = await Promise.all([
+  const [fRes, rRes, aRes, nyaRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/lagforslag?order=skapad.desc&limit=200`, {
       headers: hdrs, next: { revalidate: 60 },
     }),
@@ -16,11 +16,26 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,motivering,skapad,lagforslag_id,lagforslag(titel)&order=skapad.desc&limit=12`, {
       headers: hdrs, next: { revalidate: 60 },
     }),
+    fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,kalla,skapad&order=skapad.desc&limit=6`, {
+      headers: hdrs, next: { revalidate: 60 },
+    }),
   ]);
+
+  const roster    = rRes.ok ? await rRes.json() : [];
+  const rostvhändelser = aRes.ok ? await aRes.json() : [];
+  const nyaForslag = nyaRes.ok ? await nyaRes.json() : [];
+
+  // Bygg kombinerat aktivitetsflöde sorterat efter skapad
+  const forslagHändelser = nyaForslag.map(f => ({ _typ: "forslag", ...f }));
+  const alla = [
+    ...rostvhändelser.map(r => ({ _typ: "röst", ...r })),
+    ...forslagHändelser,
+  ].sort((a, b) => new Date(b.skapad) - new Date(a.skapad)).slice(0, 15);
+
   return {
     forslag:   fRes.ok ? await fRes.json() : [],
-    roster:    rRes.ok ? await rRes.json() : [],
-    aktivitet: aRes.ok ? await aRes.json() : [],
+    roster,
+    aktivitet: alla,
   };
 }
 
@@ -108,10 +123,6 @@ export default async function ParlamentPage() {
             </div>
             <div>
               {aktivitet.map((r, i) => {
-                const titel = r.lagforslag?.titel || `Förslag #${r.lagforslag_id}`;
-                const rodFarg = r.rod === "ja" ? C.ja : r.rod === "nej" ? C.nej : "#888";
-                const rodLabel = r.rod === "ja" ? "Ja" : r.rod === "nej" ? "Nej" : "Avstår";
-                const rodIkon = r.rod === "ja" ? "✅" : r.rod === "nej" ? "❌" : "⬜";
                 const ago = r.skapad ? (() => {
                   const diff = Date.now() - new Date(r.skapad).getTime();
                   const m = Math.floor(diff / 60000);
@@ -120,6 +131,30 @@ export default async function ParlamentPage() {
                   if (h < 24) return `${h} tim sedan`;
                   return `${Math.floor(h / 24)} dagar sedan`;
                 })() : "";
+
+                if (r._typ === "forslag") {
+                  const isRiksdag = r.kalla === "riksdagen";
+                  const ikon = isRiksdag ? "🏛" : "🤖";
+                  const verb = isRiksdag ? "Riksdagen importerade" : "AI-agent föreslog";
+                  const farg = isRiksdag ? C.riksdagen : C.accent;
+                  const titel = r.titel || `Förslag #${r.id}`;
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "9px 16px", borderBottom: i < aktivitet.length - 1 ? `1px solid #111` : "none" }}>
+                      <span style={{ fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>{ikon}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ fontSize: "11px", color: farg, fontFamily: "monospace", fontWeight: 700 }}>{verb}</span>
+                        <span style={{ fontSize: "11px", color: "#555" }}> — </span>
+                        <span style={{ fontSize: "11px", color: "#888", fontStyle: "italic" }}>"{titel.slice(0, 60)}{titel.length > 60 ? "…" : ""}"</span>
+                      </div>
+                      <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace", flexShrink: 0, marginTop: "2px" }}>{ago}</span>
+                    </div>
+                  );
+                }
+
+                const titel = r.lagforslag?.titel || `Förslag #${r.lagforslag_id}`;
+                const rodFarg = r.rod === "ja" ? C.ja : r.rod === "nej" ? C.nej : "#888";
+                const rodLabel = r.rod === "ja" ? "Ja" : r.rod === "nej" ? "Nej" : "Avstår";
+                const rodIkon = r.rod === "ja" ? "✅" : r.rod === "nej" ? "❌" : "⬜";
                 return (
                   <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", padding: "9px 16px", borderBottom: i < aktivitet.length - 1 ? `1px solid #111` : "none" }}>
                     <span style={{ fontSize: "13px", flexShrink: 0, marginTop: "1px" }}>{rodIkon}</span>
