@@ -86,7 +86,7 @@ export default async function TillvaxtPage() {
   const etfPerDag      = sumPerDag(etfData, "belopp_kr");
   const feedbackPerDag = sumPerDag(feedbackData, "belopp");
 
-  const dagar = byggDagar(60);
+  const dagar = byggDagar(90);
 
   const gdpSerie = dagar.map(dag => ({
     dag,
