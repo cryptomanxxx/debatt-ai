@@ -63,7 +63,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   const [bidBelopp,    setBidBelopp]    = useState("");
   const [bidMsg,       setBidMsg]       = useState(null); // inline feedback i budinput
   const [pending,      setPending]      = useState(false);
-  const [now,          setNow]          = useState(() => Date.now());
+  const [now,          setNow]          = useState(null); // null tills efter mount — förhindrar SSR/hydration-mismatch
   const [markMsg,      setMarkMsg]      = useState(null);
   const [renameMode,   setRenameMode]   = useState(false);
   const [renameInput,  setRenameInput]  = useState("");
@@ -72,6 +72,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   const [saljVaraPris,  setSaljVaraPris]  = useState("");
 
   useEffect(() => {
+    setNow(Date.now()); // sätt direkt efter mount
     const id = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(id);
   }, []);
@@ -369,7 +370,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
       {/* ── ÖPPNA AUKTIONER ── */}
       <section>
         {(() => {
-          const ejUtgångna = aktivaAukt.filter(a => new Date(a.stanger_at) > now);
+          const ejUtgångna = now === null ? aktivaAukt : aktivaAukt.filter(a => new Date(a.stanger_at) > now);
           return (
             <>
               <Label>Öppna auktioner · {ejUtgångna.length} st</Label>
@@ -410,7 +411,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                   </div>
                   {/* Besökar-budknapp */}
                   {besokareNamn && a.saljare !== besokareNamn && (() => {
-                    const isExpired = new Date(a.stanger_at) <= now;
+                    const isExpired = now !== null && new Date(a.stanger_at) <= now;
                     if (isExpired) return (
                       <div style={{ marginTop: "10px", fontSize: "10px", color: "#444", fontFamily: C.mono }}>Auktionen är stängd</div>
                     );
@@ -549,7 +550,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
             <Label>Mitt lager · {besokareNamn}</Label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "8px" }}>
               {mittLager.map(r => {
-                const harAktivAukt = aktivaAukt.some(
+                const harAktivAukt = now !== null && aktivaAukt.some(
                   a => a.saljare === besokareNamn && a.vara === r.vara && new Date(a.stanger_at) > now
                 );
                 return (
