@@ -87,6 +87,7 @@ export default function RootLayout({ children }) {
               <a href="/handel" className="neon-nav">Handelsimperium 🚢</a>
               <a href="/tidsgraf" className="neon-nav">Tidsgraf</a>
               <a href="/tidsserie" className="neon-nav">Tidsseriegraf</a>
+              <a href="/tillvaxt" className="neon-nav">Tillväxt</a>
               <a href="/ud" className="neon-nav">Utrikesdepartementet</a>
               <a href="/opinion" className="neon-nav">Vad tycker du?</a>
               <a href="/vecka" className="neon-nav">Veckans sammanfattning</a>
