@@ -63,12 +63,16 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   const [bidBelopp,    setBidBelopp]    = useState("");
   const [bidMsg,       setBidMsg]       = useState(null); // inline feedback i budinput
   const [pending,      setPending]      = useState(false);
-  const [now,          setNow]          = useState(() => Date.now());
+  const [now,          setNow]          = useState(null); // null tills efter mount — förhindrar SSR/hydration-mismatch
   const [markMsg,      setMarkMsg]      = useState(null);
   const [renameMode,   setRenameMode]   = useState(false);
   const [renameInput,  setRenameInput]  = useState("");
+  const [saljVara,     setSaljVara]     = useState(null);   // vara som listas
+  const [saljVaraAntal, setSaljVaraAntal] = useState("1");
+  const [saljVaraPris,  setSaljVaraPris]  = useState("");
 
   useEffect(() => {
+    setNow(Date.now()); // sätt direkt efter mount
     const id = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(id);
   }, []);
@@ -130,6 +134,29 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
       setActiveBid(null);
       setTimeout(() => setMarkMsg(null), 5000);
     } catch { setBidMsg({ text: "Nätverksfel — försök igen", ok: false }); }
+    finally { setPending(false); }
+  }
+
+  async function saljVaraAuktion(vara, antal, reservpris) {
+    if (!besokareId || pending) return;
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/salj-vara", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vara, antal, reservpris, besokare_id: besokareId, display_name: besokareNamn }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Misslyckades", ok: false }); return; }
+      // Optimistiskt: lägg till den nya auktionen i listan
+      setAktivaAukt(prev => [...prev, {
+        id: Date.now(), saljare: besokareNamn, vara, antal, reservpris,
+        nuv_bud: null, hogst_budgivare: null, stanger_at: d.stanger_at, status: "öppen",
+      }]);
+      setSaljVara(null); setSaljVaraAntal("1"); setSaljVaraPris("");
+      setMarkMsg({ text: `✅ ${antal}× ${vara} lagd på auktion — stänger om 24h!`, ok: true });
+      setTimeout(() => setMarkMsg(null), 5000);
+    } catch { setMarkMsg({ text: "Nätverksfel — försök igen", ok: false }); }
     finally { setPending(false); }
   }
 
@@ -343,7 +370,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
       {/* ── ÖPPNA AUKTIONER ── */}
       <section>
         {(() => {
-          const ejUtgångna = aktivaAukt.filter(a => new Date(a.stanger_at) > now);
+          const ejUtgångna = now === null ? aktivaAukt : aktivaAukt.filter(a => new Date(a.stanger_at) > now);
           return (
             <>
               <Label>Öppna auktioner · {ejUtgångna.length} st</Label>
@@ -384,7 +411,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                   </div>
                   {/* Besökar-budknapp */}
                   {besokareNamn && a.saljare !== besokareNamn && (() => {
-                    const isExpired = new Date(a.stanger_at) <= now;
+                    const isExpired = now !== null && new Date(a.stanger_at) <= now;
                     if (isExpired) return (
                       <div style={{ marginTop: "10px", fontSize: "10px", color: "#444", fontFamily: C.mono }}>Auktionen är stängd</div>
                     );
@@ -521,17 +548,66 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
         return (
           <section>
             <Label>Mitt lager · {besokareNamn}</Label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px" }}>
-              {mittLager.map(r => (
-                <Card key={r.vara} style={{ padding: "10px 14px", border: `1px solid rgba(34,211,238,0.2)` }}>
-                  <div style={{ fontSize: "18px", marginBottom: "4px" }}>{VARA_IKON[r.vara] || "📦"}</div>
-                  <div style={{ fontSize: "11px", color: "#f0ede6", fontFamily: C.mono, textTransform: "capitalize" }}>{r.vara}</div>
-                  <div style={{ fontSize: "18px", color: BESOKARE_FARG, fontFamily: C.mono, fontWeight: 700 }}>{r.antal}</div>
-                  <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono }}>
-                    ≈ {Math.round(r.antal * (BASPRIS[r.vara] || 0))} kr
-                  </div>
-                </Card>
-              ))}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "8px" }}>
+              {mittLager.map(r => {
+                const harAktivAukt = now !== null && aktivaAukt.some(
+                  a => a.saljare === besokareNamn && a.vara === r.vara && new Date(a.stanger_at) > now
+                );
+                return (
+                  <Card key={r.vara} style={{ padding: "10px 14px", border: `1px solid rgba(34,211,238,0.2)` }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <span style={{ fontSize: "18px" }}>{VARA_IKON[r.vara] || "📦"}</span>
+                      {harAktivAukt && (
+                        <span style={{ fontSize: "8px", color: "#f59e0b", fontFamily: C.mono, background: "rgba(245,158,11,0.1)", padding: "1px 5px", borderRadius: "3px" }}>📋 på auktion</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "#f0ede6", fontFamily: C.mono, textTransform: "capitalize", marginTop: "4px" }}>{r.vara}</div>
+                    <div style={{ fontSize: "18px", color: BESOKARE_FARG, fontFamily: C.mono, fontWeight: 700 }}>{r.antal}</div>
+                    <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "8px" }}>
+                      ≈ {Math.round(r.antal * (BASPRIS[r.vara] || 0))} kr
+                    </div>
+                    {!harAktivAukt && saljVara !== r.vara && (
+                      <button
+                        onClick={() => { setSaljVara(r.vara); setSaljVaraAntal("1"); setSaljVaraPris(String(BASPRIS[r.vara] || 10)); }}
+                        style={{ width: "100%", background: "transparent", border: `1px solid rgba(34,211,238,0.3)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "4px 0", fontSize: "9px", fontFamily: C.mono, cursor: "pointer", letterSpacing: "0.05em" }}
+                      >🏷️ Sälj på auktion</button>
+                    )}
+                    {saljVara === r.vara && (
+                      <div style={{ marginTop: "4px" }}>
+                        <div style={{ display: "flex", gap: "4px", marginBottom: "4px" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "8px", color: C.dim, fontFamily: C.mono, marginBottom: "2px" }}>ANTAL (max {r.antal})</div>
+                            <input
+                              type="number" min="1" max={r.antal} value={saljVaraAntal}
+                              onChange={e => setSaljVaraAntal(e.target.value)}
+                              style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.35)`, color: "#f0ede6", borderRadius: "4px", padding: "4px 6px", fontSize: "11px", fontFamily: C.mono, boxSizing: "border-box" }}
+                            />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "8px", color: C.dim, fontFamily: C.mono, marginBottom: "2px" }}>RES.PRIS (kr)</div>
+                            <input
+                              type="number" min="5" value={saljVaraPris}
+                              onChange={e => setSaljVaraPris(e.target.value)}
+                              style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.35)`, color: "#f0ede6", borderRadius: "4px", padding: "4px 6px", fontSize: "11px", fontFamily: C.mono, boxSizing: "border-box" }}
+                            />
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "4px" }}>
+                          <button
+                            disabled={pending || parseInt(saljVaraAntal) < 1 || parseInt(saljVaraAntal) > r.antal || parseInt(saljVaraPris) < 5}
+                            onClick={() => saljVaraAuktion(r.vara, parseInt(saljVaraAntal), parseInt(saljVaraPris))}
+                            style={{ flex: 1, background: `rgba(34,211,238,0.12)`, border: `1px solid rgba(34,211,238,0.5)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "5px 0", fontSize: "10px", fontFamily: C.mono, cursor: "pointer", fontWeight: 700 }}
+                          >{pending ? "…" : "Lägg ut"}</button>
+                          <button
+                            onClick={() => setSaljVara(null)}
+                            style={{ background: "transparent", border: `1px solid #333`, color: C.dim, borderRadius: "4px", padding: "5px 8px", fontSize: "10px", cursor: "pointer" }}
+                          >✕</button>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
             </div>
           </section>
         );
