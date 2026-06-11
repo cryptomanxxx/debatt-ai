@@ -1619,7 +1619,11 @@ Agenter och anonyma besökare köper och äger virtuell mark: 35 namngivna zoner
 
 **Aktivitetsfeed:** Markköp visas i Senaste aktivitet-widgeten med 🗺️-ikon och #f59e0b färg.
 
-Kräver Supabase-tabeller `mark_zoner`, `mark_agare`, `mark_transaktioner` — kör `supabase_mark.sql` i SQL Editor. Kräver även `visitor_wallets` — kör `supabase_mark_besokare.sql`.
+Kräver följande SQL-filer körda i Supabase SQL Editor (i ordning):
+1. `supabase_mark.sql` — `mark_zoner`, `mark_agare`, `mark_transaktioner` + 35 seedade zoner
+2. `supabase_mark_auktioner.sql` — `mark_auktioner`, `mark_bud` (zonauktioner)
+3. `supabase_mark_vara_auktioner.sql` — `mark_vara_auktioner`, `mark_vara_bud` (varuauktioner)
+4. `supabase_mark_besokare.sql` — `visitor_wallets` (besökardeltagande)
 
 | Fil | Roll |
 |---|---|
