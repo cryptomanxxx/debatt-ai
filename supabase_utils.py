@@ -1318,10 +1318,20 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key
 
     kontext_str = "\n\n".join(kontext_delar)
 
+    # Visa resolution-källan för vanliga markets (textformat).
+    # Sport-markets lagrar JSON i resolution_kalla — de hanteras redan av _sport_basrate_hint.
+    rk_raw = market.get("resolution_kalla") or ""
+    try:
+        json.loads(rk_raw)
+        resolution_rad = ""  # JSON → sport-market, bastal injicerat separat
+    except Exception:
+        resolution_rad = f"Avgörs via: {rk_raw}\n" if rk_raw else ""
+
     user_msg = (
         f"Du ska göra en sannolikhetsbedömning som {agent['namn']}.\n\n"
         f"Fråga: {market['titel']}\n"
         f"Beskrivning: {market.get('beskrivning') or ''}\n"
+        f"{resolution_rad}"
         f"Deadline: {deadline_str}\n"
     )
     if kontext_str:
