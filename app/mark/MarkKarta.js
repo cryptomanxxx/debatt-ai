@@ -134,6 +134,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const [saljPris,     setSaljPris]     = useState("");
   const [pending,      setPending]      = useState(false);
   const [markMsg,      setMarkMsg]      = useState(null);  // { text, ok }
+  const [renameMode,   setRenameMode]   = useState(false);
+  const [renameInput,  setRenameInput]  = useState("");
 
   const mergedAgare = [
     ...agare.filter(a => !lokalAgare.some(la => la.zon_id === a.zon_id)),
@@ -228,7 +230,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       });
       localStorage.setItem("mark_besokare_id", id);
     }
-    const namn = "Besökare-" + id.replace(/-/g, "").slice(0, 6).toUpperCase();
+    const fallback = "Besökare-" + id.replace(/-/g, "").slice(0, 6).toUpperCase();
+    const namn = localStorage.getItem("mark_besokare_namn") || fallback;
     setBesokareId(id);
     setBesokareNamn(namn);
     const cached = parseInt(localStorage.getItem("mark_besokare_saldo") || "2000");
@@ -236,7 +239,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     // Hämta saldo
-    fetch(`${SB_URL}/rest/v1/visitor_wallets?id=eq.${id}&select=saldo`, {
+    fetch(`${SB_URL}/rest/v1/visitor_wallets?id=eq.${id}&select=saldo,display_name`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
     })
       .then(r => r.ok ? r.json() : [])
@@ -244,6 +247,10 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
         if (data.length) {
           setBesokSaldo(data[0].saldo);
           localStorage.setItem("mark_besokare_saldo", data[0].saldo);
+          if (data[0].display_name) {
+            setBesokareNamn(data[0].display_name);
+            localStorage.setItem("mark_besokare_namn", data[0].display_name);
+          }
         }
       })
       .catch(() => {});
@@ -509,20 +516,60 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       </div>
 
         {besokareNamn && (
-          <div style={{ marginTop: "10px", background: "#070f10", border: `1px solid ${rgba(BESOKARE_FARG, 0.25)}`, borderRadius: "8px", padding: "10px 16px", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "10px", color: BESOKARE_FARG, fontFamily: "monospace", letterSpacing: "0.08em" }}>👤 {besokareNamn}</span>
-            <span style={{ fontSize: "15px", color: "#e0e0e0", fontFamily: "monospace", fontWeight: 700 }}>
-              {besokSaldo !== null ? `${besokSaldo.toLocaleString("sv-SE")} kr` : "…"}
-            </span>
-            {besokSaldo !== null && (
-              <span style={{ fontSize: "9px", color: rgba(BESOKARE_FARG, 0.5), fontFamily: "monospace" }}>
-                · {mergedAgare.filter(a => a.agent === besokareNamn).length} zon{mergedAgare.filter(a => a.agent === besokareNamn).length !== 1 ? "er" : ""}
+          <div style={{ marginTop: "10px", background: "#070f10", border: `1px solid ${rgba(BESOKARE_FARG, 0.25)}`, borderRadius: "8px", padding: "10px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "10px", color: BESOKARE_FARG, fontFamily: "monospace", letterSpacing: "0.08em" }}>👤 {besokareNamn}</span>
+              <span style={{ fontSize: "15px", color: "#e0e0e0", fontFamily: "monospace", fontWeight: 700 }}>
+                {besokSaldo !== null ? `${besokSaldo.toLocaleString("sv-SE")} kr` : "…"}
               </span>
-            )}
-            {markMsg && (
-              <span style={{ fontSize: "10px", color: markMsg.ok ? "#4ade80" : "#f87171", fontFamily: "monospace", marginLeft: "auto" }}>
-                {markMsg.text}
-              </span>
+              {besokSaldo !== null && (
+                <span style={{ fontSize: "9px", color: rgba(BESOKARE_FARG, 0.5), fontFamily: "monospace" }}>
+                  · {mergedAgare.filter(a => a.agent === besokareNamn).length} zon{mergedAgare.filter(a => a.agent === besokareNamn).length !== 1 ? "er" : ""}
+                </span>
+              )}
+              <button
+                onClick={() => { setRenameMode(v => !v); setRenameInput(""); setMarkMsg(null); }}
+                style={{ marginLeft: "auto", fontSize: "9px", color: rgba(BESOKARE_FARG, 0.6), background: "none", border: "none", cursor: "pointer", fontFamily: "monospace", letterSpacing: "0.05em" }}
+              >✏️ byt namn</button>
+              {markMsg && (
+                <span style={{ fontSize: "10px", color: markMsg.ok ? "#4ade80" : "#f87171", fontFamily: "monospace" }}>
+                  {markMsg.text}
+                </span>
+              )}
+            </div>
+            {renameMode && (
+              <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "10px", color: "#888", fontFamily: "monospace" }}>Besökare-</span>
+                <input
+                  value={renameInput}
+                  onChange={e => setRenameInput(e.target.value)}
+                  placeholder="ditt-namn"
+                  maxLength={20}
+                  style={{ background: "#111", border: `1px solid ${rgba(BESOKARE_FARG, 0.3)}`, borderRadius: "4px", color: "#f0ede6", fontFamily: "monospace", fontSize: "11px", padding: "3px 8px", width: "140px" }}
+                />
+                <button
+                  disabled={pending || renameInput.trim().length < 2}
+                  onClick={async () => {
+                    if (pending) return;
+                    setPending(true); setMarkMsg(null);
+                    try {
+                      const r = await fetch("/api/mark/namn", {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ besokare_id: besokareId, old_name: besokareNamn, new_suffix: renameInput.trim() }),
+                      });
+                      const d = await r.json();
+                      if (!r.ok) { setMarkMsg({ text: d.error || "Misslyckades", ok: false }); return; }
+                      setBesokareNamn(d.new_name);
+                      localStorage.setItem("mark_besokare_namn", d.new_name);
+                      setRenameMode(false);
+                      setMarkMsg({ text: "Namn uppdaterat!", ok: true });
+                    } finally { setPending(false); }
+                  }}
+                  style={{ fontSize: "10px", background: rgba(BESOKARE_FARG, 0.15), border: `1px solid ${rgba(BESOKARE_FARG, 0.4)}`, borderRadius: "4px", color: BESOKARE_FARG, cursor: "pointer", padding: "3px 10px", fontFamily: "monospace" }}
+                >Spara</button>
+                <button onClick={() => setRenameMode(false)} style={{ fontSize: "9px", color: "#555", background: "none", border: "none", cursor: "pointer" }}>avbryt</button>
+              </div>
             )}
           </div>
         )}
