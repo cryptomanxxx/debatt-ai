@@ -63,9 +63,15 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   const [bidBelopp,    setBidBelopp]    = useState("");
   const [bidMsg,       setBidMsg]       = useState(null); // inline feedback i budinput
   const [pending,      setPending]      = useState(false);
+  const [now,          setNow]          = useState(() => Date.now());
   const [markMsg,      setMarkMsg]      = useState(null);
   const [renameMode,   setRenameMode]   = useState(false);
   const [renameInput,  setRenameInput]  = useState("");
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -374,7 +380,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                   </div>
                   {/* Besökar-budknapp */}
                   {besokareNamn && a.saljare !== besokareNamn && (() => {
-                    const isExpired = new Date(a.stanger_at) <= Date.now();
+                    const isExpired = new Date(a.stanger_at) <= now;
                     if (isExpired) return (
                       <div style={{ marginTop: "10px", fontSize: "10px", color: "#444", fontFamily: C.mono }}>Auktionen är stängd</div>
                     );
