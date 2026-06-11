@@ -54,9 +54,23 @@ export async function POST(req) {
   }
 
   // Kontrollera att ingen öppen auktion redan finns för samma säljare + vara
-  const existR = await sb(
-    `mark_vara_auktioner?saljare=eq.${encodeURIComponent(display_name)}&vara=eq.${encodeURIComponent(vara)}&status=eq.%C3%B6ppen&select=id`
-  );
+  const cr = await sb('mark_vara_auktioner', {
+  method: 'POST',
+  body: JSON.stringify({
+    saljare: display_name,
+    vara,
+    antal,
+    reservpris,
+    nuv_bud: null,
+    hogst_budgivare: null,
+    stanger_at: stanger,
+    status: 'öppen',
+  }),
+  prefer: 'return=minimal',
+  headers: {
+    'X-Insert-If-Not-Exists': 'saljare,vara'
+  }
+});
   const exist = existR.ok ? await existR.json() : [];
   if (exist.length) {
     return NextResponse.json({ error: `Du har redan en öppen auktion för ${vara}` }, { status: 409 });
