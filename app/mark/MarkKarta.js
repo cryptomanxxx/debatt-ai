@@ -157,19 +157,26 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const auktionMap  = Object.fromEntries(auktioner.map(a => [a.mark_zoner?.id, a]));
 
   // Centrera hexklustret dynamiskt i SVG
+  // OX/OY centrerar klustret med fast padding från origo — viewBox anpassas dynamiskt
+  const PAD = HEX_SP * 1.5;
   const [OX, OY] = (() => {
-    if (!zoner.length) return [52, 50];
+    if (!zoner.length) return [PAD + HEX, PAD + HEX];
     const raw = zoner.map(z => [
       HEX_SP * SQRT3 * (z.hex_col + (z.hex_row % 2 === 1 ? 0.5 : 0)),
       HEX_SP * 1.5 * z.hex_row,
     ]);
     const minX = Math.min(...raw.map(c => c[0]));
-    const maxX = Math.max(...raw.map(c => c[0]));
     const minY = Math.min(...raw.map(c => c[1]));
-    const maxY = Math.max(...raw.map(c => c[1]));
+    return [PAD - minX, PAD - minY];
+  })();
+
+  // Dynamisk viewBox — passar alltid alla hexagoner oavsett antal
+  const [VB_W, VB_H] = (() => {
+    if (!zoner.length) return [SVG_W, SVG_H];
+    const centers = zoner.map(z => hexCenter(z.hex_col, z.hex_row, OX, OY));
     return [
-      (SVG_W - (maxX - minX + HEX_SP * SQRT3)) / 2 - minX + HEX_SP * SQRT3 / 2,
-      (SVG_H - (maxY - minY + HEX_SP * 2))      / 2 - minY + HEX_SP,
+      Math.max(SVG_W, Math.max(...centers.map(c => c[0])) + PAD + HEX),
+      Math.max(SVG_H, Math.max(...centers.map(c => c[1])) + PAD + HEX),
     ];
   })();
 
@@ -533,7 +540,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
         <div style={{ position: "relative", transform: `translate(${tfm.x}px,${tfm.y}px) scale(${tfm.z})`, transformOrigin: "0 0", willChange: "transform" }}>
         <div style={{ position: "absolute", inset: 0, backgroundImage: "url('/mark-terrain.jpg')", backgroundSize: "cover", backgroundPosition: "center", filter: "brightness(1.8)", zIndex: 0 }} />
         <svg
-          viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+          viewBox={`0 0 ${VB_W} ${VB_H}`}
           style={{
             display: "block",
             position: "relative",
@@ -734,7 +741,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             );
           })}
 
-          <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="url(#vignette)" style={{ pointerEvents: "none" }} />
+          <rect x="0" y="0" width={VB_W} height={VB_H} fill="url(#vignette)" style={{ pointerEvents: "none" }} />
 
           {floats.map(f => (
             <circle key={f.id} cx={f.cx} cy={f.cy - 16} r="5"
