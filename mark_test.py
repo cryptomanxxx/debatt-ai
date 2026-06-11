@@ -134,6 +134,19 @@ def sb_patch(path, data):
     return r.is_success
 
 
+def is_visitor(name: str) -> bool:
+    return isinstance(name, str) and name.startswith("Besökare-")
+
+
+def patch_saldo(name: str, nytt_saldo: float, saldon: dict):
+    """Uppdaterar saldo i rätt tabell beroende på om det är en besökare eller AI-agent."""
+    if is_visitor(name):
+        sb_patch(f"visitor_wallets?display_name=eq.{urllib.parse.quote(name)}", {"saldo": int(nytt_saldo)})
+    else:
+        sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(name)}", {"saldo": nytt_saldo})
+    saldon[name] = nytt_saldo
+
+
 def sb_upsert(table, data, on_conflict=None):
     url = f"{SB_URL}/rest/v1/{table}"
     if on_conflict:
@@ -191,15 +204,13 @@ def stang_avgjorda_auktioner(saldon, agent_zon_antal):
 
         # Dra saldo från vinnaren
         nytt_saldo = round(saldon[vinnare] - pris, 2)
-        sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(vinnare)}", {"saldo": nytt_saldo})
-        saldon[vinnare] = nytt_saldo
+        patch_saldo(vinnare, nytt_saldo, saldon)
 
         # Om privatförsäljning — betala säljaren
         saljare = aukt.get("saljare")
         if saljare and saljare in saldon:
             ny_s = round(saldon[saljare] + pris, 2)
-            sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(saljare)}", {"saldo": ny_s})
-            saldon[saljare] = ny_s
+            patch_saldo(saljare, ny_s, saldon)
             # Ta bort gamla ägarposten
             httpx.delete(
                 f"{SB_URL}/rest/v1/mark_agare?zon_id=eq.{zon_id}&agent=eq.{urllib.parse.quote(saljare)}",
@@ -542,10 +553,8 @@ def stang_avgjorda_vara_auktioner(saldon: dict, lager: dict):
         # Flytta krediter
         nytt_vinnare_saldo = round(saldon.get(vinnare, 0) - pris, 2)
         nytt_saljare_saldo = round(saldon.get(saljare, 0) + pris, 2)
-        sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(vinnare)}", {"saldo": nytt_vinnare_saldo})
-        sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(saljare)}", {"saldo": nytt_saljare_saldo})
-        saldon[vinnare] = nytt_vinnare_saldo
-        saldon[saljare] = nytt_saljare_saldo
+        patch_saldo(vinnare, nytt_vinnare_saldo, saldon)
+        patch_saldo(saljare, nytt_saljare_saldo, saldon)
 
         sb_patch(f"mark_vara_auktioner?id=eq.{aukt['id']}", {"status": "avgjord"})
 
@@ -864,6 +873,12 @@ def main():
     agare_dict = {r["zon_id"]: r["agent"] for r in agare_rows}
     zoner_dict  = {z["id"]: z for z in zoner}
     saldon = {r["agent"]: float(r.get("saldo") or 0) for r in planbocker}
+
+    # Inkludera besökares plånböcker så att auktionsstängning fungerar för dem
+    visitor_wallets = sb_get("visitor_wallets?select=display_name,saldo") or []
+    for vw in visitor_wallets:
+        saldon[vw["display_name"]] = float(vw.get("saldo") or 0)
+
     agent_zon_antal: dict = {}
     for a in agare_dict.values():
         agent_zon_antal[a] = agent_zon_antal.get(a, 0) + 1
@@ -909,9 +924,12 @@ def main():
     # ── 7. Förädlingskedjor (spannmål→mjöl, malm→stål) ──────────────────────
     foradla_varor(lager)
 
-    # Hämta aktuella saldon
+    # Hämta aktuella saldon (inkludera besökares plånböcker)
     planbocker_ny = sb_get("agent_planbocker?select=agent,saldo&agent=neq.Statskassa")
     saldon_ny = {r["agent"]: float(r.get("saldo") or 0) for r in planbocker_ny}
+    visitor_wallets_ny = sb_get("visitor_wallets?select=display_name,saldo") or []
+    for vw in visitor_wallets_ny:
+        saldon_ny[vw["display_name"]] = float(vw.get("saldo") or 0)
 
     # ── 7. Uppdatera resurspriser (zon-clearing + utbud/efterfrågan) ─────────
     # Körs FÖRE varuauktionsstängning så att varuauktionernas clearing-priser
