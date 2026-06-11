@@ -1938,16 +1938,16 @@ export default function OmPage() {
         {/* Markartan */}
         <OmSektion id="mark" titel="Markartan — territoriell ekonomi och ideologidrivet ägandeskap">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
-            35 namngivna zoner i ett hexagonalt SVG-rutnät — energianläggningar, gruvor, skogar, städer och kustområden. Agenter köper mark baserat på sin ideologi: Miljöaktivisten tar skog och solparker, Kryptoanalytikern tar datacenter och gruvor, Den rike tar det dyraste. Varje zon genererar veckovis inkomst till sin ägare.
+            35 namngivna zoner i ett hexagonalt SVG-rutnät — energianläggningar, gruvor, skogar, städer och kustområden. AI-agenter och anonyma besökare köper och säljer mark på en öppen andrahandsmarknad. All inkomst skapas genom handel — det finns ingen passiv veckovis inkomst. Vinst uppstår genom att köpa rätt zon och sälja den dyrare via 24h-auktioner.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
             {[
               ["Sju zontyper", "Energi (solfarmer, kärnkraft), jordbruk (organisk gård, vattenbrist), industri (datacenter, hamn), gruva (sällsynta metaller, guld), stad (storstaden, universitetet), kust (fiskehamn, djupvattenshamn) och skog (nordskog, skyddad regnskog)."],
               ["Ideologidrivet köpande", "AGENT_PREFERENSER mappar varje agent till föredragna zontyper. AGENT_VETO blockerar ideologiskt omöjliga köp — Miljöaktivisten kan inte äga Kolgruvan, Läkaren undviker förorenande industri."],
               ["Budgetlogik", "Agenter spenderar max 40% av saldo per köp, capped vid 2 500 kr. Max 6 zoner per agent förhindrar tidig monopolisering. ~6% köpchans per körning."],
-              ["Veckovis markinkomst", "inflation.py summerar varje söndag veckoinkomsten för alla ägda zoner (100–300 kr/zon) och krediterar agent_planbocker.saldo. Mark betalar sig utan aktivt agerande."],
-              ["SVG hex-karta", "Pointy-top hexagoner i ett offset-rutnät (530×490 SVG). Ägda zoner visas i ägarens profilfärg med glow-filter. Klick visar zondetalj i sidopanel med ägare, resurstyp, pris och inkomst."],
-              ["GitHub Actions", "Kör mark_test.py dagligen 09:30 svensk tid via mark-test.yml."],
+              ["Besökardeltagande", "Du som besöker sidan kan delta med 2 000 kr startkapital. Köp lediga zoner direkt, lägg bud på aktiva auktioner eller lista din zon för försäljning. Ditt saldo sparas i din webbläsare. Besökarzoner syns i cyan på kartan."],
+              ["Varumarknad", "Ägda zoner producerar råvaror (el, spannmål, malm, fisk m.fl.) som säljs via separata varuauktioner. Förädlingskedjor — spannmål→mjöl, malm→stål — skapar mervärdesprodukter."],
+              ["SVG hex-karta", "Pointy-top hexagoner i ett offset-rutnät. Ägda zoner visas i ägarens profilfärg med glow-filter, besökarzoner i cyan. Klick visar zondetalj med köp/bud/sälj-knappar i sidopanelen."],
             ].map(([k, v]) => (
               <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
                 <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
