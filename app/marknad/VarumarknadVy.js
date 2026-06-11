@@ -60,6 +60,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   const [aktivaAukt,   setAktivaAukt]   = useState(auktioner); // lokal kopia för optimistisk uppdatering
   const [activeBid,    setActiveBid]    = useState(null); // auktion-id
   const [bidBelopp,    setBidBelopp]    = useState("");
+  const [bidMsg,       setBidMsg]       = useState(null); // inline feedback i budinput
   const [pending,      setPending]      = useState(false);
   const [markMsg,      setMarkMsg]      = useState(null);
   const [renameMode,   setRenameMode]   = useState(false);
@@ -102,8 +103,8 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   async function laggBudVara(auktion) {
     if (!besokareId || pending) return;
     const belopp = parseInt(bidBelopp, 10);
-    if (!belopp || belopp < 10) { setMarkMsg({ text: "Ange ett giltigt belopp", ok: false }); return; }
-    setPending(true); setMarkMsg(null);
+    if (!belopp || belopp < 10) { setBidMsg({ text: "Ange ett giltigt belopp", ok: false }); return; }
+    setPending(true); setBidMsg(null);
     try {
       const r = await fetch("/api/mark/bud", {
         method: "POST",
@@ -111,7 +112,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
         body: JSON.stringify({ auktion_id: auktion.id, belopp, besokare_id: besokareId, display_name: besokareNamn, type: "vara" }),
       });
       const d = await r.json();
-      if (!r.ok) { setMarkMsg({ text: d.error || "Bud misslyckades", ok: false }); return; }
+      if (!r.ok) { setBidMsg({ text: d.error || "Bud misslyckades", ok: false }); return; }
       setBesokSaldo(d.saldo);
       localStorage.setItem("mark_besokare_saldo", d.saldo);
       // Uppdatera lokal auktionsstate optimistiskt så kortet reflekterar ny budgivare direkt
@@ -121,7 +122,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
       setMarkMsg({ text: `✅ Bud på ${belopp} kr lagt!`, ok: true });
       setActiveBid(null);
       setTimeout(() => setMarkMsg(null), 5000);
-    } catch { setMarkMsg({ text: "Nätverksfel — försök igen", ok: false }); }
+    } catch { setBidMsg({ text: "Nätverksfel — försök igen", ok: false }); }
     finally { setPending(false); }
   }
 
@@ -378,26 +379,33 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                     }
                     if (activeBid === a.id) {
                       return (
-                        <div style={{ marginTop: "10px", display: "flex", gap: "6px" }}>
-                          <input
-                            type="number" value={bidBelopp} min={minBud}
-                            onChange={e => setBidBelopp(e.target.value)}
-                            placeholder={`min ${minBud} kr`}
-                            style={{ flex: 1, background: "#0d1117", border: `1px solid rgba(34,211,238,0.4)`, color: "#f0ede6", borderRadius: "4px", padding: "5px 8px", fontSize: "11px", fontFamily: C.mono, width: "80px" }}
-                          />
-                          <button onClick={() => laggBudVara(a)} disabled={pending}
-                            style={{ background: `rgba(34,211,238,0.12)`, border: `1px solid rgba(34,211,238,0.5)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "5px 10px", fontSize: "10px", fontFamily: C.mono, cursor: "pointer" }}>
-                            {pending ? "…" : "Bud!"}
-                          </button>
-                          <button onClick={() => setActiveBid(null)}
-                            style={{ background: "transparent", border: `1px solid #333`, color: C.dim, borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: C.mono, cursor: "pointer" }}>
-                            ✕
-                          </button>
+                        <div style={{ marginTop: "10px" }}>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <input
+                              type="number" value={bidBelopp} min={minBud}
+                              onChange={e => setBidBelopp(e.target.value)}
+                              placeholder={`min ${minBud} kr`}
+                              style={{ flex: 1, background: "#0d1117", border: `1px solid rgba(34,211,238,0.4)`, color: "#f0ede6", borderRadius: "4px", padding: "5px 8px", fontSize: "11px", fontFamily: C.mono, width: "80px" }}
+                            />
+                            <button onClick={() => laggBudVara(a)} disabled={pending}
+                              style={{ background: `rgba(34,211,238,0.12)`, border: `1px solid rgba(34,211,238,0.5)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "5px 10px", fontSize: "10px", fontFamily: C.mono, cursor: "pointer" }}>
+                              {pending ? "…" : "Bud!"}
+                            </button>
+                            <button onClick={() => { setActiveBid(null); setBidMsg(null); }}
+                              style={{ background: "transparent", border: `1px solid #333`, color: C.dim, borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: C.mono, cursor: "pointer" }}>
+                              ✕
+                            </button>
+                          </div>
+                          {bidMsg && (
+                            <div style={{ marginTop: "5px", fontSize: "10px", color: bidMsg.ok ? "#4ade80" : "#f87171", fontFamily: C.mono }}>
+                              {bidMsg.text}
+                            </div>
+                          )}
                         </div>
                       );
                     }
                     return (
-                      <button onClick={() => { setActiveBid(a.id); setBidBelopp(String(minBud)); }}
+                      <button onClick={() => { setActiveBid(a.id); setBidBelopp(String(minBud)); setBidMsg(null); }}
                         style={{ marginTop: "10px", width: "100%", background: "transparent", border: `1px solid rgba(34,211,238,0.3)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "6px", fontSize: "10px", fontFamily: C.mono, cursor: "pointer" }}>
                         🏷️ Lägg bud ({minBud}+ kr)
                       </button>
