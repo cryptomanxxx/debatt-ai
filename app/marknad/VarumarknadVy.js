@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const BESOKARE_FARG = "#22d3ee";
+
 const BASPRIS = { el: 15, spannmål: 10, maskiner: 25, malm: 20, tjänster: 18, fisk: 12, virke: 14, mjöl: 15, stål: 36 };
 const VARA_IKON = { el: "⚡", spannmål: "🌾", maskiner: "🏭", malm: "⛏️", tjänster: "🏙️", fisk: "🌊", virke: "🌲", mjöl: "🍞", stål: "🔩" };
 const TYP_TILL_VARA = { energi: "el", jordbruk: "spannmål", industri: "maskiner", gruva: "malm", stad: "tjänster", kust: "fisk", skog: "virke" };
@@ -51,6 +54,70 @@ const EVENT_IKON = { torka: "☀️", gruvras: "💥", cyberattack: "🔒" };
 const EVENT_FARG = { torka: "#f59e0b", gruvras: "#ef4444", cyberattack: "#a78bfa" };
 
 export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lager, foradlingLog = [], zonEvents = [] }) {
+  const [besokareId,   setBesokareId]   = useState(null);
+  const [besokareNamn, setBesokareNamn] = useState(null);
+  const [besokSaldo,   setBesokSaldo]   = useState(null);
+  const [aktivaAukt,   setAktivaAukt]   = useState(auktioner); // lokal kopia för optimistisk uppdatering
+  const [activeBid,    setActiveBid]    = useState(null); // auktion-id
+  const [bidBelopp,    setBidBelopp]    = useState("");
+  const [pending,      setPending]      = useState(false);
+  const [markMsg,      setMarkMsg]      = useState(null);
+
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    let id = localStorage.getItem("mark_besokare_id");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("mark_besokare_id", id);
+    }
+    const hex = id.replace(/-/g, "").slice(0, 6).toUpperCase();
+    const namn = `Besökare-${hex}`;
+    setBesokareId(id);
+    setBesokareNamn(namn);
+
+    const cachedSaldo = localStorage.getItem("mark_besokare_saldo");
+    // Visa 2000 kr direkt för ny besökare utan cache — det är startsaldot
+    setBesokSaldo(cachedSaldo !== null ? Number(cachedSaldo) : 2000);
+
+    fetch(`${SB_URL}/rest/v1/visitor_wallets?id=eq.${id}&select=saldo`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        if (data.length) {
+          setBesokSaldo(data[0].saldo);
+          localStorage.setItem("mark_besokare_saldo", data[0].saldo);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function laggBudVara(auktion) {
+    if (!besokareId || pending) return;
+    const belopp = parseInt(bidBelopp, 10);
+    if (!belopp || belopp < 10) { setMarkMsg({ text: "Ange ett giltigt belopp", ok: false }); return; }
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/bud", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auktion_id: auktion.id, belopp, besokare_id: besokareId, display_name: besokareNamn, type: "vara" }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Bud misslyckades", ok: false }); return; }
+      setBesokSaldo(d.saldo);
+      localStorage.setItem("mark_besokare_saldo", d.saldo);
+      // Uppdatera lokal auktionsstate optimistiskt så kortet reflekterar ny budgivare direkt
+      setAktivaAukt(prev => prev.map(a =>
+        a.id === auktion.id ? { ...a, nuv_bud: belopp, hogst_budgivare: besokareNamn } : a
+      ));
+      setMarkMsg({ text: `✅ Bud på ${belopp} kr lagt!`, ok: true });
+      setActiveBid(null);
+      setTimeout(() => setMarkMsg(null), 5000);
+    } catch { setMarkMsg({ text: "Nätverksfel — försök igen", ok: false }); }
+    finally { setPending(false); }
+  }
+
   // Bygg resurs-map: typ → { pris_multiplier, trend }
   const resursMap = Object.fromEntries(resurspriser.map(r => [r.typ, r]));
 
@@ -89,6 +156,22 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "28px" }}>
+
+      {/* ── BESÖKAR-HUD ── */}
+      {besokareNamn && (
+        <div style={{ background: "#070f10", border: `1px solid rgba(34,211,238,0.25)`, borderRadius: "8px", padding: "10px 16px", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "10px", color: BESOKARE_FARG, fontFamily: C.mono, letterSpacing: "0.08em" }}>👤 {besokareNamn}</span>
+          <span style={{ fontSize: "15px", color: "#e0e0e0", fontFamily: C.mono, fontWeight: 700 }}>
+            {besokSaldo !== null ? `${besokSaldo.toLocaleString("sv-SE")} kr` : "…"}
+          </span>
+          <span style={{ fontSize: "9px", color: "rgba(34,211,238,0.5)", fontFamily: C.mono }}>· varumarknaden</span>
+          {markMsg && (
+            <span style={{ fontSize: "11px", color: markMsg.ok ? "#4ade80" : "#f87171", fontFamily: C.mono, marginLeft: "auto" }}>
+              {markMsg.text}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* ── FÖRÄDLINGSKEDJOR ── */}
       <section>
@@ -233,13 +316,46 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                       {harBud ? (
                         <>
                           <div style={{ fontSize: "16px", color: "#fbbf24", fontFamily: C.mono, fontWeight: 700 }}>{a.nuv_bud} kr</div>
-                          <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono }}>{a.hogst_budgivare}</div>
+                          <div style={{ fontSize: "9px", color: a.hogst_budgivare === besokareNamn ? BESOKARE_FARG : C.dim, fontFamily: C.mono }}>{a.hogst_budgivare}</div>
                         </>
                       ) : (
                         <div style={{ fontSize: "13px", color: C.dim, fontFamily: C.mono }}>inga bud</div>
                       )}
                     </div>
                   </div>
+                  {/* Besökar-budknapp */}
+                  {besokareNamn && a.saljare !== besokareNamn && (() => {
+                    const minBud = Math.max(a.reservpris || 0, (a.nuv_bud || 0) + 10);
+                    if (a.hogst_budgivare === besokareNamn) {
+                      return <div style={{ marginTop: "10px", fontSize: "10px", color: BESOKARE_FARG, fontFamily: C.mono }}>✓ Du leder budgivningen</div>;
+                    }
+                    if (activeBid === a.id) {
+                      return (
+                        <div style={{ marginTop: "10px", display: "flex", gap: "6px" }}>
+                          <input
+                            type="number" value={bidBelopp} min={minBud}
+                            onChange={e => setBidBelopp(e.target.value)}
+                            placeholder={`min ${minBud} kr`}
+                            style={{ flex: 1, background: "#0d1117", border: `1px solid rgba(34,211,238,0.4)`, color: "#f0ede6", borderRadius: "4px", padding: "5px 8px", fontSize: "11px", fontFamily: C.mono, width: "80px" }}
+                          />
+                          <button onClick={() => laggBudVara(a)} disabled={pending}
+                            style={{ background: `rgba(34,211,238,0.12)`, border: `1px solid rgba(34,211,238,0.5)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "5px 10px", fontSize: "10px", fontFamily: C.mono, cursor: "pointer" }}>
+                            {pending ? "…" : "Bud!"}
+                          </button>
+                          <button onClick={() => setActiveBid(null)}
+                            style={{ background: "transparent", border: `1px solid #333`, color: C.dim, borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: C.mono, cursor: "pointer" }}>
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    }
+                    return (
+                      <button onClick={() => { setActiveBid(a.id); setBidBelopp(String(minBud)); }}
+                        style={{ marginTop: "10px", width: "100%", background: "transparent", border: `1px solid rgba(34,211,238,0.3)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "6px", fontSize: "10px", fontFamily: C.mono, cursor: "pointer" }}>
+                        🏷️ Lägg bud ({minBud}+ kr)
+                      </button>
+                    );
+                  })()}
                 </Card>
               );
             })}
