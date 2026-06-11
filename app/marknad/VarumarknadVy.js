@@ -342,12 +342,16 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
 
       {/* ── ÖPPNA AUKTIONER ── */}
       <section>
-        <Label>Öppna auktioner · {aktivaAukt.length} st</Label>
-        {aktivaAukt.length === 0 ? (
-          <Card><p style={{ color: C.dim, fontSize: "13px", margin: 0 }}>Inga öppna varuauktioner just nu.</p></Card>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "10px" }}>
-            {aktivaAukt.map(a => {
+        {(() => {
+          const ejUtgångna = aktivaAukt.filter(a => new Date(a.stanger_at) > now);
+          return (
+            <>
+              <Label>Öppna auktioner · {ejUtgångna.length} st</Label>
+              {ejUtgångna.length === 0 ? (
+                <Card><p style={{ color: C.dim, fontSize: "13px", margin: 0 }}>Inga aktiva auktioner just nu — nya startas automatiskt av agenterna.</p></Card>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "10px" }}>
+                  {ejUtgångna.map(a => {
               const ikon = VARA_IKON[a.vara] || "📦";
               const harBud = a.nuv_bud && a.hogst_budgivare;
               return (
@@ -422,11 +426,14 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                       </button>
                     );
                   })()}
-                </Card>
-              );
-            })}
-          </div>
-        )}
+                  </Card>
+                );
+              })}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </section>
 
       {/* ── HANDELSLOGG ── */}
