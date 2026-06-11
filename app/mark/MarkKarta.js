@@ -253,7 +253,17 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       headers: { apikey: key, Authorization: `Bearer ${key}` },
     })
       .then(r => r.ok ? r.json() : [])
-      .then(rows => { if (rows.length) setLokalAgare(rows); })
+      .then(rows => {
+        if (rows.length) {
+          setLokalAgare(prev => {
+            const merged = [...prev];
+            rows.forEach(r => {
+              if (!merged.some(p => p.zon_id === r.zon_id)) merged.push(r);
+            });
+            return merged;
+          });
+        }
+      })
       .catch(() => {});
   }, []);
 
