@@ -226,6 +226,35 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       clearingPerVara[h.vara] = { pris: h.pris_per_enhet, skapad: h.skapad };
   }
 
+  // Handelsnätverk: agent → alla ägda zoner (används för HANDEL-lagret)
+  const agentZonerMap = {};
+  for (const zon of zoner) {
+    const ag = agareMap[zon.id];
+    if (!ag?.agent) continue;
+    if (!agentZonerMap[ag.agent]) agentZonerMap[ag.agent] = [];
+    agentZonerMap[ag.agent].push(zon);
+  }
+  // Välj säljarens zon som matchar varans typ; köparens: vilken zon som helst
+  function pickZonForAgent(agent, vara) {
+    const zones = agentZonerMap[agent] || [];
+    const targetTyp = VARA_TYP[vara];
+    return zones.find(z => z.typ === targetTyp) || zones[0] || null;
+  }
+
+  // Aggregera handelLog per rutt (salj_zon → kop_zon, per vara)
+  const handelRutter = {};
+  for (const h of handelLog) {
+    const sZon = pickZonForAgent(h.salj_agent, h.vara);
+    const kZon = (agentZonerMap[h.kop_agent] || [])[0] || null;
+    if (!sZon || !kZon || sZon.id === kZon.id) continue;
+    const key = `${sZon.id}_${kZon.id}_${h.vara}`;
+    if (!handelRutter[key]) handelRutter[key] = { sZon, kZon, vara: h.vara, totalt: 0, antal: 0 };
+    handelRutter[key].totalt += Number(h.totalt) || 0;
+    handelRutter[key].antal  += Number(h.antal)  || 0;
+  }
+  const rutterArr = Object.values(handelRutter);
+  const maxHandelVol = rutterArr.length ? Math.max(...rutterArr.map(r => r.totalt || r.antal)) : 1;
+
   // Normaliserade min/max för rikedoms- och produktionslagret
   const kopprisList = zoner.map(z => z.koppris || 0);
   const vekiList    = zoner.map(z => z.veckoinkomst || 0);
@@ -476,6 +505,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           { id: "ägande",     label: "ÄGANDE",     color: "#60a5fa" },
           { id: "rikedom",    label: "RIKEDOM",    color: "#f59e0b" },
           { id: "produktion", label: "PRODUKTION", color: "#4ade80" },
+          { id: "handel",     label: "HANDEL",     color: "#e879f9" },
         ].map(l => (
           <button key={l.id} onClick={() => setKartLager(l.id)}
             style={{ fontSize: "9px", fontFamily: "monospace", letterSpacing: "0.1em", padding: "4px 12px", borderRadius: "4px", cursor: "pointer", background: kartLager === l.id ? rgba(l.color, 0.12) : "transparent", border: `1px solid ${kartLager === l.id ? l.color : "#2a2a2a"}`, color: kartLager === l.id ? l.color : "#444" }}>
@@ -483,7 +513,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           </button>
         ))}
         <span style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", alignSelf: "center", paddingLeft: "4px" }}>
-          {kartLager === "ägande" ? "agentfärg" : kartLager === "rikedom" ? "köppris · mörk=billig · ljus=dyr" : "dagsinkomst · mörk=låg · ljus=hög"}
+          {kartLager === "ägande" ? "agentfärg" : kartLager === "rikedom" ? "köppris · mörk=billig · ljus=dyr" : kartLager === "produktion" ? "dagsinkomst · mörk=låg · ljus=hög" : `handelsflöden · tjocklek=volym · ${rutterArr.length} rutter`}
         </span>
       </div>
 
@@ -582,10 +612,12 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               const normProd    = maxVeki > minVeki ? ((zon.veckoinkomst || 0) - minVeki) / (maxVeki - minVeki) : 0;
               const layerStroke = kartLager === "ägande"    ? strokeCol
                 : kartLager === "rikedom"    ? rgba("#f59e0b", isAct ? 1.0 : 0.22 + 0.72 * normRikedom)
-                : /* produktion */              rgba("#4ade80", isAct ? 1.0 : 0.18 + 0.72 * normProd);
+                : kartLager === "produktion" ? rgba("#4ade80", isAct ? 1.0 : 0.18 + 0.72 * normProd)
+                : /* handel */                 rgba("#e879f9", isAct ? 1.0 : 0.30);
               const layerFill   = kartLager === "ägande" ? null
                 : kartLager === "rikedom"    ? `rgba(245,158,11,${(0.02 + 0.18 * normRikedom).toFixed(3)})`
-                : `rgba(74,222,128,${(0.02 + 0.14 * normProd).toFixed(3)})`;
+                : kartLager === "produktion" ? `rgba(74,222,128,${(0.02 + 0.14 * normProd).toFixed(3)})`
+                : null;
               const layerGradId = kartLager === "ägande" ? agGradId : null;
               const layerStrokeW = kartLager === "ägande"
                 ? (isAct ? 2.4 : agFarg ? 1.8 : 1.2)
@@ -626,7 +658,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                     <polygon points={hexPts(cx, cy, HEX - 4)} fill="none"
                       stroke={kartLager === "ägande"
                         ? (agFarg ? rgba(agFarg, 0.45) : rgba(typFarg, 0.28))
-                        : kartLager === "rikedom" ? rgba("#f59e0b", 0.45) : rgba("#4ade80", 0.45)}
+                        : kartLager === "rikedom" ? rgba("#f59e0b", 0.45)
+                        : kartLager === "produktion" ? rgba("#4ade80", 0.45)
+                        : rgba("#e879f9", 0.45)}
                       strokeWidth="0.8" />
                   )}
                   <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
@@ -650,6 +684,35 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               );
             })}
           </g>
+
+          {/* ── HANDELSNÄTVERK-LAGER ── */}
+          {kartLager === "handel" && rutterArr.map((r, i) => {
+            const [sx, sy] = hexCenter(r.sZon.hex_col, r.sZon.hex_row, OX, OY);
+            const [kx, ky] = hexCenter(r.kZon.hex_col, r.kZon.hex_row, OX, OY);
+            const vol = r.totalt || r.antal || 1;
+            const norm = Math.min(vol / maxHandelVol, 1);
+            const sw = 0.8 + norm * 3.5;
+            const typ = VARA_TYP[r.vara] || "industri";
+            const col = TYP_FARG[typ] || "#e879f9";
+            const mx = (sx + kx) / 2;
+            const my = (sy + ky) / 2 - 12;
+            return (
+              <g key={i} style={{ pointerEvents: "none" }}>
+                <path d={`M${sx.toFixed(1)},${sy.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${kx.toFixed(1)},${ky.toFixed(1)}`}
+                  fill="none" stroke={col} strokeWidth={sw + 1.5} strokeOpacity="0.12" />
+                <path d={`M${sx.toFixed(1)},${sy.toFixed(1)} Q${mx.toFixed(1)},${my.toFixed(1)} ${kx.toFixed(1)},${ky.toFixed(1)}`}
+                  fill="none" stroke={col} strokeWidth={sw} strokeOpacity="0.72"
+                  strokeLinecap="round" strokeDasharray={norm < 0.25 ? "3 4" : undefined} />
+                {norm >= 0.35 && (
+                  <text x={mx} y={my - 5} textAnchor="middle" fontSize="7"
+                    fill={col} fillOpacity="0.85" fontFamily="monospace"
+                    style={{ userSelect: "none" }}>
+                    {VARA_IKON[r.vara]} {r.totalt ? `${Math.round(r.totalt)} kr` : `${r.antal}st`}
+                  </text>
+                )}
+              </g>
+            );
+          })}
 
           {zoner.filter(zon => INSTITUTIONS[zon.namn]).map(zon => {
             const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row, OX, OY);
