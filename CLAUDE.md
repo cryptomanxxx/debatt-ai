@@ -14,7 +14,7 @@
 
 ## Git-arbetsflöde
 
-**Jobba alltid på `dev`-branchen** — committa och pusha dit. Skapa aldrig nya feature-branches. När ett arbete är klart: skapa en PR från `dev → main` via MCP och merga med squash. Synka sedan `dev` med `git fetch origin main && git reset --hard origin/main && git push --force-with-lease origin dev` så den är redo för nästa uppgift.
+Varje Claude Code-session på claude.ai/code får en auto-genererad branch (t.ex. `claude/merge-to-main-xxxxx`). Jobba på den branchen som sessionen tilldelats — committa och pusha dit. När ett arbete är klart: skapa en PR mot `main` via MCP och merga med squash. Synka sedan sessionsbranchens lokala kopia med `git fetch origin main && git reset --hard origin/main && git push --force origin <branch>` så den är redo för nästa uppgift. Gamla sessionsbrancher kan raderas på GitHub efter merge.
 
 ---
 
