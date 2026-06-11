@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AGENT_VISUELL } from "../agentData";
 
 const TYP_FARG = {
@@ -64,6 +64,11 @@ const HEX_SP = 40;     // gitteravstånd — frikopplat från radien så kartan 
 const SQRT3 = Math.sqrt(3);
 const SVG_W = 530;
 const SVG_H = 490;
+
+function clampPan(x, y, z, W, H) {
+  if (z <= 1) return [0, 0];
+  return [Math.min(0, Math.max(x, W * (1 - z))), Math.min(0, Math.max(y, H * (1 - z)))];
+}
 
 function hexCenter(col, row, ox, oy) {
   const x = HEX_SP * SQRT3 * (col + (row % 2 === 1 ? 0.5 : 0)) + ox;
@@ -136,6 +141,11 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const [markMsg,      setMarkMsg]      = useState(null);  // { text, ok }
   const [renameMode,   setRenameMode]   = useState(false);
   const [renameInput,  setRenameInput]  = useState("");
+  const [tfm,          setTfm]          = useState({ z: 1, x: 0, y: 0 });
+  const tfmRef       = useRef({ z: 1, x: 0, y: 0 });
+  const containerRef = useRef(null);
+  const dragRef      = useRef({ active: false, startX: 0, startY: 0, px: 0, py: 0, moved: false });
+  const touchRef     = useRef({ d0: 1, z0: 1, mx0: 0, my0: 0, px0: 0, py0: 0 });
 
   const mergedAgare = [
     ...agare.filter(a => !lokalAgare.some(la => la.zon_id === a.zon_id)),
@@ -274,6 +284,114 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    function onWheel(e) {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const mx = e.clientX - r.left, my = e.clientY - r.top;
+      const { z, x, y } = tfmRef.current;
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      const nz = Math.min(5, Math.max(1, z * factor));
+      const nx = mx - (mx - x) * (nz / z);
+      const ny = my - (my - y) * (nz / z);
+      const [cx, cy] = clampPan(nx, ny, nz, r.width, r.height);
+      const next = { z: nz, x: cx, y: cy };
+      tfmRef.current = next;
+      setTfm(next);
+    }
+    function onTouchMove(e) {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        const t = touchRef.current;
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const d = Math.hypot(dx, dy);
+        const nz = Math.min(5, Math.max(1, t.z0 * d / t.d0));
+        const r = el.getBoundingClientRect();
+        const nx = t.mx0 - (t.mx0 - t.px0) * (nz / t.z0);
+        const ny = t.my0 - (t.my0 - t.py0) * (nz / t.z0);
+        const [cx, cy] = clampPan(nx, ny, nz, r.width, r.height);
+        const next = { z: nz, x: cx, y: cy };
+        tfmRef.current = next;
+        setTfm(next);
+      } else if (e.touches.length === 1 && dragRef.current.active && tfmRef.current.z > 1) {
+        e.preventDefault();
+        const dx = e.touches[0].clientX - dragRef.current.startX;
+        const dy = e.touches[0].clientY - dragRef.current.startY;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragRef.current.moved = true;
+        const r = el.getBoundingClientRect();
+        const [cx, cy] = clampPan(dragRef.current.px + dx, dragRef.current.py + dy, tfmRef.current.z, r.width, r.height);
+        const next = { ...tfmRef.current, x: cx, y: cy };
+        tfmRef.current = next;
+        setTfm(next);
+      }
+    }
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchmove", onTouchMove);
+    };
+  }, []);
+
+  function applyZoom(factor) {
+    const el = containerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const mx = r.width / 2, my = r.height / 2;
+    const { z, x, y } = tfmRef.current;
+    const nz = Math.min(5, Math.max(1, z * factor));
+    const nx = mx - (mx - x) * (nz / z);
+    const ny = my - (my - y) * (nz / z);
+    const [cx, cy] = clampPan(nx, ny, nz, r.width, r.height);
+    const next = { z: nz, x: cx, y: cy };
+    tfmRef.current = next;
+    setTfm(next);
+  }
+
+  function handleMouseDown(e) {
+    const { x, y } = tfmRef.current;
+    dragRef.current = { active: true, startX: e.clientX, startY: e.clientY, px: x, py: y, moved: false };
+  }
+
+  function handleMouseMove(e) {
+    if (!dragRef.current.active) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragRef.current.moved = true;
+    const { z } = tfmRef.current;
+    const r = containerRef.current.getBoundingClientRect();
+    const [cx, cy] = clampPan(dragRef.current.px + dx, dragRef.current.py + dy, z, r.width, r.height);
+    const next = { ...tfmRef.current, x: cx, y: cy };
+    tfmRef.current = next;
+    setTfm(next);
+  }
+
+  function handleMouseUp() {
+    dragRef.current.active = false;
+  }
+
+  function handleTouchStart(e) {
+    if (e.touches.length === 1) {
+      const { x, y } = tfmRef.current;
+      dragRef.current = { active: true, startX: e.touches[0].clientX, startY: e.touches[0].clientY, px: x, py: y, moved: false };
+    } else if (e.touches.length === 2) {
+      dragRef.current.active = false;
+      const r = containerRef.current.getBoundingClientRect();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - r.left;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2 - r.top;
+      touchRef.current = { d0: Math.hypot(dx, dy), z0: tfmRef.current.z, mx0: mx, my0: my, px0: tfmRef.current.x, py0: tfmRef.current.y };
+    }
+  }
+
+  function handleTouchEnd() {
+    dragRef.current.active = false;
+  }
+
   async function kopZon(zon) {
     if (!besokareId || pending) return;
     setPending(true); setMarkMsg(null);
@@ -344,8 +462,19 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
       {/* ── HEX MAP ── max 700px */}
-      <div style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "#030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)" }}>
-        {/* Terrängbild i egen div så brightness-filter inte påverkar SVG */}
+      <div
+        ref={containerRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onClickCapture={e => { if (dragRef.current.moved) { e.stopPropagation(); dragRef.current.moved = false; } }}
+        style={{ width: "100%", maxWidth: "700px", position: "relative", borderRadius: "12px", overflow: "hidden", background: "#030a18", border: "1px solid #1a3020", boxShadow: "0 4px 40px rgba(0,10,30,0.9)", cursor: tfm.z > 1 ? "grab" : "default", userSelect: "none" }}
+      >
+        {/* Terrängbild + SVG inuti zoom/pan-wrapper */}
+        <div style={{ position: "relative", transform: `translate(${tfm.x}px,${tfm.y}px) scale(${tfm.z})`, transformOrigin: "0 0", willChange: "transform" }}>
         <div style={{ position: "absolute", inset: 0, backgroundImage: "url('/mark-terrain.jpg')", backgroundSize: "cover", backgroundPosition: "center", filter: "brightness(1.8)", zIndex: 0 }} />
         <svg
           viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -513,6 +642,21 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             MARKARTAN · {zoner.length} ZONER · {agare.length} ÄGDA
           </text>
         </svg>
+        </div>{/* /zoom wrapper */}
+        {/* Zoom-knappar */}
+        <div style={{ position: "absolute", bottom: "10px", right: "10px", display: "flex", flexDirection: "column", gap: "4px", zIndex: 20, pointerEvents: "none" }}>
+          {[
+            { label: "+", action: () => applyZoom(1.4), disabled: false },
+            { label: "−", action: () => applyZoom(1 / 1.4), disabled: tfm.z <= 1 },
+            { label: "↺", action: () => { const n = { z: 1, x: 0, y: 0 }; tfmRef.current = n; setTfm(n); }, disabled: tfm.z <= 1 },
+          ].map(({ label, action, disabled }) => (
+            <button key={label} onClick={e => { e.stopPropagation(); action(); }}
+              disabled={disabled}
+              style={{ pointerEvents: "all", width: "28px", height: "28px", background: "rgba(3,10,24,0.85)", border: `1px solid ${disabled ? "#1a3050" : "#2a5080"}`, borderRadius: "4px", color: disabled ? "#1a3050" : "#60a5fa", cursor: disabled ? "default" : "pointer", fontSize: "15px", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "monospace", lineHeight: 1 }}>
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
         {besokareNamn && (
