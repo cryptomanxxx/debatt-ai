@@ -226,18 +226,26 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       clearingPerVara[h.vara] = { pris: h.pris_per_enhet, skapad: h.skapad };
   }
 
-  // Handelsnätverk: agent → zon-objekt (används för HANDEL-lagret)
-  const agentZonMap = {};
+  // Handelsnätverk: agent → alla ägda zoner (används för HANDEL-lagret)
+  const agentZonerMap = {};
   for (const zon of zoner) {
     const ag = agareMap[zon.id];
-    if (ag?.agent) agentZonMap[ag.agent] = zon;
+    if (!ag?.agent) continue;
+    if (!agentZonerMap[ag.agent]) agentZonerMap[ag.agent] = [];
+    agentZonerMap[ag.agent].push(zon);
+  }
+  // Välj säljarens zon som matchar varans typ; köparens: vilken zon som helst
+  function pickZonForAgent(agent, vara) {
+    const zones = agentZonerMap[agent] || [];
+    const targetTyp = VARA_TYP[vara];
+    return zones.find(z => z.typ === targetTyp) || zones[0] || null;
   }
 
   // Aggregera handelLog per rutt (salj_zon → kop_zon, per vara)
   const handelRutter = {};
   for (const h of handelLog) {
-    const sZon = agentZonMap[h.salj_agent];
-    const kZon = agentZonMap[h.kop_agent];
+    const sZon = pickZonForAgent(h.salj_agent, h.vara);
+    const kZon = (agentZonerMap[h.kop_agent] || [])[0] || null;
     if (!sZon || !kZon || sZon.id === kZon.id) continue;
     const key = `${sZon.id}_${kZon.id}_${h.vara}`;
     if (!handelRutter[key]) handelRutter[key] = { sZon, kZon, vara: h.vara, totalt: 0, antal: 0 };
