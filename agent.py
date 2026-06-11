@@ -831,7 +831,7 @@ def main():
                         print(f"  Redan bettad: \"{market['titel'][:50]}\"")
                         continue
                     print(f"  Analyserar: \"{market['titel'][:60]}\"…")
-                    sannolikhet, motivering = estimera_sannolikhet(agent, market, krypto_data)
+                    sannolikhet, motivering = estimera_sannolikhet(agent, market, krypto_data, sb_key=sb_key)
                     bet_buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
                     ok = spara_bet(sb_key, market["id"], agent["namn"], sannolikhet, motivering, insats_multiplikator=bet_buffs.get("insats_multiplikator", 1.0))
                     status = "✓" if ok else "✗"
