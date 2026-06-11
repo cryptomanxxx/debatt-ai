@@ -76,7 +76,7 @@ export async function POST(req) {
     return NextResponse.json({ error: `Du har redan en öppen auktion för ${vara}` }, { status: 409 });
   }
 
-  // Skapa 24h-auktion
+  // Skapa 24h-auktion — hämta tillbaka id för att kunna hantera race conditions
   const stanger = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
   const cr = await sb("mark_vara_auktioner", {
     method: "POST",
@@ -90,12 +90,30 @@ export async function POST(req) {
       stanger_at: stanger,
       status: "öppen",
     }),
-    prefer: "return=minimal",
   });
   if (!cr.ok) {
     const err = await cr.text();
     console.error("salj-vara insert error:", err);
     return NextResponse.json({ error: "Kunde inte skapa auktion" }, { status: 500 });
+  }
+  const inserted = await cr.json();
+  const newId = (Array.isArray(inserted) ? inserted[0] : inserted)?.id;
+
+  // Race condition-skydd: om en parallell request smet in och skapade en auktion samtidigt
+  // (t.ex. dubbel-submit från två flikar) — behåll den med lägst id, cancel vår om vi förlorade.
+  if (newId) {
+    const dupeR = await sb(
+      `mark_vara_auktioner?saljare=eq.${encodeURIComponent(display_name)}&vara=eq.${encodeURIComponent(vara)}&status=eq.%C3%B6ppen&select=id&order=id.asc&limit=2`
+    );
+    const dupes = dupeR.ok ? await dupeR.json() : [];
+    if (dupes.length > 1 && dupes[0].id !== newId) {
+      await sb(`mark_vara_auktioner?id=eq.${newId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "inställd" }),
+        prefer: "return=minimal",
+      });
+      return NextResponse.json({ error: `Du har redan en öppen auktion för ${vara}` }, { status: 409 });
+    }
   }
 
   return NextResponse.json({ ok: true, vara, antal, reservpris, stanger_at: stanger });
