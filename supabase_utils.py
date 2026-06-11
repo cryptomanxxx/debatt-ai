@@ -1188,45 +1188,176 @@ Välj den indikator som just nu är mest politiskt relevant. typ ska vara 'line'
         return None
 
 
-def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "") -> tuple[int, str]:
-    """Låter agenten uppskatta sannolikheten (0-100) + ge en kort motivering."""
+def hamta_market_artiklar(sb_key: str, market: dict, max_artiklar: int = 3) -> list[dict]:
+    """Hämtar relevanta plattformsartiklar för ett market via nyckelordssökning i rubrik."""
+    titel = market.get("titel", "")
+    besk  = market.get("beskrivning", "") or ""
+    stopwords = {
+        "vinner", "kommer", "under", "eller", "andra", "denna", "detta", "senaste",
+        "månad", "månader", "enligt", "efter", "innan", "senast", "första", "andra",
+        "tredje", "fjärde", "femte", "vilken", "vilket", "vilka",
+    }
+    words = [w.strip("?.,!()") for w in (titel + " " + besk).split()]
+    keywords = [w for w in words if len(w) > 4 and w.lower() not in stopwords][:5]
+    if not keywords:
+        return []
+
+    artiklar = []
+    seen: set[str] = set()
+    for kw in keywords:
+        try:
+            res = httpx.get(
+                f"{SB_URL}/rest/v1/artiklar",
+                params={
+                    "select": "rubrik,forfattare,artikel",
+                    "rubrik": f"ilike.*{kw}*",
+                    "order": "skapad.desc",
+                    "limit": "2",
+                },
+                headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+                timeout=8,
+            )
+            if res.is_success:
+                for row in res.json():
+                    rubrik = row.get("rubrik", "")
+                    if rubrik and rubrik not in seen:
+                        seen.add(rubrik)
+                        artiklar.append(row)
+        except Exception:
+            pass
+        if len(artiklar) >= max_artiklar:
+            break
+
+    return artiklar[:max_artiklar]
+
+
+def hamta_market_konsensus(sb_key: str, market_id: int) -> dict | None:
+    """Hämtar befintlig bet-konsensus för ett market: snitt, spann och antal."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_bets",
+            params={"market_id": f"eq.{market_id}", "select": "sannolikhet"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=8,
+        )
+        if not res.is_success:
+            return None
+        probs = [b["sannolikhet"] for b in res.json() if b.get("sannolikhet") is not None]
+        if not probs:
+            return None
+        return {
+            "snitt": round(sum(probs) / len(probs)),
+            "min":   min(probs),
+            "max":   max(probs),
+            "antal": len(probs),
+        }
+    except Exception:
+        return None
+
+
+def _sport_basrate_hint(market: dict) -> str:
+    """Returnerar statistiska bastal för sport-markets (F1 / fotboll)."""
+    rk = market.get("resolution_kalla", "")
+    if not rk:
+        return ""
+    try:
+        meta = json.loads(rk)
+    except Exception:
+        return ""
+    typ = meta.get("type", "")
+    if typ == "f1_win":
+        return (
+            "Statistisk basnivå F1: VM-ledaren vinner enskilda lopp med ungefär "
+            "30–45% sannolikhet i en dominant säsong. Utanför topp-3 i mästerskapet "
+            "är vinstsannolikheten vanligen under 15%."
+        )
+    if typ == "football_win":
+        return (
+            "Statistisk basnivå fotboll: hemmalaget vinner ungefär 45% av matcher i "
+            "europeiska toppligor. Oavgjort ~25%, bortaseger ~30%."
+        )
+    return ""
+
+
+def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key: str = "") -> tuple[int, str]:
+    """Låter agenten uppskatta sannolikheten (0-100) med beslutsunderlag och kalibreringsregel."""
     deadline_str = market.get("deadline", "")[:10]
-    system = agent["system"]
+    system       = agent["system"]
     betting_stil = agent.get("betting_stil", "")
+
+    kontext_delar: list[str] = []
+
+    # 1. Befintlig konsensus bland andra agenter
+    if sb_key:
+        konsensus = hamta_market_konsensus(sb_key, market["id"])
+        if konsensus:
+            kontext_delar.append(
+                f"Befintlig konsensus ({konsensus['antal']} agenter): "
+                f"snitt {konsensus['snitt']}%, spann {konsensus['min']}–{konsensus['max']}%"
+            )
+
+    # 2. Relevanta plattformsartiklar
+    if sb_key:
+        art = hamta_market_artiklar(sb_key, market)
+        if art:
+            art_rader = "\n".join(
+                f'- "{r["rubrik"]}" ({r.get("forfattare","?")}): '
+                f'{(r.get("artikel") or "")[:280]}…'
+                for r in art
+            )
+            kontext_delar.append(f"Relevanta artiklar på plattformen:\n{art_rader}")
+
+    # 3. Statistiska bastal för sport
+    sport_hint = _sport_basrate_hint(market)
+    if sport_hint:
+        kontext_delar.append(sport_hint)
+
+    # 4. Extern marknadsdata (krypto m.m.)
+    if extra_data:
+        kontext_delar.append(f"Aktuell marknadsdata:\n{extra_data}")
+
+    kontext_str = "\n\n".join(kontext_delar)
+
     user_msg = (
         f"Du ska göra en sannolikhetsbedömning som {agent['namn']}.\n\n"
         f"Fråga: {market['titel']}\n"
         f"Beskrivning: {market.get('beskrivning') or ''}\n"
-        f"Avgörs via: {market.get('resolution_kalla') or ''}\n"
         f"Deadline: {deadline_str}\n"
     )
-    if extra_data:
-        user_msg += f"\nAktuell marknadsdata:\n{extra_data}\n"
+    if kontext_str:
+        user_msg += f"\nBeslutsunderlag:\n{kontext_str}\n"
     if betting_stil:
         user_msg += f"\nDin bettingstil: {betting_stil}\n"
+
     user_msg += (
-        "\nSvara EXAKT i detta JSON-format (inget annat):\n"
+        "\nKALIBRERINGSREGEL: 50% = du vet ingenting. Avvika bara från 50% om du "
+        "har konkret bevis eller välgrundad analys ovan. Undvik extremvärden "
+        "(under 10% eller över 90%) utan tydliga skäl.\n\n"
+        "Resonera kort (2-3 meningar) utifrån beslutsunderlaget, ge sedan ditt svar i JSON:\n"
         '{"sannolikhet": <heltal 0-100>, "motivering": "<1-2 meningar>"}'
     )
+
     _payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
-        "max_tokens": 120,
+        "max_tokens": 350,
         "temperature": 0.4,
     }
     try:
         text = groq_post(_payload).json()["choices"][0]["message"]["content"].strip()
     except Exception:
         try:
-            text = gemini_post(system, user_msg, max_tokens=120)
+            text = gemini_post(system, user_msg, max_tokens=350)
         except Exception:
             try:
-                text = github_models_post({**_payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"].strip()
+                text = github_models_post(
+                    {**_payload, "model": "Llama-3.3-70B-Instruct"}
+                ).json()["choices"][0]["message"]["content"].strip()
             except Exception:
                 return 50, "Ingen analys tillgänglig."
 
     start = text.find("{")
-    end = text.rfind("}") + 1
+    end   = text.rfind("}") + 1
     if start == -1 or end == 0:
         return 50, text[:150]
     try:
