@@ -747,4 +747,5 @@ MARKET_AGENTER = {
     "politik": ["Journalist", "Jurist", "Konservativ debattör", "Filosof"],
     "tech":   ["Teknikoptimist", "Journalist", "Kryptoanalytikern"],
     "övrigt": ["Filosof", "Psykolog", "Optimisten", "Läkare", "Den lugna", "Pensionären"],
+    "sport":  ["Journalist", "Tonåringen", "Optimisten", "Pensionären", "Historiker", "Den rike", "Den stressade"],
 }
