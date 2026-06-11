@@ -163,7 +163,17 @@ def sb_upsert(table, data, on_conflict=None):
 # ── Auktionslogik ─────────────────────────────────────────────────────────────
 
 def betala_passiv_inkomst(saldon: dict):
-    """Betalar ut veckoinkomst/7 dagligen till varje zonaägare (AI-agent och besökare)."""
+    """Betalar ut veckoinkomst/7 dagligen till varje zonaägare (AI-agent och besökare).
+    En sentinel-rad i mark_transaktioner förhindrar dubbelutbetalning vid re-run."""
+    today = datetime.now(timezone.utc).date().isoformat()
+    sentinel_check = sb_get(
+        f"mark_transaktioner?kop_agent=eq.__passiv_inkomst__"
+        f"&skapad=gte.{today}T00%3A00%3A00Z&select=id&limit=1"
+    )
+    if sentinel_check:
+        print("Passiv inkomst redan utbetald idag — hoppar över")
+        return
+
     agare_rows = sb_get(
         "mark_agare?select=zon_id,agent,mark_zoner(namn,veckoinkomst)"
     ) or []
@@ -179,6 +189,12 @@ def betala_passiv_inkomst(saldon: dict):
         nytt = round(nuvarande + daglig, 2)
         patch_saldo(agent, nytt, saldon)
         totalt += daglig
+    # Spara sentinel så att re-run inte betalar dubbelt
+    sb_post("mark_transaktioner", {
+        "zon_namn": f"__passiv_inkomst__{today}",
+        "kop_agent": "__passiv_inkomst__",
+        "pris": int(totalt),
+    })
     print(f"Passiv inkomst utbetald: {totalt:.0f} kr totalt till {len(agare_rows)} zoner")
 
 
