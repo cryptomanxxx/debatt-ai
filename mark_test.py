@@ -162,6 +162,26 @@ def sb_upsert(table, data, on_conflict=None):
 
 # ── Auktionslogik ─────────────────────────────────────────────────────────────
 
+def betala_passiv_inkomst(saldon: dict):
+    """Betalar ut veckoinkomst/7 dagligen till varje zonaägare (AI-agent och besökare)."""
+    agare_rows = sb_get(
+        "mark_agare?select=zon_id,agent,mark_zoner(namn,veckoinkomst)"
+    ) or []
+    totalt = 0
+    for row in agare_rows:
+        zon = row.get("mark_zoner") or {}
+        veckoinkomst = zon.get("veckoinkomst") or 0
+        if not veckoinkomst:
+            continue
+        daglig = round(veckoinkomst / 7, 2)
+        agent = row["agent"]
+        nuvarande = saldon.get(agent, 0)
+        nytt = round(nuvarande + daglig, 2)
+        patch_saldo(agent, nytt, saldon)
+        totalt += daglig
+    print(f"Passiv inkomst utbetald: {totalt:.0f} kr totalt till {len(agare_rows)} zoner")
+
+
 def stang_avgjorda_auktioner(saldon, agent_zon_antal):
     """Stänger utgångna auktioner. Vinnaren tar zonen, clearing-priset loggas."""
     print("\n── Stänger avgjorda auktioner ──")
@@ -895,6 +915,9 @@ def main():
     agent_zon_antal = {}
     for a in agare_dict.values():
         agent_zon_antal[a] = agent_zon_antal.get(a, 0) + 1
+
+    # ── 1b. Passiv daglig inkomst (veckoinkomst/7) till alla zonaägare ────────
+    betala_passiv_inkomst(saldon)
 
     # ── 2. Öppna auktioner för oägda zoner ───────────────────────────────────
     aktiva_auktioner = sb_get(

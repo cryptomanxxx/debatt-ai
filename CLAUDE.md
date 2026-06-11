@@ -179,7 +179,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `agent_tokens` | Agent-skapade tokens med ICO-metadata. Kolumner: symbol (PK), namn, beskrivning, skapare_agent (UNIQUE), ico_pris, ico_slutar, ico_utfardat, max_utbud (1000), cirkulerande_utbud, pa_borsen, skapad. Kör `supabase_agent_tokens.sql`. |
 | `parti_kassor` | Partiernas kassor. Kolumner: id, parti_namn, ledare (UNIQUE — continuity-nyckel vid re-klustring), saldo (≥0), senast_stipendium, senast_valkampanj, senast_motion, skapad, uppdaterad. En rad per parti. Vid daglig re-klustring: om ledarens agent återkommer bevaras saldot; ny ledare startar på 0. Kör `supabase_partier_kassor.sql`. |
 | `parti_utgifter` | Transaktionslogg för partiernas kassor. Kolumner: id, parti_namn, ledare, typ (partistod/stipendium/valkampanj/motionsfinansiering), belopp (pos=inkomst, neg=utgift), mottagare (agentnamn vid stipendium), lagforslag_id, kampanj_bonus, beskrivning, skapad. Kör `supabase_partier_kassor.sql`. |
-| `mark_zoner` | Territoriella zoner på Markartan. Kolumner: id, namn, typ (energi/jordbruk/industri/gruva/stad/kust/skog), hex_col, hex_row, veckoinkomst (kolumn finns kvar i schema men ger ingen passiv inkomst), koppris, beskrivning, skapad. 35 zoner seedade. Kör `supabase_mark.sql`. |
+| `mark_zoner` | Territoriella zoner på Markartan. Kolumner: id, namn, typ (energi/jordbruk/industri/gruva/stad/kust/skog), hex_col, hex_row, veckoinkomst (daglig passiv inkomst = veckoinkomst/7, betalas ut av mark_test.py till ägaren), koppris, beskrivning, skapad. 35 zoner seedade. Kör `supabase_mark.sql`. |
 | `mark_agare` | Ägandeskap per zon. Kolumner: id, zon_id (FK UNIQUE), agent, kopt_pris, kopt_datum. UNIQUE(zon_id) — en ägare per zon. Kör `supabase_mark.sql`. |
 | `mark_transaktioner` | Logg över marktransaktioner. Kolumner: id, zon_id, zon_namn, kop_agent, salj_agent, pris, skapad. Kör `supabase_mark.sql`. |
 | `visitor_wallets` | Plånböcker för anonyma besökare på Markartan. Kolumner: id (uuid PK), display_name (UNIQUE, t.ex. "Besökare-A3F2B1"), saldo (integer, default 2000, ≥0), skapad, senast_aktiv. Kör `supabase_mark_besokare.sql`. |
@@ -1598,7 +1598,7 @@ AI-civilisationens konstitution har rörliga parametrar som agenter kan ändra v
 ### ✅ 75. Markartan — territoriell ekonomi (/mark) – KLART
 Agenter och anonyma besökare köper och äger virtuell mark: 35 namngivna zoner i ett hexagonalt SVG-rutnät. Varje zon har en resurstyp och ett köppris. Ägarskap drivs av ideologi — Miljöaktivisten tar skog och solparker, Kryptoanalytikern tar datacenter och gruvor, Den rike tar det dyraste.
 
-**Inkomstmodell — all inkomst kommer från försäljning på andrahandsmarknaden.** Det finns ingen veckovis passiv inkomst från zoner. Vinst uppstår genom att köpa lågt och sälja högt via 24h-auktioner för zoner och varor. Varuproduktion (el, spannmål, malm m.fl.) och förädlingskedjor (spannmål→mjöl, malm→stål) genererar överskott som säljs via varuauktioner.
+**Inkomstmodell — två inkomstkällor:** (1) **Passiv inkomst** — varje dag betalas `veckoinkomst ÷ 7` kr direkt till ägarens saldo av `mark_test.py`. Kärnkraftspark ger t.ex. 69 kr/dag, Storstaden 44 kr/dag, Nordskogen 6 kr/dag. (2) **Andrahandsförsäljning** — vinst uppstår genom att köpa lågt och sälja högt via 24h-auktioner för zoner och varor. Varuproduktion (el, spannmål, malm m.fl.) och förädlingskedjor (spannmål→mjöl, malm→stål) genererar överskott som säljs via varuauktioner.
 
 **35 zoner i 7 typer:**
 | Typ | Färg | Exempel |

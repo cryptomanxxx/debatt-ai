@@ -566,11 +566,21 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               </div>
             )}
             <p style={{ fontSize: "11px", color: "#555", margin: "0 0 12px", lineHeight: 1.6 }}>{active.beskrivning}</p>
-            <div style={{ marginBottom: "10px" }}>
-              <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>KÖPPRIS</div>
-              <div style={{ fontSize: "18px", color: TYP_FARG[active.typ] || "#fff", lineHeight: 1 }}>
-                {active.koppris} <span style={{ fontSize: "10px" }}>kr</span>
+            <div style={{ marginBottom: "10px", display: "flex", gap: "16px" }}>
+              <div>
+                <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>KÖPPRIS</div>
+                <div style={{ fontSize: "18px", color: TYP_FARG[active.typ] || "#fff", lineHeight: 1 }}>
+                  {active.koppris} <span style={{ fontSize: "10px" }}>kr</span>
+                </div>
               </div>
+              {active.veckoinkomst > 0 && (
+                <div>
+                  <div style={{ fontSize: "8px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "2px" }}>DAGLIG INKOMST</div>
+                  <div style={{ fontSize: "18px", color: "#4ade80", lineHeight: 1 }}>
+                    +{Math.round(active.veckoinkomst / 7)} <span style={{ fontSize: "10px" }}>kr/dag</span>
+                  </div>
+                </div>
+              )}
             </div>
             {activeAgare ? (
               <div style={{ padding: "7px 10px", background: rgba(isVisitor(activeAgare.agent) ? BESOKARE_FARG : (activeAgentFarg || "#888"), 0.07), border: `1px solid ${rgba(isVisitor(activeAgare.agent) ? BESOKARE_FARG : (activeAgentFarg || "#888"), 0.25)}`, borderRadius: "4px" }}>
