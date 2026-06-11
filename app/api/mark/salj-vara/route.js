@@ -53,24 +53,10 @@ export async function POST(req) {
     return NextResponse.json({ error: `Du har bara ${harAntal} ${vara} i lager` }, { status: 400 });
   }
 
-  // Kontrollera att ingen öppen auktion redan finns för samma säljare + vara
-  const cr = await sb('mark_vara_auktioner', {
-  method: 'POST',
-  body: JSON.stringify({
-    saljare: display_name,
-    vara,
-    antal,
-    reservpris,
-    nuv_bud: null,
-    hogst_budgivare: null,
-    stanger_at: stanger,
-    status: 'öppen',
-  }),
-  prefer: 'return=minimal',
-  headers: {
-    'X-Insert-If-Not-Exists': 'saljare,vara'
-  }
-});
+  // Snabb pre-flight: förhindrar de flesta dubbletter utan race
+  const existR = await sb(
+    `mark_vara_auktioner?saljare=eq.${encodeURIComponent(display_name)}&vara=eq.${encodeURIComponent(vara)}&status=eq.%C3%B6ppen&select=id`
+  );
   const exist = existR.ok ? await existR.json() : [];
   if (exist.length) {
     return NextResponse.json({ error: `Du har redan en öppen auktion för ${vara}` }, { status: 409 });
@@ -99,8 +85,8 @@ export async function POST(req) {
   const inserted = await cr.json();
   const newId = (Array.isArray(inserted) ? inserted[0] : inserted)?.id;
 
-  // Race condition-skydd: om en parallell request smet in och skapade en auktion samtidigt
-  // (t.ex. dubbel-submit från två flikar) — behåll den med lägst id, cancel vår om vi förlorade.
+  // Race condition-skydd: om en parallell request smet in (t.ex. dubbel-submit från två flikar)
+  // behåll den med lägst id och cancela vår om vi förlorade racet.
   if (newId) {
     const dupeR = await sb(
       `mark_vara_auktioner?saljare=eq.${encodeURIComponent(display_name)}&vara=eq.${encodeURIComponent(vara)}&status=eq.%C3%B6ppen&select=id&order=id.asc&limit=2`
