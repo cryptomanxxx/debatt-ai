@@ -62,6 +62,8 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   const [bidBelopp,    setBidBelopp]    = useState("");
   const [pending,      setPending]      = useState(false);
   const [markMsg,      setMarkMsg]      = useState(null);
+  const [renameMode,   setRenameMode]   = useState(false);
+  const [renameInput,  setRenameInput]  = useState("");
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -71,7 +73,8 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
       localStorage.setItem("mark_besokare_id", id);
     }
     const hex = id.replace(/-/g, "").slice(0, 6).toUpperCase();
-    const namn = `Besökare-${hex}`;
+    const fallback = `Besökare-${hex}`;
+    const namn = localStorage.getItem("mark_besokare_namn") || fallback;
     setBesokareId(id);
     setBesokareNamn(namn);
 
@@ -79,7 +82,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
     // Visa 2000 kr direkt för ny besökare utan cache — det är startsaldot
     setBesokSaldo(cachedSaldo !== null ? Number(cachedSaldo) : 2000);
 
-    fetch(`${SB_URL}/rest/v1/visitor_wallets?id=eq.${id}&select=saldo`, {
+    fetch(`${SB_URL}/rest/v1/visitor_wallets?id=eq.${id}&select=saldo,display_name`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
     })
       .then(r => r.ok ? r.json() : [])
@@ -87,6 +90,10 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
         if (data.length) {
           setBesokSaldo(data[0].saldo);
           localStorage.setItem("mark_besokare_saldo", data[0].saldo);
+          if (data[0].display_name) {
+            setBesokareNamn(data[0].display_name);
+            localStorage.setItem("mark_besokare_namn", data[0].display_name);
+          }
         }
       })
       .catch(() => {});
@@ -159,16 +166,56 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
 
       {/* ── BESÖKAR-HUD ── */}
       {besokareNamn && (
-        <div style={{ background: "#070f10", border: `1px solid rgba(34,211,238,0.25)`, borderRadius: "8px", padding: "10px 16px", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "10px", color: BESOKARE_FARG, fontFamily: C.mono, letterSpacing: "0.08em" }}>👤 {besokareNamn}</span>
-          <span style={{ fontSize: "15px", color: "#e0e0e0", fontFamily: C.mono, fontWeight: 700 }}>
-            {besokSaldo !== null ? `${besokSaldo.toLocaleString("sv-SE")} kr` : "…"}
-          </span>
-          <span style={{ fontSize: "9px", color: "rgba(34,211,238,0.5)", fontFamily: C.mono }}>· varumarknaden</span>
-          {markMsg && (
-            <span style={{ fontSize: "11px", color: markMsg.ok ? "#4ade80" : "#f87171", fontFamily: C.mono, marginLeft: "auto" }}>
-              {markMsg.text}
+        <div style={{ background: "#070f10", border: `1px solid rgba(34,211,238,0.25)`, borderRadius: "8px", padding: "10px 16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "10px", color: BESOKARE_FARG, fontFamily: C.mono, letterSpacing: "0.08em" }}>👤 {besokareNamn}</span>
+            <span style={{ fontSize: "15px", color: "#e0e0e0", fontFamily: C.mono, fontWeight: 700 }}>
+              {besokSaldo !== null ? `${besokSaldo.toLocaleString("sv-SE")} kr` : "…"}
             </span>
+            <span style={{ fontSize: "9px", color: "rgba(34,211,238,0.5)", fontFamily: C.mono }}>· varumarknaden</span>
+            <button
+              onClick={() => { setRenameMode(v => !v); setRenameInput(""); setMarkMsg(null); }}
+              style={{ marginLeft: "auto", fontSize: "9px", color: "rgba(34,211,238,0.6)", background: "none", border: "none", cursor: "pointer", fontFamily: C.mono, letterSpacing: "0.05em" }}
+            >✏️ byt namn</button>
+            {markMsg && (
+              <span style={{ fontSize: "11px", color: markMsg.ok ? "#4ade80" : "#f87171", fontFamily: C.mono }}>
+                {markMsg.text}
+              </span>
+            )}
+          </div>
+          {renameMode && (
+            <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "10px", color: "#888", fontFamily: C.mono }}>Besökare-</span>
+              <input
+                value={renameInput}
+                onChange={e => setRenameInput(e.target.value)}
+                placeholder="ditt-namn"
+                maxLength={20}
+                style={{ background: "#111", border: "1px solid rgba(34,211,238,0.3)", borderRadius: "4px", color: "#f0ede6", fontFamily: C.mono, fontSize: "11px", padding: "3px 8px", width: "140px" }}
+              />
+              <button
+                disabled={pending || renameInput.trim().length < 2}
+                onClick={async () => {
+                  if (pending) return;
+                  setPending(true); setMarkMsg(null);
+                  try {
+                    const r = await fetch("/api/mark/namn", {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ besokare_id: besokareId, old_name: besokareNamn, new_suffix: renameInput.trim() }),
+                    });
+                    const d = await r.json();
+                    if (!r.ok) { setMarkMsg({ text: d.error || "Misslyckades", ok: false }); return; }
+                    setBesokareNamn(d.new_name);
+                    localStorage.setItem("mark_besokare_namn", d.new_name);
+                    setRenameMode(false);
+                    setMarkMsg({ text: "Namn uppdaterat!", ok: true });
+                  } finally { setPending(false); }
+                }}
+                style={{ fontSize: "10px", background: "rgba(34,211,238,0.15)", border: "1px solid rgba(34,211,238,0.4)", borderRadius: "4px", color: BESOKARE_FARG, cursor: "pointer", padding: "3px 10px", fontFamily: C.mono }}
+              >Spara</button>
+              <button onClick={() => setRenameMode(false)} style={{ fontSize: "9px", color: "#555", background: "none", border: "none", cursor: "pointer" }}>avbryt</button>
+            </div>
           )}
         </div>
       )}
@@ -440,6 +487,29 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
           </Card>
         </section>
       )}
+
+      {/* ── MITT LAGER ── */}
+      {besokareNamn && (() => {
+        const mittLager = lager.filter(r => r.agent === besokareNamn);
+        if (!mittLager.length) return null;
+        return (
+          <section>
+            <Label>Mitt lager · {besokareNamn}</Label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px" }}>
+              {mittLager.map(r => (
+                <Card key={r.vara} style={{ padding: "10px 14px", border: `1px solid rgba(34,211,238,0.2)` }}>
+                  <div style={{ fontSize: "18px", marginBottom: "4px" }}>{VARA_IKON[r.vara] || "📦"}</div>
+                  <div style={{ fontSize: "11px", color: "#f0ede6", fontFamily: C.mono, textTransform: "capitalize" }}>{r.vara}</div>
+                  <div style={{ fontSize: "18px", color: BESOKARE_FARG, fontFamily: C.mono, fontWeight: 700 }}>{r.antal}</div>
+                  <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono }}>
+                    ≈ {Math.round(r.antal * (BASPRIS[r.vara] || 0))} kr
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* ── LAGERSTATUS ── */}
       <section>

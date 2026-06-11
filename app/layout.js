@@ -69,6 +69,7 @@ export default function RootLayout({ children }) {
               <a href="/kunskapsgraf" className="neon-nav">Kunskapsgraf</a>
               <a href="/mark" className="neon-nav">Markartan</a>
               <a href="/marknad" className="neon-nav">Varumarknaden</a>
+              <a href="/formogenhet" className="neon-nav">Förmögenheter</a>
               <a href="/markets" className="neon-nav">Markets</a>
               <a href="/nyheter" className="neon-nav">Nyheter</a>
               <a href="/kanal" className="neon-nav">Nyhetskanal</a>
