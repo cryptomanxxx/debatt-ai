@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AGENT_VISUELL } from "../agentData";
 
 const TYP_FARG = {
@@ -42,6 +42,10 @@ const INSTITUTIONS = {
   "Datacenterparken": { icon: "📈", fullName: "Kryptobörsen",   color: "#34d399" },
   "Kulturcentrum":    { icon: "⚖️", fullName: "AI-Domstolen",  color: "#f87171" },
 };
+
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const BESOKARE_FARG = "#22d3ee";
+const isVisitor = n => typeof n === "string" && n.startsWith("Besökare-");
 
 const TERRAIN_BG = null; // ingen extern bild — använder CSS-gradient
 
@@ -117,12 +121,27 @@ const VARA_TYP = Object.fromEntries(
 );
 
 export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [], transClearing = [], handelClearing = [], zonEvents = [] }) {
-  const [hover, setHover]       = useState(null);
-  const [selected, setSelected] = useState(null);
-  const [floats, setFloats]     = useState([]);
+  const [hover, setHover]         = useState(null);
+  const [selected, setSelected]   = useState(null);
+  const [floats, setFloats]       = useState([]);
+  const [besokareId,   setBesokareId]   = useState(null);
+  const [besokareNamn, setBesokareNamn] = useState(null);
+  const [besokSaldo,   setBesokSaldo]   = useState(null);
+  const [lokalAgare,   setLokalAgare]   = useState([]);
+  const [activeBid,    setActiveBid]    = useState(null);  // { id, type }
+  const [bidBelopp,    setBidBelopp]    = useState("");
+  const [saljInput,    setSaljInput]    = useState(null);  // zon_id som listas
+  const [saljPris,     setSaljPris]     = useState("");
+  const [pending,      setPending]      = useState(false);
+  const [markMsg,      setMarkMsg]      = useState(null);  // { text, ok }
 
-  const agareMap    = Object.fromEntries(agare.map(a => [a.zon_id, a]));
+  const mergedAgare = [
+    ...agare.filter(a => !lokalAgare.some(la => la.zon_id === a.zon_id)),
+    ...lokalAgare,
+  ];
+  const agareMap    = Object.fromEntries(mergedAgare.map(a => [a.zon_id, a]));
   const zonEventMap = Object.fromEntries(zonEvents.map(e => [e.zon_id, e]));
+  const auktionMap  = Object.fromEntries(auktioner.map(a => [a.mark_zoner?.id, a]));
 
   // Centrera hexklustret dynamiskt i SVG
   const [OX, OY] = (() => {
@@ -141,11 +160,11 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     ];
   })();
 
-  const agentGrads = [...new Set(agare.map(a => a.agent))]
-    .map(name => ({ name, farg: AGENT_VISUELL[name]?.ikonFarg || "#888" }));
+  const agentGrads = [...new Set(mergedAgare.map(a => a.agent))]
+    .map(name => ({ name, farg: isVisitor(name) ? BESOKARE_FARG : (AGENT_VISUELL[name]?.ikonFarg || "#888") }));
 
   const leaderMap = {};
-  agare.forEach(a => {
+  mergedAgare.forEach(a => {
     const z = zoner.find(z => z.id === a.zon_id);
     if (!z) return;
     if (!leaderMap[a.agent]) leaderMap[a.agent] = { antal: 0 };
@@ -200,6 +219,92 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     ? (AGENT_VISUELL[activeAgare.agent]?.ikonFarg || "#888")
     : null;
 
+  useEffect(() => {
+    let id = localStorage.getItem("mark_besokare_id");
+    if (!id) {
+      id = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+      localStorage.setItem("mark_besokare_id", id);
+    }
+    const namn = "Besökare-" + id.replace(/-/g, "").slice(0, 6).toUpperCase();
+    setBesokareId(id);
+    setBesokareNamn(namn);
+    const cached = parseInt(localStorage.getItem("mark_besokare_saldo") || "2000");
+    setBesokSaldo(cached);
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    fetch(`${SB_URL}/rest/v1/visitor_wallets?id=eq.${id}&select=saldo`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        if (data.length) {
+          setBesokSaldo(data[0].saldo);
+          localStorage.setItem("mark_besokare_saldo", data[0].saldo);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  async function kopZon(zon) {
+    if (!besokareId || pending) return;
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/kop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zon_id: zon.id, besokare_id: besokareId, display_name: besokareNamn }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Köp misslyckades", ok: false }); return; }
+      setBesokSaldo(d.saldo);
+      localStorage.setItem("mark_besokare_saldo", d.saldo);
+      setLokalAgare(prev => [...prev.filter(a => a.zon_id !== zon.id), { zon_id: zon.id, agent: besokareNamn, kopt_pris: zon.koppris }]);
+      setMarkMsg({ text: `✅ Köpte ${d.zon_namn} för ${d.pris} kr!`, ok: true });
+      setTimeout(() => setMarkMsg(null), 5000);
+    } catch { setMarkMsg({ text: "Nätverksfel — försök igen", ok: false }); }
+    finally { setPending(false); }
+  }
+
+  async function laggBud(auktion_id, type) {
+    const belopp = parseInt(bidBelopp);
+    if (!belopp || belopp < 10 || !besokareId || pending) return;
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/bud", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auktion_id, belopp, besokare_id: besokareId, display_name: besokareNamn, type }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Bud misslyckades", ok: false }); return; }
+      setMarkMsg({ text: `✅ Bud på ${belopp} kr lagt!`, ok: true });
+      setActiveBid(null); setBidBelopp("");
+      setTimeout(() => setMarkMsg(null), 5000);
+    } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
+    finally { setPending(false); }
+  }
+
+  async function saljZon(zon) {
+    const rp = parseInt(saljPris);
+    if (!rp || rp < 50 || !besokareId || pending) return;
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/salj", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zon_id: zon.id, reservpris: rp, besokare_id: besokareId, display_name: besokareNamn }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Misslyckades", ok: false }); return; }
+      setMarkMsg({ text: `✅ ${zon.namn} lagd på auktion — stänger om 24h!`, ok: true });
+      setSaljInput(null); setSaljPris("");
+      setTimeout(() => setMarkMsg(null), 5000);
+    } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
+    finally { setPending(false); }
+  }
+
   function handleEnter(zon) {
     setHover(zon);
     const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row, OX, OY);
@@ -242,6 +347,11 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                 <stop offset="100%" stopColor={farg} stopOpacity="0.01" />
               </radialGradient>
             ))}
+            <radialGradient id="grad-ag-besokare" cx="32%" cy="25%" r="78%">
+              <stop offset="0%"   stopColor={BESOKARE_FARG} stopOpacity="0.18" />
+              <stop offset="50%"  stopColor={BESOKARE_FARG} stopOpacity="0.08" />
+              <stop offset="100%" stopColor={BESOKARE_FARG} stopOpacity="0.01" />
+            </radialGradient>
             <linearGradient id="hex-light" x1="20%" y1="0%" x2="80%" y2="100%">
               <stop offset="0%"   stopColor="white" stopOpacity="0.07" />
               <stop offset="40%"  stopColor="white" stopOpacity="0.01" />
@@ -274,12 +384,12 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row, OX, OY);
               const agInfo  = agareMap[zon.id];
               const agName  = agInfo?.agent;
-              const agFarg  = agName ? (AGENT_VISUELL[agName]?.ikonFarg || "#888") : null;
+              const agFarg  = agName ? (isVisitor(agName) ? BESOKARE_FARG : (AGENT_VISUELL[agName]?.ikonFarg || "#888")) : null;
               const typFarg = TYP_FARG[zon.typ] || "#555";
               const isHov = hover?.id === zon.id;
               const isSel = selected?.id === zon.id;
               const isAct = isHov || isSel;
-              const agGradId = agName ? `grad-ag-${agName.replace(/[^a-zA-Z]/g, "")}` : null;
+              const agGradId = agName ? (isVisitor(agName) ? "grad-ag-besokare" : `grad-ag-${agName.replace(/[^a-zA-Z]/g, "")}`) : null;
               const evt = zonEventMap[zon.id] || null;
               const strokeCol = agFarg
                 ? rgba(agFarg,  isAct ? 1.0 : 0.90)
@@ -378,6 +488,25 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
         </svg>
       </div>
 
+        {besokareNamn && (
+          <div style={{ marginTop: "10px", background: "#070f10", border: `1px solid ${rgba(BESOKARE_FARG, 0.25)}`, borderRadius: "8px", padding: "10px 16px", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "10px", color: BESOKARE_FARG, fontFamily: "monospace", letterSpacing: "0.08em" }}>👤 {besokareNamn}</span>
+            <span style={{ fontSize: "15px", color: "#e0e0e0", fontFamily: "monospace", fontWeight: 700 }}>
+              {besokSaldo !== null ? `${besokSaldo.toLocaleString("sv-SE")} kr` : "…"}
+            </span>
+            {besokSaldo !== null && (
+              <span style={{ fontSize: "9px", color: rgba(BESOKARE_FARG, 0.5), fontFamily: "monospace" }}>
+                · {mergedAgare.filter(a => a.agent === besokareNamn).length} zon{mergedAgare.filter(a => a.agent === besokareNamn).length !== 1 ? "er" : ""}
+              </span>
+            )}
+            {markMsg && (
+              <span style={{ fontSize: "10px", color: markMsg.ok ? "#4ade80" : "#f87171", fontFamily: "monospace", marginLeft: "auto" }}>
+                {markMsg.text}
+              </span>
+            )}
+          </div>
+        )}
+
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "10px" }}>
           {Object.entries(TYP_FARG).map(([typ, farg]) => (
             <span key={typ} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
@@ -424,14 +553,90 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               </div>
             </div>
             {activeAgare ? (
-              <div style={{ padding: "7px 10px", background: rgba(activeAgentFarg, 0.07), border: `1px solid ${rgba(activeAgentFarg, 0.25)}`, borderRadius: "4px" }}>
-                <span style={{ fontSize: "10px", fontFamily: "monospace", color: activeAgentFarg }}>▣ ÄGES AV: {activeAgare.agent}</span>
+              <div style={{ padding: "7px 10px", background: rgba(isVisitor(activeAgare.agent) ? BESOKARE_FARG : (activeAgentFarg || "#888"), 0.07), border: `1px solid ${rgba(isVisitor(activeAgare.agent) ? BESOKARE_FARG : (activeAgentFarg || "#888"), 0.25)}`, borderRadius: "4px" }}>
+                <span style={{ fontSize: "10px", fontFamily: "monospace", color: isVisitor(activeAgare.agent) ? BESOKARE_FARG : (activeAgentFarg || "#888") }}>
+                  {isVisitor(activeAgare.agent) ? "👤" : "▣"} ÄGES AV: {activeAgare.agent}
+                </span>
               </div>
             ) : (
               <div style={{ padding: "7px 10px", background: "#0a140a", border: "1px solid #1a3a1a", borderRadius: "4px" }}>
                 <span style={{ fontSize: "10px", color: "#4ade8077", fontFamily: "monospace" }}>◯ TILLGÄNGLIG FÖR KÖP</span>
               </div>
             )}
+
+            {/* Besökaråtgärder */}
+            {besokareNamn && (() => {
+              const activeAukt = auktionMap[active.id];
+              const agerAv = activeAgare?.agent;
+
+              // Besökaren äger zonen → kan sälja
+              if (agerAv === besokareNamn) {
+                if (activeAukt) {
+                  return <div style={{ marginTop: "8px", fontSize: "9px", color: "#f59e0b", fontFamily: "monospace" }}>📋 Zonen är redan på auktion</div>;
+                }
+                if (saljInput === active.id) {
+                  return (
+                    <div style={{ marginTop: "8px", display: "flex", gap: "6px", alignItems: "center" }}>
+                      <input type="number" min="50" placeholder="Reservpris kr" value={saljPris} onChange={e => setSaljPris(e.target.value)}
+                        style={{ flex: 1, background: "#111", border: "1px solid #333", color: "#e0e0e0", borderRadius: "4px", padding: "5px 8px", fontSize: "11px", fontFamily: "monospace" }} />
+                      <button onClick={() => saljZon(active)} disabled={pending || parseInt(saljPris) < 50}
+                        style={{ background: "#f59e0b", color: "#000", border: "none", borderRadius: "4px", padding: "5px 10px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: 700 }}>
+                        {pending ? "…" : "Sälj"}
+                      </button>
+                      <button onClick={() => { setSaljInput(null); setSaljPris(""); }}
+                        style={{ background: "#1a1a1a", color: "#666", border: "1px solid #333", borderRadius: "4px", padding: "5px 8px", fontSize: "10px", cursor: "pointer" }}>✕</button>
+                    </div>
+                  );
+                }
+                return (
+                  <button onClick={() => { setSaljInput(active.id); setSaljPris(String(Math.round(active.koppris * 0.7))); }}
+                    style={{ marginTop: "8px", width: "100%", background: "transparent", border: `1px solid ${rgba(BESOKARE_FARG, 0.4)}`, color: BESOKARE_FARG, borderRadius: "4px", padding: "7px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer" }}>
+                    🏷️ Lägg på auktion
+                  </button>
+                );
+              }
+
+              // Zonen är i aktiv auktion → kan lägga bud
+              if (!agerAv && activeAukt) {
+                const minBud = Math.max(activeAukt.reservpris || 0, (activeAukt.nuv_bud || 0) + 10);
+                if (activeBid?.id === activeAukt.id && activeBid?.type === "mark") {
+                  return (
+                    <div style={{ marginTop: "8px" }}>
+                      <div style={{ fontSize: "9px", color: "#f59e0b", fontFamily: "monospace", marginBottom: "4px" }}>Min bud: {minBud} kr</div>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <input type="number" min={minBud} placeholder={`≥ ${minBud} kr`} value={bidBelopp} onChange={e => setBidBelopp(e.target.value)}
+                          style={{ flex: 1, background: "#111", border: "1px solid #333", color: "#e0e0e0", borderRadius: "4px", padding: "5px 8px", fontSize: "11px", fontFamily: "monospace" }} />
+                        <button onClick={() => laggBud(activeAukt.id, "mark")} disabled={pending || parseInt(bidBelopp) < minBud}
+                          style={{ background: "#f59e0b", color: "#000", border: "none", borderRadius: "4px", padding: "5px 10px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: 700 }}>
+                          {pending ? "…" : "Bud!"}
+                        </button>
+                        <button onClick={() => { setActiveBid(null); setBidBelopp(""); }}
+                          style={{ background: "#1a1a1a", color: "#666", border: "1px solid #333", borderRadius: "4px", padding: "5px 8px", fontSize: "10px", cursor: "pointer" }}>✕</button>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <button onClick={() => { setActiveBid({ id: activeAukt.id, type: "mark" }); setBidBelopp(String(minBud)); }}
+                    style={{ marginTop: "8px", width: "100%", background: "transparent", border: `1px solid ${rgba(BESOKARE_FARG, 0.4)}`, color: BESOKARE_FARG, borderRadius: "4px", padding: "7px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer" }}>
+                    🏷️ Lägg bud ({minBud}+ kr)
+                  </button>
+                );
+              }
+
+              // Ledig zon utan auktion → kan köpa direkt
+              if (!agerAv && !activeAukt) {
+                const harRad = besokSaldo !== null && besokSaldo >= active.koppris;
+                return (
+                  <button onClick={() => kopZon(active)} disabled={pending || !harRad}
+                    style={{ marginTop: "8px", width: "100%", background: harRad ? rgba(BESOKARE_FARG, 0.12) : "#111", border: `1px solid ${rgba(BESOKARE_FARG, harRad ? 0.5 : 0.15)}`, color: harRad ? BESOKARE_FARG : "#444", borderRadius: "4px", padding: "7px", fontSize: "10px", fontFamily: "monospace", cursor: harRad ? "pointer" : "not-allowed" }}>
+                    {pending ? "Köper…" : harRad ? `💳 Köp för ${active.koppris} kr` : `💳 Otillräckligt saldo (${besokSaldo} kr)`}
+                  </button>
+                );
+              }
+
+              return null;
+            })()}
             {zonEventMap[active.id] && (() => {
               const ev = zonEventMap[active.id];
               const evFarg = EVENT_FARG[ev.event_typ] || "#f87171";
@@ -600,6 +805,35 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                     )}
                   </div>
                 </div>
+                {besokareNamn && a.saljare !== besokareNamn && a.hogst_budgivare !== besokareNamn && (() => {
+                  const minBud = Math.max(a.reservpris || 0, (a.nuv_bud || 0) + 10);
+                  if (activeBid?.id === a.id && activeBid?.type === "mark") {
+                    return (
+                      <div style={{ marginTop: "8px" }}>
+                        <div style={{ fontSize: "8px", color: "#f59e0b", fontFamily: "monospace", marginBottom: "4px" }}>Min bud: {minBud} kr</div>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <input type="number" min={minBud} placeholder={`≥ ${minBud} kr`} value={bidBelopp} onChange={e => setBidBelopp(e.target.value)}
+                            style={{ flex: 1, background: "#111", border: "1px solid #333", color: "#e0e0e0", borderRadius: "4px", padding: "4px 7px", fontSize: "11px", fontFamily: "monospace" }} />
+                          <button onClick={() => laggBud(a.id, "mark")} disabled={pending || parseInt(bidBelopp) < minBud}
+                            style={{ background: "#f59e0b", color: "#000", border: "none", borderRadius: "4px", padding: "4px 9px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: 700 }}>
+                            {pending ? "…" : "Bud!"}
+                          </button>
+                          <button onClick={() => { setActiveBid(null); setBidBelopp(""); }}
+                            style={{ background: "#1a1a1a", color: "#666", border: "1px solid #333", borderRadius: "4px", padding: "4px 7px", fontSize: "10px", cursor: "pointer" }}>✕</button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <button onClick={() => { setActiveBid({ id: a.id, type: "mark" }); setBidBelopp(String(minBud)); }}
+                      style={{ marginTop: "8px", width: "100%", background: "transparent", border: `1px solid ${rgba(BESOKARE_FARG, 0.35)}`, color: BESOKARE_FARG, borderRadius: "4px", padding: "5px", fontSize: "9px", fontFamily: "monospace", cursor: "pointer" }}>
+                      🏷️ Lägg bud ({minBud}+ kr)
+                    </button>
+                  );
+                })()}
+                {besokareNamn && a.hogst_budgivare === besokareNamn && (
+                  <div style={{ marginTop: "6px", fontSize: "9px", color: BESOKARE_FARG, fontFamily: "monospace", textAlign: "center" }}>✓ Du leder budgivningen</div>
+                )}
               </div>
             );
           })}
@@ -638,6 +872,35 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                     )}
                   </div>
                 </div>
+                {besokareNamn && a.saljare !== besokareNamn && a.hogst_budgivare !== besokareNamn && (() => {
+                  const minBud = Math.max(a.reservpris || 0, (a.nuv_bud || 0) + 10);
+                  if (activeBid?.id === a.id && activeBid?.type === "vara") {
+                    return (
+                      <div style={{ marginTop: "8px" }}>
+                        <div style={{ fontSize: "8px", color: "#22d3ee", fontFamily: "monospace", marginBottom: "4px" }}>Min bud: {minBud} kr</div>
+                        <div style={{ display: "flex", gap: "6px" }}>
+                          <input type="number" min={minBud} placeholder={`≥ ${minBud} kr`} value={bidBelopp} onChange={e => setBidBelopp(e.target.value)}
+                            style={{ flex: 1, background: "#111", border: "1px solid #333", color: "#e0e0e0", borderRadius: "4px", padding: "4px 7px", fontSize: "11px", fontFamily: "monospace" }} />
+                          <button onClick={() => laggBud(a.id, "vara")} disabled={pending || parseInt(bidBelopp) < minBud}
+                            style={{ background: "#22d3ee", color: "#000", border: "none", borderRadius: "4px", padding: "4px 9px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: 700 }}>
+                            {pending ? "…" : "Bud!"}
+                          </button>
+                          <button onClick={() => { setActiveBid(null); setBidBelopp(""); }}
+                            style={{ background: "#1a1a1a", color: "#666", border: "1px solid #333", borderRadius: "4px", padding: "4px 7px", fontSize: "10px", cursor: "pointer" }}>✕</button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <button onClick={() => { setActiveBid({ id: a.id, type: "vara" }); setBidBelopp(String(minBud)); }}
+                      style={{ marginTop: "8px", width: "100%", background: "transparent", border: `1px solid ${rgba(BESOKARE_FARG, 0.35)}`, color: BESOKARE_FARG, borderRadius: "4px", padding: "5px", fontSize: "9px", fontFamily: "monospace", cursor: "pointer" }}>
+                      📦 Lägg bud ({minBud}+ kr)
+                    </button>
+                  );
+                })()}
+                {besokareNamn && a.hogst_budgivare === besokareNamn && (
+                  <div style={{ marginTop: "6px", fontSize: "9px", color: BESOKARE_FARG, fontFamily: "monospace", textAlign: "center" }}>✓ Du leder budgivningen</div>
+                )}
               </div>
             );
           })}
