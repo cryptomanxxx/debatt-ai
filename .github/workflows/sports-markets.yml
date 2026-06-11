@@ -1,0 +1,29 @@
+name: Sports Markets Creator
+
+on:
+  schedule:
+    # Måndag 06:00 UTC (08:00 svensk tid)
+    - cron: "0 6 * * 1"
+    # Fredag 06:00 UTC (08:00 svensk tid)
+    - cron: "0 6 * * 5"
+  workflow_dispatch:
+
+jobs:
+  sports-markets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Create sports prediction markets
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+        run: python sports_markets.py
