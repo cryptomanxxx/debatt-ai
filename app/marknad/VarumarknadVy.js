@@ -57,6 +57,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   const [besokareId,   setBesokareId]   = useState(null);
   const [besokareNamn, setBesokareNamn] = useState(null);
   const [besokSaldo,   setBesokSaldo]   = useState(null);
+  const [aktivaAukt,   setAktivaAukt]   = useState(auktioner); // lokal kopia för optimistisk uppdatering
   const [activeBid,    setActiveBid]    = useState(null); // auktion-id
   const [bidBelopp,    setBidBelopp]    = useState("");
   const [pending,      setPending]      = useState(false);
@@ -75,7 +76,8 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
     setBesokareNamn(namn);
 
     const cachedSaldo = localStorage.getItem("mark_besokare_saldo");
-    if (cachedSaldo !== null) setBesokSaldo(Number(cachedSaldo));
+    // Visa 2000 kr direkt för ny besökare utan cache — det är startsaldot
+    setBesokSaldo(cachedSaldo !== null ? Number(cachedSaldo) : 2000);
 
     fetch(`${SB_URL}/rest/v1/visitor_wallets?id=eq.${id}&select=saldo`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
@@ -105,6 +107,10 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
       if (!r.ok) { setMarkMsg({ text: d.error || "Bud misslyckades", ok: false }); return; }
       setBesokSaldo(d.saldo);
       localStorage.setItem("mark_besokare_saldo", d.saldo);
+      // Uppdatera lokal auktionsstate optimistiskt så kortet reflekterar ny budgivare direkt
+      setAktivaAukt(prev => prev.map(a =>
+        a.id === auktion.id ? { ...a, nuv_bud: belopp, hogst_budgivare: besokareNamn } : a
+      ));
       setMarkMsg({ text: `✅ Bud på ${belopp} kr lagt!`, ok: true });
       setActiveBid(null);
       setTimeout(() => setMarkMsg(null), 5000);
