@@ -30,6 +30,13 @@ export async function POST(req) {
     return NextResponse.json({ error: "Reservpriset måste vara minst 50 kr" }, { status: 400 });
   }
 
+  // Verifiera att besokare_id matchar display_name i visitor_wallets (förhindrar identity spoofing)
+  const walletR = await sb(`visitor_wallets?id=eq.${besokare_id}&display_name=eq.${encodeURIComponent(display_name)}&select=id`);
+  const walletRows = walletR.ok ? await walletR.json() : [];
+  if (!walletRows.length) {
+    return NextResponse.json({ error: "Ogiltig identitet" }, { status: 403 });
+  }
+
   // Kontrollera att besökaren äger zonen
   const agareR = await sb(
     `mark_agare?zon_id=eq.${zon_id}&agent=eq.${encodeURIComponent(display_name)}&select=id`,

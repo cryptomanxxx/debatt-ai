@@ -924,9 +924,12 @@ def main():
     # ── 7. Förädlingskedjor (spannmål→mjöl, malm→stål) ──────────────────────
     foradla_varor(lager)
 
-    # Hämta aktuella saldon
+    # Hämta aktuella saldon (inkludera besökares plånböcker)
     planbocker_ny = sb_get("agent_planbocker?select=agent,saldo&agent=neq.Statskassa")
     saldon_ny = {r["agent"]: float(r.get("saldo") or 0) for r in planbocker_ny}
+    visitor_wallets_ny = sb_get("visitor_wallets?select=display_name,saldo") or []
+    for vw in visitor_wallets_ny:
+        saldon_ny[vw["display_name"]] = float(vw.get("saldo") or 0)
 
     # ── 7. Uppdatera resurspriser (zon-clearing + utbud/efterfrågan) ─────────
     # Körs FÖRE varuauktionsstängning så att varuauktionernas clearing-priser

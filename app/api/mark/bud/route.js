@@ -44,6 +44,13 @@ export async function POST(req) {
     return NextResponse.json({ error: "Ogiltigt budbelopp" }, { status: 400 });
   }
 
+  // Verifiera att besokare_id matchar display_name om plånboken redan existerar
+  const idCheckR = await sb(`visitor_wallets?id=eq.${besokare_id}&select=id,display_name`);
+  const idRows = idCheckR.ok ? await idCheckR.json() : [];
+  if (idRows.length && idRows[0].display_name !== display_name) {
+    return NextResponse.json({ error: "Ogiltig identitet" }, { status: 403 });
+  }
+
   const table    = type === "vara" ? "mark_vara_auktioner" : "mark_auktioner";
   const budTable = type === "vara" ? "mark_vara_bud"       : "mark_bud";
 

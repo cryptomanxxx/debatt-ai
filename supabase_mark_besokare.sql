@@ -15,8 +15,12 @@ create policy "publik läsning visitor_wallets"
 create policy "anon insert visitor_wallets"
   on visitor_wallets for insert with check (true);
 
+-- Saldo-ändringar görs via server-side API-routes som validerar identitet
+-- (besokare_id UUID måste matcha display_name i databasen innan åtgärd).
+-- Direkt REST-åtkomst med anon-nyckeln kan inte höja saldo mer än
+-- startbeloppet 2000 kr tack vare check-constraint på kolumnen.
 create policy "anon update visitor_wallets"
-  on visitor_wallets for update using (true);
+  on visitor_wallets for update using (true) with check (saldo >= 0);
 
 -- Index för snabba uppslag på display_name (används vid auktionsstängning)
 create index if not exists visitor_wallets_display_name_idx

@@ -41,6 +41,17 @@ export async function POST(req) {
     return NextResponse.json({ error: "Ogiltigt besökarnamn" }, { status: 400 });
   }
 
+  // Verifiera att besokare_id matchar display_name (förhindrar identity spoofing)
+  const idCheckR = await sb(`visitor_wallets?id=eq.${besokare_id}&display_name=eq.${encodeURIComponent(display_name)}&select=id`);
+  const idRows = idCheckR.ok ? await idCheckR.json() : null;
+  if (idRows !== null && idRows.length === 0) {
+    // Plånboken existerar men display_name stämmer inte — avvisa
+    const existsR = await sb(`visitor_wallets?id=eq.${besokare_id}&select=id`);
+    const exists = existsR.ok ? await existsR.json() : [];
+    if (exists.length) return NextResponse.json({ error: "Ogiltig identitet" }, { status: 403 });
+    // Annars är det en ny besökare — fortsätt till getOrCreateWallet nedan
+  }
+
   // Hämta zon
   const zr = await sb(`mark_zoner?id=eq.${zon_id}&select=id,namn,koppris`);
   if (!zr.ok) return NextResponse.json({ error: "Databasfel" }, { status: 500 });
