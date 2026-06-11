@@ -287,12 +287,12 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
 
       {/* ── ÖPPNA AUKTIONER ── */}
       <section>
-        <Label>Öppna auktioner · {auktioner.length} st</Label>
-        {auktioner.length === 0 ? (
+        <Label>Öppna auktioner · {aktivaAukt.length} st</Label>
+        {aktivaAukt.length === 0 ? (
           <Card><p style={{ color: C.dim, fontSize: "13px", margin: 0 }}>Inga öppna varuauktioner just nu.</p></Card>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "10px" }}>
-            {auktioner.map(a => {
+            {aktivaAukt.map(a => {
               const ikon = VARA_IKON[a.vara] || "📦";
               const harBud = a.nuv_bud && a.hogst_budgivare;
               return (
