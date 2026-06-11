@@ -46,21 +46,33 @@ export async function PATCH(req) {
     return NextResponse.json({ error: "Ogiltigt namn" }, { status: 400 });
   }
 
-  // Verifiera att besokare_id äger old_name
-  const walletR = await sb(`visitor_wallets?id=eq.${besokare_id}&select=id,display_name,saldo`);
-  if (!walletR.ok) return NextResponse.json({ error: "Databasfel" }, { status: 500 });
-  const wallets = await walletR.json();
-  if (!wallets.length) return NextResponse.json({ error: "Plånbok hittades inte" }, { status: 404 });
-  if (wallets[0].display_name !== old_name) {
-    return NextResponse.json({ error: "Identitetsfel" }, { status: 403 });
-  }
-
   // Kolla att new_name inte är taget
   const dupeR = await sb(`visitor_wallets?display_name=eq.${encodeURIComponent(new_name)}&select=id`);
   if (dupeR.ok) {
     const dupes = await dupeR.json();
     if (dupes.length) return NextResponse.json({ error: "Namnet är redan taget" }, { status: 409 });
   }
+
+  // Hämta eller skapa plånbok
+  const walletR = await sb(`visitor_wallets?id=eq.${besokare_id}&select=id,display_name,saldo`);
+  if (!walletR.ok) return NextResponse.json({ error: "Databasfel" }, { status: 500 });
+  const wallets = await walletR.json();
+
+  let currentSaldo = 2000;
+  if (wallets.length === 0) {
+    // Ny besökare utan plånbok — skapa direkt med det önskade namnet
+    const createR = await sb("visitor_wallets", {
+      method: "POST",
+      body: JSON.stringify({ id: besokare_id, display_name: new_name, saldo: 2000 }),
+    });
+    if (!createR.ok) return NextResponse.json({ error: "Kunde inte skapa plånbok" }, { status: 500 });
+    return NextResponse.json({ ok: true, new_name, saldo: 2000 });
+  }
+
+  if (wallets[0].display_name !== old_name) {
+    return NextResponse.json({ error: "Identitetsfel" }, { status: 403 });
+  }
+  currentSaldo = wallets[0].saldo;
 
   // Uppdatera visitor_wallets
   const updateR = await sb(`visitor_wallets?id=eq.${besokare_id}`, {
@@ -99,5 +111,12 @@ export async function PATCH(req) {
     prefer: "return=minimal",
   });
 
-  return NextResponse.json({ ok: true, new_name, saldo: wallets[0].saldo });
+  // Uppdatera mark_lager (varuinnehav knutet till agentnamn)
+  await sb(`mark_lager?agent=eq.${encodeURIComponent(old_name)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ agent: new_name }),
+    prefer: "return=minimal",
+  });
+
+  return NextResponse.json({ ok: true, new_name, saldo: currentSaldo });
 }
