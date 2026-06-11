@@ -70,14 +70,17 @@ function ghApi(urlPath) {
   });
 }
 
-// ── GitHub Models (Llama 3.3 70B) ────────────────────────────────────────────
+// ── Groq (Llama 3.3 70B, 128k kontext) ───────────────────────────────────────
+
+const GROQ_KEY = process.env.GROQ_API_KEY;
 
 async function llm(messages) {
+  if (!GROQ_KEY) throw new Error("GROQ_API_KEY saknas");
   const res = await httpPost(
-    "models.inference.ai.azure.com",
-    "/chat/completions",
-    { model: "Llama-3.3-70B-Instruct", messages, temperature: 0.05, max_tokens: 4096 },
-    { Authorization: `Bearer ${TOKEN}` }
+    "api.groq.com",
+    "/openai/v1/chat/completions",
+    { model: "llama-3.3-70b-versatile", messages, temperature: 0.05, max_tokens: 4096 },
+    { Authorization: `Bearer ${GROQ_KEY}` }
   );
   if (res.error) throw new Error(JSON.stringify(res.error));
   const content = res?.choices?.[0]?.message?.content;

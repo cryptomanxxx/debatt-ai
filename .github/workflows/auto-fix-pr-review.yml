@@ -7,7 +7,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  models: read
 
 jobs:
   auto-fix-review:
@@ -96,11 +95,12 @@ jobs:
             echo "SKIP=true" >> "$GITHUB_ENV"
           fi
 
-      - name: Kör autofix-review med GitHub Models
+      - name: Kör autofix-review med Groq
         if: env.SKIP == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           PR_NUM: ${{ env.PR_NUM }}
           REVIEWER: ${{ env.REVIEWER }}
           BRANCH: ${{ env.BRANCH }}
@@ -140,7 +140,7 @@ jobs:
           OUTPUT=$(head -40 /tmp/autofix_output.txt 2>/dev/null || echo "(ingen output)")
           if [[ "$FIXED" == "true" ]]; then
             {
-              echo "✅ **Auto-fix** (GitHub Models) har adresserat reviewkommentarerna från @${REVIEWER} och pushade fixes till \`${BRANCH}\`."
+              echo "✅ **Auto-fix** (Groq) har adresserat reviewkommentarerna från @${REVIEWER} och pushade fixes till \`${BRANCH}\`."
               echo ""
               echo "### Vad som fixades"
               echo '```'
@@ -151,7 +151,7 @@ jobs:
             } > /tmp/pr_comment.txt
           else
             {
-              echo "🔍 **Auto-fix** (GitHub Models) analyserade reviewkommentarerna från @${REVIEWER} — inga kodändringar behövdes."
+              echo "🔍 **Auto-fix** (Groq) analyserade reviewkommentarerna från @${REVIEWER} — inga kodändringar behövdes."
               echo ""
               echo '```'
               echo "$OUTPUT"
