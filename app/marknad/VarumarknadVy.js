@@ -37,7 +37,7 @@ function Nedrakning({ stangerAt }) {
   useEffect(() => {
     function upd() {
       const diff = new Date(stangerAt) - Date.now();
-      if (diff <= 0) { setKvar("stänger snart"); return; }
+      if (diff <= 0) { setKvar("stängd"); return; }
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       setKvar(h > 0 ? `${h}h ${m}m` : `${m}m`);
@@ -47,6 +47,7 @@ function Nedrakning({ stangerAt }) {
     return () => clearInterval(id);
   }, [stangerAt]);
 
+  if (kvar === "stängd") return <span style={{ fontSize: "10px", color: "#555", fontFamily: C.mono }}>Stängd</span>;
   return <span style={{ fontSize: "10px", color: "#f59e0b", fontFamily: C.mono }}>{kvar}</span>;
 }
 
@@ -373,6 +374,10 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                   </div>
                   {/* Besökar-budknapp */}
                   {besokareNamn && a.saljare !== besokareNamn && (() => {
+                    const isExpired = new Date(a.stanger_at) <= Date.now();
+                    if (isExpired) return (
+                      <div style={{ marginTop: "10px", fontSize: "10px", color: "#444", fontFamily: C.mono }}>Auktionen är stängd</div>
+                    );
                     const minBud = Math.max(a.reservpris || 0, (a.nuv_bud || 0) + 10);
                     if (a.hogst_budgivare === besokareNamn) {
                       return <div style={{ marginTop: "10px", fontSize: "10px", color: BESOKARE_FARG, fontFamily: C.mono }}>✓ Du leder budgivningen</div>;
