@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   CartesianGrid, ResponsiveContainer, Legend,
@@ -37,11 +37,46 @@ function StatPill({ label, value, color = C.text }) {
   );
 }
 
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+
 export default function FormogenhetVy({
   planbocker = [], statskassa = 0, markAgare = [], feedback = [],
-  etfInnehav = [], bets = [], lobbying = [], oligarki = [], visitors = [],
+  etfInnehav = [], bets = [], lobbying = [], oligarki = [], visitors: initialVisitors = [],
 }) {
   const [range, setRange] = useState(30);
+  const [liveVisitors, setLiveVisitors] = useState(initialVisitors);
+  const [mittNamn, setMittNamn] = useState(null);
+
+  useEffect(() => {
+    const id = localStorage.getItem("mark_besokare_id");
+    const cachedNamn = localStorage.getItem("mark_besokare_namn");
+    if (cachedNamn) setMittNamn(cachedNamn);
+
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    fetch(`${SB_URL}/rest/v1/visitor_wallets?order=saldo.desc&limit=20&select=display_name,saldo,skapad`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) setLiveVisitors(data);
+      })
+      .catch(() => {});
+
+    // Hämta eget aktuellt namn från DB om vi har ett id
+    if (id) {
+      fetch(`${SB_URL}/rest/v1/visitor_wallets?id=eq.${id}&select=display_name`, {
+        headers: { apikey: key, Authorization: `Bearer ${key}` },
+      })
+        .then(r => r.ok ? r.json() : [])
+        .then(rows => {
+          if (rows.length && rows[0].display_name) {
+            setMittNamn(rows[0].display_name);
+            localStorage.setItem("mark_besokare_namn", rows[0].display_name);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   // ── Beräkna mark-inkomst per agent ──
   const markInkomst = {};
@@ -105,7 +140,7 @@ export default function FormogenhetVy({
         <StatPill label="Gini (senaste)" value={latestGini} color={latestGini > 0.5 ? C.red : C.green} />
         <StatPill label="Statskassan" value={`${(statskassa || 0).toLocaleString("sv-SE")} kr`} color={C.yellow} />
         <StatPill label="Agenter" value={planbocker.length} />
-        <StatPill label="Besökare" value={visitors.length} />
+        <StatPill label="Besökare" value={liveVisitors.length} />
       </div>
 
       {/* ── AGENT-RANKNING ── */}
@@ -172,23 +207,28 @@ export default function FormogenhetVy({
       </section>
 
       {/* ── BESÖKARE ── */}
-      {visitors.length > 0 && (
+      {liveVisitors.length > 0 && (
         <section>
-          <Label>Besökare · top {visitors.length} efter saldo</Label>
+          <Label>Besökare · top {liveVisitors.length} efter saldo</Label>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "8px" }}>
-            {visitors.map((v, i) => (
-              <Card key={v.display_name} style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: "10px", color: C.cyan, fontFamily: C.mono }}>#{i + 1} {v.display_name}</div>
-                  <div style={{ fontSize: "8px", color: C.dim, fontFamily: C.mono, marginTop: "2px" }}>
-                    Gick med {new Date(v.skapad).toLocaleDateString("sv-SE")}
+            {liveVisitors.map((v, i) => {
+              const erJag = mittNamn && v.display_name === mittNamn;
+              return (
+                <Card key={v.display_name} style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", border: erJag ? `1px solid rgba(34,211,238,0.5)` : undefined, background: erJag ? "#071215" : undefined }}>
+                  <div>
+                    <div style={{ fontSize: "10px", color: erJag ? C.cyan : "#aaa", fontFamily: C.mono }}>
+                      #{i + 1} {v.display_name}{erJag ? " 👤" : ""}
+                    </div>
+                    <div style={{ fontSize: "8px", color: C.dim, fontFamily: C.mono, marginTop: "2px" }}>
+                      Gick med {new Date(v.skapad).toLocaleDateString("sv-SE")}
+                    </div>
                   </div>
-                </div>
-                <div style={{ fontSize: "16px", fontFamily: C.mono, fontWeight: 700, color: C.cyan }}>
-                  {(v.saldo || 0).toLocaleString("sv-SE")}
-                </div>
-              </Card>
-            ))}
+                  <div style={{ fontSize: "16px", fontFamily: C.mono, fontWeight: 700, color: erJag ? C.cyan : "#e0e0e0" }}>
+                    {(v.saldo || 0).toLocaleString("sv-SE")}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         </section>
       )}
