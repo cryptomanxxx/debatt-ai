@@ -142,6 +142,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const [renameMode,   setRenameMode]   = useState(false);
   const [renameInput,  setRenameInput]  = useState("");
   const [tfm,          setTfm]          = useState({ z: 1, x: 0, y: 0 });
+  const [kartLager,    setKartLager]    = useState("ägande");
   const tfmRef       = useRef({ z: 1, x: 0, y: 0 });
   const containerRef = useRef(null);
   const dragRef      = useRef({ active: false, startX: 0, startY: 0, px: 0, py: 0, moved: false });
@@ -224,6 +225,14 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     if (h.pris_per_enhet && !clearingPerVara[h.vara])
       clearingPerVara[h.vara] = { pris: h.pris_per_enhet, skapad: h.skapad };
   }
+
+  // Normaliserade min/max för rikedoms- och produktionslagret
+  const kopprisList = zoner.map(z => z.koppris || 0);
+  const vekiList    = zoner.map(z => z.veckoinkomst || 0);
+  const minKoppris  = Math.min(...kopprisList);
+  const maxKoppris  = Math.max(...kopprisList);
+  const minVeki     = Math.min(...vekiList);
+  const maxVeki     = Math.max(...vekiList);
 
   const active = selected || hover;
   const activeAgare = active ? agareMap[active.id] : null;
@@ -461,6 +470,23 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
+      {/* ── KARTLAGER-TOGGLE ── */}
+      <div style={{ display: "flex", gap: "6px" }}>
+        {[
+          { id: "ägande",     label: "ÄGANDE",     color: "#60a5fa" },
+          { id: "rikedom",    label: "RIKEDOM",    color: "#f59e0b" },
+          { id: "produktion", label: "PRODUKTION", color: "#4ade80" },
+        ].map(l => (
+          <button key={l.id} onClick={() => setKartLager(l.id)}
+            style={{ fontSize: "9px", fontFamily: "monospace", letterSpacing: "0.1em", padding: "4px 12px", borderRadius: "4px", cursor: "pointer", background: kartLager === l.id ? rgba(l.color, 0.12) : "transparent", border: `1px solid ${kartLager === l.id ? l.color : "#2a2a2a"}`, color: kartLager === l.id ? l.color : "#444" }}>
+            {l.label}
+          </button>
+        ))}
+        <span style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", alignSelf: "center", paddingLeft: "4px" }}>
+          {kartLager === "ägande" ? "agentfärg" : kartLager === "rikedom" ? "köppris · mörk=billig · ljus=dyr" : "dagsinkomst · mörk=låg · ljus=hög"}
+        </span>
+      </div>
+
       {/* ── HEX MAP ── max 700px */}
       <div
         ref={containerRef}
@@ -550,6 +576,20 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               const strokeCol = agFarg
                 ? rgba(agFarg,  isAct ? 1.0 : 0.90)
                 : isAct ? "rgba(255,255,255,0.90)" : "rgba(255,255,255,0.45)";
+
+              // Kartlager-specifika beräkningar
+              const normRikedom = maxKoppris > minKoppris ? (zon.koppris - minKoppris) / (maxKoppris - minKoppris) : 0.5;
+              const normProd    = maxVeki > minVeki ? ((zon.veckoinkomst || 0) - minVeki) / (maxVeki - minVeki) : 0;
+              const layerStroke = kartLager === "ägande"    ? strokeCol
+                : kartLager === "rikedom"    ? rgba("#f59e0b", isAct ? 1.0 : 0.22 + 0.72 * normRikedom)
+                : /* produktion */              rgba("#4ade80", isAct ? 1.0 : 0.18 + 0.72 * normProd);
+              const layerFill   = kartLager === "ägande" ? null
+                : kartLager === "rikedom"    ? `rgba(245,158,11,${(0.02 + 0.18 * normRikedom).toFixed(3)})`
+                : `rgba(74,222,128,${(0.02 + 0.14 * normProd).toFixed(3)})`;
+              const layerGradId = kartLager === "ägande" ? agGradId : null;
+              const layerStrokeW = kartLager === "ägande"
+                ? (isAct ? 2.4 : agFarg ? 1.8 : 1.2)
+                : (isAct ? 2.4 : 1.6);
               const pts = hexPts(cx, cy);
               return (
                 <g key={zon.id} style={{ cursor: "pointer" }}
@@ -572,18 +612,21 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
 
                   <polygon points={pts} fill="rgba(0,0,0,0)" stroke="none" />
                   <polygon points={pts} fill={`url(#grad-${zon.typ})`} stroke="none" />
-                  {agGradId && <polygon points={pts} fill={`url(#${agGradId})`} stroke="none" />}
+                  {layerGradId && <polygon points={pts} fill={`url(#${layerGradId})`} stroke="none" />}
+                  {layerFill && <polygon points={pts} fill={layerFill} stroke="none" />}
                   <polygon points={pts} fill="url(#hex-light)" stroke="none" />
                   {isAct && <polygon points={pts} fill="url(#grad-hover)" stroke="none" />}
                   {/* Mörk skugga bakom kanten för kontrast mot ljus terräng */}
                   <polygon points={pts} fill="none" stroke="rgba(0,0,0,0.45)"
                     strokeWidth={isAct ? 4.0 : 2.8} shapeRendering="crispEdges" />
-                  <polygon points={pts} fill="none" stroke={strokeCol}
-                    strokeWidth={isAct ? 2.4 : agFarg ? 1.8 : 1.2}
+                  <polygon points={pts} fill="none" stroke={layerStroke}
+                    strokeWidth={layerStrokeW}
                     shapeRendering="crispEdges" />
                   {isAct && (
                     <polygon points={hexPts(cx, cy, HEX - 4)} fill="none"
-                      stroke={agFarg ? rgba(agFarg, 0.45) : rgba(typFarg, 0.28)}
+                      stroke={kartLager === "ägande"
+                        ? (agFarg ? rgba(agFarg, 0.45) : rgba(typFarg, 0.28))
+                        : kartLager === "rikedom" ? rgba("#f59e0b", 0.45) : rgba("#4ade80", 0.45)}
                       strokeWidth="0.8" />
                   )}
                   <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
