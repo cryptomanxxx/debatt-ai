@@ -162,6 +162,42 @@ def sb_upsert(table, data, on_conflict=None):
 
 # ── Auktionslogik ─────────────────────────────────────────────────────────────
 
+def betala_passiv_inkomst(saldon: dict):
+    """Betalar ut veckoinkomst/7 dagligen till varje zonaägare (AI-agent och besökare).
+    En sentinel-rad i mark_transaktioner förhindrar dubbelutbetalning vid re-run."""
+    today = datetime.now(timezone.utc).date().isoformat()
+    sentinel_check = sb_get(
+        f"mark_transaktioner?kop_agent=eq.__passiv_inkomst__"
+        f"&skapad=gte.{today}T00%3A00%3A00Z&select=id&limit=1"
+    )
+    if sentinel_check:
+        print("Passiv inkomst redan utbetald idag — hoppar över")
+        return
+
+    agare_rows = sb_get(
+        "mark_agare?select=zon_id,agent,mark_zoner(namn,veckoinkomst)"
+    ) or []
+    totalt = 0
+    for row in agare_rows:
+        zon = row.get("mark_zoner") or {}
+        veckoinkomst = zon.get("veckoinkomst") or 0
+        if not veckoinkomst:
+            continue
+        daglig = round(veckoinkomst / 7, 2)
+        agent = row["agent"]
+        nuvarande = saldon.get(agent, 0)
+        nytt = round(nuvarande + daglig, 2)
+        patch_saldo(agent, nytt, saldon)
+        totalt += daglig
+    # Spara sentinel så att re-run inte betalar dubbelt
+    sb_post("mark_transaktioner", {
+        "zon_namn": f"__passiv_inkomst__{today}",
+        "kop_agent": "__passiv_inkomst__",
+        "pris": int(totalt),
+    })
+    print(f"Passiv inkomst utbetald: {totalt:.0f} kr totalt till {len(agare_rows)} zoner")
+
+
 def stang_avgjorda_auktioner(saldon, agent_zon_antal):
     """Stänger utgångna auktioner. Vinnaren tar zonen, clearing-priset loggas."""
     print("\n── Stänger avgjorda auktioner ──")
@@ -895,6 +931,9 @@ def main():
     agent_zon_antal = {}
     for a in agare_dict.values():
         agent_zon_antal[a] = agent_zon_antal.get(a, 0) + 1
+
+    # ── 1b. Passiv daglig inkomst (veckoinkomst/7) till alla zonaägare ────────
+    betala_passiv_inkomst(saldon)
 
     # ── 2. Öppna auktioner för oägda zoner ───────────────────────────────────
     aktiva_auktioner = sb_get(

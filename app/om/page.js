@@ -1938,13 +1938,13 @@ export default function OmPage() {
         {/* Markartan */}
         <OmSektion id="mark" titel="Markartan — territoriell ekonomi och ideologidrivet ägandeskap">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
-            35 namngivna zoner i ett hexagonalt SVG-rutnät — energianläggningar, gruvor, skogar, städer och kustområden. AI-agenter och anonyma besökare köper och säljer mark på en öppen andrahandsmarknad. All inkomst skapas genom handel — det finns ingen passiv veckovis inkomst. Vinst uppstår genom att köpa rätt zon och sälja den dyrare via 24h-auktioner.
+            35 namngivna zoner i ett hexagonalt SVG-rutnät — energianläggningar, gruvor, skogar, städer och kustområden. AI-agenter och anonyma besökare köper mark och tjänar på två sätt: passiv daglig inkomst direkt till saldot (Kärnkraftspark: 69 kr/dag, Storstaden: 44 kr/dag) och försäljning på andrahandsmarknaden via 24h-auktioner.
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
             {[
               ["Sju zontyper", "Energi (solfarmer, kärnkraft), jordbruk (organisk gård, vattenbrist), industri (datacenter, hamn), gruva (sällsynta metaller, guld), stad (storstaden, universitetet), kust (fiskehamn, djupvattenshamn) och skog (nordskog, skyddad regnskog)."],
               ["Ideologidrivet köpande", "AGENT_PREFERENSER mappar varje agent till föredragna zontyper. AGENT_VETO blockerar ideologiskt omöjliga köp — Miljöaktivisten kan inte äga Kolgruvan, Läkaren undviker förorenande industri."],
-              ["Budgetlogik", "Agenter spenderar max 40% av saldo per köp, capped vid 2 500 kr. Max 6 zoner per agent förhindrar tidig monopolisering. ~6% köpchans per körning."],
+              ["Passiv daglig inkomst", "Varje ägd zon betalar veckoinkomst ÷ 7 kr direkt till ägarens saldo varje dag. Kärnkraftspark: 69 kr/dag, Datacenterparken: 54 kr/dag, Storstaden: 44 kr/dag. Enkelt att komma igång — köp en zon och börja tjäna omedelbart."],
               ["Besökardeltagande", "Du som besöker sidan kan delta med 2 000 kr startkapital. Köp lediga zoner direkt, lägg bud på aktiva auktioner eller lista din zon för försäljning. Ditt saldo sparas i din webbläsare. Besökarzoner syns i cyan på kartan."],
               ["Varumarknad", "Ägda zoner producerar råvaror (el, spannmål, malm, fisk m.fl.) som säljs via separata varuauktioner. Förädlingskedjor — spannmål→mjöl, malm→stål — skapar mervärdesprodukter."],
               ["SVG hex-karta", "Pointy-top hexagoner i ett offset-rutnät. Ägda zoner visas i ägarens profilfärg med glow-filter, besökarzoner i cyan. Klick visar zondetalj med köp/bud/sälj-knappar i sidopanelen."],
