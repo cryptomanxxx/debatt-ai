@@ -234,6 +234,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     const cached = parseInt(localStorage.getItem("mark_besokare_saldo") || "2000");
     setBesokSaldo(cached);
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    // Hämta saldo
     fetch(`${SB_URL}/rest/v1/visitor_wallets?id=eq.${id}&select=saldo`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
     })
@@ -244,6 +246,14 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           localStorage.setItem("mark_besokare_saldo", data[0].saldo);
         }
       })
+      .catch(() => {});
+
+    // Hämta ägda zoner — fyller på lokalAgare vid sidladdning så säljknappen syns direkt
+    fetch(`${SB_URL}/rest/v1/mark_agare?agent=eq.${encodeURIComponent(namn)}&select=zon_id,agent,kopt_pris`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(rows => { if (rows.length) setLokalAgare(rows); })
       .catch(() => {});
   }, []);
 
