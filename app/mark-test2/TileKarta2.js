@@ -159,7 +159,7 @@ export default function TileKarta2() {
     const dpr = window.devicePixelRatio || 1;
     const W   = canvas.width  / dpr;
     const H   = canvas.height / dpr;
-    const { tx, ty, scale } = stateRef.current;
+    const { tx, ty, scale, minScale: ms } = stateRef.current;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -216,10 +216,14 @@ export default function TileKarta2() {
     }
 
     // ── Regionnamn-overlay vid utzoom ─────────────────────────────────────────
-    // Tonas in: 0.8 → 0.45. Tonas ut: 0.42 → 0.30 (ger plats åt kontinent-etiketter).
-    if (scale < 0.8) {
-      const fadeIn  = Math.min(1, (0.8 - scale) / 0.35);
-      const fadeOut = scale < 0.42 ? Math.max(0, (scale - 0.30) / 0.12) : 1;
+    // Alla trösklar är relativa till ms (minScale) så de fungerar på alla skärmstorlekar.
+    // Tonas in: ms×5.5 → ms×3.5. Tonas ut: ms×2.2 → ms×1.6 (ger plats åt kontinent).
+    const regShow  = ms * 5.5;   // region pills börjar visas vid detta scale
+    const regFadeS = ms * 2.2;   // region pills börjar tona ut (kontinent tar över)
+    const regGone  = ms * 1.6;   // region pills helt borta
+    if (scale < regShow) {
+      const fadeIn  = Math.min(1, (regShow - scale) / (regShow * 0.36));
+      const fadeOut = scale < regFadeS ? Math.max(0, (scale - regGone) / (regFadeS - regGone)) : 1;
       const alpha   = fadeIn * fadeOut;
       ctx.save();
       ctx.textAlign    = "center";
@@ -272,9 +276,11 @@ export default function TileKarta2() {
     }
 
     // ── Kontinent-etiketter vid maximal utzoom ────────────────────────────────
-    // Tonas in under scale 0.48, fullt synlig under 0.35. Atlas-stil: stor kursiv text.
-    if (scale < 0.48) {
-      const alpha = Math.min(1, (0.48 - scale) / 0.13);
+    // Relativa trösklar: tonas in ms×2.2 → ms×1.3. Atlas-stil: stor kursiv text.
+    const contShow = ms * 2.2;   // continent labels börjar visas
+    const contFull = ms * 1.3;   // continent labels fullt synliga
+    if (scale < contShow) {
+      const alpha = Math.min(1, (contShow - scale) / (contShow - contFull));
       ctx.save();
       ctx.textAlign    = "center";
       ctx.textBaseline = "middle";
