@@ -165,31 +165,10 @@ export default function TileKarta2() {
       if (img) {
         ctx.drawImage(img, rx, ry, rw, rh);
       } else {
-        // Fallback-färg tills riktiga bilder laddas
         ctx.fillStyle = reg.fallback;
         ctx.fillRect(rx, ry, rw, rh);
-        // Regionnamn som platshållare (bara vid låg zoom)
-        if (scale < 0.7) {
-          ctx.fillStyle    = "rgba(255,255,255,0.55)";
-          ctx.font         = `bold ${Math.round(24 / scale)}px sans-serif`;
-          ctx.textAlign    = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(`${reg.ikon} ${reg.namn}`, rx + rw / 2, ry + rh / 2);
-        }
       }
     });
-
-    // Tunna regiongränser (subtila, syns bara på låg zoom)
-    if (scale < 0.6) {
-      ctx.strokeStyle = "rgba(0,0,0,0.25)";
-      ctx.lineWidth   = 2 / scale;
-      for (let c = 1; c < GRID_COLS; c++) {
-        ctx.beginPath(); ctx.moveTo(c * rw, 0); ctx.lineTo(c * rw, worldH); ctx.stroke();
-      }
-      for (let r = 1; r < GRID_ROWS; r++) {
-        ctx.beginPath(); ctx.moveTo(0, r * rh); ctx.lineTo(worldW, r * rh); ctx.stroke();
-      }
-    }
 
     // ── Hex-grid (evenodd) ───────────────────────────────────────────────────
     const selId = stateRef.current.selected;
@@ -209,6 +188,29 @@ export default function TileKarta2() {
     for (const t of TILES) {
       const [cx, cy] = hexCenter(t.col, t.row);
       drawLabel(ctx, cx + ox, cy + oy, t, scale);
+    }
+
+    // ── Regionnamn-overlay vid utzoom ─────────────────────────────────────────
+    // Tonas in mellan scale 0.8 → 0.4, fullt synlig under 0.4
+    if (scale < 0.8) {
+      const alpha = Math.min(1, (0.8 - scale) / 0.35);
+      ctx.save();
+      ctx.textAlign    = "center";
+      ctx.textBaseline = "middle";
+      REGIONS.forEach((reg) => {
+        const cx = reg.gridCol * rw + rw / 2;
+        const cy = reg.gridRow * rh + rh / 2;
+        const fs = Math.round(Math.min(28, rw * 0.07) / scale);
+        ctx.font        = `bold ${fs}px sans-serif`;
+        ctx.shadowColor = "rgba(0,0,0,0.95)";
+        ctx.shadowBlur  = 8 / scale;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle   = "#ffffff";
+        ctx.fillText(`${reg.ikon} ${reg.namn}`, cx, cy);
+      });
+      ctx.globalAlpha = 1;
+      ctx.shadowBlur  = 0;
+      ctx.restore();
     }
 
     ctx.restore();
