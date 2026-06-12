@@ -99,8 +99,9 @@ function hexSubPath(ctx, cx, cy, r) {
   ctx.closePath();
 }
 
-function drawLabel(ctx, cx, cy, tile, scale) {
-  if (scale < 0.4) return;
+function drawLabel(ctx, cx, cy, tile, scale, alpha) {
+  if (alpha <= 0) return;
+  ctx.globalAlpha  = alpha;
   ctx.textAlign    = "center";
   ctx.textBaseline = "middle";
   ctx.shadowColor  = "rgba(0,0,0,0.9)";
@@ -109,6 +110,7 @@ function drawLabel(ctx, cx, cy, tile, scale) {
   ctx.font         = `${scale >= 0.9 ? 16 : 11}px sans-serif`;
   ctx.fillText(tile.region.ikon, cx, cy);
   ctx.shadowBlur   = 0;
+  ctx.globalAlpha  = 1;
 }
 
 // ── Huvudkomponent ────────────────────────────────────────────────────────────
@@ -213,11 +215,11 @@ export default function TileKarta2() {
       ctx.globalAlpha = 1.0;
     }
 
-    // ── Ikoner/etiketter — visas bara när hexagonerna är synliga ─────────────
+    // ── Ikoner/etiketter — tonas in med samma alpha som hexringarna ──────────
     if (hexAlpha > 0) {
       for (const t of TILES) {
         const [cx, cy] = hexCenter(t.col, t.row);
-        drawLabel(ctx, cx + ox, cy + oy, t, scale);
+        drawLabel(ctx, cx + ox, cy + oy, t, scale, hexAlpha);
       }
     }
 
