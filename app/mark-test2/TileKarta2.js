@@ -116,6 +116,16 @@ export default function TileKarta2() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // ── Hav runt öarna (syns när man zoomar ut) ─────────────────────────────────
+    const ocean = ctx.createRadialGradient(
+      canvas.width / 2, canvas.height / 2, 0,
+      canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.7
+    );
+    ocean.addColorStop(0, "#17405e");
+    ocean.addColorStop(1, "#061525");
+    ctx.fillStyle = ocean;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     // ── Bakgrundsbild ───────────────────────────────────────────────────────────
     ctx.save();
     ctx.scale(dpr, dpr);
