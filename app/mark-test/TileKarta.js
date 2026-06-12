@@ -73,32 +73,21 @@ function hexPath(ctx, cx, cy, r) {
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 // ── Ritfunktioner ──────────────────────────────────────────────────────────────
-function drawTile(ctx, cx, cy, typ, selected, scale) {
-  const [c0, c1, c2] = TYP_GRADIENT[typ] || ["#222", "#444", "#666"];
-
-  // Radialgradienten ger en 3D-kulform per tile
-  const grd = ctx.createRadialGradient(cx - R * 0.2, cy - R * 0.25, R * 0.1, cx, cy, R * 1.1);
-  grd.addColorStop(0,   c0);
-  grd.addColorStop(0.5, c1);
-  grd.addColorStop(1,   c2);
-
+// borderAlpha: 1.0 = skarp färgad kant (riktiga zoner), 0.2 = subtil gridlinje (wilderness)
+function drawTile(ctx, cx, cy, typ, selected, scale, borderAlpha = 1.0) {
+  const color = TYP_FARG[typ] || "#888888";
   hexPath(ctx, cx, cy, R - 1);
-  ctx.fillStyle = grd;
-  ctx.fill();
-
-  // Kant
-  hexPath(ctx, cx, cy, R - 1);
-  ctx.strokeStyle = selected ? "#ffffff" : "rgba(255,255,255,0.15)";
-  ctx.lineWidth   = selected ? 2.5 / scale : 1 / scale;
+  if (selected) {
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth   = 2.5 / scale;
+    ctx.globalAlpha = 1.0;
+  } else {
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 1.5 / scale;
+    ctx.globalAlpha = borderAlpha;
+  }
   ctx.stroke();
-
-  // Subtil inre glans (övre kant)
-  hexPath(ctx, cx, cy, R - 2);
-  const glans = ctx.createLinearGradient(cx, cy - R, cx, cy);
-  glans.addColorStop(0, "rgba(255,255,255,0.22)");
-  glans.addColorStop(0.5, "rgba(255,255,255,0)");
-  ctx.fillStyle = glans;
-  ctx.fill();
+  ctx.globalAlpha = 1.0;
 }
 
 function drawLabel(ctx, cx, cy, zon, scale) {
@@ -239,27 +228,22 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       ctx.fillRect(-R * 2, -R * 2, worldW + R * 4, worldH + R * 4);
     }
 
-    // Wilderness-tiles: semi-transparenta så bakgrundsbilden syns igenom
-    ctx.globalAlpha = 0.62;
+    // Wilderness: bara en subtil gridlinje, helt transparent innanför
     for (const t of allTiles) {
       if (t.real) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
-      drawTile(ctx, cx + ox, cy + oy, t.typ, false, scale);
+      drawTile(ctx, cx + ox, cy + oy, t.typ, false, scale, 0.22);
     }
 
-    // Riktiga zoner: högre opacitet — de är "spelets" marklager
-    ctx.globalAlpha = 0.88;
+    // Riktiga zoner: skarp färgad kant + ikoner/labels fullt synliga
     for (const t of allTiles) {
       if (!t.real) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
       const sel = stateRef.current.selected === t.id;
-      drawTile(ctx, cx + ox, cy + oy, t.typ, sel, scale);
-      ctx.globalAlpha = 1.0;
+      drawTile(ctx, cx + ox, cy + oy, t.typ, sel, scale, 1.0);
       drawOwnerDot(ctx, cx + ox, cy + oy, t.agare, scale);
       drawLabel(ctx, cx + ox, cy + oy, t, scale);
-      ctx.globalAlpha = 0.88;
     }
-    ctx.globalAlpha = 1.0;
 
     // Glödeffekt på selected tile
     const selTile = allTiles.find(t => t.id === stateRef.current.selected && t.real);
