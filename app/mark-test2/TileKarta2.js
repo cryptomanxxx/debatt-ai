@@ -195,24 +195,30 @@ export default function TileKarta2() {
       }
     });
 
-    // ── Hex-grid (evenodd) ───────────────────────────────────────────────────
-    const selId = stateRef.current.selected;
+    // ── Hex-grid (evenodd) — Level of Detail ────────────────────────────────
+    // zoomRatio = scale / ms:  1 = hela civilisationen (minzoom), 4+ = fastighetsnivå
+    // hexAlpha: 0 vid zoomRatio ≤ 1.2, 0.75 vid zoomRatio ≥ 3.5 (linjär emellan)
+    const selId    = stateRef.current.selected;
+    const hexAlpha = Math.max(0, Math.min(0.75, (scale / ms - 1.2) / 2.3 * 0.75));
     for (const t of TILES) {
-      const [cx, cy] = hexCenter(t.col, t.row);
       const isSelected = selId === t.id;
+      if (!isSelected && hexAlpha <= 0) continue;   // hoppa över om helt osynliga
+      const [cx, cy] = hexCenter(t.col, t.row);
       ctx.beginPath();
       hexSubPath(ctx, cx + ox, cy + oy, R - GAP);
       hexSubPath(ctx, cx + ox, cy + oy, R - BW - GAP);
       ctx.fillStyle   = isSelected ? "#ffffff" : t.region.ring;
-      ctx.globalAlpha = isSelected ? 1.0 : 0.75;
+      ctx.globalAlpha = isSelected ? 1.0 : hexAlpha;
       ctx.fill("evenodd");
       ctx.globalAlpha = 1.0;
     }
 
-    // ── Ikoner/etiketter ─────────────────────────────────────────────────────
-    for (const t of TILES) {
-      const [cx, cy] = hexCenter(t.col, t.row);
-      drawLabel(ctx, cx + ox, cy + oy, t, scale);
+    // ── Ikoner/etiketter — visas bara när hexagonerna är synliga ─────────────
+    if (hexAlpha > 0) {
+      for (const t of TILES) {
+        const [cx, cy] = hexCenter(t.col, t.row);
+        drawLabel(ctx, cx + ox, cy + oy, t, scale);
+      }
     }
 
     // ── Regionnamn-overlay vid utzoom ─────────────────────────────────────────
