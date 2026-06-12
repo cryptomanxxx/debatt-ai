@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { AGENT_VISUELL } from "../agentData";
 
 // ── Konstanter ─────────────────────────────────────────────────────────────────
@@ -117,7 +117,7 @@ function drawLabel(ctx, cx, cy, zon, scale) {
 
     // Ägare-badge
     if (zon.agare) {
-      const agFarg = (AGENT_VISUELL[zon.agare]?.gradient || ["#fff", "#aaa"])[0];
+      const agFarg = AGENT_VISUELL[zon.agare]?.ikonFarg || "#fff";
       ctx.font      = `${10 / scale}px sans-serif`;
       ctx.fillStyle = agFarg;
       ctx.fillText(zon.agare, cx, cy + 24 / scale);
@@ -144,12 +144,12 @@ function drawLabel(ctx, cx, cy, zon, scale) {
 
 function drawOwnerDot(ctx, cx, cy, agare, scale) {
   if (!agare) return;
-  const grad = AGENT_VISUELL[agare]?.gradient ? AGENT_VISUELL[agare].gradient.replace('radial-gradient(', '').replace(')', '').split(', ') : ["#fff", "#aaa"];
+  const color = AGENT_VISUELL[agare]?.ikonFarg || "#fff";
   const x = cx + R * 0.55, y = cy - R * 0.55;
   const r = Math.max(4, 9 / scale);
-  const g = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.1, x, y, r);
-  g.addColorStop(0, grad[0]);
-  g.addColorStop(1, grad[1] || grad[0]);
+  const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+  g.addColorStop(0, color);
+  g.addColorStop(1, color + "88");
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fillStyle = g;
@@ -166,11 +166,15 @@ export default function TileKarta({ zoner = [], agare = [] }) {
   const [selected, setSelected] = useState(null);
   const [info, setInfo] = useState(null);
 
-  // Bygg agare-map
-  const agareMap = Object.fromEntries(agare.map(a => [a.zon_id, a.agent]));
+  // Bygg agare-map — memoized så allTiles inte byggs om vid varje setState
+  const agareMap = useMemo(
+    () => Object.fromEntries(agare.map(a => [a.zon_id, a.agent])),
+    [agare]
+  );
 
-  // Bygg alla tiles (riktiga + wilderness)
-  const allTiles = [
+  // Bygg alla tiles (riktiga + wilderness) — memoized för att undvika
+  // att canvas setup-effekten körs om (och nollställer zoom) vid klick
+  const allTiles = useMemo(() => [
     ...zoner.map(z => ({
       col: z.hex_col, row: z.hex_row,
       typ: z.typ, namn: z.namn,
@@ -182,18 +186,22 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       col: w.col, row: w.row, typ: w.typ,
       namn: null, id: `w${i}`, agare: null, real: false,
     })),
-  ];
+  ], [zoner, agareMap]);
 
-  // Beräkna world bounds för initial centrering
-  const centers = allTiles.map(t => hexCenter(t.col, t.row));
-  const minX = Math.min(...centers.map(c => c[0]));
-  const maxX = Math.max(...centers.map(c => c[0]));
-  const minY = Math.min(...centers.map(c => c[1]));
-  const maxY = Math.max(...centers.map(c => c[1]));
-  const worldW = maxX - minX + R * 2;
-  const worldH = maxY - minY + R * 2;
-  const ox = -minX + R;
-  const oy = -minY + R;
+  // Beräkna world bounds för initial centrering — memoized av samma skäl
+  const { worldW, worldH, ox, oy } = useMemo(() => {
+    const centers = allTiles.map(t => hexCenter(t.col, t.row));
+    const minX = Math.min(...centers.map(c => c[0]));
+    const maxX = Math.max(...centers.map(c => c[0]));
+    const minY = Math.min(...centers.map(c => c[1]));
+    const maxY = Math.max(...centers.map(c => c[1]));
+    return {
+      worldW: maxX - minX + R * 2,
+      worldH: maxY - minY + R * 2,
+      ox: -minX + R,
+      oy: -minY + R,
+    };
+  }, [allTiles]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -472,7 +480,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
           )}
           {info.agare ? (
             <div style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>
-              👤 Ägare: <span style={{ color: (AGENT_VISUELL[info.agare]?.gradient || ["#fff"])[0] }}>{info.agare}</span>
+              👤 Ägare: <span style={{ color: AGENT_VISUELL[info.agare]?.ikonFarg || "#fff" }}>{info.agare}</span>
             </div>
           ) : (
             <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>Ingen ägare ännu</div>
