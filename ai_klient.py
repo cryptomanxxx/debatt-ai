@@ -82,7 +82,69 @@ def logga_429_passivt(provider: str) -> None:
     threading.Thread(target=_post, daemon=True).start()
 
 
-def hamta_artikel_fns(payload: dict, system: str, user_msg: str, max_tokens: int) -> list[tuple[str, callable]]:
+def _logga_ai_anrop(provider: str, source: str, status: str, latency_ms: int) -> None:
+    """Loggar ett AI-anrop till ai_log-tabellen i bakgrunden (fire-and-forget)."""
+    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    if not sb_key:
+        return
+
+    def _post():
+        try:
+            httpx.post(
+                f"{_SB_URL}/rest/v1/ai_log",
+                headers={
+                    "apikey": sb_key,
+                    "Authorization": f"Bearer {sb_key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+                json={"provider": provider, "source": source, "status": status, "latency_ms": latency_ms},
+                timeout=5,
+            )
+        except Exception:
+            pass
+
+    threading.Thread(target=_post, daemon=True).start()
+
+
+_SKIP_PHRASES = (
+    "markerad som nere",
+    "saknas",
+    "hoppar direkt till fallback",
+)
+
+
+def _log_wrap(provider_key: str, fn: callable, source: str) -> callable:
+    """Omsluter en provider-lambda med latenstiming och ai_log-loggning.
+
+    Providers som kastas utan HTTP-anrop (dagsgräns redan nådd, API-nyckel saknas)
+    loggas inte — de är pre-flight skips, inte verkliga fel.
+    """
+    def wrapper():
+        t0 = time.time()
+        try:
+            result = fn()
+            latency_ms = int((time.time() - t0) * 1000)
+            _logga_ai_anrop(provider_key, source, "ok", latency_ms)
+            return result
+        except Exception as exc:
+            err = str(exc).lower()
+            # Hoppa över logging för providers som skippas utan HTTP-anrop
+            if any(phrase in err for phrase in _SKIP_PHRASES):
+                raise
+            latency_ms = int((time.time() - t0) * 1000)
+            if "429" in err or "rate_limit" in err or "rate limit" in err or "rate-limit" in err:
+                status = "rate_limited"
+            elif "timeout" in err or "timed out" in err:
+                status = "timeout"
+            else:
+                status = "error"
+            _logga_ai_anrop(provider_key, source, status, latency_ms)
+            raise
+    return wrapper
+
+
+def hamta_artikel_fns(payload: dict, system: str, user_msg: str, max_tokens: int, source: str = "agent") -> list[tuple[str, callable]]:
     """Returnerar (namn, fn) i dynamisk rankad ordning för artikelskrivning."""
     alla = {
         "groq":          ("Groq",          lambda: groq_post(payload).json()["choices"][0]["message"]["content"]),
@@ -94,10 +156,10 @@ def hamta_artikel_fns(payload: dict, system: str, user_msg: str, max_tokens: int
         "cloudflare":    ("Cloudflare",     lambda: cloudflare_post(system, user_msg, max_tokens=max_tokens)),
         "gemini":        ("Gemini",         lambda: gemini_post(system, user_msg, max_tokens=max_tokens)),
     }
-    return [(alla[p][0], alla[p][1]) for p in _fallback_order if p in alla]
+    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _fallback_order if p in alla]
 
 
-def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int) -> list[tuple[str, callable]]:
+def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int, source: str = "agent") -> list[tuple[str, callable]]:
     """Returnerar (namn, fn) i dynamisk rankad ordning för korta LLM-anrop."""
     alla = {
         "groq":          ("Groq",         lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip()),
@@ -109,7 +171,7 @@ def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int) -> 
         "cloudflare":    ("Cloudflare",    lambda: cloudflare_post(system[:600], prompt, max_tokens=max_tokens).strip()),
         "gemini":        ("Gemini",        lambda: (gemini_post(system[:600], prompt, max_tokens=max_tokens) or "").strip()),
     }
-    return [(alla[p][0], alla[p][1]) for p in _fallback_order if p in alla]
+    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _fallback_order if p in alla]
 
 
 def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
