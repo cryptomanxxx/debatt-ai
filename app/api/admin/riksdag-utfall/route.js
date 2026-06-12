@@ -107,6 +107,57 @@ export async function POST() {
     }
   }
 
+  // 4. Dokumentstatus-fallback: motioner röstades på via betänkande (annan dok_id).
+  //    dokumentstatus/{id}.json har dokbeslut.beslut med texten "bifall"/"avslag" direkt.
+  const remainingEntries = Object.entries(pending);
+  const dokstatusChunk = remainingEntries.slice(0, 30); // max 30 per körning
+
+  await Promise.allSettled(dokstatusChunk.map(async ([dokId, lagforslagId]) => {
+    try {
+      const dsRes = await fetch(
+        `https://data.riksdagen.se/dokumentstatus/${encodeURIComponent(dokId)}.json`,
+        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(8000) }
+      );
+      if (!dsRes.ok) return;
+      const ds = await dsRes.json();
+
+      // Extrahera besluttext — kan vara objekt eller array
+      const dokStatus = (ds?.dokumentstatus?.dokument?.status || "").toLowerCase();
+      const rawBeslut = ds?.dokumentstatus?.dokbeslut;
+      const beslutObj = Array.isArray(rawBeslut) ? rawBeslut[0] : rawBeslut;
+      const beslutText = (beslutObj?.beslut || "").toLowerCase();
+      const datum = (ds?.dokumentstatus?.dokument?.datum || "").trim() || null;
+
+      // Avgör om avslutad
+      if (!["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s)) && !beslutText) return;
+
+      let riksdagenUtfall = null;
+      if (/bifall|godkänn|antog|antagen|tillstyrk/.test(beslutText)) {
+        riksdagenUtfall = "bifall";
+      } else if (/avslag|avslog|avvisad|avstyrk/.test(beslutText)) {
+        riksdagenUtfall = "avslag";
+      } else if (dokStatus.includes("avslutad") && beslutText === "") {
+        // Avslutad utan explicit besluttext — för propositioner innebär detta vanligen bifall
+        riksdagenUtfall = "bifall";
+      }
+
+      if (!riksdagenUtfall) return;
+
+      const patchRes = await fetch(
+        `${SB_URL}/rest/v1/lagforslag?id=eq.${lagforslagId}`,
+        {
+          method: "PATCH",
+          headers: { ...h, Prefer: "return=minimal" },
+          body: JSON.stringify({ riksdagen_utfall: riksdagenUtfall, riksdagen_utfall_datum: datum, status: "avgjort" }),
+        }
+      );
+      if (patchRes.ok) {
+        uppdaterade++;
+        delete pending[dokId];
+      }
+    } catch { /* ignorera per-dok-fel */ }
+  }));
+
   return NextResponse.json({
     uppdaterade,
     vantande: Object.keys(pending).length,

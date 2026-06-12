@@ -59,12 +59,20 @@ async function hämtaDoktyp(doktyp) {
   const data = await r.json();
   const dokument = data?.dokumentlista?.dokument || [];
   const fallback = doktyp === "prop" ? "Proposition" : "Motion";
-  return (Array.isArray(dokument) ? dokument : [dokument]).map(d => ({
-    dok_id: d.dok_id?.trim(),
-    titel: d.titel?.trim().slice(0, 200),
-    beskrivning: ((d.notis || "") + " " + (d.notis2 || "")).trim().slice(0, 2000) || `${fallback}: ${d.titel}`,
-    riksdagen_url: byggUrl(d),
-  })).filter(d => d.dok_id && d.titel);
+  return (Array.isArray(dokument) ? dokument : [dokument]).map(d => {
+    let url = byggUrl(d);
+    // Säkerställ att propositioner alltid får en URL med /proposition/ — annars
+    // missar ParlamentKlient.js isProposition()-filtret och de räknas som 0.
+    if (doktyp === "prop" && url && !url.includes("/proposition/")) {
+      url = `https://www.riksdagen.se/sv/dokument-och-lagar/dokument/proposition/${d.dok_id?.trim()}/`;
+    }
+    return {
+      dok_id: d.dok_id?.trim(),
+      titel: d.titel?.trim().slice(0, 200),
+      beskrivning: ((d.notis || "") + " " + (d.notis2 || "")).trim().slice(0, 2000) || `${fallback}: ${d.titel}`,
+      riksdagen_url: url,
+    };
+  }).filter(d => d.dok_id && d.titel);
 }
 
 async function hämtaViaApi() {
