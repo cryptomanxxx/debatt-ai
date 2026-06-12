@@ -375,6 +375,37 @@ export default function TileKarta2() {
     render();
   };
 
+  // Zooma in och centrera en region med animering
+  const zoomToRegion = useCallback((reg) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.width / dpr;
+    const H = canvas.height / dpr;
+    const rw = worldW / GRID_COLS;
+    const rh = worldH / GRID_ROWS;
+    const cx = reg.gridCol * rw + rw / 2;
+    const cy = reg.gridRow * rh + rh / 2;
+    const targetScale = Math.min(W / rw, H / rh) * 0.78;
+    const clampedScale = Math.max(stateRef.current.minScale, Math.min(4, targetScale));
+    const targetTx = (worldW / 2 - cx) * clampedScale;
+    const targetTy = (worldH / 2 - cy) * clampedScale;
+    const s = stateRef.current;
+    if (s.rafId) cancelAnimationFrame(s.rafId);
+    const startScale = s.scale, startTx = s.tx, startTy = s.ty;
+    const dur = 380, t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min((now - t0) / dur, 1);
+      const e = 1 - Math.pow(1 - p, 3); // ease-out cubic
+      s.scale = startScale + (clampedScale - startScale) * e;
+      s.tx    = startTx    + (targetTx    - startTx)    * e;
+      s.ty    = startTy    + (targetTy    - startTy)    * e;
+      render();
+      s.rafId = p < 1 ? requestAnimationFrame(step) : null;
+    };
+    s.rafId = requestAnimationFrame(step);
+  }, [worldW, worldH, render]);
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <canvas
@@ -401,22 +432,37 @@ export default function TileKarta2() {
         ))}
       </div>
 
-      {/* Region-legend */}
+      {/* Region-legend — klickbar, finger-vänlig */}
       <div style={{
         position: "absolute", top: 12, right: 12,
-        background: "rgba(0,0,0,0.65)", borderRadius: 8, padding: "8px 12px",
-        display: "flex", flexDirection: "column", gap: 3,
+        background: "rgba(0,0,0,0.78)", borderRadius: 12,
+        padding: "4px",
+        display: "flex", flexDirection: "column", gap: 0,
+        maxHeight: "calc(100% - 80px)", overflowY: "auto",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
       }}>
         {REGIONS.map(r => (
-          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            key={r.id}
+            onClick={() => zoomToRegion(r)}
+            style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "10px 14px",
+              background: "none", border: "none", cursor: "pointer",
+              borderRadius: 8, textAlign: "left",
+              minHeight: 46, minWidth: 150,
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+          >
             <span style={{
-              width: 12, height: 12, borderRadius: 2,
-              background: r.fallback, display: "inline-block", flexShrink: 0,
+              width: 13, height: 13, borderRadius: 3, flexShrink: 0,
+              background: r.ring, boxShadow: `0 0 6px ${r.ring}88`,
             }} />
-            <span style={{ fontSize: 11, color: "#e5e7eb", whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: 13, color: "#e5e7eb", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
               {r.ikon} {r.namn}
             </span>
-          </div>
+          </button>
         ))}
       </div>
 
