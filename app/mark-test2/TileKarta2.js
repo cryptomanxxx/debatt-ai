@@ -6,15 +6,16 @@ import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 const GRID_COLS = 5;
 const GRID_ROWS = 3;
 
-// Hex-konstanter
-const R   = 44;
+// Hex-konstanter — halverade mot original för tätare, mer storslagen civilisation
+const R   = 22;
 const S3  = Math.sqrt(3);
-const GAP = 14;
-const BW  = 7;
+const GAP = 7;
+const BW  = 3;
 
-// Världens hex-dimensioner (GRID_COLS * HEX_PER_REGION_COL × GRID_ROWS * HEX_PER_REGION_ROW)
-const HEX_COLS = 20;   // 5 regioner × 4 hex/region
-const HEX_ROWS = 15;   // 3 regioner × 5 hex/region
+// Världens hex-dimensioner — dubbla mot original, världen behåller samma fysiska storlek
+// men har 4× fler hexagoner (40×30 = 1200 st istället för 20×15 = 300 st)
+const HEX_COLS = 40;
+const HEX_ROWS = 30;
 
 // ── Kontinenter — nivå 1 i 3-nivå-hierarkin ──────────────────────────────────
 // Varje kontinent grupperar 5 regioner och har egen valuta.
@@ -22,17 +23,17 @@ const HEX_ROWS = 15;   // 3 regioner × 5 hex/region
 const CONTINENTS = [
   {
     id: "c01", namn: "Nordheim",  ikon: "❄️", valuta: "Iskrona",
-    ring: "#93c5fd", labelSeed: [10, 2],
+    ring: "#93c5fd", labelSeed: [20, 4],
     regionIds: ["r01","r02","r03","r04","r05"],
   },
   {
     id: "c02", namn: "Midgard",   ikon: "⚔️", valuta: "Guldmark",
-    ring: "#86efac", labelSeed: [10, 7],
+    ring: "#86efac", labelSeed: [20, 14],
     regionIds: ["r06","r07","r08","r09","r10"],
   },
   {
     id: "c03", namn: "Sydlandet", ikon: "🌴", valuta: "Solreal",
-    ring: "#fcd34d", labelSeed: [10, 12],
+    ring: "#fcd34d", labelSeed: [20, 24],
     regionIds: ["r11","r12","r13","r14","r15"],
   },
 ];
@@ -41,24 +42,24 @@ const CONTINENTS = [
 // seed: [col, row] = Voronoi-frö — hexar tilldelas närmaste frö → oregelbundna gränser
 // gridCol/gridRow används bara för bakgrundsbild-placering (5×3 layout)
 const REGIONS = [
-  // rad 0 — nord (fröna spridda i y-led för ojämna gränser mot rad 1)
-  { id: "r01", continentId: "c01", seed: [ 1, 1],  gridCol: 0, gridRow: 0, namn: "Arktis",      fallback: "#c7e8f7", ring: "#fb2c3b", ikon: "❄️"  }, // A röd
-  { id: "r02", continentId: "c01", seed: [ 5, 3],  gridCol: 1, gridRow: 0, namn: "Barrskog",    fallback: "#1a472a", ring: "#00d46a", ikon: "🌲"  }, // D grön
-  { id: "r03", continentId: "c01", seed: [10, 0],  gridCol: 2, gridRow: 0, namn: "Klipphöjder", fallback: "#6b5c4e", ring: "#ff6b00", ikon: "🏔️" }, // B orange
-  { id: "r04", continentId: "c01", seed: [15, 2],  gridCol: 3, gridRow: 0, namn: "Tundra",      fallback: "#b0c4b1", ring: "#b44dff", ikon: "🌾"  }, // G lila
-  { id: "r05", continentId: "c01", seed: [18, 1],  gridCol: 4, gridRow: 0, namn: "Glaciärvik",  fallback: "#a8d8ea", ring: "#00d4f5", ikon: "🧊"  }, // E cyan
+  // rad 0 — nord (seeds dubblade för det dubbla hex-rutnätet)
+  { id: "r01", continentId: "c01", seed: [ 2,  2], gridCol: 0, gridRow: 0, namn: "Arktis",      fallback: "#c7e8f7", ring: "#fb2c3b", ikon: "❄️"  },
+  { id: "r02", continentId: "c01", seed: [10,  6], gridCol: 1, gridRow: 0, namn: "Barrskog",    fallback: "#1a472a", ring: "#00d46a", ikon: "🌲"  },
+  { id: "r03", continentId: "c01", seed: [20,  0], gridCol: 2, gridRow: 0, namn: "Klipphöjder", fallback: "#6b5c4e", ring: "#ff6b00", ikon: "🏔️" },
+  { id: "r04", continentId: "c01", seed: [30,  4], gridCol: 3, gridRow: 0, namn: "Tundra",      fallback: "#b0c4b1", ring: "#b44dff", ikon: "🌾"  },
+  { id: "r05", continentId: "c01", seed: [36,  2], gridCol: 4, gridRow: 0, namn: "Glaciärvik",  fallback: "#a8d8ea", ring: "#00d4f5", ikon: "🧊"  },
   // rad 1 — mitten
-  { id: "r06", continentId: "c02", seed: [ 0, 8],  gridCol: 0, gridRow: 1, namn: "Fjordkust",   fallback: "#2e5f6e", ring: "#4090ff", ikon: "🌊"  }, // F blå
-  { id: "r07", continentId: "c02", seed: [ 6, 7],  gridCol: 1, gridRow: 1, namn: "Odlingsland", fallback: "#8bc34a", ring: "#ffcc00", ikon: "🌾"  }, // C gul
-  { id: "r08", continentId: "c02", seed: [10, 9],  gridCol: 2, gridRow: 1, namn: "Storstad",    fallback: "#607d8b", ring: "#b44dff", ikon: "🏰"  }, // G lila
-  { id: "r09", continentId: "c02", seed: [15, 8],  gridCol: 3, gridRow: 1, namn: "Stäpp",       fallback: "#c8a96e", ring: "#fb2c3b", ikon: "🌵"  }, // A röd
-  { id: "r10", continentId: "c02", seed: [19, 7],  gridCol: 4, gridRow: 1, namn: "Vulkanrev",   fallback: "#7b2d00", ring: "#00d46a", ikon: "🌋"  }, // D grön
+  { id: "r06", continentId: "c02", seed: [ 0, 16], gridCol: 0, gridRow: 1, namn: "Fjordkust",   fallback: "#2e5f6e", ring: "#4090ff", ikon: "🌊"  },
+  { id: "r07", continentId: "c02", seed: [12, 14], gridCol: 1, gridRow: 1, namn: "Odlingsland", fallback: "#8bc34a", ring: "#ffcc00", ikon: "🌾"  },
+  { id: "r08", continentId: "c02", seed: [20, 18], gridCol: 2, gridRow: 1, namn: "Storstad",    fallback: "#607d8b", ring: "#b44dff", ikon: "🏰"  },
+  { id: "r09", continentId: "c02", seed: [30, 16], gridCol: 3, gridRow: 1, namn: "Stäpp",       fallback: "#c8a96e", ring: "#fb2c3b", ikon: "🌵"  },
+  { id: "r10", continentId: "c02", seed: [38, 14], gridCol: 4, gridRow: 1, namn: "Vulkanrev",   fallback: "#7b2d00", ring: "#00d46a", ikon: "🌋"  },
   // rad 2 — syd
-  { id: "r11", continentId: "c03", seed: [ 1, 13], gridCol: 0, gridRow: 2, namn: "Mangrovkust", fallback: "#1b5e20", ring: "#ff6b00", ikon: "🌿"  }, // B orange
-  { id: "r12", continentId: "c03", seed: [ 5, 12], gridCol: 1, gridRow: 2, namn: "Djungel",     fallback: "#2e7d32", ring: "#00d4f5", ikon: "🌴"  }, // E cyan
-  { id: "r13", continentId: "c03", seed: [10, 14], gridCol: 2, gridRow: 2, namn: "Floddelta",   fallback: "#33691e", ring: "#00d46a", ikon: "💧"  }, // D grön
-  { id: "r14", continentId: "c03", seed: [15, 14], gridCol: 3, gridRow: 2, namn: "Rödöknen",    fallback: "#bf360c", ring: "#ffcc00", ikon: "🏜️" }, // C gul
-  { id: "r15", continentId: "c03", seed: [19, 13], gridCol: 4, gridRow: 2, namn: "Korallkust",  fallback: "#006064", ring: "#fb2c3b", ikon: "🐚"  }, // A röd
+  { id: "r11", continentId: "c03", seed: [ 2, 26], gridCol: 0, gridRow: 2, namn: "Mangrovkust", fallback: "#1b5e20", ring: "#ff6b00", ikon: "🌿"  },
+  { id: "r12", continentId: "c03", seed: [10, 24], gridCol: 1, gridRow: 2, namn: "Djungel",     fallback: "#2e7d32", ring: "#00d4f5", ikon: "🌴"  },
+  { id: "r13", continentId: "c03", seed: [20, 28], gridCol: 2, gridRow: 2, namn: "Floddelta",   fallback: "#33691e", ring: "#00d46a", ikon: "💧"  },
+  { id: "r14", continentId: "c03", seed: [30, 28], gridCol: 3, gridRow: 2, namn: "Rödöknen",    fallback: "#bf360c", ring: "#ffcc00", ikon: "🏜️" },
+  { id: "r15", continentId: "c03", seed: [38, 26], gridCol: 4, gridRow: 2, namn: "Korallkust",  fallback: "#006064", ring: "#fb2c3b", ikon: "🐚"  },
 ];
 
 // ── Hex-tile definitioner ────────────────────────────────────────────────────
@@ -107,7 +108,7 @@ function drawLabel(ctx, cx, cy, tile, scale, alpha) {
   ctx.shadowColor  = "rgba(0,0,0,0.9)";
   ctx.shadowBlur   = 3 / scale;
   ctx.fillStyle    = "#fff";
-  ctx.font         = `${scale >= 0.9 ? 16 : 11}px sans-serif`;
+  ctx.font         = `${scale >= 1.8 ? 11 : 8}px sans-serif`;
   ctx.fillText(tile.region.ikon, cx, cy);
   ctx.shadowBlur   = 0;
   ctx.globalAlpha  = 1;
@@ -412,7 +413,7 @@ export default function TileKarta2() {
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (s.pinchDist) {
         const ratio = dist / s.pinchDist;
-        s.scale = Math.max(s.minScale, Math.min(4, s.scale * ratio));
+        s.scale = Math.max(s.minScale, Math.min(8, s.scale * ratio));
         render();
       }
       s.pinchDist = dist;
@@ -471,13 +472,13 @@ export default function TileKarta2() {
     e.preventDefault();
     const s = stateRef.current;
     const delta = e.deltaY < 0 ? 1.1 : 0.91;
-    s.scale = Math.max(s.minScale, Math.min(4, s.scale * delta));
+    s.scale = Math.max(s.minScale, Math.min(8, s.scale * delta));
     render();
   }, [render]);
 
   const zoom = (delta) => {
     const s = stateRef.current;
-    s.scale = Math.max(s.minScale, Math.min(4, s.scale * delta));
+    s.scale = Math.max(s.minScale, Math.min(8, s.scale * delta));
     render();
   };
 
@@ -494,7 +495,7 @@ export default function TileKarta2() {
     const cx = worldW / 2;                          // alltid horisontellt centrerat
     const cy = gridRow * rh + rh / 2;
     const targetScale  = Math.min(W / worldW, H / rh) * 0.82;
-    const clampedScale = Math.max(stateRef.current.minScale, Math.min(4, targetScale));
+    const clampedScale = Math.max(stateRef.current.minScale, Math.min(8, targetScale));
     const targetTx = 0;                             // (worldW/2 - cx) * scale = 0
     const targetTy = (worldH / 2 - cy) * clampedScale;
     const s = stateRef.current;
@@ -525,7 +526,7 @@ export default function TileKarta2() {
     const cx = reg.gridCol * rw + rw / 2;
     const cy = reg.gridRow * rh + rh / 2;
     const targetScale = Math.min(W / rw, H / rh) * 0.78;
-    const clampedScale = Math.max(stateRef.current.minScale, Math.min(4, targetScale));
+    const clampedScale = Math.max(stateRef.current.minScale, Math.min(8, targetScale));
     const targetTx = (worldW / 2 - cx) * clampedScale;
     const targetTy = (worldH / 2 - cy) * clampedScale;
     const s = stateRef.current;
