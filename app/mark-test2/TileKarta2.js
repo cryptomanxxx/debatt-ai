@@ -473,6 +473,38 @@ export default function TileKarta2() {
     render();
   };
 
+  // Zooma in och centrera en hel kontinent med animering
+  const zoomToContinent = useCallback((cont) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.width / dpr;
+    const H = canvas.height / dpr;
+    const rh = worldH / GRID_ROWS;
+    const firstReg = REGIONS.find(r => r.id === cont.regionIds[0]);
+    const gridRow  = firstReg ? firstReg.gridRow : 0;
+    const cx = worldW / 2;                          // alltid horisontellt centrerat
+    const cy = gridRow * rh + rh / 2;
+    const targetScale  = Math.min(W / worldW, H / rh) * 0.82;
+    const clampedScale = Math.max(stateRef.current.minScale, Math.min(4, targetScale));
+    const targetTx = 0;                             // (worldW/2 - cx) * scale = 0
+    const targetTy = (worldH / 2 - cy) * clampedScale;
+    const s = stateRef.current;
+    if (s.rafId) cancelAnimationFrame(s.rafId);
+    const startScale = s.scale, startTx = s.tx, startTy = s.ty;
+    const dur = 400, t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min((now - t0) / dur, 1);
+      const e = 1 - Math.pow(1 - p, 3);
+      s.scale = startScale + (clampedScale - startScale) * e;
+      s.tx    = startTx    + (targetTx    - startTx)    * e;
+      s.ty    = startTy    + (targetTy    - startTy)    * e;
+      render();
+      s.rafId = p < 1 ? requestAnimationFrame(step) : null;
+    };
+    s.rafId = requestAnimationFrame(step);
+  }, [worldW, worldH, render]);
+
   // Zooma in och centrera en region med animering
   const zoomToRegion = useCallback((reg) => {
     const canvas = canvasRef.current;
@@ -581,12 +613,20 @@ export default function TileKarta2() {
 
         {CONTINENTS.map((c) => (
           <div key={c.id}>
-            {/* Kontinent-rubrik */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 8,
-              padding: "7px 14px 4px",
-              borderTop: "1px solid rgba(255,255,255,0.1)",
-            }}>
+            {/* Kontinent-rubrik — klickbar, zoomar till hela kontinenten */}
+            <button
+              onClick={() => zoomToContinent(c)}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 14px 5px",
+                borderTop: "1px solid rgba(255,255,255,0.1)",
+                borderLeft: "none", borderRight: "none", borderBottom: "none",
+                background: "none", cursor: "pointer",
+                borderRadius: 6, width: "100%", textAlign: "left",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = `${c.ring}18`}
+              onMouseLeave={e => e.currentTarget.style.background = "none"}
+            >
               <span style={{
                 display: "inline-block", width: 10, height: 10,
                 borderRadius: 2, background: c.ring, flexShrink: 0,
@@ -598,7 +638,7 @@ export default function TileKarta2() {
               <span style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", marginLeft: "auto", whiteSpace: "nowrap" }}>
                 {c.valuta}
               </span>
-            </div>
+            </button>
             {/* Regioner under denna kontinent */}
             {REGIONS.filter(r => r.continentId === c.id).map(r => (
               <button
