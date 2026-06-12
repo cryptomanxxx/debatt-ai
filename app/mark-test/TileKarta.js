@@ -359,11 +359,12 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       render();
     }
 
-    // Drag
+    // Drag — spåra total rörelse för att skilja pan från klick
     function onMouseDown(e) {
       const s = stateRef.current;
       s.dragging = true;
       s.lastX = e.clientX; s.lastY = e.clientY;
+      s.dragStartX = e.clientX; s.dragStartY = e.clientY;
       s.vx = 0; s.vy = 0;
     }
     function onMouseMove(e) {
@@ -381,6 +382,13 @@ export default function TileKarta({ zoner = [], agare = [] }) {
     // Click → välj zon
     function onClick(e) {
       const s  = stateRef.current;
+      // Ignorera klick som följer på en pan (> 6px rörelse sedan mousedown)
+      const dragDist = Math.hypot(
+        e.clientX - (s.dragStartX ?? e.clientX),
+        e.clientY - (s.dragStartY ?? e.clientY)
+      );
+      if (dragDist > 6) return;
+
       const CW = canvas.clientWidth;
       const CH = canvas.clientHeight;
       const r  = canvas.getBoundingClientRect();
