@@ -81,6 +81,18 @@ function hexPath(ctx, cx, cy, r) {
   ctx.closePath();
 }
 
+// hexSubPath: lägger till en hexsubpath UTAN att kalla beginPath.
+// Används i par (yttre + inre) med fill('evenodd') för att rita en
+// ren färgad ring utan destination-out och utan antialias-artefakter.
+function hexSubPath(ctx, cx, cy, r) {
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI / 3) * i - Math.PI / 6;
+    const px = cx + r * Math.cos(a), py = cy + r * Math.sin(a);
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 // ── Ritfunktioner ──────────────────────────────────────────────────────────────
@@ -168,7 +180,6 @@ function drawOwnerDot(ctx, cx, cy, agare, scale) {
 export default function TileKarta({ zoner = [], agare = [] }) {
   const canvasRef    = useRef(null);
   const bgImgRef     = useRef(null);
-  const offscreenRef = useRef(null); // återanvänd offscreen canvas för hex-grid
   const stateRef  = useRef({ tx: 0, ty: 0, scale: 1, dragging: false, lastX: 0, lastY: 0, vx: 0, vy: 0, selected: null, raf: null, dragStartX: 0, dragStartY: 0 });
   const [selected, setSelected] = useState(null);
   const [info, setInfo] = useState(null);
@@ -249,74 +260,32 @@ export default function TileKarta({ zoner = [], agare = [] }) {
 
     ctx.restore();
 
-    // ── Hex-grid via fill + destination-out (inga dubbla kanter) ───────────────
-    // Skapa/återanvänd offscreen canvas i device-pixelstorlek
-    const oc = (() => {
-      const prev = offscreenRef.current;
-      if (prev && prev.width === canvas.width && prev.height === canvas.height) return prev;
-      const n = document.createElement("canvas");
-      n.width  = canvas.width;
-      n.height = canvas.height;
-      offscreenRef.current = n;
-      return n;
-    })();
-    const gctx = oc.getContext("2d");
-    gctx.clearRect(0, 0, oc.width, oc.height);
+    // ── Hex-grid via evenodd fill (inga öppna hexar, inga dubbla kanter) ───────
+    // Varje hexagon ritas som yttre + inre subpath i samma beginPath-anrop.
+    // fill('evenodd') fyller bara pixlar inuti ett udda antal subpaths = ringen.
+    // Ingen destination-out, ingen offscreen canvas, inga antialias-artefakter.
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.translate(tx + W / 2, ty + H / 2);
+    ctx.scale(scale, scale);
+    ctx.translate(-worldW / 2, -worldH / 2);
 
-    gctx.save();
-    gctx.scale(dpr, dpr);
-    gctx.translate(tx + W / 2, ty + H / 2);
-    gctx.scale(scale, scale);
-    gctx.translate(-worldW / 2, -worldH / 2);
-
-    const BW = 4; // kantbredd i världskoordinater
-
-    // Pass 1: fyll yttre hexagon med regionfärg
-    for (const t of allTiles) {
-      const [cx, cy] = hexCenter(t.col, t.row);
-      hexPath(gctx, cx + ox, cy + oy, R - 0.5);
-      gctx.fillStyle  = TYP_FARG[t.typ] || "#888888";
-      gctx.globalAlpha = t.real ? 1.0 : 0.7;
-      gctx.fill();
-      gctx.globalAlpha = 1.0;
-    }
-
-    // Pass 2: radera inre hexagon → transparent interior, kvar = färgad ring
-    gctx.globalCompositeOperation = "destination-out";
-    for (const t of allTiles) {
-      if (stateRef.current.selected === t.id) continue; // vald tile hanteras separat
-      const [cx, cy] = hexCenter(t.col, t.row);
-      hexPath(gctx, cx + ox, cy + oy, R - BW - 0.5);
-      gctx.fillStyle  = "black";
-      gctx.globalAlpha = 1.0;
-      gctx.fill();
-    }
-    gctx.globalCompositeOperation = "source-over";
-
-    // Vald tile: vit/ljus ring
+    const BW = 5; // kantbredd i världskoordinater
     const selId = stateRef.current.selected;
-    if (selId) {
-      const sel = allTiles.find(t => t.id === selId);
-      if (sel) {
-        const [cx, cy] = hexCenter(sel.col, sel.row);
-        // Radera fyllning → rita vit ring
-        gctx.globalCompositeOperation = "destination-out";
-        hexPath(gctx, cx + ox, cy + oy, R - 0.5);
-        gctx.fill();
-        gctx.globalCompositeOperation = "source-over";
-        hexPath(gctx, cx + ox, cy + oy, R - 0.5);
-        gctx.fillStyle  = "#ffffff";
-        gctx.globalAlpha = 1.0;
-        gctx.fill();
-        gctx.globalCompositeOperation = "destination-out";
-        hexPath(gctx, cx + ox, cy + oy, R - BW - 0.5);
-        gctx.fill();
-        gctx.globalCompositeOperation = "source-over";
-      }
+
+    for (const t of allTiles) {
+      const [cx, cy] = hexCenter(t.col, t.row);
+      const color = selId === t.id ? "#ffffff" : (TYP_FARG[t.typ] || "#888888");
+      ctx.beginPath();
+      hexSubPath(ctx, cx + ox, cy + oy, R - 0.5);
+      hexSubPath(ctx, cx + ox, cy + oy, R - BW - 0.5);
+      ctx.fillStyle   = color;
+      ctx.globalAlpha = t.real ? 1.0 : 0.7;
+      ctx.fill("evenodd");
+      ctx.globalAlpha = 1.0;
     }
 
-    gctx.restore();
-    ctx.drawImage(oc, 0, 0);
+    ctx.restore();
 
     // ── Labels, ägarpunkter och glow ritas ovanpå grid ─────────────────────────
     ctx.save();
