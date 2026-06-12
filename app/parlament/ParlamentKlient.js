@@ -222,11 +222,13 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
   ];
 
   const isProposition = (f) => f.kalla === "riksdagen" && f.riksdagen_url?.includes("/proposition/");
-  const isMotion      = (f) => f.kalla === "riksdagen" && !f.riksdagen_url?.includes("/proposition/");
+  const isBetankande  = (f) => f.kalla === "riksdagen" && f.riksdagen_url?.includes("/betankande/");
+  const isMotion      = (f) => f.kalla === "riksdagen" && !isProposition(f) && !isBetankande(f);
 
   const efterKalla = valdKalla === "Riksdagen"    ? forslag.filter(f => f.kalla === "riksdagen")
     : valdKalla === "Proposition" ? forslag.filter(isProposition)
-    : valdKalla === "Motion"      ? forslag.filter(f => f.kalla === "riksdagen" && isMotion(f))
+    : valdKalla === "Betankande"  ? forslag.filter(isBetankande)
+    : valdKalla === "Motion"      ? forslag.filter(isMotion)
     : valdKalla === "AI-motion"   ? forslag.filter(f => f.kalla !== "riksdagen")
     : forslag;
 
@@ -286,12 +288,13 @@ export default function ParlamentKlient({ forslag, rosterMap }) {
     { id: "Alla",         etikett: "Alla",              antal: forslag.length },
     { id: "Riksdagen",    etikett: "🏛 Riksdagen",     antal: forslag.filter(f => f.kalla === "riksdagen").length },
     { id: "Proposition",  etikett: "📋 Propositioner", antal: forslag.filter(isProposition).length },
-    { id: "Motion",       etikett: "📝 Motioner",      antal: forslag.filter(f => f.kalla === "riksdagen" && isMotion(f)).length },
+    { id: "Betankande",   etikett: "📄 Betänkanden",   antal: forslag.filter(isBetankande).length },
+    { id: "Motion",       etikett: "📝 Motioner",      antal: forslag.filter(isMotion).length },
     { id: "AI-motion",    etikett: "🤖 AI-motioner",   antal: forslag.filter(f => f.kalla !== "riksdagen").length },
   ];
 
   const kallaStyle = (aktiv, id) => {
-    const färg = id === "Riksdagen" || id === "Proposition" || id === "Motion"
+    const färg = id === "Riksdagen" || id === "Proposition" || id === "Betankande" || id === "Motion"
       ? C.riksdagen : id === "AI-motion" ? C.accent : "#aaa";
     return {
       padding: "5px 14px", borderRadius: "20px",

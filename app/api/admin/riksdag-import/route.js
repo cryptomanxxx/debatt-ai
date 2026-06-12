@@ -58,13 +58,14 @@ async function hämtaDoktyp(doktyp) {
   if (!r.ok) throw new Error(`API ${r.status}`);
   const data = await r.json();
   const dokument = data?.dokumentlista?.dokument || [];
-  const fallback = doktyp === "prop" ? "Proposition" : "Motion";
+  const fallback = doktyp === "prop" ? "Proposition" : doktyp === "mot" ? "Motion" : "Betänkande";
   return (Array.isArray(dokument) ? dokument : [dokument]).map(d => {
     let url = byggUrl(d);
-    // Säkerställ att propositioner alltid får en URL med /proposition/ — annars
-    // missar ParlamentKlient.js isProposition()-filtret och de räknas som 0.
+    // Säkerställ rätt URL-struktur per dokumenttyp — ParlamentKlient.js filtrerar på dessa
     if (doktyp === "prop" && url && !url.includes("/proposition/")) {
       url = `https://www.riksdagen.se/sv/dokument-och-lagar/dokument/proposition/${d.dok_id?.trim()}/`;
+    } else if (doktyp === "bet" && url && !url.includes("/betankande/")) {
+      url = `https://www.riksdagen.se/sv/dokument-och-lagar/dokument/betankande/${d.dok_id?.trim()}/`;
     }
     return {
       dok_id: d.dok_id?.trim(),
@@ -76,19 +77,23 @@ async function hämtaDoktyp(doktyp) {
 }
 
 async function hämtaViaApi() {
-  const [propositioner, motioner] = await Promise.allSettled([
+  // Betänkanden (bet) importeras för att riksdagen röstar på dem direkt →
+  // tillhor_dok_id i voteringlista matchar bet-dok_id → utfall kan hämtas automatiskt.
+  const [propositioner, motioner, betankanden] = await Promise.allSettled([
     hämtaDoktyp("prop"),
     hämtaDoktyp("mot"),
+    hämtaDoktyp("bet"),
   ]);
 
-  // Om båda misslyckas — kasta så att HTML-fallbacken i POST aktiveras
-  if (propositioner.status === "rejected" && motioner.status === "rejected") {
-    throw new Error(`prop: ${propositioner.reason?.message} | mot: ${motioner.reason?.message}`);
+  // Om alla tre misslyckas — kasta så att HTML-fallbacken i POST aktiveras
+  if (propositioner.status === "rejected" && motioner.status === "rejected" && betankanden.status === "rejected") {
+    throw new Error(`prop: ${propositioner.reason?.message} | mot: ${motioner.reason?.message} | bet: ${betankanden.reason?.message}`);
   }
 
   const forslag = [
     ...(propositioner.status === "fulfilled" ? propositioner.value : []),
     ...(motioner.status === "fulfilled" ? motioner.value : []),
+    ...(betankanden.status === "fulfilled" ? betankanden.value : []),
   ];
 
   await Promise.all(forslag.map(async (item) => {
