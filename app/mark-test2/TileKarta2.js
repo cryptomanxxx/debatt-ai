@@ -197,19 +197,43 @@ export default function TileKarta2() {
       ctx.save();
       ctx.textAlign    = "center";
       ctx.textBaseline = "middle";
+      ctx.shadowBlur   = 0;
       REGIONS.forEach((reg) => {
         const cx = reg.gridCol * rw + rw / 2;
         const cy = reg.gridRow * rh + rh / 2;
-        const fs = Math.round(Math.min(28, rw * 0.07) / scale);
-        ctx.font        = `bold ${fs}px sans-serif`;
-        ctx.shadowColor = "rgba(255,255,255,0.9)";
-        ctx.shadowBlur  = 10 / scale;
+        const fs = Math.round(Math.min(26, rw * 0.065) / scale);
+        ctx.font = `bold ${fs}px sans-serif`;
+        const text  = `${reg.ikon} ${reg.namn}`;
+        const tw    = ctx.measureText(text).width;
+        const pad   = 7 / scale;
+        const bw    = tw + pad * 2;
+        const bh    = fs * 1.45;
+        const bx    = cx - bw / 2;
+        const by    = cy - bh / 2;
+        const rad   = bh / 2;
+
+        // Vit pill-bakgrund
+        ctx.globalAlpha = alpha * 0.82;
+        ctx.fillStyle   = "#ffffff";
+        ctx.beginPath();
+        ctx.moveTo(bx + rad, by);
+        ctx.lineTo(bx + bw - rad, by);
+        ctx.arc(bx + bw - rad, by + rad, rad, -Math.PI / 2, 0);
+        ctx.lineTo(bx + bw, by + bh - rad);
+        ctx.arc(bx + bw - rad, by + bh - rad, rad, 0, Math.PI / 2);
+        ctx.lineTo(bx + rad, by + bh);
+        ctx.arc(bx + rad, by + bh - rad, rad, Math.PI / 2, Math.PI);
+        ctx.lineTo(bx, by + rad);
+        ctx.arc(bx + rad, by + rad, rad, Math.PI, -Math.PI / 2);
+        ctx.closePath();
+        ctx.fill();
+
+        // Svart text ovanpå
         ctx.globalAlpha = alpha;
         ctx.fillStyle   = "#111111";
-        ctx.fillText(`${reg.ikon} ${reg.namn}`, cx, cy);
+        ctx.fillText(text, cx, cy);
       });
       ctx.globalAlpha = 1;
-      ctx.shadowBlur  = 0;
       ctx.restore();
     }
 
