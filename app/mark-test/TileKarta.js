@@ -466,6 +466,8 @@ export default function TileKarta({ zoner = [], agare = [] }) {
         s.dragging = true;
         s.lastX = e.touches[0].clientX;
         s.lastY = e.touches[0].clientY;
+        s.dragStartX = e.touches[0].clientX;
+        s.dragStartY = e.touches[0].clientY;
       }
     }
     function onTouchMove(e) {
