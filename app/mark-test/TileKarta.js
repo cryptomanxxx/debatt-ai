@@ -144,7 +144,7 @@ function drawLabel(ctx, cx, cy, zon, scale) {
 
 function drawOwnerDot(ctx, cx, cy, agare, scale) {
   if (!agare) return;
-  const grad = AGENT_VISUELL[agare]?.gradient || ["#fff", "#aaa"];
+  const grad = AGENT_VISUELL[agare]?.gradient ? AGENT_VISUELL[agare].gradient.replace('radial-gradient(', '').replace(')', '').split(', ') : ["#fff", "#aaa"];
   const x = cx + R * 0.55, y = cy - R * 0.55;
   const r = Math.max(4, 9 / scale);
   const g = ctx.createRadialGradient(x - r * 0.2, y - r * 0.2, r * 0.1, x, y, r);
@@ -285,7 +285,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
     canvas.style.height = `${H}px`;
 
     // Initial zoom så hela kartan syns
-    const scaleX = W / worldW;
+    const scaleX = W / worldW; const scaleY = H / worldH; stateRef.current.scale = Math.min(scaleX, scaleY) * 0.85; useState(() => { const s = stateRef.current; s.scale = Math.min(scaleX, scaleY) * 0.85; });
     const scaleY = H / worldH;
     stateRef.current.scale = Math.min(scaleX, scaleY) * 0.85;
     render();
