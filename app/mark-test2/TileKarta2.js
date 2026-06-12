@@ -89,10 +89,11 @@ export default function TileKarta2() {
   const canvasRef  = useRef(null);
   const regionImgs = useRef({});   // laddade region-bilder
   const stateRef   = useRef({
-    tx: 0, ty: 0, scale: 0.5,     // börja lite utzoomad för att se hela världen
+    tx: 0, ty: 0, scale: 0.5,
     dragging: false, lastX: 0, lastY: 0, vx: 0, vy: 0,
     selected: null, dragStartX: 0, dragStartY: 0,
     rafId: null,
+    pinchDist: null,   // tvåfingers-zoom
   });
   const [info, setInfo]     = useState(null);
   const [loaded, setLoaded] = useState(0);   // räknar laddade bilder
@@ -267,21 +268,41 @@ export default function TileKarta2() {
     else startMomentum();
   }, [startMomentum]); // eslint-disable-line
 
-  // ── Touch-händelser ────────────────────────────────────────────────────────
+  // ── Touch-händelser (drag + pinch-zoom) ───────────────────────────────────
   const onTouchStart = useCallback((e) => {
-    if (e.touches.length !== 1) return;
     const s = stateRef.current;
-    const t = e.touches[0];
     if (s.rafId) { cancelAnimationFrame(s.rafId); s.rafId = null; }
+    if (e.touches.length === 2) {
+      // Starta pinch-zoom
+      s.dragging = false;
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      s.pinchDist = Math.sqrt(dx * dx + dy * dy);
+      return;
+    }
+    const t = e.touches[0];
     s.dragging = true; s.lastX = t.clientX; s.lastY = t.clientY;
     s.dragStartX = t.clientX; s.dragStartY = t.clientY;
     s.vx = 0; s.vy = 0;
   }, []);
 
   const onTouchMove = useCallback((e) => {
-    if (e.touches.length !== 1) return;
     e.preventDefault();
     const s = stateRef.current;
+    if (e.touches.length === 2) {
+      // Pinch-zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (s.pinchDist) {
+        const ratio = dist / s.pinchDist;
+        s.scale = Math.max(0.15, Math.min(4, s.scale * ratio));
+        render();
+      }
+      s.pinchDist = dist;
+      return;
+    }
+    if (!s.dragging) return;
     const t = e.touches[0];
     s.vx = t.clientX - s.lastX; s.vy = t.clientY - s.lastY;
     s.tx += s.vx; s.ty += s.vy;
@@ -291,6 +312,8 @@ export default function TileKarta2() {
 
   const onTouchEnd = useCallback((e) => {
     const s = stateRef.current;
+    if (e.touches.length < 2) s.pinchDist = null;
+    if (e.touches.length > 0) return;   // kvar med ett finger — vänta
     s.dragging = false;
     if (e.changedTouches.length === 1) {
       const t = e.changedTouches[0];
