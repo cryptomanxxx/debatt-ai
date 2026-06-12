@@ -239,22 +239,27 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       ctx.fillRect(-R * 2, -R * 2, worldW + R * 4, worldH + R * 4);
     }
 
-    // Rita wilderness-tiles först (botten)
+    // Wilderness-tiles: semi-transparenta så bakgrundsbilden syns igenom
+    ctx.globalAlpha = 0.62;
     for (const t of allTiles) {
       if (t.real) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
       drawTile(ctx, cx + ox, cy + oy, t.typ, false, scale);
     }
 
-    // Rita riktiga tiles ovanpå
+    // Riktiga zoner: högre opacitet — de är "spelets" marklager
+    ctx.globalAlpha = 0.88;
     for (const t of allTiles) {
       if (!t.real) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
       const sel = stateRef.current.selected === t.id;
       drawTile(ctx, cx + ox, cy + oy, t.typ, sel, scale);
+      ctx.globalAlpha = 1.0;
       drawOwnerDot(ctx, cx + ox, cy + oy, t.agare, scale);
       drawLabel(ctx, cx + ox, cy + oy, t, scale);
+      ctx.globalAlpha = 0.88;
     }
+    ctx.globalAlpha = 1.0;
 
     // Glödeffekt på selected tile
     const selTile = allTiles.find(t => t.id === stateRef.current.selected && t.real);
@@ -324,7 +329,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
         initialized = true;
         const scaleX = W / worldW;
         const scaleY = H / worldH;
-        stateRef.current.scale = Math.min(scaleX, scaleY) * 0.85;
+        stateRef.current.scale = Math.min(scaleX, scaleY) * 0.97;
         stateRef.current.tx = 0;
         stateRef.current.ty = 0;
       }
