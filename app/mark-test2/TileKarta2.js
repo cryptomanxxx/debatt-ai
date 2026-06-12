@@ -18,24 +18,26 @@ const HEX_ROWS = 15;   // 3 regioner × 5 hex/region
 
 // ── Regioner ─────────────────────────────────────────────────────────────────
 const REGIONS = [
+  // 7 färger (A–G) placerade enligt 4-färgsteoremet: inga grannar delar färg
+  // Grid: A D B G E / F C G A D / B E D C A
   // rad 0 — nord
-  { id: "r01", gridCol: 0, gridRow: 0, namn: "Arktis",       fallback: "#c7e8f7", ring: "#38bdf8", ikon: "❄️" },
-  { id: "r02", gridCol: 1, gridRow: 0, namn: "Barrskog",     fallback: "#1a472a", ring: "#4ade80", ikon: "🌲" },
-  { id: "r03", gridCol: 2, gridRow: 0, namn: "Klipphöjder",  fallback: "#6b5c4e", ring: "#fbbf24", ikon: "🏔️" },
-  { id: "r04", gridCol: 3, gridRow: 0, namn: "Tundra",       fallback: "#b0c4b1", ring: "#a5f3fc", ikon: "🌾" },
-  { id: "r05", gridCol: 4, gridRow: 0, namn: "Glaciärvik",   fallback: "#a8d8ea", ring: "#818cf8", ikon: "🧊" },
+  { id: "r01", gridCol: 0, gridRow: 0, namn: "Arktis",       fallback: "#c7e8f7", ring: "#fb2c3b", ikon: "❄️" }, // A röd
+  { id: "r02", gridCol: 1, gridRow: 0, namn: "Barrskog",     fallback: "#1a472a", ring: "#00d46a", ikon: "🌲" }, // D grön
+  { id: "r03", gridCol: 2, gridRow: 0, namn: "Klipphöjder",  fallback: "#6b5c4e", ring: "#ff6b00", ikon: "🏔️" }, // B orange
+  { id: "r04", gridCol: 3, gridRow: 0, namn: "Tundra",       fallback: "#b0c4b1", ring: "#b44dff", ikon: "🌾" }, // G lila
+  { id: "r05", gridCol: 4, gridRow: 0, namn: "Glaciärvik",   fallback: "#a8d8ea", ring: "#00d4f5", ikon: "🧊" }, // E cyan
   // rad 1 — mitten
-  { id: "r06", gridCol: 0, gridRow: 1, namn: "Fjordkust",    fallback: "#2e5f6e", ring: "#60a5fa", ikon: "🌊" },
-  { id: "r07", gridCol: 1, gridRow: 1, namn: "Odlingsland",  fallback: "#8bc34a", ring: "#bef264", ikon: "🌾" },
-  { id: "r08", gridCol: 2, gridRow: 1, namn: "Storstad",     fallback: "#607d8b", ring: "#e879f9", ikon: "🏰" },
-  { id: "r09", gridCol: 3, gridRow: 1, namn: "Stäpp",        fallback: "#c8a96e", ring: "#fb923c", ikon: "🌵" },
-  { id: "r10", gridCol: 4, gridRow: 1, namn: "Vulkanrev",    fallback: "#7b2d00", ring: "#f87171", ikon: "🌋" },
+  { id: "r06", gridCol: 0, gridRow: 1, namn: "Fjordkust",    fallback: "#2e5f6e", ring: "#4090ff", ikon: "🌊" }, // F blå
+  { id: "r07", gridCol: 1, gridRow: 1, namn: "Odlingsland",  fallback: "#8bc34a", ring: "#ffcc00", ikon: "🌾" }, // C gul
+  { id: "r08", gridCol: 2, gridRow: 1, namn: "Storstad",     fallback: "#607d8b", ring: "#b44dff", ikon: "🏰" }, // G lila
+  { id: "r09", gridCol: 3, gridRow: 1, namn: "Stäpp",        fallback: "#c8a96e", ring: "#fb2c3b", ikon: "🌵" }, // A röd
+  { id: "r10", gridCol: 4, gridRow: 1, namn: "Vulkanrev",    fallback: "#7b2d00", ring: "#00d46a", ikon: "🌋" }, // D grön
   // rad 2 — syd
-  { id: "r11", gridCol: 0, gridRow: 2, namn: "Mangrovkust",  fallback: "#1b5e20", ring: "#34d399", ikon: "🌿" },
-  { id: "r12", gridCol: 1, gridRow: 2, namn: "Djungel",      fallback: "#2e7d32", ring: "#86efac", ikon: "🌴" },
-  { id: "r13", gridCol: 2, gridRow: 2, namn: "Floddelta",    fallback: "#33691e", ring: "#2dd4bf", ikon: "💧" },
-  { id: "r14", gridCol: 3, gridRow: 2, namn: "Rödöknen",     fallback: "#bf360c", ring: "#fdba74", ikon: "🏜️" },
-  { id: "r15", gridCol: 4, gridRow: 2, namn: "Korallkust",   fallback: "#006064", ring: "#f9a8d4", ikon: "🐚" },
+  { id: "r11", gridCol: 0, gridRow: 2, namn: "Mangrovkust",  fallback: "#1b5e20", ring: "#ff6b00", ikon: "🌿" }, // B orange
+  { id: "r12", gridCol: 1, gridRow: 2, namn: "Djungel",      fallback: "#2e7d32", ring: "#00d4f5", ikon: "🌴" }, // E cyan
+  { id: "r13", gridCol: 2, gridRow: 2, namn: "Floddelta",    fallback: "#33691e", ring: "#00d46a", ikon: "💧" }, // D grön
+  { id: "r14", gridCol: 3, gridRow: 2, namn: "Rödöknen",     fallback: "#bf360c", ring: "#ffcc00", ikon: "🏜️" }, // C gul
+  { id: "r15", gridCol: 4, gridRow: 2, namn: "Korallkust",   fallback: "#006064", ring: "#fb2c3b", ikon: "🐚" }, // A röd
 ];
 
 // ── Hex-tile definitioner ────────────────────────────────────────────────────
