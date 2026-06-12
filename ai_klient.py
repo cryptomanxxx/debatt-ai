@@ -107,8 +107,19 @@ def _logga_ai_anrop(provider: str, source: str, status: str, latency_ms: int) ->
     threading.Thread(target=_post, daemon=True).start()
 
 
+_SKIP_PHRASES = (
+    "markerad som nere",
+    "saknas",
+    "hoppar direkt till fallback",
+)
+
+
 def _log_wrap(provider_key: str, fn: callable, source: str) -> callable:
-    """Omsluter en provider-lambda med latenstiming och ai_log-loggning."""
+    """Omsluter en provider-lambda med latenstiming och ai_log-loggning.
+
+    Providers som kastas utan HTTP-anrop (dagsgräns redan nådd, API-nyckel saknas)
+    loggas inte — de är pre-flight skips, inte verkliga fel.
+    """
     def wrapper():
         t0 = time.time()
         try:
@@ -117,8 +128,11 @@ def _log_wrap(provider_key: str, fn: callable, source: str) -> callable:
             _logga_ai_anrop(provider_key, source, "ok", latency_ms)
             return result
         except Exception as exc:
-            latency_ms = int((time.time() - t0) * 1000)
             err = str(exc).lower()
+            # Hoppa över logging för providers som skippas utan HTTP-anrop
+            if any(phrase in err for phrase in _SKIP_PHRASES):
+                raise
+            latency_ms = int((time.time() - t0) * 1000)
             if "429" in err or "rate_limit" in err or "rate limit" in err or "rate-limit" in err:
                 status = "rate_limited"
             elif "timeout" in err or "timed out" in err:
