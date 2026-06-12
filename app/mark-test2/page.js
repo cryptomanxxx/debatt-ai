@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function MarkTest2Page() {
   return (
-    <div style={{ background: "#050510", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ background: "#050510", height: "100dvh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       {/* Header */}
       <div style={{
         padding: "14px 20px",
