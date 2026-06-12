@@ -172,14 +172,6 @@ export default function TileKarta({ zoner = [], agare = [] }) {
   const [selected, setSelected] = useState(null);
   const [info, setInfo] = useState(null);
 
-  // Ladda bakgrundsbild en gång
-  useEffect(() => {
-    const img = new Image();
-    img.src = "/mark-bakgrund.png";
-    img.onload = () => { bgImgRef.current = img; render(); };
-    bgImgRef.current = img;
-  }, [render]);
-
   // Bygg agare-map — memoized så allTiles inte byggs om vid varje setState
   const agareMap = useMemo(
     () => Object.fromEntries(agare.map(a => [a.zon_id, a.agent])),
@@ -279,6 +271,14 @@ export default function TileKarta({ zoner = [], agare = [] }) {
 
     ctx.restore();
   }, [allTiles, worldW, worldH, ox, oy]);
+
+  // Ladda bakgrundsbild — placerad efter render-deklarationen (undviker TDZ)
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/mark-bakgrund.png";
+    img.onload = () => { bgImgRef.current = img; render(); };
+    bgImgRef.current = img;
+  }, [render]);
 
   // RAF-loop för momentumrullning
   useEffect(() => {
