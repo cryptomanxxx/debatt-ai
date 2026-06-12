@@ -284,28 +284,44 @@ export default function TileKarta({ zoner = [], agare = [] }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const parent = canvas.parentElement;
-    const W = parent.clientWidth;
-    const H = parent.clientHeight;
-    canvas.width  = W * dpr;
-    canvas.height = H * dpr;
-    canvas.style.width  = `${W}px`;
-    canvas.style.height = `${H}px`;
+    let initialized = false;
 
-    // Initial zoom så hela kartan syns
-    const scaleX = W / worldW;
-    const scaleY = H / worldH;
-    stateRef.current.scale = Math.min(scaleX, scaleY) * 0.85;
-    render();
+    // Storlekssättning — körs direkt och vid varje ResizeObserver-notis.
+    // ResizeObserver triggar efter att flex-layouten faktiskt renderats,
+    // vilket löser problemet med clientHeight=0 vid mount på mobil.
+    function resize() {
+      const parent = canvas.parentElement;
+      const W = parent.clientWidth;
+      const H = parent.clientHeight;
+      if (!W || !H) return;
+      canvas.width  = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width  = `${W}px`;
+      canvas.style.height = `${H}px`;
+      if (!initialized) {
+        initialized = true;
+        const scaleX = W / worldW;
+        const scaleY = H / worldH;
+        stateRef.current.scale = Math.min(scaleX, scaleY) * 0.85;
+        stateRef.current.tx = 0;
+        stateRef.current.ty = 0;
+      }
+      render();
+    }
 
-    // Scroll → zoom
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas.parentElement);
+
+    // Scroll → zoom (CW/CH läses dynamiskt så zoom fungerar efter resize)
     function onWheel(e) {
       e.preventDefault();
-      const s   = stateRef.current;
-      const dpr = window.devicePixelRatio || 1;
-      const r   = canvas.getBoundingClientRect();
-      const mx  = (e.clientX - r.left - W / 2);
-      const my  = (e.clientY - r.top  - H / 2);
+      const s  = stateRef.current;
+      const CW = canvas.clientWidth;
+      const CH = canvas.clientHeight;
+      const r  = canvas.getBoundingClientRect();
+      const mx = (e.clientX - r.left - CW / 2);
+      const my = (e.clientY - r.top  - CH / 2);
       const factor = e.deltaY < 0 ? 1.1 : 0.91;
       const ns = Math.min(4, Math.max(0.25, s.scale * factor));
       s.tx = mx - (mx - s.tx) * (ns / s.scale);
@@ -335,11 +351,13 @@ export default function TileKarta({ zoner = [], agare = [] }) {
 
     // Click → välj zon
     function onClick(e) {
-      const s   = stateRef.current;
-      const r   = canvas.getBoundingClientRect();
+      const s  = stateRef.current;
+      const CW = canvas.clientWidth;
+      const CH = canvas.clientHeight;
+      const r  = canvas.getBoundingClientRect();
       // Omvandla skärmpunkt → världspunkt
-      const mx  = (e.clientX - r.left - W / 2 - s.tx) / s.scale + worldW / 2 - ox;
-      const my  = (e.clientY - r.top  - H / 2 - s.ty) / s.scale + worldH / 2 - oy;
+      const mx = (e.clientX - r.left - CW / 2 - s.tx) / s.scale + worldW / 2 - ox;
+      const my = (e.clientY - r.top  - CH / 2 - s.ty) / s.scale + worldH / 2 - oy;
 
       let nearest = null, nearestDist = Infinity;
       for (const t of allTiles) {
@@ -410,6 +428,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
     canvas.addEventListener("touchend",    onTouchEnd);
 
     return () => {
+      ro.disconnect();
       canvas.removeEventListener("wheel",      onWheel);
       canvas.removeEventListener("mousedown",  onMouseDown);
       canvas.removeEventListener("mousemove",  onMouseMove);
