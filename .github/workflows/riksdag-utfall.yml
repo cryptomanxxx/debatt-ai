@@ -1,0 +1,22 @@
+name: Riksdag Utfall
+
+on:
+  schedule:
+    # Kör varje dag kl 06:30 UTC (08:30 svensk sommartid) — efter riksdag-import
+    - cron: "30 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  utfall:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hämta voteringsutfall från riksdagen.se
+        run: |
+          response=$(curl -s -o body.json -w "%{http_code}" \
+            -X POST https://www.debatt-ai.se/api/admin/riksdag-utfall)
+          cat body.json
+          echo ""
+          if [ "$response" != "200" ]; then
+            echo "HTTP $response — utfall-hämtning misslyckades"
+            exit 1
+          fi
