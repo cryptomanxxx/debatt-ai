@@ -166,9 +166,10 @@ function drawOwnerDot(ctx, cx, cy, agare, scale) {
 
 // ── Huvudkomponent ─────────────────────────────────────────────────────────────
 export default function TileKarta({ zoner = [], agare = [] }) {
-  const canvasRef = useRef(null);
-  const bgImgRef  = useRef(null);
-  const stateRef  = useRef({ tx: 0, ty: 0, scale: 1, dragging: false, lastX: 0, lastY: 0, vx: 0, vy: 0, selected: null, raf: null });
+  const canvasRef    = useRef(null);
+  const bgImgRef     = useRef(null);
+  const offscreenRef = useRef(null); // återanvänd offscreen canvas för hex-grid
+  const stateRef  = useRef({ tx: 0, ty: 0, scale: 1, dragging: false, lastX: 0, lastY: 0, vx: 0, vy: 0, selected: null, raf: null, dragStartX: 0, dragStartY: 0 });
   const [selected, setSelected] = useState(null);
   const [info, setInfo] = useState(null);
 
@@ -246,34 +247,103 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       ctx.fillRect(-R * 2, -R * 2, worldW + R * 4, worldH + R * 4);
     }
 
-    // Wilderness: samma kantlinje som riktiga zoner (skarp, färgad, 1.0 alpha)
+    ctx.restore();
+
+    // ── Hex-grid via fill + destination-out (inga dubbla kanter) ───────────────
+    // Skapa/återanvänd offscreen canvas i device-pixelstorlek
+    const oc = (() => {
+      const prev = offscreenRef.current;
+      if (prev && prev.width === canvas.width && prev.height === canvas.height) return prev;
+      const n = document.createElement("canvas");
+      n.width  = canvas.width;
+      n.height = canvas.height;
+      offscreenRef.current = n;
+      return n;
+    })();
+    const gctx = oc.getContext("2d");
+    gctx.clearRect(0, 0, oc.width, oc.height);
+
+    gctx.save();
+    gctx.scale(dpr, dpr);
+    gctx.translate(tx + W / 2, ty + H / 2);
+    gctx.scale(scale, scale);
+    gctx.translate(-worldW / 2, -worldH / 2);
+
+    const BW = 4; // kantbredd i världskoordinater
+
+    // Pass 1: fyll yttre hexagon med regionfärg
     for (const t of allTiles) {
-      if (t.real) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
-      drawTile(ctx, cx + ox, cy + oy, t.typ, stateRef.current.selected === t.id, scale, 1.0);
+      hexPath(gctx, cx + ox, cy + oy, R - 0.5);
+      gctx.fillStyle  = TYP_FARG[t.typ] || "#888888";
+      gctx.globalAlpha = t.real ? 1.0 : 0.7;
+      gctx.fill();
+      gctx.globalAlpha = 1.0;
     }
 
-    // Riktiga zoner: skarp färgad kant + ikoner/labels fullt synliga
+    // Pass 2: radera inre hexagon → transparent interior, kvar = färgad ring
+    gctx.globalCompositeOperation = "destination-out";
+    for (const t of allTiles) {
+      if (stateRef.current.selected === t.id) continue; // vald tile hanteras separat
+      const [cx, cy] = hexCenter(t.col, t.row);
+      hexPath(gctx, cx + ox, cy + oy, R - BW - 0.5);
+      gctx.fillStyle  = "black";
+      gctx.globalAlpha = 1.0;
+      gctx.fill();
+    }
+    gctx.globalCompositeOperation = "source-over";
+
+    // Vald tile: vit/ljus ring
+    const selId = stateRef.current.selected;
+    if (selId) {
+      const sel = allTiles.find(t => t.id === selId);
+      if (sel) {
+        const [cx, cy] = hexCenter(sel.col, sel.row);
+        // Radera fyllning → rita vit ring
+        gctx.globalCompositeOperation = "destination-out";
+        hexPath(gctx, cx + ox, cy + oy, R - 0.5);
+        gctx.fill();
+        gctx.globalCompositeOperation = "source-over";
+        hexPath(gctx, cx + ox, cy + oy, R - 0.5);
+        gctx.fillStyle  = "#ffffff";
+        gctx.globalAlpha = 1.0;
+        gctx.fill();
+        gctx.globalCompositeOperation = "destination-out";
+        hexPath(gctx, cx + ox, cy + oy, R - BW - 0.5);
+        gctx.fill();
+        gctx.globalCompositeOperation = "source-over";
+      }
+    }
+
+    gctx.restore();
+    ctx.drawImage(oc, 0, 0);
+
+    // ── Labels, ägarpunkter och glow ritas ovanpå grid ─────────────────────────
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.translate(tx + W / 2, ty + H / 2);
+    ctx.scale(scale, scale);
+    ctx.translate(-worldW / 2, -worldH / 2);
+
     for (const t of allTiles) {
       if (!t.real) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
-      const sel = stateRef.current.selected === t.id;
-      drawTile(ctx, cx + ox, cy + oy, t.typ, sel, scale, 1.0);
       drawOwnerDot(ctx, cx + ox, cy + oy, t.agare, scale);
       drawLabel(ctx, cx + ox, cy + oy, t, scale);
     }
 
-    // Glödeffekt på selected tile (riktiga zoner och wilderness)
-    const selTile = allTiles.find(t => t.id === stateRef.current.selected);
-    if (selTile) {
-      const [cx, cy] = hexCenter(selTile.col, selTile.row);
-      hexPath(ctx, cx + ox, cy + oy, R + 4);
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth   = 2 / scale;
-      ctx.shadowColor = "#fff";
-      ctx.shadowBlur  = 18 / scale;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+    if (selId) {
+      const sel = allTiles.find(t => t.id === selId);
+      if (sel) {
+        const [cx, cy] = hexCenter(sel.col, sel.row);
+        hexPath(ctx, cx + ox, cy + oy, R + 4);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth   = 2 / scale;
+        ctx.shadowColor = "#fff";
+        ctx.shadowBlur  = 18 / scale;
+        ctx.stroke();
+        ctx.shadowBlur  = 0;
+      }
     }
 
     ctx.restore();
