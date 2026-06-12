@@ -59,7 +59,7 @@ jobs:
 
       - name: Checkout PR-branch
         if: env.SKIP == 'false'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
