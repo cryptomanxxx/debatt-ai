@@ -144,7 +144,7 @@ function drawLabel(ctx, cx, cy, zon, scale) {
 
 function drawOwnerDot(ctx, cx, cy, agare, scale) {
   if (!agare) return;
-  const color = AGENT_VISUELL[agare]?.ikonFarg || "#fff";
+  const color = AGENT_VISUELL[agare]?.ikonFarg || "#ffffff";
   const x = cx + R * 0.55, y = cy - R * 0.55;
   const r = Math.max(4, 9 / scale);
   const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
