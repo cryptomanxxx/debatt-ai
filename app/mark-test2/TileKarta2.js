@@ -28,14 +28,13 @@ const TILE_DEFS = [
   { region: "nv", row: 5,  cols: [0,1,2,3]         },
   { region: "nv", row: 6,  cols: [0,1,2]           },
 
-  // NO-ön (grön) — höger ö, trimmat till col 11 max (13-14 var i havet)
-  // rad 0 borttagen (molnen/havet ovanför ön)
-  { region: "no", row: 1,  cols: [8,9,10,11]          },
-  { region: "no", row: 2,  cols: [7,8,9,10,11]        },
-  { region: "no", row: 3,  cols: [6,7,8,9,10,11]      },
-  { region: "no", row: 4,  cols: [7,8,9,10,11]        },
-  { region: "no", row: 5,  cols: [7,8,9,10,11]        },
-  { region: "no", row: 6,  cols: [7,8,9,10]           },
+  // NO-ön (grön) — höger ö, +2 kolumner åt höger för att täcka trädön
+  { region: "no", row: 1,  cols: [10,11,12]            },
+  { region: "no", row: 2,  cols: [9,10,11,12]          },
+  { region: "no", row: 3,  cols: [8,9,10,11,12]        },
+  { region: "no", row: 4,  cols: [9,10,11,12]          },
+  { region: "no", row: 5,  cols: [9,10,11,12]          },
+  { region: "no", row: 6,  cols: [9,10,11,12]          },
 
   // Sydön (amber) — stora södra ön, rad 7 utökad till col 13 för rätt bildbredd
   { region: "soder", row: 7,  cols: [2,3,4,5,6,7,8,9,10,11,12,13] },
