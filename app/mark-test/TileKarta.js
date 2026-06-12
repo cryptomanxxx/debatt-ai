@@ -74,8 +74,8 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 
 // ── Ritfunktioner ──────────────────────────────────────────────────────────────
 // borderAlpha: 1.0 = skarp färgad kant (riktiga zoner), 0.2 = subtil gridlinje (wilderness)
-function drawTile(ctx, cx, cy, typ, selected, scale, borderAlpha = 1.0) {
-  const color = TYP_FARG[typ] || "#888888";
+function drawTile(ctx, cx, cy, typ, selected, scale, borderAlpha = 1.0, useWhite = false) {
+  const color = useWhite ? "#ffffff" : (TYP_FARG[typ] || "#888888");
   hexPath(ctx, cx, cy, R - 1);
   if (selected) {
     ctx.strokeStyle = "#ffffff";
@@ -228,11 +228,11 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       ctx.fillRect(-R * 2, -R * 2, worldW + R * 4, worldH + R * 4);
     }
 
-    // Wilderness: bara en subtil gridlinje, helt transparent innanför
+    // Wilderness: vit gridlinje med 50% opacity, helt transparent innanför
     for (const t of allTiles) {
       if (t.real) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
-      drawTile(ctx, cx + ox, cy + oy, t.typ, false, scale, 0.22);
+      drawTile(ctx, cx + ox, cy + oy, t.typ, false, scale, 0.50, true);
     }
 
     // Riktiga zoner: skarp färgad kant + ikoner/labels fullt synliga
