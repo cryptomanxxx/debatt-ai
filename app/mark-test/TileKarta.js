@@ -87,14 +87,14 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 // borderAlpha: 1.0 = skarp färgad kant (riktiga zoner), 0.5 = halvtransparent regionkant (wilderness)
 function drawTile(ctx, cx, cy, typ, selected, scale, borderAlpha = 1.0) {
   const color = TYP_FARG[typ] || "#888888";
-  hexPath(ctx, cx, cy, R - 3);
+  hexPath(ctx, cx, cy, R - 6);
   if (selected) {
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth   = 2.5 / scale;
+    ctx.lineWidth   = 2.0 / scale;
     ctx.globalAlpha = 1.0;
   } else {
     ctx.strokeStyle = color;
-    ctx.lineWidth   = 1.5 / scale;
+    ctx.lineWidth   = 1.0 / scale;
     ctx.globalAlpha = borderAlpha;
   }
   ctx.stroke();
