@@ -293,7 +293,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
     canvas.style.height = `${H}px`;
 
     // Initial zoom så hela kartan syns
-    const scaleX = W / worldW; const scaleY = H / worldH; stateRef.current.scale = Math.min(scaleX, scaleY) * 0.85; useState(() => { const s = stateRef.current; s.scale = Math.min(scaleX, scaleY) * 0.85; });
+    const scaleX = W / worldW;
     const scaleY = H / worldH;
     stateRef.current.scale = Math.min(scaleX, scaleY) * 0.85;
     render();
