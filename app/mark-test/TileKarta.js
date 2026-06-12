@@ -270,15 +270,16 @@ export default function TileKarta({ zoner = [], agare = [] }) {
     ctx.scale(scale, scale);
     ctx.translate(-worldW / 2, -worldH / 2);
 
-    const BW = 5; // kantbredd i världskoordinater
+    const BW = 7; // kantbredd i världskoordinater
+    const GAP = 14; // shrinkage — ger sqrt(3)*14≈24 wu gap mellan angränsande ringar
     const selId = stateRef.current.selected;
 
     for (const t of allTiles) {
       const [cx, cy] = hexCenter(t.col, t.row);
       const color = selId === t.id ? "#ffffff" : (TYP_FARG[t.typ] || "#888888");
       ctx.beginPath();
-      hexSubPath(ctx, cx + ox, cy + oy, R - 8);
-      hexSubPath(ctx, cx + ox, cy + oy, R - BW - 8);
+      hexSubPath(ctx, cx + ox, cy + oy, R - GAP);
+      hexSubPath(ctx, cx + ox, cy + oy, R - BW - GAP);
       ctx.fillStyle   = color;
       ctx.globalAlpha = t.real ? 1.0 : 0.7;
       ctx.fill("evenodd");
