@@ -202,10 +202,10 @@ export default function TileKarta2() {
         const cy = reg.gridRow * rh + rh / 2;
         const fs = Math.round(Math.min(28, rw * 0.07) / scale);
         ctx.font        = `bold ${fs}px sans-serif`;
-        ctx.shadowColor = "rgba(0,0,0,0.95)";
-        ctx.shadowBlur  = 8 / scale;
+        ctx.shadowColor = "rgba(255,255,255,0.9)";
+        ctx.shadowBlur  = 10 / scale;
         ctx.globalAlpha = alpha;
-        ctx.fillStyle   = "#ffffff";
+        ctx.fillStyle   = "#111111";
         ctx.fillText(`${reg.ikon} ${reg.namn}`, cx, cy);
       });
       ctx.globalAlpha = 1;
