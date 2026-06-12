@@ -14,16 +14,17 @@ export async function POST() {
 
   // 1. Hämta våra riksdagsförslag som saknar utfall
   const pendingRes = await fetch(
-    `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&riksdagen_utfall=is.null&select=id,riksdagen_id`,
+    `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&riksdagen_utfall=is.null&select=id,riksdagen_id,riksdagen_url`,
     { headers: h }
   );
   if (!pendingRes.ok) {
     return NextResponse.json({ error: "Kunde inte hämta väntande förslag" }, { status: 502 });
   }
   const pendingRows = await pendingRes.json();
+  // pending: dok_id → { id, url } — url behövs för att skilja propositioner från motioner
   const pending = {};
   for (const row of pendingRows) {
-    if (row.riksdagen_id) pending[row.riksdagen_id] = row.id;
+    if (row.riksdagen_id) pending[row.riksdagen_id] = { id: row.id, url: row.riksdagen_url || "" };
   }
 
   if (Object.keys(pending).length === 0) {
@@ -53,7 +54,7 @@ export async function POST() {
         if (!riksdagenUtfall) continue;
 
         const datum = (v.datum || "").trim() || null;
-        const lagforslagId = pending[dokId];
+        const lagforslagId = pending[dokId].id;
 
         const patchRes = await fetch(
           `${SB_URL}/rest/v1/lagforslag?id=eq.${lagforslagId}`,
@@ -74,7 +75,7 @@ export async function POST() {
   }
 
   // 3. Per-dokument-anrop för kvarvarande
-  for (const [dokId, lagforslagId] of Object.entries(pending)) {
+  for (const [dokId, { id: lagforslagId }] of Object.entries(pending)) {
     try {
       const perRes = await fetch(
         `https://data.riksdagen.se/voteringlista/?dokid=${encodeURIComponent(dokId)}&utformat=json&sz=10`,
@@ -101,7 +102,10 @@ export async function POST() {
           body: JSON.stringify({ riksdagen_utfall: riksdagenUtfall, riksdagen_utfall_datum: datum, status: "avgjort" }),
         }
       );
-      if (patchRes.ok) uppdaterade++;
+      if (patchRes.ok) {
+        uppdaterade++;
+        delete pending[dokId];
+      }
     } catch (e) {
       fel.push(`${dokId}: ${e.message}`);
     }
@@ -112,7 +116,7 @@ export async function POST() {
   const remainingEntries = Object.entries(pending);
   const dokstatusChunk = remainingEntries.slice(0, 30); // max 30 per körning
 
-  await Promise.allSettled(dokstatusChunk.map(async ([dokId, lagforslagId]) => {
+  await Promise.allSettled(dokstatusChunk.map(async ([dokId, { id: lagforslagId, url: lagforslagUrl }]) => {
     try {
       const dsRes = await fetch(
         `https://data.riksdagen.se/dokumentstatus/${encodeURIComponent(dokId)}.json`,
@@ -136,8 +140,8 @@ export async function POST() {
         riksdagenUtfall = "bifall";
       } else if (/avslag|avslog|avvisad|avstyrk/.test(beslutText)) {
         riksdagenUtfall = "avslag";
-      } else if (dokStatus.includes("avslutad") && beslutText === "") {
-        // Avslutad utan explicit besluttext — för propositioner innebär detta vanligen bifall
+      } else if (dokStatus.includes("avslutad") && beslutText === "" && lagforslagUrl.includes("/proposition/")) {
+        // Avslutad utan explicit besluttext — bara säkert för propositioner (passar nästan alltid)
         riksdagenUtfall = "bifall";
       }
 
