@@ -27,8 +27,8 @@ const TYP_GRADIENT = {
 };
 
 // Genererar wilderness-tiles som en organisk ö runt de riktiga zonerna.
-// Centrum av riktiga zoner ≈ col 3, row 2.5.
-// Tile-typ styrs av avstånd från centrum: skog/jordbruk inåt, kust utåt.
+// Indelad i 6 vinkelsektorer med distinkta färger (baserat på vinkel från centrum).
+// Ytterringen är alltid kust (cyan). Innercentrum är skog (grön).
 function generateWilderness() {
   const CX = 3, CY = 2.5;
   const result = [];
@@ -38,13 +38,24 @@ function generateWilderness() {
       const wy = (row - CY) * 0.866;
       const dist = Math.sqrt(wx * wx + wy * wy);
       if (dist > 8.5) continue;
-      // Deterministisk variation utan slump
-      const h = Math.abs((col * 17 + row * 31) % 6);
+
+      const angle = Math.atan2(wy, wx) * (180 / Math.PI); // -180..180
       let typ;
-      if      (dist < 2.5) typ = h < 4 ? "skog"    : "jordbruk";
-      else if (dist < 4.5) typ = h < 3 ? "skog"    : h < 5 ? "jordbruk" : "kust";
-      else if (dist < 6.5) typ = h < 2 ? "jordbruk": h < 4 ? "kust"     : "skog";
-      else                 typ = "kust";
+      if (dist < 1.2) {
+        typ = "skog";           // absolut centrum: grön
+      } else if (dist > 7.2) {
+        typ = "kust";           // ytterring: cyan
+      } else {
+        // Sex vinkelsektorer → sex distinkta färger
+        if      (angle >= -150 && angle < -90) typ = "industri";  // NV: blå
+        else if (angle >= -90  && angle < -30) typ = "skog";      // N: grön
+        else if (angle >= -30  && angle < 30)  typ = "energi";    // NÖ: gul/amber
+        else if (angle >= 30   && angle < 90)  typ = "gruva";     // SÖ: orange
+        else if (angle >= 90   && angle < 150) typ = "jordbruk";  // S: ljusgrön
+        else                                   typ = "stad";      // SV: lila
+        // Mjuk kustövergång i ytterkant
+        if (dist > 6.3) typ = "kust";
+      }
       result.push({ typ, col, row });
     }
   }
@@ -73,9 +84,9 @@ function hexPath(ctx, cx, cy, r) {
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 // ── Ritfunktioner ──────────────────────────────────────────────────────────────
-// borderAlpha: 1.0 = skarp färgad kant (riktiga zoner), 0.2 = subtil gridlinje (wilderness)
-function drawTile(ctx, cx, cy, typ, selected, scale, borderAlpha = 1.0, useWhite = false) {
-  const color = useWhite ? "#ffffff" : (TYP_FARG[typ] || "#888888");
+// borderAlpha: 1.0 = skarp färgad kant (riktiga zoner), 0.5 = halvtransparent regionkant (wilderness)
+function drawTile(ctx, cx, cy, typ, selected, scale, borderAlpha = 1.0) {
+  const color = TYP_FARG[typ] || "#888888";
   hexPath(ctx, cx, cy, R - 1);
   if (selected) {
     ctx.strokeStyle = "#ffffff";
@@ -168,20 +179,27 @@ export default function TileKarta({ zoner = [], agare = [] }) {
   );
 
   // Bygg alla tiles (riktiga + wilderness) — memoized för att undvika
-  // att canvas setup-effekten körs om (och nollställer zoom) vid klick
-  const allTiles = useMemo(() => [
-    ...zoner.map(z => ({
-      col: z.hex_col, row: z.hex_row,
-      typ: z.typ, namn: z.namn,
-      koppris: z.koppris, veckoinkomst: z.veckoinkomst,
-      id: z.id, agare: agareMap[z.id] || null,
-      real: true,
-    })),
-    ...WILDERNESS.map((w, i) => ({
-      col: w.col, row: w.row, typ: w.typ,
-      namn: null, id: `w${i}`, agare: null, real: false,
-    })),
-  ], [zoner, agareMap]);
+  // att canvas setup-effekten körs om (och nollställer zoom) vid klick.
+  // Wilderness-tiles filtreras bort på positioner där riktiga zoner finns,
+  // annars ritas dubbla kanter (visuell överlappning).
+  const allTiles = useMemo(() => {
+    const realPos = new Set(zoner.map(z => `${z.hex_col},${z.hex_row}`));
+    return [
+      ...zoner.map(z => ({
+        col: z.hex_col, row: z.hex_row,
+        typ: z.typ, namn: z.namn,
+        koppris: z.koppris, veckoinkomst: z.veckoinkomst,
+        id: z.id, agare: agareMap[z.id] || null,
+        real: true,
+      })),
+      ...WILDERNESS
+        .filter(w => !realPos.has(`${w.col},${w.row}`))
+        .map((w, i) => ({
+          col: w.col, row: w.row, typ: w.typ,
+          namn: null, id: `w${i}`, agare: null, real: false,
+        })),
+    ];
+  }, [zoner, agareMap]);
 
   // Beräkna world bounds för initial centrering — memoized av samma skäl
   const { worldW, worldH, ox, oy } = useMemo(() => {
@@ -228,11 +246,11 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       ctx.fillRect(-R * 2, -R * 2, worldW + R * 4, worldH + R * 4);
     }
 
-    // Wilderness: vit gridlinje med 50% opacity, helt transparent innanför
+    // Wilderness: halvtransparent regionfärgad kant, helt transparent innanför
     for (const t of allTiles) {
       if (t.real) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
-      drawTile(ctx, cx + ox, cy + oy, t.typ, false, scale, 0.50, true);
+      drawTile(ctx, cx + ox, cy + oy, t.typ, false, scale, 0.55);
     }
 
     // Riktiga zoner: skarp färgad kant + ikoner/labels fullt synliga
