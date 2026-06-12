@@ -89,11 +89,12 @@ export default function TileKarta2() {
   const canvasRef  = useRef(null);
   const regionImgs = useRef({});   // laddade region-bilder
   const stateRef   = useRef({
-    tx: 0, ty: 0, scale: 0.5,
+    tx: 0, ty: 0, scale: 0.3,
     dragging: false, lastX: 0, lastY: 0, vx: 0, vy: 0,
     selected: null, dragStartX: 0, dragStartY: 0,
     rafId: null,
-    pinchDist: null,   // tvåfingers-zoom
+    pinchDist: null,
+    minScale: 0.1,   // uppdateras av ResizeObserver till "hela världen på skärmen"
   });
   const [info, setInfo]     = useState(null);
   const [loaded, setLoaded] = useState(0);   // räknar laddade bilder
@@ -222,11 +223,18 @@ export default function TileKarta2() {
       const dpr = window.devicePixelRatio || 1;
       canvas.width  = canvas.offsetWidth  * dpr;
       canvas.height = canvas.offsetHeight * dpr;
+      // Minsta zoom = hela världen synlig med liten marginal
+      const W = canvas.offsetWidth;
+      const H = canvas.offsetHeight;
+      const fit = Math.min(W / worldW, H / worldH) * 0.97;
+      const s = stateRef.current;
+      s.minScale = fit;
+      if (s.scale < fit) { s.scale = fit; s.tx = 0; s.ty = 0; }
       render();
     });
     ro.observe(canvas);
     return () => ro.disconnect();
-  }, [render]);
+  }, [render, worldW, worldH]);
 
   // ── Momentum RAF ──────────────────────────────────────────────────────────
   const startMomentum = useCallback(() => {
@@ -296,7 +304,7 @@ export default function TileKarta2() {
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (s.pinchDist) {
         const ratio = dist / s.pinchDist;
-        s.scale = Math.max(0.15, Math.min(4, s.scale * ratio));
+        s.scale = Math.max(s.minScale, Math.min(4, s.scale * ratio));
         render();
       }
       s.pinchDist = dist;
@@ -354,15 +362,14 @@ export default function TileKarta2() {
   const onWheel = useCallback((e) => {
     e.preventDefault();
     const s = stateRef.current;
-    const delta  = e.deltaY < 0 ? 1.1 : 0.91;
-    const newScale = Math.max(0.15, Math.min(4, s.scale * delta));
-    s.scale = newScale;
+    const delta = e.deltaY < 0 ? 1.1 : 0.91;
+    s.scale = Math.max(s.minScale, Math.min(4, s.scale * delta));
     render();
   }, [render]);
 
   const zoom = (delta) => {
     const s = stateRef.current;
-    s.scale = Math.max(0.15, Math.min(4, s.scale * delta));
+    s.scale = Math.max(s.minScale, Math.min(4, s.scale * delta));
     render();
   };
 
