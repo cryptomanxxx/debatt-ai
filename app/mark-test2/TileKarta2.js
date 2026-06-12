@@ -16,28 +16,49 @@ const BW  = 7;
 const HEX_COLS = 20;   // 5 regioner × 4 hex/region
 const HEX_ROWS = 15;   // 3 regioner × 5 hex/region
 
-// ── Regioner ─────────────────────────────────────────────────────────────────
+// ── Kontinenter — nivå 1 i 3-nivå-hierarkin ──────────────────────────────────
+// Varje kontinent grupperar 5 regioner och har egen valuta.
+// labelSeed: [hexCol, hexRow] = var kontinent-etiketten visas vid utzoom.
+const CONTINENTS = [
+  {
+    id: "c01", namn: "Nordheim",  ikon: "❄️", valuta: "Iskrona",
+    ring: "#93c5fd", labelSeed: [10, 2],
+    regionIds: ["r01","r02","r03","r04","r05"],
+  },
+  {
+    id: "c02", namn: "Midgard",   ikon: "⚔️", valuta: "Guldmark",
+    ring: "#86efac", labelSeed: [10, 7],
+    regionIds: ["r06","r07","r08","r09","r10"],
+  },
+  {
+    id: "c03", namn: "Sydlandet", ikon: "🌴", valuta: "Solreal",
+    ring: "#fcd34d", labelSeed: [10, 12],
+    regionIds: ["r11","r12","r13","r14","r15"],
+  },
+];
+
+
 // seed: [col, row] = Voronoi-frö — hexar tilldelas närmaste frö → oregelbundna gränser
 // gridCol/gridRow används bara för bakgrundsbild-placering (5×3 layout)
 const REGIONS = [
   // rad 0 — nord (fröna spridda i y-led för ojämna gränser mot rad 1)
-  { id: "r01", seed: [ 1, 1],  gridCol: 0, gridRow: 0, namn: "Arktis",      fallback: "#c7e8f7", ring: "#fb2c3b", ikon: "❄️"  }, // A röd
-  { id: "r02", seed: [ 5, 3],  gridCol: 1, gridRow: 0, namn: "Barrskog",    fallback: "#1a472a", ring: "#00d46a", ikon: "🌲"  }, // D grön
-  { id: "r03", seed: [10, 0],  gridCol: 2, gridRow: 0, namn: "Klipphöjder", fallback: "#6b5c4e", ring: "#ff6b00", ikon: "🏔️" }, // B orange
-  { id: "r04", seed: [15, 2],  gridCol: 3, gridRow: 0, namn: "Tundra",      fallback: "#b0c4b1", ring: "#b44dff", ikon: "🌾"  }, // G lila
-  { id: "r05", seed: [18, 1],  gridCol: 4, gridRow: 0, namn: "Glaciärvik",  fallback: "#a8d8ea", ring: "#00d4f5", ikon: "🧊"  }, // E cyan
+  { id: "r01", continentId: "c01", seed: [ 1, 1],  gridCol: 0, gridRow: 0, namn: "Arktis",      fallback: "#c7e8f7", ring: "#fb2c3b", ikon: "❄️"  }, // A röd
+  { id: "r02", continentId: "c01", seed: [ 5, 3],  gridCol: 1, gridRow: 0, namn: "Barrskog",    fallback: "#1a472a", ring: "#00d46a", ikon: "🌲"  }, // D grön
+  { id: "r03", continentId: "c01", seed: [10, 0],  gridCol: 2, gridRow: 0, namn: "Klipphöjder", fallback: "#6b5c4e", ring: "#ff6b00", ikon: "🏔️" }, // B orange
+  { id: "r04", continentId: "c01", seed: [15, 2],  gridCol: 3, gridRow: 0, namn: "Tundra",      fallback: "#b0c4b1", ring: "#b44dff", ikon: "🌾"  }, // G lila
+  { id: "r05", continentId: "c01", seed: [18, 1],  gridCol: 4, gridRow: 0, namn: "Glaciärvik",  fallback: "#a8d8ea", ring: "#00d4f5", ikon: "🧊"  }, // E cyan
   // rad 1 — mitten
-  { id: "r06", seed: [ 0, 8],  gridCol: 0, gridRow: 1, namn: "Fjordkust",   fallback: "#2e5f6e", ring: "#4090ff", ikon: "🌊"  }, // F blå
-  { id: "r07", seed: [ 6, 7],  gridCol: 1, gridRow: 1, namn: "Odlingsland", fallback: "#8bc34a", ring: "#ffcc00", ikon: "🌾"  }, // C gul
-  { id: "r08", seed: [10, 9],  gridCol: 2, gridRow: 1, namn: "Storstad",    fallback: "#607d8b", ring: "#b44dff", ikon: "🏰"  }, // G lila
-  { id: "r09", seed: [15, 8],  gridCol: 3, gridRow: 1, namn: "Stäpp",       fallback: "#c8a96e", ring: "#fb2c3b", ikon: "🌵"  }, // A röd
-  { id: "r10", seed: [19, 7],  gridCol: 4, gridRow: 1, namn: "Vulkanrev",   fallback: "#7b2d00", ring: "#00d46a", ikon: "🌋"  }, // D grön
+  { id: "r06", continentId: "c02", seed: [ 0, 8],  gridCol: 0, gridRow: 1, namn: "Fjordkust",   fallback: "#2e5f6e", ring: "#4090ff", ikon: "🌊"  }, // F blå
+  { id: "r07", continentId: "c02", seed: [ 6, 7],  gridCol: 1, gridRow: 1, namn: "Odlingsland", fallback: "#8bc34a", ring: "#ffcc00", ikon: "🌾"  }, // C gul
+  { id: "r08", continentId: "c02", seed: [10, 9],  gridCol: 2, gridRow: 1, namn: "Storstad",    fallback: "#607d8b", ring: "#b44dff", ikon: "🏰"  }, // G lila
+  { id: "r09", continentId: "c02", seed: [15, 8],  gridCol: 3, gridRow: 1, namn: "Stäpp",       fallback: "#c8a96e", ring: "#fb2c3b", ikon: "🌵"  }, // A röd
+  { id: "r10", continentId: "c02", seed: [19, 7],  gridCol: 4, gridRow: 1, namn: "Vulkanrev",   fallback: "#7b2d00", ring: "#00d46a", ikon: "🌋"  }, // D grön
   // rad 2 — syd
-  { id: "r11", seed: [ 1, 13], gridCol: 0, gridRow: 2, namn: "Mangrovkust", fallback: "#1b5e20", ring: "#ff6b00", ikon: "🌿"  }, // B orange
-  { id: "r12", seed: [ 5, 12], gridCol: 1, gridRow: 2, namn: "Djungel",     fallback: "#2e7d32", ring: "#00d4f5", ikon: "🌴"  }, // E cyan
-  { id: "r13", seed: [10, 14], gridCol: 2, gridRow: 2, namn: "Floddelta",   fallback: "#33691e", ring: "#00d46a", ikon: "💧"  }, // D grön
-  { id: "r14", seed: [15, 14], gridCol: 3, gridRow: 2, namn: "Rödöknen",    fallback: "#bf360c", ring: "#ffcc00", ikon: "🏜️" }, // C gul
-  { id: "r15", seed: [19, 13], gridCol: 4, gridRow: 2, namn: "Korallkust",  fallback: "#006064", ring: "#fb2c3b", ikon: "🐚"  }, // A röd
+  { id: "r11", continentId: "c03", seed: [ 1, 13], gridCol: 0, gridRow: 2, namn: "Mangrovkust", fallback: "#1b5e20", ring: "#ff6b00", ikon: "🌿"  }, // B orange
+  { id: "r12", continentId: "c03", seed: [ 5, 12], gridCol: 1, gridRow: 2, namn: "Djungel",     fallback: "#2e7d32", ring: "#00d4f5", ikon: "🌴"  }, // E cyan
+  { id: "r13", continentId: "c03", seed: [10, 14], gridCol: 2, gridRow: 2, namn: "Floddelta",   fallback: "#33691e", ring: "#00d46a", ikon: "💧"  }, // D grön
+  { id: "r14", continentId: "c03", seed: [15, 14], gridCol: 3, gridRow: 2, namn: "Rödöknen",    fallback: "#bf360c", ring: "#ffcc00", ikon: "🏜️" }, // C gul
+  { id: "r15", continentId: "c03", seed: [19, 13], gridCol: 4, gridRow: 2, namn: "Korallkust",  fallback: "#006064", ring: "#fb2c3b", ikon: "🐚"  }, // A röd
 ];
 
 // ── Hex-tile definitioner ────────────────────────────────────────────────────
@@ -195,9 +216,11 @@ export default function TileKarta2() {
     }
 
     // ── Regionnamn-overlay vid utzoom ─────────────────────────────────────────
-    // Tonas in mellan scale 0.8 → 0.4, fullt synlig under 0.4
+    // Tonas in: 0.8 → 0.45. Tonas ut: 0.42 → 0.30 (ger plats åt kontinent-etiketter).
     if (scale < 0.8) {
-      const alpha = Math.min(1, (0.8 - scale) / 0.35);
+      const fadeIn  = Math.min(1, (0.8 - scale) / 0.35);
+      const fadeOut = scale < 0.42 ? Math.max(0, (scale - 0.30) / 0.12) : 1;
+      const alpha   = fadeIn * fadeOut;
       ctx.save();
       ctx.textAlign    = "center";
       ctx.textBaseline = "middle";
@@ -244,6 +267,38 @@ export default function TileKarta2() {
         ctx.fillText(text, cx, cy);
       });
 
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    // ── Kontinent-etiketter vid maximal utzoom ────────────────────────────────
+    // Tonas in under scale 0.48, fullt synlig under 0.35. Atlas-stil: stor kursiv text.
+    if (scale < 0.48) {
+      const alpha = Math.min(1, (0.48 - scale) / 0.13);
+      ctx.save();
+      ctx.textAlign    = "center";
+      ctx.textBaseline = "middle";
+      CONTINENTS.forEach((c) => {
+        const [scx, scy] = hexCenter(c.labelSeed[0], c.labelSeed[1]);
+        const lx = scx + ox;
+        const ly = scy + oy;
+        const fs = Math.round(Math.min(44, worldH * 0.068) / scale);
+        // Huvudrubrik: kontinent-namn versaler
+        ctx.font        = `italic bold ${fs}px Georgia, serif`;
+        ctx.shadowColor = "rgba(0,0,0,0.9)";
+        ctx.shadowBlur  = 7 / scale;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle   = "#ffffff";
+        ctx.fillText(c.namn.toUpperCase(), lx, ly - fs * 0.55);
+        // Undertext: ikon + valuta
+        const subFs = Math.round(fs * 0.46);
+        ctx.font        = `${subFs}px sans-serif`;
+        ctx.shadowBlur  = 4 / scale;
+        ctx.globalAlpha = alpha * 0.85;
+        ctx.fillStyle   = c.ring;
+        ctx.fillText(`${c.ikon}  ${c.valuta}`, lx, ly + fs * 0.55);
+      });
+      ctx.shadowBlur  = 0;
       ctx.globalAlpha = 1;
       ctx.restore();
     }
@@ -518,28 +573,51 @@ export default function TileKarta2() {
           </span>
         </button>
 
-        {REGIONS.map(r => (
-          <button
-            key={r.id}
-            onClick={() => zoomToRegion(r)}
-            style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 14px",
-              background: "none", border: "none", cursor: "pointer",
-              borderRadius: 8, textAlign: "left",
-              minHeight: 46, minWidth: 150,
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
-            onMouseLeave={e => e.currentTarget.style.background = "none"}
-          >
-            <span style={{
-              width: 13, height: 13, borderRadius: 3, flexShrink: 0,
-              background: r.ring, boxShadow: `0 0 6px ${r.ring}88`,
-            }} />
-            <span style={{ fontSize: 13, color: "#e5e7eb", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
-              {r.ikon} {r.namn}
-            </span>
-          </button>
+        {CONTINENTS.map((c) => (
+          <div key={c.id}>
+            {/* Kontinent-rubrik */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "7px 14px 4px",
+              borderTop: "1px solid rgba(255,255,255,0.1)",
+            }}>
+              <span style={{
+                display: "inline-block", width: 10, height: 10,
+                borderRadius: 2, background: c.ring, flexShrink: 0,
+                boxShadow: `0 0 5px ${c.ring}`,
+              }} />
+              <span style={{ fontSize: 11, color: c.ring, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                {c.ikon} {c.namn}
+              </span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.38)", marginLeft: "auto", whiteSpace: "nowrap" }}>
+                {c.valuta}
+              </span>
+            </div>
+            {/* Regioner under denna kontinent */}
+            {REGIONS.filter(r => r.continentId === c.id).map(r => (
+              <button
+                key={r.id}
+                onClick={() => zoomToRegion(r)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 10,
+                  padding: "8px 14px 8px 28px",
+                  background: "none", border: "none", cursor: "pointer",
+                  borderRadius: 8, textAlign: "left",
+                  width: "100%", minHeight: 40,
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.1)"}
+                onMouseLeave={e => e.currentTarget.style.background = "none"}
+              >
+                <span style={{
+                  width: 11, height: 11, borderRadius: 3, flexShrink: 0,
+                  background: r.ring, boxShadow: `0 0 5px ${r.ring}88`,
+                }} />
+                <span style={{ fontSize: 12, color: "#d1d5db", whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
+                  {r.ikon} {r.namn}
+                </span>
+              </button>
+            ))}
+          </div>
         ))}
       </div>
 
