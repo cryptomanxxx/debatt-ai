@@ -207,12 +207,38 @@ export default function TileKarta2() {
       const isSelected = selId === t.id;
       if (!isSelected && hexAlpha <= 0) continue;   // hoppa över om helt osynliga
       const [cx, cy] = hexCenter(t.col, t.row);
-      ctx.beginPath();
-      hexSubPath(ctx, cx + ox, cy + oy, R - GAP);
-      hexSubPath(ctx, cx + ox, cy + oy, R - BW - GAP);
-      ctx.fillStyle   = isSelected ? "#ffffff" : t.region.ring;
-      ctx.globalAlpha = isSelected ? 1.0 : hexAlpha;
-      ctx.fill("evenodd");
+      const hx = cx + ox, hy = cy + oy;
+
+      if (isSelected) {
+        // Vald hex: ren vit ring + svag vit fyllning
+        ctx.beginPath();
+        hexSubPath(ctx, hx, hy, R - GAP);
+        ctx.fillStyle = "rgba(255,255,255,0.18)";
+        ctx.globalAlpha = 1.0;
+        ctx.fill();
+        ctx.beginPath();
+        hexSubPath(ctx, hx, hy, R - GAP);
+        hexSubPath(ctx, hx, hy, R - BW - GAP);
+        ctx.fillStyle   = "#ffffff";
+        ctx.globalAlpha = 1.0;
+        ctx.fill("evenodd");
+      } else {
+        // Svag regionfärgad toning inuti hexen (8% av hexAlpha) — ger regional identitet
+        // utan att clasha med terrängen. Ringfärgen används här i sin originalnyans.
+        ctx.beginPath();
+        hexSubPath(ctx, hx, hy, R - GAP);
+        ctx.fillStyle   = t.region.ring;
+        ctx.globalAlpha = hexAlpha * 0.08;
+        ctx.fill();
+
+        // Ring: mjuk vit (51% av hexAlpha max) — ser ut som en kartöverlagring, inte neon
+        ctx.beginPath();
+        hexSubPath(ctx, hx, hy, R - GAP);
+        hexSubPath(ctx, hx, hy, R - BW - GAP);
+        ctx.fillStyle   = "#ffffff";
+        ctx.globalAlpha = hexAlpha * 0.51;
+        ctx.fill("evenodd");
+      }
       ctx.globalAlpha = 1.0;
     }
 
