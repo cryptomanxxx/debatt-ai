@@ -406,6 +406,25 @@ export default function TileKarta2() {
     s.rafId = requestAnimationFrame(step);
   }, [worldW, worldH, render]);
 
+  // Zooma ut och visa hela civilisationen
+  const zoomToWorld = useCallback(() => {
+    const s = stateRef.current;
+    if (s.rafId) cancelAnimationFrame(s.rafId);
+    const startScale = s.scale, startTx = s.tx, startTy = s.ty;
+    const targetScale = s.minScale, targetTx = 0, targetTy = 0;
+    const dur = 420, t0 = performance.now();
+    const step = (now) => {
+      const p = Math.min((now - t0) / dur, 1);
+      const e = 1 - Math.pow(1 - p, 3);
+      s.scale = startScale + (targetScale - startScale) * e;
+      s.tx    = startTx    + (targetTx    - startTx)    * e;
+      s.ty    = startTy    + (targetTy    - startTy)    * e;
+      render();
+      s.rafId = p < 1 ? requestAnimationFrame(step) : null;
+    };
+    s.rafId = requestAnimationFrame(step);
+  }, [render]);
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <canvas
@@ -441,6 +460,27 @@ export default function TileKarta2() {
         maxHeight: "calc(100% - 80px)", overflowY: "auto",
         boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
       }}>
+        {/* Civilisations-knapp — zoomar ut till hela världen */}
+        <button
+          onClick={zoomToWorld}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "10px 14px",
+            background: "rgba(255,255,255,0.08)", border: "none", cursor: "pointer",
+            borderRadius: 8, textAlign: "left",
+            minHeight: 46, minWidth: 150,
+            borderBottom: "1px solid rgba(255,255,255,0.12)",
+            marginBottom: 2,
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.16)"}
+          onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.08)"}
+        >
+          <span style={{ fontSize: 15 }}>🌍</span>
+          <span style={{ fontSize: 13, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
+            Hela civilisationen
+          </span>
+        </button>
+
         {REGIONS.map(r => (
           <button
             key={r.id}
