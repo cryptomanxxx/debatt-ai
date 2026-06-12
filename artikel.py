@@ -81,7 +81,7 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
             {"role": "user", "content": user_msg},
         ],
     }
-    for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok):
+    for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok, source="agent_nyhet"):
         try:
             result = fn()
             print(f"  ✓ {name}: artikel klar")
@@ -118,7 +118,7 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
             {"role": "user", "content": user_msg},
         ],
     }
-    for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok):
+    for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok, source="agent_artikel"):
         try:
             result = fn()
             print(f"  ✓ {name}: artikel klar")
@@ -174,7 +174,7 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
             {"role": "user", "content": user_msg},
         ],
     }
-    for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok):
+    for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok, source="agent_replik"):
         try:
             result = fn()
             print(f"  ✓ {name}: replik klar")
