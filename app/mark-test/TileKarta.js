@@ -302,20 +302,6 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       drawLabel(ctx, cx + ox, cy + oy, t, scale);
     }
 
-    if (selId) {
-      const sel = allTiles.find(t => t.id === selId);
-      if (sel) {
-        const [cx, cy] = hexCenter(sel.col, sel.row);
-        hexPath(ctx, cx + ox, cy + oy, R + 4);
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth   = 2 / scale;
-        ctx.shadowColor = "#fff";
-        ctx.shadowBlur  = 18 / scale;
-        ctx.stroke();
-        ctx.shadowBlur  = 0;
-      }
-    }
-
     ctx.restore();
   }, [allTiles, worldW, worldH, ox, oy]);
 
