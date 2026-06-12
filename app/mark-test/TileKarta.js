@@ -246,11 +246,11 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       ctx.fillRect(-R * 2, -R * 2, worldW + R * 4, worldH + R * 4);
     }
 
-    // Wilderness: halvtransparent regionfärgad kant, helt transparent innanför
+    // Wilderness: samma kantlinje som riktiga zoner (skarp, färgad, 1.0 alpha)
     for (const t of allTiles) {
       if (t.real) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
-      drawTile(ctx, cx + ox, cy + oy, t.typ, false, scale, 0.55);
+      drawTile(ctx, cx + ox, cy + oy, t.typ, stateRef.current.selected === t.id, scale, 1.0);
     }
 
     // Riktiga zoner: skarp färgad kant + ikoner/labels fullt synliga
@@ -263,8 +263,8 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       drawLabel(ctx, cx + ox, cy + oy, t, scale);
     }
 
-    // Glödeffekt på selected tile
-    const selTile = allTiles.find(t => t.id === stateRef.current.selected && t.real);
+    // Glödeffekt på selected tile (riktiga zoner och wilderness)
+    const selTile = allTiles.find(t => t.id === stateRef.current.selected);
     if (selTile) {
       const [cx, cy] = hexCenter(selTile.col, selTile.row);
       hexPath(ctx, cx + ox, cy + oy, R + 4);
@@ -390,7 +390,6 @@ export default function TileKarta({ zoner = [], agare = [] }) {
 
       let nearest = null, nearestDist = Infinity;
       for (const t of allTiles) {
-        if (!t.real) continue;
         const [cx, cy] = hexCenter(t.col, t.row);
         const d = Math.hypot(mx - cx, my - cy);
         if (d < nearestDist) { nearestDist = d; nearest = t; }
@@ -510,7 +509,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <span style={{ fontSize: 24 }}>{TYP_IKON[info.typ] || "?"}</span>
             <div>
-              <div style={{ fontWeight: 700, color: "#fff", fontSize: 15 }}>{info.namn}</div>
+              <div style={{ fontWeight: 700, color: "#fff", fontSize: 15 }}>{info.namn || "Vildmark"}</div>
               <div style={{ fontSize: 11, color: TYP_FARG[info.typ], textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 {info.typ}
               </div>
