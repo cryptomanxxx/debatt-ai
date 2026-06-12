@@ -298,7 +298,9 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       canvas.height = H * dpr;
       canvas.style.width  = `${W}px`;
       canvas.style.height = `${H}px`;
-      if (!initialized) {
+      // Sätt initial zoom bara om vi INTE redan initierat med full storlek.
+      // Kräver H > 200 för att undvika att en för tidig liten höjd låser skalan.
+      if (!initialized && H > 200) {
         initialized = true;
         const scaleX = W / worldW;
         const scaleY = H / worldH;
@@ -446,7 +448,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
   const C = "#111827";
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div style={{ position: "absolute", inset: 0 }}>
       <canvas ref={canvasRef} style={{ display: "block", cursor: "grab", userSelect: "none" }} />
 
       {/* Zoom-knappar */}
