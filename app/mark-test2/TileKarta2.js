@@ -202,24 +202,26 @@ export default function TileKarta2() {
       ctx.textAlign    = "center";
       ctx.textBaseline = "middle";
       ctx.shadowBlur   = 0;
-      REGIONS.forEach((reg) => {
+
+      // Förberäkna pill-geometri för alla regioner
+      const pills = REGIONS.map((reg) => {
         const [scx, scy] = hexCenter(reg.seed[0], reg.seed[1]);
         const cx = scx + ox;
         const cy = scy + oy;
         const fs = Math.round(Math.min(26, rw * 0.065) / scale);
         ctx.font = `bold ${fs}px sans-serif`;
-        const text  = `${reg.ikon} ${reg.namn}`;
-        const tw    = ctx.measureText(text).width;
-        const pad   = 7 / scale;
-        const bw    = tw + pad * 2;
-        const bh    = fs * 1.45;
-        const bx    = cx - bw / 2;
-        const by    = cy - bh / 2;
-        const rad   = bh / 2;
+        const text = `${reg.ikon} ${reg.namn}`;
+        const tw   = ctx.measureText(text).width;
+        const pad  = 7 / scale;
+        const bw   = tw + pad * 2;
+        const bh   = fs * 1.45;
+        return { cx, cy, fs, text, bw, bh, bx: cx - bw / 2, by: cy - bh / 2, rad: bh / 2 };
+      });
 
-        // Vit pill-bakgrund
-        ctx.globalAlpha = alpha * 0.82;
-        ctx.fillStyle   = "#ffffff";
+      // Pass 1: alla pill-bakgrunder (så ingen nästa pills vita yta täcker föregående text)
+      ctx.globalAlpha = alpha * 0.82;
+      ctx.fillStyle   = "#ffffff";
+      pills.forEach(({ bx, by, bw, bh, rad }) => {
         ctx.beginPath();
         ctx.moveTo(bx + rad, by);
         ctx.lineTo(bx + bw - rad, by);
@@ -232,12 +234,16 @@ export default function TileKarta2() {
         ctx.arc(bx + rad, by + rad, rad, Math.PI, -Math.PI / 2);
         ctx.closePath();
         ctx.fill();
+      });
 
-        // Svart text ovanpå
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle   = "#111111";
+      // Pass 2: all text ovanpå (aldrig täckt av en efterföljande pill)
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle   = "#111111";
+      pills.forEach(({ cx, cy, fs, text }) => {
+        ctx.font = `bold ${fs}px sans-serif`;
         ctx.fillText(text, cx, cy);
       });
+
       ctx.globalAlpha = 1;
       ctx.restore();
     }
