@@ -3,8 +3,10 @@ import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { AGENT_VISUELL } from "../agentData";
 
 // ── Konstanter ─────────────────────────────────────────────────────────────────
-const R   = 44;          // hex-radie i världskoordinater
-const S3  = Math.sqrt(3);
+const R    = 44;          // hex-radie i världskoordinater
+const S3   = Math.sqrt(3);
+const GAP  = 14;          // shrinkage: synlig ytterradie = R - GAP
+const BW   = 7;           // ringbredd i världskoordinater
 const SB  = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
 const TYP_FARG = {
@@ -270,8 +272,6 @@ export default function TileKarta({ zoner = [], agare = [] }) {
     ctx.scale(scale, scale);
     ctx.translate(-worldW / 2, -worldH / 2);
 
-    const BW = 7; // kantbredd i världskoordinater
-    const GAP = 14; // shrinkage — ger sqrt(3)*14≈24 wu gap mellan angränsande ringar
     const selId = stateRef.current.selected;
 
     for (const t of allTiles) {
@@ -442,7 +442,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
         const d = Math.hypot(mx - cx, my - cy);
         if (d < nearestDist) { nearestDist = d; nearest = t; }
       }
-      if (nearest && nearestDist < R * 1.2) {
+      if (nearest && nearestDist < R - GAP) {
         stateRef.current.selected = nearest.id;
         setSelected(nearest.id);
         setInfo(nearest);
