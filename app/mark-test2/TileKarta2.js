@@ -199,10 +199,9 @@ export default function TileKarta2() {
     });
 
     // ── Hex-grid (evenodd) — Level of Detail ────────────────────────────────
-    // zoomRatio = scale / ms:  1 = hela civilisationen (minzoom), 4+ = fastighetsnivå
-    // hexAlpha: 0 vid zoomRatio ≤ 1.2, 0.75 vid zoomRatio ≥ 3.5 (linjär emellan)
+    // hexAlpha: 0 vid zoomRatio ≤ 1.2, 1.0 vid zoomRatio ≥ 3.2 (linjär emellan)
     const selId    = stateRef.current.selected;
-    const hexAlpha = Math.max(0, Math.min(0.75, (scale / ms - 1.2) / 2.3 * 0.75));
+    const hexAlpha = Math.max(0, Math.min(1.0, (scale / ms - 1.2) / 2.0));
     for (const t of TILES) {
       const isSelected = selId === t.id;
       if (!isSelected && hexAlpha <= 0) continue;
@@ -223,12 +222,12 @@ export default function TileKarta2() {
         ctx.globalAlpha = 1.0;
         ctx.fill("evenodd");
       } else {
-        // Per-region-ring i full regionfärg — tydlig territoriell identitet
+        // Per-region-ring i full regionfärg — full opacity vid full zoom
         ctx.beginPath();
         hexSubPath(ctx, hx, hy, R - GAP);
         hexSubPath(ctx, hx, hy, R - BW - GAP);
         ctx.fillStyle   = t.region.ring;
-        ctx.globalAlpha = hexAlpha * 0.78;
+        ctx.globalAlpha = hexAlpha;
         ctx.fill("evenodd");
       }
       ctx.globalAlpha = 1.0;
@@ -453,7 +452,8 @@ export default function TileKarta2() {
     if (e.changedTouches.length === 1) {
       const t = e.changedTouches[0];
       const dx = t.clientX - s.dragStartX, dy = t.clientY - s.dragStartY;
-      if (Math.sqrt(dx * dx + dy * dy) < 6) handleClick(t.clientX, t.clientY);
+      // 14px-tröskel för touch (fingrar rör sig mer än muspekare vid tap)
+      if (Math.sqrt(dx * dx + dy * dy) < 14) handleClick(t.clientX, t.clientY);
       else startMomentum();
     }
   }, [startMomentum]); // eslint-disable-line
