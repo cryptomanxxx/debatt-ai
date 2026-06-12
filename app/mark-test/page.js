@@ -77,7 +77,7 @@ export default async function MarkTestPage() {
         display: "flex", gap: 20,
       }}>
         <span>{zoner.length} namngivna zoner</span>
-        <span>+ 33 wilderness-tiles</span>
+        <span>+ ~200 wilderness-tiles (genererade)</span>
         <span>Zoom: scroll/pinch · Pan: drag · Välj: klick</span>
       </div>
     </div>
