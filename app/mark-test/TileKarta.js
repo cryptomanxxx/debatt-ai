@@ -26,26 +26,31 @@ const TYP_GRADIENT = {
   skog:     ["#f0fdf4", "#16a34a", "#14532d"],
 };
 
-// Bakgrundszoner som fyller ut kartan utanför de riktiga zonerna
-const WILDERNESS = [
-  { typ: "kust",     col: -1, row: 0 }, { typ: "kust",    col: -1, row: 1 },
-  { typ: "kust",     col: -1, row: 2 }, { typ: "kust",    col: -1, row: 3 },
-  { typ: "kust",     col: -1, row: 4 }, { typ: "kust",    col: -1, row: 5 },
-  { typ: "skog",     col: 7,  row: 0 }, { typ: "skog",    col: 7,  row: 1 },
-  { typ: "skog",     col: 7,  row: 2 }, { typ: "skog",    col: 7,  row: 3 },
-  { typ: "jordbruk", col: 0,  row: -1},{ typ: "jordbruk", col: 1,  row: -1},
-  { typ: "jordbruk", col: 2,  row: -1},{ typ: "jordbruk", col: 3,  row: -1},
-  { typ: "jordbruk", col: 4,  row: -1},{ typ: "jordbruk", col: 5,  row: -1},
-  { typ: "kust",     col: 0,  row: 6 },{ typ: "kust",     col: 1,  row: 6 },
-  { typ: "kust",     col: 2,  row: 6 },{ typ: "kust",     col: 3,  row: 6 },
-  { typ: "kust",     col: 4,  row: 6 },{ typ: "kust",     col: 5,  row: 6 },
-  { typ: "skog",     col: 6,  row: -1},{ typ: "energi",   col: 7,  row: 4 },
-  { typ: "jordbruk", col: -1, row: -1},{ typ: "skog",     col: 7,  row: 5 },
-  { typ: "kust",     col: -2, row: 1 },{ typ: "kust",     col: -2, row: 2 },
-  { typ: "kust",     col: -2, row: 3 },{ typ: "kust",     col: -2, row: 4 },
-  { typ: "skog",     col: 8,  row: 0 },{ typ: "skog",     col: 8,  row: 1 },
-  { typ: "skog",     col: 8,  row: 2 },{ typ: "jordbruk", col: 8,  row: 3 },
-];
+// Genererar wilderness-tiles som en organisk ö runt de riktiga zonerna.
+// Centrum av riktiga zoner ≈ col 3, row 2.5.
+// Tile-typ styrs av avstånd från centrum: skog/jordbruk inåt, kust utåt.
+function generateWilderness() {
+  const CX = 3, CY = 2.5;
+  const result = [];
+  for (let row = -8; row <= 13; row++) {
+    for (let col = -9; col <= 15; col++) {
+      const wx = col + (row % 2 === 1 ? 0.5 : 0) - CX;
+      const wy = (row - CY) * 0.866;
+      const dist = Math.sqrt(wx * wx + wy * wy);
+      if (dist > 8.5) continue;
+      // Deterministisk variation utan slump
+      const h = Math.abs((col * 17 + row * 31) % 6);
+      let typ;
+      if      (dist < 2.5) typ = h < 4 ? "skog"    : "jordbruk";
+      else if (dist < 4.5) typ = h < 3 ? "skog"    : h < 5 ? "jordbruk" : "kust";
+      else if (dist < 6.5) typ = h < 2 ? "jordbruk": h < 4 ? "kust"     : "skog";
+      else                 typ = "kust";
+      result.push({ typ, col, row });
+    }
+  }
+  return result;
+}
+const WILDERNESS = generateWilderness();
 
 // ── Hexhjälpare ────────────────────────────────────────────────────────────────
 function hexCenter(col, row) {
@@ -162,9 +167,18 @@ function drawOwnerDot(ctx, cx, cy, agare, scale) {
 // ── Huvudkomponent ─────────────────────────────────────────────────────────────
 export default function TileKarta({ zoner = [], agare = [] }) {
   const canvasRef = useRef(null);
+  const bgImgRef  = useRef(null);
   const stateRef  = useRef({ tx: 0, ty: 0, scale: 1, dragging: false, lastX: 0, lastY: 0, vx: 0, vy: 0, selected: null, raf: null });
   const [selected, setSelected] = useState(null);
   const [info, setInfo] = useState(null);
+
+  // Ladda bakgrundsbild en gång
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/mark-bakgrund.png";
+    img.onload = () => { bgImgRef.current = img; render(); };
+    bgImgRef.current = img;
+  }, [render]);
 
   // Bygg agare-map — memoized så allTiles inte byggs om vid varje setState
   const agareMap = useMemo(
@@ -214,18 +228,24 @@ export default function TileKarta({ zoner = [], agare = [] }) {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Bakgrund
-    const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    bg.addColorStop(0, "#050510");
-    bg.addColorStop(1, "#0a0a1a");
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     ctx.save();
     ctx.scale(dpr, dpr);
     ctx.translate(tx + W / 2, ty + H / 2);
     ctx.scale(scale, scale);
     ctx.translate(-worldW / 2, -worldH / 2);
+
+    // Bakgrundsbild ritas i världskoordinater — panorerar och zoomar med hexarna
+    const bg = bgImgRef.current;
+    if (bg?.complete && bg.naturalWidth > 0) {
+      ctx.drawImage(bg, -R * 2, -R * 2, worldW + R * 4, worldH + R * 4);
+    } else {
+      // Fallback: mörk gradient tills bilden laddats
+      const grad = ctx.createLinearGradient(0, 0, 0, worldH);
+      grad.addColorStop(0, "#0c1445");
+      grad.addColorStop(1, "#050510");
+      ctx.fillStyle = grad;
+      ctx.fillRect(-R * 2, -R * 2, worldW + R * 4, worldH + R * 4);
+    }
 
     // Rita wilderness-tiles först (botten)
     for (const t of allTiles) {
