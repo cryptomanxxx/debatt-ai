@@ -17,36 +17,40 @@ const HEX_COLS = 20;   // 5 regioner × 4 hex/region
 const HEX_ROWS = 15;   // 3 regioner × 5 hex/region
 
 // ── Regioner ─────────────────────────────────────────────────────────────────
+// seed: [col, row] = Voronoi-frö — hexar tilldelas närmaste frö → oregelbundna gränser
+// gridCol/gridRow används bara för bakgrundsbild-placering (5×3 layout)
 const REGIONS = [
-  // 7 färger (A–G) placerade enligt 4-färgsteoremet: inga grannar delar färg
-  // Grid: A D B G E / F C G A D / B E D C A
-  // rad 0 — nord
-  { id: "r01", gridCol: 0, gridRow: 0, namn: "Arktis",       fallback: "#c7e8f7", ring: "#fb2c3b", ikon: "❄️" }, // A röd
-  { id: "r02", gridCol: 1, gridRow: 0, namn: "Barrskog",     fallback: "#1a472a", ring: "#00d46a", ikon: "🌲" }, // D grön
-  { id: "r03", gridCol: 2, gridRow: 0, namn: "Klipphöjder",  fallback: "#6b5c4e", ring: "#ff6b00", ikon: "🏔️" }, // B orange
-  { id: "r04", gridCol: 3, gridRow: 0, namn: "Tundra",       fallback: "#b0c4b1", ring: "#b44dff", ikon: "🌾" }, // G lila
-  { id: "r05", gridCol: 4, gridRow: 0, namn: "Glaciärvik",   fallback: "#a8d8ea", ring: "#00d4f5", ikon: "🧊" }, // E cyan
+  // rad 0 — nord (fröna spridda i y-led för ojämna gränser mot rad 1)
+  { id: "r01", seed: [ 1, 1],  gridCol: 0, gridRow: 0, namn: "Arktis",      fallback: "#c7e8f7", ring: "#fb2c3b", ikon: "❄️"  }, // A röd
+  { id: "r02", seed: [ 5, 3],  gridCol: 1, gridRow: 0, namn: "Barrskog",    fallback: "#1a472a", ring: "#00d46a", ikon: "🌲"  }, // D grön
+  { id: "r03", seed: [10, 0],  gridCol: 2, gridRow: 0, namn: "Klipphöjder", fallback: "#6b5c4e", ring: "#ff6b00", ikon: "🏔️" }, // B orange
+  { id: "r04", seed: [15, 2],  gridCol: 3, gridRow: 0, namn: "Tundra",      fallback: "#b0c4b1", ring: "#b44dff", ikon: "🌾"  }, // G lila
+  { id: "r05", seed: [18, 1],  gridCol: 4, gridRow: 0, namn: "Glaciärvik",  fallback: "#a8d8ea", ring: "#00d4f5", ikon: "🧊"  }, // E cyan
   // rad 1 — mitten
-  { id: "r06", gridCol: 0, gridRow: 1, namn: "Fjordkust",    fallback: "#2e5f6e", ring: "#4090ff", ikon: "🌊" }, // F blå
-  { id: "r07", gridCol: 1, gridRow: 1, namn: "Odlingsland",  fallback: "#8bc34a", ring: "#ffcc00", ikon: "🌾" }, // C gul
-  { id: "r08", gridCol: 2, gridRow: 1, namn: "Storstad",     fallback: "#607d8b", ring: "#b44dff", ikon: "🏰" }, // G lila
-  { id: "r09", gridCol: 3, gridRow: 1, namn: "Stäpp",        fallback: "#c8a96e", ring: "#fb2c3b", ikon: "🌵" }, // A röd
-  { id: "r10", gridCol: 4, gridRow: 1, namn: "Vulkanrev",    fallback: "#7b2d00", ring: "#00d46a", ikon: "🌋" }, // D grön
+  { id: "r06", seed: [ 0, 8],  gridCol: 0, gridRow: 1, namn: "Fjordkust",   fallback: "#2e5f6e", ring: "#4090ff", ikon: "🌊"  }, // F blå
+  { id: "r07", seed: [ 6, 7],  gridCol: 1, gridRow: 1, namn: "Odlingsland", fallback: "#8bc34a", ring: "#ffcc00", ikon: "🌾"  }, // C gul
+  { id: "r08", seed: [10, 9],  gridCol: 2, gridRow: 1, namn: "Storstad",    fallback: "#607d8b", ring: "#b44dff", ikon: "🏰"  }, // G lila
+  { id: "r09", seed: [15, 8],  gridCol: 3, gridRow: 1, namn: "Stäpp",       fallback: "#c8a96e", ring: "#fb2c3b", ikon: "🌵"  }, // A röd
+  { id: "r10", seed: [19, 7],  gridCol: 4, gridRow: 1, namn: "Vulkanrev",   fallback: "#7b2d00", ring: "#00d46a", ikon: "🌋"  }, // D grön
   // rad 2 — syd
-  { id: "r11", gridCol: 0, gridRow: 2, namn: "Mangrovkust",  fallback: "#1b5e20", ring: "#ff6b00", ikon: "🌿" }, // B orange
-  { id: "r12", gridCol: 1, gridRow: 2, namn: "Djungel",      fallback: "#2e7d32", ring: "#00d4f5", ikon: "🌴" }, // E cyan
-  { id: "r13", gridCol: 2, gridRow: 2, namn: "Floddelta",    fallback: "#33691e", ring: "#00d46a", ikon: "💧" }, // D grön
-  { id: "r14", gridCol: 3, gridRow: 2, namn: "Rödöknen",     fallback: "#bf360c", ring: "#ffcc00", ikon: "🏜️" }, // C gul
-  { id: "r15", gridCol: 4, gridRow: 2, namn: "Korallkust",   fallback: "#006064", ring: "#fb2c3b", ikon: "🐚" }, // A röd
+  { id: "r11", seed: [ 1, 13], gridCol: 0, gridRow: 2, namn: "Mangrovkust", fallback: "#1b5e20", ring: "#ff6b00", ikon: "🌿"  }, // B orange
+  { id: "r12", seed: [ 5, 12], gridCol: 1, gridRow: 2, namn: "Djungel",     fallback: "#2e7d32", ring: "#00d4f5", ikon: "🌴"  }, // E cyan
+  { id: "r13", seed: [10, 14], gridCol: 2, gridRow: 2, namn: "Floddelta",   fallback: "#33691e", ring: "#00d46a", ikon: "💧"  }, // D grön
+  { id: "r14", seed: [15, 14], gridCol: 3, gridRow: 2, namn: "Rödöknen",    fallback: "#bf360c", ring: "#ffcc00", ikon: "🏜️" }, // C gul
+  { id: "r15", seed: [19, 13], gridCol: 4, gridRow: 2, namn: "Korallkust",  fallback: "#006064", ring: "#fb2c3b", ikon: "🐚"  }, // A röd
 ];
 
 // ── Hex-tile definitioner ────────────────────────────────────────────────────
-// Varje hex tilldelas automatiskt en region baserat på sin kolumn/rad-position
+// Voronoi: varje hex tilldelas regionen vars frö är närmast (kvadratisk avstånd)
 function hexRegion(col, row) {
-  const regionCol = Math.floor(col / (HEX_COLS / GRID_COLS));
-  const regionRow = Math.floor(row / (HEX_ROWS / GRID_ROWS));
-  const idx = Math.min(regionRow, GRID_ROWS - 1) * GRID_COLS + Math.min(regionCol, GRID_COLS - 1);
-  return REGIONS[idx] || REGIONS[0];
+  const [px, py] = hexCenter(col, row);
+  let nearest = REGIONS[0], nearestD = Infinity;
+  for (const reg of REGIONS) {
+    const [sx, sy] = hexCenter(reg.seed[0], reg.seed[1]);
+    const d = (px - sx) ** 2 + (py - sy) ** 2;
+    if (d < nearestD) { nearest = reg; nearestD = d; }
+  }
+  return nearest;
 }
 
 // Generera alla hex-tiles som täcker hela världen
@@ -199,8 +203,9 @@ export default function TileKarta2() {
       ctx.textBaseline = "middle";
       ctx.shadowBlur   = 0;
       REGIONS.forEach((reg) => {
-        const cx = reg.gridCol * rw + rw / 2;
-        const cy = reg.gridRow * rh + rh / 2;
+        const [scx, scy] = hexCenter(reg.seed[0], reg.seed[1]);
+        const cx = scx + ox;
+        const cy = scy + oy;
         const fs = Math.round(Math.min(26, rw * 0.065) / scale);
         ctx.font = `bold ${fs}px sans-serif`;
         const text  = `${reg.ikon} ${reg.namn}`;
