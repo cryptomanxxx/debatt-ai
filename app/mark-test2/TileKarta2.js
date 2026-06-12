@@ -1,55 +1,61 @@
 "use client";
 import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 
-// ── Konstanter ──────────────────────────────────────────────────────────────────
+// ── Världskonfiguration ──────────────────────────────────────────────────────
+// 15 regioner i ett 5×3 rutnät. Världen täcker hela canvasen sömlöst.
+const GRID_COLS = 5;
+const GRID_ROWS = 3;
+
+// Hex-konstanter
 const R   = 44;
 const S3  = Math.sqrt(3);
-const GAP = 14;   // shrinkage: synlig ytterradie = R - GAP
-const BW  = 7;    // ringbredd i världskoordinater
+const GAP = 14;
+const BW  = 7;
 
-const REGION_FARG = {
-  nv:    "#22d3ee",   // NV-ön  – cyan
-  no:    "#4ade80",   // NO-ön  – grön
-  soder: "#f59e0b",   // Sydön  – amber
-};
-const REGION_NAMN = { nv: "NV-ön", no: "NO-ön", soder: "Sydön" };
-const REGION_IKON = { nv: "🏔️",   no: "🌿",    soder: "🏖️"   };
+// Världens hex-dimensioner (GRID_COLS * HEX_PER_REGION_COL × GRID_ROWS * HEX_PER_REGION_ROW)
+const HEX_COLS = 20;   // 5 regioner × 4 hex/region
+const HEX_ROWS = 15;   // 3 regioner × 5 hex/region
 
-// ── Tile-definitioner (handplacerade per ö) ─────────────────────────────────────
-// Varje rad anger vilka kolumner som är land på respektive ö.
-// Justera cols-listor om hexar hamnar i vattnet eller saknas på land.
-const TILE_DEFS = [
-  // NV-ön (cyan) — vänster ö med snöklädda berg
-  { region: "nv", row: 0,  cols: [1,2,3,4,5]       },
-  { region: "nv", row: 1,  cols: [0,1,2,3,4,5]     },
-  { region: "nv", row: 2,  cols: [0,1,2,3,4,5]     },
-  { region: "nv", row: 3,  cols: [0,1,2,3,4]       },
-  { region: "nv", row: 4,  cols: [0,1,2,3,4]       },
-  { region: "nv", row: 5,  cols: [0,1,2,3]         },
-  { region: "nv", row: 6,  cols: [0,1,2]           },
-
-  // NO-ön (grön) — höger ö, +2 kolumner åt höger för att täcka trädön
-  { region: "no", row: 1,  cols: [10,11,12]            },
-  { region: "no", row: 2,  cols: [9,10,11,12]          },
-  { region: "no", row: 3,  cols: [8,9,10,11,12]        },
-  { region: "no", row: 4,  cols: [9,10,11,12]          },
-  { region: "no", row: 5,  cols: [9,10,11,12]          },
-  { region: "no", row: 6,  cols: [9,10,11,12]          },
-
-  // Sydön (amber) — stora södra ön, rad 7 utökad till col 13 för rätt bildbredd
-  { region: "soder", row: 7,  cols: [2,3,4,5,6,7,8,9,10,11,12,13] },
-  { region: "soder", row: 8,  cols: [2,3,4,5,6,7,8,9,10,11,12]    },
-  { region: "soder", row: 9,  cols: [2,3,4,5,6,7,8,9,10,11]       },
-  { region: "soder", row: 10, cols: [3,4,5,6,7,8,9,10]            },
-  { region: "soder", row: 11, cols: [4,5,6,7,8,9]                 },
-  { region: "soder", row: 12, cols: [5,6,7,8]                     },
+// ── Regioner ─────────────────────────────────────────────────────────────────
+const REGIONS = [
+  // rad 0 — nord
+  { id: "r01", gridCol: 0, gridRow: 0, namn: "Arktis",       fallback: "#c7e8f7", ikon: "❄️" },
+  { id: "r02", gridCol: 1, gridRow: 0, namn: "Barrskog",     fallback: "#1a472a", ikon: "🌲" },
+  { id: "r03", gridCol: 2, gridRow: 0, namn: "Klipphöjder",  fallback: "#6b5c4e", ikon: "🏔️" },
+  { id: "r04", gridCol: 3, gridRow: 0, namn: "Tundra",       fallback: "#b0c4b1", ikon: "🌾" },
+  { id: "r05", gridCol: 4, gridRow: 0, namn: "Glaciärvik",   fallback: "#a8d8ea", ikon: "🧊" },
+  // rad 1 — mitten
+  { id: "r06", gridCol: 0, gridRow: 1, namn: "Fjordkust",    fallback: "#2e5f6e", ikon: "🌊" },
+  { id: "r07", gridCol: 1, gridRow: 1, namn: "Odlingsland",  fallback: "#8bc34a", ikon: "🌾" },
+  { id: "r08", gridCol: 2, gridRow: 1, namn: "Storstad",     fallback: "#607d8b", ikon: "🏰" },
+  { id: "r09", gridCol: 3, gridRow: 1, namn: "Stäpp",        fallback: "#c8a96e", ikon: "🌵" },
+  { id: "r10", gridCol: 4, gridRow: 1, namn: "Vulkanrev",    fallback: "#7b2d00", ikon: "🌋" },
+  // rad 2 — syd
+  { id: "r11", gridCol: 0, gridRow: 2, namn: "Mangrovkust",  fallback: "#1b5e20", ikon: "🌿" },
+  { id: "r12", gridCol: 1, gridRow: 2, namn: "Djungel",      fallback: "#2e7d32", ikon: "🌴" },
+  { id: "r13", gridCol: 2, gridRow: 2, namn: "Floddelta",    fallback: "#33691e", ikon: "💧" },
+  { id: "r14", gridCol: 3, gridRow: 2, namn: "Rödöknen",     fallback: "#bf360c", ikon: "🏜️" },
+  { id: "r15", gridCol: 4, gridRow: 2, namn: "Korallkust",   fallback: "#006064", ikon: "🐚" },
 ];
 
-const TILES = TILE_DEFS.flatMap(({ region, row, cols }) =>
-  cols.map(col => ({ col, row, region, id: `${region}-${col}-${row}` }))
-);
+// ── Hex-tile definitioner ────────────────────────────────────────────────────
+// Varje hex tilldelas automatiskt en region baserat på sin kolumn/rad-position
+function hexRegion(col, row) {
+  const regionCol = Math.floor(col / (HEX_COLS / GRID_COLS));
+  const regionRow = Math.floor(row / (HEX_ROWS / GRID_ROWS));
+  const idx = Math.min(regionRow, GRID_ROWS - 1) * GRID_COLS + Math.min(regionCol, GRID_COLS - 1);
+  return REGIONS[idx] || REGIONS[0];
+}
 
-// ── Hexhjälpare ─────────────────────────────────────────────────────────────────
+// Generera alla hex-tiles som täcker hela världen
+const TILES = [];
+for (let row = 0; row < HEX_ROWS; row++) {
+  for (let col = 0; col < HEX_COLS; col++) {
+    TILES.push({ col, row, id: `${col}-${row}`, region: hexRegion(col, row) });
+  }
+}
+
+// ── Hex-hjälpare ──────────────────────────────────────────────────────────────
 function hexCenter(col, row) {
   return [
     R * S3 * (col + (row % 2 === 1 ? 0.5 : 0)),
@@ -67,30 +73,31 @@ function hexSubPath(ctx, cx, cy, r) {
 }
 
 function drawLabel(ctx, cx, cy, tile, scale) {
-  if (scale < 0.55) return;
-  const ikon = REGION_IKON[tile.region] || "•";
+  if (scale < 0.4) return;
   ctx.textAlign    = "center";
   ctx.textBaseline = "middle";
-  ctx.shadowColor  = "rgba(0,0,0,0.85)";
+  ctx.shadowColor  = "rgba(0,0,0,0.9)";
   ctx.shadowBlur   = 3 / scale;
   ctx.fillStyle    = "#fff";
-  ctx.font         = `${scale >= 1.1 ? 18 : 13}px sans-serif`;
-  ctx.fillText(ikon, cx, cy);
-  ctx.shadowBlur = 0;
+  ctx.font         = `${scale >= 0.9 ? 16 : 11}px sans-serif`;
+  ctx.fillText(tile.region.ikon, cx, cy);
+  ctx.shadowBlur   = 0;
 }
 
-// ── Huvudkomponent ──────────────────────────────────────────────────────────────
+// ── Huvudkomponent ────────────────────────────────────────────────────────────
 export default function TileKarta2() {
-  const canvasRef = useRef(null);
-  const bgImgRef  = useRef(null);
-  const stateRef  = useRef({
-    tx: 0, ty: 0, scale: 1,
+  const canvasRef  = useRef(null);
+  const regionImgs = useRef({});   // laddade region-bilder
+  const stateRef   = useRef({
+    tx: 0, ty: 0, scale: 0.5,     // börja lite utzoomad för att se hela världen
     dragging: false, lastX: 0, lastY: 0, vx: 0, vy: 0,
     selected: null, dragStartX: 0, dragStartY: 0,
+    rafId: null,
   });
-  const [info, setInfo] = useState(null);
+  const [info, setInfo]     = useState(null);
+  const [loaded, setLoaded] = useState(0);   // räknar laddade bilder
 
-  // Beräkna world bounds från tile-positionerna
+  // Beräkna world-bounds
   const { worldW, worldH, ox, oy } = useMemo(() => {
     const centers = TILES.map(t => hexCenter(t.col, t.row));
     const minX = Math.min(...centers.map(c => c[0]));
@@ -105,18 +112,29 @@ export default function TileKarta2() {
     };
   }, []);
 
+  // Ladda region-bilder
+  useEffect(() => {
+    let n = 0;
+    REGIONS.forEach((reg, i) => {
+      const img = new Image();
+      img.onload  = () => { regionImgs.current[reg.id] = img; setLoaded(++n); };
+      img.onerror = () => { regionImgs.current[reg.id] = null; setLoaded(++n); };
+      img.src     = `/regions/region-${String(i + 1).padStart(2, "0")}.png`;
+    });
+  }, []);
+
   const render = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx   = canvas.getContext("2d");
-    const dpr   = window.devicePixelRatio || 1;
-    const W     = canvas.width  / dpr;
-    const H     = canvas.height / dpr;
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const W   = canvas.width  / dpr;
+    const H   = canvas.height / dpr;
     const { tx, ty, scale } = stateRef.current;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // ── Hav runt öarna (syns när man zoomar ut) ─────────────────────────────────
+    // ── Hav utanför världen ──────────────────────────────────────────────────
     const ocean = ctx.createRadialGradient(
       canvas.width / 2, canvas.height / 2, 0,
       canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.7
@@ -126,303 +144,272 @@ export default function TileKarta2() {
     ctx.fillStyle = ocean;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // ── Bakgrundsbild ───────────────────────────────────────────────────────────
     ctx.save();
     ctx.scale(dpr, dpr);
     ctx.translate(tx + W / 2, ty + H / 2);
     ctx.scale(scale, scale);
     ctx.translate(-worldW / 2, -worldH / 2);
 
-    const bg = bgImgRef.current;
-    if (bg?.complete && bg.naturalWidth > 0) {
-      ctx.drawImage(bg, -R * 2, -R * 2, worldW + R * 4, worldH + R * 4);
-    } else {
-      const grad = ctx.createLinearGradient(0, 0, 0, worldH);
-      grad.addColorStop(0, "#0c1445");
-      grad.addColorStop(1, "#050510");
-      ctx.fillStyle = grad;
-      ctx.fillRect(-R * 2, -R * 2, worldW + R * 4, worldH + R * 4);
+    // ── Region-bakgrunder ────────────────────────────────────────────────────
+    const rw = worldW / GRID_COLS;
+    const rh = worldH / GRID_ROWS;
+
+    REGIONS.forEach((reg) => {
+      const rx = reg.gridCol * rw;
+      const ry = reg.gridRow * rh;
+      const img = regionImgs.current[reg.id];
+      if (img) {
+        ctx.drawImage(img, rx, ry, rw, rh);
+      } else {
+        // Fallback-färg tills riktiga bilder laddas
+        ctx.fillStyle = reg.fallback;
+        ctx.fillRect(rx, ry, rw, rh);
+        // Regionnamn som platshållare (bara vid låg zoom)
+        if (scale < 0.7) {
+          ctx.fillStyle    = "rgba(255,255,255,0.55)";
+          ctx.font         = `bold ${Math.round(24 / scale)}px sans-serif`;
+          ctx.textAlign    = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(`${reg.ikon} ${reg.namn}`, rx + rw / 2, ry + rh / 2);
+        }
+      }
+    });
+
+    // Tunna regiongränser (subtila, syns bara på låg zoom)
+    if (scale < 0.6) {
+      ctx.strokeStyle = "rgba(0,0,0,0.25)";
+      ctx.lineWidth   = 2 / scale;
+      for (let c = 1; c < GRID_COLS; c++) {
+        ctx.beginPath(); ctx.moveTo(c * rw, 0); ctx.lineTo(c * rw, worldH); ctx.stroke();
+      }
+      for (let r = 1; r < GRID_ROWS; r++) {
+        ctx.beginPath(); ctx.moveTo(0, r * rh); ctx.lineTo(worldW, r * rh); ctx.stroke();
+      }
     }
-    ctx.restore();
 
-    // ── Hex-grid (evenodd fill) ─────────────────────────────────────────────────
-    ctx.save();
-    ctx.scale(dpr, dpr);
-    ctx.translate(tx + W / 2, ty + H / 2);
-    ctx.scale(scale, scale);
-    ctx.translate(-worldW / 2, -worldH / 2);
-
+    // ── Hex-grid (evenodd) ───────────────────────────────────────────────────
     const selId = stateRef.current.selected;
     for (const t of TILES) {
       const [cx, cy] = hexCenter(t.col, t.row);
-      const color = selId === t.id ? "#ffffff" : (REGION_FARG[t.region] || "#888");
+      const isSelected = selId === t.id;
       ctx.beginPath();
       hexSubPath(ctx, cx + ox, cy + oy, R - GAP);
       hexSubPath(ctx, cx + ox, cy + oy, R - BW - GAP);
-      ctx.fillStyle = color;
+      ctx.fillStyle   = isSelected ? "#ffffff" : "rgba(255,255,255,0.18)";
+      ctx.globalAlpha = isSelected ? 1.0 : 0.8;
       ctx.fill("evenodd");
+      ctx.globalAlpha = 1.0;
     }
-    ctx.restore();
 
-    // ── Etiketter ───────────────────────────────────────────────────────────────
-    ctx.save();
-    ctx.scale(dpr, dpr);
-    ctx.translate(tx + W / 2, ty + H / 2);
-    ctx.scale(scale, scale);
-    ctx.translate(-worldW / 2, -worldH / 2);
-
+    // ── Ikoner/etiketter ─────────────────────────────────────────────────────
     for (const t of TILES) {
       const [cx, cy] = hexCenter(t.col, t.row);
       drawLabel(ctx, cx + ox, cy + oy, t, scale);
     }
+
     ctx.restore();
   }, [worldW, worldH, ox, oy]);
 
-  // Ladda bakgrundsbild
-  useEffect(() => {
-    const img = new Image();
-    img.src = "/mark-test2.png";
-    img.onload = () => { bgImgRef.current = img; render(); };
-    bgImgRef.current = img;
-  }, [render]);
+  // Omrita när bilder laddas
+  useEffect(() => { render(); }, [loaded, render]);
 
-  // RAF-loop för momentumrullning
-  useEffect(() => {
-    let running = true;
-    function loop() {
-      if (!running) return;
-      const s = stateRef.current;
-      if (!s.dragging && (Math.abs(s.vx) > 0.1 || Math.abs(s.vy) > 0.1)) {
-        s.tx += s.vx; s.ty += s.vy;
-        s.vx *= 0.88; s.vy *= 0.88;
-        render();
-      }
-      requestAnimationFrame(loop);
-    }
-    requestAnimationFrame(loop);
-    return () => { running = false; };
-  }, [render]);
-
-  // Canvas setup + händelselyssnare
+  // ── Canvas setup + ResizeObserver ─────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    let initialized = false;
-
-    function resize() {
-      const parent = canvas.parentElement;
-      const W = parent.clientWidth;
-      const H = parent.clientHeight;
-      if (!W || !H) return;
-      canvas.width  = W * dpr;
-      canvas.height = H * dpr;
-      canvas.style.width  = `${W}px`;
-      canvas.style.height = `${H}px`;
-      if (!initialized && H > 200) {
-        initialized = true;
-        stateRef.current.scale = Math.min(W / worldW, H / worldH) * 0.97;
-        stateRef.current.tx = 0;
-        stateRef.current.ty = 0;
-      }
+    const ro = new ResizeObserver(() => {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width  = canvas.offsetWidth  * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
       render();
-    }
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas.parentElement);
+    });
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, [render]);
 
-    function onWheel(e) {
-      e.preventDefault();
-      const s = stateRef.current;
-      const CW = canvas.clientWidth, CH = canvas.clientHeight;
-      const r  = canvas.getBoundingClientRect();
-      const mx = e.clientX - r.left - CW / 2;
-      const my = e.clientY - r.top  - CH / 2;
-      const factor = e.deltaY < 0 ? 1.1 : 0.91;
-      const ns = Math.min(4, Math.max(0.2, s.scale * factor));
-      s.tx = mx - (mx - s.tx) * (ns / s.scale);
-      s.ty = my - (my - s.ty) * (ns / s.scale);
-      s.scale = ns;
+  // ── Momentum RAF ──────────────────────────────────────────────────────────
+  const startMomentum = useCallback(() => {
+    const s = stateRef.current;
+    if (s.rafId) cancelAnimationFrame(s.rafId);
+    const step = () => {
+      s.vx *= 0.88; s.vy *= 0.88;
+      if (Math.abs(s.vx) < 0.3 && Math.abs(s.vy) < 0.3) { s.rafId = null; return; }
+      s.tx += s.vx; s.ty += s.vy;
       render();
-    }
-
-    function onMouseDown(e) {
-      const s = stateRef.current;
-      s.dragging = true;
-      s.lastX = e.clientX; s.lastY = e.clientY;
-      s.dragStartX = e.clientX; s.dragStartY = e.clientY;
-      s.vx = 0; s.vy = 0;
-    }
-    function onMouseMove(e) {
-      const s = stateRef.current;
-      if (!s.dragging) return;
-      const dx = e.clientX - s.lastX, dy = e.clientY - s.lastY;
-      s.tx += dx; s.ty += dy;
-      s.vx = dx; s.vy = dy;
-      s.lastX = e.clientX; s.lastY = e.clientY;
-      render();
-    }
-    function onMouseUp() { stateRef.current.dragging = false; }
-
-    function onClick(e) {
-      const s = stateRef.current;
-      const dragDist = Math.hypot(
-        e.clientX - (s.dragStartX ?? e.clientX),
-        e.clientY - (s.dragStartY ?? e.clientY)
-      );
-      if (dragDist > 6) return;
-
-      const CW = canvas.clientWidth, CH = canvas.clientHeight;
-      const r  = canvas.getBoundingClientRect();
-      const mx = (e.clientX - r.left - CW / 2 - s.tx) / s.scale + worldW / 2 - ox;
-      const my = (e.clientY - r.top  - CH / 2 - s.ty) / s.scale + worldH / 2 - oy;
-
-      let nearest = null, nearestDist = Infinity;
-      for (const t of TILES) {
-        const [cx, cy] = hexCenter(t.col, t.row);
-        const d = Math.hypot(mx - cx, my - cy);
-        if (d < nearestDist) { nearestDist = d; nearest = t; }
-      }
-      if (nearest && nearestDist < R - GAP) {
-        stateRef.current.selected = nearest.id;
-        setInfo(nearest);
-      } else {
-        stateRef.current.selected = null;
-        setInfo(null);
-      }
-      render();
-    }
-
-    let lastDist = 0;
-    function onTouchStart(e) {
-      if (e.touches.length === 2) {
-        lastDist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
-      } else {
-        const s = stateRef.current;
-        s.dragging = true;
-        s.lastX = e.touches[0].clientX; s.lastY = e.touches[0].clientY;
-        s.dragStartX = e.touches[0].clientX; s.dragStartY = e.touches[0].clientY;
-      }
-    }
-    function onTouchMove(e) {
-      e.preventDefault();
-      if (e.touches.length === 2) {
-        const dist = Math.hypot(
-          e.touches[0].clientX - e.touches[1].clientX,
-          e.touches[0].clientY - e.touches[1].clientY
-        );
-        const s = stateRef.current;
-        s.scale = Math.min(4, Math.max(0.2, s.scale * dist / lastDist));
-        lastDist = dist;
-        render();
-      } else {
-        const s = stateRef.current;
-        if (!s.dragging) return;
-        s.tx += e.touches[0].clientX - s.lastX;
-        s.ty += e.touches[0].clientY - s.lastY;
-        s.lastX = e.touches[0].clientX; s.lastY = e.touches[0].clientY;
-        render();
-      }
-    }
-    function onTouchEnd() { stateRef.current.dragging = false; }
-
-    canvas.addEventListener("wheel",      onWheel,     { passive: false });
-    canvas.addEventListener("mousedown",  onMouseDown);
-    canvas.addEventListener("mousemove",  onMouseMove);
-    canvas.addEventListener("mouseup",    onMouseUp);
-    canvas.addEventListener("mouseleave", onMouseUp);
-    canvas.addEventListener("click",      onClick);
-    canvas.addEventListener("touchstart", onTouchStart, { passive: true });
-    canvas.addEventListener("touchmove",  onTouchMove,  { passive: false });
-    canvas.addEventListener("touchend",   onTouchEnd);
-
-    return () => {
-      ro.disconnect();
-      canvas.removeEventListener("wheel",      onWheel);
-      canvas.removeEventListener("mousedown",  onMouseDown);
-      canvas.removeEventListener("mousemove",  onMouseMove);
-      canvas.removeEventListener("mouseup",    onMouseUp);
-      canvas.removeEventListener("mouseleave", onMouseUp);
-      canvas.removeEventListener("click",      onClick);
-      canvas.removeEventListener("touchstart", onTouchStart);
-      canvas.removeEventListener("touchmove",  onTouchMove);
-      canvas.removeEventListener("touchend",   onTouchEnd);
+      s.rafId = requestAnimationFrame(step);
     };
-  }, [render, worldW, worldH, ox, oy]);
+    s.rafId = requestAnimationFrame(step);
+  }, [render]);
+
+  // ── Mus-händelser ──────────────────────────────────────────────────────────
+  const onMouseDown = useCallback((e) => {
+    const s = stateRef.current;
+    if (s.rafId) { cancelAnimationFrame(s.rafId); s.rafId = null; }
+    s.dragging = true; s.lastX = e.clientX; s.lastY = e.clientY;
+    s.dragStartX = e.clientX; s.dragStartY = e.clientY;
+    s.vx = 0; s.vy = 0;
+  }, []);
+
+  const onMouseMove = useCallback((e) => {
+    const s = stateRef.current;
+    if (!s.dragging) return;
+    s.vx = e.clientX - s.lastX; s.vy = e.clientY - s.lastY;
+    s.tx += s.vx; s.ty += s.vy;
+    s.lastX = e.clientX; s.lastY = e.clientY;
+    render();
+  }, [render]);
+
+  const onMouseUp = useCallback((e) => {
+    const s = stateRef.current;
+    s.dragging = false;
+    const dx = e.clientX - s.dragStartX, dy = e.clientY - s.dragStartY;
+    if (Math.sqrt(dx * dx + dy * dy) < 6) handleClick(e.clientX, e.clientY);
+    else startMomentum();
+  }, [startMomentum]); // eslint-disable-line
+
+  // ── Touch-händelser ────────────────────────────────────────────────────────
+  const onTouchStart = useCallback((e) => {
+    if (e.touches.length !== 1) return;
+    const s = stateRef.current;
+    const t = e.touches[0];
+    if (s.rafId) { cancelAnimationFrame(s.rafId); s.rafId = null; }
+    s.dragging = true; s.lastX = t.clientX; s.lastY = t.clientY;
+    s.dragStartX = t.clientX; s.dragStartY = t.clientY;
+    s.vx = 0; s.vy = 0;
+  }, []);
+
+  const onTouchMove = useCallback((e) => {
+    if (e.touches.length !== 1) return;
+    e.preventDefault();
+    const s = stateRef.current;
+    const t = e.touches[0];
+    s.vx = t.clientX - s.lastX; s.vy = t.clientY - s.lastY;
+    s.tx += s.vx; s.ty += s.vy;
+    s.lastX = t.clientX; s.lastY = t.clientY;
+    render();
+  }, [render]);
+
+  const onTouchEnd = useCallback((e) => {
+    const s = stateRef.current;
+    s.dragging = false;
+    if (e.changedTouches.length === 1) {
+      const t = e.changedTouches[0];
+      const dx = t.clientX - s.dragStartX, dy = t.clientY - s.dragStartY;
+      if (Math.sqrt(dx * dx + dy * dy) < 6) handleClick(t.clientX, t.clientY);
+      else startMomentum();
+    }
+  }, [startMomentum]); // eslint-disable-line
+
+  // ── Klick → välj hex ──────────────────────────────────────────────────────
+  function handleClick(clientX, clientY) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr   = window.devicePixelRatio || 1;
+    const rect  = canvas.getBoundingClientRect();
+    const { tx, ty, scale } = stateRef.current;
+    const W = canvas.width / dpr, H = canvas.height / dpr;
+    const wx = ((clientX - rect.left - tx - W / 2) / scale) + worldW / 2 - ox;
+    const wy = ((clientY - rect.top  - ty - H / 2) / scale) + worldH / 2 - oy;
+
+    let nearest = null, nearestDist = Infinity;
+    for (const t of TILES) {
+      const [cx, cy] = hexCenter(t.col, t.row);
+      const d = Math.sqrt((wx - cx) ** 2 + (wy - cy) ** 2);
+      if (d < nearestDist) { nearest = t; nearestDist = d; }
+    }
+    if (nearest && nearestDist < R - GAP) {
+      stateRef.current.selected = stateRef.current.selected === nearest.id ? null : nearest.id;
+      setInfo(stateRef.current.selected ? { tile: nearest } : null);
+    } else {
+      stateRef.current.selected = null;
+      setInfo(null);
+    }
+    render();
+  }
+
+  // ── Scroll-zoom ────────────────────────────────────────────────────────────
+  const onWheel = useCallback((e) => {
+    e.preventDefault();
+    const s = stateRef.current;
+    const delta  = e.deltaY < 0 ? 1.1 : 0.91;
+    const newScale = Math.max(0.15, Math.min(4, s.scale * delta));
+    s.scale = newScale;
+    render();
+  }, [render]);
+
+  const zoom = (delta) => {
+    const s = stateRef.current;
+    s.scale = Math.max(0.15, Math.min(4, s.scale * delta));
+    render();
+  };
 
   return (
-    <div style={{ position: "absolute", inset: 0 }}>
-      <canvas ref={canvasRef} style={{ display: "block", cursor: "grab", userSelect: "none" }} />
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: "100%", height: "100%", display: "block", cursor: "grab", touchAction: "none" }}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onWheel={onWheel}
+      />
 
       {/* Zoom-knappar */}
-      <div style={{ position: "absolute", bottom: 16, right: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-        {["+", "−", "⊡"].map((lbl, i) => (
-          <button key={i}
-            onClick={() => {
-              const s = stateRef.current;
-              if (i === 0) s.scale = Math.min(4, s.scale * 1.25);
-              else if (i === 1) s.scale = Math.max(0.2, s.scale * 0.8);
-              else { s.scale = Math.min(canvasRef.current?.clientWidth / worldW, canvasRef.current?.clientHeight / worldH) * 0.97; s.tx = 0; s.ty = 0; }
-              render();
-            }}
-            style={{
-              width: 36, height: 36, borderRadius: 6, border: "1px solid rgba(255,255,255,0.2)",
-              background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 18,
-              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-            {lbl}
-          </button>
+      <div style={{ position: "absolute", bottom: 20, right: 20, display: "flex", flexDirection: "column", gap: 6 }}>
+        {[["＋", 1.25], ["－", 0.8]].map(([lbl, d]) => (
+          <button key={lbl} onClick={() => zoom(d)} style={{
+            width: 36, height: 36, borderRadius: 6,
+            background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.2)",
+            color: "#fff", fontSize: 20, cursor: "pointer", lineHeight: 1,
+          }}>{lbl}</button>
         ))}
       </div>
 
       {/* Region-legend */}
       <div style={{
-        position: "absolute", top: 16, right: 16,
-        background: "rgba(0,0,0,0.75)", borderRadius: 8,
-        padding: "10px 14px", display: "flex", flexDirection: "column", gap: 6,
-        backdropFilter: "blur(6px)",
+        position: "absolute", top: 12, right: 12,
+        background: "rgba(0,0,0,0.65)", borderRadius: 8, padding: "8px 12px",
+        display: "flex", flexDirection: "column", gap: 3,
       }}>
-        {Object.entries(REGION_NAMN).map(([key, namn]) => (
-          <div key={key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#fff" }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: REGION_FARG[key], display: "inline-block" }} />
-            <span>{REGION_IKON[key]} {namn}</span>
+        {REGIONS.map(r => (
+          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{
+              width: 12, height: 12, borderRadius: 2,
+              background: r.fallback, display: "inline-block", flexShrink: 0,
+            }} />
+            <span style={{ fontSize: 11, color: "#e5e7eb", whiteSpace: "nowrap" }}>
+              {r.ikon} {r.namn}
+            </span>
           </div>
         ))}
       </div>
 
-      {/* Info-panel vid vald tile */}
+      {/* Info-panel för vald hex */}
       {info && (
         <div style={{
-          position: "absolute", top: 16, left: 16,
-          background: "rgba(0,0,0,0.85)", border: `1px solid ${REGION_FARG[info.region] || "#444"}`,
-          borderRadius: 10, padding: "14px 18px", minWidth: 200,
-          backdropFilter: "blur(8px)",
+          position: "absolute", bottom: 20, left: 20,
+          background: "rgba(0,0,0,0.75)", border: "1px solid rgba(255,255,255,0.15)",
+          borderRadius: 10, padding: "10px 14px", minWidth: 160,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 22 }}>{REGION_IKON[info.region]}</span>
-            <div>
-              <div style={{ fontWeight: 700, color: "#fff", fontSize: 15 }}>{REGION_NAMN[info.region]}</div>
-              <div style={{ fontSize: 11, color: REGION_FARG[info.region], letterSpacing: "0.07em" }}>
-                col {info.col}, rad {info.row}
-              </div>
-            </div>
+          <div style={{ color: "#f3f4f6", fontWeight: 700, marginBottom: 4 }}>
+            {info.tile.region.ikon} {info.tile.region.namn}
+          </div>
+          <div style={{ color: "#9ca3af", fontSize: 12 }}>
+            Hex {info.tile.col}, {info.tile.row}
           </div>
           <button onClick={() => { stateRef.current.selected = null; setInfo(null); render(); }}
-            style={{ marginTop: 6, fontSize: 11, color: "#6b7280", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            style={{
+              marginTop: 8, fontSize: 11, color: "#9ca3af",
+              background: "none", border: "none", cursor: "pointer", padding: 0,
+            }}>
             × Stäng
           </button>
         </div>
       )}
-
-      <div style={{
-        position: "absolute", bottom: 16, left: "50%", transform: "translateX(-50%)",
-        fontSize: 11, color: "rgba(255,255,255,0.25)", pointerEvents: "none",
-      }}>
-        Scrolla för att zooma · Dra för att panorera · Klicka på en hex för info
-      </div>
     </div>
   );
 }
