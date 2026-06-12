@@ -7,6 +7,12 @@ function sbHeaders() {
   return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
 }
 
+// Service role key för PATCH — anon-nyckeln kan ha blockerade UPDATE-rättigheter via RLS
+function sbWriteHeaders() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+}
+
 // Hämtar voteringsresultat från riksdagen.se och sätter riksdagen_utfall automatiskt.
 // Körs från Vercel (inte GitHub Actions) så att data.riksdagen.se inte blockerar anropet.
 export async function POST() {
@@ -60,7 +66,7 @@ export async function POST() {
           `${SB_URL}/rest/v1/lagforslag?id=eq.${lagforslagId}`,
           {
             method: "PATCH",
-            headers: { ...h, Prefer: "return=minimal" },
+            headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
             body: JSON.stringify({ riksdagen_utfall: riksdagenUtfall, riksdagen_utfall_datum: datum, status: "avgjort" }),
           }
         );
@@ -140,8 +146,11 @@ export async function POST() {
         riksdagenUtfall = "bifall";
       } else if (/avslag|avslog|avvisad|avstyrk/.test(beslutText)) {
         riksdagenUtfall = "avslag";
-      } else if (dokStatus.includes("avslutad") && beslutText === "" && lagforslagUrl.includes("/proposition/")) {
-        // Avslutad utan explicit besluttext — bara säkert för propositioner (passar nästan alltid)
+      } else if (
+        (dokStatus.includes("avslutad") || dokStatus.includes("beslutat") || dokStatus.includes("slutbehandlad")) &&
+        beslutText === "" && lagforslagUrl.includes("/proposition/")
+      ) {
+        // Avslutad/beslutat utan explicit besluttext — nästan alltid bifall för propositioner
         riksdagenUtfall = "bifall";
       }
 
