@@ -390,7 +390,7 @@ def hitta_overträdelser(sb_key: str, h: dict) -> int:
     period = str(datetime.now(timezone.utc).year)
     bribe_scores = sb_get(h, f"bribe_scores?period=eq.{period}&select=agent,total_givet_kr,total_bribe_kr,antal_givna,antal_mottagna")
     artikel5 = next(a for a in AI_KONSTITUTION if a["artikel"] == 5)
-    ar_start = f"{period}-01-01T00:00:00+00:00"
+    ar_start = f"{period}-01-01T00:00:00%2B00:00"
     for bs in bribe_scores:
         agent = bs.get("agent", "")
         if not agent:

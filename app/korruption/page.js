@@ -47,7 +47,7 @@ export default async function KorruptionPage() {
   const [brScores, brOffers, badges, planbocker, arenden] = await Promise.all([
     sbGet(`bribe_scores?period=eq.${period}&order=total_givet_kr.desc`),
     sbGet("bribe_offers?order=skapad.desc&limit=30"),
-    sbGet("corruption_badges?aktiv=eq.true&order=skapad.desc"),
+    sbGet(`corruption_badges?aktiv=eq.true&expires_at=gt.${new Date().toISOString()}&order=skapad.desc`),
     sbGet("agent_planbocker?select=agent,saldo&agent=neq.Statskassa&order=saldo.desc"),
     sbGet("domstol_arenden?artikel_nr=eq.5&order=skapad.desc&limit=10"),
   ]);
