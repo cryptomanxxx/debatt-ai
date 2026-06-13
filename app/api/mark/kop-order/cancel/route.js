@@ -58,18 +58,33 @@ export async function POST(req) {
   if (!Array.isArray(cancelled) || cancelled.length === 0)
     return NextResponse.json({ error: "Ordern är inte längre öppen" }, { status: 409 });
 
-  // Återbetala reserverat belopp — om detta misslyckas återöppnar vi ordern
+  // Återbetala reserverat belopp med optimistic locking + retry.
+  // Vi läser saldo EFTER canceln (wallet lästes före — kan vara inaktuellt),
+  // och använder saldo=eq.${currentSaldo} för att förhindra att ett parallellt
+  // köp/bud skrivs över. Vid konflikt: ett försök till, sedan rollback.
   const reserverat = parseInt(order.reserverat_kr) || 0;
   let nyttSaldo = null;
   if (reserverat > 0) {
-    nyttSaldo = wallet.saldo + reserverat;
-    const refundR = await sb(`visitor_wallets?id=eq.${besokare_id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ saldo: nyttSaldo, senast_aktiv: new Date().toISOString() }),
-      prefer: "return=minimal",
-    });
-    if (!refundR.ok) {
-      // Återöppna ordern så att reservationen inte går förlorad
+    let refunded = false;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const freshR = await sb(`visitor_wallets?id=eq.${besokare_id}&select=saldo`);
+      if (!freshR.ok) break;
+      const fresh = await freshR.json();
+      if (!fresh.length) break;
+      const currentSaldo = fresh[0].saldo;
+      nyttSaldo = currentSaldo + reserverat;
+      const refundR = await sb(`visitor_wallets?id=eq.${besokare_id}&saldo=eq.${currentSaldo}`, {
+        method: "PATCH",
+        body: JSON.stringify({ saldo: nyttSaldo, senast_aktiv: new Date().toISOString() }),
+        prefer: "return=representation",
+      });
+      if (!refundR.ok) break;
+      const rows = await refundR.json();
+      if (Array.isArray(rows) && rows.length > 0) { refunded = true; break; }
+      nyttSaldo = null; // konflikt — retry med ny saldo-läsning
+    }
+    if (!refunded) {
+      // Rollback: återöppna ordern så att reservationen inte försvinner
       await sb(`mark_kop_ordrar?id=eq.${order_id}`, {
         method: "PATCH",
         body: JSON.stringify({ status: "öppen" }),
