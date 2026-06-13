@@ -1,0 +1,55 @@
+name: AI Performance Observer
+
+on:
+  schedule:
+    - cron: "0 7 * * *"  # 07:00 UTC = 09:00 svensk tid (efter benchmark kl 05:00)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ai-performance-observer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 10
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Kör ai-performance-observer
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+        run: node agents/ai-performance-observer.js
+
+      - name: Commit AI performance report
+        id: commit
+        run: |
+          git config user.name "AI Performance Observer"
+          git config user.email "noreply@debatt-ai.se"
+          git add ai-bus/discussions/
+          if git diff --cached --quiet; then
+            echo "committed=false" >> $GITHUB_OUTPUT
+          else
+            git commit -m "ai-perf: Daglig prestandarapport $(date +%Y-%m-%d)"
+            git push
+            echo "committed=true" >> $GITHUB_OUTPUT
+            echo "filename=$(git diff HEAD~1 --name-only | grep 'ai-bus' | head -1)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Skicka email-notifikation
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          DATUM=$(date +%Y-%m-%d)
+          FILENAME="${{ steps.commit.outputs.filename }}"
+          GITHUB_URL="https://github.com/cryptomanxxx/debatt-ai/blob/main/${FILENAME}"
+          curl -s -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"from\": \"noreply@debatt-ai.se\", \"to\": [\"neonhawk194@gmail.com\"], \"subject\": \"🤖 AI Performance: Daglig rapport ${DATUM}\", \"html\": \"<p>AI Performance Observer har genererat en ny prestandarapport för <strong>${DATUM}</strong>.</p><p><a href='${GITHUB_URL}'>Läs rapporten på GitHub →</a></p><p><small>debatt-ai.se ai-bus</small></p>\"}"
