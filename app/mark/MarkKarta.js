@@ -150,6 +150,10 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const [widgetTyp,       setWidgetTyp]       = useState("kop");   // "kop" | "salj"
   const [widgetSubjekt,   setWidgetSubjekt]   = useState("varor"); // "varor" | "mark"
   const [saljWidgetZon,   setSaljWidgetZon]   = useState("");
+  const [kopMarkZonId,    setKopMarkZonId]    = useState("");
+  const [saljVaraVara,    setSaljVaraVara]    = useState("");
+  const [saljVaraAntal,   setSaljVaraAntal]   = useState("1");
+  const [saljVaraReservpris, setSaljVaraReservpris] = useState("");
   const tfmRef       = useRef({ z: 1, x: 0, y: 0 });
   const containerRef = useRef(null);
   const dragRef      = useRef({ active: false, startX: 0, startY: 0, px: 0, py: 0, moved: false });
@@ -564,6 +568,33 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     finally { setPending(false); }
   }
 
+  async function kopMarkViaWidget() {
+    const zon = zoner.find(z => String(z.id) === String(kopMarkZonId));
+    if (!zon) return;
+    await kopZon(zon);
+    setKopMarkZonId("");
+  }
+
+  async function saljVara() {
+    const antal = parseInt(saljVaraAntal);
+    const reservpris = parseInt(saljVaraReservpris);
+    if (!saljVaraVara || !antal || antal < 1 || !reservpris || reservpris < 5 || !besokareId || pending) return;
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/salj-vara", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vara: saljVaraVara, antal, reservpris, besokare_id: besokareId, display_name: besokareNamn }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Misslyckades", ok: false }); return; }
+      setMarkMsg({ text: `✅ ${antal}× ${saljVaraVara} lagda på auktion (reservpris ${reservpris} kr)!`, ok: true });
+      setSaljVaraVara(""); setSaljVaraAntal("1"); setSaljVaraReservpris("");
+      setTimeout(() => setMarkMsg(null), 6000);
+    } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
+    finally { setPending(false); }
+  }
+
   function handleEnter(zon) {
     setHover(zon);
     const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row, OX, OY);
@@ -642,19 +673,87 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             )}
 
             {/* KÖP + MARK */}
-            {widgetTyp === "kop" && widgetSubjekt === "mark" && (
-              <div style={{ fontSize: "10px", color: "#3a5070", fontFamily: "monospace", lineHeight: 1.7 }}>
-                Välj en ledig zon på kartan och klicka på den för att köpa direkt till listpris.
-                <br /><span style={{ color: "#1a3050" }}>Alternativt: buda på pågående auktioner i panelen nedanför.</span>
-              </div>
-            )}
+            {widgetTyp === "kop" && widgetSubjekt === "mark" && (() => {
+              const ledigaZoner = zoner.filter(z => !agareMap[z.id]);
+              const valdZon = ledigaZoner.find(z => String(z.id) === String(kopMarkZonId));
+              return (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "flex-end" }}>
+                  {ledigaZoner.length === 0 ? (
+                    <span style={{ fontSize: "10px", color: "#2a3a4a", fontFamily: "monospace" }}>Inga lediga zoner just nu — alla är ägda.</span>
+                  ) : (
+                    <>
+                      <div>
+                        <div style={{ fontSize: "8px", color: "#2a3a4a", fontFamily: "monospace", marginBottom: "3px" }}>LEDIG ZON</div>
+                        <select value={kopMarkZonId} onChange={e => setKopMarkZonId(e.target.value)}
+                          style={{ background: "#0d140d", border: "1px solid #1a2a1a", color: "#4ade80", borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: "monospace", maxWidth: "200px" }}>
+                          <option value="">— välj zon —</option>
+                          {ledigaZoner.map(z => (
+                            <option key={z.id} value={z.id}>{TYP_IKON[z.typ]} {z.namn} · {z.koppris} kr</option>
+                          ))}
+                        </select>
+                      </div>
+                      {valdZon && (
+                        <span style={{ fontSize: "9px", color: "#2a4a2a", fontFamily: "monospace" }}>
+                          Kostnad: {valdZon.koppris} kr · Saldo efter: {(besokSaldo ?? 0) - valdZon.koppris} kr
+                        </span>
+                      )}
+                      <button onClick={kopMarkViaWidget} disabled={!kopMarkZonId || pending || (besokSaldo ?? 0) < (valdZon?.koppris ?? 999999)}
+                        style={{ background: pending ? "#1a2a1a" : "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.40)", color: "#4ade80", borderRadius: "4px", padding: "5px 14px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: 700 }}>
+                        {pending ? "…" : "🗺 Köp zon"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* SÄLJ + VAROR */}
-            {widgetTyp === "salj" && widgetSubjekt === "varor" && (
-              <div style={{ fontSize: "10px", color: "#3a5070", fontFamily: "monospace", lineHeight: 1.7 }}>
-                Varor säljs via 24h-auktioner. Klicka på en varuauktion i marknadsöversikten nedan och lägg ett bud, eller lista dina varor via kartpanelen.
-              </div>
-            )}
+            {widgetTyp === "salj" && widgetSubjekt === "varor" && (() => {
+              const mittLager = lager.filter(l => l.agent === besokareNamn && l.antal > 0);
+              const valdVaraRow = mittLager.find(l => l.vara === saljVaraVara);
+              const maxAntal = valdVaraRow?.antal ?? 0;
+              return (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "flex-end" }}>
+                  {mittLager.length === 0 ? (
+                    <span style={{ fontSize: "10px", color: "#2a3a4a", fontFamily: "monospace" }}>
+                      Du har inga varor i lager. Köpordrar fylls av agenter vid kl 09:30.
+                    </span>
+                  ) : (
+                    <>
+                      <div>
+                        <div style={{ fontSize: "8px", color: "#2a3a4a", fontFamily: "monospace", marginBottom: "3px" }}>VARA I LAGER</div>
+                        <select value={saljVaraVara} onChange={e => { setSaljVaraVara(e.target.value); setSaljVaraAntal("1"); setSaljVaraReservpris(""); }}
+                          style={{ background: "#140d0d", border: "1px solid #2a1a1a", color: "#f87171", borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: "monospace" }}>
+                          <option value="">— välj vara —</option>
+                          {mittLager.map(l => (
+                            <option key={l.vara} value={l.vara}>{VARA_IKON[l.vara] || "📦"} {l.vara} ({l.antal} st)</option>
+                          ))}
+                        </select>
+                      </div>
+                      {saljVaraVara && (
+                        <>
+                          <div>
+                            <div style={{ fontSize: "8px", color: "#2a3a4a", fontFamily: "monospace", marginBottom: "3px" }}>ANTAL (1–{maxAntal})</div>
+                            <input type="number" min="1" max={maxAntal} value={saljVaraAntal} onChange={e => setSaljVaraAntal(e.target.value)}
+                              style={{ width: "65px", background: "#140d0d", border: "1px solid #2a1a1a", color: "#e0e0e0", borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: "monospace" }} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "8px", color: "#2a3a4a", fontFamily: "monospace", marginBottom: "3px" }}>RESERVPRIS KR (≥5)</div>
+                            <input type="number" min="5" placeholder={`${Math.ceil(BASPRIS_VARA[saljVaraVara] ?? 10)}`} value={saljVaraReservpris} onChange={e => setSaljVaraReservpris(e.target.value)}
+                              style={{ width: "80px", background: "#140d0d", border: "1px solid #2a1a1a", color: "#e0e0e0", borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: "monospace" }} />
+                          </div>
+                          <button onClick={saljVara}
+                            disabled={pending || !saljVaraVara || parseInt(saljVaraAntal) < 1 || parseInt(saljVaraAntal) > maxAntal || parseInt(saljVaraReservpris) < 5}
+                            style={{ background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.35)", color: "#f87171", borderRadius: "4px", padding: "5px 14px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: 700 }}>
+                            {pending ? "…" : "🏷 Lista på auktion"}
+                          </button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* SÄLJ + MARK */}
             {widgetTyp === "salj" && widgetSubjekt === "mark" && (

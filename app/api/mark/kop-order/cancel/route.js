@@ -28,6 +28,13 @@ export async function POST(req) {
   if (!display_name.startsWith("Besökare-"))
     return NextResponse.json({ error: "Ogiltigt besökarnamn" }, { status: 400 });
 
+  // Verifiera att besokare_id faktiskt tillhör display_name (förhindrar spoofing)
+  const walletR = await sb(`visitor_wallets?id=eq.${besokare_id}&display_name=eq.${encodeURIComponent(display_name)}&select=id,saldo`);
+  if (!walletR.ok) return NextResponse.json({ error: "Databasfel" }, { status: 500 });
+  const wallets = await walletR.json();
+  if (!wallets.length) return NextResponse.json({ error: "Ogiltig identitet" }, { status: 403 });
+  const wallet = wallets[0];
+
   // Hämta ordern och verifiera ägarskap
   const orderR = await sb(`mark_kop_ordrar?id=eq.${order_id}&select=*`);
   if (!orderR.ok) return NextResponse.json({ error: "Databasfel" }, { status: 500 });
@@ -40,29 +47,35 @@ export async function POST(req) {
   if (order.status !== "öppen")
     return NextResponse.json({ error: "Ordern är inte längre öppen" }, { status: 400 });
 
-  // Avbryt ordern
-  const cancelR = await sb(`mark_kop_ordrar?id=eq.${order_id}`, {
+  // Atomisk statusövergång: filtret status=eq.öppen förhindrar double-cancel vid parallella anrop
+  const cancelR = await sb(`mark_kop_ordrar?id=eq.${order_id}&status=eq.%C3%B6ppen`, {
     method: "PATCH",
     body: JSON.stringify({ status: "avbruten" }),
-    prefer: "return=minimal",
+    prefer: "return=representation",
   });
   if (!cancelR.ok) return NextResponse.json({ error: "Kunde inte avbryta ordern" }, { status: 500 });
+  const cancelled = await cancelR.json();
+  if (!Array.isArray(cancelled) || cancelled.length === 0)
+    return NextResponse.json({ error: "Ordern är inte längre öppen" }, { status: 409 });
 
-  // Återbetala reserverat belopp till besökarens plånbok
+  // Återbetala reserverat belopp — om detta misslyckas återöppnar vi ordern
   const reserverat = parseInt(order.reserverat_kr) || 0;
   let nyttSaldo = null;
   if (reserverat > 0) {
-    const walletR = await sb(`visitor_wallets?id=eq.${besokare_id}&select=id,saldo,display_name`);
-    if (walletR.ok) {
-      const wallets = await walletR.json();
-      if (wallets.length && wallets[0].display_name === display_name) {
-        nyttSaldo = wallets[0].saldo + reserverat;
-        await sb(`visitor_wallets?id=eq.${besokare_id}`, {
-          method: "PATCH",
-          body: JSON.stringify({ saldo: nyttSaldo, senast_aktiv: new Date().toISOString() }),
-          prefer: "return=minimal",
-        });
-      }
+    nyttSaldo = wallet.saldo + reserverat;
+    const refundR = await sb(`visitor_wallets?id=eq.${besokare_id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ saldo: nyttSaldo, senast_aktiv: new Date().toISOString() }),
+      prefer: "return=minimal",
+    });
+    if (!refundR.ok) {
+      // Återöppna ordern så att reservationen inte går förlorad
+      await sb(`mark_kop_ordrar?id=eq.${order_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "öppen" }),
+        prefer: "return=minimal",
+      }).catch(() => {});
+      return NextResponse.json({ error: "Återbetalning misslyckades — ordern är fortfarande öppen" }, { status: 500 });
     }
   }
 
