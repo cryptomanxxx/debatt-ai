@@ -29,13 +29,28 @@ function beteckning(dokId) {
   return dokId.match(/([A-Za-zÄÅÖäåö]{2,5}\d+)$/)?.[1] || null;
 }
 
+// Härleda riksmöte från dokId-prefix: HA=2022/23, HB=2023/24, HC=2024/25, HD=2025/26 …
+// Förhindrar att fel riksmötes röster kopplas till ett nyare dokument med samma beteckning.
+function rmFranDokId(dokId) {
+  const m = dokId.match(/^H([A-Za-z])/);
+  if (!m) return null;
+  const offset = m[1].toUpperCase().charCodeAt(0) - 'A'.charCodeAt(0);
+  const startYear = 2022 + offset;
+  return `${startYear}/${String(startYear + 1).slice(2)}`;
+}
+
 // Räkna faktiska ledamotsröster (rost=Ja/Nej) för att bestämma kammarbeslutet.
 // voteringlista returnerar individuella röster, inte aggregerat utfall.
 async function getVoteCountUtfall(dokId) {
   const bet = beteckning(dokId);
   if (!bet) return null;
 
-  for (const rm of ["2024/25", "2025/26", "2023/24", "2022/23"]) {
+  const derived = rmFranDokId(dokId);
+  const allRms = ["2025/26", "2024/25", "2023/24", "2022/23"];
+  // Prova härledd rm först — undviker att koppla föregående riksmötes röster till nyare dokument
+  const rmsToTry = derived ? [derived, ...allRms.filter(r => r !== derived)] : allRms;
+
+  for (const rm of rmsToTry) {
     const d = await get(
       `https://data.riksdagen.se/voteringlista/?rm=${rm}&bet=${encodeURIComponent(bet)}&utformat=json&sz=400`
     );
