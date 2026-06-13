@@ -18,6 +18,9 @@ const https = require("https");
 const CEREBRAS_API_KEY  = process.env.CEREBRAS_API_KEY;
 const GROQ_API_KEY      = process.env.GROQ_API_KEY;
 const DISCUSSIONS_DIR   = path.join(__dirname, "../ai-bus/discussions");
+const VISION_DIR        = path.join(DISCUSSIONS_DIR, "vision");
+const KRONIKA_DIR       = path.join(DISCUSSIONS_DIR, "kronika");
+const ECONOMY_DIR       = path.join(DISCUSSIONS_DIR, "economy");
 const GOAL_PATH         = path.join(__dirname, "../ai-bus/goal.md");
 const CLAUDE_MD_PATH    = path.join(__dirname, "../CLAUDE.md");
 const REJECTED_DIR      = path.join(__dirname, "../ai-bus/rejected");
@@ -51,35 +54,31 @@ function extractVisionTitle(content) {
 }
 
 function lastNVisions(n = 3) {
-  if (!fs.existsSync(DISCUSSIONS_DIR)) return [];
-  return fs.readdirSync(DISCUSSIONS_DIR)
-    .filter(f => f.includes("-vision"))
+  if (!fs.existsSync(VISION_DIR)) return [];
+  return fs.readdirSync(VISION_DIR)
+    .filter(f => f.endsWith(".md"))
     .sort()
     .slice(-n)
     .map(f => {
-      try { return fs.readFileSync(path.join(DISCUSSIONS_DIR, f), "utf8").slice(0, 800); }
+      try { return fs.readFileSync(path.join(VISION_DIR, f), "utf8").slice(0, 800); }
       catch { return ""; }
     })
     .filter(Boolean);
 }
 
 function lastCronike() {
-  if (!fs.existsSync(DISCUSSIONS_DIR)) return "";
-  const filer = fs.readdirSync(DISCUSSIONS_DIR)
-    .filter(f => f.includes("-civilisationshistorik"))
-    .sort();
+  if (!fs.existsSync(KRONIKA_DIR)) return "";
+  const filer = fs.readdirSync(KRONIKA_DIR).filter(f => f.endsWith(".md")).sort();
   if (filer.length === 0) return "";
-  try { return fs.readFileSync(path.join(DISCUSSIONS_DIR, filer[filer.length - 1]), "utf8").slice(0, 1200); }
+  try { return fs.readFileSync(path.join(KRONIKA_DIR, filer[filer.length - 1]), "utf8").slice(0, 1200); }
   catch { return ""; }
 }
 
 function lastEconomy() {
-  if (!fs.existsSync(DISCUSSIONS_DIR)) return "";
-  const filer = fs.readdirSync(DISCUSSIONS_DIR)
-    .filter(f => f.includes("-economy"))
-    .sort();
+  if (!fs.existsSync(ECONOMY_DIR)) return "";
+  const filer = fs.readdirSync(ECONOMY_DIR).filter(f => f.endsWith(".md")).sort();
   if (filer.length === 0) return "";
-  try { return fs.readFileSync(path.join(DISCUSSIONS_DIR, filer[filer.length - 1]), "utf8").slice(0, 800); }
+  try { return fs.readFileSync(path.join(ECONOMY_DIR, filer[filer.length - 1]), "utf8").slice(0, 800); }
   catch { return ""; }
 }
 
@@ -296,9 +295,9 @@ async function callGroq(prompt) {
 async function main() {
   const datum = dagensDatum();
   const stämpel = tidsstämpel();
-  let utfil = path.join(DISCUSSIONS_DIR, `${stämpel}-vision.md`);
+  let utfil = path.join(VISION_DIR, `${stämpel}-vision.md`);
 
-  if (!fs.existsSync(DISCUSSIONS_DIR)) fs.mkdirSync(DISCUSSIONS_DIR, { recursive: true });
+  if (!fs.existsSync(VISION_DIR)) fs.mkdirSync(VISION_DIR, { recursive: true });
 
   const goal = readGoal();
   const tidigareVisioner = lastNVisions(3);
@@ -355,7 +354,7 @@ async function main() {
 
   const rubrik = extractVisionTitle(vision);
   if (rubrik) {
-    utfil = path.join(DISCUSSIONS_DIR, `${stämpel}-vision-${toSlug(rubrik)}.md`);
+    utfil = path.join(VISION_DIR, `${stämpel}-vision-${toSlug(rubrik)}.md`);
   }
 
   const innehall = `${vision}\n\n---\n*Genererad av vision-agent.js med ${modell}, ${datum}*\n`;

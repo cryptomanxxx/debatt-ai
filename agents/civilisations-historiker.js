@@ -23,6 +23,7 @@ const SUPABASE_KEY     = process.env.SUPABASE_ANON_KEY;
 const DEBATT_API_KEY   = process.env.DEBATT_API_KEY;
 const DEBATT_SITE_URL  = process.env.DEBATT_SITE_URL || "https://www.debatt-ai.se";
 const DISCUSSIONS_DIR  = path.join(__dirname, "../ai-bus/discussions");
+const KRONIKA_DIR      = path.join(DISCUSSIONS_DIR, "kronika");
 
 if (!CEREBRAS_KEY && !GROQ_KEY) {
   console.error("CEREBRAS_API_KEY eller GROQ_API_KEY saknas — avbryter");
@@ -302,11 +303,11 @@ async function main() {
   const idag     = new Date().toISOString().slice(0, 10);
   const klockStr = new Date().toISOString().slice(11, 16).replace(":", "");
   const filnamn  = `${idag}-${klockStr}-civilisationshistorik.md`;
-  const filsökväg = path.join(DISCUSSIONS_DIR, filnamn);
+  const filsökväg = path.join(KRONIKA_DIR, filnamn);
 
   // Idempotenscheck — kör max en gång per dag
-  if (fs.existsSync(DISCUSSIONS_DIR)) {
-    const befintlig = fs.readdirSync(DISCUSSIONS_DIR)
+  if (fs.existsSync(KRONIKA_DIR)) {
+    const befintlig = fs.readdirSync(KRONIKA_DIR)
       .filter(f => f.endsWith("-civilisationshistorik.md") && f.startsWith(idag));
     if (befintlig.length > 0) {
       console.log(`Krönika för ${idag} finns redan (${befintlig[0]}) — hoppar över.`);
@@ -338,9 +339,9 @@ async function main() {
   const artikel = await genereraKrönika(dataStr, vecka, rubrik);
   console.log("Krönika genererad (" + artikel.length + " tecken).");
 
-  // Spara till ai-bus/discussions/
-  if (!fs.existsSync(DISCUSSIONS_DIR)) {
-    fs.mkdirSync(DISCUSSIONS_DIR, { recursive: true });
+  // Spara till ai-bus/discussions/kronika/
+  if (!fs.existsSync(KRONIKA_DIR)) {
+    fs.mkdirSync(KRONIKA_DIR, { recursive: true });
   }
   const markdown = `---
 typ: civilisationshistorik
@@ -354,7 +355,7 @@ rubrik: "${rubrik.replace(/"/g, '\\"')}"
 ${artikel}
 `;
   fs.writeFileSync(filsökväg, markdown, "utf8");
-  console.log(`Sparad: ai-bus/discussions/${filnamn}`);
+  console.log(`Sparad: ai-bus/discussions/kronika/${filnamn}`);
 
   // Publicera som artikel på plattformen
   const artikelId = await publiceraArtikel(rubrik, artikel);

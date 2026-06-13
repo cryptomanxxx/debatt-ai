@@ -6,7 +6,7 @@
 
 **Läs `/ai-bus/goal.md`** — plattformens kärnuppdrag och vision. All utveckling ska tjäna detta mål.
 
-**Läs senaste diskussioner i `/ai-bus/discussions/`** — dagliga vision- och strategirapporter från Gemini och Codestral. De senaste 3 filerna ger kontext om aktuell riktning och prioriterade åtgärder.
+**Läs senaste diskussioner i `/ai-bus/discussions/`** — dagliga rapporter organiserade i undermappar: `vision/` (dagliga visioner), `strategy/` (dagliga strategier), `economy/` (ekonomianalyser), `qa/` (QA-rapporter), `kronika/` (veckovis civilisationskrönika), `ai-performance/` (AI-provider-prestandarapporter). De senaste filerna i `vision/` och `strategy/` ger kontext om aktuell riktning och prioriterade åtgärder.
 
 **Kontrollera `/ai-bus/approved/`** — filer med `status: approved` ska implementeras enligt instruktionerna i `agents/claude-review.md`.
 

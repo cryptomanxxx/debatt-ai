@@ -17,6 +17,7 @@ const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SU
 const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
 const SB_URL       = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const DISCUSSIONS  = path.join(__dirname, "../ai-bus/discussions");
+const PERF_DIR     = path.join(DISCUSSIONS, "ai-performance");
 
 if (!SB_KEY) { console.error("SUPABASE_ANON_KEY saknas"); process.exit(1); }
 
@@ -30,7 +31,7 @@ function tidsstämpel() {
 // Idempotenscheck — en rapport per dag
 const datum = dagensDatum();
 try {
-  const existing = fs.readdirSync(DISCUSSIONS).find(
+  const existing = fs.existsSync(PERF_DIR) && fs.readdirSync(PERF_DIR).find(
     f => f.startsWith(datum) && f.endsWith("-ai-performance.md")
   );
   if (existing) {
@@ -289,9 +290,9 @@ Alla aktiva providers inom normala parametrar.
 ${analys}
 ` : ""}`;
 
-  if (!fs.existsSync(DISCUSSIONS)) fs.mkdirSync(DISCUSSIONS, { recursive: true });
-  fs.writeFileSync(path.join(DISCUSSIONS, filename), content);
-  console.log(`✅ Rapport skriven: ai-bus/discussions/${filename}`);
+  if (!fs.existsSync(PERF_DIR)) fs.mkdirSync(PERF_DIR, { recursive: true });
+  fs.writeFileSync(path.join(PERF_DIR, filename), content);
+  console.log(`✅ Rapport skriven: ai-bus/discussions/ai-performance/${filename}`);
 }
 
 main().catch(err => { console.error(err); process.exit(1); });
