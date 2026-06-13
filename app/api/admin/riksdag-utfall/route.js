@@ -84,9 +84,10 @@ export async function POST() {
   await Promise.allSettled(batch.map(async ([dokId, { id: lagforslagId, url: lagforslagUrl }]) => {
     // Steg A: voteringlista per dokument (fungerar för betänkanden med registrerad omröstning)
     try {
+      // Riksdagen API förväntar sig literal slash/kolon i query-parametrar, inte URL-encodat
       const perRes = await fetch(
-        `https://data.riksdagen.se/voteringlista/?dokid=${encodeURIComponent(dokId)}&utformat=json&sz=10`,
-        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(7000) }
+        `https://data.riksdagen.se/voteringlista/?dokid=${dokId}&utformat=json&sz=10`,
+        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
       );
       if (perRes.ok) {
         const perData = await perRes.json();
@@ -110,23 +111,25 @@ export async function POST() {
           }
         }
       }
-    } catch {}
+    } catch (e) {
+      if (debugSample.length < 3) debugSample.push({ dokId, steg: "A", error: e.message });
+    }
 
     // Steg B: dokumentstatus-fallback (acklamationsbeslut + propositioner)
     try {
-      // Försök literal slash i path (riksdagen-konvention), sedan encoded fallback
+      // Riksdagen-konvention: literal slash i path, t.ex. /dokumentstatus/bet2024/25:FiU20.json
       let dsRes = await fetch(
         `https://data.riksdagen.se/dokumentstatus/${dokId}.json`,
-        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(7000) }
+        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
       );
       if (!dsRes.ok) {
         dsRes = await fetch(
           `https://data.riksdagen.se/dokumentstatus/${encodeURIComponent(dokId)}.json`,
-          { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(7000) }
+          { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
         );
       }
       if (!dsRes.ok) {
-        if (debugSample.length < 3) debugSample.push({ dokId, http: dsRes.status });
+        if (debugSample.length < 3) debugSample.push({ dokId, steg: "B", http: dsRes.status });
         return;
       }
       const ds = await dsRes.json();
@@ -137,7 +140,7 @@ export async function POST() {
       const beslutText = (beslutObj?.beslut || "").toLowerCase();
       const datum = (ds?.dokumentstatus?.dokument?.datum || "").trim() || null;
 
-      if (debugSample.length < 3) debugSample.push({ dokId, dokStatus, beslutText: beslutText.slice(0, 100) });
+      if (debugSample.length < 3) debugSample.push({ dokId, steg: "B", dokStatus, beslutText: beslutText.slice(0, 100) });
 
       if (!["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s)) && !beslutText) return;
 
@@ -171,7 +174,9 @@ export async function POST() {
         }
       );
       if (pr.ok) { uppdaterade++; delete pending[dokId]; }
-    } catch {}
+    } catch (e) {
+      if (debugSample.length < 3) debugSample.push({ dokId, steg: "B", error: e.message });
+    }
   }));
 
   return NextResponse.json({
