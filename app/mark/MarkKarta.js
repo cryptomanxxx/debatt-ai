@@ -146,7 +146,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const [kopOrderVara,    setKopOrderVara]    = useState("malm");
   const [kopOrderAntal,   setKopOrderAntal]   = useState("3");
   const [kopOrderMaxPris, setKopOrderMaxPris] = useState("");
-  const [lokalaOrdrar,    setLokalaOrdrar]    = useState([]);
+  const [lokalaOrdrar,         setLokalaOrdrar]         = useState([]);
+  const [avbrutnaZonAuktioner, setAvbrutnaZonAuktioner] = useState(new Set());
   const [widgetTyp,       setWidgetTyp]       = useState("kop");   // "kop" | "salj"
   const [widgetSubjekt,   setWidgetSubjekt]   = useState("varor"); // "varor" | "mark"
   const [saljWidgetZon,   setSaljWidgetZon]   = useState("");
@@ -559,6 +560,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       });
       const d = await r.json();
       if (!r.ok) { setMarkMsg({ text: d.error || "Avbryt misslyckades", ok: false }); return; }
+      setAvbrutnaZonAuktioner(prev => new Set([...prev, auktionId]));
       setMarkMsg({ text: "✅ Auktionen avbruten.", ok: true });
       setTimeout(() => setMarkMsg(null), 5000);
     } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
@@ -831,7 +833,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           a.status === "öppen" && (a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn)
         ) : [];
         const minZonAkt = besokareNamn ? auktioner.filter(a =>
-          a.status === "öppen" && (a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn)
+          a.status === "öppen" &&
+          !avbrutnaZonAuktioner.has(a.id) &&
+          (a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn)
         ) : [];
         const totalt = alleOrdrar.length + minVaraAkt.length + minZonAkt.length;
         if (totalt === 0 && !besokareNamn) return null;
