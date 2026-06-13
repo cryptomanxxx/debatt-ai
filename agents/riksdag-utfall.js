@@ -122,39 +122,31 @@ async function main() {
   const processed = new Set();
   let uppdaterade = 0;
 
-  // DIAGNOSTIK: inspektera första dokumentet för att förstå API-svaren
+  // DIAGNOSTIK: inspektera API-struktur för att förstå fältnamn
   if (pending.length > 0) {
     const diagId = pending[0].riksdagen_id;
-    const diagUrl = pending[0].riksdagen_url || "";
-    const bet = beteckning(diagId);
-    console.log(`\n=== DIAGNOSTIK för ${diagId} (bet=${bet}, url=${diagUrl}) ===`);
+    console.log(`\n=== DIAGNOSTIK för ${diagId} ===`);
 
-    // Testa rm+bet för ALLA möjliga sessioner för att hitta rätt år för HC01
-    if (bet) {
-      for (const rm of ["2025/26","2024/25","2023/24","2022/23","2021/22","2020/21","2019/20","2018/19","2017/18","2016/17","2015/16","2010/11","2011/12","2012/13"]) {
-        const rmRes = await getDiag(`https://data.riksdagen.se/voteringlista/?rm=${rm}&bet=${encodeURIComponent(bet)}&utformat=json&sz=1`);
-        const v = [].concat(rmRes.body?.voteringlista?.votering || []);
-        if (v.length > 0) {
-          console.log(`TRÄFF rm=${rm}&bet=${bet}: utfall=${v[0].utfall}, datum=${v[0].datum}`);
-        } else {
-          console.log(`miss rm=${rm}&bet=${bet}: status=${rmRes.status}, error=${rmRes.error||"-"}`);
-        }
-      }
-    }
+    // A) Testa rm=2024/25 UTAN bet → ska ge kammarnivå-summor
+    const rmOnlyRes = await getDiag(`https://data.riksdagen.se/voteringlista/?rm=2024/25&utformat=json&sz=3&sort=datum&sortorder=desc`);
+    const rmOnlyRows = [].concat(rmOnlyRes.body?.voteringlista?.votering || []);
+    console.log(`rm=2024/25 (ingen bet): status=${rmOnlyRes.status}, rows=${rmOnlyRows.length}`);
+    if (rmOnlyRows.length > 0) console.log(`  fält på rad[0]: ${JSON.stringify(Object.keys(rmOnlyRows[0]))}`);
+    if (rmOnlyRows.length > 0) console.log(`  sample: ${JSON.stringify(rmOnlyRows[0]).slice(0,300)}`);
 
-    // Testa generisk dokid
-    const dokidUrl = `https://data.riksdagen.se/voteringlista/?dokid=${encodeURIComponent(diagId)}&utformat=json&sz=1`;
-    const dokidRes = await getDiag(dokidUrl);
-    const vDokid = [].concat(dokidRes.body?.voteringlista?.votering || []);
-    console.log(`dokid=${diagId}: status=${dokidRes.status}, error=${dokidRes.error||"-"}, voteringar=${vDokid.length}`);
+    // B) Testa dokid-sökning — visa FULLSTÄNDIGA fält
+    const dokidRes = await getDiag(`https://data.riksdagen.se/voteringlista/?dokid=${encodeURIComponent(diagId)}&utformat=json&sz=1`);
+    const dokidRows = [].concat(dokidRes.body?.voteringlista?.votering || []);
+    console.log(`dokid=${diagId}: status=${dokidRes.status}, rows=${dokidRows.length}`);
+    if (dokidRows.length > 0) console.log(`  fält: ${JSON.stringify(Object.keys(dokidRows[0]))}`);
+    if (dokidRows.length > 0) console.log(`  sample: ${JSON.stringify(dokidRows[0]).slice(0,300)}`);
 
-    // Testa dokumentstatus
-    const dsUrl = `https://data.riksdagen.se/dokumentstatus/${diagId}.json`;
-    const dsRes = await getDiag(dsUrl);
+    // C) Testa dokumentstatus — visa beslut-fält
+    const dsRes = await getDiag(`https://data.riksdagen.se/dokumentstatus/${diagId}.json`);
     const dok = dsRes.body?.dokumentstatus?.dokument;
     const beslut = dsRes.body?.dokumentstatus?.dokbeslut;
-    console.log(`dokumentstatus: status=${dsRes.status}, error=${dsRes.error||"-"}, dokStatus="${dok?.status||"-"}", datum="${dok?.datum||"-"}", typ="${dok?.typ||"-"}"`);
-    console.log(`dokumentstatus beslut: ${JSON.stringify(beslut).slice(0,200)}`);
+    console.log(`dokumentstatus: status=${dsRes.status}, dokStatus="${dok?.status||"-"}", datum="${dok?.datum||"-"}"`);
+    console.log(`  beslut: ${JSON.stringify(beslut ?? null).slice(0,300)}`);
     console.log(`=== SLUT DIAGNOSTIK ===\n`);
   }
 
