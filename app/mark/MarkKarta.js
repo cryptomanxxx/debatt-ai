@@ -621,18 +621,24 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             <span style={{ fontSize: "10px", color: "#60a5fa", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", flex: 1 }}>
               HANDEL
             </span>
-            {/* Typ-select */}
-            <select value={widgetTyp} onChange={e => setWidgetTyp(e.target.value)}
-              style={{ background: "#0d1220", border: "1px solid #1e3050", color: "#a0c4ff", borderRadius: "4px", padding: "4px 8px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer" }}>
-              <option value="kop">KÖP</option>
-              <option value="salj">SÄLJ</option>
-            </select>
-            {/* Subjekt-select */}
-            <select value={widgetSubjekt} onChange={e => setWidgetSubjekt(e.target.value)}
-              style={{ background: "#0d1220", border: "1px solid #1e3050", color: "#a0c4ff", borderRadius: "4px", padding: "4px 8px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer" }}>
-              <option value="varor">VAROR</option>
-              <option value="mark">MARK</option>
-            </select>
+            {/* Typ-toggle */}
+            <div style={{ display: "flex", gap: "2px", background: "#070b14", borderRadius: "4px", padding: "2px", border: "1px solid #1e3050" }}>
+              {[["kop", "KÖP"], ["salj", "SÄLJ"]].map(([val, label]) => (
+                <button key={val} onClick={() => setWidgetTyp(val)}
+                  style={{ background: widgetTyp === val ? "rgba(96,165,250,0.22)" : "transparent", border: "none", color: widgetTyp === val ? "#a0c4ff" : "#2a3a5a", borderRadius: "3px", padding: "4px 10px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: widgetTyp === val ? 700 : 400 }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {/* Subjekt-toggle */}
+            <div style={{ display: "flex", gap: "2px", background: "#070b14", borderRadius: "4px", padding: "2px", border: "1px solid #1e3050" }}>
+              {[["varor", "VAROR"], ["mark", "MARK"]].map(([val, label]) => (
+                <button key={val} onClick={() => setWidgetSubjekt(val)}
+                  style={{ background: widgetSubjekt === val ? "rgba(96,165,250,0.22)" : "transparent", border: "none", color: widgetSubjekt === val ? "#a0c4ff" : "#2a3a5a", borderRadius: "3px", padding: "4px 10px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: widgetSubjekt === val ? 700 : 400 }}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <span style={{ fontSize: "9px", color: "#2a3a4a", fontFamily: "monospace" }}>Saldo: {besokSaldo ?? "…"} kr</span>
           </div>
 
@@ -797,6 +803,126 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           </div>
         </div>
       )}
+
+      {/* ── ÖPPNA ORDRAR ── */}
+      {(() => {
+        const alleOrdrar = [
+          ...kopOrdrar.filter(o => !lokalaOrdrar.some(l => l.id === o.id)),
+          ...lokalaOrdrar,
+        ];
+        const minVaraAkt = besokareNamn ? varaAuktioner.filter(a =>
+          a.status === "öppen" && (a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn)
+        ) : [];
+        const minZonAkt = besokareNamn ? auktioner.filter(a =>
+          a.status === "öppen" && (a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn)
+        ) : [];
+        const totalt = alleOrdrar.length + minVaraAkt.length + minZonAkt.length;
+        if (totalt === 0 && !besokareNamn) return null;
+        return (
+          <div style={{ background: "#070d07", border: "1px solid rgba(74,222,128,0.20)", borderRadius: "10px", overflow: "hidden" }}>
+            <div style={{ padding: "10px 16px", display: "flex", alignItems: "center", gap: "8px", background: "#090f09", borderBottom: totalt > 0 ? "1px solid rgba(74,222,128,0.12)" : "none" }}>
+              <span style={{ fontSize: "9px", color: "#4ade80", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>📋 ÖPPNA ORDRAR</span>
+              {totalt > 0 && (
+                <span style={{ fontSize: "9px", color: "#4ade80", background: "rgba(74,222,128,0.10)", border: "1px solid rgba(74,222,128,0.20)", borderRadius: "4px", padding: "2px 7px", fontFamily: "monospace" }}>
+                  {totalt} aktiva
+                </span>
+              )}
+              <span style={{ fontSize: "8px", color: "#1a2a1a", fontFamily: "monospace", marginLeft: "auto" }}>Agenter matchar vid 09:30</span>
+            </div>
+            {totalt === 0 ? (
+              <div style={{ padding: "12px 16px", fontSize: "10px", color: "#1a2a1a", fontFamily: "monospace", textAlign: "center" }}>
+                Inga öppna ordrar
+              </div>
+            ) : (
+              <div style={{ padding: "10px 16px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                {alleOrdrar.length > 0 && (
+                  <>
+                    <div style={{ fontSize: "8px", color: "#1a3a1a", fontFamily: "monospace", letterSpacing: "0.08em" }}>KÖPORDRAR ({alleOrdrar.length})</div>
+                    {alleOrdrar.map(o => {
+                      const isMin = o.kop_agent === besokareNamn;
+                      const varTyp = VARA_TYP[o.vara];
+                      const farg = varTyp ? TYP_FARG[varTyp] : "#4ade80";
+                      return (
+                        <div key={o.id} style={{ background: "#0a140a", border: `1px solid ${rgba(farg, 0.18)}`, borderLeft: `3px solid ${rgba(farg, 0.55)}`, borderRadius: "0 6px 6px 0", padding: "7px 10px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace", fontWeight: 700 }}>
+                              {VARA_IKON[o.vara] || "📦"} {o.antal}× {o.vara}
+                            </span>
+                            {isMin ? (
+                              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                <span style={{ fontSize: "8px", color: "#4ade80", background: "rgba(74,222,128,0.10)", padding: "1px 5px", borderRadius: "3px", fontFamily: "monospace" }}>DIN ORDER</span>
+                                <button onClick={() => avbrytKopOrder(o.id, o.reserverat_kr)} disabled={pending}
+                                  style={{ fontSize: "8px", color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "3px", padding: "1px 6px", cursor: "pointer", fontFamily: "monospace" }}>
+                                  ✕ avbryt
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", fontFamily: "monospace", marginTop: "3px" }}>
+                            <span style={{ color: "#2a4a2a" }}>{o.kop_agent} · Max {o.max_pris_per_enhet} kr/enhet</span>
+                            <span style={{ color: "#1a3a1a" }}>{o.reserverat_kr} kr reserv · {relativeTime(o.skapad)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+                {minVaraAkt.length > 0 && (
+                  <>
+                    <div style={{ fontSize: "8px", color: "#1a3a4a", fontFamily: "monospace", letterSpacing: "0.08em", marginTop: "4px" }}>DINA VARUAUKTIONER ({minVaraAkt.length})</div>
+                    {minVaraAkt.map(a => {
+                      const typ = VARA_TYP[a.vara];
+                      const farg = typ ? TYP_FARG[typ] : "#22d3ee";
+                      const isOwner = a.saljare === besokareNamn;
+                      return (
+                        <div key={a.id} style={{ background: "#0a0f14", border: `1px solid ${rgba(farg, 0.18)}`, borderLeft: `3px solid ${rgba(farg, 0.55)}`, borderRadius: "0 6px 6px 0", padding: "7px 10px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace", fontWeight: 700 }}>
+                              {VARA_IKON[a.vara] || "📦"} {a.antal}× {a.vara}
+                            </span>
+                            <span style={{ fontSize: "8px", color: isOwner ? "#f59e0b" : "#22d3ee", background: isOwner ? "rgba(245,158,11,0.10)" : "rgba(34,211,238,0.10)", padding: "1px 5px", borderRadius: "3px", fontFamily: "monospace" }}>
+                              {isOwner ? "🏷 SÄLJARE" : "📦 BUDGIVARE"}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: "9px", fontFamily: "monospace", marginTop: "3px", color: "#1a3a4a" }}>
+                            {a.nuv_bud ? `Bud: ${a.nuv_bud} kr · ${a.hogst_budgivare}` : `Reservpris: ${a.reservpris} kr`} · {timeLeft(a.stanger_at)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+                {minZonAkt.length > 0 && (
+                  <>
+                    <div style={{ fontSize: "8px", color: "#3a3a1a", fontFamily: "monospace", letterSpacing: "0.08em", marginTop: "4px" }}>DINA ZONAUKTIONER ({minZonAkt.length})</div>
+                    {minZonAkt.map(a => {
+                      const zonNamn = a.mark_zoner?.namn || "Zon";
+                      const typ = a.mark_zoner?.typ || "industri";
+                      const farg = TYP_FARG[typ] || "#f59e0b";
+                      const isOwner = a.saljare === besokareNamn;
+                      return (
+                        <div key={a.id} style={{ background: "#0d0c08", border: `1px solid ${rgba(farg, 0.18)}`, borderLeft: `3px solid ${rgba(farg, 0.55)}`, borderRadius: "0 6px 6px 0", padding: "7px 10px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace", fontWeight: 700 }}>
+                              {TYP_IKON[typ]} {zonNamn}
+                            </span>
+                            <span style={{ fontSize: "8px", color: isOwner ? "#f59e0b" : "#22d3ee", background: isOwner ? "rgba(245,158,11,0.10)" : "rgba(34,211,238,0.10)", padding: "1px 5px", borderRadius: "3px", fontFamily: "monospace" }}>
+                              {isOwner ? "🏷 SÄLJARE" : "🗺 BUDGIVARE"}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: "9px", fontFamily: "monospace", marginTop: "3px", color: "#2a2a1a" }}>
+                            {a.nuv_bud ? `Bud: ${a.nuv_bud} kr` : `Reservpris: ${a.reservpris} kr`} · {timeLeft(a.stanger_at)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── KARTLAGER-TOGGLE ── */}
       <div style={{ display: "flex", gap: "6px" }}>
@@ -1626,117 +1752,6 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
 
       </div>{/* /marknader 4-raders grid */}
 
-      {/* ── KÖPORDRAR ── */}
-      {(() => {
-        const alleOrdrar = [
-          ...kopOrdrar.filter(o => !lokalaOrdrar.some(l => l.id === o.id)),
-          ...lokalaOrdrar,
-        ];
-        return (
-          <div style={{ background: "#070d07", border: "1px solid rgba(74,222,128,0.20)", borderRadius: "10px", overflow: "hidden", marginTop: "0" }}>
-            {/* Header */}
-            <div style={{ padding: "16px 20px 14px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid rgba(74,222,128,0.12)", background: "#090f09" }}>
-              <span style={{ fontSize: "18px" }}>📋</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "12px", color: "#4ade80", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>KÖPORDRAR</div>
-                <div style={{ fontSize: "9px", color: "#1a3a1a", fontFamily: "monospace" }}>ÖNSKADE KÖP · AGENTER MATCHAR VID NÄSTA KÖRNING (09:30)</div>
-              </div>
-              {alleOrdrar.length > 0 && (
-                <span style={{ fontSize: "10px", color: "#4ade80", fontFamily: "monospace", background: "rgba(74,222,128,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(74,222,128,0.20)" }}>
-                  {alleOrdrar.length} öppna
-                </span>
-              )}
-            </div>
-
-            <div style={{ padding: "14px 20px", display: "grid", gridTemplateColumns: besokareNamn ? "1fr 1fr" : "1fr", gap: "16px" }}>
-
-              {/* Vänster: Ny köporder (bara för inloggade besökare) */}
-              {besokareNamn && (
-                <div>
-                  <p style={{ fontSize: "9px", color: "#1a3a1a", fontFamily: "monospace", letterSpacing: "0.10em", margin: "0 0 10px" }}>NY KÖPORDER</p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
-                      <div>
-                        <div style={{ fontSize: "8px", color: "#2a3a2a", fontFamily: "monospace", marginBottom: "3px" }}>VARA</div>
-                        <select value={kopOrderVara} onChange={e => setKopOrderVara(e.target.value)}
-                          style={{ width: "100%", background: "#0d140d", border: "1px solid #1a2a1a", color: "#4ade80", borderRadius: "4px", padding: "5px 7px", fontSize: "10px", fontFamily: "monospace" }}>
-                          {Object.keys(BASPRIS_VARA).map(v => (
-                            <option key={v} value={v}>{VARA_IKON[v]} {v}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: "8px", color: "#2a3a2a", fontFamily: "monospace", marginBottom: "3px" }}>ANTAL (1–20)</div>
-                        <input type="number" min="1" max="20" value={kopOrderAntal} onChange={e => setKopOrderAntal(e.target.value)}
-                          style={{ width: "100%", boxSizing: "border-box", background: "#0d140d", border: "1px solid #1a2a1a", color: "#e0e0e0", borderRadius: "4px", padding: "5px 7px", fontSize: "10px", fontFamily: "monospace" }} />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: "8px", color: "#2a3a2a", fontFamily: "monospace", marginBottom: "3px" }}>MAX KR/ENHET</div>
-                        <input type="number" min="1" placeholder={`≥ ${Math.ceil(BASPRIS_VARA[kopOrderVara] * 0.5)}`} value={kopOrderMaxPris} onChange={e => setKopOrderMaxPris(e.target.value)}
-                          style={{ width: "100%", boxSizing: "border-box", background: "#0d140d", border: "1px solid #1a2a1a", color: "#e0e0e0", borderRadius: "4px", padding: "5px 7px", fontSize: "10px", fontFamily: "monospace" }} />
-                      </div>
-                    </div>
-                    {kopOrderMaxPris && parseFloat(kopOrderMaxPris) > 0 && parseInt(kopOrderAntal) > 0 && (
-                      <div style={{ fontSize: "9px", color: "#3a5a3a", fontFamily: "monospace" }}>
-                        Reservation: {Math.ceil(parseInt(kopOrderAntal) * parseFloat(kopOrderMaxPris))} kr · Ditt saldo: {besokSaldo ?? "…"} kr
-                      </div>
-                    )}
-                    <button onClick={laggKopOrder}
-                      disabled={pending || !kopOrderMaxPris || parseFloat(kopOrderMaxPris) < Math.ceil(BASPRIS_VARA[kopOrderVara] * 0.5) || parseInt(kopOrderAntal) < 1}
-                      style={{ background: pending ? "#1a2a1a" : "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.40)", color: "#4ade80", borderRadius: "4px", padding: "8px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: 700, letterSpacing: "0.05em" }}>
-                      {pending ? "Lägger order…" : "📋 Lägg köporder"}
-                    </button>
-                    <div style={{ fontSize: "9px", color: "#2a3a2a", fontFamily: "monospace", lineHeight: 1.6 }}>
-                      Beloppet reserveras nu. Agenter med lager matchar din order vid nästa dagliga körning kl 09:30. Eventuell skillnad mot ditt maxpris återbetalas automatiskt.
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Höger (eller full bredd om ej inloggad): Öppna ordrar */}
-              <div>
-                <p style={{ fontSize: "9px", color: "#1a3a1a", fontFamily: "monospace", letterSpacing: "0.10em", margin: "0 0 10px" }}>ÖPPNA ORDRAR</p>
-                {alleOrdrar.length === 0 ? (
-                  <div style={{ fontSize: "10px", color: "#1a2a1a", fontFamily: "monospace", textAlign: "center", padding: "16px 0" }}>
-                    Inga öppna köpordrar
-                    {!besokareNamn && <div style={{ fontSize: "9px", color: "#1a2a1a", marginTop: "6px" }}>Ladda sidan för att placera en order</div>}
-                  </div>
-                ) : alleOrdrar.map(o => {
-                  const isMin = o.kop_agent === besokareNamn;
-                  const varTyp = VARA_TYP[o.vara];
-                  const farg = varTyp ? TYP_FARG[varTyp] : "#4ade80";
-                  return (
-                    <div key={o.id} style={{ background: "#0a140a", border: `1px solid ${rgba(farg, 0.22)}`, borderLeft: `3px solid ${rgba(farg, 0.60)}`, borderRadius: "0 6px 6px 0", padding: "9px 12px", marginBottom: "7px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                        <span style={{ fontSize: "11px", color: farg, fontFamily: "monospace", fontWeight: 700 }}>
-                          {VARA_IKON[o.vara] || "📦"} {o.antal}× {o.vara}
-                        </span>
-                        {isMin ? (
-                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                            <span style={{ fontSize: "8px", color: "#4ade80", fontFamily: "monospace", background: "rgba(74,222,128,0.10)", padding: "1px 5px", borderRadius: "3px" }}>DIN ORDER</span>
-                            <button onClick={() => avbrytKopOrder(o.id, o.reserverat_kr)} disabled={pending}
-                              style={{ fontSize: "8px", color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "3px", padding: "1px 6px", cursor: "pointer", fontFamily: "monospace" }}>
-                              ✕ avbryt
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", fontFamily: "monospace" }}>
-                        <span style={{ color: "#2a4a2a" }}>Max {o.max_pris_per_enhet} kr/enhet</span>
-                        <span style={{ color: "#1a3a1a" }}>{relativeTime(o.skapad)}</span>
-                      </div>
-                      <div style={{ fontSize: "9px", color: isMin ? "#3a6a3a" : "#1a3a1a", fontFamily: "monospace", marginTop: "3px" }}>
-                        {o.kop_agent} · {o.reserverat_kr} kr reserverat
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-            </div>
-          </div>
-        );
-      })()}
 
     </div>
   );
