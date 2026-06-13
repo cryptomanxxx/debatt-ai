@@ -42,7 +42,7 @@ jobs:
 
           # Kör om: känd code review-bot ELLER changes_requested
           IS_BOT=false
-          for pattern in copilot codex coderabbit codestral gemini; do
+          for pattern in copilot coderabbit codestral; do
             if [[ "$REVIEWER" == *"$pattern"* ]]; then
               IS_BOT=true
               break
