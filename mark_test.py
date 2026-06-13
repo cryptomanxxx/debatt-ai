@@ -892,6 +892,95 @@ def foradla_varor(lager: dict) -> int:
     return totalt
 
 
+def fyll_kop_ordrar(lager: dict, saldon: dict):
+    """Fyll öppna köpordrar. Agenter med tillräckligt lager matchar till max-priset."""
+    print("\n── Fyll köpordrar ──")
+
+    ordrar = sb_get("mark_kop_ordrar?status=eq.%C3%B6ppen&order=skapad.asc")
+    if not ordrar:
+        print("  Inga öppna köpordrar.")
+        return 0
+
+    # Aktuella clearing-multiplikatorer per zontyp
+    resurs_rows = sb_get("resurspriser?select=typ,pris_multiplier") or []
+    mult_dict = {r["typ"]: float(r.get("pris_multiplier") or 1.0) for r in resurs_rows}
+
+    fyllda = 0
+    for order in ordrar:
+        vara      = order["vara"]
+        antal     = order["antal"]
+        max_pris  = float(order["max_pris_per_enhet"])
+        kop_agent = order["kop_agent"]
+        reserverat = int(order.get("reserverat_kr") or 0)
+
+        # Erbjudandepris = baspris × clearing-multiplikator
+        typ = next((t for t, v in VARA_PER_TYP.items() if v == vara), None)
+        mult = mult_dict.get(typ, 1.0) if typ else 1.0
+        offer_pris = round(BASPRIS.get(vara, 20) * mult, 2)
+
+        if offer_pris > max_pris:
+            print(f"  ✗ {kop_agent}: {antal}×{vara} — aktuellt pris {offer_pris:.1f} kr > max {max_pris:.1f} kr")
+            continue
+
+        # Hitta agent med mest lager av varan (vill av med överskott)
+        kandidater = [
+            (a, lager.get(a, {}).get(vara, 0))
+            for a in AGENTER
+            if lager.get(a, {}).get(vara, 0) >= antal
+        ]
+        if not kandidater:
+            print(f"  ✗ Ingen agent har {antal}×{vara} i lager")
+            continue
+
+        saljare, saljare_antal = max(kandidater, key=lambda x: x[1])
+
+        total_pris = round(offer_pris * antal, 2)
+
+        # Flytta varor: dra från säljarens lager
+        ny_saljare_antal = saljare_antal - antal
+        sb_upsert(
+            "mark_lager",
+            {"agent": saljare, "vara": vara, "antal": ny_saljare_antal, "uppdaterad": "now()"},
+            on_conflict="agent,vara",
+        )
+        lager.setdefault(saljare, {})[vara] = ny_saljare_antal
+
+        # Betala säljaren
+        nytt_saljare_saldo = round(saldon.get(saljare, 0) + total_pris, 2)
+        patch_saldo(saljare, nytt_saljare_saldo, saldon)
+
+        # Återbetala skillnaden (reserverat − faktisk kostnad) till köparen
+        aterbet = reserverat - int(total_pris)
+        if aterbet > 0 and kop_agent.startswith("Besökare-"):
+            kop_saldo = saldon.get(kop_agent, 0)
+            ny_kop_saldo = round(kop_saldo + aterbet, 2)
+            patch_saldo(kop_agent, ny_kop_saldo, saldon)
+
+        # Stäng ordern
+        sb_patch(
+            f"mark_kop_ordrar?id=eq.{order['id']}",
+            {"status": "ifylld", "ifylld_av": saljare, "ifyllt_pris_per_enhet": offer_pris},
+        )
+
+        # Logga till mark_handel_log
+        pris_per_enhet = round(total_pris / antal, 2)
+        sb_post("mark_handel_log", {
+            "kop_agent": kop_agent, "salj_agent": saljare,
+            "vara": vara, "antal": antal,
+            "pris_per_enhet": pris_per_enhet, "totalt": int(total_pris),
+        })
+
+        fyllda += 1
+        ikon = VARA_IKON_MAP.get(vara, "📦")
+        print(
+            f"  {ikon} {saljare} → {kop_agent}: {antal}×{vara} à {pris_per_enhet:.1f} kr "
+            f"(total {int(total_pris)} kr, återbet {aterbet} kr)"
+        )
+
+    print(f"  {fyllda} köpordrar fyllda av {len(ordrar)} öppna.")
+    return fyllda
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -989,6 +1078,9 @@ def main():
     )
     if aktiva_vara_auktioner:
         bud_pa_vara_auktioner(aktiva_vara_auktioner, saldon_ny, lager)
+
+    # ── 11. Fyll öppna köpordrar från besökare ───────────────────────────────
+    fyll_kop_ordrar(lager, saldon_ny)
 
     print(f"\n=== Körning klar ===")
 
