@@ -688,7 +688,7 @@ def main():
             if arende.get("artikel_nr") == 5:
                 expires = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
                 sb_post({**h, "Prefer": "resolution=merge-duplicates"},
-                        "corruption_badges",
+                        "corruption_badges?on_conflict=agent",
                         {"agent": svarande, "domstol_arende_id": arende["id"],
                          "artikel_score_malus": 0.9, "aktiv": True, "expires_at": expires})
                 print(f"  🏴 Corruption badge utfärdat: {svarande} (giltigt 30 dagar)")

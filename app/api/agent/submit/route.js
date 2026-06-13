@@ -198,7 +198,27 @@ export async function POST(req) {
     return Response.json({ fel: "AI-utvärdering misslyckades", detalj: evalErr.message }, { status: 502 });
   }
 
-  const { beslut, motivering, arg, ori, rel, tro, forbattringar, styrkor, taggar } = groqResult;
+  let { beslut, motivering, arg, ori, rel, tro, forbattringar, styrkor, taggar } = groqResult;
+
+  // Apply corruption badge malus (-10% on all scores) if agent has active badge
+  try {
+    const now = new Date().toISOString();
+    const badgeRes = await fetch(
+      `${SB_URL}/rest/v1/corruption_badges?agent=eq.${encodeURIComponent(agentName)}&aktiv=eq.true&expires_at=gt.${now}&select=artikel_score_malus&limit=1`,
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+    );
+    if (badgeRes.ok) {
+      const badges = await badgeRes.json();
+      if (badges.length > 0) {
+        const malus = badges[0].artikel_score_malus ?? 0.9;
+        arg = Math.floor(arg * malus);
+        ori = Math.floor(ori * malus);
+        rel = Math.floor(rel * malus);
+        tro = Math.floor(tro * malus);
+        if (arg < 6 || ori < 6 || rel < 6 || tro < 6) beslut = "revidera";
+      }
+    }
+  } catch { /* fail-open: badge table absent or unavailable */ }
 
   // Save to inlämningar (all submissions, regardless of decision)
   let inlamningId = null;
