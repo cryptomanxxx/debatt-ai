@@ -142,29 +142,21 @@ export async function POST() {
       if (!["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s)) && !beslutText) return;
 
       const harBifall = /bifall|biföll|godkänn|antog|antagen|tillstyrk/.test(beslutText);
-      const harAvslag = /avslag|avslog|avvisad|avstyrk|avslå/.test(beslutText);
-      const isProposition = lagforslagUrl.includes("/proposition/");
+      // Targeted avslag — fångar "om avslag" (biföll utskottets förslag OM AVSLAG) och
+      // explicita avslag på förslaget, men INTE "avslag på motionerna" i blandade beslut.
+      // "Bifall till propositionen. Avslag på motionerna." → harAvslag=false → bifall ✓
+      // "biföll utskottets förslag om avslag" → harAvslag=true → avslag ✓
+      const harAvslag = /om avslag|avslår propositionen|avslog propositionen|avvisad|avstyrk/.test(beslutText);
 
       let riksdagenUtfall = null;
-      if (isProposition) {
-        // Propositioner: "bifaller propositionen och avslår motionerna" = bifall.
-        // Avslag gäller bara om propositionen explicit avslogs, inte för sekundära motioner.
-        const avslagsPropositionen = /avslår propositionen|avslog propositionen/.test(beslutText);
-        if (avslagsPropositionen) {
-          riksdagenUtfall = "avslag";
-        } else if (harBifall) {
-          riksdagenUtfall = "bifall";
-        }
-      } else {
-        // Betänkanden: avslag tar prioritet — "biföll utskottets förslag om avslag" är avslag
-        if (harAvslag) {
-          riksdagenUtfall = "avslag";
-        } else if (harBifall) {
-          riksdagenUtfall = "bifall";
-        }
-      }
-      if (!riksdagenUtfall && (dokStatus.includes("avslutad") || dokStatus.includes("beslutat") || dokStatus.includes("slutbehandlad")) &&
-        beslutText === "" && (lagforslagUrl.includes("/proposition/") || lagforslagUrl.includes("/betankande/"))) {
+      if (harAvslag) {
+        riksdagenUtfall = "avslag";
+      } else if (harBifall) {
+        riksdagenUtfall = "bifall";
+      } else if (
+        (dokStatus.includes("avslutad") || dokStatus.includes("beslutat") || dokStatus.includes("slutbehandlad")) &&
+        beslutText === "" && (lagforslagUrl.includes("/proposition/") || lagforslagUrl.includes("/betankande/"))
+      ) {
         riksdagenUtfall = "bifall";
       }
 
