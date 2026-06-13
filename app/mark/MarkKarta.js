@@ -548,6 +548,23 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     finally { setPending(false); }
   }
 
+  async function avbrytZonAuktion(auktionId) {
+    if (!besokareId || pending) return;
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/cancel-zon-auktion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auktion_id: auktionId, besokare_id: besokareId, display_name: besokareNamn }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Avbryt misslyckades", ok: false }); return; }
+      setMarkMsg({ text: "✅ Auktionen avbruten.", ok: true });
+      setTimeout(() => setMarkMsg(null), 5000);
+    } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
+    finally { setPending(false); }
+  }
+
   async function saljWidgetZonAuktion() {
     const zon = zoner.find(z => String(z.id) === String(saljWidgetZon));
     if (!zon || !besokareId || pending) return;
@@ -906,12 +923,21 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                             <span style={{ fontSize: "10px", color: farg, fontFamily: "monospace", fontWeight: 700 }}>
                               {TYP_IKON[typ]} {zonNamn}
                             </span>
+                            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                             <span style={{ fontSize: "8px", color: isOwner ? "#f59e0b" : "#22d3ee", background: isOwner ? "rgba(245,158,11,0.10)" : "rgba(34,211,238,0.10)", padding: "1px 5px", borderRadius: "3px", fontFamily: "monospace" }}>
                               {isOwner ? "🏷 SÄLJARE" : "🗺 BUDGIVARE"}
                             </span>
+                            {isOwner && !a.nuv_bud && (
+                              <button onClick={() => avbrytZonAuktion(a.id)} disabled={pending}
+                                style={{ fontSize: "8px", color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "3px", padding: "1px 6px", cursor: "pointer", fontFamily: "monospace" }}>
+                                ✕ avbryt
+                              </button>
+                            )}
                           </div>
+                          </div>
+                          {/* /header row */}
                           <div style={{ fontSize: "9px", fontFamily: "monospace", marginTop: "3px", color: "#2a2a1a" }}>
-                            {a.nuv_bud ? `Bud: ${a.nuv_bud} kr` : `Reservpris: ${a.reservpris} kr`} · {timeLeft(a.stanger_at)}
+                            {a.nuv_bud ? `Bud: ${a.nuv_bud} kr · kan ej avbryta` : `Reservpris: ${a.reservpris} kr`} · {timeLeft(a.stanger_at)}
                           </div>
                         </div>
                       );
