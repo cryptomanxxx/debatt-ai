@@ -76,24 +76,66 @@ async function hämtaDoktyp(doktyp) {
   }).filter(d => d.dok_id && d.titel);
 }
 
+// Hämtar betänkanden som faktiskt röstades på via voteringlista — garanterar matchning mot utfall.
+async function hämtaVoteredeBetankanden() {
+  const r = await fetch(
+    "https://data.riksdagen.se/voteringlista/?utformat=json&sz=200&sort=datum&sortorder=desc",
+    { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(12000) }
+  );
+  if (!r.ok) throw new Error(`Voteringlista ${r.status}`);
+  const data = await r.json();
+  let voteringar = data?.voteringlista?.votering || [];
+  if (!Array.isArray(voteringar)) voteringar = [voteringar];
+
+  // Unika betänkande-dok_ids från voterings
+  const betDokIds = [...new Set(
+    voteringar.map(v => (v.tillhor_dok_id || "").trim()).filter(id => id.startsWith("bet"))
+  )].slice(0, 40);
+
+  const results = await Promise.allSettled(
+    betDokIds.map(async (dokId) => {
+      const dsRes = await fetch(
+        `https://data.riksdagen.se/dokumentstatus/${dokId}.json`,
+        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(8000) }
+      );
+      if (!dsRes.ok) return null;
+      const ds = await dsRes.json();
+      const dok = ds?.dokumentstatus?.dokument;
+      if (!dok?.titel) return null;
+      const titel = dok.titel.trim().slice(0, 200);
+      const sammanfattning = dok.sammanfattning?.trim();
+      return {
+        dok_id: dokId,
+        titel,
+        beskrivning: (sammanfattning || `Betänkande: ${titel}`).slice(0, 2000),
+        riksdagen_url: `https://www.riksdagen.se/sv/dokument-och-lagar/dokument/betankande/${dokId.trim()}/`,
+      };
+    })
+  );
+  return results.filter(r => r.status === "fulfilled" && r.value).map(r => r.value);
+}
+
 async function hämtaViaApi() {
   // Betänkanden (bet) importeras för att riksdagen röstar på dem direkt →
   // tillhor_dok_id i voteringlista matchar bet-dok_id → utfall kan hämtas automatiskt.
-  const [propositioner, motioner, betankanden] = await Promise.allSettled([
+  // hämtaVoteredeBetankanden() hämtar specifikt bet som faktiskt röstats på (från voteringlista).
+  const [propositioner, motioner, betankanden, voteredeBet] = await Promise.allSettled([
     hämtaDoktyp("prop"),
     hämtaDoktyp("mot"),
     hämtaDoktyp("bet"),
+    hämtaVoteredeBetankanden(),
   ]);
 
-  // Om alla tre misslyckas — kasta så att HTML-fallbacken i POST aktiveras
-  if (propositioner.status === "rejected" && motioner.status === "rejected" && betankanden.status === "rejected") {
-    throw new Error(`prop: ${propositioner.reason?.message} | mot: ${motioner.reason?.message} | bet: ${betankanden.reason?.message}`);
+  // Om alla fyra misslyckas — kasta så att HTML-fallbacken i POST aktiveras
+  if (propositioner.status === "rejected" && motioner.status === "rejected" && betankanden.status === "rejected" && voteredeBet.status === "rejected") {
+    throw new Error(`prop: ${propositioner.reason?.message} | mot: ${motioner.reason?.message} | bet: ${betankanden.reason?.message} | votering: ${voteredeBet.reason?.message}`);
   }
 
   const forslag = [
     ...(propositioner.status === "fulfilled" ? propositioner.value : []),
     ...(motioner.status === "fulfilled" ? motioner.value : []),
     ...(betankanden.status === "fulfilled" ? betankanden.value : []),
+    ...(voteredeBet.status === "fulfilled" ? voteredeBet.value : []),
   ];
 
   await Promise.all(forslag.map(async (item) => {

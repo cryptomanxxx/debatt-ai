@@ -84,7 +84,7 @@ export async function POST() {
   for (const [dokId, { id: lagforslagId }] of Object.entries(pending)) {
     try {
       const perRes = await fetch(
-        `https://data.riksdagen.se/voteringlista/?dokid=${encodeURIComponent(dokId)}&utformat=json&sz=10`,
+        `https://data.riksdagen.se/voteringlista/?dokid=${dokId}&utformat=json&sz=10`,
         { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
       );
       if (!perRes.ok) continue;
