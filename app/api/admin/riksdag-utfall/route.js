@@ -122,13 +122,25 @@ export async function POST() {
   const remainingEntries = Object.entries(pending);
   const dokstatusChunk = remainingEntries.slice(0, 30); // max 30 per körning
 
+  const debugSample = [];
+
   await Promise.allSettled(dokstatusChunk.map(async ([dokId, { id: lagforslagId, url: lagforslagUrl }]) => {
     try {
-      const dsRes = await fetch(
-        `https://data.riksdagen.se/dokumentstatus/${encodeURIComponent(dokId)}.json`,
+      // Försök med literal slash i path (riksdagen-konvention), fallback till encodeURIComponent
+      let dsRes = await fetch(
+        `https://data.riksdagen.se/dokumentstatus/${dokId}.json`,
         { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(8000) }
       );
-      if (!dsRes.ok) return;
+      if (!dsRes.ok) {
+        dsRes = await fetch(
+          `https://data.riksdagen.se/dokumentstatus/${encodeURIComponent(dokId)}.json`,
+          { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(8000) }
+        );
+      }
+      if (!dsRes.ok) {
+        if (debugSample.length < 3) debugSample.push({ dokId, http: dsRes.status });
+        return;
+      }
       const ds = await dsRes.json();
 
       // Extrahera besluttext — kan vara objekt eller array
@@ -137,6 +149,8 @@ export async function POST() {
       const beslutObj = Array.isArray(rawBeslut) ? rawBeslut[0] : rawBeslut;
       const beslutText = (beslutObj?.beslut || "").toLowerCase();
       const datum = (ds?.dokumentstatus?.dokument?.datum || "").trim() || null;
+
+      if (debugSample.length < 3) debugSample.push({ dokId, dokStatus, beslutText: beslutText.slice(0, 80) });
 
       // Avgör om avslutad
       if (!["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s)) && !beslutText) return;
@@ -175,5 +189,6 @@ export async function POST() {
     uppdaterade,
     vantande: Object.keys(pending).length,
     fel: fel.length > 0 ? fel : undefined,
+    debug: debugSample,
   });
 }
