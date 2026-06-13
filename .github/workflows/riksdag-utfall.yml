@@ -10,13 +10,20 @@ jobs:
   utfall:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
       - name: Hämta voteringsutfall från riksdagen.se
+        env:
+          SUPABASE_URL: https://fmwxftnistkoqazfwnuj.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          response=$(curl -s -o body.json -w "%{http_code}" \
-            -X POST https://www.debatt-ai.se/api/admin/riksdag-utfall)
-          cat body.json
-          echo ""
-          if [ "$response" != "200" ]; then
-            echo "HTTP $response — utfall-hämtning misslyckades"
+          node agents/riksdag-utfall.js
+          if [ $? -ne 0 ]; then
+            echo "Riksdag-utfall misslyckades"
             exit 1
           fi
