@@ -40,7 +40,16 @@ jobs:
             exit 0
           fi
 
-          # Kör om: känd code review-bot ELLER changes_requested
+          # Explicit deny-lista — externa AI-reviewers aldrig auto-fixas oavsett state
+          for denied in codex gemini; do
+            if [[ "$REVIEWER" == *"$denied"* ]]; then
+              echo "SKIP=true" >> "$GITHUB_ENV"
+              echo "Skippar — $REVIEWER är i deny-listan för externa AI-reviewers"
+              exit 0
+            fi
+          done
+
+          # Kör om: känd intern code review-bot ELLER changes_requested från människa
           IS_BOT=false
           for pattern in copilot coderabbit codestral; do
             if [[ "$REVIEWER" == *"$pattern"* ]]; then
