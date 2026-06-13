@@ -77,18 +77,32 @@ export async function POST() {
   }
 
   // 3+4. Parallell batch (max 50) — voteringlista per dok, sedan dokumentstatus-fallback.
-  //      Parallell = ~8s totalt oavsett antal, undviker Vercel-timeout.
-  const debugSample = [];
-  const batch = Object.entries(pending).slice(0, 100);
+  //      Parallell = ~20s totalt oavsett antal, undviker Vercel-timeout.
+  //      Batch 50 (ej 100) för att undvika rate-limiting mot riksdagen.se.
+  const debugA = [];
+  const debugB = [];
+  const batch = Object.entries(pending).slice(0, 50);
 
   await Promise.allSettled(batch.map(async ([dokId, { id: lagforslagId, url: lagforslagUrl }]) => {
-    // Steg A: voteringlista per dokument (fungerar för betänkanden med registrerad omröstning)
+    // Steg A: voteringlista per dokument
+    // bet2024/25:FiU20 → rm=2024/25&bet=FiU20&sz=1 (specifik sessionssökning, snabbare)
+    // Gamla HC01xxx → generisk dokid-sökning
     try {
-      // Riksdagen API förväntar sig literal slash/kolon i query-parametrar, inte URL-encodat
-      const perRes = await fetch(
-        `https://data.riksdagen.se/voteringlista/?dokid=${dokId}&utformat=json&sz=10`,
-        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
-      );
+      let perRes;
+      const betMatch = dokId.match(/^bet(\d{4}\/\d{2}):(.+)$/i);
+      if (betMatch) {
+        const rm = betMatch[1];   // "2024/25"
+        const bet = betMatch[2];  // "FiU20"
+        perRes = await fetch(
+          `https://data.riksdagen.se/voteringlista/?rm=${encodeURIComponent(rm)}&bet=${encodeURIComponent(bet)}&utformat=json&sz=1`,
+          { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(20000) }
+        );
+      } else {
+        perRes = await fetch(
+          `https://data.riksdagen.se/voteringlista/?dokid=${dokId}&utformat=json&sz=10`,
+          { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(20000) }
+        );
+      }
       if (perRes.ok) {
         const perData = await perRes.json();
         let voteringar = perData?.voteringlista?.votering || [];
@@ -112,7 +126,7 @@ export async function POST() {
         }
       }
     } catch (e) {
-      if (debugSample.length < 3) debugSample.push({ dokId, steg: "A", error: e.message });
+      if (debugA.length < 3) debugA.push({ dokId, error: e.message });
     }
 
     // Steg B: dokumentstatus-fallback (acklamationsbeslut + propositioner)
@@ -120,16 +134,16 @@ export async function POST() {
       // Riksdagen-konvention: literal slash i path, t.ex. /dokumentstatus/bet2024/25:FiU20.json
       let dsRes = await fetch(
         `https://data.riksdagen.se/dokumentstatus/${dokId}.json`,
-        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
+        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(20000) }
       );
       if (!dsRes.ok) {
         dsRes = await fetch(
           `https://data.riksdagen.se/dokumentstatus/${encodeURIComponent(dokId)}.json`,
-          { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
+          { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(20000) }
         );
       }
       if (!dsRes.ok) {
-        if (debugSample.length < 3) debugSample.push({ dokId, steg: "B", http: dsRes.status });
+        if (debugB.length < 3) debugB.push({ dokId, http: dsRes.status });
         return;
       }
       const ds = await dsRes.json();
@@ -140,7 +154,7 @@ export async function POST() {
       const beslutText = (beslutObj?.beslut || "").toLowerCase();
       const datum = (ds?.dokumentstatus?.dokument?.datum || "").trim() || null;
 
-      if (debugSample.length < 3) debugSample.push({ dokId, steg: "B", dokStatus, beslutText: beslutText.slice(0, 100) });
+      if (debugB.length < 3) debugB.push({ dokId, dokStatus, beslutText: beslutText.slice(0, 100) });
 
       if (!["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s)) && !beslutText) return;
 
@@ -175,7 +189,7 @@ export async function POST() {
       );
       if (pr.ok) { uppdaterade++; delete pending[dokId]; }
     } catch (e) {
-      if (debugSample.length < 3) debugSample.push({ dokId, steg: "B", error: e.message });
+      if (debugB.length < 3) debugB.push({ dokId, error: e.message });
     }
   }));
 
@@ -183,6 +197,6 @@ export async function POST() {
     uppdaterade,
     vantande: Object.keys(pending).length,
     fel: fel.length > 0 ? fel : undefined,
-    debug: debugSample,
+    debug: { stepA: debugA, stepB: debugB },
   });
 }
