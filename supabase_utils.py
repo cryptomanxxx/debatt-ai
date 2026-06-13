@@ -2576,6 +2576,22 @@ def kör_bribe(agent: dict, sb_key: str) -> bool:
             )
             rod_efter = "ja"
 
+            # Synkronisera denormaliserade räknare på lagförslaget
+            h_min2 = {**h, "Content-Type": "application/json", "Prefer": "return=minimal"}
+            cr = httpx.get(
+                f"{SB_URL}/rest/v1/lagforslag?id=eq.{forslag_id}&select=ai_ja_roster,ai_nej_roster",
+                headers={**h, "Prefer": ""}, timeout=8,
+            )
+            if cr.is_success and cr.json():
+                counts = cr.json()[0]
+                patch = {"ai_ja_roster": counts["ai_ja_roster"] + 1}
+                if rod_fore == "nej":
+                    patch["ai_nej_roster"] = max(0, counts["ai_nej_roster"] - 1)
+                httpx.patch(
+                    f"{SB_URL}/rest/v1/lagforslag?id=eq.{forslag_id}",
+                    headers=h_min2, json=patch, timeout=8,
+                )
+
             # Kreditöverföring
             h_min = {**h, "Content-Type": "application/json", "Prefer": "return=minimal"}
             httpx.patch(
