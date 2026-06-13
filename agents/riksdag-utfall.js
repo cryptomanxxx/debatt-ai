@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Körs direkt från GitHub Actions — kringgår Vercels IP-begränsningar mot riksdagen.se.
-// Hämtar voteringsutfall, matchar mot väntande lagförslag i Supabase, skriver direkt.
+// Hämtar voteringsutfall via röstningsräkning (Ja/Nej per ledamot), skriver direkt till Supabase.
 
 const SB_URL = process.env.SUPABASE_URL || "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -10,7 +10,7 @@ function sbH() {
   return { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 }
 
-async function get(url, timeoutMs = 15000) {
+async function get(url, timeoutMs = 20000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
@@ -24,56 +24,43 @@ async function get(url, timeoutMs = 15000) {
   }
 }
 
-// Diagnostik: returnerar HTTP-status + svar för debugging
-async function getDiag(url, timeoutMs = 15000) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const r = await fetch(url, { headers: { "User-Agent": UA }, signal: ctrl.signal });
-    clearTimeout(t);
-    if (!r.ok) return { ok: false, status: r.status, body: null };
-    const data = await r.json();
-    return { ok: true, status: r.status, body: data };
-  } catch (e) {
-    clearTimeout(t);
-    return { ok: false, status: 0, error: e.message };
-  }
-}
-
-// Extraherar beteckning ur kompakt dok_id, t.ex. HC01FiU16 → "FiU16", HC01KU4 → "KU4"
+// HC01FiU16 → "FiU16", HC01KU4 → "KU4", HC01AU10 → "AU10"
 function beteckning(dokId) {
   return dokId.match(/([A-Za-zÄÅÖäåö]{2,5}\d+)$/)?.[1] || null;
 }
 
-async function getVoteringUtfall(dokId) {
-  // Steg A1: försök med rm=2024/25 + bet (specifik sessionssökning — snabbare)
+// Räkna faktiska ledamotsröster (rost=Ja/Nej) för att bestämma kammarbeslutet.
+// voteringlista returnerar individuella röster, inte aggregerat utfall.
+async function getVoteCountUtfall(dokId) {
   const bet = beteckning(dokId);
-  if (bet) {
-    for (const rm of ["2024/25", "2025/26", "2023/24"]) {
-      const d = await get(
-        `https://data.riksdagen.se/voteringlista/?rm=${rm}&bet=${encodeURIComponent(bet)}&utformat=json&sz=1`
-      );
-      const v = [].concat(d?.voteringlista?.votering || [])[0];
-      if (v?.utfall) {
-        const utfall = v.utfall === "Ja" ? "bifall" : v.utfall === "Nej" ? "avslag" : null;
-        if (utfall) return { utfall, datum: v.datum || null, källa: `rm=${rm}&bet=${bet}` };
-      }
+  if (!bet) return null;
+
+  for (const rm of ["2024/25", "2025/26", "2023/24", "2022/23"]) {
+    const d = await get(
+      `https://data.riksdagen.se/voteringlista/?rm=${rm}&bet=${encodeURIComponent(bet)}&utformat=json&sz=400`
+    );
+    const roster = [].concat(d?.voteringlista?.votering || []);
+    if (roster.length < 10) continue;
+
+    // Räkna Ja/Nej för punkt="1" (utskottets huvudrekommendation)
+    const p1 = roster.filter(r => r.punkt === "1");
+    const votes = p1.length >= 10 ? p1 : roster;
+
+    let ja = 0, nej = 0;
+    for (const r of votes) {
+      if (r.rost === "Ja") ja++;
+      else if (r.rost === "Nej") nej++;
     }
-  }
+    if (ja + nej < 10) continue;
 
-  // Steg A2: generisk dokid-sökning
-  const d2 = await get(
-    `https://data.riksdagen.se/voteringlista/?dokid=${encodeURIComponent(dokId)}&utformat=json&sz=1`
-  );
-  const v2 = [].concat(d2?.voteringlista?.votering || [])[0];
-  if (v2?.utfall) {
-    const utfall = v2.utfall === "Ja" ? "bifall" : v2.utfall === "Nej" ? "avslag" : null;
-    if (utfall) return { utfall, datum: v2.datum || null, källa: "dokid" };
+    const datum = (roster[0]?.systemdatum || "").slice(0, 10) || null;
+    const utfall = ja >= nej ? "bifall" : "avslag";
+    return { utfall, datum, källa: `röstning rm=${rm} (${ja}J/${nej}N)` };
   }
-
   return null;
 }
 
+// Fallback: dokumentstatus med besluttext-analys
 async function getDokstatusUtfall(dokId, riksdagenUrl = "") {
   const ds = await get(`https://data.riksdagen.se/dokumentstatus/${dokId}.json`);
   if (!ds) return null;
@@ -90,9 +77,10 @@ async function getDokstatusUtfall(dokId, riksdagenUrl = "") {
   if (harAvslag) return { utfall: "avslag", datum, källa: "dokumentstatus" };
   if (harBifall) return { utfall: "bifall", datum, källa: "dokumentstatus" };
 
+  // Acklamationsbeslut: avslutad status + tom besluttext + betänkande/proposition
+  const avslutad = ["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s));
   if (
-    ["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s)) &&
-    !beslutText &&
+    avslutad && !beslutText &&
     (riksdagenUrl.includes("/proposition/") || riksdagenUrl.includes("/betankande/"))
   ) {
     return { utfall: "bifall", datum, källa: "dokumentstatus-acklamation" };
@@ -107,7 +95,7 @@ async function main() {
     process.exit(1);
   }
 
-  // 1. Hämta väntande
+  // 1. Hämta väntande förslag
   const pendingRes = await fetch(
     `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&riksdagen_utfall=is.null&select=id,riksdagen_id,riksdagen_url&order=skapad.desc&limit=200`,
     { headers: sbH() }
@@ -122,73 +110,16 @@ async function main() {
   const processed = new Set();
   let uppdaterade = 0;
 
-  // DIAGNOSTIK: inspektera API-struktur för att förstå fältnamn
-  if (pending.length > 0) {
-    const diagId = pending[0].riksdagen_id;
-    console.log(`\n=== DIAGNOSTIK för ${diagId} ===`);
-
-    // A) Testa rm=2024/25 UTAN bet → ska ge kammarnivå-summor
-    const rmOnlyRes = await getDiag(`https://data.riksdagen.se/voteringlista/?rm=2024/25&utformat=json&sz=3&sort=datum&sortorder=desc`);
-    const rmOnlyRows = [].concat(rmOnlyRes.body?.voteringlista?.votering || []);
-    console.log(`rm=2024/25 (ingen bet): status=${rmOnlyRes.status}, rows=${rmOnlyRows.length}`);
-    if (rmOnlyRows.length > 0) console.log(`  fält på rad[0]: ${JSON.stringify(Object.keys(rmOnlyRows[0]))}`);
-    if (rmOnlyRows.length > 0) console.log(`  sample: ${JSON.stringify(rmOnlyRows[0]).slice(0,300)}`);
-
-    // B) Testa dokid-sökning — visa FULLSTÄNDIGA fält
-    const dokidRes = await getDiag(`https://data.riksdagen.se/voteringlista/?dokid=${encodeURIComponent(diagId)}&utformat=json&sz=1`);
-    const dokidRows = [].concat(dokidRes.body?.voteringlista?.votering || []);
-    console.log(`dokid=${diagId}: status=${dokidRes.status}, rows=${dokidRows.length}`);
-    if (dokidRows.length > 0) console.log(`  fält: ${JSON.stringify(Object.keys(dokidRows[0]))}`);
-    if (dokidRows.length > 0) console.log(`  sample: ${JSON.stringify(dokidRows[0]).slice(0,300)}`);
-
-    // C) Testa dokumentstatus — visa beslut-fält
-    const dsRes = await getDiag(`https://data.riksdagen.se/dokumentstatus/${diagId}.json`);
-    const dok = dsRes.body?.dokumentstatus?.dokument;
-    const beslut = dsRes.body?.dokumentstatus?.dokbeslut;
-    console.log(`dokumentstatus: status=${dsRes.status}, dokStatus="${dok?.status||"-"}", datum="${dok?.datum||"-"}"`);
-    console.log(`  beslut: ${JSON.stringify(beslut ?? null).slice(0,300)}`);
-    console.log(`=== SLUT DIAGNOSTIK ===\n`);
-  }
-
-  // DIAGNOSTIK: kontrollera bulk-formatets tillhor_dok_id
-  // 2. Bulk-sökning (täcker nyligen röstade betänkanden i aktuell session)
-  const bulk = await get(
-    "https://data.riksdagen.se/voteringlista/?utformat=json&sz=500&sort=datum&sortorder=desc",
-    20000
-  );
-  if (bulk) {
-    const pendingMap = {};
-    for (const p of pending) if (p.riksdagen_id) pendingMap[p.riksdagen_id] = p;
-
-    const voteringar = [].concat(bulk?.voteringlista?.votering || []);
-    // Diagnostik: visa format på tillhor_dok_id i bulk
-    const sampleIds = [...new Set(voteringar.slice(0, 20).map(v => v.tillhor_dok_id))].slice(0, 5);
-    console.log(`Bulk tillhor_dok_id-format (urval): ${JSON.stringify(sampleIds)}`);
-    for (const v of voteringar) {
-      const dokId = (v.tillhor_dok_id || "").trim();
-      if (!dokId || !pendingMap[dokId] || processed.has(dokId)) continue;
-      const utfall = v.utfall === "Ja" ? "bifall" : v.utfall === "Nej" ? "avslag" : null;
-      if (!utfall) continue;
-
-      const r = await fetch(`${SB_URL}/rest/v1/lagforslag?id=eq.${pendingMap[dokId].id}`, {
-        method: "PATCH",
-        headers: { ...sbH(), Prefer: "return=minimal" },
-        body: JSON.stringify({ riksdagen_utfall: utfall, riksdagen_utfall_datum: v.datum || null, status: "avgjort" }),
-      });
-      if (r.ok) { uppdaterade++; processed.add(dokId); console.log(`bulk: ${dokId} → ${utfall}`); }
-    }
-  }
-  console.log(`Bulk klar: ${uppdaterade} uppdaterade`);
-
-  // 3. Per-dokument (rm+bet → generisk voteringlista → dokumentstatus)
+  // 2. Per-dokument: röstningsräkning → dokumentstatus-fallback
   for (const row of pending) {
     const dokId = row.riksdagen_id;
     if (!dokId || processed.has(dokId)) continue;
 
-    let result = await getVoteringUtfall(dokId);
+    let result = await getVoteCountUtfall(dokId);
     if (!result) result = await getDokstatusUtfall(dokId, row.riksdagen_url || "");
     if (!result) {
       console.log(`miss: ${dokId}`);
+      await new Promise(res => setTimeout(res, 150));
       continue;
     }
 
@@ -203,8 +134,7 @@ async function main() {
       console.log(`${result.källa}: ${dokId} → ${result.utfall}`);
     }
 
-    // Kort paus för att undvika rate-limiting
-    await new Promise(res => setTimeout(res, 300));
+    await new Promise(res => setTimeout(res, 150));
   }
 
   console.log(`\nTotalt uppdaterade: ${uppdaterade} av ${pending.length}`);
