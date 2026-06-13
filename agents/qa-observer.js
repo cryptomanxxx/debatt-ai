@@ -30,6 +30,7 @@ const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SU
 const BASE_URL     = (process.env.BASE_URL || "https://www.debatt-ai.se").replace(/\/$/, "");
 const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
 const DISCUSSIONS  = path.join(__dirname, "../ai-bus/discussions");
+const QA_DIR       = path.join(DISCUSSIONS, "qa");
 
 if (!GROQ_KEY && !GEMINI_KEY) {
   console.error("Varken GROQ_API_KEY eller GEMINI_API_KEY är satt — avbryter");
@@ -465,7 +466,7 @@ ${diffSektion}
   // ── Spara till ai-bus/discussions/ så Claude Code läser det vid sessionsstart ───────────
   try {
     const ts       = new Date().toISOString().slice(0, 16).replace("T", "-").replace(":", "");
-    const filnamn  = path.join(DISCUSSIONS, `${ts}-qa.md`);
+    const filnamn  = path.join(QA_DIR, `${ts}-qa.md`);
     const regressionerText = diff && diff.filter(d => d.regression).length > 0
       ? `regressions: ${diff.filter(d => d.regression).length}`
       : "regressions: 0";
@@ -480,11 +481,11 @@ errors: ${antalFel}
 ${regressionerText}
 ---
 `;
-    if (!fs.existsSync(DISCUSSIONS)) fs.mkdirSync(DISCUSSIONS, { recursive: true });
+    if (!fs.existsSync(QA_DIR)) fs.mkdirSync(QA_DIR, { recursive: true });
     fs.writeFileSync(filnamn, frontmatter + rapport);
     console.log(`QA-rapport sparad: ${filnamn}`);
   } catch (e) {
-    console.error(`Kunde inte spara till ai-bus/discussions/: ${e.message}`);
+    console.error(`Kunde inte spara till ai-bus/discussions/qa/: ${e.message}`);
   }
 
   // Varningar loggas men bryter inte workflow — bara faktiska fel (inga sidor laddas)

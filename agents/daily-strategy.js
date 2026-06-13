@@ -19,6 +19,8 @@ const MISTRAL_API_KEY  = process.env.MISTRAL_API_KEY;
 const SUPABASE_URL     = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SUPABASE_KEY     = process.env.SUPABASE_ANON_KEY;
 const DISCUSSIONS_DIR  = path.join(__dirname, "../ai-bus/discussions");
+const STRATEGY_DIR     = path.join(DISCUSSIONS_DIR, "strategy");
+const VISION_DIR       = path.join(DISCUSSIONS_DIR, "vision");
 const GOAL_PATH        = path.join(__dirname, "../ai-bus/goal.md");
 const CLAUDE_MD_PATH   = path.join(__dirname, "../CLAUDE.md");
 const IMPLEMENTED_DIR  = path.join(__dirname, "../ai-bus/implemented");
@@ -130,23 +132,23 @@ function readGoal() {
 
 function readTodaysVision() {
   const datum = dagensDatum();
-  if (!fs.existsSync(DISCUSSIONS_DIR)) return null;
-  const filer = fs.readdirSync(DISCUSSIONS_DIR)
-    .filter(f => f.startsWith(datum) && f.includes("-vision"))
+  if (!fs.existsSync(VISION_DIR)) return null;
+  const filer = fs.readdirSync(VISION_DIR)
+    .filter(f => f.startsWith(datum) && f.endsWith(".md"))
     .sort();
   if (!filer.length) return null;
-  try { return fs.readFileSync(path.join(DISCUSSIONS_DIR, filer[filer.length - 1]), "utf8").slice(0, 1500); }
+  try { return fs.readFileSync(path.join(VISION_DIR, filer[filer.length - 1]), "utf8").slice(0, 1500); }
   catch { return null; }
 }
 
 function readRecentVisions(n = 3) {
-  if (!fs.existsSync(DISCUSSIONS_DIR)) return [];
-  return fs.readdirSync(DISCUSSIONS_DIR)
-    .filter(f => f.includes("-vision"))
+  if (!fs.existsSync(VISION_DIR)) return [];
+  return fs.readdirSync(VISION_DIR)
+    .filter(f => f.endsWith(".md"))
     .sort()
     .slice(-n)
     .map(f => {
-      try { return fs.readFileSync(path.join(DISCUSSIONS_DIR, f), "utf8").slice(0, 600); }
+      try { return fs.readFileSync(path.join(VISION_DIR, f), "utf8").slice(0, 600); }
       catch { return ""; }
     })
     .filter(Boolean);
@@ -265,16 +267,16 @@ async function main() {
   const datum = dagensDatum();
 
   const strategyRe = new RegExp(`^${datum}-strategy(-[^.]+)?\.md$`);
-  const befintlig = fs.existsSync(DISCUSSIONS_DIR)
-    ? fs.readdirSync(DISCUSSIONS_DIR).find(f => strategyRe.test(f))
+  const befintlig = fs.existsSync(STRATEGY_DIR)
+    ? fs.readdirSync(STRATEGY_DIR).find(f => strategyRe.test(f))
     : null;
   if (befintlig) {
     console.log(`Strategi för ${datum} finns redan (${befintlig}) — hoppar över.`);
     return;
   }
-  let utfil = path.join(DISCUSSIONS_DIR, `${datum}-strategy.md`);
+  let utfil = path.join(STRATEGY_DIR, `${datum}-strategy.md`);
 
-  if (!fs.existsSync(DISCUSSIONS_DIR)) fs.mkdirSync(DISCUSSIONS_DIR, { recursive: true });
+  if (!fs.existsSync(STRATEGY_DIR)) fs.mkdirSync(STRATEGY_DIR, { recursive: true });
 
   console.log("Hämtar plattformsstatistik…");
   const stats = await fetchStats();
@@ -306,7 +308,7 @@ async function main() {
 
   const rubrik = extractStrategyTitle(strategi);
   if (rubrik) {
-    utfil = path.join(DISCUSSIONS_DIR, `${datum}-strategy-${toSlug(rubrik)}.md`);
+    utfil = path.join(STRATEGY_DIR, `${datum}-strategy-${toSlug(rubrik)}.md`);
   }
 
   const innehall = `${strategi}\n\n---\n*Genererad av daily-strategy.js med Codestral, ${datum}*\n`;

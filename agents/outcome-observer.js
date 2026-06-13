@@ -134,12 +134,18 @@ async function fetchPlatformMetrics() {
 
 function readRecentDiscussions(n = 4) {
   if (!fs.existsSync(DISCUSSIONS_DIR)) return "";
-  const filer = fs.readdirSync(DISCUSSIONS_DIR)
-    .filter(f => f.endsWith(".md"))
-    .sort()
-    .slice(-n);
-  return filer.map(f => {
-    try { return fs.readFileSync(path.join(DISCUSSIONS_DIR, f), "utf8").slice(0, 350); }
+  const subdirs = ["vision", "strategy", "economy", "qa", "kronika", "ai-performance"];
+  const allFiles = [];
+  for (const sub of subdirs) {
+    const subPath = path.join(DISCUSSIONS_DIR, sub);
+    if (!fs.existsSync(subPath)) continue;
+    fs.readdirSync(subPath)
+      .filter(f => f.endsWith(".md"))
+      .forEach(f => allFiles.push(path.join(subPath, f)));
+  }
+  allFiles.sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
+  return allFiles.slice(-n).map(f => {
+    try { return fs.readFileSync(f, "utf8").slice(0, 350); }
     catch { return ""; }
   }).filter(Boolean).join("\n---\n");
 }

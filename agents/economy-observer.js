@@ -19,6 +19,7 @@ const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
 const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_URL       = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const DISCUSSIONS  = path.join(__dirname, "../ai-bus/discussions");
+const ECONOMY_DIR  = path.join(DISCUSSIONS, "economy");
 
 if (!CEREBRAS_KEY) { console.error("CEREBRAS_API_KEY saknas"); process.exit(1); }
 if (!SB_KEY)       { console.error("SUPABASE_ANON_KEY saknas"); process.exit(1); }
@@ -254,9 +255,9 @@ async function kallaCerebras(prompt) {
 
 async function main() {
   const datum  = dagensDatum();
-  const utfil  = path.join(DISCUSSIONS, `${tidsstämpel()}-economy.md`);
+  const utfil  = path.join(ECONOMY_DIR, `${tidsstämpel()}-economy.md`);
 
-  if (!fs.existsSync(DISCUSSIONS)) fs.mkdirSync(DISCUSSIONS, { recursive: true });
+  if (!fs.existsSync(ECONOMY_DIR)) fs.mkdirSync(ECONOMY_DIR, { recursive: true });
 
   console.log("Hämtar ekonomidata från Supabase…");
   const data       = await hämtaData();
