@@ -1,4 +1,3 @@
-"use server";
 export const revalidate = 120;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";

@@ -2448,7 +2448,7 @@ def kör_bribe(agent: dict, sb_key: str) -> bool:
         # Hämta motioner agenten röstat "ja" på
         res = httpx.get(
             f"{SB_URL}/rest/v1/agent_roster_lag",
-            params={"agent": f"eq.{urllib.parse.quote(agent_namn)}", "rod": "eq.ja",
+            params={"agent": f"eq.{agent_namn}", "rod": "eq.ja",
                     "select": "lagforslag_id"},
             headers=h, timeout=8,
         )
@@ -2569,7 +2569,7 @@ def kör_bribe(agent: dict, sb_key: str) -> bool:
             # Uppdatera röst
             h_json = {**h, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"}
             httpx.post(
-                f"{SB_URL}/rest/v1/agent_roster_lag",
+                f"{SB_URL}/rest/v1/agent_roster_lag?on_conflict=lagforslag_id,agent",
                 json={"lagforslag_id": forslag_id, "agent": mal_namn, "rod": "ja",
                       "motivering": f"[Mutad av {agent_namn}] {motivering}"[:300]},
                 headers=h_json, timeout=8,
