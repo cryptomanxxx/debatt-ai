@@ -7,27 +7,23 @@ function sbHeaders() {
   return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
 }
 
-// Service role key för PATCH — anon-nyckeln kan ha blockerade UPDATE-rättigheter via RLS
 function sbWriteHeaders() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
 }
 
-// Hämtar voteringsresultat från riksdagen.se och sätter riksdagen_utfall automatiskt.
-// Körs från Vercel (inte GitHub Actions) så att data.riksdagen.se inte blockerar anropet.
 export async function POST() {
   const h = sbHeaders();
 
-  // 1. Hämta våra riksdagsförslag som saknar utfall
+  // 1. Hämta riksdagsförslag som saknar utfall — nyast först så senaste session bearbetas varje körning
   const pendingRes = await fetch(
-    `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&riksdagen_utfall=is.null&select=id,riksdagen_id,riksdagen_url`,
+    `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&riksdagen_utfall=is.null&select=id,riksdagen_id,riksdagen_url&order=skapad.desc`,
     { headers: h }
   );
   if (!pendingRes.ok) {
     return NextResponse.json({ error: "Kunde inte hämta väntande förslag" }, { status: 502 });
   }
   const pendingRows = await pendingRes.json();
-  // pending: dok_id → { id, url } — url behövs för att skilja propositioner från motioner
   const pending = {};
   for (const row of pendingRows) {
     if (row.riksdagen_id) pending[row.riksdagen_id] = { id: row.id, url: row.riksdagen_url || "" };
@@ -40,7 +36,7 @@ export async function POST() {
   let uppdaterade = 0;
   const fel = [];
 
-  // 2. Bulk-sökning i senaste 200 voteringar (täcker betänkande-baserade)
+  // 2. Bulk-sökning i senaste voteringar (täcker nyligen röstade betänkanden)
   try {
     const bulkRes = await fetch(
       "https://data.riksdagen.se/voteringlista/?utformat=json&sz=200&sort=datum&sortorder=desc",
@@ -80,61 +76,53 @@ export async function POST() {
     fel.push(`bulk: ${e.message}`);
   }
 
-  // 3. Per-dokument-anrop för kvarvarande
-  for (const [dokId, { id: lagforslagId }] of Object.entries(pending)) {
+  // 3+4. Parallell batch (max 50) — voteringlista per dok, sedan dokumentstatus-fallback.
+  //      Parallell = ~8s totalt oavsett antal, undviker Vercel-timeout.
+  const debugSample = [];
+  const batch = Object.entries(pending).slice(0, 100);
+
+  await Promise.allSettled(batch.map(async ([dokId, { id: lagforslagId, url: lagforslagUrl }]) => {
+    // Steg A: voteringlista per dokument (fungerar för betänkanden med registrerad omröstning)
     try {
       const perRes = await fetch(
-        `https://data.riksdagen.se/voteringlista/?dokid=${dokId}&utformat=json&sz=10`,
-        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
+        `https://data.riksdagen.se/voteringlista/?dokid=${encodeURIComponent(dokId)}&utformat=json&sz=10`,
+        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(7000) }
       );
-      if (!perRes.ok) continue;
-
-      const perData = await perRes.json();
-      let perVoteringar = perData?.voteringlista?.votering || [];
-      if (!Array.isArray(perVoteringar)) perVoteringar = [perVoteringar];
-      if (perVoteringar.length === 0) continue;
-
-      const v = perVoteringar[0];
-      const utfallRaw = (v.utfall || "").trim();
-      const riksdagenUtfall = utfallRaw === "Ja" ? "bifall" : utfallRaw === "Nej" ? "avslag" : null;
-      if (!riksdagenUtfall) continue;
-
-      const datum = (v.datum || "").trim() || null;
-      const patchRes = await fetch(
-        `${SB_URL}/rest/v1/lagforslag?id=eq.${lagforslagId}`,
-        {
-          method: "PATCH",
-          headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
-          body: JSON.stringify({ riksdagen_utfall: riksdagenUtfall, riksdagen_utfall_datum: datum, status: "avgjort" }),
+      if (perRes.ok) {
+        const perData = await perRes.json();
+        let voteringar = perData?.voteringlista?.votering || [];
+        if (!Array.isArray(voteringar)) voteringar = [voteringar];
+        if (voteringar.length > 0) {
+          const v = voteringar[0];
+          const utfallRaw = (v.utfall || "").trim();
+          const riksdagenUtfall = utfallRaw === "Ja" ? "bifall" : utfallRaw === "Nej" ? "avslag" : null;
+          if (riksdagenUtfall) {
+            const datum = (v.datum || "").trim() || null;
+            const pr = await fetch(
+              `${SB_URL}/rest/v1/lagforslag?id=eq.${lagforslagId}`,
+              {
+                method: "PATCH",
+                headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
+                body: JSON.stringify({ riksdagen_utfall: riksdagenUtfall, riksdagen_utfall_datum: datum, status: "avgjort" }),
+              }
+            );
+            if (pr.ok) { uppdaterade++; delete pending[dokId]; return; }
+          }
         }
-      );
-      if (patchRes.ok) {
-        uppdaterade++;
-        delete pending[dokId];
       }
-    } catch (e) {
-      fel.push(`${dokId}: ${e.message}`);
-    }
-  }
+    } catch {}
 
-  // 4. Dokumentstatus-fallback: motioner röstades på via betänkande (annan dok_id).
-  //    dokumentstatus/{id}.json har dokbeslut.beslut med texten "bifall"/"avslag" direkt.
-  const remainingEntries = Object.entries(pending);
-  const dokstatusChunk = remainingEntries.slice(0, 30); // max 30 per körning
-
-  const debugSample = [];
-
-  await Promise.allSettled(dokstatusChunk.map(async ([dokId, { id: lagforslagId, url: lagforslagUrl }]) => {
+    // Steg B: dokumentstatus-fallback (acklamationsbeslut + propositioner)
     try {
-      // Försök med literal slash i path (riksdagen-konvention), fallback till encodeURIComponent
+      // Försök literal slash i path (riksdagen-konvention), sedan encoded fallback
       let dsRes = await fetch(
         `https://data.riksdagen.se/dokumentstatus/${dokId}.json`,
-        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(8000) }
+        { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(7000) }
       );
       if (!dsRes.ok) {
         dsRes = await fetch(
           `https://data.riksdagen.se/dokumentstatus/${encodeURIComponent(dokId)}.json`,
-          { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(8000) }
+          { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(7000) }
         );
       }
       if (!dsRes.ok) {
@@ -143,21 +131,22 @@ export async function POST() {
       }
       const ds = await dsRes.json();
 
-      // Extrahera besluttext — kan vara objekt eller array
       const dokStatus = (ds?.dokumentstatus?.dokument?.status || "").toLowerCase();
       const rawBeslut = ds?.dokumentstatus?.dokbeslut;
       const beslutObj = Array.isArray(rawBeslut) ? rawBeslut[0] : rawBeslut;
       const beslutText = (beslutObj?.beslut || "").toLowerCase();
       const datum = (ds?.dokumentstatus?.dokument?.datum || "").trim() || null;
 
-      if (debugSample.length < 3) debugSample.push({ dokId, dokStatus, beslutText: beslutText.slice(0, 80) });
+      if (debugSample.length < 3) debugSample.push({ dokId, dokStatus, beslutText: beslutText.slice(0, 100) });
 
-      // Avgör om avslutad
       if (!["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s)) && !beslutText) return;
 
-      // Avslag tar alltid prioritet — "biföll utskottets förslag om avslag" är avslag
       const harBifall = /bifall|biföll|godkänn|antog|antagen|tillstyrk/.test(beslutText);
-      const harAvslag = /avslag|avslog|avvisad|avstyrk|avslå/.test(beslutText);
+      // Targeted avslag — fångar "om avslag" (biföll utskottets förslag OM AVSLAG) och
+      // explicita avslag på förslaget, men INTE "avslag på motionerna" i blandade beslut.
+      // "Bifall till propositionen. Avslag på motionerna." → harAvslag=false → bifall ✓
+      // "biföll utskottets förslag om avslag" → harAvslag=true → avslag ✓
+      const harAvslag = /om avslag|avslår propositionen|avslog propositionen|avvisad|avstyrk/.test(beslutText);
 
       let riksdagenUtfall = null;
       if (harAvslag) {
@@ -168,13 +157,12 @@ export async function POST() {
         (dokStatus.includes("avslutad") || dokStatus.includes("beslutat") || dokStatus.includes("slutbehandlad")) &&
         beslutText === "" && (lagforslagUrl.includes("/proposition/") || lagforslagUrl.includes("/betankande/"))
       ) {
-        // Avslutad/beslutat utan explicit besluttext — nästan alltid bifall för prop och bet
         riksdagenUtfall = "bifall";
       }
 
       if (!riksdagenUtfall) return;
 
-      const patchRes = await fetch(
+      const pr = await fetch(
         `${SB_URL}/rest/v1/lagforslag?id=eq.${lagforslagId}`,
         {
           method: "PATCH",
@@ -182,11 +170,8 @@ export async function POST() {
           body: JSON.stringify({ riksdagen_utfall: riksdagenUtfall, riksdagen_utfall_datum: datum, status: "avgjort" }),
         }
       );
-      if (patchRes.ok) {
-        uppdaterade++;
-        delete pending[dokId];
-      }
-    } catch { /* ignorera per-dok-fel */ }
+      if (pr.ok) { uppdaterade++; delete pending[dokId]; }
+    } catch {}
   }));
 
   return NextResponse.json({
