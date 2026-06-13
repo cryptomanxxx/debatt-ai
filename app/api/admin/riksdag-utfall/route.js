@@ -81,7 +81,12 @@ export async function POST() {
   //      Batch 50 (ej 100) för att undvika rate-limiting mot riksdagen.se.
   const debugA = [];
   const debugB = [];
-  const batch = Object.entries(pending).slice(0, 50);
+  // Prioritera bet2024/25:xxx-format — dessa processas med rm+bet och ger utfall.
+  // HC01xxx är gamla dokument (2016/17) som riksdagen.se timeout:ar på, lägg dem sist.
+  const allEntries = Object.entries(pending);
+  const betEntries = allEntries.filter(([id]) => /^bet\d{4}\/\d{2}:/i.test(id));
+  const otherEntries = allEntries.filter(([id]) => !/^bet\d{4}\/\d{2}:/i.test(id));
+  const batch = [...betEntries, ...otherEntries].slice(0, 50);
 
   await Promise.allSettled(batch.map(async ([dokId, { id: lagforslagId, url: lagforslagUrl }]) => {
     // Steg A: voteringlista per dokument
