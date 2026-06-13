@@ -155,11 +155,15 @@ export async function POST() {
       // Avgör om avslutad
       if (!["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s)) && !beslutText) return;
 
+      // Avslag tar alltid prioritet — "biföll utskottets förslag om avslag" är avslag
+      const harBifall = /bifall|biföll|godkänn|antog|antagen|tillstyrk/.test(beslutText);
+      const harAvslag = /avslag|avslog|avvisad|avstyrk|avslå/.test(beslutText);
+
       let riksdagenUtfall = null;
-      if (/bifall|biföll|godkänn|antog|antagen|tillstyrk/.test(beslutText)) {
-        riksdagenUtfall = "bifall";
-      } else if (/avslag|avslog|avvisad|avstyrk/.test(beslutText)) {
+      if (harAvslag) {
         riksdagenUtfall = "avslag";
+      } else if (harBifall) {
+        riksdagenUtfall = "bifall";
       } else if (
         (dokStatus.includes("avslutad") || dokStatus.includes("beslutat") || dokStatus.includes("slutbehandlad")) &&
         beslutText === "" && (lagforslagUrl.includes("/proposition/") || lagforslagUrl.includes("/betankande/"))
