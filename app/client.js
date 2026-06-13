@@ -179,7 +179,7 @@ async function fetchCivilisationDrift() {
 
 async function fetchAktivitetsFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -187,6 +187,7 @@ async function fetchAktivitetsFeed() {
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,skapad,lagforslag(titel)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka,senast_aktiv&order=senast_aktiv.desc&limit=5`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/lobbying_log?select=lobbying_agent,mal_agent,resultat,belopp,skapad&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()),
+    fetch(`${SB_URL}/rest/v1/bribe_offers?select=giver_agent,receiver_agent,resultat,amount_kr,skapad&order=skapad.desc&limit=5`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,pris_betalt,kopt_at,butik_varor(namn,ikon)&order=kopt_at.desc&limit=5`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/butik_auktioner?select=saljare,hogst_budgivare,nuv_bud,stanger_at,butik_varor(namn,ikon)&status=eq.avgjord&order=stanger_at.desc&limit=4`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,skapad,markets(titel)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -285,6 +286,19 @@ async function fetchAktivitetsFeed() {
       href: "/lobbying",
       skapad: l.skapad,
       farg: lyckades ? "#f59e0b" : "#f87171",
+    });
+  });
+
+  (bribes.value || []).forEach(b => {
+    if (!b.skapad) return;
+    const lyckades = b.resultat === "accepterat";
+    feed.push({
+      typ: "bribe",
+      ikon: lyckades ? "💸" : "🕵️",
+      text: `${b.giver_agent} mutade ${b.receiver_agent} med ${b.amount_kr} kr — ${lyckades ? "accepterat" : "avvisat"}`,
+      href: "/korruption",
+      skapad: b.skapad,
+      farg: lyckades ? "#c084fc" : "#94a3b8",
     });
   });
 
