@@ -39,8 +39,6 @@ export async function POST() {
 
   let uppdaterade = 0;
   const fel = [];
-  let debugVoteringSample = [];
-  const debugPendingSample = Object.keys(pending).slice(0, 8);
 
   // 2. Bulk-sökning i senaste 200 voteringar (täcker betänkande-baserade)
   try {
@@ -52,7 +50,6 @@ export async function POST() {
       const data = await bulkRes.json();
       let voteringar = data?.voteringlista?.votering || [];
       if (!Array.isArray(voteringar)) voteringar = [voteringar];
-      debugVoteringSample = [...new Set(voteringar.map(v => (v.tillhor_dok_id || "").trim()).filter(Boolean))].slice(0, 8);
 
       for (const v of voteringar) {
         const dokId = (v.tillhor_dok_id || "").trim();
@@ -178,9 +175,5 @@ export async function POST() {
     uppdaterade,
     vantande: Object.keys(pending).length,
     fel: fel.length > 0 ? fel : undefined,
-    ...(uppdaterade === 0 && {
-      debug_pending_sample: debugPendingSample,
-      debug_votering_sample: debugVoteringSample,
-    }),
   });
 }
