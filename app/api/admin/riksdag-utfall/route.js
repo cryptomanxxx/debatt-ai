@@ -104,7 +104,7 @@ export async function POST() {
         `${SB_URL}/rest/v1/lagforslag?id=eq.${lagforslagId}`,
         {
           method: "PATCH",
-          headers: { ...h, Prefer: "return=minimal" },
+          headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
           body: JSON.stringify({ riksdagen_utfall: riksdagenUtfall, riksdagen_utfall_datum: datum, status: "avgjort" }),
         }
       );
@@ -142,15 +142,15 @@ export async function POST() {
       if (!["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s)) && !beslutText) return;
 
       let riksdagenUtfall = null;
-      if (/bifall|godkänn|antog|antagen|tillstyrk/.test(beslutText)) {
+      if (/bifall|biföll|godkänn|antog|antagen|tillstyrk/.test(beslutText)) {
         riksdagenUtfall = "bifall";
       } else if (/avslag|avslog|avvisad|avstyrk/.test(beslutText)) {
         riksdagenUtfall = "avslag";
       } else if (
         (dokStatus.includes("avslutad") || dokStatus.includes("beslutat") || dokStatus.includes("slutbehandlad")) &&
-        beslutText === "" && lagforslagUrl.includes("/proposition/")
+        beslutText === "" && (lagforslagUrl.includes("/proposition/") || lagforslagUrl.includes("/betankande/"))
       ) {
-        // Avslutad/beslutat utan explicit besluttext — nästan alltid bifall för propositioner
+        // Avslutad/beslutat utan explicit besluttext — nästan alltid bifall för prop och bet
         riksdagenUtfall = "bifall";
       }
 
@@ -160,7 +160,7 @@ export async function POST() {
         `${SB_URL}/rest/v1/lagforslag?id=eq.${lagforslagId}`,
         {
           method: "PATCH",
-          headers: { ...h, Prefer: "return=minimal" },
+          headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
           body: JSON.stringify({ riksdagen_utfall: riksdagenUtfall, riksdagen_utfall_datum: datum, status: "avgjort" }),
         }
       );
