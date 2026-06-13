@@ -125,7 +125,7 @@ const VARA_TYP = Object.fromEntries(
   Object.entries(TYP_VARA).map(([t, v]) => [v, t])
 );
 
-export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [], transClearing = [], handelClearing = [], zonEvents = [] }) {
+export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [], transClearing = [], handelClearing = [], zonEvents = [], kopOrdrar = [] }) {
   const [hover, setHover]         = useState(null);
   const [selected, setSelected]   = useState(null);
   const [floats, setFloats]       = useState([]);
@@ -143,6 +143,10 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const [renameInput,  setRenameInput]  = useState("");
   const [tfm,          setTfm]          = useState({ z: 1, x: 0, y: 0 });
   const [kartLager,    setKartLager]    = useState("ägande");
+  const [kopOrderVara,    setKopOrderVara]    = useState("malm");
+  const [kopOrderAntal,   setKopOrderAntal]   = useState("3");
+  const [kopOrderMaxPris, setKopOrderMaxPris] = useState("");
+  const [lokalaOrdrar,    setLokalaOrdrar]    = useState([]);
   const tfmRef       = useRef({ z: 1, x: 0, y: 0 });
   const containerRef = useRef(null);
   const dragRef      = useRef({ active: false, startX: 0, startY: 0, px: 0, py: 0, moved: false });
@@ -491,6 +495,29 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       setMarkMsg({ text: `✅ ${zon.namn} lagd på auktion — stänger om 24h!`, ok: true });
       setSaljInput(null); setSaljPris("");
       setTimeout(() => setMarkMsg(null), 5000);
+    } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
+    finally { setPending(false); }
+  }
+
+  async function laggKopOrder() {
+    const antal = parseInt(kopOrderAntal);
+    const maxPris = parseFloat(kopOrderMaxPris);
+    if (!antal || antal < 1 || !maxPris || maxPris <= 0 || !besokareId || pending) return;
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/kop-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ besokare_id: besokareId, display_name: besokareNamn, vara: kopOrderVara, antal, max_pris_per_enhet: maxPris }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Misslyckades", ok: false }); return; }
+      setBesokSaldo(d.saldo);
+      localStorage.setItem("mark_besokare_saldo", d.saldo);
+      setLokalaOrdrar(prev => [...prev, { id: d.order_id, kop_agent: besokareNamn, vara: kopOrderVara, antal, max_pris_per_enhet: maxPris, reserverat_kr: d.reserverat_kr, status: "öppen", skapad: new Date().toISOString() }]);
+      setMarkMsg({ text: `✅ Köporder lagd! ${d.reserverat_kr} kr reserverade.`, ok: true });
+      setKopOrderMaxPris("");
+      setTimeout(() => setMarkMsg(null), 6000);
     } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
     finally { setPending(false); }
   }
@@ -1333,6 +1360,111 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
         </div>
 
       </div>{/* /marknader 4-raders grid */}
+
+      {/* ── KÖPORDRAR ── */}
+      {(() => {
+        const alleOrdrar = [
+          ...kopOrdrar.filter(o => !lokalaOrdrar.some(l => l.id === o.id)),
+          ...lokalaOrdrar,
+        ];
+        return (
+          <div style={{ background: "#070d07", border: "1px solid rgba(74,222,128,0.20)", borderRadius: "10px", overflow: "hidden", marginTop: "0" }}>
+            {/* Header */}
+            <div style={{ padding: "16px 20px 14px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid rgba(74,222,128,0.12)", background: "#090f09" }}>
+              <span style={{ fontSize: "18px" }}>📋</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "12px", color: "#4ade80", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>KÖPORDRAR</div>
+                <div style={{ fontSize: "9px", color: "#1a3a1a", fontFamily: "monospace" }}>ÖNSKADE KÖP · AGENTER MATCHAR VID NÄSTA KÖRNING (09:30)</div>
+              </div>
+              {alleOrdrar.length > 0 && (
+                <span style={{ fontSize: "10px", color: "#4ade80", fontFamily: "monospace", background: "rgba(74,222,128,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(74,222,128,0.20)" }}>
+                  {alleOrdrar.length} öppna
+                </span>
+              )}
+            </div>
+
+            <div style={{ padding: "14px 20px", display: "grid", gridTemplateColumns: besokareNamn ? "1fr 1fr" : "1fr", gap: "16px" }}>
+
+              {/* Vänster: Ny köporder (bara för inloggade besökare) */}
+              {besokareNamn && (
+                <div>
+                  <p style={{ fontSize: "9px", color: "#1a3a1a", fontFamily: "monospace", letterSpacing: "0.10em", margin: "0 0 10px" }}>NY KÖPORDER</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
+                      <div>
+                        <div style={{ fontSize: "8px", color: "#2a3a2a", fontFamily: "monospace", marginBottom: "3px" }}>VARA</div>
+                        <select value={kopOrderVara} onChange={e => setKopOrderVara(e.target.value)}
+                          style={{ width: "100%", background: "#0d140d", border: "1px solid #1a2a1a", color: "#4ade80", borderRadius: "4px", padding: "5px 7px", fontSize: "10px", fontFamily: "monospace" }}>
+                          {Object.keys(BASPRIS_VARA).map(v => (
+                            <option key={v} value={v}>{VARA_IKON[v]} {v}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "8px", color: "#2a3a2a", fontFamily: "monospace", marginBottom: "3px" }}>ANTAL (1–20)</div>
+                        <input type="number" min="1" max="20" value={kopOrderAntal} onChange={e => setKopOrderAntal(e.target.value)}
+                          style={{ width: "100%", boxSizing: "border-box", background: "#0d140d", border: "1px solid #1a2a1a", color: "#e0e0e0", borderRadius: "4px", padding: "5px 7px", fontSize: "10px", fontFamily: "monospace" }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "8px", color: "#2a3a2a", fontFamily: "monospace", marginBottom: "3px" }}>MAX KR/ENHET</div>
+                        <input type="number" min="1" placeholder={`≥ ${Math.ceil(BASPRIS_VARA[kopOrderVara] * 0.5)}`} value={kopOrderMaxPris} onChange={e => setKopOrderMaxPris(e.target.value)}
+                          style={{ width: "100%", boxSizing: "border-box", background: "#0d140d", border: "1px solid #1a2a1a", color: "#e0e0e0", borderRadius: "4px", padding: "5px 7px", fontSize: "10px", fontFamily: "monospace" }} />
+                      </div>
+                    </div>
+                    {kopOrderMaxPris && parseFloat(kopOrderMaxPris) > 0 && parseInt(kopOrderAntal) > 0 && (
+                      <div style={{ fontSize: "9px", color: "#3a5a3a", fontFamily: "monospace" }}>
+                        Reservation: {Math.ceil(parseInt(kopOrderAntal) * parseFloat(kopOrderMaxPris))} kr · Ditt saldo: {besokSaldo ?? "…"} kr
+                      </div>
+                    )}
+                    <button onClick={laggKopOrder}
+                      disabled={pending || !kopOrderMaxPris || parseFloat(kopOrderMaxPris) < Math.ceil(BASPRIS_VARA[kopOrderVara] * 0.5) || parseInt(kopOrderAntal) < 1}
+                      style={{ background: pending ? "#1a2a1a" : "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.40)", color: "#4ade80", borderRadius: "4px", padding: "8px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: 700, letterSpacing: "0.05em" }}>
+                      {pending ? "Lägger order…" : "📋 Lägg köporder"}
+                    </button>
+                    <div style={{ fontSize: "9px", color: "#2a3a2a", fontFamily: "monospace", lineHeight: 1.6 }}>
+                      Beloppet reserveras nu. Agenter med lager matchar din order vid nästa dagliga körning kl 09:30. Eventuell skillnad mot ditt maxpris återbetalas automatiskt.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Höger (eller full bredd om ej inloggad): Öppna ordrar */}
+              <div>
+                <p style={{ fontSize: "9px", color: "#1a3a1a", fontFamily: "monospace", letterSpacing: "0.10em", margin: "0 0 10px" }}>ÖPPNA ORDRAR</p>
+                {alleOrdrar.length === 0 ? (
+                  <div style={{ fontSize: "10px", color: "#1a2a1a", fontFamily: "monospace", textAlign: "center", padding: "16px 0" }}>
+                    Inga öppna köpordrar
+                    {!besokareNamn && <div style={{ fontSize: "9px", color: "#1a2a1a", marginTop: "6px" }}>Ladda sidan för att placera en order</div>}
+                  </div>
+                ) : alleOrdrar.map(o => {
+                  const isMin = o.kop_agent === besokareNamn;
+                  const varTyp = VARA_TYP[o.vara];
+                  const farg = varTyp ? TYP_FARG[varTyp] : "#4ade80";
+                  return (
+                    <div key={o.id} style={{ background: "#0a140a", border: `1px solid ${rgba(farg, 0.22)}`, borderLeft: `3px solid ${rgba(farg, 0.60)}`, borderRadius: "0 6px 6px 0", padding: "9px 12px", marginBottom: "7px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                        <span style={{ fontSize: "11px", color: farg, fontFamily: "monospace", fontWeight: 700 }}>
+                          {VARA_IKON[o.vara] || "📦"} {o.antal}× {o.vara}
+                        </span>
+                        {isMin && <span style={{ fontSize: "8px", color: "#4ade80", fontFamily: "monospace", background: "rgba(74,222,128,0.10)", padding: "1px 5px", borderRadius: "3px" }}>DIN ORDER</span>}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", fontFamily: "monospace" }}>
+                        <span style={{ color: "#2a4a2a" }}>Max {o.max_pris_per_enhet} kr/enhet</span>
+                        <span style={{ color: "#1a3a1a" }}>{relativeTime(o.skapad)}</span>
+                      </div>
+                      <div style={{ fontSize: "9px", color: isMin ? "#3a6a3a" : "#1a3a1a", fontFamily: "monospace", marginTop: "3px" }}>
+                        {o.kop_agent} · {o.reserverat_kr} kr reserverat
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   );
 }
