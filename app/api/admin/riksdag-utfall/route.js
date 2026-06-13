@@ -15,9 +15,9 @@ function sbWriteHeaders() {
 export async function POST() {
   const h = sbHeaders();
 
-  // 1. Hämta riksdagsförslag som saknar utfall
+  // 1. Hämta riksdagsförslag som saknar utfall — nyast först så senaste session bearbetas varje körning
   const pendingRes = await fetch(
-    `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&riksdagen_utfall=is.null&select=id,riksdagen_id,riksdagen_url`,
+    `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&riksdagen_utfall=is.null&select=id,riksdagen_id,riksdagen_url&order=skapad.desc`,
     { headers: h }
   );
   if (!pendingRes.ok) {
@@ -79,7 +79,7 @@ export async function POST() {
   // 3+4. Parallell batch (max 50) — voteringlista per dok, sedan dokumentstatus-fallback.
   //      Parallell = ~8s totalt oavsett antal, undviker Vercel-timeout.
   const debugSample = [];
-  const batch = Object.entries(pending).slice(0, 50); // TODO: Implement a cursor or order to process all pending rows
+  const batch = Object.entries(pending).slice(0, 100);
 
   await Promise.allSettled(batch.map(async ([dokId, { id: lagforslagId, url: lagforslagUrl }]) => {
     // Steg A: voteringlista per dokument (fungerar för betänkanden med registrerad omröstning)
@@ -141,19 +141,30 @@ export async function POST() {
 
       if (!["avslutad", "beslutat", "slutbehandlad"].some(s => dokStatus.includes(s)) && !beslutText) return;
 
-      // Avslag tar alltid prioritet — "biföll utskottets förslag om avslag" är avslag
       const harBifall = /bifall|biföll|godkänn|antog|antagen|tillstyrk/.test(beslutText);
       const harAvslag = /avslag|avslog|avvisad|avstyrk|avslå/.test(beslutText);
+      const isProposition = lagforslagUrl.includes("/proposition/");
 
       let riksdagenUtfall = null;
-      if (harAvslag) {
-        riksdagenUtfall = "avslag";
-      } else if (harBifall) {
-        riksdagenUtfall = "bifall";
-      } else if (
-        (dokStatus.includes("avslutad") || dokStatus.includes("beslutat") || dokStatus.includes("slutbehandlad")) &&
-        beslutText === "" && (lagforslagUrl.includes("/proposition/") || lagforslagUrl.includes("/betankande/"))
-      ) {
+      if (isProposition) {
+        // Propositioner: "bifaller propositionen och avslår motionerna" = bifall.
+        // Avslag gäller bara om propositionen explicit avslogs, inte för sekundära motioner.
+        const avslagsPropositionen = /avslår propositionen|avslog propositionen/.test(beslutText);
+        if (avslagsPropositionen) {
+          riksdagenUtfall = "avslag";
+        } else if (harBifall) {
+          riksdagenUtfall = "bifall";
+        }
+      } else {
+        // Betänkanden: avslag tar prioritet — "biföll utskottets förslag om avslag" är avslag
+        if (harAvslag) {
+          riksdagenUtfall = "avslag";
+        } else if (harBifall) {
+          riksdagenUtfall = "bifall";
+        }
+      }
+      if (!riksdagenUtfall && (dokStatus.includes("avslutad") || dokStatus.includes("beslutat") || dokStatus.includes("slutbehandlad")) &&
+        beslutText === "" && (lagforslagUrl.includes("/proposition/") || lagforslagUrl.includes("/betankande/"))) {
         riksdagenUtfall = "bifall";
       }
 
