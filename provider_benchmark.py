@@ -61,9 +61,11 @@ def _sb_upsert(path: str, data: dict) -> bool:
 
 
 def hamta_passiva_429s() -> dict[str, int]:
-    """Hämtar antal passiva 429-loggar per provider senaste 24h."""
+    """Hämtar antal rate-limit-fel per provider senaste 24h från ai_log."""
     since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    rows = _sb_get("provider_429_passive", f"loggad=gte.{since}&select=provider")
+    # ai_log loggas av både JS-appen och Python-agenterna — provider_429_passive
+    # fylls bara på av Python-sidan och är alltid tom för JS-routes.
+    rows = _sb_get("ai_log", f"ts=gte.{since}&status=in.(rate_limited,error_429)&select=provider")
     counts: dict[str, int] = {}
     for row in rows:
         p = row.get("provider", "")
