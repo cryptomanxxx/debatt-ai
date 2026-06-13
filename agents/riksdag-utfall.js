@@ -47,8 +47,9 @@ async function getVoteCountUtfall(dokId) {
 
   const derived = rmFranDokId(dokId);
   const allRms = ["2025/26", "2024/25", "2023/24", "2022/23"];
-  // Prova härledd rm först — undviker att koppla föregående riksmötes röster till nyare dokument
-  const rmsToTry = derived ? [derived, ...allRms.filter(r => r !== derived)] : allRms;
+  // Om riksmöte kan härledas ur dokId-prefix, använd bara det — undviker att ett annat
+  // riksmötes röster med samma beteckning kopplas till ett nyare dokument.
+  const rmsToTry = derived ? [derived] : allRms;
 
   for (const rm of rmsToTry) {
     const d = await get(
