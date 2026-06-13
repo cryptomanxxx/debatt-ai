@@ -84,8 +84,9 @@ export async function POST(req) {
       nyttSaldo = null; // konflikt — retry med ny saldo-läsning
     }
     if (!refunded) {
-      // Rollback: återöppna ordern så att reservationen inte försvinner
-      await sb(`mark_kop_ordrar?id=eq.${order_id}`, {
+      // Rollback: återöppna ordern — bara om den fortfarande är avbruten
+      // (filtret förhindrar att en redan ifylld order öppnas igen)
+      await sb(`mark_kop_ordrar?id=eq.${order_id}&status=eq.avbruten`, {
         method: "PATCH",
         body: JSON.stringify({ status: "öppen" }),
         prefer: "return=minimal",
