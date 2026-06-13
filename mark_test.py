@@ -945,6 +945,15 @@ def fyll_kop_ordrar(lager: dict, saldon: dict):
         )
         lager.setdefault(saljare, {})[vara] = ny_saljare_antal
 
+        # Lägg till i köparens lager (besökare eller agent)
+        ny_buyer_antal = lager.get(kop_agent, {}).get(vara, 0) + antal
+        sb_upsert(
+            "mark_lager",
+            {"agent": kop_agent, "vara": vara, "antal": ny_buyer_antal, "uppdaterad": "now()"},
+            on_conflict="agent,vara",
+        )
+        lager.setdefault(kop_agent, {})[vara] = ny_buyer_antal
+
         # Betala säljaren
         nytt_saljare_saldo = round(saldon.get(saljare, 0) + total_pris, 2)
         patch_saldo(saljare, nytt_saljare_saldo, saldon)

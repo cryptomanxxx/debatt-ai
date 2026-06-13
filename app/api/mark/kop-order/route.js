@@ -76,14 +76,18 @@ export async function POST(req) {
   if (existRows.length)
     return NextResponse.json({ error: `Du har redan en öppen köporder på ${vara}` }, { status: 400 });
 
-  // Reservera belopp från plånbok
+  // Reservera belopp från plånbok — atomisk: filtret saldo=gte.reserverat_kr
+  // förhindrar double-spend vid parallella anrop
   const nyttSaldo = wallet.saldo - reserverat_kr;
-  const updateR = await sb(`visitor_wallets?id=eq.${besokare_id}`, {
+  const updateR = await sb(`visitor_wallets?id=eq.${besokare_id}&saldo=gte.${reserverat_kr}`, {
     method: "PATCH",
     body: JSON.stringify({ saldo: nyttSaldo, senast_aktiv: new Date().toISOString() }),
-    prefer: "return=minimal",
+    prefer: "return=representation",
   });
   if (!updateR.ok) return NextResponse.json({ error: "Kunde inte uppdatera saldo" }, { status: 500 });
+  const updatedWallets = await updateR.json();
+  if (!Array.isArray(updatedWallets) || updatedWallets.length === 0)
+    return NextResponse.json({ error: "Saldot räckte inte till — försök igen" }, { status: 400 });
 
   // Skapa köporder
   const orderR = await sb("mark_kop_ordrar", {
