@@ -166,7 +166,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   ];
   const agareMap    = Object.fromEntries(mergedAgare.map(a => [a.zon_id, a]));
   const zonEventMap = Object.fromEntries(zonEvents.map(e => [e.zon_id, e]));
-  const auktionMap  = Object.fromEntries(auktioner.map(a => [a.mark_zoner?.id, a]));
+  const filtreradeAuktioner = auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id));
+  const auktionMap  = Object.fromEntries(filtreradeAuktioner.map(a => [a.mark_zoner?.id, a]));
 
   // Centrera hexklustret dynamiskt i SVG
   // OX/OY centrerar klustret med fast padding från origo — viewBox anpassas dynamiskt
@@ -832,9 +833,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
         const minVaraAkt = besokareNamn ? varaAuktioner.filter(a =>
           a.status === "öppen" && (a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn)
         ) : [];
-        const minZonAkt = besokareNamn ? auktioner.filter(a =>
+        const minZonAkt = besokareNamn ? filtreradeAuktioner.filter(a =>
           a.status === "öppen" &&
-          !avbrutnaZonAuktioner.has(a.id) &&
           (a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn)
         ) : [];
         const totalt = alleOrdrar.length + minVaraAkt.length + minZonAkt.length;
@@ -1532,9 +1532,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             <div style={{ fontSize: "12px", color: "#f59e0b", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>MARKAUKTIONER</div>
             <div style={{ fontSize: "9px", color: "#4a3a00", fontFamily: "monospace" }}>BUDRUNDOR · ZONÄGARSKAP · 24H</div>
           </div>
-          {auktioner.length > 0 && (
+          {filtreradeAuktioner.length > 0 && (
             <span style={{ fontSize: "10px", color: "#f59e0b", fontFamily: "monospace", background: "rgba(245,158,11,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(245,158,11,0.20)" }}>
-              {auktioner.length} aktiva
+              {filtreradeAuktioner.length} aktiva
             </span>
           )}
         </div>
@@ -1553,9 +1553,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
 
         {/* ── ROW 2: Auktionskort (variabel höjd — CSS grid gör att rad 3+ börjar på samma Y) ── */}
         <div style={{ background: "#0b0a07", borderLeft: "1px solid rgba(245,158,11,0.22)", borderRight: "1px solid rgba(245,158,11,0.22)", padding: "4px 20px 10px" }}>
-          {auktioner.length === 0 ? (
+          {filtreradeAuktioner.length === 0 ? (
             <div style={{ fontSize: "11px", color: "#2a2200", fontFamily: "monospace", textAlign: "center", padding: "20px 0" }}>Inga aktiva auktioner just nu</div>
-          ) : auktioner.map(a => {
+          ) : filtreradeAuktioner.map(a => {
             const zon     = a.mark_zoner || {};
             const typFarg = TYP_FARG[zon.typ] || "#555";
             const saljare = a.saljare || "Plattformen";
