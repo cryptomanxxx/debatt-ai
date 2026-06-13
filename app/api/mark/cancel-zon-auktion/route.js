@@ -48,8 +48,10 @@ export async function POST(req) {
   if (auktion.nuv_bud)
     return NextResponse.json({ error: "Kan inte avbryta — det finns redan ett bud" }, { status: 400 });
 
-  // Atomisk statusövergång: filtret status=eq.öppen förhindrar double-cancel
-  const cancelR = await sb(`mark_auktioner?id=eq.${auktion_id}&status=eq.%C3%B6ppen`, {
+  // Atomisk statusövergång: status=eq.öppen + nuv_bud=is.null förhindrar
+  // både double-cancel och att en auktion med inkommet bud markeras inställd
+  // (race window: bud kan ha landats mellan vår pre-check och denna PATCH)
+  const cancelR = await sb(`mark_auktioner?id=eq.${auktion_id}&status=eq.%C3%B6ppen&nuv_bud=is.null`, {
     method: "PATCH",
     body: JSON.stringify({ status: "inställd" }),
     prefer: "return=representation",
@@ -57,7 +59,7 @@ export async function POST(req) {
   if (!cancelR.ok) return NextResponse.json({ error: "Kunde inte avbryta auktionen" }, { status: 500 });
   const cancelled = await cancelR.json();
   if (!Array.isArray(cancelled) || cancelled.length === 0)
-    return NextResponse.json({ error: "Auktionen är inte längre öppen" }, { status: 409 });
+    return NextResponse.json({ error: "Auktionen är inte längre öppen eller har fått ett bud" }, { status: 409 });
 
   return NextResponse.json({ ok: true });
 }
