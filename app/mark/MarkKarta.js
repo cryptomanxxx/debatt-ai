@@ -147,6 +147,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const [kopOrderAntal,   setKopOrderAntal]   = useState("3");
   const [kopOrderMaxPris, setKopOrderMaxPris] = useState("");
   const [lokalaOrdrar,    setLokalaOrdrar]    = useState([]);
+  const [widgetTyp,       setWidgetTyp]       = useState("kop");   // "kop" | "salj"
+  const [widgetSubjekt,   setWidgetSubjekt]   = useState("varor"); // "varor" | "mark"
+  const [saljWidgetZon,   setSaljWidgetZon]   = useState("");
   const tfmRef       = useRef({ z: 1, x: 0, y: 0 });
   const containerRef = useRef(null);
   const dragRef      = useRef({ active: false, startX: 0, startY: 0, px: 0, py: 0, moved: false });
@@ -522,6 +525,45 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     finally { setPending(false); }
   }
 
+  async function avbrytKopOrder(orderId, reserverat) {
+    if (!besokareId || pending) return;
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/kop-order/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ besokare_id: besokareId, display_name: besokareNamn, order_id: orderId }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Avbryt misslyckades", ok: false }); return; }
+      if (d.saldo != null) { setBesokSaldo(d.saldo); localStorage.setItem("mark_besokare_saldo", d.saldo); }
+      setLokalaOrdrar(prev => prev.filter(o => o.id !== orderId));
+      setMarkMsg({ text: `✅ Order avbruten — ${d.refunded} kr återbetalade.`, ok: true });
+      setTimeout(() => setMarkMsg(null), 5000);
+    } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
+    finally { setPending(false); }
+  }
+
+  async function saljWidgetZonAuktion() {
+    const zon = zoner.find(z => String(z.id) === String(saljWidgetZon));
+    if (!zon || !besokareId || pending) return;
+    const rp = Math.ceil(zon.koppris * 0.65);
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/salj", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zon_id: zon.id, reservpris: rp, besokare_id: besokareId, display_name: besokareNamn }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Misslyckades", ok: false }); return; }
+      setMarkMsg({ text: `✅ ${zon.namn} lagd på auktion!`, ok: true });
+      setSaljWidgetZon("");
+      setTimeout(() => setMarkMsg(null), 5000);
+    } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
+    finally { setPending(false); }
+  }
+
   function handleEnter(zon) {
     setHover(zon);
     const [cx, cy] = hexCenter(zon.hex_col, zon.hex_row, OX, OY);
@@ -530,8 +572,132 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     setTimeout(() => setFloats(prev => prev.filter(f => f.id !== id)), 1600);
   }
 
+  // Zoner som besökaren äger (för SÄLJ + MARK-widgeten)
+  const mina_zoner = zoner.filter(z => {
+    const a = mergedAgare.find(a => a.zon_id === z.id);
+    return a && a.agent === besokareNamn;
+  });
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+      {/* ── KÖP/SÄLJ-WIDGET ── */}
+      {besokareNamn && (
+        <div style={{ background: "#07090f", border: "1px solid #1a2535", borderRadius: "10px", overflow: "hidden" }}>
+          {/* Rubrik + dropdown-par */}
+          <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", borderBottom: "1px solid #111820", background: "#080b14" }}>
+            <span style={{ fontSize: "13px" }}>🛒</span>
+            <span style={{ fontSize: "10px", color: "#60a5fa", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em", flex: 1 }}>
+              HANDEL
+            </span>
+            {/* Typ-select */}
+            <select value={widgetTyp} onChange={e => setWidgetTyp(e.target.value)}
+              style={{ background: "#0d1220", border: "1px solid #1e3050", color: "#a0c4ff", borderRadius: "4px", padding: "4px 8px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer" }}>
+              <option value="kop">KÖP</option>
+              <option value="salj">SÄLJ</option>
+            </select>
+            {/* Subjekt-select */}
+            <select value={widgetSubjekt} onChange={e => setWidgetSubjekt(e.target.value)}
+              style={{ background: "#0d1220", border: "1px solid #1e3050", color: "#a0c4ff", borderRadius: "4px", padding: "4px 8px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer" }}>
+              <option value="varor">VAROR</option>
+              <option value="mark">MARK</option>
+            </select>
+            <span style={{ fontSize: "9px", color: "#2a3a4a", fontFamily: "monospace" }}>Saldo: {besokSaldo ?? "…"} kr</span>
+          </div>
+
+          <div style={{ padding: "14px 16px" }}>
+            {/* KÖP + VAROR */}
+            {widgetTyp === "kop" && widgetSubjekt === "varor" && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "flex-end" }}>
+                <div>
+                  <div style={{ fontSize: "8px", color: "#2a3a4a", fontFamily: "monospace", marginBottom: "3px" }}>VARA</div>
+                  <select value={kopOrderVara} onChange={e => setKopOrderVara(e.target.value)}
+                    style={{ background: "#0d140d", border: "1px solid #1a2a1a", color: "#4ade80", borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: "monospace" }}>
+                    {Object.keys(BASPRIS_VARA).map(v => (
+                      <option key={v} value={v}>{VARA_IKON[v]} {v}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize: "8px", color: "#2a3a4a", fontFamily: "monospace", marginBottom: "3px" }}>ANTAL (1–20)</div>
+                  <input type="number" min="1" max="20" value={kopOrderAntal} onChange={e => setKopOrderAntal(e.target.value)}
+                    style={{ width: "70px", background: "#0d140d", border: "1px solid #1a2a1a", color: "#e0e0e0", borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: "monospace" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: "8px", color: "#2a3a4a", fontFamily: "monospace", marginBottom: "3px" }}>MAX KR/ENHET (≥{Math.ceil(BASPRIS_VARA[kopOrderVara] * 0.5)})</div>
+                  <input type="number" min="1" placeholder={`${Math.ceil(BASPRIS_VARA[kopOrderVara] * 0.5)}`} value={kopOrderMaxPris} onChange={e => setKopOrderMaxPris(e.target.value)}
+                    style={{ width: "90px", background: "#0d140d", border: "1px solid #1a2a1a", color: "#e0e0e0", borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: "monospace" }} />
+                </div>
+                <button onClick={laggKopOrder}
+                  disabled={pending || !kopOrderMaxPris || parseFloat(kopOrderMaxPris) < Math.ceil(BASPRIS_VARA[kopOrderVara] * 0.5) || parseInt(kopOrderAntal) < 1}
+                  style={{ background: pending ? "#1a2a1a" : "rgba(74,222,128,0.15)", border: "1px solid rgba(74,222,128,0.40)", color: "#4ade80", borderRadius: "4px", padding: "5px 14px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: 700 }}>
+                  {pending ? "…" : "📋 Lägg order"}
+                </button>
+                {kopOrderMaxPris && parseFloat(kopOrderMaxPris) > 0 && parseInt(kopOrderAntal) > 0 && (
+                  <span style={{ fontSize: "9px", color: "#2a4a2a", fontFamily: "monospace" }}>
+                    Reservation: {Math.ceil(parseInt(kopOrderAntal) * parseFloat(kopOrderMaxPris))} kr
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* KÖP + MARK */}
+            {widgetTyp === "kop" && widgetSubjekt === "mark" && (
+              <div style={{ fontSize: "10px", color: "#3a5070", fontFamily: "monospace", lineHeight: 1.7 }}>
+                Välj en ledig zon på kartan och klicka på den för att köpa direkt till listpris.
+                <br /><span style={{ color: "#1a3050" }}>Alternativt: buda på pågående auktioner i panelen nedanför.</span>
+              </div>
+            )}
+
+            {/* SÄLJ + VAROR */}
+            {widgetTyp === "salj" && widgetSubjekt === "varor" && (
+              <div style={{ fontSize: "10px", color: "#3a5070", fontFamily: "monospace", lineHeight: 1.7 }}>
+                Varor säljs via 24h-auktioner. Klicka på en varuauktion i marknadsöversikten nedan och lägg ett bud, eller lista dina varor via kartpanelen.
+              </div>
+            )}
+
+            {/* SÄLJ + MARK */}
+            {widgetTyp === "salj" && widgetSubjekt === "mark" && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", alignItems: "flex-end" }}>
+                {mina_zoner.length === 0 ? (
+                  <span style={{ fontSize: "10px", color: "#2a3a4a", fontFamily: "monospace" }}>
+                    Du äger inga zoner ännu. Köp en zon på kartan för att sälja den vidare.
+                  </span>
+                ) : (
+                  <>
+                    <div>
+                      <div style={{ fontSize: "8px", color: "#2a3a4a", fontFamily: "monospace", marginBottom: "3px" }}>DIN ZON</div>
+                      <select value={saljWidgetZon} onChange={e => setSaljWidgetZon(e.target.value)}
+                        style={{ background: "#140d0d", border: "1px solid #2a1a1a", color: "#f87171", borderRadius: "4px", padding: "5px 8px", fontSize: "10px", fontFamily: "monospace" }}>
+                        <option value="">— välj zon —</option>
+                        {mina_zoner.map(z => (
+                          <option key={z.id} value={z.id}>{TYP_IKON[z.typ]} {z.namn} ({z.koppris} kr)</option>
+                        ))}
+                      </select>
+                    </div>
+                    {saljWidgetZon && (
+                      <div style={{ fontSize: "9px", color: "#4a2a2a", fontFamily: "monospace" }}>
+                        Reservpris: {Math.ceil((zoner.find(z => String(z.id) === String(saljWidgetZon))?.koppris || 0) * 0.65)} kr (65% av listpris)
+                      </div>
+                    )}
+                    <button onClick={saljWidgetZonAuktion} disabled={!saljWidgetZon || pending}
+                      style={{ background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.35)", color: "#f87171", borderRadius: "4px", padding: "5px 14px", fontSize: "10px", fontFamily: "monospace", cursor: "pointer", fontWeight: 700 }}>
+                      {pending ? "…" : "🏷 Lista på auktion"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Meddelanden */}
+            {markMsg && (
+              <div style={{ marginTop: "10px", fontSize: "10px", color: markMsg.ok ? "#4ade80" : "#f87171", fontFamily: "monospace" }}>
+                {markMsg.text}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── KARTLAGER-TOGGLE ── */}
       <div style={{ display: "flex", gap: "6px" }}>
@@ -1446,7 +1612,15 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                         <span style={{ fontSize: "11px", color: farg, fontFamily: "monospace", fontWeight: 700 }}>
                           {VARA_IKON[o.vara] || "📦"} {o.antal}× {o.vara}
                         </span>
-                        {isMin && <span style={{ fontSize: "8px", color: "#4ade80", fontFamily: "monospace", background: "rgba(74,222,128,0.10)", padding: "1px 5px", borderRadius: "3px" }}>DIN ORDER</span>}
+                        {isMin ? (
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            <span style={{ fontSize: "8px", color: "#4ade80", fontFamily: "monospace", background: "rgba(74,222,128,0.10)", padding: "1px 5px", borderRadius: "3px" }}>DIN ORDER</span>
+                            <button onClick={() => avbrytKopOrder(o.id, o.reserverat_kr)} disabled={pending}
+                              style={{ fontSize: "8px", color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "3px", padding: "1px 6px", cursor: "pointer", fontFamily: "monospace" }}>
+                              ✕ avbryt
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", fontFamily: "monospace" }}>
                         <span style={{ color: "#2a4a2a" }}>Max {o.max_pris_per_enhet} kr/enhet</span>
