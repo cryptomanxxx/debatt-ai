@@ -50,9 +50,10 @@ function byggUrl(d) {
   return d.dok_id ? `https://data.riksdagen.se/dokument/${d.dok_id}.html` : null;
 }
 
-async function hämtaDoktyp(doktyp) {
+async function hämtaDoktyp(doktyp, rm = null) {
+  const rmParam = rm ? `&rm=${encodeURIComponent(rm)}` : "";
   const r = await fetch(
-    `https://data.riksdagen.se/dokumentlista/?doktyp=${doktyp}&utformat=json&sz=50&sort=datum&sortorder=desc`,
+    `https://data.riksdagen.se/dokumentlista/?doktyp=${doktyp}&utformat=json&sz=50&sort=datum&sortorder=desc${rmParam}`,
     { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
   );
   if (!r.ok) throw new Error(`API ${r.status}`);
@@ -79,21 +80,24 @@ async function hämtaDoktyp(doktyp) {
 async function hämtaViaApi() {
   // Betänkanden (bet) importeras för att riksdagen röstar på dem direkt →
   // tillhor_dok_id i voteringlista matchar bet-dok_id → utfall kan hämtas automatiskt.
-  const [propositioner, motioner, betankanden] = await Promise.allSettled([
+  // Hämtar även förra sessionen (2024/25) som är helt avslutad — alla bet har röstats på.
+  const [propositioner, motioner, betankanden, betGamla] = await Promise.allSettled([
     hämtaDoktyp("prop"),
     hämtaDoktyp("mot"),
     hämtaDoktyp("bet"),
+    hämtaDoktyp("bet", "2024/25"),
   ]);
 
-  // Om alla tre misslyckas — kasta så att HTML-fallbacken i POST aktiveras
-  if (propositioner.status === "rejected" && motioner.status === "rejected" && betankanden.status === "rejected") {
-    throw new Error(`prop: ${propositioner.reason?.message} | mot: ${motioner.reason?.message} | bet: ${betankanden.reason?.message}`);
+  // Om alla fyra misslyckas — kasta så att HTML-fallbacken i POST aktiveras
+  if (propositioner.status === "rejected" && motioner.status === "rejected" && betankanden.status === "rejected" && betGamla.status === "rejected") {
+    throw new Error(`prop: ${propositioner.reason?.message} | mot: ${motioner.reason?.message} | bet: ${betankanden.reason?.message} | bet2024: ${betGamla.reason?.message}`);
   }
 
   const forslag = [
     ...(propositioner.status === "fulfilled" ? propositioner.value : []),
     ...(motioner.status === "fulfilled" ? motioner.value : []),
     ...(betankanden.status === "fulfilled" ? betankanden.value : []),
+    ...(betGamla.status === "fulfilled" ? betGamla.value : []),
   ];
 
   await Promise.all(forslag.map(async (item) => {
