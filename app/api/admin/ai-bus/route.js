@@ -8,7 +8,7 @@ const FOLDERS = [
   { id: "approved",     label: "Godkänt",        path: "ai-bus/approved" },
   { id: "implemented",  label: "Implementerat",  path: "ai-bus/implemented" },
   { id: "rejected",     label: "Avvisat",        path: "ai-bus/rejected" },
-  { id: "discussions",  label: "Diskussioner",   path: "ai-bus/discussions" },
+  { id: "discussions",  label: "Diskussioner",   path: "ai-bus/discussions", recursive: true },
   { id: "reports",      label: "Rapporter",      path: "ai-bus/reports" },
 ];
 
@@ -56,7 +56,7 @@ async function readFile(token, filePath) {
   return Buffer.from(data.content, "base64").toString("utf-8");
 }
 
-async function listFolder(token, folderPath) {
+async function listFolder(token, folderPath, recursive = false) {
   const r = await fetch(`${GH}/repos/${REPO}/contents/${folderPath}`, {
     headers: ghHeaders(token),
     next: { revalidate: 120 },
@@ -64,9 +64,13 @@ async function listFolder(token, folderPath) {
   if (!r.ok) return [];
   const items = await r.json();
   if (!Array.isArray(items)) return [];
-  return items
-    .filter(f => f.type === "file" && (f.name.endsWith(".md") || f.name.endsWith(".json")))
-    .sort((a, b) => b.name.localeCompare(a.name));
+  const files = items.filter(f => f.type === "file" && (f.name.endsWith(".md") || f.name.endsWith(".json")));
+  if (recursive) {
+    const dirs = items.filter(f => f.type === "dir");
+    const sub = await Promise.all(dirs.map(d => listFolder(token, d.path, true)));
+    return [...files, ...sub.flat()].sort((a, b) => b.name.localeCompare(a.name));
+  }
+  return files.sort((a, b) => b.name.localeCompare(a.name));
 }
 
 const ALLOWED_PREFIXES = FOLDERS.map(f => f.path + "/");
@@ -111,7 +115,7 @@ export async function GET(req) {
   if (folder) {
     const target = FOLDERS.find(f => f.id === folder);
     if (!target) return NextResponse.json({ error: "Okänd mapp" }, { status: 400 });
-    const files = await listFolder(token, target.path);
+    const files = await listFolder(token, target.path, target.recursive);
     const result = files.map(f => {
       const dateMatch = f.name.match(/^(\d{4}-\d{2}-\d{2})/);
       const fileDate  = dateMatch ? dateMatch[1] : null;
@@ -131,7 +135,7 @@ export async function GET(req) {
   // Return metadata for all folders (file counts + newest date)
   const results = await Promise.allSettled(
     FOLDERS.map(async f => {
-      const files = await listFolder(token, f.path);
+      const files = await listFolder(token, f.path, f.recursive);
       const newCount = files.filter(file => {
         const m = file.name.match(/^(\d{4}-\d{2}-\d{2})/);
         return m ? isNew(m[1] + "T00:00:00Z") : false;
