@@ -61,12 +61,19 @@ def _sb_upsert(path: str, data: dict) -> bool:
 
 
 def hamta_passiva_429s() -> dict[str, int]:
-    """Hämtar antal passiva 429-loggar per provider senaste 24h."""
+    """Hämtar antal rate-limit-fel per provider senaste 24h från ai_log."""
     since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    rows = _sb_get("provider_429_passive", f"loggad=gte.{since}&select=provider")
+    # ai_log loggas av både JS-appen och Python-agenterna — provider_429_passive
+    # fylls bara på av Python-sidan och är alltid tom för JS-routes.
+    # Status-varianter: "rate_limited" (Python/ai_klient), "rate_limit" (aiRouter.js), "error_429".
+    rows = _sb_get("ai_log", f"ts=gte.{since}&status=in.(rate_limited,rate_limit,error_429)&select=provider")
+    # Normalisera provider-namn till benchmarkens nyckelspråk:
+    # aiRouter.js loggar "codestral" och "github" men benchmarken använder "mistral" och "github_models".
+    _ALIAS = {"codestral": "mistral", "github": "github_models"}
     counts: dict[str, int] = {}
     for row in rows:
         p = row.get("provider", "")
+        p = _ALIAS.get(p, p)
         counts[p] = counts.get(p, 0) + 1
     return counts
 
