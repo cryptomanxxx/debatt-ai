@@ -50,10 +50,10 @@ function byggUrl(d) {
   return d.dok_id ? `https://data.riksdagen.se/dokument/${d.dok_id}.html` : null;
 }
 
-async function hämtaDoktyp(doktyp, rm = null) {
+async function hämtaDoktyp(doktyp, rm = null, sz = 50) {
   const rmParam = rm ? `&rm=${encodeURIComponent(rm)}` : "";
   const r = await fetch(
-    `https://data.riksdagen.se/dokumentlista/?doktyp=${doktyp}&utformat=json&sz=50&sort=datum&sortorder=desc${rmParam}`,
+    `https://data.riksdagen.se/dokumentlista/?doktyp=${doktyp}&utformat=json&sz=${sz}&sort=datum&sortorder=desc${rmParam}`,
     { headers: { "User-Agent": "debatt-ai.se/1.0" }, signal: AbortSignal.timeout(10000) }
   );
   if (!r.ok) throw new Error(`API ${r.status}`);
@@ -85,7 +85,7 @@ async function hämtaViaApi() {
     hämtaDoktyp("prop"),
     hämtaDoktyp("mot"),
     hämtaDoktyp("bet"),
-    hämtaDoktyp("bet", "2024/25"),
+    hämtaDoktyp("bet", "2024/25", 200),
   ]);
 
   // Om alla fyra misslyckas — kasta så att HTML-fallbacken i POST aktiveras
