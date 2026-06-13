@@ -79,7 +79,7 @@ export async function POST() {
   // 3+4. Parallell batch (max 50) — voteringlista per dok, sedan dokumentstatus-fallback.
   //      Parallell = ~8s totalt oavsett antal, undviker Vercel-timeout.
   const debugSample = [];
-  const batch = Object.entries(pending).slice(0, 50);
+  const batch = Object.entries(pending).slice(0, 50); // TODO: Implement a cursor or order to process all pending rows
 
   await Promise.allSettled(batch.map(async ([dokId, { id: lagforslagId, url: lagforslagUrl }]) => {
     // Steg A: voteringlista per dokument (fungerar för betänkanden med registrerad omröstning)
