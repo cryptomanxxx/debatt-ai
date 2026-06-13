@@ -24,6 +24,22 @@ async function get(url, timeoutMs = 15000) {
   }
 }
 
+// Diagnostik: returnerar HTTP-status + svar för debugging
+async function getDiag(url, timeoutMs = 15000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const r = await fetch(url, { headers: { "User-Agent": UA }, signal: ctrl.signal });
+    clearTimeout(t);
+    if (!r.ok) return { ok: false, status: r.status, body: null };
+    const data = await r.json();
+    return { ok: true, status: r.status, body: data };
+  } catch (e) {
+    clearTimeout(t);
+    return { ok: false, status: 0, error: e.message };
+  }
+}
+
 // Extraherar beteckning ur kompakt dok_id, t.ex. HC01FiU16 → "FiU16", HC01KU4 → "KU4"
 function beteckning(dokId) {
   return dokId.match(/([A-Za-zÄÅÖäåö]{2,5}\d+)$/)?.[1] || null;
@@ -35,7 +51,7 @@ async function getVoteringUtfall(dokId) {
   if (bet) {
     for (const rm of ["2024/25", "2025/26", "2023/24"]) {
       const d = await get(
-        `https://data.riksdagen.se/voteringlista/?rm=${encodeURIComponent(rm)}&bet=${encodeURIComponent(bet)}&utformat=json&sz=1`
+        `https://data.riksdagen.se/voteringlista/?rm=${rm}&bet=${encodeURIComponent(bet)}&utformat=json&sz=1`
       );
       const v = [].concat(d?.voteringlista?.votering || [])[0];
       if (v?.utfall) {
@@ -106,6 +122,43 @@ async function main() {
   const processed = new Set();
   let uppdaterade = 0;
 
+  // DIAGNOSTIK: inspektera första dokumentet för att förstå API-svaren
+  if (pending.length > 0) {
+    const diagId = pending[0].riksdagen_id;
+    const diagUrl = pending[0].riksdagen_url || "";
+    const bet = beteckning(diagId);
+    console.log(`\n=== DIAGNOSTIK för ${diagId} (bet=${bet}, url=${diagUrl}) ===`);
+
+    // Testa rm+bet för ALLA möjliga sessioner för att hitta rätt år för HC01
+    if (bet) {
+      for (const rm of ["2025/26","2024/25","2023/24","2022/23","2021/22","2020/21","2019/20","2018/19","2017/18","2016/17","2015/16","2010/11","2011/12","2012/13"]) {
+        const rmRes = await getDiag(`https://data.riksdagen.se/voteringlista/?rm=${rm}&bet=${encodeURIComponent(bet)}&utformat=json&sz=1`);
+        const v = [].concat(rmRes.body?.voteringlista?.votering || []);
+        if (v.length > 0) {
+          console.log(`TRÄFF rm=${rm}&bet=${bet}: utfall=${v[0].utfall}, datum=${v[0].datum}`);
+        } else {
+          console.log(`miss rm=${rm}&bet=${bet}: status=${rmRes.status}, error=${rmRes.error||"-"}`);
+        }
+      }
+    }
+
+    // Testa generisk dokid
+    const dokidUrl = `https://data.riksdagen.se/voteringlista/?dokid=${encodeURIComponent(diagId)}&utformat=json&sz=1`;
+    const dokidRes = await getDiag(dokidUrl);
+    const vDokid = [].concat(dokidRes.body?.voteringlista?.votering || []);
+    console.log(`dokid=${diagId}: status=${dokidRes.status}, error=${dokidRes.error||"-"}, voteringar=${vDokid.length}`);
+
+    // Testa dokumentstatus
+    const dsUrl = `https://data.riksdagen.se/dokumentstatus/${diagId}.json`;
+    const dsRes = await getDiag(dsUrl);
+    const dok = dsRes.body?.dokumentstatus?.dokument;
+    const beslut = dsRes.body?.dokumentstatus?.dokbeslut;
+    console.log(`dokumentstatus: status=${dsRes.status}, error=${dsRes.error||"-"}, dokStatus="${dok?.status||"-"}", datum="${dok?.datum||"-"}", typ="${dok?.typ||"-"}"`);
+    console.log(`dokumentstatus beslut: ${JSON.stringify(beslut).slice(0,200)}`);
+    console.log(`=== SLUT DIAGNOSTIK ===\n`);
+  }
+
+  // DIAGNOSTIK: kontrollera bulk-formatets tillhor_dok_id
   // 2. Bulk-sökning (täcker nyligen röstade betänkanden i aktuell session)
   const bulk = await get(
     "https://data.riksdagen.se/voteringlista/?utformat=json&sz=500&sort=datum&sortorder=desc",
@@ -116,6 +169,9 @@ async function main() {
     for (const p of pending) if (p.riksdagen_id) pendingMap[p.riksdagen_id] = p;
 
     const voteringar = [].concat(bulk?.voteringlista?.votering || []);
+    // Diagnostik: visa format på tillhor_dok_id i bulk
+    const sampleIds = [...new Set(voteringar.slice(0, 20).map(v => v.tillhor_dok_id))].slice(0, 5);
+    console.log(`Bulk tillhor_dok_id-format (urval): ${JSON.stringify(sampleIds)}`);
     for (const v of voteringar) {
       const dokId = (v.tillhor_dok_id || "").trim();
       if (!dokId || !pendingMap[dokId] || processed.has(dokId)) continue;
