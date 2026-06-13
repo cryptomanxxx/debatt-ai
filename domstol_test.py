@@ -69,6 +69,17 @@ AI_KONSTITUTION = [
         ),
         "straff_belopp": 100,
     },
+    {
+        "artikel": 5,
+        "rubrik": "Systematisk korruption",
+        "text": (
+            "Agent som under innevarande år gett mutor överstigande 200 kr totalt, "
+            "eller mottagit mutor överstigande 150 kr totalt, gör sig skyldig till "
+            "systematisk korruption och rent-seeking. "
+            "Bestraffas med böter och ett offentligt korruptionsmärke."
+        ),
+        "straff_belopp": 120,
+    },
 ]
 
 DOMARE_POOL = ["Filosof", "Historiker", "Nationalekonom", "Sociolog"]
@@ -374,6 +385,39 @@ def hitta_overträdelser(sb_key: str, h: dict) -> int:
             if arende:
                 nyskapade += 1
 
+    # --- Artikel 5: Systematisk korruption (CRSE) ---
+    print("  Artikel 5: Systematisk korruption (bribe_scores)...")
+    period = str(datetime.now(timezone.utc).year)
+    bribe_scores = sb_get(h, f"bribe_scores?period=eq.{period}&select=agent,total_givet_kr,total_bribe_kr,antal_givna,antal_mottagna")
+    artikel5 = next(a for a in AI_KONSTITUTION if a["artikel"] == 5)
+    for bs in bribe_scores:
+        agent = bs.get("agent", "")
+        if not agent:
+            continue
+        givet = bs.get("total_givet_kr", 0) or 0
+        mottagit = bs.get("total_bribe_kr", 0) or 0
+        if givet <= 200 and mottagit <= 150:
+            continue
+        if arende_finns(h, agent, 5):
+            continue
+        if givet > 200:
+            beskrivning = (
+                f"{agent} har under {period} gett totalt {givet} kr i hemliga mutor "
+                f"({bs.get('antal_givna', 0)} erbjudanden). "
+                f"Systematisk röstköpning hotar demokratins legitimitet."
+            )
+            bevis = {"typ": "giver", "total_givet_kr": givet, "antal_givna": bs.get("antal_givna", 0), "period": period}
+        else:
+            beskrivning = (
+                f"{agent} har under {period} mottagit totalt {mottagit} kr i hemliga mutor "
+                f"({bs.get('antal_mottagna', 0)} erbjudanden). "
+                f"Politisk capture undergräver representativt beslutsfattande."
+            )
+            bevis = {"typ": "receiver", "total_bribe_kr": mottagit, "antal_mottagna": bs.get("antal_mottagna", 0), "period": period}
+        arende = skapa_arende(h, agent, artikel5, beskrivning, bevis)
+        if arende:
+            nyskapade += 1
+
     print(f"  → {nyskapade} nya ärenden öppnade.")
     return nyskapade
 
@@ -636,6 +680,15 @@ def main():
                     bote_totalt += belopp
             else:
                 print(f"  [INFO] Ingen bot att verkställa (dom_id={dom_id}, belopp={belopp})")
+
+            # §5-dom → corruption badge (aktiv i 30 dagar)
+            if arende.get("artikel_nr") == 5:
+                expires = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+                sb_post({**h, "Prefer": "resolution=merge-duplicates"},
+                        "corruption_badges",
+                        {"agent": svarande, "domstol_arende_id": arende["id"],
+                         "artikel_score_malus": 0.9, "aktiv": True, "expires_at": expires})
+                print(f"  🏴 Corruption badge utfärdat: {svarande} (giltigt 30 dagar)")
             try:
                 planbok = sb_get(h, f"agent_planbocker?agent=eq.{svarande}&select=saldo")
                 saldo_nu = planbok[0].get("saldo", 500) if planbok else 500

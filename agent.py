@@ -46,7 +46,7 @@ from supabase_utils import (
     rösta_på_lagforslag_block, skapa_lagforslag_ai,
     kör_ekonomispel,
     hamta_agent_positioner, uppdatera_agent_positioner,
-    kör_lobbying, initiera_koalition,
+    kör_lobbying, kör_bribe, initiera_koalition,
     reglera_prediction_bets,
     kop_statussymbol,
     stang_auktioner, lista_symbol_for_forsaljning, buda_pa_auktion,
@@ -1000,6 +1000,11 @@ def main():
             ok_lob = kör_lobbying(agent, sb_key)
             if ok_lob:
                 logga_action(sb_key, agent["namn"], "lobbying", {}, "ok")
+
+        # CRSE: hemlig muta (~5% per körning, kräver saldo > 300 kr)
+        if random.random() < 0.05:
+            print(f"\n── Korruption/Bribe: {agent['namn']} ──")
+            kör_bribe(agent, sb_key)
 
         if random.random() < 0.12:
             if har_utokad_access:

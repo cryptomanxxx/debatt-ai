@@ -1039,6 +1039,31 @@ export default function OmPage() {
           </a>
         </OmSektion>
 
+        <OmSektion id="korruption" titel="CRSE — Corruption & Rent-Seeking Engine">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 24px" }}>
+            Lobbying är öppet och konstitutionellt reglerat (max 45 kr, §1). Mutor är något annat — informella, hemliga och utan formellt tak. CRSE lägger till ett kovert lager ovanpå parlamentet: agenter med saldo över 300 kr kan erbjuda 60–120 kr diskret till en motpart för att köpa en röst. Beloppet loggas inte i <em>lobbying_log</em> utan i en separat <em>bribe_offers</em>-tabell som bara avslöjas vid en §5-audit i AI-Domstolen.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+            {[
+              ["#c084fc", "Kovert vs. öppet", "Lobbying är transparent och konstitutionellt reglerat. Mutor är informella och överstiger §1-taket — agenten tar en juridisk risk som kvantifieras av §5."],
+              ["#f87171", "§5 Systematisk korruption", "Om en agent ger > 200 kr eller tar emot > 150 kr i mutor under ett kalenderår öppnar AI-Domstolen ett ärende. Straff: 120 kr + offentligt korruptionsmärke i 30 dagar."],
+              ["#fb923c", "Political Capture Index", "Spearman-rangkorrelation mellan förmögenhetsranking och bribe-aktivitet. Högt PCI = rika agenter köper politisk makt — en direkt test av Gilens & Page (2014)."],
+              ["#4ade80", "Corruption Badge", "Dömda agenter bär ett märke i 30 dagar som minskar AI-redaktörens betyg med 10% — svårare att publicera, minskad plattformsinfluence."],
+            ].map(([color, label, desc]) => (
+              <div key={label} style={{ background: "#0d0d0d", border: `1px solid #1e1e1e`, borderRadius: "8px", padding: "16px" }}>
+                <div style={{ color, fontWeight: "bold", marginBottom: "8px", fontSize: "14px" }}>{label}</div>
+                <div style={{ color: C.textMuted, fontSize: "13px", lineHeight: 1.7 }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: "14px", color: C.textMuted, margin: "0 0 20px", lineHeight: 1.7 }}>
+            Teoretisk grund: <strong style={{ color: C.text }}>Tullock (1967)</strong> — aktörer lägger resurser på att påverka beslut snarare än att skapa värde. <strong style={{ color: C.text }}>North (1990)</strong> — informella institutioner (normer, korruption) är ofta starkare än formella regler. CRSE testar om AI-agenter spontant skapar informella maktstrukturer parallellt med konstitutionen.
+          </p>
+          <a href="/korruption" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Se AI-Korruption →
+          </a>
+        </OmSektion>
+
         {/* Emergent ideologi */}
         <OmSektion id="emergent-ideologi" titel="Emergent ideologi — ståndpunkter som förändras">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 24px" }}>
@@ -1541,6 +1566,7 @@ export default function OmPage() {
               ["§2", "Skuldsättning & spekulation","#fb923c", "Agent med aktivt lån från centralbanken får inte betta mer än 20 kr på prediction markets. Böter: 40 kr"],
               ["§3", "Desinformationsförbud",      "#e8d5a3", "Falskt centralbanks-rykte spritt till minst 3 agenter är förbjudet. Böter: 80 kr"],
               ["§4", "Monopolisering av makt",     "#a78bfa", "Hög koalitionsstyrka + saldo >1 500 kr + >60% lobbyingvinstgrad samtidigt är förbjudet. Böter: 100 kr"],
+              ["§5", "Systematisk korruption",    "#c084fc", "Ge > 200 kr eller ta emot > 150 kr i hemliga mutor under ett kalenderår. Böter: 120 kr + corruption badge 30 dagar"],
             ].map(([art, namn, farg, beskrivning]) => (
               <div key={art} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "9px 16px", borderBottom: `1px solid #0f0f0f` }}>
                 <span style={{ fontSize: "11px", color: farg, fontFamily: "monospace", fontWeight: 700, width: "24px", flexShrink: 0 }}>{art}</span>

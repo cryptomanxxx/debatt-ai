@@ -2380,6 +2380,244 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         return False
 
 
+# ── CRSE: Corruption & Rent-Seeking Engine ────────────────────────────────────
+
+def _uppdatera_bribe_score(sb_key: str, agent_namn: str, falt: str, belopp: int) -> None:
+    """Upsert bribe_scores för agent och innevarande år (falt = 'mottagare' eller 'givare')."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json",
+         "Prefer": "resolution=merge-duplicates"}
+    period = str(datetime.now(timezone.utc).year)
+    if falt == "mottagare":
+        data = {"agent": agent_namn, "period": period,
+                "total_bribe_kr": belopp, "antal_mottagna": 1,
+                "total_givet_kr": 0, "antal_givna": 0, "uppdaterad": "now()"}
+    else:
+        data = {"agent": agent_namn, "period": period,
+                "total_bribe_kr": 0, "antal_mottagna": 0,
+                "total_givet_kr": belopp, "antal_givna": 1, "uppdaterad": "now()"}
+    try:
+        # Fetch existing first
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/bribe_scores?agent=eq.{urllib.parse.quote(agent_namn)}&period=eq.{period}&select=*",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}, timeout=6,
+        )
+        existing = res.json()[0] if res.is_success and res.json() else None
+        if existing:
+            if falt == "mottagare":
+                patch = {"total_bribe_kr": existing["total_bribe_kr"] + belopp,
+                         "antal_mottagna": existing["antal_mottagna"] + 1, "uppdaterad": "now()"}
+            else:
+                patch = {"total_givet_kr": existing["total_givet_kr"] + belopp,
+                         "antal_givna": existing["antal_givna"] + 1, "uppdaterad": "now()"}
+            httpx.patch(
+                f"{SB_URL}/rest/v1/bribe_scores?agent=eq.{urllib.parse.quote(agent_namn)}&period=eq.{period}",
+                headers={**{"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                            "Content-Type": "application/json"}, "Prefer": "return=minimal"},
+                json=patch, timeout=6,
+            )
+        else:
+            httpx.post(f"{SB_URL}/rest/v1/bribe_scores", headers=h, json=data, timeout=6)
+    except Exception as e:
+        print(f"  [bribe_score] Fel vid uppdatering: {e}", file=sys.stderr)
+
+
+def kör_bribe(agent: dict, sb_key: str) -> bool:
+    """Hemlig muta: agent erbjuder 60–120 kr för en röst utan att det loggas i lobbying_log.
+
+    Distinkt från kör_lobbying:
+    - Belopp 60–120 kr (överstiger §1-taket på 45 kr — agenten tar risken)
+    - Loggas INTE i lobbying_log (informell, kovert)
+    - Uppdaterar bribe_scores → kan trigga §5-audit i domstol_test.py
+    - Kräver saldo > 300 kr (mutor är kostsamma)
+    """
+    agent_namn = agent["namn"]
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+
+    try:
+        # Kontrollera saldo
+        saldo_res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo",
+            headers=h, timeout=8,
+        )
+        saldo_data = saldo_res.json() if saldo_res.is_success else []
+        saldo = saldo_data[0]["saldo"] if saldo_data else 0
+        if saldo < 300:
+            print(f"  [bribe] Avbryter: {agent_namn} saldo {saldo} < 300 kr")
+            return False
+
+        # Hämta motioner agenten röstat "ja" på
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag",
+            params={"agent": f"eq.{urllib.parse.quote(agent_namn)}", "rod": "eq.ja",
+                    "select": "lagforslag_id"},
+            headers=h, timeout=8,
+        )
+        if not res.is_success or not res.json():
+            return False
+        forslag_ids = [r["lagforslag_id"] for r in res.json()]
+        ids_str = ",".join(str(i) for i in forslag_ids)
+
+        # Filtrera till öppna motioner
+        res2 = httpx.get(
+            f"{SB_URL}/rest/v1/lagforslag",
+            params={"id": f"in.({ids_str})", "status": "eq.omrostning", "select": "id,titel"},
+            headers=h, timeout=8,
+        )
+        if not res2.is_success or not res2.json():
+            return False
+        forslag = random.choice(res2.json())
+        forslag_id = forslag["id"]
+
+        # Hitta kandidater (röstat nej eller ej röstat)
+        res3 = httpx.get(
+            f"{SB_URL}/rest/v1/agent_roster_lag",
+            params={"lagforslag_id": f"eq.{forslag_id}", "select": "agent,rod"},
+            headers=h, timeout=8,
+        )
+        existerande = {r["agent"]: r["rod"] for r in (res3.json() if res3.is_success else [])}
+        from agenter import AGENTER
+        alla = [a["namn"] for a in AGENTER if a["namn"] != agent_namn]
+        nej_roster = [a for a, r in existerande.items() if r == "nej" and a != agent_namn]
+        ej_rostat = [a for a in alla if a not in existerande]
+        kandidater = nej_roster + ej_rostat[:4]
+        if not kandidater:
+            return False
+
+        mal_namn = random.choice(kandidater)
+        from agenter import AGENTER as _AG
+        mal_agent = next((a for a in _AG if a["namn"] == mal_namn), None)
+        if not mal_agent:
+            return False
+
+        belopp = random.choice([60, 80, 100, 120])
+
+        # Hämta målagentens saldo
+        mal_saldo_res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(mal_namn)}&select=saldo",
+            headers=h, timeout=8,
+        )
+        mal_saldo = (mal_saldo_res.json()[0]["saldo"] if mal_saldo_res.is_success and mal_saldo_res.json() else 1000)
+        rod_fore = existerande.get(mal_namn, "ej röstat")
+
+        # Generera mutor-argument (mer vädjande/undanglidande än lobbying)
+        bribe_system = "Du formulerar konfidentiella politiska påtryckningar."
+        bribe_user = (
+            f"{agent.get('systemprompt', f'Du är {agent_namn}.')}\n\n"
+            f"Du vill i tysthet övertyga {mal_namn} att rösta JA på:\n"
+            f"\"{forslag['titel']}\"\n"
+            f"Du erbjuder {belopp} kr diskret — detta är inte ett officiellt lobbyingförsök.\n"
+            f"Ditt saldo: {saldo} kr.\n\n"
+            f"Skriv ett kort, diskret argument (2 meningar) till {mal_namn}:"
+        )
+        argument = None
+        for llm_fn, llm_args in [
+            (lambda: groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": bribe_system},
+                              {"role": "user", "content": bribe_user}],
+                "max_tokens": 120, "temperature": 0.8,
+            }).json()["choices"][0]["message"]["content"].strip(), None),
+            (lambda: gemini_post(bribe_system, bribe_user, max_tokens=120), None),
+        ]:
+            try:
+                argument = llm_fn()
+                if argument:
+                    break
+            except Exception:
+                pass
+        if not argument:
+            return False
+
+        # Målagenten beslutar
+        mal_system = "Du fattar konfidentiella politiska beslut."
+        mal_prompt = (
+            f"{mal_agent.get('systemprompt', f'Du är {mal_namn}.')}\n\n"
+            f"{agent_namn} kontaktar dig diskret med ett erbjudande på {belopp} kr för att rösta JA på:\n"
+            f"\"{forslag['titel']}\"\n\n"
+            f"Deras argument: \"{argument}\"\n"
+            f"Din nuvarande ståndpunkt: {rod_fore}. Ditt saldo: {mal_saldo} kr.\n\n"
+            f"Svara EXAKT:\nBESLUT: accepterar eller avvisar\nMOTIVERING: [1 mening]"
+        )
+        mal_svar = None
+        for llm_fn in [
+            lambda: groq_post({
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": mal_system},
+                              {"role": "user", "content": mal_prompt}],
+                "max_tokens": 80, "temperature": 0.7,
+            }).json()["choices"][0]["message"]["content"].strip(),
+            lambda: gemini_post(mal_system, mal_prompt, max_tokens=80),
+        ]:
+            try:
+                mal_svar = llm_fn()
+                if mal_svar:
+                    break
+            except Exception:
+                pass
+
+        resultat = "avvisat"
+        motivering = ""
+        for rad in (mal_svar or "").strip().splitlines():
+            upper = rad.upper()
+            if "BESLUT:" in upper and "accepterar" in rad.lower():
+                resultat = "accepterat"
+            elif "MOTIVERING:" in upper:
+                motivering = rad.split(":", 1)[1].strip()
+
+        rod_efter = rod_fore
+        if resultat == "accepterat":
+            # Uppdatera röst
+            h_json = {**h, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"}
+            httpx.post(
+                f"{SB_URL}/rest/v1/agent_roster_lag",
+                json={"lagforslag_id": forslag_id, "agent": mal_namn, "rod": "ja",
+                      "motivering": f"[Mutad av {agent_namn}] {motivering}"[:300]},
+                headers=h_json, timeout=8,
+            )
+            rod_efter = "ja"
+
+            # Kreditöverföring
+            h_min = {**h, "Content-Type": "application/json", "Prefer": "return=minimal"}
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
+                json={"saldo": max(0, saldo - belopp), "uppdaterad": "now()"},
+                headers=h_min, timeout=8,
+            )
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(mal_namn)}",
+                json={"saldo": mal_saldo + belopp, "uppdaterad": "now()"},
+                headers=h_min, timeout=8,
+            )
+
+            # Uppdatera bribe_scores för BÅDA parter
+            _uppdatera_bribe_score(sb_key, agent_namn, "givare", belopp)
+            _uppdatera_bribe_score(sb_key, mal_namn, "mottagare", belopp)
+
+            spara_minne(sb_key, agent_namn, "lobbying",
+                        f"Mutade {mal_namn} med {belopp} kr för att rösta JA på \"{forslag['titel'][:50]}\"",
+                        relaterade_agenter=[mal_namn],
+                        metadata={"belopp": belopp, "typ": "bribe", "resultat": "accepterat"})
+
+        # Logga alltid i bribe_offers (INTE lobbying_log — hemlig)
+        h_min = {**h, "Content-Type": "application/json", "Prefer": "return=minimal"}
+        httpx.post(
+            f"{SB_URL}/rest/v1/bribe_offers",
+            json={"giver_agent": agent_namn, "receiver_agent": mal_namn,
+                  "lagforslag_id": forslag_id, "amount_kr": belopp, "resultat": resultat},
+            headers=h_min, timeout=8,
+        )
+
+        emoji = "💸" if resultat == "accepterat" else "🚫"
+        print(f"  {emoji} Bribe: {agent_namn} → {mal_namn} ({belopp} kr) — {resultat}")
+        if resultat == "accepterat":
+            print(f"    Röst ändrad: {rod_fore} → ja")
+        return True
+
+    except Exception as e:
+        print(f"  ✗ Bribe misslyckades: {e}", file=sys.stderr)
+        return False
+
+
 # ── Agent-positioner (emergent ideologi) ─────────────────────────────────────
 
 POSITIONS_AMNEN = [

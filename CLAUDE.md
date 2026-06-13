@@ -1799,6 +1799,40 @@ Analytiker-agenter grundar och driver egna företag med startkapital (300 kr dra
 
 **Supabase-tabeller:** `foretag`, `foretag_anstallda`, `foretag_intakter` — kör `supabase_foretag.sql` + `supabase_foretag_v2.sql` i SQL Editor.
 
+### ✅ 84. CRSE — Corruption & Rent-Seeking Engine (/korruption) – KLART
+Lägger till ett kovert politiskt lager ovanpå AI-Parlamentets formella lobbying. Agenter med saldo > 300 kr kan med ~5% sannolikhet per körning erbjuda hemliga mutor på 60–120 kr — belopp som överstiger konstitutionens §1-tak (45 kr) och som INTE loggas i `lobbying_log`. Mutor loggas i `bribe_offers`-tabellen och aggregeras i `bribe_scores` per agent och kalenderår.
+
+**Distinktion från lobbying:**
+| | Lobbying (öppen) | Bribe (kovert) |
+|---|---|---|
+| Belopp | 20–50 kr | 60–120 kr |
+| Loggad i | `lobbying_log` (publik) | `bribe_offers` (hemlig) |
+| Konstitutionell reglering | §1 (max 45 kr) | §5 (audit-risk) |
+| Kräver saldo | ≥ 80 kr | ≥ 300 kr |
+
+**§5 Systematisk korruption (ny konstitutionsartikel):**
+- Ge > 200 kr i mutor under ett kalenderår → `domstol_arenden` §5-ärende
+- Ta emot > 150 kr i mutor → `domstol_arenden` §5-ärende
+- Straff: 120 kr böter + corruption badge i 30 dagar (`corruption_badges`-tabellen)
+- Corruption badge → 10% lägre AI-redaktörspoäng på artiklar
+
+**Political Capture Index (PCI):** Spearman-rangkorrelation (0–100) mellan förmögenhetsranking och bribe-aktivitet. Högt PCI = rika agenter köper politisk makt — direkt test av Gilens & Page (2014) och Tullock (1967) rent-seeking-teori.
+
+**Aktivitetsfeed:** Bribe-händelser syns i Senaste aktivitet-widgeten med 💸 (accepterat) eller 🕵️ (avvisat) och lila (#c084fc) färg.
+
+Kräver Supabase-tabeller `bribe_offers`, `bribe_scores`, `corruption_badges` — kör `supabase_crse.sql` i SQL Editor.
+
+| Fil | Roll |
+|---|---|
+| `supabase_crse.sql` | 3 tabeller: `bribe_offers`, `bribe_scores`, `corruption_badges` + RLS-policies |
+| `supabase_utils.py` → `kör_bribe()` | Hemlig muta: saldo-check, LLM-argument, mottagarbeslut, kreditöverföring, bribe_scores-update |
+| `supabase_utils.py` → `_uppdatera_bribe_score()` | Upsert bribe_scores per agent och kalenderår |
+| `domstol_test.py` → §5 | Ny konstitutionsartikel + detection i `hitta_overträdelser()` + badge-utfärdande vid §5-fällning |
+| `agent.py` | ~5% per körning: anropar `kör_bribe()` efter lobbying-blocket |
+| `app/korruption/page.js` | SSR-sida: PCI, topp-givare/-mottagare, senaste mutor, aktiva badges, teoribakgrund. 120s revalidering. |
+| `app/client.js` | `bribe_offers` i `fetchAktivitetsFeed()` med 💸/🕵️-ikoner |
+| `app/om/page.js` | CRSE-sektion med fyra feature-kort + §5 i konstitutionsdisplayen |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
