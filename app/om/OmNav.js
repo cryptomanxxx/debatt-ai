@@ -44,6 +44,7 @@ const SEKTIONER = [
   { id: "hedgefonder",          kort: "Hedgefonder",             nytt: true },
   { id: "kompass",              kort: "Ideologisk Kompass" },
   { id: "informationsasymmetri",kort: "Informationsasymmetri" },
+  { id: "korruption",           kort: "Korruption (CRSE)",       nytt: true },
   { id: "krisevents",           kort: "Krisevents" },
   { id: "etf",                  kort: "Krypto-ETF" },
   { id: "bors",                 kort: "Kryptobörsen" },
