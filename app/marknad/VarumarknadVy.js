@@ -54,7 +54,7 @@ function Nedrakning({ stangerAt }) {
 const EVENT_IKON = { torka: "☀️", gruvras: "💥", cyberattack: "🔒" };
 const EVENT_FARG = { torka: "#f59e0b", gruvras: "#ef4444", cyberattack: "#a78bfa" };
 
-export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lager, foradlingLog = [], zonEvents = [] }) {
+export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lager, foradlingLog = [], zonEvents = [], kopOrdrar = [] }) {
   const [besokareId,   setBesokareId]   = useState(null);
   const [besokareNamn, setBesokareNamn] = useState(null);
   const [besokSaldo,   setBesokSaldo]   = useState(null);
@@ -74,7 +74,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   const [kopVara,      setKopVara]      = useState("el");
   const [kopAntal,     setKopAntal]     = useState(1);
   const [kopMaxPris,   setKopMaxPris]   = useState(20);
-  const [lokalaKopOrdrar, setLokalaKopOrdrar] = useState([]);
+  const [serverKopOrdrar, setServerKopOrdrar] = useState(kopOrdrar); // inkl. nyss skapade med order_id
 
   useEffect(() => {
     setNow(Date.now()); // sätt direkt efter mount
@@ -172,20 +172,47 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
       const r = await fetch("/api/mark/kop-order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vara: kopVara, antal: kopAntal, max_pris: kopMaxPris, besokare_id: besokareId, display_name: besokareNamn }),
+        body: JSON.stringify({ vara: kopVara, antal: kopAntal, max_pris_per_enhet: kopMaxPris, besokare_id: besokareId, display_name: besokareNamn }),
       });
       const d = await r.json();
       if (!r.ok) { setMarkMsg({ text: d.error || "Misslyckades", ok: false }); return; }
-      if (d.matched) {
+      // API reserverar saldo direkt
+      if (d.saldo !== undefined) {
         setBesokSaldo(d.saldo);
         localStorage.setItem("mark_besokare_saldo", d.saldo);
-        setMarkMsg({ text: `✅ Köpte ${d.antal}× ${kopVara} för ${d.total} kr!`, ok: true });
-      } else {
-        setLokalaKopOrdrar(prev => [...prev, { vara: kopVara, antal: kopAntal, max_pris: kopMaxPris }]);
-        setMarkMsg({ text: `📋 Köporder lagd — matchar automatiskt när en säljare väljer ditt pris.`, ok: true });
       }
+      // Lägg till ordern lokalt (med ID) så den kan avbrytas direkt
+      if (d.order_id) {
+        setServerKopOrdrar(prev => [...prev, {
+          id: d.order_id, kop_agent: besokareNamn, vara: kopVara,
+          antal: kopAntal, max_pris_per_enhet: kopMaxPris, reserverat_kr: d.reserverat_kr, status: "öppen",
+        }]);
+      }
+      setMarkMsg({ text: `📋 Köporder lagd — matchar automatiskt när en säljare väljer ditt pris.`, ok: true });
       setTimeout(() => setMarkMsg(null), 6000);
     } catch { setMarkMsg({ text: "Nätverksfel — försök igen", ok: false }); }
+    finally { setPending(false); }
+  }
+
+  async function avbrytKopOrder(orderId, reserverat) {
+    if (!besokareId || pending) return;
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/kop-order/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ besokare_id: besokareId, display_name: besokareNamn, order_id: orderId }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Misslyckades", ok: false }); return; }
+      if (d.saldo !== undefined) {
+        setBesokSaldo(d.saldo);
+        localStorage.setItem("mark_besokare_saldo", d.saldo);
+      }
+      setServerKopOrdrar(prev => prev.filter(o => o.id !== orderId));
+      setMarkMsg({ text: `✅ Order avbruten — ${reserverat || 0} kr återbetalade.`, ok: true });
+      setTimeout(() => setMarkMsg(null), 5000);
+    } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
     finally { setPending(false); }
   }
 
@@ -371,17 +398,25 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                       style={{ width: "100%", background: "rgba(34,211,238,0.12)", border: `1px solid rgba(34,211,238,0.5)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "8px 0", fontSize: "12px", fontFamily: C.mono, cursor: "pointer", fontWeight: 700, letterSpacing: "0.05em" }}>
                       {pending ? "…" : `Köp ${kopAntal}× ${kopVara}`}
                     </button>
-                    {lokalaKopOrdrar.length > 0 && (
-                      <div style={{ borderTop: `1px solid #1e1e1e`, paddingTop: "10px" }}>
-                        <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "6px", letterSpacing: "0.1em" }}>AKTIVA KÖPORDRAR</div>
-                        {lokalaKopOrdrar.map((o, i) => (
-                          <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: C.muted, fontFamily: C.mono, marginBottom: "3px" }}>
-                            <span>{VARA_IKON[o.vara]} {o.antal}× {o.vara}</span>
-                            <span>max {o.max_pris} kr/st</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {(() => {
+                      const minaOrdrar = serverKopOrdrar.filter(o => o.kop_agent === besokareNamn && o.status === "öppen");
+                      if (!minaOrdrar.length) return null;
+                      return (
+                        <div style={{ borderTop: `1px solid #1e1e1e`, paddingTop: "10px" }}>
+                          <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "6px", letterSpacing: "0.1em" }}>AKTIVA KÖPORDRAR</div>
+                          {minaOrdrar.map(o => (
+                            <div key={o.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "10px", color: C.muted, fontFamily: C.mono, marginBottom: "5px", gap: "6px" }}>
+                              <span style={{ flex: 1 }}>{VARA_IKON[o.vara]} {o.antal}× {o.vara} · max {o.max_pris_per_enhet} kr/st</span>
+                              <span style={{ color: "#f59e0b", whiteSpace: "nowrap" }}>res. {o.reserverat_kr} kr</span>
+                              <button onClick={() => avbrytKopOrder(o.id, o.reserverat_kr)} disabled={pending}
+                                style={{ fontSize: "9px", color: "#f87171", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: "3px", padding: "1px 6px", cursor: "pointer", fontFamily: C.mono, whiteSpace: "nowrap" }}>
+                                ✕ avbryt
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
