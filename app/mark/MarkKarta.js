@@ -671,7 +671,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
         <span style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", alignSelf: "center", letterSpacing: "0.1em", textTransform: "uppercase" }}>Kolonier:</span>
         {[
           { href: "/mark-test",  label: "Koloni-1", ikon: "🏝", farg: "#f59e0b" },
-          { href: null,          label: "Koloni-2",  ikon: "🌊", farg: "#22d3ee", soon: true },
+          { href: "/mark-koloni2", label: "Koloni-2", ikon: "🌊", farg: "#22d3ee" },
           { href: "/mark-test2", label: "Koloni-3", ikon: "🌍", farg: "#a78bfa" },
         ].map(({ href, label, ikon, farg, soon }) =>
           href ? (
