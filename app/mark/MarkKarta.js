@@ -666,6 +666,27 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       {/* ── KARTA-FLIKEN ── */}
       <div style={{ display: activeTab === "karta" ? "flex" : "none", flexDirection: "column", gap: "20px" }}>
 
+      {/* ── KOLONIER-NAVIGATION ── */}
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", alignSelf: "center", letterSpacing: "0.1em", textTransform: "uppercase" }}>Kolonier:</span>
+        {[
+          { href: "/mark-test",  label: "Koloni-1", ikon: "🏝", farg: "#f59e0b" },
+          { href: null,          label: "Koloni-2",  ikon: "🌊", farg: "#22d3ee", soon: true },
+          { href: "/mark-test2", label: "Koloni-3", ikon: "🌍", farg: "#a78bfa" },
+        ].map(({ href, label, ikon, farg, soon }) =>
+          href ? (
+            <a key={label} href={href}
+              style={{ display: "flex", alignItems: "center", gap: "5px", padding: "4px 10px", background: `rgba(${farg === "#f59e0b" ? "245,158,11" : farg === "#a78bfa" ? "167,139,250" : "34,211,238"},0.10)`, border: `1px solid ${farg}44`, borderRadius: "6px", textDecoration: "none", color: farg, fontSize: "10px", fontFamily: "monospace", fontWeight: 700 }}>
+              <span>{ikon}</span><span>{label}</span>
+            </a>
+          ) : (
+            <span key={label} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "4px 10px", background: "rgba(34,211,238,0.04)", border: "1px solid #22d3ee22", borderRadius: "6px", color: "#1a3a4a", fontSize: "10px", fontFamily: "monospace" }}>
+              <span>{ikon}</span><span>{label}</span><span style={{ fontSize: "8px", color: "#1a3a3a" }}>snart</span>
+            </span>
+          )
+        )}
+      </div>
+
       {/* ── KÖP/SÄLJ-WIDGET ── */}
       {besokareNamn && (
         <div style={{ background: "#07090f", border: "1px solid #1a2535", borderRadius: "10px", overflow: "hidden" }}>
