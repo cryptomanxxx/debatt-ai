@@ -21,7 +21,7 @@ jobs:
       - name: Generera och spara debatt
         env:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          GROQ_API_KEY:      ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY:      ${{ secrets.GROQ_KANAL_API_KEY }}
           GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
         run: python kanal_debatt.py
