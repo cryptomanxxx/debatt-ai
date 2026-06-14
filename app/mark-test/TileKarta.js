@@ -182,7 +182,7 @@ function drawOwnerDot(ctx, cx, cy, agare, scale) {
 export default function TileKarta({ zoner = [], agare = [] }) {
   const canvasRef    = useRef(null);
   const bgImgRef     = useRef(null);
-  const stateRef  = useRef({ tx: 0, ty: 0, scale: 1, dragging: false, lastX: 0, lastY: 0, vx: 0, vy: 0, selected: null, raf: null, dragStartX: 0, dragStartY: 0 });
+  const stateRef  = useRef({ tx: 0, ty: 0, scale: 1, minScale: 1, dragging: false, lastX: 0, lastY: 0, vx: 0, vy: 0, selected: null, raf: null, dragStartX: 0, dragStartY: 0 });
   const [selected, setSelected] = useState(null);
   const [info, setInfo] = useState(null);
 
@@ -237,7 +237,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
     const dpr   = window.devicePixelRatio || 1;
     const W     = canvas.width  / dpr;
     const H     = canvas.height / dpr;
-    const { tx, ty, scale } = stateRef.current;
+    const { tx, ty, scale, minScale = 1 } = stateRef.current;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -274,14 +274,17 @@ export default function TileKarta({ zoner = [], agare = [] }) {
 
     const selId = stateRef.current.selected;
 
+    const hexAlpha = Math.max(0, Math.min(1.0, (scale / minScale - 1.2) / 2.0));
     for (const t of allTiles) {
+      const isSelected = selId === t.id;
+      if (!isSelected && hexAlpha <= 0) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
-      const color = selId === t.id ? "#ffffff" : (TYP_FARG[t.typ] || "#888888");
+      const color = isSelected ? "#ffffff" : (TYP_FARG[t.typ] || "#888888");
       ctx.beginPath();
       hexSubPath(ctx, cx + ox, cy + oy, R - GAP);
       hexSubPath(ctx, cx + ox, cy + oy, R - BW - GAP);
       ctx.fillStyle   = color;
-      ctx.globalAlpha = t.real ? 1.0 : 0.7;
+      ctx.globalAlpha = isSelected ? 1.0 : (t.real ? hexAlpha : hexAlpha * 0.7);
       ctx.fill("evenodd");
       ctx.globalAlpha = 1.0;
     }
@@ -297,6 +300,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
 
     for (const t of allTiles) {
       if (!t.real) continue;
+      if (hexAlpha <= 0.1 && stateRef.current.selected !== t.id) continue;
       const [cx, cy] = hexCenter(t.col, t.row);
       drawOwnerDot(ctx, cx + ox, cy + oy, t.agare, scale);
       drawLabel(ctx, cx + ox, cy + oy, t, scale);
@@ -358,6 +362,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
         const scaleX = W / worldW;
         const scaleY = H / worldH;
         stateRef.current.scale = Math.min(scaleX, scaleY) * 0.97;
+        stateRef.current.minScale = stateRef.current.scale;
         stateRef.current.tx = 0;
         stateRef.current.ty = 0;
       }
@@ -511,6 +516,45 @@ export default function TileKarta({ zoner = [], agare = [] }) {
 
   return (
     <div style={{ position: "absolute", inset: 0 }}>
+      {/* Vänster nav-panel */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, bottom: 0,
+        width: 160, zIndex: 10,
+        background: "rgba(0,0,0,0.72)", borderRight: "1px solid rgba(255,255,255,0.08)",
+        display: "flex", flexDirection: "column",
+        backdropFilter: "blur(8px)",
+      }}>
+        {/* Titel */}
+        <div style={{ padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ fontSize: 11, color: "#f59e0b", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" }}>🗺 Koloni-1</div>
+          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", marginTop: 2 }}>{zoner.filter(z => z.real !== false).length || zoner.length} zoner</div>
+        </div>
+        {/* Zoom till alla */}
+        <button
+          onClick={() => { const s = stateRef.current; s.scale = s.minScale || 1; s.tx = 0; s.ty = 0; render(); }}
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "rgba(255,255,255,0.06)", border: "none", borderBottom: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", textAlign: "left", width: "100%" }}
+          onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.14)"}
+          onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.06)"}
+        >
+          <span style={{ fontSize: 14 }}>🌍</span>
+          <span style={{ fontSize: 11, color: "#fff", fontWeight: 600, fontFamily: "monospace", whiteSpace: "nowrap" }}>Hela kartan</span>
+        </button>
+        {/* Typlegend */}
+        <div style={{ padding: "10px 14px 6px", fontSize: 9, color: "rgba(255,255,255,0.35)", fontFamily: "monospace", letterSpacing: "0.08em", textTransform: "uppercase" }}>Zontyper</div>
+        <div style={{ flex: 1, overflowY: "auto", paddingBottom: 8 }}>
+          {Object.entries(TYP_FARG).map(([typ, farg]) => {
+            const zonCount = (zoner || []).filter(z => z.typ === typ).length;
+            return (
+              <div key={typ} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 14px" }}>
+                <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: farg, flexShrink: 0, boxShadow: `0 0 5px ${farg}88` }} />
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontFamily: "monospace", flex: 1, textTransform: "capitalize" }}>{TYP_IKON[typ]} {typ}</span>
+                {zonCount > 0 && <span style={{ fontSize: 9, color: farg, fontFamily: "monospace" }}>{zonCount}</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <canvas ref={canvasRef} style={{ display: "block", cursor: "grab", userSelect: "none" }} />
 
       {/* Zoom-knappar */}
@@ -537,7 +581,7 @@ export default function TileKarta({ zoner = [], agare = [] }) {
       {/* Info-panel vid vald zon */}
       {info && (
         <div style={{
-          position: "absolute", top: 16, left: 16,
+          position: "absolute", top: 16, left: 176,
           background: "rgba(0,0,0,0.85)", border: `1px solid ${TYP_FARG[info.typ] || "#444"}`,
           borderRadius: 10, padding: "14px 18px", minWidth: 220, maxWidth: 280,
           backdropFilter: "blur(8px)",
