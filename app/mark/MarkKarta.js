@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { AGENT_VISUELL } from "../agentData";
+import VarumarknadVy from "../marknad/VarumarknadVy";
 
 const TYP_FARG = {
   energi:   "#f59e0b",
@@ -125,7 +126,8 @@ const VARA_TYP = Object.fromEntries(
   Object.entries(TYP_VARA).map(([t, v]) => [v, t])
 );
 
-export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [], transClearing = [], handelClearing = [], zonEvents = [], kopOrdrar = [] }) {
+export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [], transClearing = [], handelClearing = [], zonEvents = [], kopOrdrar = [], foradlingLog = [] }) {
+  const [activeTab, setActiveTab]  = useState("karta");
   const [hover, setHover]         = useState(null);
   const [selected, setSelected]   = useState(null);
   const [floats, setFloats]       = useState([]);
@@ -639,6 +641,24 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+
+      {/* ── TABBAR ── */}
+      <div style={{ display: "flex", borderBottom: "1px solid #1a1a1a", marginBottom: "4px" }}>
+        {[["karta", "🗺️ Kartan"], ["marknad", "📊 Marknaden"]].map(([id, label]) => (
+          <button key={id} onClick={() => setActiveTab(id)} style={{
+            background: "none", border: "none",
+            borderBottom: activeTab === id ? "2px solid #f59e0b" : "2px solid transparent",
+            color: activeTab === id ? "#f0ede6" : "#555",
+            padding: "10px 22px", fontSize: "12px", fontFamily: "monospace",
+            cursor: "pointer", letterSpacing: "0.08em",
+            fontWeight: activeTab === id ? 700 : 400,
+            transition: "color 0.15s",
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* ── KARTA-FLIKEN ── */}
+      <div style={{ display: activeTab === "karta" ? "flex" : "none", flexDirection: "column", gap: "20px" }}>
 
       {/* ── KÖP/SÄLJ-WIDGET ── */}
       {besokareNamn && (
@@ -1790,6 +1810,19 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
 
       </div>{/* /marknader 4-raders grid */}
 
+      </div>{/* /karta-fliken */}
+
+      {/* ── MARKNAD-FLIKEN ── */}
+      {activeTab === "marknad" && (
+        <VarumarknadVy
+          resurspriser={resurspriser}
+          auktioner={varaAuktioner}
+          handelLog={handelLog}
+          lager={lager}
+          foradlingLog={foradlingLog}
+          zonEvents={zonEvents}
+        />
+      )}
 
     </div>
   );
