@@ -70,6 +70,11 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   const [saljVara,     setSaljVara]     = useState(null);   // vara som listas
   const [saljVaraAntal, setSaljVaraAntal] = useState("1");
   const [saljVaraPris,  setSaljVaraPris]  = useState("");
+  const [widgetTyp,    setWidgetTyp]    = useState("kop"); // "kop" | "salj"
+  const [kopVara,      setKopVara]      = useState("el");
+  const [kopAntal,     setKopAntal]     = useState(1);
+  const [kopMaxPris,   setKopMaxPris]   = useState(20);
+  const [lokalaKopOrdrar, setLokalaKopOrdrar] = useState([]);
 
   useEffect(() => {
     setNow(Date.now()); // sätt direkt efter mount
@@ -160,6 +165,30 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
     finally { setPending(false); }
   }
 
+  async function laggKopOrder() {
+    if (!besokareId || pending) return;
+    setPending(true); setMarkMsg(null);
+    try {
+      const r = await fetch("/api/mark/kop-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vara: kopVara, antal: kopAntal, max_pris: kopMaxPris, besokare_id: besokareId, display_name: besokareNamn }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setMarkMsg({ text: d.error || "Misslyckades", ok: false }); return; }
+      if (d.matched) {
+        setBesokSaldo(d.saldo);
+        localStorage.setItem("mark_besokare_saldo", d.saldo);
+        setMarkMsg({ text: `✅ Köpte ${d.antal}× ${kopVara} för ${d.total} kr!`, ok: true });
+      } else {
+        setLokalaKopOrdrar(prev => [...prev, { vara: kopVara, antal: kopAntal, max_pris: kopMaxPris }]);
+        setMarkMsg({ text: `📋 Köporder lagd — matchar automatiskt när en säljare väljer ditt pris.`, ok: true });
+      }
+      setTimeout(() => setMarkMsg(null), 6000);
+    } catch { setMarkMsg({ text: "Nätverksfel — försök igen", ok: false }); }
+    finally { setPending(false); }
+  }
+
   // Bygg resurs-map: typ → { pris_multiplier, trend }
   const resursMap = Object.fromEntries(resurspriser.map(r => [r.typ, r]));
 
@@ -188,6 +217,9 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
   for (const t of handelLog) {
     volymPerVara[t.vara] = (volymPerVara[t.vara] || 0) + t.antal;
   }
+
+  // Mitt lager (besökare) — beräknas i render, uppdateras när besokareNamn sätts
+  const mittLager = besokareNamn ? lager.filter(r => r.agent === besokareNamn) : [];
 
   // Lager per agent per vara (for foradling context)
   const lagerPerAgent = {};
@@ -253,6 +285,165 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
             </div>
           )}
         </div>
+      )}
+
+      {/* ── MITT KONTO: LAGER + HANDELSWIDGET ── */}
+      {besokareNamn && (
+        <section>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr minmax(240px, 300px)", gap: "16px", alignItems: "start" }}>
+
+            {/* Mitt lager */}
+            <div>
+              <Label>Mitt lager · {besokareNamn}</Label>
+              {mittLager.length === 0 ? (
+                <Card><p style={{ color: C.dim, fontSize: "12px", margin: 0 }}>Du har inget lager ännu — köp varor till höger!</p></Card>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "8px" }}>
+                  {mittLager.map(r => {
+                    const harAktivAukt = now !== null && aktivaAukt.some(
+                      a => a.saljare === besokareNamn && a.vara === r.vara && new Date(a.stanger_at) > now
+                    );
+                    return (
+                      <Card key={r.vara} style={{ padding: "10px 14px", border: `1px solid rgba(34,211,238,0.2)` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                          <span style={{ fontSize: "18px" }}>{VARA_IKON[r.vara] || "📦"}</span>
+                          {harAktivAukt && (
+                            <span style={{ fontSize: "8px", color: "#f59e0b", fontFamily: C.mono, background: "rgba(245,158,11,0.1)", padding: "1px 5px", borderRadius: "3px" }}>📋 på auktion</span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#f0ede6", fontFamily: C.mono, textTransform: "capitalize", marginTop: "4px" }}>{r.vara}</div>
+                        <div style={{ fontSize: "18px", color: BESOKARE_FARG, fontFamily: C.mono, fontWeight: 700 }}>{r.antal}</div>
+                        <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono }}>≈ {Math.round(r.antal * (BASPRIS[r.vara] || 0))} kr</div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* KÖP/SÄLJ widget */}
+            <div>
+              <Label>Handla varor</Label>
+              <Card>
+                {/* Tabs */}
+                <div style={{ display: "flex", gap: "4px", marginBottom: "16px" }}>
+                  {[["kop", "⬆️ KÖP"], ["salj", "⬇️ SÄLJ"]].map(([typ, lbl]) => (
+                    <button key={typ} onClick={() => setWidgetTyp(typ)}
+                      style={{ flex: 1, padding: "6px 0", fontSize: "11px", fontFamily: C.mono, fontWeight: widgetTyp === typ ? 700 : 400,
+                        background: widgetTyp === typ ? "rgba(34,211,238,0.12)" : "transparent",
+                        border: `1px solid ${widgetTyp === typ ? "rgba(34,211,238,0.5)" : "#333"}`,
+                        color: widgetTyp === typ ? BESOKARE_FARG : C.dim, borderRadius: "4px", cursor: "pointer" }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+
+                {/* KÖP form */}
+                {widgetTyp === "kop" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    <div>
+                      <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "4px", letterSpacing: "0.1em" }}>VARA</div>
+                      <select value={kopVara} onChange={e => setKopVara(e.target.value)}
+                        style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.25)`, color: "#f0ede6", borderRadius: "4px", padding: "6px 8px", fontSize: "12px", fontFamily: C.mono }}>
+                        {[...VAROR, ...FORADLADE].map(v => (
+                          <option key={v} value={v}>{VARA_IKON[v]} {v} — baspris {BASPRIS[v]} kr</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "4px", letterSpacing: "0.1em" }}>ANTAL</div>
+                        <input type="number" min="1" max="100" value={kopAntal}
+                          onChange={e => setKopAntal(Math.max(1, parseInt(e.target.value) || 1))}
+                          style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.25)`, color: "#f0ede6", borderRadius: "4px", padding: "6px 8px", fontSize: "12px", fontFamily: C.mono, boxSizing: "border-box" }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "4px", letterSpacing: "0.1em" }}>MAX KR/ST</div>
+                        <input type="number" min="5" value={kopMaxPris}
+                          onChange={e => setKopMaxPris(Math.max(5, parseInt(e.target.value) || 5))}
+                          style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.25)`, color: "#f0ede6", borderRadius: "4px", padding: "6px 8px", fontSize: "12px", fontFamily: C.mono, boxSizing: "border-box" }} />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono }}>
+                      Max totalt: {kopAntal * kopMaxPris} kr · Saldo: {besokSaldo !== null ? `${besokSaldo} kr` : "…"}
+                    </div>
+                    <button onClick={laggKopOrder} disabled={pending || !besokareId}
+                      style={{ width: "100%", background: "rgba(34,211,238,0.12)", border: `1px solid rgba(34,211,238,0.5)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "8px 0", fontSize: "12px", fontFamily: C.mono, cursor: "pointer", fontWeight: 700, letterSpacing: "0.05em" }}>
+                      {pending ? "…" : `Köp ${kopAntal}× ${kopVara}`}
+                    </button>
+                    {lokalaKopOrdrar.length > 0 && (
+                      <div style={{ borderTop: `1px solid #1e1e1e`, paddingTop: "10px" }}>
+                        <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "6px", letterSpacing: "0.1em" }}>AKTIVA KÖPORDRAR</div>
+                        {lokalaKopOrdrar.map((o, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: C.muted, fontFamily: C.mono, marginBottom: "3px" }}>
+                            <span>{VARA_IKON[o.vara]} {o.antal}× {o.vara}</span>
+                            <span>max {o.max_pris} kr/st</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* SÄLJ form */}
+                {widgetTyp === "salj" && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {mittLager.length === 0 ? (
+                      <p style={{ color: C.dim, fontSize: "12px", margin: 0 }}>Du har inget lager att sälja. Köp varor först!</p>
+                    ) : (
+                      <>
+                        <div>
+                          <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "4px", letterSpacing: "0.1em" }}>VÄLJ VARA</div>
+                          <select value={saljVara || ""} onChange={e => {
+                            const v = e.target.value || null;
+                            setSaljVara(v); setSaljVaraAntal("1");
+                            const item = mittLager.find(r => r.vara === v);
+                            if (item) setSaljVaraPris(String(BASPRIS[item.vara] || 10));
+                          }}
+                            style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.25)`, color: "#f0ede6", borderRadius: "4px", padding: "6px 8px", fontSize: "12px", fontFamily: C.mono }}>
+                            <option value="">-- välj vara --</option>
+                            {mittLager.map(r => (
+                              <option key={r.vara} value={r.vara}>{VARA_IKON[r.vara]} {r.vara} ({r.antal} st)</option>
+                            ))}
+                          </select>
+                        </div>
+                        {saljVara && (() => {
+                          const item = mittLager.find(r => r.vara === saljVara);
+                          if (!item) return null;
+                          return (
+                            <>
+                              <div style={{ display: "flex", gap: "8px" }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "4px", letterSpacing: "0.1em" }}>ANTAL (max {item.antal})</div>
+                                  <input type="number" min="1" max={item.antal} value={saljVaraAntal}
+                                    onChange={e => setSaljVaraAntal(e.target.value)}
+                                    style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.35)`, color: "#f0ede6", borderRadius: "4px", padding: "6px 8px", fontSize: "12px", fontFamily: C.mono, boxSizing: "border-box" }} />
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "4px", letterSpacing: "0.1em" }}>RES.PRIS (kr/st)</div>
+                                  <input type="number" min="5" value={saljVaraPris}
+                                    onChange={e => setSaljVaraPris(e.target.value)}
+                                    style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.35)`, color: "#f0ede6", borderRadius: "4px", padding: "6px 8px", fontSize: "12px", fontFamily: C.mono, boxSizing: "border-box" }} />
+                                </div>
+                              </div>
+                              <button
+                                disabled={pending || parseInt(saljVaraAntal) < 1 || parseInt(saljVaraAntal) > item.antal || parseInt(saljVaraPris) < 5}
+                                onClick={() => saljVaraAuktion(saljVara, parseInt(saljVaraAntal), parseInt(saljVaraPris))}
+                                style={{ width: "100%", background: "rgba(34,211,238,0.12)", border: `1px solid rgba(34,211,238,0.5)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "8px 0", fontSize: "12px", fontFamily: C.mono, cursor: "pointer", fontWeight: 700 }}>
+                                {pending ? "…" : `Lägg ut ${saljVaraAntal}× ${saljVara} på auktion`}
+                              </button>
+                            </>
+                          );
+                        })()}
+                      </>
+                    )}
+                  </div>
+                )}
+              </Card>
+            </div>
+
+          </div>
+        </section>
       )}
 
       {/* ── FÖRÄDLINGSKEDJOR ── */}
@@ -505,78 +696,6 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
           </Card>
         </section>
       )}
-
-      {/* ── MITT LAGER ── */}
-      {besokareNamn && (() => {
-        const mittLager = lager.filter(r => r.agent === besokareNamn);
-        if (!mittLager.length) return null;
-        return (
-          <section>
-            <Label>Mitt lager · {besokareNamn}</Label>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "8px" }}>
-              {mittLager.map(r => {
-                const harAktivAukt = now !== null && aktivaAukt.some(
-                  a => a.saljare === besokareNamn && a.vara === r.vara && new Date(a.stanger_at) > now
-                );
-                return (
-                  <Card key={r.vara} style={{ padding: "10px 14px", border: `1px solid rgba(34,211,238,0.2)` }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <span style={{ fontSize: "18px" }}>{VARA_IKON[r.vara] || "📦"}</span>
-                      {harAktivAukt && (
-                        <span style={{ fontSize: "8px", color: "#f59e0b", fontFamily: C.mono, background: "rgba(245,158,11,0.1)", padding: "1px 5px", borderRadius: "3px" }}>📋 på auktion</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#f0ede6", fontFamily: C.mono, textTransform: "capitalize", marginTop: "4px" }}>{r.vara}</div>
-                    <div style={{ fontSize: "18px", color: BESOKARE_FARG, fontFamily: C.mono, fontWeight: 700 }}>{r.antal}</div>
-                    <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "8px" }}>
-                      ≈ {Math.round(r.antal * (BASPRIS[r.vara] || 0))} kr
-                    </div>
-                    {!harAktivAukt && saljVara !== r.vara && (
-                      <button
-                        onClick={() => { setSaljVara(r.vara); setSaljVaraAntal("1"); setSaljVaraPris(String(BASPRIS[r.vara] || 10)); }}
-                        style={{ width: "100%", background: "transparent", border: `1px solid rgba(34,211,238,0.3)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "4px 0", fontSize: "9px", fontFamily: C.mono, cursor: "pointer", letterSpacing: "0.05em" }}
-                      >🏷️ Sälj på auktion</button>
-                    )}
-                    {saljVara === r.vara && (
-                      <div style={{ marginTop: "4px" }}>
-                        <div style={{ display: "flex", gap: "4px", marginBottom: "4px" }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: "8px", color: C.dim, fontFamily: C.mono, marginBottom: "2px" }}>ANTAL (max {r.antal})</div>
-                            <input
-                              type="number" min="1" max={r.antal} value={saljVaraAntal}
-                              onChange={e => setSaljVaraAntal(e.target.value)}
-                              style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.35)`, color: "#f0ede6", borderRadius: "4px", padding: "4px 6px", fontSize: "11px", fontFamily: C.mono, boxSizing: "border-box" }}
-                            />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: "8px", color: C.dim, fontFamily: C.mono, marginBottom: "2px" }}>RES.PRIS (kr)</div>
-                            <input
-                              type="number" min="5" value={saljVaraPris}
-                              onChange={e => setSaljVaraPris(e.target.value)}
-                              style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.35)`, color: "#f0ede6", borderRadius: "4px", padding: "4px 6px", fontSize: "11px", fontFamily: C.mono, boxSizing: "border-box" }}
-                            />
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: "4px" }}>
-                          <button
-                            disabled={pending || parseInt(saljVaraAntal) < 1 || parseInt(saljVaraAntal) > r.antal || parseInt(saljVaraPris) < 5}
-                            onClick={() => saljVaraAuktion(r.vara, parseInt(saljVaraAntal), parseInt(saljVaraPris))}
-                            style={{ flex: 1, background: `rgba(34,211,238,0.12)`, border: `1px solid rgba(34,211,238,0.5)`, color: BESOKARE_FARG, borderRadius: "4px", padding: "5px 0", fontSize: "10px", fontFamily: C.mono, cursor: "pointer", fontWeight: 700 }}
-                          >{pending ? "…" : "Lägg ut"}</button>
-                          <button
-                            onClick={() => setSaljVara(null)}
-                            style={{ background: "transparent", border: `1px solid #333`, color: C.dim, borderRadius: "4px", padding: "5px 8px", fontSize: "10px", cursor: "pointer" }}
-                          >✕</button>
-                        </div>
-                      </div>
-                    )}
-                  </Card>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })()}
 
       {/* ── LAGERSTATUS ── */}
       <section>
