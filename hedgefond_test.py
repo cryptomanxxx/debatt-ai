@@ -1217,6 +1217,9 @@ def kör_strat_paper_trading(sb_key: str):
     h_u = {**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"}
 
     # 5b. Likvidera gamla positioner om aktiv_symbol bytte (hämta priser för stale symbols)
+    # Spåra oliquiderade stale-värden för NAV-kalkyl och KÖP-blockering
+    stale_varden_usd = 0.0
+    har_oliquiderade_stale = False
     for row in innehav_raw:
         stale_sym = row["symbol"]
         stale_ant = float(row["antal"])
@@ -1234,8 +1237,12 @@ def kör_strat_paper_trading(sb_key: str):
         except Exception:
             pass
         if stale_pris <= 0:
-            # Avbryt likvidering — ett 0-pris skulle permanent förstöra positionen i NAV
-            print(f"    STRAT: inget giltigt pris för {stale_sym} — hoppar likvidering tills pris finns")
+            # Avbryt likvidering — värdera till köpkurs som proxy för korrekt NAV
+            proxy = float(row["kopt_pris_usd"])
+            stale_varden_usd += stale_ant * proxy
+            har_oliquiderade_stale = True
+            print(f"    STRAT: inget giltigt pris för {stale_sym} — hoppar likvidering "
+                  f"(proxy-värde {stale_ant * proxy:.0f} USD inkluderas i NAV)")
             continue
         intäkt = stale_ant * stale_pris
         kontant += intäkt
@@ -1268,6 +1275,10 @@ def kör_strat_paper_trading(sb_key: str):
                   f"(trigger {sl_trigger:.2f}), intäkt {intäkt:.0f} USD")
 
     # 7. Exekvera signal
+    # Blockera KÖP om oliquiderade stale-positioner finns — undvik dubbla innehav
+    if har_oliquiderade_stale and signal == "KÖP":
+        signal = "SÄLJ/HÅLL"
+        print(f"  STRAT: KÖP-signal blockerad — väntar på likvidering av stale-positioner")
     if signal == "KÖP" and kontant >= 500 and nuv_pos["antal"] < 1e-9:
         # Öppna ny position med 80% av kontant
         belopp = kontant * 0.80
@@ -1304,9 +1315,9 @@ def kör_strat_paper_trading(sb_key: str):
         print(f"    STRAT SÄLJ {salj_antal:.6f} {aktiv_symbol} @ {senaste_pris:.2f} USD "
               f"(P&L: {pnl_trade:+.0f} USD)")
 
-    # 8. Aktuellt portföljvärde (kontant + aktiv position)
+    # 8. Aktuellt portföljvärde (kontant + aktiv position + oliquiderade stale-positioner)
     pos_varde = nuv_pos["antal"] * senaste_pris if nuv_pos["antal"] > 1e-9 else 0.0
-    pv = kontant + pos_varde
+    pv = kontant + pos_varde + stale_varden_usd
 
     # 9. Benchmark: BTC och SPY sedan allra första körningen
     btc_benchmark = spy_benchmark = None
