@@ -170,7 +170,12 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const ejUtgangen  = (ts) => { const t = new Date(ts); return isNaN(t) || t > clientNow; };
   const filtreradeAuktioner    = auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id) && ejUtgangen(a.stanger_at));
   const filtreradeVaraAuktioner = varaAuktioner.filter(a => ejUtgangen(a.stanger_at));
-  const auktionMap  = Object.fromEntries(filtreradeAuktioner.map(a => [a.mark_zoner?.id, a]));
+  // Guard map includes expired-but-not-yet-closed auctions so zone actions (buy/re-list) are
+  // correctly blocked during the ISR/daily-cleanup window when stanger_at has passed but the
+  // DB row is still status='öppen'. Display uses filtreradeAuktioner (non-expired only).
+  const auktionMap  = Object.fromEntries(
+    auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id)).map(a => [a.mark_zoner?.id, a])
+  );
 
   // Centrera hexklustret dynamiskt i SVG
   // OX/OY centrerar klustret med fast padding från origo — viewBox anpassas dynamiskt
