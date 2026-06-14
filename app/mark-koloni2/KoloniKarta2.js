@@ -105,6 +105,7 @@ export default function KoloniKarta2() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
     const W   = canvas.width  / dpr;
     const H   = canvas.height / dpr;
@@ -294,13 +295,17 @@ export default function KoloniKarta2() {
       canvas.height       = H * dpr;
       canvas.style.width  = `${W}px`;
       canvas.style.height = `${H}px`;
-      if (!initialized && H > 200) {
-        initialized = true;
+      if (H > 200) {
         const s = Math.min(W / WORLD_W, H / WORLD_H) * 0.96;
-        stateRef.current.scale    = s;
+        if (!initialized) {
+          // First paint: set scale and center
+          initialized = true;
+          stateRef.current.scale = s;
+          stateRef.current.tx    = 0;
+          stateRef.current.ty    = 0;
+        }
+        // Always update minScale so "Hela kartan" reset matches current viewport
         stateRef.current.minScale = s;
-        stateRef.current.tx       = 0;
-        stateRef.current.ty       = 0;
       }
       render();
     }
@@ -375,6 +380,8 @@ export default function KoloniKarta2() {
     }
 
     let lastDist = 0;
+    let touchStart = { x: 0, y: 0 };
+
     function onTouchStart(e) {
       if (e.touches.length === 2) {
         lastDist = Math.hypot(
@@ -386,6 +393,7 @@ export default function KoloniKarta2() {
         s.dragging   = true;
         s.lastX      = e.touches[0].clientX; s.lastY      = e.touches[0].clientY;
         s.dragStartX = e.touches[0].clientX; s.dragStartY = e.touches[0].clientY;
+        touchStart   = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       }
     }
     function onTouchMove(e) {
@@ -408,7 +416,35 @@ export default function KoloniKarta2() {
         render();
       }
     }
-    function onTouchEnd() { stateRef.current.dragging = false; }
+    function onTouchEnd(e) {
+      const s = stateRef.current;
+      s.dragging = false;
+      // Treat short taps as zone selection (click is suppressed by preventDefault in touchmove)
+      if (e.changedTouches?.length === 1) {
+        const t = e.changedTouches[0];
+        if (Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) <= 8) {
+          const CW   = canvas.clientWidth;
+          const CH   = canvas.clientHeight;
+          const rect = canvas.getBoundingClientRect();
+          const mx   = (t.clientX - rect.left - CW / 2 - s.tx) / s.scale + WORLD_W / 2 - OX;
+          const my   = (t.clientY - rect.top  - CH / 2 - s.ty) / s.scale + WORLD_H / 2 - OY;
+          let nearest = null, nearestDist = Infinity;
+          for (const z of ZONER) {
+            const [cx, cy] = hexCenter(z.col, z.row);
+            const d = Math.hypot(mx - cx, my - cy);
+            if (d < nearestDist) { nearestDist = d; nearest = z; }
+          }
+          if (nearest && nearestDist < R * 0.9) {
+            stateRef.current.selected = nearest.id;
+            setSelZone(nearest);
+          } else {
+            stateRef.current.selected = null;
+            setSelZone(null);
+          }
+          render();
+        }
+      }
+    }
 
     canvas.addEventListener("wheel",      onWheel,      { passive: false });
     canvas.addEventListener("mousedown",  onMouseDown);

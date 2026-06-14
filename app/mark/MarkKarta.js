@@ -1,7 +1,12 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
 import { AGENT_VISUELL } from "../agentData";
 import VarumarknadVy from "../marknad/VarumarknadVy";
+
+const TileKarta    = dynamic(() => import("../mark-test/TileKarta"),    { ssr: false });
+const KoloniKarta2 = dynamic(() => import("../mark-koloni2/KoloniKarta2"), { ssr: false });
+const TileKarta2   = dynamic(() => import("../mark-test2/TileKarta2"),  { ssr: false });
 
 const TYP_FARG = {
   energi:   "#f59e0b",
@@ -138,6 +143,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const [activeBid,    setActiveBid]    = useState(null);  // { id, type }
   const [bidBelopp,    setBidBelopp]    = useState("");
   const [saljInput,    setSaljInput]    = useState(null);  // zon_id som listas
+  const [aktivKoloni,  setAktivKoloni]  = useState(null);  // null=Civilisationen, "koloni1"|"koloni2"|"koloni3"
   const [saljPris,     setSaljPris]     = useState("");
   const [pending,      setPending]      = useState(false);
   const [markMsg,      setMarkMsg]      = useState(null);  // { text, ok }
@@ -408,7 +414,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("touchmove", onTouchMove);
     };
-  }, []);
+  }, [aktivKoloni]);
 
   function applyZoom(factor) {
     const el = containerRef.current;
@@ -668,23 +674,31 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
 
       {/* ── KOLONIER-NAVIGATION ── */}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        <span style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", alignSelf: "center", letterSpacing: "0.1em", textTransform: "uppercase" }}>Kolonier:</span>
+        <span style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", alignSelf: "center", letterSpacing: "0.1em", textTransform: "uppercase" }}>Vy:</span>
         {[
-          { href: "/mark-test",  label: "Koloni-1", ikon: "🏝", farg: "#f59e0b" },
-          { href: "/mark-koloni2", label: "Koloni-2", ikon: "🌊", farg: "#22d3ee" },
-          { href: "/mark-test2", label: "Koloni-3", ikon: "🌍", farg: "#a78bfa" },
-        ].map(({ href, label, ikon, farg, soon }) =>
-          href ? (
-            <a key={label} href={href}
-              style={{ display: "flex", alignItems: "center", gap: "5px", padding: "4px 10px", background: `rgba(${farg === "#f59e0b" ? "245,158,11" : farg === "#a78bfa" ? "167,139,250" : "34,211,238"},0.10)`, border: `1px solid ${farg}44`, borderRadius: "6px", textDecoration: "none", color: farg, fontSize: "10px", fontFamily: "monospace", fontWeight: 700 }}>
+          { key: null,       label: "Civilisationen", ikon: "🗺️", farg: "#f59e0b" },
+          { key: "koloni1",  label: "Koloni-1",        ikon: "🏝",  farg: "#f59e0b" },
+          { key: "koloni2",  label: "Koloni-2",        ikon: "🌊",  farg: "#22d3ee" },
+          { key: "koloni3",  label: "Koloni-3",        ikon: "🌍",  farg: "#a78bfa" },
+        ].map(({ key, label, ikon, farg }) => {
+          const aktiv = aktivKoloni === key;
+          const rgb = farg === "#f59e0b" ? "245,158,11" : farg === "#a78bfa" ? "167,139,250" : "34,211,238";
+          return (
+            <button key={label}
+              onClick={() => setAktivKoloni(key)}
+              style={{
+                display: "flex", alignItems: "center", gap: "5px",
+                padding: "4px 10px",
+                background: aktiv ? `rgba(${rgb},0.20)` : `rgba(${rgb},0.07)`,
+                border: `1px solid ${aktiv ? farg : farg + "44"}`,
+                borderRadius: "6px", cursor: "pointer",
+                color: aktiv ? farg : farg + "88",
+                fontSize: "10px", fontFamily: "monospace", fontWeight: aktiv ? 700 : 400,
+              }}>
               <span>{ikon}</span><span>{label}</span>
-            </a>
-          ) : (
-            <span key={label} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "4px 10px", background: "rgba(34,211,238,0.04)", border: "1px solid #22d3ee22", borderRadius: "6px", color: "#1a3a4a", fontSize: "10px", fontFamily: "monospace" }}>
-              <span>{ikon}</span><span>{label}</span><span style={{ fontSize: "8px", color: "#1a3a3a" }}>snart</span>
-            </span>
-          )
-        )}
+            </button>
+          );
+        })}
       </div>
 
       {/* ── KÖP/SÄLJ-WIDGET ── */}
@@ -905,6 +919,15 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           </div>
         );
       })()}
+
+      {aktivKoloni !== null ? (
+        /* ── KOLONI-VY: canvas-karta byter ut SVG-kartan ── */
+        <div style={{ height: "68vh", position: "relative", borderRadius: "12px", overflow: "hidden", border: "1px solid #1a2535" }}>
+          {aktivKoloni === "koloni1" && <TileKarta  zoner={zoner} agare={mergedAgare} />}
+          {aktivKoloni === "koloni2" && <KoloniKarta2 />}
+          {aktivKoloni === "koloni3" && <TileKarta2 />}
+        </div>
+      ) : (<>
 
       {/* ── KARTLAGER-TOGGLE ── */}
       <div style={{ display: "flex", gap: "6px" }}>
@@ -1383,6 +1406,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
         </div>
 
       </div>{/* /3-kolumns grid */}
+
+      </>)}{/* /aktivKoloni ternary */}
 
       {/* ── AKTIVA ZONEVENT ── */}
       {zonEvents.length > 0 && (
