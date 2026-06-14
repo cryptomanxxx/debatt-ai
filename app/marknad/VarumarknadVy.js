@@ -455,7 +455,7 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                                     style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.35)`, color: "#f0ede6", borderRadius: "4px", padding: "6px 8px", fontSize: "12px", fontFamily: C.mono, boxSizing: "border-box" }} />
                                 </div>
                                 <div style={{ flex: 1 }}>
-                                  <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "4px", letterSpacing: "0.1em" }}>RES.PRIS (kr/st)</div>
+                                  <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "4px", letterSpacing: "0.1em" }}>RESERVPRIS (kr totalt)</div>
                                   <input type="number" min="5" value={saljVaraPris}
                                     onChange={e => setSaljVaraPris(e.target.value)}
                                     style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.35)`, color: "#f0ede6", borderRadius: "4px", padding: "6px 8px", fontSize: "12px", fontFamily: C.mono, boxSizing: "border-box" }} />
