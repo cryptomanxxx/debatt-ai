@@ -291,41 +291,6 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
         </div>
       </section>
 
-      {/* ── AKTIVA ZONEVENT ── */}
-      {zonEvents.length > 0 && (
-        <section>
-          <Label>Aktiva Zonevent · {zonEvents.length} drabbade zon{zonEvents.length !== 1 ? "er" : ""}</Label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "10px" }}>
-            {zonEvents.map(ev => {
-              const evFarg = EVENT_FARG[ev.event_typ] || "#f87171";
-              const daysLeft = Math.max(0, Math.ceil((new Date(ev.slutar) - Date.now()) / 86400000));
-              return (
-                <Card key={ev.id} style={{ borderColor: `rgba(${evFarg === "#f59e0b" ? "245,158,11" : evFarg === "#ef4444" ? "239,68,68" : "167,139,250"},0.30)`, borderLeft: `3px solid ${evFarg}` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "18px" }}>{EVENT_IKON[ev.event_typ]}</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "11px", color: evFarg, fontFamily: C.mono, fontWeight: 700 }}>{ev.zon_namn}</div>
-                      <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, textTransform: "uppercase", letterSpacing: "0.06em" }}>{ev.event_typ}</div>
-                    </div>
-                    <span style={{ fontSize: "10px", color: evFarg, fontFamily: C.mono }}>{daysLeft}d kvar</span>
-                  </div>
-                  <div style={{ fontSize: "10px", color: C.muted, lineHeight: 1.55, marginBottom: "6px" }}>{ev.beskrivning}</div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono }}>
-                      {ev.agare ? `▣ ${ev.agare}` : "◯ fri zon"}
-                    </span>
-                    {ev.produktion_effekt === 0
-                      ? <span style={{ fontSize: "9px", color: "#f87171", fontFamily: C.mono }}>⏸ PAUSAD</span>
-                      : <span style={{ fontSize: "9px", color: "#fbbf24", fontFamily: C.mono }}>⚠ {Math.round(ev.produktion_effekt * 100)}%</span>
-                    }
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
       {/* ── RÅVARUPRISER ── */}
       <section>
         <Label>Råvarupriser · {resurspriser.length} typer + {FORADLADE.length} förädlade</Label>
