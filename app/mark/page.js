@@ -13,16 +13,17 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 async function getData() {
   const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const opts = { headers: h, next: { revalidate: 180 } };
+  const now = new Date().toISOString();
 
   const [zonerRes, agareRes, transRes, auktRes, resursRes, lagerRes, handelRes, varaAuktRes, transClearingRes, handelClearingRes, zonEventsRes, kopOrdrarRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/mark_zoner?select=*&order=id.asc`, opts),
     fetch(`${SB_URL}/rest/v1/mark_agare?select=zon_id,agent,kopt_pris,kopt_datum`, opts),
     fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=*&kop_agent=neq.__passiv_inkomst__&order=skapad.desc&limit=20`, opts),
-    fetch(`${SB_URL}/rest/v1/mark_auktioner?select=*,mark_zoner(namn,typ,veckoinkomst,koppris)&status=eq.%C3%B6ppen&order=stanger_at.asc&limit=20`, opts),
+    fetch(`${SB_URL}/rest/v1/mark_auktioner?select=*,mark_zoner(namn,typ,veckoinkomst,koppris)&status=eq.%C3%B6ppen&stanger_at=gt.${now}&order=stanger_at.asc&limit=20`, opts),
     fetch(`${SB_URL}/rest/v1/resurspriser?select=*`, opts),
     fetch(`${SB_URL}/rest/v1/mark_lager?select=agent,vara,antal&order=antal.desc`, opts),
     fetch(`${SB_URL}/rest/v1/mark_handel_log?select=*&order=skapad.desc&limit=20`, opts),
-    fetch(`${SB_URL}/rest/v1/mark_vara_auktioner?select=*&status=eq.%C3%B6ppen&order=stanger_at.asc&limit=20`, opts),
+    fetch(`${SB_URL}/rest/v1/mark_vara_auktioner?select=*&status=eq.%C3%B6ppen&stanger_at=gt.${now}&order=stanger_at.asc&limit=20`, opts),
     fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=zon_namn,pris,skapad&kop_agent=neq.__passiv_inkomst__&order=skapad.desc&limit=1000`, opts),
     fetch(`${SB_URL}/rest/v1/mark_handel_log?select=vara,pris_per_enhet,skapad&order=skapad.desc&limit=500`, opts),
     fetch(`${SB_URL}/rest/v1/zon_events?select=*&aktiv=eq.true&order=skapad.desc`, { headers: h, next: { revalidate: 60 } }),
