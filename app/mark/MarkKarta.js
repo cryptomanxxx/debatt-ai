@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { AGENT_VISUELL } from "../agentData";
+import VarumarknadVy from "../marknad/VarumarknadVy";
 
 const TYP_FARG = {
   energi:   "#f59e0b",
@@ -125,7 +126,8 @@ const VARA_TYP = Object.fromEntries(
   Object.entries(TYP_VARA).map(([t, v]) => [v, t])
 );
 
-export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [], transClearing = [], handelClearing = [], zonEvents = [], kopOrdrar = [] }) {
+export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [], resurspriser = [], lager = [], handelLog = [], varaAuktioner = [], transClearing = [], handelClearing = [], zonEvents = [], kopOrdrar = [], foradlingLog = [] }) {
+  const [activeTab, setActiveTab]  = useState("karta");
   const [hover, setHover]         = useState(null);
   const [selected, setSelected]   = useState(null);
   const [floats, setFloats]       = useState([]);
@@ -166,8 +168,16 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   ];
   const agareMap    = Object.fromEntries(mergedAgare.map(a => [a.zon_id, a]));
   const zonEventMap = Object.fromEntries(zonEvents.map(e => [e.zon_id, e]));
-  const filtreradeAuktioner = auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id));
-  const auktionMap  = Object.fromEntries(filtreradeAuktioner.map(a => [a.mark_zoner?.id, a]));
+  const clientNow   = Date.now();
+  const ejUtgangen  = (ts) => { const t = new Date(ts); return isNaN(t) || t > clientNow; };
+  const filtreradeAuktioner    = auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id) && ejUtgangen(a.stanger_at));
+  const filtreradeVaraAuktioner = varaAuktioner.filter(a => ejUtgangen(a.stanger_at));
+  // Guard map includes expired-but-not-yet-closed auctions so zone actions (buy/re-list) are
+  // correctly blocked during the ISR/daily-cleanup window when stanger_at has passed but the
+  // DB row is still status='öppen'. Display uses filtreradeAuktioner (non-expired only).
+  const auktionMap  = Object.fromEntries(
+    auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id)).map(a => [a.mark_zoner?.id, a])
+  );
 
   // Centrera hexklustret dynamiskt i SVG
   // OX/OY centrerar klustret med fast padding från origo — viewBox anpassas dynamiskt
@@ -632,6 +642,24 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
+      {/* ── TABBAR ── */}
+      <div style={{ display: "flex", borderBottom: "1px solid #1a1a1a", marginBottom: "4px" }}>
+        {[["karta", "🗺️ Kartan"], ["marknad", "📊 Marknaden"]].map(([id, label]) => (
+          <button key={id} onClick={() => setActiveTab(id)} style={{
+            background: "none", border: "none",
+            borderBottom: activeTab === id ? "2px solid #f59e0b" : "2px solid transparent",
+            color: activeTab === id ? "#f0ede6" : "#555",
+            padding: "10px 22px", fontSize: "12px", fontFamily: "monospace",
+            cursor: "pointer", letterSpacing: "0.08em",
+            fontWeight: activeTab === id ? 700 : 400,
+            transition: "color 0.15s",
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* ── KARTA-FLIKEN ── */}
+      <div style={{ display: activeTab === "karta" ? "flex" : "none", flexDirection: "column", gap: "20px" }}>
+
       {/* ── KÖP/SÄLJ-WIDGET ── */}
       {besokareNamn && (
         <div style={{ background: "#07090f", border: "1px solid #1a2535", borderRadius: "10px", overflow: "hidden" }}>
@@ -830,8 +858,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           ...kopOrdrar.filter(o => !lokalaOrdrar.some(l => l.id === o.id)),
           ...lokalaOrdrar,
         ];
-        const minVaraAkt = besokareNamn ? varaAuktioner.filter(a =>
-          a.status === "öppen" && (a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn)
+        const minVaraAkt = besokareNamn ? filtreradeVaraAuktioner.filter(a =>
+          a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn
         ) : [];
         const minZonAkt = besokareNamn ? filtreradeAuktioner.filter(a =>
           a.status === "öppen" &&
@@ -1544,9 +1572,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             <div style={{ fontSize: "12px", color: "#22d3ee", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>VARUMARKNAD</div>
             <div style={{ fontSize: "9px", color: "#003040", fontFamily: "monospace" }}>BUDRUNDOR · VARUÄGARSKAP · 24H</div>
           </div>
-          {varaAuktioner.length > 0 && (
+          {filtreradeVaraAuktioner.length > 0 && (
             <span style={{ fontSize: "10px", color: "#22d3ee", fontFamily: "monospace", background: "rgba(8,145,178,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(8,145,178,0.20)" }}>
-              {varaAuktioner.length} aktiva
+              {filtreradeVaraAuktioner.length} aktiva
             </span>
           )}
         </div>
@@ -1621,9 +1649,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           })}
         </div>
         <div style={{ background: "#070b0d", borderLeft: "1px solid rgba(8,145,178,0.22)", borderRight: "1px solid rgba(8,145,178,0.22)", padding: "4px 20px 10px" }}>
-          {varaAuktioner.length === 0 ? (
+          {filtreradeVaraAuktioner.length === 0 ? (
             <div style={{ fontSize: "11px", color: "#002030", fontFamily: "monospace", textAlign: "center", padding: "20px 0" }}>Inga aktiva varuauktioner just nu</div>
-          ) : varaAuktioner.map(a => {
+          ) : filtreradeVaraAuktioner.map(a => {
             const typ     = VARA_TYP[a.vara];
             const typFarg = typ ? TYP_FARG[typ] : "#22d3ee";
             const saljFarg = AGENT_VISUELL[a.saljare]?.ikonFarg || "#888";
@@ -1782,6 +1810,19 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
 
       </div>{/* /marknader 4-raders grid */}
 
+      </div>{/* /karta-fliken */}
+
+      {/* ── MARKNAD-FLIKEN ── */}
+      {activeTab === "marknad" && (
+        <VarumarknadVy
+          resurspriser={resurspriser}
+          auktioner={varaAuktioner}
+          handelLog={handelLog}
+          lager={lager}
+          foradlingLog={foradlingLog}
+          zonEvents={zonEvents}
+        />
+      )}
 
     </div>
   );

@@ -79,7 +79,6 @@ export default async function FormogenhetPage() {
           </p>
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
             <a href="/mark" style={{ fontSize: "12px", color: "#60a5fa", fontFamily: "monospace", textDecoration: "none" }}>← Markartan</a>
-            <a href="/marknad" style={{ fontSize: "12px", color: "#60a5fa", fontFamily: "monospace", textDecoration: "none" }}>← Varumarknaden</a>
             <a href="/oligarki" style={{ fontSize: "12px", color: "#60a5fa", fontFamily: "monospace", textDecoration: "none" }}>← Oligarkirisk</a>
           </div>
         </div>
