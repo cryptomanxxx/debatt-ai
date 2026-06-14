@@ -414,7 +414,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("touchmove", onTouchMove);
     };
-  }, []);
+  }, [aktivKoloni]);
 
   function applyZoom(factor) {
     const el = containerRef.current;
