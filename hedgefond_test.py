@@ -1,18 +1,21 @@
 """
 hedgefond_test.py – Hedgefonder med poolat agent-kapital
 
-Tre fonder:
+Fyra fonder:
   ALPHA  (Kryptoanalytiker) – aggressiv momentum
   MACRO  (Nationalekonom)   – konservativ makro
   QUANT  (Teknikoptimist)   – självlärande, LLM justerar strategi varje körning
+  STRAT  (Historiker)       – algoritmisk, ingen LLM, bästa backtest-strategi direkt
 
 Flöde per körning:
   1. Hämta fonddata + NAV per fond
   2. Investeringsrunda: agenter investerar i fonder (~10% chans)
   3. Uttagsrunda: agenter tar ut vinst (~5% chans om P&L > 10%)
   4. QUANT: fråga LLM om handelsstrategi baserat på prestandahistorik
-  5. Varje fond lägger ordrar på börsen (via bors_ordrar)
+  5. ALPHA/MACRO/QUANT lägger ordrar på börsen (via bors_ordrar)
   6. Uppdatera NAV och spara snapshot i hedgefond_nav_historik
+  7. QUANT paper trading mot riktiga marknadsdata
+  8. STRAT paper trading — ren MA+volym-signal från backtest_resultat
 
 Kör via GitHub Actions (.github/workflows/hedgefond-test.yml) dagligen 11:00 svensk tid.
 """
@@ -52,6 +55,12 @@ FONDER = {
         "symboler": ["DBT", "NOVA", "ETK"],
         "aggressivitet": 0.60,  # Justeras av LLM
     },
+    "STRAT": {
+        "förvaltare": "Historiker",
+        "strategi": "algo",
+        "symboler": [],      # Inga interna börs-tokens — styrs av backtest-signal
+        "aggressivitet": 0.0,
+    },
 }
 
 # Crypto-ETF-allokering per fond (andel av totalt kapital)
@@ -59,6 +68,7 @@ FOND_CRYPTO = {
     "ALPHA": {"andel": 0.20, "symboler": ["BTC", "ETH", "SOL"]},   # Aggressiv: 20%, valfri crypto
     "MACRO": {"andel": 0.05, "symboler": ["BTC"]},                  # Konservativ: 5%, bara BTC
     "QUANT": {"andel": None, "symboler": ["BTC", "ETH", "SOL", "XRP", "BNB"]},  # LLM beslutar
+    "STRAT": {"andel": 0.0,  "symboler": []},                       # Hanteras av strat_strategi()
 }
 
 # Investeringsbelopp i SEK
@@ -851,6 +861,11 @@ def main():
         total_andelar = float(fond.get("total_andelar", 0))
         print(f"\n  {fond_symbol} ({conf['förvaltare']}, {total_andelar:.2f} andelar):")
 
+        # STRAT är rent algoritmisk paper trading — ingen intern börshandel
+        if fond_symbol == "STRAT":
+            print(f"  STRAT: algoritmisk fond — hoppar intern börshandel (hanteras av kör_strat_paper_trading)")
+            continue
+
         strategi_recs = None
         quant_crypto_rec = None
         if fond_symbol == "QUANT":
@@ -880,6 +895,9 @@ def main():
 
     # QUANT paper trading mot riktiga marknadsdata (parallell, påverkar ej agentsaldon)
     kör_quant_paper_trading(sb_key)
+
+    # STRAT paper trading — algoritmisk MA+volym-signal, ingen LLM
+    kör_strat_paper_trading(sb_key)
 
     print("\n=== Hedgefond körning klar ===")
 
@@ -1079,6 +1097,262 @@ def kör_quant_paper_trading(sb_key: str):
 
     pnl = pv - START_KAPITAL
     print(f"  Paper portfölj: {pv:.2f} USD ({pnl:+.2f} USD / {pnl/START_KAPITAL*100:+.1f}%)")
+    if btc_benchmark:
+        print(f"  BTC benchmark:  {btc_benchmark:.2f} USD ({(btc_benchmark/START_KAPITAL-1)*100:+.1f}%)")
+    if spy_benchmark:
+        print(f"  SPY benchmark:  {spy_benchmark:.2f} USD ({(spy_benchmark/START_KAPITAL-1)*100:+.1f}%)")
+
+
+
+# ─── STRAT: Algoritmisk strategi baserad på backtest ─────────────────────────
+
+def strat_strategi(sb_key: str) -> dict | None:
+    """
+    Läser bästa backtest-strategi från backtest_resultat (flest trades, högst avkastning).
+    Returnerar parametrar: symbol, lookback, vol_multiplikator, stoploss_pct.
+    """
+    try:
+        url = (
+            f"{SB_URL}/rest/v1/backtest_resultat"
+            "?select=symbol,strategi,total_avkastning,lookback,vol_multiplikator,stoploss_pct"
+            "&antal_trades=gte.5"
+            "&order=total_avkastning.desc&limit=1"
+        )
+        r = httpx.get(url, headers=_h(sb_key), timeout=10)
+        if r.is_success and r.json():
+            row = r.json()[0]
+            print(f"  STRAT: bästa strategi = {row['strategi']} ({row['symbol']}, "
+                  f"avkastning {float(row['total_avkastning']):.1f}%)")
+            return {
+                "symbol":           row["symbol"],
+                "strategi_id":      row["strategi"],
+                "lookback":         int(row.get("lookback") or 10),
+                "vol_multiplikator": float(row.get("vol_multiplikator") or 1.5),
+                "stoploss_pct":     float(row["stoploss_pct"]) if row.get("stoploss_pct") else None,
+                "total_avkastning": float(row.get("total_avkastning") or 0),
+            }
+    except Exception as e:
+        print(f"  STRAT: kunde inte hämta strategi: {e}")
+    return None
+
+
+def kör_strat_paper_trading(sb_key: str):
+    """
+    STRAT paper trading: algoritmisk fond baserad på bästa backtest-strategi.
+    Ingen LLM — ren regelbaserad MA+volym-signal.
+    Startar med 10 000 USD fiktivt kapital. Jämför mot BTC- och SPY-benchmark.
+    """
+    START_KAPITAL = 10_000.0
+
+    print("\n--- STRAT Paper Trading (algoritmisk, ingen LLM) ---")
+
+    # 1. Hämta bästa strategi från backtest_resultat
+    strat = strat_strategi(sb_key)
+    if not strat:
+        print("  STRAT: ingen strategi hittad — kör backtest.py för att populera backtest_resultat")
+        return
+
+    aktiv_symbol     = strat["symbol"]
+    lookback         = strat["lookback"]
+    vol_mult         = strat["vol_multiplikator"]
+    stoploss_pct     = strat["stoploss_pct"]
+    strategi_id_val  = strat["strategi_id"]
+    total_avk        = strat["total_avkastning"]
+
+    # 2. Hämta prishistorik (lookback + 5 dagar, äldst → nyast)
+    n_hämta = lookback + 5
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{aktiv_symbol}"
+            f"&order=datum.desc&limit={n_hämta}",
+            headers=_h(sb_key), timeout=15,
+        )
+        if not r.is_success or not r.json():
+            print(f"  STRAT: ingen prisdata för {aktiv_symbol}")
+            return
+        rows = list(reversed(r.json()))
+        priser  = [float(x["pris"]) for x in rows]
+        volymer = [float(x["vol"])  for x in rows]
+        senaste_pris = priser[-1]
+        senaste_vol  = volymer[-1]
+    except Exception as e:
+        print(f"  STRAT: datahämtning misslyckades: {e}")
+        return
+
+    if len(priser) < lookback + 1:
+        print(f"  STRAT: för lite historikdata ({len(priser)} dagar, behöver {lookback + 1})")
+        return
+
+    # 3. Beräkna MA+volym-signal
+    window_pris = priser[-(lookback + 1):-1]
+    window_vol  = volymer[-(lookback + 1):-1]
+    avg_pris = sum(window_pris) / lookback
+    avg_vol  = sum(window_vol)  / lookback
+
+    pris_ok  = senaste_pris > avg_pris
+    vol_ok   = senaste_vol  > vol_mult * avg_vol
+    signal   = "KÖP" if (pris_ok and vol_ok) else "SÄLJ/HÅLL"
+
+    print(f"  STRAT signal: {signal} ({aktiv_symbol} @ {senaste_pris:.2f} USD | "
+          f"MA{lookback}: {avg_pris:.2f}, vol-mult: {vol_mult}x)")
+
+    # 4. Hämta nuvarande positioner
+    try:
+        r = httpx.get(f"{SB_URL}/rest/v1/strat_paper_innehav", headers=_h(sb_key), timeout=10)
+        innehav_raw = r.json() if r.status_code == 200 else []
+    except Exception:
+        innehav_raw = []
+    nuv_pos = next(
+        ({"antal": float(x["antal"]), "kopt_pris_usd": float(x["kopt_pris_usd"])}
+         for x in innehav_raw if x["symbol"] == aktiv_symbol),
+        {"antal": 0.0, "kopt_pris_usd": 0.0},
+    )
+
+    # 5. Hämta kontant från senaste NAV
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/strat_paper_nav?order=skapad.desc&limit=1",
+            headers=_h(sb_key), timeout=10,
+        )
+        nav_rows = r.json() if r.status_code == 200 else []
+        kontant = float(nav_rows[0]["kontant_usd"]) if nav_rows else START_KAPITAL
+    except Exception:
+        kontant = START_KAPITAL
+
+    h_u = {**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"}
+
+    # 6. Stop-loss check (på befintlig position INNAN ny signal)
+    if stoploss_pct and nuv_pos["antal"] > 1e-9 and nuv_pos["kopt_pris_usd"] > 0:
+        sl_trigger = nuv_pos["kopt_pris_usd"] * (1 - stoploss_pct / 100)
+        if senaste_pris <= sl_trigger:
+            salj_antal = nuv_pos["antal"]
+            intäkt = salj_antal * senaste_pris
+            kontant += intäkt
+            httpx.post(
+                f"{SB_URL}/rest/v1/strat_paper_innehav?on_conflict=symbol",
+                json={"symbol": aktiv_symbol, "antal": 0.0,
+                      "kopt_pris_usd": nuv_pos["kopt_pris_usd"],
+                      "uppdaterad": datetime.now(timezone.utc).isoformat()},
+                headers=h_u, timeout=10,
+            )
+            nuv_pos["antal"] = 0.0
+            signal = "STOP-LOSS"
+            print(f"    STRAT STOP-LOSS: {salj_antal:.6f} {aktiv_symbol} @ {senaste_pris:.2f} USD "
+                  f"(trigger {sl_trigger:.2f}), intäkt {intäkt:.0f} USD")
+
+    # 7. Exekvera signal
+    if signal == "KÖP" and kontant >= 500 and nuv_pos["antal"] < 1e-9:
+        # Öppna ny position med 80% av kontant
+        belopp = kontant * 0.80
+        antal  = belopp / senaste_pris
+        httpx.post(
+            f"{SB_URL}/rest/v1/strat_paper_innehav?on_conflict=symbol",
+            json={"symbol":        aktiv_symbol,
+                  "antal":         round(antal, 8),
+                  "kopt_pris_usd": round(senaste_pris, 4),
+                  "entry_datum":   datetime.now(timezone.utc).date().isoformat(),
+                  "uppdaterad":    datetime.now(timezone.utc).isoformat()},
+            headers=h_u, timeout=10,
+        )
+        nuv_pos["antal"] = antal
+        nuv_pos["kopt_pris_usd"] = senaste_pris
+        kontant -= belopp
+        print(f"    STRAT KÖP {antal:.6f} {aktiv_symbol} @ {senaste_pris:.2f} USD ({belopp:.0f} USD)")
+
+    elif signal == "SÄLJ/HÅLL" and nuv_pos["antal"] > 1e-9:
+        # Stäng position vid säljsignal
+        salj_antal = nuv_pos["antal"]
+        intäkt = salj_antal * senaste_pris
+        pnl_trade = intäkt - (salj_antal * nuv_pos["kopt_pris_usd"])
+        kontant += intäkt
+        httpx.post(
+            f"{SB_URL}/rest/v1/strat_paper_innehav?on_conflict=symbol",
+            json={"symbol":        aktiv_symbol,
+                  "antal":         0.0,
+                  "kopt_pris_usd": nuv_pos["kopt_pris_usd"],
+                  "uppdaterad":    datetime.now(timezone.utc).isoformat()},
+            headers=h_u, timeout=10,
+        )
+        nuv_pos["antal"] = 0.0
+        print(f"    STRAT SÄLJ {salj_antal:.6f} {aktiv_symbol} @ {senaste_pris:.2f} USD "
+              f"(P&L: {pnl_trade:+.0f} USD)")
+
+    # 8. Aktuellt portföljvärde
+    pv = kontant + (nuv_pos["antal"] * senaste_pris if nuv_pos["antal"] > 1e-9 else 0.0)
+
+    # 9. Benchmark: BTC och SPY sedan allra första körningen
+    btc_benchmark = spy_benchmark = None
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/strat_paper_nav?order=skapad.asc&limit=1",
+            headers=_h(sb_key), timeout=10,
+        )
+        first_rows = r.json() if r.status_code == 200 else []
+        start_datum = first_rows[0]["skapad"][:10] if first_rows else None
+        for bm_sym in ["BTC", "SPY"]:
+            try:
+                q1 = (f"&datum=gte.{start_datum}&order=datum.asc&limit=1"
+                      if start_datum else "&order=datum.asc&limit=1")
+                r1 = httpx.get(
+                    f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{bm_sym}{q1}",
+                    headers=_h(sb_key), timeout=10,
+                )
+                r2 = httpx.get(
+                    f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{bm_sym}&order=datum.desc&limit=1",
+                    headers=_h(sb_key), timeout=10,
+                )
+                if r1.is_success and r1.json() and r2.is_success and r2.json():
+                    sp = float(r1.json()[0]["pris"])
+                    cp = float(r2.json()[0]["pris"])
+                    val = (START_KAPITAL / sp) * cp
+                    if bm_sym == "BTC":
+                        btc_benchmark = val
+                    else:
+                        spy_benchmark = val
+            except Exception:
+                pass
+        if not first_rows:
+            btc_benchmark = spy_benchmark = START_KAPITAL
+    except Exception as e:
+        print(f"  STRAT benchmark-fel: {e}")
+
+    # 10. Spara NAV-snapshot i strat_paper_nav
+    nav_row: dict = {
+        "portfölj_värde_usd": round(pv, 4),
+        "kontant_usd":        round(kontant, 4),
+        "start_kapital_usd":  START_KAPITAL,
+        "aktiv_strategi":     strategi_id_val,
+        "aktiv_symbol":       aktiv_symbol,
+        "signal":             signal,
+        "backtest_avk_pct":   round(total_avk, 2),
+    }
+    if btc_benchmark is not None:
+        nav_row["btc_benchmark_usd"] = round(btc_benchmark, 4)
+    if spy_benchmark is not None:
+        nav_row["spy_benchmark_usd"] = round(spy_benchmark, 4)
+    try:
+        httpx.post(
+            f"{SB_URL}/rest/v1/strat_paper_nav",
+            json=nav_row,
+            headers={**_h(sb_key), "Prefer": "return=minimal"},
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"  STRAT NAV-spara: {e}")
+
+    # 11. Uppdatera hedgefonder.nav_per_andel för STRAT (pv / 100 andelar)
+    try:
+        strat_fond = hamta_fond(sb_key, "STRAT")
+        if strat_fond:
+            strat_nav = round(pv / 100, 4)
+            total_and = float(strat_fond.get("total_andelar") or 0)
+            spara_nav_snapshot(sb_key, strat_fond["id"], strat_nav, round(pv, 2))
+            uppdatera_fond_nav(sb_key, strat_fond["id"], strat_nav, total_and)
+    except Exception as e:
+        print(f"  STRAT hedgefond NAV-uppdatering: {e}")
+
+    pnl = pv - START_KAPITAL
+    print(f"  STRAT portfölj: {pv:.2f} USD ({pnl:+.2f} USD / {pnl/START_KAPITAL*100:+.1f}%)")
     if btc_benchmark:
         print(f"  BTC benchmark:  {btc_benchmark:.2f} USD ({(btc_benchmark/START_KAPITAL-1)*100:+.1f}%)")
     if spy_benchmark:
