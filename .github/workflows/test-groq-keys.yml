@@ -27,5 +27,6 @@ jobs:
           GROQ_API_KEY_7:  ${{ secrets.GROQ_API_KEY_7 }}
           GROQ_API_KEY_8:  ${{ secrets.GROQ_API_KEY_8 }}
           GROQ_API_KEY_9:  ${{ secrets.GROQ_API_KEY_9 }}
-          GROQ_API_KEY_10: ${{ secrets.GROQ_API_KEY_10 }}
+          GROQ_API_KEY_10:    ${{ secrets.GROQ_API_KEY_10 }}
+          GROQ_KANAL_API_KEY: ${{ secrets.GROQ_KANAL_API_KEY }}
         run: python test_groq_keys.py

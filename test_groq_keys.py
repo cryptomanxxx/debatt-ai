@@ -13,7 +13,7 @@ import sys
 
 URL = "https://api.groq.com/openai/v1/chat/completions"
 
-CANDIDATES = ["GROQ_API_KEY"] + [f"GROQ_API_KEY_{i}" for i in range(2, 13)]
+CANDIDATES = ["GROQ_API_KEY"] + [f"GROQ_API_KEY_{i}" for i in range(2, 13)] + ["GROQ_KANAL_API_KEY"]
 
 PAYLOAD = {
     "model": "llama-3.3-70b-versatile",
