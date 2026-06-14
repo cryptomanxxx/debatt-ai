@@ -167,8 +167,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const agareMap    = Object.fromEntries(mergedAgare.map(a => [a.zon_id, a]));
   const zonEventMap = Object.fromEntries(zonEvents.map(e => [e.zon_id, e]));
   const clientNow   = Date.now();
-  const filtreradeAuktioner    = auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id) && new Date(a.stanger_at) > clientNow);
-  const filtreradeVaraAuktioner = varaAuktioner.filter(a => new Date(a.stanger_at) > clientNow);
+  const ejUtgangen  = (ts) => { const t = new Date(ts); return isNaN(t) || t > clientNow; };
+  const filtreradeAuktioner    = auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id) && ejUtgangen(a.stanger_at));
+  const filtreradeVaraAuktioner = varaAuktioner.filter(a => ejUtgangen(a.stanger_at));
   const auktionMap  = Object.fromEntries(filtreradeAuktioner.map(a => [a.mark_zoner?.id, a]));
 
   // Centrera hexklustret dynamiskt i SVG
