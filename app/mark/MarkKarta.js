@@ -987,6 +987,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
               const isHov = hover?.id === zon.id;
               const isSel = selected?.id === zon.id;
               const isAct = isHov || isSel;
+              // Hex-kanter tonas bort vid utzoom — fullt synliga vid z≥1.8, osynliga vid z≤1.0
+              const hexGridAlpha = isAct ? 1.0 : Math.max(0, Math.min(1, (tfm.z - 1.0) / 0.8));
               const agGradId = agName ? (isVisitor(agName) ? "grad-ag-besokare" : `grad-ag-${agName.replace(/[^a-zA-Z]/g, "")}`) : null;
               const evt = zonEventMap[zon.id] || null;
               const strokeCol = agFarg
@@ -1036,10 +1038,12 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
                   {isAct && <polygon points={pts} fill="url(#grad-hover)" stroke="none" />}
                   {/* Mörk skugga bakom kanten för kontrast mot ljus terräng */}
                   <polygon points={pts} fill="none" stroke="rgba(0,0,0,0.45)"
-                    strokeWidth={isAct ? 4.0 : 2.8} shapeRendering="crispEdges" />
+                    strokeWidth={isAct ? 4.0 : 2.8} shapeRendering="crispEdges"
+                    strokeOpacity={hexGridAlpha} />
                   <polygon points={pts} fill="none" stroke={layerStroke}
                     strokeWidth={layerStrokeW}
-                    shapeRendering="crispEdges" />
+                    shapeRendering="crispEdges"
+                    strokeOpacity={hexGridAlpha} />
                   {isAct && (
                     <polygon points={hexPts(cx, cy, HEX - 4)} fill="none"
                       stroke={kartLager === "ägande"

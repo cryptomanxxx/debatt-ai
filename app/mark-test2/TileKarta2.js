@@ -610,7 +610,7 @@ export default function TileKarta2() {
 
       {/* Region-legend — klickbar, finger-vänlig */}
       <div style={{
-        position: "absolute", top: 12, right: 12,
+        position: "absolute", top: 12, left: 12,
         background: "rgba(0,0,0,0.78)", borderRadius: 12,
         padding: "4px",
         display: "flex", flexDirection: "column", gap: 0,
@@ -634,7 +634,7 @@ export default function TileKarta2() {
         >
           <span style={{ fontSize: 15 }}>🌍</span>
           <span style={{ fontSize: 13, color: "#fff", fontWeight: 600, whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
-            Hela civilisationen
+            Koloni-3
           </span>
         </button>
 
