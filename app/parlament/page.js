@@ -7,7 +7,7 @@ async function getData() {
   if (!key) return { forslag: [], roster: [], aktivitet: [] };
   const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
   const [fRes, rRes, aRes, nyaRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/lagforslag?order=skapad.desc&limit=200`, {
+    fetch(`${SB_URL}/rest/v1/lagforslag?order=skapad.desc&limit=1000`, {
       headers: hdrs, next: { revalidate: 60 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=lagforslag_id,agent,rod,motivering&order=skapad.desc&limit=5000`, {
