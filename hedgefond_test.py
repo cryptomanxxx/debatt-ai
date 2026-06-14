@@ -55,12 +55,6 @@ FONDER = {
         "symboler": ["DBT", "NOVA", "ETK"],
         "aggressivitet": 0.60,  # Justeras av LLM
     },
-    "STRAT": {
-        "förvaltare": "Historiker",
-        "strategi": "algo",
-        "symboler": [],      # Inga interna börs-tokens — styrs av backtest-signal
-        "aggressivitet": 0.0,
-    },
 }
 
 # Crypto-ETF-allokering per fond (andel av totalt kapital)
@@ -68,7 +62,7 @@ FOND_CRYPTO = {
     "ALPHA": {"andel": 0.20, "symboler": ["BTC", "ETH", "SOL"]},   # Aggressiv: 20%, valfri crypto
     "MACRO": {"andel": 0.05, "symboler": ["BTC"]},                  # Konservativ: 5%, bara BTC
     "QUANT": {"andel": None, "symboler": ["BTC", "ETH", "SOL", "XRP", "BNB"]},  # LLM beslutar
-    "STRAT": {"andel": 0.0,  "symboler": []},                       # Hanteras av strat_strategi()
+    # STRAT hanteras helt av kör_strat_paper_trading() — inte i FONDER
 }
 
 # Investeringsbelopp i SEK
@@ -861,11 +855,6 @@ def main():
         total_andelar = float(fond.get("total_andelar", 0))
         print(f"\n  {fond_symbol} ({conf['förvaltare']}, {total_andelar:.2f} andelar):")
 
-        # STRAT är rent algoritmisk paper trading — ingen intern börshandel
-        if fond_symbol == "STRAT":
-            print(f"  STRAT: algoritmisk fond — hoppar intern börshandel (hanteras av kör_strat_paper_trading)")
-            continue
-
         strategi_recs = None
         quant_crypto_rec = None
         if fond_symbol == "QUANT":
@@ -1221,6 +1210,32 @@ def kör_strat_paper_trading(sb_key: str):
 
     h_u = {**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"}
 
+    # 5b. Likvidera gamla positioner om aktiv_symbol bytte (hämta priser för stale symbols)
+    for row in innehav_raw:
+        stale_sym = row["symbol"]
+        stale_ant = float(row["antal"])
+        if stale_sym == aktiv_symbol or stale_ant < 1e-9:
+            continue
+        # Hämta senaste pris för stale symbol
+        try:
+            r_stale = httpx.get(
+                f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{stale_sym}&order=datum.desc&limit=1",
+                headers=_h(sb_key), timeout=10,
+            )
+            stale_pris = float(r_stale.json()[0]["pris"]) if r_stale.is_success and r_stale.json() else 0.0
+        except Exception:
+            stale_pris = 0.0
+        intäkt = stale_ant * stale_pris
+        kontant += intäkt
+        httpx.post(
+            f"{SB_URL}/rest/v1/strat_paper_innehav?on_conflict=symbol",
+            json={"symbol": stale_sym, "antal": 0.0, "kopt_pris_usd": float(row["kopt_pris_usd"]),
+                  "uppdaterad": datetime.now(timezone.utc).isoformat()},
+            headers=h_u, timeout=10,
+        )
+        print(f"    STRAT LIKVIDERAR {stale_ant:.6f} {stale_sym} @ {stale_pris:.2f} USD "
+              f"(symbolbyte → {aktiv_symbol}, intäkt {intäkt:.0f} USD)")
+
     # 6. Stop-loss check (på befintlig position INNAN ny signal)
     if stoploss_pct and nuv_pos["antal"] > 1e-9 and nuv_pos["kopt_pris_usd"] > 0:
         sl_trigger = nuv_pos["kopt_pris_usd"] * (1 - stoploss_pct / 100)
@@ -1277,8 +1292,9 @@ def kör_strat_paper_trading(sb_key: str):
         print(f"    STRAT SÄLJ {salj_antal:.6f} {aktiv_symbol} @ {senaste_pris:.2f} USD "
               f"(P&L: {pnl_trade:+.0f} USD)")
 
-    # 8. Aktuellt portföljvärde
-    pv = kontant + (nuv_pos["antal"] * senaste_pris if nuv_pos["antal"] > 1e-9 else 0.0)
+    # 8. Aktuellt portföljvärde (kontant + aktiv position)
+    pos_varde = nuv_pos["antal"] * senaste_pris if nuv_pos["antal"] > 1e-9 else 0.0
+    pv = kontant + pos_varde
 
     # 9. Benchmark: BTC och SPY sedan allra första körningen
     btc_benchmark = spy_benchmark = None
@@ -1340,7 +1356,9 @@ def kör_strat_paper_trading(sb_key: str):
     except Exception as e:
         print(f"  STRAT NAV-spara: {e}")
 
-    # 11. Uppdatera hedgefonder.nav_per_andel för STRAT (pv / 100 andelar)
+    # 11. Uppdatera hedgefonder.nav_per_andel för STRAT
+    # NAV = pv / 100 referensenheter (10 000 USD start = 100 enheter à 100 USD/st).
+    # STRAT är inte i Python-FONDER så inga investerare skapas via bootstrap/investeringsrunda.
     try:
         strat_fond = hamta_fond(sb_key, "STRAT")
         if strat_fond:

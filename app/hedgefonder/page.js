@@ -33,7 +33,7 @@ const FOND_IKON = {
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { fonder: [], investerare: [], nav_historik: [], trades: [], planbocker: [] };
+  if (!key) return { fonder: [], investerare: [], nav_historik: [], trades: [], planbocker: [], paper_nav: [], paper_innehav: [], strat_nav: [], strat_innehav: [] };
 
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
