@@ -980,53 +980,59 @@ def kör_quant_paper_trading(sb_key: str):
     )
 
     motivering = ""
-    try:
-        raw = _llm(system, prompt, max_tokens=300)
-        start = raw.find("{"); end = raw.rfind("}") + 1
-        data = json.loads(raw[start:end])
-        motivering = data.get("motivering", "")[:500]
+    raw = _llm(system, prompt, max_tokens=300)
+    if not raw:
+        print("  QUANT paper trading: LLM returnerade inget svar (dagsgräns?) — inga trades denna körning")
+    else:
+        try:
+            start = raw.find("{"); end = raw.rfind("}") + 1
+            if start < 0 or end <= start:
+                print("  QUANT paper trading: LLM-svar saknar JSON — inga trades")
+            else:
+                data = json.loads(raw[start:end])
+                motivering = data.get("motivering", "")[:500]
 
-        for trade in data.get("trades", [])[:3]:
-            sym    = str(trade.get("symbol", "")).upper()
-            action = str(trade.get("action", ""))
-            andel  = float(trade.get("andel", 0.15))
-            if sym not in priser:
-                continue
-            pris = priser[sym]["senaste"]
+                for trade in data.get("trades", [])[:3]:
+                    sym    = str(trade.get("symbol", "")).upper()
+                    action = str(trade.get("action", ""))
+                    andel  = float(trade.get("andel", 0.15))
+                    if sym not in priser:
+                        continue
+                    pris = priser[sym]["senaste"]
 
-            if action == "kop" and kontant >= 200:
-                belopp  = kontant * min(0.40, max(0.05, andel))
-                antal   = belopp / pris
-                nuv     = innehav.get(sym, {"antal": 0.0, "kopt_pris_usd": pris})
-                ny_ant  = nuv["antal"] + antal
-                ny_sn   = (nuv["antal"] * nuv["kopt_pris_usd"] + antal * pris) / ny_ant
-                httpx.post(
-                    f"{SB_URL}/rest/v1/quant_paper_innehav?on_conflict=symbol",
-                    json={"symbol": sym, "antal": round(ny_ant, 8), "kopt_pris_usd": round(ny_sn, 4),
-                          "uppdaterad": datetime.now(timezone.utc).isoformat()},
-                    headers={**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"},
-                    timeout=10,
-                )
-                innehav[sym] = {"antal": ny_ant, "kopt_pris_usd": ny_sn}
-                kontant -= belopp
-                print(f"    Paper KÖP {antal:.5f} {sym} @ {pris:.2f} USD ({belopp:.0f} USD)")
+                    if action == "kop" and kontant >= 200:
+                        belopp  = kontant * min(0.40, max(0.05, andel))
+                        antal   = belopp / pris
+                        nuv     = innehav.get(sym, {"antal": 0.0, "kopt_pris_usd": pris})
+                        ny_ant  = nuv["antal"] + antal
+                        ny_sn   = (nuv["antal"] * nuv["kopt_pris_usd"] + antal * pris) / ny_ant
+                        httpx.post(
+                            f"{SB_URL}/rest/v1/quant_paper_innehav?on_conflict=symbol",
+                            json={"symbol": sym, "antal": round(ny_ant, 8), "kopt_pris_usd": round(ny_sn, 4),
+                                  "uppdaterad": datetime.now(timezone.utc).isoformat()},
+                            headers={**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"},
+                            timeout=10,
+                        )
+                        innehav[sym] = {"antal": ny_ant, "kopt_pris_usd": ny_sn}
+                        kontant -= belopp
+                        print(f"    Paper KÖP {antal:.5f} {sym} @ {pris:.2f} USD ({belopp:.0f} USD)")
 
-            elif action == "salj" and sym in innehav and innehav[sym]["antal"] > 0:
-                salj_ant = innehav[sym]["antal"] * min(1.0, max(0.10, andel))
-                kontant += salj_ant * pris
-                kvar     = max(0.0, innehav[sym]["antal"] - salj_ant)
-                httpx.post(
-                    f"{SB_URL}/rest/v1/quant_paper_innehav?on_conflict=symbol",
-                    json={"symbol": sym, "antal": round(kvar, 8),
-                          "kopt_pris_usd": innehav[sym]["kopt_pris_usd"],
-                          "uppdaterad": datetime.now(timezone.utc).isoformat()},
-                    headers={**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"},
-                    timeout=10,
-                )
-                innehav[sym] = {"antal": kvar, "kopt_pris_usd": innehav[sym]["kopt_pris_usd"]}
-                print(f"    Paper SÄLJ {salj_ant:.5f} {sym} @ {pris:.2f} USD")
-    except Exception as e:
-        print(f"  Paper trading LLM/trade-fel: {e}")
+                    elif action == "salj" and sym in innehav and innehav[sym]["antal"] > 0:
+                        salj_ant = innehav[sym]["antal"] * min(1.0, max(0.10, andel))
+                        kontant += salj_ant * pris
+                        kvar     = max(0.0, innehav[sym]["antal"] - salj_ant)
+                        httpx.post(
+                            f"{SB_URL}/rest/v1/quant_paper_innehav?on_conflict=symbol",
+                            json={"symbol": sym, "antal": round(kvar, 8),
+                                  "kopt_pris_usd": innehav[sym]["kopt_pris_usd"],
+                                  "uppdaterad": datetime.now(timezone.utc).isoformat()},
+                            headers={**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"},
+                            timeout=10,
+                        )
+                        innehav[sym] = {"antal": kvar, "kopt_pris_usd": innehav[sym]["kopt_pris_usd"]}
+                        print(f"    Paper SÄLJ {salj_ant:.5f} {sym} @ {pris:.2f} USD")
+        except Exception as e:
+            print(f"  Paper trading LLM/trade-fel: {e}")
 
     # 6. Uppdaterat portföljvärde
     pv = portfölj_värde_nu()
@@ -1304,30 +1310,31 @@ def kör_strat_paper_trading(sb_key: str):
             headers=_h(sb_key), timeout=10,
         )
         first_rows = r.json() if r.status_code == 200 else []
-        start_datum = first_rows[0]["skapad"][:10] if first_rows else None
-        for bm_sym in ["BTC", "SPY"]:
-            try:
-                q1 = (f"&datum=gte.{start_datum}&order=datum.asc&limit=1"
-                      if start_datum else "&order=datum.asc&limit=1")
-                r1 = httpx.get(
-                    f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{bm_sym}{q1}",
-                    headers=_h(sb_key), timeout=10,
-                )
-                r2 = httpx.get(
-                    f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{bm_sym}&order=datum.desc&limit=1",
-                    headers=_h(sb_key), timeout=10,
-                )
-                if r1.is_success and r1.json() and r2.is_success and r2.json():
-                    sp = float(r1.json()[0]["pris"])
-                    cp = float(r2.json()[0]["pris"])
-                    val = (START_KAPITAL / sp) * cp
-                    if bm_sym == "BTC":
-                        btc_benchmark = val
-                    else:
-                        spy_benchmark = val
-            except Exception:
-                pass
-        if not first_rows:
+        if first_rows:
+            start_datum = first_rows[0]["skapad"][:10]
+            for bm_sym in ["BTC", "SPY"]:
+                try:
+                    r1 = httpx.get(
+                        f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{bm_sym}"
+                        f"&datum=gte.{start_datum}&order=datum.asc&limit=1",
+                        headers=_h(sb_key), timeout=10,
+                    )
+                    r2 = httpx.get(
+                        f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{bm_sym}&order=datum.desc&limit=1",
+                        headers=_h(sb_key), timeout=10,
+                    )
+                    if r1.is_success and r1.json() and r2.is_success and r2.json():
+                        sp = float(r1.json()[0]["pris"])
+                        cp = float(r2.json()[0]["pris"])
+                        val = (START_KAPITAL / sp) * cp
+                        if bm_sym == "BTC":
+                            btc_benchmark = val
+                        else:
+                            spy_benchmark = val
+                except Exception:
+                    pass
+        else:
+            # Första körningen — ingen historik att jämföra mot ännu
             btc_benchmark = spy_benchmark = START_KAPITAL
     except Exception as e:
         print(f"  STRAT benchmark-fel: {e}")
