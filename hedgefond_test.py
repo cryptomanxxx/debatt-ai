@@ -1223,14 +1223,20 @@ def kör_strat_paper_trading(sb_key: str):
         if stale_sym == aktiv_symbol or stale_ant < 1e-9:
             continue
         # Hämta senaste pris för stale symbol
+        stale_pris = 0.0
         try:
             r_stale = httpx.get(
                 f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{stale_sym}&order=datum.desc&limit=1",
                 headers=_h(sb_key), timeout=10,
             )
-            stale_pris = float(r_stale.json()[0]["pris"]) if r_stale.is_success and r_stale.json() else 0.0
+            if r_stale.is_success and r_stale.json():
+                stale_pris = float(r_stale.json()[0]["pris"])
         except Exception:
-            stale_pris = 0.0
+            pass
+        if stale_pris <= 0:
+            # Avbryt likvidering — ett 0-pris skulle permanent förstöra positionen i NAV
+            print(f"    STRAT: inget giltigt pris för {stale_sym} — hoppar likvidering tills pris finns")
+            continue
         intäkt = stale_ant * stale_pris
         kontant += intäkt
         httpx.post(
