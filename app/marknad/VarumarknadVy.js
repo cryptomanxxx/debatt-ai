@@ -451,7 +451,11 @@ export default function VarumarknadVy({ resurspriser, auktioner, handelLog, lage
                                 <div style={{ flex: 1 }}>
                                   <div style={{ fontSize: "9px", color: C.dim, fontFamily: C.mono, marginBottom: "4px", letterSpacing: "0.1em" }}>ANTAL (max {item.antal})</div>
                                   <input type="number" min="1" max={item.antal} value={saljVaraAntal}
-                                    onChange={e => setSaljVaraAntal(e.target.value)}
+                                    onChange={e => {
+                                      setSaljVaraAntal(e.target.value);
+                                      const n = parseInt(e.target.value) || 1;
+                                      setSaljVaraPris(String(n * (BASPRIS[saljVara] || 10)));
+                                    }}
                                     style={{ width: "100%", background: "#0d1117", border: `1px solid rgba(34,211,238,0.35)`, color: "#f0ede6", borderRadius: "4px", padding: "6px 8px", fontSize: "12px", fontFamily: C.mono, boxSizing: "border-box" }} />
                                 </div>
                                 <div style={{ flex: 1 }}>
