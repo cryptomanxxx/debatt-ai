@@ -16,7 +16,7 @@ URL = "https://api.groq.com/openai/v1/chat/completions"
 CANDIDATES = ["GROQ_API_KEY"] + [f"GROQ_API_KEY_{i}" for i in range(2, 13)]
 
 PAYLOAD = {
-    "model": "llama3.3-70b-versatile",
+    "model": "llama-3.3-70b-versatile",
     "messages": [{"role": "user", "content": "Svara med ett ord: fungerar"}],
     "max_tokens": 5,
     "temperature": 0,
