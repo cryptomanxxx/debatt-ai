@@ -166,7 +166,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   ];
   const agareMap    = Object.fromEntries(mergedAgare.map(a => [a.zon_id, a]));
   const zonEventMap = Object.fromEntries(zonEvents.map(e => [e.zon_id, e]));
-  const filtreradeAuktioner = auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id));
+  const clientNow   = Date.now();
+  const filtreradeAuktioner    = auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id) && new Date(a.stanger_at) > clientNow);
+  const filtreradeVaraAuktioner = varaAuktioner.filter(a => new Date(a.stanger_at) > clientNow);
   const auktionMap  = Object.fromEntries(filtreradeAuktioner.map(a => [a.mark_zoner?.id, a]));
 
   // Centrera hexklustret dynamiskt i SVG
@@ -830,8 +832,8 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           ...kopOrdrar.filter(o => !lokalaOrdrar.some(l => l.id === o.id)),
           ...lokalaOrdrar,
         ];
-        const minVaraAkt = besokareNamn ? varaAuktioner.filter(a =>
-          a.status === "öppen" && (a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn)
+        const minVaraAkt = besokareNamn ? filtreradeVaraAuktioner.filter(a =>
+          a.saljare === besokareNamn || a.hogst_budgivare === besokareNamn
         ) : [];
         const minZonAkt = besokareNamn ? filtreradeAuktioner.filter(a =>
           a.status === "öppen" &&
@@ -1544,9 +1546,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
             <div style={{ fontSize: "12px", color: "#22d3ee", fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>VARUMARKNAD</div>
             <div style={{ fontSize: "9px", color: "#003040", fontFamily: "monospace" }}>BUDRUNDOR · VARUÄGARSKAP · 24H</div>
           </div>
-          {varaAuktioner.length > 0 && (
+          {filtreradeVaraAuktioner.length > 0 && (
             <span style={{ fontSize: "10px", color: "#22d3ee", fontFamily: "monospace", background: "rgba(8,145,178,0.10)", padding: "3px 8px", borderRadius: "4px", border: "1px solid rgba(8,145,178,0.20)" }}>
-              {varaAuktioner.length} aktiva
+              {filtreradeVaraAuktioner.length} aktiva
             </span>
           )}
         </div>
@@ -1621,9 +1623,9 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           })}
         </div>
         <div style={{ background: "#070b0d", borderLeft: "1px solid rgba(8,145,178,0.22)", borderRight: "1px solid rgba(8,145,178,0.22)", padding: "4px 20px 10px" }}>
-          {varaAuktioner.length === 0 ? (
+          {filtreradeVaraAuktioner.length === 0 ? (
             <div style={{ fontSize: "11px", color: "#002030", fontFamily: "monospace", textAlign: "center", padding: "20px 0" }}>Inga aktiva varuauktioner just nu</div>
-          ) : varaAuktioner.map(a => {
+          ) : filtreradeVaraAuktioner.map(a => {
             const typ     = VARA_TYP[a.vara];
             const typFarg = typ ? TYP_FARG[typ] : "#22d3ee";
             const saljFarg = AGENT_VISUELL[a.saljare]?.ikonFarg || "#888";
