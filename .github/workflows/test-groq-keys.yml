@@ -1,0 +1,31 @@
+name: Testa Groq API-nycklar
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Testa alla Groq API-nycklar
+        env:
+          GROQ_API_KEY:    ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY_2:  ${{ secrets.GROQ_API_KEY_2 }}
+          GROQ_API_KEY_3:  ${{ secrets.GROQ_API_KEY_3 }}
+          GROQ_API_KEY_4:  ${{ secrets.GROQ_API_KEY_4 }}
+          GROQ_API_KEY_5:  ${{ secrets.GROQ_API_KEY_5 }}
+          GROQ_API_KEY_6:  ${{ secrets.GROQ_API_KEY_6 }}
+          GROQ_API_KEY_7:  ${{ secrets.GROQ_API_KEY_7 }}
+          GROQ_API_KEY_8:  ${{ secrets.GROQ_API_KEY_8 }}
+          GROQ_API_KEY_9:  ${{ secrets.GROQ_API_KEY_9 }}
+          GROQ_API_KEY_10: ${{ secrets.GROQ_API_KEY_10 }}
+        run: python test_groq_keys.py

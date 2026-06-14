@@ -179,16 +179,9 @@ def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int, sou
 
 def _groq_api_keys() -> list[tuple[str, str]]:
     """Returnerar (env_variabelnamn, nyckel) för alla satta Groq-nycklar i prioritetsordning.
-    Läser GROQ_API_KEY, GROQ_API_KEY_2, …, GROQ_API_KEY_5.
-    Hoppar över nycklar som saknas eller redan nått sin dagsgräns (_groq_nere_keys).
+    Läser GROQ_API_KEY samt GROQ_API_KEY_2 … GROQ_API_KEY_12 (hoppar saknade/uttömda).
     """
-    candidates = [
-        "GROQ_API_KEY",
-        "GROQ_API_KEY_2",
-        "GROQ_API_KEY_3",
-        "GROQ_API_KEY_4",
-        "GROQ_API_KEY_5",
-    ]
+    candidates = ["GROQ_API_KEY"] + [f"GROQ_API_KEY_{i}" for i in range(2, 13)]
     return [
         (name, os.environ[name])
         for name in candidates
