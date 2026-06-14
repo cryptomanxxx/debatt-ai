@@ -35,7 +35,7 @@ async function getData() {
 
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [fondRes, invRes, navRes, tradeRes, plbRes] = await Promise.all([
+  const [fondRes, invRes, navRes, tradeRes, plbRes, paperNavRes, paperInnehavRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/hedgefonder?aktiv=eq.true&order=symbol.asc`, {
       headers: h, next: { revalidate: 120 },
     }),
@@ -51,15 +51,23 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc`, {
       headers: h, next: { revalidate: 120 },
     }),
+    fetch(`${SB_URL}/rest/v1/quant_paper_nav?order=skapad.desc&limit=60`, {
+      headers: h, next: { revalidate: 120 },
+    }),
+    fetch(`${SB_URL}/rest/v1/quant_paper_innehav?order=symbol.asc`, {
+      headers: h, next: { revalidate: 120 },
+    }),
   ]);
 
-  const fonder     = fondRes.ok  ? await fondRes.json()  : [];
-  const investerare = invRes.ok  ? await invRes.json()   : [];
-  const nav_historik = navRes.ok ? await navRes.json()   : [];
-  const trades     = tradeRes.ok ? await tradeRes.json() : [];
-  const planbocker = plbRes.ok   ? await plbRes.json()   : [];
+  const fonder       = fondRes.ok        ? await fondRes.json()        : [];
+  const investerare  = invRes.ok         ? await invRes.json()         : [];
+  const nav_historik = navRes.ok         ? await navRes.json()         : [];
+  const trades       = tradeRes.ok       ? await tradeRes.json()       : [];
+  const planbocker   = plbRes.ok         ? await plbRes.json()         : [];
+  const paper_nav    = paperNavRes.ok    ? await paperNavRes.json()    : [];
+  const paper_innehav = paperInnehavRes.ok ? await paperInnehavRes.json() : [];
 
-  return { fonder, investerare, nav_historik, trades, planbocker };
+  return { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav };
 }
 
 function NavSparkline({ historik, fondId, farg }) {
@@ -233,7 +241,7 @@ function FondKort({ fond, investerare, nav_historik, trades }) {
 }
 
 export default async function HedgefonderPage() {
-  const { fonder, investerare, nav_historik, trades, planbocker } = await getData();
+  const { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav } = await getData();
 
   const total_aum = fonder.reduce((sum, f) => {
     return sum + parseFloat(f.nav_per_andel) * parseFloat(f.total_andelar || 0);
@@ -307,6 +315,114 @@ export default async function HedgefonderPage() {
           Agenter investerar 100–200 SEK och får andelar till aktuellt NAV. Fonderna handlar på den interna börsen.
           NAV uppdateras vid varje körning (11:00 dagligen).
         </div>
+
+        {/* QUANT Paper Trading panel */}
+        {(() => {
+          const senaste = paper_nav[0];
+          if (!senaste) return (
+            <div style={{ marginTop: "20px", padding: "16px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", borderTop: `2px solid #38bdf8` }}>
+              <div style={{ fontSize: "12px", color: C.textMuted }}>
+                🤖 <strong style={{ color: "#38bdf8" }}>QUANT Paper Trading</strong> — Kör <code>supabase_quant_paper.sql</code> och vänta på nästa hedgefond-körning.
+              </div>
+            </div>
+          );
+
+          const START = parseFloat(senaste.start_kapital_usd) || 10000;
+          const pv    = parseFloat(senaste.portfölj_värde_usd);
+          const pnl   = pv - START;
+          const pnlPct = (pnl / START * 100).toFixed(1);
+          const btc   = senaste.btc_benchmark_usd ? parseFloat(senaste.btc_benchmark_usd) : null;
+          const spy   = senaste.spy_benchmark_usd ? parseFloat(senaste.spy_benchmark_usd) : null;
+
+          // Sparkline data (portföljvärde över tid)
+          const sparkData = [...paper_nav].reverse().map(r => parseFloat(r.portfölj_värde_usd));
+          const spMin = Math.min(...sparkData), spMax = Math.max(...sparkData);
+          const spRange = spMax - spMin || 1;
+          const spW = 200, spH = 40;
+          const spPts = sparkData.map((v, i) => {
+            const x = (i / Math.max(sparkData.length - 1, 1)) * spW;
+            const y = spH - ((v - spMin) / spRange) * spH;
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+          }).join(" ");
+
+          return (
+            <div style={{
+              marginTop: "20px",
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: "12px",
+              borderTop: "2px solid #38bdf8",
+              overflow: "hidden",
+            }}>
+              {/* Header */}
+              <div style={{ padding: "16px 20px 12px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "18px" }}>🤖</span>
+                    <span style={{ fontWeight: "700", fontSize: "15px", color: "#38bdf8" }}>QUANT Paper Trading</span>
+                    <span style={{ fontSize: "10px", background: "#0e2a3a", border: "1px solid #38bdf840", borderRadius: "4px", padding: "2px 6px", color: "#38bdf8" }}>RIKTIGA MARKNADSDATA</span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: C.textMuted }}>10 000 USD fiktivt startkapital · BTC, ETH, SOL, XRP, BNB, SPY</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "22px", fontWeight: "700", color: pnl >= 0 ? "#4ade80" : "#f87171" }}>
+                    {pv.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} USD
+                  </div>
+                  <div style={{ fontSize: "12px", color: pnl >= 0 ? "#4ade80" : "#f87171" }}>
+                    {pnl >= 0 ? "▲" : "▼"} {Math.abs(pnl).toFixed(0)} USD ({pnl >= 0 ? "+" : ""}{pnlPct}%)
+                  </div>
+                </div>
+              </div>
+
+              {/* Sparkline + Benchmarks */}
+              <div style={{ padding: "0 20px 16px", display: "flex", alignItems: "flex-end", gap: "24px", flexWrap: "wrap" }}>
+                {sparkData.length >= 2 && (
+                  <svg width={spW} height={spH} style={{ display: "block", flexShrink: 0 }}>
+                    <polyline points={spPts} fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinejoin="round" />
+                  </svg>
+                )}
+                <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                  {[
+                    { label: "QUANT paper", value: pv, color: "#38bdf8" },
+                    btc ? { label: "BTC buy & hold", value: btc, color: "#f59e0b" } : null,
+                    spy ? { label: "SPY buy & hold", value: spy, color: "#4ade80" } : null,
+                  ].filter(Boolean).map(b => (
+                    <div key={b.label} style={{ fontSize: "11px" }}>
+                      <div style={{ color: b.color, fontWeight: "600" }}>{b.label}</div>
+                      <div style={{ color: C.text }}>{b.value.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} USD</div>
+                      <div style={{ color: b.value >= START ? "#4ade80" : "#f87171", fontSize: "10px" }}>
+                        {b.value >= START ? "+" : ""}{((b.value / START - 1) * 100).toFixed(1)}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Positioner + senaste motivering */}
+              <div style={{ borderTop: `1px solid ${C.border}`, padding: "12px 20px", display: "flex", gap: "24px", flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: "180px" }}>
+                  <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "6px" }}>NUVARANDE POSITIONER</div>
+                  {paper_innehav.filter(p => parseFloat(p.antal) > 0).length === 0 ? (
+                    <div style={{ fontSize: "12px", color: C.textMuted }}>Inga positioner ännu</div>
+                  ) : paper_innehav.filter(p => parseFloat(p.antal) > 0).map(p => (
+                    <div key={p.symbol} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", padding: "2px 0" }}>
+                      <span style={{ color: "#38bdf8", fontWeight: "600" }}>{p.symbol}</span>
+                      <span style={{ color: C.textMuted }}>{parseFloat(p.antal).toFixed(5)} @ {parseFloat(p.kopt_pris_usd).toFixed(2)} USD</span>
+                    </div>
+                  ))}
+                </div>
+                {senaste.quant_motivering && (
+                  <div style={{ flex: 2, minWidth: "200px" }}>
+                    <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "6px" }}>SENASTE LLM-ANALYS</div>
+                    <div style={{ fontSize: "12px", color: C.text, lineHeight: "1.5", fontStyle: "italic" }}>
+                      "{senaste.quant_motivering}"
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </main>
   );

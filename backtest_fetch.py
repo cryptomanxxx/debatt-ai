@@ -26,6 +26,7 @@ COINS = [
     ("SOL", "SOL-USD"),
     ("XRP", "XRP-USD"),
     ("BNB", "BNB-USD"),
+    ("SPY", "SPY"),       # S&P 500 ETF — benchmark för QUANT paper trading
 ]
 DAYS = 730
 

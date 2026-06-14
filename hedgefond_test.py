@@ -878,7 +878,211 @@ def main():
         # 5. Kolla prestation
         kolla_prestation(sb_key, fond_symbol, fond_id, nav, conf["förvaltare"])
 
+    # QUANT paper trading mot riktiga marknadsdata (parallell, påverkar ej agentsaldon)
+    kör_quant_paper_trading(sb_key)
+
     print("\n=== Hedgefond körning klar ===")
+
+
+def kör_quant_paper_trading(sb_key: str):
+    """
+    QUANT paper trading mot riktiga marknadsdata (BTC, ETH, SOL, XRP, BNB, SPY).
+    Körs parallellt med intern fondhandel — påverkar inte agenternas saldo.
+    Startar med 10 000 USD fiktivt kapital. Jämför mot BTC- och SPY-benchmark.
+    """
+    START_KAPITAL = 10_000.0
+    SYMBOLER = ["BTC", "ETH", "SOL", "XRP", "BNB", "SPY"]
+
+    print("\n--- QUANT Paper Trading (riktiga marknadsdata) ---")
+
+    # 1. Hämta aktuella priser från ohlcv_cache
+    priser = {}
+    for sym in SYMBOLER:
+        try:
+            r = httpx.get(
+                f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{sym}&order=datum.desc&limit=20",
+                headers=_h(sb_key), timeout=15,
+            )
+            if r.status_code == 200 and r.json():
+                rows = r.json()
+                priser[sym] = {
+                    "senaste":  float(rows[0]["pris"]),
+                    "historik": [float(x["pris"]) for x in reversed(rows)],
+                }
+        except Exception as e:
+            print(f"  Prisfetch {sym}: {e}")
+
+    if len(priser) < 2:
+        print("  För få priser, hoppar över paper trading")
+        return
+
+    # 2. Hämta nuvarande positioner
+    try:
+        r = httpx.get(f"{SB_URL}/rest/v1/quant_paper_innehav", headers=_h(sb_key), timeout=10)
+        innehav = {
+            x["symbol"]: {"antal": float(x["antal"]), "kopt_pris_usd": float(x["kopt_pris_usd"])}
+            for x in (r.json() if r.status_code == 200 else [])
+        }
+    except Exception:
+        innehav = {}
+
+    # 3. Hämta kontantnivå från senaste NAV-snapshot
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/quant_paper_nav?order=skapad.desc&limit=1",
+            headers=_h(sb_key), timeout=10,
+        )
+        nav_rows = r.json() if r.status_code == 200 else []
+        kontant = float(nav_rows[0]["kontant_usd"]) if nav_rows else START_KAPITAL
+    except Exception:
+        kontant = START_KAPITAL
+
+    # 4. Beräkna aktuellt portföljvärde
+    def portfölj_värde_nu():
+        v = kontant
+        for sym, pos in innehav.items():
+            if sym in priser and pos["antal"] > 0:
+                v += pos["antal"] * priser[sym]["senaste"]
+        return v
+
+    pv = portfölj_värde_nu()
+
+    # 5. LLM-strategi
+    pris_text = "\n".join([
+        f"  {sym}: {info['senaste']:.2f} USD | trend: {info['historik'][0]:.2f}→{info['senaste']:.2f}"
+        f" ({(info['senaste']/info['historik'][0]-1)*100:+.1f}%)"
+        for sym, info in priser.items()
+    ])
+    innehav_text = "\n".join([
+        f"  {sym}: {pos['antal']:.5f} × {priser.get(sym,{}).get('senaste',0):.2f} = "
+        f"{pos['antal']*priser.get(sym,{}).get('senaste',0):.2f} USD"
+        for sym, pos in innehav.items() if pos["antal"] > 0
+    ]) or "  (inga positioner)"
+
+    system = (
+        "Du är QUANT, en självlärande kvantitativ handelsalgoritm. Paper trading, 10 000 USD startkapital. "
+        "Symboler: BTC, ETH, SOL, XRP, BNB och SPY (S&P 500 ETF). "
+        'Svara ALLTID med valid JSON: {"trades":[{"symbol":"BTC","action":"kop","andel":0.20}],"motivering":"..."}\n'
+        "action = kop eller salj. andel = andel av kontant att köpa (0.05–0.40) "
+        "ELLER andel av position att sälja (0.25–1.0). Max 3 trades."
+    )
+    prompt = (
+        f"Paper portfolio:\nKontant: {kontant:.2f} USD\nPositioner:\n{innehav_text}\n"
+        f"Totalt: {pv:.2f} USD ({(pv/START_KAPITAL-1)*100:+.1f}% mot start)\n\n"
+        f"Marknadsdata:\n{pris_text}\n\nVad gör vi? Motivera kort."
+    )
+
+    motivering = ""
+    try:
+        raw = _llm(system, prompt, max_tokens=300)
+        start = raw.find("{"); end = raw.rfind("}") + 1
+        data = json.loads(raw[start:end])
+        motivering = data.get("motivering", "")[:500]
+
+        for trade in data.get("trades", [])[:3]:
+            sym    = str(trade.get("symbol", "")).upper()
+            action = str(trade.get("action", ""))
+            andel  = float(trade.get("andel", 0.15))
+            if sym not in priser:
+                continue
+            pris = priser[sym]["senaste"]
+
+            if action == "kop" and kontant >= 200:
+                belopp  = kontant * min(0.40, max(0.05, andel))
+                antal   = belopp / pris
+                nuv     = innehav.get(sym, {"antal": 0.0, "kopt_pris_usd": pris})
+                ny_ant  = nuv["antal"] + antal
+                ny_sn   = (nuv["antal"] * nuv["kopt_pris_usd"] + antal * pris) / ny_ant
+                httpx.post(
+                    f"{SB_URL}/rest/v1/quant_paper_innehav?on_conflict=symbol",
+                    json={"symbol": sym, "antal": round(ny_ant, 8), "kopt_pris_usd": round(ny_sn, 4),
+                          "uppdaterad": datetime.now(timezone.utc).isoformat()},
+                    headers={**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"},
+                    timeout=10,
+                )
+                innehav[sym] = {"antal": ny_ant, "kopt_pris_usd": ny_sn}
+                kontant -= belopp
+                print(f"    Paper KÖP {antal:.5f} {sym} @ {pris:.2f} USD ({belopp:.0f} USD)")
+
+            elif action == "salj" and sym in innehav and innehav[sym]["antal"] > 0:
+                salj_ant = innehav[sym]["antal"] * min(1.0, max(0.10, andel))
+                kontant += salj_ant * pris
+                kvar     = max(0.0, innehav[sym]["antal"] - salj_ant)
+                httpx.post(
+                    f"{SB_URL}/rest/v1/quant_paper_innehav?on_conflict=symbol",
+                    json={"symbol": sym, "antal": round(kvar, 8),
+                          "kopt_pris_usd": innehav[sym]["kopt_pris_usd"],
+                          "uppdaterad": datetime.now(timezone.utc).isoformat()},
+                    headers={**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"},
+                    timeout=10,
+                )
+                innehav[sym] = {"antal": kvar, "kopt_pris_usd": innehav[sym]["kopt_pris_usd"]}
+                print(f"    Paper SÄLJ {salj_ant:.5f} {sym} @ {pris:.2f} USD")
+    except Exception as e:
+        print(f"  Paper trading LLM/trade-fel: {e}")
+
+    # 6. Uppdaterat portföljvärde
+    pv = portfölj_värde_nu()
+
+    # 7. Benchmark: vad 10 000 USD i BTC / SPY från allra första körningen ger idag
+    btc_benchmark = spy_benchmark = None
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/quant_paper_nav?order=skapad.asc&limit=1",
+            headers=_h(sb_key), timeout=10,
+        )
+        first_rows = r.json() if r.status_code == 200 else []
+        if first_rows:
+            start_datum = first_rows[0]["skapad"][:10]
+            for sym, attr in [("BTC", "btc"), ("SPY", "spy")]:
+                if sym not in priser:
+                    continue
+                r2 = httpx.get(
+                    f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{sym}"
+                    f"&datum=gte.{start_datum}&order=datum.asc&limit=1",
+                    headers=_h(sb_key), timeout=10,
+                )
+                if r2.status_code == 200 and r2.json():
+                    sp = float(r2.json()[0]["pris"])
+                    val = (START_KAPITAL / sp) * priser[sym]["senaste"]
+                    if attr == "btc":
+                        btc_benchmark = val
+                    else:
+                        spy_benchmark = val
+        else:
+            btc_benchmark = START_KAPITAL
+            if "SPY" in priser:
+                spy_benchmark = START_KAPITAL
+    except Exception as e:
+        print(f"  Benchmark-fel: {e}")
+
+    # 8. Spara NAV-snapshot
+    nav_row: dict = {
+        "portfölj_värde_usd": round(pv, 4),
+        "kontant_usd":        round(kontant, 4),
+        "start_kapital_usd":  START_KAPITAL,
+        "quant_motivering":   motivering or None,
+    }
+    if btc_benchmark is not None:
+        nav_row["btc_benchmark_usd"] = round(btc_benchmark, 4)
+    if spy_benchmark is not None:
+        nav_row["spy_benchmark_usd"] = round(spy_benchmark, 4)
+    try:
+        httpx.post(
+            f"{SB_URL}/rest/v1/quant_paper_nav",
+            json=nav_row,
+            headers={**_h(sb_key), "Prefer": "return=minimal"},
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"  NAV-spara fel: {e}")
+
+    pnl = pv - START_KAPITAL
+    print(f"  Paper portfölj: {pv:.2f} USD ({pnl:+.2f} USD / {pnl/START_KAPITAL*100:+.1f}%)")
+    if btc_benchmark:
+        print(f"  BTC benchmark:  {btc_benchmark:.2f} USD ({(btc_benchmark/START_KAPITAL-1)*100:+.1f}%)")
+    if spy_benchmark:
+        print(f"  SPY benchmark:  {spy_benchmark:.2f} USD ({(spy_benchmark/START_KAPITAL-1)*100:+.1f}%)")
 
 
 if __name__ == "__main__":
