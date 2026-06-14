@@ -105,6 +105,7 @@ export default function KoloniKarta2() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
+    if (!ctx) return;
     const dpr = window.devicePixelRatio || 1;
     const W   = canvas.width  / dpr;
     const H   = canvas.height / dpr;
@@ -419,7 +420,7 @@ export default function KoloniKarta2() {
       const s = stateRef.current;
       s.dragging = false;
       // Treat short taps as zone selection (click is suppressed by preventDefault in touchmove)
-      if (e.changedTouches.length === 1) {
+      if (e.changedTouches?.length === 1) {
         const t = e.changedTouches[0];
         if (Math.hypot(t.clientX - touchStart.x, t.clientY - touchStart.y) <= 8) {
           const CW   = canvas.clientWidth;
