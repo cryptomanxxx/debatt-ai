@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function MarknadPage() {
-  redirect("/mark");
+  redirect("/mark?tab=marknaden");
 }

@@ -300,6 +300,12 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
     : null;
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab === "marknaden" || tab === "marknad") setActiveTab("marknad");
+  }, []);
+
+  useEffect(() => {
     let id = localStorage.getItem("mark_besokare_id");
     if (!id) {
       id = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -1536,6 +1542,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
           lager={lager}
           foradlingLog={foradlingLog}
           zonEvents={zonEvents}
+          kopOrdrar={kopOrdrar}
         />
       )}
 
