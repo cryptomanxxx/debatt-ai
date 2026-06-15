@@ -17,7 +17,9 @@ ON CONFLICT (agent, symbol) DO UPDATE
       uppdaterad = now();
 
 -- 2. Se till att Börskassan har minst 1 000 kr för bid-ordrar
-UPDATE agent_planbocker
-SET saldo      = GREATEST(saldo, 1000),
-    uppdaterad = now()
-WHERE agent = 'Börskassan';
+-- (upsert skapar raden om den inte finns, annars uppdaterar)
+INSERT INTO agent_planbocker (agent, saldo, totalt_givet, totalt_fatt, antal_spel, saldo_spel, uppdaterad)
+VALUES ('Börskassan', 1000, 0, 0, 0, 0, now())
+ON CONFLICT (agent) DO UPDATE
+  SET saldo      = GREATEST(agent_planbocker.saldo, 1000),
+      uppdaterad = now();
