@@ -69,10 +69,10 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc`, {
       headers: h, next: { revalidate: 60 },
     }),
-    fetch(`${SB_URL}/rest/v1/bors_staking?utbetald=eq.false&order=slut_datum.asc&limit=100`, {
+    fetch(`${SB_URL}/rest/v1/bors_staking?utbetald=eq.false&order=slut_datum.asc`, {
       headers: h, next: { revalidate: 60 },
     }),
-    fetch(`${SB_URL}/rest/v1/bors_liquidity_log?order=skapad.desc&limit=200`, {
+    fetch(`${SB_URL}/rest/v1/bors_liquidity_log?select=agent,beloning&order=skapad.desc&limit=5000`, {
       headers: h, next: { revalidate: 60 },
     }),
   ]);
