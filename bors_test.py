@@ -143,6 +143,23 @@ LIKVIDITET_BELOPP = 1.5    # SEK per kvalificerande (agent, symbol)-par per kör
 
 AVGIFT_SATS = 0.005        # 0,5 % handelsavgift på varje genomförd affär → Börskassan
 
+# ─── Korta positioner ─────────────────────────────────────────────────────────
+
+SHORT_COLLATERAL   = 1.50  # 150 % av positionsvärdet låses som säkerhet
+SHORT_LIQ_TROSKEL  = 0.80  # likvideras när förlust > 80 % av collateral
+SHORT_DAGLIG_AVGIFT = 0.30  # % per körning dras från saldo → Börskassan
+
+# Agenter och deras benägenhet att shorta (sannolikhet per körning, max antal tokens)
+SHORT_PROFIL = {
+    "Kryptoanalytiker":     {"sannolikhet": 0.08, "max_antal": 3, "symboler": None},
+    "Den sura":             {"sannolikhet": 0.06, "max_antal": 2, "symboler": None},
+    "Konservativ debattör": {"sannolikhet": 0.05, "max_antal": 2, "symboler": None},
+    "Journalist":           {"sannolikhet": 0.05, "max_antal": 2, "symboler": None},
+    "Nationalekonom":       {"sannolikhet": 0.04, "max_antal": 2, "symboler": None},
+    "Miljöaktivist":        {"sannolikhet": 0.04, "max_antal": 2, "symboler": ["NOVA"]},
+    "Den stressade":        {"sannolikhet": 0.03, "max_antal": 1, "symboler": None},
+}
+
 # ─── Hjälpfunktioner ──────────────────────────────────────────────────────────
 
 def _h(sb_key: str) -> dict:
@@ -1142,6 +1159,194 @@ def kör_liquidity_mining(sb_key: str) -> None:
         print(f"  LIQUIDITY MINING: {agent} +{total} kr ({syms})")
 
 
+# ─── Korta positioner ─────────────────────────────────────────────────────────
+
+def _hamta_spotpris(sb_key: str, symbol: str) -> float | None:
+    """Hämtar aktuellt spotpris för en symbol."""
+    try:
+        sym_enc = urllib.parse.quote(symbol)
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/bors_tillgangar?symbol=eq.{sym_enc}&select=senaste_pris",
+            headers=_h(sb_key), timeout=6,
+        )
+        if r.is_success and r.json():
+            return float(r.json()[0]["senaste_pris"])
+    except Exception:
+        pass
+    return None
+
+
+def öppna_short(sb_key: str, agent: str, symbol: str, antal: float) -> bool:
+    """
+    Öppnar en kort position:
+    - Låser collateral (150 % av positionsvärde) från saldo
+    - Krediterar försäljningsintäkterna direkt (agent säljer tokens de lånar)
+    - Nettokostnad: 50 % av positionsvärdet
+    """
+    spot = _hamta_spotpris(sb_key, symbol)
+    if not spot:
+        return False
+
+    position_kr  = round(antal * spot, 2)
+    collateral_kr = round(position_kr * SHORT_COLLATERAL, 2)
+    netto_kostnad = round(collateral_kr - position_kr, 2)  # 50% av position
+
+    saldo = hamta_saldo(sb_key, agent)
+    if saldo < collateral_kr:
+        return False
+
+    h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+    agent_enc = urllib.parse.quote(agent)
+
+    # Nettodrag: collateral - intäkter
+    httpx.patch(
+        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
+        headers=h_min,
+        json={"saldo": round(saldo - netto_kostnad, 2), "uppdaterad": "now()"},
+        timeout=8,
+    )
+
+    # Spara short-positionen
+    httpx.post(
+        f"{SB_URL}/rest/v1/bors_shorts",
+        headers=h_min,
+        json={
+            "agent": agent,
+            "symbol": symbol,
+            "antal": round(antal, 4),
+            "ingangs_pris": round(spot, 2),
+            "collateral_kr": collateral_kr,
+            "daglig_avgift": SHORT_DAGLIG_AVGIFT,
+        },
+        timeout=8,
+    )
+    print(f"  SHORT ÖPPNAD: {agent} shortar {antal} {symbol} @ {spot:.2f} kr (collateral {collateral_kr:.0f} kr)")
+    return True
+
+
+def stang_short(sb_key: str, short: dict, anledning: str = "frivillig") -> None:
+    """
+    Stänger en kort position:
+    - Köper tillbaka tokens till spotpris
+    - Frigör collateral
+    - Beräknar P&L
+    """
+    spot = _hamta_spotpris(sb_key, short["symbol"])
+    if not spot:
+        return
+
+    antal         = float(short["antal"])
+    ingangs_pris  = float(short["ingangs_pris"])
+    collateral_kr = float(short["collateral_kr"])
+    aterköps_kr   = round(antal * spot, 2)
+    pl            = round((ingangs_pris - spot) * antal, 2)  # positivt = vinst
+
+    h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+    agent_enc = urllib.parse.quote(short["agent"])
+
+    saldo = hamta_saldo(sb_key, short["agent"])
+    # Frigör collateral, dra återköpskostnad
+    nytt_saldo = round(saldo + collateral_kr - aterköps_kr, 2)
+    httpx.patch(
+        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
+        headers=h_min,
+        json={"saldo": max(0.0, nytt_saldo), "uppdaterad": "now()"},
+        timeout=8,
+    )
+
+    # Uppdatera short-raden
+    httpx.patch(
+        f"{SB_URL}/rest/v1/bors_shorts?id=eq.{short['id']}",
+        headers=h_min,
+        json={"status": "likviderad" if anledning == "likvidation" else "stangd",
+              "vinst_forlust": pl, "stangd_at": "now()"},
+        timeout=8,
+    )
+    pl_str = f"+{pl:.2f}" if pl >= 0 else f"{pl:.2f}"
+    print(f"  SHORT STÄNGD ({anledning}): {short['agent']} {short['symbol']} P&L {pl_str} kr")
+
+
+def kör_shorts(sb_key: str, alla_symboler: list[str]) -> None:
+    """
+    Per körning:
+    1. Dra daglig avgift på öppna shorts → Börskassan
+    2. Likvidera positioner med för stor förlust
+    3. Stäng positioner med bra vinst (take profit)
+    4. Öppna nya shorts med viss sannolikhet
+    """
+    h = _h(sb_key)
+    h_min = {**h, "Prefer": "return=minimal"}
+
+    # ── Hämta alla öppna shorts ───────────────────────────────────────────────
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/bors_shorts?status=eq.öppen&select=*",
+            headers=h, timeout=8,
+        )
+        öppna = r.json() if r.is_success else []
+    except Exception:
+        öppna = []
+
+    # ── 1. Daglig avgift ─────────────────────────────────────────────────────
+    total_avgifter = 0.0
+    for s in öppna:
+        avgift = round(float(s["collateral_kr"]) * SHORT_DAGLIG_AVGIFT / 100, 2)
+        if avgift <= 0:
+            continue
+        agent_enc = urllib.parse.quote(s["agent"])
+        saldo = hamta_saldo(sb_key, s["agent"])
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
+            headers=h_min,
+            json={"saldo": max(0.0, round(saldo - avgift, 2)), "uppdaterad": "now()"},
+            timeout=8,
+        )
+        total_avgifter += avgift
+
+    if total_avgifter > 0:
+        bk_saldo = hamta_saldo(sb_key, "Börskassan")
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan",
+            headers=h_min,
+            json={"saldo": round(bk_saldo + total_avgifter, 2), "uppdaterad": "now()"},
+            timeout=8,
+        )
+
+    # ── 2 & 3. Likvidering och take-profit ───────────────────────────────────
+    for s in öppna:
+        spot = _hamta_spotpris(sb_key, s["symbol"])
+        if not spot:
+            continue
+        antal        = float(s["antal"])
+        ingangs_pris = float(s["ingangs_pris"])
+        collateral   = float(s["collateral_kr"])
+        förlust      = max(0.0, (spot - ingangs_pris) * antal)  # positivt om pris gått upp
+        vinst        = max(0.0, (ingangs_pris - spot) * antal)
+
+        if förlust >= collateral * SHORT_LIQ_TROSKEL:
+            stang_short(sb_key, s, "likvidation")
+        elif vinst >= 0.30 * ingangs_pris * antal:  # +30 % vinst = ta hem
+            stang_short(sb_key, s, "take-profit")
+        elif random.random() < 0.10:  # 10 % chans att stänga frivilligt
+            stang_short(sb_key, s, "frivillig")
+
+    # ── 4. Öppna nya shorts ──────────────────────────────────────────────────
+    for agent, profil in SHORT_PROFIL.items():
+        if random.random() > profil["sannolikhet"]:
+            continue
+
+        # Välj symbol
+        kandidater = profil["symboler"] or [s for s in alla_symboler if s in ("DBT", "NOVA", "ETK")]
+        kandidater = [s for s in kandidater if s in alla_symboler]
+        if not kandidater:
+            continue
+        symbol = random.choice(kandidater)
+
+        # Välj antal (1 till max)
+        antal = random.randint(1, profil["max_antal"])
+        öppna_short(sb_key, agent, symbol, antal)
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -1252,15 +1457,19 @@ def main():
             print(f"    Inga matchningar (pris: {aktuellt_pris:.2f} kr)")
 
     # Liquidity mining-belöningar (beräknas på kvarvarande öppna ordrar)
-    print("\n[6/8] Liquidity mining-belöningar...")
+    print("\n[6/9] Liquidity mining-belöningar...")
     kör_liquidity_mining(sb_key)
 
+    # Korta positioner
+    print("\n[7/9] Korta positioner (avgift, likvidering, nya)...")
+    kör_shorts(sb_key, alla_symboler)
+
     # Staking
-    print("\n[7/8] Staking — yield och nya stakes...")
+    print("\n[8/9] Staking — yield och nya stakes...")
     kör_staking(sb_key)
 
     # Koalitionsairdrops
-    print("\n[8/8] Koalitionsairdrops...")
+    print("\n[9/9] Koalitionsairdrops...")
     kör_koalitions_airdrops(sb_key)
 
     # Sammanfattning
