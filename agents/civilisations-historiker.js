@@ -95,6 +95,8 @@ async function hämtaCivilisationsData() {
     roster,
     borsaffarer,
     artiklar,
+    strat_nav,
+    quant_nav,
   ] = await Promise.all([
     sb("civilisations_minne", `select=typ,rubrik,beskrivning,agenter,skapad&skapad=gte.${sjuDagarSen}&order=skapad.desc&limit=25`),
     sb("domstol_domar",       `select=utfall,straff_belopp,skapad,domstol_arenden(arende_nr,svarande,artikel_nr,beskrivning)&skapad=gte.${sjuDagarSen}&order=skapad.desc&limit=10`),
@@ -107,9 +109,11 @@ async function hämtaCivilisationsData() {
     sb("agent_roster_lag",    `select=agent,rod,skapad&skapad=gte.${sjuDagarSen}&limit=150`),
     sb("bors_affarer",        `select=symbol,kop_agent,salj_agent,pris,antal,skapad&skapad=gte.${sjuDagarSen}&order=skapad.desc&limit=30`),
     sb("artiklar",            `select=rubrik,forfattare,taggar,skapad&skapad=gte.${sjuDagarSen}&kalla=eq.ai&order=lasningar.desc&limit=10`),
+    sb("strat_paper_nav",     `select=portfölj_värde_usd,start_kapital_usd,aktiv_symbol,signal,btc_benchmark_usd,spy_benchmark_usd,skapad&order=skapad.desc&limit=8`),
+    sb("quant_paper_nav",     `select=portfölj_värde_usd,start_kapital_usd,btc_benchmark_usd,spy_benchmark_usd,quant_motivering,skapad&order=skapad.desc&limit=8`),
   ]);
 
-  return { minnen, domar, kriser, val, partier, planbocker, koalitioner, lobbying, roster, borsaffarer, artiklar };
+  return { minnen, domar, kriser, val, partier, planbocker, koalitioner, lobbying, roster, borsaffarer, artiklar, strat_nav, quant_nav };
 }
 
 // ── Dataformaterare ────────────────────────────────────────────────────────
@@ -187,6 +191,35 @@ function sammanfattaData(d) {
     const topp = Object.entries(symCount).sort((a, b) => b[1] - a[1])
       .map(([s, n]) => `${s}: ${n} affärer`).join(", ");
     rader.push(`BÖRSEN: ${d.borsaffarer.length} affärer totalt. ${topp}.`);
+  }
+
+  // STRAT paper trading
+  if (d.strat_nav && d.strat_nav.length > 0) {
+    const sen = d.strat_nav[0];
+    const äld = d.strat_nav[d.strat_nav.length - 1];
+    const pv  = parseFloat(sen.portfölj_värde_usd);
+    const start = parseFloat(sen.start_kapital_usd) || 10000;
+    const veckoD = pv - parseFloat(äld.portfölj_värde_usd);
+    const totalPct = ((pv / start - 1) * 100).toFixed(1);
+    const veckoStr = (veckoD >= 0 ? "+" : "") + veckoD.toFixed(0);
+    const btcVal = sen.btc_benchmark_usd ? parseFloat(sen.btc_benchmark_usd) : null;
+    const btcStr = btcVal ? ` BTC buy&hold för samma period: ${((btcVal / start - 1) * 100).toFixed(1)}%.` : "";
+    rader.push(`STRAT PAPER TRADING (algoritmisk MA+volym, ingen LLM): Portföljvärde ${pv.toFixed(0)} USD (${totalPct >= 0 ? "+" : ""}${totalPct}% mot 10 000 USD start). Veckans rörelse: ${veckoStr} USD. Aktiv krypto: ${sen.aktiv_symbol || "–"}, senaste signal: ${sen.signal || "–"}.${btcStr}`);
+  }
+
+  // QUANT paper trading
+  if (d.quant_nav && d.quant_nav.length > 0) {
+    const sen = d.quant_nav[0];
+    const äld = d.quant_nav[d.quant_nav.length - 1];
+    const pv  = parseFloat(sen.portfölj_värde_usd);
+    const start = parseFloat(sen.start_kapital_usd) || 10000;
+    const veckoD = pv - parseFloat(äld.portfölj_värde_usd);
+    const totalPct = ((pv / start - 1) * 100).toFixed(1);
+    const veckoStr = (veckoD >= 0 ? "+" : "") + veckoD.toFixed(0);
+    const btcVal = sen.btc_benchmark_usd ? parseFloat(sen.btc_benchmark_usd) : null;
+    const btcStr = btcVal ? ` BTC buy&hold för samma period: ${((btcVal / start - 1) * 100).toFixed(1)}%.` : "";
+    const motiv = sen.quant_motivering ? ` Senaste LLM-analys: "${sen.quant_motivering.slice(0, 120)}…"` : "";
+    rader.push(`QUANT PAPER TRADING (LLM-driven, BTC/ETH/SOL/XRP/BNB/SPY): Portföljvärde ${pv.toFixed(0)} USD (${totalPct >= 0 ? "+" : ""}${totalPct}% mot 10 000 USD start). Veckans rörelse: ${veckoStr} USD.${btcStr}${motiv}`);
   }
 
   // Mest lästa artiklar
