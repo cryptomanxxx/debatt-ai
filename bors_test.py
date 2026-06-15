@@ -107,6 +107,22 @@ SALJ_MOTIVERINGAR = [
     "säljer av position",
 ]
 
+# Staking sannolikhet och APY per agent
+STAKING_PROFIL = {
+    "Den lugna":        {"sannolikhet": 0.20, "apy": 0.08},
+    "Nationalekonom":   {"sannolikhet": 0.18, "apy": 0.06},
+    "Historiker":       {"sannolikhet": 0.18, "apy": 0.06},
+    "Läkare":           {"sannolikhet": 0.15, "apy": 0.05},
+    "Pensionären":      {"sannolikhet": 0.15, "apy": 0.07},
+    "Filosof":          {"sannolikhet": 0.15, "apy": 0.05},
+    "Den nostalgiske":  {"sannolikhet": 0.12, "apy": 0.05},
+    "Mamman":           {"sannolikhet": 0.12, "apy": 0.05},
+    "Kryptoanalytiker": {"sannolikhet": 0.04, "apy": 0.05},
+    "Tonåringen":       {"sannolikhet": 0.03, "apy": 0.05},
+    "Den stressade":    {"sannolikhet": 0.04, "apy": 0.05},
+}
+DEFAULT_STAKING = {"sannolikhet": 0.08, "apy": 0.05}
+
 # ─── Hjälpfunktioner ──────────────────────────────────────────────────────────
 
 def _h(sb_key: str) -> dict:
@@ -664,6 +680,228 @@ def agent_placera_ordrar(sb_key: str, agent_namn: str) -> list[dict]:
     return []
 
 
+def hamta_mogna_stakes(sb_key: str) -> list[dict]:
+    """Hämtar stakes vars slut_datum passerat och som ej betalats ut."""
+    try:
+        today = datetime.now(timezone.utc).date().isoformat()
+        url = (
+            f"{SB_URL}/rest/v1/bors_staking"
+            f"?utbetald=eq.false&slut_datum=lte.{today}"
+            f"&select=id,agent,symbol,antal,apy,start_datum,slut_datum"
+        )
+        r = httpx.get(url, headers=_h(sb_key), timeout=10)
+        return r.json() if r.is_success else []
+    except Exception as e:
+        print(f"  [hamta_mogna_stakes] {e}")
+        return []
+
+
+def betala_ut_staking(sb_key: str, stake: dict) -> None:
+    """Betalar ut yield för en mogen stake och markerar den som utbetald."""
+    try:
+        pris = hamta_pris(sb_key, stake["symbol"])
+        start = datetime.fromisoformat(stake["start_datum"])
+        slut  = datetime.fromisoformat(stake["slut_datum"])
+        dagar = max(1, (slut - start).days)
+        yield_sek = round(float(stake["antal"]) * pris * float(stake["apy"]) * dagar / 365, 2)
+
+        # Kreditera yield till agentens saldo
+        agent_enc = urllib.parse.quote(stake["agent"])
+        r_saldo = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}&select=saldo",
+            headers=_h(sb_key), timeout=8,
+        )
+        if r_saldo.is_success and r_saldo.json():
+            gammalt_saldo = float(r_saldo.json()[0]["saldo"])
+            nytt_saldo = round(gammalt_saldo + yield_sek, 2)
+            h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
+                headers=h_min,
+                json={"saldo": nytt_saldo, "uppdaterad": "now()"},
+                timeout=8,
+            )
+
+        # Markera stake som utbetald
+        h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+        httpx.patch(
+            f"{SB_URL}/rest/v1/bors_staking?id=eq.{stake['id']}",
+            headers=h_min,
+            json={"utbetald": True},
+            timeout=8,
+        )
+        print(f"  STAKING YIELD: {stake['agent']} +{yield_sek} kr ({stake['antal']} {stake['symbol']}, {dagar}d @ {float(stake['apy'])*100:.0f}%)")
+    except Exception as e:
+        print(f"  [betala_ut_staking] {e}")
+
+
+def skapa_ny_stake(sb_key: str, agent: str, symbol: str, antal: float, dagar: int, apy: float) -> bool:
+    """Skapar en ny staking-rad i databasen."""
+    try:
+        today = datetime.now(timezone.utc).date()
+        slut  = today + timedelta(days=dagar)
+        h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+        r = httpx.post(
+            f"{SB_URL}/rest/v1/bors_staking",
+            headers=h_min,
+            json={
+                "agent": agent,
+                "symbol": symbol,
+                "antal": round(antal, 4),
+                "apy": apy,
+                "start_datum": today.isoformat(),
+                "slut_datum": slut.isoformat(),
+                "utbetald": False,
+            },
+            timeout=10,
+        )
+        return r.is_success
+    except Exception as e:
+        print(f"  [skapa_ny_stake] {e}")
+        return False
+
+
+def kör_staking(sb_key: str) -> None:
+    """Betalar ut mogna stakes och låter agenter staka nya tokens."""
+    # 1. Betala ut mogna stakes
+    mogna = hamta_mogna_stakes(sb_key)
+    if mogna:
+        print(f"  {len(mogna)} stakes löper ut — betalar ut yield...")
+        for s in mogna:
+            betala_ut_staking(sb_key, s)
+    else:
+        print("  Inga stakes att betala ut.")
+
+    # 2. Ny staking per agent
+    stakes_nya = 0
+    agenter_lista = list(AGENTER)
+    random.shuffle(agenter_lista)
+    for agent_info in agenter_lista:
+        agent_namn = agent_info["namn"]
+        profil = STAKING_PROFIL.get(agent_namn, DEFAULT_STAKING)
+        if random.random() > profil["sannolikhet"]:
+            continue
+        portfolj = hamta_portfolj(sb_key, agent_namn)
+        if not portfolj:
+            continue
+        # Välj symbol med flest tokens att staka
+        symbol = max(portfolj, key=lambda s: portfolj[s])
+        innehavet = portfolj[symbol]
+        if innehavet < 1:
+            continue
+        # Staka 25-50% av innehavet, minst 1
+        andel = random.uniform(0.25, 0.50)
+        antal = max(1.0, round(innehavet * andel, 4))
+        dagar = random.randint(3, 7)
+        apy   = profil["apy"]
+        ok = skapa_ny_stake(sb_key, agent_namn, symbol, antal, dagar, apy)
+        if ok:
+            stakes_nya += 1
+            print(f"  {agent_namn} STAKING: {antal} {symbol}, {dagar}d @ {apy*100:.0f}% APY")
+    print(f"  Nya stakes: {stakes_nya}")
+
+
+def kör_koalitions_airdrops(sb_key: str) -> None:
+    """ICO-token-skapare airdroppar tokens till sina koalitionspartner."""
+    try:
+        # Hämta alla ICO-tokens med skapare
+        r_tokens = httpx.get(
+            f"{SB_URL}/rest/v1/agent_tokens?select=symbol,namn,skapare_agent&order=skapad.asc",
+            headers=_h(sb_key), timeout=10,
+        )
+        if not r_tokens.is_success:
+            return
+        tokens = r_tokens.json()
+        if not tokens:
+            return
+
+        # Hämta koalitioner
+        r_koa = httpx.get(
+            f"{SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka&order=styrka.desc",
+            headers=_h(sb_key), timeout=10,
+        )
+        koalitioner = r_koa.json() if r_koa.is_success else []
+
+        airdrops_gjorda = 0
+        for token in tokens:
+            if random.random() > 0.05:
+                continue
+            skapare = token["skapare_agent"]
+            symbol  = token["symbol"]
+
+            # Hitta skaparens koalitionspartner (topp 3)
+            partners = []
+            for k in koalitioner:
+                if k["agent_a"] == skapare:
+                    partners.append((k["agent_b"], k["styrka"]))
+                elif k["agent_b"] == skapare:
+                    partners.append((k["agent_a"], k["styrka"]))
+            partners.sort(key=lambda x: x[1], reverse=True)
+            partners = [p[0] for p in partners[:3]]
+            if not partners:
+                continue
+
+            # Kolla skaparens innehav av denna symbol
+            skapare_portfolj = hamta_portfolj(sb_key, skapare)
+            skaparens_tokens = skapare_portfolj.get(symbol, 0)
+            if skaparens_tokens < len(partners):
+                continue
+
+            # Bestäm airdrop-storlek per partner
+            per_partner = max(1, min(10, math.floor(skaparens_tokens * 0.05 / len(partners))))
+
+            h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+            h_upsert = {**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"}
+
+            for partner in partners:
+                # Minska skaparens portfölj
+                skapare_enc = urllib.parse.quote(skapare)
+                sym_enc     = urllib.parse.quote(symbol)
+                url_pf = f"{SB_URL}/rest/v1/bors_portfoljer?agent=eq.{skapare_enc}&symbol=eq.{sym_enc}"
+                r_pf = httpx.get(url_pf, headers=_h(sb_key), timeout=8)
+                if r_pf.is_success and r_pf.json():
+                    gammalt = float(r_pf.json()[0].get("antal", 0))
+                    nytt = max(0.0, gammalt - per_partner)
+                    httpx.patch(url_pf, headers=h_min, json={"antal": nytt, "uppdaterad": "now()"}, timeout=8)
+
+                # Addera till partners portfölj
+                partner_enc = urllib.parse.quote(partner)
+                url_pp = f"{SB_URL}/rest/v1/bors_portfoljer?agent=eq.{partner_enc}&symbol=eq.{sym_enc}"
+                r_pp = httpx.get(url_pp, headers=_h(sb_key), timeout=8)
+                if r_pp.is_success and r_pp.json():
+                    gammalt_p = float(r_pp.json()[0].get("antal", 0))
+                    httpx.patch(url_pp, headers=h_min, json={"antal": gammalt_p + per_partner, "uppdaterad": "now()"}, timeout=8)
+                else:
+                    httpx.post(
+                        f"{SB_URL}/rest/v1/bors_portfoljer?on_conflict=agent,symbol",
+                        headers=h_upsert,
+                        json={"agent": partner, "symbol": symbol, "antal": float(per_partner), "genomsnittspris": 0, "uppdaterad": "now()"},
+                        timeout=8,
+                    )
+                print(f"  AIRDROP: {skapare} → {partner} +{per_partner} {symbol}")
+
+            airdrops_gjorda += 1
+            spara_civilisations_minne(
+                sb_key,
+                typ="triumf",
+                rubrik=f"Airdrop: {skapare} delar ut {symbol}",
+                beskrivning=(
+                    f"{skapare} genomför en koalitionsairdrop — delar ut {per_partner} {symbol} "
+                    f"vardera till {len(partners)} partner: {', '.join(partners)}."
+                ),
+                agenter=[skapare] + partners,
+                relaterat_typ="agent_tokens",
+            )
+
+        if airdrops_gjorda:
+            print(f"  {airdrops_gjorda} koalitionsairdrop(s) genomförda.")
+        else:
+            print("  Inga airdrops denna körning.")
+
+    except Exception as e:
+        print(f"  [kör_koalitions_airdrops] {e}")
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -678,15 +916,15 @@ def main():
     print("=" * 60)
 
     # Avbryt gamla ordrar (>48h)
-    print("\n[1/4] Avbryter gamla ordrar...")
+    print("\n[1/6] Avbryter gamla ordrar...")
     avbryt_gamla_ordrar(sb_key)
 
     # Genesis (körs bara om börsen är tom)
-    print("\n[2/4] Kontrollerar genesis...")
+    print("\n[2/6] Kontrollerar genesis...")
     genesis(sb_key)
 
     # Agenter placerar ordrar
-    print(f"\n[3/4] {len(AGENTER)} agenter placerar ordrar...")
+    print(f"\n[3/6] {len(AGENTER)} agenter placerar ordrar...")
     agenter_lista = list(AGENTER)
     random.shuffle(agenter_lista)
 
@@ -714,7 +952,7 @@ def main():
     print(f"\n  Ordrar: {stats_kop} köp, {stats_salj} sälj, {stats_skip} pass")
 
     # Matcha ordrar per symbol
-    print("\n[4/4] Matchar ordrar...")
+    print("\n[4/6] Matchar ordrar...")
     total_affarer = 0
     total_volym   = 0.0
 
@@ -756,6 +994,14 @@ def main():
             # Logga aktuellt pris även om inga affärer
             logg_pris(sb_key, symbol, aktuellt_pris, 0.0)
             print(f"    Inga matchningar (pris: {aktuellt_pris:.2f} kr)")
+
+    # Staking
+    print("\n[5/6] Staking — yield och nya stakes...")
+    kör_staking(sb_key)
+
+    # Koalitionsairdrops
+    print("\n[6/6] Koalitionsairdrops...")
+    kör_koalitions_airdrops(sb_key)
 
     # Sammanfattning
     print("\n" + "=" * 60)
