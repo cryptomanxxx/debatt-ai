@@ -111,7 +111,7 @@ def kör_arbi():
     # 1. Hämta funding rate via Vercel-proxy → Bybit
     fd = hamta_funding_data("BTCUSDT")
     if not fd:
-        print("  ⚠️  Hoppade över körningen — proxy/Bybit otillgänglig")
+        print("  ⚠️  Hoppade över körningen — proxy otillgänglig")
         return
 
     funding_rate     = fd["funding_rate"]       # per 8h, t.ex. 0.000312 = 0.0312%
