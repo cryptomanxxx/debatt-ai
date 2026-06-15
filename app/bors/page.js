@@ -52,7 +52,7 @@ async function getData() {
   }
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [tillRes, affRes, ordRes, pfjRes, prisRes, plbRes, stakRes, liqRes] = await Promise.all([
+  const [tillRes, affRes, ordRes, pfjRes, prisRes, plbRes, stakRes, liqRes, shortsRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/bors_tillgangar?order=symbol.asc`, {
       headers: h, next: { revalidate: 60 },
     }),
@@ -77,17 +77,21 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/bors_liquidity_log?select=agent,beloning&order=skapad.desc&limit=5000`, {
       headers: h, next: { revalidate: 60 },
     }),
+    fetch(`${SB_URL}/rest/v1/bors_shorts?order=skapad.desc&limit=200`, {
+      headers: h, next: { revalidate: 60 },
+    }),
   ]);
 
   return {
-    tillgangar:   tillRes.ok  ? await tillRes.json()  : [],
-    affarer:      affRes.ok   ? await affRes.json()   : [],
-    ordrar:       ordRes.ok   ? await ordRes.json()   : [],
-    portfoljer:   pfjRes.ok   ? await pfjRes.json()   : [],
-    priser:       prisRes.ok  ? await prisRes.json()  : [],
-    planbocker:   plbRes.ok   ? await plbRes.json()   : [],
-    staking:      stakRes.ok  ? await stakRes.json()  : [],
-    liquidityLog: liqRes.ok   ? await liqRes.json()   : [],
+    tillgangar:   tillRes.ok    ? await tillRes.json()    : [],
+    affarer:      affRes.ok     ? await affRes.json()     : [],
+    ordrar:       ordRes.ok     ? await ordRes.json()     : [],
+    portfoljer:   pfjRes.ok     ? await pfjRes.json()     : [],
+    priser:       prisRes.ok    ? await prisRes.json()    : [],
+    planbocker:   plbRes.ok     ? await plbRes.json()     : [],
+    staking:      stakRes.ok    ? await stakRes.json()    : [],
+    liquidityLog: liqRes.ok     ? await liqRes.json()     : [],
+    shorts:       shortsRes.ok  ? await shortsRes.json()  : [],
   };
 }
 
@@ -135,7 +139,7 @@ function SparklineInline({ data, farg }) {
 }
 
 export default async function BorsPage() {
-  const { tillgangar, affarer, ordrar, portfoljer, priser, planbocker, staking, liquidityLog } = await getData();
+  const { tillgangar, affarer, ordrar, portfoljer, priser, planbocker, staking, liquidityLog, shorts } = await getData();
 
   // ── Prishistorik per symbol (kronologisk för sparkline) ─────────────────────
   const prishistorik = {};
@@ -232,6 +236,15 @@ export default async function BorsPage() {
   // ── Handelsavgifter / Börskassan ─────────────────────────────────────────────
   const borskassaSaldo = saldoMap["Börskassan"] ?? 0;
   const totalAvgift = (affarer ?? []).reduce((s, a) => s + parseFloat(a.avgift ?? 0), 0);
+
+  // ── Korta positioner ─────────────────────────────────────────────────────────
+  const öppnaShorts = (shorts ?? []).filter(s => s.status === "öppen");
+  const shortInterestPerSym = {};
+  for (const s of öppnaShorts) {
+    shortInterestPerSym[s.symbol] = (shortInterestPerSym[s.symbol] ?? 0) + parseFloat(s.antal ?? 0);
+  }
+  const totalCollateral = öppnaShorts.reduce((sum, s) => sum + parseFloat(s.collateral_kr ?? 0), 0);
+  const historikShorts = (shorts ?? []).filter(s => s.status !== "öppen").slice(0, 10);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
@@ -870,6 +883,106 @@ export default async function BorsPage() {
           <div style={{ marginTop: 12, fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>
             Yield betalas ut i SEK till agentens saldo när stakes förfaller. APY 5–8% beroende på personlighet.
             Passiva agenter (Den lugna, Pensionären) har högst staking-benägenhet.
+          </div>
+        </div>
+
+        {/* ── Korta positioner ── */}
+        <div style={{ marginBottom: 40 }}>
+          <h2 style={{
+            fontSize: 11, color: C.textMuted, fontFamily: "monospace",
+            textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16,
+          }}>
+            ⬇️ Korta positioner
+          </h2>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20 }}>
+
+            {/* Statistikrad */}
+            <div style={{ display: "flex", gap: 24, marginBottom: 20, flexWrap: "wrap" }}>
+              {[
+                ["Öppna shorts", öppnaShorts.length, "#f87171"],
+                ["Låst collateral", `${totalCollateral.toFixed(0)} kr`, "#fbbf24"],
+                ["Short interest DBT", `${(shortInterestPerSym["DBT"] ?? 0).toFixed(1)}`, "#f87171"],
+                ["Short interest NOVA", `${(shortInterestPerSym["NOVA"] ?? 0).toFixed(1)}`, "#c084fc"],
+                ["Short interest ETK", `${(shortInterestPerSym["ETK"] ?? 0).toFixed(1)}`, "#34d399"],
+              ].map(([label, val, farg]) => (
+                <div key={label}>
+                  <div style={{ fontSize: 20, color: farg, fontFamily: "monospace", fontWeight: 700 }}>{val}</div>
+                  <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>{label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Öppna positioner */}
+            {öppnaShorts.length === 0 ? (
+              <div style={{ color: C.textMuted, fontFamily: "monospace", fontSize: 13, padding: "16px 0" }}>
+                Inga öppna korta positioner.
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto", marginBottom: 20 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "monospace", fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                      {["Agent", "Symbol", "Antal", "Ingångspris", "Aktuellt pris", "P&L", "Collateral", "Öppnad"].map(h => (
+                        <th key={h} style={{ textAlign: "left", color: C.textMuted, fontSize: 10, padding: "6px 10px", fontWeight: 400 }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {öppnaShorts.map((s, i) => {
+                      const spot = prisMap[s.symbol] ?? parseFloat(s.ingangs_pris);
+                      const pl = (parseFloat(s.ingangs_pris) - spot) * parseFloat(s.antal);
+                      const plFarg = pl >= 0 ? "#4ade80" : "#f87171";
+                      return (
+                        <tr key={s.id} style={{ borderBottom: i < öppnaShorts.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                          <td style={{ padding: "8px 10px", color: C.text }}>{s.agent}</td>
+                          <td style={{ padding: "8px 10px", color: symbolFarg(s.symbol), fontWeight: 700 }}>{s.symbol}</td>
+                          <td style={{ padding: "8px 10px", color: C.text }}>{parseFloat(s.antal).toFixed(2)}</td>
+                          <td style={{ padding: "8px 10px", color: C.textMuted }}>{parseFloat(s.ingangs_pris).toFixed(2)} kr</td>
+                          <td style={{ padding: "8px 10px", color: C.text }}>{spot.toFixed(2)} kr</td>
+                          <td style={{ padding: "8px 10px", color: plFarg, fontWeight: 700 }}>
+                            {pl >= 0 ? "+" : ""}{pl.toFixed(2)} kr
+                          </td>
+                          <td style={{ padding: "8px 10px", color: C.textMuted }}>{parseFloat(s.collateral_kr).toFixed(0)} kr</td>
+                          <td style={{ padding: "8px 10px", color: C.textMuted, fontSize: 10 }}>
+                            {new Date(s.skapad).toLocaleDateString("sv-SE", { month: "2-digit", day: "2-digit" })}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Stängningshistorik */}
+            {historikShorts.length > 0 && (
+              <>
+                <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", marginBottom: 8, marginTop: 8 }}>STÄNGDA / LIKVIDERADE</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {historikShorts.map(s => {
+                    const pl = parseFloat(s.vinst_forlust ?? 0);
+                    const plFarg = pl >= 0 ? "#4ade80" : "#f87171";
+                    const statusFarg = s.status === "likviderad" ? "#f87171" : "#666660";
+                    return (
+                      <div key={s.id} style={{
+                        background: C.surface2, border: `1px solid ${C.border}`,
+                        borderRadius: 6, padding: "6px 10px", fontSize: 11, fontFamily: "monospace",
+                      }}>
+                        <span style={{ color: C.textMuted }}>{s.agent}</span>
+                        {" "}<span style={{ color: symbolFarg(s.symbol) }}>{s.symbol}</span>
+                        {" "}<span style={{ color: plFarg }}>{pl >= 0 ? "+" : ""}{pl.toFixed(1)} kr</span>
+                        {" "}<span style={{ color: statusFarg, fontSize: 9 }}>{s.status.toUpperCase()}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            <div style={{ marginTop: 16, fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>
+              Agenter med säljbias (Kryptoanalytiker, Den sura, Journalist m.fl.) kan shorta. Collateral 150%, avgift 0,3%/körning → Börskassan.
+              Take-profit vid +30%, likvidation vid 80% förlust av collateral. Market neutral trading möjligt.
+            </div>
           </div>
         </div>
 
