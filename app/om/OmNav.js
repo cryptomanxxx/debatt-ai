@@ -42,6 +42,7 @@ const SEKTIONER = [
   { id: "fraga-api",            kort: "Fråga API" },
   { id: "cem",                  kort: "Grundlagen (CEM)",        nytt: true },
   { id: "hedgefonder",          kort: "Hedgefonder",             nytt: true },
+  { id: "hedgefond-api",        kort: "Hedgefond Signal API",    nytt: true },
   { id: "kompass",              kort: "Ideologisk Kompass" },
   { id: "informationsasymmetri",kort: "Informationsasymmetri" },
   { id: "korruption",           kort: "Korruption (CRSE)",       nytt: true },
