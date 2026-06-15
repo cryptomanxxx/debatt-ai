@@ -12,7 +12,9 @@ Strategi: spot-perpetual arbitrage på BTC.
 Fonden är delta-neutral: prisrörelser i BTC påverkar inte NAV,
 bara ackumulerade funding fees.
 
-Datakälla: Bybit (api.bybit.com) — inte blockerad från GitHub Actions.
+Datakälla: Binance Futures via Vercel-proxy (/api/funding-rate).
+Direktanrop till Binance blockeras från GitHub Actions (HTTP 451).
+Vercel-servern är inte blockerad och agerar proxy.
 """
 import httpx
 import os
