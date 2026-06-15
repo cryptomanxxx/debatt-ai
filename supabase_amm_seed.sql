@@ -18,8 +18,10 @@ ON CONFLICT (agent, symbol) DO UPDATE
 
 -- 2. Se till att Börskassan har minst 1 000 kr för bid-ordrar
 -- (upsert skapar raden om den inte finns, annars uppdaterar)
-INSERT INTO agent_planbocker (agent, saldo, totalt_givet, totalt_fatt, antal_spel, saldo_spel, uppdaterad)
-VALUES ('Börskassan', 1000, 0, 0, 0, 0, now())
+-- Obs: saldo_spel utelämnas avsiktligt — kolumnen tillkommer via
+-- supabase_prediction_spel.sql och kan saknas i enklare miljöer.
+INSERT INTO agent_planbocker (agent, saldo, totalt_givet, totalt_fatt, antal_spel, uppdaterad)
+VALUES ('Börskassan', 1000, 0, 0, 0, now())
 ON CONFLICT (agent) DO UPDATE
   SET saldo      = GREATEST(agent_planbocker.saldo, 1000),
       uppdaterad = now();
