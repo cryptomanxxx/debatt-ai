@@ -42,6 +42,7 @@ const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 export default function FormogenhetVy({
   planbocker = [], statskassa = 0, markAgare = [], feedback = [],
   etfInnehav = [], bets = [], lobbying = [], oligarki = [], visitors: initialVisitors = [],
+  borsPortfoljer = [], borsTillgangar = [],
 }) {
   const [range, setRange] = useState(30);
   const [liveVisitors, setLiveVisitors] = useState(initialVisitors);
@@ -113,9 +114,32 @@ export default function FormogenhetVy({
     }
   }
 
-  // ── Totalt förmögenhet ──
-  const totalSaldo = planbocker.reduce((s, p) => s + (p.saldo || 0), 0);
-  const maxSaldo = planbocker[0]?.saldo || 1;
+  // ── Börsportföljvärde per agent ──
+  const borsInstitutPris = {};
+  for (const tg of borsTillgangar) {
+    borsInstitutPris[tg.symbol] = parseFloat(tg.senaste_pris ?? 100);
+  }
+  const borsPortfoljVarde = {};
+  for (const pf of borsPortfoljer) {
+    const antal = parseFloat(pf.antal ?? 0);
+    if (antal <= 0) continue;
+    const pris = borsInstitutPris[pf.symbol] ?? 100;
+    borsPortfoljVarde[pf.agent] = (borsPortfoljVarde[pf.agent] || 0) + antal * pris;
+  }
+
+  // ── Totalt förmögenhet (saldo + börsportfölj) ──
+  const totalSaldo = planbocker.reduce((s, p) => s + (p.saldo || 0) + Math.round(borsPortfoljVarde[p.agent] || 0), 0);
+  const maxTotal = planbocker.reduce((m, p) => {
+    const tot = (p.saldo || 0) + Math.round(borsPortfoljVarde[p.agent] || 0);
+    return tot > m ? tot : m;
+  }, 1);
+
+  // ── Sortera agenter efter total (saldo + börs) ──
+  const sortadeAgenter = [...planbocker].sort((a, b) => {
+    const totA = (a.saldo || 0) + Math.round(borsPortfoljVarde[a.agent] || 0);
+    const totB = (b.saldo || 0) + Math.round(borsPortfoljVarde[b.agent] || 0);
+    return totB - totA;
+  });
 
   // ── Gini ──
   const latestGini = oligarki.length ? oligarki[oligarki.length - 1]?.gini?.toFixed(3) : "–";
@@ -136,7 +160,7 @@ export default function FormogenhetVy({
 
       {/* ── NYCKELTAL ── */}
       <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-        <StatPill label="Total förmögenhet" value={`${totalSaldo.toLocaleString("sv-SE")} kr`} color={C.green} />
+        <StatPill label="Total förmögenhet (inkl. börs)" value={`${totalSaldo.toLocaleString("sv-SE")} kr`} color={C.green} />
         <StatPill label="Gini (senaste)" value={latestGini} color={latestGini > 0.5 ? C.red : C.green} />
         <StatPill label="Statskassan" value={`${(statskassa || 0).toLocaleString("sv-SE")} kr`} color={C.yellow} />
         <StatPill label="Agenter" value={planbocker.length} />
@@ -150,18 +174,20 @@ export default function FormogenhetVy({
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
             <thead>
               <tr style={{ background: "#111", borderBottom: `1px solid ${C.border}` }}>
-                {["#", "Agent", "Saldo", "Spel-saldo", "Mark kr/dag", "Social netto", "Market netto", "Lobbying fått"].map(h => (
+                {["#", "Agent", "Saldo", "Börs", "Total", "Spel-saldo", "Mark kr/dag", "Social netto", "Market netto", "Lobbying fått"].map(h => (
                   <th key={h} style={{ padding: "8px 12px", textAlign: "left", color: C.dim, fontFamily: C.mono, fontSize: "9px", letterSpacing: "0.08em", fontWeight: 400 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {planbocker.map((p, i) => {
+              {sortadeAgenter.map((p, i) => {
                 const mark = markInkomst[p.agent] || 0;
                 const social = socialNetto[p.agent];
                 const market = marketNetto[p.agent];
                 const lobby = lobbyingFatt[p.agent];
-                const barW = Math.round((p.saldo / maxSaldo) * 100);
+                const bors = Math.round(borsPortfoljVarde[p.agent] || 0);
+                const total = (p.saldo || 0) + bors;
+                const barW = Math.round((total / maxTotal) * 100);
                 return (
                   <tr key={p.agent} style={{ borderBottom: `1px solid #111`, transition: "background 0.1s" }}
                     onMouseEnter={e => e.currentTarget.style.background = "#131313"}
@@ -171,12 +197,16 @@ export default function FormogenhetVy({
                     <td style={{ padding: "8px 12px" }}>
                       <a href={`/agent/${encodeURIComponent(p.agent)}`} style={{ color: "#f0ede6", textDecoration: "none", fontFamily: "Georgia, serif" }}>{p.agent}</a>
                     </td>
+                    <td style={{ padding: "8px 12px", fontFamily: C.mono, color: C.text }}>{(p.saldo || 0).toLocaleString("sv-SE")}</td>
+                    <td style={{ padding: "8px 12px", color: bors > 0 ? C.cyan : C.dim, fontFamily: C.mono }}>
+                      {bors > 0 ? bors.toLocaleString("sv-SE") : "–"}
+                    </td>
                     <td style={{ padding: "8px 12px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <div style={{ width: "80px", height: "4px", background: "#1a1a1a", borderRadius: "2px" }}>
                           <div style={{ width: `${barW}%`, height: "4px", background: C.blue, borderRadius: "2px" }} />
                         </div>
-                        <span style={{ fontFamily: C.mono, color: C.text }}>{(p.saldo || 0).toLocaleString("sv-SE")}</span>
+                        <span style={{ fontFamily: C.mono, color: C.text, fontWeight: 700 }}>{total.toLocaleString("sv-SE")}</span>
                       </div>
                     </td>
                     <td style={{ padding: "8px 12px", color: C.purple, fontFamily: C.mono }}>{p.saldo_spel != null ? p.saldo_spel : "–"}</td>

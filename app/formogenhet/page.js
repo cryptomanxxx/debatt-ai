@@ -25,6 +25,8 @@ async function getData() {
     lobbyingRes,
     oligarkiRes,
     visitorRes,
+    borsPortfoljerRes,
+    borsTillgangarRes,
   ] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&order=saldo.desc`, o),
     fetch(`${SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo`, o),
@@ -35,6 +37,8 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/lobbying_log?select=mal_agent,belopp,resultat`, o),
     fetch(`${SB_URL}/rest/v1/oligarki_historik?order=skapad.desc&limit=90&select=gini,social_mobilitet,oligarkirisk,skapad`, o),
     fetch(`${SB_URL}/rest/v1/visitor_wallets?order=saldo.desc&limit=20&select=display_name,saldo,skapad`, o),
+    fetch(`${SB_URL}/rest/v1/bors_portfoljer?select=agent,symbol,antal&order=antal.desc`, o),
+    fetch(`${SB_URL}/rest/v1/bors_tillgangar?select=symbol,senaste_pris`, o),
   ]);
 
   const safe = (r) => (r.status === "fulfilled" && r.value.ok ? r.value.json() : Promise.resolve([]));
@@ -42,10 +46,12 @@ async function getData() {
   const [
     planbocker, statskassaArr, markAgare, feedback,
     etfInnehav, bets, lobbying, oligarki, visitors,
+    borsPortfoljer, borsTillgangar,
   ] = await Promise.all([
     safe(planbockerRes), safe(statskassaRes), safe(markAgareRes),
     safe(feedbackRes), safe(etfRes), safe(betsRes),
     safe(lobbyingRes), safe(oligarkiRes), safe(visitorRes),
+    safe(borsPortfoljerRes), safe(borsTillgangarRes),
   ]);
 
   return {
@@ -58,6 +64,8 @@ async function getData() {
     lobbying: Array.isArray(lobbying) ? lobbying : [],
     oligarki: Array.isArray(oligarki) ? oligarki.reverse() : [],
     visitors: Array.isArray(visitors) ? visitors : [],
+    borsPortfoljer: Array.isArray(borsPortfoljer) ? borsPortfoljer : [],
+    borsTillgangar: Array.isArray(borsTillgangar) ? borsTillgangar : [],
   };
 }
 
