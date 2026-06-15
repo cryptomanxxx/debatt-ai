@@ -2,7 +2,7 @@
 """
 ARBI Paper Trading — Funding Rate Arbitrage Fund
 Kör 3 gånger per dag (00:30, 08:30, 16:30 UTC) via GitHub Actions,
-alignat med Binances 8h funding payments (00:00, 08:00, 16:00 UTC).
+alignat med Bybits 8h funding payments (00:00, 08:00, 16:00 UTC).
 
 Strategi: spot-perpetual arbitrage på BTC.
 - Positiv funding rate → köp BTC spot + shorta BTC-perp (long_spot_short_perp)
@@ -11,6 +11,8 @@ Strategi: spot-perpetual arbitrage på BTC.
 
 Fonden är delta-neutral: prisrörelser i BTC påverkar inte NAV,
 bara ackumulerade funding fees.
+
+Datakälla: Bybit (api.bybit.com) — inte blockerad från GitHub Actions.
 """
 import httpx
 import os
@@ -35,31 +37,32 @@ def _h():
 
 
 def hamta_funding_data(symbol="BTCUSDT"):
-    """Hämtar senaste avgjorda funding rate + aktuellt mark price från Binance Futures."""
+    """Hämtar senaste avgjorda funding rate + mark price från Bybit."""
     try:
-        # fundingRate?limit=1 returnerar den senast *avgjorda* betalningen
+        # Funding history: senaste avgjorda betalning (list[0] = senast)
         r_hist = httpx.get(
-            f"https://fapi.binance.com/fapi/v1/fundingRate?symbol={symbol}&limit=1",
+            f"https://api.bybit.com/v5/market/funding/history?category=linear&symbol={symbol}&limit=1",
             timeout=10,
         )
-        # premiumIndex för mark price (visningsändamål)
-        r_idx = httpx.get(
-            f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}",
+        # Tickers: mark price för visning
+        r_tick = httpx.get(
+            f"https://api.bybit.com/v5/market/tickers?category=linear&symbol={symbol}",
             timeout=10,
         )
-        if not r_hist.is_success or not r_idx.is_success:
-            print(f"  ⚠️  Binance HTTP {r_hist.status_code}/{r_idx.status_code}")
+        if not r_hist.is_success or not r_tick.is_success:
+            print(f"  ⚠️  Bybit HTTP {r_hist.status_code}/{r_tick.status_code}")
             return None
-        hist = r_hist.json()
-        if not hist:
-            print("  ⚠️  Ingen funding history tillgänglig")
+        hist_list = r_hist.json().get("result", {}).get("list", [])
+        tick_list = r_tick.json().get("result", {}).get("list", [])
+        if not hist_list:
+            print("  ⚠️  Ingen funding history tillgänglig från Bybit")
             return None
         return {
-            "funding_rate": float(hist[0].get("fundingRate", 0)),
-            "mark_price":   float(r_idx.json().get("markPrice", 0)),
+            "funding_rate": float(hist_list[0].get("fundingRate", 0)),
+            "mark_price":   float(tick_list[0].get("markPrice", 0)) if tick_list else 0.0,
         }
     except Exception as e:
-        print(f"  ⚠️  Binance API-fel: {e}")
+        print(f"  ⚠️  Bybit API-fel: {e}")
         return None
 
 
@@ -107,10 +110,10 @@ def kör_arbi():
     print(f"UTC: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}")
     print("━" * 52)
 
-    # 1. Hämta funding rate från Binance
+    # 1. Hämta funding rate från Bybit
     fd = hamta_funding_data("BTCUSDT")
     if not fd:
-        print("  ⚠️  Hoppade över körningen — Binance otillgänglig")
+        print("  ⚠️  Hoppade över körningen — Bybit otillgänglig")
         return
 
     funding_rate     = fd["funding_rate"]       # per 8h, t.ex. 0.000312 = 0.0312%
