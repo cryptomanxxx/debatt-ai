@@ -54,7 +54,7 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/bors_tillgangar?order=symbol.asc`, {
       headers: h, next: { revalidate: 60 },
     }),
-    fetch(`${SB_URL}/rest/v1/bors_affarer?order=skapad.desc&limit=30`, {
+    fetch(`${SB_URL}/rest/v1/bors_affarer?select=*,avgift&order=skapad.desc&limit=30`, {
       headers: h, next: { revalidate: 60 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_ordrar?status=in.(öppen,delvis)&order=skapad.desc&limit=100`, {
@@ -227,6 +227,10 @@ export default async function BorsPage() {
     .slice(0, 8);
   const liqMaxBelopp = liqTop.length > 0 ? liqTop[0][1] : 1;
 
+  // ── Handelsavgifter / Börskassan ─────────────────────────────────────────────
+  const borskassaSaldo = saldoMap["Börskassan"] ?? 0;
+  const totalAvgift = (affarer ?? []).reduce((s, a) => s + parseFloat(a.avgift ?? 0), 0);
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
       <div style={{ maxWidth: 1000, margin: "0 auto" }}>
@@ -273,6 +277,7 @@ export default async function BorsPage() {
             ["Genomförda affärer", totalAffarer, "#4a9eff"],
             ["Öppna ordrar", ordrar.length, "#fbbf24"],
             ["Agenter på börsen", agentFormoegen.length, "#34d399"],
+            ["Börskassan", `${borskassaSaldo.toFixed(0)} kr`, "#f472b6"],
           ].map(([label, val, farg]) => (
             <div key={label} style={{
               background: C.surface, border: `1px solid ${C.border}`,
@@ -482,7 +487,7 @@ export default async function BorsPage() {
               {/* Tabellhuvud */}
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "90px 1fr 1fr 70px 80px 90px",
+                gridTemplateColumns: "90px 1fr 1fr 70px 80px 90px 60px",
                 padding: "10px 16px",
                 fontSize: 9, color: C.textMuted, fontFamily: "monospace",
                 letterSpacing: "0.08em",
@@ -495,18 +500,20 @@ export default async function BorsPage() {
                 <span style={{ textAlign: "right" }}>ANTAL</span>
                 <span style={{ textAlign: "right" }}>PRIS</span>
                 <span style={{ textAlign: "right" }}>TOTAL</span>
+                <span style={{ textAlign: "right", color: "#f472b6" }}>AVGIFT</span>
               </div>
 
               {senaste20.map((a, i) => {
-                const farg  = symbolFarg(a.symbol);
-                const ikon  = symbolIkon(a.symbol);
-                const antal = parseFloat(a.antal ?? 0);
-                const pris  = parseFloat(a.pris ?? 0);
-                const total = antal * pris;
+                const farg   = symbolFarg(a.symbol);
+                const ikon   = symbolIkon(a.symbol);
+                const antal  = parseFloat(a.antal ?? 0);
+                const pris   = parseFloat(a.pris ?? 0);
+                const total  = antal * pris;
+                const avgift = parseFloat(a.avgift ?? 0);
                 return (
                   <div key={a.id ?? i} style={{
                     display: "grid",
-                    gridTemplateColumns: "90px 1fr 1fr 70px 80px 90px",
+                    gridTemplateColumns: "90px 1fr 1fr 70px 80px 90px 60px",
                     padding: "9px 16px",
                     fontSize: 11, fontFamily: "monospace",
                     borderBottom: i < senaste20.length - 1 ? `1px solid ${C.border}` : "none",
@@ -529,6 +536,9 @@ export default async function BorsPage() {
                     </span>
                     <span style={{ color: C.accent, textAlign: "right", fontWeight: 600 }}>
                       {total.toFixed(0)} kr
+                    </span>
+                    <span style={{ color: "#f472b6", textAlign: "right", fontSize: 10 }}>
+                      {avgift > 0 ? `-${avgift.toFixed(2)}` : "–"}
                     </span>
                   </div>
                 );
