@@ -19,6 +19,12 @@ const SB_URL       = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const DISCUSSIONS  = path.join(__dirname, "../ai-bus/discussions");
 const PERF_DIR     = path.join(DISCUSSIONS, "ai-performance");
 
+// Räkna konfigurerade Groq-nycklar
+const GROQ_KEY_NAMES = ["GROQ_API_KEY", ...Array.from({length: 11}, (_, i) => `GROQ_API_KEY_${i + 2}`)];
+const groqKeys = GROQ_KEY_NAMES.filter(n => process.env[n]);
+const groqKeyCount = groqKeys.length;
+const GROQ_KANAL_CONFIGURED = !!process.env.GROQ_KANAL_API_KEY;
+
 if (!SB_KEY) { console.error("SUPABASE_ANON_KEY saknas"); process.exit(1); }
 
 function dagensDatum() {
@@ -220,6 +226,7 @@ Var konkret — nämn providers vid namn. Avsluta med en prioriterad rekommendat
 
 Hälsopoäng 24h: ${health24}% | 7d: ${health7}%
 Totala anrop 24h: ${rows24.length}
+Groq-nyckelpool: ${groqKeyCount} nycklar (${groqKeyCount * 144000} tokens/dag poolat) + ${GROQ_KANAL_CONFIGURED ? "1 kanal-nyckel" : "ingen kanal-nyckel"}
 Fallback-ordning: ${rankedOrder.join(" → ")}
 Problemleverantörer (>30% rl eller <50% ok): ${problemProviders.join(", ") || "inga"}
 
@@ -231,6 +238,14 @@ ${summary}`,
     analys = result?.choices?.[0]?.message?.content?.trim() || "";
   }
 
+  // Groq nyckelpool-rad för YAML och markdown
+  const groqPoolTpd = groqKeyCount * 144000;
+  const groqPoolLine = `groq_nyckelpool: ${groqKeyCount} (${groqPoolTpd.toLocaleString("sv-SE")} tokens/dag poolat)${GROQ_KANAL_CONFIGURED ? " + kanal-nyckel" : ""}`;
+  const groqStats24 = stats24["groq"] || { ok: 0, rate_limits: 0, errors: 0, latencies: [] };
+  const groqTot24   = groqStats24.ok + groqStats24.rate_limits + groqStats24.errors;
+  const groqOkPct   = groqTot24 > 0 ? round((groqStats24.ok / groqTot24) * 100, 1) : 100;
+  const groqRlPct   = groqTot24 > 0 ? round((groqStats24.rate_limits / groqTot24) * 100, 1) : 0;
+
   // Bygg rapporten
   const filename = `${datum}-${tidsstämpel()}-ai-performance.md`;
   const content = `---
@@ -240,6 +255,7 @@ overall_health_24h: ${health24}
 overall_health_7d: ${health7}
 total_calls_24h: ${rows24.length}
 total_calls_7d: ${rows7.length}
+${groqPoolLine}
 problem_providers: [${problemProviders.map(p => `"${p}"`).join(", ")}]
 ranked_order: [${rankedOrder.map(p => `"${p}"`).join(", ")}]
 config_uppdaterad: "${configUpdated} UTC"
@@ -253,6 +269,14 @@ ${provYaml}
 
 ${trafiklampa(health24)} **${health24}%** lyckade anrop senaste 24h · ${rows24.length} anrop totalt
 ${trafiklampa(health7)} **${health7}%** lyckade anrop senaste 7 dagar · ${rows7.length} anrop totalt
+
+## Groq-nyckelpool
+
+| Nyckelpool | Antal nycklar | Kapacitet (TPD) | Kanal-nyckel |
+|---|---|---|---|
+| Rotationsnycklar | **${groqKeyCount}** | **${groqPoolTpd.toLocaleString("sv-SE")} tokens/dag** | ${GROQ_KANAL_CONFIGURED ? "✅ konfigurerad" : "❌ saknas"} |
+
+**Groq (alla nycklar sammanlagt, 24h):** ${groqTot24} anrop · ${groqStats24.ok} (${groqOkPct}%) OK · ${groqStats24.rate_limits} (${groqRlPct}%) rate-limits · ${groqStats24.errors} fel
 
 ## Per-Provider Statistik (24h)
 
