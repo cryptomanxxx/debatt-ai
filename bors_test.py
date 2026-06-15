@@ -1333,61 +1333,53 @@ def _hamta_spotpris(sb_key: str, symbol: str) -> float | None:
 
 def öppna_short(sb_key: str, agent: str, symbol: str, antal: float) -> bool:
     """
-    Öppnar en kort position:
-    - Låser collateral (150 % av positionsvärde) från saldo
-    - Krediterar försäljningsintäkterna direkt (agent säljer tokens de lånar)
-    - Nettokostnad: 50 % av positionsvärdet
+    Öppnar en kort position via atomisk RPC (open_short_rpc).
+    Om RPC-funktionen saknas i DB blockeras nya shorts (fail-safe).
+    Kör supabase_bors_short_rpc.sql i Supabase SQL Editor för att aktivera.
     """
     spot = _hamta_spotpris(sb_key, symbol)
     if not spot:
         return False
 
-    position_kr  = round(antal * spot, 2)
+    position_kr   = round(antal * spot, 2)
     collateral_kr = round(position_kr * SHORT_COLLATERAL, 2)
-    netto_kostnad = round(collateral_kr - position_kr, 2)  # 50% av position
+    netto_kostnad = round(collateral_kr - position_kr, 2)  # 50 % av position
 
-    saldo = hamta_saldo(sb_key, agent)
-    if saldo < collateral_kr:
-        return False
-
-    h_min = {**_h(sb_key), "Prefer": "return=minimal"}
-    agent_enc = urllib.parse.quote(agent)
-
-    # Spara short-positionen FÖRST — dra bara pengar om inserten lyckas
-    r_ins = httpx.post(
-        f"{SB_URL}/rest/v1/bors_shorts",
-        headers=h_min,
+    r = httpx.post(
+        f"{SB_URL}/rest/v1/rpc/open_short_rpc",
+        headers=_h(sb_key),
         json={
-            "agent": agent,
-            "symbol": symbol,
-            "antal": round(antal, 4),
-            "ingangs_pris": round(spot, 2),
-            "collateral_kr": collateral_kr,
-            "daglig_avgift": SHORT_DAGLIG_AVGIFT,
+            "p_agent":         agent,
+            "p_symbol":        symbol,
+            "p_antal":         round(antal, 4),
+            "p_ingangs_pris":  round(spot, 2),
+            "p_collateral_kr": collateral_kr,
+            "p_netto_kostnad": netto_kostnad,
+            "p_daglig_avgift": SHORT_DAGLIG_AVGIFT,
         },
-        timeout=8,
+        timeout=10,
     )
-    if not r_ins.is_success:
-        print(f"  SHORT MISSLYCKAD (insert): {agent} {symbol} — {r_ins.status_code}")
+    if r.status_code == 404:
+        print("  ⚠️  open_short_rpc saknas — kör supabase_bors_short_rpc.sql i Supabase SQL Editor")
+        return False
+    if not r.is_success:
+        print(f"  SHORT MISSLYCKAD (rpc): {agent} {symbol} — {r.status_code}")
         return False
 
-    # Nettodrag: collateral - intäkter (körs bara om insert lyckades)
-    httpx.patch(
-        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
-        headers=h_min,
-        json={"saldo": round(saldo - netto_kostnad, 2), "uppdaterad": "now()"},
-        timeout=8,
-    )
+    result = r.json()
+    if not result.get("ok"):
+        print(f"  SHORT MISSLYCKAD: {agent} {symbol} — {result.get('error')}")
+        return False
+
     print(f"  SHORT ÖPPNAD: {agent} shortar {antal} {symbol} @ {spot:.2f} kr (collateral {collateral_kr:.0f} kr)")
     return True
 
 
 def stang_short(sb_key: str, short: dict, anledning: str = "frivillig") -> None:
     """
-    Stänger en kort position:
-    - Köper tillbaka tokens till spotpris
-    - Frigör collateral
-    - Beräknar P&L
+    Stänger en kort position via atomisk RPC (close_short_rpc).
+    Om RPC-funktionen saknas faller koden tillbaka på sekventiell REST
+    så att befintliga öppna positioner inte fastnar permanent.
     """
     spot = _hamta_spotpris(sb_key, short["symbol"])
     if not spot:
@@ -1398,31 +1390,51 @@ def stang_short(sb_key: str, short: dict, anledning: str = "frivillig") -> None:
     collateral_kr = float(short["collateral_kr"])
     aterköps_kr   = round(antal * spot, 2)
     pl            = round((ingangs_pris - spot) * antal, 2)  # positivt = vinst
+    saldo_delta   = round(collateral_kr - aterköps_kr, 2)
+    status        = "likviderad" if anledning == "likvidation" else "stangd"
 
-    h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+    h_min     = {**_h(sb_key), "Prefer": "return=minimal"}
     agent_enc = urllib.parse.quote(short["agent"])
 
-    # Stäng short-raden FÖRST — frigör bara collateral om patchen lyckas
-    r_upd = httpx.patch(
-        f"{SB_URL}/rest/v1/bors_shorts?id=eq.{short['id']}",
-        headers=h_min,
-        json={"status": "likviderad" if anledning == "likvidation" else "stangd",
-              "vinst_forlust": pl, "stangd_at": "now()"},
-        timeout=8,
+    r = httpx.post(
+        f"{SB_URL}/rest/v1/rpc/close_short_rpc",
+        headers=_h(sb_key),
+        json={
+            "p_short_id":      short["id"],
+            "p_status":        status,
+            "p_vinst_forlust": pl,
+            "p_saldo_delta":   saldo_delta,
+        },
+        timeout=10,
     )
-    if not r_upd.is_success:
-        print(f"  SHORT STÄNGNING MISSLYCKAD (patch): {short['agent']} {short['symbol']} — {r_upd.status_code}")
-        return
 
-    saldo = hamta_saldo(sb_key, short["agent"])
-    # Frigör collateral, dra återköpskostnad (körs bara om short-raden stängdes)
-    nytt_saldo = round(saldo + collateral_kr - aterköps_kr, 2)
-    httpx.patch(
-        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
-        headers=h_min,
-        json={"saldo": max(0.0, nytt_saldo), "uppdaterad": "now()"},
-        timeout=8,
-    )
+    if r.status_code == 404:
+        # RPC saknas — stäng sekventiellt så positionen inte fastnar
+        print("  ⚠️  close_short_rpc saknas — sekventiell fallback (kör supabase_bors_short_rpc.sql)")
+        r_upd = httpx.patch(
+            f"{SB_URL}/rest/v1/bors_shorts?id=eq.{short['id']}",
+            headers=h_min,
+            json={"status": status, "vinst_forlust": pl, "stangd_at": "now()"},
+            timeout=8,
+        )
+        if not r_upd.is_success:
+            return
+        saldo = hamta_saldo(sb_key, short["agent"])
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
+            headers=h_min,
+            json={"saldo": max(0.0, round(saldo + saldo_delta, 2)), "uppdaterad": "now()"},
+            timeout=8,
+        )
+    elif not r.is_success:
+        print(f"  SHORT STÄNGNING MISSLYCKAD (rpc): {short['agent']} {short['symbol']} — {r.status_code}")
+        return
+    else:
+        result = r.json()
+        if not result.get("ok"):
+            print(f"  SHORT STÄNGNING MISSLYCKAD: {short['agent']} {short['symbol']} — {result.get('error')}")
+            return
+
     pl_str = f"+{pl:.2f}" if pl >= 0 else f"{pl:.2f}"
     print(f"  SHORT STÄNGD ({anledning}): {short['agent']} {short['symbol']} P&L {pl_str} kr")
 
