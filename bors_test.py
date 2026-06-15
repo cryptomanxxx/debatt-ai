@@ -1124,32 +1124,37 @@ def kör_amm(sb_key: str, alla_symboler: list[str]) -> None:
         bid_pris = round(spot * (1 - AMM_SPREAD), 2)
         ask_pris = round(spot * (1 + AMM_SPREAD), 2)
 
-        # Lägg bid om för få köpordrar och Börskassan har saldo
-        if bid_count.get(symbol, 0) < AMM_MIN_ORDERS:
+        # Lägg bids tills vi nått AMM_MIN_ORDERS (loop för att fylla hela gapet)
+        bids_kvar = max(0, AMM_MIN_ORDERS - bid_count.get(symbol, 0))
+        for _ in range(bids_kvar):
             budget = round(AMM_ANTAL * bid_pris, 2)
-            if amm_saldo >= budget:
-                r = httpx.post(
-                    f"{SB_URL}/rest/v1/bors_ordrar",
-                    headers=h_min,
-                    json={
-                        "agent":        "Börskassan",
-                        "symbol":       symbol,
-                        "typ":          "kop",
-                        "pris":         bid_pris,
-                        "antal":        AMM_ANTAL,
-                        "ifylld_antal": 0,
-                        "status":       "öppen",
-                        "motivering":   "AMM — garanterad likviditet",
-                    },
-                    timeout=8,
-                )
-                if r.is_success:
-                    amm_saldo -= budget
-                    placed += 1
-                    print(f"  AMM BID  {symbol}: {AMM_ANTAL:.0f}st @ {bid_pris:.2f} kr")
+            if amm_saldo < budget:
+                break
+            r = httpx.post(
+                f"{SB_URL}/rest/v1/bors_ordrar",
+                headers=h_min,
+                json={
+                    "agent":        "Börskassan",
+                    "symbol":       symbol,
+                    "typ":          "kop",
+                    "pris":         bid_pris,
+                    "antal":        AMM_ANTAL,
+                    "ifylld_antal": 0,
+                    "status":       "öppen",
+                    "motivering":   "AMM — garanterad likviditet",
+                },
+                timeout=8,
+            )
+            if r.is_success:
+                amm_saldo -= budget
+                placed += 1
+                print(f"  AMM BID  {symbol}: {AMM_ANTAL:.0f}st @ {bid_pris:.2f} kr")
 
-        # Lägg ask om för få säljordrar och Börskassan har tokens
-        if ask_count.get(symbol, 0) < AMM_MIN_ORDERS and portfölj.get(symbol, 0) >= AMM_ANTAL:
+        # Lägg asks tills vi nått AMM_MIN_ORDERS (loop för att fylla hela gapet)
+        asks_kvar = max(0, AMM_MIN_ORDERS - ask_count.get(symbol, 0))
+        for _ in range(asks_kvar):
+            if portfölj.get(symbol, 0) < AMM_ANTAL:
+                break
             r = httpx.post(
                 f"{SB_URL}/rest/v1/bors_ordrar",
                 headers=h_min,
