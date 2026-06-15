@@ -50,6 +50,7 @@ jobs:
           GROQ_API_KEY_9: ${{ secrets.GROQ_API_KEY_9 }}
           GROQ_API_KEY_10: ${{ secrets.GROQ_API_KEY_10 }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
