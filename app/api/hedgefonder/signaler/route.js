@@ -23,15 +23,18 @@ export async function GET() {
     stratInnehav,
     quantNavRows,
     quantInnehav,
+    arbiNavRows,
   ] = await Promise.all([
     fetchJson(`${BASE}/rest/v1/strat_paper_nav?select=*&order=skapad.desc&limit=1`),
     fetchJson(`${BASE}/rest/v1/strat_paper_innehav?select=*`),
     fetchJson(`${BASE}/rest/v1/quant_paper_nav?select=*&order=skapad.desc&limit=1`),
     fetchJson(`${BASE}/rest/v1/quant_paper_innehav?select=*`),
+    fetchJson(`${BASE}/rest/v1/arbi_paper_nav?select=*&order=skapad.desc&limit=1`),
   ]);
 
-  const stratNav  = stratNavRows?.[0]  ?? null;
-  const quantNav  = quantNavRows?.[0]  ?? null;
+  const stratNav = stratNavRows?.[0] ?? null;
+  const quantNav = quantNavRows?.[0] ?? null;
+  const arbiNav  = arbiNavRows?.[0]  ?? null;
 
   function buildBenchmark(nav) {
     if (!nav) return null;
@@ -81,6 +84,25 @@ export async function GET() {
       }
     : null;
 
+  const arbi = arbiNav
+    ? {
+        fund: "ARBI",
+        timestamp: arbiNav.skapad,
+        position_riktning: arbiNav.position_riktning ?? null,
+        funding_rate_pct: arbiNav.funding_rate_pct ?? null,
+        apr_pct: arbiNav.apr_pct ?? null,
+        nav_usd: arbiNav.portfölj_värde_usd ?? null,
+        inkomst_usd: arbiNav.inkomst_usd ?? null,
+        position_storlek_usd: arbiNav.position_storlek_usd ?? null,
+        kontant_usd: arbiNav.portfölj_värde_usd != null && arbiNav.position_storlek_usd != null
+          ? arbiNav.portfölj_värde_usd - arbiNav.position_storlek_usd
+          : null,
+        symbol: arbiNav.symbol ?? "BTCUSDT",
+        strategi: "spot_perpetual_funding_rate_arbitrage",
+        paper_trading: true,
+      }
+    : null;
+
   return Response.json({
     generated_at: new Date().toISOString(),
     disclaimer:
@@ -89,6 +111,7 @@ export async function GET() {
     funds: {
       STRAT: strat,
       QUANT: quant,
+      ARBI: arbi,
     },
   });
 }

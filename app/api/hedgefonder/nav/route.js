@@ -21,12 +21,15 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "60", 10), 365);
 
-  const [stratRows, quantRows] = await Promise.all([
+  const [stratRows, quantRows, arbiRows] = await Promise.all([
     fetchJson(
       `${BASE}/rest/v1/strat_paper_nav?select=skapad,portfölj_värde_usd,kontant_usd,btc_benchmark_usd,spy_benchmark_usd,aktiv_strategi,signal&order=skapad.desc&limit=${limit}`
     ),
     fetchJson(
       `${BASE}/rest/v1/quant_paper_nav?select=skapad,portfölj_värde_usd,kontant_usd,btc_benchmark_usd,spy_benchmark_usd,quant_motivering&order=skapad.desc&limit=${limit}`
+    ),
+    fetchJson(
+      `${BASE}/rest/v1/arbi_paper_nav?select=skapad,portfölj_värde_usd,inkomst_usd,position_storlek_usd,funding_rate_pct,apr_pct,position_riktning&order=skapad.desc&limit=${limit}`
     ),
   ]);
 
@@ -57,8 +60,21 @@ export async function GET(request) {
     }));
   }
 
+  function mapArbi(rows) {
+    return (rows ?? []).reverse().map((r) => ({
+      timestamp: r.skapad,
+      nav_usd: r.portfölj_värde_usd,
+      inkomst_usd: r.inkomst_usd,
+      position_storlek_usd: r.position_storlek_usd,
+      funding_rate_pct: r.funding_rate_pct,
+      apr_pct: r.apr_pct,
+      position_riktning: r.position_riktning,
+    }));
+  }
+
   const stratData = mapStrat(stratRows);
   const quantData = mapQuant(quantRows);
+  const arbiData  = mapArbi(arbiRows);
 
   function latest(arr) {
     return arr.length ? arr[arr.length - 1] : null;
@@ -80,6 +96,11 @@ export async function GET(request) {
         latest_nav: latest(quantData),
         data_points: quantData.length,
         history: quantData,
+      },
+      ARBI: {
+        latest_nav: latest(arbiData),
+        data_points: arbiData.length,
+        history: arbiData,
       },
     },
   });
