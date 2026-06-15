@@ -119,12 +119,20 @@ export default function FormogenhetVy({
   for (const tg of borsTillgangar) {
     borsInstitutPris[tg.symbol] = parseFloat(tg.senaste_pris ?? 100);
   }
+  const prisDataTillganglig = borsTillgangar.length > 0;
   const borsPortfoljVarde = {};
   for (const pf of borsPortfoljer) {
     const antal = parseFloat(pf.antal ?? 0);
     if (antal <= 0) continue;
     const pris = borsInstitutPris[pf.symbol];
-    if (pris == null) continue; // hoppa över onoterade ICO-tokens
+    if (pris == null) {
+      // Om pristabell saknas helt (transient fetch-fel): använd 100 kr-fallback
+      // Om pristabell finns men symbolen saknas: onoterad ICO-token, hoppa över
+      if (!prisDataTillganglig) {
+        borsPortfoljVarde[pf.agent] = (borsPortfoljVarde[pf.agent] || 0) + antal * 100;
+      }
+      continue;
+    }
     borsPortfoljVarde[pf.agent] = (borsPortfoljVarde[pf.agent] || 0) + antal * pris;
   }
 
@@ -162,7 +170,7 @@ export default function FormogenhetVy({
       {/* ── NYCKELTAL ── */}
       <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
         <StatPill label="Total förmögenhet (inkl. börs)" value={`${totalSaldo.toLocaleString("sv-SE")} kr`} color={C.green} />
-        <StatPill label="Gini (senaste)" value={latestGini} color={latestGini > 0.5 ? C.red : C.green} />
+        <StatPill label="Gini (cash, senaste)" value={latestGini} color={latestGini > 0.5 ? C.red : C.green} />
         <StatPill label="Statskassan" value={`${(statskassa || 0).toLocaleString("sv-SE")} kr`} color={C.yellow} />
         <StatPill label="Agenter" value={planbocker.length} />
         <StatPill label="Besökare" value={liveVisitors.length} />
