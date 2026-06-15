@@ -1277,7 +1277,7 @@ def kör_strat_paper_trading(sb_key: str):
     # 7. Exekvera signal
     # Blockera KÖP om oliquiderade stale-positioner finns — undvik dubbla innehav
     if har_oliquiderade_stale and signal == "KÖP":
-        signal = "SÄLJ/HÅLL"
+        signal = "HÅLL"  # inte SÄLJ/HÅLL — undvik att sälja aktiv position av misstag
         print(f"  STRAT: KÖP-signal blockerad — väntar på likvidering av stale-positioner")
     if signal == "KÖP" and kontant >= 500 and nuv_pos["antal"] < 1e-9:
         # Öppna ny position med 80% av kontant
