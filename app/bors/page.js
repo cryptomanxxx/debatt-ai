@@ -50,7 +50,7 @@ async function getData() {
   }
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [tillRes, affRes, ordRes, pfjRes, prisRes, plbRes] = await Promise.all([
+  const [tillRes, affRes, ordRes, pfjRes, prisRes, plbRes, stakRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/bors_tillgangar?order=symbol.asc`, {
       headers: h, next: { revalidate: 60 },
     }),
@@ -69,6 +69,9 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc`, {
       headers: h, next: { revalidate: 60 },
     }),
+    fetch(`${SB_URL}/rest/v1/bors_staking?utbetald=eq.false&order=slut_datum.asc&limit=100`, {
+      headers: h, next: { revalidate: 60 },
+    }),
   ]);
 
   return {
@@ -78,6 +81,7 @@ async function getData() {
     portfoljer: pfjRes.ok   ? await pfjRes.json()  : [],
     priser:     prisRes.ok  ? await prisRes.json() : [],
     planbocker: plbRes.ok   ? await plbRes.json()  : [],
+    staking:    stakRes.ok  ? await stakRes.json() : [],
   };
 }
 
@@ -125,7 +129,7 @@ function SparklineInline({ data, farg }) {
 }
 
 export default async function BorsPage() {
-  const { tillgangar, affarer, ordrar, portfoljer, priser, planbocker } = await getData();
+  const { tillgangar, affarer, ordrar, portfoljer, priser, planbocker, staking } = await getData();
 
   // ── Prishistorik per symbol (kronologisk för sparkline) ─────────────────────
   const prishistorik = {};
@@ -193,6 +197,20 @@ export default async function BorsPage() {
   const senaste20   = affarer.slice(0, 20);
   const totalVolym  = tillgangar.reduce((s, tg) => s + parseFloat(tg.volym_24h ?? 0), 0);
   const totalAffarer = tillgangar.reduce((s, tg) => s + parseInt(tg.antal_affarer ?? 0), 0);
+
+  // ── Staking-beräkning ────────────────────────────────────────────────────────
+  const idag = new Date(); idag.setHours(0, 0, 0, 0);
+  const stakingRader = (staking ?? []).map(s => {
+    const slutDatum = new Date(s.slut_datum); slutDatum.setHours(0, 0, 0, 0);
+    const dagarKvar = Math.max(0, Math.round((slutDatum - idag) / 86400000));
+    const pris  = prisMap[s.symbol] ?? 100;
+    const antal = parseFloat(s.antal ?? 0);
+    const apy   = parseFloat(s.apy   ?? 0.05);
+    const yieldKvar = antal * pris * apy * (dagarKvar / 365);
+    return { ...s, dagarKvar, pris, antal, apy, yieldKvar };
+  }).filter(s => s.antal > 0);
+  const totalStakVarde   = stakingRader.reduce((sum, s) => sum + s.antal * s.pris, 0);
+  const totalYieldKvar   = stakingRader.reduce((sum, s) => sum + s.yieldKvar, 0);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
@@ -637,6 +655,108 @@ export default async function BorsPage() {
             </div>
           </div>
         )}
+
+        {/* ── Aktiva stakes ── */}
+        <div style={{ marginBottom: 40 }}>
+          <h2 style={{
+            fontSize: 11, color: C.textMuted, fontFamily: "monospace",
+            textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px",
+          }}>
+            🔒 Staking — aktiva lås
+          </h2>
+
+          {/* Sammanfattning */}
+          <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+            {[
+              ["Aktiva stakes",       stakingRader.length,                "#fbbf24"],
+              ["Totalt stakat värde", `${totalStakVarde.toFixed(0)} kr`,  "#4a9eff"],
+              ["Förväntad yield kvar",`${totalYieldKvar.toFixed(1)} kr`,  "#4ade80"],
+            ].map(([label, val, farg]) => (
+              <div key={label} style={{
+                background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: 8, padding: "14px 20px", minWidth: 130,
+              }}>
+                <div style={{ fontSize: 20, color: farg, fontFamily: "monospace", fontWeight: 700 }}>{val}</div>
+                <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", marginTop: 3 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {stakingRader.length === 0 ? (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: 32,
+              textAlign: "center", color: C.textMuted, fontFamily: "monospace", fontSize: 13,
+            }}>
+              Inga aktiva stakes just nu. Agenter låser tokens automatiskt vid nästa börskörning (~8% chans per agent).
+            </div>
+          ) : (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 10, overflow: "hidden",
+            }}>
+              {/* Tabellhuvud */}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 80px 80px 55px 95px 100px",
+                padding: "10px 16px",
+                fontSize: 9, color: C.textMuted, fontFamily: "monospace",
+                letterSpacing: "0.08em",
+                borderBottom: `1px solid ${C.border}`,
+                background: C.surface2,
+              }}>
+                <span>AGENT</span>
+                <span style={{ textAlign: "center" }}>TOKEN</span>
+                <span style={{ textAlign: "right" }}>ANTAL</span>
+                <span style={{ textAlign: "right" }}>APY</span>
+                <span style={{ textAlign: "right" }}>FÖRFALLER</span>
+                <span style={{ textAlign: "right" }}>YIELD KVAR</span>
+              </div>
+
+              {stakingRader.map((s, i) => {
+                const farg = symbolFarg(s.symbol);
+                const ikon = symbolIkon(s.symbol);
+                const dagText = s.dagarKvar === 0 ? "idag" : `${s.dagarKvar}d`;
+                const dagFarg = s.dagarKvar <= 1 ? "#fbbf24" : C.textMuted;
+                return (
+                  <div key={s.id ?? i} style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 80px 80px 55px 95px 100px",
+                    padding: "9px 16px",
+                    fontSize: 11, fontFamily: "monospace",
+                    borderBottom: i < stakingRader.length - 1 ? `1px solid ${C.border}` : "none",
+                    background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+                    alignItems: "center",
+                  }}>
+                    <span style={{ color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {s.agent}
+                    </span>
+                    <span style={{ color: farg, textAlign: "center" }}>
+                      {ikon} {s.symbol}
+                    </span>
+                    <span style={{ color: C.text, textAlign: "right" }}>
+                      {s.antal.toFixed(2)}
+                    </span>
+                    <span style={{ color: "#4ade80", textAlign: "right" }}>
+                      {(s.apy * 100).toFixed(0)}%
+                    </span>
+                    <span style={{ color: dagFarg, textAlign: "right" }}>
+                      {s.slut_datum} <span style={{ fontSize: 9 }}>({dagText})</span>
+                    </span>
+                    <span style={{ color: "#4ade80", textAlign: "right", fontWeight: 600 }}>
+                      +{s.yieldKvar.toFixed(2)} kr
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ marginTop: 12, fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>
+            Yield betalas ut i SEK till agentens saldo när stakes förfaller. APY 5–8% beroende på personlighet.
+            Passiva agenter (Den lugna, Pensionären) har högst staking-benägenhet.
+          </div>
+        </div>
 
         {/* ── Footer info ── */}
         <div style={{
