@@ -389,6 +389,33 @@ async function getAgentSymboler(namn) {
   return syms.map(s => ({ ...varorMap[s.vara_id], pris_betalt: s.pris_betalt, kopt_at: s.kopt_at })).filter(s => s.namn);
 }
 
+async function getAgentEtf(namn) {
+  const [innehavRes, ...prisResults] = await Promise.all([
+    fetch(
+      `${SB_URL}/rest/v1/agent_etf_innehav?agent=eq.${encodeURIComponent(namn)}&select=symbol,investerat_kr,kopt_pris_usd,uppdaterad`,
+      { headers: sbHeaders(), next: { revalidate: 120 } }
+    ),
+    ...["BTC", "ETH", "SOL", "XRP", "BNB"].map(s =>
+      fetch(`${SB_URL}/rest/v1/ohlcv_cache?symbol=eq.${s}&order=datum.desc&limit=1&select=symbol,pris`, {
+        headers: sbHeaders(), next: { revalidate: 300 },
+      }).then(r => r.ok ? r.json() : [])
+    ),
+  ]);
+  if (!innehavRes.ok) return [];
+  const innehav = await innehavRes.json();
+  const priser = {};
+  for (const rows of prisResults) {
+    if (rows.length) priser[rows[0].symbol] = parseFloat(rows[0].pris);
+  }
+  return innehav.map(r => {
+    const inv = parseFloat(r.investerat_kr);
+    const koptPris = parseFloat(r.kopt_pris_usd);
+    const senastePris = priser[r.symbol];
+    const varde = (senastePris && koptPris) ? inv * (senastePris / koptPris) : inv;
+    return { symbol: r.symbol, investerat_kr: inv, varde, pl: varde - inv };
+  }).sort((a, b) => b.varde - a.varde);
+}
+
 async function getAgentStats(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?forfattare=eq.${encodeURIComponent(namn)}&kalla=eq.ai&select=id,arg,ori,rel,tro`,
@@ -441,7 +468,7 @@ export default async function AgentPage({ params }) {
   if (namn === "Statskassa") redirect("/staten");
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler, dagbok, bets, bilder] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler, dagbok, bets, bilder, etf] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
@@ -456,6 +483,7 @@ export default async function AgentPage({ params }) {
     getAgentDagbok(namn),
     getAgentBets(namn),
     getAgentBilder(namn),
+    getAgentEtf(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -570,6 +598,56 @@ export default async function AgentPage({ params }) {
         )}
 
         <style>{`.agent-rad { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 20px; background:#111111; text-decoration:none; transition:background 0.15s; } .agent-rad:hover { background:#161616; }`}</style>
+
+        {/* Krypto-ETF */}
+        {etf.length > 0 && (() => {
+          const FARG = { BTC: "#f7931a", ETH: "#627eea", SOL: "#9945ff", XRP: "#346aa9", BNB: "#f3ba2f" };
+          const IKON = { BTC: "₿", ETH: "Ξ", SOL: "◎", XRP: "✕", BNB: "⬡" };
+          const totInv = etf.reduce((s, r) => s + r.investerat_kr, 0);
+          const totVarde = etf.reduce((s, r) => s + r.varde, 0);
+          const totPl = totVarde - totInv;
+          return (
+            <div style={{ marginBottom: "48px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: 0 }}>
+                  Krypto-ETF — portfölj
+                </p>
+                <a href="/etf" style={{ fontSize: "11px", color: "#f7931a", textDecoration: "none", opacity: 0.8 }}>Se alla →</a>
+              </div>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
+                {etf.map((r, i) => {
+                  const farg = FARG[r.symbol] || "#888";
+                  const plColor = r.pl >= 0 ? "#4ade80" : "#f87171";
+                  return (
+                    <div key={r.symbol} style={{ display: "flex", alignItems: "center", gap: "16px", padding: "12px 16px", borderBottom: i < etf.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                      <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: `${farg}18`, border: `1px solid ${farg}40`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", color: farg, fontFamily: "monospace", flexShrink: 0 }}>
+                        {IKON[r.symbol] || r.symbol[0]}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <span style={{ fontSize: "13px", color: farg, fontFamily: "monospace", fontWeight: 700 }}>{r.symbol}</span>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "13px", color: C.text, fontFamily: "monospace" }}>{r.varde.toFixed(0)} kr</div>
+                        <div style={{ fontSize: "11px", color: plColor, fontFamily: "monospace" }}>
+                          {r.pl >= 0 ? "+" : ""}{r.pl.toFixed(0)} kr
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 16px", borderTop: `1px solid #1a1a1a`, background: "#0d0d0d" }}>
+                  <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>TOTALT</span>
+                  <div style={{ textAlign: "right" }}>
+                    <span style={{ fontSize: "13px", color: C.accent, fontFamily: "monospace" }}>{totVarde.toFixed(0)} kr</span>
+                    <span style={{ fontSize: "11px", color: totPl >= 0 ? "#4ade80" : "#f87171", fontFamily: "monospace", marginLeft: "8px" }}>
+                      {totPl >= 0 ? "+" : ""}{totPl.toFixed(0)} kr P&L
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Position evolution */}
         {positioner.length > 0 && (
