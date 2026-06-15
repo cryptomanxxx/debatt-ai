@@ -742,6 +742,70 @@ def agent_placera_ordrar(sb_key: str, agent_namn: str) -> list[dict]:
     return []
 
 
+def agent_placera_ico_ordrar(sb_key: str, agent_namn: str, alla_symboler: list[str]) -> list[dict]:
+    """
+    Skapar ordrar för ICO-tokens (symboler utanför de ursprungliga SYMBOLER).
+    - Säljordrar: 25 % chans per ICO-token agenten håller i portföljen
+    - Köpordrar:  15 % chans att köpa en slumpmässig ICO-token opportunistiskt
+    Returnerar lista med lagda ordrar.
+    """
+    ico_syms = [s for s in alla_symboler if s not in SYMBOLER]
+    if not ico_syms:
+        return []
+
+    stil = TRADING_STIL.get(agent_namn, {"aggressivitet": 0.4, "bias": "neutral", "risk": "medel"})
+    portfolj = hamta_portfolj(sb_key, agent_namn)
+    ordrar: list[dict] = []
+
+    # Säljordrar för ICO-tokens agenten faktiskt håller
+    for symbol in ico_syms:
+        antal = portfolj.get(symbol, 0)
+        if antal < 0.5:
+            continue
+        if random.random() > 0.25:
+            continue
+        spot = hamta_pris(sb_key, symbol)
+        if spot <= 0:
+            continue
+        # Säljlimit måste vara ≤ AMM-bud (spot * (1 - AMM_SPREAD)) för att korsa spreaden
+        aggressivitet = stil.get("aggressivitet", 0.4)
+        if aggressivitet > 0.6:
+            # Aggressiv: säljer direkt under AMM-budet
+            limit_pris = round(spot * (1 - AMM_SPREAD - random.uniform(0, 0.01)), 2)
+        else:
+            # Försiktig: säljer precis vid AMM-budet
+            limit_pris = round(spot * (1 - AMM_SPREAD), 2)
+        limit_pris = max(0.01, limit_pris)
+        sälj_antal = float(math.floor(antal)) or antal
+        motivering = random.choice(SALJ_MOTIVERINGAR).format(symbol=symbol)
+        order_id = lagg_order(sb_key, agent_namn, symbol, "salj", limit_pris, sälj_antal, motivering)
+        if order_id:
+            ordrar.append({"typ": "salj", "symbol": symbol, "pris": limit_pris, "antal": sälj_antal})
+
+    # Köpordrar: opportunistisk chans att köpa en billig ICO-token
+    if random.random() < 0.15:
+        symbol = random.choice(ico_syms)
+        saldo = hamta_saldo(sb_key, agent_namn)
+        spot = hamta_pris(sb_key, symbol)
+        if spot > 0 and saldo >= spot:
+            risk = stil.get("risk", "medel")
+            if risk == "lag":
+                antal = 1.0
+            elif risk == "hog":
+                antal = float(random.randint(2, 4))
+            else:
+                antal = float(random.randint(1, 3))
+            # Köplimit måste vara ≥ AMM-ask (spot * (1 + AMM_SPREAD)) för att korsa spreaden
+            limit_pris = round(spot * (1 + AMM_SPREAD + random.uniform(0, 0.02)), 2)
+            if limit_pris * antal <= saldo:
+                motivering = random.choice(KOP_MOTIVERINGAR).format(symbol=symbol)
+                order_id = lagg_order(sb_key, agent_namn, symbol, "kop", limit_pris, antal, motivering)
+                if order_id:
+                    ordrar.append({"typ": "kop", "symbol": symbol, "pris": limit_pris, "antal": antal})
+
+    return ordrar
+
+
 def hamta_mogna_stakes(sb_key: str) -> list[dict]:
     """Hämtar stakes vars slut_datum passerat och som ej betalats ut."""
     try:
@@ -1563,6 +1627,7 @@ def main():
     stats_kop  = 0
     stats_salj = 0
     stats_skip = 0
+    stats_ico  = 0
 
     for agent_info in agenter_lista:
         agent_namn = agent_info["namn"]
@@ -1577,11 +1642,18 @@ def main():
                     print(f"  {agent_namn}: SÄLJ {o['antal']} {o['symbol']} @ {o['pris']} kr")
             if not ordrar:
                 stats_skip += 1
+
+            # Ordrar för ICO-tokens utanför ordinarie preferenser
+            ico_ordrar = agent_placera_ico_ordrar(sb_key, agent_namn, alla_symboler)
+            for o in ico_ordrar:
+                stats_ico += 1
+                riktning = "KÖP" if o["typ"] == "kop" else "SÄLJ"
+                print(f"  {agent_namn}: ICO-{riktning} {o['antal']} {o['symbol']} @ {o['pris']} kr")
         except Exception as e:
             print(f"  {agent_namn}: FEL – {e}")
             stats_skip += 1
 
-    print(f"\n  Ordrar: {stats_kop} köp, {stats_salj} sälj, {stats_skip} pass")
+    print(f"\n  Ordrar: {stats_kop} köp, {stats_salj} sälj, {stats_skip} pass, {stats_ico} ico")
 
     # Market maker-ordrar (tvåsidiga likviditetsordrar)
     print("\n[5/10] Market maker-ordrar...")
