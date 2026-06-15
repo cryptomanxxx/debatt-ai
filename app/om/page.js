@@ -1911,6 +1911,82 @@ export default function OmPage() {
           </a>
         </OmSektion>
 
+        {/* Hedgefond Signal API */}
+        <OmSektion id="hedgefond-api" titel="Hedgefond Signal API — paper trading-signaler">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 16px" }}>
+            QUANT och STRAT är experimentella paper trading-fonder som köper och säljer riktiga kryptotillgångar (BTC/ETH/SOL) med ett fiktivt startkapital på 10 000 USD. Signalerna — köp/sälj, aktiv strategi och LLM-resonemang — exponeras via ett öppet REST API utan autentisering.
+          </p>
+          <p style={{ fontSize: "13px", color: C.accentDim, fontWeight: 700, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em" }}>
+            Hämta senaste signal och innehav
+          </p>
+          <div style={{ background: "#050505", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginBottom: "16px", fontFamily: "monospace", fontSize: "13px", color: "#666", overflowX: "auto" }}>
+            <span style={{ color: "#4a4a4a" }}>GET </span>
+            <span style={{ color: C.accentDim }}>https://www.debatt-ai.se/api/hedgefonder/signaler</span>
+            {"\n\n"}
+            <span style={{ color: "#4a7a4a" }}>{`{
+  "funds": {
+    "STRAT": {
+      "fund": "STRAT", "signal": "BUY", "asset": "BTC",
+      "aktiv_strategi": "MA_20_50", "backtest_avkastning_pct": 142.3,
+      "nav_usd": 10250.5, "kontant_usd": 5000,
+      "innehav": [{ "symbol": "BTC", "antal": 0.05, "kopt_pris_usd": 62000 }],
+      "paper_trading": true
+    },
+    "QUANT": {
+      "fund": "QUANT", "llm_motivering": "Momentum stärks. Ökar BTC-exponering.",
+      "nav_usd": 11200.0, "kontant_usd": 3000,
+      "innehav": [{ "symbol": "ETH", "antal": 1.2, "kopt_pris_usd": 3400 }],
+      "paper_trading": true
+    }
+  }
+}`}</span>
+          </div>
+          <p style={{ fontSize: "13px", color: C.accentDim, fontWeight: 700, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em" }}>
+            NAV-historik med benchmark
+          </p>
+          <div style={{ background: "#050505", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginBottom: "20px", fontFamily: "monospace", fontSize: "13px", color: "#666", overflowX: "auto" }}>
+            <span style={{ color: "#4a4a4a" }}>GET </span>
+            <span style={{ color: C.accentDim }}>https://www.debatt-ai.se/api/hedgefonder/nav?limit=30</span>
+            {"\n\n"}
+            <span style={{ color: "#4a7a4a" }}>{`{
+  "params": { "limit": 30 },
+  "funds": {
+    "STRAT": {
+      "latest_nav": { "nav_usd": 10250, "signal": "BUY",
+        "benchmark": { "btc_buy_hold_usd": 10025, "spy_buy_hold_usd": 10010 }
+      },
+      "data_points": 30,
+      "history": [ ... ]
+    },
+    "QUANT": { ... }
+  }
+}`}</span>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+            {[
+              ["STRAT — Algoritmisk", "Kör MA-korsningsstrategier (t.ex. MA_20_50) utan LLM. Genererar BUY/SELL/HOLD-signaler baserade på rörliga medelvärden och volymfilter. Backtestresultat ingår per signal."],
+              ["QUANT — Självlärande", "Läser de senaste 20 NAV-snapshots och 30 trades, frågar Groq-LLM om strategi. quant_motivering-fältet innehåller LLM:ens resonemang i klartext."],
+              ["Inga API-nycklar", "Alla tre endpoints är öppna och kräver ingen autentisering. Revalideras utan cache (revalidate: 0)."],
+              ["Benchmark", "Varje NAV-snapshot jämförs mot BTC buy-and-hold och SPY buy-and-hold från samma startdatum (10 000 USD)."],
+              ["?limit=N", "GET /nav stödjer ?limit= (default 60, max 365) för att begränsa historikens längd. Historiken returneras i kronologisk ordning."],
+              ["Paper trading", "Fonderna handlar med fiktivt kapital mot riktiga kryptopriser via Yahoo Finance. Alla signaler märks med paper_trading: true."],
+            ].map(([k, v]) => (
+              <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>
+                <p style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6, margin: 0 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <a href="/hedgefond-api" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+              Prova API:et →
+            </a>
+            <a href="/api/hedgefonder" target="_blank" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.textMuted, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+              API-dokumentation (JSON) →
+            </a>
+          </div>
+        </OmSektion>
+
         {/* Stablecoin */}
         <OmSektion id="stablecoin" titel="Stablecoin — STAB med target-pris 100 SEK">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
