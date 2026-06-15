@@ -143,6 +143,14 @@ LIKVIDITET_BELOPP = 1.5    # SEK per kvalificerande (agent, symbol)-par per kör
 
 AVGIFT_SATS = 0.005        # 0,5 % handelsavgift på varje genomförd affär → Börskassan
 
+# ─── Automatisk Market Maker (AMM) ────────────────────────────────────────────
+
+AMM_SPREAD           = 0.04   # 4 % varje sida av spotpriset
+AMM_ANTAL            = 3.0    # tokens per AMM-order
+AMM_MIN_ORDERS       = 2      # minimum ordrar per sida innan AMM agerar
+AMM_REFILL_TROSKEL   = 10.0   # auto-refill om token-inventariet sjunker under detta
+AMM_REFILL_ANTAL     = 50.0   # antal tokens som fylls på vid refill
+
 # ─── Korta positioner ─────────────────────────────────────────────────────────
 
 SHORT_COLLATERAL   = 1.50  # 150 % av positionsvärdet låses som säkerhet
@@ -1023,6 +1031,148 @@ def lagg_market_maker_ordrar(sb_key: str, agent: str, symbol: str, tighthet: flo
     return kop_id is not None and salj_id is not None
 
 
+def kör_amm(sb_key: str, alla_symboler: list[str]) -> None:
+    """
+    Automatisk Market Maker — garanterar minst AMM_MIN_ORDERS ordrar per sida
+    för varje noterad symbol.  Körs som första handlingssteg så att agenter
+    alltid har något att handla mot.
+
+    Logik per körning:
+    1. Avbryt egna AMM-ordrar äldre än 6h (prisen är inaktuella)
+    2. Räkna kvarvarande öppna ordrar per symbol/sida
+    3. Fyll på token-inventariet om det sjunker under AMM_REFILL_TROSKEL
+    4. Lägg bid @ spot*(1-AMM_SPREAD) och/eller ask @ spot*(1+AMM_SPREAD)
+       när antalet ordrar underskrider AMM_MIN_ORDERS
+    """
+    h     = _h(sb_key)
+    h_min = {**h, "Prefer": "return=minimal"}
+    amm_enc = urllib.parse.quote("Börskassan")
+
+    # 1. Avbryt gamla Börskassan-ordrar (>6h)
+    cutoff_amm = (datetime.now(timezone.utc) - timedelta(hours=6)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    r_old = httpx.get(
+        f"{SB_URL}/rest/v1/bors_ordrar"
+        f"?agent=eq.{amm_enc}&status=in.(öppen,delvis)"
+        f"&skapad=lt.{urllib.parse.quote(cutoff_amm)}&select=id",
+        headers=h, timeout=8,
+    )
+    cancelled = 0
+    if r_old.is_success:
+        for row in r_old.json():
+            r = httpx.patch(
+                f"{SB_URL}/rest/v1/bors_ordrar?id=eq.{row['id']}",
+                headers=h_min, json={"status": "avbruten"}, timeout=6,
+            )
+            if r.is_success:
+                cancelled += 1
+    if cancelled:
+        print(f"  AMM: avbröt {cancelled} inaktuella ordrar")
+
+    # 2. Räkna öppna ordrar per symbol och sida
+    r_ord = httpx.get(
+        f"{SB_URL}/rest/v1/bors_ordrar?status=in.(öppen,delvis)&select=symbol,typ",
+        headers=h, timeout=8,
+    )
+    ordrar = r_ord.json() if r_ord.is_success else []
+    bid_count: dict[str, int] = {}
+    ask_count: dict[str, int] = {}
+    for o in ordrar:
+        sym = o["symbol"]
+        if o["typ"] == "kop":
+            bid_count[sym] = bid_count.get(sym, 0) + 1
+        else:
+            ask_count[sym] = ask_count.get(sym, 0) + 1
+
+    # 3. Börskassans saldo och token-portfölj
+    amm_saldo = hamta_saldo(sb_key, "Börskassan")
+
+    r_portf = httpx.get(
+        f"{SB_URL}/rest/v1/bors_portfoljer?agent=eq.{amm_enc}&select=symbol,antal",
+        headers=h, timeout=8,
+    )
+    portfölj: dict[str, float] = {}
+    if r_portf.is_success:
+        for row in r_portf.json():
+            portfölj[row["symbol"]] = float(row["antal"])
+
+    placed = 0
+    for symbol in alla_symboler:
+        spot = _hamta_spotpris(sb_key, symbol)
+        if not spot:
+            continue
+
+        sym_enc = urllib.parse.quote(symbol)
+
+        # Auto-refill: om inventariet är lågt fyller Börskassan på från "börskassan"
+        if portfölj.get(symbol, 0) < AMM_REFILL_TROSKEL:
+            h_ups = {**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"}
+            httpx.post(
+                f"{SB_URL}/rest/v1/bors_portfoljer?on_conflict=agent,symbol",
+                headers=h_ups,
+                json={
+                    "agent":          "Börskassan",
+                    "symbol":         symbol,
+                    "antal":          AMM_REFILL_ANTAL,
+                    "genomsnittspris": round(spot, 2),
+                    "uppdaterad":     "now()",
+                },
+                timeout=8,
+            )
+            portfölj[symbol] = AMM_REFILL_ANTAL
+            print(f"  AMM: påfyllning {symbol} → {AMM_REFILL_ANTAL:.0f} tokens")
+
+        bid_pris = round(spot * (1 - AMM_SPREAD), 2)
+        ask_pris = round(spot * (1 + AMM_SPREAD), 2)
+
+        # Lägg bid om för få köpordrar och Börskassan har saldo
+        if bid_count.get(symbol, 0) < AMM_MIN_ORDERS:
+            budget = round(AMM_ANTAL * bid_pris, 2)
+            if amm_saldo >= budget:
+                r = httpx.post(
+                    f"{SB_URL}/rest/v1/bors_ordrar",
+                    headers=h_min,
+                    json={
+                        "agent":        "Börskassan",
+                        "symbol":       symbol,
+                        "typ":          "kop",
+                        "pris":         bid_pris,
+                        "antal":        AMM_ANTAL,
+                        "ifylld_antal": 0,
+                        "status":       "öppen",
+                        "motivering":   "AMM — garanterad likviditet",
+                    },
+                    timeout=8,
+                )
+                if r.is_success:
+                    amm_saldo -= budget
+                    placed += 1
+                    print(f"  AMM BID  {symbol}: {AMM_ANTAL:.0f}st @ {bid_pris:.2f} kr")
+
+        # Lägg ask om för få säljordrar och Börskassan har tokens
+        if ask_count.get(symbol, 0) < AMM_MIN_ORDERS and portfölj.get(symbol, 0) >= AMM_ANTAL:
+            r = httpx.post(
+                f"{SB_URL}/rest/v1/bors_ordrar",
+                headers=h_min,
+                json={
+                    "agent":        "Börskassan",
+                    "symbol":       symbol,
+                    "typ":          "salj",
+                    "pris":         ask_pris,
+                    "antal":        AMM_ANTAL,
+                    "ifylld_antal": 0,
+                    "status":       "öppen",
+                    "motivering":   "AMM — garanterad likviditet",
+                },
+                timeout=8,
+            )
+            if r.is_success:
+                portfölj[symbol] = portfölj.get(symbol, 0) - AMM_ANTAL
+                placed += 1
+                print(f"  AMM ASK  {symbol}: {AMM_ANTAL:.0f}st @ {ask_pris:.2f} kr")
+
+    print(f"  AMM: {placed} nya ordrar lagda")
+
+
 def kör_market_maker_ordrar(sb_key: str) -> int:
     """
     Låter agenter med MM-profil lägga tvåsidiga likviditetsordrar.
@@ -1367,15 +1517,29 @@ def main():
     print("=" * 60)
 
     # Avbryt gamla ordrar (>48h)
-    print("\n[1/8] Avbryter gamla ordrar...")
+    print("\n[1/10] Avbryter gamla ordrar...")
     avbryt_gamla_ordrar(sb_key)
 
     # Genesis (körs bara om börsen är tom)
-    print("\n[2/8] Kontrollerar genesis...")
+    print("\n[2/10] Kontrollerar genesis...")
     genesis(sb_key)
 
+    # Hämta alla symboler tidigt (behövs av AMM och resten)
+    try:
+        r_sym = httpx.get(
+            f"{SB_URL}/rest/v1/bors_tillgangar?select=symbol&order=symbol.asc",
+            headers=_h(sb_key), timeout=8,
+        )
+        alla_symboler = [t["symbol"] for t in r_sym.json()] if r_sym.is_success and r_sym.json() else SYMBOLER
+    except Exception:
+        alla_symboler = SYMBOLER
+
+    # AMM — garantera tvåsidig likviditet för alla symboler
+    print(f"\n[3/10] AMM — garanterar likviditet ({', '.join(alla_symboler)})...")
+    kör_amm(sb_key, alla_symboler)
+
     # Agenter placerar ordrar
-    print(f"\n[3/8] {len(AGENTER)} agenter placerar ordrar...")
+    print(f"\n[4/10] {len(AGENTER)} agenter placerar ordrar...")
     agenter_lista = list(AGENTER)
     random.shuffle(agenter_lista)
 
@@ -1403,23 +1567,14 @@ def main():
     print(f"\n  Ordrar: {stats_kop} köp, {stats_salj} sälj, {stats_skip} pass")
 
     # Market maker-ordrar (tvåsidiga likviditetsordrar)
-    print("\n[4/8] Market maker-ordrar...")
+    print("\n[5/10] Market maker-ordrar...")
     mm_count = kör_market_maker_ordrar(sb_key)
     print(f"  {mm_count} agenter la MM-ordrar.")
 
-    # Matcha ordrar per symbol — hämtar alla noterade symboler dynamiskt
-    print("\n[5/8] Matchar ordrar...")
+    # Matcha ordrar per symbol
+    print("\n[6/10] Matchar ordrar...")
     total_affarer = 0
     total_volym   = 0.0
-
-    try:
-        r_sym = httpx.get(
-            f"{SB_URL}/rest/v1/bors_tillgangar?select=symbol&order=symbol.asc",
-            headers=_h(sb_key), timeout=8,
-        )
-        alla_symboler = [t["symbol"] for t in r_sym.json()] if r_sym.is_success and r_sym.json() else SYMBOLER
-    except Exception:
-        alla_symboler = SYMBOLER
 
     print(f"  Symboler att matcha: {', '.join(alla_symboler)}")
 
@@ -1463,19 +1618,19 @@ def main():
             print(f"    Inga matchningar (pris: {aktuellt_pris:.2f} kr)")
 
     # Liquidity mining-belöningar (beräknas på kvarvarande öppna ordrar)
-    print("\n[6/9] Liquidity mining-belöningar...")
+    print("\n[7/10] Liquidity mining-belöningar...")
     kör_liquidity_mining(sb_key)
 
     # Korta positioner
-    print("\n[7/9] Korta positioner (avgift, likvidering, nya)...")
+    print("\n[8/10] Korta positioner (avgift, likvidering, nya)...")
     kör_shorts(sb_key, alla_symboler)
 
     # Staking
-    print("\n[8/9] Staking — yield och nya stakes...")
+    print("\n[9/10] Staking — yield och nya stakes...")
     kör_staking(sb_key)
 
     # Koalitionsairdrops
-    print("\n[9/9] Koalitionsairdrops...")
+    print("\n[10/10] Koalitionsairdrops...")
     kör_koalitions_airdrops(sb_key)
 
     # Sammanfattning
