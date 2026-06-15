@@ -542,6 +542,27 @@ export default async function HedgefonderPage() {
                 </div>
               </div>
 
+              {/* Strategibeskrivning */}
+              <div style={{ margin: "0 20px 12px", background: "#000d1a", border: "1px solid #38bdf830", borderRadius: "6px", padding: "12px" }}>
+                <div style={{ fontSize: "10px", color: "#38bdf8", marginBottom: "8px", fontWeight: "600", letterSpacing: "0.08em" }}>🤖 QUANT — SÅ HÄR FUNGERAR DET</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px" }}>
+                  {[
+                    { rubrik: "Tillgångar", text: "Handlar sex tillgångar: BTC, ETH, SOL, XRP, BNB och SPY (S&P 500 ETF). Ingen fast fördelning — LLM beslutar fritt vilka tillgångar som köps eller säljs varje körning." },
+                    { rubrik: "LLM-beslut", text: "Varje dag får en AI (Groq Llama 3.3 70B) se aktuellt portföljvärde, kassaposition, alla positioner och pristrend (äldst→nyast) för varje tillgång. Utifrån detta fattar AI:n upp till 3 handelsbeslut." },
+                    { rubrik: "Köp & sälj", text: "Köpordrar använder 5–40% av tillgänglig kassa per trade. Säljordrar stänger 10–100% av en befintlig position. AI:n anger både vilken tillgång och hur stor andel." },
+                    { rubrik: "Självlärande", text: "QUANT har inget fast regelverk — strategin formas av vad AI:n ser i marknadsdata just den dagen. Kontrast mot STRAT som följer ett statiskt MA+volym-regelverk oavsett marknadsläge." },
+                  ].map(item => (
+                    <div key={item.rubrik}>
+                      <div style={{ fontSize: "10px", color: "#38bdf8", fontWeight: "600", marginBottom: "2px" }}>{item.rubrik}</div>
+                      <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: "1.5" }}>{item.text}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid #38bdf820", fontSize: "10px", color: C.textMuted }}>
+                  Senaste AI-analys visas nedan. Resultatet jämförs mot BTC buy &amp; hold och SPY buy &amp; hold som benchmarks.
+                </div>
+              </div>
+
               {/* Sparkline + Benchmarks */}
               <div style={{ padding: "0 20px 16px", display: "flex", alignItems: "flex-end", gap: "24px", flexWrap: "wrap" }}>
                 {sparkData.length >= 2 && (
