@@ -1177,12 +1177,23 @@ def main():
     mm_count = kör_market_maker_ordrar(sb_key)
     print(f"  {mm_count} agenter la MM-ordrar.")
 
-    # Matcha ordrar per symbol
+    # Matcha ordrar per symbol — hämtar alla noterade symboler dynamiskt
     print("\n[5/8] Matchar ordrar...")
     total_affarer = 0
     total_volym   = 0.0
 
-    for symbol in SYMBOLER:
+    try:
+        r_sym = httpx.get(
+            f"{SB_URL}/rest/v1/bors_tillgangar?select=symbol&order=symbol.asc",
+            headers=_h(sb_key), timeout=8,
+        )
+        alla_symboler = [t["symbol"] for t in r_sym.json()] if r_sym.is_success and r_sym.json() else SYMBOLER
+    except Exception:
+        alla_symboler = SYMBOLER
+
+    print(f"  Symboler att matcha: {', '.join(alla_symboler)}")
+
+    for symbol in alla_symboler:
         print(f"\n  {symbol}:")
         aktuellt_pris = hamta_pris(sb_key, symbol)
         affarer = matcha_ordrar(sb_key, symbol)
