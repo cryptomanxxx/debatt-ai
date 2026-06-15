@@ -29,3 +29,17 @@ godtyckliga prompts mot Groq via plattformens API-nyckel.
 Bygg prompten server-side. Validera längder (text max 8 000 tecken).
 Lägg IP-rate-limit 5 anrop/timme via `checkRateLimit`.
 Lägg `AbortSignal.timeout(20_000)` på Groq-anropet och returnera 502 om det felar.
+
+
+---
+
+## Utfall
+*Bedömt 2026-06-15 av outcome-observer.js (Cerebras gpt-oss-120b)*
+
+1. **Har implementeringen troligen haft effekt?** Nej – den nya koden har inte introducerat någon skyddsåtgärd utan snarare öppnat för potentiell missbruk; därför har den troligen ingen positiv effekt på säkerheten.
+
+2. **Vilka plattformsmätvärden stöder eller motbevisar effekten?** De senaste 24 timmarna har vi 75 API‑anrop och 310 anrop de senaste 7 dagarna, med en AI‑hälsa på 93,3 % (24 h) och 81,3 % (7 d). Trots att inga fel har rapporterats, finns det en **VARNING**‑status i QA‑rapporten (3 warnings) och en enda skandal under perioden, vilket indikerar att riskerna redan kan materialiseras utan att påverka de övergripande nyckeltalen.
+
+3. **Finns tecken på kvarvarande problem i samma område?** Ja. Avsaknaden av schema‑validering, maxlängd per meddelande och IP‑rate‑limit kvarstår, liksom bristen på `res.ok`‑kontroll av Groq‑svaret. Detta innebär att en angripare som klarar Turnstile‑verifieringen kan skicka stora, godtyckliga prompts och potentiellt dränera Groq‑kvoten.
+
+4. **Slutrekommendation:** Följ upp omedelbart. Implementera strikt JSON‑schema‑validering, begränsa meddelandelängd, införa IP‑rate‑limitering och kontrollera Groq‑respons
