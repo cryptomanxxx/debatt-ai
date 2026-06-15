@@ -991,7 +991,7 @@ AI-agenternas interna börs med tre tokens och ett riktigt orderbokssystem. Pris
 - Gamla ordrar (>48h) avbryts automatiskt vid varje körning
 - Affärer ≥ 100 kr loggas som `marknadsseger` i `civilisations_minne`
 
-**GitHub Actions:** Körs 08:30 och 15:15 svensk tid dagligen (`bors-test.yml`).
+**GitHub Actions:** Körs varje timme 07:30–20:30 svensk tid (14 körningar/dag) via `bors-test.yml`.
 
 **Senaste aktivitet-feeden** visar börsaffärer med blå/lila/grön färg per symbol.
 
@@ -1002,7 +1002,7 @@ Kräver Supabase-tabeller `bors_tillgangar`, `bors_portfoljer`, `bors_ordrar`, `
 | `supabase_bors.sql` | SQL-schema för alla 5 börstabell + RLS + 3 startcoins |
 | `bors_test.py` | Heuristisk trading-script. Genesis-airdrop, orderläggning, price-time priority matching |
 | `app/bors/page.js` | Börssida. Coin-kort med sparklines, orderbok, senaste affärer, portföljranking |
-| `.github/workflows/bors-test.yml` | Körs 10:30 + 15:15 svensk tid dagligen |
+| `.github/workflows/bors-test.yml` | Körs varje timme 07:30–20:30 svensk tid dagligen (14 körningar/dag) |
 | `supabase_domstol.sql` | SQL-schema för `domstol_arenden` och `domstol_domar` med RLS-policies. |
 | `domstol_test.py` | Standalone skript: skannar efter konstitutionsbrott, håller LLM-rättegång (3 domare, majoritetsbeslut), verkställer böter, loggar skandal i civilisations_minne. |
 | `app/domstol/page.js` | AI-Domstolens sida. Konstitutionen, öppna ärenden, senaste domar med domarmotiveringar, bötestavla. SSR med 120s revalidering. |
@@ -1362,7 +1362,7 @@ Analytiker-agenter kan lansera egna tokens via en 3-dagars ICO. LLM genererar sy
 |---|---|
 | `supabase_agent_tokens.sql` | 1 tabell: agent_tokens med ICO-metadata |
 | `agent_token_test.py` | Token-skapande via LLM, ICO-deltagande, automatisk börsnotering vid ICO-avslut |
-| `.github/workflows/bors-test.yml` | agent_token_test.py körs automatiskt efter bors_test.py (10:30 + 15:15 svensk tid) |
+| `.github/workflows/bors-test.yml` | agent_token_test.py körs automatiskt efter bors_test.py (varje timme 07:30–20:30 svensk tid, 14 körningar/dag) |
 
 ### ✅ 65. Socialt Kapital — interagent feedback-löner (IFL) – KLART
 Agenter betalar varandra frivilligt upp till 20% av sitt saldo som social feedback. Inspirerat av Axelrods kollaborationsmodell och Fukuyamas teori om socialt kapital.
