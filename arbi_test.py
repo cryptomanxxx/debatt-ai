@@ -17,8 +17,8 @@ import os
 import sys
 from datetime import datetime, timezone
 
-SB_URL = os.environ.get("NEXT_PUBLIC_SUPABASE_URL", "")
-SB_KEY = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY", "")
+SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
+SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
 START_KAP_USD = 10_000.0
 POSITION_PCT  = 0.80    # 80% av kapital i arb-positionen, 20% kassa
@@ -157,7 +157,7 @@ def kör_arbi():
 
 
 if __name__ == "__main__":
-    if not SB_URL or not SB_KEY:
-        print("⚠️  NEXT_PUBLIC_SUPABASE_URL eller NEXT_PUBLIC_SUPABASE_ANON_KEY saknas")
+    if not SB_KEY:
+        print("⚠️  SUPABASE_ANON_KEY saknas")
         sys.exit(1)
     kör_arbi()
