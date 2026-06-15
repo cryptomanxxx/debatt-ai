@@ -380,7 +380,9 @@ def main():
 
     # CoinMarketCap – daglig kryptodata
     print("\n── CoinMarketCap ──")
-    spara_krypto_historik()
+    krypto_ok = spara_krypto_historik()
+    if krypto_ok > 0:
+        ok += 1
 
     # Krypto-markets: lös utgångna, skapa nya
     print("\n── Krypto-markets ──")
