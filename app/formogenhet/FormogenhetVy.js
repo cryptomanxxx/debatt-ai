@@ -123,7 +123,8 @@ export default function FormogenhetVy({
   for (const pf of borsPortfoljer) {
     const antal = parseFloat(pf.antal ?? 0);
     if (antal <= 0) continue;
-    const pris = borsInstitutPris[pf.symbol] ?? 100;
+    const pris = borsInstitutPris[pf.symbol];
+    if (pris == null) continue; // hoppa över onoterade ICO-tokens
     borsPortfoljVarde[pf.agent] = (borsPortfoljVarde[pf.agent] || 0) + antal * pris;
   }
 
