@@ -59,7 +59,7 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/bors_affarer?select=*,avgift&order=skapad.desc&limit=30`, {
       headers: h, next: { revalidate: 60 },
     }),
-    fetch(`${SB_URL}/rest/v1/bors_ordrar?select=agent,symbol,typ,pris,antal,ifylld_antal,status&status=in.(öppen,delvis)&order=skapad.desc&limit=200`, {
+    fetch(`${SB_URL}/rest/v1/bors_ordrar?select=agent,symbol,typ,pris,antal,ifylld_antal,status&status=in.(öppen,delvis)&order=pris.desc&limit=1000`, {
       headers: h, next: { revalidate: 60 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_portfoljer?select=agent,symbol,antal,genomsnittspris&order=antal.desc`, {

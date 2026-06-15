@@ -307,7 +307,11 @@ def execute_trade(sb_key: str, kop_order: dict, salj_order: dict,
 
     h_min = {**_h(sb_key), "Prefer": "return=minimal"}
 
-    # 1. Spara affären (inkl. avgift)
+    # 1. Spara affären (inkl. faktisk avgift — beräknas nedan)
+    kop_saldo_pre = hamta_saldo(sb_key, kop_agent)
+    # Avgiften capped till vad köparen faktiskt har kvar efter handeln
+    avgift_betald = min(avgift_kr, max(0.0, round(kop_saldo_pre - total_kr, 2)))
+
     try:
         affar_payload = {
             "symbol": symbol,
@@ -317,7 +321,7 @@ def execute_trade(sb_key: str, kop_order: dict, salj_order: dict,
             "salj_agent": salj_agent,
             "pris": round(pris, 2),
             "antal": round(antal, 4),
-            "avgift": avgift_kr,
+            "avgift": avgift_betald,
         }
         r = httpx.post(f"{SB_URL}/rest/v1/bors_affarer", headers=h_min, json=affar_payload, timeout=10)
         if not r.is_success:
@@ -327,10 +331,10 @@ def execute_trade(sb_key: str, kop_order: dict, salj_order: dict,
         print(f"  [execute_trade] affar-exception: {e}")
         return False
 
-    # 2. Dra saldo från köparen (handel + avgift)
+    # 2. Dra saldo från köparen (handel + faktisk avgift)
     try:
-        kop_saldo = hamta_saldo(sb_key, kop_agent)
-        nytt_kop_saldo = max(0.0, round(kop_saldo - total_kr - avgift_kr, 2))
+        kop_saldo = kop_saldo_pre  # redan hämtat ovan
+        nytt_kop_saldo = max(0.0, round(kop_saldo - total_kr - avgift_betald, 2))
         kop_enc = urllib.parse.quote(kop_agent)
         httpx.patch(
             f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{kop_enc}",
@@ -355,17 +359,18 @@ def execute_trade(sb_key: str, kop_order: dict, salj_order: dict,
     except Exception as e:
         print(f"  [execute_trade] saldo salj: {e}")
 
-    # 3b. Kreditera avgiften till Börskassan
-    try:
-        bk_saldo = hamta_saldo(sb_key, "Börskassan")
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan",
-            headers=h_min,
-            json={"saldo": round(bk_saldo + avgift_kr, 2), "uppdaterad": "now()"},
-            timeout=8,
-        )
-    except Exception as e:
-        print(f"  [execute_trade] avgift borskassan: {e}")
+    # 3b. Kreditera faktisk avgift till Börskassan
+    if avgift_betald > 0:
+        try:
+            bk_saldo = hamta_saldo(sb_key, "Börskassan")
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan",
+                headers=h_min,
+                json={"saldo": round(bk_saldo + avgift_betald, 2), "uppdaterad": "now()"},
+                timeout=8,
+            )
+        except Exception as e:
+            print(f"  [execute_trade] avgift borskassan: {e}")
 
     # 4. Uppdatera köparens portfölj (weighted average cost basis)
     try:

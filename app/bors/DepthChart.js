@@ -140,7 +140,8 @@ export default function DepthChart({ ordrar, symboler }) {
       if (match) { cumVol = match.cum; side = "bid"; }
     }
     if (askCum.length > 0 && price >= bestAsk) {
-      const match = askCum.find(a => a.pris >= price);
+      // Last ask level at or below hover price = current staircase step height
+      const match = [...askCum].reverse().find(a => a.pris <= price);
       if (match) { cumVol = match.cum; side = "ask"; }
     }
 
