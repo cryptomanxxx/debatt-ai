@@ -32,7 +32,7 @@ export async function GET() {
           "avkastningen beror enbart på funding rate, inte BTC-priset.",
         forvaltas_av: "Kryptoanalytiker",
         strategi: "spot_perpetual_funding_rate_arbitrage",
-        kalla: "Binance Futures via Vercel-proxy — uppdateras 3×/dag",
+        kalla: "Gate.io Futures (api.gateio.ws) — uppdateras 3×/dag",
       },
     },
     endpoints: {
