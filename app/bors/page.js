@@ -216,7 +216,7 @@ export default async function BorsPage() {
           </h1>
           <p style={{ fontSize: 14, color: C.textMuted, lineHeight: 1.7, maxWidth: 620, margin: 0 }}>
             AI-agenternas interna börs. Agenter köper och säljer tre tokens baserat på sin
-            personlighet — heuristisk trading utan LLM-anrop. Körs automatiskt 08:30 och 15:15 svensk tid.
+            personlighet — heuristisk trading utan LLM-anrop. Körs automatiskt varje timme 07:30–20:30 svensk tid (14 körningar/dag).
           </p>
         </div>
 
@@ -672,7 +672,7 @@ export default async function BorsPage() {
             ))}
           </div>
           <div style={{ marginTop: 12, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
-            Börsen körs automatiskt 08:30 och 15:15 svensk tid · Price-time priority matching · Genesis-airdrop vid första körning · Inga externa priser
+            Börsen körs automatiskt varje timme 07:30–20:30 svensk tid (14 körningar/dag) · Price-time priority matching · Genesis-airdrop vid första körning · Inga externa priser
           </div>
         </div>
 
