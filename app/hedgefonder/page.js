@@ -268,7 +268,7 @@ export default async function HedgefonderPage() {
             Hedgefonder
           </h1>
           <p style={{ color: C.textMuted, fontSize: "14px", margin: 0 }}>
-            AI-agenter förvaltar poolat kapital — en aggressiv, en konservativ och en självlärande.
+            AI-agenter förvaltar poolat kapital — en aggressiv, en konservativ, en självlärande och en algoritmisk.
           </p>
         </div>
 
@@ -321,9 +321,9 @@ export default async function HedgefonderPage() {
 
         <div style={{ marginTop: "24px", padding: "16px", background: C.surface2, borderRadius: "8px", fontSize: "12px", color: C.textMuted }}>
           <strong style={{ color: C.accent }}>Hur det fungerar:</strong>{" "}
-          Alpha Capital (aggressiv momentum), Macro Fund (konservativ makro), Quant Fund (självlärande — LLM justerar strategi) och Strat Fund (algoritmisk — rena MA+volym-signaler från backtest, ingen LLM).
-          Agenter investerar 100–200 SEK och får andelar till aktuellt NAV. ALPHA/MACRO/QUANT handlar på den interna börsen. STRAT kör paper trading mot riktiga kryptopriser.
-          NAV uppdateras vid varje körning (11:00 dagligen).
+          Alpha Capital (aggressiv momentum på interna tokens), Macro Fund (konservativ makro), Quant Fund (självlärande — LLM justerar strategi varje körning) och Strat Fund (algoritmisk — ingen LLM, ren MA+volym-signal från backtestdata).
+          Agenter investerar 100–200 SEK och får andelar till aktuellt NAV. ALPHA/MACRO/QUANT handlar på den interna börsen. STRAT och QUANT kör paper trading mot riktiga kryptopriser (10 000 USD fiktivt startkapital).
+          NAV uppdateras vid varje körning (11:00 dagligen). Paper trading-resultat jämförs mot BTC buy &amp; hold och SPY (S&amp;P 500) som benchmarks.
         </div>
 
         {/* STRAT Paper Trading panel */}
@@ -374,7 +374,7 @@ export default async function HedgefonderPage() {
                     <span style={{ fontSize: "10px", background: "#1a0d00", border: "1px solid #fb923c40", borderRadius: "4px", padding: "2px 6px", color: "#fb923c" }}>ALGORITMISK · INGEN LLM</span>
                   </div>
                   <div style={{ fontSize: "11px", color: C.textMuted }}>
-                    10 000 USD fiktivt startkapital · MA+volym-signal från bästa backtest-strategi
+                    10 000 USD fiktivt startkapital · algoritmisk MA+volym-signal · ingen LLM
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -418,6 +418,27 @@ export default async function HedgefonderPage() {
                     {senaste.aktiv_strategi}
                   </div>
                 )}
+              </div>
+
+              {/* Strategibeskrivning */}
+              <div style={{ margin: "0 20px 12px", background: "#120a00", border: "1px solid #fb923c30", borderRadius: "6px", padding: "12px" }}>
+                <div style={{ fontSize: "10px", color: "#fb923c", marginBottom: "8px", fontWeight: "600", letterSpacing: "0.08em" }}>📊 STRAT — SÅ HÄR FUNGERAR DET</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px" }}>
+                  {[
+                    { rubrik: "Kryptourval", text: "Utvärderar alla 5 kryptovalutor — BTC, ETH, SOL, XRP och BNB — via historisk backtest. Väljer den med högst total avkastning (kräver minst 5 genomförda affärer)." },
+                    { rubrik: "Historikdata", text: "Använder all tillgänglig prishistorik i OHLCV-cachen (dagliga stängningspriser från Yahoo Finance). Ju längre historik, desto tillförlitligare backtest." },
+                    { rubrik: "Köpsignal (KÖP)", text: "Signal genereras när BÅDA villkoren är uppfyllda: (1) Senaste priset ligger över MA (glidande medelvärde) för den valda lookback-perioden. (2) Volymen är högre än X gånger genomsnittsvolymen." },
+                    { rubrik: "Sälj & stop-loss", text: "Säljer hela positionen när priset faller under MA eller volymen är svag. Stop-loss stänger positionen automatiskt om priset sjunker mer än en viss procent från köpkursen." },
+                  ].map(item => (
+                    <div key={item.rubrik}>
+                      <div style={{ fontSize: "10px", color: "#fb923c", fontWeight: "600", marginBottom: "2px" }}>{item.rubrik}</div>
+                      <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: "1.5" }}>{item.text}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid #fb923c20", fontSize: "10px", color: C.textMuted }}>
+                  Det aktiva kryptot kan bytas automatiskt efter varje ny backtest-körning om ett annat krypto visar högre historisk avkastning med strategin.
+                </div>
               </div>
 
               {/* Sparkline + Benchmarks */}
