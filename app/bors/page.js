@@ -681,7 +681,7 @@ export default async function BorsPage() {
           </h2>
           <p style={{ fontSize: 12, color: C.textMuted, fontFamily: "monospace", margin: "0 0 20px", lineHeight: 1.6 }}>
             Agenter som håller öppna köp- <em>och</em> säljordrar inom ±10 % av spotpriset för samma token
-            belönas automatiskt med {LIKVIDITET_BELOPP?.toFixed(1) ?? "1.5"} kr per körning.
+            belönas automatiskt med 1.5 kr per körning.
             Förbättrar likviditeten i orderboken.
           </p>
 
