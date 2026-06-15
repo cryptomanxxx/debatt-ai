@@ -123,6 +123,24 @@ STAKING_PROFIL = {
 }
 DEFAULT_STAKING = {"sannolikhet": 0.08, "apy": 0.05}
 
+# Market making — agenter med analytisk/lugn personlighet bidrar med likviditet
+MARKET_MAKER_PROFIL = {
+    # agent: (sannolikhet att lägga MM-ordrar, spread-tighthet som andel av spot)
+    "Nationalekonom":       {"sannolikhet": 0.25, "tighthet": 0.04},
+    "Den lugna":            {"sannolikhet": 0.25, "tighthet": 0.03},
+    "Filosof":              {"sannolikhet": 0.20, "tighthet": 0.05},
+    "Jurist":               {"sannolikhet": 0.18, "tighthet": 0.04},
+    "Läkare":               {"sannolikhet": 0.15, "tighthet": 0.05},
+    "Psykolog":             {"sannolikhet": 0.15, "tighthet": 0.05},
+    "Historiker":           {"sannolikhet": 0.15, "tighthet": 0.06},
+    "Sociolog":             {"sannolikhet": 0.12, "tighthet": 0.06},
+    "Mamman":               {"sannolikhet": 0.12, "tighthet": 0.05},
+    "Pensionären":          {"sannolikhet": 0.12, "tighthet": 0.06},
+    "Konservativ debattör": {"sannolikhet": 0.10, "tighthet": 0.05},
+}
+LIKVIDITET_SPANN  = 0.10   # ordrar inom ±10 % av spot räknas som nära
+LIKVIDITET_BELOPP = 1.5    # SEK per kvalificerande (agent, symbol)-par per körning
+
 # ─── Hjälpfunktioner ──────────────────────────────────────────────────────────
 
 def _h(sb_key: str) -> dict:
@@ -943,6 +961,168 @@ def kör_koalitions_airdrops(sb_key: str) -> None:
         print(f"  [kör_koalitions_airdrops] {e}")
 
 
+def lagg_market_maker_ordrar(sb_key: str, agent: str, symbol: str, tighthet: float) -> bool:
+    """
+    Lägger en köporder och en säljorder symmetriskt runt spotpriset.
+    Returnerar True om båda ordrar lades framgångsrikt.
+    """
+    spot = hamta_pris(sb_key, symbol)
+    if spot <= 0:
+        return False
+
+    saldo    = hamta_saldo(sb_key, agent)
+    portfolj = hamta_portfolj(sb_key, agent)
+
+    antal     = 1.0  # Litet belopp — market makers är nöjda med tunn volym
+    kop_pris  = round(spot * (1 - tighthet), 2)
+    salj_pris = round(spot * (1 + tighthet), 2)
+
+    if saldo < kop_pris * antal:
+        return False
+    if portfolj.get(symbol, 0) < antal:
+        return False
+
+    kop_id  = lagg_order(sb_key, agent, symbol, "kop",  kop_pris,  antal, "market making — likviditet")
+    salj_id = lagg_order(sb_key, agent, symbol, "salj", salj_pris, antal, "market making — likviditet")
+    return kop_id is not None and salj_id is not None
+
+
+def kör_market_maker_ordrar(sb_key: str) -> int:
+    """
+    Låter agenter med MM-profil lägga tvåsidiga likviditetsordrar.
+    Returnerar antal agenter som la ordrar.
+    """
+    mm_count = 0
+    agenter_lista = list(AGENTER)
+    random.shuffle(agenter_lista)
+    for agent_info in agenter_lista:
+        agent_namn = agent_info["namn"]
+        profil = MARKET_MAKER_PROFIL.get(agent_namn)
+        if not profil:
+            continue
+        if random.random() > profil["sannolikhet"]:
+            continue
+        # Välj helst agentens föredragna symbol, annars DBT
+        pref = SYMBOL_PREFS.get(agent_namn, ["DBT"])
+        pref = [s for s in pref if s in SYMBOLER]
+        symbol = pref[0] if pref else "DBT"
+        ok = lagg_market_maker_ordrar(sb_key, agent_namn, symbol, profil["tighthet"])
+        if ok:
+            mm_count += 1
+            spot = hamta_pris(sb_key, symbol)
+            print(
+                f"  {agent_namn}: MM {symbol} "
+                f"köp @ {round(spot*(1-profil['tighthet']),2)} / "
+                f"sälj @ {round(spot*(1+profil['tighthet']),2)} kr"
+            )
+    return mm_count
+
+
+def kör_liquidity_mining(sb_key: str) -> None:
+    """
+    Belönar agenter som bidrar med likviditet — har öppna köp- och säljordrar
+    inom ±LIKVIDITET_SPANN av spotpriset för samma symbol. Betalar ut
+    LIKVIDITET_BELOPP SEK per kvalificerande (agent, symbol)-par och
+    loggar till bors_liquidity_log.
+    """
+    # Hämta alla öppna ordrar
+    try:
+        url = f"{SB_URL}/rest/v1/bors_ordrar?status=in.(öppen,delvis)&select=agent,symbol,typ,pris"
+        r = httpx.get(url, headers=_h(sb_key), timeout=10)
+        aktiva = r.json() if r.is_success else []
+    except Exception as e:
+        print(f"  [kör_liquidity_mining] hämta ordrar: {e}")
+        return
+
+    # Hämta spotpriser
+    try:
+        r_tg = httpx.get(
+            f"{SB_URL}/rest/v1/bors_tillgangar?select=symbol,senaste_pris",
+            headers=_h(sb_key), timeout=8,
+        )
+        spot_map = {t["symbol"]: float(t["senaste_pris"] or 100) for t in r_tg.json()} if r_tg.is_success else {}
+    except Exception:
+        spot_map = {}
+
+    # Bästa köp- och säljpris per (agent, symbol)
+    bud_map: dict[tuple, float] = {}   # (agent, symbol) → högsta köppris
+    ask_map: dict[tuple, float] = {}   # (agent, symbol) → lägsta säljpris
+
+    for o in aktiva:
+        key  = (o["agent"], o["symbol"])
+        pris = float(o["pris"] or 0)
+        if o["typ"] == "kop":
+            bud_map[key] = max(bud_map.get(key, 0.0), pris)
+        elif o["typ"] == "salj":
+            ask_map[key] = min(ask_map.get(key, float("inf")), pris)
+
+    # Hitta kvalificerande par
+    kvalar: list[tuple[str, str, float]] = []  # (agent, symbol, spread_pct)
+    for key in bud_map:
+        if key not in ask_map:
+            continue
+        agent, symbol = key
+        spot = spot_map.get(symbol, 0.0)
+        if spot <= 0:
+            continue
+        bud = bud_map[key]
+        ask = ask_map[key]
+        if bud < spot * (1 - LIKVIDITET_SPANN):
+            continue
+        if ask > spot * (1 + LIKVIDITET_SPANN):
+            continue
+        if ask <= bud:
+            continue  # Korsad orderbok — ska ej förekomma efter matching
+        spread_pct = round((ask - bud) / spot * 100, 2)
+        kvalar.append((agent, symbol, spread_pct))
+
+    if not kvalar:
+        print("  Inga kvalificerande market makers denna körning.")
+        return
+
+    print(f"  {len(kvalar)} MM-par → {LIKVIDITET_BELOPP} kr/par")
+
+    # Aggregera per agent och betala ut
+    agent_pairs: dict[str, list[tuple[str, float]]] = {}
+    for agent, symbol, spread_pct in kvalar:
+        agent_pairs.setdefault(agent, []).append((symbol, spread_pct))
+
+    h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+
+    for agent, pairs in agent_pairs.items():
+        total = round(LIKVIDITET_BELOPP * len(pairs), 2)
+        agent_enc = urllib.parse.quote(agent)
+
+        r_sal = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}&select=saldo",
+            headers=_h(sb_key), timeout=8,
+        )
+        if not r_sal.is_success or not r_sal.json():
+            continue
+
+        nytt_saldo = round(float(r_sal.json()[0]["saldo"]) + total, 2)
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
+            headers=h_min,
+            json={"saldo": nytt_saldo, "uppdaterad": "now()"},
+            timeout=8,
+        )
+
+        for symbol, spread_pct in pairs:
+            try:
+                httpx.post(
+                    f"{SB_URL}/rest/v1/bors_liquidity_log",
+                    headers=h_min,
+                    json={"agent": agent, "symbol": symbol, "beloning": LIKVIDITET_BELOPP, "spread_pct": spread_pct},
+                    timeout=8,
+                )
+            except Exception:
+                pass
+
+        syms = ", ".join(s for s, _ in pairs)
+        print(f"  LIQUIDITY MINING: {agent} +{total} kr ({syms})")
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -957,15 +1137,15 @@ def main():
     print("=" * 60)
 
     # Avbryt gamla ordrar (>48h)
-    print("\n[1/6] Avbryter gamla ordrar...")
+    print("\n[1/8] Avbryter gamla ordrar...")
     avbryt_gamla_ordrar(sb_key)
 
     # Genesis (körs bara om börsen är tom)
-    print("\n[2/6] Kontrollerar genesis...")
+    print("\n[2/8] Kontrollerar genesis...")
     genesis(sb_key)
 
     # Agenter placerar ordrar
-    print(f"\n[3/6] {len(AGENTER)} agenter placerar ordrar...")
+    print(f"\n[3/8] {len(AGENTER)} agenter placerar ordrar...")
     agenter_lista = list(AGENTER)
     random.shuffle(agenter_lista)
 
@@ -992,8 +1172,13 @@ def main():
 
     print(f"\n  Ordrar: {stats_kop} köp, {stats_salj} sälj, {stats_skip} pass")
 
+    # Market maker-ordrar (tvåsidiga likviditetsordrar)
+    print("\n[4/8] Market maker-ordrar...")
+    mm_count = kör_market_maker_ordrar(sb_key)
+    print(f"  {mm_count} agenter la MM-ordrar.")
+
     # Matcha ordrar per symbol
-    print("\n[4/6] Matchar ordrar...")
+    print("\n[5/8] Matchar ordrar...")
     total_affarer = 0
     total_volym   = 0.0
 
@@ -1036,12 +1221,16 @@ def main():
             logg_pris(sb_key, symbol, aktuellt_pris, 0.0)
             print(f"    Inga matchningar (pris: {aktuellt_pris:.2f} kr)")
 
+    # Liquidity mining-belöningar (beräknas på kvarvarande öppna ordrar)
+    print("\n[6/8] Liquidity mining-belöningar...")
+    kör_liquidity_mining(sb_key)
+
     # Staking
-    print("\n[5/6] Staking — yield och nya stakes...")
+    print("\n[7/8] Staking — yield och nya stakes...")
     kör_staking(sb_key)
 
     # Koalitionsairdrops
-    print("\n[6/6] Koalitionsairdrops...")
+    print("\n[8/8] Koalitionsairdrops...")
     kör_koalitions_airdrops(sb_key)
 
     # Sammanfattning
