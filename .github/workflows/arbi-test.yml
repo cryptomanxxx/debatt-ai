@@ -1,0 +1,29 @@
+name: ARBI Paper Trading
+
+on:
+  schedule:
+    # Binance funding payments: 00:00, 08:00, 16:00 UTC
+    # Vi kör 30 minuter senare för att säkerställa att raten har uppdaterats
+    - cron: '30 0 * * *'
+    - cron: '30 8 * * *'
+    - cron: '30 16 * * *'
+  workflow_dispatch:
+
+jobs:
+  arbi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install httpx
+
+      - name: Run ARBI paper trading
+        run: python arbi_test.py
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

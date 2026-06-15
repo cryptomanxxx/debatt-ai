@@ -206,14 +206,16 @@ export default function HedgefondApiPage() {
 
         {result && tab === "signaler" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-            {["STRAT", "QUANT"].map((fund) => {
+            {["STRAT", "QUANT", "ARBI"].map((fund) => {
               const f = result.funds?.[fund];
               if (!f) return null;
+              const tagLabel = fund === "STRAT" ? "ALGORITMISK" : fund === "ARBI" ? "DELTA-NEUTRAL ARBITRAGE" : "SJÄLVLÄRANDE LLM";
+              const tagColor = fund === "STRAT" ? C.blue : fund === "ARBI" ? "#a78bfa" : C.amber;
               return (
                 <section key={fund}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
                     <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>{fund}</h2>
-                    <Tag label={fund === "STRAT" ? "ALGORITMISK" : "SJÄLVLÄRANDE LLM"} color={fund === "STRAT" ? C.blue : C.amber} />
+                    <Tag label={tagLabel} color={tagColor} />
                     <Tag label="PAPER TRADING" color="#555" />
                     {f.timestamp && (
                       <span style={{ fontSize: 11, color: C.dim, marginLeft: "auto" }}>
@@ -222,16 +224,50 @@ export default function HedgefondApiPage() {
                     )}
                   </div>
                   <NavCard nav={f} fund={fund} />
+                  {/* ARBI-specifika fält */}
+                  {fund === "ARBI" && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 12 }}>
+                      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: 14 }}>
+                        <p style={{ fontSize: 11, color: C.dim, margin: "0 0 4px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>Funding Rate / 8h</p>
+                        <p style={{ fontSize: 20, fontWeight: 700, color: (f.funding_rate_pct ?? 0) >= 0 ? C.green : C.red, margin: 0 }}>
+                          {f.funding_rate_pct != null ? `${Number(f.funding_rate_pct) >= 0 ? "+" : ""}${Number(f.funding_rate_pct).toFixed(4)}%` : "—"}
+                        </p>
+                      </div>
+                      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: 14 }}>
+                        <p style={{ fontSize: 11, color: C.dim, margin: "0 0 4px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>APR (annualiserad)</p>
+                        <p style={{ fontSize: 20, fontWeight: 700, color: C.green, margin: 0 }}>
+                          {f.apr_pct != null ? `${Number(f.apr_pct).toFixed(2)}%` : "—"}
+                        </p>
+                      </div>
+                      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: 14 }}>
+                        <p style={{ fontSize: 11, color: C.dim, margin: "0 0 4px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>Total funding-inkomst</p>
+                        <p style={{ fontSize: 20, fontWeight: 700, color: C.accent, margin: 0 }}>
+                          {f.inkomst_usd != null ? `$${Number(f.inkomst_usd).toFixed(2)}` : "—"}
+                        </p>
+                      </div>
+                      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: 14, gridColumn: "span 3" }}>
+                        <p style={{ fontSize: 11, color: C.dim, margin: "0 0 6px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>Aktiv position</p>
+                        <p style={{ fontSize: 13, color: C.text, margin: 0, lineHeight: 1.6 }}>
+                          {f.position_riktning === "long_spot_short_perp" && "📈 Long BTC spot + Short BTC perpetual — tjänar på positiv funding rate"}
+                          {f.position_riktning === "long_perp_short_spot" && "📉 Long BTC perpetual + Short BTC spot — tjänar på negativ funding rate"}
+                          {f.position_riktning === "neutral" && "⏸ Neutral — funding rate för liten för lönsam arbitrage"}
+                          {!f.position_riktning && "—"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {f.llm_motivering && (
                     <div style={{ background: "#07100a", border: `1px solid #1a3020`, borderRadius: 8, padding: 16, marginTop: 12 }}>
                       <p style={{ fontSize: 11, color: C.green, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>LLM-motivering</p>
                       <p style={{ fontSize: 14, color: C.text, lineHeight: 1.7, margin: 0 }}>{f.llm_motivering}</p>
                     </div>
                   )}
-                  <div style={{ marginTop: 16 }}>
-                    <p style={{ fontSize: 11, color: C.dim, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>Öppna positioner</p>
-                    <HoldingsList items={f.innehav} />
-                  </div>
+                  {f.innehav && (
+                    <div style={{ marginTop: 16 }}>
+                      <p style={{ fontSize: 11, color: C.dim, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>Öppna positioner</p>
+                      <HoldingsList items={f.innehav} />
+                    </div>
+                  )}
                 </section>
               );
             })}
@@ -243,22 +279,50 @@ export default function HedgefondApiPage() {
 
         {result && tab === "nav" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-            {["STRAT", "QUANT"].map((fund) => {
+            {["STRAT", "QUANT", "ARBI"].map((fund) => {
               const fd = result.funds?.[fund];
               if (!fd) return null;
               const hist = fd.history ?? [];
+              const tagLabel = fund === "STRAT" ? "ALGORITMISK" : fund === "ARBI" ? "DELTA-NEUTRAL ARBITRAGE" : "SJÄLVLÄRANDE LLM";
+              const tagColor = fund === "STRAT" ? C.blue : fund === "ARBI" ? "#a78bfa" : C.amber;
               return (
                 <section key={fund}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
                     <h2 style={{ fontSize: 18, fontWeight: 700, color: C.text, margin: 0 }}>{fund}</h2>
-                    <Tag label={fund === "STRAT" ? "ALGORITMISK" : "SJÄLVLÄRANDE LLM"} color={fund === "STRAT" ? C.blue : C.amber} />
+                    <Tag label={tagLabel} color={tagColor} />
                     <span style={{ fontSize: 12, color: C.dim, marginLeft: "auto" }}>{fd.data_points} datapunkter</span>
                   </div>
-                  {fd.latest_nav && <NavCard nav={fd.latest_nav} fund={fund} />}
+                  {fd.latest_nav && <NavCard nav={fd.latest_nav} fund={fund} />
                   {hist.length > 0 && (
                     <div style={{ marginTop: 16 }}>
                       <p style={{ fontSize: 11, color: C.dim, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>Historik (senaste {Math.min(hist.length, 8)} av {hist.length})</p>
                       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
+                        {fund === "ARBI" ? (
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "monospace" }}>
+                            <thead>
+                              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                                {["Datum", "NAV (USD)", "Total inkomst", "Funding Rate/8h", "APR", "Position"].map(h => (
+                                  <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: C.dim, fontWeight: 400, fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {hist.slice(-8).reverse().map((row, i) => {
+                                const rc = (row.funding_rate_pct ?? 0) >= 0 ? C.green : C.red;
+                                return (
+                                  <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
+                                    <td style={{ padding: "8px 12px", color: C.dim }}>{row.timestamp ? new Date(row.timestamp).toLocaleDateString("sv-SE") : "—"}</td>
+                                    <td style={{ padding: "8px 12px", color: C.accent, fontWeight: 700 }}>${Number(row.nav_usd ?? 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}</td>
+                                    <td style={{ padding: "8px 12px", color: C.green }}>+${Number(row.inkomst_usd ?? 0).toFixed(2)}</td>
+                                    <td style={{ padding: "8px 12px", color: rc }}>{row.funding_rate_pct != null ? `${Number(row.funding_rate_pct) >= 0 ? "+" : ""}${Number(row.funding_rate_pct).toFixed(4)}%` : "—"}</td>
+                                    <td style={{ padding: "8px 12px", color: C.green }}>{row.apr_pct != null ? `${Number(row.apr_pct).toFixed(1)}%` : "—"}</td>
+                                    <td style={{ padding: "8px 12px", color: C.dim, fontSize: 11 }}>{row.position_riktning?.replace(/_/g, " ") ?? "—"}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        ) : (
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "monospace" }}>
                           <thead>
                             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
@@ -283,6 +347,7 @@ export default function HedgefondApiPage() {
                             })}
                           </tbody>
                         </table>
+                        )}
                       </div>
                     </div>
                   )}
