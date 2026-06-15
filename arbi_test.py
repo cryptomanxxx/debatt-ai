@@ -12,9 +12,8 @@ Strategi: spot-perpetual arbitrage på BTC.
 Fonden är delta-neutral: prisrörelser i BTC påverkar inte NAV,
 bara ackumulerade funding fees.
 
-Datakälla: Binance Futures via Vercel-proxy (/api/funding-rate).
-Direktanrop till Binance blockeras från GitHub Actions (HTTP 451).
-Vercel-servern är inte blockerad och agerar proxy.
+Datakälla: Gate.io (api.gateio.ws) — öppet API, blockerar inte cloud-IPs.
+Binance (HTTP 451) och Bybit (HTTP 403) blockerar GitHub Actions och Vercel.
 """
 import httpx
 import os
@@ -38,29 +37,33 @@ def _h():
     }
 
 
-PROXY_URL = "https://www.debatt-ai.se/api/funding-rate"
-
-
-def hamta_funding_data(symbol="BTCUSDT"):
-    """Hämtar funding rate via debatt-ai.se/api/funding-rate (Vercel → Bybit).
-    Direktanrop till Bybit blockeras från GitHub Actions datacenter-IPs (HTTP 403).
-    Vercel-servern är inte blockerad och agerar proxy.
+def hamta_funding_data():
+    """Hämtar senaste avgjorda funding rate från Gate.io.
+    Gate.io blockerar inte cloud/datacenter-IPs (till skillnad från Binance/Bybit).
     """
     try:
-        r = httpx.get(PROXY_URL, timeout=15)
-        if not r.is_success:
-            print(f"  ⚠️  Proxy HTTP {r.status_code}")
+        r_hist = httpx.get(
+            "https://api.gateio.ws/api/v4/futures/usdt/funding_rate?contract=BTC_USDT&limit=1",
+            timeout=10,
+        )
+        r_tick = httpx.get(
+            "https://api.gateio.ws/api/v4/futures/usdt/tickers?contract=BTC_USDT",
+            timeout=10,
+        )
+        if not r_hist.is_success or not r_tick.is_success:
+            print(f"  ⚠️  Gate.io HTTP {r_hist.status_code}/{r_tick.status_code}")
             return None
-        data = r.json()
-        if "error" in data:
-            print(f"  ⚠️  Proxy-fel: {data['error']}")
+        hist    = r_hist.json()
+        tickers = r_tick.json()
+        if not hist:
+            print("  ⚠️  Ingen funding history från Gate.io")
             return None
         return {
-            "funding_rate": float(data.get("funding_rate", 0)),
-            "mark_price":   float(data.get("mark_price", 0)),
+            "funding_rate": float(hist[0].get("r", 0)),     # decimalt, t.ex. 0.0001
+            "mark_price":   float(tickers[0].get("mark_price", 0)) if tickers else 0.0,
         }
     except Exception as e:
-        print(f"  ⚠️  Proxy API-fel: {e}")
+        print(f"  ⚠️  Gate.io API-fel: {e}")
         return None
 
 
@@ -108,10 +111,10 @@ def kör_arbi():
     print(f"UTC: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}")
     print("━" * 52)
 
-    # 1. Hämta funding rate via Vercel-proxy → Bybit
-    fd = hamta_funding_data("BTCUSDT")
+    # 1. Hämta funding rate från Gate.io
+    fd = hamta_funding_data()
     if not fd:
-        print("  ⚠️  Hoppade över körningen — proxy otillgänglig")
+        print("  ⚠️  Hoppade över körningen — Gate.io otillgänglig")
         return
 
     funding_rate     = fd["funding_rate"]       # per 8h, t.ex. 0.000312 = 0.0312%
