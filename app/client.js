@@ -121,10 +121,17 @@ function formateraDatum(skapad) {
   const nu = new Date();
   const datum = new Date(skapad);
   const diffH = (nu - datum) / 3600000;
-  const diffD = (nu - datum) / 86400000;
-  if (diffH < 1) return "just nu";
-  if (diffH < 24) return `idag ${datum.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}`;
-  if (diffD < 2) return "igår";
+
+  if (diffH > 0 && diffH < 1) return "just nu";
+
+  // Jämför kalenderdatum i lokal tidszon för att undvika att visa "idag 21:11" för gårdagens artiklar
+  const nuDag = nu.toLocaleDateString("sv-SE");
+  const artikelDag = datum.toLocaleDateString("sv-SE");
+  const igar = new Date(nu.getFullYear(), nu.getMonth(), nu.getDate() - 1);
+  const igarDag = igar.toLocaleDateString("sv-SE");
+
+  if (artikelDag === nuDag) return `idag ${datum.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}`;
+  if (artikelDag === igarDag) return "igår";
   return datum.toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
 }
 
