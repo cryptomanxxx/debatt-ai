@@ -711,18 +711,24 @@ def betala_ut_staking(sb_key: str, stake: dict) -> None:
             f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}&select=saldo",
             headers=_h(sb_key), timeout=8,
         )
+        saldo_ok = False
         if r_saldo.is_success and r_saldo.json():
             gammalt_saldo = float(r_saldo.json()[0]["saldo"])
             nytt_saldo = round(gammalt_saldo + yield_sek, 2)
             h_min = {**_h(sb_key), "Prefer": "return=minimal"}
-            httpx.patch(
+            r_patch = httpx.patch(
                 f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
                 headers=h_min,
                 json={"saldo": nytt_saldo, "uppdaterad": "now()"},
                 timeout=8,
             )
+            saldo_ok = r_patch.is_success
 
-        # Markera stake som utbetald
+        if not saldo_ok:
+            print(f"  [betala_ut_staking] saldo-uppdatering misslyckades för {stake['agent']} — hoppar över utbetalning")
+            return
+
+        # Markera stake som utbetald (bara om saldo-krediteringen lyckades)
         h_min = {**_h(sb_key), "Prefer": "return=minimal"}
         httpx.patch(
             f"{SB_URL}/rest/v1/bors_staking?id=eq.{stake['id']}",
@@ -774,6 +780,29 @@ def kör_staking(sb_key: str) -> None:
 
     # 2. Ny staking per agent
     stakes_nya = 0
+
+    # Hämta noterade symboler (bara dessa har ett pålitligt pris)
+    try:
+        r_tg = httpx.get(f"{SB_URL}/rest/v1/bors_tillgangar?select=symbol", headers=_h(sb_key), timeout=8)
+        noterade_symboler = {row["symbol"] for row in r_tg.json()} if r_tg.is_success else set()
+    except Exception:
+        noterade_symboler = set()
+
+    # Hämta aktiva stakes (utbetald=false) för att undvika dubbelstakning
+    try:
+        r_aktiva = httpx.get(
+            f"{SB_URL}/rest/v1/bors_staking?utbetald=eq.false&select=agent,symbol,antal",
+            headers=_h(sb_key), timeout=8,
+        )
+        aktiva_stakes = r_aktiva.json() if r_aktiva.is_success else []
+    except Exception:
+        aktiva_stakes = []
+    # Bygg dict: {(agent, symbol): total_stakad}
+    stakad = {}
+    for s in aktiva_stakes:
+        key = (s["agent"], s["symbol"])
+        stakad[key] = stakad.get(key, 0) + float(s["antal"])
+
     agenter_lista = list(AGENTER)
     random.shuffle(agenter_lista)
     for agent_info in agenter_lista:
@@ -784,9 +813,18 @@ def kör_staking(sb_key: str) -> None:
         portfolj = hamta_portfolj(sb_key, agent_namn)
         if not portfolj:
             continue
-        # Välj symbol med flest tokens att staka
-        symbol = max(portfolj, key=lambda s: portfolj[s])
-        innehavet = portfolj[symbol]
+        # Filtrera till noterade symboler med tillgängligt (ej stakad) saldo
+        tillgangligt = {
+            sym: max(0.0, antal - stakad.get((agent_namn, sym), 0))
+            for sym, antal in portfolj.items()
+            if sym in noterade_symboler
+        }
+        tillgangligt = {s: a for s, a in tillgangligt.items() if a >= 1}
+        if not tillgangligt:
+            continue
+        # Välj symbol med störst tillgängligt saldo
+        symbol = max(tillgangligt, key=lambda s: tillgangligt[s])
+        innehavet = tillgangligt[symbol]
         if innehavet < 1:
             continue
         # Staka 25-50% av innehavet, minst 1
@@ -847,8 +885,11 @@ def kör_koalitions_airdrops(sb_key: str) -> None:
             if skaparens_tokens < len(partners):
                 continue
 
-            # Bestäm airdrop-storlek per partner
-            per_partner = max(1, min(10, math.floor(skaparens_tokens * 0.05 / len(partners))))
+            # Bestäm airdrop-storlek per partner (strikt 5%-budget)
+            budget = math.floor(skaparens_tokens * 0.05)
+            if budget < len(partners):
+                continue  # För lite tokens för att airdroppa till alla partner
+            per_partner = min(10, math.floor(budget / len(partners)))
 
             h_min = {**_h(sb_key), "Prefer": "return=minimal"}
             h_upsert = {**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"}
