@@ -279,18 +279,39 @@ export default function FormogenhetVy({
         {tidsData.length > 1 ? (
           <Card>
             <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={tidsData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+              <LineChart data={tidsData} margin={{ top: 8, right: 48, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
                 <XAxis dataKey="datum" tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} tickLine={false} axisLine={false} />
+                {/* Vänster axel: Gini (0–1) */}
+                <YAxis
+                  yAxisId="gini"
+                  domain={[0, 1]}
+                  tick={{ fontSize: 9, fill: C.red, fontFamily: "monospace" }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={v => v.toFixed(2)}
+                  width={36}
+                />
+                {/* Höger axel: % (0–100) */}
+                <YAxis
+                  yAxisId="pct"
+                  orientation="right"
+                  domain={[0, 100]}
+                  tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={v => v + "%"}
+                  width={40}
+                />
                 <Tooltip
                   contentStyle={{ background: "#111", border: "1px solid #222", borderRadius: "6px", fontSize: "11px", fontFamily: "monospace" }}
                   labelStyle={{ color: "#888" }}
+                  formatter={(value, name) => name === "Gini" ? value?.toFixed(3) : value + "%"}
                 />
                 <Legend wrapperStyle={{ fontSize: "10px", fontFamily: "monospace", color: "#666" }} />
-                <Line type="monotone" dataKey="gini" name="Gini" stroke={C.red} dot={false} strokeWidth={1.5} connectNulls />
-                <Line type="monotone" dataKey="mobilitet" name="Mobilitet %" stroke={C.green} dot={false} strokeWidth={1.5} connectNulls />
-                <Line type="monotone" dataKey="risk" name="Oligarkirisk %" stroke={C.yellow} dot={false} strokeWidth={1.5} connectNulls />
+                <Line yAxisId="gini" type="monotone" dataKey="gini" name="Gini" stroke={C.red} dot={false} strokeWidth={1.5} connectNulls />
+                <Line yAxisId="pct" type="monotone" dataKey="mobilitet" name="Mobilitet %" stroke={C.green} dot={false} strokeWidth={1.5} connectNulls />
+                <Line yAxisId="pct" type="monotone" dataKey="risk" name="Oligarkirisk %" stroke={C.yellow} dot={false} strokeWidth={1.5} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           </Card>
