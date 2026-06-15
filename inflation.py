@@ -136,7 +136,7 @@ def main():
     # ── 0. Förmögenhetsskatt ────────────────────────────────────────────
     print(f"\n── Förmögenhetsskatt (progressiv): {bracket_str} ──")
     skatt_res = httpx.get(
-        f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SKATTETRÖSKEL}&agent=neq.Statskassa&select=agent,saldo",
+        f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SKATTETRÖSKEL}&agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&select=agent,saldo",
         headers={**h, "Prefer": ""}, timeout=10,
     )
     total_skatt = 0
@@ -347,7 +347,7 @@ def main():
     SPARTRÖSKEL = 400.0
     print(f"\n── Sparränta: {SPARRANTA*100:.0f}% på saldo > {SPARTRÖSKEL:.0f} kr ──")
     alla_res = httpx.get(
-        f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SPARTRÖSKEL}&agent=neq.Statskassa&select=agent,saldo",
+        f"{SB_URL}/rest/v1/agent_planbocker?saldo=gt.{SPARTRÖSKEL}&agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&select=agent,saldo",
         headers={**h, "Prefer": ""}, timeout=10,
     )
     if alla_res.is_success:
@@ -389,7 +389,7 @@ def main():
     # ── 4. Bailout: agenter med saldo < BAILOUT_TROSKEL ─────────────────────────
     print(f"\n── Bailout: kontrollerar agenter med saldo < {BAILOUT_TROSKEL} kr ──")
     saldo_res = httpx.get(
-        f"{SB_URL}/rest/v1/agent_planbocker?saldo=lt.{BAILOUT_TROSKEL}&agent=neq.Statskassa&select=agent,saldo",
+        f"{SB_URL}/rest/v1/agent_planbocker?saldo=lt.{BAILOUT_TROSKEL}&agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&select=agent,saldo",
         headers={**h, "Prefer": ""}, timeout=10,
     )
     if saldo_res.is_success:
@@ -431,7 +431,7 @@ def main():
         statskassa_balans = statskassa_res.json()[0].get("saldo") or 0
         if statskassa_balans >= 1:
             agenter_res = httpx.get(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&select=agent,saldo",
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&select=agent,saldo",
                 headers={**h, "Prefer": ""}, timeout=10,
             )
             agenter = agenter_res.json() if agenter_res.is_success else []
