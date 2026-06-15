@@ -12,7 +12,7 @@ Körs av GitHub Actions varje söndag. Sex åtgärder:
 Obs: Markinkomst genereras via varuauktioner (mark_test.py) — ingen fast veckoinkomst längre.
 """
 
-import os, sys, httpx, math
+import os, sys, httpx, math, urllib.parse
 from datetime import datetime, timezone
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
@@ -479,6 +479,51 @@ def main():
             print("  Statskassan är tom — inga böter att omfördela.")
     else:
         print("  [VARNING] Kunde inte hämta statskassan — statskassa-raden kanske inte är skapad.")
+
+    # ── 6. Börskassan: omfördela handelsavgifter till market makers ──────────────
+    print("\n── Börskassan: omfördelar handelsavgifter till market makers ──")
+    MARKET_MAKERS = [
+        "Nationalekonom", "Den lugna", "Filosof", "Jurist", "Läkare",
+        "Psykolog", "Historiker", "Sociolog", "Mamman", "Pensionären",
+        "Konservativ debattör",
+    ]
+    try:
+        bk_res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan&select=saldo",
+            headers={**h, "Prefer": ""}, timeout=8,
+        )
+        if bk_res.is_success and bk_res.json():
+            bk_balans = float(bk_res.json()[0].get("saldo") or 0)
+            if bk_balans >= 1:
+                per_mm = math.floor(bk_balans / len(MARKET_MAKERS))
+                if per_mm >= 1:
+                    for mm in MARKET_MAKERS:
+                        mm_saldo = float(httpx.get(
+                            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(mm)}&select=saldo",
+                            headers={**h, "Prefer": ""}, timeout=8,
+                        ).json()[0].get("saldo", 0))
+                        httpx.patch(
+                            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(mm)}",
+                            headers=h,
+                            json={"saldo": round(mm_saldo + per_mm, 2), "uppdaterad": "now()"},
+                            timeout=8,
+                        )
+                    aterstaende_bk = bk_balans - per_mm * len(MARKET_MAKERS)
+                    httpx.patch(
+                        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan",
+                        headers=h,
+                        json={"saldo": round(aterstaende_bk, 2), "uppdaterad": "now()"},
+                        timeout=8,
+                    )
+                    print(f"  ✓ {bk_balans} kr omfördelade: {per_mm} kr × {len(MARKET_MAKERS)} market makers")
+                else:
+                    print(f"  Börskassan ({bk_balans} kr) räcker inte till minst 1 kr/market maker — väntar.")
+            else:
+                print("  Börskassan är tom — inga avgifter att omfördela.")
+        else:
+            print("  [INFO] Börskassan-raden saknas — kör supabase_borskassan.sql.")
+    except Exception as e:
+        print(f"  [VARNING] Börskassan-omfördelning: {e}")
 
     print("\n✓ Inflationscykeln klar.")
 
