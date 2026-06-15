@@ -767,11 +767,14 @@ def agent_placera_ico_ordrar(sb_key: str, agent_namn: str, alla_symboler: list[s
         spot = hamta_pris(sb_key, symbol)
         if spot <= 0:
             continue
+        # Säljlimit måste vara ≤ AMM-bud (spot * (1 - AMM_SPREAD)) för att korsa spreaden
         aggressivitet = stil.get("aggressivitet", 0.4)
         if aggressivitet > 0.6:
-            limit_pris = round(spot * (1 - random.uniform(0, 0.02)), 2)   # säljer snabbt nära spot
+            # Aggressiv: säljer direkt under AMM-budet
+            limit_pris = round(spot * (1 - AMM_SPREAD - random.uniform(0, 0.01)), 2)
         else:
-            limit_pris = round(spot * (1 + random.uniform(0.01, 0.04)), 2) # vill ha lite mer
+            # Försiktig: säljer precis vid AMM-budet
+            limit_pris = round(spot * (1 - AMM_SPREAD), 2)
         limit_pris = max(0.01, limit_pris)
         sälj_antal = float(math.floor(antal)) or antal
         motivering = random.choice(SALJ_MOTIVERINGAR).format(symbol=symbol)
@@ -792,7 +795,8 @@ def agent_placera_ico_ordrar(sb_key: str, agent_namn: str, alla_symboler: list[s
                 antal = float(random.randint(2, 4))
             else:
                 antal = float(random.randint(1, 3))
-            limit_pris = round(spot * (1 + random.uniform(0, 0.04)), 2)
+            # Köplimit måste vara ≥ AMM-ask (spot * (1 + AMM_SPREAD)) för att korsa spreaden
+            limit_pris = round(spot * (1 + AMM_SPREAD + random.uniform(0, 0.02)), 2)
             if limit_pris * antal <= saldo:
                 motivering = random.choice(KOP_MOTIVERINGAR).format(symbol=symbol)
                 order_id = lagg_order(sb_key, agent_namn, symbol, "kop", limit_pris, antal, motivering)
