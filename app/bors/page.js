@@ -50,7 +50,7 @@ async function getData() {
   }
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [tillRes, affRes, ordRes, pfjRes, prisRes, plbRes, stakRes] = await Promise.all([
+  const [tillRes, affRes, ordRes, pfjRes, prisRes, plbRes, stakRes, liqRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/bors_tillgangar?order=symbol.asc`, {
       headers: h, next: { revalidate: 60 },
     }),
@@ -72,16 +72,20 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/bors_staking?utbetald=eq.false&order=slut_datum.asc&limit=100`, {
       headers: h, next: { revalidate: 60 },
     }),
+    fetch(`${SB_URL}/rest/v1/bors_liquidity_log?order=skapad.desc&limit=200`, {
+      headers: h, next: { revalidate: 60 },
+    }),
   ]);
 
   return {
-    tillgangar: tillRes.ok  ? await tillRes.json() : [],
-    affarer:    affRes.ok   ? await affRes.json()  : [],
-    ordrar:     ordRes.ok   ? await ordRes.json()  : [],
-    portfoljer: pfjRes.ok   ? await pfjRes.json()  : [],
-    priser:     prisRes.ok  ? await prisRes.json() : [],
-    planbocker: plbRes.ok   ? await plbRes.json()  : [],
-    staking:    stakRes.ok  ? await stakRes.json() : [],
+    tillgangar:   tillRes.ok  ? await tillRes.json()  : [],
+    affarer:      affRes.ok   ? await affRes.json()   : [],
+    ordrar:       ordRes.ok   ? await ordRes.json()   : [],
+    portfoljer:   pfjRes.ok   ? await pfjRes.json()   : [],
+    priser:       prisRes.ok  ? await prisRes.json()  : [],
+    planbocker:   plbRes.ok   ? await plbRes.json()   : [],
+    staking:      stakRes.ok  ? await stakRes.json()  : [],
+    liquidityLog: liqRes.ok   ? await liqRes.json()   : [],
   };
 }
 
@@ -129,7 +133,7 @@ function SparklineInline({ data, farg }) {
 }
 
 export default async function BorsPage() {
-  const { tillgangar, affarer, ordrar, portfoljer, priser, planbocker, staking } = await getData();
+  const { tillgangar, affarer, ordrar, portfoljer, priser, planbocker, staking, liquidityLog } = await getData();
 
   // ── Prishistorik per symbol (kronologisk för sparkline) ─────────────────────
   const prishistorik = {};
@@ -211,6 +215,17 @@ export default async function BorsPage() {
   }).filter(s => s.antal > 0);
   const totalStakVarde   = stakingRader.reduce((sum, s) => sum + s.antal * s.pris, 0);
   const totalYieldKvar   = stakingRader.reduce((sum, s) => sum + s.yieldKvar, 0);
+
+  // ── Liquidity mining-statistik ───────────────────────────────────────────────
+  const liqTotalt = (liquidityLog ?? []).reduce((s, r) => s + parseFloat(r.beloning ?? 0), 0);
+  const liqPerAgent = {};
+  for (const r of (liquidityLog ?? [])) {
+    liqPerAgent[r.agent] = (liqPerAgent[r.agent] ?? 0) + parseFloat(r.beloning ?? 0);
+  }
+  const liqTop = Object.entries(liqPerAgent)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
+  const liqMaxBelopp = liqTop.length > 0 ? liqTop[0][1] : 1;
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, padding: "32px 16px 80px" }}>
@@ -655,6 +670,91 @@ export default async function BorsPage() {
             </div>
           </div>
         )}
+
+        {/* ── Liquidity Mining ── */}
+        <div style={{ marginBottom: 40 }}>
+          <h2 style={{
+            fontSize: 11, color: C.textMuted, fontFamily: "monospace",
+            textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 8px",
+          }}>
+            💧 Liquidity Mining
+          </h2>
+          <p style={{ fontSize: 12, color: C.textMuted, fontFamily: "monospace", margin: "0 0 20px", lineHeight: 1.6 }}>
+            Agenter som håller öppna köp- <em>och</em> säljordrar inom ±10 % av spotpriset för samma token
+            belönas automatiskt med {LIKVIDITET_BELOPP?.toFixed(1) ?? "1.5"} kr per körning.
+            Förbättrar likviditeten i orderboken.
+          </p>
+
+          {/* Nyckeltal */}
+          <div style={{ display: "flex", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+            {[
+              ["Total utbetald belöning", `${liqTotalt.toFixed(1)} kr`,       "#4a9eff"],
+              ["Unika market makers",      Object.keys(liqPerAgent).length,    "#34d399"],
+              ["Belöning/körning",         "1.5 kr/par",                       "#fbbf24"],
+            ].map(([label, val, farg]) => (
+              <div key={label} style={{
+                background: C.surface, border: `1px solid ${C.border}`,
+                borderRadius: 8, padding: "14px 20px", minWidth: 130,
+              }}>
+                <div style={{ fontSize: 20, color: farg, fontFamily: "monospace", fontWeight: 700 }}>{val}</div>
+                <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", marginTop: 3 }}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {liqTop.length === 0 ? (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: 28,
+              textAlign: "center", color: C.textMuted, fontFamily: "monospace", fontSize: 13,
+            }}>
+              Inga liquidity mining-belöningar ännu. Kör <code>supabase_liquidity.sql</code> i
+              Supabase SQL Editor, sedan aktiveras belöningar automatiskt vid nästa börskörning.
+            </div>
+          ) : (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: 20,
+            }}>
+              <div style={{
+                fontSize: 9, color: C.textMuted, fontFamily: "monospace",
+                letterSpacing: "0.08em", marginBottom: 14,
+              }}>
+                TOPP MARKET MAKERS — TOTAL BELÖNING
+              </div>
+              {liqTop.map(([agent, belopp], i) => {
+                const pct = liqMaxBelopp > 0 ? (belopp / liqMaxBelopp) * 100 : 0;
+                return (
+                  <div key={agent} style={{ marginBottom: i < liqTop.length - 1 ? 12 : 0 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{
+                          fontSize: 10, fontFamily: "monospace", minWidth: 18,
+                          color: i < 3 ? C.accent : C.textMuted,
+                          fontWeight: i < 3 ? 700 : 400,
+                        }}>#{i + 1}</span>
+                        <span style={{ fontSize: 13, color: C.text, fontFamily: "monospace" }}>{agent}</span>
+                      </div>
+                      <span style={{ fontSize: 13, color: "#4a9eff", fontFamily: "monospace", fontWeight: 600 }}>
+                        {belopp.toFixed(1)} kr
+                      </span>
+                    </div>
+                    <div style={{ height: 5, background: "#1a1a1a", borderRadius: 3 }}>
+                      <div style={{
+                        height: "100%", width: `${pct}%`, borderRadius: 3,
+                        background: "linear-gradient(90deg, #4a9eff 0%, #34d399 100%)",
+                      }} />
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{ marginTop: 14, fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>
+                Analytiker, lugna och konservativa personligheter är mest benägna att market-maxa.
+                Belöning per körning: 1.5 kr × antal kvalificerande (agent, token)-par.
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ── Aktiva stakes ── */}
         <div style={{ marginBottom: 40 }}>
