@@ -151,8 +151,8 @@ export default function FormogenhetVy({
     .map(r => ({
       datum: new Date(r.skapad).toLocaleDateString("sv-SE", { month: "short", day: "numeric" }),
       gini: r.gini != null ? parseFloat(r.gini.toFixed(3)) : null,
-      mobilitet: r.social_mobilitet != null ? parseFloat(r.social_mobilitet.toFixed(1)) : null,
-      risk: r.oligarkirisk != null ? parseFloat(r.oligarkirisk.toFixed(1)) : null,
+      mobilitet: r.mobilitet != null ? parseFloat(r.mobilitet.toFixed(1)) : null,
+      risk: r.oligarki_risk != null ? parseFloat(r.oligarki_risk.toFixed(1)) : null,
     }));
 
   return (

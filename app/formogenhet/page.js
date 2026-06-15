@@ -35,7 +35,7 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/agent_etf_innehav?select=agent,investerat_kr,kopt_pris_usd,symbol`, o),
     fetch(`${SB_URL}/rest/v1/agent_bets?avgjord=eq.true&select=agent,vinst`, o),
     fetch(`${SB_URL}/rest/v1/lobbying_log?select=mal_agent,belopp,resultat`, o),
-    fetch(`${SB_URL}/rest/v1/oligarki_historik?order=skapad.desc&limit=90&select=gini,social_mobilitet,oligarkirisk,skapad`, o),
+    fetch(`${SB_URL}/rest/v1/oligarki_historik?order=skapad.desc&limit=90&select=gini,mobilitet,oligarki_risk,skapad`, o),
     fetch(`${SB_URL}/rest/v1/visitor_wallets?order=saldo.desc&limit=20&select=display_name,saldo,skapad`, o),
     fetch(`${SB_URL}/rest/v1/bors_portfoljer?select=agent,symbol,antal&order=antal.desc`, o),
     fetch(`${SB_URL}/rest/v1/bors_tillgangar?select=symbol,senaste_pris`, o),
