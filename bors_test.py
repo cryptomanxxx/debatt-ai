@@ -1198,16 +1198,8 @@ def öppna_short(sb_key: str, agent: str, symbol: str, antal: float) -> bool:
     h_min = {**_h(sb_key), "Prefer": "return=minimal"}
     agent_enc = urllib.parse.quote(agent)
 
-    # Nettodrag: collateral - intäkter
-    httpx.patch(
-        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
-        headers=h_min,
-        json={"saldo": round(saldo - netto_kostnad, 2), "uppdaterad": "now()"},
-        timeout=8,
-    )
-
-    # Spara short-positionen
-    httpx.post(
+    # Spara short-positionen FÖRST — dra bara pengar om inserten lyckas
+    r_ins = httpx.post(
         f"{SB_URL}/rest/v1/bors_shorts",
         headers=h_min,
         json={
@@ -1218,6 +1210,17 @@ def öppna_short(sb_key: str, agent: str, symbol: str, antal: float) -> bool:
             "collateral_kr": collateral_kr,
             "daglig_avgift": SHORT_DAGLIG_AVGIFT,
         },
+        timeout=8,
+    )
+    if not r_ins.is_success:
+        print(f"  SHORT MISSLYCKAD (insert): {agent} {symbol} — {r_ins.status_code}")
+        return False
+
+    # Nettodrag: collateral - intäkter (körs bara om insert lyckades)
+    httpx.patch(
+        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
+        headers=h_min,
+        json={"saldo": round(saldo - netto_kostnad, 2), "uppdaterad": "now()"},
         timeout=8,
     )
     print(f"  SHORT ÖPPNAD: {agent} shortar {antal} {symbol} @ {spot:.2f} kr (collateral {collateral_kr:.0f} kr)")
@@ -1244,22 +1247,25 @@ def stang_short(sb_key: str, short: dict, anledning: str = "frivillig") -> None:
     h_min = {**_h(sb_key), "Prefer": "return=minimal"}
     agent_enc = urllib.parse.quote(short["agent"])
 
+    # Stäng short-raden FÖRST — frigör bara collateral om patchen lyckas
+    r_upd = httpx.patch(
+        f"{SB_URL}/rest/v1/bors_shorts?id=eq.{short['id']}",
+        headers=h_min,
+        json={"status": "likviderad" if anledning == "likvidation" else "stangd",
+              "vinst_forlust": pl, "stangd_at": "now()"},
+        timeout=8,
+    )
+    if not r_upd.is_success:
+        print(f"  SHORT STÄNGNING MISSLYCKAD (patch): {short['agent']} {short['symbol']} — {r_upd.status_code}")
+        return
+
     saldo = hamta_saldo(sb_key, short["agent"])
-    # Frigör collateral, dra återköpskostnad
+    # Frigör collateral, dra återköpskostnad (körs bara om short-raden stängdes)
     nytt_saldo = round(saldo + collateral_kr - aterköps_kr, 2)
     httpx.patch(
         f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
         headers=h_min,
         json={"saldo": max(0.0, nytt_saldo), "uppdaterad": "now()"},
-        timeout=8,
-    )
-
-    # Uppdatera short-raden
-    httpx.patch(
-        f"{SB_URL}/rest/v1/bors_shorts?id=eq.{short['id']}",
-        headers=h_min,
-        json={"status": "likviderad" if anledning == "likvidation" else "stangd",
-              "vinst_forlust": pl, "stangd_at": "now()"},
         timeout=8,
     )
     pl_str = f"+{pl:.2f}" if pl >= 0 else f"{pl:.2f}"
