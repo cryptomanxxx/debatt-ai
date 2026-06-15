@@ -78,8 +78,10 @@ function buildPolygon(levels, toX, toY, side) {
   return pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
 }
 
-export default function DepthChart({ ordrar, symboler }) {
-  const [aktivSym, setAktivSym] = useState(symboler[0] ?? "DBT");
+export default function DepthChart({ ordrar, symboler, externalSym }) {
+  const [interntSym, setInterntSym] = useState(symboler[0] ?? "DBT");
+  const aktivSym = externalSym ?? interntSym;
+  const setAktivSym = externalSym ? () => {} : setInterntSym;
   const [tooltip, setTooltip] = useState(null);
   const svgRef = useRef(null);
 
@@ -159,25 +161,27 @@ export default function DepthChart({ ordrar, symboler }) {
         }}>
           Djupdiagram — orderbok
         </h2>
-        {/* Symbol-tabs */}
-        <div style={{ display: "flex", gap: 6 }}>
-          {symboler.map(sym => (
-            <button
-              key={sym}
-              onClick={() => setAktivSym(sym)}
-              style={{
-                padding: "4px 12px",
-                fontSize: 11, fontFamily: "monospace",
-                borderRadius: 4, cursor: "pointer", border: "1px solid",
-                borderColor: aktivSym === sym ? C.accent : C.border,
-                background: aktivSym === sym ? "rgba(232,213,163,0.08)" : "transparent",
-                color: aktivSym === sym ? C.accent : C.textMuted,
-              }}
-            >
-              {sym}
-            </button>
-          ))}
-        </div>
+        {/* Symbol-tabs — döljs när PrisChart styr symbolen utifrån */}
+        {!externalSym && (
+          <div style={{ display: "flex", gap: 6 }}>
+            {symboler.map(sym => (
+              <button
+                key={sym}
+                onClick={() => setAktivSym(sym)}
+                style={{
+                  padding: "4px 12px",
+                  fontSize: 11, fontFamily: "monospace",
+                  borderRadius: 4, cursor: "pointer", border: "1px solid",
+                  borderColor: aktivSym === sym ? C.accent : C.border,
+                  background: aktivSym === sym ? "rgba(232,213,163,0.08)" : "transparent",
+                  color: aktivSym === sym ? C.accent : C.textMuted,
+                }}
+              >
+                {sym}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "20px 20px 12px" }}>

@@ -1,4 +1,4 @@
-import DepthChart from "./DepthChart";
+import PrisChart from "./PrisChart";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -65,7 +65,7 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/bors_portfoljer?select=agent,symbol,antal,genomsnittspris&order=antal.desc`, {
       headers: h, next: { revalidate: 60 },
     }),
-    fetch(`${SB_URL}/rest/v1/bors_priser?order=skapad.desc&limit=150`, {
+    fetch(`${SB_URL}/rest/v1/bors_priser?order=skapad.desc&limit=500`, {
       headers: h, next: { revalidate: 60 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc`, {
@@ -478,8 +478,8 @@ export default async function BorsPage() {
           </div>
         </div>
 
-        {/* ── Djupdiagram ── */}
-        <DepthChart ordrar={ordrar} symboler={alleSymboler} />
+        {/* ── Prishistorik + Djupdiagram ── */}
+        <PrisChart ordrar={ordrar} priser={priser} symboler={alleSymboler} />
 
         {/* ── Senaste affärer ── */}
         <div style={{ marginBottom: 40 }}>
