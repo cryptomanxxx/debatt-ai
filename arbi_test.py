@@ -36,33 +36,29 @@ def _h():
     }
 
 
+PROXY_URL = "https://www.debatt-ai.se/api/funding-rate"
+
+
 def hamta_funding_data(symbol="BTCUSDT"):
-    """Hämtar senaste avgjorda funding rate + mark price från Bybit."""
+    """Hämtar funding rate via debatt-ai.se/api/funding-rate (Vercel → Bybit).
+    Direktanrop till Bybit blockeras från GitHub Actions datacenter-IPs (HTTP 403).
+    Vercel-servern är inte blockerad och agerar proxy.
+    """
     try:
-        # Funding history: senaste avgjorda betalning (list[0] = senast)
-        r_hist = httpx.get(
-            f"https://api.bybit.com/v5/market/funding/history?category=linear&symbol={symbol}&limit=1",
-            timeout=10,
-        )
-        # Tickers: mark price för visning
-        r_tick = httpx.get(
-            f"https://api.bybit.com/v5/market/tickers?category=linear&symbol={symbol}",
-            timeout=10,
-        )
-        if not r_hist.is_success or not r_tick.is_success:
-            print(f"  ⚠️  Bybit HTTP {r_hist.status_code}/{r_tick.status_code}")
+        r = httpx.get(PROXY_URL, timeout=15)
+        if not r.is_success:
+            print(f"  ⚠️  Proxy HTTP {r.status_code}")
             return None
-        hist_list = r_hist.json().get("result", {}).get("list", [])
-        tick_list = r_tick.json().get("result", {}).get("list", [])
-        if not hist_list:
-            print("  ⚠️  Ingen funding history tillgänglig från Bybit")
+        data = r.json()
+        if "error" in data:
+            print(f"  ⚠️  Proxy-fel: {data['error']}")
             return None
         return {
-            "funding_rate": float(hist_list[0].get("fundingRate", 0)),
-            "mark_price":   float(tick_list[0].get("markPrice", 0)) if tick_list else 0.0,
+            "funding_rate": float(data.get("funding_rate", 0)),
+            "mark_price":   float(data.get("mark_price", 0)),
         }
     except Exception as e:
-        print(f"  ⚠️  Bybit API-fel: {e}")
+        print(f"  ⚠️  Proxy API-fel: {e}")
         return None
 
 
@@ -110,10 +106,10 @@ def kör_arbi():
     print(f"UTC: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}")
     print("━" * 52)
 
-    # 1. Hämta funding rate från Bybit
+    # 1. Hämta funding rate via Vercel-proxy → Bybit
     fd = hamta_funding_data("BTCUSDT")
     if not fd:
-        print("  ⚠️  Hoppade över körningen — Bybit otillgänglig")
+        print("  ⚠️  Hoppade över körningen — proxy/Bybit otillgänglig")
         return
 
     funding_rate     = fd["funding_rate"]       # per 8h, t.ex. 0.000312 = 0.0312%
