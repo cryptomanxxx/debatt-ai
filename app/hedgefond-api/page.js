@@ -292,7 +292,7 @@ export default function HedgefondApiPage() {
                     <Tag label={tagLabel} color={tagColor} />
                     <span style={{ fontSize: 12, color: C.dim, marginLeft: "auto" }}>{fd.data_points} datapunkter</span>
                   </div>
-                  {fd.latest_nav && <NavCard nav={fd.latest_nav} fund={fund} />
+                  {fd.latest_nav && <NavCard nav={fd.latest_nav} fund={fund} />}
                   {hist.length > 0 && (
                     <div style={{ marginTop: 16 }}>
                       <p style={{ fontSize: 11, color: C.dim, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>Historik (senaste {Math.min(hist.length, 8)} av {hist.length})</p>

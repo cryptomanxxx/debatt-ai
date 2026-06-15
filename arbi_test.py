@@ -35,19 +35,28 @@ def _h():
 
 
 def hamta_funding_data(symbol="BTCUSDT"):
-    """Hämtar aktuell funding rate och mark price från Binance Futures."""
+    """Hämtar senaste avgjorda funding rate + aktuellt mark price från Binance Futures."""
     try:
-        r = httpx.get(
+        # fundingRate?limit=1 returnerar den senast *avgjorda* betalningen
+        r_hist = httpx.get(
+            f"https://fapi.binance.com/fapi/v1/fundingRate?symbol={symbol}&limit=1",
+            timeout=10,
+        )
+        # premiumIndex för mark price (visningsändamål)
+        r_idx = httpx.get(
             f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}",
             timeout=10,
         )
-        if not r.is_success:
-            print(f"  ⚠️  Binance HTTP {r.status_code}")
+        if not r_hist.is_success or not r_idx.is_success:
+            print(f"  ⚠️  Binance HTTP {r_hist.status_code}/{r_idx.status_code}")
             return None
-        data = r.json()
+        hist = r_hist.json()
+        if not hist:
+            print("  ⚠️  Ingen funding history tillgänglig")
+            return None
         return {
-            "funding_rate": float(data.get("lastFundingRate", 0)),
-            "mark_price":   float(data.get("markPrice", 0)),
+            "funding_rate": float(hist[0].get("fundingRate", 0)),
+            "mark_price":   float(r_idx.json().get("markPrice", 0)),
         }
     except Exception as e:
         print(f"  ⚠️  Binance API-fel: {e}")
@@ -115,19 +124,20 @@ def kör_arbi():
     current_nav = senaste["portfölj_värde_usd"] if senaste else START_KAP_USD
     accumulated = senaste["inkomst_usd"]         if senaste else 0.0
 
-    position_usd = current_nav * POSITION_PCT
-
     # 3. Beräkna 8h-inkomst och APR
     if abs(funding_rate_pct) < MIN_RATE_PCT:
         riktning       = "neutral"
+        position_usd   = 0.0           # ingen aktiv position vid neutral
         funding_income = 0.0
         apr_pct        = 0.0
         print(f"  Rate för liten ({abs(funding_rate_pct):.4f}% < {MIN_RATE_PCT}%) → neutral position")
     elif funding_rate >= 0:
+        position_usd   = current_nav * POSITION_PCT
         riktning       = "long_spot_short_perp"
         funding_income = funding_rate * position_usd
         apr_pct        = funding_rate * 3 * 365 * 100
     else:
+        position_usd   = current_nav * POSITION_PCT
         riktning       = "long_perp_short_spot"
         funding_income = abs(funding_rate) * position_usd
         apr_pct        = abs(funding_rate) * 3 * 365 * 100
