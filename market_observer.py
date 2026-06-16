@@ -15,12 +15,10 @@ import json
 import httpx
 from datetime import datetime, timezone
 
-from supabase_utils import reglera_prediction_bets
+from supabase_utils import reglera_prediction_bets, _llm_spel
 
 SB_URL    = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY    = os.environ.get("SUPABASE_ANON_KEY", "").strip()
-GROQ_KEY  = os.environ.get("GROQ_API_KEY", "").strip()
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 TAVILY_KEY = os.environ.get("TAVILY_API_KEY", "").strip()
 
 if not SB_KEY:
@@ -165,54 +163,10 @@ def _bygg_prompt(market: dict, nyheter_text: str = "") -> str:
     )
 
 
-def groq_anrop(prompt: str) -> str:
-    for model in ("llama3.3-70b-versatile", "llama-3.3-70b-versatile"):
-        r = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 150,
-                "temperature": 0.1,
-            },
-            timeout=20,
-        )
-        if r.status_code == 404:
-            continue
-        r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"].strip()
-    raise RuntimeError("Groq: båda modellnamnen returnerade 404")
-
-
-def gemini_anrop(prompt: str) -> str:
-    r = httpx.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={GEMINI_KEY}",
-        json={"contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {"maxOutputTokens": 150, "temperature": 0.1}},
-        timeout=20,
-    )
-    r.raise_for_status()
-    return r.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-
-
 def llm_anrop(prompt: str) -> tuple[str | None, str, str]:
-    """Försöker Groq, sedan Gemini. Returnerar (utfall, konfidens, motivering)."""
-    if GROQ_KEY:
-        try:
-            utfall, konfidens, motivering = _parse_llm_svar(groq_anrop(prompt))
-            if utfall:
-                return utfall, konfidens, motivering
-        except Exception as e:
-            print(f"  Groq-fel: {e}")
-    if GEMINI_KEY:
-        try:
-            utfall, konfidens, motivering = _parse_llm_svar(gemini_anrop(prompt))
-            if utfall:
-                return utfall, konfidens, motivering
-        except Exception as e:
-            print(f"  Gemini-fel: {e}")
-    return None, "låg", ""
+    """Provar alla AI-providers i dynamisk rankad ordning (ai_klient.py)."""
+    svar = _llm_spel("Du är en faktaverifierare.", prompt, max_tokens=150)
+    return _parse_llm_svar(svar)
 
 
 # ── Huvud-verifieringslogik ───────────────────────────────────────────────────

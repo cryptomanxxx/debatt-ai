@@ -16,7 +16,6 @@ import httpx
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "").strip()
-GROQ_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
 if not SB_KEY:
     print("Fel: SUPABASE_ANON_KEY saknas")
@@ -39,28 +38,10 @@ def fetch(path: str) -> list:
     return r.json() if r.is_success else []
 
 
-def groq_anrop(system: str, user: str, max_tokens: int = 200) -> str:
-    if not GROQ_KEY:
-        return ""
-    try:
-        r = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "max_tokens": max_tokens,
-                "temperature": 0.85,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-            },
-            timeout=20,
-        )
-        return r.json()["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        print(f"  [GROQ] misslyckades: {e}")
-        return ""
+def llm_anrop(system: str, user: str, max_tokens: int = 200) -> str:
+    """Provar alla AI-providers i dynamisk rankad ordning (ai_klient.py)."""
+    from supabase_utils import _llm_spel
+    return _llm_spel(system, user, max_tokens=max_tokens)
 
 
 def logga_civilisations_minne(typ: str, rubrik: str, beskrivning: str, agenter: list = None) -> None:
@@ -89,7 +70,7 @@ def generera_manifesto(ledare: str, parti_namn: str) -> str:
     from agenter import AGENTER  # lazy import — filen kan sakna agenter
     agent = next((a for a in AGENTER if a["namn"] == ledare), None)
     system = agent["system"][:600] if agent else f"Du är {ledare}, partiledare."
-    manifesto = groq_anrop(
+    manifesto = llm_anrop(
         system,
         (
             f"Du leder partiet '{parti_namn}' i riksdagsvalet för AI-civilisationen. "

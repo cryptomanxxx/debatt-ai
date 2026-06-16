@@ -16,7 +16,7 @@ Flöde:
   5. Uppdatera constitution_rules om antagen
   6. Logga till civilisations_minne
 
-Kräver: SUPABASE_ANON_KEY, GROQ_API_KEY
+Kräver: SUPABASE_ANON_KEY
 """
 
 import json
@@ -83,30 +83,13 @@ def sb_patch(h: dict, path: str, data: dict, timeout: int = 10) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Groq
+# LLM
 # ---------------------------------------------------------------------------
 
 
-def groq_anrop(groq_key: str, system: str, prompt: str, max_tokens: int = 300, temp: float = 0.5) -> str:
-    try:
-        r = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt},
-                ],
-                "max_tokens": max_tokens,
-                "temperature": temp,
-            },
-            timeout=20,
-        )
-        return r.json()["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        print(f"  [FEL] Groq: {e}")
-        return ""
+def llm_anrop(system: str, prompt: str, max_tokens: int = 300) -> str:
+    """Provar alla AI-providers i dynamisk rankad ordning (ai_klient.py)."""
+    return _llm_spel(system, prompt, max_tokens=max_tokens)
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +136,7 @@ def hamta_regler(h: dict) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def generera_forslag(groq_key: str, regler: list[dict], ekon: dict) -> dict | None:
+def generera_forslag(regler: list[dict], ekon: dict) -> dict | None:
     """Ber LLM välja en parameter att ändra och motivera varför."""
     regler_text = "\n".join(
         f"  - {r['id']} ({r['namn']}): nuvarande {r['varde']} {r['enhet']}, "
@@ -180,7 +163,7 @@ def generera_forslag(groq_key: str, regler: list[dict], ekon: dict) -> dict | No
         '{{"regel_id": "parameter-id", "foreslagen_varde": 123, "motivering": "...2-3 meningar..."}}'
     )
 
-    svar = groq_anrop(groq_key, system, prompt, max_tokens=300, temp=0.6)
+    svar = llm_anrop(system, prompt, max_tokens=300)
     if not svar:
         return None
 
@@ -239,7 +222,7 @@ def spara_amendment(h: dict, regel: dict, forslag: dict) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-def agent_rostar(groq_key: str, agent: dict, amendment: dict, regel: dict, ekon: dict) -> tuple[str, str]:
+def agent_rostar(agent: dict, amendment: dict, regel: dict, ekon: dict) -> tuple[str, str]:
     """Returnerar ('for'|'mot', motivering)."""
     namn = agent["namn"]
     pers = agent.get("personlighet", "")
@@ -259,7 +242,7 @@ def agent_rostar(groq_key: str, agent: dict, amendment: dict, regel: dict, ekon:
         '{{"rod": "for" eller "mot", "motivering": "din karaktärsenliga 1-mening-motivering"}}'
     )
 
-    svar = groq_anrop(groq_key, system, prompt, max_tokens=150, temp=0.7)
+    svar = llm_anrop(system, prompt, max_tokens=150)
     if not svar:
         # default: rösta slumpmässigt
         return random.choice(["for", "mot"]), "Ingen motivering."
@@ -285,7 +268,7 @@ def agent_rostar(groq_key: str, agent: dict, amendment: dict, regel: dict, ekon:
     return random.choice(["for", "mot"]), "Tekniskt fel — slumpmässig röst."
 
 
-def kör_röstning(groq_key: str, sb_key: str, h: dict, amendment: dict, regel: dict, ekon: dict, maktindex: dict[str, float]) -> dict:
+def kör_röstning(sb_key: str, h: dict, amendment: dict, regel: dict, ekon: dict, maktindex: dict[str, float]) -> dict:
     """Låt alla 24 agenter rösta. Returnerar {for_ki, mot_ki, for_antal, mot_antal}."""
     for_ki = 0.0
     mot_ki = 0.0
@@ -299,7 +282,7 @@ def kör_röstning(groq_key: str, sb_key: str, h: dict, amendment: dict, regel: 
         namn = agent["namn"]
         ki = maktindex.get(namn, 1.0)  # minst 1.0 så alla räknas
 
-        rod, motivering = agent_rostar(groq_key, agent, amendment, regel, ekon)
+        rod, motivering = agent_rostar(agent, amendment, regel, ekon)
 
         # Spara röst
         h_repr = {**h, "Prefer": "return=minimal"}
@@ -418,13 +401,9 @@ def main():
         or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         or os.environ.get("SUPABASE_ANON_KEY")
     )
-    groq_key = os.environ.get("GROQ_API_KEY")
 
     if not sb_key:
         print("FEL: SUPABASE_ANON_KEY saknas", file=sys.stderr)
-        sys.exit(1)
-    if not groq_key:
-        print("FEL: GROQ_API_KEY saknas", file=sys.stderr)
         sys.exit(1)
 
     h = {
@@ -474,7 +453,7 @@ def main():
     print("\n[STEG 4] Genererar ändringsförslag via LLM...")
     # Exkludera voting_majority från förslaget — den är metanivå
     möjliga_regler = [r for r in regler if r["id"] != "voting_majority"]
-    forslag_raw = generera_forslag(groq_key, möjliga_regler, ekon)
+    forslag_raw = generera_forslag(möjliga_regler, ekon)
 
     if not forslag_raw or "regel_id" not in forslag_raw:
         print("  LLM-förslag misslyckades — väljer slumpmässig parameter")
@@ -507,7 +486,7 @@ def main():
 
     # --- Steg 6: Röstning ---
     print(f"\n[STEG 6] Röstning ({len(AGENTER)} agenter)...")
-    roster = kör_röstning(groq_key, sb_key, h, amendment, vald_regel, ekon, maktindex_map)
+    roster = kör_röstning(sb_key, h, amendment, vald_regel, ekon, maktindex_map)
 
     # --- Steg 7: Avgör ---
     print("\n[STEG 7] Avgör utfall...")

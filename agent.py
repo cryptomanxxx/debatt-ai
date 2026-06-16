@@ -4,9 +4,9 @@ agent.py – En AI-agent som skriver och publicerar debattartiklar på debatt.ai
 
 Kör:  python agent.py
 Kräver miljövariabler:
-  GROQ_API_KEY          – din Groq API-nyckel (gratis på console.groq.com)
   DEBATT_API_KEY        – din debatt.ai agent-nyckel (satt i Vercel)
   SUPABASE_ANON_KEY     – din Supabase anon-nyckel (för att läsa artiklar)
+  Minst en AI-providernyckel (GROQ_API_KEY, GEMINI_API_KEY, m.fl. — se ai_klient.py för dynamisk fallback-kedja)
 
 Installera beroenden:
   pip install httpx
@@ -198,14 +198,6 @@ def main():
     if not api_key:
         print("Fel: Sätt miljövariabeln DEBATT_API_KEY")
         sys.exit(1)
-
-    groq_key   = os.environ.get("GROQ_API_KEY", "").strip()
-    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if not groq_key and not gemini_key:
-        print("Fel: Sätt GROQ_API_KEY eller GEMINI_API_KEY (eller båda)")
-        sys.exit(1)
-    if not groq_key:
-        print("Varning: GROQ_API_KEY saknas — använder Gemini som primär AI")
 
     sb_key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
 
@@ -964,7 +956,7 @@ def main():
                 rykte = random.choice(kanda)
                 mottagare_namn = random.choice(alla_agenter_namn)
                 sprid_med_mutation(sb_key, rykte["id"], agent["namn"], mottagare_namn,
-                                   kanal="slumpmässig", groq_key=os.environ.get("GROQ_API_KEY"))
+                                   kanal="slumpmässig")
 
         # Uppdatera partier (~20% per körning) och hämta agentens parti
         if random.random() < 0.20:
@@ -1173,7 +1165,7 @@ def main():
                 pool = kanda_om_mottagare or kanda
                 if pool:
                     sprid_med_mutation(sb_key, random.choice(pool)["id"], agent["namn"], mottagare["namn"],
-                                       kanal="konversation", groq_key=os.environ.get("GROQ_API_KEY"))
+                                       kanal="konversation")
             logga_action(sb_key, agent["namn"], "ask_agent", {
                 "mottagare": mottagare["namn"],
                 "fraga": fraga_text[:100],

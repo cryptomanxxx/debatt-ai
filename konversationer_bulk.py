@@ -8,7 +8,6 @@ Kör:
   python konversationer_bulk.py --antal 5 --agenter "Filosof,Jurist,Psykolog"
 
 Kräver miljövariabler:
-  GROQ_API_KEY
   SUPABASE_ANON_KEY
 """
 
@@ -155,11 +154,6 @@ def main():
     sb_key = os.environ.get("SUPABASE_ANON_KEY")
     if not sb_key:
         print("FEL: SUPABASE_ANON_KEY saknas", file=sys.stderr)
-        sys.exit(1)
-
-    groq_key = os.environ.get("GROQ_API_KEY")
-    if not groq_key:
-        print("FEL: GROQ_API_KEY saknas", file=sys.stderr)
         sys.exit(1)
 
     # Filtrera agenter om specificerade

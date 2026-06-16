@@ -12,7 +12,7 @@ Flöde:
   5. Verkställ straff (böter) om fälld — dra från saldo
   6. Logga domen som en skandalhändelse i civilisations_minne
 
-Kräver miljövariabler: SUPABASE_ANON_KEY (eller SUPABASE_SERVICE_KEY), GROQ_API_KEY
+Kräver miljövariabler: SUPABASE_ANON_KEY (eller SUPABASE_SERVICE_KEY)
 """
 
 import json
@@ -23,7 +23,7 @@ from datetime import datetime, timezone, timedelta
 
 import httpx
 
-from supabase_utils import generera_domstolsdom_bild
+from supabase_utils import generera_domstolsdom_bild, _llm_spel
 
 # ---------------------------------------------------------------------------
 # Konstanter
@@ -132,34 +132,13 @@ def sb_patch(h: dict, path: str, data: dict, timeout: int = 10) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Groq-anrop
+# LLM-anrop
 # ---------------------------------------------------------------------------
 
 
-def groq_anrop(groq_key: str, system: str, prompt: str, max_tokens: int = 200) -> str:
-    """Anropa Groq och returnera modellens svar som sträng."""
-    try:
-        r = httpx.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {groq_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt},
-                ],
-                "max_tokens": max_tokens,
-                "temperature": 0.3,
-            },
-            timeout=15,
-        )
-        return r.json()["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        print(f"  [FEL] Groq-anrop: {e}")
-        return ""
+def llm_anrop(system: str, prompt: str, max_tokens: int = 200) -> str:
+    """Provar alla AI-providers i dynamisk rankad ordning (ai_klient.py)."""
+    return _llm_spel(system, prompt, max_tokens=max_tokens)
 
 
 # ---------------------------------------------------------------------------
@@ -430,7 +409,7 @@ def hitta_overträdelser(sb_key: str, h: dict) -> int:
 # ---------------------------------------------------------------------------
 
 
-def hall_forhandling(groq_key: str, arende: dict) -> dict:
+def hall_forhandling(arende: dict) -> dict:
     """Håll en rättslig förhandling med 3 domare. Returnerar dom-dict."""
     arende_nr = arende.get("arende_nr", "?")
     svarande = arende.get("svarande", "?")
@@ -481,7 +460,7 @@ def hall_forhandling(groq_key: str, arende: dict) -> dict:
             '{{"utfall": "fälld" eller "friad", "motivering": "din juridiska analys på 2-3 meningar"}}'
         )
 
-        svar_text = groq_anrop(groq_key, system_prompt, user_prompt, max_tokens=200)
+        svar_text = llm_anrop(system_prompt, user_prompt, max_tokens=200)
 
         # Försök parsa JSON
         parsed = None
@@ -545,7 +524,7 @@ def hall_forhandling(groq_key: str, arende: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def verkstall_straff(h: dict, groq_key: str, dom_id: int, svarande: str, belopp: int) -> bool:
+def verkstall_straff(h: dict, dom_id: int, svarande: str, belopp: int) -> bool:
     """Dra böter från agentens saldo och logga som skandal."""
     # Hämta nuvarande saldo
     planbok = sb_get(h, f"agent_planbocker?agent=eq.{svarande}&select=saldo")
@@ -613,13 +592,9 @@ def main():
         or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         or os.environ.get("SUPABASE_ANON_KEY")
     )
-    groq_key = os.environ.get("GROQ_API_KEY")
 
     if not sb_key:
         print("FEL: SUPABASE_ANON_KEY saknas", file=sys.stderr)
-        sys.exit(1)
-    if not groq_key:
-        print("FEL: GROQ_API_KEY saknas", file=sys.stderr)
         sys.exit(1)
 
     h = {
@@ -656,7 +631,7 @@ def main():
         print(f"{'─' * 60}")
 
         # Steg 2a: Håll förhandling
-        dom = hall_forhandling(groq_key, arende)
+        dom = hall_forhandling(arende)
 
         # Steg 2b: Spara domen
         dom_headers = {**h, "Prefer": "return=representation"}
@@ -678,7 +653,7 @@ def main():
             fallda_count += 1
             belopp = dom.get("straff_belopp") or 0
             if dom_id and belopp > 0:
-                ok = verkstall_straff(h, groq_key, dom_id, svarande, belopp)
+                ok = verkstall_straff(h, dom_id, svarande, belopp)
                 if ok:
                     bote_totalt += belopp
             else:

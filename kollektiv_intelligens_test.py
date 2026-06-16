@@ -20,7 +20,7 @@ utan att öka träffsäkerhet — därför testas tre kommunikationslägen mot v
 Körs dagligen via GitHub Actions (kollektiv-intelligens-test.yml), roterar
 slumpmässigt mellan de tre lägena (eller styrs med miljövariabeln LAGE).
 
-Kräver: SUPABASE_ANON_KEY, GROQ_API_KEY
+Kräver: SUPABASE_ANON_KEY
 """
 
 import hashlib
