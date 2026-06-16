@@ -219,7 +219,7 @@ def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
                     _groq_nere_keys.add(env_name)
                     _nere.add("groq")
                     print(f"  Groq dagsgräns nådd (TPD) för {env_name} — delas sannolikt per konto, hoppar direkt till fallback")
-                    raise Exception("Groq har nått sin dagsgräns (TPD) — markerar Groq som nere")
+                    raise Exception("Groq 429 rate_limit: nått sin dagsgräns (TPD) — markerar Groq som nere")
                 wait = min(int(r.headers.get("retry-after", 20)) + 2, 60)
                 print(f"  Groq rate-limit (429) med {env_name} — väntar {wait}s (försök {attempt + 1}/3)…")
                 time.sleep(wait)
