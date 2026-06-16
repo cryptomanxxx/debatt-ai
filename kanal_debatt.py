@@ -148,9 +148,6 @@ def spara_debatt(amne: str, agenter: list[str], inlagg: list[dict], summering: s
 
 
 def main():
-    if not os.environ.get("GROQ_API_KEY") and not os.environ.get("GEMINI_API_KEY"):
-        print("Fel: GROQ_API_KEY eller GEMINI_API_KEY krävs")
-        exit(1)
     if not SB_KEY:
         print("Fel: SUPABASE_ANON_KEY krävs")
         exit(1)

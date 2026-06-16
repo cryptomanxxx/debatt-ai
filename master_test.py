@@ -20,7 +20,7 @@ Flaggor:
   --antal-konv N            Antal konversationer att generera (default: 10)
   --dry-run                 Skriv ut körordningen utan att köra
 
-Kräver miljövariabler: GROQ_API_KEY, SUPABASE_ANON_KEY
+Kräver miljövariabler: SUPABASE_ANON_KEY
 """
 
 import argparse

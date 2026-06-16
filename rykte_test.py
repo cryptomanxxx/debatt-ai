@@ -6,13 +6,12 @@ Kör: python rykte_test.py
 
 Kräver:
   SUPABASE_ANON_KEY  – Supabase anon-nyckel
-  GROQ_API_KEY       – (valfritt) för LLM-mutation av rykten
 
 Vad skriptet gör:
   1. Skapar 6 startbeteende-rykten (3 sanna, 3 falska) från slumpmässiga agenter
   2. Skapar ett falskt bankruns-rykte om Centralbanken
   3. Sprider befintliga rykten mellan 12 slumpmässiga agentpar
-  4. Triggar mutation på 3 av spridningarna (om GROQ_API_KEY finns)
+  4. Triggar mutation på 3 av spridningarna (LLM via dynamisk providerkedja)
   5. Skriver ut en sammanfattning
 """
 
@@ -48,12 +47,6 @@ def main():
     if not sb_key:
         print("Fel: Sätt SUPABASE_ANON_KEY som miljövariabel.", file=sys.stderr)
         sys.exit(1)
-
-    groq_key = os.environ.get("GROQ_API_KEY", "").strip() or None
-    if groq_key:
-        print("✓ GROQ_API_KEY hittad — LLM-mutation aktiverad")
-    else:
-        print("  GROQ_API_KEY saknas — mutation inaktiverad (rykten sprids utan mutation)")
 
     skapade = []
     spridningar = 0
@@ -134,13 +127,12 @@ def main():
         rykte = random.choice(kandidater)
         till = random.choice([a for a in ALLA_AGENTER if a != fran])
 
-        # Mutation på var fjärde spridning om Groq finns
-        anvand_mutation = groq_key and (i % 4 == 3)
+        # Mutation på var fjärde spridning
+        anvand_mutation = (i % 4 == 3)
         kanal = random.choice(["slumpmässig", "slumpmässig", "konversation"])
 
         if anvand_mutation:
-            ok = sprid_med_mutation(sb_key, rykte["id"], fran, till,
-                                    kanal=kanal, groq_key=groq_key)
+            ok = sprid_med_mutation(sb_key, rykte["id"], fran, till, kanal=kanal)
             if ok:
                 mutationer += 1
                 spridningar += 1

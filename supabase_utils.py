@@ -4689,26 +4689,19 @@ AGENT_GODTROGENHET: dict[str, int] = {
 }
 
 
-def mutera_rykte_innehall(groq_key: str, original: str) -> str | None:
-    """Muterar ett rykte med LLM. Returnerar lätt modifierad text eller None vid fel."""
+def mutera_rykte_innehall(original: str) -> str | None:
+    """Muterar ett rykte med LLM (dynamisk providerkedja). Returnerar lätt modifierad text eller None vid fel."""
     try:
-        import groq as groq_lib
-        client = groq_lib.Groq(api_key=groq_key)
-        resp = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{
-                "role": "user",
-                "content": (
-                    "Skriv en lätt modifierad version av detta rykte. "
-                    "Byt ut ETT litet detalj (ett belopp, ett ord eller en handling) men behåll kärnan. "
-                    "Svara BARA med den modifierade texten, inga förklaringar, inga citattecken.\n\n"
-                    f"Original: {original}"
-                ),
-            }],
+        muterad = _llm_spel(
+            "Du skriver lätt modifierade versioner av rykten.",
+            (
+                "Skriv en lätt modifierad version av detta rykte. "
+                "Byt ut ETT litet detalj (ett belopp, ett ord eller en handling) men behåll kärnan. "
+                "Svara BARA med den modifierade texten, inga förklaringar, inga citattecken.\n\n"
+                f"Original: {original}"
+            ),
             max_tokens=120,
-            temperature=0.9,
-        )
-        muterad = resp.choices[0].message.content.strip().strip('"').strip("'")
+        ).strip().strip('"').strip("'")
         if muterad and muterad != original and len(muterad) > 15:
             return muterad
     except Exception as e:
@@ -4718,10 +4711,10 @@ def mutera_rykte_innehall(groq_key: str, original: str) -> str | None:
 
 def sprid_med_mutation(
     sb_key: str, rykte_id: int, fran_agent: str, till_agent: str,
-    kanal: str = "slumpmässig", groq_key: str | None = None,
+    kanal: str = "slumpmässig",
 ) -> bool:
     """Sprider ett rykte med 30% chans till mutation (skapar nytt rykte med parent_rykte_id)."""
-    if groq_key and random.random() < 0.30:
+    if random.random() < 0.30:
         h_get = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
         try:
             r = httpx.get(
@@ -4730,7 +4723,7 @@ def sprid_med_mutation(
             )
             if r.is_success and r.json():
                 original = r.json()[0]
-                muterad_text = mutera_rykte_innehall(groq_key, original["innehall"])
+                muterad_text = mutera_rykte_innehall(original["innehall"])
                 if muterad_text:
                     h_post = {
                         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
