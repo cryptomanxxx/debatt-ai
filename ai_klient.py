@@ -191,7 +191,14 @@ def _groq_api_keys() -> list[tuple[str, str]]:
 
 
 def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
-    """Groq API-anrop med nyckelrotation vid TPD och automatisk retry vid RPM (429)."""
+    """Groq API-anrop med nyckelrotation vid RPM (429) och direkt fallback vid TPD.
+
+    TPD-kvoten delas sannolikt per Groq-konto, inte per nyckel — om en nyckel når
+    dagsgränsen är resten med stor sannolikhet uttömda också. Vi provar därför inte
+    fler nycklar vid TPD, utan markerar Groq som nere direkt och faller vidare till
+    nästa provider i kedjan. RPM (per minut) är en transient gräns där nyckelrotation
+    fortfarande hjälper.
+    """
     if "groq" in _nere:
         raise Exception("Groq markerad som nere denna körning — hoppar direkt till fallback")
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -205,33 +212,28 @@ def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
         }
-        last_r = None
-        tpd_hit = False
         for attempt in range(3):
             r = httpx.post(url, headers=headers, json=json_payload, timeout=timeout)
-            last_r = r
             if r.status_code == 429:
                 if "tokens per day" in r.text or "TPD" in r.text:
                     _groq_nere_keys.add(env_name)
-                    print(f"  Groq dagsgräns nådd (TPD) för {env_name} — provar nästa nyckel")
-                    tpd_hit = True
-                    break
+                    _nere.add("groq")
+                    print(f"  Groq dagsgräns nådd (TPD) för {env_name} — delas sannolikt per konto, hoppar direkt till fallback")
+                    raise Exception("Groq har nått sin dagsgräns (TPD) — markerar Groq som nere")
                 wait = min(int(r.headers.get("retry-after", 20)) + 2, 60)
                 print(f"  Groq rate-limit (429) med {env_name} — väntar {wait}s (försök {attempt + 1}/3)…")
                 time.sleep(wait)
                 continue
             r.raise_for_status()
             return r
-        if tpd_hit:
-            continue
-        # RPM uttömd efter 3 försök — markera nyckeln och prova nästa
+        # RPM uttömd efter 3 försök — markera nyckeln och prova nästa (RPM är per nyckel, rotation hjälper)
         logga_429_passivt("groq")
         _groq_nere_keys.add(env_name)
         print(f"  Groq RPM-gräns kvarstår efter 3 försök för {env_name} — provar nästa nyckel")
 
-    # Alla tillgängliga nycklar uttömda
+    # Alla tillgängliga nycklar RPM-uttömda
     _nere.add("groq")
-    raise Exception("Alla Groq API-nycklar har nått sin dagsgräns — markerar Groq som nere")
+    raise Exception("Alla Groq API-nycklar är RPM-begränsade — markerar Groq som nere")
 
 
 def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, timeout: int = 60) -> str:
