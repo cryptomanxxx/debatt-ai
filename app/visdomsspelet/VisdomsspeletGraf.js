@@ -27,7 +27,7 @@ function TT({ active, payload, label }) {
       <div style={{ color: "#666", marginBottom: 4 }}>{label}</div>
       {payload.map(p => (
         <div key={p.dataKey} style={{ color: p.color }}>
-          {p.name}: {p.value}{p.dataKey === "crowdVinner" ? "" : "%"}
+          {p.name}: {p.value > 0 && p.dataKey === "crowdAdvantage" ? "+" : ""}{p.value}%
         </div>
       ))}
     </div>
@@ -68,18 +68,18 @@ export default function VisdomsspeletGraf({ data }) {
 
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "20px 20px 16px" }}>
         <div style={{ fontFamily: "monospace", fontSize: 12, color: "#e0e0e0", fontWeight: 600, marginBottom: 2 }}>
-          Vinner crowd:en eller bästa individ?
+          Crowd advantage — hur mycket bättre är kollektivet?
         </div>
         <div style={{ fontFamily: "monospace", fontSize: 10, color: "#555", marginBottom: 16 }}>
-          100 = kollektivet slog bästa enskilda agent · 0 = bästa individ vann
+          (snitt individuellt fel − kollektivt fel) / snitt individuellt fel · positivt = kollektivet vinner över snittindividen
         </div>
-        <ResponsiveContainer width="100%" height={140}>
+        <ResponsiveContainer width="100%" height={160}>
           <LineChart data={data} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
             <XAxis dataKey="label" tick={xTickStyle} interval="preserveStartEnd" />
-            <YAxis domain={[0, 100]} ticks={[0, 100]} tick={yTickStyle} />
-            <ReferenceLine y={50} stroke="#222" />
+            <YAxis tick={yTickStyle} />
+            <ReferenceLine y={0} stroke="#222" />
             <Tooltip content={<TT />} />
-            <Line type="stepAfter" dataKey="crowdVinner" stroke={C.green} dot={{ r: 3 }} strokeWidth={1.5} name="Crowd vinner" />
+            <Line type="monotone" dataKey="crowdAdvantage" stroke={C.green} dot={{ r: 2 }} strokeWidth={1.5} name="Crowd advantage" />
           </LineChart>
         </ResponsiveContainer>
       </div>

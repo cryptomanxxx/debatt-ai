@@ -1856,14 +1856,16 @@ Mäter om de 24 AI-agenterna tillsammans är "smartare" än var och en för sig.
 
 **Lorenz et al. 2011 (PNAS)-testet:** de tre kommunikationslägena jämförs mot varandra på `/visdomsspelet`. Om sekventiellt/deliberativt visar lägre diversitet men inte lägre kollektivt fel än oberoende är det samma social-påverkan-effekt som i den klassiska studien, nu hos AI-agenter.
 
+**Crowd advantage:** `(genomsnittligt_individuellt_fel − kollektivt_fel) / genomsnittligt_individuellt_fel`. Mäter hur mycket bättre kollektivet är än en *typisk* enskild agent — till skillnad från `crowd_vinner` (binärt, jämför mot den allra bästa individen, en hög ribba). Beräknas klientsidan ur redan lagrade fält, ingen ny databaskolumn. Visas som procentpill i statistikraden, per-läge-jämförelsen, varje spelkort i "Senaste spelen" och som egen tidsseriegraf (ersätter den tidigare binära 0/100-stegkurvan för crowd vinner).
+
 Minst 8 giltiga agentsvar krävs för att ett spel ska sparas. Kräver Supabase-tabell `ki_spel` — kör `supabase_kollektiv_intelligens.sql` i SQL Editor.
 
 | Fil | Roll |
 |---|---|
 | `supabase_kollektiv_intelligens.sql` | SQL-schema för `ki_spel` med RLS-policies |
 | `kollektiv_intelligens_test.py` | Frågegenerering (12 generatorer), tre lägesrunnare (oberoende/sekventiellt/deliberativt), mätvärdesberäkning, Supabase-sparning, civilisationsminne. Läser kommunikationsläge från `LAGE`-miljövariabeln om satt, annars slumpas det (`os.environ.get("LAGE") or random.choice(LAGEN)`). |
-| `app/visdomsspelet/page.js` | SSR-sida: statistikrad, per-läge-jämförelse (kommunikationseffekten), tidsseriegraf (Recharts), senaste spelen med expanderbar agentlista sorterad efter fel, teoribakgrund. 5 min revalidering. |
-| `app/visdomsspelet/VisdomsspeletGraf.js` | Klientkomponent. Två Recharts-grafer: kollektivt fel/individuellt fel/diversitet per spel kronologiskt, samt crowd vinner (0/100) som stegkurva. Kräver minst 2 spel. |
+| `app/visdomsspelet/page.js` | SSR-sida: statistikrad (inkl. crowd advantage), per-läge-jämförelse (kommunikationseffekten), tidsseriegraf (Recharts), senaste spelen med expanderbar agentlista sorterad efter fel, teoribakgrund. 5 min revalidering. |
+| `app/visdomsspelet/VisdomsspeletGraf.js` | Klientkomponent. Två Recharts-grafer: kollektivt fel/individuellt fel/diversitet per spel kronologiskt, samt crowd advantage (kontinuerlig linje, ersätter tidigare binär crowd vinner-stegkurva). Kräver minst 2 spel. |
 | `.github/workflows/kollektiv-intelligens-test.yml` | Kör dagligen 16:30 svensk tid (14:30 UTC). `workflow_dispatch` har ett valbart `lage`-dropdown (slumpmässigt/oberoende/sekventiellt/deliberativt) för manuell körning — sätts som `LAGE`-miljövariabel till skriptet. |
 
 ---

@@ -67,6 +67,14 @@ function kortLabel(iso) {
   return `${d.getDate()}/${d.getMonth() + 1} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+// Hur mycket bättre är kollektivet än en genomsnittlig enskild agent?
+// (genomsnittligt individuellt fel − kollektivt fel) / genomsnittligt individuellt fel
+// Positivt = kollektivet vinner över snittindividen, negativt = snittindividen hade haft rätt oftare.
+function crowdAdvantage(individuelltFel, kollektivtFel) {
+  if (!individuelltFel || individuelltFel <= 0) return 0;
+  return ((individuelltFel - kollektivtFel) / individuelltFel) * 100;
+}
+
 function LageBadge({ lage }) {
   const s = LAGE_LABEL[lage] || { label: lage?.toUpperCase() || "?", color: C.dim };
   return (
@@ -104,6 +112,9 @@ export default async function VisdomsspeletPage() {
   const snittIndividuelltFel = snitt(giltiga.map(s => s.genomsnittligt_individuellt_fel));
   const snittDiversitet = snitt(giltiga.map(s => s.diversitet));
   const snittOverkonfidens = snitt(giltiga.map(s => s.overkonfidens));
+  const snittCrowdAdvantage = snitt(
+    giltiga.map(s => crowdAdvantage(s.genomsnittligt_individuellt_fel, s.kollektivt_fel))
+  );
 
   const perLage = ["oberoende", "sekventiellt", "deliberativt"].map(lage => {
     const grupp = giltiga.filter(s => s.lage === lage);
@@ -115,6 +126,9 @@ export default async function VisdomsspeletPage() {
         : 0,
       snittFel: snitt(grupp.map(s => s.kollektivt_fel)),
       snittDiversitet: snitt(grupp.map(s => s.diversitet)),
+      snittCrowdAdvantage: snitt(
+        grupp.map(s => crowdAdvantage(s.genomsnittligt_individuellt_fel, s.kollektivt_fel))
+      ),
     };
   });
 
@@ -123,7 +137,7 @@ export default async function VisdomsspeletPage() {
     kollektivtFel: Math.round((s.kollektivt_fel ?? 0) * 10) / 10,
     individuelltFel: Math.round((s.genomsnittligt_individuellt_fel ?? 0) * 10) / 10,
     diversitet: Math.round((s.diversitet ?? 0) * 10) / 10,
-    crowdVinner: s.crowd_vinner ? 100 : 0,
+    crowdAdvantage: Math.round(crowdAdvantage(s.genomsnittligt_individuellt_fel, s.kollektivt_fel) * 10) / 10,
   }));
 
   return (
@@ -170,6 +184,11 @@ export default async function VisdomsspeletPage() {
         {[
           { label: "Spel spelade", value: antalSpel, color: C.teal },
           { label: "Crowd vinner", value: `${crowdVinnerPct}%`, color: C.green },
+          {
+            label: "Crowd advantage",
+            value: `${snittCrowdAdvantage >= 0 ? "+" : ""}${snittCrowdAdvantage.toFixed(1)}%`,
+            color: snittCrowdAdvantage >= 0 ? C.green : C.red,
+          },
           { label: "Kollektivt fel", value: `${snittKollektivtFel.toFixed(1)}%`, color: C.accent },
           { label: "Individuellt fel", value: `${snittIndividuelltFel.toFixed(1)}%`, color: C.orange },
           { label: "Diversitet", value: snittDiversitet.toFixed(1), color: C.purple },
@@ -222,12 +241,18 @@ export default async function VisdomsspeletPage() {
                 <div style={{ marginTop: "12px", fontSize: "11px", color: C.dim, fontFamily: "monospace" }}>
                   {p.antal} spel
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "10px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "10px", marginTop: "10px" }}>
                   <div>
                     <div style={{ fontSize: "18px", fontWeight: 700, color: C.green, fontFamily: "monospace" }}>
                       {p.crowdVinnerPct}%
                     </div>
                     <div style={{ fontSize: "9px", color: C.dimmer, fontFamily: "monospace" }}>CROWD VINNER</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "18px", fontWeight: 700, color: p.snittCrowdAdvantage >= 0 ? C.green : C.red, fontFamily: "monospace" }}>
+                      {p.snittCrowdAdvantage >= 0 ? "+" : ""}{p.snittCrowdAdvantage.toFixed(1)}%
+                    </div>
+                    <div style={{ fontSize: "9px", color: C.dimmer, fontFamily: "monospace" }}>CROWD ADVANTAGE</div>
                   </div>
                   <div>
                     <div style={{ fontSize: "18px", fontWeight: 700, color: C.accent, fontFamily: "monospace" }}>
@@ -328,6 +353,17 @@ export default async function VisdomsspeletPage() {
                         {s.bast_individuellt_fel}% fel
                       </div>
                     </div>
+                    <div>
+                      <div style={{ fontSize: "10px", color: C.dim, fontFamily: "monospace" }}>CROWD ADVANTAGE</div>
+                      {(() => {
+                        const ca = crowdAdvantage(s.genomsnittligt_individuellt_fel, s.kollektivt_fel);
+                        return (
+                          <div style={{ fontSize: "16px", fontWeight: 700, color: ca >= 0 ? C.green : C.red, fontFamily: "monospace" }}>
+                            {ca >= 0 ? "+" : ""}{ca.toFixed(1)}%
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
 
                   <details>
@@ -381,7 +417,7 @@ export default async function VisdomsspeletPage() {
               {
                 icon: "📐",
                 rubrik: "Page's diversity prediction theorem",
-                text: `Scott Page visade matematiskt att kollektivt_fel ≈ genomsnittligt_individuellt_fel − diversitet. Ju mer agenternas gissningar skiljer sig från varandra (utan att vara systematiskt fel), desto mer slår gruppen sina egna medlemmar. Diversitet är inte brus — det är själva källan till crowd-fördelen.`,
+                text: `Scott Page visade matematiskt att kollektivt_fel ≈ genomsnittligt_individuellt_fel − diversitet. Ju mer agenternas gissningar skiljer sig från varandra (utan att vara systematiskt fel), desto mer slår gruppen sina egna medlemmar. Diversitet är inte brus — det är själva källan till crowd-fördelen. "Crowd advantage" gör det konkret: (genomsnittligt individuellt fel − kollektivt fel) / genomsnittligt individuellt fel — hur mycket bättre kollektivet är än en typisk enskild agent, inte bara om det slår den allra bästa.`,
               },
               {
                 icon: "🔗",
