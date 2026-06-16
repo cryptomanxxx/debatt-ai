@@ -17,7 +17,7 @@ import sys
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
-from ai_klient import groq_post
+from ai_klient import hamta_kort_fns
 from agenter import YOUTUBE_KANALER
 
 _PROXY = "https://www.debatt-ai.se/api/rss-proxy?url="
@@ -480,19 +480,20 @@ def valj_nyhet_med_groq(nyheter: list, agent: dict) -> dict:
         f"Nyheter:\n{lista}\n\n"
         f"Svara ENBART med numret (t.ex. '4'). Inget annat."
     )
-    try:
-        r = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 5,
-            "temperature": 0.2,
-            "messages": [{"role": "user", "content": prompt}],
-        })
-        svar = r.json()["choices"][0]["message"]["content"].strip()
-        idx = int(svar) - 1
-        if 0 <= idx < len(kandidater):
-            print(f"  [groq-urval] Vald nyhet #{idx+1}: {kandidater[idx]['rubrik'][:60]}")
-            return kandidater[idx]
-    except Exception as e:
-        print(f"  [groq-urval] Fel, faller tillbaka på slump: {e}", file=sys.stderr)
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "max_tokens": 5,
+        "temperature": 0.2,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    for _name, fn in hamta_kort_fns(payload, "", prompt, 5, source="nyhetsurval"):
+        try:
+            svar = fn()
+            idx = int(svar) - 1
+            if 0 <= idx < len(kandidater):
+                print(f"  [{_name}-urval] Vald nyhet #{idx+1}: {kandidater[idx]['rubrik'][:60]}")
+                return kandidater[idx]
+        except Exception as e:
+            print(f"  [{_name}-urval] Fel: {e}", file=sys.stderr)
     import random
     return random.choice(kandidater)

@@ -80,7 +80,7 @@ KONKURS_TROSKEL        = -100.0
 
 def _llm(system: str, prompt: str, max_tokens: int = 120) -> str:
     try:
-        from ai_klient import groq_post, deepseek_post, github_models_post
+        from ai_klient import hamta_kort_fns
     except ImportError:
         return ""
     payload = {
@@ -92,11 +92,11 @@ def _llm(system: str, prompt: str, max_tokens: int = 120) -> str:
             {"role": "user",   "content": prompt},
         ],
     }
-    for fn in [lambda: groq_post(payload),
-               lambda: deepseek_post(payload),
-               lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"})]:
+    for _name, fn in hamta_kort_fns(payload, system, prompt, max_tokens, source="foretag"):
         try:
-            return fn().json()["choices"][0]["message"]["content"].strip()
+            result = fn()
+            if result:
+                return result
         except Exception:
             pass
     return ""

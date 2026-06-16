@@ -29,24 +29,18 @@ import urllib.parse
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, sambanova_post, cerebras_post, mistral_post
+from ai_klient import hamta_kort_fns
 from agenter import OPINION_FRAGOR
 
 
 def _llm_spel(system: str, prompt: str, max_tokens: int = 80) -> str:
-    """Kort LLM-anrop för ekonomispel med full fallback-kedja."""
+    """Kort LLM-anrop för ekonomispel — provar alla providers i dynamisk rankad ordning."""
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         "max_tokens": max_tokens, "temperature": 0.7,
     }
-    for fn in [
-        lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip(),
-        lambda: deepseek_post(payload).json()["choices"][0]["message"]["content"].strip(),
-        lambda: github_models_post(payload).json()["choices"][0]["message"]["content"].strip(),
-        lambda: cloudflare_post(system, prompt, max_tokens=max_tokens),
-        lambda: gemini_post(system, prompt, max_tokens=max_tokens),
-    ]:
+    for _name, fn in hamta_kort_fns(payload, system, prompt, max_tokens, source="spel"):
         try:
             result = fn()
             if result:
@@ -863,19 +857,19 @@ def rösta_på_opinion(agent: dict, sb_key: str) -> int:
                 "Svara med exakt ett ord: Ja, Nej eller Osäker."
             )
             svar_raw = ""
-            try:
-                r = groq_post({
-                    "model": "llama-3.3-70b-versatile",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 5,
-                    "temperature": 0.3,
-                })
-                svar_raw = r.json()["choices"][0]["message"]["content"].strip().lower()
-            except Exception:
+            _osaker_payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 5,
+                "temperature": 0.3,
+            }
+            for _name, fn in hamta_kort_fns(_osaker_payload, "", prompt, 5, source="opinion_ai"):
                 try:
-                    svar_raw = gemini_post("", prompt, max_tokens=5).strip().lower()
+                    svar_raw = fn().lower()
+                    if svar_raw:
+                        break
                 except Exception:
-                    pass
+                    continue
             if "ja" in svar_raw and "nej" not in svar_raw:
                 svar = "ja"
             elif "nej" in svar_raw:
@@ -958,19 +952,21 @@ def skapa_opinion_fraga(agent: dict, sb_key: str, amne: str, rubrik: str = "") -
         )
 
         svar_raw = ""
-        try:
-            r = groq_post({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 80,
-                "temperature": 0.9,
-            })
-            svar_raw = r.json()["choices"][0]["message"]["content"].strip()
-        except Exception:
+        _amnesforslag_payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 80,
+            "temperature": 0.9,
+        }
+        for _name, fn in hamta_kort_fns(_amnesforslag_payload, "", prompt, 80, source="opinion_amnesforslag"):
             try:
-                svar_raw = gemini_post("", prompt, max_tokens=80).strip()
+                svar_raw = fn()
+                if svar_raw:
+                    break
             except Exception:
-                return False
+                continue
+        if not svar_raw:
+            return False
 
         svar_raw = svar_raw.replace("```json", "").replace("```", "").strip()
         parsed = json.loads(svar_raw)
@@ -1036,16 +1032,15 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
             "max_tokens": 150,
             "temperature": 0.85,
         }
-        try:
-            svar_raw = groq_post(_market_payload).json()["choices"][0]["message"]["content"].strip()
-        except Exception:
+        for _name, fn in hamta_kort_fns(_market_payload, "", prompt, 150, source="market_forslag"):
             try:
-                svar_raw = gemini_post("", prompt, max_tokens=150).strip()
+                svar_raw = fn()
+                if svar_raw:
+                    break
             except Exception:
-                try:
-                    svar_raw = github_models_post({**_market_payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"].strip()
-                except Exception:
-                    return False
+                continue
+        if not svar_raw:
+            return False
         svar_raw = svar_raw.replace("```json", "").replace("```", "").strip()
         parsed = json.loads(svar_raw)
         titel = parsed.get("titel", "").strip()
@@ -1152,7 +1147,7 @@ def hamta_pexels_bild(sokterm: str) -> tuple[str | None, str | None]:
 
 
 def valj_visualisering(statistik_data: list[dict]) -> dict | None:
-    """Låter Groq välja vilken statistik som ska visualiseras och hur."""
+    """Låter AI välja vilken statistik som ska visualiseras och hur."""
     stats_text = "\n".join([
         f"- nyckel={r['nyckel']} | {r['namn']} ({r['kategori']}): "
         f"{r['senaste_varde']} {r['enhet']} ({r['period']})"
@@ -1173,19 +1168,20 @@ Returnera ENDAST JSON (inga andra tecken):
 
 Välj den indikator som just nu är mest politiskt relevant. typ ska vara 'line' för trender över tid, 'bar' för jämförelser."""
 
-    try:
-        response = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 250,
-            "temperature": 0.7,
-        }, timeout=30)
-        raw = response.json()["choices"][0]["message"]["content"].strip()
-        raw = raw[raw.find("{"):raw.rfind("}")+1]
-        return json.loads(raw)
-    except Exception as e:
-        print(f"  Fel i valj_visualisering: {e}", file=sys.stderr)
-        return None
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 250,
+        "temperature": 0.7,
+    }
+    for _name, fn in hamta_kort_fns(payload, "", prompt, 250, source="visualisering"):
+        try:
+            raw = fn()
+            raw = raw[raw.find("{"):raw.rfind("}")+1]
+            return json.loads(raw)
+        except Exception:
+            continue
+    return None
 
 
 def hamta_market_artiklar(sb_key: str, market: dict, max_artiklar: int = 3) -> list[dict]:
@@ -1353,18 +1349,16 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key
         "max_tokens": 350,
         "temperature": 0.4,
     }
-    try:
-        text = groq_post(_payload).json()["choices"][0]["message"]["content"].strip()
-    except Exception:
+    text = ""
+    for _name, fn in hamta_kort_fns(_payload, system, user_msg, 350, source="market_bet"):
         try:
-            text = gemini_post(system, user_msg, max_tokens=350)
+            text = fn()
+            if text:
+                break
         except Exception:
-            try:
-                text = github_models_post(
-                    {**_payload, "model": "Llama-3.3-70B-Instruct"}
-                ).json()["choices"][0]["message"]["content"].strip()
-            except Exception:
-                return 50, "Ingen analys tillgänglig."
+            continue
+    if not text:
+        return 50, "Ingen analys tillgänglig."
 
     start = text.find("{")
     end   = text.rfind("}") + 1
@@ -1587,18 +1581,15 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
                 "max_tokens": 120, "temperature": 0.7,
             }
             raw = None
-            for _name, _fn in [
-                ("Groq",      lambda: groq_post(payload)),
-                ("DeepSeek",  lambda: deepseek_post(payload)),
-                ("GitHub",    lambda: github_models_post(payload)),
-            ]:
+            for _name, _fn in hamta_kort_fns(payload, agent["system"][:600], prompt, 120, source="parlament_rost"):
                 try:
-                    raw = _fn().json()["choices"][0]["message"]["content"].strip()
-                    break
+                    raw = _fn()
+                    if raw:
+                        break
                 except Exception:
                     pass
             if not raw:
-                raw = cloudflare_post(agent["system"][:600], prompt, max_tokens=120)
+                continue
 
             rod, motivering = "avstar", ""
             for line in raw.splitlines():
@@ -1650,10 +1641,14 @@ def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str, return_id: bool = F
             ],
             "max_tokens": 400, "temperature": 0.85,
         }
-        try:
-            raw = groq_post(payload).json()["choices"][0]["message"]["content"].strip()
-        except Exception:
-            raw = gemini_post(agent["system"][:600], prompt, max_tokens=400)
+        raw = ""
+        for _name, fn in hamta_kort_fns(payload, agent["system"][:600], prompt, 400, source="lagforslag"):
+            try:
+                raw = fn()
+                if raw:
+                    break
+            except Exception:
+                continue
 
         titel, kategori, beskrivning = amne[:80], "Övrigt", ""
         for line in raw.splitlines():
@@ -1970,28 +1965,18 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
         )
         forslag_system = "Du föreslår politiska allianser."
         forslag = None
-        try:
-            forslag = groq_post({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "system", "content": forslag_system}, {"role": "user", "content": forslag_prompt}],
-                "max_tokens": 120, "temperature": 0.8,
-            }).json()["choices"][0]["message"]["content"].strip()
-        except Exception:
-            pass
-        if not forslag:
+        _forslag_payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": forslag_system}, {"role": "user", "content": forslag_prompt}],
+            "max_tokens": 120, "temperature": 0.8,
+        }
+        for _name, fn in hamta_kort_fns(_forslag_payload, forslag_system, forslag_prompt, 120, source="koalition_forslag"):
             try:
-                forslag = gemini_post(forslag_system, forslag_prompt, max_tokens=120)
+                forslag = fn()
+                if forslag:
+                    break
             except Exception:
-                pass
-        if not forslag:
-            try:
-                forslag = github_models_post({
-                    "model": "Llama-3.3-70B-Instruct",
-                    "messages": [{"role": "system", "content": forslag_system}, {"role": "user", "content": forslag_prompt}],
-                    "max_tokens": 120, "temperature": 0.8,
-                }).json()["choices"][0]["message"]["content"].strip()
-            except Exception:
-                pass
+                continue
         if not forslag:
             return False
 
@@ -2005,28 +1990,18 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
         )
         svar_system = "Du besvarar politiska koalitionsförslag."
         svar = None
-        try:
-            svar = groq_post({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "system", "content": svar_system}, {"role": "user", "content": svar_prompt}],
-                "max_tokens": 100, "temperature": 0.8,
-            }).json()["choices"][0]["message"]["content"].strip()
-        except Exception:
-            pass
-        if not svar:
+        _svar_payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": svar_system}, {"role": "user", "content": svar_prompt}],
+            "max_tokens": 100, "temperature": 0.8,
+        }
+        for _name, fn in hamta_kort_fns(_svar_payload, svar_system, svar_prompt, 100, source="koalition_svar"):
             try:
-                svar = gemini_post(svar_system, svar_prompt, max_tokens=100)
+                svar = fn()
+                if svar:
+                    break
             except Exception:
-                pass
-        if not svar:
-            try:
-                svar = github_models_post({
-                    "model": "Llama-3.3-70B-Instruct",
-                    "messages": [{"role": "system", "content": svar_system}, {"role": "user", "content": svar_prompt}],
-                    "max_tokens": 100, "temperature": 0.8,
-                }).json()["choices"][0]["message"]["content"].strip()
-            except Exception:
-                pass
+                continue
 
         beslut = "avvisar"
         svar_text = ""
@@ -2201,28 +2176,18 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
             f"Skriv ett kort, övertygande lobbyingargument (2 meningar) till {mal_namn}:"
         )
         argument = None
-        try:
-            argument = groq_post({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "system", "content": lobby_system}, {"role": "user", "content": lobby_user}],
-                "max_tokens": 120, "temperature": 0.7,
-            }).json()["choices"][0]["message"]["content"].strip()
-        except Exception:
-            pass
-        if not argument:
+        _argument_payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": lobby_system}, {"role": "user", "content": lobby_user}],
+            "max_tokens": 120, "temperature": 0.7,
+        }
+        for _name, fn in hamta_kort_fns(_argument_payload, lobby_system, lobby_user, 120, source="lobbying_argument"):
             try:
-                argument = gemini_post(lobby_system, lobby_user, max_tokens=120)
+                argument = fn()
+                if argument:
+                    break
             except Exception:
-                pass
-        if not argument:
-            try:
-                argument = github_models_post({
-                    "model": "Llama-3.3-70B-Instruct",
-                    "messages": [{"role": "system", "content": lobby_system}, {"role": "user", "content": lobby_user}],
-                    "max_tokens": 120, "temperature": 0.7,
-                }).json()["choices"][0]["message"]["content"].strip()
-            except Exception:
-                pass
+                continue
         if not argument:
             print("  [lobbying] Avbryter: kunde inte generera argument")
             return False
@@ -2247,28 +2212,18 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         )
         mal_system = "Du fattar politiska beslut."
         mal_svar = None
-        try:
-            mal_svar = groq_post({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "system", "content": mal_system}, {"role": "user", "content": mal_prompt}],
-                "max_tokens": 80, "temperature": 0.7,
-            }).json()["choices"][0]["message"]["content"].strip()
-        except Exception:
-            pass
-        if not mal_svar:
+        _mal_payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": mal_system}, {"role": "user", "content": mal_prompt}],
+            "max_tokens": 80, "temperature": 0.7,
+        }
+        for _name, fn in hamta_kort_fns(_mal_payload, mal_system, mal_prompt, 80, source="lobbying_beslut"):
             try:
-                mal_svar = gemini_post(mal_system, mal_prompt, max_tokens=80)
+                mal_svar = fn()
+                if mal_svar:
+                    break
             except Exception:
-                pass
-        if not mal_svar:
-            try:
-                mal_svar = github_models_post({
-                    "model": "Llama-3.3-70B-Instruct",
-                    "messages": [{"role": "system", "content": mal_system}, {"role": "user", "content": mal_prompt}],
-                    "max_tokens": 80, "temperature": 0.7,
-                }).json()["choices"][0]["message"]["content"].strip()
-            except Exception:
-                pass
+                continue
 
         resultat = "avvisat"
         motivering = ""
@@ -2510,15 +2465,13 @@ def kör_bribe(agent: dict, sb_key: str) -> bool:
             f"Skriv ett kort, diskret argument (2 meningar) till {mal_namn}:"
         )
         argument = None
-        for llm_fn, llm_args in [
-            (lambda: groq_post({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "system", "content": bribe_system},
-                              {"role": "user", "content": bribe_user}],
-                "max_tokens": 120, "temperature": 0.8,
-            }).json()["choices"][0]["message"]["content"].strip(), None),
-            (lambda: gemini_post(bribe_system, bribe_user, max_tokens=120), None),
-        ]:
+        _bribe_payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": bribe_system},
+                          {"role": "user", "content": bribe_user}],
+            "max_tokens": 120, "temperature": 0.8,
+        }
+        for _name, llm_fn in hamta_kort_fns(_bribe_payload, bribe_system, bribe_user, 120, source="bribe_argument"):
             try:
                 argument = llm_fn()
                 if argument:
@@ -2539,15 +2492,13 @@ def kör_bribe(agent: dict, sb_key: str) -> bool:
             f"Svara EXAKT:\nBESLUT: accepterar eller avvisar\nMOTIVERING: [1 mening]"
         )
         mal_svar = None
-        for llm_fn in [
-            lambda: groq_post({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "system", "content": mal_system},
-                              {"role": "user", "content": mal_prompt}],
-                "max_tokens": 80, "temperature": 0.7,
-            }).json()["choices"][0]["message"]["content"].strip(),
-            lambda: gemini_post(mal_system, mal_prompt, max_tokens=80),
-        ]:
+        _lobby_payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": mal_system},
+                          {"role": "user", "content": mal_prompt}],
+            "max_tokens": 80, "temperature": 0.7,
+        }
+        for _name, llm_fn in hamta_kort_fns(_lobby_payload, mal_system, mal_prompt, 80, source="lobbying"):
             try:
                 mal_svar = llm_fn()
                 if mal_svar:
@@ -2753,24 +2704,23 @@ def uppdatera_agent_positioner(sb_key: str, agent: dict) -> None:
         )
 
         _system = "Du extraherar ståndpunkter ur debattartiklar."
-        try:
-            r = groq_post({
-                "model": "llama-3.3-70b-versatile",
-                "messages": [
-                    {"role": "system", "content": _system},
-                    {"role": "user", "content": prompt},
-                ],
-                "max_tokens": 400,
-                "temperature": 0.3,
-            })
-            svar = r.json()["choices"][0]["message"]["content"].strip()
-        except Exception:
-            svar = None
-        if not svar:
+        _payload = {
+            "model": "llama-3.3-70b-versatile",
+            "messages": [
+                {"role": "system", "content": _system},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": 400,
+            "temperature": 0.3,
+        }
+        svar = None
+        for _name, fn in hamta_kort_fns(_payload, _system, prompt, 400, source="positioner"):
             try:
-                svar = gemini_post(_system, prompt, max_tokens=400)
+                svar = fn()
+                if svar:
+                    break
             except Exception:
-                svar = None
+                continue
         if not svar:
             return
 
@@ -5202,10 +5152,7 @@ def reagera_pa_bild(sb_key: str, fran_agent: str, fran_system: str) -> bool:
             "max_tokens": 120, "temperature": 0.9,
         }
         reaktion = ""
-        for fn in [
-            lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip(),
-            lambda: gemini_post(fran_system[:600], prompt_text, max_tokens=120),
-        ]:
+        for _name, fn in hamta_kort_fns(payload, fran_system[:600], prompt_text, 120, source="bildreaktion"):
             try:
                 reaktion = fn()
                 if reaktion and len(reaktion) > 10:
@@ -5676,12 +5623,11 @@ def uppdatera_strategi(sb_key: str, agent_namn: str) -> bool:
     )
     system = "Du är analytisk och kortfattad. Inga inledningar eller sammanfattningar."
 
-    from ai_klient import groq_post, gemini_post, github_models_post
     svar = ""
     payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "max_tokens": 150, "temperature": 0.6}
-    for fn in [lambda: groq_post(payload), lambda: gemini_post(payload), lambda: github_models_post(payload)]:
+    for _name, fn in hamta_kort_fns(payload, system, prompt, 150, source="strategi"):
         try:
-            svar = fn().json()["choices"][0]["message"]["content"].strip()
+            svar = fn()
             if svar:
                 break
         except Exception:
@@ -5774,25 +5720,13 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
             "max_tokens": 480, "temperature": 0.35,
         }
         raw = None
-        try:
-            raw = mistral_post(payload).json()["choices"][0]["message"]["content"].strip()
-        except Exception:
-            pass
-        if not raw:
+        for _name, _fn in hamta_kort_fns(payload, system, prompt, 480, source="pis_analys"):
             try:
-                raw = sambanova_post(payload).json()["choices"][0]["message"]["content"].strip()
+                raw = _fn()
+                if raw:
+                    break
             except Exception:
-                pass
-        if not raw:
-            try:
-                raw = deepseek_post(payload).json()["choices"][0]["message"]["content"].strip()
-            except Exception:
-                pass
-        if not raw:
-            try:
-                raw = cloudflare_post(system, prompt, max_tokens=480)
-            except Exception:
-                pass
+                continue
         if not raw:
             return False
 
@@ -5928,25 +5862,13 @@ def analysera_pis_monte_carlo(sb_key: str, forslag_id: int, titel: str,
         }
         try:
             raw = None
-            try:
-                raw = mistral_post(payload).json()["choices"][0]["message"]["content"].strip()
-            except Exception:
-                pass
-            if not raw:
+            for _name, _fn in hamta_kort_fns(payload, system, prompt, 160, source="pis_monte_carlo"):
                 try:
-                    raw = sambanova_post(payload).json()["choices"][0]["message"]["content"].strip()
+                    raw = _fn()
+                    if raw:
+                        break
                 except Exception:
-                    pass
-            if not raw:
-                try:
-                    raw = deepseek_post(payload).json()["choices"][0]["message"]["content"].strip()
-                except Exception:
-                    pass
-            if not raw:
-                try:
-                    raw = cloudflare_post(system, prompt, max_tokens=160)
-                except Exception:
-                    pass
+                    continue
             if not raw:
                 continue
             parsed = _parse_pis_iteration(raw)

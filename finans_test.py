@@ -23,7 +23,7 @@ from supabase_utils import (
     SB_URL, kop_etf, spara_civilisations_minne,
     ETF_KRYPTO_PREFERENSER,
 )
-from ai_klient import groq_post, gemini_post, github_models_post
+from ai_klient import hamta_kort_fns
 
 
 # ── LLM-anrop ─────────────────────────────────────────────────────────────────
@@ -35,11 +35,7 @@ def _llm(system: str, prompt: str, max_tokens: int = 60) -> str:
                      {"role": "user",   "content": prompt}],
         "max_tokens": max_tokens, "temperature": 0.8,
     }
-    for fn in [
-        lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip(),
-        lambda: gemini_post(system, prompt, max_tokens=max_tokens),
-        lambda: github_models_post(payload).json()["choices"][0]["message"]["content"].strip(),
-    ]:
+    for _name, fn in hamta_kort_fns(payload, system, prompt, max_tokens, source="finans"):
         try:
             r = fn()
             if r:

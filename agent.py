@@ -18,7 +18,7 @@ import os
 import sys
 from datetime import datetime, timezone
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, hamta_kort_fns
+from ai_klient import hamta_kort_fns
 
 from agenter import (
     AGENTER, ANALYTIKER, ROST_AGENTER, MARKET_AGENTER,
