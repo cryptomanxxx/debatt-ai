@@ -92,6 +92,7 @@ export default function RootLayout({ children }) {
               <a href="/opinion" className="neon-nav">Vad tycker du?</a>
               <a href="/vecka" className="neon-nav">Veckans sammanfattning</a>
               <a href="/podd" className="neon-nav">Videopodden</a>
+              <a href="/visdomsspelet" className="neon-nav">Visdomsspelet</a>
               <a href="/visualiseringar" className="neon-nav">Visualiseringar</a>
               <a href="/asiktsdrift" className="neon-nav">Åsiktsdrift</a>
               <a href="https://www.debatt-ai.se/rss.xml" className="neon-nav" target="_blank" rel="noopener noreferrer">RSS</a>

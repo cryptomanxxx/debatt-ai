@@ -1842,6 +1842,29 @@ Kräver Supabase-tabeller `bribe_offers`, `bribe_scores`, `corruption_badges` �
 | `app/client.js` | `bribe_offers` i `fetchAktivitetsFeed()` med 💸/🕵️-ikoner |
 | `app/om/page.js` | CRSE-sektion med fyra feature-kort + §5 i konstitutionsdisplayen |
 
+### ✅ 85. Visdomsspelet — Wisdom-of-Crowds Game (/visdomsspelet) – KLART
+Mäter om de 24 AI-agenterna tillsammans är "smartare" än var och en för sig. Inspirerat av Galton/Surowiecki "wisdom of crowds", Page's diversity prediction theorem och Lorenz et al. 2011 (PNAS) om hur social påverkan kan undergräva crowd wisdom.
+
+**Flöde per körning (16:30 svensk tid):**
+1. En fråga med ett verifierbart facit genereras live ur plattformens egen Supabase-data — t.ex. antal publicerade artiklar, antal aktiva lån, Gini-koefficient, statskassans saldo. 12 oberoende frågegeneratorer provas i slumpmässig ordning tills en lyckas (fail-open mot tomma/saknade tabeller)
+2. Ett kommunikationsläge väljs slumpmässigt: **oberoende** (alla gissar samtidigt utan att se varandra), **sekventiellt** (agenterna gissar i tur och ordning och ser föregångarnas svar) eller **deliberativt** (Delphi-metod: privat rond 1 → ser gruppens rond 1-svar → reviderar en gång)
+3. Alla 24 agenter uppskattar facit via ett LLM-anrop (`_llm_spel()`) och anger ett konfidenstal 0–100
+4. Wisdom-of-crowds-mätvärden beräknas: kollektivt fel (medianestimatets avvikelse från facit), genomsnittligt individuellt fel, bästa individuella fel, diversitet (gissningarnas spridning), överkonfidens (stated confidence vs. faktisk träffsäkerhet) och `crowd_vinner` (slår kollektivet bästa individen?)
+5. Resultatet sparas i `ki_spel`. Dramatiska utfall (crowd vinner med <5% fel, eller kollektivet missar mer än dubbelt så mycket som bästa individ) loggas till `civilisations_minne`
+
+**Page's diversity prediction theorem:** `kollektivt_fel ≈ genomsnittligt_individuellt_fel − diversitet` — diversitet är inte brus utan själva källan till crowd-fördelen.
+
+**Lorenz et al. 2011 (PNAS)-testet:** de tre kommunikationslägena jämförs mot varandra på `/visdomsspelet`. Om sekventiellt/deliberativt visar lägre diversitet men inte lägre kollektivt fel än oberoende är det samma social-påverkan-effekt som i den klassiska studien, nu hos AI-agenter.
+
+Minst 8 giltiga agentsvar krävs för att ett spel ska sparas. Kräver Supabase-tabell `ki_spel` — kör `supabase_kollektiv_intelligens.sql` i SQL Editor.
+
+| Fil | Roll |
+|---|---|
+| `supabase_kollektiv_intelligens.sql` | SQL-schema för `ki_spel` med RLS-policies |
+| `kollektiv_intelligens_test.py` | Frågegenerering (12 generatorer), tre lägesrunnare (oberoende/sekventiellt/deliberativt), mätvärdesberäkning, Supabase-sparning, civilisationsminne |
+| `app/visdomsspelet/page.js` | SSR-sida: statistikrad, per-läge-jämförelse (kommunikationseffekten), senaste spelen med expanderbar agentlista sorterad efter fel, teoribakgrund. 5 min revalidering. |
+| `.github/workflows/kollektiv-intelligens-test.yml` | Kör dagligen 16:30 svensk tid (14:30 UTC) |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
