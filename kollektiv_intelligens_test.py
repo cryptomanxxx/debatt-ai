@@ -483,7 +483,7 @@ def berakna_matvarden(svar: list[dict], facit: float):
     kollektivt_fel = round(_relativt_fel(kollektivt_estimat, facit), 2)
     genomsnittligt_fel = round(statistics.mean(fel_lista), 2)
     bast_fel = round(min(fel_lista), 2)
-    diversitet = round((statistics.pstdev(estimat_lista) / max(abs(facit), 1)) * 100, 2)
+    diversitet = round(min((statistics.pstdev(estimat_lista) / max(abs(facit), 1)) * 100, FEL_TAK), 2)
 
     overkonfidens_lista = []
     for s, fel in zip(svar, fel_lista):
