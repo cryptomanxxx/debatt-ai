@@ -370,7 +370,7 @@ export default function HedgefondApiPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[
               ["GET /api/hedgefonder", "Dokumentation — fondbeskrivningar, endpoint-lista, exempelsignal"],
-              ["GET /api/hedgefonder/signaler", "Senaste signal och innehav för QUANT och STRAT"],
+              ["GET /api/hedgefonder/signaler", "Senaste signal och innehav för QUANT, STRAT och ARBI"],
               ["GET /api/hedgefonder/nav", "NAV-historik med BTC/SPY benchmark. Param: ?limit=N (default 60, max 365)"],
             ].map(([endpoint, desc]) => (
               <div key={endpoint} style={{ display: "flex", gap: 16, alignItems: "baseline", flexWrap: "wrap" }}>
