@@ -29,24 +29,18 @@ import urllib.parse
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, sambanova_post, cerebras_post, mistral_post
+from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, sambanova_post, cerebras_post, mistral_post, hamta_kort_fns
 from agenter import OPINION_FRAGOR
 
 
 def _llm_spel(system: str, prompt: str, max_tokens: int = 80) -> str:
-    """Kort LLM-anrop för ekonomispel med full fallback-kedja."""
+    """Kort LLM-anrop för ekonomispel — provar alla providers i dynamisk rankad ordning."""
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         "max_tokens": max_tokens, "temperature": 0.7,
     }
-    for fn in [
-        lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip(),
-        lambda: deepseek_post(payload).json()["choices"][0]["message"]["content"].strip(),
-        lambda: github_models_post(payload).json()["choices"][0]["message"]["content"].strip(),
-        lambda: cloudflare_post(system, prompt, max_tokens=max_tokens),
-        lambda: gemini_post(system, prompt, max_tokens=max_tokens),
-    ]:
+    for _name, fn in hamta_kort_fns(payload, system, prompt, max_tokens, source="spel"):
         try:
             result = fn()
             if result:
