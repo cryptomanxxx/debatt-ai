@@ -751,6 +751,13 @@ export default async function HedgefonderPage() {
                   {!riktning && "—"}
                 </div>
               </div>
+
+              {/* Riskvarning */}
+              <div style={{ margin: "0 20px 16px", background: "#1f1606", border: "1px solid #c9a02740", borderRadius: "6px", padding: "10px 12px" }}>
+                <div style={{ fontSize: "11px", color: "#e8c468", lineHeight: "1.5" }}>
+                  ⚠️ ARBI är paper trading. Strategin är delta-neutral mot BTC-prisrörelser, men inte riskfri — funding rates kan ändras snabbt och verklig handel påverkas av avgifter, slippage, likvidation, spreadar och börsrisk.
+                </div>
+              </div>
             </div>
           );
         })()}

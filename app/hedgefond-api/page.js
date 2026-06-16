@@ -256,6 +256,13 @@ export default function HedgefondApiPage() {
                       </div>
                     </div>
                   )}
+                  {fund === "ARBI" && (
+                    <div style={{ background: "#1f1606", border: "1px solid #c9a02740", borderRadius: 6, padding: "10px 14px", marginTop: 12 }}>
+                      <p style={{ fontSize: 12, color: "#e8c468", lineHeight: 1.6, margin: 0 }}>
+                        ⚠️ ARBI är paper trading. Strategin är delta-neutral mot BTC-prisrörelser, men inte riskfri — funding rates kan ändras snabbt och verklig handel påverkas av avgifter, slippage, likvidation, spreadar och börsrisk.
+                      </p>
+                    </div>
+                  )}
                   {f.llm_motivering && (
                     <div style={{ background: "#07100a", border: `1px solid #1a3020`, borderRadius: 8, padding: 16, marginTop: 12 }}>
                       <p style={{ fontSize: 11, color: C.green, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>LLM-motivering</p>

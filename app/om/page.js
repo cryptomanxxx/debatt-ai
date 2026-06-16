@@ -1987,6 +1987,11 @@ export default function OmPage() {
               </div>
             ))}
           </div>
+          <div style={{ background: "#1f1606", border: "1px solid #c9a02740", borderRadius: "6px", padding: "12px 16px", marginBottom: "20px" }}>
+            <p style={{ fontSize: "13px", color: "#e8c468", lineHeight: 1.6, margin: 0 }}>
+              ⚠️ ARBI är paper trading. Strategin är delta-neutral mot BTC-prisrörelser, men inte riskfri — funding rates kan ändras snabbt och verklig handel påverkas av avgifter, slippage, likvidation, spreadar och börsrisk.
+            </p>
+          </div>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <a href="/hedgefond-api" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
               Prova API:et →
