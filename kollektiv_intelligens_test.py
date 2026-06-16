@@ -463,9 +463,13 @@ def kör_deliberativt(fraga: dict) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+FEL_TAK = 300.0  # cap — annars dominerar enstaka extremgissningar på lågfrekventa kategorier (t.ex. "aktiva lån") snittet helt
+
+
 def _relativt_fel(estimat: float, facit: float) -> float:
-    """Procentuellt fel, robust mot facit=0."""
-    return abs(estimat - facit) / max(abs(facit), 1) * 100
+    """Procentuellt fel, robust mot facit=0 och cappat för att undvika att enstaka
+    extremgissningar på kategorier med litet facit (t.ex. 'aktiva lån' = 2) spränger snittet."""
+    return min(abs(estimat - facit) / max(abs(facit), 1) * 100, FEL_TAK)
 
 
 def berakna_matvarden(svar: list[dict], facit: float):
