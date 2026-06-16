@@ -9,6 +9,7 @@ jobs:
   val:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       models: read
     steps:
       - uses: actions/checkout@v6
