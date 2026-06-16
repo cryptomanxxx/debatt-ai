@@ -2,6 +2,17 @@ name: Visdomsspelet (Kollektiv Intelligens)
 
 on:
   workflow_dispatch:
+    inputs:
+      lage:
+        description: "Kommunikationsläge"
+        required: false
+        default: "slumpmässigt"
+        type: choice
+        options:
+          - slumpmässigt
+          - oberoende
+          - sekventiellt
+          - deliberativt
   schedule:
     # 16:30 svensk tid (14:30 UTC, sommartid UTC+2)
     - cron: "30 14 * * *"
@@ -36,4 +47,5 @@ jobs:
           GROQ_API_KEY_10: ${{ secrets.GROQ_API_KEY_10 }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PYTHONUNBUFFERED: "1"
+          LAGE: ${{ github.event.inputs.lage != 'slumpmässigt' && github.event.inputs.lage || '' }}
         run: python -u kollektiv_intelligens_test.py
