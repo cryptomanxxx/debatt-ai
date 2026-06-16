@@ -58,8 +58,10 @@ async function getData() {
   return { spel };
 }
 
+const FEL_TAK = 300; // cap — annars dominerar enstaka extremgissningar på lågfrekventa kategorier (t.ex. "aktiva lån") snittet helt
+
 function relFel(estimat, facit) {
-  return (Math.abs(estimat - facit) / Math.max(Math.abs(facit), 1)) * 100;
+  return Math.min((Math.abs(estimat - facit) / Math.max(Math.abs(facit), 1)) * 100, FEL_TAK);
 }
 
 function kortLabel(iso) {
