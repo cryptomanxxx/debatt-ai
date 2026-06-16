@@ -104,13 +104,16 @@ function CrowdBadge({ vinner }) {
 export default async function VisdomsspeletPage() {
   const { spel } = await getData();
 
+  const FEL_TAK = 300;
+  const capV = v => Math.min(v ?? 0, FEL_TAK);
+
   const giltiga = spel.filter(s => s.kollektivt_fel != null);
   const antalSpel = giltiga.length;
   const crowdVinner = giltiga.filter(s => s.crowd_vinner).length;
   const crowdVinnerPct = antalSpel > 0 ? Math.round((crowdVinner / antalSpel) * 100) : 0;
-  const snittKollektivtFel = snitt(giltiga.map(s => s.kollektivt_fel));
-  const snittIndividuelltFel = snitt(giltiga.map(s => s.genomsnittligt_individuellt_fel));
-  const snittDiversitet = snitt(giltiga.map(s => s.diversitet));
+  const snittKollektivtFel = snitt(giltiga.map(s => capV(s.kollektivt_fel)));
+  const snittIndividuelltFel = snitt(giltiga.map(s => capV(s.genomsnittligt_individuellt_fel)));
+  const snittDiversitet = snitt(giltiga.map(s => capV(s.diversitet)));
   const snittOverkonfidens = snitt(giltiga.map(s => s.overkonfidens));
   const snittCrowdAdvantage = snitt(
     giltiga.map(s => crowdAdvantage(s.genomsnittligt_individuellt_fel, s.kollektivt_fel))
@@ -124,20 +127,20 @@ export default async function VisdomsspeletPage() {
       crowdVinnerPct: grupp.length > 0
         ? Math.round((grupp.filter(s => s.crowd_vinner).length / grupp.length) * 100)
         : 0,
-      snittFel: snitt(grupp.map(s => s.kollektivt_fel)),
-      snittDiversitet: snitt(grupp.map(s => s.diversitet)),
+      snittFel: snitt(grupp.map(s => capV(s.kollektivt_fel))),
+      snittDiversitet: snitt(grupp.map(s => capV(s.diversitet))),
       snittCrowdAdvantage: snitt(
-        grupp.map(s => crowdAdvantage(s.genomsnittligt_individuellt_fel, s.kollektivt_fel))
+        grupp.map(s => crowdAdvantage(capV(s.genomsnittligt_individuellt_fel), capV(s.kollektivt_fel)))
       ),
     };
   });
 
   const grafData = giltiga.slice().reverse().map(s => ({
     label: kortLabel(s.skapad),
-    kollektivtFel: Math.round((s.kollektivt_fel ?? 0) * 10) / 10,
-    individuelltFel: Math.round((s.genomsnittligt_individuellt_fel ?? 0) * 10) / 10,
-    diversitet: Math.round((s.diversitet ?? 0) * 10) / 10,
-    crowdAdvantage: Math.round(crowdAdvantage(s.genomsnittligt_individuellt_fel, s.kollektivt_fel) * 10) / 10,
+    kollektivtFel: Math.round(capV(s.kollektivt_fel) * 10) / 10,
+    individuelltFel: Math.round(capV(s.genomsnittligt_individuellt_fel) * 10) / 10,
+    diversitet: Math.round(capV(s.diversitet) * 10) / 10,
+    crowdAdvantage: Math.round(crowdAdvantage(capV(s.genomsnittligt_individuellt_fel), capV(s.kollektivt_fel)) * 10) / 10,
   }));
 
   return (
