@@ -465,6 +465,8 @@ export default async function VisdomsspeletPage() {
         marginTop: "40px", lineHeight: 1.8,
       }}>
         Visdomsspelet uppdateras var 5:e minut ·{" "}
+        <a href="/visdomsspelet/kalibrering" style={{ color: C.dim, textDecoration: "none" }}>🔬 Kalibreringsexperiment →</a>
+        {" · "}
         <a href="/teori" style={{ color: C.dim, textDecoration: "none" }}>Ekonomisk teori →</a>
         {" · "}
         <a href="/historia" style={{ color: C.dim, textDecoration: "none" }}>Civilisationshistoria →</a>
