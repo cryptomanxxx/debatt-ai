@@ -1861,9 +1861,10 @@ Minst 8 giltiga agentsvar krävs för att ett spel ska sparas. Kräver Supabase-
 | Fil | Roll |
 |---|---|
 | `supabase_kollektiv_intelligens.sql` | SQL-schema för `ki_spel` med RLS-policies |
-| `kollektiv_intelligens_test.py` | Frågegenerering (12 generatorer), tre lägesrunnare (oberoende/sekventiellt/deliberativt), mätvärdesberäkning, Supabase-sparning, civilisationsminne |
-| `app/visdomsspelet/page.js` | SSR-sida: statistikrad, per-läge-jämförelse (kommunikationseffekten), senaste spelen med expanderbar agentlista sorterad efter fel, teoribakgrund. 5 min revalidering. |
-| `.github/workflows/kollektiv-intelligens-test.yml` | Kör dagligen 16:30 svensk tid (14:30 UTC) |
+| `kollektiv_intelligens_test.py` | Frågegenerering (12 generatorer), tre lägesrunnare (oberoende/sekventiellt/deliberativt), mätvärdesberäkning, Supabase-sparning, civilisationsminne. Läser kommunikationsläge från `LAGE`-miljövariabeln om satt, annars slumpas det (`os.environ.get("LAGE") or random.choice(LAGEN)`). |
+| `app/visdomsspelet/page.js` | SSR-sida: statistikrad, per-läge-jämförelse (kommunikationseffekten), tidsseriegraf (Recharts), senaste spelen med expanderbar agentlista sorterad efter fel, teoribakgrund. 5 min revalidering. |
+| `app/visdomsspelet/VisdomsspeletGraf.js` | Klientkomponent. Två Recharts-grafer: kollektivt fel/individuellt fel/diversitet per spel kronologiskt, samt crowd vinner (0/100) som stegkurva. Kräver minst 2 spel. |
+| `.github/workflows/kollektiv-intelligens-test.yml` | Kör dagligen 16:30 svensk tid (14:30 UTC). `workflow_dispatch` har ett valbart `lage`-dropdown (slumpmässigt/oberoende/sekventiellt/deliberativt) för manuell körning — sätts som `LAGE`-miljövariabel till skriptet. |
 
 ---
 

@@ -1,5 +1,7 @@
 export const revalidate = 300;
 
+import VisdomsspeletGraf from "./VisdomsspeletGraf";
+
 export const metadata = {
   title: "Visdomsspelet – DEBATT-AI",
   description:
@@ -59,6 +61,12 @@ function snitt(arr) {
   return arr.reduce((s, v) => s + v, 0) / arr.length;
 }
 
+function kortLabel(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${d.getDate()}/${d.getMonth() + 1} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 function LageBadge({ lage }) {
   const s = LAGE_LABEL[lage] || { label: lage?.toUpperCase() || "?", color: C.dim };
   return (
@@ -109,6 +117,14 @@ export default async function VisdomsspeletPage() {
       snittDiversitet: snitt(grupp.map(s => s.diversitet)),
     };
   });
+
+  const grafData = giltiga.slice().reverse().map(s => ({
+    label: kortLabel(s.skapad),
+    kollektivtFel: Math.round((s.kollektivt_fel ?? 0) * 10) / 10,
+    individuelltFel: Math.round((s.genomsnittligt_individuellt_fel ?? 0) * 10) / 10,
+    diversitet: Math.round((s.diversitet ?? 0) * 10) / 10,
+    crowdVinner: s.crowd_vinner ? 100 : 0,
+  }));
 
   return (
     <main style={{
@@ -234,6 +250,20 @@ export default async function VisdomsspeletPage() {
             att öka träffsäkerhet. Om sekventiellt/deliberativt har lägre diversitet men inte
             lägre snittfel än oberoende — det är samma effekt hos AI-agenterna.
           </p>
+        </section>
+      )}
+
+      {/* Tidsserie */}
+      {antalSpel > 0 && (
+        <section style={{ marginBottom: "48px" }}>
+          <h2 style={{
+            fontSize: "11px", color: C.dim,
+            fontFamily: "monospace", letterSpacing: "0.12em",
+            textTransform: "uppercase", marginBottom: "16px",
+          }}>
+            Utveckling över tid
+          </h2>
+          <VisdomsspeletGraf data={grafData} />
         </section>
       )}
 
