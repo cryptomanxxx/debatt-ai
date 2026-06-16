@@ -1,0 +1,57 @@
+name: Lint – ingen hårdkodad providerklient
+
+on:
+  push:
+    branches: [main]
+    paths: ["**/*.py"]
+  pull_request:
+    paths: ["**/*.py"]
+
+jobs:
+  lint-provider-usage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Kontrollera att ingen fil hårdkodar en AI-providerklient
+        run: |
+          # Tillåtna filer — deras uttalade syfte är att testa/instansiera providers direkt
+          ALLOWLIST="ai_klient.py provider_benchmark.py test_groq_keys.py"
+
+          PATTERN='groq\.Groq\(|import groq\b|from groq import|api\.groq\.com|def groq_anrop'
+
+          FILES=$(grep -rlE "$PATTERN" --include='*.py' . || true)
+
+          VIOLATIONS=""
+          for f in $FILES; do
+            base=$(basename "$f")
+            allowed=false
+            for a in $ALLOWLIST; do
+              if [[ "$base" == "$a" ]]; then
+                allowed=true
+                break
+              fi
+            done
+            if [[ "$allowed" == "false" ]]; then
+              VIOLATIONS="$VIOLATIONS$f"$'\n'
+            fi
+          done
+
+          if [[ -n "$VIOLATIONS" ]]; then
+            echo "❌ Hittade hårdkodad providerklient utanför den dynamiska fallback-kedjan:"
+            echo ""
+            echo "$VIOLATIONS" | while read -r f; do
+              [[ -z "$f" ]] && continue
+              echo "  $f"
+              grep -nE "$PATTERN" "$f" | sed 's/^/    /'
+            done
+            echo ""
+            echo "Använd istället den dynamiska kedjan: hamta_kort_fns()/hamta_artikel_fns() i ai_klient.py,"
+            echo "eller _llm_spel()-wrappern i supabase_utils.py. Se CLAUDE.md för regeln och undantagen."
+            exit 1
+          fi
+
+          echo "✓ Inga hårdkodade providerklienter hittades utanför allowlistan."

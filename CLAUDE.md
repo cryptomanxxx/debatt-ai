@@ -132,6 +132,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 
 `GITHUB_TOKEN` är automatisk i GitHub Actions (kräver `models: read` permission). På Vercel krävs ett PAT med `models:read`-scope som manuell miljövariabel.
 
+**Regel — ingen hårdkodning av providerklienter:** Inga skript får instansiera en AI-providerklient direkt (t.ex. `groq.Groq()`, raw HTTP-anrop till en specifik providers API, eller en lokal `groq_anrop()`-helper) utanför `ai_klient.py`. All LLM-användning ska gå via den dynamiska fallback-kedjan: `hamta_kort_fns()` / `hamta_artikel_fns()` i `ai_klient.py`, eller `_llm_spel()`-wrappern i `supabase_utils.py`. Detta var orsaken till en återkommande bugg där flera skript (`cem_test.py`, `domstol_test.py`, `val_test.py`, m.fl.) hade egna hårdkodade Groq-anrop som föll platt när Groq nådde sin dagsgräns, trots att den dynamiska kedjan fanns och fungerade. Undantag: `provider_benchmark.py` och `test_groq_keys.py`, vars uttalade syfte är att testa enskilda providers. En GitHub Action (`lint-provider-usage.yml`) failar CI om regeln bryts.
+
 ---
 
 ## Supabase-tabeller
