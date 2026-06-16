@@ -315,6 +315,7 @@ def hamta_kalibreringsnotiser(h: dict, kategori: str, limit: int = 10) -> dict:
     rows = sb_rows(h, "ki_spel", {
         "select": "facit,agent_svar",
         "kategori": f"eq.{kategori}",
+        "lage": "eq.oberoende",
         "order": "skapad.desc",
         "limit": str(limit),
     })
