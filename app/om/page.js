@@ -1914,7 +1914,7 @@ export default function OmPage() {
         {/* Hedgefond Signal API */}
         <OmSektion id="hedgefond-api" titel="Hedgefond Signal API — paper trading-signaler">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 16px" }}>
-            QUANT och STRAT är experimentella paper trading-fonder som köper och säljer riktiga kryptotillgångar (BTC/ETH/SOL) med ett fiktivt startkapital på 10 000 USD. Signalerna — köp/sälj, aktiv strategi och LLM-resonemang — exponeras via ett öppet REST API utan autentisering.
+            QUANT och STRAT är experimentella paper trading-fonder som köper och säljer riktiga kryptotillgångar (BTC/ETH/SOL) med ett fiktivt startkapital på 10 000 USD. ARBI kör delta-neutral spot/perpetual funding rate-arbitrage på riktiga Binance/Gate.io-fundingräntor med samma startkapital. Signalerna — köp/sälj, aktiv strategi, LLM-resonemang och funding rate — exponeras via ett öppet REST API utan autentisering.
           </p>
           <p style={{ fontSize: "13px", color: C.accentDim, fontWeight: 700, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em" }}>
             Hämta senaste signal och innehav
@@ -1937,6 +1937,14 @@ export default function OmPage() {
       "nav_usd": 11200.0, "kontant_usd": 3000,
       "innehav": [{ "symbol": "ETH", "antal": 1.2, "kopt_pris_usd": 3400 }],
       "paper_trading": true
+    },
+    "ARBI": {
+      "fund": "ARBI", "position_riktning": "long_spot_short_perp",
+      "funding_rate_pct": 0.0066, "apr_pct": 7.23,
+      "nav_usd": 10000.53, "inkomst_usd": 0.53,
+      "position_storlek_usd": 2000, "symbol": "BTCUSDT",
+      "strategi": "spot_perpetual_funding_rate_arbitrage",
+      "paper_trading": true
     }
   }
 }`}</span>
@@ -1958,7 +1966,8 @@ export default function OmPage() {
       "data_points": 30,
       "history": [ ... ]
     },
-    "QUANT": { ... }
+    "QUANT": { ... },
+    "ARBI": { ... }
   }
 }`}</span>
           </div>
@@ -1966,6 +1975,7 @@ export default function OmPage() {
             {[
               ["STRAT — Algoritmisk", "Kör MA-korsningsstrategier (t.ex. MA_20_50) utan LLM. Genererar BUY/SELL/HOLD-signaler baserade på rörliga medelvärden och volymfilter. Backtestresultat ingår per signal."],
               ["QUANT — Självlärande", "Läser de senaste 20 NAV-snapshots och 30 trades, frågar Groq-LLM om strategi. quant_motivering-fältet innehåller LLM:ens resonemang i klartext."],
+              ["ARBI — Funding rate-arbitrage", "Delta-neutral spot/perpetual-position på BTC. Tjänar på funding rate oavsett riktning — position_riktning, funding_rate_pct och apr_pct visar aktuell strategi."],
               ["Inga API-nycklar", "Alla tre endpoints är öppna och kräver ingen autentisering. Revalideras utan cache (revalidate: 0)."],
               ["Benchmark", "Varje NAV-snapshot jämförs mot BTC buy-and-hold och SPY buy-and-hold från samma startdatum (10 000 USD)."],
               ["?limit=N", "GET /nav stödjer ?limit= (default 60, max 365) för att begränsa historikens längd. Historiken returneras i kronologisk ordning."],
