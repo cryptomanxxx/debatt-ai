@@ -716,8 +716,8 @@ export default async function HedgefonderPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px" }}>
                   {[
                     { rubrik: "Strategi", text: "Delta-neutral arbitrage mellan spotmarknaden och perpetual futures-marknaden för BTC. Position justeras efter tecknet på den faktiska funding rate som hämtas från Binance Futures." },
-                    { rubrik: "Positiv funding rate", text: "Long BTC spot + Short BTC perpetual — mottar funding-betalningar från korta innehavare som betalar långa, helt hedgad mot prisrörelser." },
-                    { rubrik: "Negativ funding rate", text: "Long BTC perpetual + Short BTC spot — mottar funding-betalningar från långa innehavare som betalar korta." },
+                    { rubrik: "Positiv funding rate", text: "Long BTC spot + Short BTC perpetual — mottar funding-betalningar från långa innehavare som betalar korta, helt hedgad mot prisrörelser." },
+                    { rubrik: "Negativ funding rate", text: "Long BTC perpetual + Short BTC spot — mottar funding-betalningar från korta innehavare som betalar långa." },
                     { rubrik: "Avkastning", text: "Inkomsten kommer enbart från funding-betalningar var 8:e timme, inte från prisrörelser i BTC. APR annualiseras från senaste funding rate." },
                   ].map(item => (
                     <div key={item.rubrik}>
