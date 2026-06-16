@@ -23,6 +23,7 @@ slumpmässigt mellan de tre lägena (eller styrs med miljövariabeln LAGE).
 Kräver: SUPABASE_ANON_KEY, GROQ_API_KEY
 """
 
+import hashlib
 import json
 import os
 import random
@@ -199,24 +200,54 @@ def _q_rikaste_agent(h):
     }
 
 
-FRAGE_GENERATORER = [
-    _q_antal_artiklar, _q_antal_repliker, _q_aktiva_lan, _q_oppna_lagforslag,
-    _q_aktiva_koalitioner, _q_avgjorda_markets, _q_oppna_auktioner,
-    _q_lyckad_lobbying, _q_snittsaldo, _q_gini, _q_statskassa, _q_rikaste_agent,
-]
+KATEGORI_GENERATORER = {
+    "antal_artiklar": _q_antal_artiklar,
+    "antal_repliker": _q_antal_repliker,
+    "aktiva_lan": _q_aktiva_lan,
+    "oppna_lagforslag": _q_oppna_lagforslag,
+    "aktiva_koalitioner": _q_aktiva_koalitioner,
+    "avgjorda_markets": _q_avgjorda_markets,
+    "oppna_auktioner": _q_oppna_auktioner,
+    "lyckad_lobbying": _q_lyckad_lobbying,
+    "snittsaldo": _q_snittsaldo,
+    "gini": _q_gini,
+    "statskassa": _q_statskassa,
+    "rikaste_agent": _q_rikaste_agent,
+}
+
+
+def hamta_senaste_per_kategori(h: dict) -> dict:
+    """Hämtar senaste skapad-tidpunkt per kategori — underlag för round-robin-ordning."""
+    rows = sb_rows(h, "ki_spel", {
+        "select": "kategori,skapad",
+        "kategori": "not.is.null",
+        "order": "skapad.desc",
+        "limit": "300",
+    })
+    senaste = {}
+    if rows:
+        for r in rows:
+            kat = r.get("kategori")
+            if kat and kat not in senaste:
+                senaste[kat] = r["skapad"]
+    return senaste
 
 
 def generera_fraga(h: dict) -> dict | None:
-    """Försöker frågegeneratorerna i slumpmässig ordning tills en lyckas."""
-    generatorer = list(FRAGE_GENERATORER)
-    random.shuffle(generatorer)
-    for gen in generatorer:
+    """Round-robin: provar kategorier i ordning från minst nyligen testad till senast
+    testad (aldrig testade kategorier prioriteras allra högst). Säkerställer jämn och
+    snabb täckning av alla 12 frågekategorier, istället för slumpmässig ordning."""
+    senaste = hamta_senaste_per_kategori(h)
+    kategorier = sorted(KATEGORI_GENERATORER.keys(), key=lambda k: senaste.get(k, ""))
+    for kat in kategorier:
+        gen = KATEGORI_GENERATORER[kat]
         try:
             fraga = gen(h)
         except Exception as e:
-            print(f"  [FEL] frågegenerator {gen.__name__}: {e}")
+            print(f"  [FEL] frågegenerator {kat}: {e}")
             fraga = None
         if fraga is not None:
+            fraga["kategori"] = kat
             return fraga
     return None
 
@@ -265,17 +296,103 @@ def _fraga_agent(agent: dict, fraga: dict, kontext: str = ""):
     return _parse_estimat(svar)
 
 
-def kör_oberoende(fraga: dict) -> list[dict]:
-    """Alla agenter gissar samtidigt, helt utan att se varandras svar."""
+def _kohort_for_agent(agent_namn: str) -> str:
+    """Deterministisk men jämn tudelning av agenterna i en kalibrerings- och en
+    kontrollkohort, baserad på en hash av agentnamnet. Samma agent hamnar alltid i
+    samma kohort — detta är kärnan i kohort-RCT-designen för kalibreringsexperimentet:
+    båda kohorterna svarar på samma fråga med samma facit samma dag, så all skillnad
+    i felutveckling över tid kan tillskrivas kalibreringsnotisen, inte att civilisationens
+    underliggande data (facit) förändras."""
+    digest = int(hashlib.md5(agent_namn.encode()).hexdigest(), 16)
+    return "kalibrering" if digest % 2 == 0 else "kontroll"
+
+
+def hamta_kalibreringsnotiser(h: dict, kategori: str, limit: int = 10) -> dict:
+    """Bygger ett kalibreringsmeddelande per agent utifrån agentens EGNA historiska
+    gissningar i samma kategori. Visar bara riktning (för högt/för lågt) och en ungefärlig
+    grad — ALDRIG det faktiska historiska facit-talet, för att undvika att agenten
+    bara extrapolerar fram dagens svar ur gamla facit-värden."""
+    rows = sb_rows(h, "ki_spel", {
+        "select": "facit,agent_svar",
+        "kategori": f"eq.{kategori}",
+        "lage": "eq.oberoende",
+        "order": "skapad.desc",
+        "limit": str(limit),
+    })
+    if not rows:
+        return {}
+
+    per_agent_par = {}
+    for rad in rows:
+        try:
+            facit = float(rad.get("facit"))
+        except (TypeError, ValueError):
+            continue
+        for s in rad.get("agent_svar") or []:
+            agent_namn = s.get("agent")
+            estimat = s.get("estimat")
+            if agent_namn is None or estimat is None:
+                continue
+            try:
+                estimat = float(estimat)
+            except (TypeError, ValueError):
+                continue
+            per_agent_par.setdefault(agent_namn, []).append((estimat, facit))
+
+    notiser = {}
+    for agent_namn, par in per_agent_par.items():
+        if len(par) < 2:
+            continue
+        riktningar, faktorer = [], []
+        for estimat, facit in par:
+            if facit == 0:
+                continue
+            riktningar.append(1 if estimat > facit else (-1 if estimat < facit else 0))
+            faktorer.append(abs(estimat - facit) / max(abs(facit), 1))
+        if not riktningar:
+            continue
+        snitt_riktning = statistics.mean(riktningar)
+        snitt_faktor = statistics.mean(faktorer)
+        if abs(snitt_riktning) < 0.3 or snitt_faktor < 0.15:
+            continue  # ingen tydlig systematisk bias värd att nämna än
+        riktning_text = "för högt" if snitt_riktning > 0 else "för lågt"
+        if snitt_faktor >= 1.5:
+            grad = "kraftigt"
+        elif snitt_faktor >= 0.5:
+            grad = "tydligt"
+        else:
+            grad = "något"
+        notiser[agent_namn] = (
+            f"Kalibreringsnotis: i tidigare frågor inom denna kategori har dina gissningar "
+            f"systematiskt legat {grad} {riktning_text} jämfört med det rätta svaret "
+            "(du får INTE veta de exakta tidigare svaren). Justera din uppskattning därefter."
+        )
+    return notiser
+
+
+def kör_oberoende(fraga: dict, h: dict | None = None) -> list[dict]:
+    """Alla agenter gissar samtidigt, helt utan att se varandras svar.
+
+    Kohort-RCT för kalibreringsexperimentet: hälften av agenterna (kohort
+    'kalibrering') får en kalibreringsnotis baserad på sin egen historik i samma
+    kategori, den andra hälften ('kontroll') får ingen extra kontext. Eftersom båda
+    kohorterna svarar på exakt samma fråga med exakt samma facit samma dag isoleras
+    kalibreringseffekten från civilisationens naturliga datadrift."""
     resultat = []
+    notiser = hamta_kalibreringsnotiser(h, fraga["kategori"]) if h and fraga.get("kategori") else {}
     for agent in AGENTER:
-        parsed = _fraga_agent(agent, fraga)
+        kohort = _kohort_for_agent(agent["namn"])
+        kontext = notiser.get(agent["namn"], "") if kohort == "kalibrering" else ""
+        parsed = _fraga_agent(agent, fraga, kontext)
         if parsed is None:
             print(f"    [HOPPAR] {agent['namn']}: kunde inte tolka svar")
             continue
         estimat, konfidens, motivering = parsed
-        resultat.append({"agent": agent["namn"], "estimat": estimat, "konfidens": konfidens, "motivering": motivering})
-        print(f"    {agent['namn']}: {estimat} (konfidens {konfidens})")
+        resultat.append({
+            "agent": agent["namn"], "estimat": estimat, "konfidens": konfidens,
+            "motivering": motivering, "kohort": kohort,
+        })
+        print(f"    {agent['namn']} [{kohort}]: {estimat} (konfidens {konfidens})")
     return resultat
 
 
@@ -420,7 +537,7 @@ def main():
     # --- Steg 3: Agenterna gissar ---
     print(f"\n[STEG 3] {len(AGENTER)} agenter uppskattar facit...")
     if lage == "oberoende":
-        svar = kör_oberoende(fraga)
+        svar = kör_oberoende(fraga, h)
     elif lage == "sekventiellt":
         svar = kör_sekventiellt(fraga)
     else:
@@ -447,6 +564,7 @@ def main():
         "fraga": fraga["fraga"],
         "enhet": fraga["enhet"],
         "facit": fraga["facit"],
+        "kategori": fraga.get("kategori"),
         "lage": lage,
         "agent_svar": svar,
         **matvarden,

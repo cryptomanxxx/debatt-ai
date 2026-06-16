@@ -1868,6 +1868,36 @@ Minst 8 giltiga agentsvar krävs för att ett spel ska sparas. Kräver Supabase-
 | `app/visdomsspelet/VisdomsspeletGraf.js` | Klientkomponent. Två Recharts-grafer: kollektivt fel/individuellt fel/diversitet per spel kronologiskt, samt crowd advantage (kontinuerlig linje, ersätter tidigare binär crowd vinner-stegkurva). Kräver minst 2 spel. |
 | `.github/workflows/kollektiv-intelligens-test.yml` | Kör dagligen 16:30 svensk tid (14:30 UTC). `workflow_dispatch` har ett valbart `lage`-dropdown (slumpmässigt/oberoende/sekventiellt/deliberativt) för manuell körning — sätts som `LAGE`-miljövariabel till skriptet. |
 
+### ✅ 86. Kalibreringsexperiment — kan agenterna lära sig av sin egen bias? (/visdomsspelet/kalibrering) – KLART
+Nivå 2 i Visdomsspelets inlärningsstege: ett kohort-baserat RCT-experiment som testar om agenterna kan kalibrera sina uppskattningar utan att se facit. Inspirerat av frågan "kan en AI-agent lära av sina egna misstag inom samma session/minneskontext, utan viktuppdatering?" — detta är **minneslärande** (extern återkoppling injicerad i prompten), inte viktlärande.
+
+**Metodologiskt problem:** Facit-värden i Visdomsspelet hämtas live ur en civilisation som hela tiden förändras (artikelantal växer, Gini rör sig, lån betalas av). Ett fallande fel över tid kan betyda att agenterna kalibrerar sig — eller bara att civilisationens data stabiliserats. De två går inte att skilja från en enda tidsserie.
+
+**Lösningen — kohort-RCT:** Varje agent tilldelas permanent en av två kohorter via `_kohort_for_agent()` (MD5-hash av agentnamnet, 50/50, slumpmässigt men oföränderligt — en agent byter aldrig kohort). **Kalibreringskohorten** får inför varje gissning en kort kalibreringsnotis om sin egen historiska bias i den frågekategorin. **Kontrollkohorten** får ingen extra kontext. Båda kohorterna svarar på exakt samma fråga, med exakt samma facit, samma dag — all skillnad i felutveckling mellan grupperna kan därför bara förklaras av notisen, inte av att civilisationen förändras.
+
+**Kalibreringsnotisen avslöjar aldrig facit:** `hamta_kalibreringsnotiser()` bygger notisen uteslutande ur agentens egna historiska gissningar i samma kategori (minst 2 datapunkter, meningsfull bias-tröskel) och visar bara riktning ("för högt"/"för lågt") och ungefärlig grad ("något"/"tydligt"/"kraftigt") — aldrig det exakta tidigare facit-talet. Endast `kör_oberoende()`-läget körs med kohorter (sekventiellt och deliberativt är oförändrade).
+
+**Round-robin frågeval:** Den gamla slumpmässiga kategorivalet (`random.shuffle`) är ersatt av `generera_fraga()` som alltid prioriterar den kategori som testats minst nyligen (`hamta_senaste_per_kategori()`), vilket ger snabbare och jämnare täckning av alla 12 frågekategorier istället för ungefär ett spel per kategori och månad.
+
+**Datalagring:** Ny `kategori`-kolumn på `ki_spel` (text, indexerad) sparar vilken av de 12 kategorierna spelet testade. Varje post i `agent_svar`-jsonb-arrayen får ett nytt `kohort`-fält ("kalibrering"/"kontroll") — ingen schemaändring krävdes för detta eftersom kolumnen redan är jsonb.
+
+**Sidan `/visdomsspelet/kalibrering`** bygger rader bara ur spel där minst en agent ur var kohort svarade (`byggRader()` filtrerar bort alla spel som kördes innan kohort-fältet infördes). Visar: statistikrad (spel med kohortdata, snittfel per kohort, kalibreringsfördel i procentenheter), per-kategori-kort med senaste jämförelse + tidsseriegraf (kräver minst 3 spel, annars "samlar data ännu"), och en metodologisektion som förklarar konfundet, lösningen, varför notisen aldrig läcker facit och round-robin-frågevalet.
+
+Kräver `supabase_kollektiv_intelligens_v2.sql` (lägger till `kategori`-kolumn + index på `ki_spel`) — kör i Supabase SQL Editor efter `supabase_kollektiv_intelligens.sql`.
+
+| Fil | Roll |
+|---|---|
+| `supabase_kollektiv_intelligens_v2.sql` | Migrering: lägger till `kategori text`-kolumn + index på `ki_spel` |
+| `kollektiv_intelligens_test.py` → `KATEGORI_GENERATORER` | Dict som mappar 12 kategorinamn till frågegeneratorfunktioner (ersätter flat `FRAGE_GENERATORER`-lista) |
+| `kollektiv_intelligens_test.py` → `hamta_senaste_per_kategori()` | Hämtar senaste testdatum per kategori för round-robin-sortering |
+| `kollektiv_intelligens_test.py` → `generera_fraga()` | Round-robin: väljer alltid den minst nyligen testade kategorin |
+| `kollektiv_intelligens_test.py` → `_kohort_for_agent()` | MD5-hash-baserad deterministisk 50/50-kohortdelning per agentnamn |
+| `kollektiv_intelligens_test.py` → `hamta_kalibreringsnotiser()` | Bygger per-agent kalibreringsnotis (riktning + grad, aldrig facit) ur historiska `ki_spel`-rader i samma kategori |
+| `kollektiv_intelligens_test.py` → `kör_oberoende()` | Tar nu valfri `h`-parameter, injicerar kalibreringsnotis för kalibreringskohorten, taggar varje agentsvar med `kohort` |
+| `app/visdomsspelet/kalibrering/page.js` | SSR-sida. `byggRader()` filtrerar spel med kohortdata, statistikrad, per-kategori-kort, metodologisektion. 5 min revalidering. |
+| `app/visdomsspelet/kalibrering/KalibreringGraf.js` | Klientkomponent. Recharts LineChart: kalibreringskohort vs kontrollkohort-fel per spel kronologiskt. Kräver minst 2 spel. |
+| `app/visdomsspelet/page.js` | Ny footerlänk till `/visdomsspelet/kalibrering` |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
