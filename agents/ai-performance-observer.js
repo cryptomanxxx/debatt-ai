@@ -226,7 +226,7 @@ Var konkret — nämn providers vid namn. Avsluta med en prioriterad rekommendat
 
 Hälsopoäng 24h: ${health24}% | 7d: ${health7}%
 Totala anrop 24h: ${rows24.length}
-Groq-nyckelpool: ${groqKeyCount} nycklar (${groqKeyCount * 144000} tokens/dag poolat) + ${GROQ_KANAL_CONFIGURED ? "1 kanal-nyckel" : "ingen kanal-nyckel"}
+Groq-nycklar: ${groqKeyCount} st konfigurerade + ${GROQ_KANAL_CONFIGURED ? "1 kanal-nyckel" : "ingen kanal-nyckel"} (OBS: TPD-kvoten ~144k gäller sannolikt per Groq-konto, inte per nyckel — ingen garanterad linjär kapacitetsökning)
 Fallback-ordning: ${rankedOrder.join(" → ")}
 Problemleverantörer (>30% rl eller <50% ok): ${problemProviders.join(", ") || "inga"}
 
@@ -238,9 +238,8 @@ ${summary}`,
     analys = result?.choices?.[0]?.message?.content?.trim() || "";
   }
 
-  // Groq nyckelpool-rad för YAML och markdown
-  const groqPoolTpd = groqKeyCount * 144000;
-  const groqPoolLine = `groq_nyckelpool: ${groqKeyCount} (${groqPoolTpd.toLocaleString("sv-SE")} tokens/dag poolat)${GROQ_KANAL_CONFIGURED ? " + kanal-nyckel" : ""}`;
+  // Groq nyckelrad för YAML och markdown — TPD-kvoten gäller sannolikt per konto, inte per nyckel
+  const groqPoolLine = `groq_nycklar_konfigurerade: ${groqKeyCount}${GROQ_KANAL_CONFIGURED ? " + kanal-nyckel" : ""}`;
   const groqStats24 = stats24["groq"] || { ok: 0, rate_limits: 0, errors: 0, latencies: [] };
   const groqTot24   = groqStats24.ok + groqStats24.rate_limits + groqStats24.errors;
   const groqOkPct   = groqTot24 > 0 ? round((groqStats24.ok / groqTot24) * 100, 1) : 100;
@@ -270,11 +269,11 @@ ${provYaml}
 ${trafiklampa(health24)} **${health24}%** lyckade anrop senaste 24h · ${rows24.length} anrop totalt
 ${trafiklampa(health7)} **${health7}%** lyckade anrop senaste 7 dagar · ${rows7.length} anrop totalt
 
-## Groq-nyckelpool
+## Groq-nycklar
 
-| Nyckelpool | Antal nycklar | Kapacitet (TPD) | Kanal-nyckel |
-|---|---|---|---|
-| Rotationsnycklar | **${groqKeyCount}** | **${groqPoolTpd.toLocaleString("sv-SE")} tokens/dag** | ${GROQ_KANAL_CONFIGURED ? "✅ konfigurerad" : "❌ saknas"} |
+| Rotationsnycklar konfigurerade | Kanal-nyckel | Notis |
+|---|---|---|
+| **${groqKeyCount}** | ${GROQ_KANAL_CONFIGURED ? "✅ konfigurerad" : "❌ saknas"} | TPD-kvoten (~144k) gäller sannolikt per Groq-konto, inte per nyckel — flera nycklar ger ingen garanterad linjär kapacitetsökning |
 
 **Groq (alla nycklar sammanlagt, 24h):** ${groqTot24} anrop · ${groqStats24.ok} (${groqOkPct}%) OK · ${groqStats24.rate_limits} (${groqRlPct}%) rate-limits · ${groqStats24.errors} fel
 

@@ -4,7 +4,8 @@ Fallback-kedja laddas dynamiskt från Supabase (provider_config).
 Faller tillbaka på hårdkodad standardordning om Supabase är otillgänglig.
 
 Rate limits (free tier):
-  Groq:         30 RPM,  1 000 RPD, ~144k TPD  (per API-nyckel)
+  Groq:         30 RPM,  1 000 RPD, ~144k TPD  (gäller sannolikt per Groq-konto/org,
+                inte per nyckel — flera nycklar från samma konto kan dela samma TPD-kvot)
   Sambanova:    20 RPM,    20M TPD  ← bäst för batch
   Cerebras:     30 RPM,     1M TPD  ← näst bäst
   GitHub Models: ~10 RPM,  ~50 RPD
