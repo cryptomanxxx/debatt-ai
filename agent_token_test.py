@@ -27,7 +27,7 @@ import httpx
 
 from agenter import AGENTER
 from supabase_utils import SB_URL, spara_civilisations_minne
-from ai_klient import groq_post, gemini_post, github_models_post
+from ai_klient import hamta_kort_fns
 
 # ─── Konstanter ───────────────────────────────────────────────────────────────
 
@@ -76,11 +76,7 @@ def _llm(system: str, prompt: str, max_tokens: int = 200) -> str:
         "max_tokens": max_tokens,
         "temperature": 0.8,
     }
-    for fn in [
-        lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip(),
-        lambda: gemini_post(system, prompt, max_tokens=max_tokens),
-        lambda: github_models_post(payload).json()["choices"][0]["message"]["content"].strip(),
-    ]:
+    for _name, fn in hamta_kort_fns(payload, system, prompt, max_tokens, source="agent_token"):
         try:
             result = fn()
             if result:

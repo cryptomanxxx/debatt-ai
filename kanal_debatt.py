@@ -10,6 +10,8 @@ import os, json, random, re, time
 import xml.etree.ElementTree as ET
 import httpx
 
+from ai_klient import hamta_kort_fns
+
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -38,85 +40,25 @@ AGENTER = {
 }
 
 
-def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {os.environ['GROQ_API_KEY']}",
-        "Content-Type": "application/json",
-    }
-    last_r = None
-    for attempt in range(3):
-        r = httpx.post(url, headers=headers, json=json_payload, timeout=timeout)
-        last_r = r
-        if r.status_code == 429:
-            wait = min(int(r.headers.get("retry-after", 20)) + 2, 60)
-            print(f"  Groq rate-limit — väntar {wait}s (försök {attempt + 1}/3)…")
-            time.sleep(wait)
-            continue
-        r.raise_for_status()
-        return r
-    raise Exception(f"Groq rate-limit kvarstår. Svar: {last_r.text[:200] if last_r else 'okänt'}")
-
-
-def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise Exception("GEMINI_API_KEY saknas")
-    models = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]
+def llm(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
+    """Provar alla providers i dynamisk rankad ordning (se ai_klient.py)."""
     payload = {
-        "contents": [{"role": "user", "parts": [{"text": user_message}]}],
-        "systemInstruction": {"parts": [{"text": system_prompt}]},
-        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.85},
-    }
-    for model in models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        r = httpx.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=60)
-        if r.is_success:
-            text = r.json().get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-            if text:
-                return text
-    raise Exception("Gemini misslyckades")
-
-
-def github_models_post(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        raise Exception("GITHUB_TOKEN saknas")
-    url = "https://models.inference.ai.azure.com/chat/completions"
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    payload = {
-        "model": "Llama-3.3-70B-Instruct",
+        "model": GROQ_MODEL,
         "messages": [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
+            {"role": "user",   "content": user_message},
         ],
         "max_tokens": max_tokens,
         "temperature": 0.85,
     }
-    r = httpx.post(url, headers=headers, json=payload, timeout=60)
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"].strip()
-
-
-def llm(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
-    try:
-        r = groq_post({
-            "model": GROQ_MODEL,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_message},
-            ],
-            "max_tokens": max_tokens,
-            "temperature": 0.85,
-        })
-        return r.json()["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        print(f"  Groq fel: {e} — försöker Gemini…")
-    try:
-        return gemini_post(system_prompt, user_message, max_tokens)
-    except Exception as e:
-        print(f"  Gemini fel: {e} — försöker GitHub Models…")
-        return github_models_post(system_prompt, user_message, max_tokens)
+    for _name, fn in hamta_kort_fns(payload, system_prompt, user_message, max_tokens, source="kanal_debatt"):
+        try:
+            result = fn()
+            if result:
+                return result
+        except Exception as e:
+            print(f"  {_name} fel: {e}")
+    return ""
 
 
 def hamta_nyheter() -> list[dict]:

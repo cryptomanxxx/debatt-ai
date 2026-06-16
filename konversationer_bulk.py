@@ -19,7 +19,6 @@ import sys
 import time
 import httpx
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post
 from agenter import AGENTER
 from supabase_utils import hamta_relation, upsert_koalition
 from agent import _llm_kort, hamta_drama_kontext

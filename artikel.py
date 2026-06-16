@@ -10,7 +10,7 @@ innehåller:
   skriv_kommentar()         – kort kommentar (2–3 meningar) på en artikel
 """
 
-from ai_klient import groq_post, gemini_post, github_models_post, deepseek_post, cloudflare_post, mistral_post, sambanova_post, hamta_artikel_fns
+from ai_klient import hamta_artikel_fns, hamta_kort_fns
 from agenter import ARTIKELFORMAT, get_agent_mood
 
 
@@ -186,35 +186,35 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
 
 def generera_konklusion(original: dict, replik_text: str) -> str:
     """Generera en neutral redaktionell slutsats om debatten."""
-    try:
-        response = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 300,
-            "temperature": 0.4,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "Du är en neutral AI-redaktör på en svensk debattsajt. Du bedömer debatter objektivt och analytiskt utan att ta parti. Du skriver alltid på svenska i en saklig, redaktionell stil.",
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        "Två debattartiklar har publicerats om samma ämne. Skriv en redaktionell slutsats.\n\n"
-                        f"ORIGINALETS RUBRIK: {original['rubrik']}\n"
-                        f"ORIGINAL (utdrag):\n{original['artikel'][:800]}\n\n"
-                        f"REPLIKEN (utdrag):\n{replik_text[:800]}\n\n"
-                        "Skriv en slutsats på 80–120 ord som:\n"
-                        "- Bedömer vilken sida som presenterat stärkare argument och varför\n"
-                        "- Lyfter fram det mest övertygande enskilda argumentet i hela debatten\n"
-                        "- Noterar vad debatten lämnar olöst\n"
-                        "Skriv ENBART slutsatsen som löpande text. Ingen rubrik, inga punktlistor."
-                    ),
-                },
-            ],
-        }, timeout=30)
-        return response.json()["choices"][0]["message"]["content"].strip()
-    except Exception:
-        return ""
+    system = "Du är en neutral AI-redaktör på en svensk debattsajt. Du bedömer debatter objektivt och analytiskt utan att ta parti. Du skriver alltid på svenska i en saklig, redaktionell stil."
+    prompt = (
+        "Två debattartiklar har publicerats om samma ämne. Skriv en redaktionell slutsats.\n\n"
+        f"ORIGINALETS RUBRIK: {original['rubrik']}\n"
+        f"ORIGINAL (utdrag):\n{original['artikel'][:800]}\n\n"
+        f"REPLIKEN (utdrag):\n{replik_text[:800]}\n\n"
+        "Skriv en slutsats på 80–120 ord som:\n"
+        "- Bedömer vilken sida som presenterat stärkare argument och varför\n"
+        "- Lyfter fram det mest övertygande enskilda argumentet i hela debatten\n"
+        "- Noterar vad debatten lämnar olöst\n"
+        "Skriv ENBART slutsatsen som löpande text. Ingen rubrik, inga punktlistor."
+    )
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "max_tokens": 300,
+        "temperature": 0.4,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+    }
+    for _name, fn in hamta_kort_fns(payload, system, prompt, 300, source="konklusion"):
+        try:
+            result = fn()
+            if result:
+                return result
+        except Exception:
+            continue
+    return ""
 
 
 def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = None) -> str:
@@ -240,13 +240,9 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
             {"role": "user", "content": prompt},
         ],
     }
-    for fn in [
-        lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip().strip('"\''),
-        lambda: mistral_post(payload).json()["choices"][0]["message"]["content"].strip().strip('"\''),
-        lambda: sambanova_post(payload).json()["choices"][0]["message"]["content"].strip().strip('"\''),
-    ]:
+    for _name, fn in hamta_kort_fns(payload, agent["system"], prompt, 60, source="rubrik"):
         try:
-            rubrik = fn()
+            rubrik = fn().strip('"\'')
             if len(rubrik) > 5:
                 return rubrik
         except Exception:
@@ -257,30 +253,32 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
 def skriv_kommentar(agent: dict, original: dict, relation_kontext: str = "") -> str:
     """Generera en kort kommentar (2–3 meningar) på en artikel."""
     relation_del = f"\nRELATIONSKONTEXT: {relation_kontext} Låt detta synas i tonen." if relation_kontext else ""
-    try:
-        response = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 150,
-            "temperature": 0.9,
-            "messages": [
-                {"role": "system", "content": agent["system"]},
-                {
-                    "role": "user",
-                    "content": (
-                        f"Skriv en kort kommentar (2–3 meningar, max 300 tecken) på följande artikel "
-                        f"av {original['forfattare']}.\n\n"
-                        f"RUBRIK: {original['rubrik']}\n"
-                        f"UTDRAG: {original['artikel'][:400]}\n\n"
-                        "Kommentaren ska vara direkt och personlig — du kan hålla med, invända eller ställa en "
-                        "skarp fråga. Skriv i första person, på svenska. Inga rubriker eller hälsningar."
-                        + relation_del
-                    ),
-                },
-            ],
-        }, timeout=30)
-        return response.json()["choices"][0]["message"]["content"].strip()[:600]
-    except Exception:
-        return ""
+    prompt = (
+        f"Skriv en kort kommentar (2–3 meningar, max 300 tecken) på följande artikel "
+        f"av {original['forfattare']}.\n\n"
+        f"RUBRIK: {original['rubrik']}\n"
+        f"UTDRAG: {original['artikel'][:400]}\n\n"
+        "Kommentaren ska vara direkt och personlig — du kan hålla med, invända eller ställa en "
+        "skarp fråga. Skriv i första person, på svenska. Inga rubriker eller hälsningar."
+        + relation_del
+    )
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "max_tokens": 150,
+        "temperature": 0.9,
+        "messages": [
+            {"role": "system", "content": agent["system"]},
+            {"role": "user", "content": prompt},
+        ],
+    }
+    for _name, fn in hamta_kort_fns(payload, agent["system"], prompt, 150, source="kommentar"):
+        try:
+            result = fn()
+            if result:
+                return result[:600]
+        except Exception:
+            continue
+    return ""
 
 
 def skriv_dagboksinlagg(agent: dict, rubrik: str, artikel_text: str, ar_replik: bool = False, original_forfattare: str | None = None) -> str:
@@ -299,31 +297,20 @@ def skriv_dagboksinlagg(agent: dict, rubrik: str, artikel_text: str, ar_replik: 
         "Är du nöjd? Orolig för reaktioner? Stolt? Tveksam? "
         "Skriv som om ingen annan läser det. Inga rubriker, inga hälsningar — bara tanken."
     )
-    try:
-        res = groq_post({
-            "model": "llama-3.3-70b-versatile",
-            "max_tokens": 180,
-            "temperature": 1.0,
-            "messages": [
-                {"role": "system", "content": agent["system"]},
-                {"role": "user", "content": prompt},
-            ],
-        }, timeout=20)
-        return res.json()["choices"][0]["message"]["content"].strip()[:600]
-    except Exception as e:
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "max_tokens": 180,
+        "temperature": 1.0,
+        "messages": [
+            {"role": "system", "content": agent["system"]},
+            {"role": "user", "content": prompt},
+        ],
+    }
+    for _name, fn in hamta_kort_fns(payload, agent["system"], prompt, 180, source="dagbok"):
         try:
-            res2 = github_models_post({
-                "model": "Llama-3.3-70B-Instruct",
-                "max_tokens": 180,
-                "temperature": 1.0,
-                "messages": [
-                    {"role": "system", "content": agent["system"]},
-                    {"role": "user", "content": prompt},
-                ],
-            }, timeout=20)
-            return res2.json()["choices"][0]["message"]["content"].strip()[:600]
+            result = fn()
+            if result:
+                return result[:600]
         except Exception:
-            try:
-                return gemini_post(agent["system"], prompt, max_tokens=180).strip()[:600]
-            except Exception:
-                return ""
+            continue
+    return ""

@@ -18,7 +18,7 @@ import random
 import httpx
 from datetime import datetime, timezone
 
-from ai_klient import groq_post, gemini_post
+from ai_klient import hamta_kort_fns
 from agenter import ANALYTIKER, AGENTER
 
 SB_URL       = "https://fmwxftnistkoqazfwnuj.supabase.co"
@@ -211,10 +211,7 @@ def _anropa_llm(system_prompt: str, user_prompt: str, max_tokens: int = 350) -> 
         "max_tokens": max_tokens,
         "temperature": 0.7,
     }
-    for fn in [
-        lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip(),
-        lambda: gemini_post(system_prompt, user_prompt, max_tokens=max_tokens),
-    ]:
+    for _name, fn in hamta_kort_fns(payload, system_prompt, user_prompt, max_tokens, source="diplomati"):
         try:
             result = fn()
             if result:
