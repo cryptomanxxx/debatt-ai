@@ -15,7 +15,8 @@ import json
 import httpx
 from datetime import datetime, timezone
 
-from supabase_utils import reglera_prediction_bets, _llm_spel
+from supabase_utils import reglera_prediction_bets
+from ai_klient import hamta_kort_fns
 
 SB_URL    = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY    = os.environ.get("SUPABASE_ANON_KEY", "").strip()
@@ -164,9 +165,26 @@ def _bygg_prompt(market: dict, nyheter_text: str = "") -> str:
 
 
 def llm_anrop(prompt: str) -> tuple[str | None, str, str]:
-    """Provar alla AI-providers i dynamisk rankad ordning (ai_klient.py)."""
-    svar = _llm_spel("Du är en faktaverifierare.", prompt, max_tokens=150)
-    return _parse_llm_svar(svar)
+    """Provar alla AI-providers i dynamisk rankad ordning (ai_klient.py) tills
+    en ger ett tolkningsbart svar — går vidare till nästa provider om svaret
+    inte går att tolka som JSON, inte bara om anropet misslyckas."""
+    system = "Du är en faktaverifierare."
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+        "max_tokens": 150, "temperature": 0.1,
+    }
+    for _name, fn in hamta_kort_fns(payload, system, prompt, 150, source="market_observer"):
+        try:
+            svar = fn()
+        except Exception:
+            continue
+        if not svar:
+            continue
+        utfall, konfidens, motivering = _parse_llm_svar(svar)
+        if utfall:
+            return utfall, konfidens, motivering
+    return None, "låg", ""
 
 
 # ── Huvud-verifieringslogik ───────────────────────────────────────────────────
