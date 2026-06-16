@@ -29,7 +29,7 @@ export async function GET(request) {
       `${BASE}/rest/v1/quant_paper_nav?select=skapad,portfölj_värde_usd,kontant_usd,btc_benchmark_usd,spy_benchmark_usd,quant_motivering&order=skapad.desc&limit=${limit}`
     ),
     fetchJson(
-      `${BASE}/rest/v1/arbi_paper_nav?select=skapad,portfölj_värde_usd,inkomst_usd,position_storlek_usd,funding_rate_pct,apr_pct,position_riktning&order=skapad.desc&limit=${limit}`
+      `${BASE}/rest/v1/arbi_paper_nav?select=skapad,portfölj_värde_usd,inkomst_usd,position_storlek_usd,funding_rate_pct,apr_pct,position_riktning,btc_benchmark_usd&order=skapad.desc&limit=${limit}`
     ),
   ]);
 
@@ -69,6 +69,9 @@ export async function GET(request) {
       funding_rate_pct: r.funding_rate_pct,
       apr_pct: r.apr_pct,
       position_riktning: r.position_riktning,
+      benchmark: {
+        btc_buy_hold_usd: r.btc_benchmark_usd ?? null,
+      },
     }));
   }
 

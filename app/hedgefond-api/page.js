@@ -67,18 +67,22 @@ function NavCard({ nav, fund }) {
           <p style={{ fontSize: 22, fontWeight: 700, color: C.green, margin: 0 }}>+{Number(nav.backtest_avkastning_pct).toFixed(1)}%</p>
         </div>
       )}
-      {nav.benchmark && (
+      {nav.benchmark && (nav.benchmark.btc_buy_hold_usd != null || nav.benchmark.spy_buy_hold_usd != null) && (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: 14, gridColumn: "span 2" }}>
           <p style={{ fontSize: 11, color: C.dim, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>Benchmark (USD)</p>
           <div style={{ display: "flex", gap: 20 }}>
-            <div>
-              <span style={{ fontSize: 11, color: C.dim }}>BTC buy &amp; hold </span>
-              <span style={{ fontSize: 14, color: C.amber, fontWeight: 700 }}>${Number(nav.benchmark.btc_buy_hold_usd ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
-            </div>
-            <div>
-              <span style={{ fontSize: 11, color: C.dim }}>SPY buy &amp; hold </span>
-              <span style={{ fontSize: 14, color: C.blue, fontWeight: 700 }}>${Number(nav.benchmark.spy_buy_hold_usd ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
-            </div>
+            {nav.benchmark.btc_buy_hold_usd != null && (
+              <div>
+                <span style={{ fontSize: 11, color: C.dim }}>BTC buy &amp; hold </span>
+                <span style={{ fontSize: 14, color: C.amber, fontWeight: 700 }}>${Number(nav.benchmark.btc_buy_hold_usd).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+              </div>
+            )}
+            {nav.benchmark.spy_buy_hold_usd != null && (
+              <div>
+                <span style={{ fontSize: 11, color: C.dim }}>SPY buy &amp; hold </span>
+                <span style={{ fontSize: 14, color: C.blue, fontWeight: 700 }}>${Number(nav.benchmark.spy_buy_hold_usd).toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -308,7 +312,7 @@ export default function HedgefondApiPage() {
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "monospace" }}>
                             <thead>
                               <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                                {["Datum", "NAV (USD)", "Total inkomst", "Funding Rate/8h", "APR", "Position"].map(h => (
+                                {["Datum", "NAV (USD)", "Total inkomst", "Funding Rate/8h", "APR", "Position", "BTC B&H"].map(h => (
                                   <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: C.dim, fontWeight: 400, fontSize: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>{h}</th>
                                 ))}
                               </tr>
@@ -324,6 +328,7 @@ export default function HedgefondApiPage() {
                                     <td style={{ padding: "8px 12px", color: rc }}>{row.funding_rate_pct != null ? `${Number(row.funding_rate_pct) >= 0 ? "+" : ""}${Number(row.funding_rate_pct).toFixed(4)}%` : "—"}</td>
                                     <td style={{ padding: "8px 12px", color: C.green }}>{row.apr_pct != null ? `${Number(row.apr_pct).toFixed(1)}%` : "—"}</td>
                                     <td style={{ padding: "8px 12px", color: C.dim, fontSize: 11 }}>{row.position_riktning?.replace(/_/g, " ") ?? "—"}</td>
+                                    <td style={{ padding: "8px 12px", color: C.amber }}>{row.benchmark?.btc_buy_hold_usd ? "$" + Number(row.benchmark.btc_buy_hold_usd).toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—"}</td>
                                   </tr>
                                 );
                               })}

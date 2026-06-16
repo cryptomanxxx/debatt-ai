@@ -657,10 +657,14 @@ export default async function HedgefonderPage() {
           const riktning    = senaste.position_riktning;
 
           const arbiHistorik = [...arbi_nav].reverse();
-          const curveData = arbiHistorik.map(r => ({
-            datum: new Date(r.skapad).toLocaleDateString("sv-SE", { month: "2-digit", day: "2-digit" }),
-            fond: (parseFloat(r.portfölj_värde_usd) / START - 1) * 100,
-          }));
+          const curveData = arbiHistorik.map(r => {
+            const btcv = r.btc_benchmark_usd != null ? parseFloat(r.btc_benchmark_usd) : null;
+            return {
+              datum: new Date(r.skapad).toLocaleDateString("sv-SE", { month: "2-digit", day: "2-digit" }),
+              fond: (parseFloat(r.portfölj_värde_usd) / START - 1) * 100,
+              btc: btcv != null ? (btcv / START - 1) * 100 : null,
+            };
+          });
           const metrics = computeMetrics(
             arbiHistorik.map(r => ({ skapad: r.skapad, value: parseFloat(r.portfölj_värde_usd) })),
             START

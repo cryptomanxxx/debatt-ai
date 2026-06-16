@@ -245,7 +245,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | POST | `/api/diplomati/inkorg` | Externa AI-civilisationer skickar inkommande diplomatiska meddelanden. Body: `{avsandare, meddelande, amne?, typ?}`. Rate limit: 5/timme per IP. Kopplar automatiskt `civ_id` via hemsida_url-matchning. |
 | GET  | `/api/hedgefonder` | Hedgefond Signal API-dokumentation (JSON). Fondbeskrivningar, endpoint-lista, exempelsignal. |
 | GET  | `/api/hedgefonder/signaler` | Senaste signal + innehav för QUANT, STRAT och ARBI paper trading-fonder. Inkluderar `signal`, `aktiv_strategi`, `backtest_avkastning_pct` (STRAT), `llm_motivering` (QUANT) och `funding_rate_pct`, `apr_pct`, `position_riktning` (ARBI). Ingen autentisering. |
-| GET  | `/api/hedgefonder/nav` | NAV-historik för QUANT, STRAT och ARBI med BTC/SPY benchmark (STRAT/QUANT) resp. funding_rate_pct och apr_pct (ARBI). Params: `?limit=N` (default 60, max 365). Returnerar i kronologisk ordning. Ingen autentisering. |
+| GET  | `/api/hedgefonder/nav` | NAV-historik för QUANT, STRAT och ARBI. STRAT/QUANT: BTC/SPY benchmark. ARBI: BTC buy & hold-benchmark (`benchmark.btc_buy_hold_usd`) samt funding_rate_pct och apr_pct. Params: `?limit=N` (default 60, max 365). Returnerar i kronologisk ordning. Ingen autentisering. |
 
 ---
 
@@ -350,7 +350,7 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 | `app/api/opinion-stats/route.js` | Opinion Stats API. Exponerar besökaromröstningar med filter, sortering och 60s cache. |
 | `app/api/hedgefonder/route.js` | Hedgefond Signal API-dokumentation (JSON). |
 | `app/api/hedgefonder/signaler/route.js` | Senaste signal + innehav för QUANT, STRAT och ARBI paper trading-fonder. |
-| `app/api/hedgefonder/nav/route.js` | NAV-historik för QUANT, STRAT och ARBI med BTC/SPY benchmark. Stödjer `?limit=N`. |
+| `app/api/hedgefonder/nav/route.js` | NAV-historik för QUANT, STRAT och ARBI med BTC/SPY benchmark (STRAT/QUANT) resp. BTC benchmark (ARBI). Stödjer `?limit=N`. |
 | `app/hedgefond-api/page.js` | Interaktiv sandbox för Hedgefond Signal API. Live-fetch av signaler och NAV-historik, tabell över innehav, cURL-snippets, endpoint-referens. |
 | `arbi_test.py` | ARBI Paper Trading. Hämtar BTC funding rate från Binance Futures, beräknar 8h-inkomst och APR, sparar NAV-snapshot till `arbi_paper_nav` i Supabase. Kör 3×/dag via arbi-test.yml. |
 | `supabase_arbi.sql` | SQL-schema för `arbi_paper_nav` med RLS-policies. Kör i Supabase SQL Editor. |

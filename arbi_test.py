@@ -82,21 +82,54 @@ def hamta_senaste_nav():
         return None
 
 
-def spara_nav(nav_usd, inkomst_usd, position_usd, funding_rate_pct, apr_pct, riktning):
+def hamta_btc_benchmark(mark_price):
+    """Vad START_KAP_USD i ren long BTC (buy & hold) sedan första körningen
+    skulle vara värt idag. Visar att ARBI:s delta-neutrala strategi tjänar på
+    funding fees, inte på BTC:s prisrörelser."""
     try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/arbi_paper_nav?order=skapad.asc&limit=1",
+            headers=_h(), timeout=10,
+        )
+        first_rows = r.json() if r.is_success else []
+        if not first_rows:
+            return START_KAP_USD
+        if not mark_price:
+            return None
+        start_datum = first_rows[0]["skapad"][:10]
+        r2 = httpx.get(
+            f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.BTC"
+            f"&datum=gte.{start_datum}&order=datum.asc&limit=1",
+            headers=_h(), timeout=10,
+        )
+        rows2 = r2.json() if r2.is_success else []
+        if not rows2:
+            return None
+        start_pris = float(rows2[0]["pris"])
+        return (START_KAP_USD / start_pris) * mark_price
+    except Exception as e:
+        print(f"  ⚠️  BTC-benchmark-fel: {e}")
+        return None
+
+
+def spara_nav(nav_usd, inkomst_usd, position_usd, funding_rate_pct, apr_pct, riktning, btc_benchmark=None):
+    try:
+        payload = {
+            "portfölj_värde_usd":   round(nav_usd, 4),
+            "inkomst_usd":           round(inkomst_usd, 4),
+            "position_storlek_usd":  round(position_usd, 2),
+            "funding_rate_pct":      round(funding_rate_pct, 6),
+            "apr_pct":               round(apr_pct, 2),
+            "symbol":                "BTCUSDT",
+            "position_riktning":     riktning,
+            "start_kapital_usd":     START_KAP_USD,
+        }
+        if btc_benchmark is not None:
+            payload["btc_benchmark_usd"] = round(btc_benchmark, 4)
         r = httpx.post(
             f"{SB_URL}/rest/v1/arbi_paper_nav",
             headers=_h(),
-            json={
-                "portfölj_värde_usd":   round(nav_usd, 4),
-                "inkomst_usd":           round(inkomst_usd, 4),
-                "position_storlek_usd":  round(position_usd, 2),
-                "funding_rate_pct":      round(funding_rate_pct, 6),
-                "apr_pct":               round(apr_pct, 2),
-                "symbol":                "BTCUSDT",
-                "position_riktning":     riktning,
-                "start_kapital_usd":     START_KAP_USD,
-            },
+            json=payload,
             timeout=10,
         )
         return r.is_success
@@ -155,8 +188,13 @@ def kör_arbi():
     print(f"  APR (annualiserad):{apr_pct:.2f}%")
     print(f"  Nytt NAV:          ${new_nav:,.4f}  (Δ +${new_nav - START_KAP_USD:.4f})")
 
-    # 4. Spara
-    ok = spara_nav(new_nav, new_income, position_usd, funding_rate_pct, apr_pct, riktning)
+    # 4. BTC buy & hold-benchmark
+    btc_benchmark = hamta_btc_benchmark(fd["mark_price"])
+    if btc_benchmark is not None:
+        print(f"  BTC buy & hold:    ${btc_benchmark:,.4f}")
+
+    # 5. Spara
+    ok = spara_nav(new_nav, new_income, position_usd, funding_rate_pct, apr_pct, riktning, btc_benchmark)
     print(f"  Supabase:          {'✅ sparat' if ok else '❌ misslyckades'}")
 
 
