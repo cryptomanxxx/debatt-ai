@@ -1,6 +1,8 @@
 // Beräknar prestationsmått (avkastning, drawdown, volatilitet, Sharpe) från en
 // tidsserie av NAV-snapshots. rows måste vara kronologiskt stigande.
-export function computeMetrics(rows, startCapital) {
+// periodsPerYear anger hur många snapshots per år serien har (365 = dagligen,
+// 1095 = 3 ggr/dag som ARBI) — krävs för korrekt annualisering.
+export function computeMetrics(rows, startCapital, periodsPerYear = 365) {
   if (!rows || rows.length === 0) return null;
 
   const values = rows.map((r) => r.value).filter((v) => Number.isFinite(v));
@@ -9,7 +11,7 @@ export function computeMetrics(rows, startCapital) {
   const last = values[values.length - 1];
   const totalReturnPct = (last / startCapital - 1) * 100;
 
-  let peak = values[0];
+  let peak = startCapital;
   let maxDrawdownPct = 0;
   for (const v of values) {
     if (v > peak) peak = v;
@@ -27,8 +29,8 @@ export function computeMetrics(rows, startCapital) {
     ? dailyReturns.reduce((a, b) => a + (b - meanRet) ** 2, 0) / n
     : 0;
   const stdDailyRet = Math.sqrt(variance);
-  const volatilityPct = stdDailyRet * Math.sqrt(365) * 100;
-  const sharpe = stdDailyRet > 0 ? (meanRet / stdDailyRet) * Math.sqrt(365) : null;
+  const volatilityPct = stdDailyRet * Math.sqrt(periodsPerYear) * 100;
+  const sharpe = stdDailyRet > 0 ? (meanRet / stdDailyRet) * Math.sqrt(periodsPerYear) : null;
 
   const firstDate = new Date(rows[0].skapad);
   const lastDate = new Date(rows[rows.length - 1].skapad);

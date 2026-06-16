@@ -70,7 +70,9 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/strat_paper_innehav?order=symbol.asc`, {
       headers: h, next: { revalidate: 120 },
     }),
-    fetch(`${SB_URL}/rest/v1/arbi_paper_nav?order=skapad.desc&limit=60`, {
+    // ARBI tar 3 NAV-snapshots/dag (STRAT/QUANT tar 1/dag) — limit 180 ger samma
+    // ungefärliga kalenderfönster (~60 dagar) som STRAT/QUANT:s limit=60.
+    fetch(`${SB_URL}/rest/v1/arbi_paper_nav?order=skapad.desc&limit=180`, {
       headers: h, next: { revalidate: 120 },
     }),
   ]);
@@ -667,7 +669,8 @@ export default async function HedgefonderPage() {
           });
           const metrics = computeMetrics(
             arbiHistorik.map(r => ({ skapad: r.skapad, value: parseFloat(r.portfölj_värde_usd) })),
-            START
+            START,
+            365 * 3 // ARBI tar 3 NAV-snapshots/dag (00:30, 08:30, 16:30 UTC)
           );
 
           return (
