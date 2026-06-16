@@ -1,3 +1,6 @@
+import EquityCurve from "./EquityCurve";
+import { computeMetrics } from "./metrics";
+
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
 export const revalidate = 120;
@@ -84,6 +87,35 @@ async function getData() {
   const arbi_nav       = arbiNavRes.ok       ? await arbiNavRes.json()       : [];
 
   return { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav, strat_nav, strat_innehav, arbi_nav };
+}
+
+function PrestationsmattGrid({ metrics }) {
+  if (!metrics) return null;
+  const stats = [
+    {
+      label: "Total avkastning",
+      value: `${metrics.totalReturnPct >= 0 ? "+" : ""}${metrics.totalReturnPct.toFixed(1)}%`,
+      color: metrics.totalReturnPct >= 0 ? "#4ade80" : "#f87171",
+    },
+    {
+      label: "Max drawdown",
+      value: `${metrics.maxDrawdownPct.toFixed(1)}%`,
+      color: metrics.maxDrawdownPct < 0 ? "#f87171" : C.text,
+    },
+    { label: "Volatilitet (årlig)", value: `${metrics.volatilityPct.toFixed(1)}%`, color: C.text },
+    { label: "Sharpe ratio", value: metrics.sharpe != null ? metrics.sharpe.toFixed(2) : "—", color: C.text },
+    { label: "Dagar aktiv", value: `${metrics.daysActive}`, color: C.text },
+  ];
+  return (
+    <div style={{ padding: "0 20px 12px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: "10px" }}>
+      {stats.map((s) => (
+        <div key={s.label} style={{ background: "#0a0a0a", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "8px 10px" }}>
+          <div style={{ fontSize: "9px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</div>
+          <div style={{ fontSize: "14px", fontWeight: "700", color: s.color }}>{s.value}</div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function NavSparkline({ historik, fondId, farg }) {
@@ -348,20 +380,25 @@ export default async function HedgefonderPage() {
           const pv      = parseFloat(senaste.portfölj_värde_usd);
           const pnl     = pv - START;
           const pnlPct  = (pnl / START * 100).toFixed(1);
-          const btc     = senaste.btc_benchmark_usd ? parseFloat(senaste.btc_benchmark_usd) : null;
-          const spy     = senaste.spy_benchmark_usd ? parseFloat(senaste.spy_benchmark_usd) : null;
           const signal  = senaste.signal || "–";
           const sigColor = signal === "KÖP" ? "#4ade80" : signal === "STOP-LOSS" ? "#f87171" : "#94a3b8";
 
-          const sparkData = [...strat_nav].reverse().map(r => parseFloat(r.portfölj_värde_usd));
-          const spMin = Math.min(...sparkData), spMax = Math.max(...sparkData);
-          const spRange = spMax - spMin || 1;
-          const spW = 200, spH = 40;
-          const spPts = sparkData.map((v, i) => {
-            const x = (i / Math.max(sparkData.length - 1, 1)) * spW;
-            const y = spH - ((v - spMin) / spRange) * spH;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-          }).join(" ");
+          const stratHistorik = [...strat_nav].reverse();
+          const curveData = stratHistorik.map(r => {
+            const navv = parseFloat(r.portfölj_värde_usd);
+            const btcv = r.btc_benchmark_usd != null ? parseFloat(r.btc_benchmark_usd) : null;
+            const spyv = r.spy_benchmark_usd != null ? parseFloat(r.spy_benchmark_usd) : null;
+            return {
+              datum: new Date(r.skapad).toLocaleDateString("sv-SE", { month: "2-digit", day: "2-digit" }),
+              fond: (navv / START - 1) * 100,
+              btc: btcv != null ? (btcv / START - 1) * 100 : null,
+              spy: spyv != null ? (spyv / START - 1) * 100 : null,
+            };
+          });
+          const metrics = computeMetrics(
+            stratHistorik.map(r => ({ skapad: r.skapad, value: parseFloat(r.portfölj_värde_usd) })),
+            START
+          );
 
           return (
             <div style={{
@@ -448,28 +485,15 @@ export default async function HedgefonderPage() {
                 </div>
               </div>
 
-              {/* Sparkline + Benchmarks */}
-              <div style={{ padding: "0 20px 16px", display: "flex", alignItems: "flex-end", gap: "24px", flexWrap: "wrap" }}>
-                {sparkData.length >= 2 && (
-                  <svg width={spW} height={spH} style={{ display: "block", flexShrink: 0 }}>
-                    <polyline points={spPts} fill="none" stroke="#fb923c" strokeWidth="1.5" strokeLinejoin="round" />
-                  </svg>
-                )}
-                <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-                  {[
-                    { label: "STRAT paper", value: pv, color: "#fb923c" },
-                    btc ? { label: "BTC buy & hold", value: btc, color: "#f59e0b" } : null,
-                    spy ? { label: "SPY buy & hold", value: spy, color: "#4ade80" } : null,
-                  ].filter(Boolean).map(b => (
-                    <div key={b.label} style={{ fontSize: "11px" }}>
-                      <div style={{ color: b.color, fontWeight: "600" }}>{b.label}</div>
-                      <div style={{ color: C.text }}>{b.value.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} USD</div>
-                      <div style={{ color: b.value >= START ? "#4ade80" : "#f87171", fontSize: "10px" }}>
-                        {b.value >= START ? "+" : ""}{((b.value / START - 1) * 100).toFixed(1)}%
-                      </div>
-                    </div>
-                  ))}
+              {/* Prestationsmått */}
+              <PrestationsmattGrid metrics={metrics} />
+
+              {/* Equity curve */}
+              <div style={{ padding: "0 20px 16px" }}>
+                <div style={{ fontSize: "10px", color: C.textMuted, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  EQUITY CURVE — AVKASTNING SEDAN START (%)
                 </div>
+                <EquityCurve data={curveData} farg="#fb923c" label="STRAT paper" />
               </div>
 
               {/* Positioner */}
@@ -506,19 +530,23 @@ export default async function HedgefonderPage() {
           const pv    = parseFloat(senaste.portfölj_värde_usd);
           const pnl   = pv - START;
           const pnlPct = (pnl / START * 100).toFixed(1);
-          const btc   = senaste.btc_benchmark_usd ? parseFloat(senaste.btc_benchmark_usd) : null;
-          const spy   = senaste.spy_benchmark_usd ? parseFloat(senaste.spy_benchmark_usd) : null;
 
-          // Sparkline data (portföljvärde över tid)
-          const sparkData = [...paper_nav].reverse().map(r => parseFloat(r.portfölj_värde_usd));
-          const spMin = Math.min(...sparkData), spMax = Math.max(...sparkData);
-          const spRange = spMax - spMin || 1;
-          const spW = 200, spH = 40;
-          const spPts = sparkData.map((v, i) => {
-            const x = (i / Math.max(sparkData.length - 1, 1)) * spW;
-            const y = spH - ((v - spMin) / spRange) * spH;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-          }).join(" ");
+          const quantHistorik = [...paper_nav].reverse();
+          const curveData = quantHistorik.map(r => {
+            const navv = parseFloat(r.portfölj_värde_usd);
+            const btcv = r.btc_benchmark_usd != null ? parseFloat(r.btc_benchmark_usd) : null;
+            const spyv = r.spy_benchmark_usd != null ? parseFloat(r.spy_benchmark_usd) : null;
+            return {
+              datum: new Date(r.skapad).toLocaleDateString("sv-SE", { month: "2-digit", day: "2-digit" }),
+              fond: (navv / START - 1) * 100,
+              btc: btcv != null ? (btcv / START - 1) * 100 : null,
+              spy: spyv != null ? (spyv / START - 1) * 100 : null,
+            };
+          });
+          const metrics = computeMetrics(
+            quantHistorik.map(r => ({ skapad: r.skapad, value: parseFloat(r.portfölj_värde_usd) })),
+            START
+          );
 
           return (
             <div style={{
@@ -570,28 +598,15 @@ export default async function HedgefonderPage() {
                 </div>
               </div>
 
-              {/* Sparkline + Benchmarks */}
-              <div style={{ padding: "0 20px 16px", display: "flex", alignItems: "flex-end", gap: "24px", flexWrap: "wrap" }}>
-                {sparkData.length >= 2 && (
-                  <svg width={spW} height={spH} style={{ display: "block", flexShrink: 0 }}>
-                    <polyline points={spPts} fill="none" stroke="#38bdf8" strokeWidth="1.5" strokeLinejoin="round" />
-                  </svg>
-                )}
-                <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-                  {[
-                    { label: "QUANT paper", value: pv, color: "#38bdf8" },
-                    btc ? { label: "BTC buy & hold", value: btc, color: "#f59e0b" } : null,
-                    spy ? { label: "SPY buy & hold", value: spy, color: "#4ade80" } : null,
-                  ].filter(Boolean).map(b => (
-                    <div key={b.label} style={{ fontSize: "11px" }}>
-                      <div style={{ color: b.color, fontWeight: "600" }}>{b.label}</div>
-                      <div style={{ color: C.text }}>{b.value.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} USD</div>
-                      <div style={{ color: b.value >= START ? "#4ade80" : "#f87171", fontSize: "10px" }}>
-                        {b.value >= START ? "+" : ""}{((b.value / START - 1) * 100).toFixed(1)}%
-                      </div>
-                    </div>
-                  ))}
+              {/* Prestationsmått */}
+              <PrestationsmattGrid metrics={metrics} />
+
+              {/* Equity curve */}
+              <div style={{ padding: "0 20px 16px" }}>
+                <div style={{ fontSize: "10px", color: C.textMuted, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  EQUITY CURVE — AVKASTNING SEDAN START (%)
                 </div>
+                <EquityCurve data={curveData} farg="#38bdf8" label="QUANT paper" />
               </div>
 
               {/* Positioner + senaste motivering */}
@@ -641,15 +656,15 @@ export default async function HedgefonderPage() {
           const posStorlek  = senaste.position_storlek_usd != null ? parseFloat(senaste.position_storlek_usd) : null;
           const riktning    = senaste.position_riktning;
 
-          const sparkData = [...arbi_nav].reverse().map(r => parseFloat(r.portfölj_värde_usd));
-          const spMin = Math.min(...sparkData), spMax = Math.max(...sparkData);
-          const spRange = spMax - spMin || 1;
-          const spW = 200, spH = 40;
-          const spPts = sparkData.map((v, i) => {
-            const x = (i / Math.max(sparkData.length - 1, 1)) * spW;
-            const y = spH - ((v - spMin) / spRange) * spH;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-          }).join(" ");
+          const arbiHistorik = [...arbi_nav].reverse();
+          const curveData = arbiHistorik.map(r => ({
+            datum: new Date(r.skapad).toLocaleDateString("sv-SE", { month: "2-digit", day: "2-digit" }),
+            fond: (parseFloat(r.portfölj_värde_usd) / START - 1) * 100,
+          }));
+          const metrics = computeMetrics(
+            arbiHistorik.map(r => ({ skapad: r.skapad, value: parseFloat(r.portfölj_värde_usd) })),
+            START
+          );
 
           return (
             <div style={{
@@ -728,17 +743,15 @@ export default async function HedgefonderPage() {
                 </div>
               </div>
 
-              {/* Sparkline */}
-              <div style={{ padding: "0 20px 16px", display: "flex", alignItems: "flex-end", gap: "24px", flexWrap: "wrap" }}>
-                {sparkData.length >= 2 && (
-                  <svg width={spW} height={spH} style={{ display: "block", flexShrink: 0 }}>
-                    <polyline points={spPts} fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinejoin="round" />
-                  </svg>
-                )}
-                <div style={{ fontSize: "11px" }}>
-                  <div style={{ color: "#a78bfa", fontWeight: "600" }}>ARBI paper</div>
-                  <div style={{ color: C.text }}>{pv.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} USD</div>
+              {/* Prestationsmått */}
+              <PrestationsmattGrid metrics={metrics} />
+
+              {/* Equity curve */}
+              <div style={{ padding: "0 20px 16px" }}>
+                <div style={{ fontSize: "10px", color: C.textMuted, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  EQUITY CURVE — AVKASTNING SEDAN START (%)
                 </div>
+                <EquityCurve data={curveData} farg="#a78bfa" label="ARBI paper" />
               </div>
 
               {/* Aktiv position */}
