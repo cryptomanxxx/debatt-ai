@@ -22,6 +22,7 @@ const FOND_FARG = {
   MACRO: "#34d399",
   QUANT: "#38bdf8",
   STRAT: "#fb923c",
+  ARBI:  "#a78bfa",
 };
 
 const FOND_IKON = {
@@ -29,15 +30,16 @@ const FOND_IKON = {
   MACRO: "🏛️",
   QUANT: "🤖",
   STRAT: "📊",
+  ARBI:  "🔁",
 };
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { fonder: [], investerare: [], nav_historik: [], trades: [], planbocker: [], paper_nav: [], paper_innehav: [], strat_nav: [], strat_innehav: [] };
+  if (!key) return { fonder: [], investerare: [], nav_historik: [], trades: [], planbocker: [], paper_nav: [], paper_innehav: [], strat_nav: [], strat_innehav: [], arbi_nav: [] };
 
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [fondRes, invRes, navRes, tradeRes, plbRes, paperNavRes, paperInnehavRes, stratNavRes, stratInnehavRes] = await Promise.all([
+  const [fondRes, invRes, navRes, tradeRes, plbRes, paperNavRes, paperInnehavRes, stratNavRes, stratInnehavRes, arbiNavRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/hedgefonder?aktiv=eq.true&order=symbol.asc`, {
       headers: h, next: { revalidate: 120 },
     }),
@@ -65,6 +67,9 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/strat_paper_innehav?order=symbol.asc`, {
       headers: h, next: { revalidate: 120 },
     }),
+    fetch(`${SB_URL}/rest/v1/arbi_paper_nav?order=skapad.desc&limit=60`, {
+      headers: h, next: { revalidate: 120 },
+    }),
   ]);
 
   const fonder         = fondRes.ok          ? await fondRes.json()          : [];
@@ -76,8 +81,9 @@ async function getData() {
   const paper_innehav  = paperInnehavRes.ok  ? await paperInnehavRes.json()  : [];
   const strat_nav      = stratNavRes.ok      ? await stratNavRes.json()      : [];
   const strat_innehav  = stratInnehavRes.ok  ? await stratInnehavRes.json()  : [];
+  const arbi_nav       = arbiNavRes.ok       ? await arbiNavRes.json()       : [];
 
-  return { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav, strat_nav, strat_innehav };
+  return { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav, strat_nav, strat_innehav, arbi_nav };
 }
 
 function NavSparkline({ historik, fondId, farg }) {
@@ -251,7 +257,7 @@ function FondKort({ fond, investerare, nav_historik, trades }) {
 }
 
 export default async function HedgefonderPage() {
-  const { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav, strat_nav, strat_innehav } = await getData();
+  const { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav, strat_nav, strat_innehav, arbi_nav } = await getData();
 
   const total_aum = fonder.reduce((sum, f) => {
     return sum + parseFloat(f.nav_per_andel) * parseFloat(f.total_andelar || 0);
@@ -323,6 +329,7 @@ export default async function HedgefonderPage() {
           <strong style={{ color: C.accent }}>Hur det fungerar:</strong>{" "}
           Alpha Capital (aggressiv momentum på interna tokens), Macro Fund (konservativ makro), Quant Fund (självlärande — LLM justerar strategi varje körning) och Strat Fund (algoritmisk — ingen LLM, ren MA+volym-signal från backtestdata).
           Agenter investerar 100–200 SEK och får andelar till aktuellt NAV. ALPHA/MACRO/QUANT handlar på den interna börsen. STRAT och QUANT kör paper trading mot riktiga kryptopriser (10 000 USD fiktivt startkapital).
+          ARBI kör delta-neutral spot/perpetual funding rate-arbitrage på riktiga Binance-fundingräntor (samma 10 000 USD fiktiva startkapital).
           NAV uppdateras vid varje körning (11:00 dagligen). Paper trading-resultat jämförs mot BTC buy &amp; hold och SPY (S&amp;P 500) som benchmarks.
         </div>
 
@@ -608,6 +615,141 @@ export default async function HedgefonderPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ARBI Paper Trading panel */}
+        {(() => {
+          const senaste = arbi_nav[0];
+          if (!senaste) return (
+            <div style={{ marginTop: "20px", padding: "16px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", borderTop: "2px solid #a78bfa" }}>
+              <div style={{ fontSize: "12px", color: C.textMuted }}>
+                🔁 <strong style={{ color: "#a78bfa" }}>ARBI Paper Trading</strong> — Kör <code>supabase_arbi.sql</code> och vänta på nästa ARBI-körning.
+              </div>
+            </div>
+          );
+
+          const START  = parseFloat(senaste.start_kapital_usd) || 10000;
+          const pv     = parseFloat(senaste.portfölj_värde_usd);
+          const pnl    = pv - START;
+          const pnlPct = (pnl / START * 100).toFixed(1);
+          const fundingPct = senaste.funding_rate_pct != null ? parseFloat(senaste.funding_rate_pct) : null;
+          const aprPct      = senaste.apr_pct != null ? parseFloat(senaste.apr_pct) : null;
+          const inkomst     = senaste.inkomst_usd != null ? parseFloat(senaste.inkomst_usd) : null;
+          const posStorlek  = senaste.position_storlek_usd != null ? parseFloat(senaste.position_storlek_usd) : null;
+          const riktning    = senaste.position_riktning;
+
+          const sparkData = [...arbi_nav].reverse().map(r => parseFloat(r.portfölj_värde_usd));
+          const spMin = Math.min(...sparkData), spMax = Math.max(...sparkData);
+          const spRange = spMax - spMin || 1;
+          const spW = 200, spH = 40;
+          const spPts = sparkData.map((v, i) => {
+            const x = (i / Math.max(sparkData.length - 1, 1)) * spW;
+            const y = spH - ((v - spMin) / spRange) * spH;
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+          }).join(" ");
+
+          return (
+            <div style={{
+              marginTop: "20px",
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: "12px",
+              borderTop: "2px solid #a78bfa",
+              overflow: "hidden",
+            }}>
+              {/* Header */}
+              <div style={{ padding: "16px 20px 12px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "18px" }}>🔁</span>
+                    <span style={{ fontWeight: "700", fontSize: "15px", color: "#a78bfa" }}>ARBI Paper Trading</span>
+                    <span style={{ fontSize: "10px", background: "#150d28", border: "1px solid #a78bfa40", borderRadius: "4px", padding: "2px 6px", color: "#a78bfa" }}>DELTA-NEUTRAL ARBITRAGE</span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: C.textMuted }}>
+                    10 000 USD fiktivt startkapital · spot/perpetual funding rate-arbitrage · {senaste.symbol || "BTCUSDT"}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "22px", fontWeight: "700", color: pnl >= 0 ? "#4ade80" : "#f87171" }}>
+                    {pv.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} USD
+                  </div>
+                  <div style={{ fontSize: "12px", color: pnl >= 0 ? "#4ade80" : "#f87171" }}>
+                    {pnl >= 0 ? "▲" : "▼"} {Math.abs(pnl).toFixed(0)} USD ({pnl >= 0 ? "+" : ""}{pnlPct}%)
+                  </div>
+                </div>
+              </div>
+
+              {/* Funding rate / APR / inkomst */}
+              <div style={{ padding: "0 20px 12px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "12px" }}>
+                <div>
+                  <div style={{ fontSize: "10px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Funding rate / 8h</div>
+                  <div style={{ fontSize: "16px", fontWeight: "700", color: (fundingPct ?? 0) >= 0 ? "#4ade80" : "#f87171" }}>
+                    {fundingPct != null ? `${fundingPct >= 0 ? "+" : ""}${fundingPct.toFixed(4)}%` : "—"}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "10px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>APR (annualiserad)</div>
+                  <div style={{ fontSize: "16px", fontWeight: "700", color: "#4ade80" }}>
+                    {aprPct != null ? `${aprPct.toFixed(2)}%` : "—"}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "10px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Total funding-inkomst</div>
+                  <div style={{ fontSize: "16px", fontWeight: "700", color: C.accent }}>
+                    {inkomst != null ? `$${inkomst.toFixed(2)}` : "—"}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: "10px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Positionsstorlek</div>
+                  <div style={{ fontSize: "16px", fontWeight: "700", color: C.text }}>
+                    {posStorlek != null ? `$${posStorlek.toLocaleString("sv-SE", { maximumFractionDigits: 0 })}` : "—"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Strategibeskrivning */}
+              <div style={{ margin: "0 20px 12px", background: "#0d0820", border: "1px solid #a78bfa30", borderRadius: "6px", padding: "12px" }}>
+                <div style={{ fontSize: "10px", color: "#a78bfa", marginBottom: "8px", fontWeight: "600", letterSpacing: "0.08em" }}>🔁 ARBI — SÅ HÄR FUNGERAR DET</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px" }}>
+                  {[
+                    { rubrik: "Strategi", text: "Delta-neutral arbitrage mellan spotmarknaden och perpetual futures-marknaden för BTC. Position justeras efter tecknet på den faktiska funding rate som hämtas från Binance Futures." },
+                    { rubrik: "Positiv funding rate", text: "Long BTC spot + Short BTC perpetual — mottar funding-betalningar från långa innehavare som betalar korta, helt hedgad mot prisrörelser." },
+                    { rubrik: "Negativ funding rate", text: "Long BTC perpetual + Short BTC spot — mottar funding-betalningar från korta innehavare som betalar långa." },
+                    { rubrik: "Avkastning", text: "Inkomsten kommer enbart från funding-betalningar var 8:e timme, inte från prisrörelser i BTC. APR annualiseras från senaste funding rate." },
+                  ].map(item => (
+                    <div key={item.rubrik}>
+                      <div style={{ fontSize: "10px", color: "#a78bfa", fontWeight: "600", marginBottom: "2px" }}>{item.rubrik}</div>
+                      <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: "1.5" }}>{item.text}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sparkline */}
+              <div style={{ padding: "0 20px 16px", display: "flex", alignItems: "flex-end", gap: "24px", flexWrap: "wrap" }}>
+                {sparkData.length >= 2 && (
+                  <svg width={spW} height={spH} style={{ display: "block", flexShrink: 0 }}>
+                    <polyline points={spPts} fill="none" stroke="#a78bfa" strokeWidth="1.5" strokeLinejoin="round" />
+                  </svg>
+                )}
+                <div style={{ fontSize: "11px" }}>
+                  <div style={{ color: "#a78bfa", fontWeight: "600" }}>ARBI paper</div>
+                  <div style={{ color: C.text }}>{pv.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} USD</div>
+                </div>
+              </div>
+
+              {/* Aktiv position */}
+              <div style={{ borderTop: `1px solid ${C.border}`, padding: "12px 20px" }}>
+                <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "6px" }}>AKTIV POSITION</div>
+                <div style={{ fontSize: "12px", color: C.text }}>
+                  {riktning === "long_spot_short_perp" && "📈 Long BTC spot + Short BTC perpetual — tjänar på positiv funding rate"}
+                  {riktning === "long_perp_short_spot" && "📉 Long BTC perpetual + Short BTC spot — tjänar på negativ funding rate"}
+                  {riktning === "neutral" && "⏸ Neutral — funding rate för liten för lönsam arbitrage"}
+                  {!riktning && "—"}
+                </div>
               </div>
             </div>
           );
