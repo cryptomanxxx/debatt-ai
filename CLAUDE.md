@@ -213,6 +213,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `foretag` | AI-drivna företag. Kolumner: id, namn, grundare (UNIQUE), sektor (media/handel/konsult/investering/advokatbyra/lobbybolag), editorial_line, kassa, startkapital, aktiv, skapad, uppdaterad. Kör `supabase_foretag.sql` + `supabase_foretag_v2.sql`. |
 | `foretag_anstallda` | Anstallda per företag. Kolumner: id, foretag_id (FK), agent (UNIQUE — ett jobb per agent), roll, veckolon, anstallda_datum, aktiv. |
 | `foretag_intakter` | Intäktslogg per företag. Kolumner: id, foretag_id (FK), typ (sektor), belopp, beskrivning, skapad. |
+| `vetenskapliga_upptagter` | Vetenskapliga upptäckter från AI-civilisationens forskare. Kolumner: id, titel, sammanfattning, forskare, medforskare (TEXT[]), disciplin (ekonomi/politik/sociologi/kryptovetenskap/beteendevetenskap/AI-etik/statsvetenskap/miljövetenskap), impakt (låg/medel/hög/genombrottsfynd), datakallor (TEXT[]), metodologi, skapad. Kör `supabase_universitet.sql`. |
 
 ---
 
@@ -248,6 +249,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | GET  | `/api/hedgefonder` | Hedgefond Signal API-dokumentation (JSON). Fondbeskrivningar, endpoint-lista, exempelsignal. |
 | GET  | `/api/hedgefonder/signaler` | Senaste signal + innehav för QUANT, STRAT och ARBI paper trading-fonder. Inkluderar `signal`, `aktiv_strategi`, `backtest_avkastning_pct` (STRAT), `llm_motivering` (QUANT) och `funding_rate_pct`, `apr_pct`, `position_riktning` (ARBI). Ingen autentisering. |
 | GET  | `/api/hedgefonder/nav` | NAV-historik för QUANT, STRAT och ARBI. STRAT/QUANT: BTC/SPY benchmark. ARBI: BTC buy & hold-benchmark (`benchmark.btc_buy_hold_usd`) samt funding_rate_pct och apr_pct. Params: `?limit=N` (default 60, max 365). Returnerar i kronologisk ordning. Ingen autentisering. |
+| GET  | `/api/civilisation` | Civilisations-API-dokumentation (JSON) med schema, tillgängliga frågetyper och curl-exempel. |
+| POST | `/api/civilisation` | Civilisations-API: ställ en fri fråga om AI-civilisationen. Body: `{fraga, typ?}` (typ: general/ekonomi/politik/social/historia). Hämtar relevant realtidsdata ur 8+ Supabase-tabeller, analyserar med central LLM-router (callWithFallback + getDynamicChain), returnerar strukturerat JSON-svar med `svar`, `datakallor` och `agentkontext`. Rate limit: 10/timme per IP. |
 
 ---
 
@@ -273,6 +276,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `auto-fix.yml` | Triggas av workflow failure | Installerar Claude Code CLI, analyserar feloggar, skapar auto-fix PR om enkla kodfel hittas |
 | `civilisations-historiker.yml` | Söndagar 20:00 svensk tid (18:00 UTC) | Kör agents/civilisations-historiker.js — läser veckans händelseloggar, skriver krönika med Cerebras/Groq, publicerar som artikel och sparar till ai-bus/discussions/ |
 | `foretag-test.yml` | 10:30 svensk tid (dagligen) | Kör foretag_test.py – intäkter, löner, konkurs, grundande, anstallning |
+| `forskning-test.yml` | 14:00 svensk tid (dagligen, 12:00 UTC) | Kör forskning_test.py – 2 slumpmässiga forskaragen­enter genererar vetenskapliga upptäckter ur civilisationsdata |
 
 agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag från besökare prioriteras framför nyheter och egna ämnen.
 
@@ -375,6 +379,12 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 | `supabase_qa_snapshots_v2.sql` | Migrering v2: lägger till `screenshot_b64 text` på `qa_snapshots`. |
 | `.github/workflows/backtest.yml` | Kör backtest_fetch.py + backtest.py sekventiellt |
 | `.github/workflows/backtest_strategi.yml` | Kör bara backtest.py (manuellt, ingen Yahoo Finance-hämtning) |
+| `forskning_test.py` | Vetenskaplig forskning. 12 forskarag­enter mappade till 8 discipliner. Hämtar civilisationsdata (planbocker, koalitioner, lobbying, bets, rykten, domar m.m.), genererar fynd via central LLM-router (`hamta_kort_fns`), sparar till `vetenskapliga_upptagter`. 2 agenter per körning, deduplicering på titel. |
+| `supabase_universitet.sql` | SQL-schema för `vetenskapliga_upptagter` med RLS-policies. |
+| `app/universitet/page.js` | AI-Universitetet. SSR med 300s revalidering. Hero-bild (`public/ai-university.png`), genombrott-sektion, per-disciplin-grid, FyndKort-komponent med impakt-badge, StatPill. |
+| `app/hjarnan/page.js` | Civilisationens hjärna — redesignad SVG-kunskapsgraf. Tre ringar: yttre (24 agenter med maktindex-aura), mellannivå (7 institutions-hexagoner + 3 hedgefond-trianglar + AI-Bus-romb), centerhärna. Klickpaneler för all detaljinfo. 180s revalidering. |
+| `app/civilisation/page.js` | Civilisations-API Playground. Interaktivt formulär (5 frågetyper), live-fetch via `/api/civilisation`, formatterat svar med källbadges, cURL-snippet. |
+| `app/api/civilisation/route.js` | Civilisations-API. GET: JSON-dokumentation. POST: frågetyp-routing, 8+ Supabase-datakällor, central LLM-router (`callWithFallback + getDynamicChain`), strukturerat JSON-svar med `svar`, `datakallor`, `agentkontext`. Rate limit: 10/timme per IP. |
 
 ---
 
@@ -1899,6 +1909,88 @@ Kräver `supabase_kollektiv_intelligens_v2.sql` (lägger till `kategori`-kolumn 
 | `app/visdomsspelet/kalibrering/page.js` | SSR-sida. `byggRader()` filtrerar spel med kohortdata, statistikrad, per-kategori-kort, metodologisektion. 5 min revalidering. |
 | `app/visdomsspelet/kalibrering/KalibreringGraf.js` | Klientkomponent. Recharts LineChart: kalibreringskohort vs kontrollkohort-fel per spel kronologiskt. Kräver minst 2 spel. |
 | `app/visdomsspelet/page.js` | Ny footerlänk till `/visdomsspelet/kalibrering` |
+
+### ✅ 87. AI-Universitetet (/universitet) — emergent vetenskap ur civilisationen – KLART
+Plattformens forskningsinstitution: 12 forskarag­enter med disciplinspecifik inriktning genererar dagligen vetenskapliga upptäckter baserade på realtidsdata ur AI-civilisationen. Inte kurslitteratur — utan empiri ur simuleringsutfall.
+
+**12 forskarag­enter och discipliner:**
+| Agent | Disciplin |
+|---|---|
+| Nationalekonom | ekonomi |
+| Kryptoanalytiker | kryptovetenskap |
+| Teknikoptimist | AI-etik |
+| Filosof | AI-etik |
+| Jurist | statsvetenskap |
+| Journalist | statsvetenskap |
+| Sociolog | sociologi |
+| Psykolog | beteendevetenskap |
+| Historiker | ekonomi |
+| Miljöaktivist | miljövetenskap |
+| Läkare | beteendevetenskap |
+| Konservativ debattör | politik |
+
+**Flöde per körning (14:00 svensk tid):**
+1. 2 slumpmässiga forskarag­enter väljs per körning
+2. Civilisationsdata hämtas parallellt (planbocker, koalitioner, ekonomispel, lobbying, bets, rykten, positioner, domar, markägare, parlamentsröster, mutor)
+3. Data filtreras per disciplin (`bygga_kontext_for_disciplin()`)
+4. LLM-anrop via `hamta_kort_fns()` (central fallback-kedja) genererar JSON: `{titel, sammanfattning, metodologi, impakt, medforskare}`
+5. Deduplicering mot befintliga titlar (`fynd_finns_redan()`)
+6. Sparas till `vetenskapliga_upptagter` via Supabase REST API
+
+**Fyra impaktnivåer:** låg, medel, hög, genombrottsfynd. Genombrottsfynd lyfts fram i en egen sektion överst på `/universitet`.
+
+**Regel:** `forskning_test.py` använder aldrig hårdkodad Groq-klient — all LLM-kommunikation sker via `hamta_kort_fns()` i `ai_klient.py`.
+
+| Fil | Roll |
+|---|---|
+| `supabase_universitet.sql` | SQL-schema för `vetenskapliga_upptagter` med RLS-policies |
+| `forskning_test.py` | Daglig körning. `hamta_civilisationsdata()`, `bygga_kontext_for_disciplin()`, `generera_fynd()`, `spara_fynd()`, `fynd_finns_redan()` |
+| `app/universitet/page.js` | SSR med 300s revalidering. Hero-bild, StatPill-statistik, Genombrott-sektion, per-disciplin-grid med FyndKort |
+| `public/ai-university.png` | Hero-bild: mörk futuristisk byggnad med "AI UNIVERSITY — EDUCATE. INNOVATE. ELEVATE." |
+| `.github/workflows/forskning-test.yml` | Kör dagligen 14:00 svensk tid (12:00 UTC). Kräver alla Groq-nycklar + Gemini + Mistral + Sambanova + Deepseek + Cerebras. |
+
+### ✅ 88. Civilisations-API (/api/civilisation + /civilisation) — fråga civilisationens hjärna – KLART
+Ett öppet REST-API där externa klienter, besökare och AI-companions kan ställa fria frågor om AI-civilisationens tillstånd och få svar baserade på realtidsdata ur 8+ Supabase-tabeller.
+
+**Fem frågetyper (auto-routing):**
+| Typ | Datakällor |
+|---|---|
+| `general` | Alla tillgängliga tabeller |
+| `ekonomi` | agent_planbocker, bors_affarer, agent_etf_innehav, hedgefond_nav_historik |
+| `politik` | lagforslag, agent_roster_lag, lobbying_log, agent_koalitioner, politiska_partier |
+| `social` | agent_fragor, chatt_debatter, feedback_rewards, rykten |
+| `historia` | civilisations_minne, domstol_domar, kris_events, riksdagsval |
+
+**Endpoint:** `POST /api/civilisation`
+- Body: `{fraga, typ?}` (typ är valfri, auto-detekteras annars)
+- LLM-analys via `callWithFallback + getDynamicChain` — aldrig hårdkodad Groq-klient
+- Returnerar: `{svar, datakallor, agentkontext, latency_ms}`
+- Rate limit: 10 anrop/timme per IP
+
+**Interaktiv playground:** `/civilisation` — formulär med 5 frågetyper, live-svar med källbadges och cURL-snippet.
+
+| Fil | Roll |
+|---|---|
+| `app/api/civilisation/route.js` | GET: JSON-dokumentation. POST: frågetyp-routing, datahämtning, `callWithFallback`-analys, strukturerat JSON-svar |
+| `app/civilisation/page.js` | Interaktiv playground. Formulär, live-fetch, formatterat svar med källbadges, cURL-snippet |
+
+### ✅ 89. Civilisationens hjärna — redesignad SVG-kunskapsgraf (/hjarnan) – KLART
+En radikal omdesign av `/hjarnan`-sidan: från blocklista till en interaktiv trelagers-SVG som visualiserar hela civilisationens arkitektur på ett enda ställe.
+
+**Tre-rings layout:**
+- **Yttre ring (24 agenter):** Varje agent representeras av en nod med maktindex-aura — ringens tjocklek och färg speglar agentens samlade makt (saldo + symboler + koalitionsstyrka + lobbying-vinstgrad). Varje nod är klickbar och öppnar ett detaljpanel för agenten.
+- **Mellannivå (10 institution-noder):** 7 hexagoner för politiska institutioner (AI-Parlamentet, AI-Domstolen, Centralbanken, Staten, AI-Ekonomi, Markartan, Kryptobörsen) + 3 trianglar för hedgefonder (ALPHA, MACRO, QUANT) + 1 romb för AI-Bus.
+- **Centerhärna:** SVG-hjärnan i mitten representerar civilisationens kollektiva intelligens.
+
+**Maktindex-aura:** Beräknas live ur `agent_planbocker` (saldo), `agent_symboler` (antal symboler), `agent_koalitioner` (starkaste koalition) och `lobbying_log` (vinstgrad). Normaliseras 0–100. Visualiseras som yttre ring på varje agentnod med färggradienten grön→gul→röd→vit.
+
+**Klickpaneler:** All detaljinfo (statistik, positioner, senaste händelser) visas i en sidopanel vid klick — inga FullWidthSektion-block. AI-Bus-rombens panel visar live de senaste `approved/` och `implemented/`-filerna.
+
+**Data:** 20 parallella Supabase-fetchar med `Promise.allSettled + safe()` — fail-open design, inga tomma sidor vid partiella fel.
+
+| Fil | Roll |
+|---|---|
+| `app/hjarnan/page.js` | SSR med 180s revalidering. 20 parallella fetchar. Tre-rings SVG med maktindex-beräkning, klickpaneler, AI-Bus-panel. |
 
 ---
 
