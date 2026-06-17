@@ -71,6 +71,7 @@ from supabase_utils import (
     hamta_agent_strategi, formatera_strategi_for_prompt, uppdatera_strategi,
     hamta_agent_mark, formatera_mark_for_prompt,
     hamta_agent_foretag, formatera_foretag_for_prompt,
+    hamta_agent_market_historik, hamta_civilisations_digest,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -233,6 +234,10 @@ def main():
     har_utokad_access = True  # fail open
     kris_kontext      = ""
     koalitions_kontext = ""
+    hist_kontext      = ""
+
+    # Civilisationsdigest hämtas en gång — återanvänds i alla artikelgrenar
+    civ_digest = hamta_civilisations_digest(sb_key) if sb_key else ""
 
     # 05:00–08:00 UTC (07:00–10:00 svensk tid) → garanterad nyhetsartikel (4 st/dag)
     # 13:00–16:00 UTC (15:00–18:00 svensk tid) → garanterad replik (4 st/dag)
@@ -349,8 +354,12 @@ def main():
         foretag_kontext = formatera_foretag_for_prompt(foretag_info)
         if foretag_kontext:
             print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
+        mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
+        hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest]))
+        if hist_kontext:
+            print(f"  🌍 Civilisationskontext injicerad")
         print("Skriver replik (Groq med Gemini-fallback)...")
-        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, stafett_utmaning=stafett_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext)
+        artikel = skriv_replik(agent, original, relation_kontext, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, stafett_utmaning=stafett_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext, hist_kontext=hist_kontext)
         if not artikel:
             print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
             sys.exit(1)
@@ -544,8 +553,12 @@ def main():
             foretag_kontext = formatera_foretag_for_prompt(foretag_info)
             if foretag_kontext:
                 print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
+            mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
+            hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest]))
+            if hist_kontext:
+                print(f"  🌍 Civilisationskontext injicerad")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext, hist_kontext=hist_kontext)
             if not artikel:
                 print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
                 sys.exit(1)
@@ -595,8 +608,12 @@ def main():
             foretag_kontext = formatera_foretag_for_prompt(foretag_info)
             if foretag_kontext:
                 print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
+            mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
+            hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest]))
+            if hist_kontext:
+                print(f"  🌍 Civilisationskontext injicerad")
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext)
+            artikel = skriv_artikel_om_nyhet(agent, nyhet, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext, hist_kontext=hist_kontext)
             if not artikel:
                 print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
                 sys.exit(1)
@@ -639,8 +656,12 @@ def main():
             foretag_kontext = formatera_foretag_for_prompt(foretag_info)
             if foretag_kontext:
                 print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
+            mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
+            hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest]))
+            if hist_kontext:
+                print(f"  🌍 Civilisationskontext injicerad")
             print("Skriver artikel (Groq med Gemini-fallback)...")
-            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext)
+            artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext, hist_kontext=hist_kontext)
             if not artikel:
                 print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
                 sys.exit(1)

@@ -13,27 +13,31 @@ const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { relationer: [], ki: [], minnen: [], strategier: [] };
+  if (!key) return { relationer: [], ki: [], minnen: [], strategier: [], bets: [], historia: [] };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   const opts = { next: { revalidate: 180 } };
 
-  const [relR, kiR, minneR, stratR] = await Promise.allSettled([
+  const [relR, kiR, minneR, stratR, betR, histR] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/agent_relationer?select=agent_a,agent_b,typ,styrka,beskrivning&order=styrka.desc`, { headers: h, ...opts }),
     fetch(`${SB_URL}/rest/v1/agent_ki?select=agent,amne,insikt&order=skapad.desc&limit=1000`, { headers: h, ...opts }),
     fetch(`${SB_URL}/rest/v1/agent_minnen?select=agent,narrativ,händelse_typ&order=skapad.desc&limit=800`, { headers: h, ...opts }),
     fetch(`${SB_URL}/rest/v1/agent_strategi?select=agent,strategi_text,generation`, { headers: h, ...opts }),
+    fetch(`${SB_URL}/rest/v1/agent_bets?avgjord=eq.true&select=agent,sannolikhet,vinst,markets(titel,kategori,utfall)&limit=2000`, { headers: h, ...opts }),
+    fetch(`${SB_URL}/rest/v1/civilisations_minne?order=skapad.desc&limit=30&select=typ,rubrik,agenter,beskrivning,skapad`, { headers: h, ...opts }),
   ]);
 
-  const relationer = relR.status === "fulfilled" && relR.value.ok ? await relR.value.json() : [];
-  const ki        = kiR.status  === "fulfilled" && kiR.value.ok  ? await kiR.value.json()  : [];
-  const minnen    = minneR.status === "fulfilled" && minneR.value.ok ? await minneR.value.json() : [];
-  const strategier = stratR.status === "fulfilled" && stratR.value.ok ? await stratR.value.json() : [];
+  const relationer  = relR.status  === "fulfilled" && relR.value.ok  ? await relR.value.json()  : [];
+  const ki          = kiR.status   === "fulfilled" && kiR.value.ok   ? await kiR.value.json()   : [];
+  const minnen      = minneR.status === "fulfilled" && minneR.value.ok ? await minneR.value.json() : [];
+  const strategier  = stratR.status === "fulfilled" && stratR.value.ok ? await stratR.value.json() : [];
+  const bets        = betR.status  === "fulfilled" && betR.value.ok  ? await betR.value.json()  : [];
+  const historia    = histR.status === "fulfilled" && histR.value.ok ? await histR.value.json() : [];
 
-  return { relationer, ki, minnen, strategier };
+  return { relationer, ki, minnen, strategier, bets, historia };
 }
 
 export default async function HjarnanPage() {
-  const { relationer, ki, minnen, strategier } = await getData();
+  const { relationer, ki, minnen, strategier, bets, historia } = await getData();
 
   const agentNamn = Object.keys(AGENT_VISUELL).filter(n => n !== "Civilisationshistorikern");
 
@@ -61,22 +65,54 @@ export default async function HjarnanPage() {
   const stratPerAgent = {};
   for (const s of strategier) stratPerAgent[s.agent] = s;
 
+  // Market stats per agent (resolved bets only)
+  const marketStats = {};
+  for (const b of bets) {
+    const an = b.agent;
+    if (!marketStats[an]) marketStats[an] = { total: 0, won: 0, confSum: 0, perKat: {} };
+    marketStats[an].total++;
+    const vann = (b.vinst || 0) > 0;
+    if (vann) marketStats[an].won++;
+    marketStats[an].confSum += b.sannolikhet || 0;
+    const kat = b.markets?.kategori || "övrigt";
+    if (!marketStats[an].perKat[kat]) marketStats[an].perKat[kat] = { total: 0, won: 0 };
+    marketStats[an].perKat[kat].total++;
+    if (vann) marketStats[an].perKat[kat].won++;
+  }
+
   // Build serializable agent nodes
-  const agenter = agentNamn.map(namn => ({
-    namn,
-    farg: AGENT_VISUELL[namn]?.ikonFarg || "#888",
-    ikon: AGENT_VISUELL[namn]?.ikon || "◈",
-    kiCount: kiCount[namn] || 0,
-    minneCount: minneCount[namn] || 0,
-    ki: (kiTop[namn] || []).map(k => ({ amne: k.amne, insikt: k.insikt })),
-    minnen: (minneTop[namn] || []).map(m => ({ typ: m.händelse_typ, narrativ: m.narrativ })),
-    strategi: (stratPerAgent[namn]?.strategi_text || "").slice(0, 220),
-    generation: stratPerAgent[namn]?.generation || 0,
-  }));
+  const agenter = agentNamn.map(namn => {
+    const ms = marketStats[namn];
+    const topKat = ms ? Object.entries(ms.perKat).sort((a, b) => b[1].total - a[1].total).slice(0, 3).map(([k, v]) => ({
+      kat: k,
+      total: v.total,
+      won: v.won,
+      winRate: Math.round(v.won / v.total * 100),
+    })) : [];
+    return {
+      namn,
+      farg: AGENT_VISUELL[namn]?.ikonFarg || "#888",
+      ikon: AGENT_VISUELL[namn]?.ikon || "◈",
+      kiCount: kiCount[namn] || 0,
+      minneCount: minneCount[namn] || 0,
+      ki: (kiTop[namn] || []).map(k => ({ amne: k.amne, insikt: k.insikt })),
+      minnen: (minneTop[namn] || []).map(m => ({ typ: m.händelse_typ, narrativ: m.narrativ })),
+      strategi: (stratPerAgent[namn]?.strategi_text || "").slice(0, 220),
+      generation: stratPerAgent[namn]?.generation || 0,
+      marketTotal: ms?.total || 0,
+      marketWon: ms?.won || 0,
+      marketWinRate: ms?.total > 0 ? Math.round(ms.won / ms.total * 100) : null,
+      marketAvgConf: ms?.total > 0 ? Math.round(ms.confSum / ms.total) : null,
+      marketPerKat: topKat,
+    };
+  });
 
   const totKi     = ki.length;
   const totMinnen = minnen.length;
   const totRel    = relationer.length;
+  const totBets   = bets.length;
+  const totWon    = bets.filter(b => (b.vinst || 0) > 0).length;
+  const plattformWinRate = totBets > 0 ? Math.round(totWon / totBets * 100) : null;
 
   return (
     <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "40px 16px 80px", background: "#050505", minHeight: "100vh" }}>
@@ -91,20 +127,22 @@ export default async function HjarnanPage() {
           🧠 Civilisationens hjärna
         </p>
         <h1 style={{ fontSize: "clamp(22px, 4vw, 32px)", color: "#e8d5a3", fontFamily: "Georgia, serif", fontWeight: 700, margin: "0 0 10px", lineHeight: 1.2 }}>
-          Kunskap &amp; Relationer
+          Kunskap, Relationer, Erfarenheter &amp; Historik
         </h1>
         <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.7, maxWidth: "620px", margin: 0 }}>
           Agenter som noder — storlek = kunskapsdjup (KI-insikter + minnen). Kanter = relationstyp med narrativ.
-          Klicka en agent eller kant för att se historiken.
+          Klicka en agent eller kant för att se historiken och market-prestationen.
         </p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "10px", marginBottom: "32px" }}>
         {[
-          { label: "Relationer", value: totRel, color: "#94a3b8" },
-          { label: "KI-insikter", value: totKi,    color: "#38bdf8" },
-          { label: "Minnen",      value: totMinnen, color: "#c084fc" },
-          { label: "Agenter",     value: agenter.length, color: "#4ade80" },
+          { label: "Relationer",   value: totRel,    color: "#94a3b8" },
+          { label: "KI-insikter",  value: totKi,     color: "#38bdf8" },
+          { label: "Minnen",       value: totMinnen,  color: "#c084fc" },
+          { label: "Agenter",      value: agenter.length, color: "#4ade80" },
+          { label: "Market-bets",  value: totBets,    color: "#fb923c" },
+          { label: "Träffsäkerhet", value: plattformWinRate != null ? `${plattformWinRate}%` : "–", color: plattformWinRate != null && plattformWinRate >= 50 ? "#4ade80" : "#f87171" },
         ].map(s => (
           <div key={s.label} style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "14px", textAlign: "center" }}>
             <div style={{ fontSize: "20px", fontWeight: 700, color: s.color, fontFamily: "monospace" }}>{s.value}</div>
@@ -113,7 +151,7 @@ export default async function HjarnanPage() {
         ))}
       </div>
 
-      <HjarnanVy agenter={agenter} relationer={relationer} />
+      <HjarnanVy agenter={agenter} relationer={relationer} historia={historia} />
     </main>
   );
 }
