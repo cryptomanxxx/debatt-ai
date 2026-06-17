@@ -155,7 +155,30 @@ function readDecisionHistory() {
     parts.push("\n### Nyligen implementerat (bygg PÅ detta, upprepa det inte)");
     for (const fm of implemented) {
       const extra = fm.impact ? ` → ${fm.impact}` : "";
-      parts.push(`- ${fm.title}${extra}`);
+      const utfall = fm.lyckad === "true" ? " ✅" : fm.lyckad === "false" ? " ❌" : "";
+      parts.push(`- ${fm.title}${extra}${utfall}`);
+    }
+
+    // Compute success rates per feature type from implementations with lyckad field
+    const medUtfall = implemented.filter(fm => fm.lyckad === "true" || fm.lyckad === "false");
+    if (medUtfall.length >= 2) {
+      const perTyp = {};
+      for (const fm of medUtfall) {
+        const typ = fm.type || "okänd";
+        if (!perTyp[typ]) perTyp[typ] = { lyckade: 0, totalt: 0 };
+        perTyp[typ].totalt++;
+        if (fm.lyckad === "true") perTyp[typ].lyckade++;
+      }
+      const rader = Object.entries(perTyp)
+        .sort((a, b) => b[1].totalt - a[1].totalt)
+        .map(([typ, s]) => {
+          const pct = Math.round((s.lyckade / s.totalt) * 100);
+          return `${typ}: ${s.lyckade}/${s.totalt} (${pct}%)`;
+        });
+      if (rader.length > 0) {
+        parts.push(`\n### Framgångsstatistik per feature-typ (ur outcome-observer)\n${rader.join(", ")}`);
+        parts.push("Prioritera typer med hög träffsäkerhet. Var mer försiktig med typer som visar låg framgångsgrad.");
+      }
     }
   }
 
