@@ -98,7 +98,7 @@ export default function HjarnanVy({
   hedgefonderNodes = [],
   aibusFiler = [],
   universitetUpptackter = [],
-  partier = [],
+  koalitions = [],
 }) {
   const [vald, setVald] = useState(null);
 
@@ -134,22 +134,24 @@ export default function HjarnanVy({
     setVald(prev => prev?.data?.id === inst.id ? null : { typ: inst.typ, data: inst });
   }, []);
 
-  const klickaKoalition = useCallback((parti) => {
-    setVald(prev => prev?.typ === "koalition" && prev.data.id === parti.id ? null : { typ: "koalition", data: parti });
-  }, []);
+  const klickaKoalition = useCallback((idx) => {
+    setVald(prev => prev?.typ === "koalition" && prev.data.idx === idx ? null : { typ: "koalition", data: { ...koalitions[idx], idx } });
+  }, [koalitions]);
 
   const avmarkera = useCallback(() => setVald(null), []);
 
-  // koalPos map: parti.id → position
-  const koalPosMap = useMemo(() => {
-    const m = {};
-    partier.forEach((p, i) => { m[p.id] = koalPos(i, partier.length); });
-    return m;
-  }, [partier]);
+  // One position per coalition pair, evenly spaced on KOAL_R circle
+  const koalPositions = useMemo(() =>
+    koalitions.map((_, i) => koalPos(i, koalitions.length)),
+  [koalitions]);
+
+  const maxKoalStyrka = useMemo(() =>
+    Math.max(...koalitions.map(k => k.styrka || 1), 1),
+  [koalitions]);
 
   const valdAgentNamn = vald?.typ === "agent" ? vald.data.namn : null;
   const valdKant = vald?.typ === "kant" ? vald.data : null;
-  const valdKoalitionId = vald?.typ === "koalition" ? vald.data.id : null;
+  const valdKoalitionIdx = vald?.typ === "koalition" ? vald.data.idx : null;
 
   return (
     <div>
@@ -185,27 +187,26 @@ export default function HjarnanVy({
             <circle cx={CENTER} cy={CENTER} r={KOAL_R} fill="none" stroke="#1a1505" strokeWidth={0.5} strokeDasharray="3 4" />
             <circle cx={CENTER} cy={CENTER} r={MID_R}  fill="none" stroke="#191919" strokeWidth={0.5} strokeDasharray="3 5" />
 
-            {/* Coalition ring: member lines (agent → coalition node) */}
-            {partier.map((parti) => {
-              const pk = koalPosMap[parti.id];
-              if (!pk) return null;
-              return (parti.medlemmar || []).map((agent) => {
-                const pa = posMap[agent];
-                if (!pa) return null;
-                const agentVald = valdAgentNamn === agent;
-                const koalVald = valdKoalitionId === parti.id;
-                const opacity = (valdAgentNamn || valdKoalitionId)
-                  ? (agentVald || koalVald ? 0.65 : 0.03)
-                  : 0.08;
-                return (
-                  <line key={`km-${parti.id}-${agent}`}
-                    x1={pa.x} y1={pa.y} x2={pk.x} y2={pk.y}
-                    stroke={parti.farg} strokeWidth={1} strokeOpacity={opacity} />
-                );
-              });
+            {/* Coalition ring: lines from coalition node → agent_a and agent_b */}
+            {koalitions.map((koa, i) => {
+              const pk = koalPositions[i];
+              const pa = posMap[koa.agent_a];
+              const pb = posMap[koa.agent_b];
+              if (!pk || !pa || !pb) return null;
+              const agentVald = valdAgentNamn && (koa.agent_a === valdAgentNamn || koa.agent_b === valdAgentNamn);
+              const koalVald = valdKoalitionIdx === i;
+              const opacity = (valdAgentNamn != null || valdKoalitionIdx != null)
+                ? (agentVald || koalVald ? 0.7 : 0.03)
+                : 0.14;
+              return (
+                <g key={`kl-${i}`}>
+                  <line x1={pa.x} y1={pa.y} x2={pk.x} y2={pk.y} stroke="#facc15" strokeWidth={1} strokeOpacity={opacity} />
+                  <line x1={pb.x} y1={pb.y} x2={pk.x} y2={pk.y} stroke="#facc15" strokeWidth={1} strokeOpacity={opacity} />
+                </g>
+              );
             })}
 
-            {/* Agent-relation edges */}
+            {/* Agent-relation edges (dimmed by default — only highlight on selection) */}
             {relationer.map((rel, i) => {
               const pa = posMap[rel.agent_a];
               const pb = posMap[rel.agent_b];
@@ -213,7 +214,7 @@ export default function HjarnanVy({
               const c = REL[rel.typ] || REL.neutral;
               const isVald = valdKant === rel;
               const agentVald = valdAgentNamn && (rel.agent_a === valdAgentNamn || rel.agent_b === valdAgentNamn);
-              const opacity = valdAgentNamn ? (agentVald ? 0.9 : 0.06) : (isVald ? 1 : 0.3);
+              const opacity = valdAgentNamn ? (agentVald ? 0.85 : 0.03) : (isVald ? 1 : 0.05);
               const sw = isVald ? 3 : 1 + (rel.styrka || 30) / 50;
               return (
                 <line key={i} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y}
@@ -237,42 +238,21 @@ export default function HjarnanVy({
               );
             })}
 
-            {/* Coalition ring: party nodes */}
-            {partier.map((parti, j) => {
-              const pk = koalPosMap[parti.id];
+            {/* Coalition ring: pair nodes */}
+            {koalitions.map((koa, i) => {
+              const pk = koalPositions[i];
               if (!pk) return null;
-              const isVald = valdKoalitionId === parti.id;
-              const agentBelongs = valdAgentNamn && (parti.medlemmar || []).includes(valdAgentNamn);
-              const opacity = (valdAgentNamn || valdKoalitionId)
-                ? (isVald || agentBelongs ? 1 : 0.2)
-                : 1;
-              const kort = parti.namn.length > 11 ? parti.namn.slice(0, 10) + "…" : parti.namn;
-              const angle = (j / partier.length) * 2 * Math.PI - Math.PI / 2;
-              const labelR = KOAL_R + 18;
-              const lx = CENTER + labelR * Math.cos(angle);
-              const ly = CENTER + labelR * Math.sin(angle);
-              const anchor = lx < CENTER - 8 ? "end" : lx > CENTER + 8 ? "start" : "middle";
+              const isVald = valdKoalitionIdx === i;
+              const agentVald = valdAgentNamn && (koa.agent_a === valdAgentNamn || koa.agent_b === valdAgentNamn);
+              const opacity = (valdAgentNamn != null || valdKoalitionIdx != null)
+                ? (isVald || agentVald ? 1 : 0.15) : 1;
+              const r = 3 + Math.min((koa.styrka || 1) / maxKoalStyrka * 5, 5);
               return (
-                <g key={parti.id} opacity={opacity} style={{ cursor: "pointer" }}
-                  onClick={e => { e.stopPropagation(); klickaKoalition(parti); }}>
-                  {isVald && (
-                    <circle cx={pk.x} cy={pk.y} r={20} fill="none"
-                      stroke={parti.farg} strokeWidth={1} strokeOpacity={0.3} />
-                  )}
-                  <circle cx={pk.x} cy={pk.y} r={14}
-                    fill={isVald ? parti.farg + "33" : parti.farg + "18"}
-                    stroke={parti.farg} strokeWidth={isVald ? 2 : 1.2} />
-                  <text x={pk.x} y={pk.y} textAnchor="middle" dominantBaseline="central"
-                    fontSize={10} fill={parti.farg}
-                    style={{ pointerEvents: "none", userSelect: "none" }}>
-                    {parti.ikon || "⚡"}
-                  </text>
-                  <text x={lx} y={ly} textAnchor={anchor} dominantBaseline="central"
-                    fontSize={7.5} fill="#4a3a00" fontFamily="monospace"
-                    style={{ userSelect: "none" }}>
-                    {kort}
-                  </text>
-                </g>
+                <circle key={`kn-${i}`} cx={pk.x} cy={pk.y} r={r}
+                  fill={isVald ? "#facc1540" : "#facc1515"}
+                  stroke="#facc15" strokeWidth={isVald ? 1.5 : 0.8}
+                  opacity={opacity} style={{ cursor: "pointer" }}
+                  onClick={e => { e.stopPropagation(); klickaKoalition(i); }} />
               );
             })}
 
@@ -411,7 +391,7 @@ export default function HjarnanVy({
           {!vald && <TomPanel />}
           {vald?.typ === "agent"      && <AgentPanel agent={vald.data} />}
           {vald?.typ === "kant"       && <KantPanel rel={vald.data} agenter={agenter} />}
-          {vald?.typ === "koalition"  && <KoalitionPanel parti={vald.data} agenter={agenter} />}
+          {vald?.typ === "koalition"  && <KoalitionPanel koa={vald.data} agenter={agenter} />}
           {vald?.typ === "institution" && <InstitutionPanel inst={vald.data} />}
           {vald?.typ === "hedgefond"   && <HedgefondPanel node={vald.data} />}
           {vald?.typ === "aibus"       && <AiBusPanel filer={vald.data.filer || []} />}
@@ -428,11 +408,11 @@ function TomPanel() {
     <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: "10px", padding: "24px", color: "#333", fontFamily: "monospace", fontSize: "12px", lineHeight: 1.8 }}>
       <div style={{ fontSize: "28px", marginBottom: "12px", opacity: 0.4 }}>🧠</div>
       <div>Klicka en <span style={{ color: "#555" }}>agent</span> (yttre ring) för KI-insikter, minnen, ekonomi och maktindex.</div>
-      <div style={{ marginTop: "10px" }}>Klicka ett <span style={{ color: "#facc15" }}>koalitionsparti</span> (mellanring) för partinamn, ledare och medlemmar.</div>
+      <div style={{ marginTop: "10px" }}>Klicka ett <span style={{ color: "#facc15" }}>koalitionspar</span> (mellanring) för agentpar och alliansstyrka.</div>
       <div style={{ marginTop: "10px" }}>Klicka en <span style={{ color: "#555" }}>kant</span> för relationstyp och narrativ.</div>
       <div style={{ marginTop: "10px" }}>Klicka en <span style={{ color: "#555" }}>institution</span> (inre ring) för institutionens data.</div>
       <div style={{ marginTop: "14px", color: "#222", fontSize: "11px" }}>
-        ⬡ = institution · △ = hedgefond · ◇ = AI-Bus · ○ = parti
+        ⬡ = institution · △ = hedgefond · ◇ = AI-Bus · ○ = koalitionspar
       </div>
       <div style={{ marginTop: "4px", color: "#222", fontSize: "11px" }}>
         Nodstorlek = kunskapsdjup · Yttre ring = maktindex
@@ -441,50 +421,49 @@ function TomPanel() {
   );
 }
 
-function KoalitionPanel({ parti, agenter }) {
+function KoalitionPanel({ koa, agenter }) {
   const C = { bg: "#0f0f0f", border: "#1a1a1a", dim: "#555", text: "#e8e8e8" };
-  const memberList = (parti.medlemmar || []).slice(0, 12);
   const agentMap = {};
   for (const a of agenter) agentMap[a.namn] = a;
+  const agA = agentMap[koa.agent_a];
+  const agB = agentMap[koa.agent_b];
   return (
-    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        <div style={{ width: 32, height: 32, borderRadius: "50%", background: parti.farg + "22", border: `2px solid ${parti.farg}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, flexShrink: 0 }}>
-          {parti.ikon || "⚡"}
-        </div>
-        <div>
-          <div style={{ fontSize: "14px", color: C.text, fontFamily: "Georgia, serif", fontWeight: 600 }}>{parti.namn}</div>
-          <div style={{ fontSize: "10px", color: C.dim, fontFamily: "monospace" }}>
-            Ledare: <span style={{ color: parti.farg }}>{parti.ledare}</span>
-          </div>
-        </div>
+    <div style={{ background: C.bg, border: "1px solid #2a2000", borderRadius: "10px", padding: "20px", display: "flex", flexDirection: "column", gap: "14px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#facc1515", border: "1.5px solid #facc15", flexShrink: 0 }} />
+        <div style={{ fontSize: "12px", color: "#facc15", fontFamily: "monospace", letterSpacing: "0.08em" }}>KOALITIONSPAR</div>
       </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <AgentChip agent={agA} namn={koa.agent_a} />
+        <div style={{ flex: 1, height: 1, background: "#facc1533" }} />
+        <AgentChip agent={agB} namn={koa.agent_b} />
+      </div>
+
       <div>
-        <div style={{ fontSize: "9px", color: C.dim, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px" }}>MEDLEMMAR ({memberList.length})</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-          {memberList.map(m => {
-            const a = agentMap[m];
-            return (
-              <a key={m} href={`/agent/${encodeURIComponent(m)}`}
-                style={{ display: "flex", alignItems: "center", gap: "4px", background: "#111", border: "1px solid #1e1e1e", borderRadius: "5px", padding: "3px 7px", textDecoration: "none" }}>
-                {a && <span style={{ fontSize: "10px", color: a.farg }}>{a.ikon}</span>}
-                <span style={{ fontSize: "10px", color: "#888", fontFamily: "monospace" }}>{m}</span>
-              </a>
-            );
-          })}
+        <div style={{ fontSize: "9px", color: C.dim, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "6px" }}>ALLIANSSTYRKA</div>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div style={{ flex: 1, height: 4, background: "#111", borderRadius: 2 }}>
+            <div style={{ width: `${Math.min((koa.styrka || 1) * 5, 100)}%`, height: "100%", background: "#facc15", borderRadius: 2 }} />
+          </div>
+          <span style={{ fontSize: "14px", fontWeight: 700, color: "#facc15", fontFamily: "monospace" }}>{koa.styrka || 0}</span>
         </div>
       </div>
-      {parti.styrka > 0 && (
-        <div>
-          <div style={{ fontSize: "9px", color: C.dim, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "6px" }}>KOALITIONSSTYRKA</div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{ flex: 1, height: 4, background: "#111", borderRadius: 2 }}>
-              <div style={{ width: `${Math.min(parti.styrka * 5, 100)}%`, height: "100%", background: parti.farg, borderRadius: 2 }} />
-            </div>
-            <span style={{ fontSize: "12px", fontWeight: 700, color: parti.farg, fontFamily: "monospace" }}>{parti.styrka}</span>
-          </div>
-        </div>
-      )}
+
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        {[koa.agent_a, koa.agent_b].map(namn => (
+          <a key={namn} href={`/agent/${encodeURIComponent(namn)}`}
+            style={{ fontSize: "10px", color: C.dim, fontFamily: "monospace", textDecoration: "none", background: "#0a0a0a", border: "1px solid #1e1e1e", borderRadius: "4px", padding: "3px 8px" }}
+            onClick={e => e.stopPropagation()}>
+            {namn} →
+          </a>
+        ))}
+        <a href={`/versus?a=${encodeURIComponent(koa.agent_a)}&b=${encodeURIComponent(koa.agent_b)}`}
+          style={{ fontSize: "10px", color: "#facc15", fontFamily: "monospace", textDecoration: "none", background: "#facc1510", border: "1px solid #facc1530", borderRadius: "4px", padding: "3px 8px", marginLeft: "auto" }}
+          onClick={e => e.stopPropagation()}>
+          Se 1v1 →
+        </a>
+      </div>
     </div>
   );
 }
