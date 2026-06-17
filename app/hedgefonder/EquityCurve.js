@@ -35,7 +35,7 @@ export default function EquityCurve({ data, farg, label }) {
         <Tooltip content={<TT />} />
         <ReferenceLine y={0} stroke="#94a3b855" strokeDasharray="3 3" label={{ value: "Kontanter", position: "insideTopRight", fill: "#94a3b8", fontSize: 9 }} />
         <Line type="monotone" dataKey="fond" stroke={farg} dot={false} strokeWidth={2} name={label} />
-        {harBtc && <Line type="monotone" dataKey="btc" stroke="#f59e0b" dot={false} strokeWidth={1.5} strokeDasharray="4 2" name="BTC buy & hold" />}
+        {harBtc && <Line type="monotone" dataKey="btc" stroke="#94a3b8" dot={false} strokeWidth={1.5} strokeDasharray="4 2" name="BTC buy & hold" />}
         {harSpy && <Line type="monotone" dataKey="spy" stroke="#4ade80" dot={false} strokeWidth={1.5} strokeDasharray="4 2" name="SPY buy & hold" />}
         <Legend iconType="line" iconSize={12} wrapperStyle={{ fontSize: 10, fontFamily: "monospace", color: "#666", paddingTop: 4 }} />
       </LineChart>
