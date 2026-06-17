@@ -238,9 +238,24 @@ async function main() {
 
     try {
       const assessment = await kallaCerebras(prompt);
+
+      // Parse verdict and inject lyckad into frontmatter
+      const verdictMatch = assessment.match(/\*\*Bedömning:\s*(POSITIV|NEUTRAL|NEGATIV)\*\*/i);
+      const verdict = verdictMatch?.[1]?.toUpperCase();
+      const lyckadVärde = verdict === "POSITIV" ? "true" : verdict === "NEGATIV" ? "false" : "null";
+
+      let uppdateratInnehall = content;
+      if (/^---\n/.test(content)) {
+        // Inject lyckad field into existing frontmatter (before closing ---)
+        uppdateratInnehall = content.replace(
+          /^(---\n[\s\S]+?)\n---/,
+          (_, fm) => `${fm}\nlyckad: ${lyckadVärde}\n---`
+        );
+      }
+
       const appendix = `\n\n---\n\n## Utfall\n*Bedömt ${dagens} av outcome-observer.js (Cerebras gpt-oss-120b)*\n\n${assessment}\n`;
-      fs.writeFileSync(fp, content + appendix, "utf8");
-      console.log(`  ✓ Utfall tillagt: ${fil}`);
+      fs.writeFileSync(fp, uppdateratInnehall + appendix, "utf8");
+      console.log(`  ✓ Utfall tillagt (${verdict ?? "ingen bedömning"}): ${fil}`);
       bedömdaAntal++;
     } catch (e) {
       console.error(`  ✗ Kunde inte bedöma ${fil}: ${e.message}`);
