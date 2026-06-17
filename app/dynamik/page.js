@@ -70,8 +70,13 @@ export default function DynamikPage() {
       }
       setLoading(false);
     });
-    const ts = localStorage.getItem("platform_stamning_voted");
-    if (ts && Date.now() - Number(ts) < 24 * 60 * 60 * 1000) setVoted(true);
+    function checkVoted() {
+      const ts = localStorage.getItem("platform_stamning_voted");
+      setVoted(!!(ts && Date.now() - Number(ts) < 24 * 60 * 60 * 1000));
+    }
+    checkVoted();
+    document.addEventListener("visibilitychange", checkVoted);
+    return () => document.removeEventListener("visibilitychange", checkVoted);
   }, []);
 
   async function roста() {
