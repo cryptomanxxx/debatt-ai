@@ -3,7 +3,7 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 
 const RING_R  = 205;
 const KOAL_R  = 138;
-const MID_R   = 70;
+const MID_R   = 95;
 const CENTER  = 265;
 const SVG_W   = 530;
 const SVG_H   = 530;
