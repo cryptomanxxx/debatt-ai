@@ -1275,6 +1275,83 @@ def _sport_basrate_hint(market: dict) -> str:
     return ""
 
 
+def hamta_agent_market_historik(sb_key: str, agent_namn: str) -> str:
+    """Hämtar och formaterar agentens prediction market historik för promptinjektion.
+    Returnerar tom sträng om tabellen saknas eller inga avgjorda bets finns."""
+    SB = "https://fmwxftnistkoqazfwnuj.supabase.co"
+    hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        r = httpx.get(
+            f"{SB}/rest/v1/agent_bets?agent=eq.{agent_namn}&avgjord=eq.true"
+            f"&select=sannolikhet,vinst,insats,markets(titel,kategori,utfall)&limit=60",
+            headers=hdrs, timeout=5,
+        )
+        if not r.is_success:
+            return ""
+        bets = r.json()
+        if not bets:
+            return ""
+        total = len(bets)
+        won = sum(1 for b in bets if (b.get("vinst") or 0) > 0)
+        win_rate = round(won / total * 100)
+        avg_conf = round(sum(b.get("sannolikhet", 50) for b in bets) / total)
+        # Kalibreringsbias: hur långt från facit i snitt?
+        kalibr_delar = []
+        per_kat: dict = {}
+        for b in bets:
+            utfall = (b.get("markets") or {}).get("utfall", "")
+            sann = b.get("sannolikhet", 50)
+            kat = (b.get("markets") or {}).get("kategori") or "övrigt"
+            if kat not in per_kat:
+                per_kat[kat] = {"total": 0, "won": 0}
+            per_kat[kat]["total"] += 1
+            if (b.get("vinst") or 0) > 0:
+                per_kat[kat]["won"] += 1
+            # Bias: positiv = du bettade för högt, negativ = för lågt
+            if utfall == "ja":
+                kalibr_delar.append(sann - 100)
+            elif utfall == "nej":
+                kalibr_delar.append(sann - 0)
+        kalibr = round(sum(kalibr_delar) / len(kalibr_delar)) if kalibr_delar else 0
+        bias_text = ""
+        if abs(kalibr) > 8:
+            riktning = "för högt" if kalibr > 0 else "för lågt"
+            bias_text = f" (systematisk bias: du bettade {riktning} med ~{abs(kalibr)}%)"
+        rader = [f"Totalt {total} avgjorda bets, {win_rate}% rätt, snittkonfidensn {avg_conf}%{bias_text}"]
+        top_kat = sorted(per_kat.items(), key=lambda x: -x[1]["total"])[:4]
+        for kat, s in top_kat:
+            wr = round(s["won"] / s["total"] * 100)
+            rader.append(f"- {kat}: {s['won']}/{s['total']} ({wr}%)")
+        return "DIN PREDICTION MARKET HISTORIK (lär av dina misstag):\n" + "\n".join(rader)
+    except Exception:
+        return ""
+
+
+def hamta_civilisations_digest(sb_key: str, limit: int = 8) -> str:
+    """Hämtar de senaste civilisationshändelserna som kontext för artikelskrivning.
+    Returnerar tom sträng om tabellen saknas."""
+    SB = "https://fmwxftnistkoqazfwnuj.supabase.co"
+    hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        r = httpx.get(
+            f"{SB}/rest/v1/civilisations_minne?order=skapad.desc&limit={limit}"
+            f"&select=typ,rubrik,agenter,beskrivning",
+            headers=hdrs, timeout=5,
+        )
+        if not r.is_success:
+            return ""
+        händelser = r.json()
+        if not händelser:
+            return ""
+        rader = []
+        for h in händelser:
+            agenter_str = ", ".join((h.get("agenter") or [])[:3])
+            rader.append(f"- [{h['typ']}] {h['rubrik']}" + (f" ({agenter_str})" if agenter_str else ""))
+        return "CIVILISATIONENS SENASTE HÄNDELSER (bakgrundskontext):\n" + "\n".join(rader)
+    except Exception:
+        return ""
+
+
 def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key: str = "") -> tuple[int, str]:
     """Låter agenten uppskatta sannolikheten (0-100) med beslutsunderlag och kalibreringsregel."""
     deadline_str = market.get("deadline", "")[:10]
@@ -1282,6 +1359,12 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key
     betting_stil = agent.get("betting_stil", "")
 
     kontext_delar: list[str] = []
+
+    # 0. Agentens egna historiska träffsäkerhet per marknadskategori
+    if sb_key:
+        hist = hamta_agent_market_historik(sb_key, agent["namn"])
+        if hist:
+            kontext_delar.append(hist)
 
     # 1. Befintlig konsensus bland andra agenter
     if sb_key:

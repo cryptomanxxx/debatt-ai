@@ -16,6 +16,28 @@ const REL = {
 
 const HÄNDELSE_IKON = { röst: "🗳", koalition: "🤝", lobbying: "💰", artikel: "📝", ekonomi: "💸" };
 
+const HISTORIK_IKON = {
+  koalition_bildad: "🤝",
+  allians_bruten:   "💔",
+  förräderi:        "🗡️",
+  triumf:           "🏆",
+  skandal:          "😱",
+  marknadsseger:    "💰",
+  marknadskrasch:   "📉",
+  symbolkup:        "👑",
+};
+
+const HISTORIK_FARG = {
+  koalition_bildad: "#facc15",
+  allians_bruten:   "#f87171",
+  förräderi:        "#fb923c",
+  triumf:           "#4ade80",
+  skandal:          "#f87171",
+  marknadsseger:    "#4ade80",
+  marknadskrasch:   "#f87171",
+  symbolkup:        "#e879f9",
+};
+
 function agentPos(idx, total) {
   const angle = (idx / total) * 2 * Math.PI - Math.PI / 2;
   return { x: CENTER + RING_R * Math.cos(angle), y: CENTER + RING_R * Math.sin(angle) };
@@ -26,7 +48,7 @@ function nodeR(agent) {
   return 7 + Math.sqrt(depth) * 1.5;
 }
 
-export default function HjarnanVy({ agenter, relationer }) {
+export default function HjarnanVy({ agenter, relationer, historia = [] }) {
   const [vald, setVald] = useState(null);   // { typ: "agent"|"kant", data: ... }
 
   const posMap = {};
@@ -46,106 +68,136 @@ export default function HjarnanVy({ agenter, relationer }) {
   const valdKant = vald?.typ === "kant" ? vald.data : null;
 
   return (
-    <div style={{ display: "flex", gap: "20px", alignItems: "flex-start", flexWrap: "wrap" }}>
-      {/* SVG-graf */}
-      <div style={{ flex: "0 0 auto" }}>
-        <svg
-          viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-          width={SVG_W}
-          height={SVG_H}
-          style={{ display: "block", background: "#080808", borderRadius: "12px", border: "1px solid #1a1a1a", maxWidth: "100%", cursor: "default" }}
-          onClick={avmarkera}
-        >
-          <defs>
-            {Object.entries(REL).map(([typ, c]) => (
-              <filter key={typ} id={`glow-${typ}`} x="-40%" y="-40%" width="180%" height="180%">
-                <feGaussianBlur stdDeviation="2.5" result="blur" />
-                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-              </filter>
-            ))}
-          </defs>
+    <div>
+      {/* Graf + infopanel */}
+      <div style={{ display: "flex", gap: "20px", alignItems: "flex-start", flexWrap: "wrap" }}>
+        {/* SVG-graf */}
+        <div style={{ flex: "0 0 auto" }}>
+          <svg
+            viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+            width={SVG_W}
+            height={SVG_H}
+            style={{ display: "block", background: "#080808", borderRadius: "12px", border: "1px solid #1a1a1a", maxWidth: "100%", cursor: "default" }}
+            onClick={avmarkera}
+          >
+            <defs>
+              {Object.entries(REL).map(([typ, c]) => (
+                <filter key={typ} id={`glow-${typ}`} x="-40%" y="-40%" width="180%" height="180%">
+                  <feGaussianBlur stdDeviation="2.5" result="blur" />
+                  <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
+              ))}
+            </defs>
 
-          {/* Kanter */}
-          {relationer.map((rel, i) => {
-            const pa = posMap[rel.agent_a];
-            const pb = posMap[rel.agent_b];
-            if (!pa || !pb) return null;
-            const c = REL[rel.typ] || REL.neutral;
-            const isVald = valdKant === rel;
-            const agentVald = valdAgentNamn && (rel.agent_a === valdAgentNamn || rel.agent_b === valdAgentNamn);
-            const opacity = valdAgentNamn ? (agentVald ? 0.9 : 0.1) : (isVald ? 1 : 0.35);
-            const sw = isVald ? 3 : 1 + (rel.styrka || 30) / 50;
-            return (
-              <line
-                key={i}
-                x1={pa.x} y1={pa.y}
-                x2={pb.x} y2={pb.y}
-                stroke={c.stroke}
-                strokeWidth={sw}
-                strokeOpacity={opacity}
-                filter={isVald ? `url(#glow-${rel.typ})` : undefined}
-                style={{ cursor: "pointer" }}
-                onClick={e => { e.stopPropagation(); klickaKant(rel); }}
-              />
-            );
-          })}
-
-          {/* Noder */}
-          {agenter.map((agent, i) => {
-            const pos = posMap[agent.namn];
-            const r = nodeR(agent);
-            const isVald = valdAgentNamn === agent.namn;
-            const hasKant = valdKant && (valdKant.agent_a === agent.namn || valdKant.agent_b === agent.namn);
-            const opacity = valdAgentNamn ? (isVald ? 1 : 0.3) : (valdKant ? (hasKant ? 1 : 0.3) : 1);
-            const angle = (i / agenter.length) * 360 - 90;
-            const labelR = RING_R + r + 14;
-            const lx = CENTER + labelR * Math.cos(((i / agenter.length) * 2 * Math.PI) - Math.PI / 2);
-            const ly = CENTER + labelR * Math.sin(((i / agenter.length) * 2 * Math.PI) - Math.PI / 2);
-            const anchor = lx < CENTER - 10 ? "end" : lx > CENTER + 10 ? "start" : "middle";
-            const kortNamn = agent.namn.length > 12 ? agent.namn.slice(0, 11) + "…" : agent.namn;
-            return (
-              <g key={agent.namn} opacity={opacity} style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); klickaAgent(agent); }}>
-                <circle
-                  cx={pos.x} cy={pos.y} r={r + 3}
-                  fill={isVald ? agent.farg + "33" : "none"}
-                  stroke={isVald ? agent.farg : "transparent"}
-                  strokeWidth={1.5}
+            {/* Kanter */}
+            {relationer.map((rel, i) => {
+              const pa = posMap[rel.agent_a];
+              const pb = posMap[rel.agent_b];
+              if (!pa || !pb) return null;
+              const c = REL[rel.typ] || REL.neutral;
+              const isVald = valdKant === rel;
+              const agentVald = valdAgentNamn && (rel.agent_a === valdAgentNamn || rel.agent_b === valdAgentNamn);
+              const opacity = valdAgentNamn ? (agentVald ? 0.9 : 0.1) : (isVald ? 1 : 0.35);
+              const sw = isVald ? 3 : 1 + (rel.styrka || 30) / 50;
+              return (
+                <line
+                  key={i}
+                  x1={pa.x} y1={pa.y}
+                  x2={pb.x} y2={pb.y}
+                  stroke={c.stroke}
+                  strokeWidth={sw}
+                  strokeOpacity={opacity}
+                  filter={isVald ? `url(#glow-${rel.typ})` : undefined}
+                  style={{ cursor: "pointer" }}
+                  onClick={e => { e.stopPropagation(); klickaKant(rel); }}
                 />
-                <circle cx={pos.x} cy={pos.y} r={r} fill={agent.farg + "22"} stroke={agent.farg} strokeWidth={1.5} />
-                <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="central" fontSize={r > 10 ? 9 : 7} fill={agent.farg} fontFamily="monospace">
-                  {agent.ikon}
-                </text>
-                <text x={lx} y={ly} textAnchor={anchor} dominantBaseline="central" fontSize={8.5} fill="#555" fontFamily="monospace">
-                  {kortNamn}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+              );
+            })}
 
-        {/* Legend */}
-        <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "10px", paddingLeft: "4px" }}>
-          {Object.entries(REL).map(([typ, c]) => {
-            const antal = relationer.filter(r => r.typ === typ).length;
-            return (
-              <div key={typ} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                <div style={{ width: 20, height: 2, background: c.stroke, borderRadius: 1 }} />
-                <span style={{ fontSize: 10, color: "#555", fontFamily: "monospace" }}>{c.label} ({antal})</span>
-              </div>
-            );
-          })}
-          <div style={{ fontSize: 10, color: "#333", fontFamily: "monospace", marginLeft: "auto" }}>
-            Nodstorlek = KI-insikter + minnen · Klicka för detaljer
+            {/* Noder */}
+            {agenter.map((agent, i) => {
+              const pos = posMap[agent.namn];
+              const r = nodeR(agent);
+              const isVald = valdAgentNamn === agent.namn;
+              const hasKant = valdKant && (valdKant.agent_a === agent.namn || valdKant.agent_b === agent.namn);
+              const opacity = valdAgentNamn ? (isVald ? 1 : 0.3) : (valdKant ? (hasKant ? 1 : 0.3) : 1);
+              const labelR = RING_R + r + 14;
+              const lx = CENTER + labelR * Math.cos(((i / agenter.length) * 2 * Math.PI) - Math.PI / 2);
+              const ly = CENTER + labelR * Math.sin(((i / agenter.length) * 2 * Math.PI) - Math.PI / 2);
+              const anchor = lx < CENTER - 10 ? "end" : lx > CENTER + 10 ? "start" : "middle";
+              const kortNamn = agent.namn.length > 12 ? agent.namn.slice(0, 11) + "…" : agent.namn;
+              return (
+                <g key={agent.namn} opacity={opacity} style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); klickaAgent(agent); }}>
+                  <circle
+                    cx={pos.x} cy={pos.y} r={r + 3}
+                    fill={isVald ? agent.farg + "33" : "none"}
+                    stroke={isVald ? agent.farg : "transparent"}
+                    strokeWidth={1.5}
+                  />
+                  <circle cx={pos.x} cy={pos.y} r={r} fill={agent.farg + "22"} stroke={agent.farg} strokeWidth={1.5} />
+                  <text x={pos.x} y={pos.y} textAnchor="middle" dominantBaseline="central" fontSize={r > 10 ? 9 : 7} fill={agent.farg} fontFamily="monospace">
+                    {agent.ikon}
+                  </text>
+                  <text x={lx} y={ly} textAnchor={anchor} dominantBaseline="central" fontSize={8.5} fill="#555" fontFamily="monospace">
+                    {kortNamn}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Legend */}
+          <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "10px", paddingLeft: "4px" }}>
+            {Object.entries(REL).map(([typ, c]) => {
+              const antal = relationer.filter(r => r.typ === typ).length;
+              return (
+                <div key={typ} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                  <div style={{ width: 20, height: 2, background: c.stroke, borderRadius: 1 }} />
+                  <span style={{ fontSize: 10, color: "#555", fontFamily: "monospace" }}>{c.label} ({antal})</span>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 10, color: "#333", fontFamily: "monospace", marginLeft: "auto" }}>
+              Nodstorlek = KI-insikter + minnen · Klicka för detaljer
+            </div>
           </div>
+        </div>
+
+        {/* Infopanel */}
+        <div style={{ flex: "1 1 260px", minWidth: "240px", maxWidth: "380px" }}>
+          {!vald && <TomPanel />}
+          {vald?.typ === "agent" && <AgentPanel agent={vald.data} />}
+          {vald?.typ === "kant" && <KantPanel rel={vald.data} agenter={agenter} />}
         </div>
       </div>
 
-      {/* Infopanel */}
-      <div style={{ flex: "1 1 260px", minWidth: "240px", maxWidth: "380px" }}>
-        {!vald && <TomPanel />}
-        {vald?.typ === "agent" && <AgentPanel agent={vald.data} />}
-        {vald?.typ === "kant" && <KantPanel rel={vald.data} agenter={agenter} />}
-      </div>
+      {/* Historik — full-width under grafen */}
+      {historia.length > 0 && (
+        <div style={{ marginTop: "40px" }}>
+          <div style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "16px" }}>
+            🌍 Civilisationens Historik — senaste händelser
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "8px" }}>
+            {historia.map((h, i) => {
+              const ikon = HISTORIK_IKON[h.typ] || "•";
+              const farg = HISTORIK_FARG[h.typ] || "#555";
+              const agenterStr = (h.agenter || []).slice(0, 3).join(", ");
+              return (
+                <div key={i} style={{ background: "#0a0a0a", border: `1px solid ${farg}22`, borderLeft: `2px solid ${farg}`, borderRadius: "6px", padding: "10px 12px", display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                  <span style={{ fontSize: "14px", flexShrink: 0, marginTop: "1px" }}>{ikon}</span>
+                  <div>
+                    <div style={{ fontSize: "10px", color: farg, fontFamily: "monospace", letterSpacing: "0.06em", marginBottom: "3px" }}>{h.typ?.toUpperCase().replace("_", " ")}</div>
+                    <div style={{ fontSize: "11px", color: "#888", lineHeight: 1.5 }}>{h.rubrik}</div>
+                    {agenterStr && (
+                      <div style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", marginTop: "4px" }}>{agenterStr}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -154,7 +206,7 @@ function TomPanel() {
   return (
     <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: "10px", padding: "24px", color: "#333", fontFamily: "monospace", fontSize: "12px", lineHeight: 1.8 }}>
       <div style={{ fontSize: "28px", marginBottom: "12px", opacity: 0.4 }}>🧠</div>
-      <div>Klicka en <span style={{ color: "#555" }}>agent</span> för att se dess KI-insikter, minnen och strategitext.</div>
+      <div>Klicka en <span style={{ color: "#555" }}>agent</span> för att se dess KI-insikter, minnen, market-prestation och strategitext.</div>
       <div style={{ marginTop: "10px" }}>Klicka en <span style={{ color: "#555" }}>kant</span> för att se relationstyp och narrativet bakom den.</div>
     </div>
   );
@@ -163,6 +215,11 @@ function TomPanel() {
 function AgentPanel({ agent }) {
   const C = { bg: "#0f0f0f", border: "#1a1a1a", dim: "#555", dimmer: "#333", text: "#e8e8e8" };
   const strategi = agent.strategi;
+
+  // Market win rate color
+  const wr = agent.marketWinRate;
+  const wrFarg = wr == null ? "#555" : wr >= 60 ? "#4ade80" : wr >= 45 ? "#facc15" : "#f87171";
+
   return (
     <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "20px", display: "flex", flexDirection: "column", gap: "16px" }}>
       {/* Header */}
@@ -176,6 +233,39 @@ function AgentPanel({ agent }) {
             {agent.kiCount} KI · {agent.minneCount} minnen · gen {agent.generation}
           </div>
         </div>
+      </div>
+
+      {/* Market-prestation */}
+      <div>
+        <div style={{ fontSize: "9px", color: C.dimmer, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px" }}>MARKET-PRESTATION</div>
+        {agent.marketTotal === 0 ? (
+          <div style={{ fontSize: "11px", color: C.dimmer, fontFamily: "monospace" }}>Inga avgjorda bets ännu.</div>
+        ) : (
+          <div>
+            <div style={{ display: "flex", gap: "12px", marginBottom: "8px", alignItems: "baseline" }}>
+              <div>
+                <span style={{ fontSize: "18px", fontWeight: 700, color: wrFarg, fontFamily: "monospace" }}>{wr}%</span>
+                <span style={{ fontSize: "9px", color: C.dimmer, fontFamily: "monospace", marginLeft: "4px" }}>rätt</span>
+              </div>
+              <div style={{ fontSize: "10px", color: C.dimmer, fontFamily: "monospace" }}>
+                {agent.marketWon}/{agent.marketTotal} bets · snittkonfidens {agent.marketAvgConf}%
+              </div>
+            </div>
+            {agent.marketPerKat.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                {agent.marketPerKat.map((k, i) => {
+                  const kFarg = k.winRate >= 60 ? "#4ade80" : k.winRate >= 45 ? "#facc15" : "#f87171";
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div style={{ width: `${k.winRate}%`, height: 3, background: kFarg, borderRadius: 2, maxWidth: "80px" }} />
+                      <span style={{ fontSize: "9px", color: "#555", fontFamily: "monospace" }}>{k.kat}: {k.won}/{k.total} ({k.winRate}%)</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* KI-insikter */}
