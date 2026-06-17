@@ -246,7 +246,7 @@ export default function HjarnanVy({
               const agentVald = valdAgentNamn && (koa.agent_a === valdAgentNamn || koa.agent_b === valdAgentNamn);
               const opacity = (valdAgentNamn != null || valdKoalitionIdx != null)
                 ? (isVald || agentVald ? 1 : 0.15) : 1;
-              const r = 3 + Math.min((koa.styrka || 1) / maxKoalStyrka * 5, 5);
+              const r = 6 + Math.min((koa.styrka || 1) / maxKoalStyrka * 7, 7);
               return (
                 <circle key={`kn-${i}`} cx={pk.x} cy={pk.y} r={r}
                   fill={isVald ? "#facc1540" : "#facc1515"}
@@ -260,7 +260,7 @@ export default function HjarnanVy({
             {alleInstitutioner.map((inst, j) => {
               const pi = instPos(j, alleInstitutioner.length);
               const isVald = vald?.data?.id === inst.id;
-              const r = inst.typ === "aibus" ? 10 : inst.typ === "hedgefond" ? 8 : 9;
+              const r = inst.typ === "aibus" ? 15 : inst.typ === "hedgefond" ? 13 : 14;
               const dimmed = valdAgentNamn && !instAktMap[inst.id]?.has(valdAgentNamn);
               const opacity = dimmed ? 0.25 : 1;
               return (
@@ -287,7 +287,7 @@ export default function HjarnanVy({
                       stroke={inst.farg} strokeWidth={isVald ? 2 : 1.2} />
                   )}
                   <text x={pi.x} y={pi.y} textAnchor="middle" dominantBaseline="central"
-                    fontSize={inst.typ === "aibus" ? 7 : 6} fill={inst.farg}
+                    fontSize={inst.typ === "aibus" ? 11 : 10} fill={inst.farg}
                     style={{ pointerEvents: "none", userSelect: "none" }}>
                     {inst.ikon}
                   </text>
