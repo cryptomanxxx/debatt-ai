@@ -1027,6 +1027,13 @@ def main():
             else:
                 print(f"\n── Koalitionsinitiering: {agent['namn']} blockerad (rank {agent_rank}/24 — kräver topp 12) ──")
 
+        # Marknadsbaserade rivaliteter (~15% per körning)
+        if random.random() < 0.15:
+            from supabase_utils import skapa_market_rivaliteter
+            n = skapa_market_rivaliteter(sb_key, agent["namn"])
+            if n:
+                print(f"  {n} marknadsoense-relation(er) skapad(e) för {agent['namn']}")
+
     # Ekonomispel (~5% chans per körning, eller om pending ultimatum)
     if sb_key and random.random() < 0.05:
         print(f"\n── AI-Ekonomi: {agent['namn']} ──")

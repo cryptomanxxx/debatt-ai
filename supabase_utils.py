@@ -3995,6 +3995,60 @@ def upsert_relation(sb_key: str, agent_a: str, agent_b: str, typ: str, styrka: i
         return False
 
 
+def skapa_market_rivaliteter(sb_key: str, agent_namn: str) -> int:
+    """Skapar rival-relationer ur stora prediction market-oenigheter (|diff| >= 35%).
+    Uppdaterar bara relationer som är neutral eller saknas — skriver inte över allierad/rival/fiende."""
+    h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_bets?agent=eq.{agent_namn}"
+            f"&avgjord=eq.false&select=market_id,sannolikhet,markets(titel)",
+            headers=h, timeout=8,
+        )
+        if not r.is_success:
+            return 0
+        egna = r.json()
+        if not egna:
+            return 0
+
+        skapade = 0
+        for bet in egna[:5]:
+            mid = bet["market_id"]
+            titel = (bet.get("markets") or {}).get("titel", f"market {mid}")
+            alla_r = httpx.get(
+                f"{SB_URL}/rest/v1/agent_bets?market_id=eq.{mid}"
+                f"&agent=neq.{agent_namn}&avgjord=eq.false&select=agent,sannolikhet",
+                headers=h, timeout=8,
+            )
+            if not alla_r.is_success:
+                continue
+            for annan in alla_r.json():
+                diff = abs(bet["sannolikhet"] - annan["sannolikhet"])
+                if diff < 35:
+                    continue
+                motpart = annan["agent"]
+                a1, a2 = sorted([agent_namn, motpart])
+                check = httpx.get(
+                    f"{SB_URL}/rest/v1/agent_relationer?agent_a=eq.{a1}&agent_b=eq.{a2}&select=typ",
+                    headers=h, timeout=5,
+                )
+                befintlig = (check.json()[0].get("typ") if check.is_success and check.json() else None)
+                if befintlig in (None, "neutral"):
+                    styrka = min(30 + (diff - 35), 55)
+                    narrativ = (
+                        f"Marknadsoense om \"{titel[:55]}\": "
+                        f"{agent_namn} {bet['sannolikhet']}% vs {motpart} {annan['sannolikhet']}%"
+                    )
+                    upsert_relation(sb_key, agent_namn, motpart, "rival", styrka, narrativ)
+                    skapade += 1
+                if skapade >= 2:
+                    return skapade
+        return skapade
+    except Exception as e:
+        print(f"  skapa_market_rivaliteter: {e}", file=sys.stderr)
+        return 0
+
+
 # ---------------------------------------------------------------------------
 # Politiska partier
 # ---------------------------------------------------------------------------
