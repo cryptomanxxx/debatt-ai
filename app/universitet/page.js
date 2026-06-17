@@ -57,13 +57,13 @@ export default async function UniversitetPage() {
   return (
     <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 0 80px", background: "#020a1a", minHeight: "100vh" }}>
       {/* Hero image */}
-      <div style={{ position: "relative", width: "100%", overflow: "hidden", maxHeight: "420px" }}>
+      <div style={{ position: "relative", width: "100%" }}>
         <img
           src="/ai-university.png"
           alt="AI University — Educate. Innovate. Elevate."
-          style={{ width: "100%", objectFit: "cover", objectPosition: "center top", display: "block", maxHeight: "420px" }}
+          style={{ width: "100%", height: "auto", display: "block" }}
         />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 40%, #020a1a 100%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 60%, #020a1a 100%)" }} />
       </div>
 
       {/* Hero text */}
