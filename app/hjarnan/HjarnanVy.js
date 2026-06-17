@@ -260,7 +260,7 @@ export default function HjarnanVy({
             {alleInstitutioner.map((inst, j) => {
               const pi = instPos(j, alleInstitutioner.length);
               const isVald = vald?.data?.id === inst.id;
-              const r = inst.typ === "aibus" ? 15 : inst.typ === "hedgefond" ? 13 : 14;
+              const r = inst.typ === "aibus" ? 20 : inst.typ === "hedgefond" ? 18 : 19;
               const dimmed = valdAgentNamn && !instAktMap[inst.id]?.has(valdAgentNamn);
               const opacity = dimmed ? 0.25 : 1;
               return (
@@ -287,7 +287,7 @@ export default function HjarnanVy({
                       stroke={inst.farg} strokeWidth={isVald ? 2 : 1.2} />
                   )}
                   <text x={pi.x} y={pi.y} textAnchor="middle" dominantBaseline="central"
-                    fontSize={inst.typ === "aibus" ? 11 : 10} fill={inst.farg}
+                    fontSize={inst.typ === "aibus" ? 15 : 14} fill={inst.farg}
                     style={{ pointerEvents: "none", userSelect: "none" }}>
                     {inst.ikon}
                   </text>
