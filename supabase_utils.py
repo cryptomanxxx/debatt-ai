@@ -3727,6 +3727,20 @@ def hamta_agent_status(sb_key: str, agent_namn: str) -> dict:
             status["lobbying_wins"] = sum(1 for l in lobs if l.get("resultat") == "accepterat")
     except Exception:
         pass
+    try:
+        alla_r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc",
+            headers=hdrs, timeout=5,
+        )
+        if alla_r.is_success:
+            alla = alla_r.json()
+            for i, row in enumerate(alla):
+                if row.get("agent") == agent_namn:
+                    status["saldo_rank"] = i + 1
+                    status["saldo_total"] = len(alla)
+                    break
+    except Exception:
+        pass
     return status
 
 
@@ -3736,13 +3750,21 @@ def format_status_for_prompt(status: dict) -> str:
         return ""
     delar = []
     saldo = status.get("saldo")
+    rank = status.get("saldo_rank")
+    total = status.get("saldo_total", 24)
     if saldo is not None:
+        rank_str = f" (#{rank}/{total})" if rank else ""
         if saldo < 200:
-            delar.append(f"Ekonomi: Utarmad — bara {saldo} kr kvar av ursprungliga 1 000 kr")
+            delar.append(f"Ekonomi: Utarmad — bara {saldo} kr kvar av ursprungliga 1 000 kr{rank_str}")
         elif saldo > 2500:
-            delar.append(f"Ekonomi: Förmögen — {saldo} kr, mer än dubbelt startkapitalet")
+            delar.append(f"Ekonomi: Förmögen — {saldo} kr, mer än dubbelt startkapitalet{rank_str}")
         elif saldo > 1500:
-            delar.append(f"Ekonomi: Välmående — {saldo} kr")
+            delar.append(f"Ekonomi: Välmående — {saldo} kr{rank_str}")
+    if rank:
+        if rank <= 5:
+            delar.append(f"Förmögenhetsrankning: #{rank}/{total} — bland de rikaste agenterna i civilisationen")
+        elif total and rank >= total - 4:
+            delar.append(f"Förmögenhetsrankning: #{rank}/{total} — bland de fattigaste agenterna, ekonomiskt sårbar")
     market_bets = status.get("market_bets", 0)
     market_wins = status.get("market_wins", 0)
     if market_bets >= 3:
