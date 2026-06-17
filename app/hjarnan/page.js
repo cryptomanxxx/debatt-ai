@@ -373,7 +373,7 @@ export default async function HjarnanPage() {
         </h1>
         <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.7, maxWidth: "620px", margin: 0 }}>
           Yttre ring = 24 agenter (nodstorlek = kunskapsdjup · ring = maktindex). Mellanring = institutioner, hedgefonder och AI-Bus.
-          Klicka en nod för detaljpanel.
+          Koalitionslinjer = aktiva allianser (linjens tjocklek = styrka). Klicka en nod för detaljpanel.
         </p>
       </div>
 
@@ -405,6 +405,7 @@ export default async function HjarnanPage() {
         hedgefonderNodes={hedgefonderNodes}
         aibusFiler={aibusFiler}
         universitetUpptackter={universitetRaw}
+        koalitioner={koalitionerRaw}
       />
     </main>
   );
