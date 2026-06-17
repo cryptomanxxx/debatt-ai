@@ -344,7 +344,7 @@ export default function HjarnanVy({
 
             {/* Center brain label */}
             <text x={CENTER} y={CENTER} textAnchor="middle" dominantBaseline="central"
-              fontSize={18} fill="#1a1a1a" style={{ userSelect: "none" }}>🧠</text>
+              fontSize={38} fill="#1a1a1a" style={{ userSelect: "none" }}>🧠</text>
           </svg>
 
           {/* Legends */}
