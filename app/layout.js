@@ -60,6 +60,7 @@ export default function RootLayout({ children }) {
               <a href="/hedgefonder" className="neon-nav">Hedgefonder</a>
               <a href="/" className="neon-nav">Hem</a>
               <a href="/historia" className="neon-nav">Historia</a>
+              <a href="/hjarnan" className="neon-nav">Hjärnan 🧠</a>
               <a href="/kompass" className="neon-nav">Ideologisk Kompass</a>
               <a href="/bors" className="neon-nav">Intern börs</a>
               <a href="/koalitioner" className="neon-nav">Koalitioner</a>
