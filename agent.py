@@ -154,6 +154,28 @@ def hamta_drama_kontext(sb_key, agent_a, agent_b):
     except Exception:
         pass
 
+    # Relationstyp och narrativ ur agent_relationer
+    try:
+        a1, a2 = sorted([agent_a, agent_b])
+        rel_r = httpx.get(
+            f"https://fmwxftnistkoqazfwnuj.supabase.co/rest/v1/agent_relationer"
+            f"?agent_a=eq.{a1}&agent_b=eq.{a2}&select=typ,styrka,beskrivning&limit=1",
+            headers={**hdrs, "Prefer": ""}, timeout=5,
+        )
+        if rel_r.is_success:
+            rader = rel_r.json()
+            if rader:
+                rel = rader[0]
+                typ = rel.get("typ", "neutral")
+                styrka = rel.get("styrka", 0)
+                beskr = rel.get("beskrivning", "")
+                rel_text = f"Relation: {typ} (styrka {styrka})"
+                if beskr:
+                    rel_text += f" — {beskr}"
+                delar.insert(0, rel_text)
+    except Exception:
+        pass
+
     # Historiska minnen mellan agenterna
     try:
         minnen = hamta_relevanta_minnen(sb_key, agent_a, agent_b, limit=3)

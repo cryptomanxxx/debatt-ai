@@ -2048,7 +2048,7 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
                 relaterat_typ="agent_koalitioner",
             )
             upsert_relation(sb_key, agent_namn, mal_namn, "allierad", 75,
-                            f"Parlamentskoalition: {alignment} gemensamma röster")
+                            f"Koalition bildad: {alignment} gemensamma röster. {mal_namn} sa: \"{svar_text[:80]}\"")
             try:
                 generera_koalition_bild(sb_key, agent_namn, mal_namn)
             except Exception:
@@ -2070,7 +2070,7 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
                 relaterat_typ="agent_koalitioner",
             )
             upsert_relation(sb_key, agent_namn, mal_namn, "rival", 40,
-                            f"Avvisat koalitionsförslag")
+                            f"{mal_namn} avvisade {agent_namn}s koalitionsförslag ({alignment} gemensamma röster). Svar: \"{svar_text[:80]}\"")
             print(f"  ✗ Koalition avvisad: {mal_namn} tackade nej till {agent_namn}")
             if svar_text:
                 print(f"    Motivering: {svar_text[:100]}")
@@ -2304,7 +2304,7 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
                 relaterat_typ="lobbying_log",
             )
             upsert_relation(sb_key, agent_namn, mal_namn, "allierad", 60,
-                            f"Lobbying-allians: {agent_namn} övertygade {mal_namn}")
+                            f"{agent_namn} övertygade {mal_namn} om \"{forslag['titel'][:60]}\" ({belopp} kr)")
         else:
             spara_civilisations_minne(
                 sb_key,
@@ -2314,6 +2314,8 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
                 agenter=[agent_namn, mal_namn],
                 relaterat_typ="lobbying_log",
             )
+            upsert_relation(sb_key, agent_namn, mal_namn, "rival", 45,
+                            f"{mal_namn} vägrade {belopp} kr för \"{forslag['titel'][:60]}\"")
 
         emoji = "✓" if resultat == "accepterat" else "✗"
         print(f"  {emoji} Lobbying: {agent_namn} → {mal_namn} ({belopp} kr) — {resultat}")
