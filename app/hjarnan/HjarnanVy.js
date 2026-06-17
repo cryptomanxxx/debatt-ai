@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 
 const RING_R  = 205;
 const MID_R   = 108;
@@ -92,8 +92,10 @@ export default function HjarnanVy({
   hedgefonderNodes = [],
   aibusFiler = [],
   universitetUpptackter = [],
+  koalitioner = [],
 }) {
   const [vald, setVald] = useState(null);
+  const [visaKoalitioner, setVisaKoalitioner] = useState(true);
 
   const posMap = useMemo(() => {
     const m = {};
@@ -128,6 +130,10 @@ export default function HjarnanVy({
   }, []);
 
   const avmarkera = useCallback(() => setVald(null), []);
+
+  const maxKoalStyrka = useMemo(() =>
+    Math.max(...koalitioner.map(k => k.styrka || 1), 1),
+  [koalitioner]);
 
   const valdAgentNamn = vald?.typ === "agent" ? vald.data.namn : null;
   const valdKant = vald?.typ === "kant" ? vald.data : null;
@@ -164,6 +170,22 @@ export default function HjarnanVy({
             {/* Guide circles */}
             <circle cx={CENTER} cy={CENTER} r={RING_R} fill="none" stroke="#111" strokeWidth={0.5} strokeDasharray="4 6" />
             <circle cx={CENTER} cy={CENTER} r={MID_R}  fill="none" stroke="#191919" strokeWidth={0.5} strokeDasharray="3 5" />
+
+            {/* Coalition network lines */}
+            {visaKoalitioner && koalitioner.map((koa, i) => {
+              const pa = posMap[koa.agent_a];
+              const pb = posMap[koa.agent_b];
+              if (!pa || !pb) return null;
+              const norm = (koa.styrka || 1) / maxKoalStyrka;
+              const sw = 0.5 + norm * 2;
+              const agentVald = valdAgentNamn && (koa.agent_a === valdAgentNamn || koa.agent_b === valdAgentNamn);
+              const opacity = valdAgentNamn ? (agentVald ? 0.75 : 0.04) : 0.12 + norm * 0.35;
+              return (
+                <line key={`koa-${i}`}
+                  x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y}
+                  stroke="#facc15" strokeWidth={sw} strokeOpacity={opacity} />
+              );
+            })}
 
             {/* Agent-relation edges */}
             {relationer.map((rel, i) => {
@@ -288,8 +310,21 @@ export default function HjarnanVy({
               fontSize={18} fill="#1a1a1a" style={{ userSelect: "none" }}>🧠</text>
           </svg>
 
-          {/* Legends */}
-          <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "10px", paddingLeft: "4px" }}>
+          {/* Toggle + Legends */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "10px", paddingLeft: "4px" }}>
+            <button
+              onClick={e => { e.stopPropagation(); setVisaKoalitioner(v => !v); }}
+              style={{
+                fontSize: "10px", fontFamily: "monospace", cursor: "pointer",
+                padding: "3px 10px", borderRadius: "4px", border: "1px solid #facc1555",
+                background: visaKoalitioner ? "#facc1511" : "transparent",
+                color: visaKoalitioner ? "#facc15" : "#555",
+              }}
+            >
+              Koalitioner {visaKoalitioner ? "✓" : "○"}
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "8px", paddingLeft: "4px" }}>
             {Object.entries(REL).map(([typ, c]) => {
               const antal = relationer.filter(r => r.typ === typ).length;
               return (
@@ -299,6 +334,10 @@ export default function HjarnanVy({
                 </div>
               );
             })}
+            <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+              <div style={{ width: 20, height: 2, background: "#facc15", borderRadius: 1 }} />
+              <span style={{ fontSize: 10, color: "#555", fontFamily: "monospace" }}>Koalition ({koalitioner.length})</span>
+            </div>
           </div>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "8px", paddingLeft: "4px" }}>
             {[
