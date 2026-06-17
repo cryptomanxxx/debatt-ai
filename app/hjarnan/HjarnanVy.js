@@ -32,6 +32,16 @@ const SEKTOR_IKON = { media: "📰", handel: "🏪", konsult: "💼", investerin
 
 const STATUS_BADGES = { öppen: { label: "ÖPPEN", c: "#4ade80" }, avgjort: { label: "AVGJORD", c: "#94a3b8" } };
 
+const AIBUS_FARG = { vision: "#c084fc", strategy: "#38bdf8" };
+
+function maktFarg(mi) {
+  if (mi >= 75) return "#f59e0b";
+  if (mi >= 55) return "#facc15";
+  if (mi >= 35) return "#22d3ee";
+  if (mi >= 15) return "#475569";
+  return "transparent";
+}
+
 function agentPos(idx, total) {
   const angle = (idx / total) * 2 * Math.PI - Math.PI / 2;
   return { x: CENTER + RING_R * Math.cos(angle), y: CENTER + RING_R * Math.sin(angle) };
@@ -61,7 +71,7 @@ function Sparkline({ values, width = 80, height = 24, color = "#4ade80" }) {
   );
 }
 
-export default function HjarnanVy({ agenter, relationer, historia = [], kryptoPriser = {}, hedgeNavMap = {}, arbiHistory = [], motioner = [] }) {
+export default function HjarnanVy({ agenter, relationer, historia = [], kryptoPriser = {}, hedgeNavMap = {}, arbiHistory = [], motioner = [], aibusFiler = [] }) {
   const [vald, setVald] = useState(null);
 
   const posMap = {};
@@ -84,6 +94,7 @@ export default function HjarnanVy({ agenter, relationer, historia = [], kryptoPr
   const harHedgeData  = Object.keys(hedgeNavMap).length > 0;
   const harArbiData   = arbiHistory.length > 0;
   const harMotioner   = motioner.length > 0;
+  const harAiBus      = aibusFiler.length > 0;
 
   return (
     <div>
@@ -105,6 +116,10 @@ export default function HjarnanVy({ agenter, relationer, historia = [], kryptoPr
                   <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
                 </filter>
               ))}
+              <filter id="glow-makt" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
             </defs>
 
             {/* Kanter */}
@@ -139,8 +154,23 @@ export default function HjarnanVy({ agenter, relationer, historia = [], kryptoPr
               const ly = CENTER + labelR * Math.sin(((i / agenter.length) * 2 * Math.PI) - Math.PI / 2);
               const anchor = lx < CENTER - 10 ? "end" : lx > CENTER + 10 ? "start" : "middle";
               const kortNamn = agent.namn.length > 12 ? agent.namn.slice(0, 11) + "…" : agent.namn;
+              const mc = maktFarg(agent.maktindex || 0);
+              const harHogMakt = (agent.maktindex || 0) >= 75;
+              const maktRingR = r + 7;
               return (
                 <g key={agent.namn} opacity={opacity} style={{ cursor: "pointer" }} onClick={e => { e.stopPropagation(); klickaAgent(agent); }}>
+                  {/* Maktindex aura (yttre ring) */}
+                  {mc !== "transparent" && (
+                    <circle cx={pos.x} cy={pos.y} r={maktRingR}
+                      fill="none"
+                      stroke={mc}
+                      strokeWidth={1 + (agent.maktindex || 0) / 40}
+                      strokeOpacity={0.65}
+                      strokeDasharray={harHogMakt ? undefined : "3 2.5"}
+                      filter={harHogMakt ? "url(#glow-makt)" : undefined}
+                    />
+                  )}
+                  {/* Selektionsring */}
                   <circle cx={pos.x} cy={pos.y} r={r + 3}
                     fill={isVald ? agent.farg + "33" : "none"}
                     stroke={isVald ? agent.farg : "transparent"} strokeWidth={1.5} />
@@ -158,7 +188,7 @@ export default function HjarnanVy({ agenter, relationer, historia = [], kryptoPr
             })}
           </svg>
 
-          {/* Legend */}
+          {/* Relation legend */}
           <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginTop: "10px", paddingLeft: "4px" }}>
             {Object.entries(REL).map(([typ, c]) => {
               const antal = relationer.filter(r => r.typ === typ).length;
@@ -169,8 +199,24 @@ export default function HjarnanVy({ agenter, relationer, historia = [], kryptoPr
                 </div>
               );
             })}
-            <div style={{ fontSize: 10, color: "#333", fontFamily: "monospace", marginLeft: "auto" }}>
-              Nodstorlek = KI + minnen · Klicka för detaljer
+          </div>
+          {/* Maktindex legend */}
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "8px", paddingLeft: "4px" }}>
+            {[
+              { mi: 75, label: "Elite ≥75", c: "#f59e0b" },
+              { mi: 55, label: "Mäktig ≥55", c: "#facc15" },
+              { mi: 35, label: "Inflytelserik ≥35", c: "#22d3ee" },
+              { mi: 15, label: "Begränsad ≥15", c: "#475569" },
+            ].map(({ label, c }) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                <svg width={14} height={14}>
+                  <circle cx={7} cy={7} r={5} fill="none" stroke={c} strokeWidth={1.5} strokeDasharray="3 2" />
+                </svg>
+                <span style={{ fontSize: 9, color: "#444", fontFamily: "monospace" }}>{label}</span>
+              </div>
+            ))}
+            <div style={{ fontSize: 9, color: "#333", fontFamily: "monospace", marginLeft: "auto" }}>
+              Ring = maktindex · Nod = kunskap
             </div>
           </div>
         </div>
@@ -184,6 +230,32 @@ export default function HjarnanVy({ agenter, relationer, historia = [], kryptoPr
       </div>
 
       {/* === Full-width sektioner === */}
+
+      {/* AI-Bus Diskussioner */}
+      {harAiBus && (
+        <FullWidthSektion titel="🤖 AI-Bus — senaste diskussioner" color="#c084fc">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "10px" }}>
+            {aibusFiler.map((f, i) => {
+              const farg = AIBUS_FARG[f.typ] || "#888";
+              return (
+                <div key={i} style={{ background: "#0a0a0a", border: `1px solid ${farg}33`, borderLeft: `2px solid ${farg}`, borderRadius: "8px", padding: "14px 16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px", gap: "10px" }}>
+                    <div style={{ fontSize: "9px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em" }}>
+                      {f.typ?.toUpperCase()} · {f.date}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "#c8c8c8", lineHeight: 1.5, fontWeight: 600, marginBottom: "8px" }}>
+                    {f.title}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#555", lineHeight: 1.6 }}>
+                    {f.body}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </FullWidthSektion>
+      )}
 
       {/* Kryptomarknaden */}
       {harKryptoData && (
@@ -271,6 +343,11 @@ export default function HjarnanVy({ agenter, relationer, historia = [], kryptoPr
                     <div style={{ fontSize: "11px", color: "#c7d2fe", lineHeight: 1.4 }}>{m.titel}</div>
                     <div style={{ fontSize: "8px", color: sb.c, fontFamily: "monospace", flexShrink: 0, border: `1px solid ${sb.c}44`, borderRadius: "3px", padding: "1px 4px" }}>{sb.label}</div>
                   </div>
+                  {m.skapare && (
+                    <div style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", marginBottom: "5px" }}>
+                      av {m.skapare}
+                    </div>
+                  )}
                   {tot > 0 && (
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                       <div style={{ flex: 1, height: 3, background: "#111", borderRadius: 2, overflow: "hidden" }}>
@@ -330,8 +407,9 @@ function TomPanel() {
   return (
     <div style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: "10px", padding: "24px", color: "#333", fontFamily: "monospace", fontSize: "12px", lineHeight: 1.8 }}>
       <div style={{ fontSize: "28px", marginBottom: "12px", opacity: 0.4 }}>🧠</div>
-      <div>Klicka en <span style={{ color: "#555" }}>agent</span> för att se KI-insikter, minnen, ekonomi, territorium, market-prestation och strategitext.</div>
+      <div>Klicka en <span style={{ color: "#555" }}>agent</span> för att se KI-insikter, minnen, ekonomi, territorium, rykte-DNA och maktindex.</div>
       <div style={{ marginTop: "10px" }}>Klicka en <span style={{ color: "#555" }}>kant</span> för att se relationstyp och narrativet bakom den.</div>
+      <div style={{ marginTop: "10px", color: "#222", fontSize: "11px" }}>Nodstorlek = kunskapsdjup · Yttre ring = maktindex</div>
     </div>
   );
 }
@@ -346,18 +424,32 @@ function AgentPanel({ agent }) {
   const total = agent.saldoTotal || 24;
   const rankFarg = rank == null ? "#555" : rank <= 6 ? "#4ade80" : rank >= total - 5 ? "#f87171" : "#facc15";
 
+  const mi = agent.maktindex || 0;
+  const miFarg = maktFarg(mi);
+  const miLabel = mi >= 75 ? "ELITE" : mi >= 55 ? "MÄKTIG" : mi >= 35 ? "INFLYTELSERIK" : mi >= 15 ? "BEGRÄNSAD" : "MARGINELL";
+
   return (
     <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "20px", display: "flex", flexDirection: "column", gap: "16px", maxHeight: "80vh", overflowY: "auto" }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-        <div style={{ width: 32, height: 32, borderRadius: "50%", background: agent.farg + "22", border: `2px solid ${agent.farg}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: agent.farg, fontFamily: "monospace", flexShrink: 0 }}>
-          {agent.ikon}
+        <div style={{ position: "relative", width: 38, height: 38, flexShrink: 0 }}>
+          {miFarg !== "transparent" && (
+            <div style={{ position: "absolute", inset: -4, borderRadius: "50%", border: `2px ${mi >= 75 ? "solid" : "dashed"} ${miFarg}`, opacity: 0.7 }} />
+          )}
+          <div style={{ width: 32, height: 32, borderRadius: "50%", background: agent.farg + "22", border: `2px solid ${agent.farg}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: agent.farg, fontFamily: "monospace", position: "absolute", top: 3, left: 3 }}>
+            {agent.ikon}
+          </div>
         </div>
         <div>
           <a href={`/agent/${encodeURIComponent(agent.namn)}`} style={{ fontSize: "14px", color: C.text, fontFamily: "Georgia, serif", fontWeight: 600, textDecoration: "none" }}>{agent.namn}</a>
           <div style={{ fontSize: "10px", color: C.dimmer, fontFamily: "monospace" }}>
             {agent.kiCount} KI · {agent.minneCount} minnen · gen {agent.generation}
           </div>
+          {mi > 0 && (
+            <div style={{ fontSize: "9px", color: miFarg, fontFamily: "monospace", marginTop: "2px" }}>
+              MAKTINDEX {Math.round(mi)} — {miLabel}
+            </div>
+          )}
         </div>
       </div>
 
@@ -466,6 +558,63 @@ function AgentPanel({ agent }) {
               <span style={{ fontSize: "9px", color: "#555", fontFamily: "monospace" }}>{agent.foretag.sektor?.toUpperCase()}</span>
               <span style={{ fontSize: "9px", color: "#4ade80", fontFamily: "monospace" }}>Kassa: {agent.foretag.kassa} kr</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rykte-DNA */}
+      {agent.rykten && (agent.rykten.sant > 0 || agent.rykten.falskt > 0) && (
+        <div>
+          <div style={{ fontSize: "9px", color: C.dimmer, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px" }}>RYKTE-DNA</div>
+          <div style={{ display: "flex", gap: "10px", marginBottom: "8px" }}>
+            <div style={{ flex: 1, background: "#0a2a0a", border: "1px solid #1a3a1a", borderRadius: "6px", padding: "8px 10px", textAlign: "center" }}>
+              <div style={{ fontSize: "16px", color: "#4ade80", fontFamily: "monospace", fontWeight: 700 }}>{agent.rykten.sant}</div>
+              <div style={{ fontSize: "8px", color: "#2a5a2a", fontFamily: "monospace" }}>SANNA</div>
+            </div>
+            <div style={{ flex: 1, background: "#2a0a0a", border: "1px solid #3a1a1a", borderRadius: "6px", padding: "8px 10px", textAlign: "center" }}>
+              <div style={{ fontSize: "16px", color: "#f87171", fontFamily: "monospace", fontWeight: 700 }}>{agent.rykten.falskt}</div>
+              <div style={{ fontSize: "8px", color: "#5a2a2a", fontFamily: "monospace" }}>FALSKA</div>
+            </div>
+          </div>
+          {agent.rykten.topRykte && (
+            <div style={{ background: "#0a0a0a", borderLeft: `2px solid ${agent.rykten.topRykte.sanning ? "#4ade80" : "#f87171"}`, borderRadius: "4px", padding: "8px 10px" }}>
+              <div style={{ fontSize: "8px", color: agent.rykten.topRykte.sanning ? "#2a5a2a" : "#5a2a2a", fontFamily: "monospace", marginBottom: "4px" }}>
+                MEST SPRIDD · {agent.rykten.topRykte.spridningar} spridningar · {agent.rykten.topRykte.sanning ? "SANT" : "FALSKT"}
+              </div>
+              <div style={{ fontSize: "11px", color: "#666", lineHeight: 1.5 }}>
+                {agent.rykten.topRykte.innehall?.slice(0, 130)}{(agent.rykten.topRykte.innehall?.length || 0) > 130 ? "…" : ""}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Motioner */}
+      {agent.motioner && agent.motioner.length > 0 && (
+        <div>
+          <div style={{ fontSize: "9px", color: C.dimmer, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px" }}>MOTIONER ({agent.motioner.length})</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {agent.motioner.slice(0, 4).map((m, i) => {
+              const tot = (m.ja || 0) + (m.nej || 0);
+              const jaPct = tot > 0 ? Math.round((m.ja || 0) / tot * 100) : 0;
+              const sb = STATUS_BADGES[m.status] || { label: m.status?.toUpperCase() || "?", c: "#555" };
+              return (
+                <div key={i} style={{ background: "#0a0a0a", border: "1px solid #18182a", borderLeft: "2px solid #818cf8", borderRadius: "5px", padding: "8px 10px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: "6px", marginBottom: "4px" }}>
+                    <div style={{ fontSize: "10px", color: "#c7d2fe", lineHeight: 1.4 }}>{m.titel}</div>
+                    <div style={{ fontSize: "7px", color: sb.c, fontFamily: "monospace", flexShrink: 0, border: `1px solid ${sb.c}44`, borderRadius: "2px", padding: "1px 3px" }}>{sb.label}</div>
+                  </div>
+                  {tot > 0 && (
+                    <div style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+                      <div style={{ flex: 1, height: 2, background: "#111", borderRadius: 1, overflow: "hidden" }}>
+                        <div style={{ width: `${jaPct}%`, height: "100%", background: "#4ade80" }} />
+                      </div>
+                      <span style={{ fontSize: "8px", color: "#444", fontFamily: "monospace" }}>{m.ja}✓ {m.nej}✗</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

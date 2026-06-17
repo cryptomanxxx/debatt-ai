@@ -1757,6 +1757,7 @@ def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str, return_id: bool = F
             json={
                 "titel": titel, "beskrivning": beskrivning.strip()[:1500],
                 "kategori": kategori, "kalla": "ai", "status": "omrostning",
+                "skapare": agent["namn"],
             },
             timeout=10,
         )
