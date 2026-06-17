@@ -54,7 +54,7 @@ async function getData() {
     planbocker: [], markAgare: [], foretag: [], motioner: [],
     ohlcvRaw: [], etfRaw: [], hedgeRaw: [], arbiRaw: [],
     symbolerRaw: [], koalitionerRaw: [], lobbyingRaw: [], ryktenRaw: [],
-    hedgeInvRaw: [], universitetRaw: [], partierRaw: [],
+    hedgeInvRaw: [], universitetRaw: [],
   };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   const opts = { next: { revalidate: 180 } };
@@ -80,7 +80,6 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/rykten?select=om_agent,sanning,antal_spridningar,innehall&order=antal_spridningar.desc&limit=200`, { headers: h, ...opts }),
     fetch(`${SB_URL}/rest/v1/hedgefond_investerare?select=fond_id,agent,andelar,investerat_sek,hedgefonder(symbol,namn)`, { headers: h, ...opts }),
     fetch(`${SB_URL}/rest/v1/vetenskapliga_upptagter?order=skapad.desc&limit=20&select=id,titel,sammanfattning,forskare,disciplin,impakt,skapad`, { headers: h, ...opts }),
-    fetch(`${SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=id,namn,ledare,medlemmar,styrka&order=styrka.desc`, { headers: h, ...opts }),
   ]);
 
   const safe = (r) => r.status === "fulfilled" && r.value.ok ? r.value.json() : Promise.resolve([]);
@@ -89,7 +88,7 @@ async function getData() {
     planbocker, markAgare, foretag, motioner,
     ohlcvRaw, etfRaw, hedgeRaw, arbiRaw,
     symbolerRaw, koalitionerRaw, lobbyingRaw, ryktenRaw,
-    hedgeInvRaw, universitetRaw, partierRaw,
+    hedgeInvRaw, universitetRaw,
   ] = await Promise.all(results.map(safe));
 
   return {
@@ -97,7 +96,7 @@ async function getData() {
     planbocker, markAgare, foretag, motioner,
     ohlcvRaw, etfRaw, hedgeRaw, arbiRaw,
     symbolerRaw, koalitionerRaw, lobbyingRaw, ryktenRaw,
-    hedgeInvRaw, universitetRaw, partierRaw,
+    hedgeInvRaw, universitetRaw,
   };
 }
 
@@ -107,7 +106,7 @@ export default async function HjarnanPage() {
     planbocker, markAgare, foretag, motioner,
     ohlcvRaw, etfRaw, hedgeRaw, arbiRaw,
     symbolerRaw, koalitionerRaw, lobbyingRaw, ryktenRaw,
-    hedgeInvRaw, universitetRaw, partierRaw,
+    hedgeInvRaw, universitetRaw,
   } = await getData();
 
   const aibusFiler = lasAiBusFiler();
@@ -349,16 +348,10 @@ export default async function HjarnanPage() {
     };
   });
 
-  // Coalition ring: one node per active party
-  const partierNodes = (Array.isArray(partierRaw) ? partierRaw : []).map(p => ({
-    id: p.id,
-    namn: p.namn || "Okänt parti",
-    ledare: p.ledare || "",
-    medlemmar: Array.isArray(p.medlemmar) ? p.medlemmar : [],
-    styrka: p.styrka || 0,
-    farg: AGENT_VISUELL[p.ledare]?.ikonFarg || "#a855f7",
-    ikon: AGENT_VISUELL[p.ledare]?.ikon || "⚡",
-  }));
+  // Coalition ring: top 30 pairs by styrka
+  const koalitionsTop = [...(Array.isArray(koalitionerRaw) ? koalitionerRaw : [])]
+    .sort((a, b) => (b.styrka || 0) - (a.styrka || 0))
+    .slice(0, 30);
 
   const totKi       = ki.length;
   const totMinnen   = minnen.length;
@@ -384,8 +377,8 @@ export default async function HjarnanPage() {
           Kunskap · Relationer · Makt · Historia
         </h1>
         <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.7, maxWidth: "620px", margin: 0 }}>
-          Ring 1 (yttre) = 24 agenter (nodstorlek = kunskapsdjup · aura = maktindex). Ring 2 = politiska koalitionspartier.
-          Ring 3 (inre) = institutioner, hedgefonder och AI-Bus. Klicka en nod för detaljpanel.
+          Ring 1 (yttre) = 24 agenter (nodstorlek = kunskapsdjup · aura = maktindex). Ring 2 = koalitionspar (top 30 starkaste allianser).
+          Ring 3 (inre) = institutioner, hedgefonder och AI-Bus. Klicka en nod för detaljpanel. Koalitionspar är de starkaste allianserna ur agent_koalitioner.
         </p>
       </div>
 
@@ -399,7 +392,7 @@ export default async function HjarnanPage() {
           { label: "Träffsäkerhet",  value: plattformWinRate != null ? `${plattformWinRate}%` : "–", color: plattformWinRate != null && plattformWinRate >= 50 ? "#4ade80" : "#f87171" },
           { label: "Zoner ägda",     value: totZoner,    color: "#f59e0b" },
           { label: "AI-motioner",    value: totMotioner, color: "#818cf8" },
-          { label: "Partier",         value: partierNodes.length, color: "#facc15" },
+          { label: "Koalitioner",     value: koalitionerRaw.length, color: "#facc15" },
           { label: "Forskningsfynd", value: universitetRaw.length, color: "#34d399" },
         ].map(s => (
           <div key={s.label} style={{ background: "#0f0f0f", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "14px", textAlign: "center" }}>
@@ -417,7 +410,7 @@ export default async function HjarnanPage() {
         hedgefonderNodes={hedgefonderNodes}
         aibusFiler={aibusFiler}
         universitetUpptackter={universitetRaw}
-        partier={partierNodes}
+        koalitions={koalitionsTop}
       />
     </main>
   );
