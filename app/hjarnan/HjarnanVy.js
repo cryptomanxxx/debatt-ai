@@ -157,10 +157,10 @@ export default function HjarnanVy({
     <div>
       <div style={{ display: "flex", gap: "20px", alignItems: "flex-start", flexWrap: "wrap" }}>
         {/* SVG-graf */}
-        <div style={{ flex: "0 1 auto", maxWidth: "100%", minWidth: 0 }}>
+        <div style={{ flex: "0 1 auto", width: SVG_W, maxWidth: "100%", minWidth: 0 }}>
           <svg
             viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-            style={{ display: "block", width: "100%", maxWidth: `${SVG_W}px`, height: "auto", background: "#080808", borderRadius: "12px", border: "1px solid #1a1a1a", cursor: "default" }}
+            style={{ display: "block", width: "100%", height: "auto", background: "#080808", borderRadius: "12px", border: "1px solid #1a1a1a", cursor: "default" }}
             onClick={avmarkera}
           >
             <defs>
