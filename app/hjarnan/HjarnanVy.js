@@ -314,6 +314,15 @@ export default function HjarnanVy({
               return (
                 <g key={agent.namn} opacity={opacity} style={{ cursor: "pointer" }}
                   onClick={e => { e.stopPropagation(); klickaAgent(agent); }}>
+                  {/* Betweenness ring — lila, broagenter */}
+                  {(agent.centralitet?.betweenness || 0) > 15 && (
+                    <circle cx={pos.x} cy={pos.y} r={r + 16}
+                      fill="none" stroke="#a78bfa"
+                      strokeWidth={0.8 + (agent.centralitet.betweenness / 100) * 2.2}
+                      strokeOpacity={0.30 + (agent.centralitet.betweenness / 100) * 0.40}
+                      strokeDasharray="2 3"
+                    />
+                  )}
                   {mc !== "transparent" && (
                     <circle cx={pos.x} cy={pos.y} r={maktRingR}
                       fill="none" stroke={mc}
@@ -373,6 +382,12 @@ export default function HjarnanVy({
                 <span style={{ fontSize: 9, color: "#444", fontFamily: "monospace" }}>{label}</span>
               </div>
             ))}
+            <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+              <svg width={14} height={14}>
+                <circle cx={7} cy={7} r={5} fill="none" stroke="#a78bfa" strokeWidth={1.2} strokeDasharray="2 2.5" />
+              </svg>
+              <span style={{ fontSize: 9, color: "#444", fontFamily: "monospace" }}>Broagent (betweenness)</span>
+            </div>
             <div style={{ display: "flex", gap: "10px", marginLeft: "auto" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                 <svg width={14} height={14}><polygon points="7,1 13,13 1,13" fill="none" stroke="#888" strokeWidth={1} /></svg>
@@ -415,7 +430,7 @@ function TomPanel() {
         ⬡ = institution · △ = hedgefond · ◇ = AI-Bus · ○ = koalitionspar
       </div>
       <div style={{ marginTop: "4px", color: "#222", fontSize: "11px" }}>
-        Nodstorlek = kunskapsdjup · Yttre ring = maktindex
+        Nodstorlek = kunskapsdjup · Guldring = maktindex · Lila ring = broagent (betweenness-centralitet)
       </div>
     </div>
   );
@@ -503,6 +518,31 @@ function AgentPanel({ agent }) {
           )}
         </div>
       </div>
+
+      {/* Centralitet */}
+      {agent.centralitet && (
+        <div>
+          <div style={{ fontSize: "9px", color: C.dimmer, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px" }}>CENTRALITET</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+            {[
+              { label: "Betweenness",  desc: "Broagent — sitter på genvägar",  val: agent.centralitet.betweenness, color: "#a78bfa" },
+              { label: "Eigenvector",  desc: "Kopplad till mäktiga agenter",   val: agent.centralitet.eigenvector, color: "#38bdf8" },
+              { label: "Grad",         desc: "Viktad summa av allianser",       val: agent.centralitet.degree,      color: "#facc15" },
+            ].map(({ label, desc, val, color }) => (
+              <div key={label}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "3px" }}>
+                  <span style={{ fontSize: "9px", color: "#555", fontFamily: "monospace" }}>{label}</span>
+                  <span style={{ fontSize: "12px", color: color, fontFamily: "monospace", fontWeight: 700 }}>{val}</span>
+                </div>
+                <div style={{ position: "relative", height: 3, background: "#111", borderRadius: 2 }}>
+                  <div style={{ width: `${val}%`, height: "100%", background: color, borderRadius: 2, opacity: 0.65 }} />
+                </div>
+                <div style={{ fontSize: "8px", color: "#333", fontFamily: "monospace", marginTop: "2px" }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Ekonomi */}
       {agent.saldo != null && (
