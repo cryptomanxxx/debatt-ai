@@ -107,21 +107,21 @@ SALJ_MOTIVERINGAR = [
     "säljer av position",
 ]
 
-# Staking sannolikhet och APY per agent
+# Staking sannolikhet och APY per agent — höjt 2–2.5x p.g.a. hög Gini
 STAKING_PROFIL = {
-    "Den lugna":        {"sannolikhet": 0.20, "apy": 0.08},
-    "Nationalekonom":   {"sannolikhet": 0.18, "apy": 0.06},
-    "Historiker":       {"sannolikhet": 0.18, "apy": 0.06},
-    "Läkare":           {"sannolikhet": 0.15, "apy": 0.05},
-    "Pensionären":      {"sannolikhet": 0.15, "apy": 0.07},
-    "Filosof":          {"sannolikhet": 0.15, "apy": 0.05},
-    "Den nostalgiske":  {"sannolikhet": 0.12, "apy": 0.05},
-    "Mamman":           {"sannolikhet": 0.12, "apy": 0.05},
-    "Kryptoanalytiker": {"sannolikhet": 0.04, "apy": 0.05},
-    "Tonåringen":       {"sannolikhet": 0.03, "apy": 0.05},
-    "Den stressade":    {"sannolikhet": 0.04, "apy": 0.05},
+    "Den lugna":        {"sannolikhet": 0.20, "apy": 0.20},
+    "Nationalekonom":   {"sannolikhet": 0.18, "apy": 0.15},
+    "Historiker":       {"sannolikhet": 0.18, "apy": 0.15},
+    "Läkare":           {"sannolikhet": 0.15, "apy": 0.12},
+    "Pensionären":      {"sannolikhet": 0.15, "apy": 0.18},
+    "Filosof":          {"sannolikhet": 0.15, "apy": 0.12},
+    "Den nostalgiske":  {"sannolikhet": 0.12, "apy": 0.12},
+    "Mamman":           {"sannolikhet": 0.12, "apy": 0.12},
+    "Kryptoanalytiker": {"sannolikhet": 0.04, "apy": 0.12},
+    "Tonåringen":       {"sannolikhet": 0.03, "apy": 0.12},
+    "Den stressade":    {"sannolikhet": 0.04, "apy": 0.12},
 }
-DEFAULT_STAKING = {"sannolikhet": 0.08, "apy": 0.05}
+DEFAULT_STAKING = {"sannolikhet": 0.08, "apy": 0.12}
 
 # Market making — agenter med analytisk/lugn personlighet bidrar med likviditet
 MARKET_MAKER_PROFIL = {
