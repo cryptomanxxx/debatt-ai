@@ -100,6 +100,70 @@ async function getData() {
   };
 }
 
+function computeCentrality(agentNamn, koalitioner) {
+  const adj = {};
+  for (const a of agentNamn) adj[a] = {};
+  for (const k of koalitioner) {
+    const w = k.styrka || 1;
+    const a = k.agent_a, b = k.agent_b;
+    if (!adj[a]) adj[a] = {};
+    if (!adj[b]) adj[b] = {};
+    adj[a][b] = (adj[a][b] || 0) + w;
+    adj[b][a] = (adj[b][a] || 0) + w;
+  }
+
+  // Betweenness centrality (Brandes' algorithm, unweighted BFS)
+  const bet = {};
+  for (const a of agentNamn) bet[a] = 0;
+  for (const s of agentNamn) {
+    const stack = [], pred = {}, sigma = {}, dist = {}, delta = {};
+    for (const w of agentNamn) { pred[w] = []; sigma[w] = 0; dist[w] = -1; delta[w] = 0; }
+    sigma[s] = 1; dist[s] = 0;
+    const q = [s]; let qi = 0;
+    while (qi < q.length) {
+      const v = q[qi++]; stack.push(v);
+      for (const w of Object.keys(adj[v] || {})) {
+        if (dist[w] < 0) { q.push(w); dist[w] = dist[v] + 1; }
+        if (dist[w] === dist[v] + 1) { sigma[w] += sigma[v]; pred[w].push(v); }
+      }
+    }
+    while (stack.length) {
+      const w = stack.pop();
+      for (const v of pred[w]) delta[v] += (sigma[v] / sigma[w]) * (1 + delta[w]);
+      if (w !== s) bet[w] += delta[w];
+    }
+  }
+  const maxBet = Math.max(...Object.values(bet), 1);
+  const normBet = {};
+  for (const a of agentNamn) normBet[a] = bet[a] / maxBet;
+
+  // Weighted degree centrality
+  const deg = {};
+  for (const a of agentNamn) deg[a] = Object.values(adj[a] || {}).reduce((s, w) => s + w, 0);
+  const maxDeg = Math.max(...Object.values(deg), 1);
+  const normDeg = {};
+  for (const a of agentNamn) normDeg[a] = deg[a] / maxDeg;
+
+  // Eigenvector centrality (power iteration, 80 steps)
+  let eig = {};
+  for (const a of agentNamn) eig[a] = 1;
+  for (let iter = 0; iter < 80; iter++) {
+    const newEig = {};
+    for (const a of agentNamn) {
+      let sum = 0;
+      for (const [b, w] of Object.entries(adj[a] || {})) sum += w * (eig[b] || 0);
+      newEig[a] = sum;
+    }
+    const norm = Math.sqrt(Object.values(newEig).reduce((s, v) => s + v * v, 0)) || 1;
+    for (const a of agentNamn) eig[a] = (newEig[a] || 0) / norm;
+  }
+  const maxEig = Math.max(...Object.values(eig), 1);
+  const normEig = {};
+  for (const a of agentNamn) normEig[a] = eig[a] / maxEig;
+
+  return { betweenness: normBet, degree: normDeg, eigenvector: normEig };
+}
+
 export default async function HjarnanPage() {
   const {
     relationer, ki, minnen, strategier, bets, historia,
@@ -302,6 +366,9 @@ export default async function HjarnanPage() {
     });
   }
 
+  // Centrality metrics from coalition network (must be before agenter build)
+  const centralitet = computeCentrality(agentNamn, Array.isArray(koalitionerRaw) ? koalitionerRaw : []);
+
   // Build agenter
   const agenter = agentNamn.map(namn => {
     const ms = marketStats[namn];
@@ -345,6 +412,11 @@ export default async function HjarnanPage() {
       motioner: motionerPerAgent[namn] || [],
       maktindex: mi,
       rykten: ryktenPerAgent[namn] || null,
+      centralitet: {
+        betweenness: Math.round((centralitet.betweenness[namn] || 0) * 100),
+        eigenvector: Math.round((centralitet.eigenvector[namn] || 0) * 100),
+        degree:      Math.round((centralitet.degree[namn]      || 0) * 100),
+      },
     };
   });
 
@@ -377,8 +449,8 @@ export default async function HjarnanPage() {
           Kunskap · Relationer · Makt · Historia
         </h1>
         <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.7, maxWidth: "620px", margin: 0 }}>
-          Ring 1 (yttre) = 24 agenter (nodstorlek = kunskapsdjup · aura = maktindex). Ring 2 = koalitionspar (top 30 starkaste allianser).
-          Ring 3 (inre) = institutioner, hedgefonder och AI-Bus. Klicka en nod för detaljpanel. Koalitionspar är de starkaste allianserna ur agent_koalitioner.
+          Ring 1 (yttre) = 24 agenter · nodstorlek = kunskapsdjup · guldring = maktindex · lila ring = betweenness-centralitet (broagent).
+          Ring 2 = koalitionspar (top 30). Ring 3 (inre) = institutioner, hedgefonder och AI-Bus. Klicka en nod för detaljer inkl. eigenvector-centralitet.
         </p>
       </div>
 
