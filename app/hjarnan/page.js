@@ -366,6 +366,9 @@ export default async function HjarnanPage() {
     });
   }
 
+  // Centrality metrics from coalition network (must be before agenter build)
+  const centralitet = computeCentrality(agentNamn, Array.isArray(koalitionerRaw) ? koalitionerRaw : []);
+
   // Build agenter
   const agenter = agentNamn.map(namn => {
     const ms = marketStats[namn];
@@ -416,9 +419,6 @@ export default async function HjarnanPage() {
       },
     };
   });
-
-  // Centrality metrics from coalition network
-  const centralitet = computeCentrality(agentNamn, Array.isArray(koalitionerRaw) ? koalitionerRaw : []);
 
   // Coalition ring: top 30 pairs by styrka
   const koalitionsTop = [...(Array.isArray(koalitionerRaw) ? koalitionerRaw : [])]
