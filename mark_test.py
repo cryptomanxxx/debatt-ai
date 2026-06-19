@@ -441,6 +441,8 @@ def lista_zon_for_forsaljning(agare_dict, saldon, agent_zon_antal, zoner_dict):
 
     listningar = 0
     for zon_id, agent in list(agare_dict.items()):
+        if is_visitor(agent):
+            continue  # besökare säljer aldrig automatiskt
         if agent_zon_antal.get(agent, 0) <= 2:
             continue  # behåller sina zoner om de har ≤2
         if zon_id in listade_zon_ids:
