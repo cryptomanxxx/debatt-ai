@@ -2,11 +2,11 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
 
 const RING_R  = 205;
-const KOAL_R  = 138;
+const KOAL_R  = 150;
 const MID_R   = 95;
-const CENTER  = 265;
-const SVG_W   = 530;
-const SVG_H   = 530;
+const CENTER  = 350;
+const SVG_W   = 720;
+const SVG_H   = 720;
 const MAX_DEPTH = 60;
 
 const REL = {
@@ -307,7 +307,6 @@ export default function HjarnanVy({
               const lx = CENTER + labelR * Math.cos(angle);
               const ly = CENTER + labelR * Math.sin(angle);
               const anchor = lx < CENTER - 10 ? "end" : lx > CENTER + 10 ? "start" : "middle";
-              const kortNamn = agent.namn.length > 12 ? agent.namn.slice(0, 11) + "…" : agent.namn;
               const mc = maktFarg(agent.maktindex || 0);
               const harHogMakt = (agent.maktindex || 0) >= 75;
               const maktRingR = r + 7;
@@ -343,9 +342,9 @@ export default function HjarnanVy({
                     {agent.ikon}
                   </text>
                   <text x={lx} y={ly} textAnchor={anchor} dominantBaseline="central"
-                    fontSize={8.5} fill="#555" fontFamily="monospace"
+                    fontSize={agent.namn.length > 15 ? 7.5 : 8.5} fill="#555" fontFamily="monospace"
                     style={{ userSelect: "none" }}>
-                    {kortNamn}
+                    {agent.namn}
                   </text>
                 </g>
               );
