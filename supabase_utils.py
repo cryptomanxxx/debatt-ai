@@ -1358,7 +1358,7 @@ AGENT_CIV_FRAGA: dict[str, tuple[str, str]] = {
     "Kryptoanalytiker":     ("Hur presterar börshandeln och kryptoekonomin just nu?",                       "ekonomi"),
     "Teknikoptimist":       ("Vilka tekniska genombrott och AI-experiment har skett senast?",                "general"),
     "Miljöaktivist":        ("Vilka kriser och ekologiska händelser påverkar civilisationen?",               "historia"),
-    "Jurist":               ("Vilka rättsfall och konstitutionsbrott har domstolen hanterat senast?",        "politik"),
+    "Jurist":               ("Vilka rättsfall och konstitutionsbrott har domstolen hanterat senast?",        "historia"),
     "Journalist":           ("Vad är de viktigaste händelserna och skandalerna i civilisationen?",           "historia"),
     "Filosof":              ("Vilka etiska dilemman och maktdynamiker präglar civilisationen just nu?",      "social"),
     "Läkare":               ("Hur mår civilisationen socialt och ekonomiskt just nu?",                       "social"),
@@ -1434,12 +1434,18 @@ def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "g
     if typ in ("historia",):
         try:
             r = httpx.get(
-                f"{SB_URL}/rest/v1/domstol_domar?select=svarande,paragraf,utfall,skapad&order=skapad.desc&limit=4",
+                f"{SB_URL}/rest/v1/domstol_arenden?status=eq.avgjord"
+                "&select=svarande,artikel_nr,domstol_domar(utfall)&order=skapad.desc&limit=4",
                 headers=hdrs, timeout=5,
             )
             if r.is_success and r.json():
-                rader = [f"  {row['svarande']} §{row['paragraf']} → {row['utfall']}" for row in r.json()]
-                data_delar.append("Senaste domstolsdomar:\n" + "\n".join(rader))
+                rader = []
+                for row in r.json():
+                    dom = (row.get("domstol_domar") or [{}])[0]
+                    utfall = dom.get("utfall", "?")
+                    rader.append(f"  {row['svarande']} §{row['artikel_nr']} → {utfall}")
+                if rader:
+                    data_delar.append("Senaste domstolsdomar:\n" + "\n".join(rader))
         except Exception:
             pass
 
