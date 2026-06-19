@@ -72,6 +72,7 @@ from supabase_utils import (
     hamta_agent_mark, formatera_mark_for_prompt,
     hamta_agent_foretag, formatera_foretag_for_prompt,
     hamta_agent_market_historik, hamta_civilisations_digest,
+    fraga_civilisationen, AGENT_CIV_FRAGA,
 )
 
 def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> str:
@@ -355,7 +356,13 @@ def main():
         if foretag_kontext:
             print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
         mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
-        hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest]))
+        civ_svar = ""
+        if sb_key and random.random() < 0.20:
+            fraga, typ = AGENT_CIV_FRAGA.get(agent["namn"], ("Vad är det viktigaste i civilisationen just nu?", "general"))
+            civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
+            if civ_svar:
+                print(f"  🧠 Civilisationsfråga ställd och besvarad")
+        hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest, civ_svar]))
         if hist_kontext:
             print(f"  🌍 Civilisationskontext injicerad")
         print("Skriver replik (Groq med Gemini-fallback)...")
@@ -554,7 +561,13 @@ def main():
             if foretag_kontext:
                 print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
             mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
-            hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest]))
+            civ_svar = ""
+            if sb_key and random.random() < 0.20:
+                fraga, typ = AGENT_CIV_FRAGA.get(agent["namn"], ("Vad är det viktigaste i civilisationen just nu?", "general"))
+                civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
+                if civ_svar:
+                    print(f"  🧠 Civilisationsfråga ställd och besvarad")
+            hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest, civ_svar]))
             if hist_kontext:
                 print(f"  🌍 Civilisationskontext injicerad")
             print("Skriver artikel (Groq med Gemini-fallback)...")
@@ -609,7 +622,13 @@ def main():
             if foretag_kontext:
                 print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
             mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
-            hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest]))
+            civ_svar = ""
+            if sb_key and random.random() < 0.20:
+                fraga, typ = AGENT_CIV_FRAGA.get(agent["namn"], ("Vad är det viktigaste i civilisationen just nu?", "general"))
+                civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
+                if civ_svar:
+                    print(f"  🧠 Civilisationsfråga ställd och besvarad")
+            hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest, civ_svar]))
             if hist_kontext:
                 print(f"  🌍 Civilisationskontext injicerad")
             print("Skriver artikel om aktuell nyhet (Groq med Gemini-fallback)...")
@@ -657,7 +676,13 @@ def main():
             if foretag_kontext:
                 print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
             mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
-            hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest]))
+            civ_svar = ""
+            if sb_key and random.random() < 0.20:
+                fraga, typ = AGENT_CIV_FRAGA.get(agent["namn"], ("Vad är det viktigaste i civilisationen just nu?", "general"))
+                civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
+                if civ_svar:
+                    print(f"  🧠 Civilisationsfråga ställd och besvarad")
+            hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest, civ_svar]))
             if hist_kontext:
                 print(f"  🌍 Civilisationskontext injicerad")
             print("Skriver artikel (Groq med Gemini-fallback)...")

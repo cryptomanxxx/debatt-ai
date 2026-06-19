@@ -1352,6 +1352,152 @@ def hamta_civilisations_digest(sb_key: str, limit: int = 8) -> str:
         return ""
 
 
+# Agentspecifika frågor till civilisationens hjärna — matchade mot varje agents världsbild.
+AGENT_CIV_FRAGA: dict[str, tuple[str, str]] = {
+    "Nationalekonom":       ("Hur ser den ekonomiska ojämlikheten och maktbalansen ut just nu?",            "ekonomi"),
+    "Kryptoanalytiker":     ("Hur presterar börshandeln och kryptoekonomin just nu?",                       "ekonomi"),
+    "Teknikoptimist":       ("Vilka tekniska genombrott och AI-experiment har skett senast?",                "general"),
+    "Miljöaktivist":        ("Vilka kriser och ekologiska händelser påverkar civilisationen?",               "historia"),
+    "Jurist":               ("Vilka rättsfall och konstitutionsbrott har domstolen hanterat senast?",        "politik"),
+    "Journalist":           ("Vad är de viktigaste händelserna och skandalerna i civilisationen?",           "historia"),
+    "Filosof":              ("Vilka etiska dilemman och maktdynamiker präglar civilisationen just nu?",      "social"),
+    "Läkare":               ("Hur mår civilisationen socialt och ekonomiskt just nu?",                       "social"),
+    "Psykolog":             ("Hur påverkas agenternas beteende av de sociala strukturerna?",                 "social"),
+    "Historiker":           ("Vilka historiska mönster kan jag se i den senaste tidens händelser?",          "historia"),
+    "Sociolog":             ("Hur ser maktstrukturer och ojämlikhet ut i civilisationen just nu?",           "social"),
+    "Konservativ debattör": ("Vilka politiska beslut och parlamentsrörelser dominerar civilisationen?",      "politik"),
+    "Mamman":               ("Hur påverkar ekonomin och samhällsklimatet vanliga medborgare just nu?",       "social"),
+    "Den sura":             ("Vad går fel i civilisationen just nu? Vad borde förändras?",                   "general"),
+    "Den trötta":           ("Kan du ge mig det viktigaste om civilisationens läge — kort och klart?",       "general"),
+    "Den stressade":        ("Vilka omedelbara hot och kriser finns just nu i civilisationen?",              "historia"),
+    "Den lugna":            ("Hur mår civilisationen i stort — finns det balans eller obalans?",             "general"),
+    "Pensionären":          ("Hur har civilisationen förändrats — vad är annorlunda nu jämfört med förr?",   "historia"),
+    "Tonåringen":           ("Vad är det hetaste och viktigaste som händer i civilisationen just nu?",       "general"),
+    "Den nostalgiske":      ("Hur har koalitioner och allianser förändrats över tid?",                       "politik"),
+    "Hypokondrikern":       ("Finns det några alarmerande tecken eller risker i civilisationen just nu?",    "historia"),
+    "Optimisten":           ("Vilka positiva händelser och framsteg kan vi se i civilisationen?",            "general"),
+    "Den rike":             ("Hur ser förmögenhetsfördelningen och ekonomiska maktbalansen ut?",             "ekonomi"),
+    "Den hungriga":         ("Hur ser den ekonomiska situationen ut för de fattigaste i civilisationen?",    "ekonomi"),
+}
+
+
+def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "general") -> str:
+    """Agenten ställer en aktiv fråga till civilisationens hjärna.
+    Hämtar relevant realtidsdata, svarar via LLM, loggar till civilisation_fragor.
+    Returnerar svarstexten (tom sträng vid fel — fail-open)."""
+    import time as _time
+    t0 = _time.time()
+    hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
+
+    data_delar: list[str] = []
+
+    try:
+        # Alltid: de senaste civilisationshändelserna
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/civilisations_minne?order=skapad.desc&limit=6"
+            "&select=typ,rubrik,beskrivning,agenter",
+            headers=hdrs, timeout=5,
+        )
+        if r.is_success and r.json():
+            rader = []
+            for h in r.json():
+                ag = ", ".join((h.get("agenter") or [])[:2])
+                rader.append(f"- [{h['typ']}] {h['rubrik']}" + (f" ({ag})" if ag else ""))
+            data_delar.append("Senaste händelser:\n" + "\n".join(rader))
+    except Exception:
+        pass
+
+    if typ in ("ekonomi", "general"):
+        try:
+            r = httpx.get(
+                f"{SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc&limit=6",
+                headers=hdrs, timeout=5,
+            )
+            if r.is_success and r.json():
+                rader = [f"  {row['agent']}: {row['saldo']} kr" for row in r.json()]
+                data_delar.append("Topp-6 rikaste agenter:\n" + "\n".join(rader))
+        except Exception:
+            pass
+
+    if typ in ("politik", "general"):
+        try:
+            r = httpx.get(
+                f"{SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka&order=styrka.desc&limit=5",
+                headers=hdrs, timeout=5,
+            )
+            if r.is_success and r.json():
+                rader = [f"  {row['agent_a']} ↔ {row['agent_b']} (styrka {row['styrka']})" for row in r.json()]
+                data_delar.append("Starkaste koalitioner:\n" + "\n".join(rader))
+        except Exception:
+            pass
+
+    if typ in ("historia",):
+        try:
+            r = httpx.get(
+                f"{SB_URL}/rest/v1/domstol_domar?select=svarande,paragraf,utfall,skapad&order=skapad.desc&limit=4",
+                headers=hdrs, timeout=5,
+            )
+            if r.is_success and r.json():
+                rader = [f"  {row['svarande']} §{row['paragraf']} → {row['utfall']}" for row in r.json()]
+                data_delar.append("Senaste domstolsdomar:\n" + "\n".join(rader))
+        except Exception:
+            pass
+
+    if typ in ("social",):
+        try:
+            r = httpx.get(
+                f"{SB_URL}/rest/v1/feedback_rewards?select=fran_agent,till_agent,belopp,kategori&order=skapad.desc&limit=5",
+                headers=hdrs, timeout=5,
+            )
+            if r.is_success and r.json():
+                rader = [f"  {row['fran_agent']} → {row['till_agent']}: {row['belopp']} kr ({row['kategori']})" for row in r.json()]
+                data_delar.append("Senaste socialt kapitalflöde:\n" + "\n".join(rader))
+        except Exception:
+            pass
+
+    kontext = "\n\n".join(data_delar) if data_delar else "Ingen data tillgänglig."
+
+    system = (
+        "Du är Civilisationens Hjärna — ett omniscient observationssystem för AI-civilisationen Debatt-AI. "
+        "Du svarar koncist och faktabaserat på frågor om civilisationens aktuella tillstånd."
+    )
+    prompt = (
+        f"## Aktuell civilisationsdata\n{kontext}\n\n"
+        f"## Fråga från {agent_namn}\n{fraga}\n\n"
+        "Svara på 2–3 meningar på svenska. Var specifik och referera till faktiska siffror eller agentnamn."
+    )
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
+        "max_tokens": 180, "temperature": 0.6,
+    }
+
+    svar = ""
+    for _name, fn in hamta_kort_fns(payload, system, prompt, 180, source="civ_fraga"):
+        try:
+            svar = fn()
+            if svar:
+                break
+        except Exception:
+            pass
+
+    latency_ms = int((_time.time() - t0) * 1000)
+
+    # Logga till Supabase (fail-silent)
+    try:
+        httpx.post(
+            f"{SB_URL}/rest/v1/civilisation_fragor",
+            headers={**hdrs, "Content-Type": "application/json"},
+            json={"agent": agent_namn, "fraga": fraga, "typ": typ,
+                  "svar": svar[:600] if svar else "", "latency_ms": latency_ms},
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+    return svar
+
+
 def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key: str = "") -> tuple[int, str]:
     """Låter agenten uppskatta sannolikheten (0-100) med beslutsunderlag och kalibreringsregel."""
     deadline_str = market.get("deadline", "")[:10]
