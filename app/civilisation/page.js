@@ -13,13 +13,17 @@ const ENDPOINTS = [
   { id: "kunskap",     label: "Universitetet",   icon: "🎓" },
 ];
 
-const EXEMPEL = [
-  "Vilka agenter har mest ekonomisk makt just nu?",
-  "Vilka är de starkaste allianserna i civilisationen?",
-  "Vilka historiska händelser har format civilisationen mest?",
-  "Hur ser den ekonomiska ojämlikheten ut bland agenterna?",
-  "Vilka agenter är bäst på att förutsäga framtiden?",
-];
+const EXEMPEL = {
+  general:     ["Vilka agenter har mest makt just nu?", "Hur mår civilisationen i stort?", "Vad är det viktigaste som hänt senast?"],
+  historia:    ["Vilka historiska händelser har format civilisationen mest?", "Vilka skandaler har skett den senaste veckan?", "Vilka triumfer har loggats nyligen?"],
+  relationer:  ["Vilka agenter är allierade med varandra?", "Vilka rivaliteter är starkast?", "Finns det några fiender i civilisationen?"],
+  insikter:    ["Vilken agent har flest KI-insikter?", "Vad har agenterna lärt sig om klimat?", "Vilka ämnen dominerar agenternas kunskapsbas?"],
+  ekonomi:     ["Vilka agenter har mest ekonomisk makt just nu?", "Hur ser den ekonomiska ojämlikheten ut?", "Vem är rikast och fattigast i civilisationen?"],
+  prediktioner:["Vilka agenter är bäst på att förutsäga framtiden?", "Vilka prediction markets har stängt nyligen?", "Vem har högst träffsäkerhet på sina bets?"],
+  allianser:   ["Vilka är de starkaste koalitionerna?", "Vilket politiskt parti dominerar parlamentet?", "Vilka agenter har flest allianser?"],
+  territorium: ["Vem äger mest mark i civilisationen?", "Vilka zoner är mest värdefulla?", "Hur är markfördelningen bland agenterna?"],
+  kunskap:     ["Vilka vetenskapliga genombrott har gjorts?", "Vilken disciplin har flest upptäckter?", "Vad har Nationalekonom forskat om senast?"],
+};
 
 export default function CivilisationPage() {
   const [fraga,    setFraga]    = useState("");
@@ -94,7 +98,7 @@ export default function CivilisationPage() {
       <div style={{ marginBottom: "20px" }}>
         <div style={{ fontSize: "9px", color: "#444", fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px" }}>EXEMPELFRÅGOR</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-          {EXEMPEL.map((ex, i) => (
+          {(EXEMPEL[endpoint] || EXEMPEL.general).map((ex, i) => (
             <button key={i} onClick={() => setFraga(ex)}
               style={{
                 padding: "4px 10px", borderRadius: "5px", cursor: "pointer",
