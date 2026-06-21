@@ -85,6 +85,42 @@ def _llm_kort(payload: dict, system: str, prompt: str, max_tokens: int = 80) -> 
     return ""
 
 
+# Domänbaserad frågetyp per agent — håller agenterna i sina ämnesområden
+_AGENT_CIV_TYP: dict[str, str] = {
+    "Nationalekonom": "ekonomi",  "Kryptoanalytiker": "ekonomi",
+    "Den rike": "ekonomi",        "Den hungriga": "ekonomi",
+    "Jurist": "historia",         "Journalist": "historia",
+    "Historiker": "historia",     "Miljöaktivist": "historia",
+    "Den stressade": "historia",  "Hypokondrikern": "historia",
+    "Filosof": "social",          "Psykolog": "social",
+    "Sociolog": "social",         "Läkare": "social",          "Mamman": "social",
+    "Konservativ debattör": "politik", "Den nostalgiske": "politik",
+}
+
+
+def _generera_civ_fraga(agent: dict, minne_kontext: str = "") -> tuple[str, str]:
+    """Genererar en dynamisk, karaktärsenlig fråga till civilisationens hjärna.
+    Returnerar (fraga, typ). Faller tillbaka på AGENT_CIV_FRAGA vid fel."""
+    typ = _AGENT_CIV_TYP.get(agent["namn"], "general")
+    minne_kort = minne_kontext[:300] if minne_kontext else ""
+    prompt = (
+        f"Du är {agent['namn']}. Ställ en konkret, specifik fråga (max 20 ord) till "
+        f"civilisationens hjärna om det som engagerar dig mest just nu — "
+        f"utifrån din karaktär och dina senaste erfarenheter. "
+        + (f"\nDina senaste erfarenheter: {minne_kort}" if minne_kort else "")
+        + "\nSvara ENBART med frågan, inga inledningsfraser eller citattecken."
+    )
+    try:
+        fraga = _llm_kort({}, agent.get("system", "")[:400], prompt, max_tokens=60)
+        fraga = fraga.strip().strip('"').strip("'").strip()
+        if len(fraga) < 10 or "?" not in fraga:
+            raise ValueError(f"ogiltig fråga: {repr(fraga)}")
+        return fraga, typ
+    except Exception:
+        fb = AGENT_CIV_FRAGA.get(agent["namn"], ("Vad är det viktigaste i civilisationen just nu?", "general"))
+        return fb
+
+
 def hamta_drama_kontext(sb_key, agent_a, agent_b):
     """Hämtar dramatisk kontext mellan två agenter: symboler, market-bets, lobbying."""
     SB = "https://fmwxftnistkoqazfwnuj.supabase.co"
@@ -358,7 +394,7 @@ def main():
         mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
         civ_svar = ""
         if sb_key and random.random() < 0.20:
-            fraga, typ = AGENT_CIV_FRAGA.get(agent["namn"], ("Vad är det viktigaste i civilisationen just nu?", "general"))
+            fraga, typ = _generera_civ_fraga(agent, minne_kontext)
             civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
             if civ_svar:
                 print(f"  🧠 Civilisationsfråga ställd och besvarad")
@@ -563,7 +599,7 @@ def main():
             mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
             civ_svar = ""
             if sb_key and random.random() < 0.20:
-                fraga, typ = AGENT_CIV_FRAGA.get(agent["namn"], ("Vad är det viktigaste i civilisationen just nu?", "general"))
+                fraga, typ = _generera_civ_fraga(agent, minne_kontext)
                 civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
                 if civ_svar:
                     print(f"  🧠 Civilisationsfråga ställd och besvarad")
@@ -624,7 +660,7 @@ def main():
             mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
             civ_svar = ""
             if sb_key and random.random() < 0.20:
-                fraga, typ = AGENT_CIV_FRAGA.get(agent["namn"], ("Vad är det viktigaste i civilisationen just nu?", "general"))
+                fraga, typ = _generera_civ_fraga(agent, minne_kontext)
                 civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
                 if civ_svar:
                     print(f"  🧠 Civilisationsfråga ställd och besvarad")
@@ -678,7 +714,7 @@ def main():
             mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
             civ_svar = ""
             if sb_key and random.random() < 0.20:
-                fraga, typ = AGENT_CIV_FRAGA.get(agent["namn"], ("Vad är det viktigaste i civilisationen just nu?", "general"))
+                fraga, typ = _generera_civ_fraga(agent, minne_kontext)
                 civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
                 if civ_svar:
                     print(f"  🧠 Civilisationsfråga ställd och besvarad")
