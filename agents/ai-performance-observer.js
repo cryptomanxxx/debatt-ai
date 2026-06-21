@@ -100,10 +100,15 @@ function round(n, dec = 0) { return Math.round(n * 10 ** dec) / 10 ** dec; }
 const RATE_LIMIT_STATUSES = new Set(["rate_limited", "rate_limit", "error_429"]);
 const ERROR_STATUSES      = new Set(["error", "parse_fail", "all_failed"]);
 
+// JS-sidan loggar "codestral" och "github", Python-sidan loggar "mistral" och "github_models".
+// Normalisera till benchmarkens namnkonvention så att de slås ihop i rapporten.
+const PROVIDER_ALIAS = { codestral: "mistral", github: "github_models" };
+
 function agg(rows) {
   const stats = {};
   for (const row of rows) {
-    const p = row.provider || "unknown";
+    const raw = row.provider || "unknown";
+    const p   = PROVIDER_ALIAS[raw] || raw;
     if (!stats[p]) stats[p] = { ok: 0, rate_limits: 0, errors: 0, latencies: [] };
     if (row.status === "ok") {
       stats[p].ok++;
