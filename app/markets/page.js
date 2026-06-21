@@ -72,15 +72,15 @@ async function getPrediktionsRankning() {
     const outcome = bet.markets.utfall === "ja" ? 1 : 0;
     const p = bet.sannolikhet / 100;
     map[bet.agent].brierSum += (p - outcome) ** 2;
-    map[bet.agent].confSum += p; // för överkonfidensberäkning
+    map[bet.agent].confSum += p >= 0.5 ? p : 1 - p; // konfidens i vald riktning
     map[bet.agent].totalt++;
     if ((outcome === 1 && p >= 0.5) || (outcome === 0 && p < 0.5)) map[bet.agent].won++;
   }
   return Object.entries(map)
     .filter(([, s]) => s.totalt >= 2)
     .map(([agent, s]) => {
-      const avgConf = s.confSum / s.totalt;       // genomsnittlig angiven sannolikhet
-      const winRate = s.won / s.totalt;            // faktisk träffsäkerhet
+      const avgConf = s.confSum / s.totalt;       // genomsnittlig riktningskonfidens
+      const winRate = s.won / s.totalt;            // faktisk träffsäkerhet per riktning
       return {
         agent,
         totalt: s.totalt,
