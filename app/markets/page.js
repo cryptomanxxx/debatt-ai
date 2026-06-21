@@ -68,15 +68,24 @@ async function getPrediktionsRankning() {
   if (!resolved.length) return [];
   const map = {};
   for (const bet of resolved) {
-    if (!map[bet.agent]) map[bet.agent] = { totalScore: 0, totalt: 0 };
-    const utfallNum = bet.markets.utfall === "ja" ? 100 : 0;
-    const score = 100 - Math.abs(bet.sannolikhet - utfallNum);
-    map[bet.agent].totalScore += score;
+    if (!map[bet.agent]) map[bet.agent] = { brierSum: 0, errorSum: 0, totalt: 0, won: 0 };
+    const outcome = bet.markets.utfall === "ja" ? 1 : 0;
+    const p = bet.sannolikhet / 100;
+    map[bet.agent].brierSum += (p - outcome) ** 2;
+    map[bet.agent].errorSum += (p - outcome); // positiv = overkonfident
     map[bet.agent].totalt++;
+    if ((outcome === 1 && p >= 0.5) || (outcome === 0 && p < 0.5)) map[bet.agent].won++;
   }
   return Object.entries(map)
-    .map(([agent, s]) => ({ agent, totalt: s.totalt, avgScore: Math.round(s.totalScore / s.totalt) }))
-    .sort((a, b) => b.avgScore - a.avgScore || b.totalt - a.totalt);
+    .filter(([, s]) => s.totalt >= 2)
+    .map(([agent, s]) => ({
+      agent,
+      totalt: s.totalt,
+      brier: Math.round((s.brierSum / s.totalt) * 1000) / 1000,
+      bias: Math.round((s.errorSum / s.totalt) * 100), // %-enheter, + = overkonfident
+      winRate: Math.round(s.won / s.totalt * 100),
+    }))
+    .sort((a, b) => a.brier - b.brier || b.totalt - a.totalt);
 }
 
 function sedanStr(iso) {
@@ -159,19 +168,27 @@ function AktivitetsFeed({ aktivitet }) {
 function PrediktionsRankning({ rankning }) {
   return (
     <div style={{ marginTop: "28px" }}>
-      <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 12px" }}>
-        Bästa prediktorer
+      <p style={{ fontSize: "10px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "monospace", margin: "0 0 2px" }}>
+        Kalibreringsrankning
+      </p>
+      <p style={{ fontSize: "10px", color: "#444", fontFamily: "monospace", margin: "0 0 12px" }}>
+        Brier score — lägre är bättre (0 = perfekt)
       </p>
       {rankning.length === 0 ? (
         <p style={{ fontSize: "12px", color: "#444", fontStyle: "italic", margin: 0, lineHeight: 1.6 }}>
-          Syns när markets avgörs.
+          Syns när minst 2 markets per agent avgörs.
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           {rankning.slice(0, 8).map((r, i) => {
             const v = agentVisuell(r.agent);
             const medalColor = i === 0 ? "#f8fafc" : i === 1 ? "#94a3b8" : i === 2 ? "#b87333" : C.textMuted;
-            const scoreColor = r.avgScore >= 65 ? C.green : r.avgScore >= 45 ? C.yellow : C.red;
+            const brierColor = r.brier <= 0.20 ? C.green : r.brier <= 0.30 ? C.yellow : C.red;
+            const biasInfo = Math.abs(r.bias) <= 8
+              ? { txt: "≈", col: C.green, title: "Väl kalibrerad" }
+              : r.bias > 8
+                ? { txt: `+${r.bias}%`, col: "#f87171", title: "Overkonfident — bettar för högt" }
+                : { txt: `${r.bias}%`, col: "#60a5fa", title: "Underkonfident — bettar för lågt" };
             return (
               <a key={r.agent} href={`/agent/${encodeURIComponent(r.agent)}`} style={{
                 display: "flex", alignItems: "center", gap: "8px", textDecoration: "none",
@@ -183,11 +200,15 @@ function PrediktionsRankning({ rankning }) {
                 <span style={{ fontSize: "11px", color: medalColor, fontFamily: "monospace", fontWeight: 700, width: "18px", flexShrink: 0 }}>#{i + 1}</span>
                 <AgentAvatar namn={r.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={20} />
                 <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.agent}</span>
-                <span style={{ fontSize: "13px", color: scoreColor, fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>{r.avgScore}</span>
+                <span style={{ fontSize: "10px", color: biasInfo.col, fontFamily: "monospace", flexShrink: 0 }} title={biasInfo.title}>{biasInfo.txt}</span>
+                <span style={{ fontSize: "13px", color: brierColor, fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>{r.brier.toFixed(2)}</span>
                 <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace", flexShrink: 0 }}>{r.totalt}m</span>
               </a>
             );
           })}
+          <p style={{ fontSize: "9px", color: "#333", fontFamily: "monospace", margin: "6px 0 0", lineHeight: 1.5 }}>
+            Bias: ≈ kalibrerad · +% overkonfident · −% underkonfident
+          </p>
         </div>
       )}
     </div>
