@@ -60,22 +60,38 @@ def _sb_upsert(path: str, data: dict) -> bool:
         return False
 
 
+_PROVIDER_ALIAS = {"codestral": "mistral", "github": "github_models"}
+
+
 def hamta_passiva_429s() -> dict[str, int]:
     """Hämtar antal rate-limit-fel per provider senaste 24h från ai_log."""
     since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
-    # ai_log loggas av både JS-appen och Python-agenterna — provider_429_passive
-    # fylls bara på av Python-sidan och är alltid tom för JS-routes.
-    # Status-varianter: "rate_limited" (Python/ai_klient), "rate_limit" (aiRouter.js), "error_429".
     rows = _sb_get("ai_log", f"ts=gte.{since}&status=in.(rate_limited,rate_limit,error_429)&select=provider")
-    # Normalisera provider-namn till benchmarkens nyckelspråk:
-    # aiRouter.js loggar "codestral" och "github" men benchmarken använder "mistral" och "github_models".
-    _ALIAS = {"codestral": "mistral", "github": "github_models"}
     counts: dict[str, int] = {}
     for row in rows:
-        p = row.get("provider", "")
-        p = _ALIAS.get(p, p)
+        p = _PROVIDER_ALIAS.get(row.get("provider", ""), row.get("provider", ""))
         counts[p] = counts.get(p, 0) + 1
     return counts
+
+
+def hamta_produktion_ok_rate_7d() -> dict[str, float]:
+    """Hämtar faktisk OK-rate per provider från ai_log de senaste 7 dagarna.
+
+    Detta är den tyngsta rankingsignalen — speglar hur providers faktiskt presterar
+    under produktionslast (12 agentkörningar/dag), inte bara i tomgångsbenchmarks.
+    Providers med <10 anrop exkluderas (för lite data för att vara meningsfullt).
+    """
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    rows = _sb_get("ai_log", f"ts=gte.{since}&select=provider,status&limit=50000")
+    totals: dict[str, int] = {}
+    oks: dict[str, int] = {}
+    for row in rows:
+        p = _PROVIDER_ALIAS.get(row.get("provider", ""), row.get("provider", ""))
+        totals[p] = totals.get(p, 0) + 1
+        if row.get("status") == "ok":
+            oks[p] = oks.get(p, 0) + 1
+    result = {p: oks.get(p, 0) / totals[p] for p in totals if totals[p] >= 10}
+    return result
 
 
 def spara_och_kalibrera(results: list[dict]) -> None:
@@ -97,16 +113,19 @@ def spara_och_kalibrera(results: list[dict]) -> None:
     ok = _sb_post("provider_benchmark_log", rows)
     print(f"  {'✓' if ok else '✗'} Historik sparad till provider_benchmark_log")
 
-    # Hämta passiva 429s och beräkna justerat poäng
-    passiva = hamta_passiva_429s()
-    if passiva:
-        print(f"  Passiva 429-loggar (24h): {passiva}")
+    # Hämta produktionsdata — 7d OK-rate är den tyngsta signalen
+    prod_ok = hamta_produktion_ok_rate_7d()
+    if prod_ok:
+        print(f"  7-dagars produktions-OK-rate: { {p: f'{v*100:.1f}%' for p, v in prod_ok.items()} }")
+    else:
+        print("  Ingen 7-dagars produktionsdata tillgänglig — använder bara benchmarkdata")
 
     def score(r: dict) -> float:
-        succé = r["lyckade"] / r["totalt"] if r["totalt"] else 0
-        p429  = passiva.get(r["provider"], 0)
-        # Hög succé = bra, låg latens = bra, passiva 429s = dåligt
-        return succé * 100 - r["snitt_latens_s"] * 2 - p429 * 3
+        bench_ok = r["lyckade"] / r["totalt"] if r["totalt"] else 0
+        # Produktions-OK-rate väger 70%, benchmarks 30% — latens som tiebreaker.
+        # Faller tillbaka på bench_ok om providern saknar tillräcklig produktionshistorik.
+        p_ok = prod_ok.get(r["provider"], bench_ok)
+        return p_ok * 70 + bench_ok * 30 - r["snitt_latens_s"] * 2
 
     ranked = sorted(results, key=score, reverse=True)
     ranked_benchmarked = [r["provider"] for r in ranked]
