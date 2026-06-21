@@ -68,23 +68,27 @@ async function getPrediktionsRankning() {
   if (!resolved.length) return [];
   const map = {};
   for (const bet of resolved) {
-    if (!map[bet.agent]) map[bet.agent] = { brierSum: 0, errorSum: 0, totalt: 0, won: 0 };
+    if (!map[bet.agent]) map[bet.agent] = { brierSum: 0, confSum: 0, totalt: 0, won: 0 };
     const outcome = bet.markets.utfall === "ja" ? 1 : 0;
     const p = bet.sannolikhet / 100;
     map[bet.agent].brierSum += (p - outcome) ** 2;
-    map[bet.agent].errorSum += (p - outcome); // positiv = overkonfident
+    map[bet.agent].confSum += p >= 0.5 ? p : 1 - p; // konfidens i vald riktning
     map[bet.agent].totalt++;
     if ((outcome === 1 && p >= 0.5) || (outcome === 0 && p < 0.5)) map[bet.agent].won++;
   }
   return Object.entries(map)
     .filter(([, s]) => s.totalt >= 2)
-    .map(([agent, s]) => ({
-      agent,
-      totalt: s.totalt,
-      brier: Math.round((s.brierSum / s.totalt) * 1000) / 1000,
-      bias: Math.round((s.errorSum / s.totalt) * 100), // %-enheter, + = overkonfident
-      winRate: Math.round(s.won / s.totalt * 100),
-    }))
+    .map(([agent, s]) => {
+      const avgConf = s.confSum / s.totalt;       // genomsnittlig riktningskonfidens
+      const winRate = s.won / s.totalt;            // faktisk träffsäkerhet per riktning
+      return {
+        agent,
+        totalt: s.totalt,
+        brier: Math.round((s.brierSum / s.totalt) * 1000) / 1000,
+        bias: Math.round((avgConf - winRate) * 100), // + = overkonfident, − = underkonfident
+        winRate: Math.round(winRate * 100),
+      };
+    })
     .sort((a, b) => a.brier - b.brier || b.totalt - a.totalt);
 }
 
