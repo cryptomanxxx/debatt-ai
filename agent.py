@@ -110,8 +110,18 @@ def _generera_civ_fraga(agent: dict, minne_kontext: str = "") -> tuple[str, str]
         + (f"\nDina senaste erfarenheter: {minne_kort}" if minne_kort else "")
         + "\nSvara ENBART med frågan, inga inledningsfraser eller citattecken."
     )
+    system_txt = agent.get("system", "")[:400]
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": system_txt},
+            {"role": "user", "content": prompt},
+        ],
+        "max_tokens": 60,
+        "temperature": 0.9,
+    }
     try:
-        fraga = _llm_kort({}, agent.get("system", "")[:400], prompt, max_tokens=60)
+        fraga = _llm_kort(payload, system_txt, prompt, max_tokens=60)
         fraga = fraga.strip().strip('"').strip("'").strip()
         if len(fraga) < 10 or "?" not in fraga:
             raise ValueError(f"ogiltig fråga: {repr(fraga)}")
