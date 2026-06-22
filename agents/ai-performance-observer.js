@@ -189,8 +189,8 @@ async function main() {
           const prodB = stats7[pb] || {};
           const totA  = (prodA.ok || 0) + (prodA.rate_limits || 0) + (prodA.errors || 0);
           const totB  = (prodB.ok || 0) + (prodB.rate_limits || 0) + (prodB.errors || 0);
-          const pOkA  = totA > 0 ? prodA.ok / totA : -1;
-          const pOkB  = totB > 0 ? prodB.ok / totB : -1;
+          const pOkA  = totA >= 10 ? prodA.ok / totA : -1;
+          const pOkB  = totB >= 10 ? prodB.ok / totB : -1;
           const bOkA  = a.totalt > 0 ? a.lyckade / a.totalt : -1;
           const bOkB  = b.totalt > 0 ? b.lyckade / b.totalt : -1;
           const latA  = a.snitt_latens_s || 0;
