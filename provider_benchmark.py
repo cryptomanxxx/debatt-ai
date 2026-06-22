@@ -149,6 +149,13 @@ def spara_och_kalibrera(results: list[dict]) -> None:
     })
     print(f"  {'✓' if ok2 else '✗'} Fallback-ordning uppdaterad: {' → '.join(ranked_order)}")
 
+    # Verifiering — läs tillbaka för att bekräfta att raden är läsbar via anon-nyckeln
+    verify = _sb_get("provider_config", "id=eq.current&select=ranked_order")
+    if verify and verify[0].get("ranked_order"):
+        print(f"  ✓ Verifiering OK — provider_config läsbar: {verify[0]['ranked_order'][:3]}…")
+    else:
+        print(f"  ⚠ Verifiering MISSLYCKADES — provider_config returnerade: {verify!r}")
+
 # ── Samma PIS-prompt som i produktionen ──────────────────────────────────────
 
 SYSTEM = (

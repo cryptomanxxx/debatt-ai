@@ -147,19 +147,46 @@ async function main() {
   const since7d  = new Date(Date.now() -  7 * 24 * 3600 * 1000).toISOString();
 
   console.log("Hämtar data från Supabase…");
-  const [log24h, log7d, configRows] = await Promise.all([
+  const [log24h, log7d, configRows, benchLogRows] = await Promise.all([
     sb("ai_log", `ts=gte.${since24h}&select=provider,status,latency_ms&limit=5000`),
     sb("ai_log", `ts=gte.${since7d}&select=provider,status&limit=20000`),
     sb("provider_config", "id=eq.current&select=ranked_order,uppdaterad"),
+    sb("provider_benchmark_log", "select=provider,lyckade,totalt,snitt_latens_s,kord_at&order=kord_at.desc&limit=200"),
   ]);
 
   const rows24 = arr(log24h);
   const rows7  = arr(log7d);
   const stats24 = agg(rows24);
   const stats7  = agg(rows7);
-  const configRow    = arr(configRows)[0] || {};
-  const rankedOrder  = configRow.ranked_order || [];
+  const configRow     = arr(configRows)[0] || {};
+  let   rankedOrder   = Array.isArray(configRow.ranked_order) ? configRow.ranked_order : [];
   const configUpdated = (configRow.uppdaterad || "").slice(0, 16).replace("T", " ");
+  let   orderSource   = "provider_config";
+
+  // Fallback: om provider_config är tom, rekonstruera ordningen från senaste benchmark-körning
+  if (rankedOrder.length === 0) {
+    const benchRows = arr(benchLogRows);
+    if (benchRows.length > 0) {
+      // Hitta senaste kord_at per provider
+      const latest = {};
+      for (const r of benchRows) {
+        const p = PROVIDER_ALIAS[r.provider] || r.provider;
+        if (!latest[p] || r.kord_at > latest[p].kord_at) latest[p] = r;
+      }
+      // Sortera efter samma formel som benchmarken: OK-rate × 100 - latens × 2
+      rankedOrder = Object.entries(latest)
+        .sort(([, a], [, b]) => {
+          const scoreA = (a.totalt > 0 ? a.lyckade / a.totalt : 0) * 100 - a.snitt_latens_s * 2;
+          const scoreB = (b.totalt > 0 ? b.lyckade / b.totalt : 0) * 100 - b.snitt_latens_s * 2;
+          return scoreB - scoreA;
+        })
+        .map(([p]) => p);
+      if (rankedOrder.length > 0) {
+        orderSource = "provider_benchmark_log";
+        console.log(`  ℹ️  provider_config tom — fallback från provider_benchmark_log: ${rankedOrder.join(" → ")}`);
+      }
+    }
+  }
 
   const health24 = healthScore(stats24);
   const health7  = healthScore(stats7);
@@ -263,6 +290,7 @@ ${groqPoolLine}
 problem_providers: [${problemProviders.map(p => `"${p}"`).join(", ")}]
 ranked_order: [${rankedOrder.map(p => `"${p}"`).join(", ")}]
 config_uppdaterad: "${configUpdated} UTC"
+order_source: "${orderSource}"
 providers_24h:
 ${provYaml}
 ---
@@ -290,9 +318,9 @@ ${tableRows}
 
 ## Nuvarande Fallback-ordning
 
-\`${rankedOrder.join(" → ")}\`
+\`${rankedOrder.length > 0 ? rankedOrder.join(" → ") : "Okänd — ingen benchmarkdata tillgänglig"}\`
 
-*(Benchmark senast körde: ${configUpdated} UTC)*
+*(${orderSource === "provider_benchmark_log" ? "Rekonstruerad från provider_benchmark_log" : `Benchmark senast körde: ${configUpdated} UTC`})*
 
 ## 7-Dagars Trend
 
