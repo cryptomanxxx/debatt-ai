@@ -167,20 +167,47 @@ async function main() {
   if (rankedOrder.length === 0) {
     const benchRows = arr(benchLogRows);
     if (benchRows.length > 0) {
-      // Hitta senaste kord_at per provider
-      const latest = {};
-      for (const r of benchRows) {
+      // Använd bara rader från senaste körnings-fönstret (inom 10 min av senaste kord_at)
+      // för att undvika att blanda stale data från äldre delvisa körningar
+      const maxKordAt = benchRows.reduce((max, r) => r.kord_at > max ? r.kord_at : max, "");
+      const maxMs     = new Date(maxKordAt).getTime();
+      const latestRun = benchRows.filter(r => maxMs - new Date(r.kord_at).getTime() < 10 * 60 * 1000);
+
+      // Deduplicera per provider (ta senaste raden inom fönstret)
+      const byProvider = {};
+      for (const r of latestRun) {
         const p = PROVIDER_ALIAS[r.provider] || r.provider;
-        if (!latest[p] || r.kord_at > latest[p].kord_at) latest[p] = r;
+        if (!byProvider[p] || r.kord_at > byProvider[p].kord_at) byProvider[p] = r;
       }
-      // Sortera efter samma formel som benchmarken: OK-rate × 100 - latens × 2
-      rankedOrder = Object.entries(latest)
-        .sort(([, a], [, b]) => {
-          const scoreA = (a.totalt > 0 ? a.lyckade / a.totalt : 0) * 100 - a.snitt_latens_s * 2;
-          const scoreB = (b.totalt > 0 ? b.lyckade / b.totalt : 0) * 100 - b.snitt_latens_s * 2;
+
+      // Produktion-viktad formel — matchar benchmark:s spara_och_kalibrera():
+      //   prod_ok * 70 + bench_ok * 30 − latens_s * 2   (prod_ok och bench_ok är 0–1 fraktioner)
+      // Om 7d-produktionsdata finns används den; annars bench-only.
+      rankedOrder = Object.entries(byProvider)
+        .sort(([pa, a], [pb, b]) => {
+          const prodA = stats7[pa] || {};
+          const prodB = stats7[pb] || {};
+          const totA  = (prodA.ok || 0) + (prodA.rate_limits || 0) + (prodA.errors || 0);
+          const totB  = (prodB.ok || 0) + (prodB.rate_limits || 0) + (prodB.errors || 0);
+          const pOkA  = totA > 0 ? prodA.ok / totA : -1;
+          const pOkB  = totB > 0 ? prodB.ok / totB : -1;
+          const bOkA  = a.totalt > 0 ? a.lyckade / a.totalt : -1;
+          const bOkB  = b.totalt > 0 ? b.lyckade / b.totalt : -1;
+          const latA  = a.snitt_latens_s || 0;
+          const latB  = b.snitt_latens_s || 0;
+
+          const scoreA = pOkA >= 0 && bOkA >= 0 ? pOkA * 70 + bOkA * 30 - latA * 2
+                       : pOkA >= 0              ? pOkA * 70              - latA * 2
+                       : bOkA >= 0              ? bOkA * 100             - latA * 2
+                       : -999;
+          const scoreB = pOkB >= 0 && bOkB >= 0 ? pOkB * 70 + bOkB * 30 - latB * 2
+                       : pOkB >= 0              ? pOkB * 70              - latB * 2
+                       : bOkB >= 0              ? bOkB * 100             - latB * 2
+                       : -999;
           return scoreB - scoreA;
         })
         .map(([p]) => p);
+
       if (rankedOrder.length > 0) {
         orderSource = "provider_benchmark_log";
         console.log(`  ℹ️  provider_config tom — fallback från provider_benchmark_log: ${rankedOrder.join(" → ")}`);
