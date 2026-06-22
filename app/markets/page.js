@@ -274,7 +274,7 @@ async function getSaldoSpelHistorik() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const [betsRes, saldonRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/agent_bets?select=agent,insats,vinst,avgjord,avgjord_at,skapad&order=skapad.asc`, { headers, cache: "no-store" }),
-    fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo_spel&agent=neq.Statskassa`, { headers, cache: "no-store" }),
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo_spel&agent=neq.Statskassa&agent=neq.B%C3%B6rskassan`, { headers, cache: "no-store" }),
   ]);
   if (!betsRes.ok) return [];
   const bets = await betsRes.json();
@@ -327,7 +327,7 @@ async function getSaldoSpelHistorik() {
 async function getSpelarKonton() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const res = await fetch(
-    `${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo_spel&agent=neq.Statskassa&order=saldo_spel.desc`,
+    `${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo_spel&agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&order=saldo_spel.desc`,
     { headers, cache: "no-store" }
   );
   if (!res.ok) return [];
