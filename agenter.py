@@ -742,10 +742,10 @@ ANALYTIKER = [a for a in AGENTER if a["namn"] not in ROST_AGENTER]
 
 # Vilka agenter bettar på vilka market-kategorier
 MARKET_AGENTER = {
-    "krypto": ["Kryptoanalytikern", "Teknikoptimist", "Nationalekonom", "Journalist"],
+    "krypto": ["Kryptoanalytiker", "Teknikoptimist", "Nationalekonom", "Journalist"],
     "makro":  ["Nationalekonom", "Historiker", "Sociolog", "Konservativ debattör"],
     "politik": ["Journalist", "Jurist", "Konservativ debattör", "Filosof"],
-    "tech":   ["Teknikoptimist", "Journalist", "Kryptoanalytikern"],
+    "tech":   ["Teknikoptimist", "Journalist", "Kryptoanalytiker"],
     "övrigt": ["Filosof", "Psykolog", "Optimisten", "Läkare", "Den lugna", "Pensionären"],
     "sport":  ["Journalist", "Tonåringen", "Optimisten", "Pensionären", "Historiker", "Den rike", "Den stressade"],
 }
