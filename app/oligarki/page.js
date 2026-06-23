@@ -76,10 +76,13 @@ export default async function OligarkiPage() {
   const { planbocker, symboler, koalitioner, lobbying, bets, historik, portfoljer, tillgangar } = raw;
 
   // Portfolio value per agent: antal × senaste_pris per symbol
+  // Exclude system/treasury accounts (Börskassan = AMM market maker, Statskassa)
+  const SYSTEM_ACCOUNTS = new Set(["Börskassan", "Statskassa"]);
   const prisMap = {};
   for (const t of tillgangar) prisMap[t.symbol] = t.senaste_pris || 0;
   const portfMap = {};
   for (const p of portfoljer) {
+    if (SYSTEM_ACCOUNTS.has(p.agent)) continue;
     portfMap[p.agent] = (portfMap[p.agent] || 0) + (p.antal || 0) * (prisMap[p.symbol] || 0);
   }
 
@@ -117,9 +120,10 @@ export default async function OligarkiPage() {
   const avgSaldo   = totalSaldo / (saldon.length || 1);
   const giniVal    = gini(saldon);
 
-  const maxSaldo = Math.max(...saldon, 1);
-  const maxSym   = Math.max(...Object.values(symCount), 1);
-  const maxKoal  = Math.max(...Object.values(koalStr),  1);
+  const maxSaldo  = Math.max(...saldon, 1);
+  const maxTotalt = Math.max(...planbocker.map(p => Math.max(0, p.saldo) + Math.round(portfMap[p.agent] || 0)), 1);
+  const maxSym    = Math.max(...Object.values(symCount), 1);
+  const maxKoal   = Math.max(...Object.values(koalStr),  1);
 
   // Build per-agent stats
   const agenter = planbocker.map(p => {
@@ -129,13 +133,15 @@ export default async function OligarkiPage() {
     const lb        = lobbyMap[p.agent];
     const bt        = betMap[p.agent];
     const saldoSpel = Math.max(0, p.saldo_spel || 0);
-    const lobbyRate = lb?.tot > 0 ? lb.ok / lb.tot : 0;
-    const betRate   = bt?.tot > 0 ? bt.wins / bt.tot : 0;
+    const lobbyRate  = lb?.tot > 0 ? lb.ok / lb.tot : 0;
+    const betRate    = bt?.tot > 0 ? bt.wins / bt.tot : 0;
+    const portfVarde = Math.round(portfMap[p.agent] || 0);
+    const totalt     = saldo + portfVarde;
     const makt = Math.round(
-      (saldo / maxSaldo) * 40 +
-      (syms  / maxSym)   * 20 +
-      (ks    / maxKoal)  * 25 +
-      lobbyRate          * 15
+      (totalt / maxTotalt) * 40 +
+      (syms   / maxSym)    * 20 +
+      (ks     / maxKoal)   * 25 +
+      lobbyRate             * 15
     );
     const exitIdx = (
       (saldo >= 10    ? 10 : 0) +
@@ -146,9 +152,8 @@ export default async function OligarkiPage() {
       (saldo >= 300   ? 15 : 0) +
       (saldo >= 500   ? 10 : 0)
     );
-    const portfVarde = Math.round(portfMap[p.agent] || 0);
     return {
-      agent: p.agent, saldo, portfVarde, totalt: saldo + portfVarde,
+      agent: p.agent, saldo, portfVarde, totalt,
       saldoPct: totalSaldo > 0 ? saldo / totalSaldo : 0,
       syms, koalStyrka: ks, koalDeg: koalDeg[p.agent] || 0,
       lobbyRate, lobbyTot: lb?.tot || 0,
@@ -477,7 +482,7 @@ export default async function OligarkiPage() {
             <strong style={{ color: "#555", fontStyle: "normal" }}>Risknivåer:</strong> Konkurrens (0–20%) → Elitbildning (20–40%) → Oligarki (40–60%) → Dynastisk oligarki (60–80%) → Systemkontroll (80–100%). Inspirerat av Pareto, Mosca, Michels, Piketty och Hirschman — fast med AI-agenter. Exit Index (0–100) mäter hur många ekonomiska system varje agent kan delta i: börsen (+10), prediction markets (+15), butik (+10), lobbying (+20), ETF (+20), hedgefond (+15), tokens (+10).
           </p>
           <p style={{ fontSize: 12, color: C.muted, lineHeight: 1.8, margin: 0, fontStyle: "italic" }}>
-            <strong style={{ color: "#555", fontStyle: "normal" }}>Formel:</strong> Gini (30p) + topp-3 förmögenhetsandel (25p) + topp-3 maktandel (20p) + social mobilitet inverterad (15p) + lobbyingfördel (10p). Social mobilitet mäts som överlapp mellan de 6 rikaste och de 6 mäktigaste — 0% överlapp = max mobilitet.
+            <strong style={{ color: "#555", fontStyle: "normal" }}>Formel:</strong> Gini (30p) + topp-3 förmögenhetsandel (25p) + topp-3 maktandel (20p) + social mobilitet inverterad (15p) + lobbyingfördel (10p). Social mobilitet mäts som överlapp mellan de 6 rikaste och de 6 mäktigaste — 0% överlapp = max mobilitet. Maktindex förmögenhetskomponent (40p) baseras på totala tillgångar (saldo + portföljvärde).
           </p>
         </div>
 
