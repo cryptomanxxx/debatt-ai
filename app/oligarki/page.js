@@ -31,13 +31,15 @@ async function fetchData() {
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   const r = (path) => fetch(`${SB_URL}/rest/v1/${path}`, { headers: h, next: { revalidate: 180 } });
 
-  const [plRes, symRes, koalRes, lobbyRes, betsRes, histRes] = await Promise.all([
+  const [plRes, symRes, koalRes, lobbyRes, betsRes, histRes, portfRes, tillgRes] = await Promise.all([
     r("agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc"),
     r("agent_symboler?select=agent"),
     r("agent_koalitioner?select=agent_a,agent_b,styrka&order=styrka.desc"),
     r("lobbying_log?select=lobbying_agent,resultat"),
     r("agent_bets?select=agent,vinst&avgjord=eq.true"),
     r("oligarki_historik?select=datum,gini,oligarki_risk,top3_andel,mobilitet,dynasti_index&order=datum.asc&limit=90"),
+    r("bors_portfoljer?select=agent,symbol,antal"),
+    r("bors_tillgangar?select=symbol,senaste_pris"),
   ]);
 
   return {
@@ -47,6 +49,8 @@ async function fetchData() {
     lobbying:    lobbyRes.ok ? await lobbyRes.json() : [],
     bets:        betsRes.ok  ? await betsRes.json()  : [],
     historik:    histRes.ok  ? await histRes.json()  : [],
+    portfoljer:  portfRes.ok ? await portfRes.json() : [],
+    tillgangar:  tillgRes.ok ? await tillgRes.json() : [],
   };
 }
 
@@ -69,7 +73,15 @@ export default async function OligarkiPage() {
   const raw = await fetchData();
   if (!raw) return <div style={{ color: C.muted, padding: 40, fontFamily: "monospace" }}>Saknar Supabase-nyckel.</div>;
 
-  const { planbocker, symboler, koalitioner, lobbying, bets, historik } = raw;
+  const { planbocker, symboler, koalitioner, lobbying, bets, historik, portfoljer, tillgangar } = raw;
+
+  // Portfolio value per agent: antal × senaste_pris per symbol
+  const prisMap = {};
+  for (const t of tillgangar) prisMap[t.symbol] = t.senaste_pris || 0;
+  const portfMap = {};
+  for (const p of portfoljer) {
+    portfMap[p.agent] = (portfMap[p.agent] || 0) + (p.antal || 0) * (prisMap[p.symbol] || 0);
+  }
 
   // Symbol count per agent
   const symCount = {};
@@ -134,8 +146,9 @@ export default async function OligarkiPage() {
       (saldo >= 300   ? 15 : 0) +
       (saldo >= 500   ? 10 : 0)
     );
+    const portfVarde = Math.round(portfMap[p.agent] || 0);
     return {
-      agent: p.agent, saldo,
+      agent: p.agent, saldo, portfVarde, totalt: saldo + portfVarde,
       saldoPct: totalSaldo > 0 ? saldo / totalSaldo : 0,
       syms, koalStyrka: ks, koalDeg: koalDeg[p.agent] || 0,
       lobbyRate, lobbyTot: lb?.tot || 0,
@@ -378,8 +391,8 @@ export default async function OligarkiPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "monospace" }}>
               <thead>
                 <tr style={{ background: "#0f0f0f" }}>
-                  {["#", "Agent", "Saldo", "Sym.", "Koal.", "Lobbying", "Market", "Makt"].map(h => (
-                    <th key={h} style={{ padding: "10px 12px", color: C.muted, fontWeight: 600, textAlign: h === "Agent" ? "left" : "right", letterSpacing: "0.04em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                  {["#", "Agent", "Saldo", "Portfölj", "Totalt", "Sym.", "Koal.", "Lobbying", "Market", "Makt"].map(h => (
+                    <th key={h} style={{ padding: "10px 12px", color: h === "Totalt" ? C.text : C.muted, fontWeight: h === "Totalt" ? 700 : 600, textAlign: h === "Agent" ? "left" : "right", letterSpacing: "0.04em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -390,7 +403,11 @@ export default async function OligarkiPage() {
                     <td style={{ padding: "9px 12px" }}>
                       <a href={`/agent/${encodeURIComponent(a.agent)}`} style={{ color: a.farg, textDecoration: "none", fontWeight: 600 }}>{a.agent}</a>
                     </td>
-                    <td style={{ padding: "9px 12px", color: C.text, textAlign: "right" }}>{a.saldo.toLocaleString("sv-SE")} kr</td>
+                    <td style={{ padding: "9px 12px", color: C.muted, textAlign: "right" }}>{a.saldo.toLocaleString("sv-SE")} kr</td>
+                    <td style={{ padding: "9px 12px", color: a.portfVarde > 0 ? C.blue : C.muted, textAlign: "right" }}>
+                      {a.portfVarde > 0 ? `${a.portfVarde.toLocaleString("sv-SE")} kr` : "–"}
+                    </td>
+                    <td style={{ padding: "9px 12px", color: C.text, textAlign: "right", fontWeight: 600 }}>{a.totalt.toLocaleString("sv-SE")} kr</td>
                     <td style={{ padding: "9px 12px", color: C.text, textAlign: "right" }}>{a.syms}</td>
                     <td style={{ padding: "9px 12px", color: C.text, textAlign: "right" }}>{a.koalStyrka}</td>
                     <td style={{ padding: "9px 12px", textAlign: "right", color: a.lobbyTot > 0 ? (a.lobbyRate > 0.5 ? C.green : C.yellow) : C.muted }}>
