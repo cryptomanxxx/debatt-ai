@@ -16,8 +16,14 @@ CREATE INDEX IF NOT EXISTS civilisation_log_endpoint_idx ON civilisation_log (en
 
 ALTER TABLE civilisation_log ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Public read civilisation_log"
-  ON civilisation_log FOR SELECT USING (true);
+-- Only service role can read logs (questions are private)
+CREATE POLICY "Service read civilisation_log"
+  ON civilisation_log FOR SELECT
+  TO service_role
+  USING (true);
 
+-- Only service role can insert — prevents forged rows via anon key
 CREATE POLICY "Service insert civilisation_log"
-  ON civilisation_log FOR INSERT WITH CHECK (true);
+  ON civilisation_log FOR INSERT
+  TO service_role
+  WITH CHECK (true);

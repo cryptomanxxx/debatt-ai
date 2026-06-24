@@ -138,8 +138,9 @@ export async function POST(req) {
     const latency = Date.now() - t0;
     const resolvedEndpoint = endpoint || gissaEndpoint(fraga);
 
-    // Log fire-and-forget — never block the response
-    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    // Log fire-and-forget — never block the response.
+    // Requires service role key so anon users cannot read or forge log rows.
+    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (sbKey) {
       fetch(`${SB_URL}/rest/v1/civilisation_log`, {
         method: "POST",
