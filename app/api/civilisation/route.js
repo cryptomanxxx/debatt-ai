@@ -135,13 +135,39 @@ export async function POST(req) {
       { maxTokens: 400, temperature: 0.3, source: "civilisation_api" }
     );
 
+    const latency = Date.now() - t0;
+    const resolvedEndpoint = endpoint || gissaEndpoint(fraga);
+
+    // Log fire-and-forget — never block the response
+    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (sbKey) {
+      fetch(`${SB_URL}/rest/v1/civilisation_log`, {
+        method: "POST",
+        headers: {
+          apikey: sbKey,
+          Authorization: `Bearer ${sbKey}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          fraga:       fraga.trim().slice(0, 500),
+          endpoint:    resolvedEndpoint,
+          datapunkter: kontext.length,
+          provider,
+          model,
+          latency_ms:  latency,
+          lang,
+        }),
+      }).catch(() => {});
+    }
+
     return Response.json({
       svar:         text,
-      endpoint:     endpoint || gissaEndpoint(fraga),
+      endpoint:     resolvedEndpoint,
       datapunkter:  kontext.length,
       provider,
       model,
-      latency_ms:   Date.now() - t0,
+      latency_ms:   latency,
       version:      "debatt-ai/civilisation/v1",
     });
   } catch (err) {
