@@ -5,15 +5,16 @@
  * Visuell QA-observatör: tar skärmdumpar av nyckelsidor på debatt-ai.se,
  * skickar dem till ett vision-LLM och rapporterar status.
  *
- * Primär: Groq (Llama 4 Scout) — genrösa rate limits, 30 rpm.
- * Fallback: Gemini 2.0 Flash — används om Groq saknas eller svarar 429.
+ * Primär: Gemini 2.0 Flash — aktiv vision-modell.
+ * Fallback: Groq — reserveras tills en ny Groq vision-modell blir tillgänglig
+ *   (Llama 4 Scout deprecerades 2026-06-25, Maverick stängdes 2026-03-09).
  *
  * Sparar resultat till Supabase (qa_snapshots) för veckovis jämförelse.
  * Hämtar föregående veckas data och visar diff: "förra veckan OK → nu FEL".
  *
  * Kräver:
- *   GROQ_API_KEY            — primär vision-provider (GitHub Secret)
- *   GEMINI_API_KEY          — fallback vision-provider (GitHub Secret)
+ *   GEMINI_API_KEY          — primär vision-provider (GitHub Secret)
+ *   GROQ_API_KEY            — fallback vision-provider (GitHub Secret)
  *   SUPABASE_ANON_KEY       — valfritt, aktiverar historik (GitHub Secret)
  *   BASE_URL                — valfritt, default https://www.debatt-ai.se
  *
@@ -226,7 +227,7 @@ async function analyseraGroq(sidnamn, b64, konsolfEl) {
     "/openai/v1/chat/completions",
     { Authorization: `Bearer ${GROQ_KEY}` },
     {
-      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      model: "meta-llama/llama-4-maverick-17b-128e-instruct",
       messages: [{
         role: "user",
         content: [
@@ -270,16 +271,18 @@ async function analyseraGemini(sidnamn, b64, konsolfEl) {
 }
 
 async function analysera(sidnamn, b64, konsolfEl) {
-  // Primär: Groq
-  if (GROQ_KEY) {
-    const r = await analyseraGroq(sidnamn, b64, konsolfEl);
+  // Primär: Gemini (Groq saknar aktiva vision-modeller sedan 2026-06-25)
+  if (GEMINI_KEY) {
+    const r = await analyseraGemini(sidnamn, b64, konsolfEl);
     if (r) return r;
-    console.log(`  ↩ Groq rate-limited — provar Gemini fallback för ${sidnamn}`);
+    console.log(`  ↩ Gemini misslyckades — provar Groq fallback för ${sidnamn}`);
   }
-  // Fallback: Gemini (3s fördröjning för att undvika att även Gemini rate-limiteras)
-  await sleep(3000);
-  const r2 = await analyseraGemini(sidnamn, b64, konsolfEl);
-  if (r2) return r2;
+  // Fallback: Groq (återaktiveras när en ny Groq vision-modell är tillgänglig)
+  if (GROQ_KEY) {
+    await sleep(1000);
+    const r2 = await analyseraGroq(sidnamn, b64, konsolfEl);
+    if (r2) return r2;
+  }
   return { status: "VARNING", orsak: "Alla vision-providers otillgängliga", detalj: "–" };
 }
 
