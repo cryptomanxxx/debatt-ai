@@ -5,7 +5,7 @@
  * Visuell QA-observatör: tar skärmdumpar av nyckelsidor på debatt-ai.se,
  * skickar dem till ett vision-LLM och rapporterar status.
  *
- * Primär: Groq (Llama 4 Scout) — genrösa rate limits, 30 rpm.
+ * Primär: Groq (Llama 4 Maverick) — genrösa rate limits, vision-kapabel.
  * Fallback: Gemini 2.0 Flash — används om Groq saknas eller svarar 429.
  *
  * Sparar resultat till Supabase (qa_snapshots) för veckovis jämförelse.
@@ -226,7 +226,7 @@ async function analyseraGroq(sidnamn, b64, konsolfEl) {
     "/openai/v1/chat/completions",
     { Authorization: `Bearer ${GROQ_KEY}` },
     {
-      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      model: "meta-llama/llama-4-maverick-17b-128e-instruct",
       messages: [{
         role: "user",
         content: [

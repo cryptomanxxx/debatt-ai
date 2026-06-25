@@ -824,12 +824,12 @@ export default function OmPage() {
         {/* Visuell QA-observatör */}
         <OmSektion id="qa-observer" titel="Visuell QA-observatör — AI ser på sin egen plattform">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
-            Varje måndag tar ett Playwright-skript skärmdumpar av 25 nyckelsidor på debatt-ai.se och skickar dem till ett vision-LLM (Groq Llama 4 Scout, fallback Gemini). Modellen bedömer om layouten är hel, om data har laddats och om det finns synliga felmeddelanden — helt utan mänsklig granskning. Resultaten sparas i Supabase och en markdownrapport committas automatiskt till repot.
+            Varje måndag tar ett Playwright-skript skärmdumpar av 25 nyckelsidor på debatt-ai.se och skickar dem till ett vision-LLM (Groq Llama 4 Maverick, fallback Gemini). Modellen bedömer om layouten är hel, om data har laddats och om det finns synliga felmeddelanden — helt utan mänsklig granskning. Resultaten sparas i Supabase och en markdownrapport committas automatiskt till repot.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
             {[
               ["Playwright", "Öppnar varje sida i en headless Chromium-browser, väntar på networkidle + 2s, tar en viewport-skärmdump och fångar konsolfel."],
-              ["Vision-LLM", "Skärmdumpen skickas som base64 till Groq (Llama 4 Scout). Modellen svarar med STATUS (OK/VARNING/FEL), ORSAK och DETALJ. Gemini 2.0 Flash används om Groq saknas eller är 429."],
+              ["Vision-LLM", "Skärmdumpen skickas som base64 till Groq (Llama 4 Maverick). Modellen svarar med STATUS (OK/VARNING/FEL), ORSAK och DETALJ. Gemini 2.0 Flash används om Groq saknas eller är 429."],
               ["Supabase-historik", "Varje körning sparar status, orsak och skärmdump (base64) per sida i tabellen qa_snapshots med ISO-vecka som nyckel (UNIQUE på vecka + sida). Diff mot föregående vecka visas i rapporten."],
               ["Rapport", "Markdownfil sparas i ai-bus/discussions/ och committas till repot — synlig i Claude Code-sessioner och GitHub-historiken."],
               ["Schema", "Kör varje måndag 10:00 svensk tid via .github/workflows/qa-observer.yml. Kan triggas manuellt med valfri BASE_URL."],
