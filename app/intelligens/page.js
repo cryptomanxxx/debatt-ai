@@ -23,6 +23,12 @@ function weekStart(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 
+function weekEnd(weekStartStr) {
+  const d = new Date(weekStartStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 6); // Monday + 6 = Sunday
+  return d.toISOString().slice(0, 10);
+}
+
 export default async function IntelligensPage() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
@@ -48,11 +54,14 @@ export default async function IntelligensPage() {
     .slice(0, 6);
 
   // Weekly KI growth timeseries (merged across top 6)
+  // Use end-of-week (Sunday 23:59:59) as cutoff so the full week's KI is counted,
+  // not just items up to Monday — otherwise Tuesday–Sunday items lag by one week.
   const allWeeks = [...new Set(kiItems.map(k => weekStart(k.skapad)))].sort();
   const kiGrowthData = allWeeks.map(week => {
     const row = { week };
+    const cutoff = weekEnd(week) + "T23:59:59";
     for (const { agent } of agentsByKi) {
-      const n = (kiByAgent[agent] || []).filter(k => k.datum <= week + "T23:59:59").length;
+      const n = (kiByAgent[agent] || []).filter(k => k.datum <= cutoff).length;
       row[agent] = n > 0 ? n : undefined;
     }
     return row;
