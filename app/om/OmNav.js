@@ -48,6 +48,7 @@ const SEKTIONER = [
   { id: "hedgefond-api",        kort: "Hedgefond Signal API",    nytt: true },
   { id: "kompass",              kort: "Ideologisk Kompass" },
   { id: "informationsasymmetri",kort: "Informationsasymmetri" },
+  { id: "intelligens",          kort: "Intelligens & Minne",     nytt: true },
   { id: "korruption",           kort: "Korruption (CRSE)",       nytt: true },
   { id: "krisevents",           kort: "Krisevents" },
   { id: "etf",                  kort: "Krypto-ETF" },
