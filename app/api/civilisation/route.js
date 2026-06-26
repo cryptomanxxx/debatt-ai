@@ -144,7 +144,7 @@ function detekteraExternTopik(fraga) {
   const f = fraga.toLowerCase();
   if (/bitcoin|ethereum|krypto|btc|eth|sol|xrp|bnb|crypto|blockchain|defi|nft/.test(f)) return "krypto";
   if (/aktier|börsen|nasdaq|s&p|dow|aktie|investering|ränta|riksbank|inflation/.test(f)) return "ekonomi";
-  if (/tech|teknologi|ai\b|artificiell intelligens|openai|google|apple|meta|microsoft/.test(f)) return "tech";
+  if (/tech|teknologi|\bai(?!-civilisation)\b|artificiell intelligens|openai|google|apple|meta|microsoft/.test(f)) return "tech";
   if (/forskning|vetenskap|studie|medicin|biologi|cancer|fysik|kemi|kvantum/.test(f))    return "vetenskap";
   if (/klimat|co2|utsläpp|temperatur|havsnivå|isberg/.test(f))                           return "klimat";
   if (/politik|val|regering|riksdag|eu|nato|krig|fred/.test(f))                          return "politik";
