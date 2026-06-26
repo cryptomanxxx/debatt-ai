@@ -364,9 +364,11 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       })
       .catch(() => {});
 
-    // Hämta färsk auktionsdata — SSR-propen kan vara upp till 180s gammal (ISR-cache)
-    const nowIso = new Date().toISOString();
-    fetch(`${SB_URL}/rest/v1/mark_auktioner?status=eq.öppen&stanger_at=gt.${nowIso}&select=*,mark_zoner(id,namn,typ)`, {
+    // Hämta färsk auktionsdata — SSR-propen kan vara upp till 180s gammal (ISR-cache).
+    // Hämtar ALLA öppna auktioner (inkl. utgångna men ej städade) så auktionMap
+    // korrekt blockerar köp/listning under cleanup-fönstret.
+    // filtreradeAuktioner hanterar display-filtrering av utgångna.
+    fetch(`${SB_URL}/rest/v1/mark_auktioner?status=eq.öppen&select=*,mark_zoner(id,namn,typ)`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
     })
       .then(r => r.ok ? r.json() : null)
