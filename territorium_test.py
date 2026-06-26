@@ -8,12 +8,22 @@ import random
 from datetime import date, timedelta
 import requests
 
-SB_URL = os.environ.get("SUPABASE_URL", "https://fmwxftnistkoqazfwnuj.supabase.co")
-SB_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+SB_URL       = os.environ.get("SUPABASE_URL", "https://fmwxftnistkoqazfwnuj.supabase.co")
+SB_KEY       = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+SB_SVC_KEY   = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")  # krävs för INSERT/UPDATE på events + hexagoner
 
 HEADERS = {
     "apikey":        SB_KEY,
     "Authorization": f"Bearer {SB_KEY}",
+    "Content-Type":  "application/json",
+    "Prefer":        "return=minimal",
+}
+
+# Service-role headers — används för att skapa/avsluta events och seeda hexagoner
+# (territorium_events + territorium_hexagoner har ingen publik INSERT/UPDATE-policy)
+ADMIN_HEADERS = {
+    "apikey":        SB_SVC_KEY or SB_KEY,
+    "Authorization": f"Bearer {SB_SVC_KEY or SB_KEY}",
     "Content-Type":  "application/json",
     "Prefer":        "return=minimal",
 }
@@ -64,8 +74,9 @@ def sb_post(table, data):
     return requests.post(f"{SB_URL}/rest/v1/{table}", headers=HEADERS, json=data, timeout=10)
 
 
-def sb_patch(table, params, data):
-    return requests.patch(f"{SB_URL}/rest/v1/{table}?{params}", headers=HEADERS, json=data, timeout=10)
+def sb_patch(table, params, data, admin=False):
+    h = ADMIN_HEADERS if admin else HEADERS
+    return requests.patch(f"{SB_URL}/rest/v1/{table}?{params}", headers=h, json=data, timeout=10)
 
 
 def is_adjacent(col1, row1, col2, row2):
@@ -107,7 +118,7 @@ def seed_hexagoner(event_id):
     data = [{"event_id": event_id, "hex_col": c, "hex_row": r,
              "namn": n, "typ": t, "poang": p} for c, r, n, t, p in hexes]
     requests.post(f"{SB_URL}/rest/v1/territorium_hexagoner",
-                  headers=HEADERS, json=data, timeout=10)
+                  headers=ADMIN_HEADERS, json=data, timeout=10)
     print(f"  Seedade {len(hexes)} hexagoner för event {event_id}")
 
 
@@ -119,7 +130,7 @@ def avsluta_event(event):
         vinnare = c.most_common(1)[0][0]
     else:
         vinnare = "Ingen"
-    sb_patch("territorium_events", f"id=eq.{event['id']}", {"status": "avslutad", "vinnare": vinnare})
+    sb_patch("territorium_events", f"id=eq.{event['id']}", {"status": "avslutad", "vinnare": vinnare}, admin=True)
     print(f"Event '{event['namn']}' avslutat. Vinnare: {vinnare}")
     return vinnare
 
@@ -128,7 +139,7 @@ def skapa_nytt_event():
     today = date.today()
     r = requests.post(
         f"{SB_URL}/rest/v1/territorium_events",
-        headers={**HEADERS, "Prefer": "return=representation"},
+        headers={**ADMIN_HEADERS, "Prefer": "return=representation"},
         json={
             "namn":        "Territorium",
             "start_datum": today.isoformat(),
