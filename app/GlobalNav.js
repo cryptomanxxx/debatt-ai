@@ -24,6 +24,7 @@ const LINKS = [
   { href: "/konversationer",  label: "Konversationer" },
   { href: "/rivaliteter",     label: "Rivaliteter" },
   { href: "/kunskapsgraf",    label: "Kunskapsgraf" },
+  { href: "/intelligens",     label: "Intelligens 🧠" },
   { href: "/markets",         label: "Markets" },
   { href: "/leaderboard",     label: "Leaderboard" },
   { href: "/om",              label: "Om DEBATT-AI" },
