@@ -12,8 +12,9 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const H = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
 
 async function getData() {
+  const now = new Date().toISOString();
   const evRes = await fetch(
-    `${SB_URL}/rest/v1/territorium_events?status=eq.aktiv&order=skapad.desc&limit=1`,
+    `${SB_URL}/rest/v1/territorium_events?status=eq.aktiv&slut_datum=gte.${now}&order=skapad.desc&limit=1`,
     { headers: H, next: { revalidate: 60 } },
   ).catch(() => null);
 

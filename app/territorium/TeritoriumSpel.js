@@ -186,12 +186,14 @@ export default function TeritoriumSpel({ initialData }) {
   });
   const lb = Object.entries(poangBySp).sort(([, a], [, b]) => b - a).slice(0, 12);
 
-  const actions   = getActions();
-  const dagarKvar = event
-    ? Math.max(0, Math.ceil((new Date(event.slut_datum) - Date.now()) / 86_400_000))
-    : 0;
+  const actions      = getActions();
+  const dagarKvarRaw = event
+    ? Math.ceil((new Date(event.slut_datum) - Date.now()) / 86_400_000)
+    : -1;
+  const dagarKvar    = Math.max(0, dagarKvarRaw);
+  const evtUtgånget  = dagarKvarRaw < 0;
 
-  if (!event) {
+  if (!event || evtUtgånget) {
     return (
       <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
         <div className="text-center">
@@ -211,7 +213,7 @@ export default function TeritoriumSpel({ initialData }) {
         <div className="text-center mb-6">
           <h1 className="text-4xl font-bold tracking-tight">🗺️ {event.namn}</h1>
           <p className="text-gray-400 mt-1 text-sm">
-            {dagarKvar > 0 ? `${dagarKvar} dagar kvar` : "Sista dagen!"} ·{" "}
+            {evtUtgånget ? "Avslutat" : dagarKvar > 0 ? `${dagarKvar} dagar kvar` : "Sista dagen!"} ·{" "}
             {Object.keys(hexBySp).length} spelare · {agare.length}/20 territorier erövrade
           </p>
         </div>
