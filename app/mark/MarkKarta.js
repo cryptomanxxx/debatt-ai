@@ -156,6 +156,7 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const [kopOrderMaxPris, setKopOrderMaxPris] = useState("");
   const [lokalaOrdrar,         setLokalaOrdrar]         = useState([]);
   const [avbrutnaZonAuktioner, setAvbrutnaZonAuktioner] = useState(new Set());
+  const [lokalAuktioner,      setLokalAuktioner]      = useState(auktioner);
   const [widgetTyp,       setWidgetTyp]       = useState("kop");   // "kop" | "salj"
   // widgetSubjekt removed — widget only handles mark (varor moved to Marknad tab)
   const [saljWidgetZon,   setSaljWidgetZon]   = useState("");
@@ -176,13 +177,13 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
   const zonEventMap = Object.fromEntries(zonEvents.map(e => [e.zon_id, e]));
   const clientNow   = Date.now();
   const ejUtgangen  = (ts) => { const t = new Date(ts); return isNaN(t) || t > clientNow; };
-  const filtreradeAuktioner    = auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id) && ejUtgangen(a.stanger_at));
+  const filtreradeAuktioner    = lokalAuktioner.filter(a => !avbrutnaZonAuktioner.has(a.id) && ejUtgangen(a.stanger_at));
   const filtreradeVaraAuktioner = varaAuktioner.filter(a => ejUtgangen(a.stanger_at));
   // Guard map includes expired-but-not-yet-closed auctions so zone actions (buy/re-list) are
   // correctly blocked during the ISR/daily-cleanup window when stanger_at has passed but the
   // DB row is still status='öppen'. Display uses filtreradeAuktioner (non-expired only).
   const auktionMap  = Object.fromEntries(
-    auktioner.filter(a => !avbrutnaZonAuktioner.has(a.id)).map(a => [a.mark_zoner?.id, a])
+    lokalAuktioner.filter(a => !avbrutnaZonAuktioner.has(a.id)).map(a => [a.mark_zoner?.id, a])
   );
 
   // Centrera hexklustret dynamiskt i SVG
@@ -362,6 +363,17 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
         }
       })
       .catch(() => {});
+
+    // Hämta färsk auktionsdata — SSR-propen kan vara upp till 180s gammal (ISR-cache).
+    // Hämtar ALLA öppna auktioner (inkl. utgångna men ej städade) så auktionMap
+    // korrekt blockerar köp/listning under cleanup-fönstret.
+    // filtreradeAuktioner hanterar display-filtrering av utgångna.
+    fetch(`${SB_URL}/rest/v1/mark_auktioner?status=eq.öppen&select=*,mark_zoner(id,namn,typ)`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(rows => { if (rows) setLokalAuktioner(rows); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -506,6 +518,10 @@ export default function MarkKarta({ zoner, agare, transaktioner, auktioner = [],
       if (!r.ok) { setMarkMsg({ text: d.error || "Bud misslyckades", ok: false }); return; }
       setMarkMsg({ text: `✅ Bud på ${belopp} kr lagt!`, ok: true });
       setActiveBid(null); setBidBelopp("");
+      // Uppdatera auktionen optimistiskt så budet syns direkt utan sidomladdning
+      setLokalAuktioner(prev => prev.map(a =>
+        a.id === auktion_id ? { ...a, nuv_bud: belopp, hogst_budgivare: besokareNamn } : a
+      ));
       setTimeout(() => setMarkMsg(null), 5000);
     } catch { setMarkMsg({ text: "Nätverksfel", ok: false }); }
     finally { setPending(false); }
