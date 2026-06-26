@@ -32,9 +32,10 @@ function weekEnd(weekStartStr) {
 export default async function IntelligensPage() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
-  const [kiItems, artiklar] = await Promise.all([
+  const [kiItems, artiklar, fragaItems] = await Promise.all([
     sb("agent_ki?order=skapad.asc&select=agent,amne,insikt,skapad&limit=5000", key),
     sb("artiklar?kalla=eq.ai&order=skapad.asc&select=forfattare,arg,ori,rel,tro,skapad&limit=3000", key),
+    sb("agent_fragor?order=skapad.asc&select=fragare,skapad&limit=5000", key),
   ]);
 
   // ── KI per agent ──────────────────────────────────────────────────────────
@@ -130,6 +131,30 @@ export default async function IntelligensPage() {
     })
     .sort((a, b) => b.total - a.total);
 
+  // ── AI-till-AI frågor ─────────────────────────────────────────────────────
+  const aiFragor = fragaItems.filter(f => f.fragare && f.fragare !== "api");
+  const fragorByAgent = {};
+  for (const f of aiFragor) {
+    if (!fragorByAgent[f.fragare]) fragorByAgent[f.fragare] = [];
+    fragorByAgent[f.fragare].push(f.skapad);
+  }
+  const agentsByFragor = Object.entries(fragorByAgent)
+    .map(([agent, items]) => ({ agent, total: items.length }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+  const fragaAllWeeks = [...new Set(aiFragor.map(f => weekStart(f.skapad)))].sort();
+  const fragaVeckoData = fragaAllWeeks.map(week => {
+    const wStart = week + "T00:00:00";
+    const wEnd = weekEnd(week) + "T23:59:59";
+    const row = { week };
+    for (const { agent } of agentsByFragor) {
+      const n = (fragorByAgent[agent] || []).filter(d => d >= wStart && d <= wEnd).length;
+      row[agent] = n > 0 ? n : undefined;
+    }
+    return row;
+  });
+  const totalFragor = aiFragor.length;
+
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalKi = kiItems.length;
   const agenterMedKi = Object.keys(kiByAgent).length;
@@ -163,11 +188,12 @@ export default async function IntelligensPage() {
       </div>
 
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "32px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px", marginBottom: "32px" }}>
         {[
           { label: "KI-minnen totalt", v: totalKi.toLocaleString("sv-SE") },
           { label: "Agenter med minnen", v: agenterMedKi },
           { label: "Snitt KI / agent", v: snittKi },
+          { label: "AI→AI frågor totalt", v: totalFragor.toLocaleString("sv-SE") },
           {
             label: "Starkast förbättring",
             v: bastaAgent || "–",
@@ -188,6 +214,8 @@ export default async function IntelligensPage() {
         kiBins={kiBins}
         kvalitetTrend={kvalitetTrend}
         kiLibrary={kiLibrary}
+        fragaVeckoData={fragaVeckoData}
+        agentsByFragor={agentsByFragor}
       />
     </main>
   );
