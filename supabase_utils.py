@@ -1617,7 +1617,13 @@ def hamta_nyhetskontext_for_market(market: dict) -> str:
 
 
 def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key: str = "") -> tuple[int, str]:
-    """Låter agenten uppskatta sannolikheten (0-100) med beslutsunderlag och kalibreringsregel."""
+    """Uppskattar sannolikheten (0-100) via MCTS-inspirerad scenario-simulering.
+
+    Steg 1: Generera 3 framtidsscenarier med vikter (ett LLM-anrop).
+    Steg 2: Uppskatta sannolikhet per scenario (tre LLM-anrop).
+    Steg 3: Viktad summering → slutuppskattning.
+    Fallback: original enkelt LLM-anrop om scenario-steget misslyckas.
+    """
     deadline_str = market.get("deadline", "")[:10]
     system       = agent["system"]
     betting_stil = agent.get("betting_stil", "")
@@ -1675,12 +1681,82 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key
     except Exception:
         resolution_rad = f"Avgörs via: {rk_raw}\n" if rk_raw else ""
 
-    user_msg = (
-        f"Du ska göra en sannolikhetsbedömning som {agent['namn']}.\n\n"
+    market_info = (
         f"Fråga: {market['titel']}\n"
         f"Beskrivning: {market.get('beskrivning') or ''}\n"
         f"{resolution_rad}"
         f"Deadline: {deadline_str}\n"
+    )
+
+    # ── MCTS-inspirerad scenario-simulering ──────────────────────────────────
+    # Steg 1: Generera 3 framtidsscenarier med vikter
+    scenarier: list[dict] = []
+    try:
+        scenario_prompt = (
+            f"{market_info}\n"
+            + (f"Beslutsunderlag:\n{kontext_str}\n\n" if kontext_str else "\n")
+            + "Generera 3 distinkta framtidsscenarier (Optimistiskt, Neutralt, Pessimistiskt) "
+            "med sannolikhetsvikter (vikterna summerar till 1.0) och en kortfattad beskrivning per scenario. "
+            "JSON-array (inget annat, inga kommentarer):\n"
+            '[{"namn": "Optimistiskt", "vikt": 0.25, "beskrivning": "..."}, '
+            '{"namn": "Neutralt", "vikt": 0.50, "beskrivning": "..."}, '
+            '{"namn": "Pessimistiskt", "vikt": 0.25, "beskrivning": "..."}]'
+        )
+        svar = _llm_spel(
+            "Du är en analytisk beslutsfattare. Svara ALLTID som JSON-array och inget annat.",
+            scenario_prompt,
+            max_tokens=300,
+        )
+        m = re.search(r'\[.*\]', svar, re.DOTALL)
+        if m:
+            kandidater = json.loads(m.group())
+            scenarier = [
+                s for s in kandidater
+                if s.get("namn") and isinstance(s.get("vikt"), (int, float)) and s.get("beskrivning")
+            ][:4]
+    except Exception:
+        scenarier = []
+
+    # Steg 2: Uppskatta sannolikhet per scenario och vikta ihop
+    if len(scenarier) >= 2:
+        scenario_probs: list[tuple[float, float]] = []  # (sannolikhet, vikt)
+        for scenario in scenarier:
+            try:
+                sp = (
+                    f"Scenario: {scenario['namn']} — {scenario['beskrivning']}\n\n"
+                    f"{market_info}"
+                    + (f"\nBeslutsunderlag:\n{kontext_str[:500]}\n" if kontext_str else "")
+                    + "\nOm DETTA scenario inträffar, vilken sannolikhet (0–100) att utfallet är JA?\n"
+                    "KALIBRERING: 50% = vet ingenting. Avvika bara med konkreta skäl.\n"
+                    'JSON (inget annat): {"sannolikhet": <heltal 0-100>}'
+                )
+                sv = _llm_spel(system, sp, max_tokens=80)
+                sm = re.search(r'\{[^}]+\}', sv)
+                if sm:
+                    prob = max(0, min(100, int(json.loads(sm.group()).get("sannolikhet", 50))))
+                    scenario_probs.append((float(prob), float(scenario["vikt"])))
+            except Exception:
+                continue
+
+        if len(scenario_probs) >= 2:
+            total_vikt = sum(v for _, v in scenario_probs)
+            if total_vikt > 0:
+                viktad_prob = sum(p * v for p, v in scenario_probs) / total_vikt
+                final_s = max(0, min(100, round(viktad_prob)))
+                # Bygg en läsbar motivering med scenario-summering
+                delar = []
+                for i, (prob, vikt) in enumerate(scenario_probs):
+                    if i < len(scenarier):
+                        delar.append(f"{scenarier[i]['namn']} ({vikt:.0%}): {round(prob)}%")
+                motivering = "Scenarioanalys — " + ", ".join(delar) + f". Viktat resultat: {final_s}%."
+                if betting_stil:
+                    motivering += f" [{betting_stil}]"
+                return final_s, motivering[:300]
+
+    # ── Fallback: enkelt LLM-anrop (original) ────────────────────────────────
+    user_msg = (
+        f"Du ska göra en sannolikhetsbedömning som {agent['namn']}.\n\n"
+        f"{market_info}"
     )
     if kontext_str:
         user_msg += f"\nBeslutsunderlag:\n{kontext_str}\n"
