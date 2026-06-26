@@ -2,6 +2,7 @@
 import { useState } from "react";
 import {
   LineChart, Line, BarChart, Bar,
+  AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 
@@ -16,7 +17,7 @@ const INGRESS = { color: "#6b7280", fontSize: "14px", marginBottom: "20px" };
 const TOOLTIP_STYLE = { contentStyle: { background: "#1f2937", border: "1px solid #374151", borderRadius: "8px" }, labelStyle: { color: "#e5e7eb" }, itemStyle: { color: "#9ca3af" } };
 const TOM = { color: "#6b7280", textAlign: "center", padding: "40px 0", fontSize: "14px" };
 
-export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalitetTrend, kiLibrary }) {
+export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalitetTrend, kiLibrary, fragaVeckoData, agentsByFragor }) {
   const [oppenAgent, setOppenAgent] = useState(null);
 
   // Detect if quality trend goes up with more KI
@@ -133,6 +134,47 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
           </ResponsiveContainer>
         )}
       </div>
+
+      {/* Chart 4: AI-to-AI question activity per week */}
+      {fragaVeckoData && fragaVeckoData.length > 0 && agentsByFragor && agentsByFragor.length > 0 && (
+        <div style={SEKTION}>
+          <h2 style={RUBRIK}>AI→AI frågeaktivitet per vecka</h2>
+          <p style={INGRESS}>
+            Antal frågor varje agent ställt till sina kollegor per vecka — kognitiv aktivitet som
+            komplement till KI-ackumuleringen. Hög frågefrekvens tyder på aktiv informationssökning.
+          </p>
+          <ResponsiveContainer width="100%" height={280}>
+            <AreaChart data={fragaVeckoData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <defs>
+                {(agentsByFragor || []).map((ag, i) => (
+                  <linearGradient key={ag.agent} id={`grad-fraga-${i}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={FARGER[i % FARGER.length]} stopOpacity={0.25} />
+                    <stop offset="95%" stopColor={FARGER[i % FARGER.length]} stopOpacity={0} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+              <XAxis dataKey="week" tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} allowDecimals={false} />
+              <Tooltip {...TOOLTIP_STYLE} />
+              <Legend wrapperStyle={{ fontSize: "13px", paddingTop: "12px" }} />
+              {(agentsByFragor || []).map((ag, i) => (
+                <Area
+                  key={ag.agent}
+                  type="monotone"
+                  dataKey={ag.agent}
+                  stackId="fraga"
+                  stroke={FARGER[i % FARGER.length]}
+                  fill={`url(#grad-fraga-${i})`}
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls={false}
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* KI Library */}
       <div>
