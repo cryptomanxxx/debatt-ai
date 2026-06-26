@@ -1501,9 +1501,11 @@ def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "g
     except Exception:
         pass
 
-    # Spara insikten som Knowledge Item så agenten minns den vid nästa körning
+    # Spara insikten som Knowledge Item med datumprefix så agenten vet när den är från
     if svar:
-        spara_ki(sb_key, agent_namn, typ, svar[:300])
+        from datetime import date as _date
+        datumprefix = f"[{_date.today().isoformat()}] "
+        spara_ki(sb_key, agent_namn, typ, (datumprefix + svar)[:300])
 
     # Logga även till civilisation_log (gemensam logg med kalltyp=agent)
     svc_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
