@@ -1524,29 +1524,38 @@ def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "g
     return svar
 
 
-# Kategori → 2-3 lättviktiga RSS-feeds för prediction market-kontext
+# Kategori → 2-3 lättviktiga RSS-feeds för prediction market-kontext.
+# Primärnycklar matchar MARKET_AGENTER i agenter.py: krypto, makro, politik, tech, övrigt, sport.
+# Extra nycklar täcker manuellt skapade markets med andra kategorinamn.
 _MARKET_FEEDS: dict[str, list[tuple[str, str]]] = {
-    "krypto":      [("CoinDesk", "https://www.coindesk.com/arc/outboundfeeds/rss/"),
-                    ("Reddit Bitcoin", "https://www.reddit.com/r/Bitcoin/.rss"),
-                    ("Reddit Crypto",  "https://www.reddit.com/r/CryptoCurrency/.rss")],
-    "investering": [("Reddit Finance", "https://www.reddit.com/r/finance/.rss"),
-                    ("Reddit Stocks",  "https://www.reddit.com/r/stocks/.rss")],
-    "klimat":      [("Reddit Climate", "https://www.reddit.com/r/climatechange/.rss"),
-                    ("Reddit Energy",  "https://www.reddit.com/r/energy/.rss")],
-    "AI":          [("The Verge",      "https://www.theverge.com/rss/index.xml"),
-                    ("Reddit AI",      "https://www.reddit.com/r/artificial/.rss")],
-    "tech":        [("The Verge",      "https://www.theverge.com/rss/index.xml"),
-                    ("Hacker News",    "https://hnrss.org/frontpage")],
-    "hälsa":       [("Reddit Science", "https://www.reddit.com/r/science/.rss"),
-                    ("Reddit Sjukvård","https://www.reddit.com/r/medicine/.rss")],
-    "juridik":     [("Reddit World",   "https://www.reddit.com/r/worldnews/.rss"),
-                    ("Al Jazeera",     "https://www.aljazeera.com/xml/rss/all.xml")],
-    "politik":     [("Reddit World",   "https://www.reddit.com/r/worldnews/.rss"),
-                    ("BBC News",       "https://feeds.bbci.co.uk/news/rss.xml")],
-    "sport":       [("Reddit Sports",  "https://www.reddit.com/r/sports/.rss"),
-                    ("Reddit Soccer",  "https://www.reddit.com/r/soccer/.rss")],
-    "ekonomi":     [("Reddit Economics", "https://www.reddit.com/r/Economics/.rss"),
-                    ("Reddit Finance",   "https://www.reddit.com/r/finance/.rss")],
+    # ── Produktionskategorier (MARKET_AGENTER) ──────────────────────────────
+    "krypto":      [("CoinDesk",         "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+                    ("Reddit Bitcoin",    "https://www.reddit.com/r/Bitcoin/.rss"),
+                    ("Reddit Crypto",     "https://www.reddit.com/r/CryptoCurrency/.rss")],
+    "makro":       [("Reddit Economics",  "https://www.reddit.com/r/Economics/.rss"),
+                    ("Reddit Finance",    "https://www.reddit.com/r/finance/.rss"),
+                    ("BBC News",          "https://feeds.bbci.co.uk/news/rss.xml")],
+    "politik":     [("Reddit World",      "https://www.reddit.com/r/worldnews/.rss"),
+                    ("BBC News",          "https://feeds.bbci.co.uk/news/rss.xml")],
+    "tech":        [("The Verge",         "https://www.theverge.com/rss/index.xml"),
+                    ("Hacker News",       "https://hnrss.org/frontpage")],
+    "övrigt":      [("BBC News",          "https://feeds.bbci.co.uk/news/rss.xml"),
+                    ("Reddit World",      "https://www.reddit.com/r/worldnews/.rss")],
+    "sport":       [("Reddit Sports",     "https://www.reddit.com/r/sports/.rss"),
+                    ("Reddit Soccer",     "https://www.reddit.com/r/soccer/.rss")],
+    # ── Extra alias-kategorier för manuellt skapade markets ─────────────────
+    "investering": [("Reddit Finance",    "https://www.reddit.com/r/finance/.rss"),
+                    ("Reddit Stocks",     "https://www.reddit.com/r/stocks/.rss")],
+    "klimat":      [("Reddit Climate",    "https://www.reddit.com/r/climatechange/.rss"),
+                    ("Reddit Energy",     "https://www.reddit.com/r/energy/.rss")],
+    "AI":          [("The Verge",         "https://www.theverge.com/rss/index.xml"),
+                    ("Reddit AI",         "https://www.reddit.com/r/artificial/.rss")],
+    "hälsa":       [("Reddit Science",    "https://www.reddit.com/r/science/.rss"),
+                    ("Reddit Sjukvård",   "https://www.reddit.com/r/medicine/.rss")],
+    "juridik":     [("Reddit World",      "https://www.reddit.com/r/worldnews/.rss"),
+                    ("Al Jazeera",        "https://www.aljazeera.com/xml/rss/all.xml")],
+    "ekonomi":     [("Reddit Economics",  "https://www.reddit.com/r/Economics/.rss"),
+                    ("Reddit Finance",    "https://www.reddit.com/r/finance/.rss")],
 }
 _MARKET_PROXY = "https://www.debatt-ai.se/api/rss-proxy?url="
 
