@@ -528,23 +528,55 @@ def markera_stafett_behandlad(sb_key: str, utmaning_id: int) -> None:
         pass
 
 
-def generera_ki(agent_namn: str, rubrik: str, artikel_text: str, taggar: list) -> list[dict]:
-    """Anropar LLM för att destillera 2–3 djupa tematiska insikter ur en publicerad artikel."""
+def _ki_skala(ki_antal: int) -> dict:
+    """Returnerar skalningsparametrar baserat på agentens totala KI-antal.
+    Erfarna agenter får längre minnen och fler injicerade items."""
+    if ki_antal >= 31:
+        return {"max_chars": 3000, "inject_limit": 7, "max_tokens": 1800, "langd_hint": "500–3000 tecken"}
+    if ki_antal >= 16:
+        return {"max_chars": 2000, "inject_limit": 5, "max_tokens": 1200, "langd_hint": "300–2000 tecken"}
+    if ki_antal >= 6:
+        return {"max_chars": 1200, "inject_limit": 3, "max_tokens": 800, "langd_hint": "200–1000 tecken"}
+    return {"max_chars": 600, "inject_limit": 2, "max_tokens": 500, "langd_hint": "150–600 tecken"}
+
+
+def hamta_ki_antal(sb_key: str, agent_namn: str) -> int:
+    """Hämtar agentens totala antal KI-minnen."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/agent_ki",
+            params={"agent": f"eq.{agent_namn}", "select": "id"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Prefer": "count=exact"},
+            timeout=5,
+        )
+        count_header = res.headers.get("content-range", "")
+        if "/" in count_header:
+            return int(count_header.split("/")[-1])
+        return len(res.json()) if res.status_code == 200 else 0
+    except Exception:
+        return 0
+
+
+def generera_ki(agent_namn: str, rubrik: str, artikel_text: str, taggar: list, ki_count: int = 0) -> list[dict]:
+    """Anropar LLM för att destillera tematiska insikter ur en publicerad artikel.
+    Minnesdjupet skalas dynamiskt — erfarna agenter får längre och rikare insikter."""
     import re as _re, json as _json
+    skala = _ki_skala(ki_count)
     tagg_str = ", ".join(taggar[:6]) if taggar else "okänt"
     system = "Du är en debattanalytiker. Svara ALLTID som JSON-array och inget annat."
     prompt = (
         f"Agent '{agent_namn}' publicerade just artikeln: \"{rubrik}\"\n"
-        f"Taggar: {tagg_str}\n\n"
+        f"Taggar: {tagg_str}\n"
+        f"Agentens nuvarande KI-minnen: {ki_count} st\n\n"
         f"Artikeltext:\n{artikel_text[:2000]}\n\n"
         "Destillera 2–3 DJUPA tematiska insikter som agenten kan bära med sig till framtida debatter. "
         "Varje insikt ska vara substantiell — inte en mening utan ett riktigt argument: "
         "vilket perspektiv som fungerade, varför, vad som bör byggas vidare på, eventuella svagheter att åtgärda. "
         "Skriv som om agenten reflekterar i första person.\n\n"
-        "Format (JSON-array, inget annat):\n"
-        '[{"amne": "kort ämnesord (max 60 tecken)", "insikt": "djup reflektion 200–1000 tecken"}]'
+        f"Format (JSON-array, inget annat). Insikt-fältet ska vara {skala['langd_hint']}:\n"
+        '[{"amne": "kort ämnesord (max 60 tecken)", "insikt": "djup reflektion"}]'
     )
-    svar = _llm_spel(system, prompt, max_tokens=1000)
+    svar = _llm_spel(system, prompt, max_tokens=skala["max_tokens"])
     try:
         m = _re.search(r'\[.*\]', svar, _re.DOTALL)
         if m:
@@ -555,25 +587,30 @@ def generera_ki(agent_namn: str, rubrik: str, artikel_text: str, taggar: list) -
     return []
 
 
-def spara_ki(sb_key: str, agent: str, amne: str, insikt: str, artikel_id: int | None = None) -> None:
-    """Sparar en Knowledge Item i Supabase."""
+def spara_ki(sb_key: str, agent: str, amne: str, insikt: str, artikel_id: int | None = None, ki_count: int = 0) -> None:
+    """Sparar en Knowledge Item i Supabase. Maxlängden skalas med agentens erfarenhet."""
+    skala = _ki_skala(ki_count)
     try:
         httpx.post(
             f"{SB_URL}/rest/v1/agent_ki",
             headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={"agent": agent, "amne": amne[:80], "insikt": insikt[:1200], "artikel_id": artikel_id},
+            json={"agent": agent, "amne": amne[:80], "insikt": insikt[:skala["max_chars"]], "artikel_id": artikel_id},
             timeout=8,
         )
     except Exception:
         pass
 
 
-def hamta_relevanta_ki(sb_key: str, agent: str, amne_ord: list[str]) -> list[dict]:
-    """Hämtar de KIs som är mest relevanta för aktuellt ämne (keyword-match på amne-fältet)."""
+def hamta_relevanta_ki(sb_key: str, agent: str, amne_ord: list[str], ki_count: int = 0) -> list[dict]:
+    """Hämtar de KIs som är mest relevanta för aktuellt ämne (keyword-match på amne-fältet).
+    Erfarna agenter (fler KI) får fler items injicerade i systempromten."""
+    skala = _ki_skala(ki_count)
+    inject_limit = skala["inject_limit"]
+    fetch_limit = max(40, inject_limit * 10)  # hämta tillräckligt många kandidater
     try:
         res = httpx.get(
             f"{SB_URL}/rest/v1/agent_ki",
-            params={"agent": f"eq.{agent}", "order": "skapad.desc", "limit": "40", "select": "amne,insikt,skapad"},
+            params={"agent": f"eq.{agent}", "order": "skapad.desc", "limit": str(fetch_limit), "select": "amne,insikt,skapad"},
             headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
             timeout=8,
         )
@@ -588,9 +625,9 @@ def hamta_relevanta_ki(sb_key: str, agent: str, amne_ord: list[str]) -> list[dic
             amne_l = ki["amne"].lower()
             return sum(1 for o in ord_lower if o in amne_l)
         sorterade = sorted(alla, key=score, reverse=True)
-        # Ta topp 3 med poäng > 0, annars de 3 senaste
-        topp = [k for k in sorterade if score(k) > 0][:3]
-        return topp if topp else alla[:2]
+        # Ta topp N med poäng > 0, annars de N senaste
+        topp = [k for k in sorterade if score(k) > 0][:inject_limit]
+        return topp if topp else alla[:max(2, inject_limit - 1)]
     except Exception:
         return []
 

@@ -67,7 +67,7 @@ from supabase_utils import (
     hamta_agent_minnen, formatera_minnen_for_prompt,
     generera_stafett_utmaning, spara_stafett_utmaning,
     hamta_stafett_utmaning, markera_stafett_behandlad,
-    generera_ki, spara_ki, hamta_relevanta_ki, formatera_ki_for_prompt,
+    generera_ki, spara_ki, hamta_relevanta_ki, formatera_ki_for_prompt, hamta_ki_antal,
     hamta_agent_strategi, formatera_strategi_for_prompt, uppdatera_strategi,
     hamta_agent_mark, formatera_mark_for_prompt,
     hamta_agent_foretag, formatera_foretag_for_prompt,
@@ -385,10 +385,11 @@ def main():
             print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
         minne_kontext = formatera_minnen_for_prompt(hamta_agent_minnen(sb_key, agent["namn"])) if sb_key else ""
         amne_ord = (original.get("taggar") or []) + original.get("rubrik", "").split()[:6]
-        ki_list   = hamta_relevanta_ki(sb_key, agent["namn"], amne_ord) if sb_key else []
+        ki_antal  = hamta_ki_antal(sb_key, agent["namn"]) if sb_key else 0
+        ki_list   = hamta_relevanta_ki(sb_key, agent["namn"], amne_ord, ki_count=ki_antal) if sb_key else []
         ki_kontext = formatera_ki_for_prompt(ki_list)
         if ki_kontext:
-            print(f"  📚 KIs injicerade: {len(ki_list)} st")
+            print(f"  📚 KIs injicerade: {len(ki_list)} st (totalt {ki_antal} KI)")
         strategi_text  = hamta_agent_strategi(sb_key, agent["namn"]) if sb_key else ""
         strategi_kontext = formatera_strategi_for_prompt(strategi_text)
         if strategi_kontext:
@@ -590,10 +591,11 @@ def main():
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             minne_kontext = formatera_minnen_for_prompt(hamta_agent_minnen(sb_key, agent["namn"])) if sb_key else ""
-            ki_list   = hamta_relevanta_ki(sb_key, agent["namn"], amne.split()[:8]) if sb_key else []
+            ki_antal  = hamta_ki_antal(sb_key, agent["namn"]) if sb_key else 0
+            ki_list   = hamta_relevanta_ki(sb_key, agent["namn"], amne.split()[:8], ki_count=ki_antal) if sb_key else []
             ki_kontext = formatera_ki_for_prompt(ki_list)
             if ki_kontext:
-                print(f"  📚 KIs injicerade: {len(ki_list)} st")
+                print(f"  📚 KIs injicerade: {len(ki_list)} st (totalt {ki_antal} KI)")
             strategi_text  = hamta_agent_strategi(sb_key, agent["namn"]) if sb_key else ""
             strategi_kontext = formatera_strategi_for_prompt(strategi_text)
             if strategi_kontext:
@@ -651,7 +653,8 @@ def main():
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             minne_kontext = formatera_minnen_for_prompt(hamta_agent_minnen(sb_key, agent["namn"])) if sb_key else ""
-            ki_list   = hamta_relevanta_ki(sb_key, agent["namn"], (nyhet.get("taggar") or []) + nyhet.get("rubrik", "").split()[:6]) if sb_key else []
+            ki_antal  = hamta_ki_antal(sb_key, agent["namn"]) if sb_key else 0
+            ki_list   = hamta_relevanta_ki(sb_key, agent["namn"], (nyhet.get("taggar") or []) + nyhet.get("rubrik", "").split()[:6], ki_count=ki_antal) if sb_key else []
             ki_kontext = formatera_ki_for_prompt(ki_list)
             if ki_kontext:
                 print(f"  📚 KIs injicerade: {len(ki_list)} st")
@@ -705,7 +708,8 @@ def main():
             if agent_status:
                 print(f"  Status: saldo={agent_status.get('saldo')} kr, market={agent_status.get('market_wins',0)}/{agent_status.get('market_bets',0)}")
             minne_kontext = formatera_minnen_for_prompt(hamta_agent_minnen(sb_key, agent["namn"])) if sb_key else ""
-            ki_list   = hamta_relevanta_ki(sb_key, agent["namn"], amne.split()[:8]) if sb_key else []
+            ki_antal  = hamta_ki_antal(sb_key, agent["namn"]) if sb_key else 0
+            ki_list   = hamta_relevanta_ki(sb_key, agent["namn"], amne.split()[:8], ki_count=ki_antal) if sb_key else []
             ki_kontext = formatera_ki_for_prompt(ki_list)
             if ki_kontext:
                 print(f"  📚 KIs injicerade: {len(ki_list)} st")
@@ -850,11 +854,12 @@ def main():
         # Knowledge Items: ~40% chans att distillera insikter från publicerad artikel
         if publicerad and sb_key and artikel_id_num and random.random() < 0.40:
             taggar_ki = svar.get("taggar") or []
-            ki_items = generera_ki(agent["namn"], amne, artikel, taggar_ki)
+            ki_antal_nu = hamta_ki_antal(sb_key, agent["namn"])
+            ki_items = generera_ki(agent["namn"], amne, artikel, taggar_ki, ki_count=ki_antal_nu)
             for ki in ki_items:
-                spara_ki(sb_key, agent["namn"], ki["amne"], ki["insikt"], artikel_id_num)
+                spara_ki(sb_key, agent["namn"], ki["amne"], ki["insikt"], artikel_id_num, ki_count=ki_antal_nu)
             if ki_items:
-                print(f"  📚 KI sparad: {len(ki_items)} insikt(er) för {agent['namn']}")
+                print(f"  📚 KI sparad: {len(ki_items)} insikt(er) för {agent['namn']} (skala: {ki_antal_nu} KI)")
 
         # Evolutionär Systemprompt — uppdatera strategi med 20% sannolikhet
         if publicerad and sb_key and random.random() < 0.20:
