@@ -439,6 +439,15 @@ async function getAgentStats(namn) {
   };
 }
 
+async function getAgentKi(namn) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/agent_ki?agent=eq.${encodeURIComponent(namn)}&order=skapad.desc&select=amne,insikt&limit=300`,
+    { headers: sbHeaders(), next: { revalidate: 300 } }
+  );
+  if (!res.ok) return [];
+  return res.json();
+}
+
 export async function generateMetadata({ params }) {
   const namn = decodeURIComponent(params.namn);
   const profil = AGENTPROFILER[namn];
@@ -468,7 +477,7 @@ export default async function AgentPage({ params }) {
   if (namn === "Statskassa") redirect("/staten");
   if (!profil) notFound();
 
-  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler, dagbok, bets, bilder, etf] = await Promise.all([
+  const [artiklar, stats, kommentarer, debatter, marketStats, actions, fragor, foljare, planbok, positioner, symboler, dagbok, bets, bilder, etf, kiInsikter] = await Promise.all([
     getAgentArtiklar(namn),
     getAgentStats(namn),
     getAgentKommentarer(namn),
@@ -484,6 +493,7 @@ export default async function AgentPage({ params }) {
     getAgentBets(namn),
     getAgentBilder(namn),
     getAgentEtf(namn),
+    getAgentKi(namn),
   ]);
 
   const repliker = artiklar.filter(a => a.rubrik && a.rubrik.startsWith("Replik:"));
@@ -678,6 +688,59 @@ export default async function AgentPage({ params }) {
             </div>
           </div>
         )}
+
+        {/* KI Kunskapsminne */}
+        {kiInsikter.length > 0 && (() => {
+          const kiAntal = kiInsikter.length;
+          const niva = kiAntal >= 31
+            ? { label: "EXPERT", color: "#f59e0b", emoji: "🏆" }
+            : kiAntal >= 16
+            ? { label: "VETERAN", color: "#4ade80", emoji: "⭐" }
+            : kiAntal >= 6
+            ? { label: "ERFAREN", color: "#4a9eff", emoji: "📚" }
+            : { label: "NYBÖRJARE", color: "#888880", emoji: "🌱" };
+          const amnenMap = {};
+          for (const ki of kiInsikter) {
+            if (!amnenMap[ki.amne]) amnenMap[ki.amne] = [];
+            amnenMap[ki.amne].push(ki.insikt);
+          }
+          const amnen = Object.entries(amnenMap)
+            .map(([amne, insikter]) => ({ amne, antal: insikter.length, senaste: insikter[0] }))
+            .sort((a, b) => b.antal - a.antal)
+            .slice(0, 8);
+          return (
+            <div style={{ marginBottom: "48px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: 0 }}>
+                  🧠 Kunskapsminne (KI)
+                </p>
+                <a href="/intelligens" style={{ fontSize: "11px", color: C.textMuted, textDecoration: "none", opacity: 0.7 }}>Se ranking →</a>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", borderRadius: "20px", background: `${niva.color}12`, border: `1px solid ${niva.color}40`, fontSize: "12px", color: niva.color, fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>
+                  {niva.emoji} {niva.label}
+                </span>
+                <span style={{ fontSize: "14px", color: C.accent, fontFamily: "monospace" }}>{kiAntal >= 300 ? "300+" : kiAntal} insikter</span>
+                <span style={{ fontSize: "12px", color: C.textMuted }}>{Object.keys(amnenMap).length} ämnesområden</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {amnen.map(({ amne, antal, senaste }) => (
+                  <div key={amne} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "12px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: senaste ? "6px" : 0 }}>
+                      <span style={{ fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: "monospace" }}>{amne}</span>
+                      <span style={{ fontSize: "10px", color: niva.color, fontFamily: "monospace", marginLeft: "auto", flexShrink: 0 }}>{antal} st</span>
+                    </div>
+                    {senaste && (
+                      <p style={{ fontSize: "12px", color: C.textMuted, lineHeight: 1.55, margin: 0, fontStyle: "italic" }}>
+                        &ldquo;{senaste.slice(0, 220)}&rdquo;
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Agentdagbok */}
         <DagbokVy dagbok={dagbok} />
