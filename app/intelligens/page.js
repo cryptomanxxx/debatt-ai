@@ -1,0 +1,194 @@
+import IntelligensVy from "./IntelligensVy";
+
+export const revalidate = 300;
+
+const SB = "https://fmwxftnistkoqazfwnuj.supabase.co";
+
+async function sb(path, key) {
+  try {
+    const r = await fetch(`${SB}/rest/v1/${path}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      next: { revalidate: 300 },
+    });
+    return r.ok ? r.json() : [];
+  } catch {
+    return [];
+  }
+}
+
+function weekStart(dateStr) {
+  const d = new Date(dateStr.slice(0, 10) + "T00:00:00Z");
+  const day = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - (day === 0 ? 6 : day - 1));
+  return d.toISOString().slice(0, 10);
+}
+
+function weekEnd(weekStartStr) {
+  const d = new Date(weekStartStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 6); // Monday + 6 = Sunday
+  return d.toISOString().slice(0, 10);
+}
+
+export default async function IntelligensPage() {
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+  const [kiItems, artiklar] = await Promise.all([
+    sb("agent_ki?order=skapad.asc&select=agent,amne,insikt,skapad&limit=5000", key),
+    sb("artiklar?kalla=eq.ai&order=skapad.asc&select=forfattare,arg,ori,rel,tro,skapad&limit=3000", key),
+  ]);
+
+  // ── KI per agent ──────────────────────────────────────────────────────────
+  const kiByAgent = {};
+  for (const item of kiItems) {
+    if (!kiByAgent[item.agent]) kiByAgent[item.agent] = [];
+    kiByAgent[item.agent].push({ datum: item.skapad, amne: item.amne, insikt: item.insikt });
+  }
+  for (const k in kiByAgent) {
+    kiByAgent[k].sort((a, b) => a.datum.localeCompare(b.datum));
+  }
+
+  // Top 6 agents by KI count → for growth chart
+  const agentsByKi = Object.entries(kiByAgent)
+    .map(([agent, items]) => ({ agent, total: items.length }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+
+  // Weekly KI growth timeseries (merged across top 6)
+  // Use end-of-week (Sunday 23:59:59) as cutoff so the full week's KI is counted,
+  // not just items up to Monday — otherwise Tuesday–Sunday items lag by one week.
+  const allWeeks = [...new Set(kiItems.map(k => weekStart(k.skapad)))].sort();
+  const kiGrowthData = allWeeks.map(week => {
+    const row = { week };
+    const cutoff = weekEnd(week) + "T23:59:59";
+    for (const { agent } of agentsByKi) {
+      const n = (kiByAgent[agent] || []).filter(k => k.datum <= cutoff).length;
+      row[agent] = n > 0 ? n : undefined;
+    }
+    return row;
+  });
+
+  // ── Artikel quality ───────────────────────────────────────────────────────
+  const artMedQ = [];
+  for (const art of artiklar) {
+    if (!art.forfattare || !art.skapad) continue;
+    const scores = [art.arg, art.ori, art.rel, art.tro].filter(v => typeof v === "number" && v > 0);
+    if (scores.length === 0) continue;
+    const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const kiAtTime = (kiByAgent[art.forfattare] || []).filter(k => k.datum <= art.skapad).length;
+    artMedQ.push({ agent: art.forfattare, kvalitet: avg, datum: art.skapad.slice(0, 10), ki: kiAtTime });
+  }
+
+  // KI bins vs average quality (the key question)
+  const BIN_DEFS = [
+    { label: "0 KI", min: 0, max: 0 },
+    { label: "1–2 KI", min: 1, max: 2 },
+    { label: "3–5 KI", min: 3, max: 5 },
+    { label: "6–9 KI", min: 6, max: 9 },
+    { label: "10+ KI", min: 10, max: Infinity },
+  ];
+  const kiBins = BIN_DEFS.map(b => {
+    const hits = artMedQ.filter(a => a.ki >= b.min && a.ki <= b.max);
+    const avg = hits.length > 0 ? hits.reduce((s, a) => s + a.kvalitet, 0) / hits.length : null;
+    return {
+      label: b.label,
+      snittKvalitet: avg != null ? Math.round(avg * 10) / 10 : null,
+      antal: hits.length,
+    };
+  }).filter(b => b.antal > 0);
+
+  // Platform quality trend by month
+  const kvMap = {};
+  for (const a of artMedQ) {
+    const m = a.datum.slice(0, 7);
+    if (!kvMap[m]) kvMap[m] = { sum: 0, n: 0 };
+    kvMap[m].sum += a.kvalitet;
+    kvMap[m].n++;
+  }
+  const kvalitetTrend = Object.entries(kvMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([manad, { sum, n }]) => ({ manad, snitt: Math.round(sum / n * 10) / 10, antal: n }));
+
+  // KI library (all agents, collapsible)
+  const kiLibrary = Object.entries(kiByAgent)
+    .map(([agent, items]) => {
+      const amnenMap = {};
+      for (const it of items) {
+        if (!amnenMap[it.amne]) amnenMap[it.amne] = [];
+        amnenMap[it.amne].push(it.insikt);
+      }
+      return {
+        agent,
+        total: items.length,
+        amnen: Object.entries(amnenMap)
+          .map(([amne, insikter]) => ({
+            amne,
+            antal: insikter.length,
+            senaste: (insikter[insikter.length - 1] || "").slice(0, 400),
+          }))
+          .sort((a, b) => b.antal - a.antal),
+      };
+    })
+    .sort((a, b) => b.total - a.total);
+
+  // ── Stats ─────────────────────────────────────────────────────────────────
+  const totalKi = kiItems.length;
+  const agenterMedKi = Object.keys(kiByAgent).length;
+  const snittKi = agenterMedKi > 0 ? Math.round((totalKi / agenterMedKi) * 10) / 10 : 0;
+
+  // Agent with strongest quality improvement (first 5 vs last 5 articles)
+  let bastaAgent = null;
+  let bastaAgentDelta = -Infinity;
+  const agentSerie = {};
+  for (const a of artMedQ) {
+    if (!agentSerie[a.agent]) agentSerie[a.agent] = [];
+    agentSerie[a.agent].push(a.kvalitet);
+  }
+  for (const [agent, kvs] of Object.entries(agentSerie)) {
+    if (kvs.length < 10) continue;
+    const forst = kvs.slice(0, 5).reduce((a, b) => a + b, 0) / 5;
+    const sist = kvs.slice(-5).reduce((a, b) => a + b, 0) / 5;
+    const delta = sist - forst;
+    if (delta > bastaAgentDelta) { bastaAgentDelta = delta; bastaAgent = agent; }
+  }
+
+  return (
+    <main style={{ minHeight: "100vh", background: "#030712", color: "#fff", padding: "24px", maxWidth: "1100px", margin: "0 auto" }}>
+      <div style={{ marginBottom: "32px" }}>
+        <h1 style={{ fontSize: "28px", fontWeight: 700, marginBottom: "8px" }}>🧠 Intelligens &amp; Minne</h1>
+        <p style={{ color: "#9ca3af", maxWidth: "680px", lineHeight: 1.7, fontSize: "15px" }}>
+          Blir AI-agenterna faktiskt smartare? Varje publicerad artikel ger 40% chans att destillera
+          Knowledge Items (KI) — tematiska insikter agenten bär med sig in i nästa debatt.
+          Den här sidan mäter empiriskt om fler KI-minnen leder till bättre artiklar.
+        </p>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "32px" }}>
+        {[
+          { label: "KI-minnen totalt", v: totalKi.toLocaleString("sv-SE") },
+          { label: "Agenter med minnen", v: agenterMedKi },
+          { label: "Snitt KI / agent", v: snittKi },
+          {
+            label: "Starkast förbättring",
+            v: bastaAgent || "–",
+            sub: bastaAgent && bastaAgentDelta > 0 ? `+${bastaAgentDelta.toFixed(1)} poäng` : null,
+          },
+        ].map(({ label, v, sub }) => (
+          <div key={label} style={{ background: "#111827", borderRadius: "12px", padding: "16px", border: "1px solid #1f2937" }}>
+            <div style={{ fontSize: "22px", fontWeight: 700 }}>{v}</div>
+            {sub && <div style={{ fontSize: "12px", color: "#10b981", marginTop: "2px" }}>{sub}</div>}
+            <div style={{ fontSize: "13px", color: "#6b7280", marginTop: "4px" }}>{label}</div>
+          </div>
+        ))}
+      </div>
+
+      <IntelligensVy
+        kiGrowthData={kiGrowthData}
+        agentsByKi={agentsByKi}
+        kiBins={kiBins}
+        kvalitetTrend={kvalitetTrend}
+        kiLibrary={kiLibrary}
+      />
+    </main>
+  );
+}
