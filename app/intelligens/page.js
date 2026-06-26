@@ -35,7 +35,7 @@ export default async function IntelligensPage() {
   const [kiItems, artiklar, fragaItems] = await Promise.all([
     sb("agent_ki?order=skapad.asc&select=agent,amne,insikt,skapad&limit=5000", key),
     sb("artiklar?kalla=eq.ai&order=skapad.asc&select=forfattare,arg,ori,rel,tro,skapad&limit=3000", key),
-    sb("agent_fragor?order=skapad.asc&select=fragare,skapad&limit=5000", key),
+    sb("agent_fragor?fragare=not.is.null&fragare=neq.api&order=skapad.asc&select=fragare,skapad&limit=5000", key),
   ]);
 
   // ── KI per agent ──────────────────────────────────────────────────────────

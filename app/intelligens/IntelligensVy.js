@@ -163,6 +163,7 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
                   key={ag.agent}
                   type="monotone"
                   dataKey={ag.agent}
+                  stackId="fraga"
                   stroke={FARGER[i % FARGER.length]}
                   fill={`url(#grad-fraga-${i})`}
                   strokeWidth={2}
