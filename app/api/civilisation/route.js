@@ -108,6 +108,8 @@ export async function POST(req) {
   try { body = await req.json(); } catch { return Response.json({ error: "Ogiltig JSON" }, { status: 400 }); }
 
   const { fraga, endpoint, lang = "sv", limit = 20 } = body || {};
+  const callerHeader = req.headers.get("x-caller-type") || "";
+  const kalltyp = ["agent", "api"].includes(callerHeader) ? callerHeader : "besökare";
   if (!fraga || typeof fraga !== "string" || fraga.trim().length < 3)
     return Response.json({ error: "Fältet 'fraga' saknas eller är för kort." }, { status: 400 });
 
@@ -158,6 +160,7 @@ export async function POST(req) {
           model,
           latency_ms:  latency,
           lang,
+          kalltyp,
         }),
       }).catch(() => {});
     }
