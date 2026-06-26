@@ -529,25 +529,27 @@ def markera_stafett_behandlad(sb_key: str, utmaning_id: int) -> None:
 
 
 def generera_ki(agent_namn: str, rubrik: str, artikel_text: str, taggar: list) -> list[dict]:
-    """Anropar LLM för att destillera 1–2 tematiska insikter ur en publicerad artikel."""
+    """Anropar LLM för att destillera 2–3 djupa tematiska insikter ur en publicerad artikel."""
     import re as _re, json as _json
     tagg_str = ", ".join(taggar[:6]) if taggar else "okänt"
     system = "Du är en debattanalytiker. Svara ALLTID som JSON-array och inget annat."
     prompt = (
         f"Agent '{agent_namn}' publicerade just artikeln: \"{rubrik}\"\n"
         f"Taggar: {tagg_str}\n\n"
-        f"Artikelns kärna (första 500 tecken):\n{artikel_text[:500]}\n\n"
-        "Destillera 1–2 korta tematiska insikter om VAD SOM FUNGERAR i denna agents argumentation "
-        "— inte en sammanfattning av artikeln utan en lärdom om retorisk effektivitet eller vinkel.\n\n"
+        f"Artikeltext:\n{artikel_text[:2000]}\n\n"
+        "Destillera 2–3 DJUPA tematiska insikter som agenten kan bära med sig till framtida debatter. "
+        "Varje insikt ska vara substantiell — inte en mening utan ett riktigt argument: "
+        "vilket perspektiv som fungerade, varför, vad som bör byggas vidare på, eventuella svagheter att åtgärda. "
+        "Skriv som om agenten reflekterar i första person.\n\n"
         "Format (JSON-array, inget annat):\n"
-        '[{"amne": "kort ämnesord", "insikt": "max 200 tecken om vad som fungerade/lärdes"}]'
+        '[{"amne": "kort ämnesord (max 60 tecken)", "insikt": "djup reflektion 200–1000 tecken"}]'
     )
-    svar = _llm_spel(system, prompt, max_tokens=200)
+    svar = _llm_spel(system, prompt, max_tokens=1000)
     try:
         m = _re.search(r'\[.*\]', svar, _re.DOTALL)
         if m:
             data = _json.loads(m.group())
-            return [d for d in data if d.get("amne") and d.get("insikt")][:2]
+            return [d for d in data if d.get("amne") and d.get("insikt")][:3]
     except Exception:
         pass
     return []
@@ -559,7 +561,7 @@ def spara_ki(sb_key: str, agent: str, amne: str, insikt: str, artikel_id: int | 
         httpx.post(
             f"{SB_URL}/rest/v1/agent_ki",
             headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json", "Prefer": "return=minimal"},
-            json={"agent": agent, "amne": amne[:80], "insikt": insikt[:300], "artikel_id": artikel_id},
+            json={"agent": agent, "amne": amne[:80], "insikt": insikt[:1200], "artikel_id": artikel_id},
             timeout=8,
         )
     except Exception:
@@ -597,8 +599,8 @@ def formatera_ki_for_prompt(ki_list: list[dict]) -> str:
     """Formaterar KI-listan till ett systemprompt-stycke."""
     if not ki_list:
         return ""
-    rader = "\n".join(f"- [{k['amne']}] {k['insikt']}" for k in ki_list)
-    return f"DINA LÄRDOMAR från tidigare debatter (använd dessa för att skärpa din argumentation):\n{rader}"
+    rader = "\n\n".join(f"[{k['amne']}]\n{k['insikt']}" for k in ki_list)
+    return f"DINA LÄRDOMAR från tidigare debatter (använd dessa för att skärpa din argumentation):\n\n{rader}"
 
 
 
