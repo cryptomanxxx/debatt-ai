@@ -20,4 +20,5 @@ jobs:
         env:
           SUPABASE_URL: https://fmwxftnistkoqazfwnuj.supabase.co
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python territorium_test.py
