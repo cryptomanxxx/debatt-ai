@@ -1489,13 +1489,27 @@ def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "g
 
     latency_ms = int((_time.time() - t0) * 1000)
 
-    # Logga till Supabase (fail-silent)
+    # Logga till civilisation_fragor (agentspecifik logg med svar)
     try:
         httpx.post(
             f"{SB_URL}/rest/v1/civilisation_fragor",
             headers={**hdrs, "Content-Type": "application/json"},
             json={"agent": agent_namn, "fraga": fraga, "typ": typ,
                   "svar": svar[:600] if svar else "", "latency_ms": latency_ms},
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+    # Logga även till civilisation_log (gemensam logg med kalltyp=agent)
+    svc_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+    try:
+        httpx.post(
+            f"{SB_URL}/rest/v1/civilisation_log",
+            headers={"apikey": svc_key, "Authorization": f"Bearer {svc_key}",
+                     "Content-Type": "application/json", "Prefer": "return=minimal"},
+            json={"fraga": fraga[:500], "endpoint": typ, "datapunkter": len(data_delar),
+                  "latency_ms": latency_ms, "lang": "sv", "kalltyp": "agent"},
             timeout=5,
         )
     except Exception:

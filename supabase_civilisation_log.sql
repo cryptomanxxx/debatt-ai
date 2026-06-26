@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS civilisation_log (
   model       text,
   latency_ms  integer,
   lang        text        DEFAULT 'sv',
+  kalltyp     text        DEFAULT 'besökare',
   skapad      timestamptz DEFAULT now()
 );
 
