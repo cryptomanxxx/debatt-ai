@@ -156,44 +156,57 @@ async function hämtaExternKontext(fraga) {
   const topik = detekteraExternTopik(fraga);
   if (!topik) return "";
 
-  const delar = [];
+  // Bygg upp alla fetchar och kör dem i parallell — aldrig sekventiellt.
+  const uppgifter = [];
 
-  // Krypto: hämta live-priser från CoinGecko (gratis, ingen API-nyckel)
   if (topik === "krypto") {
-    try {
-      const r = await fetch(
+    uppgifter.push({
+      typ: "coingecko",
+      p: fetch(
         "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,binancecoin&vs_currencies=usd&include_24hr_change=true",
-        { signal: AbortSignal.timeout(6000), headers: { "Accept": "application/json" } }
-      );
-      if (r.ok) {
-        const data = await r.json();
-        const NAMN = { bitcoin: "Bitcoin (BTC)", ethereum: "Ethereum (ETH)", solana: "Solana (SOL)", ripple: "XRP", binancecoin: "BNB" };
-        const rader = Object.entries(data).map(([id, d]) => {
-          const förändr = d.usd_24h_change != null
-            ? ` (${d.usd_24h_change > 0 ? "+" : ""}${d.usd_24h_change.toFixed(1)}% 24h)`
-            : "";
-          return `${NAMN[id] ?? id}: $${d.usd.toLocaleString("en-US")}${förändr}`;
-        });
-        if (rader.length) delar.push("Live kryptopriser (CoinGecko):\n" + rader.join("\n"));
-      }
-    } catch { /* fail-open */ }
+        { signal: AbortSignal.timeout(5000), headers: { Accept: "application/json" } }
+      ).then(r => r.ok ? r.json() : null).catch(() => null),
+    });
   }
 
-  // RSS-nyheter för ämnesområdet
-  const feeds = EXTERN_FEEDS[topik] ?? [];
-  const titlar = [];
-  for (const { namn, url } of feeds.slice(0, 2)) {
-    if (titlar.length >= 8) break;
-    try {
-      const r = await fetch(url, {
-        signal: AbortSignal.timeout(6000),
+  for (const { namn, url } of (EXTERN_FEEDS[topik] ?? []).slice(0, 2)) {
+    uppgifter.push({
+      typ: "rss",
+      namn,
+      p: fetch(url, {
+        signal: AbortSignal.timeout(5000),
         headers: { "User-Agent": "Mozilla/5.0 (compatible; debatt-ai/1.0)" },
-      });
-      if (!r.ok) continue;
-      const xml = await r.text();
-      titlar.push(...extractRssTitlar(xml, namn));
-    } catch { continue; }
+      })
+        .then(r => r.ok ? r.text() : "")
+        .then(xml => xml ? extractRssTitlar(xml, namn) : [])
+        .catch(() => []),
+    });
   }
+
+  const resultat = await Promise.allSettled(uppgifter.map(u => u.p));
+
+  const delar = [];
+  const titlar = [];
+  const KRYPTONAMN = { bitcoin: "Bitcoin (BTC)", ethereum: "Ethereum (ETH)", solana: "Solana (SOL)", ripple: "XRP", binancecoin: "BNB" };
+
+  for (let i = 0; i < uppgifter.length; i++) {
+    const u = uppgifter[i];
+    const res = resultat[i];
+    if (res.status !== "fulfilled" || !res.value) continue;
+
+    if (u.typ === "coingecko") {
+      const rader = Object.entries(res.value).map(([id, d]) => {
+        const förändr = d.usd_24h_change != null
+          ? ` (${d.usd_24h_change > 0 ? "+" : ""}${d.usd_24h_change.toFixed(1)}% 24h)`
+          : "";
+        return `${KRYPTONAMN[id] ?? id}: $${d.usd.toLocaleString("en-US")}${förändr}`;
+      });
+      if (rader.length) delar.push("Live kryptopriser (CoinGecko):\n" + rader.join("\n"));
+    } else {
+      titlar.push(...res.value);
+    }
+  }
+
   if (titlar.length) delar.push("Aktuella nyheter:\n" + titlar.slice(0, 8).join("\n"));
 
   return delar.join("\n\n");
