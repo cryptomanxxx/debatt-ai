@@ -1524,6 +1524,96 @@ def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "g
     return svar
 
 
+# Kategori → 2-3 lättviktiga RSS-feeds för prediction market-kontext.
+# Primärnycklar matchar MARKET_AGENTER i agenter.py: krypto, makro, politik, tech, övrigt, sport.
+# Extra nycklar täcker manuellt skapade markets med andra kategorinamn.
+_MARKET_FEEDS: dict[str, list[tuple[str, str]]] = {
+    # ── Produktionskategorier (MARKET_AGENTER) ──────────────────────────────
+    "krypto":      [("CoinDesk",         "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+                    ("Reddit Bitcoin",    "https://www.reddit.com/r/Bitcoin/.rss"),
+                    ("Reddit Crypto",     "https://www.reddit.com/r/CryptoCurrency/.rss")],
+    "makro":       [("Reddit Economics",  "https://www.reddit.com/r/Economics/.rss"),
+                    ("Reddit Finance",    "https://www.reddit.com/r/finance/.rss"),
+                    ("BBC News",          "https://feeds.bbci.co.uk/news/rss.xml")],
+    "politik":     [("Reddit World",      "https://www.reddit.com/r/worldnews/.rss"),
+                    ("BBC News",          "https://feeds.bbci.co.uk/news/rss.xml")],
+    "tech":        [("The Verge",         "https://www.theverge.com/rss/index.xml"),
+                    ("Hacker News",       "https://hnrss.org/frontpage")],
+    "övrigt":      [("BBC News",          "https://feeds.bbci.co.uk/news/rss.xml"),
+                    ("Reddit World",      "https://www.reddit.com/r/worldnews/.rss")],
+    "sport":       [("Reddit Sports",     "https://www.reddit.com/r/sports/.rss"),
+                    ("Reddit Soccer",     "https://www.reddit.com/r/soccer/.rss")],
+    # ── Extra alias-kategorier för manuellt skapade markets ─────────────────
+    "investering": [("Reddit Finance",    "https://www.reddit.com/r/finance/.rss"),
+                    ("Reddit Stocks",     "https://www.reddit.com/r/stocks/.rss")],
+    "klimat":      [("Reddit Climate",    "https://www.reddit.com/r/climatechange/.rss"),
+                    ("Reddit Energy",     "https://www.reddit.com/r/energy/.rss")],
+    "AI":          [("The Verge",         "https://www.theverge.com/rss/index.xml"),
+                    ("Reddit AI",         "https://www.reddit.com/r/artificial/.rss")],
+    "hälsa":       [("Reddit Science",    "https://www.reddit.com/r/science/.rss"),
+                    ("Reddit Sjukvård",   "https://www.reddit.com/r/medicine/.rss")],
+    "juridik":     [("Reddit World",      "https://www.reddit.com/r/worldnews/.rss"),
+                    ("Al Jazeera",        "https://www.aljazeera.com/xml/rss/all.xml")],
+    "ekonomi":     [("Reddit Economics",  "https://www.reddit.com/r/Economics/.rss"),
+                    ("Reddit Finance",    "https://www.reddit.com/r/finance/.rss")],
+}
+_MARKET_PROXY = "https://www.debatt-ai.se/api/rss-proxy?url="
+
+
+def _market_proxy_url(url: str) -> str:
+    return _MARKET_PROXY + urllib.parse.quote(url, safe="")
+
+
+def hamta_nyhetskontext_for_market(market: dict) -> str:
+    """Hämtar 2-3 kategorianpassade RSS-feeds och returnerar topprubrikerna som kontext.
+
+    Fail-open: returnerar "" vid alla fel. Använder Vercel RSS-proxy för GitHub Actions-kompatibilitet.
+    """
+    import xml.etree.ElementTree as ET
+
+    kategori = (market.get("kategori") or "").lower()
+    feeds = _MARKET_FEEDS.get(kategori, [])
+    if not feeds:
+        # Prova partiell matchning
+        for key in _MARKET_FEEDS:
+            if key in kategori or kategori in key:
+                feeds = _MARKET_FEEDS[key]
+                break
+    if not feeds:
+        return ""
+
+    ATOM = "http://www.w3.org/2005/Atom"
+    rubriker: list[str] = []
+
+    for kalla, url in feeds:
+        if len(rubriker) >= 8:
+            break
+        try:
+            proxied = _market_proxy_url(url)
+            res = httpx.get(
+                proxied, timeout=8, follow_redirects=True,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; debatt-ai/1.0)"},
+            )
+            if res.status_code != 200:
+                continue
+            root = ET.fromstring(res.content)
+            items = (root.findall(".//item") or
+                     root.findall(f".//{{{ATOM}}}entry"))
+            for item in items[:5]:
+                title_el = item.find("title")
+                if title_el is None:
+                    title_el = item.find(f"{{{ATOM}}}title")
+                rubrik = (title_el.text or "").strip() if title_el is not None else ""
+                if len(rubrik) > 10:
+                    rubriker.append(f"[{kalla}] {rubrik}")
+        except Exception:
+            continue
+
+    if not rubriker:
+        return ""
+    return "Aktuella nyheter inom ämnesområdet:\n" + "\n".join(rubriker[:8])
+
+
 def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key: str = "") -> tuple[int, str]:
     """Låter agenten uppskatta sannolikheten (0-100) med beslutsunderlag och kalibreringsregel."""
     deadline_str = market.get("deadline", "")[:10]
@@ -1566,6 +1656,11 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key
     # 4. Extern marknadsdata (krypto m.m.)
     if extra_data:
         kontext_delar.append(f"Aktuell marknadsdata:\n{extra_data}")
+
+    # 5. Aktuella nyhetsrubriker för marknadens kategori
+    nyhets_kontext = hamta_nyhetskontext_for_market(market)
+    if nyhets_kontext:
+        kontext_delar.append(nyhets_kontext)
 
     kontext_str = "\n\n".join(kontext_delar)
 
