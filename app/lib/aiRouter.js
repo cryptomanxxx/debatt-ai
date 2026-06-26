@@ -92,6 +92,8 @@ export const CHAINS = {
   agent_submit: ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini", "github"],
   pis:          ["groq", "sambanova", "codestral", "cerebras", "deepseek", "gemini", "github"],
   chatt:        ["groq", "cerebras", "sambanova", "codestral", "deepseek", "gemini", "github"],
+  // hjarnan: Cerebras (gpt-oss-120b, 120B params) prioriteras för starkare resonemang
+  hjarnan:      ["cerebras", "gemini", "groq", "sambanova", "codestral", "deepseek", "github"],
 };
 
 // ── Dynamisk Supabase-ordning (1h cache) ────────────────────────────────────

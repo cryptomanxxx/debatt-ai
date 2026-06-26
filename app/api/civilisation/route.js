@@ -7,7 +7,7 @@
  * intern Supabase-data när frågan rör omvärlden.
  */
 
-import { callWithFallback, getDynamicChain } from "../../lib/aiRouter.js";
+import { callWithFallback, CHAINS } from "../../lib/aiRouter.js";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -253,8 +253,7 @@ export async function POST(req) {
   }
 
   try {
-    const chain = await getDynamicChain("general");
-    const { text, provider, model } = await callWithFallback(chain,
+    const { text, provider, model } = await callWithFallback(CHAINS.hjarnan,
       [
         { role: "system", content: systemPrompt },
         { role: "user",   content: userPrompt },
