@@ -1724,8 +1724,9 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key
             try:
                 sp = (
                     f"Scenario: {scenario['namn']} — {scenario['beskrivning']}\n\n"
-                    f"Fråga: {market['titel']}\n"
-                    "Om DETTA scenario inträffar, vilken sannolikhet (0–100) att utfallet är JA?\n"
+                    f"{market_info}"
+                    + (f"\nBeslutsunderlag:\n{kontext_str[:500]}\n" if kontext_str else "")
+                    + "\nOm DETTA scenario inträffar, vilken sannolikhet (0–100) att utfallet är JA?\n"
                     "KALIBRERING: 50% = vet ingenting. Avvika bara med konkreta skäl.\n"
                     'JSON (inget annat): {"sannolikhet": <heltal 0-100>}'
                 )
