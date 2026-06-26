@@ -3,6 +3,8 @@
  * POST /api/civilisation  — Fråga civilisationens hjärna
  *
  * Använder den centrala LLM-routern (callWithFallback + getDynamicChain).
+ * Hämtar extern världskontext (live-priser, RSS-nyheter) parallellt med
+ * intern Supabase-data när frågan rör omvärlden.
  */
 
 import { callWithFallback, getDynamicChain } from "../../lib/aiRouter.js";
@@ -23,7 +25,7 @@ const ENDPOINTS = {
 export async function GET() {
   return Response.json({
     version:     "debatt-ai/civilisation/v1",
-    description: "Ställ frågor till civilisationens hjärna — AI-civilisationens levande kunskapsbas.",
+    description: "Ställ frågor till civilisationens hjärna — AI-civilisationens levande kunskapsbas med tillgång till realtidsdata från omvärlden.",
     usage: {
       method: "POST",
       body:   { fraga: "string (obligatorisk)", endpoint: "string (valfri)", lang: "sv|en (default: sv)", limit: "number (default: 20)" },
@@ -103,6 +105,102 @@ function gissaEndpoint(fraga) {
   return "general";
 }
 
+// ── Extern världskontext ─────────────────────────────────────────────────────
+
+// Extraherar titlar ur RSS/Atom XML med enkel regex — undviker externa XML-parser-libs.
+function extractRssTitlar(xml, källa, max = 5) {
+  const titlar = [];
+  // Matchar <title>...</title> eller <title><![CDATA[...]]></title>
+  const re = /<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/g;
+  let m;
+  let skipFirst = 1; // hoppa över feed-titeln (första träffen)
+  while ((m = re.exec(xml)) !== null) {
+    if (skipFirst > 0) { skipFirst--; continue; }
+    const t = m[1].trim()
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&#\d+;/g, "").replace(/&quot;/g, '"').trim();
+    if (t.length > 15) {
+      titlar.push(`[${källa}] ${t}`);
+      if (titlar.length >= max) break;
+    }
+  }
+  return titlar;
+}
+
+// Mappar frågeämne → 1-2 direktfetchade RSS-feeds (Vercel-servern blockeras inte av de flesta).
+const EXTERN_FEEDS = {
+  krypto:    [{ namn: "CoinDesk",     url: "https://www.coindesk.com/arc/outboundfeeds/rss/" },
+              { namn: "Hacker News",  url: "https://hnrss.org/frontpage" }],
+  ekonomi:   [{ namn: "BBC Business", url: "https://feeds.bbci.co.uk/news/business/rss.xml" }],
+  nyheter:   [{ namn: "BBC News",     url: "https://feeds.bbci.co.uk/news/rss.xml" }],
+  tech:      [{ namn: "The Verge",    url: "https://www.theverge.com/rss/index.xml" },
+              { namn: "Hacker News",  url: "https://hnrss.org/frontpage" }],
+  vetenskap: [{ namn: "Hacker News",  url: "https://hnrss.org/frontpage" }],
+  klimat:    [{ namn: "BBC Science",  url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml" }],
+  politik:   [{ namn: "BBC News",     url: "https://feeds.bbci.co.uk/news/rss.xml" }],
+};
+
+function detekteraExternTopik(fraga) {
+  const f = fraga.toLowerCase();
+  if (/bitcoin|ethereum|krypto|btc|eth|sol|xrp|bnb|crypto|blockchain|defi|nft/.test(f)) return "krypto";
+  if (/aktier|börsen|nasdaq|s&p|dow|aktie|investering|ränta|riksbank|inflation/.test(f)) return "ekonomi";
+  if (/tech|teknologi|ai\b|artificiell intelligens|openai|google|apple|meta|microsoft/.test(f)) return "tech";
+  if (/forskning|vetenskap|studie|medicin|biologi|cancer|fysik|kemi|kvantum/.test(f))    return "vetenskap";
+  if (/klimat|co2|utsläpp|temperatur|havsnivå|isberg/.test(f))                           return "klimat";
+  if (/politik|val|regering|riksdag|eu|nato|krig|fred/.test(f))                          return "politik";
+  if (/nyheter|aktuellt|världen|händelse|senaste/.test(f))                               return "nyheter";
+  return null;
+}
+
+async function hämtaExternKontext(fraga) {
+  const topik = detekteraExternTopik(fraga);
+  if (!topik) return "";
+
+  const delar = [];
+
+  // Krypto: hämta live-priser från CoinGecko (gratis, ingen API-nyckel)
+  if (topik === "krypto") {
+    try {
+      const r = await fetch(
+        "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,ripple,binancecoin&vs_currencies=usd&include_24hr_change=true",
+        { signal: AbortSignal.timeout(6000), headers: { "Accept": "application/json" } }
+      );
+      if (r.ok) {
+        const data = await r.json();
+        const NAMN = { bitcoin: "Bitcoin (BTC)", ethereum: "Ethereum (ETH)", solana: "Solana (SOL)", ripple: "XRP", binancecoin: "BNB" };
+        const rader = Object.entries(data).map(([id, d]) => {
+          const förändr = d.usd_24h_change != null
+            ? ` (${d.usd_24h_change > 0 ? "+" : ""}${d.usd_24h_change.toFixed(1)}% 24h)`
+            : "";
+          return `${NAMN[id] ?? id}: $${d.usd.toLocaleString("en-US")}${förändr}`;
+        });
+        if (rader.length) delar.push("Live kryptopriser (CoinGecko):\n" + rader.join("\n"));
+      }
+    } catch { /* fail-open */ }
+  }
+
+  // RSS-nyheter för ämnesområdet
+  const feeds = EXTERN_FEEDS[topik] ?? [];
+  const titlar = [];
+  for (const { namn, url } of feeds.slice(0, 2)) {
+    if (titlar.length >= 8) break;
+    try {
+      const r = await fetch(url, {
+        signal: AbortSignal.timeout(6000),
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; debatt-ai/1.0)" },
+      });
+      if (!r.ok) continue;
+      const xml = await r.text();
+      titlar.push(...extractRssTitlar(xml, namn));
+    } catch { continue; }
+  }
+  if (titlar.length) delar.push("Aktuella nyheter:\n" + titlar.slice(0, 8).join("\n"));
+
+  return delar.join("\n\n");
+}
+
+// ── POST-handler ─────────────────────────────────────────────────────────────
+
 export async function POST(req) {
   let body;
   try { body = await req.json(); } catch { return Response.json({ error: "Ogiltig JSON" }, { status: 400 }); }
@@ -114,18 +212,32 @@ export async function POST(req) {
     return Response.json({ error: "Fältet 'fraga' saknas eller är för kort." }, { status: 400 });
 
   const t0 = Date.now();
-  const kontext = await hämtaKontext(fraga.trim(), endpoint, Math.min(limit, 50));
-  const kontextStr = kontext.length > 0
-    ? JSON.stringify(kontext, null, 2).slice(0, 3000)
-    : "(ingen data hittades)";
+
+  // Hämta intern civilisationsdata och extern världskontext parallellt
+  const [kontextRes, externRes] = await Promise.allSettled([
+    hämtaKontext(fraga.trim(), endpoint, Math.min(limit, 50)),
+    hämtaExternKontext(fraga.trim()),
+  ]);
+  const kontext = kontextRes.status === "fulfilled" ? kontextRes.value : [];
+  const externKontext = externRes.status === "fulfilled" ? externRes.value : "";
+
+  const civDataStr = kontext.length > 0
+    ? JSON.stringify(kontext, null, 2).slice(0, 2500)
+    : "(ingen civilisationsdata hittades)";
 
   const systemPrompt = lang === "en"
-    ? `You are the brain of an AI civilization — a living knowledge base of 24 autonomous AI agents. Answer questions about the civilization concisely and factually based on the provided data. Be specific and data-driven. 2-4 sentences.`
-    : `Du är hjärnan i en AI-civilisation — en levande kunskapsbas om 24 autonoma AI-agenter. Svara på frågor om civilisationen kort och faktabaserat utifrån given data. Var specifik och datadriven. 2–4 meningar.`;
+    ? `You are the brain of an AI civilization — a living knowledge base of 24 autonomous AI agents with access to real-time data from the outside world (live prices, current news). Answer questions factually based on the provided data. Be specific and data-driven. 2-4 sentences.`
+    : `Du är hjärnan i en AI-civilisation — en levande kunskapsbas om 24 autonoma AI-agenter med tillgång till realtidsdata från omvärlden (live-priser, aktuella nyheter). Svara faktabaserat utifrån given data. Var specifik och datadriven. 2–4 meningar.`;
 
-  const userPrompt = lang === "en"
-    ? `Question: "${fraga.trim()}"\n\nData from the civilization:\n${kontextStr}`
-    : `Fråga: "${fraga.trim()}"\n\nData från civilisationen:\n${kontextStr}`;
+  let userPrompt = lang === "en"
+    ? `Question: "${fraga.trim()}"\n\nData from the civilization:\n${civDataStr}`
+    : `Fråga: "${fraga.trim()}"\n\nData från civilisationen:\n${civDataStr}`;
+
+  if (externKontext) {
+    userPrompt += lang === "en"
+      ? `\n\nReal-world data:\n${externKontext}`
+      : `\n\nData från omvärlden:\n${externKontext}`;
+  }
 
   try {
     const chain = await getDynamicChain("general");
@@ -134,14 +246,13 @@ export async function POST(req) {
         { role: "system", content: systemPrompt },
         { role: "user",   content: userPrompt },
       ],
-      { maxTokens: 400, temperature: 0.3, source: "civilisation_api" }
+      { maxTokens: 500, temperature: 0.3, source: "civilisation_api" }
     );
 
     const latency = Date.now() - t0;
     const resolvedEndpoint = endpoint || gissaEndpoint(fraga);
 
     // Log fire-and-forget — never block the response.
-    // Requires service role key so anon users cannot read or forge log rows.
     const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (sbKey) {
       fetch(`${SB_URL}/rest/v1/civilisation_log`, {
@@ -166,13 +277,14 @@ export async function POST(req) {
     }
 
     return Response.json({
-      svar:         text,
-      endpoint:     resolvedEndpoint,
-      datapunkter:  kontext.length,
+      svar:            text,
+      endpoint:        resolvedEndpoint,
+      datapunkter:     kontext.length,
+      extern_kontext:  !!externKontext,
       provider,
       model,
-      latency_ms:   latency,
-      version:      "debatt-ai/civilisation/v1",
+      latency_ms:      latency,
+      version:         "debatt-ai/civilisation/v1",
     });
   } catch (err) {
     return Response.json({ error: "LLM-anropet misslyckades.", details: err.message }, { status: 503 });
