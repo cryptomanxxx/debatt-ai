@@ -1591,7 +1591,9 @@ def hamta_nyhetskontext_for_market(market: dict) -> str:
             items = (root.findall(".//item") or
                      root.findall(f".//{{{ATOM}}}entry"))
             for item in items[:5]:
-                title_el = (item.find("title") or item.find(f"{{{ATOM}}}title"))
+                title_el = item.find("title")
+                if title_el is None:
+                    title_el = item.find(f"{{{ATOM}}}title")
                 rubrik = (title_el.text or "").strip() if title_el is not None else ""
                 if len(rubrik) > 10:
                     rubriker.append(f"[{kalla}] {rubrik}")
