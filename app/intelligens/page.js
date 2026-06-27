@@ -199,7 +199,7 @@ export default async function IntelligensPage() {
     const row = { week };
     for (const ep of civEndpoints) {
       const n = civLogItems.filter(r => (r.endpoint || "general") === ep && r.skapad >= wStart && r.skapad <= wEnd).length;
-      row[ep] = n > 0 ? n : undefined;
+      row[ep] = n;
     }
     return row;
   });

@@ -254,7 +254,6 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
                   stroke={CIV_FARGER[ep] || FARGER[i % FARGER.length]}
                   strokeWidth={2}
                   dot={{ r: 3, fill: CIV_FARGER[ep] || FARGER[i % FARGER.length] }}
-                  connectNulls
                   name={ep}
                 />
               ))}
