@@ -1,0 +1,41 @@
+name: Civilisationsfrågor
+
+on:
+  workflow_dispatch:
+    inputs:
+      agenter_subset:
+        description: "Komma-separerade agentnamn (tom = alla 24)"
+        required: false
+        default: ""
+  # Kör varje dag 11:30 svensk tid (09:30 UTC) — efter agent.yml-körningarna
+  schedule:
+    - cron: "30 9 * * *"
+
+jobs:
+  civ-fraga:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install httpx
+
+      - name: Kör civilisationsfrågor
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AGENTER_SUBSET: ${{ github.event.inputs.agenter_subset }}
+        run: python civ_fraga_test.py
