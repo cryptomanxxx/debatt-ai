@@ -104,15 +104,8 @@ export default async function IntelligensPage() {
     };
   }).filter(b => b.antal > 0);
 
-  // Per-agent quality over time (monthly) — top 6 agents by article count
-  const agentArticleCount = {};
-  for (const a of artMedQ) {
-    agentArticleCount[a.agent] = (agentArticleCount[a.agent] || 0) + 1;
-  }
-  const agentsForKvalitet = Object.entries(agentArticleCount)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 6)
-    .map(([agent]) => agent);
+  // Per-agent quality over time (monthly) — same top-6 agents as KI chart so colors align
+  const agentsForKvalitet = agentsByKi.map(({ agent }) => agent);
   const kvMonths = [...new Set(artMedQ.map(a => a.datum.slice(0, 7)))].sort();
   const kvalitetPerAgentData = kvMonths.map(manad => {
     const row = { manad };
