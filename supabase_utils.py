@@ -1456,10 +1456,9 @@ def generera_ki_fran_svar(sb_key: str, agent_namn: str, fraga: str, svar: str, t
 def _hamta_extern_kontext_py(fraga: str, typ: str = "general") -> str:
     """Hämtar aktuella nyheter/data från omvärlden baserat på frågans ämne.
     Returnerar formatterad sträng att injicera som extern kontext, eller '' vid ej relevant fråga."""
-    INTERNA = {"historia", "relationer", "insikter", "allianser", "territorium", "kunskap", "prediktioner"}
-    if typ in INTERNA:
-        return ""
-
+    # Gate on question text, not on typ — in Python, typ is the agent's domain label
+    # (e.g. "historia"), not an explicit endpoint, so it's not a reliable signal for
+    # "simulation-only". The question-text regex below handles simulation questions correctly.
     f = fraga.lower()
     if re.search(r'bitcoin|ethereum|krypto|btc|eth|sol|xrp|bnb|crypto|blockchain|defi|nft', f):
         topik = "krypto"
