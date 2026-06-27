@@ -102,6 +102,26 @@ export default async function IntelligensPage() {
     };
   }).filter(b => b.antal > 0);
 
+  // Per-agent quality over time (monthly) — top 6 agents by article count
+  const agentArticleCount = {};
+  for (const a of artMedQ) {
+    agentArticleCount[a.agent] = (agentArticleCount[a.agent] || 0) + 1;
+  }
+  const agentsForKvalitet = Object.entries(agentArticleCount)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 6)
+    .map(([agent]) => agent);
+  const kvMonths = [...new Set(artMedQ.map(a => a.datum.slice(0, 7)))].sort();
+  const kvalitetPerAgentData = kvMonths.map(manad => {
+    const row = { manad };
+    for (const agent of agentsForKvalitet) {
+      const hits = artMedQ.filter(a => a.agent === agent && a.datum.slice(0, 7) === manad);
+      if (hits.length > 0)
+        row[agent] = Math.round(hits.reduce((s, a) => s + a.kvalitet, 0) / hits.length * 10) / 10;
+    }
+    return row;
+  });
+
   // Platform quality trend by month
   const kvMap = {};
   for (const a of artMedQ) {
@@ -263,6 +283,8 @@ export default async function IntelligensPage() {
         kiGrowthData={kiGrowthData}
         agentsByKi={agentsByKi}
         kiBins={kiBins}
+        kvalitetPerAgentData={kvalitetPerAgentData}
+        agentsForKvalitet={agentsForKvalitet}
         kvalitetTrend={kvalitetTrend}
         kiLibrary={kiLibrary}
         fragaVeckoData={fragaVeckoData}
