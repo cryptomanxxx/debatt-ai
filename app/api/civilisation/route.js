@@ -131,25 +131,38 @@ function extractRssTitlar(xml, källa, max = 5) {
 const EXTERN_FEEDS = {
   krypto:    [{ namn: "CoinDesk",     url: "https://www.coindesk.com/arc/outboundfeeds/rss/" },
               { namn: "Hacker News",  url: "https://hnrss.org/frontpage" }],
-  ekonomi:   [{ namn: "BBC Business", url: "https://feeds.bbci.co.uk/news/business/rss.xml" }],
-  nyheter:   [{ namn: "BBC News",     url: "https://feeds.bbci.co.uk/news/rss.xml" }],
+  ekonomi:   [{ namn: "BBC Business", url: "https://feeds.bbci.co.uk/news/business/rss.xml" },
+              { namn: "SVT Nyheter",  url: "https://www.svt.se/nyheter/rss.xml" }],
+  nyheter:   [{ namn: "SVT Nyheter",  url: "https://www.svt.se/nyheter/rss.xml" },
+              { namn: "BBC News",     url: "https://feeds.bbci.co.uk/news/rss.xml" }],
   tech:      [{ namn: "The Verge",    url: "https://www.theverge.com/rss/index.xml" },
               { namn: "Hacker News",  url: "https://hnrss.org/frontpage" }],
-  vetenskap: [{ namn: "Hacker News",  url: "https://hnrss.org/frontpage" }],
-  klimat:    [{ namn: "BBC Science",  url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml" }],
-  politik:   [{ namn: "BBC News",     url: "https://feeds.bbci.co.uk/news/rss.xml" }],
+  vetenskap: [{ namn: "BBC Science",  url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml" },
+              { namn: "Hacker News",  url: "https://hnrss.org/frontpage" }],
+  klimat:    [{ namn: "BBC Science",  url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml" },
+              { namn: "SVT Nyheter",  url: "https://www.svt.se/nyheter/rss.xml" }],
+  politik:   [{ namn: "SVT Nyheter",  url: "https://www.svt.se/nyheter/rss.xml" },
+              { namn: "BBC News",     url: "https://feeds.bbci.co.uk/news/rss.xml" }],
+  samhälle:  [{ namn: "SVT Nyheter",  url: "https://www.svt.se/nyheter/rss.xml" },
+              { namn: "Al Jazeera",   url: "https://www.aljazeera.com/xml/rss/all.xml" }],
+  hälsa:     [{ namn: "BBC Health",   url: "https://feeds.bbci.co.uk/news/health/rss.xml" },
+              { namn: "SVT Nyheter",  url: "https://www.svt.se/nyheter/rss.xml" }],
 };
 
 function detekteraExternTopik(fraga) {
   const f = fraga.toLowerCase();
-  if (/bitcoin|ethereum|krypto|btc|eth|sol|xrp|bnb|crypto|blockchain|defi|nft/.test(f)) return "krypto";
-  if (/aktier|börsen|nasdaq|s&p|dow|aktie|investering|ränta|riksbank|inflation/.test(f)) return "ekonomi";
+  if (/bitcoin|ethereum|krypto|btc|eth|sol|xrp|bnb|crypto|blockchain|defi|nft/.test(f))           return "krypto";
+  if (/aktier|börsen|nasdaq|s&p|dow|aktie|investering|ränta|riksbank|inflation/.test(f))           return "ekonomi";
   if (/tech|teknologi|\bai(?!-civilisation)\b|artificiell intelligens|openai|google|apple|meta|microsoft/.test(f)) return "tech";
-  if (/forskning|vetenskap|studie|medicin|biologi|cancer|fysik|kemi|kvantum/.test(f))    return "vetenskap";
-  if (/klimat|co2|utsläpp|temperatur|havsnivå|isberg/.test(f))                           return "klimat";
-  if (/politik|val|regering|riksdag|eu|nato|krig|fred/.test(f))                          return "politik";
-  if (/nyheter|aktuellt|världen|händelse|senaste/.test(f))                               return "nyheter";
-  return null;
+  if (/forskning|vetenskap|studie|medicin|biologi|cancer|fysik|kemi|kvantum/.test(f))              return "vetenskap";
+  if (/klimat|co2|utsläpp|temperatur|havsnivå|isberg|miljö|hållbar/.test(f))                      return "klimat";
+  if (/demokrati|mänsklig|värdighet|rättighet|integritet|privatliv|frihet|suveränitet/.test(f))    return "samhälle";
+  if (/hälsa|psykisk|psykologi|välfärd|sjukvård|barnhälsa|digitalisering av välfärd/.test(f))     return "hälsa";
+  if (/politik|val|regering|riksdag|eu|nato|krig|fred|lag|lagstiftning|korruption/.test(f))        return "politik";
+  if (/nyheter|aktuellt|världen|händelse|senaste/.test(f))                                         return "nyheter";
+  // Fallback: hämta alltid allmänna nyheter — eliminerar den cirkulära epistemologin
+  // där frågor om verkligheten bara speglar simuleringsdata tillbaka.
+  return "nyheter";
 }
 
 async function hämtaExternKontext(fraga) {
@@ -239,8 +252,8 @@ export async function POST(req) {
     : "(ingen civilisationsdata hittades)";
 
   const systemPrompt = lang === "en"
-    ? `You are the brain of an AI civilization — a living knowledge base of 24 autonomous AI agents with access to real-time data from the outside world (live prices, current news). Answer questions factually based on the provided data. Be specific and data-driven. 2-4 sentences.`
-    : `Du är hjärnan i en AI-civilisation — en levande kunskapsbas om 24 autonoma AI-agenter med tillgång till realtidsdata från omvärlden (live-priser, aktuella nyheter). Svara faktabaserat utifrån given data. Var specifik och datadriven. 2–4 meningar.`;
+    ? `You are the brain of an AI civilization with access to BOTH real-world news/data AND internal simulation data. When answering questions about the real world: ground your answer in the real-world data first, then draw parallels to what you observe in the AI civilization. Never let simulation data replace real-world facts — use it as a complementary lens. Be specific and cite sources when possible. 2-4 sentences.`
+    : `Du är hjärnan i en AI-civilisation med tillgång till BÅDE verkliga nyheter/data från omvärlden OCH intern data från simuleringen. När frågan handlar om den verkliga världen: förankra svaret i de verkliga nyheterna/data först, dra sedan paralleller till vad du observerar i AI-civilisationen. Låt aldrig simuleringsdata ersätta verkliga fakta — använd den som ett kompletterande lins. Var specifik och hänvisa till källor när möjligt. 2–4 meningar.`;
 
   let userPrompt = lang === "en"
     ? `Question: "${fraga.trim()}"\n\nData from the civilization:\n${civDataStr}`
