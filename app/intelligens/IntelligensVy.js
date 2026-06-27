@@ -369,7 +369,7 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={civVeckoData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-              <XAxis dataKey="week" tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} interval="preserveStartEnd" />
+              <XAxis dataKey="dag" tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} allowDecimals={false} />
               <Tooltip
                 {...TOOLTIP_STYLE}
