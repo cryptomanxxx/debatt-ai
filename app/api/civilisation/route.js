@@ -149,7 +149,13 @@ const EXTERN_FEEDS = {
               { namn: "SVT Nyheter",  url: "https://www.svt.se/nyheter/rss.xml" }],
 };
 
-function detekteraExternTopik(fraga) {
+// explicitEndpoint = det endpoint-värde kalleraren skickade in (null = ej angivet)
+function detekteraExternTopik(fraga, explicitEndpoint = null) {
+  // Rent interna endpoints — extern RSS-kontext tillför inget värde och
+  // kan lägga till upp till 5s timeout + irrelevanta rubriker.
+  const INTERNA = new Set(["historia", "relationer", "insikter", "allianser", "territorium", "kunskap", "prediktioner"]);
+  if (explicitEndpoint && INTERNA.has(explicitEndpoint)) return null;
+
   const f = fraga.toLowerCase();
   if (/bitcoin|ethereum|krypto|btc|eth|sol|xrp|bnb|crypto|blockchain|defi|nft/.test(f))           return "krypto";
   if (/aktier|börsen|nasdaq|s&p|dow|aktie|investering|ränta|riksbank|inflation/.test(f))           return "ekonomi";
@@ -160,13 +166,13 @@ function detekteraExternTopik(fraga) {
   if (/hälsa|psykisk|psykologi|välfärd|sjukvård|barnhälsa|digitalisering av välfärd/.test(f))     return "hälsa";
   if (/politik|val|regering|riksdag|eu|nato|krig|fred|lag|lagstiftning|korruption/.test(f))        return "politik";
   if (/nyheter|aktuellt|världen|händelse|senaste/.test(f))                                         return "nyheter";
-  // Fallback: hämta alltid allmänna nyheter — eliminerar den cirkulära epistemologin
-  // där frågor om verkligheten bara speglar simuleringsdata tillbaka.
+  // Nyheter-fallback för allmänna omvärldsfrågor — men inte om frågan handlar om simuleringen.
+  if (/civilisation|agenten\b|plattformen|vår civilisation|simuleringen|debatt-ai/.test(f))        return null;
   return "nyheter";
 }
 
-async function hämtaExternKontext(fraga) {
-  const topik = detekteraExternTopik(fraga);
+async function hämtaExternKontext(fraga, explicitEndpoint = null) {
+  const topik = detekteraExternTopik(fraga, explicitEndpoint);
   if (!topik) return "";
 
   // Bygg upp alla fetchar och kör dem i parallell — aldrig sekventiellt.
@@ -239,10 +245,12 @@ export async function POST(req) {
 
   const t0 = Date.now();
 
-  // Hämta intern civilisationsdata och extern världskontext parallellt
+  // Hämta intern civilisationsdata och extern världskontext parallellt.
+  // Skicka explicit endpoint till hämtaExternKontext så att interna frågor
+  // (historia, relationer, etc.) aldrig triggar onödig RSS-hämtning.
   const [kontextRes, externRes] = await Promise.allSettled([
     hämtaKontext(fraga.trim(), endpoint, Math.min(limit, 50)),
-    hämtaExternKontext(fraga.trim()),
+    hämtaExternKontext(fraga.trim(), endpoint || null),
   ]);
   const kontext = kontextRes.status === "fulfilled" ? kontextRes.value : [];
   const externKontext = externRes.status === "fulfilled" ? externRes.value : "";
