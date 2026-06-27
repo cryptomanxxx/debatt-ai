@@ -94,10 +94,11 @@ async function deleteKommentar(id) {
 }
 
 async function updateArtikel(id, changes) {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?id=eq.${id}`, {
-    method: "PATCH",
-    headers: { ...sbHeaders(), "Prefer": "return=minimal" },
-    body: JSON.stringify(changes),
+  // Routed through server-side API so SUPABASE_SERVICE_ROLE_KEY is used — anon key lacks UPDATE on artiklar
+  const res = await fetch("/api/admin/update-artikel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pw: getStoredPw(), id, changes }),
   });
   if (!res.ok) throw new Error(await res.text());
 }
@@ -2957,11 +2958,11 @@ export default function AdminClient() {
     if (!authed) return;
     const iv = setInterval(() => {
       if (mainTab === "inlamningar") loadInlamningar(true);
-      else if (mainTab === "artiklar") loadArtiklar(true);
+      else if (mainTab === "artiklar" && editingId === null) loadArtiklar(true);
       else if (mainTab === "kommentarer") loadKommentarer(true);
     }, 30000);
     return () => clearInterval(iv);
-  }, [authed, mainTab, loadInlamningar, loadArtiklar, loadKommentarer]);
+  }, [authed, mainTab, editingId, loadInlamningar, loadArtiklar, loadKommentarer]);
 
   useEffect(() => {
     if (!authed) return;
