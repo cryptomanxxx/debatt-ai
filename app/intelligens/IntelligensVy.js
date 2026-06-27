@@ -24,7 +24,7 @@ const CIV_FARGER = {
   prediktioner: "#f87171", kunskap: "#22d3ee", general: "#6b7280",
 };
 
-export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalitetTrend, kiLibrary, fragaVeckoData, agentsByFragor, fragaMottagarVeckoData, agentsByMottagare, civVeckoData, civEndpoints, endpointLabels }) {
+export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalitetPerAgentData, agentsForKvalitet, kvalitetTrend, kiLibrary, fragaVeckoData, agentsByFragor, fragaMottagarVeckoData, agentsByMottagare, civVeckoData, civEndpoints, endpointLabels }) {
   const [oppenAgent, setOppenAgent] = useState(null);
 
   // Detect if quality trend goes up with more KI
@@ -76,37 +76,40 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
         )}
       </div>
 
-      {/* Chart 2: KI bins vs quality — the key question */}
+      {/* Chart 2: Per-agent quality over time — the real learning test */}
       <div style={SEKTION}>
         <h2 style={RUBRIK}>Mer KI → bättre artiklar?</h2>
         <p style={{ ...INGRESS, marginBottom: korrelationsTecken ? "8px" : "20px" }}>
-          Genomsnittlig AI-redaktörspoäng (arg + ori + rel + tro / 4) för artiklar, grupperade
-          efter hur många KI-minnen agenten hade vid publiceringstillfället.
+          Genomsnittlig artikelkvalitet per månad för de 6 mest produktiva agenterna.
+          Jämför med KI-ackumuleringskurvan ovan — stiger kvaliteten i takt med KI?
         </p>
         {korrelationsTecken && (
           <div style={{ fontSize: "13px", fontWeight: 500, color: korrelationsTecken.color, marginBottom: "16px" }}>
             {korrelationsTecken.text}
           </div>
         )}
-        {!kiBins || kiBins.length === 0 ? (
+        {!kvalitetPerAgentData || kvalitetPerAgentData.length < 2 ? (
           <div style={TOM}>Inte tillräckligt med data ännu — samlas in automatiskt.</div>
         ) : (
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={kiBins} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+          <ResponsiveContainer width="100%" height={280}>
+            <LineChart data={kvalitetPerAgentData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-              <XAxis dataKey="label" tick={{ fill: "#6b7280", fontSize: 12 }} tickLine={false} />
-              <YAxis
-                domain={["auto", "auto"]}
-                tick={{ fill: "#6b7280", fontSize: 11 }}
-                tickLine={false}
-                label={{ value: "Snittpoäng", angle: -90, position: "insideLeft", fill: "#6b7280", fontSize: 11, dy: 40 }}
-              />
-              <Tooltip
-                {...TOOLTIP_STYLE}
-                formatter={(v, _, props) => [`${v} poäng (${props.payload?.antal ?? "?"} artiklar)`, "Snitt"]}
-              />
-              <Bar dataKey="snittKvalitet" fill="#60a5fa" radius={[6, 6, 0, 0]} name="Snittpoäng" />
-            </BarChart>
+              <XAxis dataKey="manad" tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} />
+              <YAxis domain={["auto", "auto"]} tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} allowDecimals />
+              <Tooltip {...TOOLTIP_STYLE} formatter={(v) => [`${v} poäng`, ""]} />
+              <Legend wrapperStyle={{ fontSize: "13px", paddingTop: "12px" }} />
+              {(agentsForKvalitet || []).map((agent, i) => (
+                <Line
+                  key={agent}
+                  type="monotone"
+                  dataKey={agent}
+                  stroke={FARGER[i % FARGER.length]}
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: FARGER[i % FARGER.length] }}
+                  connectNulls
+                />
+              ))}
+            </LineChart>
           </ResponsiveContainer>
         )}
       </div>
