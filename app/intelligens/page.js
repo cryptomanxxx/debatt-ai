@@ -246,8 +246,8 @@ export default async function IntelligensPage() {
   for (const spel of kiSpelData) {
     if (!spel.agent_svar || !spel.facit || spel.facit === 0) continue;
     for (const svar of spel.agent_svar) {
-      if (!svar.agent || svar.uppskattning == null) continue;
-      const relFel = Math.min(Math.abs(svar.uppskattning - spel.facit) / Math.abs(spel.facit), 2);
+      if (!svar.agent || svar.estimat == null) continue;
+      const relFel = Math.min(Math.abs(svar.estimat - spel.facit) / Math.abs(spel.facit), 2);
       if (!iiCalibSumma[svar.agent]) { iiCalibSumma[svar.agent] = 0; iiCalibAntal[svar.agent] = 0; }
       iiCalibSumma[svar.agent] += relFel;
       iiCalibAntal[svar.agent]++;
