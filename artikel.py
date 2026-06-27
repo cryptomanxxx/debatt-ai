@@ -245,16 +245,22 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
         ],
     }
     def _rensa_rubrik(raw: str) -> str:
-        # Cut off at any "**Rubrik:**" / "Rubrik:" / "Alternativ rubriker:" label
-        raw = re.split(r'(?i)\*{0,2}(rubrik|alternativ\s+rubriker?|titel|headline)\*{0,2}\s*:', raw)[0]
+        LABEL = r'(?i)\*{0,2}(?:rubrik|alternativ\s+rubriker?|titel|headline)\*{0,2}\s*:'
+        # If the response starts with a label ("**Rubrik:** Title"), extract what follows
+        m = re.match(LABEL + r'\s*(.+)', raw.strip(), re.DOTALL)
+        if m:
+            candidate = re.split(LABEL, m.group(1))[0]
+        else:
+            # Title appears first, label follows — keep only the part before the first label
+            candidate = re.split(LABEL, raw)[0]
         # Strip markdown bold/italic markers
-        raw = re.sub(r'\*+|_{2,}', '', raw)
+        candidate = re.sub(r'\*+|_{2,}', '', candidate)
         # Take the first non-empty, non-bullet line
-        for line in raw.splitlines():
-            line = line.strip().strip('"\'').lstrip('-* ').strip()
+        for line in candidate.splitlines():
+            line = line.strip().strip("\"'").lstrip('-* ').strip()
             if len(line) > 5:
                 return line
-        return raw.strip().strip('"\'')
+        return candidate.strip().strip("\"'")
 
     for _name, fn in hamta_kort_fns(payload, agent["system"], prompt, 60, source="rubrik"):
         try:
