@@ -219,11 +219,11 @@ export default async function IntelligensPage() {
     ...(civLogRaw   || []).filter(r => r.skapad).map(r => ({ endpoint: normEp(r.endpoint || "general"), skapad: r.skapad })),
   ].sort((a, b) => a.skapad.localeCompare(b.skapad));
   const civEndpoints = [...new Set(civLogItems.map(r => r.endpoint))].sort();
-  const civWeeks = [...new Set(civLogItems.map(r => weekStart(r.skapad)))].sort();
-  // Kumulativt: räkna alla frågor t.o.m. slutet av varje vecka (samma mönster som kiGrowthData)
-  const civVeckoData = civWeeks.map(week => {
-    const cutoff = weekEnd(week) + "T23:59:59";
-    const row = { week };
+  const civDagar = [...new Set(civLogItems.map(r => r.skapad.slice(0, 10)))].sort();
+  // Kumulativt: räkna alla frågor t.o.m. slutet av varje dag
+  const civVeckoData = civDagar.map(dag => {
+    const cutoff = dag + "T23:59:59";
+    const row = { dag };
     for (const ep of civEndpoints) {
       const n = civLogItems.filter(r => r.endpoint === ep && r.skapad <= cutoff).length;
       row[ep] = n > 0 ? n : undefined;
