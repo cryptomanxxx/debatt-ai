@@ -17,7 +17,7 @@ const INGRESS = { color: "#6b7280", fontSize: "14px", marginBottom: "20px" };
 const TOOLTIP_STYLE = { contentStyle: { background: "#1f2937", border: "1px solid #374151", borderRadius: "8px" }, labelStyle: { color: "#e5e7eb" }, itemStyle: { color: "#9ca3af" } };
 const TOM = { color: "#6b7280", textAlign: "center", padding: "40px 0", fontSize: "14px" };
 
-export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalitetTrend, kiLibrary, fragaVeckoData, agentsByFragor }) {
+export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalitetTrend, kiLibrary, fragaVeckoData, agentsByFragor, fragaMottagarVeckoData, agentsByMottagare }) {
   const [oppenAgent, setOppenAgent] = useState(null);
 
   // Detect if quality trend goes up with more KI
@@ -166,6 +166,48 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
                   stackId="fraga"
                   stroke={FARGER[i % FARGER.length]}
                   fill={`url(#grad-fraga-${i})`}
+                  strokeWidth={2}
+                  dot={false}
+                  connectNulls={false}
+                />
+              ))}
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Chart 5: Which agents receive the most questions — the civilization's brain */}
+      {fragaMottagarVeckoData && fragaMottagarVeckoData.length > 0 && agentsByMottagare && agentsByMottagare.length > 0 && (
+        <div style={SEKTION}>
+          <h2 style={RUBRIK}>Civilisationens hjärna — mest efterfrågade agenter</h2>
+          <p style={INGRESS}>
+            Antal frågor varje agent tagit emot från sina kollegor per vecka — vilka agenter fungerar som
+            kunskapsnav och kollektiv hjärna? Hög mottagningsfrekvens tyder på att agenten ses som en
+            auktoritet sina kamrater söker råd hos.
+          </p>
+          <ResponsiveContainer width="100%" height={280}>
+            <AreaChart data={fragaMottagarVeckoData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+              <defs>
+                {(agentsByMottagare || []).map((ag, i) => (
+                  <linearGradient key={ag.agent} id={`grad-mottagare-${i}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={FARGER[i % FARGER.length]} stopOpacity={0.25} />
+                    <stop offset="95%" stopColor={FARGER[i % FARGER.length]} stopOpacity={0} />
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+              <XAxis dataKey="week" tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} allowDecimals={false} />
+              <Tooltip {...TOOLTIP_STYLE} />
+              <Legend wrapperStyle={{ fontSize: "13px", paddingTop: "12px" }} />
+              {(agentsByMottagare || []).map((ag, i) => (
+                <Area
+                  key={ag.agent}
+                  type="monotone"
+                  dataKey={ag.agent}
+                  stackId="mottagare"
+                  stroke={FARGER[i % FARGER.length]}
+                  fill={`url(#grad-mottagare-${i})`}
                   strokeWidth={2}
                   dot={false}
                   connectNulls={false}

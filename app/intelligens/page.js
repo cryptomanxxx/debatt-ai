@@ -35,7 +35,7 @@ export default async function IntelligensPage() {
   const [kiItems, artiklar, fragaItems] = await Promise.all([
     sb("agent_ki?order=skapad.asc&select=agent,amne,insikt,skapad&limit=5000", key),
     sb("artiklar?kalla=eq.ai&order=skapad.asc&select=forfattare,arg,ori,rel,tro,skapad&limit=3000", key),
-    sb("agent_fragor?fragare=not.is.null&fragare=neq.api&order=skapad.asc&select=fragare,skapad&limit=5000", key),
+    sb("agent_fragor?fragare=not.is.null&fragare=neq.api&order=skapad.asc&select=fragare,agent,skapad&limit=5000", key),
   ]);
 
   // ── KI per agent ──────────────────────────────────────────────────────────
@@ -133,6 +133,8 @@ export default async function IntelligensPage() {
 
   // ── AI-till-AI frågor ─────────────────────────────────────────────────────
   const aiFragor = fragaItems.filter(f => f.fragare && f.fragare !== "api");
+
+  // Sändarsidan: vilka agenter ställer flest frågor?
   const fragorByAgent = {};
   for (const f of aiFragor) {
     if (!fragorByAgent[f.fragare]) fragorByAgent[f.fragare] = [];
@@ -154,6 +156,28 @@ export default async function IntelligensPage() {
     return row;
   });
   const totalFragor = aiFragor.length;
+
+  // Mottagarsidan: vilka agenter tas det mest i anspråk som hjärna?
+  const fragaMottagarByAgent = {};
+  for (const f of aiFragor) {
+    if (!f.agent) continue;
+    if (!fragaMottagarByAgent[f.agent]) fragaMottagarByAgent[f.agent] = [];
+    fragaMottagarByAgent[f.agent].push(f.skapad);
+  }
+  const agentsByMottagare = Object.entries(fragaMottagarByAgent)
+    .map(([agent, items]) => ({ agent, total: items.length }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+  const fragaMottagarVeckoData = fragaAllWeeks.map(week => {
+    const wStart = week + "T00:00:00";
+    const wEnd = weekEnd(week) + "T23:59:59";
+    const row = { week };
+    for (const { agent } of agentsByMottagare) {
+      const n = (fragaMottagarByAgent[agent] || []).filter(d => d >= wStart && d <= wEnd).length;
+      row[agent] = n > 0 ? n : undefined;
+    }
+    return row;
+  });
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalKi = kiItems.length;
@@ -216,6 +240,8 @@ export default async function IntelligensPage() {
         kiLibrary={kiLibrary}
         fragaVeckoData={fragaVeckoData}
         agentsByFragor={agentsByFragor}
+        fragaMottagarVeckoData={fragaMottagarVeckoData}
+        agentsByMottagare={agentsByMottagare}
       />
     </main>
   );
