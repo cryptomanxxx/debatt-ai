@@ -4,7 +4,7 @@ import {
   LineChart, Line, BarChart, Bar,
   AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  Cell,
+  Cell, LabelList,
 } from "recharts";
 
 const FARGER = [
@@ -67,19 +67,27 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
           <div style={TOM}>Indexet beräknas när agenter publicerat artiklar.</div>
         ) : (
           <>
-            {/* Compact ranking */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "16px" }}>
-              {intelligensRanking.map((entry, i) => (
-                <div key={entry.agent} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 12px", background: "#0d1117", borderRadius: "7px", border: `1px solid ${i === 0 ? "#78350f" : "#1f2937"}` }}>
-                  <span style={{ color: "#4b5563", fontSize: "11px", fontWeight: 700, minWidth: "22px" }}>#{i + 1}</span>
-                  <span style={{ flex: 1, fontSize: "13px", fontWeight: i < 3 ? 600 : 400 }}>{entry.agent}</span>
-                  <span style={{ fontSize: "14px", fontWeight: 700, color: indexFarg(entry.index), minWidth: "34px", textAlign: "right" }}>{entry.index}</span>
-                  <div style={{ width: "60px", height: "4px", background: "#1f2937", borderRadius: "2px", flexShrink: 0 }}>
-                    <div style={{ width: `${entry.index}%`, height: "100%", background: indexFarg(entry.index), borderRadius: "2px" }} />
-                  </div>
-                </div>
-              ))}
-            </div>
+            {/* Ranking bar chart */}
+            <ResponsiveContainer width="100%" height={intelligensRanking.length * 26 + 16}>
+              <BarChart
+                layout="vertical"
+                data={intelligensRanking}
+                margin={{ top: 0, right: 44, left: 4, bottom: 0 }}
+                barCategoryGap="20%"
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false} />
+                <XAxis type="number" domain={[0, 100]} tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="agent" tick={{ fill: "#d1d5db", fontSize: 12 }} tickLine={false} axisLine={false} width={140} />
+                <Tooltip {...TOOLTIP_STYLE} formatter={v => [`${v} / 100`, "Intelligensindex"]} />
+                <Bar dataKey="index" radius={[0, 3, 3, 0]}>
+                  {intelligensRanking.map(entry => (
+                    <Cell key={entry.agent} fill={indexFarg(entry.index)} />
+                  ))}
+                  <LabelList dataKey="index" position="right" style={{ fill: "#9ca3af", fontSize: 11 }} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+            <div style={{ height: "16px" }} />
 
             {/* Agent detail dropdown */}
             <select
