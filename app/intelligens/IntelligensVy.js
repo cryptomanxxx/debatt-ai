@@ -26,6 +26,7 @@ const CIV_FARGER = {
 
 export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalitetPerAgentData, agentsForKvalitet, kvalitetTrend, kiLibrary, fragaVeckoData, agentsByFragor, fragaMottagarVeckoData, agentsByMottagare, civVeckoData, civEndpoints, endpointLabels, intelligensRanking }) {
   const [oppenAgent, setOppenAgent] = useState(null);
+  const [valtAgent, setValtAgent] = useState(null);
 
   // Detect if quality trend goes up with more KI
   let korrelationsTecken = null;
@@ -58,74 +59,107 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
       <div style={SEKTION}>
         <h2 style={RUBRIK}>🧠 Intelligensindex</h2>
         <p style={INGRESS}>
-          Sammansatt mätvärde per agent — inspirerat av ChatGPT:s förslag.
-          Fyra dimensioner: Kunskapsackumulering · KI (20%) + Artikelkvalitet (30%) +
-          Prognosträffsäkerhet · Prediction Markets (30%) + Kalibrering · Visdomsspelet (20%).
-          Lärande och Originalitet tillkommer när vi har mer data.
+          Sammansatt mätvärde: KI (20%) + Artikelkvalitet (30%) + Prediction Markets (30%) + Kalibrering (20%).
+          Välj agent för dimensionsdetalj och tidsserier.
         </p>
 
         {(!intelligensRanking || intelligensRanking.length === 0) ? (
           <div style={TOM}>Indexet beräknas när agenter publicerat artiklar.</div>
         ) : (
           <>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {/* Compact ranking */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginBottom: "16px" }}>
               {intelligensRanking.map((entry, i) => (
-                <div
-                  key={entry.agent}
-                  style={{
-                    background: "#0d1117",
-                    borderRadius: "10px",
-                    padding: "14px 16px",
-                    border: `1px solid ${i === 0 ? "#854d0e" : i === 1 ? "#374151" : "#1f2937"}`,
-                  }}
-                >
-                  {/* Agent header row */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-                    <span style={{ color: "#6b7280", fontSize: "13px", fontWeight: 700, minWidth: "26px" }}>
-                      #{i + 1}
-                    </span>
-                    <span style={{ fontWeight: 600, fontSize: "14px", flex: 1 }}>{entry.agent}</span>
-                    <span style={{ fontSize: "20px", fontWeight: 800, color: indexFarg(entry.index) }}>
-                      {entry.index}
-                    </span>
-                    <span style={{ fontSize: "11px", color: "#4b5563" }}>/100</span>
-                  </div>
-
-                  {/* Dimension bars */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "10px" }}>
-                    {DIMENSIONER.map(dim => {
-                      const score = entry[dim.key];
-                      const uncertain = dim.flagga && !entry[dim.flagga];
-                      return (
-                        <div key={dim.key}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#6b7280", marginBottom: "4px" }}>
-                            <span>{dim.label} <span style={{ color: "#374151" }}>{dim.vikt}</span></span>
-                            <span style={{ color: uncertain ? "#4b5563" : "#9ca3af" }}>
-                              {uncertain ? "~" : ""}{score}
-                            </span>
-                          </div>
-                          <div style={{ height: "5px", background: "#1f2937", borderRadius: "3px", overflow: "hidden" }}>
-                            <div style={{
-                              height: "100%",
-                              width: `${score}%`,
-                              background: uncertain ? "#2d3748" : dim.color,
-                              borderRadius: "3px",
-                              transition: "width 0.3s ease",
-                            }} />
-                          </div>
-                        </div>
-                      );
-                    })}
+                <div key={entry.agent} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 12px", background: "#0d1117", borderRadius: "7px", border: `1px solid ${i === 0 ? "#78350f" : "#1f2937"}` }}>
+                  <span style={{ color: "#4b5563", fontSize: "11px", fontWeight: 700, minWidth: "22px" }}>#{i + 1}</span>
+                  <span style={{ flex: 1, fontSize: "13px", fontWeight: i < 3 ? 600 : 400 }}>{entry.agent}</span>
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: indexFarg(entry.index), minWidth: "34px", textAlign: "right" }}>{entry.index}</span>
+                  <div style={{ width: "60px", height: "4px", background: "#1f2937", borderRadius: "2px", flexShrink: 0 }}>
+                    <div style={{ width: `${entry.index}%`, height: "100%", background: indexFarg(entry.index), borderRadius: "2px" }} />
                   </div>
                 </div>
               ))}
             </div>
 
-            <div style={{ fontSize: "11px", color: "#374151", marginTop: "14px", lineHeight: 1.6 }}>
-              ~ = standardantagande 50 vid otillräcklig data &nbsp;·&nbsp;
-              Prediktion kräver ≥3 avgjorda Prediction Market-bets &nbsp;·&nbsp;
-              Kalibrering kräver ≥2 Visdomsspelet-omgångar
-            </div>
+            {/* Agent detail dropdown */}
+            <select
+              value={valtAgent || ""}
+              onChange={e => setValtAgent(e.target.value || null)}
+              style={{ width: "100%", background: "#1f2937", color: "#e5e7eb", border: "1px solid #374151", borderRadius: "8px", padding: "10px 14px", fontSize: "14px", cursor: "pointer", marginBottom: valtAgent ? "16px" : 0 }}
+            >
+              <option value="">Välj agent för detaljvy och tidsserier →</option>
+              {intelligensRanking.map((e, i) => (
+                <option key={e.agent} value={e.agent}>#{i + 1} {e.agent} — {e.index} / 100</option>
+              ))}
+            </select>
+
+            {/* Detail panel for selected agent */}
+            {valtAgent && (() => {
+              const entry = intelligensRanking.find(e => e.agent === valtAgent);
+              if (!entry) return null;
+              const harKiData = (kiGrowthData || []).some(r => r[valtAgent] != null);
+              const harKvalData = (kvalitetPerAgentData || []).some(r => r[valtAgent] != null);
+              return (
+                <div>
+                  {/* 4 dimension score cards */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px", marginBottom: "20px" }}>
+                    {DIMENSIONER.map(dim => {
+                      const score = entry[dim.key];
+                      const uncertain = dim.flagga && !entry[dim.flagga];
+                      return (
+                        <div key={dim.key} style={{ background: "#0d1117", borderRadius: "8px", padding: "12px 10px", border: "1px solid #1f2937", textAlign: "center" }}>
+                          <div style={{ fontSize: "10px", color: "#6b7280", marginBottom: "6px" }}>{dim.label}<br /><span style={{ color: "#374151" }}>{dim.vikt}</span></div>
+                          <div style={{ fontSize: "22px", fontWeight: 800, color: uncertain ? "#4b5563" : dim.color }}>{uncertain ? "~" : ""}{score}</div>
+                          <div style={{ marginTop: "8px", height: "3px", background: "#1f2937", borderRadius: "2px" }}>
+                            <div style={{ width: `${score}%`, height: "100%", background: uncertain ? "#2d3748" : dim.color, borderRadius: "2px" }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* KI time series */}
+                  {harKiData ? (
+                    <div style={{ marginBottom: "16px" }}>
+                      <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "8px" }}>KI-ackumulering — {valtAgent}</div>
+                      <ResponsiveContainer width="100%" height={140}>
+                        <LineChart data={kiGrowthData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                          <XAxis dataKey="week" tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false} interval="preserveStartEnd" />
+                          <YAxis tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false} allowDecimals={false} />
+                          <Tooltip {...TOOLTIP_STYLE} />
+                          <Line type="monotone" dataKey={valtAgent} stroke="#60a5fa" strokeWidth={2} dot={false} connectNulls />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "12px", color: "#4b5563", marginBottom: "12px" }}>KI-kurva saknas — agenten ingår inte bland topp-6 KI-insamlare.</div>
+                  )}
+
+                  {/* Quality time series */}
+                  {harKvalData ? (
+                    <div>
+                      <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "8px" }}>Artikelkvalitet per månad — {valtAgent}</div>
+                      <ResponsiveContainer width="100%" height={140}>
+                        <LineChart data={kvalitetPerAgentData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                          <XAxis dataKey="manad" tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false} />
+                          <YAxis domain={["auto", "auto"]} tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false} />
+                          <Tooltip {...TOOLTIP_STYLE} formatter={v => [`${v} poäng`, "Snittpoäng"]} />
+                          <Line type="monotone" dataKey={valtAgent} stroke="#34d399" strokeWidth={2} dot={{ r: 3, fill: "#34d399" }} connectNulls />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "12px", color: "#4b5563" }}>Kvalitetstrend saknas — agenten ingår inte bland topp-6 KI-insamlare.</div>
+                  )}
+
+                  <div style={{ fontSize: "11px", color: "#374151", marginTop: "14px" }}>
+                    ~ = standardantagande 50 &nbsp;·&nbsp; Prediktion kräver ≥3 avgjorda bets &nbsp;·&nbsp; Kalibrering kräver ≥2 Visdomsspelet-omgångar
+                  </div>
+                </div>
+              );
+            })()}
           </>
         )}
       </div>
