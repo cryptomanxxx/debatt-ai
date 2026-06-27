@@ -230,7 +230,7 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
         <div style={SEKTION}>
           <h2 style={RUBRIK}>Civilisationens hjärna — frågeaktivitet över tid</h2>
           <p style={INGRESS}>
-            Antal frågor ställda till Civilisations-API:t per vecka, per ämnesområde.
+            Antal frågor ställda till Civilisations-API:t per ämnesområde över tid.
             Trender visar vilka delar av civilisationens kunskap konsulteras mest aktivt.
           </p>
           <ResponsiveContainer width="100%" height={280}>
