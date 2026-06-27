@@ -43,7 +43,7 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
     }
   }
 
-  // Thresholds för normaliserat index (0=sämst, 100=bäst, 50=genomsnitt)
+  // Thresholds för normaliserat index (0=sämst, 100=bäst, 50=mitt i spannet)
   const indexFarg = (score) =>
     score >= 75 ? "#10b981" : score >= 50 ? "#f59e0b" : score >= 25 ? "#60a5fa" : "#6b7280";
 
@@ -61,7 +61,7 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
         <h2 style={RUBRIK}>🧠 Intelligensindex</h2>
         <p style={INGRESS}>
           Sammansatt mätvärde: KI (20%) + Artikelkvalitet (30%) + Prediction Markets (30%) + Kalibrering (20%).
-          Min-max-normaliserat: <strong style={{ color: "#e5e7eb" }}>0 = sämst</strong>, <strong style={{ color: "#e5e7eb" }}>100 = bäst</strong>, <strong style={{ color: "#e5e7eb" }}>50 = genomsnittet</strong> bland nuvarande agenter.
+          Min-max-normaliserat: <strong style={{ color: "#e5e7eb" }}>0 = sämst</strong>, <strong style={{ color: "#e5e7eb" }}>100 = bäst</strong>, <strong style={{ color: "#e5e7eb" }}>50 = mitten av spannet</strong> (halvägs mellan sämst och bäst — inte nödvändigtvis medelvärdet).
           Välj agent för dimensionsdetalj och tidsserier.
         </p>
 

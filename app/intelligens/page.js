@@ -287,7 +287,8 @@ export default async function IntelligensPage() {
     };
   }).sort((a, b) => b.index - a.index);
 
-  // Min-max-normalisera så att 0 = sämst, 100 = bäst, 50 = genomsnittet bland nuvarande agenter.
+  // Min-max-normalisera så att 0 = sämst, 100 = bäst, 50 = mitten av spannet.
+  // OBS: 50 är mittpunkten mellan sämst och bäst, inte nödvändigtvis populationsmedelvärdet.
   // Det råa indexet har ett golv på ~39-49 p.g.a. att artikelkvalitet alltid är ~80
   // och win/calib defaultar till 50 — normalisering eliminerar golvet.
   if (intelligensRanking.length >= 2) {
