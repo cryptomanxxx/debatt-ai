@@ -225,13 +225,13 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
         </div>
       )}
 
-      {/* Chart 6: Civilisations-API queries over time, one line per endpoint */}
+      {/* Chart 6: Civilisations-API cumulative queries over time, one line per endpoint */}
       {civVeckoData && civVeckoData.length > 0 && civEndpoints && civEndpoints.length > 0 && (
         <div style={SEKTION}>
-          <h2 style={RUBRIK}>Civilisationens hjärna — frågeaktivitet över tid</h2>
+          <h2 style={RUBRIK}>Civilisationens hjärna — kumulativa frågor över tid</h2>
           <p style={INGRESS}>
-            Antal frågor ställda till Civilisations-API:t per ämnesområde över tid.
-            Trender visar vilka delar av civilisationens kunskap konsulteras mest aktivt.
+            Totalt antal frågor ställda till Civilisations-API:t per ämnesområde sedan start.
+            Visar vilka delar av civilisationens kunskap som konsulteras mest och hur användningen växer.
           </p>
           <ResponsiveContainer width="100%" height={280}>
             <LineChart data={civVeckoData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
@@ -255,6 +255,7 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
                   strokeWidth={2}
                   dot={{ r: 3, fill: CIV_FARGER[ep] || FARGER[i % FARGER.length] }}
                   name={ep}
+                  connectNulls
                 />
               ))}
             </LineChart>

@@ -193,13 +193,13 @@ export default async function IntelligensPage() {
   const civLogItems = (civLog || []).filter(r => r.skapad);
   const civEndpoints = [...new Set(civLogItems.map(r => r.endpoint || "general"))].sort();
   const civWeeks = [...new Set(civLogItems.map(r => weekStart(r.skapad)))].sort();
+  // Kumulativt: räkna alla frågor t.o.m. slutet av varje vecka (samma mönster som kiGrowthData)
   const civVeckoData = civWeeks.map(week => {
-    const wStart = week + "T00:00:00";
-    const wEnd = weekEnd(week) + "T23:59:59";
+    const cutoff = weekEnd(week) + "T23:59:59";
     const row = { week };
     for (const ep of civEndpoints) {
-      const n = civLogItems.filter(r => (r.endpoint || "general") === ep && r.skapad >= wStart && r.skapad <= wEnd).length;
-      row[ep] = n;
+      const n = civLogItems.filter(r => (r.endpoint || "general") === ep && r.skapad <= cutoff).length;
+      row[ep] = n > 0 ? n : undefined;
     }
     return row;
   });
