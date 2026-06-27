@@ -31,12 +31,18 @@ function weekEnd(weekStartStr) {
 
 export default async function IntelligensPage() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-  const [kiItems, artiklar, fragaItems, civFragorRaw, betsData, kiSpelData] = await Promise.all([
+  const [kiItems, artiklar, fragaItems, civFragorRaw, civLogRaw, betsData, kiSpelData] = await Promise.all([
     sb("agent_ki?order=skapad.asc&select=agent,amne,insikt,skapad&limit=5000", key),
     sb("artiklar?kalla=eq.ai&order=skapad.asc&select=forfattare,arg,ori,rel,tro,skapad&limit=3000", key),
     sb("agent_fragor?fragare=not.is.null&fragare=neq.api&order=skapad.asc&select=fragare,agent,skapad&limit=5000", key),
+    // Agent queries: anon-readable table, always available
     sb("civilisation_fragor?order=skapad.asc&select=agent,typ,skapad&limit=5000", key),
+    // Web/API queries: service-role-only, filter out agent entries to avoid double-counting
+    svcKey
+      ? sb("civilisation_log?kalltyp=neq.agent&order=skapad.asc&select=endpoint,kalltyp,skapad&limit=5000", svcKey)
+      : Promise.resolve([]),
     sb("agent_bets?avgjord=eq.true&select=agent,vinst&limit=5000", key),
     sb("ki_spel?select=agent_svar,facit&order=skapad.desc&limit=200", key),
   ]);
@@ -196,24 +202,30 @@ export default async function IntelligensPage() {
   });
 
   // ── Civilisations-API frågor ──────────────────────────────────────────────
-  // Källa: civilisation_fragor (publik RLS) — agenternas frågor till Civilisationens hjärna.
-  // civilisation_log (service-role-only) loggar bara om SUPABASE_SERVICE_ROLE_KEY är satt
-  // i Next.js-runtimen, vilket ger nästan inga rader och en tom graf.
+  // Slår ihop två källor för fullständig täckning:
+  //   civilisation_fragor — agentfrågor, publik RLS, alltid tillgänglig (typ-kolumn)
+  //   civilisation_log    — web/API-frågor (kalltyp != agent), service-role-only (endpoint-kolumn)
+  // Ingen dubbelräkning: log-rader med kalltyp=agent filtreras bort i fetchen.
   const ENDPOINT_LABELS = {
     ekonomi: "Ekonomi", historia: "Historia", allianser: "Allianser",
     relationer: "Relationer", insikter: "Insikter", territorium: "Territorium",
     prediktioner: "Prediktioner", kunskap: "Kunskap", general: "Allmänt",
     nyheter: "Nyheter", politik: "Politik", social: "Social",
   };
-  const civLogItems = (civFragorRaw || []).filter(r => r.skapad);
-  const civEndpoints = [...new Set(civLogItems.map(r => r.typ || "general"))].sort();
+  const KNOWN_EPS = new Set(Object.keys(ENDPOINT_LABELS));
+  const normEp = ep => KNOWN_EPS.has(ep) ? ep : "general";
+  const civLogItems = [
+    ...(civFragorRaw || []).filter(r => r.skapad).map(r => ({ endpoint: normEp(r.typ || "general"), skapad: r.skapad })),
+    ...(civLogRaw   || []).filter(r => r.skapad).map(r => ({ endpoint: normEp(r.endpoint || "general"), skapad: r.skapad })),
+  ].sort((a, b) => a.skapad.localeCompare(b.skapad));
+  const civEndpoints = [...new Set(civLogItems.map(r => r.endpoint))].sort();
   const civWeeks = [...new Set(civLogItems.map(r => weekStart(r.skapad)))].sort();
   // Kumulativt: räkna alla frågor t.o.m. slutet av varje vecka (samma mönster som kiGrowthData)
   const civVeckoData = civWeeks.map(week => {
     const cutoff = weekEnd(week) + "T23:59:59";
     const row = { week };
     for (const ep of civEndpoints) {
-      const n = civLogItems.filter(r => (r.typ || "general") === ep && r.skapad <= cutoff).length;
+      const n = civLogItems.filter(r => r.endpoint === ep && r.skapad <= cutoff).length;
       row[ep] = n > 0 ? n : undefined;
     }
     return row;
