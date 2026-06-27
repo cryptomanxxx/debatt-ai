@@ -1478,10 +1478,11 @@ def _hamta_extern_kontext_py(fraga: str, typ: str = "general") -> str:
         topik = "politik"
     elif re.search(r'nyheter|aktuellt|världen|händelse|senaste', f):
         topik = "nyheter"
-    elif re.search(r'civilisation|agenten\b|plattformen|vår civilisation|simuleringen|debatt-ai', f):
-        return ""
     else:
-        topik = "nyheter"
+        # No explicit external-world keyword match — don't inject news.
+        # Internal agent questions (e.g. "Vad hände i domstolen senast?") fall here
+        # and must NOT get world-news context that overrides simulation answers.
+        return ""
 
     EXTERN_FEEDS = {
         "krypto":    [("CoinDesk",    "https://www.coindesk.com/arc/outboundfeeds/rss/"),
