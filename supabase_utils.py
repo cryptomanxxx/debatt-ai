@@ -1453,6 +1453,106 @@ def generera_ki_fran_svar(sb_key: str, agent_namn: str, fraga: str, svar: str, t
         spara_ki(sb_key, agent_namn, typ, f"[{_date.today().isoformat()}] {svar[:240]}")
 
 
+def _hamta_extern_kontext_py(fraga: str, typ: str = "general") -> str:
+    """Hämtar aktuella nyheter/data från omvärlden baserat på frågans ämne.
+    Returnerar formatterad sträng att injicera som extern kontext, eller '' vid ej relevant fråga."""
+    # Gate on question text, not on typ — in Python, typ is the agent's domain label
+    # (e.g. "historia"), not an explicit endpoint, so it's not a reliable signal for
+    # "simulation-only". The question-text regex below handles simulation questions correctly.
+    f = fraga.lower()
+    if re.search(r'bitcoin|ethereum|krypto|btc|eth|sol|xrp|bnb|crypto|blockchain|defi|nft', f):
+        topik = "krypto"
+    elif re.search(r'aktier|börsen|nasdaq|aktie|investering|ränta|riksbank|inflation', f):
+        topik = "ekonomi"
+    elif re.search(r'tech|teknologi|\bai(?!-civilisation)\b|artificiell intelligens|openai|google|apple|meta|microsoft', f):
+        topik = "tech"
+    elif re.search(r'forskning|vetenskap|studie|medicin|biologi|cancer|fysik|kemi|kvantum', f):
+        topik = "vetenskap"
+    elif re.search(r'klimat|co2|utsläpp|temperatur|havsnivå|isberg|miljö|hållbar', f):
+        topik = "klimat"
+    elif re.search(r'demokrati|mänsklig|värdighet|rättighet|integritet|privatliv|frihet|suveränitet', f):
+        topik = "samhälle"
+    elif re.search(r'hälsa|psykisk|psykologi|välfärd|sjukvård|barnhälsa', f):
+        topik = "hälsa"
+    elif re.search(r'politik|val|regering|riksdag|eu|nato|krig|fred|lag|lagstiftning|korruption', f):
+        topik = "politik"
+    elif re.search(r'nyheter|aktuellt|världen|händelse|senaste', f):
+        topik = "nyheter"
+    elif re.search(r'civilisation|agenten\b|plattformen|vår civilisation|simuleringen|debatt-ai', f):
+        return ""
+    else:
+        topik = "nyheter"
+
+    EXTERN_FEEDS = {
+        "krypto":    [("CoinDesk",    "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+                      ("Hacker News", "https://hnrss.org/frontpage")],
+        "ekonomi":   [("BBC Business", "https://feeds.bbci.co.uk/news/business/rss.xml"),
+                      ("SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml")],
+        "nyheter":   [("SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml"),
+                      ("BBC News",     "https://feeds.bbci.co.uk/news/rss.xml")],
+        "tech":      [("The Verge",    "https://www.theverge.com/rss/index.xml"),
+                      ("Hacker News",  "https://hnrss.org/frontpage")],
+        "vetenskap": [("BBC Science",  "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml"),
+                      ("Hacker News",  "https://hnrss.org/frontpage")],
+        "klimat":    [("BBC Science",  "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml"),
+                      ("SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml")],
+        "politik":   [("SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml"),
+                      ("BBC News",     "https://feeds.bbci.co.uk/news/rss.xml")],
+        "samhälle":  [("SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml"),
+                      ("Al Jazeera",   "https://www.aljazeera.com/xml/rss/all.xml")],
+        "hälsa":     [("BBC Health",   "https://feeds.bbci.co.uk/news/health/rss.xml"),
+                      ("SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml")],
+    }
+
+    hdrs = {"User-Agent": "Mozilla/5.0 (compatible; debatt-ai/1.0)"}
+    delar = []
+
+    if topik == "krypto":
+        try:
+            r = httpx.get(
+                "https://api.coingecko.com/api/v3/simple/price"
+                "?ids=bitcoin,ethereum,solana,ripple,binancecoin&vs_currencies=usd&include_24hr_change=true",
+                timeout=5, headers={"Accept": "application/json"},
+            )
+            if r.is_success:
+                NAMN = {"bitcoin": "Bitcoin (BTC)", "ethereum": "Ethereum (ETH)",
+                        "solana": "Solana (SOL)", "ripple": "XRP", "binancecoin": "BNB"}
+                rader = []
+                for coin_id, d in r.json().items():
+                    ch = d.get("usd_24h_change")
+                    ch_s = f" ({'+' if ch > 0 else ''}{ch:.1f}% 24h)" if ch is not None else ""
+                    rader.append(f"{NAMN.get(coin_id, coin_id)}: ${d['usd']:,.0f}{ch_s}")
+                if rader:
+                    delar.append("Live kryptopriser (CoinGecko):\n" + "\n".join(rader))
+        except Exception:
+            pass
+
+    titlar: list[str] = []
+    for namn, url in (EXTERN_FEEDS.get(topik) or [])[:2]:
+        try:
+            r = httpx.get(url, timeout=5, headers=hdrs)
+            if not r.is_success:
+                continue
+            for m in re.findall(
+                r'<title[^>]*>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?</title>', r.text, re.DOTALL
+            )[1:]:
+                t = re.sub(r'<[^>]+>', '', m)
+                t = (t.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>')
+                       .replace('&quot;', '"'))
+                t = re.sub(r'&#\d+;', '', t).strip()
+                if len(t) > 15:
+                    titlar.append(f"[{namn}] {t}")
+                    if len(titlar) >= 8:
+                        break
+        except Exception:
+            pass
+
+    if titlar:
+        delar.append("Aktuella nyheter:\n" + "\n".join(titlar[:8]))
+
+    return "\n\n".join(delar)
+
+
 def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "general") -> str:
     """Agenten ställer en aktiv fråga till civilisationens hjärna.
     Hämtar relevant realtidsdata, svarar via LLM, loggar till civilisation_fragor.
@@ -1535,15 +1635,24 @@ def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "g
 
     kontext = "\n\n".join(data_delar) if data_delar else "Ingen data tillgänglig."
 
+    extern_kontext = _hamta_extern_kontext_py(fraga, typ)
+
     system = (
-        "Du är Civilisationens Hjärna — ett omniscient observationssystem för AI-civilisationen Debatt-AI. "
-        "Du svarar koncist och faktabaserat på frågor om civilisationens aktuella tillstånd."
+        "Du är Civilisationens Hjärna — ett omniscient observationssystem med tillgång till BÅDE verkliga "
+        "nyheter/data från omvärlden OCH intern data från AI-civilisationen Debatt-AI. "
+        "När frågan handlar om den verkliga världen: förankra svaret i de verkliga nyheterna/data först, "
+        "dra sedan paralleller till vad du observerar i AI-civilisationen. "
+        "Låt aldrig simuleringsdata ersätta verkliga fakta — använd den som ett kompletterande lins. "
+        "Var specifik och hänvisa till källor när möjligt. 2–3 meningar."
     )
-    prompt = (
-        f"## Aktuell civilisationsdata\n{kontext}\n\n"
-        f"## Fråga från {agent_namn}\n{fraga}\n\n"
+    prompt_delar = [f"## Aktuell civilisationsdata\n{kontext}"]
+    if extern_kontext:
+        prompt_delar.append(f"## Data från omvärlden\n{extern_kontext}")
+    prompt_delar.append(f"## Fråga från {agent_namn}\n{fraga}")
+    prompt_delar.append(
         "Svara på 2–3 meningar på svenska. Var specifik och referera till faktiska siffror eller agentnamn."
     )
+    prompt = "\n\n".join(prompt_delar)
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
