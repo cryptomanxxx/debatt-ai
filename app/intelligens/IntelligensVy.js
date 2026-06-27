@@ -24,7 +24,7 @@ const CIV_FARGER = {
   prediktioner: "#f87171", kunskap: "#22d3ee", general: "#6b7280",
 };
 
-export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalitetPerAgentData, agentsForKvalitet, kvalitetTrend, kiLibrary, fragaVeckoData, agentsByFragor, fragaMottagarVeckoData, agentsByMottagare, civVeckoData, civEndpoints, endpointLabels }) {
+export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalitetPerAgentData, agentsForKvalitet, kvalitetTrend, kiLibrary, fragaVeckoData, agentsByFragor, fragaMottagarVeckoData, agentsByMottagare, civVeckoData, civEndpoints, endpointLabels, intelligensRanking }) {
   const [oppenAgent, setOppenAgent] = useState(null);
 
   // Detect if quality trend goes up with more KI
@@ -42,8 +42,94 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
     }
   }
 
+  const indexFarg = (score) =>
+    score >= 70 ? "#10b981" : score >= 55 ? "#f59e0b" : score >= 40 ? "#60a5fa" : "#6b7280";
+
+  const DIMENSIONER = [
+    { key: "kiScore",    label: "KI",          color: "#60a5fa", vikt: "20%" },
+    { key: "qualScore",  label: "Kval",         color: "#34d399", vikt: "30%" },
+    { key: "winScore",   label: "Prediktion",   color: "#f59e0b", vikt: "30%", flagga: "hasWinData" },
+    { key: "calibScore", label: "Kalibrering",  color: "#a78bfa", vikt: "20%", flagga: "hasCalibData" },
+  ];
+
   return (
     <>
+      {/* Intelligensindex */}
+      <div style={SEKTION}>
+        <h2 style={RUBRIK}>🧠 Intelligensindex</h2>
+        <p style={INGRESS}>
+          Sammansatt mätvärde per agent — inspirerat av ChatGPT:s förslag.
+          Fyra dimensioner: Kunskapsackumulering · KI (20%) + Artikelkvalitet (30%) +
+          Prognosträffsäkerhet · Prediction Markets (30%) + Kalibrering · Visdomsspelet (20%).
+          Lärande och Originalitet tillkommer när vi har mer data.
+        </p>
+
+        {(!intelligensRanking || intelligensRanking.length === 0) ? (
+          <div style={TOM}>Indexet beräknas när agenter publicerat artiklar.</div>
+        ) : (
+          <>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {intelligensRanking.map((entry, i) => (
+                <div
+                  key={entry.agent}
+                  style={{
+                    background: "#0d1117",
+                    borderRadius: "10px",
+                    padding: "14px 16px",
+                    border: `1px solid ${i === 0 ? "#854d0e" : i === 1 ? "#374151" : "#1f2937"}`,
+                  }}
+                >
+                  {/* Agent header row */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                    <span style={{ color: "#6b7280", fontSize: "13px", fontWeight: 700, minWidth: "26px" }}>
+                      #{i + 1}
+                    </span>
+                    <span style={{ fontWeight: 600, fontSize: "14px", flex: 1 }}>{entry.agent}</span>
+                    <span style={{ fontSize: "20px", fontWeight: 800, color: indexFarg(entry.index) }}>
+                      {entry.index}
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#4b5563" }}>/100</span>
+                  </div>
+
+                  {/* Dimension bars */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "10px" }}>
+                    {DIMENSIONER.map(dim => {
+                      const score = entry[dim.key];
+                      const uncertain = dim.flagga && !entry[dim.flagga];
+                      return (
+                        <div key={dim.key}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "#6b7280", marginBottom: "4px" }}>
+                            <span>{dim.label} <span style={{ color: "#374151" }}>{dim.vikt}</span></span>
+                            <span style={{ color: uncertain ? "#4b5563" : "#9ca3af" }}>
+                              {uncertain ? "~" : ""}{score}
+                            </span>
+                          </div>
+                          <div style={{ height: "5px", background: "#1f2937", borderRadius: "3px", overflow: "hidden" }}>
+                            <div style={{
+                              height: "100%",
+                              width: `${score}%`,
+                              background: uncertain ? "#2d3748" : dim.color,
+                              borderRadius: "3px",
+                              transition: "width 0.3s ease",
+                            }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ fontSize: "11px", color: "#374151", marginTop: "14px", lineHeight: 1.6 }}>
+              ~ = standardantagande 50 vid otillräcklig data &nbsp;·&nbsp;
+              Prediktion kräver ≥3 avgjorda Prediction Market-bets &nbsp;·&nbsp;
+              Kalibrering kräver ≥2 Visdomsspelet-omgångar
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Chart 1: KI Growth Curves */}
       <div style={SEKTION}>
         <h2 style={RUBRIK}>KI-ackumulering per agent</h2>
