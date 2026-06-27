@@ -1420,6 +1420,39 @@ AGENT_CIV_FRAGA: dict[str, tuple[str, str]] = {
 }
 
 
+def generera_ki_fran_svar(sb_key: str, agent_namn: str, fraga: str, svar: str, typ: str) -> None:
+    """Destillerar 1–2 KI-insikter ur ett Civilisations-API Q&A-utbyte.
+    Ersätter verbatim-sparning med faktisk insiktsextraktion via LLM."""
+    import re as _re, json as _json
+    system = "Du är en debattanalytiker. Svara ALLTID som JSON-array och inget annat."
+    prompt = (
+        f"Agent '{agent_namn}' konsulterade Civilisationens hjärna:\n"
+        f"Fråga: {fraga}\n"
+        f"Svar: {svar}\n\n"
+        "Destillera 1–2 konkreta insikter ur detta Q&A-utbyte som agenten kan bära med sig "
+        "till framtida debatter. Varje insikt ska fånga det essentiella faktumet eller lärdomen "
+        "— specifik, datanära och handlingsbar. Skriv som om agenten reflekterar i första person.\n\n"
+        "Format (JSON-array, inget annat):\n"
+        '[{"amne": "specifikt ämnesord (max 60 tecken)", "insikt": "konkret lärdom (max 220 tecken)"}]'
+    )
+    llm_svar = _llm_spel(system, prompt, max_tokens=280)
+    sparad = False
+    try:
+        m = _re.search(r'\[.*\]', llm_svar, _re.DOTALL)
+        if m:
+            data = _json.loads(m.group())
+            for d in data[:2]:
+                if d.get("amne") and d.get("insikt"):
+                    spara_ki(sb_key, agent_namn, d["amne"][:60], d["insikt"][:220])
+                    sparad = True
+    except Exception:
+        pass
+    if not sparad:
+        # Fallback: spara råsvaret om LLM-destillationen misslyckas
+        from datetime import date as _date
+        spara_ki(sb_key, agent_namn, typ, f"[{_date.today().isoformat()}] {svar[:240]}")
+
+
 def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "general") -> str:
     """Agenten ställer en aktiv fråga till civilisationens hjärna.
     Hämtar relevant realtidsdata, svarar via LLM, loggar till civilisation_fragor.
@@ -1540,11 +1573,9 @@ def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "g
     except Exception:
         pass
 
-    # Spara insikten som Knowledge Item med datumprefix så agenten vet när den är från
+    # Destillera Q&A-utbytet till persistenta KI-insikter
     if svar:
-        from datetime import date as _date
-        datumprefix = f"[{_date.today().isoformat()}] "
-        spara_ki(sb_key, agent_namn, typ, (datumprefix + svar)[:300])
+        generera_ki_fran_svar(sb_key, agent_namn, fraga, svar, typ)
 
     # Logga även till civilisation_log (gemensam logg med kalltyp=agent)
     svc_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key

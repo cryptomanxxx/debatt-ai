@@ -404,11 +404,11 @@ def main():
             print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
         mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
         civ_svar = ""
-        if sb_key and random.random() < 0.20:
+        if sb_key and random.random() < 0.35:
             fraga, typ = _generera_civ_fraga(agent, minne_kontext)
             civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
             if civ_svar:
-                print(f"  🧠 Civilisationsfråga ställd och besvarad")
+                print(f"  🧠 Civilisationsfråga ställd och KI destillerat")
         hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest, civ_svar]))
         if hist_kontext:
             print(f"  🌍 Civilisationskontext injicerad")
@@ -610,11 +610,11 @@ def main():
                 print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
             mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
             civ_svar = ""
-            if sb_key and random.random() < 0.20:
+            if sb_key and random.random() < 0.35:
                 fraga, typ = _generera_civ_fraga(agent, minne_kontext)
                 civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
                 if civ_svar:
-                    print(f"  🧠 Civilisationsfråga ställd och besvarad")
+                    print(f"  🧠 Civilisationsfråga ställd och KI destillerat")
             hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest, civ_svar]))
             if hist_kontext:
                 print(f"  🌍 Civilisationskontext injicerad")
@@ -672,11 +672,11 @@ def main():
                 print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
             mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
             civ_svar = ""
-            if sb_key and random.random() < 0.20:
+            if sb_key and random.random() < 0.35:
                 fraga, typ = _generera_civ_fraga(agent, minne_kontext)
                 civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
                 if civ_svar:
-                    print(f"  🧠 Civilisationsfråga ställd och besvarad")
+                    print(f"  🧠 Civilisationsfråga ställd och KI destillerat")
             hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest, civ_svar]))
             if hist_kontext:
                 print(f"  🌍 Civilisationskontext injicerad")
@@ -727,11 +727,11 @@ def main():
                 print(f"  🏢 Företagsroll injicerad: {foretag_info['foretag']['namn']}")
             mkt_hist = hamta_agent_market_historik(sb_key, agent["namn"]) if sb_key else ""
             civ_svar = ""
-            if sb_key and random.random() < 0.20:
+            if sb_key and random.random() < 0.35:
                 fraga, typ = _generera_civ_fraga(agent, minne_kontext)
                 civ_svar = fraga_civilisationen(sb_key, agent["namn"], fraga, typ)
                 if civ_svar:
-                    print(f"  🧠 Civilisationsfråga ställd och besvarad")
+                    print(f"  🧠 Civilisationsfråga ställd och KI destillerat")
             hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest, civ_svar]))
             if hist_kontext:
                 print(f"  🌍 Civilisationskontext injicerad")
