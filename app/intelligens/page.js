@@ -287,6 +287,22 @@ export default async function IntelligensPage() {
     };
   }).sort((a, b) => b.index - a.index);
 
+  // Min-max-normalisera så att 0 = sämst, 100 = bäst, 50 = genomsnittet bland nuvarande agenter.
+  // Det råa indexet har ett golv på ~39-49 p.g.a. att artikelkvalitet alltid är ~80
+  // och win/calib defaultar till 50 — normalisering eliminerar golvet.
+  if (intelligensRanking.length >= 2) {
+    const rawMin = intelligensRanking[intelligensRanking.length - 1].index;
+    const rawMax = intelligensRanking[0].index;
+    const span = rawMax - rawMin;
+    for (const e of intelligensRanking) {
+      e.indexNorm = span > 0.5
+        ? Math.round(((e.index - rawMin) / span) * 100 * 10) / 10
+        : 50;
+    }
+  } else if (intelligensRanking.length === 1) {
+    intelligensRanking[0].indexNorm = 50;
+  }
+
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalKi = kiItems.length;
   const agenterMedKi = Object.keys(kiByAgent).length;

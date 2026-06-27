@@ -43,8 +43,9 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
     }
   }
 
+  // Thresholds för normaliserat index (0=sämst, 100=bäst, 50=genomsnitt)
   const indexFarg = (score) =>
-    score >= 70 ? "#10b981" : score >= 55 ? "#f59e0b" : score >= 40 ? "#60a5fa" : "#6b7280";
+    score >= 75 ? "#10b981" : score >= 50 ? "#f59e0b" : score >= 25 ? "#60a5fa" : "#6b7280";
 
   const DIMENSIONER = [
     { key: "kiScore",    label: "KI",          color: "#60a5fa", vikt: "20%" },
@@ -60,6 +61,7 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
         <h2 style={RUBRIK}>🧠 Intelligensindex</h2>
         <p style={INGRESS}>
           Sammansatt mätvärde: KI (20%) + Artikelkvalitet (30%) + Prediction Markets (30%) + Kalibrering (20%).
+          Min-max-normaliserat: <strong style={{ color: "#e5e7eb" }}>0 = sämst</strong>, <strong style={{ color: "#e5e7eb" }}>100 = bäst</strong>, <strong style={{ color: "#e5e7eb" }}>50 = genomsnittet</strong> bland nuvarande agenter.
           Välj agent för dimensionsdetalj och tidsserier.
         </p>
 
@@ -78,12 +80,12 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false} />
                 <XAxis type="number" domain={[0, 100]} tick={{ fill: "#6b7280", fontSize: 10 }} tickLine={false} axisLine={false} />
                 <YAxis type="category" dataKey="agent" tick={{ fill: "#d1d5db", fontSize: 12 }} tickLine={false} axisLine={false} width={140} />
-                <Tooltip {...TOOLTIP_STYLE} formatter={v => [`${v} / 100`, "Intelligensindex"]} />
-                <Bar dataKey="index" radius={[0, 3, 3, 0]}>
+                <Tooltip {...TOOLTIP_STYLE} formatter={v => [`${v}`, "Intelligensindex (normaliserat)"]} />
+                <Bar dataKey="indexNorm" radius={[0, 3, 3, 0]}>
                   {intelligensRanking.map(entry => (
-                    <Cell key={entry.agent} fill={indexFarg(entry.index)} />
+                    <Cell key={entry.agent} fill={indexFarg(entry.indexNorm ?? entry.index)} />
                   ))}
-                  <LabelList dataKey="index" position="right" style={{ fill: "#9ca3af", fontSize: 11 }} />
+                  <LabelList dataKey="indexNorm" position="right" style={{ fill: "#9ca3af", fontSize: 11 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -97,7 +99,7 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
             >
               <option value="">Välj agent för detaljvy och tidsserier →</option>
               {intelligensRanking.map((e, i) => (
-                <option key={e.agent} value={e.agent}>#{i + 1} {e.agent} — {e.index} / 100</option>
+                <option key={e.agent} value={e.agent}>#{i + 1} {e.agent} — {e.indexNorm ?? e.index}</option>
               ))}
             </select>
 
