@@ -33,7 +33,7 @@ export default async function IntelligensPage() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
   const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-  const [kiItems, artiklar, fragaItems, civLog] = await Promise.all([
+  const [kiItems, artiklar, fragaItems, civLog, betsData, kiSpelData] = await Promise.all([
     sb("agent_ki?order=skapad.asc&select=agent,amne,insikt,skapad&limit=5000", key),
     sb("artiklar?kalla=eq.ai&order=skapad.asc&select=forfattare,arg,ori,rel,tro,skapad&limit=3000", key),
     sb("agent_fragor?fragare=not.is.null&fragare=neq.api&order=skapad.asc&select=fragare,agent,skapad&limit=5000", key),
@@ -41,6 +41,8 @@ export default async function IntelligensPage() {
     svcKey
       ? sb("civilisation_log?order=skapad.asc&select=endpoint,kalltyp,skapad&limit=5000", svcKey)
       : Promise.resolve([]),
+    sb("agent_bets?avgjord=eq.true&select=agent,vinst&limit=5000", key),
+    sb("ki_spel?select=agent_svar,facit&order=skapad.desc&limit=200", key),
   ]);
 
   // ── KI per agent ──────────────────────────────────────────────────────────
@@ -102,15 +104,8 @@ export default async function IntelligensPage() {
     };
   }).filter(b => b.antal > 0);
 
-  // Per-agent quality over time (monthly) — top 6 agents by article count
-  const agentArticleCount = {};
-  for (const a of artMedQ) {
-    agentArticleCount[a.agent] = (agentArticleCount[a.agent] || 0) + 1;
-  }
-  const agentsForKvalitet = Object.entries(agentArticleCount)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 6)
-    .map(([agent]) => agent);
+  // Per-agent quality over time (monthly) — same top-6 agents as KI chart so colors align
+  const agentsForKvalitet = agentsByKi.map(({ agent }) => agent);
   const kvMonths = [...new Set(artMedQ.map(a => a.datum.slice(0, 7)))].sort();
   const kvalitetPerAgentData = kvMonths.map(manad => {
     const row = { manad };
@@ -225,6 +220,73 @@ export default async function IntelligensPage() {
   });
   const totalCivFragor = civLogItems.length;
 
+  // ── Intelligensindex ──────────────────────────────────────────────────────
+  // Dimension 1: KI-count per agent (normalized)
+  const iiMaxKi = Math.max(...Object.values(kiByAgent).map(v => v.length), 1);
+
+  // Dimension 2: Average article quality per agent
+  const iiKvalSumma = {}, iiKvalAntal = {};
+  for (const a of artMedQ) {
+    if (!iiKvalSumma[a.agent]) { iiKvalSumma[a.agent] = 0; iiKvalAntal[a.agent] = 0; }
+    iiKvalSumma[a.agent] += a.kvalitet;
+    iiKvalAntal[a.agent]++;
+  }
+
+  // Dimension 3: Prediction market win rate (≥3 resolved bets)
+  const iiBetsVunna = {}, iiBetsTotal = {};
+  for (const bet of betsData) {
+    if (!bet.agent) continue;
+    if (!iiBetsTotal[bet.agent]) { iiBetsVunna[bet.agent] = 0; iiBetsTotal[bet.agent] = 0; }
+    iiBetsTotal[bet.agent]++;
+    if (bet.vinst > 0) iiBetsVunna[bet.agent]++;
+  }
+
+  // Dimension 4: Calibration from ki_spel (avg relative error, lower = better)
+  const iiCalibSumma = {}, iiCalibAntal = {};
+  for (const spel of kiSpelData) {
+    if (!spel.agent_svar || !spel.facit || spel.facit === 0) continue;
+    for (const svar of spel.agent_svar) {
+      if (!svar.agent || svar.estimat == null) continue;
+      const relFel = Math.min(Math.abs(svar.estimat - spel.facit) / Math.abs(spel.facit), 2);
+      if (!iiCalibSumma[svar.agent]) { iiCalibSumma[svar.agent] = 0; iiCalibAntal[svar.agent] = 0; }
+      iiCalibSumma[svar.agent] += relFel;
+      iiCalibAntal[svar.agent]++;
+    }
+  }
+
+  // Build ranked list for all agents that have written at least 1 scored article
+  const intelligensRanking = Object.keys(iiKvalAntal).map(agent => {
+    const kiCount = (kiByAgent[agent] || []).length;
+    const kiScore = Math.round((kiCount / iiMaxKi) * 100);
+
+    const avgQ = iiKvalSumma[agent] / iiKvalAntal[agent];
+    const qualScore = Math.round((avgQ / 10) * 100);
+
+    const hasWinData = (iiBetsTotal[agent] || 0) >= 3;
+    const winScore = hasWinData ? Math.round((iiBetsVunna[agent] / iiBetsTotal[agent]) * 100) : 50;
+
+    const hasCalibData = (iiCalibAntal[agent] || 0) >= 2;
+    const calibScore = hasCalibData
+      ? Math.round(Math.max(0, 1 - iiCalibSumma[agent] / iiCalibAntal[agent]) * 100)
+      : 50;
+
+    const index = Math.round((0.20 * kiScore + 0.30 * qualScore + 0.30 * winScore + 0.20 * calibScore) * 10) / 10;
+
+    return {
+      agent,
+      index,
+      kiScore,
+      qualScore,
+      winScore,
+      calibScore,
+      hasWinData,
+      hasCalibData,
+      kiAntal: kiCount,
+      avgKval: Math.round(avgQ * 10) / 10,
+      winPct: hasWinData ? Math.round((iiBetsVunna[agent] / iiBetsTotal[agent]) * 100) : null,
+    };
+  }).sort((a, b) => b.index - a.index);
+
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalKi = kiItems.length;
   const agenterMedKi = Object.keys(kiByAgent).length;
@@ -294,6 +356,7 @@ export default async function IntelligensPage() {
         civVeckoData={civVeckoData}
         civEndpoints={civEndpoints}
         endpointLabels={ENDPOINT_LABELS}
+        intelligensRanking={intelligensRanking}
       />
     </main>
   );
