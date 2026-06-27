@@ -225,17 +225,16 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
         </div>
       )}
 
-      {/* Chart 6: Civilisations-API queries per week, broken down by endpoint */}
+      {/* Chart 6: Civilisations-API queries over time, one line per endpoint */}
       {civVeckoData && civVeckoData.length > 0 && civEndpoints && civEndpoints.length > 0 && (
         <div style={SEKTION}>
-          <h2 style={RUBRIK}>Civilisationens hjärna — frågor per vecka</h2>
+          <h2 style={RUBRIK}>Civilisationens hjärna — frågeaktivitet över tid</h2>
           <p style={INGRESS}>
-            Antal frågor ställda till Civilisations-API:t på{" "}
-            <span style={{ color: "#9ca3af" }}>/civilisation</span> per vecka, uppdelat
-            på ämnesområde. Visar hur aktivt civilisationens samlade kunskap konsulteras.
+            Antal frågor ställda till Civilisations-API:t per vecka, per ämnesområde.
+            Trender visar vilka delar av civilisationens kunskap konsulteras mest aktivt.
           </p>
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={civVeckoData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <LineChart data={civVeckoData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
               <XAxis dataKey="week" tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} tickLine={false} allowDecimals={false} />
@@ -248,16 +247,18 @@ export default function IntelligensVy({ kiGrowthData, agentsByKi, kiBins, kvalit
                 formatter={name => (endpointLabels || {})[name] || name}
               />
               {(civEndpoints || []).map((ep, i) => (
-                <Bar
+                <Line
                   key={ep}
+                  type="monotone"
                   dataKey={ep}
-                  stackId="civ"
-                  fill={CIV_FARGER[ep] || FARGER[i % FARGER.length]}
+                  stroke={CIV_FARGER[ep] || FARGER[i % FARGER.length]}
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: CIV_FARGER[ep] || FARGER[i % FARGER.length] }}
+                  connectNulls
                   name={ep}
-                  radius={i === (civEndpoints.length - 1) ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                 />
               ))}
-            </BarChart>
+            </LineChart>
           </ResponsiveContainer>
         </div>
       )}
