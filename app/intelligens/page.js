@@ -31,11 +31,16 @@ function weekEnd(weekStartStr) {
 
 export default async function IntelligensPage() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  const svcKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
-  const [kiItems, artiklar, fragaItems] = await Promise.all([
+  const [kiItems, artiklar, fragaItems, civLog] = await Promise.all([
     sb("agent_ki?order=skapad.asc&select=agent,amne,insikt,skapad&limit=5000", key),
     sb("artiklar?kalla=eq.ai&order=skapad.asc&select=forfattare,arg,ori,rel,tro,skapad&limit=3000", key),
-    sb("agent_fragor?fragare=not.is.null&fragare=neq.api&order=skapad.asc&select=fragare,skapad&limit=5000", key),
+    sb("agent_fragor?fragare=not.is.null&fragare=neq.api&order=skapad.asc&select=fragare,agent,skapad&limit=5000", key),
+    // civilisation_log kräver service role (RLS-skyddat)
+    svcKey
+      ? sb("civilisation_log?order=skapad.asc&select=endpoint,kalltyp,skapad&limit=5000", svcKey)
+      : Promise.resolve([]),
   ]);
 
   // ── KI per agent ──────────────────────────────────────────────────────────
@@ -133,6 +138,8 @@ export default async function IntelligensPage() {
 
   // ── AI-till-AI frågor ─────────────────────────────────────────────────────
   const aiFragor = fragaItems.filter(f => f.fragare && f.fragare !== "api");
+
+  // Sändarsidan: vilka agenter ställer flest frågor?
   const fragorByAgent = {};
   for (const f of aiFragor) {
     if (!fragorByAgent[f.fragare]) fragorByAgent[f.fragare] = [];
@@ -154,6 +161,49 @@ export default async function IntelligensPage() {
     return row;
   });
   const totalFragor = aiFragor.length;
+
+  // Mottagarsidan: vilka agenter tas det mest i anspråk som hjärna?
+  const fragaMottagarByAgent = {};
+  for (const f of aiFragor) {
+    if (!f.agent) continue;
+    if (!fragaMottagarByAgent[f.agent]) fragaMottagarByAgent[f.agent] = [];
+    fragaMottagarByAgent[f.agent].push(f.skapad);
+  }
+  const agentsByMottagare = Object.entries(fragaMottagarByAgent)
+    .map(([agent, items]) => ({ agent, total: items.length }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+  const fragaMottagarVeckoData = fragaAllWeeks.map(week => {
+    const wStart = week + "T00:00:00";
+    const wEnd = weekEnd(week) + "T23:59:59";
+    const row = { week };
+    for (const { agent } of agentsByMottagare) {
+      const n = (fragaMottagarByAgent[agent] || []).filter(d => d >= wStart && d <= wEnd).length;
+      row[agent] = n > 0 ? n : undefined;
+    }
+    return row;
+  });
+
+  // ── Civilisations-API frågor ──────────────────────────────────────────────
+  const ENDPOINT_LABELS = {
+    ekonomi: "Ekonomi", historia: "Historia", allianser: "Allianser",
+    relationer: "Relationer", insikter: "Insikter", territorium: "Territorium",
+    prediktioner: "Prediktioner", kunskap: "Kunskap", general: "Allmänt",
+  };
+  const civLogItems = (civLog || []).filter(r => r.skapad);
+  const civEndpoints = [...new Set(civLogItems.map(r => r.endpoint || "general"))].sort();
+  const civWeeks = [...new Set(civLogItems.map(r => weekStart(r.skapad)))].sort();
+  const civVeckoData = civWeeks.map(week => {
+    const wStart = week + "T00:00:00";
+    const wEnd = weekEnd(week) + "T23:59:59";
+    const row = { week };
+    for (const ep of civEndpoints) {
+      const n = civLogItems.filter(r => (r.endpoint || "general") === ep && r.skapad >= wStart && r.skapad <= wEnd).length;
+      row[ep] = n > 0 ? n : undefined;
+    }
+    return row;
+  });
+  const totalCivFragor = civLogItems.length;
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const totalKi = kiItems.length;
@@ -194,6 +244,7 @@ export default async function IntelligensPage() {
           { label: "Agenter med minnen", v: agenterMedKi },
           { label: "Snitt KI / agent", v: snittKi },
           { label: "AI→AI frågor totalt", v: totalFragor.toLocaleString("sv-SE") },
+          { label: "Civilisations-API frågor", v: totalCivFragor.toLocaleString("sv-SE") },
           {
             label: "Starkast förbättring",
             v: bastaAgent || "–",
@@ -216,6 +267,11 @@ export default async function IntelligensPage() {
         kiLibrary={kiLibrary}
         fragaVeckoData={fragaVeckoData}
         agentsByFragor={agentsByFragor}
+        fragaMottagarVeckoData={fragaMottagarVeckoData}
+        agentsByMottagare={agentsByMottagare}
+        civVeckoData={civVeckoData}
+        civEndpoints={civEndpoints}
+        endpointLabels={ENDPOINT_LABELS}
       />
     </main>
   );
