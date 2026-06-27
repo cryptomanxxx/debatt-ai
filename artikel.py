@@ -10,6 +10,8 @@ innehåller:
   skriv_kommentar()         – kort kommentar (2–3 meningar) på en artikel
 """
 
+import re
+
 from ai_klient import hamta_artikel_fns, hamta_kort_fns
 from agenter import ARTIKELFORMAT, get_agent_mood
 
@@ -242,9 +244,21 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
             {"role": "user", "content": prompt},
         ],
     }
+    def _rensa_rubrik(raw: str) -> str:
+        # Cut off at any "**Rubrik:**" / "Rubrik:" / "Alternativ rubriker:" label
+        raw = re.split(r'(?i)\*{0,2}(rubrik|alternativ\s+rubriker?|titel|headline)\*{0,2}\s*:', raw)[0]
+        # Strip markdown bold/italic markers
+        raw = re.sub(r'\*+|_{2,}', '', raw)
+        # Take the first non-empty, non-bullet line
+        for line in raw.splitlines():
+            line = line.strip().strip('"\'').lstrip('-* ').strip()
+            if len(line) > 5:
+                return line
+        return raw.strip().strip('"\'')
+
     for _name, fn in hamta_kort_fns(payload, agent["system"], prompt, 60, source="rubrik"):
         try:
-            rubrik = fn().strip('"\'')
+            rubrik = _rensa_rubrik(fn())
             if len(rubrik) > 5:
                 return rubrik
         except Exception:
