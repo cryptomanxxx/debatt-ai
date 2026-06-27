@@ -212,9 +212,11 @@ export default async function IntelligensPage() {
     prediktioner: "Prediktioner", kunskap: "Kunskap", general: "Allmänt",
     nyheter: "Nyheter", politik: "Politik", social: "Social",
   };
+  const KNOWN_EPS = new Set(Object.keys(ENDPOINT_LABELS));
+  const normEp = ep => KNOWN_EPS.has(ep) ? ep : "general";
   const civLogItems = [
-    ...(civFragorRaw || []).filter(r => r.skapad).map(r => ({ endpoint: r.typ || "general", skapad: r.skapad })),
-    ...(civLogRaw   || []).filter(r => r.skapad).map(r => ({ endpoint: r.endpoint || "general", skapad: r.skapad })),
+    ...(civFragorRaw || []).filter(r => r.skapad).map(r => ({ endpoint: normEp(r.typ || "general"), skapad: r.skapad })),
+    ...(civLogRaw   || []).filter(r => r.skapad).map(r => ({ endpoint: normEp(r.endpoint || "general"), skapad: r.skapad })),
   ].sort((a, b) => a.skapad.localeCompare(b.skapad));
   const civEndpoints = [...new Set(civLogItems.map(r => r.endpoint))].sort();
   const civWeeks = [...new Set(civLogItems.map(r => weekStart(r.skapad)))].sort();
