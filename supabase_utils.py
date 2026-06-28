@@ -3602,6 +3602,52 @@ MOTIVERING: [1–2 meningar]"""
     return True
 
 
+def _hamta_ultimatum_historik(sb_key: str, agent_namn: str, limit: int = 3) -> list:
+    """Hämtar agentens senaste ultimatumsvar (som B) för kontextinjektion."""
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/ekonomi_spel"
+            f"?typ=eq.ultimatum&agent_b=eq.{urllib.parse.quote(agent_namn)}"
+            f"&svar=not.is.null&order=skapad.desc&limit={limit}&select=erbjudande,svar,agent_a,motivering_b",
+            headers=_ekonomi_headers(sb_key), timeout=6,
+        )
+        return r.json() if r.is_success else []
+    except Exception:
+        return []
+
+
+def _hamta_relation_ultimatum(sb_key: str, agent_a: str, agent_b: str) -> str:
+    """Returnerar kort relationsbeskrivning mellan agent_a och agent_b."""
+    delar = []
+    try:
+        a_s, b_s = sorted([agent_a, agent_b])
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/agent_koalitioner"
+            f"?agent_a=eq.{urllib.parse.quote(a_s)}&agent_b=eq.{urllib.parse.quote(b_s)}"
+            f"&select=styrka,antal_utbyten",
+            headers=_ekonomi_headers(sb_key), timeout=5,
+        )
+        if r.is_success and r.json():
+            k = r.json()[0]
+            delar.append(f"Ni har en aktiv allians (styrka {k['styrka']}, {k['antal_utbyten']} utbyten).")
+    except Exception:
+        pass
+    try:
+        r2 = httpx.get(
+            f"{SB_URL}/rest/v1/lobbying_log"
+            f"?lobbying_agent=eq.{urllib.parse.quote(agent_a)}&mal_agent=eq.{urllib.parse.quote(agent_b)}"
+            f"&order=skapad.desc&limit=2&select=belopp,resultat",
+            headers=_ekonomi_headers(sb_key), timeout=5,
+        )
+        if r2.is_success and r2.json():
+            for l in r2.json():
+                res = "lyckades" if l["resultat"] == "accepterat" else "misslyckades"
+                delar.append(f"{agent_a} lobbade dig med {l['belopp']} kr och {res}.")
+    except Exception:
+        pass
+    return " ".join(delar) if delar else ""
+
+
 def svara_ultimatum(agent: dict, spel: dict, sb_key: str) -> bool:
     """Agent B svarar på ett väntande ultimatumerbjudande."""
     saldo_b = _hamta_saldo(sb_key, agent["namn"])
@@ -3609,6 +3655,28 @@ def svara_ultimatum(agent: dict, spel: dict, sb_key: str) -> bool:
     saldo_a = _hamta_saldo(sb_key, a_namn)
     erbjudande = spel["erbjudande"]
     behaller_a = spel["belopp_start"] - erbjudande
+
+    # Kontextblock: spelhistorik
+    historik = _hamta_ultimatum_historik(sb_key, agent["namn"])
+    historik_text = ""
+    if historik:
+        rader = []
+        for h in historik:
+            pct = round(h["erbjudande"])
+            rader.append(f"  – {h['agent_a']} erbjöd {pct} kr → du {h['svar']}: \"{h.get('motivering_b','') or '—'}\"")
+        historik_text = "\nDina senaste ultimatumsvar:\n" + "\n".join(rader)
+
+    # Kontextblock: relation till motparten
+    relation_text = _hamta_relation_ultimatum(sb_key, a_namn, agent["namn"])
+    relation_block = f"\nDin relation till {a_namn}: {relation_text}" if relation_text else ""
+
+    # Kontextblock: ekonomisk trend
+    if saldo_b < 400:
+        trend = f"Du är ekonomiskt pressad (saldo {saldo_b} kr — under 400 kr)."
+    elif saldo_b > 1500:
+        trend = f"Du är välbärgad (saldo {saldo_b} kr)."
+    else:
+        trend = f"Ditt saldo är {saldo_b} kr."
 
     prompt = f"""{agent.get('systemprompt', f'Du är {agent["namn"]}.')}
 
@@ -3619,7 +3687,7 @@ Om du ACCEPTERAR: du får {erbjudande} kr, {a_namn} får {behaller_a} kr.
 Om du AVVISAR: ingen får något — erbjudandet förstörs.
 
 {a_namn}s motivering: "{spel.get('motivering_a', '')}"
-Ditt saldo: {saldo_b} kr
+{trend}{historik_text}{relation_block}
 
 Svara EXAKT i detta format:
 SVAR: accepterat eller avvisat

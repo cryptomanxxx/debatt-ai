@@ -115,13 +115,17 @@ export default async function EkonomiPage() {
     giniMap[row.skapad.slice(0, 10)] = row.gini;
   }
 
-  // Empiriska utfall per Gini-bucket (avrundat till närmaste 0.05)
+  // Empiriska utfall per Gini-bucket (avrundat till närmaste 0.05, klamrat till GINI_STEPS-intervall)
+  const GINI_MIN = GINI_STEPS[0];
+  const GINI_MAX = GINI_STEPS[GINI_STEPS.length - 1];
   const empiriskBuckets = {};
   for (const s of ultimatumAvslutade) {
-    const dag = s.skapad?.slice(0, 10);
+    // Använd svarsdatum (avslutad) om det finns, annars erbjudandedatumet
+    const dag = (s.avslutad ?? s.skapad)?.slice(0, 10);
     const giniDag = giniMap[dag];
     if (giniDag == null) continue;
-    const key = (Math.round(giniDag / 0.05) * 0.05).toFixed(2);
+    const rounded = Math.min(GINI_MAX, Math.max(GINI_MIN, Math.round(giniDag / 0.05) * 0.05));
+    const key = rounded.toFixed(2);
     if (!empiriskBuckets[key]) empiriskBuckets[key] = { total: 0, avvisade: 0 };
     empiriskBuckets[key].total++;
     if (s.svar === "avvisat") empiriskBuckets[key].avvisade++;
