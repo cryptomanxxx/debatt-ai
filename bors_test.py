@@ -823,27 +823,23 @@ def hamta_mogna_stakes(sb_key: str) -> list[dict]:
         return []
 
 
-def betala_ut_staking(sb_key: str, stake: dict) -> None:
-    """Betalar ut yield för en mogen stake och markerar den som utbetald."""
+def betala_ut_staking(sb_key: str, stake: dict, total_antal: float | None = None) -> None:
+    """Betalar ut yield för en mogen stake och markerar den som utbetald.
+
+    total_antal bör alltid skickas av kör_staking() som räknat ut gruppens summa
+    *innan* några rader markerats utbetalda — annars ser senare rader i samma batch
+    en felaktigt lägre total och beräknar en för stor andel.
+    """
     try:
         pris = hamta_pris(sb_key, stake["symbol"])
         start = datetime.fromisoformat(stake["start_datum"])
         slut  = datetime.fromisoformat(stake["slut_datum"])
         dagar = max(1, (slut - start).days)
 
-        # Avtagande avkastning baseras på agentens TOTALA position (alla aktiva rader
-        # för samma symbol), inte bara denna rad. Annars gynnar fragmenterade stakes.
-        # R_total = total^ALPHA; denna rad får sin proportionella andel.
-        agent_enc = urllib.parse.quote(stake["agent"])
-        symbol_enc = urllib.parse.quote(stake["symbol"])
-        try:
-            r_tot = httpx.get(
-                f"{SB_URL}/rest/v1/bors_staking"
-                f"?agent=eq.{agent_enc}&symbol=eq.{symbol_enc}&utbetald=eq.false&select=antal",
-                headers=_h(sb_key), timeout=8,
-            )
-            total_antal = sum(float(r["antal"]) for r in r_tot.json()) if r_tot.is_success and r_tot.json() else float(stake["antal"])
-        except Exception:
+        # Avtagande avkastning baseras på agentens TOTALA position (alla mogna rader
+        # för samma symbol i denna batch), inte bara denna rad.
+        # total_antal skickas in från kör_staking() och är beräknat före loopen.
+        if total_antal is None:
             total_antal = float(stake["antal"])
 
         this_antal = float(stake["antal"])
@@ -918,8 +914,17 @@ def kör_staking(sb_key: str) -> None:
     mogna = hamta_mogna_stakes(sb_key)
     if mogna:
         print(f"  {len(mogna)} stakes löper ut — betalar ut yield...")
+        # Beräkna total antal per (agent, symbol) INNAN loopen startar.
+        # Om vi lät betala_ut_staking() fråga databasen under loopen skulle
+        # rader som redan markerats utbetalda saknas i totalen — det ger
+        # en för liten total och för stor andel till de sista raderna.
+        grupp_totaler: dict[tuple, float] = {}
         for s in mogna:
-            betala_ut_staking(sb_key, s)
+            key = (s["agent"], s["symbol"])
+            grupp_totaler[key] = grupp_totaler.get(key, 0.0) + float(s["antal"])
+        for s in mogna:
+            key = (s["agent"], s["symbol"])
+            betala_ut_staking(sb_key, s, total_antal=grupp_totaler[key])
     else:
         print("  Inga stakes att betala ut.")
 
