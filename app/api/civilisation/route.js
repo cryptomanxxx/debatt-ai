@@ -313,11 +313,12 @@ export async function POST(req) {
       }).catch(() => {});
     }
 
-    // Fallback: when service role key is unavailable (civilisation_log not writable),
-    // mirror visitor questions to civilisation_fragor using anon key so hjarnans-logg
-    // can display them. Gated on !sbKey to avoid double-counting in pages that
-    // read both tables (e.g. intelligens/page.js).
-    if (!sbKey && kalltyp === "besökare" && anonKey) {
+    // Always mirror visitor questions to civilisation_fragor — even when civilisation_log
+    // is the primary target. The civilisation_log insert is fire-and-forget and may fail
+    // silently (rotated key, transient error). The mirror ensures hjarnans-logg never
+    // loses a visitor question. The dedup in hjarnans-logg/page.js drops this row when
+    // a matching civilisation_log row exists (same fraga + timestamp within 2 min).
+    if (kalltyp === "besökare" && anonKey) {
       fetch(`${SB_URL}/rest/v1/civilisation_fragor`, {
         method: "POST",
         headers: {

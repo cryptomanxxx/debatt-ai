@@ -10,20 +10,22 @@ export const metadata = {
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-// Only rows from known agents are shown — prevents spam/impersonation via public anon INSERT.
-const KANDA_AGENTER = new Set(Object.keys(AGENT_VISUELL));
+// Push the known-agent filter into the Supabase query so limit=200 applies after
+// the filter — prevents spam rows from flooding the page with unknowns.
+const AGENT_IN_FILTER = Object.keys(AGENT_VISUELL)
+  .map(a => (a.includes(" ") ? `"${a}"` : a))
+  .join(",");
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return [];
   try {
     const r = await fetch(
-      `${SB_URL}/rest/v1/agent_feature_requests?order=skapad.desc&limit=200&select=id,agent,kategori,titel,beskrivning,prioritet,status,skapad`,
+      `${SB_URL}/rest/v1/agent_feature_requests?agent=in.(${AGENT_IN_FILTER})&order=skapad.desc&limit=200&select=id,agent,kategori,titel,beskrivning,prioritet,status,skapad`,
       { headers: { apikey: key, Authorization: `Bearer ${key}` }, next: { revalidate } }
     );
     if (!r.ok) return [];
-    const rows = await r.json();
-    return rows.filter(f => KANDA_AGENTER.has(f.agent));
+    return await r.json();
   } catch { return []; }
 }
 

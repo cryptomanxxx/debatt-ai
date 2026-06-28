@@ -18,22 +18,29 @@ async function getData() {
     ? { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
     : anonH;
 
-  const [r1, r2] = await Promise.allSettled([
-    // All questions from civilisation_fragor (AI agents + visitor fallback rows).
-    // No agent filter here — visitor rows with agent='besökare' must be included.
+  // Three parallel queries so agent rows are never crowded out by visitor rows.
+  const [r1, r2, r3] = await Promise.allSettled([
+    // AI-agent rows only — never mixed with visitor rows in the same limit window.
     fetch(
-      `${SB_URL}/rest/v1/civilisation_fragor?order=skapad.desc&limit=500&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
+      `${SB_URL}/rest/v1/civilisation_fragor?agent=neq.besökare&order=skapad.desc&limit=500&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
       { headers: anonH, next: { revalidate: 60 } }
     ),
-    // Visitor questions logged via the API route (requires service role for SELECT).
+    // Visitor fallback rows from civilisation_fragor (present when civilisation_log insert failed).
+    fetch(
+      `${SB_URL}/rest/v1/civilisation_fragor?agent=eq.besökare&order=skapad.desc&limit=200&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
+      { headers: anonH, next: { revalidate: 60 } }
+    ),
+    // Primary visitor log — requires service role to bypass SELECT RLS.
     fetch(
       `${SB_URL}/rest/v1/civilisation_log?kalltyp=eq.besökare&order=skapad.desc&limit=500&select=id,fraga,svar,endpoint,latency_ms,skapad`,
       { headers: logH, next: { revalidate: 60 } }
     ),
   ]);
 
-  const fragor = r1.status === "fulfilled" && r1.value.ok ? await r1.value.json() : [];
-  const logs   = r2.status === "fulfilled" && r2.value.ok ? await r2.value.json() : [];
+  const agentFragor   = r1.status === "fulfilled" && r1.value.ok ? await r1.value.json() : [];
+  const visitorFragor = r2.status === "fulfilled" && r2.value.ok ? await r2.value.json() : [];
+  const logs          = r3.status === "fulfilled" && r3.value.ok ? await r3.value.json() : [];
+  const fragor        = [...agentFragor, ...visitorFragor];
 
   // Normalisera civilisation_log-rader till samma form som civilisation_fragor
   const normalizedLogs = logs.map(p => ({
