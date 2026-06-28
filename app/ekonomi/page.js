@@ -169,6 +169,74 @@ export default async function EkonomiPage() {
               )}
             </div>
 
+            {/* Teori & analys */}
+            <div style={{ marginBottom: "40px" }}>
+              <p style={{ fontSize: "11px", color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 14px", fontFamily: "monospace" }}>
+                Vad mäter experimenten?
+              </p>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "12px", marginBottom: "12px" }}>
+                {/* Diktatorspelet */}
+                <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "24px" }}>
+                  <div style={{ fontSize: "12px", color: C.accent, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "10px", fontFamily: "monospace" }}>
+                    Diktatorspelet
+                  </div>
+                  <p style={{ fontSize: "13px", color: C.text, lineHeight: 1.7, margin: "0 0 14px" }}>
+                    Agent A har 100 kr och bestämmer fritt hur mycket Agent B får. B har ingenting att säga till om — ingen motprestation, inget hot om avvisning.
+                  </p>
+                  <p style={{ fontSize: "13px", color: C.dim, lineHeight: 1.7, margin: "0 0 14px" }}>
+                    En strikt rationell agent ger <strong style={{ color: C.text }}>0 kr</strong> — det maximerar det egna utfallet. I verkligheten ger människor i snitt 20–30 % av potten utan strategiskt skäl.
+                  </p>
+                  <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "12px", fontSize: "12px", color: C.yellow }}>
+                    Mäter: ren altruism och prosocialt beteende — generositet utan incitament.
+                  </div>
+                </div>
+
+                {/* Ultimatumspelet */}
+                <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "24px" }}>
+                  <div style={{ fontSize: "12px", color: C.accent, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "10px", fontFamily: "monospace" }}>
+                    Ultimatumspelet
+                  </div>
+                  <p style={{ fontSize: "13px", color: C.text, lineHeight: 1.7, margin: "0 0 14px" }}>
+                    Agent A föreslår en uppdelning av 100 kr. Agent B kan <strong style={{ color: C.green }}>acceptera</strong> — båda får sina andelar — eller <strong style={{ color: C.red }}>avvisa</strong> — ingen får något.
+                  </p>
+                  <p style={{ fontSize: "13px", color: C.dim, lineHeight: 1.7, margin: "0 0 14px" }}>
+                    Rationellt borde B acceptera vilket erbjudande som helst över 0 kr, eftersom det alltid är mer än ingenting. I praktiken avvisar människor erbjudanden under ~30 kr — de väljer att vara fattigare snarare än att acceptera en orättvisa.
+                  </p>
+                  <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "12px", fontSize: "12px", color: C.yellow }}>
+                    Mäter: ojämlikhetsaversion — hur mycket orättvisa agenter tolererar innan de straffar den på egen bekostnad.
+                  </div>
+                </div>
+              </div>
+
+              {/* Jämförelse & systemeffekter */}
+              <div style={{ background: C.card, border: `1px solid #1f1f1f`, borderRadius: "10px", padding: "24px" }}>
+                <div style={{ fontSize: "12px", color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "14px", fontFamily: "monospace" }}>
+                  Jämförelse och systemeffekter
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "20px" }}>
+                  <div>
+                    <div style={{ fontSize: "12px", color: C.text, fontWeight: 600, marginBottom: "6px" }}>Strategisk vs äkta generositet</div>
+                    <p style={{ fontSize: "12px", color: C.dim, lineHeight: 1.7, margin: 0 }}>
+                      Om agenterna erbjuder mer i ultimatumspelet än i diktatorspelet är de strategiska — de ger för att undvika avvisning, inte av altruism. Lika erbjudanden tyder på att generositeten är genuin och inte taktisk.
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: C.text, fontWeight: 600, marginBottom: "6px" }}>Avvisningar och Gini-koefficienten</div>
+                    <p style={{ fontSize: "12px", color: C.dim, lineHeight: 1.7, margin: 0 }}>
+                      Spelen är nollsummespel på individnivå, men avvisningar <em>förstör</em> värde — de 100 kr försvinner ur ekonomin. Hög avvisningsfrekvens sänker det totala kapitalet i systemet och påverkar Gini-koefficienten indirekt.
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", color: C.text, fontWeight: 600, marginBottom: "6px" }}>Personlighet och saldo som faktorer</div>
+                    <p style={{ fontSize: "12px", color: C.dim, lineHeight: 1.7, margin: 0 }}>
+                      Agenternas ideologi och aktuelle saldo påverkar deras beteende — precis som forskning visar att rika individer tenderar att acceptera lägre procentandelar. Välmående agenter kan "ha råd" att vara generösa eller att avvisa låga erbjudanden.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Senaste spel */}
             {spel.length > 0 && (
               <div style={{ marginBottom: "32px" }}>
