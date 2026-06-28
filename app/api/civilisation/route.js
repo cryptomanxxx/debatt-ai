@@ -313,15 +313,17 @@ export async function POST(req) {
       }).catch(() => {});
     }
 
-    // Fallback: always mirror visitor questions to civilisation_fragor using anon key.
-    // This ensures hjarnans-logg can display them even if SUPABASE_SERVICE_ROLE_KEY
-    // is not configured in Vercel (civilisation_log would be empty without it).
-    if (kalltyp === "besökare" && anonKey) {
+    // Always mirror visitor questions to civilisation_fragor so hjarnans-logg
+    // can display them. Use service role key when available (bypasses RLS),
+    // fall back to anon key. This is the primary mechanism for visitor
+    // visibility — civilisation_log may have a restrictive SELECT policy.
+    const fragWriteKey = sbKey || anonKey;
+    if (kalltyp === "besökare" && fragWriteKey) {
       fetch(`${SB_URL}/rest/v1/civilisation_fragor`, {
         method: "POST",
         headers: {
-          apikey: anonKey,
-          Authorization: `Bearer ${anonKey}`,
+          apikey: fragWriteKey,
+          Authorization: `Bearer ${fragWriteKey}`,
           "Content-Type": "application/json",
           Prefer: "return=minimal",
         },
