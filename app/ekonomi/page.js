@@ -31,8 +31,8 @@ const P_GAVA = { u: 15,   p: 22,   v: 32,   r: 37   }; // Förväntat diktatorer
 function expectedValues(g) {
   const d = statusDist(g);
   return {
-    avvisning: Math.round((d.u * P_AVV.u + d.p * P_AVV.p + d.v * P_AVV.v + d.r * P_AVV.r) * 100),
-    gava:      Math.round(d.u * P_GAVA.u + d.p * P_GAVA.p + d.v * P_GAVA.v + d.r * P_GAVA.r),
+    ultimatum: Math.round((d.u * P_AVV.u + d.p * P_AVV.p + d.v * P_AVV.v + d.r * P_AVV.r) * 100),
+    diktatorn: Math.round(d.u * P_GAVA.u + d.p * P_GAVA.p + d.v * P_GAVA.v + d.r * P_GAVA.r),
   };
 }
 
@@ -337,7 +337,7 @@ export default async function EkonomiPage() {
                   Förväntade värden vid tre Gini-nivåer (typiskt erbjudande = 30 kr)
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "10px" }}>
-                  {scenarios.map(({ g, dist, avvisning, gava }) => (
+                  {scenarios.map(({ g, dist, ultimatum: avvisning, diktatorn: gava }) => (
                     <div key={g} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "18px 20px" }}>
                       <div style={{ fontSize: "24px", fontWeight: 700, color: g < 0.3 ? C.green : g < 0.5 ? C.yellow : C.red, lineHeight: 1, marginBottom: "2px" }}>
                         G = {g.toFixed(1)}
