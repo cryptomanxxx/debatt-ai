@@ -298,6 +298,7 @@ export async function POST(req) {
         },
         body: JSON.stringify({
           fraga:       fraga.trim().slice(0, 500),
+          svar:        text.slice(0, 2000),
           endpoint:    resolvedEndpoint,
           datapunkter: kontext.length,
           provider,
