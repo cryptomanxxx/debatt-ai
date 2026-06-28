@@ -1,4 +1,5 @@
 import LoggVy from "./LoggVy";
+import AmneskluterGraf from "./AmneskluterGraf";
 
 export const revalidate = 60;
 
@@ -106,7 +107,10 @@ export default async function HjarnansLoggPage() {
             </p>
           </div>
         ) : (
-          <LoggVy poster={poster} />
+          <>
+            <AmneskluterGraf poster={poster} />
+            <LoggVy poster={poster} />
+          </>
         )}
 
       </div>
