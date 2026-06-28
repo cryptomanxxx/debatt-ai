@@ -122,7 +122,7 @@ STAKING_PROFIL = {
     "Den stressade":    {"sannolikhet": 0.04, "apy": 0.12},
 }
 DEFAULT_STAKING = {"sannolikhet": 0.08, "apy": 0.12}
-STAKING_ALPHA = 0.6   # Exponent för avtagande avkastning (0 < alpha < 1)
+STAKING_ALPHA = 0.35  # Exponent för avtagande avkastning (0 < alpha < 1). Staka 2× ger +27%, 10× ger +2.2×
 
 # Market making — agenter med analytisk/lugn personlighet bidrar med likviditet
 MARKET_MAKER_PROFIL = {
