@@ -288,14 +288,16 @@ export async function POST(req) {
     // Log fire-and-forget — never block the response.
     const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (sbKey) {
+      const logHeaders = {
+        apikey: sbKey,
+        Authorization: `Bearer ${sbKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      };
+      // Legacy log table (all calls)
       fetch(`${SB_URL}/rest/v1/civilisation_log`, {
         method: "POST",
-        headers: {
-          apikey: sbKey,
-          Authorization: `Bearer ${sbKey}`,
-          "Content-Type": "application/json",
-          Prefer: "return=minimal",
-        },
+        headers: logHeaders,
         body: JSON.stringify({
           fraga:       fraga.trim().slice(0, 500),
           svar:        text.slice(0, 2000),
@@ -306,6 +308,18 @@ export async function POST(req) {
           latency_ms:  latency,
           lang,
           kalltyp,
+        }),
+      }).catch(() => {});
+      // civilisation_fragor — same table agents write to directly (agent=null for visitors)
+      fetch(`${SB_URL}/rest/v1/civilisation_fragor`, {
+        method: "POST",
+        headers: logHeaders,
+        body: JSON.stringify({
+          agent:      kalltyp === "besökare" ? null : kalltyp,
+          fraga:      fraga.trim().slice(0, 500),
+          typ:        resolvedEndpoint,
+          svar:       text.slice(0, 2000),
+          latency_ms: latency,
         }),
       }).catch(() => {});
     }
