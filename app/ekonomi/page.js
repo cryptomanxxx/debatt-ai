@@ -1,6 +1,7 @@
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
 import GiniSpelGraf from "./GiniSpelGraf";
+import AvvikelseGraf from "./AvvikelseGraf";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -21,8 +22,10 @@ function statusDist(g) {
   const u = Math.min(0.02 + g * 0.80, 0.60);
   const p = Math.min(0.10 + g * 0.25, 0.30);
   const r = Math.min(0.08 + g * 0.12, 0.16);
-  const v = Math.max(0, 1 - u - p - r);
-  return { u, p, v, r };
+  const vRaw = Math.max(0, 1 - u - p - r);
+  const tot = u + p + r + vRaw;
+  const [un, pn, rn, vn] = [u, p, r, vRaw].map(x => x / tot);
+  return { u: un, p: pn, v: vn, r: rn };
 }
 
 const P_AVV  = { u: 0.05, p: 0.15, v: 0.40, r: 0.35 }; // P(avvisning | status) vid erbjudande ≈ 30 kr
@@ -45,7 +48,7 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&order=saldo.desc`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/ekonomi_spel?order=skapad.desc&limit=40`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/agent_transaktioner?order=skapad.desc&limit=30&typ=neq.startkapital`, { headers: hdrs, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/oligarki_historik?select=skapad,gini_koefficient&order=skapad.asc&limit=120`, { headers: hdrs, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/oligarki_historik?select=skapad,gini&order=skapad.asc&limit=120`, { headers: hdrs, next: { revalidate: 120 } }),
   ]);
 
   return {
@@ -109,8 +112,38 @@ export default async function EkonomiPage() {
   // Empiriska datapunkter: para ihop spel med Gini-koefficienten samma dag
   const giniMap = {};
   for (const row of giniHistorik) {
-    giniMap[row.skapad.slice(0, 10)] = row.gini_koefficient;
+    giniMap[row.skapad.slice(0, 10)] = row.gini;
   }
+
+  // Empiriska utfall per Gini-bucket (avrundat till närmaste 0.05)
+  const empiriskBuckets = {};
+  for (const s of ultimatumAvslutade) {
+    const dag = s.skapad?.slice(0, 10);
+    const giniDag = giniMap[dag];
+    if (giniDag == null) continue;
+    const key = (Math.round(giniDag / 0.05) * 0.05).toFixed(2);
+    if (!empiriskBuckets[key]) empiriskBuckets[key] = { total: 0, avvisade: 0 };
+    empiriskBuckets[key].total++;
+    if (s.svar === "avvisat") empiriskBuckets[key].avvisade++;
+  }
+
+  const avvikelseData = GINI_STEPS.map(g => {
+    const key = g.toFixed(2);
+    const emp = empiriskBuckets[key];
+    const teoretisk = expectedValues(g).ultimatum;
+    const empirisk = emp ? Math.round(emp.avvisade / emp.total * 100) : null;
+    const avvikelse = empirisk !== null ? empirisk - teoretisk : null;
+    return { gini: g, teoretisk, empirisk, avvikelse, n: emp?.total || 0 };
+  });
+
+  const matchadeSpel = avvikelseData.reduce((sum, d) => sum + d.n, 0);
+  const bucketsWithData = avvikelseData.filter(d => d.avvikelse !== null);
+  const medAvvikelse = bucketsWithData.length > 0
+    ? bucketsWithData.reduce((sum, d) => sum + Math.abs(d.avvikelse), 0) / bucketsWithData.length
+    : 0;
+  const bias = bucketsWithData.length > 0
+    ? bucketsWithData.reduce((sum, d) => sum + d.avvikelse, 0) / bucketsWithData.length
+    : 0;
 
   return (
     <main style={{ background: C.bg, minHeight: "100vh", padding: "72px 20px 80px", fontFamily: "Georgia, serif" }}>
@@ -390,6 +423,53 @@ export default async function EkonomiPage() {
                   Den gröna vertikala linjen markerar plattformens aktuella Gini-koefficient. Modellen antar ett typiskt erbjudande på 30 kr i Ultimatumspelet. Båda kurvorna är fallande med Gini — ojämlikhetsparadoxen.
                 </p>
               </div>
+            </div>
+
+            {/* Avvikelse från teori */}
+            <div style={{ background: C.card, border: `1px solid #1f1f1f`, borderRadius: "10px", padding: "22px 24px", marginBottom: "32px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px", flexWrap: "wrap", gap: "8px" }}>
+                <div>
+                  <p style={{ fontSize: "11px", color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 4px", fontFamily: "monospace" }}>
+                    Avvikelse från teorin
+                  </p>
+                  <p style={{ fontSize: "12px", color: C.dimmer, margin: 0 }}>
+                    Faktisk avvisningsfrekvens vs. Fehr-Schmidt E[R(G)]
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: "14px", fontSize: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ color: "#e879f9" }}>── Teori E[R(G)]</span>
+                  <span style={{ color: "#60a5fa" }}>● Empirisk</span>
+                  <span style={{ color: "#f87171" }}>▊ Δ+ (mer avvisning)</span>
+                  <span style={{ color: "#4ade80" }}>▊ Δ− (mer acceptans)</span>
+                </div>
+              </div>
+
+              <AvvikelseGraf data={avvikelseData} />
+
+              {matchadeSpel > 0 && (
+                <div style={{ display: "flex", gap: "24px", marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${C.border}`, fontSize: "11px", flexWrap: "wrap" }}>
+                  <span style={{ color: C.dim }}>
+                    Matchade spel: <strong style={{ color: C.text }}>{matchadeSpel}</strong>
+                  </span>
+                  <span style={{ color: C.dim }}>
+                    Snitt |Δ|: <strong style={{ color: C.text }}>{medAvvikelse.toFixed(1)} pp</strong>
+                  </span>
+                  <span style={{ color: C.dim }}>
+                    Systematisk bias:{" "}
+                    <strong style={{ color: bias > 1 ? C.red : bias < -1 ? C.green : C.dimmer }}>
+                      {bias > 1
+                        ? `+${bias.toFixed(1)} pp (mer avvisning än teori)`
+                        : bias < -1
+                        ? `${bias.toFixed(1)} pp (mer acceptans än teori)`
+                        : "ingen tydlig bias"}
+                    </strong>
+                  </span>
+                </div>
+              )}
+
+              <p style={{ fontSize: "11px", color: C.dimmer, margin: "10px 0 0", lineHeight: 1.6 }}>
+                Positiv Δ = agenterna avvisar <em>fler</em> erbjudanden än Fehr-Schmidt-modellen förutsäger — starkare ojämlikhetsaversion än hos genomsnittliga människor. Negativ Δ = agenterna är mer rationella/accepterande. Tomma staplar = inga spel med känd Gini-data i den bucketen.
+              </p>
             </div>
 
             {/* Senaste spel */}
