@@ -1690,21 +1690,45 @@ def kör_shorts(sb_key: str, alla_symboler: list[str]) -> None:
 
 def _sakerstall_borskassan_likviditet(sb_key: str) -> None:
     """Garanterar att Börskassan alltid håller minst BORSKASSAN_MIN_SALDO.
-    Differensen skapas som ny likviditet — börsens centralbanks-funktion."""
+    Differensen skapas som ny likviditet — börsens centralbanks-funktion.
+    Hanterar både fallet att raden finns (PATCH) och saknas (upsert INSERT).
+    """
     saldo = hamta_saldo(sb_key, "Börskassan")
     if saldo >= BORSKASSAN_MIN_SALDO:
         print(f"  Börskassan: {saldo:.0f} kr (OK)")
         return
     pafall = round(BORSKASSAN_MIN_SALDO - saldo, 2)
+    h_rep = {**_h(sb_key), "Prefer": "return=representation"}
     h_min = {**_h(sb_key), "Prefer": "return=minimal"}
     try:
-        httpx.patch(
+        # Försök PATCH — returnerar raden om den fanns, tom lista om den saknas
+        r = httpx.patch(
             f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan",
-            headers=h_min,
+            headers=h_rep,
             json={"saldo": BORSKASSAN_MIN_SALDO, "uppdaterad": "now()"},
             timeout=8,
         )
-        print(f"  Börskassan: {saldo:.0f} kr → {BORSKASSAN_MIN_SALDO:.0f} kr (+{pafall:.0f} kr likviditetspåfyll)")
+        if r.is_success and r.json():
+            print(f"  Börskassan: {saldo:.0f} kr → {BORSKASSAN_MIN_SALDO:.0f} kr (+{pafall:.0f} kr likviditetspåfyll)")
+            return
+        # Raden finns inte — skapa den via upsert
+        r2 = httpx.post(
+            f"{SB_URL}/rest/v1/agent_planbocker?on_conflict=agent",
+            headers={**h_min, "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "agent":       "Börskassan",
+                "saldo":       BORSKASSAN_MIN_SALDO,
+                "totalt_givet": 0,
+                "totalt_fatt":  0,
+                "antal_spel":   0,
+                "uppdaterad":  "now()",
+            },
+            timeout=8,
+        )
+        if r2.is_success:
+            print(f"  Börskassan: skapades med {BORSKASSAN_MIN_SALDO:.0f} kr (ny rad)")
+        else:
+            print(f"  Börskassan upsert misslyckades: {r2.status_code} {r2.text[:120]}")
     except Exception as e:
         print(f"  Börskassan påfyll misslyckades: {e}")
 
