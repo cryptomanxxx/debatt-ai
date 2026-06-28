@@ -313,17 +313,16 @@ export async function POST(req) {
       }).catch(() => {});
     }
 
-    // Always mirror visitor questions to civilisation_fragor so hjarnans-logg
-    // can display them. Use service role key when available (bypasses RLS),
-    // fall back to anon key. This is the primary mechanism for visitor
-    // visibility — civilisation_log may have a restrictive SELECT policy.
-    const fragWriteKey = sbKey || anonKey;
-    if (kalltyp === "besökare" && fragWriteKey) {
+    // Fallback: when service role key is unavailable (civilisation_log not writable),
+    // mirror visitor questions to civilisation_fragor using anon key so hjarnans-logg
+    // can display them. Gated on !sbKey to avoid double-counting in pages that
+    // read both tables (e.g. intelligens/page.js).
+    if (!sbKey && kalltyp === "besökare" && anonKey) {
       fetch(`${SB_URL}/rest/v1/civilisation_fragor`, {
         method: "POST",
         headers: {
-          apikey: fragWriteKey,
-          Authorization: `Bearer ${fragWriteKey}`,
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
           "Content-Type": "application/json",
           Prefer: "return=minimal",
         },

@@ -6,20 +6,29 @@ export const revalidate = 60;
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
 async function getData() {
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return [];
-  const h = { apikey: key, Authorization: `Bearer ${key}` };
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const sbKey   = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!anonKey) return [];
+
+  // civilisation_fragor is readable with anon key (AI agent rows confirmed working).
+  // civilisation_log may have a restrictive SELECT policy — use service role when
+  // available to bypass RLS and ensure visitor rows from that table are visible.
+  const anonH = { apikey: anonKey, Authorization: `Bearer ${anonKey}` };
+  const logH  = sbKey
+    ? { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+    : anonH;
 
   const [r1, r2] = await Promise.allSettled([
-    // AI-agenternas frågor (Python-skripten skriver direkt hit)
+    // All questions from civilisation_fragor (AI agents + visitor fallback rows).
+    // No agent filter here — visitor rows with agent='besökare' must be included.
     fetch(
-      `${SB_URL}/rest/v1/civilisation_fragor?agent=neq.besökare&order=skapad.desc&limit=500&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
-      { headers: h, next: { revalidate: 60 } }
+      `${SB_URL}/rest/v1/civilisation_fragor?order=skapad.desc&limit=500&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
+      { headers: anonH, next: { revalidate: 60 } }
     ),
-    // Besökarnas frågor via web-UI (API-routen skriver hit)
+    // Visitor questions logged via the API route (requires service role for SELECT).
     fetch(
       `${SB_URL}/rest/v1/civilisation_log?kalltyp=eq.besökare&order=skapad.desc&limit=500&select=id,fraga,svar,endpoint,latency_ms,skapad`,
-      { headers: h, next: { revalidate: 60 } }
+      { headers: logH, next: { revalidate: 60 } }
     ),
   ]);
 
