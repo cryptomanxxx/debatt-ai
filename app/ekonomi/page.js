@@ -46,7 +46,7 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&order=saldo.desc`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/ekonomi_spel?order=skapad.desc&limit=40`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/agent_transaktioner?order=skapad.desc&limit=30&typ=neq.startkapital`, { headers: hdrs, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/oligarki_historik?select=skapad,gini_koefficient&order=skapad.asc&limit=120`, { headers: hdrs, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/oligarki_historik?select=skapad,gini&order=skapad.asc&limit=120`, { headers: hdrs, next: { revalidate: 120 } }),
   ]);
 
   return {
@@ -110,7 +110,7 @@ export default async function EkonomiPage() {
   // Empiriska datapunkter: para ihop spel med Gini-koefficienten samma dag
   const giniMap = {};
   for (const row of giniHistorik) {
-    giniMap[row.skapad.slice(0, 10)] = row.gini_koefficient;
+    giniMap[row.skapad.slice(0, 10)] = row.gini;
   }
 
   // Empiriska utfall per Gini-bucket (avrundat till närmaste 0.05)
