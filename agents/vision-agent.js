@@ -17,10 +17,11 @@ const https = require("https");
 
 const CEREBRAS_API_KEY  = process.env.CEREBRAS_API_KEY;
 const GROQ_API_KEY      = process.env.GROQ_API_KEY;
-const DISCUSSIONS_DIR   = path.join(__dirname, "../ai-bus/discussions");
-const VISION_DIR        = path.join(DISCUSSIONS_DIR, "vision");
-const KRONIKA_DIR       = path.join(DISCUSSIONS_DIR, "kronika");
-const ECONOMY_DIR       = path.join(DISCUSSIONS_DIR, "economy");
+const DISCUSSIONS_DIR       = path.join(__dirname, "../ai-bus/discussions");
+const VISION_DIR            = path.join(DISCUSSIONS_DIR, "vision");
+const KRONIKA_DIR           = path.join(DISCUSSIONS_DIR, "kronika");
+const ECONOMY_DIR           = path.join(DISCUSSIONS_DIR, "economy");
+const AGENT_REQUESTS_DIR    = path.join(DISCUSSIONS_DIR, "agent-requests");
 const GOAL_PATH         = path.join(__dirname, "../ai-bus/goal.md");
 const CLAUDE_MD_PATH    = path.join(__dirname, "../CLAUDE.md");
 const REJECTED_DIR      = path.join(__dirname, "../ai-bus/rejected");
@@ -243,6 +244,86 @@ async function readFeatureRequests() {
   } catch { return ""; }
 }
 
+/**
+ * Exporterar öppna agent_feature_requests som individuella md-filer
+ * i ai-bus/discussions/agent-requests/.
+ * Deduplicerar via ID i filnamnet — exporterar aldrig samma förslag två gånger.
+ */
+async function exportAgentRequests() {
+  const sbKey = process.env.SUPABASE_ANON_KEY;
+  if (!sbKey) return 0;
+
+  if (!fs.existsSync(AGENT_REQUESTS_DIR)) {
+    fs.mkdirSync(AGENT_REQUESTS_DIR, { recursive: true });
+  }
+
+  let requests;
+  try {
+    const { status, data } = await httpGet(
+      "https://fmwxftnistkoqazfwnuj.supabase.co/rest/v1/agent_feature_requests" +
+      "?status=eq.open&order=skapad.asc&limit=50" +
+      "&select=id,agent,kategori,titel,beskrivning,prioritet,skapad",
+      { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
+    );
+    if (status !== 200 || !Array.isArray(data)) return 0;
+    requests = data;
+  } catch (e) {
+    console.error("  [agent-requests] Supabase-fetch misslyckades:", e.message);
+    return 0;
+  }
+
+  // Hämta redan exporterade IDs från filnamnen (format: {id:04d}-...)
+  const exporterade = new Set(
+    fs.readdirSync(AGENT_REQUESTS_DIR)
+      .filter(f => f.endsWith(".md") && f !== ".gitkeep")
+      .map(f => parseInt(f.split("-")[0], 10))
+      .filter(n => !isNaN(n))
+  );
+
+  let nyaSkapta = 0;
+  for (const r of requests) {
+    if (exporterade.has(r.id)) continue;
+
+    const datum = (r.skapad || new Date().toISOString()).slice(0, 10);
+    const agentSlug = toSlug(r.agent || "okand");
+    const titelSlug = toSlug(r.titel || "forslag");
+    const idPadded = String(r.id).padStart(4, "0");
+    const filnamn = `${idPadded}-${datum}-${agentSlug}-${titelSlug}.md`;
+    const filstig = path.join(AGENT_REQUESTS_DIR, filnamn);
+
+    const innehall = `---
+type: agent-request
+status: pending
+agent: "${(r.agent || "").replace(/"/g, '\\"')}"
+kategori: "${r.kategori || ""}"
+prioritet: "${r.prioritet || "medium"}"
+titel: "${(r.titel || "").replace(/"/g, '\\"')}"
+skapad: "${datum}"
+supabase_id: ${r.id}
+---
+
+# [${r.kategori || "?"}/${r.prioritet || "medium"}] ${r.agent}: ${r.titel}
+
+**Agent:** ${r.agent}
+**Kategori:** ${r.kategori}
+**Prioritet:** ${r.prioritet}
+**Datum:** ${datum}
+
+## Förslag
+
+${r.beskrivning || ""}
+
+---
+*Agent feature request exporterad av vision-agent.js från Supabase agent_feature_requests (id: ${r.id})*
+`;
+
+    fs.writeFileSync(filstig, innehall, "utf8");
+    nyaSkapta++;
+  }
+
+  return nyaSkapta;
+}
+
 function httpPost(url, headers, body) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
@@ -383,6 +464,12 @@ async function main() {
   const innehall = `${vision}\n\n---\n*Genererad av vision-agent.js med ${modell}, ${datum}*\n`;
   fs.writeFileSync(utfil, innehall, "utf8");
   console.log(`Vision sparad: ${utfil}`);
+
+  // Exportera agent feature requests till ai-bus/discussions/agent-requests/
+  const nyaRequests = await exportAgentRequests();
+  if (nyaRequests > 0) {
+    console.log(`  🤖 Exporterade ${nyaRequests} nya agent feature requests till ai-bus/discussions/agent-requests/`);
+  }
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
