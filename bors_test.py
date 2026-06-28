@@ -122,6 +122,7 @@ STAKING_PROFIL = {
     "Den stressade":    {"sannolikhet": 0.04, "apy": 0.12},
 }
 DEFAULT_STAKING = {"sannolikhet": 0.08, "apy": 0.12}
+STAKING_ALPHA = 0.6   # Exponent för avtagande avkastning (0 < alpha < 1)
 
 # Market making — agenter med analytisk/lugn personlighet bidrar med likviditet
 MARKET_MAKER_PROFIL = {
@@ -829,7 +830,9 @@ def betala_ut_staking(sb_key: str, stake: dict) -> None:
         start = datetime.fromisoformat(stake["start_datum"])
         slut  = datetime.fromisoformat(stake["slut_datum"])
         dagar = max(1, (slut - start).days)
-        yield_sek = round(float(stake["antal"]) * pris * float(stake["apy"]) * dagar / 365, 2)
+        # Avtagande avkastning: R(x) = x^ALPHA × pris × apy × t
+        # Staka dubbelt ger INTE dubbel reward — x^0.6 ger 52% mer vid 2x
+        yield_sek = round((float(stake["antal"]) ** STAKING_ALPHA) * pris * float(stake["apy"]) * dagar / 365, 2)
 
         # Kreditera yield till agentens saldo
         agent_enc = urllib.parse.quote(stake["agent"])
