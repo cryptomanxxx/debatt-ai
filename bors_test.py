@@ -852,9 +852,16 @@ def betala_ut_staking(
         if total_antal is None:
             total_antal = float(stake["antal"])
 
-        symbol    = stake["symbol"]
+        symbol     = stake["symbol"]
         this_antal = float(stake["antal"])
-        rad_andel  = this_antal / total_antal if total_antal > 0 else 1.0
+
+        # Reject zero-token stakes — the 0.001 floor in the pool formula would
+        # give them a spurious nonzero weight and drain pool yield fraudulently.
+        if this_antal <= 0 or total_antal <= 0:
+            print(f"  [staking] skip zero-token stake for {stake.get('agent')} {symbol}")
+            return
+
+        rad_andel = this_antal / total_antal
 
         if pool_namnare is not None and symbol in STAKING_POOL_SEK_PER_DAG:
             # Pool-modell Y = X^0.3:
@@ -978,7 +985,9 @@ def kör_staking(sb_key: str) -> None:
                     sett_par.add(key)
                     sym         = s["symbol"]
                     agent_total = grupp_totaler[key]
-                    pool_namnare[sym] = pool_namnare.get(sym, 0.0) + max(agent_total, 0.001) ** STAKING_ALPHA
+                    if agent_total <= 0:
+                        continue  # skip — would produce spurious pool weight
+                    pool_namnare[sym] = pool_namnare.get(sym, 0.0) + agent_total ** STAKING_ALPHA
 
             # Logga pool-andelar för debug
             for sym, namnare in pool_namnare.items():
