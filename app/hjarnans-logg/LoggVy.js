@@ -4,16 +4,10 @@ import { useState } from "react";
 const C = {
   bg: "#0a0a0a", card: "#0f0f0f", border: "#1a1a1a",
   text: "#e8e8e8", dim: "#666", accent: "#e879f9",
-  besokare: "#60a5fa", agent: "#4ade80", api: "#fb923c",
+  besokare: "#60a5fa", agent: "#4ade80",
 };
 
-const KALLTYP_LABEL = {
-  besökare: { label: "Besökare", ikon: "👤", farg: C.besokare },
-  agent:    { label: "Agent",    ikon: "🤖", farg: C.agent },
-  api:      { label: "API",      ikon: "⚡", farg: C.api },
-};
-
-const ENDPOINT_IKON = {
+const TYP_IKON = {
   historia:     "📜",
   relationer:   "🤝",
   insikter:     "💡",
@@ -40,15 +34,16 @@ export default function LoggVy({ poster }) {
 
   const visade = filter === "alla"
     ? poster
-    : poster.filter(p => p.kalltyp === filter);
+    : filter === "besökare"
+      ? poster.filter(p => !p.agent)
+      : poster.filter(p => !!p.agent);
 
   const toggle = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }));
 
   const filterKnappar = [
-    { id: "alla", label: "Alla", count: poster.length },
-    { id: "besökare", label: "Besökare", ikon: "👤", count: poster.filter(p => p.kalltyp === "besökare").length },
-    { id: "agent",    label: "Agent",    ikon: "🤖", count: poster.filter(p => p.kalltyp === "agent").length },
-    { id: "api",      label: "API",      ikon: "⚡", count: poster.filter(p => p.kalltyp === "api").length },
+    { id: "alla",     label: "Alla",       count: poster.length },
+    { id: "besökare", label: "Besökare", ikon: "👤", count: poster.filter(p => !p.agent).length },
+    { id: "agent",    label: "AI-agenter", ikon: "🤖", count: poster.filter(p => !!p.agent).length },
   ];
 
   return (
@@ -94,8 +89,8 @@ export default function LoggVy({ poster }) {
       {/* Q&A-lista */}
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         {visade.map((p) => {
-          const kall = KALLTYP_LABEL[p.kalltyp] ?? KALLTYP_LABEL["besökare"];
-          const epIkon = ENDPOINT_IKON[p.endpoint] ?? "🧠";
+          const isAgent = !!p.agent;
+          const typIkon = TYP_IKON[p.typ] ?? "🧠";
           const isOpen = !!expanded[p.id];
           const harSvar = p.svar && p.svar.trim().length > 0;
 
@@ -122,7 +117,7 @@ export default function LoggVy({ poster }) {
               >
                 {/* Källikon */}
                 <span style={{ fontSize: "16px", flexShrink: 0, marginTop: "1px" }}>
-                  {kall.ikon}
+                  {isAgent ? "🤖" : "👤"}
                 </span>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -139,29 +134,39 @@ export default function LoggVy({ poster }) {
 
                   {/* Meta-rad */}
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-                    <span style={{
-                      fontSize: "10px",
-                      color: kall.farg,
-                      fontFamily: "monospace",
-                      background: `${kall.farg}18`,
-                      border: `1px solid ${kall.farg}44`,
-                      borderRadius: "4px",
-                      padding: "2px 7px",
-                    }}>
-                      {kall.label}
-                    </span>
+                    {isAgent && (
+                      <span style={{
+                        fontSize: "10px",
+                        color: C.agent,
+                        fontFamily: "monospace",
+                        background: `${C.agent}18`,
+                        border: `1px solid ${C.agent}44`,
+                        borderRadius: "4px",
+                        padding: "2px 7px",
+                      }}>
+                        {p.agent}
+                      </span>
+                    )}
+                    {!isAgent && (
+                      <span style={{
+                        fontSize: "10px",
+                        color: C.besokare,
+                        fontFamily: "monospace",
+                        background: `${C.besokare}18`,
+                        border: `1px solid ${C.besokare}44`,
+                        borderRadius: "4px",
+                        padding: "2px 7px",
+                      }}>
+                        Besökare
+                      </span>
+                    )}
                     <span style={{
                       fontSize: "10px",
                       color: C.dim,
                       fontFamily: "monospace",
                     }}>
-                      {epIkon} {p.endpoint || "general"}
+                      {typIkon} {p.typ || "general"}
                     </span>
-                    {p.datapunkter > 0 && (
-                      <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace" }}>
-                        {p.datapunkter} datapunkter
-                      </span>
-                    )}
                     {p.latency_ms && (
                       <span style={{ fontSize: "10px", color: "#444", fontFamily: "monospace" }}>
                         {p.latency_ms} ms
@@ -193,14 +198,10 @@ export default function LoggVy({ poster }) {
                     color: "#aaa",
                     lineHeight: "1.7",
                     margin: 0,
+                    whiteSpace: "pre-wrap",
                   }}>
                     {p.svar}
                   </p>
-                  {p.model && (
-                    <p style={{ fontSize: "10px", color: "#333", fontFamily: "monospace", margin: "10px 0 0" }}>
-                      {p.provider ?? ""} · {p.model}
-                    </p>
-                  )}
                 </div>
               )}
             </div>

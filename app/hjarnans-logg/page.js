@@ -8,7 +8,7 @@ async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return [];
   const res = await fetch(
-    `${SB_URL}/rest/v1/civilisation_log?order=skapad.desc&limit=200&select=id,fraga,svar,endpoint,datapunkter,provider,model,latency_ms,kalltyp,skapad`,
+    `${SB_URL}/rest/v1/civilisation_fragor?order=skapad.desc&limit=200&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
     {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
       next: { revalidate: 60 },
@@ -31,9 +31,8 @@ const C = {
 export default async function HjarnansLoggPage() {
   const poster = await getData();
 
-  const antalBesokare = poster.filter(p => p.kalltyp === "besökare").length;
-  const antalAgent    = poster.filter(p => p.kalltyp === "agent").length;
-  const antalApi      = poster.filter(p => p.kalltyp === "api").length;
+  const antalBesokare = poster.filter(p => !p.agent).length;
+  const antalAgent    = poster.filter(p => !!p.agent).length;
   const medLatens     = poster.length > 0
     ? Math.round(poster.filter(p => p.latency_ms).reduce((s, p) => s + p.latency_ms, 0) / poster.filter(p => p.latency_ms).length)
     : null;
@@ -62,7 +61,6 @@ export default async function HjarnansLoggPage() {
               ["Totalt", poster.length, "#fff"],
               ["Besökare", antalBesokare, C.besokare],
               ["AI-agenter", antalAgent, C.agent],
-              ["API", antalApi, C.api],
               ...(medLatens ? [["Snitt-svarstid", `${medLatens} ms`, "#888"]] : []),
             ].map(([label, val, farg]) => (
               <div key={label}>
@@ -78,9 +76,8 @@ export default async function HjarnansLoggPage() {
           <div style={{ textAlign: "center", padding: "80px 0" }}>
             <p style={{ fontSize: "16px", color: C.dim, marginBottom: "8px" }}>Inga frågor loggade ännu</p>
             <p style={{ fontSize: "13px", color: "#444" }}>
-              Kör{" "}
-              <code style={{ color: "#888" }}>supabase_civilisation_log.sql</code>
-              {" "}i Supabase SQL Editor och ställ sedan frågor via{" "}
+              Inga frågor loggade i <code style={{ color: "#888" }}>civilisation_fragor</code> ännu.
+              Ställ frågor via{" "}
               <a href="/civilisation" style={{ color: C.accent }}>Civilisations-API:et</a>.
             </p>
           </div>
