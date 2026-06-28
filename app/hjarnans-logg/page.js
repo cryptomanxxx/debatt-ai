@@ -31,8 +31,8 @@ const C = {
 export default async function HjarnansLoggPage() {
   const poster = await getData();
 
-  const antalBesokare = poster.filter(p => !p.agent).length;
-  const antalAgent    = poster.filter(p => !!p.agent).length;
+  const antalBesokare = poster.filter(p => !p.agent || p.agent === "besökare").length;
+  const antalAgent    = poster.filter(p => !!p.agent && p.agent !== "besökare").length;
   const medLatens     = poster.length > 0
     ? Math.round(poster.filter(p => p.latency_ms).reduce((s, p) => s + p.latency_ms, 0) / poster.filter(p => p.latency_ms).length)
     : null;

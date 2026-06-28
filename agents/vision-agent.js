@@ -261,7 +261,7 @@ async function exportAgentRequests() {
   try {
     const { status, data } = await httpGet(
       "https://fmwxftnistkoqazfwnuj.supabase.co/rest/v1/agent_feature_requests" +
-      "?status=eq.open&order=skapad.asc&limit=50" +
+      "?status=eq.open&order=skapad.asc&limit=200" +
       "&select=id,agent,kategori,titel,beskrivning,prioritet,skapad",
       { apikey: sbKey, Authorization: `Bearer ${sbKey}` }
     );

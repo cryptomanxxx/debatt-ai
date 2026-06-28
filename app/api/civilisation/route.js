@@ -310,12 +310,13 @@ export async function POST(req) {
           kalltyp,
         }),
       }).catch(() => {});
-      // civilisation_fragor — same table agents write to directly (agent=null for visitors)
+      // civilisation_fragor — same table agents write to directly
+      // agent column is NOT NULL: use "besökare" sentinel for web visitors
       fetch(`${SB_URL}/rest/v1/civilisation_fragor`, {
         method: "POST",
         headers: logHeaders,
         body: JSON.stringify({
-          agent:      kalltyp === "besökare" ? null : kalltyp,
+          agent:      kalltyp === "besökare" ? "besökare" : kalltyp,
           fraga:      fraga.trim().slice(0, 500),
           typ:        resolvedEndpoint,
           svar:       text.slice(0, 2000),
