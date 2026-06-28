@@ -941,15 +941,24 @@ def kör_staking(sb_key: str) -> None:
         # Vi behöver hela mängden för att beräkna:
         #   a) agentens total position per (agent, symbol)  — staggered stakes inkluderas
         #   b) pool-nämnaren per symbol: sum(agent_total^alpha för alla unika agenter)
+        #
+        # pool_ok=False → pool_namnare skickas INTE till betala_ut_staking(),
+        # som då faller tillbaka på gammal APY-formel istället för att överkreditera
+        # baserat på ett ofullständigt nämnare (Codex P2).
+        pool_ok = False
+        alla_aktiva: list[dict] = mogna[:]
         try:
             r_all = httpx.get(
                 f"{SB_URL}/rest/v1/bors_staking?utbetald=eq.false&select=agent,symbol,antal",
                 headers=_h(sb_key), timeout=10,
             )
-            alla_aktiva: list[dict] = r_all.json() if r_all.is_success else mogna[:]
+            if r_all.is_success and r_all.json():
+                alla_aktiva = r_all.json()
+                pool_ok = True
+            else:
+                raise ValueError(f"HTTP {r_all.status_code} eller tom respons")
         except Exception as e:
-            print(f"  [kör_staking] VARNING: kunde inte hämta alla aktiva stakes: {e} — använder bara mogna")
-            alla_aktiva = mogna[:]
+            print(f"  [kör_staking] VARNING: kunde inte hämta alla aktiva stakes: {e} — pool-modellen inaktiveras, använder APY-fallback")
 
         # a) Total aktiv position per (agent, symbol)
         grupp_totaler: dict[tuple, float] = {}
@@ -957,28 +966,29 @@ def kör_staking(sb_key: str) -> None:
             key = (s["agent"], s["symbol"])
             grupp_totaler[key] = grupp_totaler.get(key, 0.0) + float(s["antal"])
 
-        # b) Pool-nämnare per symbol: ett bidrag per unik agent
+        # b) Pool-nämnare per symbol: ett bidrag per unik agent (bara vid pool_ok)
         pool_namnare: dict[str, float] = {}
-        sett_par: set[tuple] = set()
-        for s in alla_aktiva:
-            key = (s["agent"], s["symbol"])
-            if key not in sett_par:
-                sett_par.add(key)
-                sym          = s["symbol"]
-                agent_total  = grupp_totaler[key]
-                pool_namnare[sym] = pool_namnare.get(sym, 0.0) + (agent_total ** STAKING_ALPHA)
+        if pool_ok:
+            sett_par: set[tuple] = set()
+            for s in alla_aktiva:
+                key = (s["agent"], s["symbol"])
+                if key not in sett_par:
+                    sett_par.add(key)
+                    sym         = s["symbol"]
+                    agent_total = grupp_totaler[key]
+                    pool_namnare[sym] = pool_namnare.get(sym, 0.0) + (agent_total ** STAKING_ALPHA)
 
-        # Logga pool-andelar för debug
-        for sym, namnare in pool_namnare.items():
-            pool_dag = STAKING_POOL_SEK_PER_DAG.get(sym, 0)
-            print(f"  [staking pool] {sym}: nämnare={namnare:.3f}, pool={pool_dag} kr/dag")
+            # Logga pool-andelar för debug
+            for sym, namnare in pool_namnare.items():
+                pool_dag = STAKING_POOL_SEK_PER_DAG.get(sym, 0)
+                print(f"  [staking pool] {sym}: nämnare={namnare:.3f}, pool={pool_dag} kr/dag")
 
         for s in mogna:
             key = (s["agent"], s["symbol"])
             betala_ut_staking(
                 sb_key, s,
                 total_antal=grupp_totaler.get(key, float(s["antal"])),
-                pool_namnare=pool_namnare,
+                pool_namnare=pool_namnare if pool_ok else None,
             )
     else:
         print("  Inga stakes att betala ut.")

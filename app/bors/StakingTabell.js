@@ -48,7 +48,7 @@ export default function StakingTabell({ rader }) {
         const ikon    = symbolIkon(s.symbol);
         const dagText = s.dagarKvar === 0 ? "idag" : `${s.dagarKvar}d`;
         const dagFarg = s.dagarKvar <= 1 ? "#fbbf24" : C.textMuted;
-        const pct     = (s.poolAndelPct ?? 0).toFixed(1);
+        const pct     = s.poolAndelPct != null ? `${s.poolAndelPct.toFixed(1)}%` : `APY ${(s.apy * 100).toFixed(0)}%`;
         return (
           <div key={s.id ?? i} style={{
             display: "grid",
@@ -68,8 +68,8 @@ export default function StakingTabell({ rader }) {
             <span style={{ color: C.text, textAlign: "right" }}>
               {s.antal.toFixed(2)}
             </span>
-            <span style={{ color: "#a855f7", textAlign: "right" }}>
-              {pct}%
+            <span style={{ color: s.poolAndelPct != null ? "#a855f7" : "#4ade80", textAlign: "right" }}>
+              {pct}
             </span>
             <span style={{ color: dagFarg, textAlign: "right" }}>
               {s.slut_datum} <span style={{ fontSize: 9 }}>({dagText})</span>

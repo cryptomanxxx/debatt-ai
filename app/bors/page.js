@@ -236,7 +236,10 @@ export default async function BorsPage() {
     }
   }
 
-  // Steg 3: beräkna yield kvar per rad med pool-formeln
+  // Steg 3: beräkna yield kvar per rad.
+  // Pool-formeln används bara för symboler i STAKING_POOL_DAG (DBT/NOVA/ETK).
+  // Övriga symboler (STAB, agent-tokens m.fl.) använder gammal APY-formel
+  // för att matcha vad betala_ut_staking() faktiskt betalar ut.
   const stakingRader = (staking ?? []).map(s => {
     const slutDatum = new Date(s.slut_datum); slutDatum.setHours(0, 0, 0, 0);
     const dagarKvar  = Math.max(0, Math.round((slutDatum - idag) / 86400000));
@@ -246,11 +249,20 @@ export default async function BorsPage() {
     const sym        = s.symbol;
     const agentTotal = stakingTotalMap[`${s.agent}:${sym}`] ?? antal;
     const radAndel   = agentTotal > 0 ? antal / agentTotal : 1;
-    const namnare    = poolNamnare[sym] ?? 1;
-    const poolDag    = STAKING_POOL_DAG[sym] ?? 15;
-    const poolAndel  = namnare > 0 ? Math.pow(agentTotal, STAKING_ALPHA) / namnare : 1;
-    const yieldKvar  = poolAndel * radAndel * poolDag * dagarKvar;
-    return { ...s, dagarKvar, pris, antal, apy, yieldKvar, poolAndelPct: poolAndel * 100 };
+    const poolDag    = STAKING_POOL_DAG[sym]; // undefined för icke-poolade symboler
+    let yieldKvar, poolAndelPct;
+    if (poolDag !== undefined) {
+      // Delad pool-modell (DBT / NOVA / ETK)
+      const namnare   = poolNamnare[sym] ?? 1;
+      const poolAndel = namnare > 0 ? Math.pow(agentTotal, STAKING_ALPHA) / namnare : 1;
+      yieldKvar     = poolAndel * radAndel * poolDag * dagarKvar;
+      poolAndelPct  = poolAndel * 100;
+    } else {
+      // Gammal APY-formel för symboler utanför pool (STAB, agent-tokens m.fl.)
+      yieldKvar    = Math.pow(agentTotal, STAKING_ALPHA) * radAndel * pris * apy * (dagarKvar / 365);
+      poolAndelPct = null;
+    }
+    return { ...s, dagarKvar, pris, antal, apy, yieldKvar, poolAndelPct };
   }).filter(s => s.antal > 0);
   const totalStakVarde   = stakingRader.reduce((sum, s) => sum + s.antal * s.pris, 0);
   const totalYieldKvar   = stakingRader.reduce((sum, s) => sum + s.yieldKvar, 0);
