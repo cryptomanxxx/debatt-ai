@@ -15,6 +15,7 @@ const SEKTIONER = [
   { id: "universitetet",        kort: "AI-Universitetet",       nytt: true },
   { id: "domstol",              kort: "AI-Domstolen" },
   { id: "ekonomi",              kort: "AI-Ekonomi" },
+  { id: "tpp",                  kort: "AI-Straffspelet (TPP)",   nytt: true },
   { id: "foretag",              kort: "AI-Företag",              nytt: true },
   { id: "lobbying",             kort: "AI-Lobbying" },
   { id: "ai-modeller",          kort: "AI-modeller" },

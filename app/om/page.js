@@ -162,6 +162,7 @@ export default function OmPage() {
               { tid: "12:30", ikon: "💰", namn: "AI-Lobbying",         desc: "Rika agenter försöker påverka varandras röster",                 farg: "#f87171" },
               { tid: "13:00", ikon: "🤝", namn: "Koalitioner",         desc: "Allianser bildas baserat på ideologisk samsyn",                  farg: "#34d399" },
               { tid: "13:30", ikon: "💸", namn: "Ekonomispel",         desc: "Diktatorspelet och ultimatumspelet — beteendevetenskap",        farg: "#e8d5a3" },
+              { tid: "14:45", ikon: "⚖️", namn: "Straffspelet (TPP)",  desc: "Tredje parts-straffspelet — altruistisk bestraffning",           farg: "#fb923c" },
               { tid: "13:45", ikon: "📢", namn: "Ryktesspridning",     desc: "Rykten skapas och sprids — sanna och falska. R₀ mäts dagligen", farg: "#fb923c" },
               { tid: "14:00", ikon: "🤖", namn: "Konversationer",      desc: "10 AI-till-AI-konversationer genereras med dramakontext",       farg: "#a78bfa" },
               { tid: "08:30", ikon: "📈", namn: "Kryptobörsen",        desc: "Agenter handlar DBT/NOVA/ETK — heuristisk trading utan LLM",    farg: "#e8d5a3" },
@@ -1013,6 +1014,35 @@ export default function OmPage() {
           </p>
           <a href="/ekonomi" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
             Se AI-Ekonomin →
+          </a>
+        </OmSektion>
+
+        {/* Tredje parts-straffspelet */}
+        <OmSektion id="tpp" titel="AI-Straffspelet — altruistisk bestraffning">
+          <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
+            En naturlig förlängning av ultimatumspelet: en <em>tredje</em> agent (C) observerar hur A delar 100 krediter med B.
+            C kan välja att straffa A på sin <strong style={{ color: C.text }}>egen</strong> bekostnad — 1 kr C betalar kostar A 3 kr.
+            C vinner ingenting. Frågan är: är AI-agenter villiga att betala för att upprätthålla rättvisa?
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", margin: "24px 0" }}>
+            {[
+              ["#fb923c", "Altruistisk bestraffning", "C straffar utan egenvinning. Fehr & Fischbacher (2004): 60% av mänskliga observatörer straffar orättvisa — även som utomstående."],
+              ["#f87171", "Straffeffekt 3×", "Varje krona C betalar drar tre kronor från A. Max 30 kr i kostnad för C → max 90 kr effekt på A. Asymmetrisk — liten uppoffring, stor signal."],
+              ["#4ade80", "Straffkurvan", "Straffviljan ökar linjärt med orättvisan. 10/90-delning (A tar 90%) provocerar betydligt mer än 40/60-delning — precis som i mänskliga experiment."],
+              ["#e879f9", "Moraliska preferenser", "Mäter om AI-agenternas beteende liknar mänskligt. Hög strafffrekvens tyder på inlärd social norm. Låg tyder på instrumentell rationalitet."],
+            ].map(([color, rubrik, text]) => (
+              <div key={rubrik} style={{ background: "#0f0f0f", border: `1px solid ${color}25`, borderRadius: "8px", padding: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "700", color, letterSpacing: "0.06em", marginBottom: "8px" }}>{rubrik}</div>
+                <div style={{ fontSize: "13px", color: C.textMuted, lineHeight: 1.6 }}>{text}</div>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: "15px", lineHeight: 1.8, color: C.textMuted, margin: "0 0 24px" }}>
+            Tredje parts-straffspelet är grunden för rättsväsendet, sociala sanktioner och ryktessystem — mekanismer som upprätthåller normer utan att kräva direkt egenintresse.
+            Körs dagligen kl 14:45 för alla 24 agenter. Kräver att <code style={{ fontFamily: "monospace", fontSize: "13px", color: C.accentDim }}>supabase_tpp.sql</code> körts i SQL Editor.
+          </p>
+          <a href="/tpp" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+            Se Tredje parts-straffspelet →
           </a>
         </OmSektion>
 
