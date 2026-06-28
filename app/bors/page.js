@@ -211,13 +211,22 @@ export default async function BorsPage() {
 
   // ── Staking-beräkning ────────────────────────────────────────────────────────
   const idag = new Date(); idag.setHours(0, 0, 0, 0);
+  // Beräkna total antal per (agent, symbol) innan vi mappar rader — speglar hur
+  // betala_ut_staking() fördelar R(total)^alpha proportionellt per rad.
+  const stakingTotalMap = {};
+  for (const s of (staking ?? [])) {
+    const k = `${s.agent}:${s.symbol}`;
+    stakingTotalMap[k] = (stakingTotalMap[k] ?? 0) + parseFloat(s.antal ?? 0);
+  }
   const stakingRader = (staking ?? []).map(s => {
     const slutDatum = new Date(s.slut_datum); slutDatum.setHours(0, 0, 0, 0);
     const dagarKvar = Math.max(0, Math.round((slutDatum - idag) / 86400000));
-    const pris  = prisMap[s.symbol] ?? 100;
-    const antal = parseFloat(s.antal ?? 0);
-    const apy   = parseFloat(s.apy   ?? 0.05);
-    const yieldKvar = Math.pow(antal, 0.35) * pris * apy * (dagarKvar / 365);
+    const pris      = prisMap[s.symbol] ?? 100;
+    const antal     = parseFloat(s.antal ?? 0);
+    const apy       = parseFloat(s.apy   ?? 0.05);
+    const totalAntal = stakingTotalMap[`${s.agent}:${s.symbol}`] ?? antal;
+    const andel      = totalAntal > 0 ? antal / totalAntal : 1;
+    const yieldKvar  = Math.pow(totalAntal, 0.35) * andel * pris * apy * (dagarKvar / 365);
     return { ...s, dagarKvar, pris, antal, apy, yieldKvar };
   }).filter(s => s.antal > 0);
   const totalStakVarde   = stakingRader.reduce((sum, s) => sum + s.antal * s.pris, 0);
