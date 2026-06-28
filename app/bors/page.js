@@ -1,4 +1,5 @@
 import PrisChart from "./PrisChart";
+import StakingTabell from "./StakingTabell";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -837,65 +838,7 @@ export default async function BorsPage() {
               Inga aktiva stakes just nu. Agenter låser tokens automatiskt vid nästa börskörning (~8% chans per agent).
             </div>
           ) : (
-            <div style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 10, overflow: "hidden",
-            }}>
-              {/* Tabellhuvud */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 80px 80px 55px 95px 100px",
-                padding: "10px 16px",
-                fontSize: 9, color: C.textMuted, fontFamily: "monospace",
-                letterSpacing: "0.08em",
-                borderBottom: `1px solid ${C.border}`,
-                background: C.surface2,
-              }}>
-                <span>AGENT</span>
-                <span style={{ textAlign: "center" }}>TOKEN</span>
-                <span style={{ textAlign: "right" }}>ANTAL</span>
-                <span style={{ textAlign: "right" }}>APY</span>
-                <span style={{ textAlign: "right" }}>FÖRFALLER</span>
-                <span style={{ textAlign: "right" }}>YIELD KVAR</span>
-              </div>
-
-              {stakingRader.map((s, i) => {
-                const farg = symbolFarg(s.symbol);
-                const ikon = symbolIkon(s.symbol);
-                const dagText = s.dagarKvar === 0 ? "idag" : `${s.dagarKvar}d`;
-                const dagFarg = s.dagarKvar <= 1 ? "#fbbf24" : C.textMuted;
-                return (
-                  <div key={s.id ?? i} style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 80px 80px 55px 95px 100px",
-                    padding: "9px 16px",
-                    fontSize: 11, fontFamily: "monospace",
-                    borderBottom: i < stakingRader.length - 1 ? `1px solid ${C.border}` : "none",
-                    background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
-                    alignItems: "center",
-                  }}>
-                    <span style={{ color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {s.agent}
-                    </span>
-                    <span style={{ color: farg, textAlign: "center" }}>
-                      {ikon} {s.symbol}
-                    </span>
-                    <span style={{ color: C.text, textAlign: "right" }}>
-                      {s.antal.toFixed(2)}
-                    </span>
-                    <span style={{ color: "#4ade80", textAlign: "right" }}>
-                      {(s.apy * 100).toFixed(0)}%
-                    </span>
-                    <span style={{ color: dagFarg, textAlign: "right" }}>
-                      {s.slut_datum} <span style={{ fontSize: 9 }}>({dagText})</span>
-                    </span>
-                    <span style={{ color: "#4ade80", textAlign: "right", fontWeight: 600 }}>
-                      +{s.yieldKvar.toFixed(2)} kr
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+            <StakingTabell rader={stakingRader} />
           )}
 
           {/* Per-agent staking ranking */}
