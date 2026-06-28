@@ -40,7 +40,7 @@ export default function StakingTabell({ rader }) {
         <span style={{ textAlign: "right" }}>ANTAL</span>
         <span style={{ textAlign: "right" }}>POOL %</span>
         <span style={{ textAlign: "right" }}>FÖRFALLER</span>
-        <span style={{ textAlign: "right" }}>YIELD KVAR</span>
+        <span style={{ textAlign: "right" }}>YIELD/DAG</span>
       </div>
 
       {synliga.map((s, i) => {
@@ -75,7 +75,7 @@ export default function StakingTabell({ rader }) {
               {s.slut_datum} <span style={{ fontSize: 9 }}>({dagText})</span>
             </span>
             <span style={{ color: "#4ade80", textAlign: "right", fontWeight: 600 }}>
-              +{s.yieldKvar.toFixed(2)} kr
+              +{s.yieldPerDag.toFixed(2)} kr/dag
             </span>
           </div>
         );
