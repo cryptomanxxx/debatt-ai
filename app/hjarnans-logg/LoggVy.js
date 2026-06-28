@@ -28,16 +28,23 @@ function Ago({ skapad }) {
   return <span>{Math.floor(h / 24)} dagar sedan</span>;
 }
 
+const PAGE_SIZE = 20;
+
 export default function LoggVy({ poster }) {
   const [filter, setFilter] = useState("alla");
   const [expanded, setExpanded] = useState({});
+  const [sida, setSida] = useState(1);
 
-  const visade = filter === "alla"
+  const filtrerade = filter === "alla"
     ? poster
     : filter === "besökare"
       ? poster.filter(p => !p.agent)
       : poster.filter(p => !!p.agent);
 
+  const totalSidor = Math.max(1, Math.ceil(filtrerade.length / PAGE_SIZE));
+  const visade = filtrerade.slice((sida - 1) * PAGE_SIZE, sida * PAGE_SIZE);
+
+  const byttFilter = (id) => { setFilter(id); setSida(1); };
   const toggle = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }));
 
   const filterKnappar = [
@@ -53,7 +60,7 @@ export default function LoggVy({ poster }) {
         {filterKnappar.map(({ id, label, ikon, count }) => (
           <button
             key={id}
-            onClick={() => setFilter(id)}
+            onClick={() => byttFilter(id)}
             style={{
               background: filter === id ? "#1a1a1a" : "transparent",
               border: `1px solid ${filter === id ? C.accent : C.border}`,
@@ -84,6 +91,13 @@ export default function LoggVy({ poster }) {
         <p style={{ color: C.dim, fontSize: "14px", fontStyle: "italic" }}>
           Inga poster matchade filtret.
         </p>
+      )}
+
+      {/* Pagination info */}
+      {filtrerade.length > PAGE_SIZE && (
+        <div style={{ fontSize: "12px", color: C.dim, marginBottom: "16px" }}>
+          Visar {(sida - 1) * PAGE_SIZE + 1}–{Math.min(sida * PAGE_SIZE, filtrerade.length)} av {filtrerade.length}
+        </div>
       )}
 
       {/* Q&A-lista */}
@@ -208,6 +222,56 @@ export default function LoggVy({ poster }) {
           );
         })}
       </div>
+
+      {/* Paginering */}
+      {totalSidor > 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "32px", justifyContent: "center" }}>
+          <button
+            onClick={() => setSida(s => Math.max(1, s - 1))}
+            disabled={sida === 1}
+            style={{
+              background: "transparent",
+              border: `1px solid ${sida === 1 ? "#222" : C.border}`,
+              borderRadius: "6px",
+              padding: "6px 14px",
+              cursor: sida === 1 ? "default" : "pointer",
+              fontSize: "12px",
+              color: sida === 1 ? "#333" : C.dim,
+            }}
+          >← Föregående</button>
+
+          {Array.from({ length: totalSidor }, (_, i) => i + 1).map(n => (
+            <button
+              key={n}
+              onClick={() => setSida(n)}
+              style={{
+                background: n === sida ? "#1a1a1a" : "transparent",
+                border: `1px solid ${n === sida ? C.accent : C.border}`,
+                borderRadius: "6px",
+                padding: "6px 10px",
+                cursor: "pointer",
+                fontSize: "12px",
+                color: n === sida ? "#fff" : C.dim,
+                minWidth: "36px",
+              }}
+            >{n}</button>
+          ))}
+
+          <button
+            onClick={() => setSida(s => Math.min(totalSidor, s + 1))}
+            disabled={sida === totalSidor}
+            style={{
+              background: "transparent",
+              border: `1px solid ${sida === totalSidor ? "#222" : C.border}`,
+              borderRadius: "6px",
+              padding: "6px 14px",
+              cursor: sida === totalSidor ? "default" : "pointer",
+              fontSize: "12px",
+              color: sida === totalSidor ? "#333" : C.dim,
+            }}
+          >Nästa →</button>
+        </div>
+      )}
     </div>
   );
 }

@@ -8,7 +8,7 @@ async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return [];
   const res = await fetch(
-    `${SB_URL}/rest/v1/civilisation_fragor?order=skapad.desc&limit=200&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
+    `${SB_URL}/rest/v1/civilisation_fragor?order=skapad.desc&limit=500&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
     {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
       next: { revalidate: 60 },
