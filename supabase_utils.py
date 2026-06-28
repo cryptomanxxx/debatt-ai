@@ -5075,6 +5075,16 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
             sedda_namn.add(p["namn"])
         _overfor_parti_kassor(sb_key, kommande_partier)
 
+        # Hämta befintliga partinamn innan delete — används för att avgöra om ett parti är genuint nytt
+        try:
+            r_gamla = httpx.get(
+                f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn",
+                headers=h, timeout=8,
+            )
+            gamla_namn: set[str] = {p["namn"] for p in r_gamla.json()} if r_gamla.is_success else set()
+        except Exception:
+            gamla_namn = set()
+
         # Ta bort gamla partier
         httpx.delete(f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true", headers=h, timeout=8)
 
@@ -5103,12 +5113,14 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
             r2 = httpx.post(f"{SB_URL}/rest/v1/politiska_partier", headers=h, json=payload, timeout=8)
             if r2.is_success:
                 aktiva += 1
-                spara_civilisations_minne(
-                    sb_key, typ="koalition_bildad",
-                    rubrik=f"Parti bildat: {namn}",
-                    beskrivning=f"Partiet {namn} bildades med {len(medlemmar)} medlemmar. Partiledare: {ledare}. Styrka: {intern_styrka}.",
-                    agenter=medlemmar, relaterat_typ="politiska_partier",
-                )
+                # Logga bara "Parti bildat" om partiet är genuint nytt — inte vid daglig omklustring
+                if namn not in gamla_namn:
+                    spara_civilisations_minne(
+                        sb_key, typ="koalition_bildad",
+                        rubrik=f"Parti bildat: {namn}",
+                        beskrivning=f"Partiet {namn} bildades med {len(medlemmar)} medlemmar. Partiledare: {ledare}. Styrka: {intern_styrka}.",
+                        agenter=medlemmar, relaterat_typ="politiska_partier",
+                    )
         return aktiva
     except Exception as e:
         print(f"  [FEL] berakna_och_spara_partier: {e}")
