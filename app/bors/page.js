@@ -232,7 +232,8 @@ export default async function BorsPage() {
     if (!seddaPar.has(k)) {
       seddaPar.add(k);
       const sym        = s.symbol;
-      const agentTotal = Math.max(stakingTotalMap[k] ?? parseFloat(s.antal ?? 0), 0.001);
+      const agentTotal = stakingTotalMap[k] ?? parseFloat(s.antal ?? 0);
+      if (agentTotal <= 0) continue; // skip zero-token rows — same guard as Python payout job
       poolNamnare[sym] = (poolNamnare[sym] ?? 0) + Math.pow(agentTotal, STAKING_ALPHA);
     }
   }

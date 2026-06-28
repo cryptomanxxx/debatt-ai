@@ -150,6 +150,8 @@ LIKVIDITET_BELOPP = 1.5    # SEK per kvalificerande (agent, symbol)-par per kör
 
 AVGIFT_SATS = 0.005        # 0,5 % handelsavgift på varje genomförd affär → Börskassan
 
+BORSKASSAN_MIN_SALDO = 100_000  # Börsens likviditetsreserv — hålls alltid ≥ detta
+
 # ─── Automatisk Market Maker (AMM) ────────────────────────────────────────────
 
 AMM_SPREAD           = 0.04   # 4 % varje sida av spotpriset
@@ -857,8 +859,19 @@ def betala_ut_staking(
 
         # Reject zero-token stakes — the 0.001 floor in the pool formula would
         # give them a spurious nonzero weight and drain pool yield fraudulently.
+        # Mark as utbetald so the row is not re-fetched on future runs.
         if this_antal <= 0 or total_antal <= 0:
-            print(f"  [staking] skip zero-token stake for {stake.get('agent')} {symbol}")
+            print(f"  [staking] skip zero-token stake for {stake.get('agent')} {symbol} — marking utbetald")
+            h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+            try:
+                httpx.patch(
+                    f"{SB_URL}/rest/v1/bors_staking?id=eq.{stake['id']}",
+                    headers=h_min,
+                    json={"utbetald": True},
+                    timeout=8,
+                )
+            except Exception as e_retire:
+                print(f"  [staking] retire zero-stake failed: {e_retire}")
             return
 
         rad_andel = this_antal / total_antal
@@ -1684,6 +1697,53 @@ def kör_shorts(sb_key: str, alla_symboler: list[str]) -> None:
         öppna_short(sb_key, agent, symbol, antal)
 
 
+# ─── Likviditetsreserv ────────────────────────────────────────────────────────
+
+def _sakerstall_borskassan_likviditet(sb_key: str) -> None:
+    """Garanterar att Börskassan alltid håller minst BORSKASSAN_MIN_SALDO.
+    Differensen skapas som ny likviditet — börsens centralbanks-funktion.
+    Hanterar både fallet att raden finns (PATCH) och saknas (upsert INSERT).
+    """
+    saldo = hamta_saldo(sb_key, "Börskassan")
+    if saldo >= BORSKASSAN_MIN_SALDO:
+        print(f"  Börskassan: {saldo:.0f} kr (OK)")
+        return
+    pafall = round(BORSKASSAN_MIN_SALDO - saldo, 2)
+    h_rep = {**_h(sb_key), "Prefer": "return=representation"}
+    h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+    try:
+        # Försök PATCH — returnerar raden om den fanns, tom lista om den saknas
+        r = httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan",
+            headers=h_rep,
+            json={"saldo": BORSKASSAN_MIN_SALDO, "uppdaterad": "now()"},
+            timeout=8,
+        )
+        if r.is_success and r.json():
+            print(f"  Börskassan: {saldo:.0f} kr → {BORSKASSAN_MIN_SALDO:.0f} kr (+{pafall:.0f} kr likviditetspåfyll)")
+            return
+        # Raden finns inte — skapa den via upsert
+        r2 = httpx.post(
+            f"{SB_URL}/rest/v1/agent_planbocker?on_conflict=agent",
+            headers={**h_min, "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json={
+                "agent":       "Börskassan",
+                "saldo":       BORSKASSAN_MIN_SALDO,
+                "totalt_givet": 0,
+                "totalt_fatt":  0,
+                "antal_spel":   0,
+                "uppdaterad":  "now()",
+            },
+            timeout=8,
+        )
+        if r2.is_success:
+            print(f"  Börskassan: skapades med {BORSKASSAN_MIN_SALDO:.0f} kr (ny rad)")
+        else:
+            print(f"  Börskassan upsert misslyckades: {r2.status_code} {r2.text[:120]}")
+    except Exception as e:
+        print(f"  Börskassan påfyll misslyckades: {e}")
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -1704,6 +1764,10 @@ def main():
     # Genesis (körs bara om börsen är tom)
     print("\n[2/10] Kontrollerar genesis...")
     genesis(sb_key)
+
+    # Likviditetsreserv — toppa upp Börskassan om saldo < BORSKASSAN_MIN_SALDO
+    print(f"\n[2b] Likviditetsreserv (min {BORSKASSAN_MIN_SALDO:,} kr)...")
+    _sakerstall_borskassan_likviditet(sb_key)
 
     # Hämta alla symboler tidigt (behövs av AMM och resten)
     try:

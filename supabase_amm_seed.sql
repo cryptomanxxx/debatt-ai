@@ -16,12 +16,11 @@ ON CONFLICT (agent, symbol) DO UPDATE
   SET antal      = GREATEST(bors_portfoljer.antal, 50),
       uppdaterad = now();
 
--- 2. Se till att Börskassan har minst 1 000 kr för bid-ordrar
--- (upsert skapar raden om den inte finns, annars uppdaterar)
--- Obs: saldo_spel utelämnas avsiktligt — kolumnen tillkommer via
--- supabase_prediction_spel.sql och kan saknas i enklare miljöer.
+-- 2. Se till att Börskassan har minst 100 000 kr för bid-ordrar och AMM-likviditet.
+-- bors_test.py toppar automatiskt upp till BORSKASSAN_MIN_SALDO = 100 000 kr
+-- vid varje körning, men denna seed sätter rätt startvärde.
 INSERT INTO agent_planbocker (agent, saldo, totalt_givet, totalt_fatt, antal_spel, uppdaterad)
-VALUES ('Börskassan', 1000, 0, 0, 0, now())
+VALUES ('Börskassan', 100000, 0, 0, 0, now())
 ON CONFLICT (agent) DO UPDATE
-  SET saldo      = GREATEST(agent_planbocker.saldo, 1000),
+  SET saldo      = GREATEST(agent_planbocker.saldo, 100000),
       uppdaterad = now();
