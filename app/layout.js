@@ -37,6 +37,7 @@ export default function RootLayout({ children }) {
           <div style={{ maxWidth: "900px", margin: "0 auto" }}>
             <div style={{ display: "flex", flexWrap: "wrap", marginBottom: "16px" }}>
               <a href="/versus" className="neon-nav">Agent vs Agent</a>
+              <a href="/agentforslag" className="neon-nav">Agentförslag 💡</a>
               <a href="/tokens" className="neon-nav">Agent-tokens</a>
               <a href="/dynamik" className="neon-nav">Agentdynamik</a>
               <a href="/ai-bilder" className="neon-nav">AI-Bilder</a>
