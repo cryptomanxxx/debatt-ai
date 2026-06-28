@@ -216,7 +216,7 @@ export default async function BorsPage() {
     const pris  = prisMap[s.symbol] ?? 100;
     const antal = parseFloat(s.antal ?? 0);
     const apy   = parseFloat(s.apy   ?? 0.05);
-    const yieldKvar = antal * pris * apy * (dagarKvar / 365);
+    const yieldKvar = Math.pow(antal, 0.6) * pris * apy * (dagarKvar / 365);
     return { ...s, dagarKvar, pris, antal, apy, yieldKvar };
   }).filter(s => s.antal > 0);
   const totalStakVarde   = stakingRader.reduce((sum, s) => sum + s.antal * s.pris, 0);
