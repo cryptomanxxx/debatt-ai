@@ -935,11 +935,15 @@ def kör_staking(sb_key: str) -> None:
                     grupp_totaler[(agent, symbol)] = sum(float(r["antal"]) for r in r_tot.json())
                 else:
                     raise ValueError("empty response")
-            except Exception:
-                # Fallback: summera bara de mogna raderna för detta par
-                grupp_totaler[(agent, symbol)] = sum(
+            except Exception as e:
+                # Fallback: summera bara de mogna raderna för detta par.
+                # OBS: detta underskattar totalen om agenten har staggered stakes —
+                # avtagande avkastning beräknas på för litet underlag tills DB svarar igen.
+                fallback = sum(
                     float(s["antal"]) for s in mogna if s["agent"] == agent and s["symbol"] == symbol
                 )
+                grupp_totaler[(agent, symbol)] = fallback
+                print(f"  [kör_staking] VARNING: kunde inte hämta total position för ({agent}, {symbol}): {e} — använder fallback {fallback:.2f}")
         for s in mogna:
             key = (s["agent"], s["symbol"])
             betala_ut_staking(sb_key, s, total_antal=grupp_totaler[key])
