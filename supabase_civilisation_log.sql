@@ -28,8 +28,10 @@ CREATE POLICY "Publik läsning civilisation_log"
   ON civilisation_log FOR SELECT
   USING (true);
 
--- Skrivning kräver service role key (eller anon — fire-and-forget från API-route)
+-- Skrivning kräver service role key — anon-nyckeln är publik och får aldrig skriva
 DROP POLICY IF EXISTS "Service insert civilisation_log" ON civilisation_log;
-CREATE POLICY "Insert civilisation_log"
+DROP POLICY IF EXISTS "Insert civilisation_log" ON civilisation_log;
+CREATE POLICY "Service role insert civilisation_log"
   ON civilisation_log FOR INSERT
+  TO service_role
   WITH CHECK (true);
