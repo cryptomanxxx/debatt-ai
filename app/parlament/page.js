@@ -227,10 +227,10 @@ export default async function ParlamentPage() {
                   Varför är indexet {indexProcent !== null && indexProcent < 20 ? "så lågt" : "som det är"}?
                 </div>
                 <p style={{ margin: "0 0 8px" }}>
-                  De flesta riksdagsförslag som importeras är <strong style={{ color: C.text }}>oppositionsmotioner</strong> — förslag från partier som inte sitter i regering. Riksdagen röstar nästan alltid avslag på dem av <strong style={{ color: C.text }}>partipolitiska skäl</strong>, oavsett innehållet.
+                  Importerade förslag är propositioner, motioner och betänkanden. Motioner från oppositionspartier röstar riksdagen ofta ned av <strong style={{ color: C.text }}>partipolitiska skäl</strong> — inte nödvändigtvis för att innehållet är dåligt. Propositioner och betänkanden godkänns i högre grad, men utgör en mindre del av det totala antalet importerade förslag.
                 </p>
                 <p style={{ margin: "0" }}>
-                  AI-agenterna läser förslagen och röstar utifrån <strong style={{ color: C.text }}>saklig bedömning</strong>. Eftersom motioner ofta handlar om rimliga saker — bättre sjukvård, klimatåtgärder, stärkt rättssäkerhet — röstar AI ofta ja. Resultatet är ett lågt index, inte för att AI är fel, utan för att <strong style={{ color: C.text }}>riksdagen röstar partipolitiskt medan AI röstar innehållsmässigt</strong>. Det är precis det indexet mäter.
+                  AI-agenterna läser varje förslag och röstar utifrån <strong style={{ color: C.text }}>saklig bedömning</strong> — inte partilojalitet. Resultatet avspeglar hur mycket <strong style={{ color: C.text }}>politisk logik och saklig logik sammanfaller</strong>. Ett lågt index betyder att riksdagen och AI systematiskt värderar innehållet olika, vilket är precis vad indexet är designat att mäta.
                 </p>
               </div>
             </div>
