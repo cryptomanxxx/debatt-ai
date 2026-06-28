@@ -3775,6 +3775,144 @@ def kör_ekonomispel(agent: dict, sb_key: str) -> bool:
         return False
 
 
+# ── Tredje parts-straffspelet ───────────────────────────────────────────────
+
+def kör_tpp(agent: dict, sb_key: str) -> bool:
+    """
+    Tredje parts-straffspelet (TPP / Third-Party Punishment Game).
+    Agent A (den aktiva agenten) delar 100 kr ur eget saldo med B.
+    Agent C (slumpmässig observatör) kan betala 0–30 kr ur sitt saldo
+    för att straffa A med 3× beloppet.
+    """
+    from agenter import AGENTER
+
+    saldo_a = _hamta_saldo(sb_key, agent["namn"])
+    if saldo_a < 100:
+        print(f"  ✗ TPP: {agent['namn']} har för lite saldo ({saldo_a} kr)", file=sys.stderr)
+        return False
+
+    # Välj B och C – tre unika agenter
+    ovriga = [a for a in AGENTER if a["namn"] != agent["namn"]]
+    if len(ovriga) < 2:
+        return False
+    b_agent, c_agent = random.sample(ovriga, 2)
+    b_namn = b_agent["namn"]
+    c_namn = c_agent["namn"]
+    saldo_b = _hamta_saldo(sb_key, b_namn)
+    saldo_c = _hamta_saldo(sb_key, c_namn)
+
+    # ── Steg 1: A gör erbjudandet (precis som diktatorspelet) ──────────────
+    prompt_a = f"""{agent.get('systemprompt', f'Du är {agent["namn"]}.')}
+
+Du deltar i ett ekonomiskt experiment — TREDJE PARTS-STRAFFSPELET.
+Du har 100 krediter att fördela (tagna ur ditt eget saldo, nu {saldo_a} kr).
+Du bestämmer hur mycket {b_namn} får (0–100). Resten behåller du.
+{b_namn} har inget att säga till om.
+OBS: En tredje agent ({c_namn}) kommer att observera din uppdelning och kan
+välja att straffa dig ekonomiskt om de anser att du var orättvis.
+
+Nuvarande saldon: Du {saldo_a} kr · {b_namn} {saldo_b} kr · {c_namn} {saldo_c} kr
+
+Svara EXAKT i detta format (inget annat):
+BELOPP: [heltal 0-100]
+MOTIVERING: [1–2 meningar som speglar din personlighet]"""
+
+    system_a = agent.get('system', f'Du är {agent["namn"]}.')
+    svar_a = _llm_spel(system_a, prompt_a, max_tokens=100)
+    if not svar_a:
+        return False
+
+    erbjudande = 0
+    motivering_a = ""
+    for rad in svar_a.strip().splitlines():
+        rad = rad.strip()
+        if rad.upper().startswith("BELOPP:"):
+            try:
+                erbjudande = max(0, min(100, int(rad.split(":", 1)[1].strip())))
+            except ValueError:
+                pass
+        elif rad.upper().startswith("MOTIVERING:"):
+            motivering_a = rad.split(":", 1)[1].strip()
+
+    behaller_a = 100 - erbjudande
+
+    # ── Steg 2: C observerar och bestämmer straff ──────────────────────────
+    max_straff = min(30, saldo_c)   # C kan max spendera 30 kr
+    prompt_c = f"""{c_agent.get('systemprompt', f'Du är {c_namn}.')}
+
+Du observerar ett ekonomiskt experiment — TREDJE PARTS-STRAFFSPELET.
+{agent["namn"]} delade 100 kr med {b_namn}: gav {erbjudande} kr, behöll {behaller_a} kr.
+{agent["namn"]}s motivering: "{motivering_a}"
+
+Du kan nu STRAFFA {agent["namn"]} på din egen bekostnad:
+Varje krona du betalar (0–{max_straff} kr) minskar {agent["namn"]}:s behållning med 3 kr.
+Du vinner ingenting på att straffa — det kostar dig enbart egna krediter.
+
+Ditt saldo: {saldo_c} kr
+
+Svara EXAKT i detta format (inget annat):
+STRAFF: [heltal 0-{max_straff}]
+MOTIVERING: [1–2 meningar som förklarar ditt beslut]"""
+
+    system_c = c_agent.get('system', f'Du är {c_namn}.')
+    svar_c = _llm_spel(system_c, prompt_c, max_tokens=100)
+
+    straff_kr = 0
+    motivering_c = ""
+    if svar_c:
+        for rad in svar_c.strip().splitlines():
+            rad = rad.strip()
+            if rad.upper().startswith("STRAFF:"):
+                try:
+                    straff_kr = max(0, min(max_straff, int(rad.split(":", 1)[1].strip())))
+                except ValueError:
+                    pass
+            elif rad.upper().startswith("MOTIVERING:"):
+                motivering_c = rad.split(":", 1)[1].strip()
+
+    straffeffekt_kr = straff_kr * 3
+
+    # ── Spara spelet ────────────────────────────────────────────────────────
+    try:
+        spel_r = httpx.post(
+            f"{SB_URL}/rest/v1/tpp_spel",
+            headers={**_ekonomi_headers(sb_key), "Prefer": "return=representation"},
+            json={
+                "agent_a": agent["namn"], "agent_b": b_namn, "agent_c": c_namn,
+                "erbjudande": erbjudande, "behaller_a": behaller_a,
+                "straff_kr": straff_kr, "straffeffekt_kr": straffeffekt_kr,
+                "motivering_a": motivering_a, "motivering_c": motivering_c,
+            },
+            timeout=8,
+        )
+    except Exception as e:
+        print(f"  ✗ TPP: kunde inte spara spelet: {e}", file=sys.stderr)
+        return False
+
+    # ── Uppdatera saldon ────────────────────────────────────────────────────
+    # A: betalar 100 kr ur saldo, får tillbaka behaller_a minus straffet
+    ny_saldo_a = max(0, saldo_a - 100 + behaller_a - straffeffekt_kr)
+    # B: får erbjudandet
+    ny_saldo_b = saldo_b + erbjudande
+    # C: betalar straffet
+    ny_saldo_c = max(0, saldo_c - straff_kr)
+
+    for namn, ny in [(agent["namn"], ny_saldo_a), (b_namn, ny_saldo_b), (c_namn, ny_saldo_c)]:
+        try:
+            httpx.patch(
+                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}",
+                headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+                json={"saldo": ny, "uppdaterad": "now()"},
+                timeout=8,
+            )
+        except Exception:
+            pass
+
+    straff_symbol = f"⚖️ straffar {straffeffekt_kr} kr" if straff_kr > 0 else "🤝 straffar inte"
+    print(f"  🎭 TPP: {agent['namn']} gav {erbjudande}/100 → {c_namn} {straff_symbol} (kostnad {straff_kr} kr)")
+    return True
+
+
 # ── Prediction market-settlement ────────────────────────────────────────────
 
 def reglera_prediction_bets(sb_key: str) -> int:
