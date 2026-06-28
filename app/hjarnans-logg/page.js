@@ -13,7 +13,7 @@ async function getData() {
   const [r1, r2] = await Promise.allSettled([
     // AI-agenternas frågor (Python-skripten skriver direkt hit)
     fetch(
-      `${SB_URL}/rest/v1/civilisation_fragor?agent=neq.besökare&order=skapad.desc&limit=500&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
+      `${SB_URL}/rest/v1/civilisation_fragor?order=skapad.desc&limit=500&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
       { headers: h, next: { revalidate: 60 } }
     ),
     // Besökarnas frågor via web-UI (API-routen skriver hit)
@@ -37,8 +37,15 @@ async function getData() {
     skapad:     p.skapad,
   }));
 
+  // Dedup: om samma frågetext finns i båda källorna (legacy-rader från #1145-fönstret)
+  // föredra civilisation_log-versionen och filtrera bort civilisation_fragor-dubletten.
+  const logFragor = new Set(normalizedLogs.map(p => p.fraga));
+  const fragorFiltered = fragor.filter(
+    p => p.agent !== "besökare" || !logFragor.has(p.fraga)
+  );
+
   // Slå ihop och sortera nyast först
-  return [...fragor, ...normalizedLogs]
+  return [...fragorFiltered, ...normalizedLogs]
     .sort((a, b) => new Date(b.skapad) - new Date(a.skapad))
     .slice(0, 500);
 }
