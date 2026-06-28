@@ -212,9 +212,26 @@ export default async function ParlamentPage() {
                 <div style={{ width: `${indexProcent}%`, background: C.ja, transition: "width 0.4s" }} />
                 <div style={{ width: `${100 - indexProcent}%`, background: C.nej }} />
               </div>
-              <div style={{ display: "flex", gap: "20px", fontSize: "12px" }}>
+              <div style={{ display: "flex", gap: "20px", fontSize: "12px", marginBottom: "20px" }}>
                 <span style={{ color: C.ja }}>{samstammiga.length} samstämmiga</span>
                 <span style={{ color: C.nej }}>{jamforbara.length - samstammiga.length} avvikelser</span>
+              </div>
+
+              {/* Förklaring till varför indexet är lågt */}
+              <div style={{
+                background: "#111", border: "1px solid #222",
+                borderRadius: "8px", padding: "16px 20px",
+                fontSize: "13px", color: C.dim, lineHeight: "1.65",
+              }}>
+                <div style={{ fontWeight: "600", color: "#888", marginBottom: "8px", fontSize: "11px", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+                  Varför är indexet {indexProcent !== null && indexProcent < 20 ? "så lågt" : "som det är"}?
+                </div>
+                <p style={{ margin: "0 0 8px" }}>
+                  De flesta riksdagsförslag som importeras är <strong style={{ color: C.text }}>oppositionsmotioner</strong> — förslag från partier som inte sitter i regering. Riksdagen röstar nästan alltid avslag på dem av <strong style={{ color: C.text }}>partipolitiska skäl</strong>, oavsett innehållet.
+                </p>
+                <p style={{ margin: "0" }}>
+                  AI-agenterna läser förslagen och röstar utifrån <strong style={{ color: C.text }}>saklig bedömning</strong>. Eftersom motioner ofta handlar om rimliga saker — bättre sjukvård, klimatåtgärder, stärkt rättssäkerhet — röstar AI ofta ja. Resultatet är ett lågt index, inte för att AI är fel, utan för att <strong style={{ color: C.text }}>riksdagen röstar partipolitiskt medan AI röstar innehållsmässigt</strong>. Det är precis det indexet mäter.
+                </p>
               </div>
             </div>
           )}
