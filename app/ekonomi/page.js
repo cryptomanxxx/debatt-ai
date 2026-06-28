@@ -1,5 +1,6 @@
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
+import GiniSpelGraf from "./GiniSpelGraf";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -15,21 +16,43 @@ const C = {
   gold: "#f59e0b", accent: "#e879f9",
 };
 
+// Fehr-Schmidt: Andel agenter i varje ekonomisk status vid givet Gini-värde (förenklad linjär modell)
+function statusDist(g) {
+  const u = Math.min(0.02 + g * 0.80, 0.60);
+  const p = Math.min(0.10 + g * 0.25, 0.30);
+  const r = Math.min(0.08 + g * 0.12, 0.16);
+  const v = Math.max(0, 1 - u - p - r);
+  return { u, p, v, r };
+}
+
+const P_AVV  = { u: 0.05, p: 0.15, v: 0.40, r: 0.35 }; // P(avvisning | status) vid erbjudande ≈ 30 kr
+const P_GAVA = { u: 15,   p: 22,   v: 32,   r: 37   }; // Förväntat diktatorerbjudande (kr)
+
+function expectedValues(g) {
+  const d = statusDist(g);
+  return {
+    avvisning: Math.round((d.u * P_AVV.u + d.p * P_AVV.p + d.v * P_AVV.v + d.r * P_AVV.r) * 100),
+    gava:      Math.round(d.u * P_GAVA.u + d.p * P_GAVA.p + d.v * P_GAVA.v + d.r * P_GAVA.r),
+  };
+}
+
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { planbocker: [], spel: [], transaktioner: [] };
+  if (!key) return { planbocker: [], spel: [], transaktioner: [], giniHistorik: [] };
   const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [pRes, spelRes, transRes] = await Promise.all([
+  const [pRes, spelRes, transRes, giniRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&order=saldo.desc`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/ekonomi_spel?order=skapad.desc&limit=40`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/agent_transaktioner?order=skapad.desc&limit=30&typ=neq.startkapital`, { headers: hdrs, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/oligarki_historik?select=skapad,gini_koefficient&order=skapad.asc&limit=120`, { headers: hdrs, next: { revalidate: 120 } }),
   ]);
 
   return {
-    planbocker:    pRes.ok    ? await pRes.json()    : [],
-    spel:          spelRes.ok ? await spelRes.json() : [],
+    planbocker:   pRes.ok    ? await pRes.json()    : [],
+    spel:         spelRes.ok ? await spelRes.json() : [],
     transaktioner: transRes.ok ? await transRes.json() : [],
+    giniHistorik: giniRes.ok ? await giniRes.json() : [],
   };
 }
 
@@ -50,7 +73,7 @@ function fmt(iso) {
 }
 
 export default async function EkonomiPage() {
-  const { planbocker, spel, transaktioner } = await getData();
+  const { planbocker, spel, transaktioner, giniHistorik } = await getData();
 
   const saldon = planbocker.map(p => p.saldo);
   const giniIndex = gini(saldon);
@@ -75,6 +98,19 @@ export default async function EkonomiPage() {
     : null;
 
   const ingenData = planbocker.length === 0;
+
+  // Prediktionsmodell: teoretiska kurvor
+  const GINI_STEPS = [0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70];
+  const chartData = GINI_STEPS.map(g => ({ gini: g, ...expectedValues(g) }));
+
+  // Tre scenarios för tabellvisning
+  const scenarios = [0.20, 0.40, 0.60].map(g => ({ g, dist: statusDist(g), ...expectedValues(g) }));
+
+  // Empiriska datapunkter: para ihop spel med Gini-koefficienten samma dag
+  const giniMap = {};
+  for (const row of giniHistorik) {
+    giniMap[row.skapad.slice(0, 10)] = row.gini_koefficient;
+  }
 
   return (
     <main style={{ background: C.bg, minHeight: "100vh", padding: "72px 20px 80px", fontFamily: "Georgia, serif" }}>
@@ -234,6 +270,125 @@ export default async function EkonomiPage() {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Fehr-Schmidt modellen */}
+              <div style={{ background: C.card, border: `1px solid #1f1f1f`, borderRadius: "10px", padding: "24px", marginTop: "12px" }}>
+                <div style={{ fontSize: "12px", color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "16px", fontFamily: "monospace" }}>
+                  Fehr-Schmidt modellen — matematisk grund för ojämlikhetsaversion
+                </div>
+                <p style={{ fontSize: "13px", color: C.dim, lineHeight: 1.7, margin: "0 0 14px" }}>
+                  Agent B:s nytta av att ta emot erbjudandet <em>s</em> ur en pott på 100 kr ges av:
+                </p>
+                <div style={{ background: "#0a0a0a", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "14px 20px", fontFamily: "monospace", fontSize: "14px", color: C.text, marginBottom: "14px", letterSpacing: "0.02em" }}>
+                  U(s) = s − α × max(100 − 2s, 0)
+                </div>
+                <p style={{ fontSize: "13px", color: C.dim, lineHeight: 1.7, margin: "0 0 18px" }}>
+                  B avvisar när U(s) &lt; 0, vilket löses till: <strong style={{ color: C.text, fontFamily: "monospace" }}>s &lt; α ÷ (1 + 2α) × 100 kr</strong>
+                </p>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                    <thead>
+                      <tr>
+                        {["Ekonomisk status", "Saldo", "Ojämlikhetsaversion α", "Min. accepterat erbjudande", "Avvisningsrisk vid 30 kr"].map(h => (
+                          <th key={h} style={{ textAlign: "left", color: C.dimmer, fontWeight: 400, padding: "6px 14px 10px 0", borderBottom: `1px solid ${C.border}`, fontSize: "10px", letterSpacing: "0.06em", textTransform: "uppercase" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        ["Utarmad",   "< 400 kr",      "α ≈ 0.10", "≈ 5 kr",  "Låg (~5%)",       C.red],
+                        ["Pressad",   "400–800 kr",     "α ≈ 0.33", "≈ 20 kr", "Låg–medel (~15%)", C.yellow],
+                        ["Välmående", "800–1 500 kr",   "α ≈ 0.70", "≈ 30 kr", "Medel–hög (~40%)", C.green],
+                        ["Rik",       "> 1 500 kr",     "α ≈ 0.55", "≈ 25 kr", "Medel (~35%)",    C.gold],
+                      ].map(([status, saldo, alpha, min, risk, color]) => (
+                        <tr key={status}>
+                          <td style={{ padding: "9px 14px 9px 0", color, fontWeight: 600 }}>{status}</td>
+                          <td style={{ padding: "9px 14px 9px 0", color: C.text, fontFamily: "monospace" }}>{saldo}</td>
+                          <td style={{ padding: "9px 14px 9px 0", color: C.text, fontFamily: "monospace" }}>{alpha}</td>
+                          <td style={{ padding: "9px 14px 9px 0", color: C.text, fontFamily: "monospace" }}>{min}</td>
+                          <td style={{ padding: "9px 14px 9px 0", color: C.dim }}>{risk}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p style={{ fontSize: "12px", color: C.dimmer, margin: "14px 0 0", lineHeight: 1.6 }}>
+                  Agenternas α bestäms av deras ekonomiska status som injiceras i systempromten — "utarmad" agenter agerar rationellare, "välmående" agenter kan ha råd med sin rättvisa.
+                </p>
+              </div>
+
+              {/* Förväntad avvisningsfrekvens-formel */}
+              <div style={{ background: C.card, border: `1px solid #1f1f1f`, borderRadius: "10px", padding: "22px 24px", marginTop: "12px" }}>
+                <div style={{ fontSize: "12px", color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "14px", fontFamily: "monospace" }}>
+                  Förväntad avvisningsfrekvens som funktion av Gini
+                </div>
+                <div style={{ background: "#0a0a0a", border: `1px solid ${C.border}`, borderRadius: "6px", padding: "14px 20px", fontFamily: "monospace", fontSize: "14px", color: C.text, marginBottom: "14px", lineHeight: 1.9 }}>
+                  E[R(G)] = Σᵢ wᵢ(G) × P(avvisning | statusᵢ)
+                </div>
+                <p style={{ fontSize: "13px", color: C.dim, lineHeight: 1.7, margin: 0 }}>
+                  Där <em>wᵢ(G)</em> är andelen agenter i status <em>i</em> vid Gini-nivå G. När G ökar skiftar fördelningen mot "utarmad" och "pressad" — vilket <strong style={{ color: C.text }}>sänker E[R(G)] trots ökande ojämlikhet</strong>.
+                </p>
+              </div>
+
+              {/* Tre Gini-scenarios */}
+              <div style={{ marginTop: "12px" }}>
+                <div style={{ fontSize: "11px", color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "monospace" }}>
+                  Förväntade värden vid tre Gini-nivåer (typiskt erbjudande = 30 kr)
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "10px" }}>
+                  {scenarios.map(({ g, dist, avvisning, gava }) => (
+                    <div key={g} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "18px 20px" }}>
+                      <div style={{ fontSize: "24px", fontWeight: 700, color: g < 0.3 ? C.green : g < 0.5 ? C.yellow : C.red, lineHeight: 1, marginBottom: "2px" }}>
+                        G = {g.toFixed(1)}
+                      </div>
+                      <div style={{ fontSize: "10px", color: C.dimmer, marginBottom: "14px", letterSpacing: "0.05em" }}>
+                        {g < 0.3 ? "Nära jämlikhet" : g < 0.5 ? "Måttlig ojämlikhet" : "Hög ojämlikhet"}
+                      </div>
+                      <div style={{ fontSize: "11px", color: C.dim, marginBottom: "12px", lineHeight: 1.8, fontFamily: "monospace" }}>
+                        <span style={{ color: C.red }}>Utarmad {Math.round(dist.u * 100)}%</span> · <span style={{ color: C.yellow }}>Pressad {Math.round(dist.p * 100)}%</span><br />
+                        <span style={{ color: C.green }}>Välmående {Math.round(dist.v * 100)}%</span> · <span style={{ color: C.gold }}>Rik {Math.round(dist.r * 100)}%</span>
+                      </div>
+                      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "10px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "11px", color: C.dim }}>E[Avvisning]</span>
+                          <span style={{ fontSize: "15px", color: C.accent, fontFamily: "monospace", fontWeight: 700 }}>{avvisning}%</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "11px", color: C.dim }}>E[Diktatorgåva]</span>
+                          <span style={{ fontSize: "15px", color: C.yellow, fontFamily: "monospace", fontWeight: 700 }}>{gava} kr</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Paradoxen */}
+              <div style={{ background: "#0f0808", border: `1px solid ${C.red}28`, borderRadius: "10px", padding: "18px 22px", marginTop: "12px" }}>
+                <div style={{ fontSize: "11px", color: C.red, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "8px", fontFamily: "monospace" }}>
+                  Paradoxen: hög Gini → lägre aggregerad avvisningsfrekvens
+                </div>
+                <p style={{ fontSize: "13px", color: C.dim, lineHeight: 1.75, margin: 0 }}>
+                  Trots att ökad ojämlikhet borde utlösa mer rättviseindignation <em>sänker</em> hög Gini den aggregerade avvisningsfrekvensen. Förklaringen: fler agenter hamnar i "utarmad"-status och kan inte ha råd med sin ojämlikhetsaversion — de accepterar orättvisan snarare än att straffa den och gå miste om krediter. Precis som verklig forskning (Henrich et al. 2001) visar att extremt fattiga samhällen ibland accepterar lägre erbjudanden än medelklassen.
+                </p>
+              </div>
+
+              {/* Prediktionsdiagram */}
+              <div style={{ background: C.card, border: `1px solid #1f1f1f`, borderRadius: "10px", padding: "22px 24px", marginTop: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
+                  <div style={{ fontSize: "12px", color: C.dim, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace" }}>
+                    Prediktionsmodell
+                  </div>
+                  <div style={{ display: "flex", gap: "18px", fontSize: "11px" }}>
+                    <span style={{ color: "#e879f9" }}>── Ultimatum: förväntad avvisning (vänster axel)</span>
+                    <span style={{ color: "#facc15" }}>╌╌ Diktatorn: förväntad gåva (höger axel)</span>
+                  </div>
+                </div>
+                <GiniSpelGraf chartData={chartData} aktuelltGini={giniIndex} />
+                <p style={{ fontSize: "11px", color: C.dimmer, margin: "10px 0 0", lineHeight: 1.6 }}>
+                  Den gröna vertikala linjen markerar plattformens aktuella Gini-koefficient. Modellen antar ett typiskt erbjudande på 30 kr i Ultimatumspelet. Båda kurvorna är fallande med Gini — ojämlikhetsparadoxen.
+                </p>
               </div>
             </div>
 
