@@ -901,6 +901,7 @@ export default async function BorsPage() {
                 {stakingAgentRanking.map(([agent, stats]) => {
                   const maxYield = stakingAgentRanking[0][1].yieldKvar || 1;
                   const pctStr = Object.entries(stats.poolAndelar)
+                    .filter(([, pct]) => pct != null)
                     .map(([sym, pct]) => `${sym} ${pct.toFixed(0)}%`)
                     .join(" · ");
                   return (
