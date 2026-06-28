@@ -217,7 +217,7 @@ export default async function BorsPage() {
     const pris  = prisMap[s.symbol] ?? 100;
     const antal = parseFloat(s.antal ?? 0);
     const apy   = parseFloat(s.apy   ?? 0.05);
-    const yieldKvar = Math.pow(antal, 0.6) * pris * apy * (dagarKvar / 365);
+    const yieldKvar = Math.pow(antal, 0.35) * pris * apy * (dagarKvar / 365);
     return { ...s, dagarKvar, pris, antal, apy, yieldKvar };
   }).filter(s => s.antal > 0);
   const totalStakVarde   = stakingRader.reduce((sum, s) => sum + s.antal * s.pris, 0);
@@ -876,91 +876,74 @@ export default async function BorsPage() {
 
           {/* Avtagande avkastningskurvor */}
           <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-            {/* Graf 1: Total Staking Belöning R(x) = x^0.6 */}
+            {/* Graf 1: Total Staking Belöning R(x) = x^0.35 */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
               <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
-                Total Staking Belöning — R(x) = x<sup>0.6</sup>
+                Total Staking Belöning — R(x) = x<sup>0.35</sup>
               </div>
               <svg width="100%" viewBox="0 0 260 120" style={{ display: "block" }}>
-                {/* Grid lines */}
                 {[0, 30, 60, 90, 120].map(y => (
                   <line key={y} x1={30} y1={y + 5} x2={255} y2={y + 5} stroke={C.border} strokeWidth={0.5} />
                 ))}
                 {/* Linjär referenskurva (grå streckad) */}
                 <polyline
-                  fill="none"
-                  stroke="#4b5563"
-                  strokeWidth={1}
-                  strokeDasharray="4 3"
+                  fill="none" stroke="#4b5563" strokeWidth={1} strokeDasharray="4 3"
                   points={(() => {
                     const pts = [];
                     for (let i = 0; i <= 40; i++) {
                       const x = i / 40;
-                      const px = 30 + x * 225;
-                      const py = 125 - x * 120;
-                      pts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+                      pts.push(`${(30 + x * 225).toFixed(1)},${(125 - x * 120).toFixed(1)}`);
                     }
                     return pts.join(" ");
                   })()}
                 />
-                {/* Power-law kurva alpha=0.6 (lila) */}
+                {/* Power-law kurva alpha=0.35 (lila) */}
                 <polyline
-                  fill="none"
-                  stroke="#a855f7"
-                  strokeWidth={2}
+                  fill="none" stroke="#a855f7" strokeWidth={2}
                   points={(() => {
                     const pts = [];
                     for (let i = 0; i <= 40; i++) {
                       const x = i / 40;
-                      const px = 30 + x * 225;
-                      const py = 125 - Math.pow(x, 0.6) * 120;
-                      pts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+                      pts.push(`${(30 + x * 225).toFixed(1)},${(125 - Math.pow(x, 0.35) * 120).toFixed(1)}`);
                     }
                     return pts.join(" ");
                   })()}
                 />
-                {/* Axeletiketter */}
                 <text x={140} y={118} textAnchor="middle" fill={C.textMuted} fontSize={8} fontFamily="monospace">Antal tokens (x)</text>
                 <text x={10} y={65} textAnchor="middle" fill={C.textMuted} fontSize={8} fontFamily="monospace" transform="rotate(-90,10,65)">Belöning R(x)</text>
               </svg>
               <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-                <span style={{ fontSize: 9, color: "#a855f7", fontFamily: "monospace" }}>— x^0.6 (faktisk)</span>
+                <span style={{ fontSize: 9, color: "#a855f7", fontFamily: "monospace" }}>— x^0.35 (faktisk)</span>
                 <span style={{ fontSize: 9, color: "#4b5563", fontFamily: "monospace" }}>--- linjär (jämförelse)</span>
               </div>
             </div>
 
-            {/* Graf 2: Marginalbelöning dR/dx = 0.6 × x^(−0.4) */}
+            {/* Graf 2: Marginalbelöning dR/dx = 0.35 × x^(−0.65) */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
               <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
-                Marginalbelöning — dR/dx = 0.6 × x<sup>−0.4</sup>
+                Marginalbelöning — dR/dx = 0.35 × x<sup>−0.65</sup>
               </div>
               <svg width="100%" viewBox="0 0 260 120" style={{ display: "block" }}>
-                {/* Grid lines */}
                 {[0, 30, 60, 90, 120].map(y => (
                   <line key={y} x1={30} y1={y + 5} x2={255} y2={y + 5} stroke={C.border} strokeWidth={0.5} />
                 ))}
-                {/* Marginalbelöningskurva (cyan) — börjar vid x=0.02 för att undvika x=0-singularitet */}
+                {/* Marginalbelöningskurva — börjar vid i=1 för att undvika x=0-singularitet */}
                 <polyline
-                  fill="none"
-                  stroke="#22d3ee"
-                  strokeWidth={2}
+                  fill="none" stroke="#22d3ee" strokeWidth={2}
                   points={(() => {
                     const pts = [];
                     for (let i = 1; i <= 40; i++) {
                       const x = i / 40;
-                      const marginal = 0.6 * Math.pow(x, -0.4);
-                      // Normalisera: vid x=0.025 (i=1) är marginal ≈ 0.6×0.025^-0.4 ≈ 2.39, klämma max till 2.5
-                      const norm = Math.min(marginal / 2.5, 1);
-                      const px = 30 + x * 225;
-                      const py = 125 - norm * 120;
-                      pts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+                      const marginal = 0.35 * Math.pow(x, -0.65);
+                      // Normalisera: vid i=1 (x=0.025) är marginal ≈ 0.35×0.025^-0.65 ≈ 3.85, klämma max till 4
+                      const norm = Math.min(marginal / 4, 1);
+                      pts.push(`${(30 + x * 225).toFixed(1)},${(125 - norm * 120).toFixed(1)}`);
                     }
                     return pts.join(" ");
                   })()}
                 />
-                {/* Horisontell referenslinje vid konstant marginal=1 (linjärt fall) */}
-                <line x1={30} y1={77} x2={255} y2={77} stroke="#4b5563" strokeWidth={1} strokeDasharray="4 3" />
-                {/* Axeletiketter */}
+                {/* Horisontell referenslinje (linjärt = konstant marginal) */}
+                <line x1={30} y1={95} x2={255} y2={95} stroke="#4b5563" strokeWidth={1} strokeDasharray="4 3" />
                 <text x={140} y={118} textAnchor="middle" fill={C.textMuted} fontSize={8} fontFamily="monospace">Antal tokens (x)</text>
                 <text x={10} y={65} textAnchor="middle" fill={C.textMuted} fontSize={8} fontFamily="monospace" transform="rotate(-90,10,65)">Marginal dR/dx</text>
               </svg>
@@ -973,8 +956,8 @@ export default async function BorsPage() {
 
           {/* Formelförklaring */}
           <div style={{ marginTop: 14, padding: "10px 14px", background: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: 8, fontFamily: "monospace", fontSize: 10, color: C.textMuted }}>
-            <span style={{ color: "#a855f7" }}>R(x) = x<sup>0.6</sup> × pris × APY × (dagar/365)</span>
-            {" "}— Staka 2× ger +52% belöning (inte +100%). Marginalavkastningen är avtagande: varje extra token bidrar mindre än den förra.
+            <span style={{ color: "#a855f7" }}>R(x) = x<sup>0.35</sup> × pris × APY × (dagar/365)</span>
+            {" "}— Staka 2× ger +27% belöning (inte +100%). Staka 10× ger +2.2× (inte +10×). Kurvan planar tydligt ut vid höga staking-belopp.
           </div>
 
           <div style={{ marginTop: 12, fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>
