@@ -1,4 +1,5 @@
 import AgentForslagVy from "./AgentForslagVy";
+import { AGENT_VISUELL } from "../agentData";
 
 export const revalidate = 300;
 
@@ -9,6 +10,9 @@ export const metadata = {
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
+// Only rows from known agents are shown — prevents spam/impersonation via public anon INSERT.
+const KANDA_AGENTER = new Set(Object.keys(AGENT_VISUELL));
+
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return [];
@@ -18,7 +22,8 @@ async function getData() {
       { headers: { apikey: key, Authorization: `Bearer ${key}` }, next: { revalidate } }
     );
     if (!r.ok) return [];
-    return await r.json();
+    const rows = await r.json();
+    return rows.filter(f => KANDA_AGENTER.has(f.agent));
   } catch { return []; }
 }
 
