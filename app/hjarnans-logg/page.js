@@ -37,8 +37,15 @@ async function getData() {
     skapad:     p.skapad,
   }));
 
+  // Dedup: om samma frågetext finns i båda källorna (legacy-rader från #1145-fönstret)
+  // föredra civilisation_log-versionen och filtrera bort civilisation_fragor-dubletten.
+  const logFragor = new Set(normalizedLogs.map(p => p.fraga));
+  const fragorFiltered = fragor.filter(
+    p => p.agent !== "besökare" || !logFragor.has(p.fraga)
+  );
+
   // Slå ihop och sortera nyast först
-  return [...fragor, ...normalizedLogs]
+  return [...fragorFiltered, ...normalizedLogs]
     .sort((a, b) => new Date(b.skapad) - new Date(a.skapad))
     .slice(0, 500);
 }
