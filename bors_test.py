@@ -859,8 +859,19 @@ def betala_ut_staking(
 
         # Reject zero-token stakes — the 0.001 floor in the pool formula would
         # give them a spurious nonzero weight and drain pool yield fraudulently.
+        # Mark as utbetald so the row is not re-fetched on future runs.
         if this_antal <= 0 or total_antal <= 0:
-            print(f"  [staking] skip zero-token stake for {stake.get('agent')} {symbol}")
+            print(f"  [staking] skip zero-token stake for {stake.get('agent')} {symbol} — marking utbetald")
+            h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+            try:
+                httpx.patch(
+                    f"{SB_URL}/rest/v1/bors_staking?id=eq.{stake['id']}",
+                    headers=h_min,
+                    json={"utbetald": True},
+                    timeout=8,
+                )
+            except Exception as e_retire:
+                print(f"  [staking] retire zero-stake failed: {e_retire}")
             return
 
         rad_andel = this_antal / total_antal
