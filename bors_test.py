@@ -150,6 +150,8 @@ LIKVIDITET_BELOPP = 1.5    # SEK per kvalificerande (agent, symbol)-par per kör
 
 AVGIFT_SATS = 0.005        # 0,5 % handelsavgift på varje genomförd affär → Börskassan
 
+BORSKASSAN_MIN_SALDO = 100_000  # Börsens likviditetsreserv — hålls alltid ≥ detta
+
 # ─── Automatisk Market Maker (AMM) ────────────────────────────────────────────
 
 AMM_SPREAD           = 0.04   # 4 % varje sida av spotpriset
@@ -1684,6 +1686,29 @@ def kör_shorts(sb_key: str, alla_symboler: list[str]) -> None:
         öppna_short(sb_key, agent, symbol, antal)
 
 
+# ─── Likviditetsreserv ────────────────────────────────────────────────────────
+
+def _sakerstall_borskassan_likviditet(sb_key: str) -> None:
+    """Garanterar att Börskassan alltid håller minst BORSKASSAN_MIN_SALDO.
+    Differensen skapas som ny likviditet — börsens centralbanks-funktion."""
+    saldo = hamta_saldo(sb_key, "Börskassan")
+    if saldo >= BORSKASSAN_MIN_SALDO:
+        print(f"  Börskassan: {saldo:.0f} kr (OK)")
+        return
+    pafall = round(BORSKASSAN_MIN_SALDO - saldo, 2)
+    h_min = {**_h(sb_key), "Prefer": "return=minimal"}
+    try:
+        httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan",
+            headers=h_min,
+            json={"saldo": BORSKASSAN_MIN_SALDO, "uppdaterad": "now()"},
+            timeout=8,
+        )
+        print(f"  Börskassan: {saldo:.0f} kr → {BORSKASSAN_MIN_SALDO:.0f} kr (+{pafall:.0f} kr likviditetspåfyll)")
+    except Exception as e:
+        print(f"  Börskassan påfyll misslyckades: {e}")
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
@@ -1704,6 +1729,10 @@ def main():
     # Genesis (körs bara om börsen är tom)
     print("\n[2/10] Kontrollerar genesis...")
     genesis(sb_key)
+
+    # Likviditetsreserv — toppa upp Börskassan om saldo < BORSKASSAN_MIN_SALDO
+    print(f"\n[2b] Likviditetsreserv (min {BORSKASSAN_MIN_SALDO:,} kr)...")
+    _sakerstall_borskassan_likviditet(sb_key)
 
     # Hämta alla symboler tidigt (behövs av AMM och resten)
     try:
