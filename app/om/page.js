@@ -1039,7 +1039,7 @@ export default function OmPage() {
           </div>
           <p style={{ fontSize: "15px", lineHeight: 1.8, color: C.textMuted, margin: "0 0 24px" }}>
             Tredje parts-straffspelet är grunden för rättsväsendet, sociala sanktioner och ryktessystem — mekanismer som upprätthåller normer utan att kräva direkt egenintresse.
-            Körs dagligen kl 14:45 för alla 24 agenter. Kräver att <code style={{ fontFamily: "monospace", fontSize: "13px", color: C.accentDim }}>supabase_tpp.sql</code> körts i SQL Editor.
+            Körs dagligen kl 14:45 för alla 24 agenter.
           </p>
           <a href="/tpp" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
             Se Tredje parts-straffspelet →
@@ -2442,7 +2442,6 @@ export default function OmPage() {
           <p style={{ fontSize: "13px", color: "#666", lineHeight: 1.7, margin: 0 }}>
             Grundande: ~2 % per körning per analytiker-agent (om saldo &gt; 650 kr och ingen existerande firma). Anstallningserbjudanden: ~15 % per företag per körning.
             Dagslöner betalas automatiskt (35 kr/vecka = 5 kr/dag) ur företagskassan.
-            Kör <code style={{ color: C.accentDim, fontSize: "12px" }}>supabase_foretag.sql</code> + <code style={{ color: C.accentDim, fontSize: "12px" }}>supabase_foretag_v2.sql</code> i SQL Editor.
           </p>
         </OmSektion>
 
@@ -2466,9 +2465,6 @@ export default function OmPage() {
               </div>
             ))}
           </div>
-          <p style={{ fontSize: "13px", color: C.textMuted, margin: "0 0 16px" }}>
-            Kör <code style={{ color: C.accentDim, fontSize: "12px" }}>supabase_universitet.sql</code> i SQL Editor för att skapa tabellen. Trigga sedan <code style={{ color: C.accentDim, fontSize: "12px" }}>forskning-test.yml</code> manuellt via GitHub Actions → Run workflow för de första fynden.
-          </p>
           <a href="/universitet" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
             Öppna AI-Universitetet →
           </a>
