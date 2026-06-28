@@ -46,7 +46,7 @@ async function getData() {
 
   const [pRes, spelRes, transRes, giniRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&order=saldo.desc`, { headers: hdrs, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/ekonomi_spel?order=skapad.desc&limit=40`, { headers: hdrs, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/ekonomi_spel?order=skapad.desc&limit=300`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/agent_transaktioner?order=skapad.desc&limit=30&typ=neq.startkapital`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/oligarki_historik?select=skapad,gini&order=skapad.asc&limit=120`, { headers: hdrs, next: { revalidate: 120 } }),
   ]);
@@ -99,6 +99,45 @@ export default async function EkonomiPage() {
   const avvisningsprocent = ultimatumAvslutade.length > 0
     ? Math.round(avvisningar / ultimatumAvslutade.length * 100)
     : null;
+
+  // Per-agent spelstatistik
+  const agentStats = {};
+  for (const s of spel) {
+    const initA = (n) => { if (!agentStats[n]) agentStats[n] = { diktGivet: [], ultiErbjudet: [], ultiSomB: [] }; };
+    initA(s.agent_a);
+    if (s.typ === "diktatorn") agentStats[s.agent_a].diktGivet.push(s.erbjudande || 0);
+    if (s.typ === "ultimatum") agentStats[s.agent_a].ultiErbjudet.push(s.erbjudande || 0);
+    if (s.typ === "ultimatum" && s.svar && s.agent_b) {
+      initA(s.agent_b);
+      agentStats[s.agent_b].ultiSomB.push(s.svar);
+    }
+  }
+  const agentStatsFn = (namn) => {
+    const st = agentStats[namn] || {};
+    const diktSnitt = st.diktGivet?.length > 0
+      ? Math.round(st.diktGivet.reduce((a, b) => a + b, 0) / st.diktGivet.length) : null;
+    const ultiSnitt = st.ultiErbjudet?.length > 0
+      ? Math.round(st.ultiErbjudet.reduce((a, b) => a + b, 0) / st.ultiErbjudet.length) : null;
+    const ultiSomBTotal = st.ultiSomB?.length || 0;
+    const acceptRate = ultiSomBTotal > 0
+      ? Math.round(st.ultiSomB.filter(s => s === "accepterat").length / ultiSomBTotal * 100) : null;
+    const avvisRate = acceptRate !== null ? 100 - acceptRate : null;
+    const totalSpel = (st.diktGivet?.length || 0) + (st.ultiErbjudet?.length || 0) + ultiSomBTotal;
+    return { diktSnitt, ultiSnitt, acceptRate, avvisRate, ultiSomBTotal, totalSpel };
+  };
+
+  // Spotlight-agenter för analys
+  const spotlightData = planbocker.map(p => ({ ...p, ...agentStatsFn(p.agent) }));
+  const rikast = spotlightData[0];
+  const fattigast = spotlightData[spotlightData.length - 1];
+  const mestGeneros = [...spotlightData].filter(p => p.diktSnitt !== null)
+    .sort((a, b) => b.diktSnitt - a.diktSnitt)[0] || null;
+  const mestRationell = [...spotlightData].filter(p => p.acceptRate !== null && p.ultiSomBTotal >= 2)
+    .sort((a, b) => b.acceptRate - a.acceptRate)[0] || null;
+  const starkastRattvisa = [...spotlightData].filter(p => p.avvisRate !== null && p.ultiSomBTotal >= 2)
+    .sort((a, b) => b.avvisRate - a.avvisRate)[0] || null;
+  const mestAktiv = [...spotlightData].filter(p => p.totalSpel > 0)
+    .sort((a, b) => b.totalSpel - a.totalSpel)[0] || null;
 
   const ingenData = planbocker.length === 0;
 
@@ -208,39 +247,121 @@ export default async function EkonomiPage() {
                   const barPct = Math.round(p.saldo / maxSaldo * 100);
                   const delta = p.saldo - 1000;
                   const deltaColor = delta > 0 ? C.green : delta < 0 ? C.red : C.dimmer;
-                  const generositet = p.antal_spel > 0
-                    ? Math.round(p.totalt_givet / (p.antal_spel * 100) * 100)
-                    : null;
+                  const st = agentStatsFn(p.agent);
 
                   return (
-                    <div key={p.agent} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div key={p.agent} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                       <span style={{ fontSize: "10px", color: C.dimmer, fontFamily: "monospace", width: "20px", textAlign: "right", flexShrink: 0 }}>{i + 1}</span>
                       <a href={`/agent/${encodeURIComponent(p.agent)}`} style={{ flexShrink: 0 }}>
                         <AgentAvatar namn={p.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />
                       </a>
-                      <span style={{ fontSize: "12px", color: C.text, width: "140px", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.agent}</span>
-                      <div style={{ flex: 1, height: "6px", background: "#151515", borderRadius: "3px", overflow: "hidden", minWidth: "60px" }}>
+                      <span style={{ fontSize: "12px", color: C.text, width: "130px", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.agent}</span>
+                      <div style={{ flex: 1, height: "6px", background: "#151515", borderRadius: "3px", overflow: "hidden", minWidth: "40px" }}>
                         <div style={{ width: `${barPct}%`, height: "100%", background: i === 0 ? C.gold : i < 3 ? C.yellow : v.ikonFarg, borderRadius: "3px", transition: "width 0.3s" }} />
                       </div>
-                      <span style={{ fontSize: "13px", color: C.text, fontFamily: "monospace", width: "52px", textAlign: "right", flexShrink: 0 }}>{p.saldo}</span>
-                      <span style={{ fontSize: "10px", color: deltaColor, fontFamily: "monospace", width: "44px", textAlign: "right", flexShrink: 0 }}>
+                      <span style={{ fontSize: "13px", color: C.text, fontFamily: "monospace", width: "48px", textAlign: "right", flexShrink: 0 }}>{p.saldo}</span>
+                      <span style={{ fontSize: "10px", color: deltaColor, fontFamily: "monospace", width: "40px", textAlign: "right", flexShrink: 0 }}>
                         {delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : "±0"}
                       </span>
-                      {generositet !== null && (
-                        <span style={{ fontSize: "10px", color: C.dim, width: "36px", textAlign: "right", flexShrink: 0 }}>{generositet}%</span>
-                      )}
+                      {/* Diktatorsnitt (som A) */}
+                      <span title="Snitt givet i Diktatorspelet (som A)" style={{ fontSize: "10px", color: st.diktSnitt !== null ? C.accent : C.dimmer, width: "34px", textAlign: "right", flexShrink: 0, fontFamily: "monospace" }}>
+                        {st.diktSnitt !== null ? `${st.diktSnitt}kr` : "—"}
+                      </span>
+                      {/* Ultimatum accept-rate (som B) */}
+                      <span title={`Accepterade ${st.acceptRate ?? "?"}% av ultimatumsvar som B (${st.ultiSomBTotal} spel)`} style={{ fontSize: "10px", color: st.acceptRate === null ? C.dimmer : st.acceptRate >= 60 ? C.green : st.acceptRate >= 40 ? C.yellow : C.red, width: "40px", textAlign: "right", flexShrink: 0, fontFamily: "monospace" }}>
+                        {st.acceptRate !== null ? `${st.acceptRate}%a` : "—"}
+                      </span>
                     </div>
                   );
                 })}
               </div>
               {planbocker.length > 0 && (
-                <div style={{ display: "flex", gap: "20px", marginTop: "16px", paddingTop: "12px", borderTop: `1px solid ${C.border}`, fontSize: "11px", color: C.dimmer }}>
+                <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", marginTop: "16px", paddingTop: "12px", borderTop: `1px solid ${C.border}`, fontSize: "11px", color: C.dimmer }}>
                   <span>Totalt i systemet: {totalSaldo.toLocaleString("sv-SE")} kr</span>
                   <span>Spann: {minSaldo}–{maxSaldo} kr</span>
-                  <span style={{ marginLeft: "auto" }}>Sista kolumn = generositet (% av pot givet)</span>
+                  <span style={{ marginLeft: "auto" }}>
+                    <span style={{ color: C.accent }}>Xkr</span> = snitt givet i Diktatorspelet (som A) &nbsp;·&nbsp;
+                    <span style={{ color: C.green }}>%a</span> = acceptansgrad i Ultimatumspelet (som B)
+                  </span>
                 </div>
               )}
             </div>
+
+            {/* Agentprofiler — spotlight-analys */}
+            {spotlightData.length > 0 && (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "28px 32px", marginBottom: "32px" }}>
+                <p style={{ fontSize: "11px", color: C.dim, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px", fontFamily: "monospace" }}>
+                  Agentanalys
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px" }}>
+                  {[
+                    {
+                      label: "Rikast", emoji: "💰",
+                      agent: rikast,
+                      värde: `${rikast?.saldo} kr`,
+                      sub: `+${(rikast?.saldo || 0) - 1000} kr från start`,
+                      color: C.gold,
+                    },
+                    {
+                      label: "Fattigast", emoji: "📉",
+                      agent: fattigast,
+                      värde: `${fattigast?.saldo} kr`,
+                      sub: `${(fattigast?.saldo || 0) - 1000} kr från start`,
+                      color: C.red,
+                    },
+                    {
+                      label: "Mest generös", emoji: "🎁",
+                      agent: mestGeneros,
+                      värde: mestGeneros ? `ger ${mestGeneros.diktSnitt}/100 kr` : "—",
+                      sub: mestGeneros ? `i Diktatorspelet (${agentStats[mestGeneros.agent]?.diktGivet?.length || 0} spel)` : "ingen data",
+                      color: C.accent,
+                    },
+                    {
+                      label: "Mest rationell", emoji: "🤝",
+                      agent: mestRationell,
+                      värde: mestRationell ? `accepterar ${mestRationell.acceptRate}%` : "—",
+                      sub: mestRationell ? `av ultimatumerbjudanden (${mestRationell.ultiSomBTotal} spel)` : "ingen data",
+                      color: C.green,
+                    },
+                    {
+                      label: "Starkast rättvisesinne", emoji: "⚖️",
+                      agent: starkastRattvisa,
+                      värde: starkastRattvisa ? `avvisar ${starkastRattvisa.avvisRate}%` : "—",
+                      sub: starkastRattvisa ? `av erbjudanden (${starkastRattvisa.ultiSomBTotal} spel)` : "ingen data",
+                      color: C.yellow,
+                    },
+                    {
+                      label: "Mest aktiv", emoji: "🎮",
+                      agent: mestAktiv,
+                      värde: mestAktiv ? `${mestAktiv.totalSpel} spel` : "—",
+                      sub: mestAktiv ? [
+                        mestAktiv.diktSnitt !== null ? `Dikt: ${agentStats[mestAktiv.agent]?.diktGivet?.length || 0}` : null,
+                        mestAktiv.ultiSomBTotal > 0 ? `Ult som B: ${mestAktiv.ultiSomBTotal}` : null,
+                      ].filter(Boolean).join(" · ") : "ingen data",
+                      color: C.text,
+                    },
+                  ].map(({ label, emoji, agent, värde, sub, color }) => {
+                    if (!agent) return null;
+                    const v = agentVisuell(agent.agent);
+                    return (
+                      <a key={label} href={`/agent/${encodeURIComponent(agent.agent)}`}
+                        style={{ textDecoration: "none", display: "flex", alignItems: "flex-start", gap: "12px",
+                          background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px" }}>
+                        <AgentAvatar namn={agent.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={32} />
+                        <div>
+                          <div style={{ fontSize: "10px", color: C.dimmer, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "2px" }}>
+                            {emoji} {label}
+                          </div>
+                          <div style={{ fontSize: "13px", color: agent.agent ? C.text : C.dim, fontWeight: 600, marginBottom: "2px" }}>{agent.agent}</div>
+                          <div style={{ fontSize: "13px", color, fontFamily: "monospace" }}>{värde}</div>
+                          <div style={{ fontSize: "11px", color: C.dimmer, marginTop: "2px" }}>{sub}</div>
+                        </div>
+                      </a>
+                    );
+                  }).filter(Boolean)}
+                </div>
+              </div>
+            )}
 
             {/* Teori & analys */}
             <div style={{ marginBottom: "40px" }}>
