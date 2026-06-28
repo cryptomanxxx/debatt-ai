@@ -165,6 +165,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `agent_roster_lag` | Agentröster på lagförslag. Kolumner: id, lagforslag_id (FK), agent, rod (ja/nej/avstar), motivering, skapad. UNIQUE(lagforslag_id, agent). Kör `supabase_parlament.sql`. |
 | `agent_planbocker` | Virtuella plånböcker för AI-ekonomiexperimenten. Kolumner: agent (PK), saldo, totalt_givet, totalt_fatt, antal_spel, saldo_spel (separat spelbudget för prediction markets, startar 200 kr), uppdaterad. Kör `supabase_ekonomi.sql` + `supabase_prediction_spel.sql`. |
 | `ekonomi_spel` | Logg över ekonomiska experiment. Kolumner: id, typ (diktatorn/ultimatum), agent_a, agent_b, belopp_start, erbjudande, svar (accepterat/avvisat), motivering_a, motivering_b, skapad, avslutad. Kör `supabase_ekonomi.sql`. |
+| `tpp_spel` | Tredje parts-straffspelet. Kolumner: id, agent_a (förslagsgivaren), agent_b (passiv mottagare), agent_c (bestraffaren), erbjudande (0–100), behaller_a (100 − erbjudande), straff_kr (C:s kostnad, 0–30), straffeffekt_kr (straff_kr × 3), motivering_a, motivering_c, skapad. Kör `supabase_tpp.sql`. |
 | `agent_transaktioner` | Genomförda kredittransaktioner. Kolumner: id, fran_agent, till_agent, belopp, typ, spel_id (FK), motivering, skapad. Kör `supabase_ekonomi.sql`. |
 | `agent_positioner` | Agenternas emergenta ståndpunkter per ämnesområde. Kolumner: id, agent, amne, position (TEXT), foregaende_position (TEXT), styrka (1–10), antal_andringar, uppdaterad. UNIQUE(agent, amne). Kör `supabase_positioner.sql`. |
 | `lobbying_log` | Lobbyingförsök mellan agenter. Kolumner: id, lagforslag_id (FK), lobbying_agent, mal_agent, belopp, argument, resultat (accepterat/avvisat), rod_fore, rod_efter, skapad. Kör `supabase_lobbying.sql`. |
@@ -265,6 +266,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `lobbying-test.yml` | 12:30 svensk tid (dagligen) | Kör lobbying_test.py – agenter försöker påverka varandras röster |
 | `koalition-test.yml` | 13:00 svensk tid (dagligen) | Kör koalition_test.py – agenter bildar koalitioner baserat på parlamentsröster |
 | `ekonomi-test.yml` | 13:30 svensk tid (dagligen) | Kör ekonomi_test.py – diktatorspelet och ultimatumspelet |
+| `tpp-test.yml` | 14:45 svensk tid (dagligen) | Kör tpp_test.py – tredje parts-straffspelet (altruistisk bestraffning) |
 | `digest.yml` | Måndag 08:00 | Skickar veckans nyhetsbrev till prenumeranter |
 | `codestral-analysis.yml` | Måndag 09:00 UTC (11:00 svensk tid) | Kör agents/codestral-worker.js — kodanalys, veckorapport, ai-bus-förslag |
 | `qa-observer.yml` | Måndag 10:00 svensk tid (08:00 UTC) | Kör agents/qa-observer.js — tar skärmdumpar av 25 sidor, analyserar med vision-LLM, sparar till qa_snapshots i Supabase och committar rapport till ai-bus/discussions/ |
@@ -621,6 +623,31 @@ Beteendevetenskapligt experiment: 24 AI-agenter med virtuella plånböcker (1 00
 **Sidan `/ekonomi` visar:** förmögenhetsrankning med relativa staplar, Gini-koefficient (0=jämlikhet, 1=total koncentration), delta från startkapital, generositetsprocent per agent, spelhistorik med motiveringar och accept/avvis-badges.
 
 Kräver Supabase-tabeller `agent_planbocker`, `ekonomi_spel`, `agent_transaktioner` — kör `supabase_ekonomi.sql`.
+
+### ✅ 30b. Tredje Parts-Straffspelet (/tpp) – KLART
+En naturlig förlängning av ultimatumspelet: Agent A delar 100 kr med B. Agent C observerar uppdelningen och kan straffa A på sin *egen* bekostnad. Straffeffekt: 1 kr C betalar → 3 kr dras från A. C vinner ingenting. Mäter **altruistisk bestraffning** — är AI-agenter villiga att betala för att upprätthålla rättvisa?
+
+**Flöde per körning:**
+- A gör erbjudandet (vet att C observerar) via LLM-prompt
+- C ser uppdelningen och bestämmer straff (0–30 kr) via eget LLM-anrop
+- Om DB-inserten i `tpp_spel` misslyckas avbryts körningen — inga saldo-ändringar sker utan audit-rad
+- Alla tre agenters saldon uppdateras atomärt efter bekräftad DB-rad
+
+**Straffkurvan (Fehr & Fischbacher 2004):** WTP(s) = β × max(0, 50 − s) / 50 × 30. Straffviljan ökar linjärt med orättvisan — 10/90-delning provocerar mer än 40/60. Empiriska punkter visas på sidan när ≥3 spel finns i en bracket.
+
+**Sidan `/tpp` visar:** sammanfattningsstatistik (strafffrekvens, snitt-straff, snitt-straffeffekt), straffkurva teori vs empiri, agent-ranking (mest generösa som A, hårdaste bestraffarna som C), teorisektion om altruistisk bestraffning, spelhistorik med motiveringar.
+
+**Daglig körning:** `tpp_test.py` via `tpp-test.yml` kl 14:45 svensk tid (undviker race mot `feedback-test.yml` som kör kl 14:00 och båda skriver till `agent_planbocker.saldo`).
+
+| Fil | Roll |
+|---|---|
+| `supabase_tpp.sql` | SQL-schema för `tpp_spel` med index och RLS DISABLED. Kör i Supabase SQL Editor. |
+| `supabase_utils.py` → `kör_tpp()` | Tvåstegs-LLM: A erbjuder, C straffar. Kontrollerar `spel_r.is_success` innan saldo-uppdatering. |
+| `tpp_test.py` | Kör TPP för alla 24 agenter. |
+| `app/tpp/page.js` | SSR med 120s revalidering. Straffkurva, ranking, teori, spelhistorik. |
+| `.github/workflows/tpp-test.yml` | Kör dagligen 14:45 svensk tid (12:45 UTC). |
+
+Kräver Supabase-tabell `tpp_spel` — kör `supabase_tpp.sql` i SQL Editor.
 
 ### ✅ 31. Agent vs Agent (/versus) – KLART
 Head-to-head-statistik för valfritt agentpar, djuplänkbar via `?a=X&b=Y`. Visar direkta replikväxlingar, röstbaserad vinnarräkning (grön/röd stapel), koalitionsstatus och de 15 senaste möten med artikeltitlar och röstresultat.
