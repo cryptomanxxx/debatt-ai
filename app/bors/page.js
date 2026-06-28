@@ -209,10 +209,10 @@ export default async function BorsPage() {
   const totalVolym  = tillgangar.reduce((s, tg) => s + parseFloat(tg.volym_24h ?? 0), 0);
   const totalAffarer = tillgangar.reduce((s, tg) => s + parseInt(tg.antal_affarer ?? 0), 0);
 
-  // ── Staking-beräkning (delad pool-modell) ────────────────────────────────────
-  // Pool: fast daglig emission per symbol (SEK), delas proportionellt med x^0.35
+  // ── Staking-beräkning (delad pool-modell, Y = X^0.3) ────────────────────────
+  // Pool: fast daglig emission per symbol (SEK), delas med vikt x^0.3
   const STAKING_POOL_DAG = { DBT: 15, NOVA: 10, ETK: 12 };
-  const STAKING_ALPHA = 0.35;
+  const STAKING_ALPHA = 0.3;
 
   const idag = new Date(); idag.setHours(0, 0, 0, 0);
 
@@ -223,8 +223,8 @@ export default async function BorsPage() {
     stakingTotalMap[k] = (stakingTotalMap[k] ?? 0) + parseFloat(s.antal ?? 0);
   }
 
-  // Steg 2: pool-nämnare per symbol = sum(1 / agent_total^alpha för unika agenter)
-  // Inverterad viktning: liten staker → hög vikt → större poolandel → MER totalt i yield.
+  // Steg 2: pool-nämnare per symbol = sum(agent_total^alpha för unika agenter)
+  // Y = X^0.3: avtagande marginalavkastning — stor staker tjänar mer men inte proportionellt.
   const poolNamnare = {};
   const seddaPar = new Set();
   for (const s of (staking ?? [])) {
@@ -233,7 +233,7 @@ export default async function BorsPage() {
       seddaPar.add(k);
       const sym        = s.symbol;
       const agentTotal = Math.max(stakingTotalMap[k] ?? parseFloat(s.antal ?? 0), 0.001);
-      poolNamnare[sym] = (poolNamnare[sym] ?? 0) + 1 / Math.pow(agentTotal, STAKING_ALPHA);
+      poolNamnare[sym] = (poolNamnare[sym] ?? 0) + Math.pow(agentTotal, STAKING_ALPHA);
     }
   }
 
@@ -254,10 +254,10 @@ export default async function BorsPage() {
     const poolDag    = STAKING_POOL_DAG[sym]; // undefined för icke-poolade symboler
     let yieldPerDag, poolAndelPct;
     if (poolDag !== undefined) {
-      // Inverterad pool-modell (DBT / NOVA / ETK):
-      // vikt = 1 / (antal ^ alpha)  →  liten staker får MER
+      // Pool-modell Y = X^0.3 (DBT / NOVA / ETK):
+      // vikt = antal ^ alpha  →  avtagande marginalavkastning per token
       const namnare   = poolNamnare[sym] ?? 1;
-      const poolAndel = namnare > 0 ? (1 / Math.pow(agentTotal, STAKING_ALPHA)) / namnare : 1;
+      const poolAndel = namnare > 0 ? Math.pow(agentTotal, STAKING_ALPHA) / namnare : 1;
       yieldPerDag   = poolAndel * radAndel * poolDag;
       poolAndelPct  = poolAndel * 100;
     } else {
@@ -280,16 +280,18 @@ export default async function BorsPage() {
   const stakingPerAgent = {};
   for (const s of stakingRader) {
     if (!stakingPerAgent[s.agent]) {
-      stakingPerAgent[s.agent] = { totalAntal: 0, yieldPerDag: 0, symboler: [], poolAndelar: {} };
+      stakingPerAgent[s.agent] = { totalAntal: 0, yieldPerDag: 0, stakatVarde: 0, symboler: [], poolAndelar: {} };
     }
     stakingPerAgent[s.agent].totalAntal += s.antal;
     stakingPerAgent[s.agent].yieldPerDag += s.yieldPerDag;
+    stakingPerAgent[s.agent].stakatVarde += s.antal * s.pris;
     if (!stakingPerAgent[s.agent].symboler.includes(s.symbol)) {
       stakingPerAgent[s.agent].symboler.push(s.symbol);
       stakingPerAgent[s.agent].poolAndelar[s.symbol] = s.poolAndelPct;
     }
   }
   const stakingAgentRanking = Object.entries(stakingPerAgent)
+    .filter(([, stats]) => stats.yieldPerDag >= 0.005)
     .sort((a, b) => b[1].yieldPerDag - a[1].yieldPerDag); // sorteras efter daglig yield
   const antalStakingAgenter = stakingAgentRanking.length;
 
@@ -903,27 +905,25 @@ export default async function BorsPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                 {stakingAgentRanking.map(([agent, stats]) => {
                   const maxYield = stakingAgentRanking[0][1].yieldPerDag || 1;
-                  const pctStr = Object.entries(stats.poolAndelar)
-                    .filter(([, pct]) => pct != null)
-                    .map(([sym, pct]) => `${sym} ${pct.toFixed(0)}%`)
-                    .join(" · ");
                   return (
-                    <div key={agent} style={{ display: "grid", gridTemplateColumns: "130px 1fr 90px 80px", gap: 8, alignItems: "center" }}>
+                    <div key={agent} style={{ display: "grid", gridTemplateColumns: "130px 1fr 110px", gap: 8, alignItems: "center" }}>
                       <span style={{ fontSize: 11, color: C.text, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {stats.symboler.map(sym => symbolIkon(sym)).join("")} {agent}
                       </span>
-                      <div style={{ background: C.border, borderRadius: 4, height: 8, overflow: "hidden" }}>
-                        <div style={{
-                          background: "#a855f7",
-                          height: "100%",
-                          width: `${(stats.yieldPerDag / maxYield) * 100}%`,
-                          borderRadius: 4,
-                          transition: "width 0.3s",
-                        }} />
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ flex: 1, background: C.border, borderRadius: 4, height: 8, overflow: "hidden" }}>
+                          <div style={{
+                            background: "#a855f7",
+                            height: "100%",
+                            width: `${(stats.yieldPerDag / maxYield) * 100}%`,
+                            borderRadius: 4,
+                            transition: "width 0.3s",
+                          }} />
+                        </div>
+                        <span style={{ fontSize: 9, color: C.textMuted, fontFamily: "monospace", whiteSpace: "nowrap", minWidth: 48, textAlign: "right" }}>
+                          {stats.stakatVarde.toFixed(0)} kr
+                        </span>
                       </div>
-                      <span style={{ fontSize: 9, color: "#a855f7", fontFamily: "monospace", textAlign: "right" }}>
-                        {pctStr}
-                      </span>
                       <span style={{ fontSize: 10, color: "#4ade80", fontFamily: "monospace", textAlign: "right" }}>
                         +{stats.yieldPerDag.toFixed(2)} kr/dag
                       </span>
@@ -936,10 +936,10 @@ export default async function BorsPage() {
 
           {/* Avtagande avkastningskurvor */}
           <div style={{ marginTop: 28, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
-            {/* Graf 1: Total Staking Belöning R(x) = x^0.35 */}
+            {/* Graf 1: Total Staking Belöning R(x) = x^0.3 */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
               <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
-                Total Staking Belöning — R(x) = x<sup>0.35</sup>
+                Total Staking Belöning — R(x) = x<sup>0.3</sup>
               </div>
               <svg width="100%" viewBox="0 0 300 155" style={{ display: "block" }}>
                 {/* Y grid + ticks + labels: R(x) values 0–5 */}
@@ -968,14 +968,14 @@ export default async function BorsPage() {
                 <line x1={46} y1={128} x2={293} y2={128} stroke={C.textMuted} strokeWidth={0.8} />
                 {/* Proportionell referens: linjär ökning med samma maxvärde vid x=100 */}
                 <line x1={46} y1={128} x2={293} y2={20.5} stroke="#4b5563" strokeWidth={1} strokeDasharray="4 3" />
-                {/* Power-law kurva R(x) = x^0.35 */}
+                {/* Power-law kurva R(x) = x^0.3 */}
                 <polyline
                   fill="none" stroke="#a855f7" strokeWidth={2}
                   points={(() => {
                     const pts = ["46,128"];
                     for (let t = 2; t <= 100; t += 2) {
                       const xPx = (46 + (t / 100) * 247).toFixed(1);
-                      const yPx = (128 - (Math.pow(t, 0.35) / 5.5) * 118).toFixed(1);
+                      const yPx = (128 - (Math.pow(t, 0.3) / 5.5) * 118).toFixed(1);
                       pts.push(`${xPx},${yPx}`);
                     }
                     return pts.join(" ");
@@ -986,15 +986,15 @@ export default async function BorsPage() {
                 <text x={8} y={69} textAnchor="middle" fill={C.textMuted} fontSize={7} fontFamily="monospace" transform="rotate(-90,8,69)">R(x)</text>
               </svg>
               <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-                <span style={{ fontSize: 9, color: "#a855f7", fontFamily: "monospace" }}>— R(x) = x^0.35</span>
+                <span style={{ fontSize: 9, color: "#a855f7", fontFamily: "monospace" }}>— R(x) = x^0.3</span>
                 <span style={{ fontSize: 9, color: "#4b5563", fontFamily: "monospace" }}>--- proportionell (jämförelse)</span>
               </div>
             </div>
 
-            {/* Graf 2: Marginalbelöning dR/dx = 0.35 × x^(−0.65) */}
+            {/* Graf 2: Marginalbelöning dR/dx = 0.3 × x^(−0.7) */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 16 }}>
               <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
-                Marginalbelöning — dR/dx = 0.35 × x<sup>−0.65</sup>
+                Marginalbelöning — dR/dx = 0.3 × x<sup>−0.7</sup>
               </div>
               <svg width="100%" viewBox="0 0 300 155" style={{ display: "block" }}>
                 {/* Y grid + ticks + labels: dR/dx values 0–0.3 */}
@@ -1028,7 +1028,7 @@ export default async function BorsPage() {
                     const pts = [];
                     for (let t = 1; t <= 100; t++) {
                       const xPx = (46 + (t / 100) * 247).toFixed(1);
-                      const marginal = 0.35 * Math.pow(t, -0.65);
+                      const marginal = 0.3 * Math.pow(t, -0.7);
                       const yPx = (128 - Math.min(marginal / 0.37, 1) * 118).toFixed(1);
                       pts.push(`${xPx},${yPx}`);
                     }
@@ -1040,7 +1040,7 @@ export default async function BorsPage() {
                 <text x={8} y={69} textAnchor="middle" fill={C.textMuted} fontSize={7} fontFamily="monospace" transform="rotate(-90,8,69)">dR/dx</text>
               </svg>
               <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-                <span style={{ fontSize: 9, color: "#22d3ee", fontFamily: "monospace" }}>— dR/dx = 0.35 × x^−0.65</span>
+                <span style={{ fontSize: 9, color: "#22d3ee", fontFamily: "monospace" }}>— dR/dx = 0.3 × x^−0.7</span>
               </div>
             </div>
           </div>
@@ -1049,9 +1049,9 @@ export default async function BorsPage() {
           <div style={{ marginTop: 14, padding: "10px 14px", background: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: 8, fontFamily: "monospace", fontSize: 10, color: C.textMuted }}>
             <span style={{ color: "#a855f7" }}>Pool per dag: DBT 15 kr · NOVA 10 kr · ETK 12 kr</span>
             <br />
-            <span style={{ color: "#c084fc" }}>Din vikt = 1 / x<sup>0.35</sup>  →  Din andel = vikt / Σ(alla vikter)  ×  pool</span>
+            <span style={{ color: "#c084fc" }}>Din vikt = x<sup>0.3</sup>  →  Din andel = vikt / Σ(alla vikter)  ×  pool</span>
             <br />
-            Inverterad modell: liten staker → hög vikt → MER total yield. Rik agent stakar 100× → tjänar MINDRE än en som stakar 1.
+            Y = X^0.3: X=1→1, X=10→2.0, X=100→4.0, X=500→6.5 — avtagande marginalavkastning per token.
           </div>
 
           <div style={{ marginTop: 12, fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>

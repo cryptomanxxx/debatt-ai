@@ -122,12 +122,12 @@ STAKING_PROFIL = {
     "Den stressade":    {"sannolikhet": 0.04, "apy": 0.12},
 }
 DEFAULT_STAKING = {"sannolikhet": 0.08, "apy": 0.12}
-STAKING_ALPHA = 0.35  # Exponent i inverterad pool-viktning: vikt = 1 / x^alpha
+STAKING_ALPHA = 0.3  # Exponent i pool-viktning: vikt = x^alpha (avtagande marginalavkastning)
 
 # Delad pool-modell: fast daglig emission per symbol (SEK).
-# Inverterad viktning: vikt_i = 1 / (antal_i ^ STAKING_ALPHA)
-# Liten staker → hög vikt → större poolandel → MER totalt i yield.
-# Stor staker → låg vikt → mindre poolandel → MINDRE totalt i yield.
+# Direkt power-law viktning: vikt_i = antal_i ^ STAKING_ALPHA  (Y = X^0.3)
+# Stor staker → mer total yield, men avtagande marginalavkastning per token.
+# X=1 → vikt 1.0, X=10 → vikt 2.0, X=100 → vikt 3.98, X=500 → vikt 6.45
 STAKING_POOL_SEK_PER_DAG = {"DBT": 15, "NOVA": 10, "ETK": 12}
 
 # Market making — agenter med analytisk/lugn personlighet bidrar med likviditet
@@ -839,8 +839,8 @@ def betala_ut_staking(
 
     total_antal: agentens totala aktiva position för detta (agent, symbol)-par,
                  beräknat av kör_staking() INNAN loopen (undviker ordningsberoende).
-    pool_namnare: summan av alla aktiva agenters 1/x^STAKING_ALPHA per symbol —
-                  används för den inverterade delade pool-modellen. Saknas →
+    pool_namnare: summan av alla aktiva agenters x^STAKING_ALPHA per symbol —
+                  används för pool-modellen (Y=X^0.3). Saknas →
                   fallback till gammal formel (token^alpha × pris × APY × dagar/365).
     """
     try:
@@ -857,12 +857,12 @@ def betala_ut_staking(
         rad_andel  = this_antal / total_antal if total_antal > 0 else 1.0
 
         if pool_namnare is not None and symbol in STAKING_POOL_SEK_PER_DAG:
-            # Inverterad pool-modell:
-            # Din vikt = 1 / (antal ^ alpha)  →  liten staker får MER totalt
+            # Pool-modell Y = X^0.3:
+            # Din vikt = antal ^ alpha  →  avtagande marginalavkastning per token
             # Din andel = vikt_i / sum(alla_agenters vikter)
             pool_dag    = STAKING_POOL_SEK_PER_DAG[symbol]
             namnare     = pool_namnare.get(symbol, 1.0) or 1.0
-            agent_power = 1.0 / max(total_antal, 0.001) ** STAKING_ALPHA
+            agent_power = max(total_antal, 0.001) ** STAKING_ALPHA
             pool_andel  = agent_power / namnare
             yield_sek   = round(pool_andel * rad_andel * pool_dag * dagar, 2)
         else:
@@ -967,8 +967,8 @@ def kör_staking(sb_key: str) -> None:
             key = (s["agent"], s["symbol"])
             grupp_totaler[key] = grupp_totaler.get(key, 0.0) + float(s["antal"])
 
-        # b) Pool-nämnare per symbol: inverterad vikt = 1 / (antal ^ alpha)
-        #    Liten staker bidrar med hög vikt → får större andel av poolen.
+        # b) Pool-nämnare per symbol: vikt = antal ^ alpha  (Y = X^0.3)
+        #    Avtagande marginalavkastning: stor staker tjänar mer men inte proportionellt.
         pool_namnare: dict[str, float] = {}
         if pool_ok:
             sett_par: set[tuple] = set()
@@ -978,7 +978,7 @@ def kör_staking(sb_key: str) -> None:
                     sett_par.add(key)
                     sym         = s["symbol"]
                     agent_total = grupp_totaler[key]
-                    pool_namnare[sym] = pool_namnare.get(sym, 0.0) + (1.0 / max(agent_total, 0.001) ** STAKING_ALPHA)
+                    pool_namnare[sym] = pool_namnare.get(sym, 0.0) + max(agent_total, 0.001) ** STAKING_ALPHA
 
             # Logga pool-andelar för debug
             for sym, namnare in pool_namnare.items():
