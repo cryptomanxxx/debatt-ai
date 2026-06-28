@@ -22,8 +22,10 @@ function statusDist(g) {
   const u = Math.min(0.02 + g * 0.80, 0.60);
   const p = Math.min(0.10 + g * 0.25, 0.30);
   const r = Math.min(0.08 + g * 0.12, 0.16);
-  const v = Math.max(0, 1 - u - p - r);
-  return { u, p, v, r };
+  const vRaw = Math.max(0, 1 - u - p - r);
+  const tot = u + p + r + vRaw;
+  const [un, pn, rn, vn] = [u, p, r, vRaw].map(x => x / tot);
+  return { u: un, p: pn, v: vn, r: rn };
 }
 
 const P_AVV  = { u: 0.05, p: 0.15, v: 0.40, r: 0.35 }; // P(avvisning | status) vid erbjudande ≈ 30 kr
