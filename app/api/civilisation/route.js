@@ -286,7 +286,9 @@ export async function POST(req) {
     const resolvedEndpoint = endpoint || gissaEndpoint(fraga);
 
     // Log fire-and-forget — never block the response.
-    const sbKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const sbKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
     if (sbKey) {
       const logHeaders = {
         apikey: sbKey,
@@ -294,7 +296,6 @@ export async function POST(req) {
         "Content-Type": "application/json",
         Prefer: "return=minimal",
       };
-      // Legacy log table (all calls)
       fetch(`${SB_URL}/rest/v1/civilisation_log`, {
         method: "POST",
         headers: logHeaders,
@@ -308,6 +309,28 @@ export async function POST(req) {
           latency_ms:  latency,
           lang,
           kalltyp,
+        }),
+      }).catch(() => {});
+    }
+
+    // Fallback: always mirror visitor questions to civilisation_fragor using anon key.
+    // This ensures hjarnans-logg can display them even if SUPABASE_SERVICE_ROLE_KEY
+    // is not configured in Vercel (civilisation_log would be empty without it).
+    if (kalltyp === "besökare" && anonKey) {
+      fetch(`${SB_URL}/rest/v1/civilisation_fragor`, {
+        method: "POST",
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          agent:      "besökare",
+          fraga:      fraga.trim().slice(0, 500),
+          typ:        resolvedEndpoint,
+          svar:       text.slice(0, 2000),
+          latency_ms: latency,
         }),
       }).catch(() => {});
     }
