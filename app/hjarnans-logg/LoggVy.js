@@ -38,8 +38,8 @@ export default function LoggVy({ poster }) {
   const filtrerade = filter === "alla"
     ? poster
     : filter === "besökare"
-      ? poster.filter(p => !p.agent || p.agent === "besökare")
-      : poster.filter(p => !!p.agent && p.agent !== "besökare");
+      ? poster.filter(p => p.agent === "besökare")
+      : poster.filter(p => p.agent !== "besökare");
 
   const totalSidor = Math.max(1, Math.ceil(filtrerade.length / PAGE_SIZE));
   const visade = filtrerade.slice((sida - 1) * PAGE_SIZE, sida * PAGE_SIZE);
@@ -49,8 +49,8 @@ export default function LoggVy({ poster }) {
 
   const filterKnappar = [
     { id: "alla",     label: "Alla",       count: poster.length },
-    { id: "besökare", label: "Besökare", ikon: "👤", count: poster.filter(p => !p.agent || p.agent === "besökare").length },
-    { id: "agent",    label: "AI-agenter", ikon: "🤖", count: poster.filter(p => !!p.agent && p.agent !== "besökare").length },
+    { id: "besökare", label: "Besökare", ikon: "👤", count: poster.filter(p => p.agent === "besökare").length },
+    { id: "agent",    label: "AI-agenter", ikon: "🤖", count: poster.filter(p => p.agent !== "besökare").length },
   ];
 
   return (
@@ -103,7 +103,7 @@ export default function LoggVy({ poster }) {
       {/* Q&A-lista */}
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         {visade.map((p) => {
-          const isAgent = !!p.agent && p.agent !== "besökare";
+          const isAgent = p.agent !== "besökare";
           const typIkon = TYP_IKON[p.typ] ?? "🧠";
           const isOpen = !!expanded[p.id];
           const harSvar = p.svar && p.svar.trim().length > 0;
