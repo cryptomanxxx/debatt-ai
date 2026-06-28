@@ -46,12 +46,16 @@ async function getData() {
     skapad:     p.skapad,
   }));
 
-  // Dedup: om samma frågetext finns i båda källorna (legacy-rader från #1145-fönstret)
-  // föredra civilisation_log-versionen och filtrera bort civilisation_fragor-dubletten.
-  const logFragor = new Set(normalizedLogs.map(p => p.fraga));
-  const fragorFiltered = fragor.filter(
-    p => p.agent !== "besökare" || !logFragor.has(p.fraga)
-  );
+  // Dedup: filtrera bort civilisation_fragor-rader som är exakta speglingar av en
+  // civilisation_log-rad (samma frågetext OCH skapad inom 2 min). Enbart text-match
+  // räcker inte — populära exempelfrågor kan upprepas av olika besökare vid olika tider.
+  const fragorFiltered = fragor.filter(p => {
+    if (p.agent !== "besökare") return true;
+    return !normalizedLogs.some(
+      lg => lg.fraga === p.fraga &&
+        Math.abs(new Date(lg.skapad) - new Date(p.skapad)) < 2 * 60 * 1000
+    );
+  });
 
   // Slå ihop och sortera nyast först
   return [...fragorFiltered, ...normalizedLogs]
