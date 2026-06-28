@@ -914,14 +914,32 @@ def kör_staking(sb_key: str) -> None:
     mogna = hamta_mogna_stakes(sb_key)
     if mogna:
         print(f"  {len(mogna)} stakes löper ut — betalar ut yield...")
-        # Beräkna total antal per (agent, symbol) INNAN loopen startar.
-        # Om vi lät betala_ut_staking() fråga databasen under loopen skulle
-        # rader som redan markerats utbetalda saknas i totalen — det ger
-        # en för liten total och för stor andel till de sista raderna.
+        # Beräkna total aktiv position per (agent, symbol) INNAN loopen startar.
+        # Totalen måste inkludera ALLA aktiva (utbetald=false) rader — inte bara de
+        # som mognar idag — annars underskattas positionen för agenter med staggered
+        # stakes (t.ex. 50 DBT idag + 50 DBT nästa vecka ger total 100, inte 50).
+        # Vi frågar databasen EN gång per unikt (agent, symbol)-par; loopen rör
+        # aldrig totalen efter detta, så ordningsberoendet från PR #1129 kvarstår inte.
+        aktiva_par = {(s["agent"], s["symbol"]) for s in mogna}
         grupp_totaler: dict[tuple, float] = {}
-        for s in mogna:
-            key = (s["agent"], s["symbol"])
-            grupp_totaler[key] = grupp_totaler.get(key, 0.0) + float(s["antal"])
+        for agent, symbol in aktiva_par:
+            try:
+                r_tot = httpx.get(
+                    f"{SB_URL}/rest/v1/bors_staking"
+                    f"?agent=eq.{urllib.parse.quote(agent)}"
+                    f"&symbol=eq.{urllib.parse.quote(symbol)}"
+                    f"&utbetald=eq.false&select=antal",
+                    headers=_h(sb_key), timeout=8,
+                )
+                if r_tot.is_success and r_tot.json():
+                    grupp_totaler[(agent, symbol)] = sum(float(r["antal"]) for r in r_tot.json())
+                else:
+                    raise ValueError("empty response")
+            except Exception:
+                # Fallback: summera bara de mogna raderna för detta par
+                grupp_totaler[(agent, symbol)] = sum(
+                    float(s["antal"]) for s in mogna if s["agent"] == agent and s["symbol"] == symbol
+                )
         for s in mogna:
             key = (s["agent"], s["symbol"])
             betala_ut_staking(sb_key, s, total_antal=grupp_totaler[key])
