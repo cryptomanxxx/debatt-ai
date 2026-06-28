@@ -28,7 +28,7 @@ export default function StakingTabell({ rader }) {
       {/* Tabellhuvud */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: "1fr 80px 80px 55px 95px 100px",
+        gridTemplateColumns: "1fr 80px 80px 65px 95px 100px",
         padding: "10px 16px",
         fontSize: 9, color: C.textMuted, fontFamily: "monospace",
         letterSpacing: "0.08em",
@@ -38,20 +38,21 @@ export default function StakingTabell({ rader }) {
         <span>AGENT</span>
         <span style={{ textAlign: "center" }}>TOKEN</span>
         <span style={{ textAlign: "right" }}>ANTAL</span>
-        <span style={{ textAlign: "right" }}>APY</span>
+        <span style={{ textAlign: "right" }}>POOL %</span>
         <span style={{ textAlign: "right" }}>FÖRFALLER</span>
         <span style={{ textAlign: "right" }}>YIELD KVAR</span>
       </div>
 
       {synliga.map((s, i) => {
-        const farg   = symbolFarg(s.symbol);
-        const ikon   = symbolIkon(s.symbol);
+        const farg    = symbolFarg(s.symbol);
+        const ikon    = symbolIkon(s.symbol);
         const dagText = s.dagarKvar === 0 ? "idag" : `${s.dagarKvar}d`;
         const dagFarg = s.dagarKvar <= 1 ? "#fbbf24" : C.textMuted;
+        const pct     = s.poolAndelPct != null ? `${s.poolAndelPct.toFixed(1)}%` : `APY ${(s.apy * 100).toFixed(0)}%`;
         return (
           <div key={s.id ?? i} style={{
             display: "grid",
-            gridTemplateColumns: "1fr 80px 80px 55px 95px 100px",
+            gridTemplateColumns: "1fr 80px 80px 65px 95px 100px",
             padding: "9px 16px",
             fontSize: 11, fontFamily: "monospace",
             borderBottom: `1px solid ${C.border}`,
@@ -67,8 +68,8 @@ export default function StakingTabell({ rader }) {
             <span style={{ color: C.text, textAlign: "right" }}>
               {s.antal.toFixed(2)}
             </span>
-            <span style={{ color: "#4ade80", textAlign: "right" }}>
-              {(s.apy * 100).toFixed(0)}%
+            <span style={{ color: s.poolAndelPct != null ? "#a855f7" : "#4ade80", textAlign: "right" }}>
+              {pct}
             </span>
             <span style={{ color: dagFarg, textAlign: "right" }}>
               {s.slut_datum} <span style={{ fontSize: 9 }}>({dagText})</span>

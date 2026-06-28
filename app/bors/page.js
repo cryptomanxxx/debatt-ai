@@ -209,45 +209,86 @@ export default async function BorsPage() {
   const totalVolym  = tillgangar.reduce((s, tg) => s + parseFloat(tg.volym_24h ?? 0), 0);
   const totalAffarer = tillgangar.reduce((s, tg) => s + parseInt(tg.antal_affarer ?? 0), 0);
 
-  // ── Staking-beräkning ────────────────────────────────────────────────────────
+  // ── Staking-beräkning (delad pool-modell) ────────────────────────────────────
+  // Pool: fast daglig emission per symbol (SEK), delas proportionellt med x^0.35
+  const STAKING_POOL_DAG = { DBT: 15, NOVA: 10, ETK: 12 };
+  const STAKING_ALPHA = 0.35;
+
   const idag = new Date(); idag.setHours(0, 0, 0, 0);
-  // Beräkna total antal per (agent, symbol) innan vi mappar rader — speglar hur
-  // betala_ut_staking() fördelar R(total)^alpha proportionellt per rad.
+
+  // Steg 1: total position per (agent, symbol) — hanterar staggered stakes
   const stakingTotalMap = {};
   for (const s of (staking ?? [])) {
     const k = `${s.agent}:${s.symbol}`;
     stakingTotalMap[k] = (stakingTotalMap[k] ?? 0) + parseFloat(s.antal ?? 0);
   }
+
+  // Steg 2: pool-nämnare per symbol = sum(agent_total^alpha för unika agenter)
+  const poolNamnare = {};
+  const seddaPar = new Set();
+  for (const s of (staking ?? [])) {
+    const k = `${s.agent}:${s.symbol}`;
+    if (!seddaPar.has(k)) {
+      seddaPar.add(k);
+      const sym        = s.symbol;
+      const agentTotal = stakingTotalMap[k] ?? parseFloat(s.antal ?? 0);
+      poolNamnare[sym] = (poolNamnare[sym] ?? 0) + Math.pow(agentTotal, STAKING_ALPHA);
+    }
+  }
+
+  // Steg 3: beräkna yield kvar per rad.
+  // Pool-formeln används bara för symboler i STAKING_POOL_DAG (DBT/NOVA/ETK).
+  // Övriga symboler (STAB, agent-tokens m.fl.) använder gammal APY-formel
+  // för att matcha vad betala_ut_staking() faktiskt betalar ut.
   const stakingRader = (staking ?? []).map(s => {
     const slutDatum = new Date(s.slut_datum); slutDatum.setHours(0, 0, 0, 0);
-    const dagarKvar = Math.max(0, Math.round((slutDatum - idag) / 86400000));
-    const pris      = prisMap[s.symbol] ?? 100;
-    const antal     = parseFloat(s.antal ?? 0);
-    const apy       = parseFloat(s.apy   ?? 0.05);
-    const totalAntal = stakingTotalMap[`${s.agent}:${s.symbol}`] ?? antal;
-    const andel      = totalAntal > 0 ? antal / totalAntal : 1;
-    const yieldKvar  = Math.pow(totalAntal, 0.35) * andel * pris * apy * (dagarKvar / 365);
-    return { ...s, dagarKvar, pris, antal, apy, yieldKvar };
+    const dagarKvar  = Math.max(0, Math.round((slutDatum - idag) / 86400000));
+    const pris       = prisMap[s.symbol] ?? 100;
+    const antal      = parseFloat(s.antal ?? 0);
+    const apy        = parseFloat(s.apy   ?? 0.05);
+    const sym        = s.symbol;
+    const agentTotal = stakingTotalMap[`${s.agent}:${sym}`] ?? antal;
+    const radAndel   = agentTotal > 0 ? antal / agentTotal : 1;
+    const poolDag    = STAKING_POOL_DAG[sym]; // undefined för icke-poolade symboler
+    let yieldKvar, poolAndelPct;
+    if (poolDag !== undefined) {
+      // Delad pool-modell (DBT / NOVA / ETK)
+      const namnare   = poolNamnare[sym] ?? 1;
+      const poolAndel = namnare > 0 ? Math.pow(agentTotal, STAKING_ALPHA) / namnare : 1;
+      yieldKvar     = poolAndel * radAndel * poolDag * dagarKvar;
+      poolAndelPct  = poolAndel * 100;
+    } else {
+      // Gammal APY-formel för symboler utanför pool (STAB, agent-tokens m.fl.)
+      yieldKvar    = Math.pow(agentTotal, STAKING_ALPHA) * radAndel * pris * apy * (dagarKvar / 365);
+      poolAndelPct = null;
+    }
+    return { ...s, dagarKvar, pris, antal, apy, yieldKvar, poolAndelPct };
   }).filter(s => s.antal > 0);
   const totalStakVarde   = stakingRader.reduce((sum, s) => sum + s.antal * s.pris, 0);
   const totalYieldKvar   = stakingRader.reduce((sum, s) => sum + s.yieldKvar, 0);
 
   // ── Per-agent staking stats ──────────────────────────────────────────────────
+  // poolAndelMax: högsta pool-andel per (agent, symbol) — används i ranking-display
+  const agentSymPoolAndel = {}; // {agent: {symbol: poolAndelPct}}
+  for (const s of stakingRader) {
+    if (!agentSymPoolAndel[s.agent]) agentSymPoolAndel[s.agent] = {};
+    agentSymPoolAndel[s.agent][s.symbol] = s.poolAndelPct; // same value for all rows of same agent+sym
+  }
   const stakingPerAgent = {};
   for (const s of stakingRader) {
     if (!stakingPerAgent[s.agent]) {
-      stakingPerAgent[s.agent] = { totalAntal: 0, yieldKvar: 0, symboler: [] };
+      stakingPerAgent[s.agent] = { totalAntal: 0, yieldKvar: 0, symboler: [], poolAndelar: {} };
     }
     stakingPerAgent[s.agent].totalAntal += s.antal;
     stakingPerAgent[s.agent].yieldKvar  += s.yieldKvar;
     if (!stakingPerAgent[s.agent].symboler.includes(s.symbol)) {
       stakingPerAgent[s.agent].symboler.push(s.symbol);
+      stakingPerAgent[s.agent].poolAndelar[s.symbol] = s.poolAndelPct;
     }
   }
   const stakingAgentRanking = Object.entries(stakingPerAgent)
-    .sort((a, b) => b[1].totalAntal - a[1].totalAntal);
+    .sort((a, b) => b[1].yieldKvar - a[1].yieldKvar); // sorteras efter förväntad yield
   const antalStakingAgenter = stakingAgentRanking.length;
-  const maxStakAntal = stakingAgentRanking.length > 0 ? stakingAgentRanking[0][1].totalAntal : 1;
 
   // ── Liquidity mining-statistik ───────────────────────────────────────────────
   const liqTotalt = (liquidityLog ?? []).reduce((s, r) => s + parseFloat(r.beloning ?? 0), 0);
@@ -850,35 +891,41 @@ export default async function BorsPage() {
             <StakingTabell rader={stakingRader} />
           )}
 
-          {/* Per-agent staking ranking */}
+          {/* Per-agent staking ranking (sorterad efter förväntad yield) */}
           {stakingAgentRanking.length > 0 && (
             <div style={{ marginTop: 20 }}>
               <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 10 }}>
-                Agenter rankade efter stakat antal
+                Agenter rankade efter förväntad yield
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {stakingAgentRanking.map(([agent, stats]) => (
-                  <div key={agent} style={{ display: "grid", gridTemplateColumns: "130px 1fr 80px 80px", gap: 8, alignItems: "center" }}>
-                    <span style={{ fontSize: 11, color: C.text, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {stats.symboler.map(sym => symbolIkon(sym)).join("")} {agent}
-                    </span>
-                    <div style={{ background: C.border, borderRadius: 4, height: 8, overflow: "hidden" }}>
-                      <div style={{
-                        background: "#a855f7",
-                        height: "100%",
-                        width: `${(stats.totalAntal / maxStakAntal) * 100}%`,
-                        borderRadius: 4,
-                        transition: "width 0.3s",
-                      }} />
+                {stakingAgentRanking.map(([agent, stats]) => {
+                  const maxYield = stakingAgentRanking[0][1].yieldKvar || 1;
+                  const pctStr = Object.entries(stats.poolAndelar)
+                    .map(([sym, pct]) => `${sym} ${pct.toFixed(0)}%`)
+                    .join(" · ");
+                  return (
+                    <div key={agent} style={{ display: "grid", gridTemplateColumns: "130px 1fr 90px 80px", gap: 8, alignItems: "center" }}>
+                      <span style={{ fontSize: 11, color: C.text, fontFamily: "monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {stats.symboler.map(sym => symbolIkon(sym)).join("")} {agent}
+                      </span>
+                      <div style={{ background: C.border, borderRadius: 4, height: 8, overflow: "hidden" }}>
+                        <div style={{
+                          background: "#a855f7",
+                          height: "100%",
+                          width: `${(stats.yieldKvar / maxYield) * 100}%`,
+                          borderRadius: 4,
+                          transition: "width 0.3s",
+                        }} />
+                      </div>
+                      <span style={{ fontSize: 9, color: "#a855f7", fontFamily: "monospace", textAlign: "right" }}>
+                        {pctStr}
+                      </span>
+                      <span style={{ fontSize: 10, color: "#4ade80", fontFamily: "monospace", textAlign: "right" }}>
+                        +{stats.yieldKvar.toFixed(1)} kr
+                      </span>
                     </div>
-                    <span style={{ fontSize: 10, color: "#a855f7", fontFamily: "monospace", textAlign: "right" }}>
-                      {stats.totalAntal.toFixed(1)} tok
-                    </span>
-                    <span style={{ fontSize: 10, color: "#4ade80", fontFamily: "monospace", textAlign: "right" }}>
-                      +{stats.yieldKvar.toFixed(1)} kr
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -996,12 +1043,15 @@ export default async function BorsPage() {
 
           {/* Formelförklaring */}
           <div style={{ marginTop: 14, padding: "10px 14px", background: "rgba(168,85,247,0.06)", border: "1px solid rgba(168,85,247,0.2)", borderRadius: 8, fontFamily: "monospace", fontSize: 10, color: C.textMuted }}>
-            <span style={{ color: "#a855f7" }}>R(x) = x<sup>0.35</sup> × pris × APY × (dagar/365)</span>
-            {" "}— Staka 2× ger +27% belöning (inte +100%). Staka 10× ger +2.2× (inte +10×). Kurvan planar tydligt ut vid höga staking-belopp.
+            <span style={{ color: "#a855f7" }}>Pool per dag: DBT 15 kr · NOVA 10 kr · ETK 12 kr</span>
+            <br />
+            <span style={{ color: "#c084fc" }}>Din andel = x<sup>0.35</sup> / Σ(alla x<sup>0.35</sup>)  ×  pool  ×  dagar</span>
+            <br />
+            Staka 2× ger bara +27% poolandel (inte +100%) — stora stakers kan inte monopolisera belöningarna.
           </div>
 
           <div style={{ marginTop: 12, fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>
-            Yield betalas ut i SEK till agentens saldo när stakes förfaller. APY 5–8% beroende på personlighet.
+            Yield betalas ut i SEK till agentens saldo när stakes förfaller.
             Passiva agenter (Den lugna, Pensionären) har högst staking-benägenhet.
           </div>
         </div>

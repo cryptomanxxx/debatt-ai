@@ -124,6 +124,11 @@ STAKING_PROFIL = {
 DEFAULT_STAKING = {"sannolikhet": 0.08, "apy": 0.12}
 STAKING_ALPHA = 0.35  # Exponent för avtagande avkastning (0 < alpha < 1). Staka 2× ger +27%, 10× ger +2.2×
 
+# Delad pool-modell: fast daglig emission per symbol (SEK).
+# Alla aktiva stakers delar på respektive pool proportionellt med x^STAKING_ALPHA.
+# Stora stakers kan INTE dominera poolen — deras andel ökar sublineärt.
+STAKING_POOL_SEK_PER_DAG = {"DBT": 15, "NOVA": 10, "ETK": 12}
+
 # Market making — agenter med analytisk/lugn personlighet bidrar med likviditet
 MARKET_MAKER_PROFIL = {
     # agent: (sannolikhet att lägga MM-ordrar, spread-tighthet som andel av spot)
@@ -823,12 +828,19 @@ def hamta_mogna_stakes(sb_key: str) -> list[dict]:
         return []
 
 
-def betala_ut_staking(sb_key: str, stake: dict, total_antal: float | None = None) -> None:
+def betala_ut_staking(
+    sb_key: str,
+    stake: dict,
+    total_antal: float | None = None,
+    pool_namnare: dict | None = None,
+) -> None:
     """Betalar ut yield för en mogen stake och markerar den som utbetald.
 
-    total_antal bör alltid skickas av kör_staking() som räknat ut gruppens summa
-    *innan* några rader markerats utbetalda — annars ser senare rader i samma batch
-    en felaktigt lägre total och beräknar en för stor andel.
+    total_antal: agentens totala aktiva position för detta (agent, symbol)-par,
+                 beräknat av kör_staking() INNAN loopen (undviker ordningsberoende).
+    pool_namnare: summan av alla aktiva agenters x^STAKING_ALPHA per symbol —
+                  används för den delade pool-modellen. Saknas → fallback till
+                  gammal formel (token^alpha × pris × APY × dagar/365).
     """
     try:
         pris = hamta_pris(sb_key, stake["symbol"])
@@ -836,15 +848,25 @@ def betala_ut_staking(sb_key: str, stake: dict, total_antal: float | None = None
         slut  = datetime.fromisoformat(stake["slut_datum"])
         dagar = max(1, (slut - start).days)
 
-        # Avtagande avkastning baseras på agentens TOTALA position (alla mogna rader
-        # för samma symbol i denna batch), inte bara denna rad.
-        # total_antal skickas in från kör_staking() och är beräknat före loopen.
         if total_antal is None:
             total_antal = float(stake["antal"])
 
+        symbol    = stake["symbol"]
         this_antal = float(stake["antal"])
-        andel = this_antal / total_antal if total_antal > 0 else 1.0
-        yield_sek = round((total_antal ** STAKING_ALPHA) * andel * pris * float(stake["apy"]) * dagar / 365, 2)
+        rad_andel  = this_antal / total_antal if total_antal > 0 else 1.0
+
+        if pool_namnare is not None and symbol in STAKING_POOL_SEK_PER_DAG:
+            # Delad pool-modell:
+            # Din andel = x^alpha / sum(alla_agenters x^alpha)
+            # Din yield = andel × pool_per_dag × dagar  (× rad_andel om staggered stakes)
+            pool_dag    = STAKING_POOL_SEK_PER_DAG[symbol]
+            namnare     = pool_namnare.get(symbol, 1.0) or 1.0
+            agent_power = total_antal ** STAKING_ALPHA
+            pool_andel  = agent_power / namnare
+            yield_sek   = round(pool_andel * rad_andel * pool_dag * dagar, 2)
+        else:
+            # Fallback: gammal formel (används om pool_namnare saknas)
+            yield_sek = round((total_antal ** STAKING_ALPHA) * rad_andel * pris * float(stake["apy"]) * dagar / 365, 2)
 
         # Kreditera yield till agentens saldo
         agent_enc = urllib.parse.quote(stake["agent"])
@@ -914,39 +936,60 @@ def kör_staking(sb_key: str) -> None:
     mogna = hamta_mogna_stakes(sb_key)
     if mogna:
         print(f"  {len(mogna)} stakes löper ut — betalar ut yield...")
-        # Beräkna total aktiv position per (agent, symbol) INNAN loopen startar.
-        # Totalen måste inkludera ALLA aktiva (utbetald=false) rader — inte bara de
-        # som mognar idag — annars underskattas positionen för agenter med staggered
-        # stakes (t.ex. 50 DBT idag + 50 DBT nästa vecka ger total 100, inte 50).
-        # Vi frågar databasen EN gång per unikt (agent, symbol)-par; loopen rör
-        # aldrig totalen efter detta, så ordningsberoendet från PR #1129 kvarstår inte.
-        aktiva_par = {(s["agent"], s["symbol"]) for s in mogna}
+
+        # Hämta ALLA aktiva stakes i ett enda anrop.
+        # Vi behöver hela mängden för att beräkna:
+        #   a) agentens total position per (agent, symbol)  — staggered stakes inkluderas
+        #   b) pool-nämnaren per symbol: sum(agent_total^alpha för alla unika agenter)
+        #
+        # pool_ok=False → pool_namnare skickas INTE till betala_ut_staking(),
+        # som då faller tillbaka på gammal APY-formel istället för att överkreditera
+        # baserat på ett ofullständigt nämnare (Codex P2).
+        pool_ok = False
+        alla_aktiva: list[dict] = mogna[:]
+        try:
+            r_all = httpx.get(
+                f"{SB_URL}/rest/v1/bors_staking?utbetald=eq.false&select=agent,symbol,antal",
+                headers=_h(sb_key), timeout=10,
+            )
+            if r_all.is_success and r_all.json():
+                alla_aktiva = r_all.json()
+                pool_ok = True
+            else:
+                raise ValueError(f"HTTP {r_all.status_code} eller tom respons")
+        except Exception as e:
+            print(f"  [kör_staking] VARNING: kunde inte hämta alla aktiva stakes: {e} — pool-modellen inaktiveras, använder APY-fallback")
+
+        # a) Total aktiv position per (agent, symbol)
         grupp_totaler: dict[tuple, float] = {}
-        for agent, symbol in aktiva_par:
-            try:
-                r_tot = httpx.get(
-                    f"{SB_URL}/rest/v1/bors_staking"
-                    f"?agent=eq.{urllib.parse.quote(agent)}"
-                    f"&symbol=eq.{urllib.parse.quote(symbol)}"
-                    f"&utbetald=eq.false&select=antal",
-                    headers=_h(sb_key), timeout=8,
-                )
-                if r_tot.is_success and r_tot.json():
-                    grupp_totaler[(agent, symbol)] = sum(float(r["antal"]) for r in r_tot.json())
-                else:
-                    raise ValueError("empty response")
-            except Exception as e:
-                # Fallback: summera bara de mogna raderna för detta par.
-                # OBS: detta underskattar totalen om agenten har staggered stakes —
-                # avtagande avkastning beräknas på för litet underlag tills DB svarar igen.
-                fallback = sum(
-                    float(s["antal"]) for s in mogna if s["agent"] == agent and s["symbol"] == symbol
-                )
-                grupp_totaler[(agent, symbol)] = fallback
-                print(f"  [kör_staking] VARNING: kunde inte hämta total position för ({agent}, {symbol}): {e} — använder fallback {fallback:.2f}")
+        for s in alla_aktiva:
+            key = (s["agent"], s["symbol"])
+            grupp_totaler[key] = grupp_totaler.get(key, 0.0) + float(s["antal"])
+
+        # b) Pool-nämnare per symbol: ett bidrag per unik agent (bara vid pool_ok)
+        pool_namnare: dict[str, float] = {}
+        if pool_ok:
+            sett_par: set[tuple] = set()
+            for s in alla_aktiva:
+                key = (s["agent"], s["symbol"])
+                if key not in sett_par:
+                    sett_par.add(key)
+                    sym         = s["symbol"]
+                    agent_total = grupp_totaler[key]
+                    pool_namnare[sym] = pool_namnare.get(sym, 0.0) + (agent_total ** STAKING_ALPHA)
+
+            # Logga pool-andelar för debug
+            for sym, namnare in pool_namnare.items():
+                pool_dag = STAKING_POOL_SEK_PER_DAG.get(sym, 0)
+                print(f"  [staking pool] {sym}: nämnare={namnare:.3f}, pool={pool_dag} kr/dag")
+
         for s in mogna:
             key = (s["agent"], s["symbol"])
-            betala_ut_staking(sb_key, s, total_antal=grupp_totaler[key])
+            betala_ut_staking(
+                sb_key, s,
+                total_antal=grupp_totaler.get(key, float(s["antal"])),
+                pool_namnare=pool_namnare if pool_ok else None,
+            )
     else:
         print("  Inga stakes att betala ut.")
 
