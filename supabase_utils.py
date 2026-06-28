@@ -3889,6 +3889,10 @@ MOTIVERING: [1–2 meningar som förklarar ditt beslut]"""
         print(f"  ✗ TPP: kunde inte spara spelet: {e}", file=sys.stderr)
         return False
 
+    if not spel_r.is_success:
+        print(f"  ✗ TPP: DB-insert misslyckades ({spel_r.status_code}): {spel_r.text[:200]}", file=sys.stderr)
+        return False
+
     # ── Uppdatera saldon ────────────────────────────────────────────────────
     # A: betalar 100 kr ur saldo, får tillbaka behaller_a minus straffet
     ny_saldo_a = max(0, saldo_a - 100 + behaller_a - straffeffekt_kr)

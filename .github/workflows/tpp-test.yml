@@ -3,7 +3,7 @@ name: Tredje parts-straffspelet
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 12 * * *"  # 14:00 svensk tid
+    - cron: "45 12 * * *"  # 14:45 svensk tid (undviker kollision med feedback-test kl 14:00)
 
 jobs:
   tpp:
