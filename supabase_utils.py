@@ -5075,15 +5075,20 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
             sedda_namn.add(p["namn"])
         _overfor_parti_kassor(sb_key, kommande_partier)
 
-        # Hämta befintliga partinamn innan delete — används för att avgöra om ett parti är genuint nytt
+        # Hämta befintliga partiers MEDLEMMAR innan delete — jämför på klusteridentitet,
+        # inte displaynamn, för att klara av namnbyten vid ledarskifte.
         try:
             r_gamla = httpx.get(
-                f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn",
+                f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=medlemmar",
                 headers=h, timeout=8,
             )
-            gamla_namn: set[str] = {p["namn"] for p in r_gamla.json()} if r_gamla.is_success else set()
+            gamla_kluster: set[frozenset] = (
+                {frozenset(p["medlemmar"]) for p in r_gamla.json()}
+                if r_gamla.is_success and r_gamla.json()
+                else set()
+            )
         except Exception:
-            gamla_namn = set()
+            gamla_kluster = set()
 
         # Ta bort gamla partier
         httpx.delete(f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true", headers=h, timeout=8)
@@ -5113,8 +5118,9 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
             r2 = httpx.post(f"{SB_URL}/rest/v1/politiska_partier", headers=h, json=payload, timeout=8)
             if r2.is_success:
                 aktiva += 1
-                # Logga bara "Parti bildat" om partiet är genuint nytt — inte vid daglig omklustring
-                if namn not in gamla_namn:
+                # Logga bara "Parti bildat" om klustret är genuint nytt (jämför på
+                # medlemsuppsättning, inte displaynamn — tål ledarskiften/namnbyten).
+                if frozenset(medlemmar) not in gamla_kluster:
                     spara_civilisations_minne(
                         sb_key, typ="koalition_bildad",
                         rubrik=f"Parti bildat: {namn}",
