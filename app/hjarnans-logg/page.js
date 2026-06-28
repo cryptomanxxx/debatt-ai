@@ -1,4 +1,5 @@
 import LoggVy from "./LoggVy";
+import AmneskluterGraf from "./AmneskluterGraf";
 
 export const revalidate = 60;
 
@@ -12,7 +13,7 @@ async function getData() {
   const [r1, r2] = await Promise.allSettled([
     // AI-agenternas frågor (Python-skripten skriver direkt hit)
     fetch(
-      `${SB_URL}/rest/v1/civilisation_fragor?order=skapad.desc&limit=500&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
+      `${SB_URL}/rest/v1/civilisation_fragor?agent=neq.besökare&order=skapad.desc&limit=500&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
       { headers: h, next: { revalidate: 60 } }
     ),
     // Besökarnas frågor via web-UI (API-routen skriver hit)
@@ -106,7 +107,10 @@ export default async function HjarnansLoggPage() {
             </p>
           </div>
         ) : (
-          <LoggVy poster={poster} />
+          <>
+            <AmneskluterGraf poster={poster} />
+            <LoggVy poster={poster} />
+          </>
         )}
 
       </div>
