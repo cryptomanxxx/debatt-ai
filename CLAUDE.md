@@ -631,7 +631,7 @@ En naturlig förlängning av ultimatumspelet: Agent A delar 100 kr med B. Agent 
 - A gör erbjudandet (vet att C observerar) via LLM-prompt
 - C ser uppdelningen och bestämmer straff (0–30 kr) via eget LLM-anrop
 - Om DB-inserten i `tpp_spel` misslyckas avbryts körningen — inga saldo-ändringar sker utan audit-rad
-- Alla tre agenters saldon uppdateras atomärt efter bekräftad DB-rad
+- Alla tre agenters saldon uppdateras sekventiellt efter bekräftad DB-rad (tre separata PATCH-anrop — inte en transaktion; partiella fel kan ge inkonsistenta saldon)
 
 **Straffkurvan (Fehr & Fischbacher 2004):** WTP(s) = β × max(0, 50 − s) / 50 × 30. Straffviljan ökar linjärt med orättvisan — 10/90-delning provocerar mer än 40/60. Empiriska punkter visas på sidan när ≥3 spel finns i en bracket.
 
