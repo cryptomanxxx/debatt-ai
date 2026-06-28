@@ -881,40 +881,53 @@ export default async function BorsPage() {
               <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
                 Total Staking Belöning — R(x) = x<sup>0.35</sup>
               </div>
-              <svg width="100%" viewBox="0 0 260 120" style={{ display: "block" }}>
-                {[0, 30, 60, 90, 120].map(y => (
-                  <line key={y} x1={30} y1={y + 5} x2={255} y2={y + 5} stroke={C.border} strokeWidth={0.5} />
-                ))}
-                {/* Linjär referenskurva (grå streckad) */}
-                <polyline
-                  fill="none" stroke="#4b5563" strokeWidth={1} strokeDasharray="4 3"
-                  points={(() => {
-                    const pts = [];
-                    for (let i = 0; i <= 40; i++) {
-                      const x = i / 40;
-                      pts.push(`${(30 + x * 225).toFixed(1)},${(125 - x * 120).toFixed(1)}`);
-                    }
-                    return pts.join(" ");
-                  })()}
-                />
-                {/* Power-law kurva alpha=0.35 (lila) */}
+              <svg width="100%" viewBox="0 0 300 155" style={{ display: "block" }}>
+                {/* Y grid + ticks + labels: R(x) values 0–5 */}
+                {[0, 1, 2, 3, 4, 5].map(v => {
+                  const yPx = 128 - (v / 5.5) * 118;
+                  return (
+                    <g key={v}>
+                      <line x1={46} y1={yPx} x2={293} y2={yPx} stroke={C.border} strokeWidth={0.5} />
+                      <line x1={42} y1={yPx} x2={46} y2={yPx} stroke={C.textMuted} strokeWidth={0.8} />
+                      <text x={40} y={yPx + 2.5} textAnchor="end" fill={C.textMuted} fontSize={6.5} fontFamily="monospace">{v}</text>
+                    </g>
+                  );
+                })}
+                {/* X ticks + labels: tokens 0–100 */}
+                {[0, 25, 50, 75, 100].map(t => {
+                  const xPx = 46 + (t / 100) * 247;
+                  return (
+                    <g key={t}>
+                      <line x1={xPx} y1={128} x2={xPx} y2={132} stroke={C.textMuted} strokeWidth={0.8} />
+                      <text x={xPx} y={141} textAnchor="middle" fill={C.textMuted} fontSize={6.5} fontFamily="monospace">{t}</text>
+                    </g>
+                  );
+                })}
+                {/* Axis lines */}
+                <line x1={46} y1={10} x2={46} y2={128} stroke={C.textMuted} strokeWidth={0.8} />
+                <line x1={46} y1={128} x2={293} y2={128} stroke={C.textMuted} strokeWidth={0.8} />
+                {/* Proportionell referens: linjär ökning med samma maxvärde vid x=100 */}
+                <line x1={46} y1={128} x2={293} y2={20.5} stroke="#4b5563" strokeWidth={1} strokeDasharray="4 3" />
+                {/* Power-law kurva R(x) = x^0.35 */}
                 <polyline
                   fill="none" stroke="#a855f7" strokeWidth={2}
                   points={(() => {
-                    const pts = [];
-                    for (let i = 0; i <= 40; i++) {
-                      const x = i / 40;
-                      pts.push(`${(30 + x * 225).toFixed(1)},${(125 - Math.pow(x, 0.35) * 120).toFixed(1)}`);
+                    const pts = ["46,128"];
+                    for (let t = 2; t <= 100; t += 2) {
+                      const xPx = (46 + (t / 100) * 247).toFixed(1);
+                      const yPx = (128 - (Math.pow(t, 0.35) / 5.5) * 118).toFixed(1);
+                      pts.push(`${xPx},${yPx}`);
                     }
                     return pts.join(" ");
                   })()}
                 />
-                <text x={140} y={118} textAnchor="middle" fill={C.textMuted} fontSize={8} fontFamily="monospace">Antal tokens (x)</text>
-                <text x={10} y={65} textAnchor="middle" fill={C.textMuted} fontSize={8} fontFamily="monospace" transform="rotate(-90,10,65)">Belöning R(x)</text>
+                {/* Axis labels */}
+                <text x={169} y={152} textAnchor="middle" fill={C.textMuted} fontSize={7} fontFamily="monospace">Antal tokens (x)</text>
+                <text x={8} y={69} textAnchor="middle" fill={C.textMuted} fontSize={7} fontFamily="monospace" transform="rotate(-90,8,69)">R(x)</text>
               </svg>
               <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-                <span style={{ fontSize: 9, color: "#a855f7", fontFamily: "monospace" }}>— x^0.35 (faktisk)</span>
-                <span style={{ fontSize: 9, color: "#4b5563", fontFamily: "monospace" }}>--- linjär (jämförelse)</span>
+                <span style={{ fontSize: 9, color: "#a855f7", fontFamily: "monospace" }}>— R(x) = x^0.35</span>
+                <span style={{ fontSize: 9, color: "#4b5563", fontFamily: "monospace" }}>--- proportionell (jämförelse)</span>
               </div>
             </div>
 
@@ -923,33 +936,51 @@ export default async function BorsPage() {
               <div style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
                 Marginalbelöning — dR/dx = 0.35 × x<sup>−0.65</sup>
               </div>
-              <svg width="100%" viewBox="0 0 260 120" style={{ display: "block" }}>
-                {[0, 30, 60, 90, 120].map(y => (
-                  <line key={y} x1={30} y1={y + 5} x2={255} y2={y + 5} stroke={C.border} strokeWidth={0.5} />
-                ))}
-                {/* Marginalbelöningskurva — börjar vid i=1 för att undvika x=0-singularitet */}
+              <svg width="100%" viewBox="0 0 300 155" style={{ display: "block" }}>
+                {/* Y grid + ticks + labels: dR/dx values 0–0.3 */}
+                {[0, 0.1, 0.2, 0.3].map(v => {
+                  const yPx = 128 - (v / 0.37) * 118;
+                  return (
+                    <g key={v}>
+                      <line x1={46} y1={yPx} x2={293} y2={yPx} stroke={C.border} strokeWidth={0.5} />
+                      <line x1={42} y1={yPx} x2={46} y2={yPx} stroke={C.textMuted} strokeWidth={0.8} />
+                      <text x={40} y={yPx + 2.5} textAnchor="end" fill={C.textMuted} fontSize={6.5} fontFamily="monospace">{v.toFixed(1)}</text>
+                    </g>
+                  );
+                })}
+                {/* X ticks + labels: tokens 0–100 */}
+                {[0, 25, 50, 75, 100].map(t => {
+                  const xPx = 46 + (t / 100) * 247;
+                  return (
+                    <g key={t}>
+                      <line x1={xPx} y1={128} x2={xPx} y2={132} stroke={C.textMuted} strokeWidth={0.8} />
+                      <text x={xPx} y={141} textAnchor="middle" fill={C.textMuted} fontSize={6.5} fontFamily="monospace">{t}</text>
+                    </g>
+                  );
+                })}
+                {/* Axis lines */}
+                <line x1={46} y1={10} x2={46} y2={128} stroke={C.textMuted} strokeWidth={0.8} />
+                <line x1={46} y1={128} x2={293} y2={128} stroke={C.textMuted} strokeWidth={0.8} />
+                {/* Marginalbelöningskurva — börjar vid t=1 för att undvika division med noll */}
                 <polyline
                   fill="none" stroke="#22d3ee" strokeWidth={2}
                   points={(() => {
                     const pts = [];
-                    for (let i = 1; i <= 40; i++) {
-                      const x = i / 40;
-                      const marginal = 0.35 * Math.pow(x, -0.65);
-                      // Normalisera: vid i=1 (x=0.025) är marginal ≈ 0.35×0.025^-0.65 ≈ 3.85, klämma max till 4
-                      const norm = Math.min(marginal / 4, 1);
-                      pts.push(`${(30 + x * 225).toFixed(1)},${(125 - norm * 120).toFixed(1)}`);
+                    for (let t = 1; t <= 100; t++) {
+                      const xPx = (46 + (t / 100) * 247).toFixed(1);
+                      const marginal = 0.35 * Math.pow(t, -0.65);
+                      const yPx = (128 - Math.min(marginal / 0.37, 1) * 118).toFixed(1);
+                      pts.push(`${xPx},${yPx}`);
                     }
                     return pts.join(" ");
                   })()}
                 />
-                {/* Horisontell referenslinje (linjärt = konstant marginal) */}
-                <line x1={30} y1={95} x2={255} y2={95} stroke="#4b5563" strokeWidth={1} strokeDasharray="4 3" />
-                <text x={140} y={118} textAnchor="middle" fill={C.textMuted} fontSize={8} fontFamily="monospace">Antal tokens (x)</text>
-                <text x={10} y={65} textAnchor="middle" fill={C.textMuted} fontSize={8} fontFamily="monospace" transform="rotate(-90,10,65)">Marginal dR/dx</text>
+                {/* Axis labels */}
+                <text x={169} y={152} textAnchor="middle" fill={C.textMuted} fontSize={7} fontFamily="monospace">Antal tokens (x)</text>
+                <text x={8} y={69} textAnchor="middle" fill={C.textMuted} fontSize={7} fontFamily="monospace" transform="rotate(-90,8,69)">dR/dx</text>
               </svg>
               <div style={{ display: "flex", gap: 12, marginTop: 6 }}>
-                <span style={{ fontSize: 9, color: "#22d3ee", fontFamily: "monospace" }}>— marginalbelöning</span>
-                <span style={{ fontSize: 9, color: "#4b5563", fontFamily: "monospace" }}>--- konstant (linjärt)</span>
+                <span style={{ fontSize: 9, color: "#22d3ee", fontFamily: "monospace" }}>— dR/dx = 0.35 × x^−0.65</span>
               </div>
             </div>
           </div>
