@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { AGENT_VISUELL } from "../../../../agentData";
+import { AGENT_VISUELL } from "../../../agentData";
 import HistorikVy from "./HistorikVy";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
