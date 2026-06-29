@@ -21,7 +21,7 @@ async function hamtaData() {
     fetch(`${SB_URL}/rest/v1/lobbying_log?order=skapad.desc&limit=20&select=lobbying_agent,mal_agent,belopp,resultat,skapad`, { headers: h }),
     fetch(`${SB_URL}/rest/v1/agent_planbocker?order=saldo.desc&select=agent,saldo`, { headers: h }),
     fetch(`${SB_URL}/rest/v1/civilisations_minne?order=skapad.desc&limit=10&select=typ,rubrik,beskrivning,agenter,skapad`, { headers: h }),
-    fetch(`${SB_URL}/rest/v1/domstol_domar?order=skapad.desc&limit=5&select=svarande,utfall,lagrum,straff_kr`, { headers: h }),
+    fetch(`${SB_URL}/rest/v1/domstol_domar?order=skapad.desc&limit=5&select=utfall,lagrum,straff_belopp,domstol_arenden(svarande)`, { headers: h }),
     fetch(`${SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn,ledare,medlemmar,styrka`, { headers: h }),
   ]);
 
@@ -77,7 +77,8 @@ function byggKontext({ artiklar, koal, positioner, lobbying, planbocker, minnen,
   if (domar.length) {
     k += "\nDOMSTOLSDOMAR:\n";
     domar.forEach(d => {
-      k += `- ${d.svarande}: ${d.utfall}, ${d.straff_kr} kr (${d.lagrum})\n`;
+      const svarande = d.domstol_arenden?.svarande || "Okänd";
+      k += `- ${svarande}: ${d.utfall}, ${d.straff_belopp} kr (${d.lagrum})\n`;
     });
   }
 
