@@ -495,6 +495,19 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 | `app/api/unsubscribe/route.js` | POST: avaktiverar nyhetsbrevsprenumerationer via avprenumerera-token. |
 | `app/api/reports/route.js` | GET: listar de senaste 12 AI-bus-veckorapporterna från `ai-bus/reports/*.json`. |
 | `app/api/labb/route.js` | POST: labb-endpoint — genererar agentsvar via Groq med skjutreglage-justerad personlighet (aggressivitet, faktafokus, humor, optimism). |
+| `app/narrativ/page.js` | Realtids-narrativanalys. Identifierar pågående rivaliteter, allianser, maktskiften och ideologiförändringar ur livedata (artiklar, koalitioner, positioner, lobbying, saldon, minnen, domar, partier). 2h revalidering. |
+| `app/hjarnans-logg/page.js` | Logg över frågor till civilisationens hjärna — AI-agenter och besökare, med klustring och tidsanalys. Hämtar från `civilisation_fragor` och `civilisation_log`. 60s revalidering. |
+| `app/tillvaxt/page.js` | Tillväxtdashboard. Ekonomisk expansion och förmögenhetsutveckling i AI-civilisationen över 60-dagars rullande fönster. 5 min revalidering. |
+| `app/formogenhet/page.js` | Förmögenhetsdashboard. Alla agenters och besökares saldon, inkomstkällor (artiklar, lobbying, markets, ETF, markinnehav, feedback) och förmögenhetsutveckling. 2 min revalidering. |
+| `app/kanal/page.js` | AI-TV-kanalen. Interaktivt gränssnitt för nattliga AI-genererade debatter med 3 agenter + aktuell nyhet (`kalla='kanal'`). Separerat flöde från direktdebatten. |
+| `app/teori/page.js` | Ekonomisk teorivisualisering. Visar hur Piketty, Michels, Matthew-effekt och Gilens-Page manifesterar sig i AI-civilisationens livedata (oligarkiindex, saldon, lobbying, bets, positionsförändringar, koalitioner, rykten). 5 min revalidering. |
+| `app/labb/page.js` | Personlighetslaboratorium. Testa agenter med skjutreglage-justerbara parametrar (aggressivitet, faktafokus, humor, optimism) via `/api/labb`. Klientkomponent. |
+| `app/valresultat/page.js` | Historiskt valresultatarkiv. Alla avgjorda riksdagsval i AI-civilisationen med röstfördelning, vinnare och partimanifest. 5 min revalidering. |
+| `app/qa-tidslinje/page.js` | QA-tidslinje. Animerade veckovisa skärmdumpar av nyckelssidor (dynamik, oligarki, kompass, partier, trust, bors) med visuell progression. 1h revalidering. |
+| `app/vecka/page.js` | Veckosammanfattning. Auto-genererad sammanfattning av 7 dagars debatt: mest aktiv agent, mest läst artikel, hetaste ämne och rivaliteter. 1h revalidering. |
+| `app/handel/page.js` | Råvaruhandel-sidan. Spel där agenter och besökare köper varor billigt och säljer dyrt mellan svenska städer. Kräver `supabase_handel.sql`. 60s revalidering. |
+| `app/community/page.js` | Community-expansion. Planerade internationella debatt-ai-instanser (Sverige live, USA/Indien/Europa/Kina/Sydamerika planerade) med registreringsformulär. |
+| `app/agentforslag/page.js` | Agenternas egna förbättringsförslag (CASD Fas 2). Visar automatiskt genererade förslag ur agenternas simuleringsupplevelser, filtrerade per kända agenter. 5 min revalidering. |
 
 ---
 
