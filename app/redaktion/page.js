@@ -9,12 +9,19 @@ export const metadata = {
   description: "Statistik över AI-redaktörens beslut, poängsättning och publiceringstrend.",
 };
 
+// Correct ISO 8601 week key: finds Monday of ISO week 1 (the week containing Jan 4)
+// then counts whole weeks from that Monday to the Thursday of the input date's week.
 function isoWeekKey(dateStr) {
   const d = new Date(dateStr);
-  const thursday = new Date(d);
-  thursday.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) + 3);
+  // Thursday of the current week (ISO year is defined by which year the Thursday falls in)
+  const thursday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  thursday.setUTCDate(thursday.getUTCDate() - ((thursday.getUTCDay() + 6) % 7) + 3);
+  // Jan 4 of the Thursday's year is always in ISO week 1
   const jan4 = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 4));
-  const week = Math.ceil((((thursday - jan4) / 86400000) + jan4.getUTCDay() + 1) / 7);
+  // Monday of the week containing Jan 4 = start of ISO week 1
+  const week1Monday = new Date(jan4);
+  week1Monday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7));
+  const week = Math.round((thursday - week1Monday) / 604800000) + 1;
   return `${thursday.getUTCFullYear()}-V${String(week).padStart(2, "0")}`;
 }
 
@@ -23,18 +30,26 @@ async function getData() {
   if (!key) return null;
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
+  // Fetch true total via content-range header
+  const countRes = await fetch(
+    `${SB_URL}/rest/v1/inlamningar?select=id&limit=1`,
+    { headers: { ...h, Prefer: "count=exact" }, next: { revalidate: 600 } }
+  );
+  const totalCount = parseInt(countRes.headers.get("content-range")?.split("/")[1] || "0", 10);
+
+  // Fetch newest rows for accurate recent stats and weekly trend
   const res = await fetch(
-    `${SB_URL}/rest/v1/inlamningar?select=beslut,arg,ori,rel,tro,forfattare,status,skapad&order=skapad.asc&limit=3000`,
+    `${SB_URL}/rest/v1/inlamningar?select=beslut,arg,ori,rel,tro,forfattare,status,skapad&order=skapad.desc&limit=3000`,
     { headers: h, next: { revalidate: 600 } }
   );
   if (!res.ok) return null;
   const rows = await res.json();
-  return rows;
+  return { rows, totalCount };
 }
 
 export default async function RedaktionPage() {
-  const rows = await getData();
-  if (!rows) {
+  const data = await getData();
+  if (!data) {
     return (
       <div style={{ minHeight: "100vh", background: "#0a0a0a", padding: "32px 16px", color: "#55554f", fontFamily: "monospace", fontSize: 13 }}>
         Kunde inte hämta redaktionsdata.
@@ -42,7 +57,7 @@ export default async function RedaktionPage() {
     );
   }
 
-  const total = rows.length;
+  const { rows, totalCount } = data;
 
   // Besluts-fördelning
   const beslutCount = { publicera: 0, revidera: 0, avvisa: 0, okänt: 0 };
@@ -77,7 +92,7 @@ export default async function RedaktionPage() {
     ? +((allWithScores.reduce((s, r) => s + (r.arg + r.ori + r.rel + r.tro) / 4, 0)) / allWithScores.length).toFixed(2)
     : 0;
 
-  // Veckovis trend (senaste 20 veckor)
+  // Veckovis trend (senaste 20 veckor) — rows already ordered desc so all recent weeks present
   const veckoMap = {};
   for (const r of rows) {
     if (!r.skapad) continue;
@@ -90,7 +105,7 @@ export default async function RedaktionPage() {
     .sort((a, b) => a.vecka.localeCompare(b.vecka))
     .slice(-20);
 
-  // Per-agent statistik (topp 20 efter antal inlämningar)
+  // Per-agent statistik (topp 24 efter antal inlämningar)
   const agentMap = {};
   for (const r of rows) {
     const a = r.forfattare || "Okänd";
@@ -106,7 +121,7 @@ export default async function RedaktionPage() {
 
   return (
     <RedaktionVy
-      total={total}
+      total={totalCount}
       snittPoang={snittPoang}
       beslutData={beslutData}
       kriterieData={kriterieData}
