@@ -22,7 +22,7 @@ export default function GiniSpelGraf({ chartData, aktuelltGini }) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <ComposedChart data={chartData} margin={{ top: 12, right: 20, bottom: 28, left: 0 }}>
-        <CartesianGrid stroke="#151515" strokeDasharray="3 3" />
+        <CartesianGrid stroke="#151515" strokeDasharray="3 3" yAxisId="left" />
         <XAxis
           dataKey="gini"
           type="number"
