@@ -76,6 +76,7 @@ const SEKTIONER = [
   { id: "rykten",               kort: "Ryktesspridning" },
   { id: "roster",               kort: "Röster & kommentarer" },
   { id: "aktivitet",            kort: "Senaste aktivitet" },
+  { id: "state-api",            kort: "Simulationsdata-API",     nytt: true },
   { id: "socialt-kapital",      kort: "Socialt Kapital",         nytt: true },
   { id: "spelbudget",           kort: "Spelbudget" },
   { id: "stablecoin",           kort: "Stablecoin",              nytt: true },
