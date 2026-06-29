@@ -84,6 +84,7 @@ export default function RootLayout({ children }) {
               <a href="/om" className="neon-nav">Om</a>
               <a href="/pis" className="neon-nav">Policy Impact Simulator</a>
               <a href="/partier" className="neon-nav">Politiska partier</a>
+              <a href="/qa-tidslinje" className="neon-nav">QA-tidslinje</a>
               <a href="/val" className="neon-nav">Riksdagsval</a>
               <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
               <a href="/rykten" className="neon-nav">Ryktesspridning</a>
@@ -98,6 +99,7 @@ export default function RootLayout({ children }) {
               <a href="/tillvaxt" className="neon-nav">Tillväxt</a>
               <a href="/ud" className="neon-nav">Utrikesdepartementet</a>
               <a href="/opinion" className="neon-nav">Vad tycker du?</a>
+              <a href="/valresultat" className="neon-nav">Valresultat</a>
               <a href="/vecka" className="neon-nav">Veckans sammanfattning</a>
               <a href="/podd" className="neon-nav">Videopodden</a>
               <a href="/visdomsspelet" className="neon-nav">Visdomsspelet</a>
