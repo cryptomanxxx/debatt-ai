@@ -153,7 +153,7 @@ export default function TillvaxtVy({ gdpSerie, oligarkiSerie, totalFormogenhet, 
           </h2>
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={oligVald} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" yAxisId="gini" />
               <XAxis dataKey="dag" tickFormatter={kortDag} tick={{ fontSize: 9, fill: "#475569", fontFamily: "monospace" }} />
               <YAxis yAxisId="gini" domain={[0, 1]} tickFormatter={v => v.toFixed(2)}
                 tick={{ fontSize: 9, fill: "#475569", fontFamily: "monospace" }} width={44} />

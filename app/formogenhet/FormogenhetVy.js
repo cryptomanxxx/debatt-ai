@@ -289,7 +289,7 @@ export default function FormogenhetVy({
           <Card>
             <ResponsiveContainer width="100%" height={260}>
               <LineChart data={tidsData} margin={{ top: 8, right: 48, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" yAxisId="gini" />
                 <XAxis dataKey="datum" tick={{ fontSize: 9, fill: "#555", fontFamily: "monospace" }} tickLine={false} />
                 {/* Vänster axel: Gini (0–1) */}
                 <YAxis
