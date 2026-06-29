@@ -32,7 +32,7 @@ async function sb(path, key) {
 async function byggState(key) {
   const [planbocker, positioner, koalitioner, artiklar, symboler, lobbying] =
     await Promise.all([
-      sb("agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc", key),
+      sb("agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc&agent=neq.Statskassa&agent=neq.B%C3%B6rskassan", key),
       sb("agent_positioner?select=agent,amne,position,styrka,antal_andringar&order=styrka.desc&limit=500", key),
       sb("agent_koalitioner?select=agent_a,agent_b,styrka,antal_utbyten,senast_aktiv&order=styrka.desc", key),
       sb("artiklar?kalla=eq.ai&select=id,rubrik,forfattare,skapad&order=skapad.desc&limit=200", key),
