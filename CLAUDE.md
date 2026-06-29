@@ -250,6 +250,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | GET  | `/api/hedgefonder` | Hedgefond Signal API-dokumentation (JSON). Fondbeskrivningar, endpoint-lista, exempelsignal. |
 | GET  | `/api/hedgefonder/signaler` | Senaste signal + innehav för QUANT, STRAT och ARBI paper trading-fonder. Inkluderar `signal`, `aktiv_strategi`, `backtest_avkastning_pct` (STRAT), `llm_motivering` (QUANT) och `funding_rate_pct`, `apr_pct`, `position_riktning` (ARBI). Ingen autentisering. |
 | GET  | `/api/hedgefonder/nav` | NAV-historik för QUANT, STRAT och ARBI. STRAT/QUANT: BTC/SPY benchmark. ARBI: BTC buy & hold-benchmark (`benchmark.btc_buy_hold_usd`) samt funding_rate_pct och apr_pct. Params: `?limit=N` (default 60, max 365). Returnerar i kronologisk ordning. Ingen autentisering. |
+| GET  | `/api/v1/state` | Simulationsdata-API: returnerar alla 24 agenters saldo, maktindex, ideologiska positioner, allianser och senaste artikel i ett JSON-svar. Cachat 5 min. Öppet utan autentisering. |
 | GET  | `/api/civilisation` | Civilisations-API-dokumentation (JSON) med schema, tillgängliga frågetyper och curl-exempel. |
 | POST | `/api/civilisation` | Civilisations-API: ställ en fri fråga om AI-civilisationen. Body: `{fraga, typ?}` (typ: general/ekonomi/politik/social/historia). Hämtar relevant realtidsdata ur 8+ Supabase-tabeller, analyserar med central LLM-router (callWithFallback + getDynamicChain), returnerar strukturerat JSON-svar med `svar`, `datakallor` och `agentkontext`. Rate limit: 10/timme per IP. |
 
@@ -387,6 +388,7 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 | `app/hjarnan/page.js` | Civilisationens hjärna — redesignad SVG-kunskapsgraf. Tre ringar: yttre (24 agenter med maktindex-aura), mellannivå (7 institutions-hexagoner + 3 hedgefond-trianglar + AI-Bus-romb), centerhärna. Klickpaneler för all detaljinfo. 180s revalidering. |
 | `app/civilisation/page.js` | Civilisations-API Playground. Interaktivt formulär (5 frågetyper), live-fetch via `/api/civilisation`, formatterat svar med källbadges, cURL-snippet. |
 | `app/api/civilisation/route.js` | Civilisations-API. GET: JSON-dokumentation. POST: frågetyp-routing, 8+ Supabase-datakällor, central LLM-router (`callWithFallback + getDynamicChain`), strukturerat JSON-svar med `svar`, `datakallor`, `agentkontext`. Rate limit: 10/timme per IP. |
+| `app/api/v1/state/route.js` | Simulationsdata-API. GET: returnerar alla 24 agenters saldo, maktindex, positioner, allianser och senaste artikel. 5 min server-side cache + CDN Cache-Control. Öppet utan autentisering. |
 
 ---
 
