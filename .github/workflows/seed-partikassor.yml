@@ -6,7 +6,7 @@ on:
       belopp:
         description: "Startsaldo i kr per parti"
         required: false
-        default: "500"
+        default: "10000"
         type: string
 
 jobs:
