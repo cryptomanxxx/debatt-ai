@@ -9,10 +9,10 @@ export const metadata = {
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { partier: [], roster: [], kassor: [], aktivtVal: null };
+  if (!key) return { partier: [], roster: [], kassor: [], aktivtVal: null, utgifter: [] };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [pRes, rRes, kRes, vRes] = await Promise.all([
+  const [pRes, rRes, kRes, vRes, uRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&order=styrka.desc`, {
       headers: h, next: { revalidate: 300 },
     }),
@@ -25,14 +25,18 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/riksdagsval?status=eq.aktiv&order=skapad.desc&limit=1&select=partier`, {
       headers: h, next: { revalidate: 300 },
     }),
+    fetch(`${SB_URL}/rest/v1/parti_utgifter?select=ledare,parti_namn,typ,belopp,mottagare,lagforslag_id,kampanj_bonus,beskrivning,skapad&order=skapad.desc&limit=500`, {
+      headers: h, next: { revalidate: 300 },
+    }),
   ]);
 
   const valRows = vRes.ok ? await vRes.json() : [];
   return {
-    partier: pRes.ok ? await pRes.json() : [],
-    roster:  rRes.ok ? await rRes.json() : [],
-    kassor:  kRes.ok ? await kRes.json() : [],
+    partier:   pRes.ok ? await pRes.json() : [],
+    roster:    rRes.ok ? await rRes.json() : [],
+    kassor:    kRes.ok ? await kRes.json() : [],
     aktivtVal: valRows.length > 0 ? valRows[0] : null,
+    utgifter:  uRes.ok ? await uRes.json() : [],
   };
 }
 
@@ -41,8 +45,20 @@ const C = {
   text: "#c8c8c2", textMuted: "#55554f", accent: "#e8d5a3",
 };
 
+const TYP_LABEL = {
+  partistod:           { label: "Partistöd",            color: "#4ade80", prefix: "+" },
+  stipendium:          { label: "Stipendium",            color: "#f87171", prefix: "" },
+  valkampanj:          { label: "Valkampanj",            color: "#f59e0b", prefix: "" },
+  motionsfinansiering: { label: "Motionsfinansiering",   color: "#a78bfa", prefix: "" },
+};
+
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
 export default async function PartierPage() {
-  const { partier, roster, kassor, aktivtVal } = await getData();
+  const { partier, roster, kassor, aktivtVal, utgifter } = await getData();
 
   // Beräkna ja-röster per agent
   const jaPerAgent = {};
@@ -67,6 +83,13 @@ export default async function PartierPage() {
   const kassorMap = {};
   for (const k of kassor) kassorMap[k.ledare] = k.saldo;
   const totalKassor = Object.values(kassorMap).reduce((s, v) => s + v, 0);
+
+  // Transaktioner per ledare (max 30 per parti)
+  const utgifterPerLedare = {};
+  for (const u of utgifter) {
+    if (!utgifterPerLedare[u.ledare]) utgifterPerLedare[u.ledare] = [];
+    if (utgifterPerLedare[u.ledare].length < 30) utgifterPerLedare[u.ledare].push(u);
+  }
 
   // Kampanjbonus från aktivt val (om det pågår)
   const kampanjMap = {};
@@ -200,6 +223,59 @@ export default async function PartierPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Transaktionslogg */}
+                  {(() => {
+                    const txs = utgifterPerLedare[p.ledare] || [];
+                    if (txs.length === 0) return null;
+                    return (
+                      <div style={{ marginTop: 16 }}>
+                        <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                          Transaktionslogg ({txs.length} senaste)
+                        </span>
+                        <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                          {txs.map((tx, i) => {
+                            const meta = TYP_LABEL[tx.typ] || { label: tx.typ, color: C.textMuted, prefix: "" };
+                            const positivt = tx.belopp > 0;
+                            const beloppStr = (positivt ? "+" : "") + Math.round(tx.belopp).toLocaleString("sv-SE") + " kr";
+                            let detalj = "";
+                            if (tx.mottagare) detalj = `→ ${tx.mottagare}`;
+                            else if (tx.lagforslag_id) detalj = `Förslag #${tx.lagforslag_id}`;
+                            else if (tx.kampanj_bonus) detalj = `+${tx.kampanj_bonus.toFixed(1)}% kampanjbonus`;
+                            else if (tx.beskrivning) detalj = tx.beskrivning.slice(0, 60);
+                            return (
+                              <div key={i} style={{
+                                display: "flex", alignItems: "center", gap: 8,
+                                background: "#0d0d0d", border: `1px solid ${C.border}`,
+                                borderRadius: 5, padding: "6px 10px",
+                                fontSize: 12, fontFamily: "monospace",
+                              }}>
+                                <span style={{
+                                  fontSize: 10, background: positivt ? "#0a1a0a" : "#1a0a0a",
+                                  border: `1px solid ${meta.color}44`,
+                                  color: meta.color, padding: "2px 7px", borderRadius: 3,
+                                  minWidth: 120, textAlign: "center",
+                                }}>
+                                  {meta.label}
+                                </span>
+                                <span style={{ color: positivt ? "#4ade80" : "#f87171", fontWeight: 700, minWidth: 72, textAlign: "right" }}>
+                                  {beloppStr}
+                                </span>
+                                {detalj && (
+                                  <span style={{ color: C.textMuted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {detalj}
+                                  </span>
+                                )}
+                                <span style={{ color: "#333", fontSize: 10, marginLeft: "auto", flexShrink: 0 }}>
+                                  {fmtDate(tx.skapad)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
