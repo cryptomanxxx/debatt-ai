@@ -38,7 +38,8 @@ export default async function IntelligensPage() {
     sb("artiklar?kalla=eq.ai&order=skapad.asc&select=forfattare,arg,ori,rel,tro,skapad&limit=3000", key),
     sb("agent_fragor?fragare=not.is.null&fragare=neq.api&order=skapad.asc&select=fragare,agent,skapad&limit=5000", key),
     // Agent queries: anon-readable table, always available
-    sb("civilisation_fragor?order=skapad.asc&select=agent,typ,skapad&limit=5000", key),
+    // Agent queries only — visitor mirror rows are excluded to avoid double-counting with civilisation_log
+    sb("civilisation_fragor?agent=neq.besökare&order=skapad.asc&select=agent,typ,skapad&limit=5000", key),
     // Web/API queries: service-role-only, filter out agent entries to avoid double-counting
     svcKey
       ? sb("civilisation_log?kalltyp=neq.agent&order=skapad.asc&select=endpoint,kalltyp,skapad&limit=5000", svcKey)
