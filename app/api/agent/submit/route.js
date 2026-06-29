@@ -235,7 +235,7 @@ export async function POST(req) {
         beslut,
         arg, ori, rel, tro,
         taggar: taggar || [],
-        status: "inkorg",
+        status: beslut === "publicera" ? "inkorg" : "avvisad",
         kalla: "ai",
       }),
     });
@@ -307,13 +307,6 @@ export async function POST(req) {
     } catch {
       // Logging/publishing failure is non-fatal for the response
     }
-  } else if (inlamningId) {
-    // Uppdatera inlämningsstatus till "avvisad" så att veckorapporter kan räkna korrekt
-    fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${inlamningId}`, {
-      method: "PATCH",
-      headers: sbHeaders(),
-      body: JSON.stringify({ status: "avvisad" }),
-    }).catch(() => {});
   }
 
   return Response.json({
