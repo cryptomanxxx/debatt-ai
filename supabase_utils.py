@@ -4946,6 +4946,14 @@ def _overfor_parti_kassor(sb_key: str, nya_partier: list[dict]) -> None:
                     json={"parti_namn": namn, "ledare": ledare, "saldo": 10000},
                     timeout=8,
                 )
+                # Log the initial funding so it's traceable in parti_utgifter
+                httpx.post(
+                    f"{SB_URL}/rest/v1/parti_utgifter",
+                    headers=h_w,
+                    json={"parti_namn": namn, "ledare": ledare, "typ": "partistod",
+                          "belopp": 10000, "beskrivning": "Startkapital vid partibildning"},
+                    timeout=8,
+                )
         except Exception:
             pass
 
