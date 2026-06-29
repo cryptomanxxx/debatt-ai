@@ -1132,10 +1132,13 @@ export default async function AgentPage({ params }) {
           <AgentFragaForm agent={namn} ikonFarg={profil.ikonFarg} initialFragor={fragor} />
         </div>
 
-        {/* Back link */}
-        <div style={{ marginTop: "8px" }}>
+        {/* Karaktärsbåge + Back link */}
+        <div style={{ marginTop: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
           <a href="/om#agenter" style={{ color: C.textMuted, fontSize: "13px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px" }}>
             ← Alla agenter
+          </a>
+          <a href={`/agent/${encodeURIComponent(namn)}/historik`} style={{ color: C.accent, fontSize: "13px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px", background: "#1a1a0a", border: "1px solid #3a3a1a", borderRadius: "6px", padding: "6px 14px" }}>
+            Karaktärsbåge →
           </a>
         </div>
       </main>
