@@ -206,16 +206,22 @@ def rostar_agenter(val: dict) -> None:
         print("  Inga aktiva partier — agenter röstar inte")
         return
 
-    # Bygg ledare → valpartinamn från valets eget JSONB (stabilt, ändras inte vid reklustring)
+    # Bygg ledare → valpartinamn och namn → valpartinamn från valets eget JSONB
     ledare_till_valparti: dict[str, str] = {
         p["ledare"]: p["namn"] for p in val.get("partier", [])
     }
+    namn_till_valparti: dict[str, str] = {
+        p["namn"]: p["namn"] for p in val.get("partier", [])
+    }
     parti_namn_i_val = set(ledare_till_valparti.values())
 
-    # Mappa agent → valpartinamn via ledare-matchning (fungerar även om partiet döpts om)
+    # Mappa agent → valpartinamn via ledare-matchning (primärt, stabilt mot namnbyten)
+    # Fallback: namnmatchning om ledaren bytts sedan valet startade (saldo-skift)
     agent_parti: dict[str, str] = {}
     for p in partier_db:
         valparti = ledare_till_valparti.get(p["ledare"])
+        if not valparti:
+            valparti = namn_till_valparti.get(p["namn"])
         if not valparti:
             continue
         for m in p.get("medlemmar") or []:
