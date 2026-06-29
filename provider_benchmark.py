@@ -65,7 +65,7 @@ _PROVIDER_ALIAS = {"codestral": "mistral", "github": "github_models"}
 
 def hamta_passiva_429s() -> dict[str, int]:
     """Hämtar antal rate-limit-fel per provider senaste 24h från ai_log."""
-    since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    since = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
     rows = _sb_get("ai_log", f"ts=gte.{since}&status=in.(rate_limited,rate_limit,error_429)&select=provider")
     counts: dict[str, int] = {}
     for row in rows:
@@ -81,7 +81,7 @@ def hamta_produktion_ok_rate_7d() -> dict[str, float]:
     under produktionslast (12 agentkörningar/dag), inte bara i tomgångsbenchmarks.
     Providers med <10 anrop exkluderas (för lite data för att vara meningsfullt).
     """
-    since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
     rows = _sb_get("ai_log", f"ts=gte.{since}&select=provider,status&limit=50000")
     totals: dict[str, int] = {}
     oks: dict[str, int] = {}
