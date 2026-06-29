@@ -125,8 +125,8 @@ export default async function OligarkiPage() {
   const maxSym    = Math.max(...Object.values(symCount), 1);
   const maxKoal   = Math.max(...Object.values(koalStr),  1);
 
-  // Build per-agent stats
-  const agenter = planbocker.map(p => {
+  // Build per-agent stats (exclude system/treasury accounts)
+  const agenter = planbocker.filter(p => !SYSTEM_ACCOUNTS.has(p.agent)).map(p => {
     const saldo     = Math.max(0, p.saldo);
     const syms      = symCount[p.agent] || 0;
     const ks        = koalStr[p.agent] || 0;
