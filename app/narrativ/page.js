@@ -1,4 +1,5 @@
 import NarrativVy from "./NarrativVy";
+import { callWithFallback, getDynamicChain } from "../lib/aiRouter.js";
 
 export const revalidate = 7200; // Regenerate every 2 hours
 
@@ -108,60 +109,28 @@ ${kontext}
 Svara med exakt detta JSON (inget annat):
 {"storylines":[{"rubrik":"max 65 tecken","sammanfattning":"2-3 meningar om vad som pågår och varför det är intressant","agenter":["namn1","namn2"],"intensitet":"stigande|stabil|avtagande","typ":"rivalitet|uppgång|fall|allians|ideologi|makt|ekonomi","datapunkter":["faktum 1","faktum 2"]}]}`;
 
-  const tryGroq = async (apiKey) => {
-    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "llama3.3-70b-versatile",
-        messages: [{ role: "user", content: prompt }],
+  try {
+    const chain = await getDynamicChain("general");
+    const { text } = await callWithFallback(
+      chain,
+      [{ role: "user", content: prompt }],
+      {
+        maxTokens: 1400,
         temperature: 0.65,
-        max_tokens: 1400,
-        response_format: { type: "json_object" },
-      }),
-    });
-    if (!r.ok) throw new Error(`Groq ${r.status}`);
-    const j = await r.json();
-    const parsed = JSON.parse(j.choices[0].message.content);
-    if (!parsed.storylines?.length) throw new Error("empty");
-    return parsed.storylines;
-  };
-
-  for (const key of [
-    process.env.GROQ_API_KEY,
-    process.env.GROQ_API_KEY_2,
-    process.env.GROQ_API_KEY_3,
-  ].filter(Boolean)) {
-    try { return await tryGroq(key); } catch {}
-  }
-
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (geminiKey) {
-    try {
-      const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${geminiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.65, maxOutputTokens: 1400 },
-          }),
-        }
-      );
-      if (r.ok) {
-        const j = await r.json();
-        const text = j.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const match = text.match(/\{[\s\S]*\}/);
-        if (match) {
-          const parsed = JSON.parse(match[0]);
-          if (parsed.storylines?.length) return parsed.storylines;
-        }
+        json: true,
+        source: "narrativ",
+        validate: t => {
+          try { const m = t.match(/\{[\s\S]*\}/); return !!(m && JSON.parse(m[0]).storylines?.length); }
+          catch { return false; }
+        },
       }
-    } catch {}
+    );
+    const match = text.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(match[0]);
+    return parsed.storylines ?? [];
+  } catch {
+    return [];
   }
-
-  return [];
 }
 
 export default async function NarrativPage() {
