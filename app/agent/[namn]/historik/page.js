@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { AGENT_VISUELL } from "../../../../agentData";
+import { AGENT_VISUELL } from "../../../agentData";
 import HistorikVy from "./HistorikVy";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
@@ -48,7 +48,7 @@ export default async function HistorikPage({ params }) {
   ] = await Promise.all([
     fetchJson(`${SB_URL}/rest/v1/artiklar?forfattare=eq.${enc}&order=skapad.asc&select=id,rubrik,arg,ori,rel,tro,skapad,parent_id&limit=1000`),
     fetchJson(`${SB_URL}/rest/v1/agent_positioner?agent=eq.${enc}&order=uppdaterad.desc`),
-    fetchJson(`${SB_URL}/rest/v1/civilisations_minne?agenter=cs.${encodeURIComponent(`{"${namn}"}`))}&order=skapad.desc&limit=150&select=typ,rubrik,beskrivning,skapad`),
+    fetchJson(`${SB_URL}/rest/v1/civilisations_minne?agenter=cs.${encodeURIComponent(`{"${namn}"}`)}&order=skapad.desc&limit=150&select=typ,rubrik,beskrivning,skapad`),
     fetchJson(`${SB_URL}/rest/v1/agent_bets?agent=eq.${enc}&avgjord=eq.true&order=skapad.desc&select=market_id,sannolikhet,insats,vinst,skapad&limit=300`),
     fetchJson(`${SB_URL}/rest/v1/lobbying_log?lobbying_agent=eq.${enc}&order=skapad.desc&select=lagforslag_id,belopp,resultat,argument,skapad&limit=100`),
     fetchJson(`${SB_URL}/rest/v1/lobbying_log?mal_agent=eq.${enc}&order=skapad.desc&select=lobbying_agent,lagforslag_id,belopp,resultat,skapad&limit=100`),
