@@ -4943,7 +4943,7 @@ def _overfor_parti_kassor(sb_key: str, nya_partier: list[dict]) -> None:
                 httpx.post(
                     f"{SB_URL}/rest/v1/parti_kassor",
                     headers=h_w,
-                    json={"parti_namn": namn, "ledare": ledare, "saldo": 0},
+                    json={"parti_namn": namn, "ledare": ledare, "saldo": 10000},
                     timeout=8,
                 )
         except Exception:
