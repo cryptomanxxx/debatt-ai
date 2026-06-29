@@ -73,11 +73,11 @@ export default async function OligarkiPage() {
   const raw = await fetchData();
   if (!raw) return <div style={{ color: C.muted, padding: 40, fontFamily: "monospace" }}>Saknar Supabase-nyckel.</div>;
 
-  const { planbocker, symboler, koalitioner, lobbying, bets, historik, portfoljer, tillgangar } = raw;
+  const { planbocker: allPlanbocker, symboler, koalitioner, lobbying, bets, historik, portfoljer, tillgangar } = raw;
 
-  // Portfolio value per agent: antal × senaste_pris per symbol
-  // Exclude system/treasury accounts (Börskassan = AMM market maker, Statskassa)
+  // Exclude system/treasury accounts everywhere — Gini, totals, node sizes, makt
   const SYSTEM_ACCOUNTS = new Set(["Börskassan", "Statskassa"]);
+  const planbocker = allPlanbocker.filter(p => !SYSTEM_ACCOUNTS.has(p.agent));
   const prisMap = {};
   for (const t of tillgangar) prisMap[t.symbol] = t.senaste_pris || 0;
   const portfMap = {};
