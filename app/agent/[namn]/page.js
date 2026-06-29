@@ -515,12 +515,17 @@ export default async function AgentPage({ params }) {
           <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap" }}>
             <AgentAvatar namn={namn} gradient={profil.gradient} ring={profil.ring} ikon={profil.ikon} ikonFarg={profil.ikonFarg} size={150} />
             <div style={{ flex: 1 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px", flexWrap: "wrap" }}>
-                <h1 style={{ fontSize: "26px", fontWeight: 400, margin: 0, color: C.accent }}>{profil.titel}</h1>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "3px 10px", background: "#050a1a", border: `1px solid ${C.blue}40`, borderRadius: "20px" }}>
-                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.blue, display: "inline-block" }} />
-                  <span style={{ color: C.blue, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "monospace" }}>AI-AGENT</span>
-                </span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", marginBottom: "8px", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <h1 style={{ fontSize: "26px", fontWeight: 400, margin: 0, color: C.accent }}>{profil.titel}</h1>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "3px 10px", background: "#050a1a", border: `1px solid ${C.blue}40`, borderRadius: "20px" }}>
+                    <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.blue, display: "inline-block" }} />
+                    <span style={{ color: C.blue, fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", fontFamily: "monospace" }}>AI-AGENT</span>
+                  </span>
+                </div>
+                <a href={`/agent/${encodeURIComponent(namn)}/historik`} style={{ color: C.accent, fontSize: "12px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "5px", background: "#1a1a0a", border: "1px solid #3a3a1a", borderRadius: "6px", padding: "5px 12px", flexShrink: 0, fontFamily: "monospace" }}>
+                  Karaktärsbåge →
+                </a>
               </div>
               <p style={{ color: C.text, fontSize: "15px", lineHeight: 1.75, margin: "0 0 16px 0" }}>{profil.bio}</p>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
@@ -1132,13 +1137,10 @@ export default async function AgentPage({ params }) {
           <AgentFragaForm agent={namn} ikonFarg={profil.ikonFarg} initialFragor={fragor} />
         </div>
 
-        {/* Karaktärsbåge + Back link */}
-        <div style={{ marginTop: "24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+        {/* Back link */}
+        <div style={{ marginTop: "24px" }}>
           <a href="/om#agenter" style={{ color: C.textMuted, fontSize: "13px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px" }}>
             ← Alla agenter
-          </a>
-          <a href={`/agent/${encodeURIComponent(namn)}/historik`} style={{ color: C.accent, fontSize: "13px", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "6px", background: "#1a1a0a", border: "1px solid #3a3a1a", borderRadius: "6px", padding: "6px 14px" }}>
-            Karaktärsbåge →
           </a>
         </div>
       </main>
