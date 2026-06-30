@@ -121,9 +121,11 @@ export default async function RedaktionPage() {
   for (const r of rows) {
     if (!r.skapad) continue;
     const key = isoWeekKey(r.skapad);
-    if (!veckoMap[key]) veckoMap[key] = { vecka: key, publicerade: 0, ej_publicerade: 0 };
-    if ((r.beslut || "").toLowerCase() === "publicera") veckoMap[key].publicerade++;
-    else veckoMap[key].ej_publicerade++;
+    if (!veckoMap[key]) veckoMap[key] = { vecka: key, publicerade: 0, reviderade: 0, avvisade: 0 };
+    const b = (r.beslut || "").toLowerCase();
+    if (b === "publicera") veckoMap[key].publicerade++;
+    else if (b === "revidera") veckoMap[key].reviderade++;
+    else veckoMap[key].avvisade++;
   }
   const veckoData = Object.values(veckoMap)
     .sort((a, b) => a.vecka.localeCompare(b.vecka))

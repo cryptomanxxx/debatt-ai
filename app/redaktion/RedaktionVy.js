@@ -133,7 +133,11 @@ export default function RedaktionVy({ total, snittPoang, beslutData, kriterieDat
                   <stop offset="5%" stopColor="#4ade80" stopOpacity={0.3} />
                   <stop offset="95%" stopColor="#4ade80" stopOpacity={0} />
                 </linearGradient>
-                <linearGradient id="gradRej" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="gradRev" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gradAv" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f87171" stopOpacity={0.25} />
                   <stop offset="95%" stopColor="#f87171" stopOpacity={0} />
                 </linearGradient>
@@ -151,7 +155,8 @@ export default function RedaktionVy({ total, snittPoang, beslutData, kriterieDat
                 formatter={(v) => <span style={{ color: C.text, fontSize: 12 }}>{v}</span>}
               />
               <Area type="monotone" dataKey="publicerade" name="Publicerade" stroke="#4ade80" strokeWidth={2} fill="url(#gradPub)" />
-              <Area type="monotone" dataKey="ej_publicerade" name="Ej publicerade" stroke="#f87171" strokeWidth={2} fill="url(#gradRej)" />
+              <Area type="monotone" dataKey="reviderade" name="Reviderade" stroke="#f59e0b" strokeWidth={2} fill="url(#gradRev)" />
+              <Area type="monotone" dataKey="avvisade" name="Avvisade" stroke="#f87171" strokeWidth={2} fill="url(#gradAv)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
