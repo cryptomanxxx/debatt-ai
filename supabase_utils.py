@@ -899,10 +899,10 @@ def rösta_på_opinion(agent: dict, sb_key: str) -> int:
             _osaker_payload = {
                 "model": "openai/gpt-oss-120b",
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 5,
+                "max_tokens": 60,
                 "temperature": 0.3,
             }
-            for _name, fn in hamta_kort_fns(_osaker_payload, "", prompt, 5, source="opinion_ai"):
+            for _name, fn in hamta_kort_fns(_osaker_payload, "", prompt, 60, source="opinion_ai"):
                 try:
                     svar_raw = fn().lower()
                     if svar_raw:

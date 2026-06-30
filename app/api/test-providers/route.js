@@ -34,7 +34,14 @@ async function testGroq() {
       reasoning_snippet: reasoning.slice(0, 150) || null,
       raw_choice: JSON.stringify(choice).slice(0, 300),
     } : undefined;
-    return { ok: !!text, text, latency, model: json.model, debug };
+    return {
+      ok: !!text,
+      text,
+      latency,
+      model: json.model,
+      debug,
+      error: !text ? "Tomt svar — modellen förbrukade troligen hela token-budgeten på reasoning" : undefined,
+    };
   } catch (e) {
     return { ok: false, error: e.message, latency: Date.now() - t0 };
   }

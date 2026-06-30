@@ -103,9 +103,19 @@ export default function TestProviders() {
                     )}
                   </>
                 ) : (
-                  <div style={{ color: "#f87171", fontSize: 13, wordBreak: "break-word" }}>
-                    {r.error || `HTTP ${r.status}`}
-                  </div>
+                  <>
+                    <div style={{ color: "#f87171", fontSize: 13, wordBreak: "break-word" }}>
+                      {r.error || `HTTP ${r.status}`}
+                    </div>
+                    {r.debug && (
+                      <div style={{ color: "#f59e0b", fontSize: 11, marginTop: 6, background: "#1a1200", padding: "6px 8px", borderRadius: 4 }}>
+                        <div>finish_reason: {r.debug.finish_reason ?? "–"}</div>
+                        <div>message keys: {r.debug.message_keys?.join(", ") ?? "–"}</div>
+                        {r.debug.reasoning_snippet && <div style={{ wordBreak: "break-all" }}>reasoning: {r.debug.reasoning_snippet}</div>}
+                        <div style={{ wordBreak: "break-all" }}>raw: {r.debug.raw_choice}</div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             );
