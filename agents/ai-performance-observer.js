@@ -218,56 +218,104 @@ async function main() {
   const health24 = healthScore(stats24);
   const health7  = healthScore(stats7);
 
-  // Sortera providers efter totalt anropsvolym
-  const providers24 = Object.entries(stats24).sort((a, b) => {
-    const tA = a[1].ok + a[1].rate_limits + a[1].errors;
-    const tB = b[1].ok + b[1].rate_limits + b[1].errors;
-    return tB - tA;
-  });
+  // Parsa senaste benchmark-körning per provider (för providers utan ai_log-anrop)
+  const benchByProvider = {};
+  {
+    const benchRows = arr(benchLogRows);
+    if (benchRows.length > 0) {
+      const maxKordAt = benchRows.reduce((max, r) => r.kord_at > max ? r.kord_at : max, "");
+      const maxMs     = new Date(maxKordAt).getTime();
+      const latestRun = benchRows.filter(r => maxMs - new Date(r.kord_at).getTime() < 10 * 60 * 1000);
+      for (const r of latestRun) {
+        const p = PROVIDER_ALIAS[r.provider] || r.provider;
+        if (!benchByProvider[p] || r.kord_at > (benchByProvider[p].kord_at || "")) benchByProvider[p] = r;
+      }
+    }
+  }
 
-  const problemProviders = providers24.filter(([, s]) => {
+  // Bygg fullständig providerlista: rankedOrder + ai_log (24h) + benchmark
+  const knownProviders = new Set([...rankedOrder, ...Object.keys(stats24), ...Object.keys(benchByProvider)]);
+  const allProviders = [
+    ...rankedOrder.filter(p => knownProviders.has(p)),
+    ...[...knownProviders].filter(p => !rankedOrder.includes(p)).sort((a, b) => {
+      const tA = stats24[a] ? stats24[a].ok + stats24[a].rate_limits + stats24[a].errors : 0;
+      const tB = stats24[b] ? stats24[b].ok + stats24[b].rate_limits + stats24[b].errors : 0;
+      return tB - tA;
+    }),
+  ];
+
+  const problemProviders = allProviders.filter(p => {
+    const s = stats24[p];
+    if (!s) return false;
     const tot = s.ok + s.rate_limits + s.errors;
     return tot >= 3 && (s.rate_limits / tot > 0.30 || s.ok / tot < 0.50);
-  }).map(([p]) => p);
+  });
 
-  // Markdown-tabell
-  const tableRows = providers24.map(([p, s]) => {
-    const tot   = s.ok + s.rate_limits + s.errors;
-    const okPct = tot > 0 ? round((s.ok / tot) * 100, 1) : 0;
+  // Markdown-tabell — alla kända providers, med benchmark-kolumn för de som inte anropades
+  const tableRows = allProviders.map(p => {
+    const s   = stats24[p];
+    const b   = benchByProvider[p];
+    const tot = s ? s.ok + s.rate_limits + s.errors : 0;
+    const okPct = tot > 0 ? round((s.ok / tot) * 100, 1) : null;
     const rlPct = tot > 0 ? round((s.rate_limits / tot) * 100, 1) : 0;
-    const ms    = avgMs(s.latencies);
-    return `| ${trafiklampa(okPct)} \`${p}\` | ${tot} | ${s.ok} (${okPct}%) | ${s.rate_limits} (${rlPct}%) | ${s.errors} | ${ms != null ? ms + " ms" : "–"} |`;
+    const ms    = s ? avgMs(s.latencies) : null;
+    const lamp  = okPct !== null
+      ? trafiklampa(okPct)
+      : (b && b.totalt > 0 ? trafiklampa(round(b.lyckade / b.totalt * 100, 1)) : "⚪");
+    const anropStr = tot > 0 ? `${tot}` : "–";
+    const okStr    = tot > 0 ? `${s.ok} (${okPct}%)` : "–";
+    const rlStr    = tot > 0 ? `${s.rate_limits} (${rlPct}%)` : "–";
+    const errStr   = tot > 0 ? `${s.errors}` : "–";
+    const msStr    = ms !== null ? `${ms} ms` : "–";
+    let benchStr   = "–";
+    if (b && b.totalt > 0) {
+      const bOkPct = round(b.lyckade / b.totalt * 100, 1);
+      const bMs    = b.snitt_latens_s != null ? `${round(b.snitt_latens_s * 1000)} ms` : "–";
+      benchStr = `${bOkPct}% ok · ${bMs}`;
+    }
+    const inaktivTag = tot === 0 ? " _(ej anropad)_" : "";
+    return `| ${lamp} \`${p}\`${inaktivTag} | ${anropStr} | ${okStr} | ${rlStr} | ${errStr} | ${msStr} | ${benchStr} |`;
   }).join("\n");
 
-  // 7-dagars trend
-  const trend7Lines = Object.entries(stats7)
-    .sort((a, b) => {
-      const tA = a[1].ok + a[1].rate_limits + a[1].errors;
-      const tB = b[1].ok + b[1].rate_limits + b[1].errors;
-      return tB - tA;
-    })
-    .map(([p, s]) => {
-      const tot   = s.ok + s.rate_limits + s.errors;
-      const okPct = tot > 0 ? round((s.ok / tot) * 100, 1) : 0;
+  // 7-dagars trend — alla kända providers
+  const trend7Lines = allProviders
+    .map(p => {
+      const s   = stats7[p];
+      const b   = benchByProvider[p];
+      const tot = s ? s.ok + s.rate_limits + s.errors : 0;
+      const okPct = tot > 0 ? round((s.ok / tot) * 100, 1) : null;
+      if (tot === 0 && !b) return null;
+      if (tot === 0) {
+        const bOkPct = b && b.totalt > 0 ? round(b.lyckade / b.totalt * 100, 1) : null;
+        return `  ⚪ ${p.padEnd(16)} ej anropad (7d)${bOkPct !== null ? `  ·  benchmark: ${bOkPct}% ok` : ""}`;
+      }
       return `  ${trafiklampa(okPct)} ${p.padEnd(16)} ${okPct}% ok   (${tot} anrop, ${s.rate_limits} rl, ${s.errors} err)`;
-    }).join("\n");
+    })
+    .filter(Boolean)
+    .join("\n");
 
   // YAML frontmatter per provider
-  const provYaml = providers24.map(([p, s]) => {
-    const tot = s.ok + s.rate_limits + s.errors;
-    const ms  = avgMs(s.latencies);
-    return `  ${p}:\n    anrop: ${tot}\n    ok: ${s.ok}\n    rate_limits: ${s.rate_limits}\n    errors: ${s.errors}\n    snitt_ms: ${ms ?? "null"}`;
+  const provYaml = allProviders.map(p => {
+    const s   = stats24[p];
+    const tot = s ? s.ok + s.rate_limits + s.errors : 0;
+    const ms  = s ? avgMs(s.latencies) : null;
+    return `  ${p}:\n    anrop: ${tot}\n    ok: ${s?.ok ?? 0}\n    rate_limits: ${s?.rate_limits ?? 0}\n    errors: ${s?.errors ?? 0}\n    snitt_ms: ${ms ?? "null"}`;
   }).join("\n");
 
   // Cerebras-analys (körs bara om nyckel finns)
   let analys = "";
-  if (CEREBRAS_KEY && providers24.length > 0) {
+  if (CEREBRAS_KEY && allProviders.length > 0) {
     console.log("Genererar LLM-analys med Cerebras…");
-    const summary = providers24.map(([p, s]) => {
-      const tot   = s.ok + s.rate_limits + s.errors;
-      const okPct = tot > 0 ? round((s.ok / tot) * 100, 1) : 0;
-      const ms    = avgMs(s.latencies);
-      return `${p}: ${tot} anrop, ${okPct}% ok, ${s.rate_limits} rate-limits, ${ms ?? "–"} ms`;
+    const summary = allProviders.map(p => {
+      const s   = stats24[p];
+      const b   = benchByProvider[p];
+      const tot = s ? s.ok + s.rate_limits + s.errors : 0;
+      const okPct = tot > 0 ? round((s.ok / tot) * 100, 1) : null;
+      const ms    = s ? avgMs(s.latencies) : null;
+      const benchNote = (tot === 0 && b && b.totalt > 0)
+        ? ` [ej anropad — benchmark: ${round(b.lyckade / b.totalt * 100, 1)}% ok]`
+        : "";
+      return `${p}: ${tot} anrop, ${okPct ?? "–"}% ok, ${s?.rate_limits ?? 0} rate-limits, ${ms ?? "–"} ms${benchNote}`;
     }).join("\n");
 
     const result = await httpPost(
@@ -339,8 +387,8 @@ ${trafiklampa(health7)} **${health7}%** lyckade anrop senaste 7 dagar · ${rows7
 
 ## Per-Provider Statistik (24h)
 
-| Provider | Anrop | OK | Rate-limits | Errors | Snitt-latens |
-|---|---|---|---|---|---|
+| Provider | Anrop (24h) | OK | Rate-limits | Errors | Snitt-latens | Senaste benchmark |
+|---|---|---|---|---|---|---|
 ${tableRows}
 
 ## Nuvarande Fallback-ordning
