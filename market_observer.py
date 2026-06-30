@@ -170,7 +170,7 @@ def llm_anrop(prompt: str) -> tuple[str | None, str, str]:
     inte går att tolka som JSON, inte bara om anropet misslyckas."""
     system = "Du är en faktaverifierare."
     payload = {
-        "model": "llama-3.3-70b-specdec",
+        "model": "openai/gpt-oss-120b",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         "max_tokens": 150, "temperature": 0.1,
     }

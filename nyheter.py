@@ -481,7 +481,7 @@ def valj_nyhet_med_groq(nyheter: list, agent: dict) -> dict:
         f"Svara ENBART med numret (t.ex. '4'). Inget annat."
     )
     payload = {
-        "model": "llama-3.3-70b-specdec",
+        "model": "openai/gpt-oss-120b",
         "max_tokens": 5,
         "temperature": 0.2,
         "messages": [{"role": "user", "content": prompt}],

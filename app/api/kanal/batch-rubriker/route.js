@@ -161,7 +161,7 @@ export async function POST(req) {
       const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama-3.3-70b-specdec", messages: msgs, max_tokens: 600, temperature: 0.1 }),
+        body: JSON.stringify({ model: "openai/gpt-oss-120b", messages: msgs, max_tokens: 600, temperature: 0.1 }),
         signal: AbortSignal.timeout(12000),
       });
       if (r.ok) {
@@ -169,16 +169,16 @@ export async function POST(req) {
         const text = json.choices[0].message.content.trim();
         const parsed = parseNumberedList(text, rubriker.length);
         if (parsed) {
-          logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "kanal-batch-en", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
+          logAiCall({ provider: "groq", model: "openai/gpt-oss-120b", source: "kanal-batch-en", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
           return Response.json({ translated: parsed });
         }
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "kanal-batch-en", status: "parse_fail", latency_ms: Date.now() - t0 });
+        logAiCall({ provider: "groq", model: "openai/gpt-oss-120b", source: "kanal-batch-en", status: "parse_fail", latency_ms: Date.now() - t0 });
       } else {
         if (r.status === 429) markProviderDown("groq_kanal");
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "kanal-batch-en", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
+        logAiCall({ provider: "groq", model: "openai/gpt-oss-120b", source: "kanal-batch-en", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
       }
     } catch {
-      logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "kanal-batch-en", status: "timeout", latency_ms: Date.now() - t0 });
+      logAiCall({ provider: "groq", model: "openai/gpt-oss-120b", source: "kanal-batch-en", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 

@@ -79,7 +79,7 @@ async function llm(messages) {
   const res = await httpPost(
     "api.groq.com",
     "/openai/v1/chat/completions",
-    { model: "llama-3.3-70b-specdec", messages, temperature: 0.05, max_tokens: 4096 },
+    { model: "openai/gpt-oss-120b", messages, temperature: 0.05, max_tokens: 4096 },
     { Authorization: `Bearer ${GROQ_KEY}` }
   );
   if (res.error) throw new Error(JSON.stringify(res.error));

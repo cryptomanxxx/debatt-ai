@@ -71,7 +71,7 @@ def _h(sb_key: str) -> dict:
 
 def _llm(system: str, prompt: str, max_tokens: int = 200) -> str:
     payload = {
-        "model": "llama-3.3-70b-specdec",
+        "model": "openai/gpt-oss-120b",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": 0.8,

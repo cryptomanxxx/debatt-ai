@@ -84,7 +84,7 @@ def _llm(system: str, prompt: str, max_tokens: int = 120) -> str:
     except ImportError:
         return ""
     payload = {
-        "model": "llama-3.3-70b-specdec",
+        "model": "openai/gpt-oss-120b",
         "max_tokens": max_tokens,
         "temperature": 0.7,
         "messages": [

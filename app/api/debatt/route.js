@@ -75,7 +75,7 @@ function checkRL(ip) {
 // ── LLM-anrop (Groq primär, fallbacks) ───────────────────────────────────────
 async function llmCall(messages) {
   const providers = [
-    ["groq",          "https://api.groq.com/openai/v1/chat/completions",            "llama-3.3-70b-specdec",     process.env.GROQ_API_KEY],
+    ["groq",          "https://api.groq.com/openai/v1/chat/completions",            "openai/gpt-oss-120b",     process.env.GROQ_API_KEY],
     ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",                "llama3.1-8b",                 process.env.CEREBRAS_API_KEY],
     ["codestral",     "https://api.mistral.ai/v1/chat/completions",                 "codestral-latest",            process.env.MISTRAL_API_KEY],
     ["sambanova",     "https://api.sambanova.ai/v1/chat/completions",               "Meta-Llama-3.3-70B-Instruct", process.env.SAMBANOVA_API_KEY],
