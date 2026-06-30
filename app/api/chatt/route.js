@@ -183,7 +183,7 @@ REGLER — viktiga:
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
         signal: groqAbort.signal,
         body: JSON.stringify({
-          model: "llama-3.3-70b-versatile",
+          model: "llama-3.3-70b-specdec",
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
           max_tokens: 250,
           temperature: 0.88,
@@ -196,19 +196,19 @@ REGLER — viktiga:
       const rst = groqRes.headers.get("x-ratelimit-reset-requests");
       if (groqRes.ok) {
         ps.groq = { remaining: rem >= 0 ? rem : ps.groq.remaining, limit: 30, resetAt: rst, ts: Date.now(), status: rem <= 5 ? "warn" : "ok" };
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "ok", latency_ms: Date.now() - groqT0 });
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "chatt", status: "ok", latency_ms: Date.now() - groqT0 });
         return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
       }
       if (groqRes.status === 429) {
         ps.groq = { remaining: 0, limit: 30, resetAt: rst, ts: Date.now(), status: "limited" };
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "rate_limited", latency_ms: Date.now() - groqT0 });
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "chatt", status: "rate_limited", latency_ms: Date.now() - groqT0 });
       } else {
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: "error", latency_ms: Date.now() - groqT0 });
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "chatt", status: "error", latency_ms: Date.now() - groqT0 });
       }
       groqFailReason = `Groq HTTP ${groqRes.status}`;
     } catch (e) {
       clearTimeout(groqTimeout);
-      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "chatt", status: e.name === "AbortError" ? "timeout" : "error", latency_ms: Date.now() - groqT0 });
+      logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "chatt", status: e.name === "AbortError" ? "timeout" : "error", latency_ms: Date.now() - groqT0 });
       groqFailReason = e.name === "AbortError" ? "Groq timeout (5s)" : `Groq fel: ${e.message}`;
     }
   }

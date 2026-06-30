@@ -112,7 +112,7 @@ def _generera_civ_fraga(agent: dict, minne_kontext: str = "") -> tuple[str, str]
     )
     system_txt = agent.get("system", "")[:400]
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "messages": [
             {"role": "system", "content": system_txt},
             {"role": "user", "content": prompt},
@@ -1239,7 +1239,7 @@ def main():
                 + relation_tillagg + drama_tillagg
             )
             fraga_payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "llama-3.3-70b-specdec",
                 "messages": [
                     {"role": "system", "content": agent.get("system", "")[:600]},
                     {"role": "user", "content": fraga_prompt},
@@ -1263,7 +1263,7 @@ def main():
                 )
             )
             svar_payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "llama-3.3-70b-specdec",
                 "messages": [
                     {"role": "system", "content": mottagare.get("system", "")[:600]},
                     {"role": "user", "content": svar_innehall},
@@ -1324,7 +1324,7 @@ def main():
                 f"Svara ENBART med frågan, inga inledningsfraser."
             )
             fraga_payload2 = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "llama-3.3-70b-specdec",
                 "messages": [
                     {"role": "system", "content": agent.get("system", "")[:600]},
                     {"role": "user", "content": fraga_prompt2},
@@ -1340,7 +1340,7 @@ def main():
                 f"Svara kort och i karaktär (2–3 meningar)."
             )
             svar_payload2 = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "llama-3.3-70b-specdec",
                 "messages": [
                     {"role": "system", "content": mottagare2.get("system", "")[:600]},
                     {"role": "user", "content": svar_innehall2},
@@ -1441,7 +1441,7 @@ def main():
                 f"PRIORITET: low|medium|high"
             )
             fr_payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "llama-3.3-70b-specdec",
                 "messages": [
                     {"role": "system", "content": agent.get("system", "")[:400]},
                     {"role": "user", "content": fr_prompt},

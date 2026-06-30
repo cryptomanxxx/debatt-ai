@@ -10,7 +10,7 @@ function makeMessages(providerName) {
 async function testGroq() {
   const key = process.env.GROQ_API_KEY;
   if (!key) return { ok: false, error: "GROQ_API_KEY saknas" };
-  const model = "llama-3.3-70b-versatile";
+  const model = "llama-3.3-70b-specdec";
   const t0 = Date.now();
   try {
     const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {

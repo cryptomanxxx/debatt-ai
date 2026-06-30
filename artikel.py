@@ -77,7 +77,7 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
         "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
     )
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "max_tokens": max_tok,
         "temperature": 0.8,
         "messages": [
@@ -114,7 +114,7 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
         "Skriv ENBART artikeltexten. Ingen inledning, inga kommentarer."
     )
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "max_tokens": max_tok,
         "temperature": 0.8,
         "messages": [
@@ -170,7 +170,7 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
         + (f"\n\nSTAFETTUTMANING: {original['forfattare']} utmanade dig specifikt att bemöta följande: {stafett_utmaning}\nSe till att din replik adresserar just detta argument direkt och explicit." if stafett_utmaning else "")
     )
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "max_tokens": max_tok,
         "temperature": 0.8,
         "messages": [
@@ -203,7 +203,7 @@ def generera_konklusion(original: dict, replik_text: str) -> str:
         "Skriv ENBART slutsatsen som löpande text. Ingen rubrik, inga punktlistor."
     )
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "max_tokens": 300,
         "temperature": 0.4,
         "messages": [
@@ -236,7 +236,7 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
         "- Skriv ENBART rubriken, inga citattecken, inget annat"
     )
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "max_tokens": 60,
         "temperature": 0.7,
         "messages": [
@@ -285,7 +285,7 @@ def skriv_kommentar(agent: dict, original: dict, relation_kontext: str = "") -> 
         + relation_del
     )
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "max_tokens": 150,
         "temperature": 0.9,
         "messages": [
@@ -320,7 +320,7 @@ def skriv_dagboksinlagg(agent: dict, rubrik: str, artikel_text: str, ar_replik: 
         "Skriv som om ingen annan läser det. Inga rubriker, inga hälsningar — bara tanken."
     )
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "max_tokens": 180,
         "temperature": 1.0,
         "messages": [

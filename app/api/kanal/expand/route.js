@@ -148,7 +148,7 @@ export async function POST(req) {
       const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${groqKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages: msgs, max_tokens: 350, temperature: 0.4 }),
+        body: JSON.stringify({ model: "llama-3.3-70b-specdec", messages: msgs, max_tokens: 350, temperature: 0.4 }),
         signal: AbortSignal.timeout(6000),
       });
       const latency_ms = Date.now() - t0;
@@ -156,15 +156,15 @@ export async function POST(req) {
         const json = await r.json();
         const text = json.choices[0].message.content.trim();
         if (text && text !== rubrik) {
-          logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
+          logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "kanal", status: "ok", latency_ms, input_tokens: json?.usage?.prompt_tokens, output_tokens: json?.usage?.completion_tokens });
           return Response.json({ text }, { headers: { "X-Provider": "groq" } });
         }
       } else {
         if (r.status === 429) markProviderDown("groq_kanal");
-        logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
+        logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "kanal", status: r.status === 429 ? "rate_limited" : "error", latency_ms });
       }
     } catch {
-      logAiCall({ provider: "groq", model: "llama-3.3-70b-versatile", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
+      logAiCall({ provider: "groq", model: "llama-3.3-70b-specdec", source: "kanal", status: "timeout", latency_ms: Date.now() - t0 });
     }
   }
 

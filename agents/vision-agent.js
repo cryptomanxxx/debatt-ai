@@ -378,7 +378,7 @@ async function callCerebras(prompt) {
 
 async function callGroq(prompt) {
   const body = JSON.stringify({
-    model: "llama-3.3-70b-versatile",
+    model: "llama-3.3-70b-specdec",
     messages: [{ role: "user", content: prompt }],
     max_tokens: 1200,
     temperature: 0.9,
@@ -443,10 +443,10 @@ async function main() {
     }
   }
   if (!vision && GROQ_API_KEY) {
-    console.log("Faller tillbaka till Groq (llama-3.3-70b-versatile)…");
+    console.log("Faller tillbaka till Groq (llama-3.3-70b-specdec)…");
     try {
       vision = await callGroq(prompt);
-      modell = "Groq llama-3.3-70b-versatile";
+      modell = "Groq llama-3.3-70b-specdec";
     } catch (e) {
       console.error("Groq misslyckades:", e.message);
     }

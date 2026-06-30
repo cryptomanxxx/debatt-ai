@@ -83,7 +83,7 @@ def _h(sb_key: str) -> dict:
 def _llm(system: str, prompt: str, max_tokens: int = 200) -> str:
     """LLM-anrop med fallback."""
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": prompt},
