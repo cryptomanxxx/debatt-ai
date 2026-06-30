@@ -340,7 +340,7 @@ def cerebras_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
         raise Exception("CEREBRAS_API_KEY saknas")
     url = "https://api.cerebras.ai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {**json_payload, "model": "llama-3.3-70b"}
+    payload = {**json_payload, "model": "gpt-oss-120b"}
     last_r = None
     for attempt in range(3):
         r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
