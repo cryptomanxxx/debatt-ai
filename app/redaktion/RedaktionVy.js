@@ -170,7 +170,7 @@ export default function RedaktionVy({ total, snittPoang, beslutData, kriterieDat
             <ComposedChart data={dagligData} barGap={2} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="#1e1e1e" />
               <XAxis dataKey="dag" tick={{ fill: C.textMuted, fontSize: 9 }} axisLine={false} tickLine={false} interval={0} angle={-45} textAnchor="end" height={40} />
-              <YAxis domain={[0, 10]} ticks={[0,1,2,3,4,5,6,7,8,9,10]} tick={{ fill: C.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <YAxis domain={[0, dataMax => Math.max(10, Math.ceil(dataMax))]} tick={{ fill: C.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip
                 contentStyle={CHART_TOOLTIP_STYLE.contentStyle}
                 cursor={CHART_TOOLTIP_STYLE.cursor}

@@ -259,9 +259,7 @@ async function main() {
     const okPct = tot > 0 ? round((s.ok / tot) * 100, 1) : null;
     const rlPct = tot > 0 ? round((s.rate_limits / tot) * 100, 1) : 0;
     const ms    = s ? avgMs(s.latencies) : null;
-    const lamp  = okPct !== null
-      ? trafiklampa(okPct)
-      : (b && b.totalt > 0 ? trafiklampa(round(b.lyckade / b.totalt * 100, 1)) : "⚪");
+    const lamp  = okPct !== null ? trafiklampa(okPct) : "⚪";
     const anropStr = tot > 0 ? `${tot}` : "–";
     const okStr    = tot > 0 ? `${s.ok} (${okPct}%)` : "–";
     const rlStr    = tot > 0 ? `${s.rate_limits} (${rlPct}%)` : "–";
