@@ -38,13 +38,20 @@ async function getData() {
   const totalCount = parseInt(countRes.headers.get("content-range")?.split("/")[1] || "0", 10);
 
   // Fetch newest rows for accurate recent stats and weekly trend
-  const res = await fetch(
-    `${SB_URL}/rest/v1/inlamningar?select=beslut,arg,ori,rel,tro,forfattare,status,skapad&order=skapad.desc&limit=3000`,
-    { headers: h, next: { revalidate: 600 } }
-  );
+  const [res, artRes] = await Promise.all([
+    fetch(
+      `${SB_URL}/rest/v1/inlamningar?select=beslut,arg,ori,rel,tro,forfattare,status,skapad&order=skapad.desc&limit=3000`,
+      { headers: h, next: { revalidate: 600 } }
+    ),
+    fetch(
+      `${SB_URL}/rest/v1/artiklar?select=skapad,nyhetskalla,parent_id&kalla=eq.ai&order=skapad.desc&limit=1500`,
+      { headers: h, next: { revalidate: 600 } }
+    ),
+  ]);
   if (!res.ok) return null;
   const rows = await res.json();
-  return { rows, totalCount };
+  const artRows = artRes.ok ? await artRes.json() : [];
+  return { rows, totalCount, artRows };
 }
 
 export default async function RedaktionPage() {
@@ -57,7 +64,24 @@ export default async function RedaktionPage() {
     );
   }
 
-  const { rows, totalCount } = data;
+  const { rows, totalCount, artRows } = data;
+
+  // Daglig publicering senaste 30 dagarna
+  const dagMap = {};
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    dagMap[key] = { dag: key.slice(5), nyheter: 0, debatt: 0 };
+  }
+  for (const a of artRows) {
+    if (!a.skapad || a.parent_id != null) continue;
+    const key = a.skapad.slice(0, 10);
+    if (!dagMap[key]) continue;
+    if (a.nyhetskalla) dagMap[key].nyheter++;
+    else dagMap[key].debatt++;
+  }
+  const dagligData = Object.values(dagMap);
 
   // Besluts-fördelning
   const beslutCount = { publicera: 0, revidera: 0, avvisa: 0, okänt: 0 };
@@ -127,6 +151,7 @@ export default async function RedaktionPage() {
       kriterieData={kriterieData}
       veckoData={veckoData}
       agentData={agentData}
+      dagligData={dagligData}
     />
   );
 }
