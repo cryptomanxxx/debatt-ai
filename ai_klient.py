@@ -27,6 +27,11 @@ _groq_nere_keys: set[str] = set()
 # ── Dynamisk fallback-ordning ──────────────────────────────────────────────────
 
 _DEFAULT_ORDER = ["groq", "mistral", "sambanova", "deepseek", "cloudflare", "gemini", "github_models", "cerebras"]
+
+# Hårdkodad kedja för artikelskrivning — exkluderar Mistral/Codestral (kodmodell, sämre på
+# kreativ långform svenska) samt DeepSeek och Cloudflare (lägre kvalitet för långa texter).
+# Oberoende av den dynamiska benchmark-rankingen i _fallback_order.
+_ARTIKEL_CHAIN = ["groq", "deepseek", "gemini", "cerebras", "sambanova", "github_models"]
 _SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 
@@ -160,7 +165,7 @@ def hamta_artikel_fns(payload: dict, system: str, user_msg: str, max_tokens: int
         "cloudflare":    ("Cloudflare",     lambda: cloudflare_post(system, user_msg, max_tokens=max_tokens)),
         "gemini":        ("Gemini",         lambda: gemini_post(system, user_msg, max_tokens=max_tokens)),
     }
-    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _fallback_order if p in alla]
+    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _ARTIKEL_CHAIN if p in alla]
 
 
 def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int, source: str = "agent") -> list[tuple[str, callable]]:
