@@ -87,7 +87,7 @@ def skapa_konversation(sb_key: str, avsandare: dict, mottagare: dict, amne: str 
         + relation_tillagg + drama_tillagg
     )
     fraga_payload = {
-        "model": "llama-3.3-70b-specdec",
+        "model": "openai/gpt-oss-120b",
         "messages": [
             {"role": "system", "content": avsandare.get("system", "")[:600]},
             {"role": "user", "content": fraga_prompt},
@@ -106,7 +106,7 @@ def skapa_konversation(sb_key: str, avsandare: dict, mottagare: dict, amne: str 
         + (f"\nDRAMATISK BAKGRUND:\n{drama}" if drama else "")
     )
     svar_payload = {
-        "model": "llama-3.3-70b-specdec",
+        "model": "openai/gpt-oss-120b",
         "messages": [
             {"role": "system", "content": mottagare.get("system", "")[:600]},
             {"role": "user", "content": svar_innehall},

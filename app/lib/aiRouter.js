@@ -28,7 +28,7 @@ const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const PROVIDERS = {
   groq: {
     url:     "https://api.groq.com/openai/v1/chat/completions",
-    model:   "llama-3.3-70b-specdec",
+    model:   "openai/gpt-oss-120b",
     key:     () => process.env.GROQ_API_KEY,
     timeout: 15_000,
     cbKey:   "groq",

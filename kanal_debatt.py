@@ -14,7 +14,7 @@ from ai_klient import hamta_kort_fns
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
-GROQ_MODEL = "llama-3.3-70b-specdec"
+GROQ_MODEL = "openai/gpt-oss-120b"
 
 RSS_FEEDS = [
     ("SVT Nyheter",  "https://www.svt.se/nyheter/rss.xml"),

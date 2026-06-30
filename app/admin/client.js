@@ -825,7 +825,7 @@ function ApiStatusTab() {
 
       {loading ? <p style={{ color: C.textMuted }}>Hämtar status…</p> : (
         <>
-          <ProviderCard name="Groq" model="llama-3.3-70b-specdec · primär" p={health?.groq} />
+          <ProviderCard name="Groq" model="openai/gpt-oss-120b · primär" p={health?.groq} />
           <ProviderCard name="DeepSeek" model="deepseek-chat (V3) · fallback 1" p={health?.deepseek} />
           <ProviderCard name="Codestral" model="codestral-latest · fallback 2" p={health?.codestral} />
           <ProviderCard name="Cerebras" model="gpt-oss-120b · fallback 3" p={health?.cerebras} />
