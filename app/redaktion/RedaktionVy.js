@@ -4,6 +4,7 @@ import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   AreaChart, Area,
+  ComposedChart, ReferenceLine,
 } from "recharts";
 
 const C = {
@@ -25,7 +26,7 @@ const CHART_TOOLTIP_STYLE = {
   cursor: { fill: "rgba(255,255,255,0.04)" },
 };
 
-export default function RedaktionVy({ total, snittPoang, beslutData, kriterieData, veckoData, agentData }) {
+export default function RedaktionVy({ total, snittPoang, beslutData, kriterieData, veckoData, agentData, dagligData }) {
   const publiceratPct = total > 0
     ? ((beslutData.find(d => d.name === "Publicera")?.value || 0) / total * 100).toFixed(1)
     : "0.0";
@@ -155,7 +156,33 @@ export default function RedaktionVy({ total, snittPoang, beslutData, kriterieDat
           </ResponsiveContainer>
         </div>
 
-        {/* Rad 3: Per-agent horisontell stapel */}
+        {/* Rad 3: Daglig publicering vs mål */}
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "24px 20px", marginBottom: 24 }}>
+          <h2 style={{ fontSize: 14, color: C.accent, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px" }}>
+            Daglig publicering vs mål — senaste 30 dagarna
+          </h2>
+          <ResponsiveContainer width="100%" height={220}>
+            <ComposedChart data={dagligData} barGap={2} barCategoryGap="20%">
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e1e1e" />
+              <XAxis dataKey="dag" tick={{ fill: C.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} interval={4} />
+              <YAxis tick={{ fill: C.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip
+                contentStyle={CHART_TOOLTIP_STYLE.contentStyle}
+                cursor={CHART_TOOLTIP_STYLE.cursor}
+              />
+              <Legend
+                iconType="circle"
+                iconSize={10}
+                formatter={(v) => <span style={{ color: C.text, fontSize: 12 }}>{v}</span>}
+              />
+              <ReferenceLine y={4} stroke="#60a5fa" strokeDasharray="4 2" ifOverflow="extendDomain" label={{ value: "Mål 4", fill: "#60a5fa", fontSize: 10, position: "right" }} />
+              <Bar dataKey="nyheter" name="Nyhetsartiklar" fill="#60a5fa" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="debatt" name="Debattartiklar" fill="#e8d5a3" radius={[3, 3, 0, 0]} />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Rad 4: Per-agent horisontell stapel */}
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "24px 20px" }}>
           <h2 style={{ fontSize: 14, color: C.accent, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px" }}>
             Per agent — publicerade / reviderade / avvisade

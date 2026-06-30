@@ -82,7 +82,8 @@ export default async function PartierPage() {
   // Kassainfo per ledare
   const kassorMap = {};
   for (const k of kassor) kassorMap[k.ledare] = k.saldo;
-  const totalKassor = Object.values(kassorMap).reduce((s, v) => s + v, 0);
+  // Sum only active parties — kassor-tabellen kan ha rader från gamla upplösta partier
+  const totalKassor = partier.reduce((s, p) => s + (kassorMap[p.ledare] ?? 0), 0);
 
   // Transaktioner per ledare (max 30 per parti)
   const utgifterPerLedare = {};
