@@ -116,7 +116,7 @@ export default async function RedaktionPage() {
     const b = (r.beslut || "").toLowerCase();
     if (b === "publicera") dagTrendMap[key].publicerade++;
     else if (b === "revidera") dagTrendMap[key].reviderade++;
-    else dagTrendMap[key].avvisade++;
+    else if (b === "avvisa") dagTrendMap[key].avvisade++;
   }
   const veckoData = Object.values(dagTrendMap);
 
