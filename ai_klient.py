@@ -31,7 +31,7 @@ _DEFAULT_ORDER = ["groq", "mistral", "sambanova", "deepseek", "cloudflare", "gem
 # Hårdkodad kedja för artikelskrivning — exkluderar Mistral/Codestral (kodmodell, sämre på
 # kreativ långform svenska) samt DeepSeek och Cloudflare (lägre kvalitet för långa texter).
 # Oberoende av den dynamiska benchmark-rankingen i _fallback_order.
-_ARTIKEL_CHAIN = ["groq", "deepseek", "sambanova", "cerebras", "github_models", "gemini"]
+_ARTIKEL_CHAIN = ["groq", "deepseek", "sambanova", "cerebras", "github_models"]
 _SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 
