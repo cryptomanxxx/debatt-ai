@@ -4644,6 +4644,10 @@ def ta_oligarki_snapshot(sb_key: str) -> None:
     lobbying    = get("lobbying_log?select=lobbying_agent,resultat")
     bets        = get("agent_bets?select=agent,vinst&avgjord=eq.true")
 
+    # Filtrera bort systemkonton — dessa ska inte påverka Gini, top-3-andel eller maktindex
+    _SYSTEM = {"Börskassan", "Statskassa"}
+    planbocker = [p for p in planbocker if p["agent"] not in _SYSTEM]
+
     if not planbocker:
         return
 
