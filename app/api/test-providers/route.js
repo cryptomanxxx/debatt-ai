@@ -79,7 +79,7 @@ async function testCerebras() {
     }
   } catch {}
 
-  const model = "gpt-oss-120b";
+  const model = "gemma-4-31b";
   const t0 = Date.now();
   try {
     const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
