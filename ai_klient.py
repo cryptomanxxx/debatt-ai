@@ -31,7 +31,7 @@ _DEFAULT_ORDER = ["groq", "mistral", "sambanova", "deepseek", "cloudflare", "gem
 # Hårdkodad kedja för artikelskrivning — exkluderar Mistral/Codestral (kodmodell, sämre på
 # kreativ långform svenska) samt DeepSeek och Cloudflare (lägre kvalitet för långa texter).
 # Oberoende av den dynamiska benchmark-rankingen i _fallback_order.
-_ARTIKEL_CHAIN = ["groq", "deepseek", "gemini", "cerebras", "sambanova", "github_models"]
+_ARTIKEL_CHAIN = ["groq", "deepseek", "sambanova", "cerebras", "github_models", "gemini"]
 _SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 
@@ -347,7 +347,7 @@ def cerebras_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
         raise Exception("CEREBRAS_API_KEY saknas")
     url = "https://api.cerebras.ai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {**json_payload, "model": "gpt-oss-120b", "stream": False}
+    payload = {**json_payload, "model": "gemma-4-31b", "stream": False}
     last_r = None
     for attempt in range(3):
         r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
