@@ -5075,32 +5075,38 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
                     return k
             return f"{bas} ({ledare}) x"
 
-        # Bygg lista med kommande partier för kassaöverföring
-        kommande_partier = [
-            {"ledare": _hamta_ledare(sb_key, m), "namn": _parti_namn_fran_positioner(sb_key, m)}
-            for m in kluster
-        ]
-        # Deduplicera namn — garanterat unika oavsett hur många delar samma basnamn
+        # Bygg lista med kommande partier för kassaöverföring.
+        # Återanvänd befintliga namn för oförändrade kluster (samma logik som nedan).
         sedda_namn: set[str] = set()
-        for p in kommande_partier:
-            if p["namn"] in sedda_namn:
-                p["namn"] = _unikt_namn(p["namn"], p["ledare"], sedda_namn)
-            sedda_namn.add(p["namn"])
+        kommande_partier = []
+        for m in kluster:
+            ledare = _hamta_ledare(sb_key, m)
+            fs_k = frozenset(m)
+            if fs_k in gamla_namn_map and gamla_namn_map[fs_k] not in sedda_namn:
+                namn_k = gamla_namn_map[fs_k]
+            else:
+                namn_k = _parti_namn_fran_positioner(sb_key, m)
+                if namn_k in sedda_namn:
+                    namn_k = _unikt_namn(namn_k, ledare, sedda_namn)
+            sedda_namn.add(namn_k)
+            kommande_partier.append({"ledare": ledare, "namn": namn_k})
         _overfor_parti_kassor(sb_key, kommande_partier)
 
-        # Hämta befintliga partiers MEDLEMMAR innan delete — jämför på klusteridentitet,
-        # inte displaynamn, för att klara av namnbyten vid ledarskifte.
+        # Hämta befintliga partiers NAMN + MEDLEMMAR innan delete.
+        # Nyckeln är frozenset(medlemmar) — tål ledarskiften och namnbyten.
+        # gamma_namn_map: frozenset → befintligt partinamn (återanvänds om klustret är oförändrat).
         try:
             r_gamla = httpx.get(
-                f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=medlemmar",
+                f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn,medlemmar",
                 headers=h, timeout=8,
             )
-            gamla_kluster: set[frozenset] = (
-                {frozenset(p["medlemmar"]) for p in r_gamla.json()}
-                if r_gamla.is_success and r_gamla.json()
-                else set()
-            )
+            gamla_rader = r_gamla.json() if r_gamla.is_success else []
+            gamla_namn_map: dict[frozenset, str] = {
+                frozenset(p["medlemmar"]): p["namn"] for p in gamla_rader
+            }
+            gamla_kluster: set[frozenset] = set(gamla_namn_map.keys())
         except Exception:
+            gamla_namn_map = {}
             gamla_kluster = set()
 
         # Ta bort gamla partier
@@ -5111,9 +5117,15 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
         anvanda_namn: set[str] = set()
         for medlemmar in kluster:
             ledare = _hamta_ledare(sb_key, medlemmar)
-            namn = _parti_namn_fran_positioner(sb_key, medlemmar)
-            if namn in anvanda_namn:
-                namn = _unikt_namn(namn, ledare, anvanda_namn)
+            fs = frozenset(medlemmar)
+            # Återanvänd befintligt namn om klustrets medlemsuppsättning är oförändrad —
+            # förhindrar dagliga namnbyten när bara saldo-ledaren skiftar.
+            if fs in gamla_namn_map and gamla_namn_map[fs] not in anvanda_namn:
+                namn = gamla_namn_map[fs]
+            else:
+                namn = _parti_namn_fran_positioner(sb_key, medlemmar)
+                if namn in anvanda_namn:
+                    namn = _unikt_namn(namn, ledare, anvanda_namn)
             anvanda_namn.add(namn)
             intern_styrka = sum(
                 styrka_map.get(f"{a}||{b}", styrka_map.get(f"{b}||{a}", 0))
