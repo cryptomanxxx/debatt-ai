@@ -161,11 +161,11 @@ export default function RedaktionVy({ total, snittPoang, beslutData, kriterieDat
           <h2 style={{ fontSize: 14, color: C.accent, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px" }}>
             Daglig publicering vs mål — senaste 30 dagarna
           </h2>
-          <ResponsiveContainer width="100%" height={220}>
+          <ResponsiveContainer width="100%" height={260}>
             <ComposedChart data={dagligData} barGap={2} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="#1e1e1e" />
-              <XAxis dataKey="dag" tick={{ fill: C.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} interval={4} />
-              <YAxis tick={{ fill: C.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <XAxis dataKey="dag" tick={{ fill: C.textMuted, fontSize: 9 }} axisLine={false} tickLine={false} interval={0} angle={-45} textAnchor="end" height={40} />
+              <YAxis domain={[0, 10]} ticks={[0,1,2,3,4,5,6,7,8,9,10]} tick={{ fill: C.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip
                 contentStyle={CHART_TOOLTIP_STYLE.contentStyle}
                 cursor={CHART_TOOLTIP_STYLE.cursor}
