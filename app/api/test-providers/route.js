@@ -85,14 +85,20 @@ async function testCerebras() {
     const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages: makeMessages("Cerebras"), max_tokens: 30 }),
+      body: JSON.stringify({ model, messages: makeMessages("Cerebras"), max_tokens: 30, stream: false }),
       signal: AbortSignal.timeout(15000),
     });
     const latency = Date.now() - t0;
     if (r.ok) {
       const json = await r.json();
-      const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-      return { ok: true, text, latency, model: json.model, availableModels };
+      const choice = json.choices?.[0];
+      const text = choice?.message?.content?.trim() ?? "";
+      const debug = !text ? {
+        finish_reason: choice?.finish_reason,
+        message_keys: choice?.message ? Object.keys(choice.message) : null,
+        raw_choice: JSON.stringify(choice).slice(0, 300),
+      } : undefined;
+      return { ok: true, text, latency, model: json.model, availableModels, debug };
     }
     const err = await r.text();
     return { ok: false, status: r.status, error: err.slice(0, 300), latency, availableModels };
