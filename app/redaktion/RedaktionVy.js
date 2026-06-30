@@ -124,9 +124,9 @@ export default function RedaktionVy({ total, snittPoang, beslutData, kriterieDat
         {/* Rad 2: Veckovis trend */}
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "24px 20px", marginBottom: 24 }}>
           <h2 style={{ fontSize: 14, color: C.accent, fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 20px" }}>
-            Publiceringstrend — senaste 20 veckorna
+            Publiceringstrend — senaste 30 dagarna
           </h2>
-          <ResponsiveContainer width="100%" height={200}>
+          <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={veckoData}>
               <defs>
                 <linearGradient id="gradPub" x1="0" y1="0" x2="0" y2="1">
@@ -143,7 +143,7 @@ export default function RedaktionVy({ total, snittPoang, beslutData, kriterieDat
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e1e1e" />
-              <XAxis dataKey="vecka" tick={{ fill: C.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} interval={3} />
+              <XAxis dataKey="dag" tick={{ fill: C.textMuted, fontSize: 9 }} axisLine={false} tickLine={false} interval={0} angle={-45} textAnchor="end" height={40} />
               <YAxis tick={{ fill: C.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} />
               <Tooltip
                 contentStyle={CHART_TOOLTIP_STYLE.contentStyle}

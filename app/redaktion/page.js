@@ -9,21 +9,6 @@ export const metadata = {
   description: "Statistik över AI-redaktörens beslut, poängsättning och publiceringstrend.",
 };
 
-// Correct ISO 8601 week key: finds Monday of ISO week 1 (the week containing Jan 4)
-// then counts whole weeks from that Monday to the Thursday of the input date's week.
-function isoWeekKey(dateStr) {
-  const d = new Date(dateStr);
-  // Thursday of the current week (ISO year is defined by which year the Thursday falls in)
-  const thursday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-  thursday.setUTCDate(thursday.getUTCDate() - ((thursday.getUTCDay() + 6) % 7) + 3);
-  // Jan 4 of the Thursday's year is always in ISO week 1
-  const jan4 = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 4));
-  // Monday of the week containing Jan 4 = start of ISO week 1
-  const week1Monday = new Date(jan4);
-  week1Monday.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay() + 6) % 7));
-  const week = Math.round((thursday - week1Monday) / 604800000) + 1;
-  return `${thursday.getUTCFullYear()}-V${String(week).padStart(2, "0")}`;
-}
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -116,20 +101,24 @@ export default async function RedaktionPage() {
     ? +((allWithScores.reduce((s, r) => s + (r.arg + r.ori + r.rel + r.tro) / 4, 0)) / allWithScores.length).toFixed(2)
     : 0;
 
-  // Veckovis trend (senaste 20 veckor) — rows already ordered desc so all recent weeks present
-  const veckoMap = {};
+  // Daglig trend (senaste 30 dagarna)
+  const dagTrendMap = {};
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    dagTrendMap[key] = { dag: key.slice(5), publicerade: 0, reviderade: 0, avvisade: 0 };
+  }
   for (const r of rows) {
     if (!r.skapad) continue;
-    const key = isoWeekKey(r.skapad);
-    if (!veckoMap[key]) veckoMap[key] = { vecka: key, publicerade: 0, reviderade: 0, avvisade: 0 };
+    const key = r.skapad.slice(0, 10);
+    if (!dagTrendMap[key]) continue;
     const b = (r.beslut || "").toLowerCase();
-    if (b === "publicera") veckoMap[key].publicerade++;
-    else if (b === "revidera") veckoMap[key].reviderade++;
-    else veckoMap[key].avvisade++;
+    if (b === "publicera") dagTrendMap[key].publicerade++;
+    else if (b === "revidera") dagTrendMap[key].reviderade++;
+    else dagTrendMap[key].avvisade++;
   }
-  const veckoData = Object.values(veckoMap)
-    .sort((a, b) => a.vecka.localeCompare(b.vecka))
-    .slice(-20);
+  const veckoData = Object.values(dagTrendMap);
 
   // Per-agent statistik (topp 24 efter antal inlämningar)
   const agentMap = {};
