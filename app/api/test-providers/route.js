@@ -16,8 +16,8 @@ async function testGroq() {
     const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages: makeMessages("Groq"), max_tokens: 30 }),
-      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({ model, messages: makeMessages("Groq"), max_tokens: 500 }),
+      signal: AbortSignal.timeout(20000),
     });
     const latency = Date.now() - t0;
     if (!r.ok) {
@@ -25,8 +25,16 @@ async function testGroq() {
       return { ok: false, status: r.status, error: err.slice(0, 200), latency };
     }
     const json = await r.json();
-    const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-    return { ok: true, text, latency, model: json.model };
+    const choice = json.choices?.[0];
+    const text = choice?.message?.content?.trim() ?? "";
+    const reasoning = choice?.message?.reasoning_content?.trim() ?? "";
+    const debug = !text ? {
+      finish_reason: choice?.finish_reason,
+      message_keys: choice?.message ? Object.keys(choice.message) : null,
+      reasoning_snippet: reasoning.slice(0, 150) || null,
+      raw_choice: JSON.stringify(choice).slice(0, 300),
+    } : undefined;
+    return { ok: !!text, text, latency, model: json.model, debug };
   } catch (e) {
     return { ok: false, error: e.message, latency: Date.now() - t0 };
   }
