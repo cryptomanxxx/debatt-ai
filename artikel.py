@@ -88,6 +88,8 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
     for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok, source="agent_nyhet"):
         try:
             result = fn()
+            if not result or not result.strip():
+                raise Exception("tom respons")
             print(f"  ✓ {name}: artikel klar")
             return result
         except Exception as e:
@@ -125,6 +127,8 @@ def skriv_artikel(agent: dict, amne: str, extra_kontext: str = "", fmt: dict | N
     for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok, source="agent_artikel"):
         try:
             result = fn()
+            if not result or not result.strip():
+                raise Exception("tom respons")
             print(f"  ✓ {name}: artikel klar")
             return result
         except Exception as e:
@@ -181,6 +185,8 @@ def skriv_replik(agent: dict, original: dict, relation_kontext: str = "", buffs:
     for name, fn in hamta_artikel_fns(payload, system, user_msg, max_tok, source="agent_replik"):
         try:
             result = fn()
+            if not result or not result.strip():
+                raise Exception("tom respons")
             print(f"  ✓ {name}: replik klar")
             return result
         except Exception as e:
