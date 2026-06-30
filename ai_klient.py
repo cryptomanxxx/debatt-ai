@@ -153,17 +153,24 @@ def _log_wrap(provider_key: str, fn: callable, source: str) -> callable:
     return wrapper
 
 
+def _nonempty(text: str | None) -> str:
+    """Kastar undantag om texten är tom — garanterar att tom respons loggas som 'error' av _log_wrap."""
+    if not text or not text.strip():
+        raise Exception("tom respons från provider")
+    return text
+
+
 def hamta_artikel_fns(payload: dict, system: str, user_msg: str, max_tokens: int, source: str = "agent") -> list[tuple[str, callable]]:
     """Returnerar (namn, fn) i dynamisk rankad ordning för artikelskrivning."""
     alla = {
-        "groq":          ("Groq",          lambda: groq_post(payload).json()["choices"][0]["message"]["content"]),
-        "mistral":       ("Mistral",        lambda: mistral_post(payload).json()["choices"][0]["message"]["content"]),
-        "sambanova":     ("Sambanova",      lambda: sambanova_post(payload).json()["choices"][0]["message"]["content"]),
-        "deepseek":      ("DeepSeek",       lambda: deepseek_post(payload).json()["choices"][0]["message"]["content"]),
-        "cerebras":      ("Cerebras",       lambda: cerebras_post(payload).json()["choices"][0]["message"]["content"]),
-        "github_models": ("GitHub Models",  lambda: github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"]),
-        "cloudflare":    ("Cloudflare",     lambda: cloudflare_post(system, user_msg, max_tokens=max_tokens)),
-        "gemini":        ("Gemini",         lambda: gemini_post(system, user_msg, max_tokens=max_tokens)),
+        "groq":          ("Groq",          lambda: _nonempty(groq_post(payload).json()["choices"][0]["message"]["content"])),
+        "mistral":       ("Mistral",        lambda: _nonempty(mistral_post(payload).json()["choices"][0]["message"]["content"])),
+        "sambanova":     ("Sambanova",      lambda: _nonempty(sambanova_post(payload).json()["choices"][0]["message"]["content"])),
+        "deepseek":      ("DeepSeek",       lambda: _nonempty(deepseek_post(payload).json()["choices"][0]["message"]["content"])),
+        "cerebras":      ("Cerebras",       lambda: _nonempty(cerebras_post(payload).json()["choices"][0]["message"]["content"])),
+        "github_models": ("GitHub Models",  lambda: _nonempty(github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"])),
+        "cloudflare":    ("Cloudflare",     lambda: _nonempty(cloudflare_post(system, user_msg, max_tokens=max_tokens))),
+        "gemini":        ("Gemini",         lambda: _nonempty(gemini_post(system, user_msg, max_tokens=max_tokens))),
     }
     return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _ARTIKEL_CHAIN if p in alla]
 
