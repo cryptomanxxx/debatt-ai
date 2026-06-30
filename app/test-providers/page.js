@@ -84,7 +84,7 @@ export default function TestProviders() {
                 {ok ? (
                   <>
                     <div style={{ color: "#ccc", fontSize: 14, marginBottom: 4 }}>
-                      Svar: <span style={{ color: "#fff" }}>{r.text}</span>
+                      Svar: <span style={{ color: r.text ? "#fff" : "#f59e0b" }}>{r.text || "⚠️ tomt svar"}</span>
                     </div>
                     {r.model && (
                       <div style={{ color: "#666", fontSize: 12 }}>Modell: {r.model}</div>
@@ -92,6 +92,13 @@ export default function TestProviders() {
                     {r.availableModels?.length > 0 && (
                       <div style={{ color: "#555", fontSize: 11, marginTop: 4 }}>
                         Tillgängliga: {r.availableModels.join(", ")}
+                      </div>
+                    )}
+                    {r.debug && (
+                      <div style={{ color: "#f59e0b", fontSize: 11, marginTop: 6, background: "#1a1200", padding: "6px 8px", borderRadius: 4 }}>
+                        <div>finish_reason: {r.debug.finish_reason ?? "–"}</div>
+                        <div>message keys: {r.debug.message_keys?.join(", ") ?? "–"}</div>
+                        <div style={{ wordBreak: "break-all" }}>raw: {r.debug.raw_choice}</div>
                       </div>
                     )}
                   </>
