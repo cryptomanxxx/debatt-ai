@@ -194,7 +194,7 @@ def _groq(n: int) -> str:
     r = httpx.post(
         "https://api.groq.com/openai/v1/chat/completions",
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        json={"model": "llama-3.3-70b-versatile",
+        json={"model": "llama-3.3-70b-specdec",
               "messages": [{"role": "system", "content": SYSTEM},
                            {"role": "user", "content": PROMPT}],
               "max_tokens": 200, "temperature": 0.35},
@@ -326,7 +326,7 @@ def _cloudflare(n: int) -> str:
 
 
 PROVIDERS = {
-    "groq":          ("Groq llama-3.3-70b-versatile",     _groq),
+    "groq":          ("Groq llama-3.3-70b-specdec",     _groq),
     "sambanova":     ("Sambanova Meta-Llama-3.3-70B",      _sambanova),
     "cerebras":      ("Cerebras llama-3.3-70b",            _cerebras),
     "github_models": ("GitHub Models Llama-3.3-70B",       _github_models),

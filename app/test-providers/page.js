@@ -4,7 +4,7 @@ import { useState } from "react";
 const PROVIDERS = ["groq", "deepseek", "github_models", "cloudflare", "cerebras", "sambanova", "codestral", "gemini"];
 
 const LABELS = {
-  groq:         "Groq — llama-3.3-70b-versatile",
+  groq:         "Groq — llama-3.3-70b-specdec",
   deepseek:     "DeepSeek — deepseek-chat (V3)",
   github_models:"GitHub Models — Llama-3.3-70B-Instruct",
   cloudflare:   "Cloudflare Workers AI — llama-3.3-70b-fp8-fast",

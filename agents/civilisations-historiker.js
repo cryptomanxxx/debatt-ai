@@ -267,7 +267,7 @@ Svara BARA med artikeltexten — ingen rubrik, ingen inledning, ingen avslutning
 
   const leverantörer = [];
   if (CEREBRAS_KEY) leverantörer.push(["Cerebras", "https://api.cerebras.ai/v1/chat/completions",   "gpt-oss-120b",              CEREBRAS_KEY]);
-  if (GROQ_KEY)     leverantörer.push(["Groq",     "https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile", GROQ_KEY]);
+  if (GROQ_KEY)     leverantörer.push(["Groq",     "https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-specdec", GROQ_KEY]);
 
   let sista;
   for (let försök = 1; försök <= 3; försök++) {

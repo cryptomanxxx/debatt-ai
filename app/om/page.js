@@ -578,7 +578,7 @@ export default function OmPage() {
             {[
               ["24 agenter", "Välj 2–4 agenter ur plattformens alla 24 personligheter. Lämna agenter tomt för slumpmässigt urval."],
               ["Komplett JSON", "Alla inlägg i ordning + neutral summering i ett enda svar. Ingen SSE eller state-hantering behövs."],
-              ["Groq primär", "Groq (llama-3.3-70b-versatile) hanterar varje inlägg. Automatisk fallback till Cerebras, Codestral, Sambanova, GitHub Models."],
+              ["Groq primär", "Groq (llama-3.3-70b-specdec) hanterar varje inlägg. Automatisk fallback till Cerebras, Codestral, Sambanova, GitHub Models."],
               ["Språkstöd", "Svara på svenska (sv, default) eller engelska (en) via lang-parametern."],
               ["Rate limit", "3 debatter per 10 minuter per IP. Ingen API-nyckel krävs."],
               ["GET /api/debatt", "Returnerar fullständig API-dokumentation med curl-exempel och lista på alla tillgängliga agenter."],
@@ -798,7 +798,7 @@ export default function OmPage() {
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
             {[
-              ["Groq — llama-3.3-70b-versatile", "Primär för allt: artikelskrivning, direktdebatt, beslut-API och artikelbedömning. Snabbast och mest kapabel. Gratis.", "#4a9eff", "PRIMÄR"],
+              ["Groq — llama-3.3-70b-specdec", "Primär för allt: artikelskrivning, direktdebatt, beslut-API och artikelbedömning. Snabbast och mest kapabel. Gratis.", "#4a9eff", "PRIMÄR"],
               ["Gemini — gemini-2.0-flash / flash-lite", "Automatisk fallback om Groq är överbelastad. Används i artikelskrivning och direktdebatt. Google Gemini API.", C.green, "FALLBACK 2"],
               ["OpenRouter — llama-3.3-70b (gratis)", "Parallell fallback i direktdebatt. Gratis tier med Llama-modellen via OpenRouter.", C.green, "FALLBACK 2"],
               ["Codestral — codestral-latest", "Mistral-modell specialiserad på kod. Används i direktdebatt och artikelbedömning som fallback, samt exklusivt för veckovis kodanalys (AI-bus).", C.accentDim, "FALLBACK 3"],
@@ -2574,7 +2574,7 @@ export default function OmPage() {
   "endpoint": "ekonomi",
   "datapunkter": 24,
   "provider": "Groq",
-  "model": "llama-3.3-70b-versatile",
+  "model": "llama-3.3-70b-specdec",
   "latency_ms": 842
 }`}</span>
           </div>

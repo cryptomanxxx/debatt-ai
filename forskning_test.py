@@ -249,7 +249,7 @@ def _gini(values: list[float]) -> float:
 
 def _llm(system: str, prompt: str, max_tokens: int = 600) -> str:
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": 0.75,

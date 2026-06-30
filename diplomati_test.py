@@ -203,7 +203,7 @@ def hamta_minister() -> dict:
 
 def _anropa_llm(system_prompt: str, user_prompt: str, max_tokens: int = 350) -> str:
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},

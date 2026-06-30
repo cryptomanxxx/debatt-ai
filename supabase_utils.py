@@ -36,7 +36,7 @@ from agenter import OPINION_FRAGOR
 def _llm_spel(system: str, prompt: str, max_tokens: int = 80) -> str:
     """Kort LLM-anrop för ekonomispel — provar alla providers i dynamisk rankad ordning."""
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         "max_tokens": max_tokens, "temperature": 0.7,
     }
@@ -897,7 +897,7 @@ def rösta_på_opinion(agent: dict, sb_key: str) -> int:
             )
             svar_raw = ""
             _osaker_payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "llama-3.3-70b-specdec",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 5,
                 "temperature": 0.3,
@@ -992,7 +992,7 @@ def skapa_opinion_fraga(agent: dict, sb_key: str, amne: str, rubrik: str = "") -
 
         svar_raw = ""
         _amnesforslag_payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 80,
             "temperature": 0.9,
@@ -1066,7 +1066,7 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
         )
         svar_raw = ""
         _market_payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 150,
             "temperature": 0.85,
@@ -1208,7 +1208,7 @@ Returnera ENDAST JSON (inga andra tecken):
 Välj den indikator som just nu är mest politiskt relevant. typ ska vara 'line' för trender över tid, 'bar' för jämförelser."""
 
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 250,
         "temperature": 0.7,
@@ -1655,7 +1655,7 @@ def fraga_civilisationen(sb_key: str, agent_namn: str, fraga: str, typ: str = "g
     )
     prompt = "\n\n".join(prompt_delar)
     payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         "max_tokens": 180, "temperature": 0.6,
     }
@@ -1950,7 +1950,7 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key
     )
 
     _payload = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b-specdec",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user_msg}],
         "max_tokens": 350,
         "temperature": 0.4,
@@ -2179,7 +2179,7 @@ def rösta_på_lagforslag_block(agent: dict, sb_key: str, parti: dict | None = N
                 "Välj RÖST: ja, nej eller avstar"
             )
             payload = {
-                "model": "llama-3.3-70b-versatile",
+                "model": "llama-3.3-70b-specdec",
                 "messages": [
                     {"role": "system", "content": agent["system"][:600]},
                     {"role": "user", "content": prompt},
@@ -2240,7 +2240,7 @@ def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str, return_id: bool = F
             "Inga andra ord. Ingen inledning."
         )
         payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [
                 {"role": "system", "content": agent["system"][:600]},
                 {"role": "user", "content": prompt},
@@ -2573,7 +2573,7 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
         forslag_system = "Du föreslår politiska allianser."
         forslag = None
         _forslag_payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [{"role": "system", "content": forslag_system}, {"role": "user", "content": forslag_prompt}],
             "max_tokens": 120, "temperature": 0.8,
         }
@@ -2598,7 +2598,7 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
         svar_system = "Du besvarar politiska koalitionsförslag."
         svar = None
         _svar_payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [{"role": "system", "content": svar_system}, {"role": "user", "content": svar_prompt}],
             "max_tokens": 100, "temperature": 0.8,
         }
@@ -2784,7 +2784,7 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         )
         argument = None
         _argument_payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [{"role": "system", "content": lobby_system}, {"role": "user", "content": lobby_user}],
             "max_tokens": 120, "temperature": 0.7,
         }
@@ -2820,7 +2820,7 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
         mal_system = "Du fattar politiska beslut."
         mal_svar = None
         _mal_payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [{"role": "system", "content": mal_system}, {"role": "user", "content": mal_prompt}],
             "max_tokens": 80, "temperature": 0.7,
         }
@@ -3075,7 +3075,7 @@ def kör_bribe(agent: dict, sb_key: str) -> bool:
         )
         argument = None
         _bribe_payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [{"role": "system", "content": bribe_system},
                           {"role": "user", "content": bribe_user}],
             "max_tokens": 120, "temperature": 0.8,
@@ -3102,7 +3102,7 @@ def kör_bribe(agent: dict, sb_key: str) -> bool:
         )
         mal_svar = None
         _lobby_payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [{"role": "system", "content": mal_system},
                           {"role": "user", "content": mal_prompt}],
             "max_tokens": 80, "temperature": 0.7,
@@ -3314,7 +3314,7 @@ def uppdatera_agent_positioner(sb_key: str, agent: dict) -> None:
 
         _system = "Du extraherar ståndpunkter ur debattartiklar."
         _payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [
                 {"role": "system", "content": _system},
                 {"role": "user", "content": prompt},
@@ -6075,7 +6075,7 @@ def reagera_pa_bild(sb_key: str, fran_agent: str, fran_system: str) -> bool:
             f"Var konkret och i karaktär. Inga inledningsfraser."
         )
         payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [
                 {"role": "system", "content": fran_system[:600]},
                 {"role": "user",   "content": prompt_text},
@@ -6555,7 +6555,7 @@ def uppdatera_strategi(sb_key: str, agent_namn: str) -> bool:
     system = "Du är analytisk och kortfattad. Inga inledningar eller sammanfattningar."
 
     svar = ""
-    payload = {"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "max_tokens": 150, "temperature": 0.6}
+    payload = {"model": "llama-3.3-70b-specdec", "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}], "max_tokens": 150, "temperature": 0.6}
     for _name, fn in hamta_kort_fns(payload, system, prompt, 150, source="strategi"):
         try:
             svar = fn()
@@ -6643,7 +6643,7 @@ def analysera_forslag_pis(sb_key: str, forslag_id: int, titel: str, beskrivning:
     )
     try:
         payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
@@ -6786,7 +6786,7 @@ def analysera_pis_monte_carlo(sb_key: str, forslag_id: int, titel: str,
 
     for i in range(iterationer):
         payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "llama-3.3-70b-specdec",
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": prompt}],
             "max_tokens": 160, "temperature": temps[i % len(temps)],
