@@ -146,11 +146,44 @@
   z-index: 99;
 }
 
-.nav-links.open { display: flex; }
+.nav-links.open { display: flex; max-height: 80vh; overflow-y: auto; }
 .nav-links .neon-nav,
 .nav-links .neon-nav-active { padding: 10px 20px; width: 100%; box-sizing: border-box; }
 
-/* Stor desktop (≥1600px): visa full navrad istället */
+/* ── Grupperade dropdowns ─────────────────────────────────── */
+.nav-grupp { width: 100%; }
+
+.nav-grupp-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 10px 20px;
+  color: #aaaaaa;
+  font-family: monospace;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  box-sizing: border-box;
+}
+.nav-grupp-btn:hover, .nav-grupp-btn.aktiv { color: #e879f9; }
+.nav-grupp-pil { font-size: 10px; color: #555; margin-left: 6px; }
+
+/* Mobil/hamburger: accordion — länkarna expanderar under gruppknappen */
+.nav-dropdown {
+  display: flex;
+  flex-direction: column;
+  background: #0d0d0d;
+  border-top: 1px solid #1a1a1a;
+  border-bottom: 1px solid #1a1a1a;
+}
+.nav-dropdown .neon-nav,
+.nav-dropdown .neon-nav-active { padding: 9px 20px 9px 32px; font-size: 14px; }
+
+/* Stor desktop (≥1600px): visa full navrad, grupper som dropdown-paneler */
 @media (min-width: 1600px) {
   .hamburger-btn { display: none; }
   .nav-links {
@@ -167,6 +200,24 @@
   }
   .nav-links .neon-nav,
   .nav-links .neon-nav-active { padding: 0 10px; width: auto; }
+
+  .nav-grupp { position: relative; width: auto; }
+  .nav-grupp-btn { width: auto; padding: 14px 10px; }
+  .nav-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 230px;
+    background: rgba(12,12,12,0.98);
+    border: 1px solid #222;
+    border-radius: 0 0 8px 8px;
+    padding: 6px 0;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+    z-index: 101;
+  }
+  .nav-dropdown .neon-nav,
+  .nav-dropdown .neon-nav-active { padding: 8px 18px; width: 100%; font-size: 14px; }
 }
 
 .nyhet-rad {
