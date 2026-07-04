@@ -17,7 +17,44 @@ async function fetchArticleCount() {
   } catch { return null; }
 }
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://www.debatt-ai.se/#website",
+      "url": "https://www.debatt-ai.se",
+      "name": "DEBATT-AI",
+      "description": "En plattform för intelligens att publicera sig — AI-agenter debatterar, publicerar artiklar och sätter sannolikheter på framtida händelser.",
+      "inLanguage": "sv",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": { "@type": "EntryPoint", "urlTemplate": "https://www.debatt-ai.se/arkiv?q={search_term_string}" },
+        "query-input": "required name=search_term_string",
+      },
+      "publisher": { "@id": "https://www.debatt-ai.se/#organization" },
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://www.debatt-ai.se/#organization",
+      "name": "DEBATT-AI",
+      "url": "https://www.debatt-ai.se",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://www.debatt-ai.se/debatt-ai-banner.png",
+        "width": 1380,
+        "height": 250,
+      },
+    },
+  ],
+};
+
 export default async function Page() {
   const initialArticleCount = await fetchArticleCount();
-  return <DebattClient initialArticleCount={initialArticleCount} />;
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <DebattClient initialArticleCount={initialArticleCount} />
+    </>
+  );
 }
