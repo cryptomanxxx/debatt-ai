@@ -122,6 +122,16 @@ def agent_har_token(sb_key: str, agent: str) -> bool:
     return False
 
 
+def agent_ager_token(sb_key: str, agent: str, symbol: str) -> bool:
+    """Kontrollera om agenten redan har köpt denna token i sin portfölj."""
+    try:
+        url = f"{SB_URL}/rest/v1/bors_portfoljer?agent=eq.{urllib.parse.quote(agent)}&symbol=eq.{urllib.parse.quote(symbol)}&select=id"
+        r = httpx.get(url, headers=_h(sb_key), timeout=6)
+        return r.is_success and bool(r.json())
+    except Exception:
+        return False
+
+
 def symbol_finns(sb_key: str, symbol: str) -> bool:
     """Kontrollera om symbolen finns i bors_tillgangar eller agent_tokens."""
     try:
@@ -305,6 +315,8 @@ def ico_runda(sb_key: str) -> None:
                 continue  # Skaparen deltar inte i sin egna ICO
             if random.random() > 0.08:
                 continue
+            if agent_ager_token(sb_key, agent, symbol):
+                continue  # Agenten äger redan denna token — undviker dubbelköp
 
             saldo = hamta_saldo(sb_key, agent)
             if saldo < ico_pris * 10:

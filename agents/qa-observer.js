@@ -22,8 +22,9 @@
  *   GROQ_API_KEY=... SUPABASE_ANON_KEY=... node agents/qa-observer.js
  */
 
-const fs   = require("fs");
-const path = require("path");
+const fs     = require("fs");
+const path   = require("path");
+const crypto = require("crypto");
 
 const GROQ_KEY     = process.env.GROQ_API_KEY;
 const GEMINI_KEY   = process.env.GEMINI_API_KEY;
@@ -182,7 +183,7 @@ async function hämtaFörraVeckan(vecka) {
   try {
     const rows = await httpsGet(
       "fmwxftnistkoqazfwnuj.supabase.co",
-      `/rest/v1/qa_snapshots?vecka=eq.${prev}&select=sida_path,status,orsak`,
+      `/rest/v1/qa_snapshots?vecka=eq.${prev}&select=sida_path,status,orsak,detalj`,
       { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
     );
     return Array.isArray(rows) ? rows : [];
@@ -323,8 +324,9 @@ async function kör() {
   console.log(`\n🔍 QA-observatör startar — ${BASE_URL} (${vecka})`);
   console.log(`   Kontrollerar ${SIDOR.length} sidor...\n`);
 
-  // Hämta föregående veckas data parallellt med att vi startar browsern
-  const förraLöfte = hämtaFörraVeckan(vecka);
+  // Hämta föregående veckas data — måste vara löst innan loopen för hash-jämförelse
+  const förra    = await hämtaFörraVeckan(vecka);
+  const förraMap = Object.fromEntries(förra.map(r => [r.sida_path, r]));
 
   const browser = await playwright.chromium.launch({ args: ["--no-sandbox"] });
   const context = await browser.newContext({
@@ -345,9 +347,12 @@ async function kör() {
     page.on("pageerror", (err) => konsolfEl.push(`[pageerror] ${err.message.slice(0, 200)}`));
 
     let laddningsfel = null;
+    let htmlHash = null;
     try {
       await page.goto(url, { waitUntil: "load", timeout: 30_000 });
       await page.waitForTimeout(2000);
+      const html = await page.content().catch(() => "");
+      htmlHash = crypto.createHash("md5").update(html).digest("hex");
     } catch (e) {
       laddningsfel = e.message.slice(0, 120);
     }
@@ -360,9 +365,17 @@ async function kör() {
     }
     await page.close();
 
+    // Hash-baserad ändringsdetektion: hoppa över LLM om sidan är oförändrad
+    const förraData  = förraMap[sida.path];
+    const förraHash  = förraData?.detalj?.match(/^\[h:([a-f0-9]{32})\]/)?.[1];
+    const oförändrad = htmlHash && förraHash && förraHash === htmlHash && förraData?.status === "OK";
+
     let analys;
     if (laddningsfel) {
       analys = { status: "FEL", orsak: `Sidan laddades inte: ${laddningsfel}`, detalj: "–" };
+    } else if (oförändrad) {
+      analys = { status: förraData.status, orsak: förraData.orsak, detalj: förraData.detalj };
+      console.log(`  ⏩ ${sida.namn}: oförändrad — återanvänder förra veckans analys`);
     } else if (fs.existsSync(skärmdumpPath)) {
       const b64 = fs.readFileSync(skärmdumpPath).toString("base64");
       console.log(`  📸 Analyserar ${sida.namn}...`);
@@ -382,16 +395,21 @@ async function kör() {
     console.log(`  ${ikon} ${sida.namn}: ${analys.status} — ${analys.orsak}`);
 
     // Spara till Supabase direkt (icke-blockerande fel)
+    // Prependa HTML-hash till detalj för nästa veckas ändringsdetektion
+    const detaljMedHash = htmlHash
+      ? `[h:${htmlHash}] ${analys.detalj.replace(/^\[h:[a-f0-9]{32}\] /, "")}`
+      : analys.detalj;
+
     sparaSnapshot({
       vecka,
       sida_path:          sida.path,
       sida_namn:          sida.namn,
       status:             analys.status,
       orsak:              analys.orsak,
-      detalj:             analys.detalj,
+      detalj:             detaljMedHash,
       konsol_fel_antal:   konsolfEl.length,
       konsol_fel_exempel: konsolfEl.slice(0, 3),
-      screenshot_b64:     fs.existsSync(skärmdumpPath)
+      screenshot_b64:     !oförändrad && fs.existsSync(skärmdumpPath)
                             ? fs.readFileSync(skärmdumpPath).toString("base64")
                             : null,
     });
@@ -400,7 +418,6 @@ async function kör() {
   await browser.close();
 
   // ── Hämta diff ────────────────────────────────────────────────────────────────────────────
-  const förra    = await förraLöfte;
   const diff     = byggDiff(resultat, förra);
   const prevVecka = föregåendeVecka(vecka);
 
