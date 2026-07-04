@@ -368,7 +368,7 @@ async function kör() {
     // Hash-baserad ändringsdetektion: hoppa över LLM om sidan är oförändrad
     const förraData  = förraMap[sida.path];
     const förraHash  = förraData?.detalj?.match(/^\[h:([a-f0-9]{32})\]/)?.[1];
-    const oförändrad = htmlHash && förraHash && förraHash === htmlHash && förraData?.status === "OK";
+    const oförändrad = htmlHash && förraHash && förraHash === htmlHash && förraData?.status === "OK" && konsolfEl.length === 0;
 
     let analys;
     if (laddningsfel) {
@@ -409,7 +409,7 @@ async function kör() {
       detalj:             detaljMedHash,
       konsol_fel_antal:   konsolfEl.length,
       konsol_fel_exempel: konsolfEl.slice(0, 3),
-      screenshot_b64:     !oförändrad && fs.existsSync(skärmdumpPath)
+      screenshot_b64:     fs.existsSync(skärmdumpPath)
                             ? fs.readFileSync(skärmdumpPath).toString("base64")
                             : null,
     });
