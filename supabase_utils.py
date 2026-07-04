@@ -821,12 +821,17 @@ def _uppdatera_saldo_spel(sb_key: str, agent_namn: str, delta: int) -> None:
         pass
 
 
+def berakna_insats(sannolikhet: int, insats_multiplikator: float = 1.0) -> int:
+    """Insats baseras på konfidensgrad: 10 kr vid 50% (ren gissning) → 40 kr vid
+    0%/100% (maxövertygelse). Multiplikator (Kryptoportör 1.5×) cappas vid 60 kr."""
+    confidence = abs(sannolikhet - 50)
+    return max(10, min(60, int((10 + int(confidence * 0.6)) * insats_multiplikator)))
+
+
 def spara_bet(sb_key: str, market_id: int, agent_namn: str, sannolikhet: int, motivering: str, insats_multiplikator: float = 1.0) -> bool:
     """Sparar ett agent-bet i Supabase. Drar insats från saldo_spel."""
     try:
-        # Insats baseras på konfidensgrad: 10–40 kr (x multiplikator för Kryptoportör m.fl.)
-        confidence = abs(sannolikhet - 50)
-        insats = max(10, min(60, int((10 + int(confidence * 0.6)) * insats_multiplikator)))
+        insats = berakna_insats(sannolikhet, insats_multiplikator)
 
         # Kontrollera spelkonto — hoppa över om bankrupt
         saldo_spel = _hamta_saldo_spel(sb_key, agent_namn)
