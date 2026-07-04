@@ -120,7 +120,7 @@ async function hämtaData() {
     hedgefondNav,
     etfInnehav,
   ] = await Promise.all([
-    sb("agent_planbocker?select=agent,saldo,saldo_spel&agent=neq.Statskassa&order=saldo.desc"),
+    sb("agent_planbocker?select=agent,saldo,saldo_spel&agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&order=saldo.desc"),
     sb("oligarki_historik?order=skapad.desc&limit=14&select=skapad,oligarki_risk,gini,social_mobilitet"),
     sb("bors_affarer?order=skapad.desc&limit=100&select=symbol,pris,antal,skapad"),
     sb("bors_priser?order=skapad.desc&limit=50&select=symbol,pris,skapad"),
@@ -180,7 +180,7 @@ function beräknaNyckeltal(data) {
   const oligarkiTrend = oligarkiHist.length >= 2
     ? (Number(oligarkiHist[0].oligarki_risk) - Number(oligarkiHist[Math.min(6, oligarkiHist.length - 1)].oligarki_risk)).toFixed(1)
     : null;
-  const senGini = oligarkiHist[0] ? Number(oligarkiHist[0].gini).toFixed(3) : gini;
+  const senGini = gini.toFixed(3);
 
   return {
     gini, senGini, t3, totalK, medelS,
