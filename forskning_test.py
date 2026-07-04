@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 import httpx
 
 from ai_klient import hamta_kort_fns
+from supabase_utils import SYSTEM_KONTON, berakna_gini
 
 SB_URL  = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY  = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY")
@@ -144,7 +145,10 @@ def _get(path: str, params: dict | None = None) -> list:
 
 def hamta_civilisationsdata() -> dict:
     """Hämtar en ögonblicksbild av civilisationens nyckeldata."""
-    planbocker   = _get("agent_planbocker", {"select": "agent,saldo,saldo_spel", "order": "saldo.desc", "limit": "24"})
+    # limit 30 + klientfilter: systemkonton (Statskassa, Börskassan) ligger i
+    # samma tabell och får inte tränga ut riktiga agenter eller skeva Gini
+    planbocker   = [p for p in _get("agent_planbocker", {"select": "agent,saldo,saldo_spel", "order": "saldo.desc", "limit": "30"})
+                    if p.get("agent") not in SYSTEM_KONTON][:24]
     koalitioner  = _get("agent_koalitioner", {"select": "agent_a,agent_b,styrka,antal_utbyten", "order": "styrka.desc", "limit": "20"})
     ekonomispel  = _get("ekonomi_spel", {"select": "typ,erbjudande,svar", "order": "skapad.desc", "limit": "50"})
     lobbying     = _get("lobbying_log", {"select": "lobbying_agent,mal_agent,belopp,resultat", "order": "skapad.desc", "limit": "50"})
@@ -179,7 +183,7 @@ def bygga_kontext_for_disciplin(disciplin: str, data: dict) -> str:
         if data["planbocker"]:
             saldon = [p["saldo"] for p in data["planbocker"] if p.get("saldo") is not None]
             if saldon:
-                gini = _gini(saldon)
+                gini = berakna_gini(saldon)
                 delar.append(f"Förmögenhetsdata ({len(saldon)} agenter): min={min(saldon):.0f} kr, max={max(saldon):.0f} kr, snitt={sum(saldon)/len(saldon):.0f} kr, Gini={gini:.3f}")
         if data["ekonomispel"]:
             ultimatum = [s for s in data["ekonomispel"] if s.get("typ") == "ultimatum" and s.get("svar")]
@@ -229,18 +233,6 @@ def bygga_kontext_for_disciplin(disciplin: str, data: dict) -> str:
             delar.append(f"Åsiktsdrift: {len(relevanta)} ståndpunkter har förändrats minst 2 ggr")
 
     return "\n".join(delar) if delar else "Begränsade civdata tillgängliga."
-
-
-def _gini(values: list[float]) -> float:
-    if not values:
-        return 0.0
-    n = len(values)
-    s = sorted(values)
-    total = sum(s)
-    if total == 0:
-        return 0.0
-    cum = sum((i + 1) * v for i, v in enumerate(s))
-    return (2 * cum / (n * total)) - (n + 1) / n
 
 
 # ---------------------------------------------------------------------------

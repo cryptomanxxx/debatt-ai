@@ -6,6 +6,7 @@ export const metadata = {
 };
 
 import FormogenhetVy from "./FormogenhetVy";
+import { EXKL_SYSTEM_QS } from "../lib/metrics";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -28,7 +29,7 @@ async function getData() {
     borsPortfoljerRes,
     borsTillgangarRes,
   ] = await Promise.allSettled([
-    fetch(`${SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&order=saldo.desc`, o),
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?${EXKL_SYSTEM_QS}&order=saldo.desc`, o),
     fetch(`${SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo`, o),
     fetch(`${SB_URL}/rest/v1/mark_agare?select=agent,mark_zoner(veckoinkomst)`, o),
     fetch(`${SB_URL}/rest/v1/feedback_rewards?select=fran_agent,till_agent,belopp&order=skapad.desc&limit=500`, o),

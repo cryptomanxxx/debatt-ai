@@ -1,4 +1,5 @@
 import { agentVisuell } from "../agentData";
+import { EXKL_SYSTEM_QS } from "../lib/metrics";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -128,7 +129,7 @@ async function getData() {
       { headers: h, next: { revalidate: 120 } }
     ),
     fetch(
-      `${SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&select=agent,saldo&order=saldo.desc`,
+      `${SB_URL}/rest/v1/agent_planbocker?${EXKL_SYSTEM_QS}&select=agent,saldo&order=saldo.desc`,
       { headers: h, next: { revalidate: 120 } }
     ),
     fetch(

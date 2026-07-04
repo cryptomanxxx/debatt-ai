@@ -12,6 +12,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { EXKL_SYSTEM_QS, gini as beraknaGini } from "../../../lib/metrics";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -32,7 +33,7 @@ async function sb(path, key) {
 async function byggState(key) {
   const [planbocker, positioner, koalitioner, artiklar, symboler, lobbying] =
     await Promise.all([
-      sb("agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc&agent=neq.Statskassa&agent=neq.B%C3%B6rskassan", key),
+      sb(`agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc&${EXKL_SYSTEM_QS}`, key),
       sb("agent_positioner?select=agent,amne,position,styrka,antal_andringar&order=styrka.desc&limit=500", key),
       sb("agent_koalitioner?select=agent_a,agent_b,styrka,antal_utbyten,senast_aktiv&order=styrka.desc", key),
       sb("artiklar?kalla=eq.ai&select=id,rubrik,forfattare,skapad&order=skapad.desc&limit=200", key),
@@ -103,12 +104,7 @@ async function byggState(key) {
 
   // Civilisations-sammanfattning med Gini
   const totalKapital = planbocker.reduce((s, p) => s + p.saldo, 0);
-  const n = planbocker.length || 1;
-  const mean = totalKapital / n;
-  const sorted = [...planbocker].sort((a, b) => a.saldo - b.saldo);
-  let giniNum = 0;
-  sorted.forEach((p, i) => { giniNum += (2 * (i + 1) - n - 1) * p.saldo; });
-  const gini = mean > 0 ? Math.max(0, Math.round((giniNum / (n * n * mean)) * 100) / 100) : 0;
+  const gini = Math.round(beraknaGini(planbocker.map(p => p.saldo)) * 100) / 100;
 
   return {
     generated_at:  new Date().toISOString(),

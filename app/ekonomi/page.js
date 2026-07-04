@@ -1,5 +1,6 @@
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
+import { EXKL_SYSTEM_QS, gini } from "../lib/metrics";
 import GiniSpelGraf from "./GiniSpelGraf";
 import AvvikelseGraf from "./AvvikelseGraf";
 
@@ -45,7 +46,7 @@ async function getData() {
   const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
 
   const [pRes, spelRes, transRes, giniRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&order=saldo.desc`, { headers: hdrs, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?${EXKL_SYSTEM_QS}&order=saldo.desc`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/ekonomi_spel?order=skapad.desc&limit=300`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/agent_transaktioner?order=skapad.desc&limit=30&typ=neq.startkapital`, { headers: hdrs, next: { revalidate: 120 } }),
     fetch(`${SB_URL}/rest/v1/oligarki_historik?select=skapad,gini&order=skapad.asc&limit=120`, { headers: hdrs, next: { revalidate: 120 } }),
@@ -57,17 +58,6 @@ async function getData() {
     transaktioner: transRes.ok ? await transRes.json() : [],
     giniHistorik: giniRes.ok ? await giniRes.json() : [],
   };
-}
-
-function gini(values) {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const n = sorted.length;
-  const sum = sorted.reduce((a, b) => a + b, 0);
-  if (sum === 0) return 0;
-  let g = 0;
-  for (let i = 0; i < n; i++) g += (2 * (i + 1) - n - 1) * sorted[i];
-  return Math.max(0, Math.min(1, g / (n * sum)));
 }
 
 function fmt(iso) {
