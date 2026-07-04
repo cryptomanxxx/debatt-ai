@@ -54,6 +54,29 @@ SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 DEBATT_API = "https://www.debatt-ai.se/api/agent/submit"
 PEXELS_API = "https://api.pexels.com/v1/search"
 
+# Systemkonton i agent_planbocker som aldrig ska ingå i förmögenhetsstatistik
+# (Gini, topp-3-andel, maktindex, rikast/fattigast). Spegling av SYSTEM_KONTON
+# i app/lib/metrics.js — håll listorna synkade.
+SYSTEM_KONTON = {"Statskassa", "Börskassan"}
+
+# Percent-enkodad query-fragment för Supabase REST (ö är inte URL-safe).
+EXKL_SYSTEM_QS = "agent=neq.Statskassa&agent=neq.B%C3%B6rskassan"
+
+
+def berakna_gini(saldon: list) -> float:
+    """Gini-koefficient 0–1 (0 = perfekt jämlikhet). Negativa saldon klampas
+    till 0. Samma implementation som gini() i app/lib/metrics.js."""
+    v = [max(0.0, float(s or 0)) for s in saldon]
+    n = len(v)
+    if n == 0:
+        return 0.0
+    sv = sorted(v)
+    total = sum(sv)
+    if total == 0:
+        return 0.0
+    g = sum((2 * (i + 1) - n - 1) * x for i, x in enumerate(sv))
+    return max(0.0, min(1.0, g / (n * total)))
+
 
 # ── Supabase-läsning ────────────────────────────────────────────
 
@@ -4645,8 +4668,7 @@ def ta_oligarki_snapshot(sb_key: str) -> None:
     bets        = get("agent_bets?select=agent,vinst&avgjord=eq.true")
 
     # Filtrera bort systemkonton — dessa ska inte påverka Gini, top-3-andel eller maktindex
-    _SYSTEM = {"Börskassan", "Statskassa"}
-    planbocker = [p for p in planbocker if p["agent"] not in _SYSTEM]
+    planbocker = [p for p in planbocker if p["agent"] not in SYSTEM_KONTON]
 
     if not planbocker:
         return
@@ -4680,14 +4702,7 @@ def ta_oligarki_snapshot(sb_key: str) -> None:
 
     saldon = [max(0, p["saldo"]) for p in planbocker]
     total_saldo = sum(saldon)
-
-    if total_saldo > 0:
-        sv = sorted(saldon)
-        n = len(sv)
-        g = sum((2 * (i + 1) - n - 1) * v for i, v in enumerate(sv))
-        gini_val = max(0.0, min(1.0, g / (n * total_saldo)))
-    else:
-        gini_val = 0.0
+    gini_val = berakna_gini(saldon)
 
     max_s  = max(saldon) if saldon else 1
     max_sy = max(sym_count.values()) if sym_count else 1

@@ -1,5 +1,6 @@
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import { agentVisuell } from "../agentData";
+import { EXKL_SYSTEM_QS } from "../lib/metrics";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -25,7 +26,7 @@ async function getData() {
 
   const [tppRes, pbRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/tpp_spel?order=skapad.desc&limit=200`, { headers: hdrs, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/agent_planbocker?agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&order=saldo.desc`, { headers: hdrs, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?${EXKL_SYSTEM_QS}&order=saldo.desc`, { headers: hdrs, next: { revalidate: 120 } }),
   ]);
 
   return {

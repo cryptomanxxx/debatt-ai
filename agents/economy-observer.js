@@ -14,6 +14,7 @@
 const fs    = require("fs");
 const path  = require("path");
 const https = require("https");
+const { EXKL_SYSTEM_QS, gini, toppAndel } = require(path.join(__dirname, "..", "app", "lib", "metrics.js"));
 
 const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
 const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -87,24 +88,10 @@ function sb(endpoint) {
   });
 }
 
-function beraknaGini(saldon) {
-  if (!saldon.length) return 0;
-  const s = [...saldon].sort((a, b) => a - b);
-  const n = s.length;
-  const sum = s.reduce((a, b) => a + b, 0);
-  if (sum === 0) return 0;
-  let giniSum = 0;
-  for (let i = 0; i < n; i++) giniSum += (2 * (i + 1) - n - 1) * s[i];
-  return Math.round((giniSum / (n * sum)) * 1000) / 1000;
-}
-
-function topp3Andel(saldon) {
-  if (!saldon.length) return 0;
-  const s = [...saldon].sort((a, b) => b - a);
-  const total = s.reduce((a, b) => a + b, 0);
-  const topp3 = s.slice(0, 3).reduce((a, b) => a + b, 0);
-  return total > 0 ? Math.round((topp3 / total) * 100) : 0;
-}
+// Gini och topp-3 beräknas via app/lib/metrics.js — samma implementation
+// som /oligarki, /ekonomi och /api/v1/state använder.
+const beraknaGini = saldon => Math.round(gini(saldon) * 1000) / 1000;
+const topp3Andel  = saldon => Math.round(toppAndel(saldon, 3) * 100);
 
 async function hämtaData() {
   const vecka = isoVecka();
@@ -120,7 +107,7 @@ async function hämtaData() {
     hedgefondNav,
     etfInnehav,
   ] = await Promise.all([
-    sb("agent_planbocker?select=agent,saldo,saldo_spel&agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&order=saldo.desc"),
+    sb(`agent_planbocker?select=agent,saldo,saldo_spel&${EXKL_SYSTEM_QS}&order=saldo.desc`),
     sb("oligarki_historik?order=skapad.desc&limit=14&select=skapad,oligarki_risk,gini,social_mobilitet"),
     sb("bors_affarer?order=skapad.desc&limit=100&select=symbol,pris,antal,skapad"),
     sb("bors_priser?order=skapad.desc&limit=50&select=symbol,pris,skapad"),

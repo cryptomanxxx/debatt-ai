@@ -1,4 +1,5 @@
 import { AGENT_VISUELL } from "../agentData";
+import { SYSTEM_KONTON, filtreraSystemkonton, gini } from "../lib/metrics";
 import OligarkiGraf from "./OligarkiGraf";
 import Maktkarta from "./Maktkarta";
 import OligarkiTidsserie from "./OligarkiTidsserie";
@@ -54,16 +55,6 @@ async function fetchData() {
   };
 }
 
-function gini(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  const n = sorted.length;
-  const sum = sorted.reduce((a, b) => a + b, 0);
-  if (sum === 0 || n === 0) return 0;
-  let g = 0;
-  for (let i = 0; i < n; i++) g += (2 * (i + 1) - n - 1) * sorted[i];
-  return Math.max(0, Math.min(1, g / (n * sum)));
-}
-
 function avgRate(arr, rateKey, totKey) {
   const active = arr.filter(a => a[totKey] > 0);
   return active.length > 0 ? active.reduce((s, a) => s + a[rateKey], 0) / active.length : 0;
@@ -76,8 +67,8 @@ export default async function OligarkiPage() {
   const { planbocker: allPlanbocker, symboler, koalitioner, lobbying, bets, historik, portfoljer, tillgangar } = raw;
 
   // Exclude system/treasury accounts everywhere — Gini, totals, node sizes, makt
-  const SYSTEM_ACCOUNTS = new Set(["Börskassan", "Statskassa"]);
-  const planbocker = allPlanbocker.filter(p => !SYSTEM_ACCOUNTS.has(p.agent));
+  const SYSTEM_ACCOUNTS = new Set(SYSTEM_KONTON);
+  const planbocker = filtreraSystemkonton(allPlanbocker);
   const prisMap = {};
   for (const t of tillgangar) prisMap[t.symbol] = t.senaste_pris || 0;
   const portfMap = {};

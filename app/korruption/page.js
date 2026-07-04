@@ -1,5 +1,7 @@
 export const revalidate = 120;
 
+import { EXKL_SYSTEM_QS } from "../lib/metrics";
+
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -48,7 +50,7 @@ export default async function KorruptionPage() {
     sbGet(`bribe_scores?period=eq.${period}&order=total_givet_kr.desc`),
     sbGet("bribe_offers?order=skapad.desc&limit=30"),
     sbGet(`corruption_badges?aktiv=eq.true&expires_at=gt.${new Date().toISOString()}&order=skapad.desc`),
-    sbGet("agent_planbocker?select=agent,saldo&agent=neq.Statskassa&order=saldo.desc"),
+    sbGet(`agent_planbocker?select=agent,saldo&${EXKL_SYSTEM_QS}&order=saldo.desc`),
     sbGet("domstol_arenden?artikel_nr=eq.5&order=skapad.desc&limit=10"),
   ]);
 
