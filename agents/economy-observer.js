@@ -120,7 +120,7 @@ async function hämtaData() {
     hedgefondNav,
     etfInnehav,
   ] = await Promise.all([
-    sb("agent_planbocker?select=agent,saldo,saldo_spel&agent=not.in.(Statskassa,Börskassan)&order=saldo.desc"),
+    sb("agent_planbocker?select=agent,saldo,saldo_spel&agent=neq.Statskassa&agent=neq.B%C3%B6rskassan&order=saldo.desc"),
     sb("oligarki_historik?order=skapad.desc&limit=14&select=skapad,oligarki_risk,gini,social_mobilitet"),
     sb("bors_affarer?order=skapad.desc&limit=100&select=symbol,pris,antal,skapad"),
     sb("bors_priser?order=skapad.desc&limit=50&select=symbol,pris,skapad"),
