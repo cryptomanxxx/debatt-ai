@@ -13,16 +13,26 @@ Stack: Next.js App Router, Supabase, Groq (primär AI), Gemini Flash (fallback),
 
 ---
 
-## Senaste sessionen (2026-05-16)
+## Senaste sessionen (2026-07-04)
 
-**Vad som gjordes:**
-- Centraliserad fellogg: ny Supabase-tabell `fel_log` + `logFel()`-funktion i `app/lib/logFel.js`
-- `logFel`-anrop i kanal/expand, kanal/batch-expand, kanal/batch-rubriker, chatt, agent/submit
-- `FellogTab` i admin-panelen: färgkodad tabell (gul=rate_limit, orange=ai_fail, blå=rss_fail, lila=db-fel, röd=server-fel), filter per feltyp, sammanfattningskort, senaste 7 dagarna
+**Vad som gjordes (8 mergade PR:ar, #1193–#1200):**
+- **Gemensam statistikkälla** (#1194, #1195): Gini beräknades på 5 ställen oberoende av varandra med olika systemkontofiltrering — economy-observern rapporterade Gini 0.862 samma dag som /oligarki visade 0.339 (Börskassan, 100 000 kr, ingick i den ena). Nu finns `app/lib/metrics.js` (CommonJS: `gini()`, `toppAndel()`, `filtreraSystemkonton()`, `SYSTEM_KONTON`, `EXKL_SYSTEM_QS`) och Python-spegeln i `supabase_utils.py` (`berakna_gini()`, `SYSTEM_KONTON`, `EXKL_SYSTEM_QS`). Fyra sidor som glömt filtrera Börskassan fixades (korruption, staten, formogenhet, forskning_test).
+- **CI-testsvit** (#1199): `tests/test_berakningar.py` (pytest, 19 tester) + `tests/metrics.test.mjs` (node:test, 11 tester) körs via `.github/workflows/tests.yml` vid varje push/PR som rör `*.py`, `metrics.js` eller `tests/`. Inkluderar paritetstester Python↔JS och Börskassan-scenariot som regressionstest. `berakna_insats()` extraherades ur `spara_bet()` för testbarhet.
+- **Cachad aktivitetsfeed** (#1196): startsidans 26 Supabase-fetchar per besökare var 30:e sekund flyttade till `GET /api/aktivitet` med 25s in-memory-cache + CDN s-maxage. Klientens `fetchAktivitetsFeed()` är nu en tunn fetch.
+- **SEO** (#1197): `metadataBase` + självrefererande canonical (`"./"`) i layout, og:article publishedTime/authors/tags per artikel, 34 saknade sidor i sitemap, robots blockerar testsidor + /api/, WebSite/Organization JSON-LD med SearchAction på startsidan.
+- **"Vad är detta?"-intro** (#1198): avvisningsbar sektion under hero på startsidan (localStorage-nyckel `introDold`), tre ingångar: /arkiv, /chatt, /hjarnan.
+- **Grupperad nav** (#1200): GlobalNav har nu toppnivå (Hem/Nyheter/Direktdebatt/Arkiv/Debatthistorik) + fem dropdown-grupper (Debatt/Ekonomi/Politik/Socialt/Spel & Mer, 63 sidor). Desktop: klick-dropdowns; mobil: accordion. Footern förblir det kompletta indexet. Startsidans egen SPA-nav orörd.
+- **ai-bus-städning** (#1193): QA-observern hash-cachar oförändrade sidor (MD5 i `detalj`-fältet, `[h:…]`-prefix; cache gäller bara vid 0 konsolfel, skärmdump sparas alltid för qa-tidslinjen), `agent_ager_token()` förhindrar ICO-dubbelköp. 11 inaktuella Codestral-förslag avvisade med rationale.
+
+**Viktiga regler framåt:**
+- All Gini/förmögenhetsstatistik ska gå via `app/lib/metrics.js` (JS) resp. `berakna_gini`/`SYSTEM_KONTON` i `supabase_utils.py` (Python) — aldrig egna inline-implementationer. Testerna i `tests/` låser pariteten.
+- Systemkontona `Statskassa` och `Börskassan` ska ALLTID filtreras ur förmögenhetsdata. Använd `EXKL_SYSTEM_QS` i Supabase-queries (percent-enkodad — rå "ö" i URL-path ger HPE_INVALID_URL i Node).
+- Codex granskar varje PR automatiskt: kommenterar vid fynd, reagerar med 👍 på PR-beskrivningen vid godkänt utan anmärkningar. Kolla reaktionen innan merge om ingen kommentar synts inom ~3 min.
 
 **Varför vi valde dessa lösningar:**
-- Fire-and-forget (`.catch(() => {})`) — samma mönster som `logAiCall`, påverkar inte request-flödet
-- Separata kolumner (kalla, feltyp, meddelande, ip, extra) — enkelt att filtrera i admin utan att parsa JSON
+- `metrics.js` som CommonJS — kan både importeras av Next-sidor och `require()`:as av fristående `agents/`-skript (ingen `"type": "module"` i package.json)
+- Nodes inbyggda testrunner (`node --test`) — noll nya beroenden
+- Paritetstest som parsar JS-filen från Python — Gini-implementationerna kan inte glida isär obemärkt
 
 ---
 
