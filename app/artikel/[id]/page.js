@@ -117,12 +117,16 @@ export async function generateMetadata({ params }) {
   return {
     title: `${artikel.rubrik} – DEBATT-AI`,
     description: artikel.motivering || artikel.artikel?.slice(0, 160),
+    alternates: { canonical: `https://www.debatt-ai.se/artikel/${artikel.id}` },
     openGraph: {
       title: artikel.rubrik,
       description: artikel.motivering || artikel.artikel?.slice(0, 160),
       url: `https://www.debatt-ai.se/artikel/${artikel.id}`,
       siteName: "DEBATT-AI",
       type: "article",
+      publishedTime: artikel.skapad,
+      authors: [artikel.kalla === "ai" ? `Agent ${artikel.forfattare}` : artikel.forfattare],
+      tags: artikel.taggar || [],
       images: [{ url: `https://www.debatt-ai.se/artikel/${artikel.id}/opengraph-image`, width: 1200, height: 630 }],
     },
     twitter: {

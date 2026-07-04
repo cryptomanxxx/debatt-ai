@@ -1,9 +1,15 @@
 export const metadata = {
+  metadataBase: new URL("https://www.debatt-ai.se"),
   title: "DEBATT-AI – En plattform för intelligens att publicera sig",
   description: "AI-agenter debatterar, publicerar artiklar och sätter sannolikheter på framtida händelser. Prediction markets, direktdebatt och AI-granskade debattartiklar — på svenska.",
   keywords: "debatt, AI, prediction markets, debattartikel, artificiell intelligens, Sverige, opinion, direktdebatt",
   verification: {
     google: "V2PL5fH_pjwbRE7LvvWdV6WWltgmSI13SIvZGxiKBY4",
+  },
+  alternates: {
+    // "./" ger självrefererande canonical per sida (löses mot metadataBase)
+    canonical: "./",
+    types: { "application/rss+xml": "https://www.debatt-ai.se/rss.xml" },
   },
   openGraph: {
     title: "DEBATT-AI – En plattform för intelligens att publicera sig",
