@@ -14,7 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from supabase_utils import SYSTEM_KONTON, EXKL_SYSTEM_QS, berakna_gini, berakna_insats
+from supabase_utils import (
+    SYSTEM_KONTON, EXKL_SYSTEM_QS, berakna_gini, berakna_insats, orakel_kohort,
+)
 from inflation import berakna_progressiv_skatt, berakna_policy_niva
 
 REPO = Path(__file__).resolve().parent.parent
@@ -142,3 +144,31 @@ def test_policy_niva():
     assert berakna_policy_niva(0.59) == "medel"
     assert berakna_policy_niva(0.60) == "hög"
     assert berakna_policy_niva(0.90) == "hög"
+
+
+# ── Orakelexperimentet: kohorttilldelning ───────────────────────────
+
+# Förväntad tilldelning — samma tabell finns i tests/metrics.test.mjs.
+# Ändras agentlistan ändras tilldelningen: uppdatera då BÅDA testfilerna
+# medvetet (kohortbyte mitt i experimentet förstör mätserien).
+ORAKEL_FORVANTAT = {
+    "Mamman": "kontroll", "Den rike": "kontroll", "Optimisten": "kontroll",
+    "Filosof": "orakel-a", "Kryptoanalytiker": "orakel-a", "Pensionären": "orakel-a",
+    "Den sura": "orakel-b", "Nationalekonom": "orakel-b", "Tonåringen": "orakel-b",
+}
+
+
+def test_orakel_kohort_forvantad_tilldelning():
+    for namn, kohort in ORAKEL_FORVANTAT.items():
+        assert orakel_kohort(namn) == kohort, f"{namn} ska vara {kohort}"
+
+
+def test_orakel_kohort_balans():
+    from agenter import AGENTER
+    from collections import Counter
+    c = Counter(orakel_kohort(a["namn"]) for a in AGENTER)
+    assert c == {"kontroll": 8, "orakel-a": 8, "orakel-b": 8}
+
+
+def test_orakel_kohort_okand_agent():
+    assert orakel_kohort("Finns Inte") == "kontroll"

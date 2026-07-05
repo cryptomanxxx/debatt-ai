@@ -79,6 +79,7 @@ const GRUPPER = [
       { href: "/asiktsdrift",   label: "Åsiktsdrift" },
       { href: "/universitet",   label: "AI-Universitetet" },
       { href: "/visdomsspelet", label: "Visdomsspelet" },
+      { href: "/orakel",        label: "Oraklet 🔮" },
       { href: "/intelligens",   label: "Intelligens" },
       { href: "/hjarnan",       label: "Hjärnan" },
       { href: "/narrativ",      label: "Narrativ" },
