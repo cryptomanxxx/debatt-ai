@@ -1919,6 +1919,11 @@ def hamta_eller_skapa_orakel_rad(sb_key: str, market: dict) -> dict:
     if not saknade:
         return resultat
 
+    # INSERT kräver service role — anon-nyckeln är publik och får inte kunna
+    # förgifta orakel-cachen (RLS: ingen anon-INSERT-policy på hjarna_rad)
+    import os as _os
+    write_key = _os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+
     underlag = _orakel_underlag(market, sb_key)
     for arm in saknade:
         bed = _generera_orakel_bedomning(market, underlag, arm)
@@ -1927,7 +1932,7 @@ def hamta_eller_skapa_orakel_rad(sb_key: str, market: dict) -> dict:
         try:
             ins = httpx.post(
                 f"{SB_URL}/rest/v1/hjarna_rad",
-                headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+                headers={"apikey": write_key, "Authorization": f"Bearer {write_key}"},
                 json={"market_id": market["id"], "arm": arm, "sannolikhet": bed["sannolikhet"],
                       "motivering": bed["motivering"], "model": bed["model"]},
                 timeout=8,
@@ -1940,12 +1945,15 @@ def hamta_eller_skapa_orakel_rad(sb_key: str, market: dict) -> dict:
 
 
 def formatera_orakel_rad(rad: dict) -> str:
-    """Formaterar en orakelbedömning för injektion i agentens beslutsunderlag."""
+    """Formaterar en orakelbedömning för injektion i agentens beslutsunderlag.
+    Håll totalen under ~450 tecken — scenario-scoringen i estimera_sannolikhet
+    klipper underlaget vid 500 tecken och rådet prependas för att överleva."""
     if not rad:
         return ""
+    motivering = (rad.get("motivering") or "")[:220]
     return (
         f"CIVILISATIONENS HJÄRNA (neutral analytisk rådgivare) bedömer sannolikheten till "
-        f"{rad['sannolikhet']}% — motivering: {rad.get('motivering', '')} "
+        f"{rad['sannolikhet']}% — motivering: {motivering} "
         f"Du avgör själv, utifrån din karaktär, hur mycket du litar på denna bedömning."
     )
 
@@ -2004,9 +2012,12 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key
     if nyhets_kontext:
         kontext_delar.append(nyhets_kontext)
 
-    # 6. Orakelexperimentet: hjärnans råd (bara för orakel-kohorterna)
+    # 6. Orakelexperimentet: hjärnans råd (bara för orakel-kohorterna).
+    # PREPENDAS — scenario-scoringen trunkerar underlaget till 500 tecken
+    # (kontext_str[:500]) och rådet får aldrig klippas bort ur de avgörande
+    # prompterna, då beter sig orakel-kohorterna som kontrollgruppen.
     if orakel_kontext:
-        kontext_delar.append(orakel_kontext)
+        kontext_delar.insert(0, orakel_kontext)
 
     kontext_str = "\n\n".join(kontext_delar)
 

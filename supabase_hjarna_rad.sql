@@ -27,8 +27,8 @@ drop policy if exists "hjarna_rad_public_select" on hjarna_rad;
 create policy "hjarna_rad_public_select" on hjarna_rad
   for select using (true);
 
--- Agenterna kör med anon-nyckeln i GitHub Actions — INSERT måste tillåtas.
--- UNIQUE-constrainten skyddar mot dubbletter vid parallella körningar.
+-- INSERT sker med SUPABASE_SERVICE_ROLE_KEY (kringgår RLS) — ingen
+-- anon-INSERT-policy. Anon-nyckeln är publik i Next-appen och en öppen
+-- policy skulle låta vem som helst pre-seeda (market_id, arm) och
+-- permanent förgifta orakelbedömningen tack vare UNIQUE-constrainten.
 drop policy if exists "hjarna_rad_anon_insert" on hjarna_rad;
-create policy "hjarna_rad_anon_insert" on hjarna_rad
-  for insert with check (true);
