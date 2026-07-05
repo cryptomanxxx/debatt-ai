@@ -1,6 +1,7 @@
 export const revalidate = 300;
 
 import VisdomsspeletGraf from "./VisdomsspeletGraf";
+import { bootstrapKI } from "../lib/metrics";
 
 export const metadata = {
   title: "Visdomsspelet – DEBATT-AI",
@@ -119,8 +120,15 @@ export default async function VisdomsspeletPage() {
     giltiga.map(s => crowdAdvantage(s.genomsnittligt_individuellt_fel, s.kollektivt_fel))
   );
 
+  // 95% bootstrap-KI för crowd advantage — parat per spel (samma fråga, samma
+  // facit för kollektiv och individ). Seedad PRNG → stabilt mellan renders.
+  // Svarar på frågan "kan +X% vara slumpen?": hela intervallet > 0 = robust.
+  const caVarden = giltiga.map(s => crowdAdvantage(capV(s.genomsnittligt_individuellt_fel), capV(s.kollektivt_fel)));
+  const caKI = bootstrapKI(caVarden);
+
   const perLage = ["oberoende", "sekventiellt", "deliberativt"].map(lage => {
     const grupp = giltiga.filter(s => s.lage === lage);
+    const gruppCA = grupp.map(s => crowdAdvantage(capV(s.genomsnittligt_individuellt_fel), capV(s.kollektivt_fel)));
     return {
       lage,
       antal: grupp.length,
@@ -129,11 +137,14 @@ export default async function VisdomsspeletPage() {
         : 0,
       snittFel: snitt(grupp.map(s => capV(s.kollektivt_fel))),
       snittDiversitet: snitt(grupp.map(s => capV(s.diversitet))),
-      snittCrowdAdvantage: snitt(
-        grupp.map(s => crowdAdvantage(capV(s.genomsnittligt_individuellt_fel), capV(s.kollektivt_fel)))
-      ),
+      snittCrowdAdvantage: snitt(gruppCA),
+      caKI: grupp.length >= 8 ? bootstrapKI(gruppCA) : null,
     };
   });
+
+  const fmtKI = ki => ki ? `${ki.lag >= 0 ? "+" : ""}${ki.lag.toFixed(0)}% till ${ki.hog >= 0 ? "+" : ""}${ki.hog.toFixed(0)}%` : null;
+  // Grön = hela intervallet över 0 (robust), röd = helt under 0, grå = kan vara slump
+  const kiFarg = ki => !ki ? C.dim : ki.lag > 0 ? C.green : ki.hog < 0 ? C.red : C.dim;
 
   const grafData = giltiga.slice().reverse().map(s => ({
     label: kortLabel(s.skapad),
@@ -191,6 +202,8 @@ export default async function VisdomsspeletPage() {
             label: "Crowd advantage",
             value: `${snittCrowdAdvantage >= 0 ? "+" : ""}${snittCrowdAdvantage.toFixed(1)}%`,
             color: snittCrowdAdvantage >= 0 ? C.green : C.red,
+            sub: caKI ? `95% KI: ${fmtKI(caKI)}` : null,
+            subColor: kiFarg(caKI),
           },
           { label: "Kollektivt fel", value: `${snittKollektivtFel.toFixed(1)}%`, color: C.accent },
           { label: "Individuellt fel", value: `${snittIndividuelltFel.toFixed(1)}%`, color: C.orange },
@@ -206,6 +219,11 @@ export default async function VisdomsspeletPage() {
             <div style={{ fontSize: "10px", color: C.dim, fontFamily: "monospace", letterSpacing: "0.08em", marginTop: "4px" }}>
               {s.label.toUpperCase()}
             </div>
+            {s.sub && (
+              <div style={{ fontSize: "9px", color: s.subColor || C.dim, fontFamily: "monospace", marginTop: "3px" }}>
+                {s.sub}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -256,6 +274,9 @@ export default async function VisdomsspeletPage() {
                       {p.snittCrowdAdvantage >= 0 ? "+" : ""}{p.snittCrowdAdvantage.toFixed(1)}%
                     </div>
                     <div style={{ fontSize: "9px", color: C.dimmer, fontFamily: "monospace" }}>CROWD ADVANTAGE</div>
+                    <div style={{ fontSize: "8px", color: kiFarg(p.caKI), fontFamily: "monospace", marginTop: "2px" }}>
+                      {p.caKI ? `KI: ${fmtKI(p.caKI)}` : "för få spel för KI"}
+                    </div>
                   </div>
                   <div>
                     <div style={{ fontSize: "18px", fontWeight: 700, color: C.accent, fontFamily: "monospace" }}>
@@ -431,6 +452,11 @@ export default async function VisdomsspeletPage() {
                 icon: "📊",
                 rubrik: "Verifierbara fakta, inte åsikter",
                 text: `Varje fråga har ett exakt, objektivt facit hämtat live från Supabase — antal artiklar, aktiva lån, Gini-koefficient, statskassans saldo m.fl. Det gör Visdomsspelet falsifierbart på ett sätt som AI-Parlamentets omröstningar eller prediction markets inte kan vara: det finns alltid ett rätt svar att mäta mot.`,
+              },
+              {
+                icon: "🎲",
+                rubrik: "Kan det vara slumpen? Bootstrap-konfidensintervall",
+                text: `Crowd advantage-siffran visas med ett 95% konfidensintervall beräknat med parat bootstrap (2 000 omsamplingar av hela spel, percentilmetoden). Parningen är viktig: kollektivets och individernas fel jämförs på samma fråga med samma facit. Om hela intervallet ligger över 0% (grönt) kan slumpen uteslutas med rimlig säkerhet — spänner det över 0% (grått) behövs fler spel innan slutsatser dras. Per-läge-intervallen kräver minst 8 spel.`,
               },
             ].map(s => (
               <div key={s.rubrik} style={{ display: "flex", gap: "14px" }}>
