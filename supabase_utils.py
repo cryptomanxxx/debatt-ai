@@ -1822,7 +1822,143 @@ def hamta_nyhetskontext_for_market(market: dict) -> str:
     return "Aktuella nyheter inom ämnesområdet:\n" + "\n".join(rubriker[:8])
 
 
-def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key: str = "") -> tuple[int, str]:
+# ── Orakelexperimentet — civilisationens hjärna som rådgivare ──────
+#
+# RCT i tre armar: kontroll (inget råd), orakel-a (råd från dagens
+# fallback-kedja) och orakel-b (råd från Claude via anthropic_post).
+# Båda armarna får IDENTISKT underlag och IDENTISK prompt — skillnaden
+# i utfall isolerar ren modellintelligens. Rådet genereras en gång per
+# market och cachas i hjarna_rad-tabellen. Dashboard: /orakel.
+
+ORAKEL_KOHORTER = ("kontroll", "orakel-a", "orakel-b")
+
+
+def orakel_kohort(agent_namn: str) -> str:
+    """Deterministisk kohorttilldelning: round-robin över alfabetiskt
+    sorterade agentnamn → exakt 8/8/8. En agent byter aldrig kohort så
+    länge agentlistan är oförändrad. Speglas i app/lib/orakel.js —
+    paritetstest i tests/ låser att båda sidor ger samma tilldelning.
+    Sortering via Unicode-kodpunkter (Python default) på båda sidor."""
+    from agenter import AGENTER
+    sorterade = sorted(a["namn"] for a in AGENTER)
+    if agent_namn not in sorterade:
+        return "kontroll"
+    return ORAKEL_KOHORTER[sorterade.index(agent_namn) % 3]
+
+
+def _orakel_underlag(market: dict, sb_key: str) -> str:
+    """Neutralt beslutsunderlag för oraklet — nyheter + sportbastal.
+    Medvetet UTAN agentkonsensus: oraklet ska vara oberoende av flocken."""
+    delar = []
+    hint = _sport_basrate_hint(market)
+    if hint:
+        delar.append(hint)
+    nyheter = hamta_nyhetskontext_for_market(market)
+    if nyheter:
+        delar.append(nyheter)
+    return "\n\n".join(delar)
+
+
+def _generera_orakel_bedomning(market: dict, underlag: str, arm: str) -> dict | None:
+    """Ett orakelanrop för given arm. Returnerar {sannolikhet, motivering, model} eller None."""
+    deadline_str = market.get("deadline", "")[:10]
+    system = (
+        "Du är civilisationens hjärna — en neutral, analytisk prognosmakare utan personlighet. "
+        "Ditt enda mål är maximal kalibrering: din angivna sannolikhet ska över många frågor "
+        "matcha den faktiska utfallsfrekvensen. Svara ALLTID med enbart JSON."
+    )
+    prompt = (
+        f"Fråga: {market['titel']}\n"
+        f"Beskrivning: {market.get('beskrivning') or ''}\n"
+        f"Deadline: {deadline_str}\n"
+        + (f"\nBeslutsunderlag:\n{underlag}\n" if underlag else "")
+        + "\nVilken är sannolikheten (0–100) att utfallet är JA vid deadline?\n"
+        "KALIBRERING: 50% = total osäkerhet. Avvik bara med konkreta skäl ur underlaget eller kända basfrekvenser.\n"
+        'JSON (inget annat): {"sannolikhet": <heltal 0-100>, "motivering": "<2-3 meningar>"}'
+    )
+    try:
+        if arm == "b":
+            from ai_klient import anthropic_post
+            raw = anthropic_post(system, prompt, max_tokens=300)
+            model = "claude-sonnet-5"
+        else:
+            raw = _llm_spel(system, prompt, max_tokens=300)
+            model = "fallback-kedjan"
+        if not raw:
+            return None
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if not m:
+            return None
+        parsed = json.loads(m.group())
+        s = max(0, min(100, int(parsed.get("sannolikhet", -1))))
+        if parsed.get("sannolikhet") is None or int(parsed.get("sannolikhet", -1)) < 0:
+            return None
+        return {"sannolikhet": s, "motivering": str(parsed.get("motivering", ""))[:400], "model": model}
+    except Exception:
+        return None
+
+
+def hamta_eller_skapa_orakel_rad(sb_key: str, market: dict) -> dict:
+    """Hämtar cachade orakelbedömningar för ett market — genererar och sparar
+    de som saknas (båda armarna, för hjärna-mot-hjärna-jämförelsen).
+    Returnerar {"a": {...}, "b": {...}} där en arm kan saknas. Fail-open:
+    saknas hjarna_rad-tabellen eller misslyckas LLM-anropen returneras {}."""
+    resultat = {}
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/hjarna_rad?market_id=eq.{market['id']}&select=arm,sannolikhet,motivering,model",
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}, timeout=8,
+        )
+        if r.is_success:
+            for rad in r.json():
+                resultat[rad["arm"]] = rad
+    except Exception:
+        return {}
+
+    saknade = [arm for arm in ("a", "b") if arm not in resultat]
+    if not saknade:
+        return resultat
+
+    # INSERT kräver service role — anon-nyckeln är publik och får inte kunna
+    # förgifta orakel-cachen (RLS: ingen anon-INSERT-policy på hjarna_rad)
+    import os as _os
+    write_key = _os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+
+    underlag = _orakel_underlag(market, sb_key)
+    for arm in saknade:
+        bed = _generera_orakel_bedomning(market, underlag, arm)
+        if not bed:
+            continue  # arm B utan ANTHROPIC_API_KEY hamnar här — experimentet fortsätter utan
+        try:
+            ins = httpx.post(
+                f"{SB_URL}/rest/v1/hjarna_rad",
+                headers={"apikey": write_key, "Authorization": f"Bearer {write_key}"},
+                json={"market_id": market["id"], "arm": arm, "sannolikhet": bed["sannolikhet"],
+                      "motivering": bed["motivering"], "model": bed["model"]},
+                timeout=8,
+            )
+            if ins.is_success or ins.status_code == 409:  # 409 = annan körning hann före
+                resultat[arm] = bed
+        except Exception:
+            continue
+    return resultat
+
+
+def formatera_orakel_rad(rad: dict) -> str:
+    """Formaterar en orakelbedömning för injektion i agentens beslutsunderlag.
+    Håll totalen under ~450 tecken — scenario-scoringen i estimera_sannolikhet
+    klipper underlaget vid 500 tecken och rådet prependas för att överleva."""
+    if not rad:
+        return ""
+    motivering = (rad.get("motivering") or "")[:220]
+    return (
+        f"CIVILISATIONENS HJÄRNA (neutral analytisk rådgivare) bedömer sannolikheten till "
+        f"{rad['sannolikhet']}% — motivering: {motivering} "
+        f"Du avgör själv, utifrån din karaktär, hur mycket du litar på denna bedömning."
+    )
+
+
+def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key: str = "", orakel_kontext: str = "") -> tuple[int, str]:
     """Uppskattar sannolikheten (0-100) via MCTS-inspirerad scenario-simulering.
 
     Steg 1: Generera 3 framtidsscenarier med vikter (ett LLM-anrop).
@@ -1875,6 +2011,13 @@ def estimera_sannolikhet(agent: dict, market: dict, extra_data: str = "", sb_key
     nyhets_kontext = hamta_nyhetskontext_for_market(market)
     if nyhets_kontext:
         kontext_delar.append(nyhets_kontext)
+
+    # 6. Orakelexperimentet: hjärnans råd (bara för orakel-kohorterna).
+    # PREPENDAS — scenario-scoringen trunkerar underlaget till 500 tecken
+    # (kontext_str[:500]) och rådet får aldrig klippas bort ur de avgörande
+    # prompterna, då beter sig orakel-kohorterna som kontrollgruppen.
+    if orakel_kontext:
+        kontext_delar.insert(0, orakel_kontext)
 
     kontext_str = "\n\n".join(kontext_delar)
 

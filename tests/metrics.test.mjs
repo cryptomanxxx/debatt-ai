@@ -74,3 +74,30 @@ test("EXKL_SYSTEM_QS är ren ASCII (rå ö ger HPE_INVALID_URL i Node)", () => {
   assert.ok(/^[\x00-\x7F]*$/.test(EXKL_SYSTEM_QS));
   assert.ok(EXKL_SYSTEM_QS.includes("B%C3%B6rskassan"));
 });
+
+// ── Orakelexperimentet: kohorttilldelning (paritet med Python) ──────
+
+const { orakelKohort, AGENTER: ORAKEL_AGENTER } = require("../app/lib/orakel.js");
+
+// Samma förväntningstabell som i tests/test_berakningar.py — ändra alltid båda.
+const ORAKEL_FORVANTAT = {
+  "Mamman": "kontroll", "Den rike": "kontroll", "Optimisten": "kontroll",
+  "Filosof": "orakel-a", "Kryptoanalytiker": "orakel-a", "Pensionären": "orakel-a",
+  "Den sura": "orakel-b", "Nationalekonom": "orakel-b", "Tonåringen": "orakel-b",
+};
+
+test("orakelKohort: förväntad tilldelning (paritet med Python)", () => {
+  for (const [namn, kohort] of Object.entries(ORAKEL_FORVANTAT)) {
+    assert.equal(orakelKohort(namn), kohort, `${namn} ska vara ${kohort}`);
+  }
+});
+
+test("orakelKohort: exakt 8/8/8-balans", () => {
+  const c = { "kontroll": 0, "orakel-a": 0, "orakel-b": 0 };
+  for (const namn of ORAKEL_AGENTER) c[orakelKohort(namn)]++;
+  assert.deepEqual(c, { "kontroll": 8, "orakel-a": 8, "orakel-b": 8 });
+});
+
+test("orakelKohort: okänd agent → kontroll", () => {
+  assert.equal(orakelKohort("Finns Inte"), "kontroll");
+});

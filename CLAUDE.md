@@ -2162,6 +2162,34 @@ Sidan `/intelligens` mäter empiriskt om AI-agenterna faktiskt blir smartare öv
 | `app/intelligens/page.js` | SSR-sida. Fetchar agent_ki + artiklar, processar KI-tillväxt, bins, kvalitetstrend och KI-bibliotek server-side. |
 | `app/intelligens/IntelligensVy.js` | Klientkomponent med fyra Recharts-sektioner och kollapsibara KI-bibliotekskort. |
 
+### ✅ 91. Orakelexperimentet (/orakel) — hjärnan som prediction market-rådgivare – KLART
+RCT som mäter var intelligensvärde faktiskt sitter: kan en rådgivare förbättra agenternas kalibrering — och spelar modellens råstyrka någon roll?
+
+**Tre armar (deterministisk round-robin över alfabetiskt sorterade agentnamn, exakt 8/8/8):**
+| Kohort | Får |
+|---|---|
+| `kontroll` | Inget råd — bettar som förut |
+| `orakel-a` | Råd från dagens fallback-kedja |
+| `orakel-b` | Råd från Claude (`anthropic_post()` i `ai_klient.py`, kräver `ANTHROPIC_API_KEY`) |
+
+**Mekanik:** Innan en orakel-kohortagent bettar genereras hjärnans bedömning för marketen — **en gång per market och arm**, cachas i `hjarna_rad` (UNIQUE(market_id, arm)). Båda armarna får identiskt underlag (nyheter + sportbastal, medvetet UTAN agentkonsensus) och identisk prompt — skillnaden isolerar ren modellintelligens. Rådet injiceras i agentens beslutsunderlag med formuleringen att agenten själv, i karaktär, avgör hur mycket den litar på det. Fail-open överallt: saknad tabell/nyckel → agenten bettar utan råd.
+
+**Mätvärden på `/orakel`:** Brier score per kohort (bets efter 2026-07-05), hjärnans egen Brier per arm (hjärna-mot-hjärna), följsamhet (snittavstånd bet↔råd), kohorttilldelning, senaste bedömningar med utfall. Sportmarkets (avgörs inom dagar) driver datainsamlingen.
+
+**Regel:** Anthropic-anropet ligger i `ai_klient.py` (lint-regeln) men ingår INTE i fallback-kedjorna — arm B får aldrig tyst ersättas av en annan provider, då förstörs experimentet. Kohorttilldelningen speglas i `app/lib/orakel.js`; paritetstester i `tests/` låser att Python och JS ger identisk tilldelning. Ändra aldrig agentlistan utan att uppdatera båda testfilernas förväntningstabeller — kohortbyte mitt i experimentet förstör mätserien.
+
+| Fil | Roll |
+|---|---|
+| `supabase_hjarna_rad.sql` | Tabell `hjarna_rad` (market_id, arm, sannolikhet, motivering, model) + RLS |
+| `supabase_utils.py` → `orakel_kohort()` | Deterministisk 8/8/8-kohorttilldelning |
+| `supabase_utils.py` → `hamta_eller_skapa_orakel_rad()` | Cachar/genererar båda armarnas bedömningar per market |
+| `supabase_utils.py` → `formatera_orakel_rad()` | Formaterar rådet för agentens beslutsunderlag |
+| `ai_klient.py` → `anthropic_post()` | Claude-anrop för arm B — exklusivt för oraklet, ej i fallback-kedjan |
+| `agent.py` | Betting-loopen: kohortcheck → hämta/skapa råd → injicera via `orakel_kontext` |
+| `app/lib/orakel.js` | JS-spegel av kohorttilldelningen (CommonJS) |
+| `app/orakel/page.js` | Dashboard: kohort-Brier, hjärna-mot-hjärna, följsamhet, bedömningslista. SSR 300s |
+| `.github/workflows/agent.yml` | `ANTHROPIC_API_KEY` tillagd i env |
+
 ---
 
 ## Den autonoma debatten – slutvisionen

@@ -447,3 +447,38 @@ def cloudflare_post(system_prompt: str, user_message: str, max_tokens: int = 200
     if not text:
         raise Exception(f"Cloudflare: tomt svar — {r.text[:200]}")
     return text
+
+
+def anthropic_post(system_prompt: str, user_message: str, max_tokens: int = 500, timeout: int = 60) -> str:
+    """Anthropic Claude — används EXKLUSIVT av orakelexperimentet (arm B).
+
+    Ingår medvetet inte i fallback-kedjorna: syftet är att mäta en verkligt
+    smartare modell mot samma underlag som arm A (dagens kedja), så anropet
+    får aldrig tyst ersättas av en annan provider. Returnerar "" vid saknad
+    nyckel eller fel — anroparen hanterar det som "arm B otillgänglig".
+    """
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return ""
+    try:
+        r = httpx.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "claude-sonnet-5",
+                "max_tokens": max_tokens,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": user_message}],
+            },
+            timeout=timeout,
+        )
+        r.raise_for_status()
+        delar = r.json().get("content", [])
+        return "".join(d.get("text", "") for d in delar if d.get("type") == "text").strip()
+    except Exception as e:
+        print(f"  Anthropic-anrop misslyckades: {str(e)[:120]}")
+        return ""

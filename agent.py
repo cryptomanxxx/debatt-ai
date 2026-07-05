@@ -39,6 +39,7 @@ from supabase_utils import (
     hamta_trendande_amnen, hamta_senaste_visualisering, publicera_visualisering,
     hamta_all_statistik, valj_visualisering, spara_nyhetslog,
     hamta_oppna_markets, hamta_existerande_bets, estimera_sannolikhet,
+    orakel_kohort, hamta_eller_skapa_orakel_rad, formatera_orakel_rad,
     spara_bet, skicka_artikel, rösta_på_artikel, skicka_kommentar,
     rösta_på_opinion, skapa_opinion_fraga, skapa_market_forslag,
     rakna_debattdjup, ar_duplikat, oracle_ovdebattering, hamta_pexels_bild, logga_action,
@@ -936,13 +937,22 @@ def main():
                 print(f"  Inga relevanta markets för {agent['namn']}")
             else:
                 krypto_data = hamta_kryptodata() if "krypto" in relevanta_kat else ""
+                kohort = orakel_kohort(agent["namn"])
                 for market in relevanta:
                     existerande = hamta_existerande_bets(sb_key, market["id"])
                     if agent["namn"] in existerande:
                         print(f"  Redan bettad: \"{market['titel'][:50]}\"")
                         continue
                     print(f"  Analyserar: \"{market['titel'][:60]}\"…")
-                    sannolikhet, motivering = estimera_sannolikhet(agent, market, krypto_data, sb_key=sb_key)
+                    # Orakelexperimentet: orakel-kohorterna får hjärnans råd i sitt underlag
+                    orakel_kontext = ""
+                    if kohort != "kontroll":
+                        rad_map = hamta_eller_skapa_orakel_rad(sb_key, market)
+                        arm = "a" if kohort == "orakel-a" else "b"
+                        if rad_map.get(arm):
+                            orakel_kontext = formatera_orakel_rad(rad_map[arm])
+                            print(f"  🔮 Hjärnan (arm {arm.upper()}): {rad_map[arm]['sannolikhet']}%")
+                    sannolikhet, motivering = estimera_sannolikhet(agent, market, krypto_data, sb_key=sb_key, orakel_kontext=orakel_kontext)
                     bet_buffs = hamta_agent_buffs(sb_key, agent["namn"]) if sb_key else {}
                     ok = spara_bet(sb_key, market["id"], agent["namn"], sannolikhet, motivering, insats_multiplikator=bet_buffs.get("insats_multiplikator", 1.0))
                     status = "✓" if ok else "✗"
