@@ -116,14 +116,15 @@ export default async function VisdomsspeletPage() {
   const snittIndividuelltFel = snitt(giltiga.map(s => capV(s.genomsnittligt_individuellt_fel)));
   const snittDiversitet = snitt(giltiga.map(s => capV(s.diversitet)));
   const snittOverkonfidens = snitt(giltiga.map(s => s.overkonfidens));
-  const snittCrowdAdvantage = snitt(
-    giltiga.map(s => crowdAdvantage(s.genomsnittligt_individuellt_fel, s.kollektivt_fel))
-  );
-
-  // 95% bootstrap-KI för crowd advantage — parat per spel (samma fråga, samma
-  // facit för kollektiv och individ). Seedad PRNG → stabilt mellan renders.
-  // Svarar på frågan "kan +X% vara slumpen?": hela intervallet > 0 = robust.
+  // Crowd advantage-serien beräknas EN gång med cappade fel (samma capV som
+  // övriga aggregat) — huvudsiffran och konfidensintervallet måste beskriva
+  // exakt samma estimator, annars kan signifikansfärgen hamna på fel tal.
   const caVarden = giltiga.map(s => crowdAdvantage(capV(s.genomsnittligt_individuellt_fel), capV(s.kollektivt_fel)));
+  const snittCrowdAdvantage = snitt(caVarden);
+
+  // 95% bootstrap-KI — parat per spel (samma fråga, samma facit för kollektiv
+  // och individ). Seedad PRNG → stabilt mellan renders. Svarar på frågan
+  // "kan +X% vara slumpen?": hela intervallet > 0 = robust.
   const caKI = bootstrapKI(caVarden);
 
   const perLage = ["oberoende", "sekventiellt", "deliberativt"].map(lage => {
