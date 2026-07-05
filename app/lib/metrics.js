@@ -48,4 +48,41 @@ function toppAndel(values, n = 3) {
   return sorted.slice(0, n).reduce((a, b) => a + b, 0) / sum;
 }
 
-module.exports = { SYSTEM_KONTON, EXKL_SYSTEM_QS, filtreraSystemkonton, gini, toppAndel };
+/** Seedad PRNG (mulberry32) — deterministisk så att bootstrap-intervall
+ *  är stabila mellan sidladdningar istället för att fladdra per render. */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Bootstrap-konfidensintervall (percentilmetoden) för medelvärdet av `varden`.
+ * Parat per observation: varje värde är redan en per-observation-differens/kvot,
+ * så omsampling av hela observationer bevarar parningen.
+ *
+ * Returnerar { lag, hog, n } eller null om färre än 5 värden.
+ */
+function bootstrapKI(varden, { iterationer = 2000, alfa = 0.05, seed = 42 } = {}) {
+  const v = (varden || []).filter(x => Number.isFinite(x));
+  const n = v.length;
+  if (n < 5) return null;
+  const rand = mulberry32(seed);
+  const medel = arr => arr.reduce((s, x) => s + x, 0) / arr.length;
+  const stickprov = new Array(iterationer);
+  for (let i = 0; i < iterationer; i++) {
+    let s = 0;
+    for (let j = 0; j < n; j++) s += v[(rand() * n) | 0];
+    stickprov[i] = s / n;
+  }
+  stickprov.sort((a, b) => a - b);
+  const lo = stickprov[Math.floor((alfa / 2) * iterationer)];
+  const hi = stickprov[Math.ceil((1 - alfa / 2) * iterationer) - 1];
+  return { lag: lo, hog: hi, n };
+}
+
+module.exports = { SYSTEM_KONTON, EXKL_SYSTEM_QS, filtreraSystemkonton, gini, toppAndel, bootstrapKI };

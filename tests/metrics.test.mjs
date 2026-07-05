@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { SYSTEM_KONTON, EXKL_SYSTEM_QS, gini, toppAndel, filtreraSystemkonton } =
+const { SYSTEM_KONTON, EXKL_SYSTEM_QS, gini, toppAndel, filtreraSystemkonton, bootstrapKI } =
   require("../app/lib/metrics.js");
 
 const approx = (a, b, eps = 1e-9) =>
@@ -100,4 +100,44 @@ test("orakelKohort: exakt 8/8/8-balans", () => {
 
 test("orakelKohort: okänd agent → kontroll", () => {
   assert.equal(orakelKohort("Finns Inte"), "kontroll");
+});
+
+// ── bootstrapKI ─────────────────────────────────────────────────────
+
+test("bootstrapKI: null vid färre än 5 värden", () => {
+  assert.equal(bootstrapKI([1, 2, 3, 4]), null);
+  assert.equal(bootstrapKI([]), null);
+});
+
+test("bootstrapKI: deterministiskt med samma seed", () => {
+  const v = [3, -5, 12, 8, -1, 20, 4, 7, -3, 15];
+  const a = bootstrapKI(v);
+  const b = bootstrapKI(v);
+  assert.deepEqual(a, b);
+});
+
+test("bootstrapKI: intervallet omsluter medelvärdet", () => {
+  const v = [3, -5, 12, 8, -1, 20, 4, 7, -3, 15];
+  const medel = v.reduce((s, x) => s + x, 0) / v.length;
+  const ki = bootstrapKI(v);
+  assert.ok(ki.lag <= medel && medel <= ki.hog, `${ki.lag} ≤ ${medel} ≤ ${ki.hog}`);
+  assert.equal(ki.n, 10);
+});
+
+test("bootstrapKI: konstant data → punktintervall", () => {
+  const ki = bootstrapKI([7, 7, 7, 7, 7, 7]);
+  assert.equal(ki.lag, 7);
+  assert.equal(ki.hog, 7);
+});
+
+test("bootstrapKI: tydligt positiv effekt → hela intervallet över 0", () => {
+  // 30 värden kring +20 med måttlig spridning — KI ska inte omfatta 0
+  const v = Array.from({ length: 30 }, (_, i) => 15 + (i % 11));
+  const ki = bootstrapKI(v);
+  assert.ok(ki.lag > 0, `förväntade lag > 0, fick ${ki.lag}`);
+});
+
+test("bootstrapKI: ignorerar NaN/Infinity", () => {
+  const ki = bootstrapKI([5, NaN, 6, Infinity, 7, 5, 6, 7]);
+  assert.equal(ki.n, 6);
 });
