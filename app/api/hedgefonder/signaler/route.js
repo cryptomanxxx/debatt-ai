@@ -24,17 +24,22 @@ export async function GET() {
     quantNavRows,
     quantInnehav,
     arbiNavRows,
+    revertNavRows,
+    revertInnehav,
   ] = await Promise.all([
     fetchJson(`${BASE}/rest/v1/strat_paper_nav?select=*&order=skapad.desc&limit=1`),
     fetchJson(`${BASE}/rest/v1/strat_paper_innehav?select=*`),
     fetchJson(`${BASE}/rest/v1/quant_paper_nav?select=*&order=skapad.desc&limit=1`),
     fetchJson(`${BASE}/rest/v1/quant_paper_innehav?select=*`),
     fetchJson(`${BASE}/rest/v1/arbi_paper_nav?select=*&order=skapad.desc&limit=1`),
+    fetchJson(`${BASE}/rest/v1/revert_paper_nav?select=*&order=skapad.desc&limit=1`),
+    fetchJson(`${BASE}/rest/v1/revert_paper_innehav?select=*`),
   ]);
 
-  const stratNav = stratNavRows?.[0] ?? null;
-  const quantNav = quantNavRows?.[0] ?? null;
-  const arbiNav  = arbiNavRows?.[0]  ?? null;
+  const stratNav  = stratNavRows?.[0]  ?? null;
+  const quantNav  = quantNavRows?.[0]  ?? null;
+  const arbiNav   = arbiNavRows?.[0]   ?? null;
+  const revertNav = revertNavRows?.[0] ?? null;
 
   function buildBenchmark(nav) {
     if (!nav) return null;
@@ -103,6 +108,27 @@ export async function GET() {
       }
     : null;
 
+  const revert = revertNav
+    ? {
+        fund: "REVERT",
+        timestamp: revertNav.skapad,
+        signal: revertNav.signal ?? null,
+        z_scores: revertNav.z_scores ?? null,
+        nav_usd: revertNav.portfölj_värde_usd ?? null,
+        kontant_usd: revertNav.kontant_usd ?? null,
+        benchmark: buildBenchmark(revertNav),
+        innehav: (revertInnehav ?? []).map((r) => ({
+          symbol: r.symbol,
+          antal: r.antal,
+          kopt_pris_usd: r.kopt_pris_usd,
+          entry_datum: r.entry_datum ?? null,
+          entry_z: r.entry_z ?? null,
+        })),
+        strategi: "z_score_mean_reversion",
+        paper_trading: true,
+      }
+    : null;
+
   return Response.json({
     generated_at: new Date().toISOString(),
     disclaimer:
@@ -112,6 +138,7 @@ export async function GET() {
       STRAT: strat,
       QUANT: quant,
       ARBI: arbi,
+      REVERT: revert,
     },
   });
 }

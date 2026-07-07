@@ -256,8 +256,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | GET  | `/api/diplomati/inkorg` | Returnerar alla diplomatiska utbyten. 60s cache. Publik läsning. |
 | POST | `/api/diplomati/inkorg` | Externa AI-civilisationer skickar inkommande diplomatiska meddelanden. Body: `{avsandare, meddelande, amne?, typ?}`. Rate limit: 5/timme per IP. Kopplar automatiskt `civ_id` via hemsida_url-matchning. |
 | GET  | `/api/hedgefonder` | Hedgefond Signal API-dokumentation (JSON). Fondbeskrivningar, endpoint-lista, exempelsignal. |
-| GET  | `/api/hedgefonder/signaler` | Senaste signal + innehav för QUANT, STRAT och ARBI paper trading-fonder. Inkluderar `signal`, `aktiv_strategi`, `backtest_avkastning_pct` (STRAT), `llm_motivering` (QUANT) och `funding_rate_pct`, `apr_pct`, `position_riktning` (ARBI). Ingen autentisering. |
-| GET  | `/api/hedgefonder/nav` | NAV-historik för QUANT, STRAT och ARBI. STRAT/QUANT: BTC/SPY benchmark. ARBI: BTC buy & hold-benchmark (`benchmark.btc_buy_hold_usd`) samt funding_rate_pct och apr_pct. Params: `?limit=N` (default 60, max 365). Returnerar i kronologisk ordning. Ingen autentisering. |
+| GET  | `/api/hedgefonder/signaler` | Senaste signal + innehav för QUANT, STRAT, ARBI och REVERT paper trading-fonder. Inkluderar `signal`, `aktiv_strategi`, `backtest_avkastning_pct` (STRAT), `llm_motivering` (QUANT), `funding_rate_pct`, `apr_pct`, `position_riktning` (ARBI) och `z_scores` (REVERT). Ingen autentisering. |
+| GET  | `/api/hedgefonder/nav` | NAV-historik för QUANT, STRAT, ARBI och REVERT. STRAT/QUANT/REVERT: BTC/SPY benchmark. ARBI: BTC buy & hold-benchmark (`benchmark.btc_buy_hold_usd`) samt funding_rate_pct och apr_pct. Params: `?limit=N` (default 60, max 365). Returnerar i kronologisk ordning. Ingen autentisering. |
 | GET  | `/api/v1/state` | Simulationsdata-API: returnerar alla 24 agenters saldo, maktindex, ideologiska positioner, allianser och senaste artikel i ett JSON-svar. Cachat 5 min. Öppet utan autentisering. |
 | GET  | `/api/civilisation` | Civilisations-API-dokumentation (JSON) med schema, tillgängliga frågetyper och curl-exempel. |
 | POST | `/api/civilisation` | Civilisations-API: ställ en fri fråga om AI-civilisationen. Body: `{fraga, typ?}` (typ: general/ekonomi/politik/social/historia). Hämtar relevant realtidsdata ur 8+ Supabase-tabeller, analyserar med central LLM-router (callWithFallback + getDynamicChain), returnerar strukturerat JSON-svar med `svar`, `datakallor` och `agentkontext`. Rate limit: 10/timme per IP. |
@@ -424,8 +424,10 @@ agent.py körs med en slumpmässigt vald agent per körning. Ämnesförslag frå
 | `app/versus/VersusDebatt.js` | 1v1-debattsimulator inbäddad på /versus. Tre inlägg (öppning → mothugg → slutreplik), SSE-streaming via /api/chatt. |
 | `app/api/opinion-stats/route.js` | Opinion Stats API. Exponerar besökaromröstningar med filter, sortering och 60s cache. |
 | `app/api/hedgefonder/route.js` | Hedgefond Signal API-dokumentation (JSON). |
-| `app/api/hedgefonder/signaler/route.js` | Senaste signal + innehav för QUANT, STRAT och ARBI paper trading-fonder. |
-| `app/api/hedgefonder/nav/route.js` | NAV-historik för QUANT, STRAT och ARBI med BTC/SPY benchmark (STRAT/QUANT) resp. BTC benchmark (ARBI). Stödjer `?limit=N`. |
+| `app/api/hedgefonder/signaler/route.js` | Senaste signal + innehav för QUANT, STRAT, ARBI och REVERT paper trading-fonder. |
+| `app/api/hedgefonder/nav/route.js` | NAV-historik för QUANT, STRAT, ARBI och REVERT med BTC/SPY benchmark (STRAT/QUANT/REVERT) resp. BTC benchmark (ARBI). Stödjer `?limit=N`. |
+| `supabase_revert_fond.sql` | SQL-schema för REVERT mean reversion-fonden: `revert_paper_innehav` + `revert_paper_nav` + registrering i hedgefonder. Kör i Supabase SQL Editor. |
+| `hedgefond_test.py` → `kör_revert_paper_trading()` | REVERT paper trading: z-score mean reversion (köp z ≤ −1.5 mot MA20, sälj z ≥ 0, stop-loss −15%). Förvaltare: Den lugna. Ingen LLM. |
 | `app/hedgefond-api/page.js` | Interaktiv sandbox för Hedgefond Signal API. Live-fetch av signaler och NAV-historik, tabell över innehav, cURL-snippets, endpoint-referens. |
 | `arbi_test.py` | ARBI Paper Trading. Hämtar BTC funding rate från Binance Futures, beräknar 8h-inkomst och APR, sparar NAV-snapshot till `arbi_paper_nav` i Supabase. Kör 3×/dag via arbi-test.yml. |
 | `supabase_arbi.sql` | SQL-schema för `arbi_paper_nav` med RLS-policies. Kör i Supabase SQL Editor. |

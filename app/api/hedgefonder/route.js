@@ -34,11 +34,19 @@ export async function GET() {
         strategi: "spot_perpetual_funding_rate_arbitrage",
         kalla: "Gate.io Futures (api.gateio.ws) — uppdateras 3×/dag",
       },
+      REVERT: {
+        description:
+          "Mean reversion-fond. Köper översålda kryptovalutor (z-score ≤ −1,5 mot " +
+          "20-dagars glidande medelvärde) och säljer när priset återvänt till medelvärdet " +
+          "(z ≥ 0). Stop-loss −15%. Ingen LLM — motsatsen till STRAT:s momentum.",
+        forvaltas_av: "Den lugna",
+        strategi: "z_score_mean_reversion",
+      },
     },
     endpoints: {
       "GET /api/hedgefonder":          "Denna dokumentation",
-      "GET /api/hedgefonder/signaler": "Senaste signaler + innehav för QUANT, STRAT och ARBI",
-      "GET /api/hedgefonder/nav":      "NAV-historik för alla tre fonder",
+      "GET /api/hedgefonder/signaler": "Senaste signaler + innehav för QUANT, STRAT, ARBI och REVERT",
+      "GET /api/hedgefonder/nav":      "NAV-historik för alla fyra fonder",
     },
     parametrar: {
       "/api/hedgefonder/nav": {
@@ -55,6 +63,17 @@ export async function GET() {
       nav_usd: 10250.5,
       kontant_usd: 5000,
       benchmark: { btc_buy_hold_usd: 10025, spy_buy_hold_usd: 10010 },
+      paper_trading: true,
+    },
+    example_signal_revert: {
+      fund: "REVERT",
+      timestamp: "2026-07-08T11:00:00Z",
+      signal: "KÖP SOL (z=-1.82)",
+      z_scores: { BTC: -0.4, ETH: -1.1, SOL: -1.82, XRP: 0.3, BNB: -0.2 },
+      nav_usd: 10120.0,
+      kontant_usd: 7000,
+      benchmark: { btc_buy_hold_usd: 10025, spy_buy_hold_usd: 10010 },
+      strategi: "z_score_mean_reversion",
       paper_trading: true,
     },
     example_signal_arbi: {

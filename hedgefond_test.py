@@ -16,6 +16,7 @@ Flöde per körning:
   6. Uppdatera NAV och spara snapshot i hedgefond_nav_historik
   7. QUANT paper trading mot riktiga marknadsdata
   8. STRAT paper trading — ren MA+volym-signal från backtest_resultat
+  9. REVERT paper trading — mean reversion via z-score mot MA20
 
 Kör via GitHub Actions (.github/workflows/hedgefond-test.yml) dagligen 11:00 svensk tid.
 """
@@ -884,6 +885,9 @@ def main():
     # STRAT paper trading — algoritmisk MA+volym-signal, ingen LLM
     kör_strat_paper_trading(sb_key)
 
+    # REVERT paper trading — mean reversion via z-score, ingen LLM
+    kör_revert_paper_trading(sb_key)
+
     print("\n=== Hedgefond körning klar ===")
 
 
@@ -1391,6 +1395,248 @@ def kör_strat_paper_trading(sb_key: str):
 
     pnl = pv - START_KAPITAL
     print(f"  STRAT portfölj: {pv:.2f} USD ({pnl:+.2f} USD / {pnl/START_KAPITAL*100:+.1f}%)")
+    if btc_benchmark:
+        print(f"  BTC benchmark:  {btc_benchmark:.2f} USD ({(btc_benchmark/START_KAPITAL-1)*100:+.1f}%)")
+    if spy_benchmark:
+        print(f"  SPY benchmark:  {spy_benchmark:.2f} USD ({(spy_benchmark/START_KAPITAL-1)*100:+.1f}%)")
+
+
+
+
+# ─── REVERT: Mean reversion via z-score ──────────────────────────────────────
+
+def kör_revert_paper_trading(sb_key: str):
+    """
+    REVERT paper trading: mean reversion-fond. Ren algoritmisk, ingen LLM.
+
+    Strategi (z-score mot MA20):
+      z = (senaste_pris − MA20) / std20, beräknat på de 20 föregående dagarna.
+      KÖP  när z ≤ −1.5 (översålt — marknaden har paniksålt) och ingen position finns.
+      SÄLJ när z ≥ 0 (priset har återvänt till medelvärdet — reversionen är klar).
+      STOP-LOSS om priset faller > 15% under köpkursen (reversionen uteblev).
+
+    Flera symboler kan ägas samtidigt (BTC, ETH, SOL, XRP, BNB). Varje köp
+    använder 30% av tillgänglig kontant. 10 000 USD fiktivt startkapital,
+    benchmark mot BTC och SPY buy & hold — samma mönster som STRAT/QUANT.
+    """
+    START_KAPITAL = 10_000.0
+    SYMBOLER      = ["BTC", "ETH", "SOL", "XRP", "BNB"]
+    LOOKBACK      = 20
+    ENTRY_Z       = -1.5
+    EXIT_Z        = 0.0
+    STOPLOSS_PCT  = 15.0
+    KOP_ANDEL     = 0.30
+
+    print("\n--- REVERT Paper Trading (mean reversion, ingen LLM) ---")
+
+    # 1. Hämta prishistorik och beräkna z-score per symbol
+    data = {}
+    for sym in SYMBOLER:
+        try:
+            r = httpx.get(
+                f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{sym}"
+                f"&order=datum.desc&limit={LOOKBACK + 1}",
+                headers=_h(sb_key), timeout=15,
+            )
+            if not r.is_success or len(r.json()) < LOOKBACK + 1:
+                continue
+            rows = list(reversed(r.json()))
+            priser = [float(x["pris"]) for x in rows]
+            senaste = priser[-1]
+            fönster = priser[:-1]  # de 20 föregående dagarna, exkl. idag
+            ma  = sum(fönster) / len(fönster)
+            var = sum((p - ma) ** 2 for p in fönster) / len(fönster)
+            std = var ** 0.5
+            if std <= 0:
+                continue
+            data[sym] = {"senaste": senaste, "ma": ma, "z": (senaste - ma) / std}
+        except Exception as e:
+            print(f"  REVERT prisfetch {sym}: {e}")
+
+    if len(data) < 2:
+        print("  REVERT: för få priser — hoppar över")
+        return
+
+    z_scores = {sym: round(d["z"], 2) for sym, d in data.items()}
+    print("  Z-scores: " + ", ".join(f"{s}: {z:+.2f}" for s, z in z_scores.items()))
+
+    # 2. Hämta nuvarande positioner
+    try:
+        r = httpx.get(f"{SB_URL}/rest/v1/revert_paper_innehav", headers=_h(sb_key), timeout=10)
+        innehav = {
+            x["symbol"]: {"antal": float(x["antal"]), "kopt_pris_usd": float(x["kopt_pris_usd"])}
+            for x in (r.json() if r.status_code == 200 else [])
+        }
+    except Exception:
+        innehav = {}
+
+    # 3. Hämta kontant från senaste NAV-snapshot
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/revert_paper_nav?order=skapad.desc&limit=1",
+            headers=_h(sb_key), timeout=10,
+        )
+        nav_rows = r.json() if r.status_code == 200 else []
+        kontant = float(nav_rows[0]["kontant_usd"]) if nav_rows else START_KAPITAL
+    except Exception:
+        kontant = START_KAPITAL
+
+    h_u = {**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"}
+    signaler = []
+    sålda_denna_körning: set[str] = set()
+
+    # 4. SÄLJ-pass först (frigör kontant): mean reversion klar eller stop-loss
+    for sym, pos in innehav.items():
+        if pos["antal"] < 1e-9 or sym not in data:
+            continue
+        pris = data[sym]["senaste"]
+        z    = data[sym]["z"]
+        stoploss_trigger = pos["kopt_pris_usd"] * (1 - STOPLOSS_PCT / 100)
+
+        skäl = None
+        if pris <= stoploss_trigger:
+            skäl = "STOP-LOSS"
+        elif z >= EXIT_Z:
+            skäl = "SÄLJ"
+        if not skäl:
+            continue
+
+        intäkt = pos["antal"] * pris
+        pnl_trade = intäkt - pos["antal"] * pos["kopt_pris_usd"]
+        kontant += intäkt
+        httpx.post(
+            f"{SB_URL}/rest/v1/revert_paper_innehav?on_conflict=symbol",
+            json={"symbol": sym, "antal": 0.0, "kopt_pris_usd": pos["kopt_pris_usd"],
+                  "uppdaterad": datetime.now(timezone.utc).isoformat()},
+            headers=h_u, timeout=10,
+        )
+        innehav[sym]["antal"] = 0.0
+        sålda_denna_körning.add(sym)
+        signaler.append(f"{skäl} {sym} (z={z:+.2f})")
+        print(f"    REVERT {skäl} {pos['antal']:.6f} {sym} @ {pris:.2f} USD "
+              f"(P&L: {pnl_trade:+.0f} USD)")
+
+    # 5. KÖP-pass: översålda symboler utan befintlig position, mest översåld först.
+    # Symboler som såldes i samma körning exkluderas — en stop-loss på en fortfarande
+    # översåld symbol får inte omedelbart återköpas, då neutraliseras stop-lossen.
+    kandidater = sorted(
+        (sym for sym, d in data.items()
+         if d["z"] <= ENTRY_Z
+         and innehav.get(sym, {}).get("antal", 0.0) < 1e-9
+         and sym not in sålda_denna_körning),
+        key=lambda s: data[s]["z"],
+    )
+    for sym in kandidater:
+        if kontant < 500:
+            break
+        pris   = data[sym]["senaste"]
+        z      = data[sym]["z"]
+        belopp = kontant * KOP_ANDEL
+        antal  = belopp / pris
+        httpx.post(
+            f"{SB_URL}/rest/v1/revert_paper_innehav?on_conflict=symbol",
+            json={"symbol":        sym,
+                  "antal":         round(antal, 8),
+                  "kopt_pris_usd": round(pris, 4),
+                  "entry_datum":   datetime.now(timezone.utc).date().isoformat(),
+                  "entry_z":       round(z, 2),
+                  "uppdaterad":    datetime.now(timezone.utc).isoformat()},
+            headers=h_u, timeout=10,
+        )
+        innehav[sym] = {"antal": antal, "kopt_pris_usd": pris}
+        kontant -= belopp
+        signaler.append(f"KÖP {sym} (z={z:+.2f})")
+        print(f"    REVERT KÖP {antal:.6f} {sym} @ {pris:.2f} USD ({belopp:.0f} USD, z={z:+.2f})")
+
+    signal = " · ".join(signaler) if signaler else "HÅLL"
+
+    # 6. Aktuellt portföljvärde. Positioner vars prisdata saknas denna körning
+    # (misslyckad fetch / för få rader) värderas till köpkurs som proxy —
+    # annars faller NAV med hela positionens värde trots att den finns kvar.
+    pv = kontant
+    for sym, pos in innehav.items():
+        if pos["antal"] < 1e-9:
+            continue
+        if sym in data:
+            pv += pos["antal"] * data[sym]["senaste"]
+        else:
+            proxy = pos["antal"] * pos["kopt_pris_usd"]
+            pv += proxy
+            print(f"    REVERT: inget pris för {sym} denna körning — "
+                  f"värderas till köpkurs ({proxy:.0f} USD) i NAV")
+
+    # 7. Benchmark: BTC och SPY buy & hold sedan första körningen
+    btc_benchmark = spy_benchmark = None
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/revert_paper_nav?order=skapad.asc&limit=1",
+            headers=_h(sb_key), timeout=10,
+        )
+        first_rows = r.json() if r.status_code == 200 else []
+        if first_rows:
+            start_datum = first_rows[0]["skapad"][:10]
+            for bm_sym in ["BTC", "SPY"]:
+                try:
+                    r1 = httpx.get(
+                        f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{bm_sym}"
+                        f"&datum=gte.{start_datum}&order=datum.asc&limit=1",
+                        headers=_h(sb_key), timeout=10,
+                    )
+                    r2 = httpx.get(
+                        f"{SB_URL}/rest/v1/ohlcv_cache?symbol=eq.{bm_sym}&order=datum.desc&limit=1",
+                        headers=_h(sb_key), timeout=10,
+                    )
+                    if r1.is_success and r1.json() and r2.is_success and r2.json():
+                        sp  = float(r1.json()[0]["pris"])
+                        cp  = float(r2.json()[0]["pris"])
+                        val = (START_KAPITAL / sp) * cp
+                        if bm_sym == "BTC":
+                            btc_benchmark = val
+                        else:
+                            spy_benchmark = val
+                except Exception:
+                    pass
+        else:
+            btc_benchmark = START_KAPITAL
+            spy_benchmark = START_KAPITAL
+    except Exception as e:
+        print(f"  REVERT benchmark: {e}")
+
+    # 8. Spara NAV-snapshot
+    nav_row: dict = {
+        "portfölj_värde_usd": round(pv, 4),
+        "kontant_usd":        round(kontant, 4),
+        "start_kapital_usd":  START_KAPITAL,
+        "signal":             signal[:300],
+        "z_scores":           z_scores,
+    }
+    if btc_benchmark is not None:
+        nav_row["btc_benchmark_usd"] = round(btc_benchmark, 4)
+    if spy_benchmark is not None:
+        nav_row["spy_benchmark_usd"] = round(spy_benchmark, 4)
+    try:
+        httpx.post(
+            f"{SB_URL}/rest/v1/revert_paper_nav",
+            json=nav_row,
+            headers={**_h(sb_key), "Prefer": "return=minimal"},
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"  REVERT NAV-spara: {e}")
+
+    # 9. Uppdatera hedgefonder.nav_per_andel för REVERT (samma mönster som STRAT)
+    try:
+        revert_fond = hamta_fond(sb_key, "REVERT")
+        if revert_fond:
+            revert_nav = round(pv / 100, 4)
+            total_and  = float(revert_fond.get("total_andelar") or 0)
+            spara_nav_snapshot(sb_key, revert_fond["id"], revert_nav, round(pv, 2))
+            uppdatera_fond_nav(sb_key, revert_fond["id"], revert_nav, total_and)
+    except Exception as e:
+        print(f"  REVERT hedgefond NAV-uppdatering: {e}")
+
+    pnl = pv - START_KAPITAL
+    print(f"  REVERT portfölj: {pv:.2f} USD ({pnl:+.2f} USD / {pnl/START_KAPITAL*100:+.1f}%)")
     if btc_benchmark:
         print(f"  BTC benchmark:  {btc_benchmark:.2f} USD ({(btc_benchmark/START_KAPITAL-1)*100:+.1f}%)")
     if spy_benchmark:
