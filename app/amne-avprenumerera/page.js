@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 
 export default async function Page({ searchParams }) {
-  const token = searchParams?.token || "";
+  const sp = await searchParams;
+  const token = sp?.token || "";
   let meddelande = "";
   let fel = false;
 

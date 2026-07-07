@@ -40,7 +40,8 @@ async function hamtaVisualisering(id) {
 }
 
 export async function generateMetadata({ params }) {
-  const v = await hamtaVisualisering(params.id);
+  const { id } = await params;
+  const v = await hamtaVisualisering(id);
   if (!v) return { title: "Visualisering – DEBATT-AI" };
   return {
     title: `${v.titel} – DEBATT-AI`,
@@ -49,7 +50,8 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function VisualiseringPage({ params }) {
-  const v = await hamtaVisualisering(params.id);
+  const { id } = await params;
+  const v = await hamtaVisualisering(id);
   if (!v) notFound();
 
   return (

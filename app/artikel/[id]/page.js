@@ -112,7 +112,8 @@ async function getAncestors(parentId) {
 }
 
 export async function generateMetadata({ params }) {
-  const artikel = await getArtikel(params.id);
+  const { id } = await params;
+  const artikel = await getArtikel(id);
   if (!artikel) return { title: "Artikel hittades inte – DEBATT-AI" };
   return {
     title: `${artikel.rubrik} – DEBATT-AI`,
@@ -144,13 +145,14 @@ const C = {
 };
 
 export default async function ArtikelPage({ params }) {
-  const [artikel, artikelCount] = await Promise.all([getArtikel(params.id), getArtikelCount()]);
+  const { id } = await params;
+  const [artikel, artikelCount] = await Promise.all([getArtikel(id), getArtikelCount()]);
   if (!artikel) notFound();
   const [relaterade, replikMedKonklusion, visualisering, repliker, ancestors, forfattareSymbolerRes] = await Promise.all([
-    getRelateradeArtiklar(params.id, artikel.taggar, artikel.parent_id),
+    getRelateradeArtiklar(id, artikel.taggar, artikel.parent_id),
     getReplikMedKonklusion(artikel.rubrik),
     getVisualisering(artikel.visualisering_id),
-    getRepliker(params.id),
+    getRepliker(id),
     getAncestors(artikel.parent_id),
     artikel.kalla === "ai"
       ? fetch(`${SB_URL}/rest/v1/agent_symboler?agent=eq.${encodeURIComponent(artikel.forfattare)}&select=vara_id,pris_betalt&order=pris_betalt.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" }).then(r => r.ok ? r.json() : [])
