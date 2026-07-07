@@ -21,28 +21,30 @@ const C = {
 };
 
 const FOND_FARG = {
-  ALPHA: "#e879f9",
-  MACRO: "#34d399",
-  QUANT: "#38bdf8",
-  STRAT: "#fb923c",
-  ARBI:  "#a78bfa",
+  ALPHA:  "#e879f9",
+  MACRO:  "#34d399",
+  QUANT:  "#38bdf8",
+  STRAT:  "#fb923c",
+  ARBI:   "#a78bfa",
+  REVERT: "#2dd4bf",
 };
 
 const FOND_IKON = {
-  ALPHA: "⚡",
-  MACRO: "🏛️",
-  QUANT: "🤖",
-  STRAT: "📊",
-  ARBI:  "🔁",
+  ALPHA:  "⚡",
+  MACRO:  "🏛️",
+  QUANT:  "🤖",
+  STRAT:  "📊",
+  ARBI:   "🔁",
+  REVERT: "⚖️",
 };
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { fonder: [], investerare: [], nav_historik: [], trades: [], planbocker: [], paper_nav: [], paper_innehav: [], strat_nav: [], strat_innehav: [], arbi_nav: [] };
+  if (!key) return { fonder: [], investerare: [], nav_historik: [], trades: [], planbocker: [], paper_nav: [], paper_innehav: [], strat_nav: [], strat_innehav: [], arbi_nav: [], revert_nav: [], revert_innehav: [] };
 
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const [fondRes, invRes, navRes, tradeRes, plbRes, paperNavRes, paperInnehavRes, stratNavRes, stratInnehavRes, arbiNavRes] = await Promise.all([
+  const [fondRes, invRes, navRes, tradeRes, plbRes, paperNavRes, paperInnehavRes, stratNavRes, stratInnehavRes, arbiNavRes, revertNavRes, revertInnehavRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/hedgefonder?aktiv=eq.true&order=symbol.asc`, {
       headers: h, next: { revalidate: 120 },
     }),
@@ -75,6 +77,12 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/arbi_paper_nav?order=skapad.desc&limit=180`, {
       headers: h, next: { revalidate: 120 },
     }),
+    fetch(`${SB_URL}/rest/v1/revert_paper_nav?order=skapad.desc&limit=60`, {
+      headers: h, next: { revalidate: 120 },
+    }),
+    fetch(`${SB_URL}/rest/v1/revert_paper_innehav?order=symbol.asc`, {
+      headers: h, next: { revalidate: 120 },
+    }),
   ]);
 
   const fonder         = fondRes.ok          ? await fondRes.json()          : [];
@@ -87,8 +95,10 @@ async function getData() {
   const strat_nav      = stratNavRes.ok      ? await stratNavRes.json()      : [];
   const strat_innehav  = stratInnehavRes.ok  ? await stratInnehavRes.json()  : [];
   const arbi_nav       = arbiNavRes.ok       ? await arbiNavRes.json()       : [];
+  const revert_nav     = revertNavRes.ok     ? await revertNavRes.json()     : [];
+  const revert_innehav = revertInnehavRes.ok ? await revertInnehavRes.json() : [];
 
-  return { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav, strat_nav, strat_innehav, arbi_nav };
+  return { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav, strat_nav, strat_innehav, arbi_nav, revert_nav, revert_innehav };
 }
 
 function PrestationsmattGrid({ metrics }) {
@@ -291,7 +301,7 @@ function FondKort({ fond, investerare, nav_historik, trades }) {
 }
 
 export default async function HedgefonderPage() {
-  const { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav, strat_nav, strat_innehav, arbi_nav } = await getData();
+  const { fonder, investerare, nav_historik, trades, planbocker, paper_nav, paper_innehav, strat_nav, strat_innehav, arbi_nav, revert_nav, revert_innehav } = await getData();
 
   const total_aum = fonder.reduce((sum, f) => {
     return sum + parseFloat(f.nav_per_andel) * parseFloat(f.total_andelar || 0);
@@ -363,7 +373,7 @@ export default async function HedgefonderPage() {
           <strong style={{ color: C.accent }}>Hur det fungerar:</strong>{" "}
           Alpha Capital (aggressiv momentum på interna tokens), Macro Fund (konservativ makro), Quant Fund (självlärande — LLM justerar strategi varje körning) och Strat Fund (algoritmisk — ingen LLM, ren MA+volym-signal från backtestdata).
           Agenter investerar 100–200 SEK och får andelar till aktuellt NAV. ALPHA/MACRO/QUANT handlar på den interna börsen. STRAT och QUANT kör paper trading mot riktiga kryptopriser (10 000 USD fiktivt startkapital).
-          ARBI kör delta-neutral spot/perpetual funding rate-arbitrage på riktiga Binance-fundingräntor (samma 10 000 USD fiktiva startkapital).
+          ARBI kör delta-neutral spot/perpetual funding rate-arbitrage på riktiga Binance-fundingräntor (samma 10 000 USD fiktiva startkapital). REVERT kör mean reversion — köper översålda kryptovalutor (z-score ≤ −1,5 mot 20-dagars medelvärde) och säljer när priset återvänt till medelvärdet.
           NAV uppdateras vid varje körning (11:00 dagligen). Paper trading-resultat jämförs mot BTC buy &amp; hold och SPY (S&amp;P 500) som benchmarks.
         </div>
 
@@ -777,6 +787,148 @@ export default async function HedgefonderPage() {
                 <div style={{ fontSize: "11px", color: "#e8c468", lineHeight: "1.5" }}>
                   ⚠️ ARBI är paper trading. Strategin är delta-neutral mot BTC-prisrörelser, men inte riskfri — funding rates kan ändras snabbt och verklig handel påverkas av avgifter, slippage, likvidation, spreadar och börsrisk.
                 </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* REVERT Paper Trading panel */}
+        {(() => {
+          const senaste = revert_nav[0];
+          if (!senaste) return (
+            <div style={{ marginTop: "20px", padding: "16px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "12px", borderTop: "2px solid #2dd4bf" }}>
+              <div style={{ fontSize: "12px", color: C.textMuted }}>
+                ⚖️ <strong style={{ color: "#2dd4bf" }}>REVERT Paper Trading</strong> — Kör <code>supabase_revert_fond.sql</code> och vänta på nästa hedgefond-körning.
+              </div>
+            </div>
+          );
+
+          const START   = parseFloat(senaste.start_kapital_usd) || 10000;
+          const pv      = parseFloat(senaste.portfölj_värde_usd);
+          const pnl     = pv - START;
+          const pnlPct  = (pnl / START * 100).toFixed(1);
+          const signal  = senaste.signal || "–";
+          const sigColor = signal.includes("KÖP") ? "#4ade80" : signal.includes("STOP-LOSS") ? "#f87171" : signal.includes("SÄLJ") ? "#fbbf24" : "#94a3b8";
+          const zScores = senaste.z_scores || {};
+
+          const revertHistorik = [...revert_nav].reverse();
+          const curveData = revertHistorik.map(r => {
+            const navv = parseFloat(r.portfölj_värde_usd);
+            const btcv = r.btc_benchmark_usd != null ? parseFloat(r.btc_benchmark_usd) : null;
+            const spyv = r.spy_benchmark_usd != null ? parseFloat(r.spy_benchmark_usd) : null;
+            return {
+              datum: new Date(r.skapad).toLocaleDateString("sv-SE", { month: "2-digit", day: "2-digit" }),
+              fond: (navv / START - 1) * 100,
+              btc: btcv != null ? (btcv / START - 1) * 100 : null,
+              spy: spyv != null ? (spyv / START - 1) * 100 : null,
+            };
+          });
+          const metrics = computeMetrics(
+            revertHistorik.map(r => ({ skapad: r.skapad, value: parseFloat(r.portfölj_värde_usd) })),
+            START
+          );
+
+          return (
+            <div style={{
+              marginTop: "20px",
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              borderRadius: "12px",
+              borderTop: "2px solid #2dd4bf",
+              overflow: "hidden",
+            }}>
+              {/* Header */}
+              <div style={{ padding: "16px 20px 12px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "18px" }}>⚖️</span>
+                    <span style={{ fontWeight: "700", fontSize: "15px", color: "#2dd4bf" }}>REVERT Paper Trading</span>
+                    <span style={{ fontSize: "10px", background: "#03191a", border: "1px solid #2dd4bf40", borderRadius: "4px", padding: "2px 6px", color: "#2dd4bf" }}>MEAN REVERSION · INGEN LLM</span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: C.textMuted }}>
+                    10 000 USD fiktivt startkapital · z-score mot MA20 · köper panik, säljer återhämtning
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: "22px", fontWeight: "700", color: pnl >= 0 ? "#4ade80" : "#f87171" }}>
+                    {pv.toLocaleString("sv-SE", { maximumFractionDigits: 0 })} USD
+                  </div>
+                  <div style={{ fontSize: "12px", color: pnl >= 0 ? "#4ade80" : "#f87171" }}>
+                    {pnl >= 0 ? "▲" : "▼"} {Math.abs(pnl).toFixed(0)} USD ({pnl >= 0 ? "+" : ""}{pnlPct}%)
+                  </div>
+                </div>
+              </div>
+
+              {/* Signal + z-scores */}
+              <div style={{ padding: "0 20px 12px", display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{
+                  background: "#0a0a0a",
+                  border: `1px solid ${sigColor}40`,
+                  borderRadius: "6px",
+                  padding: "6px 14px",
+                  fontSize: "13px",
+                  fontWeight: "700",
+                  color: sigColor,
+                  letterSpacing: "0.05em",
+                }}>
+                  {signal.includes("KÖP") ? "🟢" : signal.includes("STOP-LOSS") ? "🔴" : signal.includes("SÄLJ") ? "🟡" : "⚪"} {signal}
+                </div>
+                {Object.entries(zScores).map(([sym, z]) => (
+                  <div key={sym} style={{ fontSize: "12px", color: C.textMuted }}>
+                    {sym}: <span style={{ fontFamily: "monospace", fontWeight: "600", color: parseFloat(z) <= -1.5 ? "#4ade80" : parseFloat(z) >= 1.5 ? "#f87171" : C.text }}>
+                      {parseFloat(z) >= 0 ? "+" : ""}{parseFloat(z).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Strategibeskrivning */}
+              <div style={{ margin: "0 20px 12px", background: "#03110f", border: "1px solid #2dd4bf30", borderRadius: "6px", padding: "12px" }}>
+                <div style={{ fontSize: "10px", color: "#2dd4bf", marginBottom: "8px", fontWeight: "600", letterSpacing: "0.08em" }}>⚖️ REVERT — SÅ HÄR FUNGERAR DET</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px 24px" }}>
+                  {[
+                    { rubrik: "Z-score", text: "För varje krypto (BTC, ETH, SOL, XRP, BNB) beräknas hur många standardavvikelser dagens pris ligger från sitt 20-dagars glidande medelvärde. Negativt z = priset är under sitt medelvärde." },
+                    { rubrik: "Köpsignal (z ≤ −1,5)", text: "När ett krypto är kraftigt översålt — mer än 1,5 standardavvikelser under medelvärdet — köper fonden för 30% av tillgänglig kontant. Idén: paniksäljningar överdriver, priser tenderar att återvända till medelvärdet." },
+                    { rubrik: "Säljsignal (z ≥ 0)", text: "När priset har återvänt till sitt medelvärde är reversionen klar och hela positionen säljs. Fonden jagar aldrig uppgångar — den skördar bara återhämtningen." },
+                    { rubrik: "Stop-loss (−15%)", text: "Om priset fortsätter falla mer än 15% under köpkursen har mean reversion-tesen misslyckats — positionen stängs för att begränsa förlusten. Fallande knivar fångas inte två gånger." },
+                  ].map(item => (
+                    <div key={item.rubrik}>
+                      <div style={{ fontSize: "10px", color: "#2dd4bf", fontWeight: "600", marginBottom: "2px" }}>{item.rubrik}</div>
+                      <div style={{ fontSize: "11px", color: C.textMuted, lineHeight: "1.5" }}>{item.text}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: "1px solid #2dd4bf20", fontSize: "10px", color: C.textMuted }}>
+                  Motsatsen till STRAT: där STRAT följer momentum (köper styrka), köper REVERT svaghet. När båda körs parallellt syns vilken regim marknaden befinner sig i — trendande eller mean-reverting.
+                </div>
+              </div>
+
+              {/* Prestationsmått */}
+              <PrestationsmattGrid metrics={metrics} />
+
+              {/* Equity curve */}
+              <div style={{ padding: "0 20px 16px" }}>
+                <div style={{ fontSize: "10px", color: C.textMuted, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  EQUITY CURVE — AVKASTNING SEDAN START (%)
+                </div>
+                <EquityCurve data={curveData} farg="#2dd4bf" label="REVERT paper" />
+              </div>
+
+              {/* Positioner */}
+              <div style={{ borderTop: `1px solid ${C.border}`, padding: "12px 20px" }}>
+                <div style={{ fontSize: "11px", color: C.textMuted, marginBottom: "6px" }}>NUVARANDE POSITIONER</div>
+                {revert_innehav.filter(p => parseFloat(p.antal) > 0).length === 0 ? (
+                  <div style={{ fontSize: "12px", color: C.textMuted }}>Inga positioner (kontant — väntar på nästa panik)</div>
+                ) : revert_innehav.filter(p => parseFloat(p.antal) > 0).map(p => (
+                  <div key={p.symbol} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", padding: "2px 0" }}>
+                    <span style={{ color: "#2dd4bf", fontWeight: "600" }}>{p.symbol}</span>
+                    <span style={{ color: C.textMuted }}>
+                      {parseFloat(p.antal).toFixed(6)} @ {parseFloat(p.kopt_pris_usd).toFixed(2)} USD
+                      {p.entry_z != null && <span style={{ marginLeft: "8px", fontSize: "10px" }}>(entry z={parseFloat(p.entry_z).toFixed(2)})</span>}
+                      {p.entry_datum && <span style={{ marginLeft: "8px", fontSize: "10px" }}>({p.entry_datum})</span>}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           );

@@ -21,7 +21,7 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const limit = Math.min(parseInt(searchParams.get("limit") ?? "60", 10), 365);
 
-  const [stratRows, quantRows, arbiRows] = await Promise.all([
+  const [stratRows, quantRows, arbiRows, revertRows] = await Promise.all([
     fetchJson(
       `${BASE}/rest/v1/strat_paper_nav?select=skapad,portfölj_värde_usd,kontant_usd,btc_benchmark_usd,spy_benchmark_usd,aktiv_strategi,signal&order=skapad.desc&limit=${limit}`
     ),
@@ -30,6 +30,9 @@ export async function GET(request) {
     ),
     fetchJson(
       `${BASE}/rest/v1/arbi_paper_nav?select=skapad,portfölj_värde_usd,inkomst_usd,position_storlek_usd,funding_rate_pct,apr_pct,position_riktning,btc_benchmark_usd&order=skapad.desc&limit=${limit}`
+    ),
+    fetchJson(
+      `${BASE}/rest/v1/revert_paper_nav?select=skapad,portfölj_värde_usd,kontant_usd,btc_benchmark_usd,spy_benchmark_usd,signal,z_scores&order=skapad.desc&limit=${limit}`
     ),
   ]);
 
@@ -75,9 +78,24 @@ export async function GET(request) {
     }));
   }
 
-  const stratData = mapStrat(stratRows);
-  const quantData = mapQuant(quantRows);
-  const arbiData  = mapArbi(arbiRows);
+  function mapRevert(rows) {
+    return (rows ?? []).reverse().map((r) => ({
+      timestamp: r.skapad,
+      nav_usd: r.portfölj_värde_usd,
+      kontant_usd: r.kontant_usd,
+      benchmark: {
+        btc_buy_hold_usd: r.btc_benchmark_usd,
+        spy_buy_hold_usd: r.spy_benchmark_usd,
+      },
+      signal: r.signal ?? null,
+      z_scores: r.z_scores ?? null,
+    }));
+  }
+
+  const stratData  = mapStrat(stratRows);
+  const quantData  = mapQuant(quantRows);
+  const arbiData   = mapArbi(arbiRows);
+  const revertData = mapRevert(revertRows);
 
   function latest(arr) {
     return arr.length ? arr[arr.length - 1] : null;
@@ -104,6 +122,11 @@ export async function GET(request) {
         latest_nav: latest(arbiData),
         data_points: arbiData.length,
         history: arbiData,
+      },
+      REVERT: {
+        latest_nav: latest(revertData),
+        data_points: revertData.length,
+        history: revertData,
       },
     },
   });
