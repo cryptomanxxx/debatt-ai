@@ -62,7 +62,8 @@ function numLabel(val, suffix = "%", decimals = 1) {
 }
 
 export default async function PisPage({ searchParams }) {
-  const initialQ = searchParams?.q || "";
+  const sp = await searchParams;
+  const initialQ = sp?.q || "";
   const { analyser, forslagMap, mcMap } = await getData();
 
   const medBnp  = analyser.filter(a => a.bnp_effekt_pct   !== null);

@@ -449,7 +449,8 @@ async function getAgentKi(namn) {
 }
 
 export async function generateMetadata({ params }) {
-  const namn = decodeURIComponent(params.namn);
+  const { namn: rawNamn } = await params;
+  const namn = decodeURIComponent(rawNamn);
   const profil = AGENTPROFILER[namn];
   if (!profil) return { title: "Agent hittades inte – DEBATT-AI" };
   return {
@@ -472,7 +473,8 @@ const C = {
 };
 
 export default async function AgentPage({ params }) {
-  const namn = decodeURIComponent(params.namn);
+  const { namn: rawNamn } = await params;
+  const namn = decodeURIComponent(rawNamn);
   const profil = AGENTPROFILER[namn];
   if (namn === "Statskassa") redirect("/staten");
   if (!profil) notFound();

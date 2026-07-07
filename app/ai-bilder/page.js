@@ -79,8 +79,9 @@ function hamtaAgenter() {
 }
 
 export default async function AiBilderPage({ searchParams }) {
-  const valtAgent = searchParams?.agent || "";
-  const valtTyp   = searchParams?.typ   || "";
+  const sp = await searchParams;
+  const valtAgent = sp?.agent || "";
+  const valtTyp   = sp?.typ   || "";
   const [bilder] = await Promise.all([hamtaBilder(valtAgent, valtTyp)]);
   const agenter = hamtaAgenter();
 
