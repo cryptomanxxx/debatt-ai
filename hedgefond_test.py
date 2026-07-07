@@ -1483,6 +1483,7 @@ def kör_revert_paper_trading(sb_key: str):
 
     h_u = {**_h(sb_key), "Prefer": "resolution=merge-duplicates,return=minimal"}
     signaler = []
+    sålda_denna_körning: set[str] = set()
 
     # 4. SÄLJ-pass först (frigör kontant): mean reversion klar eller stop-loss
     for sym, pos in innehav.items():
@@ -1510,14 +1511,19 @@ def kör_revert_paper_trading(sb_key: str):
             headers=h_u, timeout=10,
         )
         innehav[sym]["antal"] = 0.0
+        sålda_denna_körning.add(sym)
         signaler.append(f"{skäl} {sym} (z={z:+.2f})")
         print(f"    REVERT {skäl} {pos['antal']:.6f} {sym} @ {pris:.2f} USD "
               f"(P&L: {pnl_trade:+.0f} USD)")
 
-    # 5. KÖP-pass: översålda symboler utan befintlig position, mest översåld först
+    # 5. KÖP-pass: översålda symboler utan befintlig position, mest översåld först.
+    # Symboler som såldes i samma körning exkluderas — en stop-loss på en fortfarande
+    # översåld symbol får inte omedelbart återköpas, då neutraliseras stop-lossen.
     kandidater = sorted(
         (sym for sym, d in data.items()
-         if d["z"] <= ENTRY_Z and innehav.get(sym, {}).get("antal", 0.0) < 1e-9),
+         if d["z"] <= ENTRY_Z
+         and innehav.get(sym, {}).get("antal", 0.0) < 1e-9
+         and sym not in sålda_denna_körning),
         key=lambda s: data[s]["z"],
     )
     for sym in kandidater:
@@ -1544,11 +1550,20 @@ def kör_revert_paper_trading(sb_key: str):
 
     signal = " · ".join(signaler) if signaler else "HÅLL"
 
-    # 6. Aktuellt portföljvärde
+    # 6. Aktuellt portföljvärde. Positioner vars prisdata saknas denna körning
+    # (misslyckad fetch / för få rader) värderas till köpkurs som proxy —
+    # annars faller NAV med hela positionens värde trots att den finns kvar.
     pv = kontant
     for sym, pos in innehav.items():
-        if sym in data and pos["antal"] > 1e-9:
+        if pos["antal"] < 1e-9:
+            continue
+        if sym in data:
             pv += pos["antal"] * data[sym]["senaste"]
+        else:
+            proxy = pos["antal"] * pos["kopt_pris_usd"]
+            pv += proxy
+            print(f"    REVERT: inget pris för {sym} denna körning — "
+                  f"värderas till köpkurs ({proxy:.0f} USD) i NAV")
 
     # 7. Benchmark: BTC och SPY buy & hold sedan första körningen
     btc_benchmark = spy_benchmark = None
