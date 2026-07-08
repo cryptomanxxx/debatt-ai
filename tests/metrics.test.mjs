@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { SYSTEM_KONTON, EXKL_SYSTEM_QS, gini, toppAndel, filtreraSystemkonton, bootstrapKI, viktadMedian } =
+const { SYSTEM_KONTON, EXKL_SYSTEM_QS, gini, toppAndel, filtreraSystemkonton, bootstrapKI, viktadMedian, spearman } =
   require("../app/lib/metrics.js");
 
 const approx = (a, b, eps = 1e-9) =>
@@ -177,4 +177,30 @@ test("viktadMedian: tom lista och ogiltiga poster → null", () => {
 
 test("viktadMedian: en post → dess värde", () => {
   assert.equal(viktadMedian([{ varde: 42, vikt: 0.1 }]), 42);
+});
+
+// ── spearman ────────────────────────────────────────────────────────
+
+test("spearman: perfekt monoton relation → 1", () => {
+  approx(spearman([1, 2, 3, 4, 5], [10, 100, 1000, 10000, 100000]), 1);
+});
+
+test("spearman: omvänd ordning → −1", () => {
+  approx(spearman([1, 2, 3, 4, 5], [5, 4, 3, 2, 1]), -1);
+});
+
+test("spearman: robust mot extremvärden (rang, inte magnitud)", () => {
+  // Pearson skulle kidnappas av 1e9-värdet — Spearman ser bara ordningen
+  approx(spearman([1, 2, 3, 4, 1e9], [1, 2, 3, 4, 5]), 1);
+});
+
+test("spearman: ties får medelrang", () => {
+  const r = spearman([1, 2, 2, 3], [1, 2, 3, 4]);
+  assert.ok(r > 0.9 && r <= 1, `fick ${r}`);
+});
+
+test("spearman: konstant serie eller för få par → null", () => {
+  assert.equal(spearman([5, 5, 5, 5], [1, 2, 3, 4]), null);
+  assert.equal(spearman([1, 2], [3, 4]), null);
+  assert.equal(spearman([1, 2, 3], [1, 2]), null);
 });
