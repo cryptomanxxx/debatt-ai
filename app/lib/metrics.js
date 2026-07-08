@@ -113,4 +113,41 @@ function viktadMedian(poster) {
   return sorted[sorted.length - 1].varde;
 }
 
-module.exports = { SYSTEM_KONTON, EXKL_SYSTEM_QS, filtreraSystemkonton, gini, toppAndel, bootstrapKI, viktadMedian };
+/** Medelrang med tie-hantering: lika värden får genomsnittet av sina ranger. */
+function _ranger(varden) {
+  const idx = varden.map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]);
+  const ranger = new Array(varden.length);
+  let i = 0;
+  while (i < idx.length) {
+    let j = i;
+    while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++;
+    const medelRang = (i + j) / 2 + 1;
+    for (let k = i; k <= j; k++) ranger[idx[k][1]] = medelRang;
+    i = j + 1;
+  }
+  return ranger;
+}
+
+/**
+ * Spearmans rangkorrelation (−1…1) — robust mot tunga svansar eftersom den
+ * bara ser rangordningen, inte magnituderna. Används av diversitetsanalysen
+ * i Visdomsspelet (felkorrelation mellan agentpar) och matchar PCI-mönstret
+ * på korruptionssidan. Returnerar null vid < 3 par eller konstanta serier.
+ */
+function spearman(x, y) {
+  if (!Array.isArray(x) || !Array.isArray(y) || x.length !== y.length || x.length < 3) return null;
+  const rx = _ranger(x);
+  const ry = _ranger(y);
+  const n = x.length;
+  const mx = rx.reduce((s, v) => s + v, 0) / n;
+  const my = ry.reduce((s, v) => s + v, 0) / n;
+  let cov = 0, vx = 0, vy = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = rx[i] - mx, dy = ry[i] - my;
+    cov += dx * dy; vx += dx * dx; vy += dy * dy;
+  }
+  if (vx === 0 || vy === 0) return null;
+  return cov / Math.sqrt(vx * vy);
+}
+
+module.exports = { SYSTEM_KONTON, EXKL_SYSTEM_QS, filtreraSystemkonton, gini, toppAndel, bootstrapKI, viktadMedian, spearman };
