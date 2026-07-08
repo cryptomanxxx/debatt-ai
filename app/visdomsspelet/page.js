@@ -147,6 +147,33 @@ export default async function VisdomsspeletPage() {
   // Grön = hela intervallet över 0 (robust), röd = helt under 0, grå = kan vara slump
   const kiFarg = ki => !ki ? C.dim : ki.lag > 0 ? C.green : ki.hog < 0 ? C.red : C.dim;
 
+  // Leaderboard: Kollektivet tävlar som 25:e deltagare. Kumulativt snittfel
+  // per deltagare över alla spel — den i förväg utpekade "bästa agenten" är
+  // den ärliga ribban för crowd-vs-expert, inte rundvinnaren (som oftast är
+  // en annan agent varje gång, ofta av tur).
+  const leaderboard = (() => {
+    const acc = {};
+    const laggTill = (namn, fel) => {
+      if (!acc[namn]) acc[namn] = { sum: 0, n: 0 };
+      acc[namn].sum += fel;
+      acc[namn].n += 1;
+    };
+    for (const s of giltiga) {
+      if (s.facit == null) continue;
+      laggTill("Kollektivet", capV(s.kollektivt_fel));
+      for (const a of s.agent_svar || []) {
+        if (!a?.agent || a.estimat == null || isNaN(Number(a.estimat))) continue;
+        const fel = Math.abs(Number(a.estimat) - s.facit) / Math.max(Math.abs(s.facit), 1) * 100;
+        laggTill(a.agent, capV(fel));
+      }
+    }
+    const minSpel = Math.max(5, Math.floor(antalSpel * 0.25));
+    return Object.entries(acc)
+      .filter(([namn, v]) => namn === "Kollektivet" || v.n >= minSpel)
+      .map(([namn, v]) => ({ namn, snittFel: v.sum / v.n, n: v.n }))
+      .sort((x, y) => x.snittFel - y.snittFel);
+  })();
+
   const grafData = giltiga.slice().reverse().map(s => ({
     label: kortLabel(s.skapad),
     kollektivtFel: Math.round(capV(s.kollektivt_fel) * 10) / 10,
@@ -314,6 +341,65 @@ export default async function VisdomsspeletPage() {
             Utveckling över tid
           </h2>
           <VisdomsspeletGraf data={grafData} />
+        </section>
+      )}
+
+      {/* Leaderboard — Kollektivet som 25:e deltagare */}
+      {leaderboard.length > 1 && (
+        <section style={{ marginBottom: "48px" }}>
+          <h2 style={{
+            fontSize: "11px", color: C.dim,
+            fontFamily: "monospace", letterSpacing: "0.12em",
+            textTransform: "uppercase", marginBottom: "8px",
+          }}>
+            Leaderboard — Kollektivet som 25:e deltagare
+          </h2>
+          <p style={{ fontSize: "12px", color: C.dim, margin: "0 0 16px", lineHeight: 1.6, maxWidth: "680px" }}>
+            Kumulativt snittfel över alla spel. &quot;Crowd vinner&quot;-måttet jämför mot rundans bästa
+            individ — men den är oftast en annan agent varje gång, ofta av tur. Den ärliga frågan är om
+            kollektivet slår den <em>i förväg utpekade</em> bästa agenten över tid: ingen enskild agent är
+            konsekvent bäst, men kollektivet är konsekvent hyggligt — och konsekvens vinner maraton.
+          </p>
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", overflow: "hidden" }}>
+            {leaderboard.map((rad, i) => {
+              const arKollektiv = rad.namn === "Kollektivet";
+              const maxFel = leaderboard[leaderboard.length - 1].snittFel || 1;
+              const bredd = Math.max(2, Math.round(rad.snittFel / maxFel * 100));
+              return (
+                <div key={rad.namn} style={{
+                  display: "flex", alignItems: "center", gap: "12px",
+                  padding: "8px 16px",
+                  borderBottom: i < leaderboard.length - 1 ? `1px solid ${C.border}` : "none",
+                  background: arKollektiv ? "#141003" : "transparent",
+                }}>
+                  <span style={{ fontSize: "11px", color: i < 3 ? C.gold : C.dim, fontFamily: "monospace", width: "24px", flexShrink: 0, textAlign: "right" }}>
+                    {i + 1}.
+                  </span>
+                  <span style={{
+                    fontSize: "13px", width: "150px", flexShrink: 0,
+                    color: arKollektiv ? C.gold : C.text,
+                    fontWeight: arKollektiv ? 700 : 400,
+                    fontFamily: "Georgia, serif",
+                  }}>
+                    {arKollektiv ? "👥 Kollektivet" : rad.namn}
+                  </span>
+                  <div style={{ flex: 1, minWidth: "60px" }}>
+                    <div style={{
+                      height: "8px", borderRadius: "4px",
+                      width: `${bredd}%`,
+                      background: arKollektiv ? C.gold : "#2a3a4a",
+                    }} />
+                  </div>
+                  <span style={{ fontSize: "12px", color: arKollektiv ? C.gold : C.text, fontFamily: "monospace", width: "76px", flexShrink: 0, textAlign: "right", fontWeight: arKollektiv ? 700 : 400 }}>
+                    {rad.snittFel.toFixed(1)}%
+                  </span>
+                  <span style={{ fontSize: "10px", color: C.dimmer, fontFamily: "monospace", width: "56px", flexShrink: 0, textAlign: "right" }}>
+                    {rad.n} spel
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </section>
       )}
 
