@@ -18,7 +18,7 @@ och Lorenz et al. 2011 (PNAS) som visar att social påverkan kan minska diversit
 utan att öka träffsäkerhet — därför testas tre kommunikationslägen mot varandra.
 
 Körs dagligen via GitHub Actions (kollektiv-intelligens-test.yml), roterar
-slumpmässigt mellan de tre lägena (eller styrs med miljövariabeln LAGE).
+slumpmässigt mellan de fyra lägena (eller styrs med miljövariabeln LAGE).
 
 Kräver: SUPABASE_ANON_KEY
 """
@@ -37,7 +37,7 @@ from supabase_utils import _llm_spel, spara_civilisations_minne
 from agent import AGENTER
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
-LAGEN = ["oberoende", "sekventiellt", "deliberativt"]
+LAGEN = ["oberoende", "sekventiellt", "deliberativt", "kontrarian"]
 MIN_AGENTER_FOR_GILTIGT_SPEL = 8
 
 
@@ -396,6 +396,112 @@ def kör_oberoende(fraga: dict, h: dict | None = None) -> list[dict]:
     return resultat
 
 
+def hamta_kollektiv_bias(h: dict, kategori: str, limit: int = 10) -> dict | None:
+    """Kollektivets historiska biasriktning i kategorin — underlaget för
+    kontrarian-lägets "baklänges optimering". Jämför kollektivt_estimat mot
+    facit i tidigare spel. Returnerar riktning + grad (aldrig exakta tal —
+    perspektiven ska styra processen, inte diktera svaret)."""
+    rows = sb_rows(h, "ki_spel", {
+        "select": "facit,kollektivt_estimat",
+        "kategori": f"eq.{kategori}",
+        "order": "skapad.desc",
+        "limit": str(limit),
+    })
+    riktningar, faktorer = [], []
+    for rad in rows or []:
+        try:
+            facit = float(rad["facit"])
+            est = float(rad["kollektivt_estimat"])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if facit == 0:
+            continue
+        riktningar.append(1 if est > facit else (-1 if est < facit else 0))
+        faktorer.append(abs(est - facit) / max(abs(facit), 1))
+    if len(riktningar) < 2:
+        return None
+    snitt_riktning = statistics.mean(riktningar)
+    snitt_faktor = statistics.mean(faktorer)
+    if abs(snitt_riktning) < 0.3 or snitt_faktor < 0.15:
+        return None  # ingen tydlig kollektiv bias att kontra
+    riktning = "för lågt" if snitt_riktning < 0 else "för högt"
+    kontra = "högre" if snitt_riktning < 0 else "lägre"
+    grad = "kraftigt" if snitt_faktor >= 1.5 else ("tydligt" if snitt_faktor >= 0.5 else "något")
+    return {"riktning": riktning, "kontra": kontra, "grad": grad}
+
+
+def _kontrarian_perspektiv(bias: dict | None) -> list[tuple[str, str]]:
+    """De fyra resonemangsperspektiven i kontrarian-läget. Styr HUR agenten
+    resonerar — aldrig VAD den ska svara. Biasriktningen (när den finns) är
+    hämtad ur kollektivets historik, inte ur dagens facit."""
+    if bias:
+        kontra_text = (
+            f"Grupper som gissar på den här typen av frågor har historiskt legat {bias['grad']} "
+            f"{bias['riktning']}. Undersök aktivt om det sanna värdet är betydligt {bias['kontra']} "
+            "än din första instinkt innan du svarar."
+        )
+        dialektisk_text = (
+            "Gör först en snabb tyst gissning. Anta sedan att den — som gruppgissningar historiskt "
+            f"på den här typen av frågor — ligger {bias['grad']} {bias['riktning']}. Fundera på varför "
+            "den kan vara fel åt det hållet, och låt ditt slutliga svar väga in den insikten."
+        )
+    else:
+        kontra_text = (
+            "Anta att de flesta som gissar på den här frågan gör samma systematiska misstag. "
+            "Fundera på åt vilket håll flocken troligen felar, och undersök aktivt det motsatta "
+            "hållet innan du svarar."
+        )
+        dialektisk_text = (
+            "Gör först en snabb tyst gissning. Anta sedan att den är fel — fundera på det starkaste "
+            "skälet till att det sanna värdet är mycket större respektive mycket mindre, och låt "
+            "ditt slutliga svar väga in båda."
+        )
+    return [
+        ("kontrarian", kontra_text),
+        ("fermi", "Bryt ned frågan i delfaktorer (hur många per dag? hur många dagar? hur stor andel?) "
+                  "och multiplicera ihop dem i stället för att gissa totalen direkt."),
+        ("basfrekvens", "Resonera från jämförbara kända storheter på plattformen (antal agenter, körningar "
+                        "per dag, dagar plattformen funnits) och härled svaret därifrån i stället för att "
+                        "gissa fritt."),
+        ("dialektisk", dialektisk_text),
+    ]
+
+
+def kör_kontrarian(fraga: dict, h: dict | None = None) -> list[dict]:
+    """Fjärde läget: "baklänges optimering" på processnivå. Agenterna gissar
+    oberoende (ingen kommunikation) men tilldelas slumpmässigt ett av fyra
+    resonemangsperspektiv, där kontrarian- och dialektisk-perspektiven är
+    informerade av kollektivets historiska biasriktning i kategorin.
+
+    Perspektiven styr processen, aldrig svaret. Pages dekomposition avgör i
+    efterhand om den tillverkade diversiteten är äkta: äkta = diversitet ↑
+    utan att snittfelet stiger lika mycket → kollektivt fel ↓. Fejkad =
+    ren utspridning → kollektivt fel oförändrat."""
+    bias = hamta_kollektiv_bias(h, fraga["kategori"]) if h and fraga.get("kategori") else None
+    if bias:
+        print(f"    Kollektiv bias i kategorin: {bias['grad']} {bias['riktning']}")
+    else:
+        print("    Ingen tydlig kollektiv bias i kategorin — neutrala perspektiv")
+    perspektiv = _kontrarian_perspektiv(bias)
+
+    resultat = []
+    agenter_shuffled = list(AGENTER)
+    random.shuffle(agenter_shuffled)
+    for i, agent in enumerate(agenter_shuffled):
+        p_namn, p_text = perspektiv[i % len(perspektiv)]
+        parsed = _fraga_agent(agent, fraga, p_text)
+        if parsed is None:
+            print(f"    [HOPPAR] {agent['namn']}: kunde inte tolka svar")
+            continue
+        estimat, konfidens, motivering = parsed
+        resultat.append({
+            "agent": agent["namn"], "estimat": estimat, "konfidens": konfidens,
+            "motivering": motivering, "perspektiv": p_namn,
+        })
+        print(f"    {agent['namn']} [{p_namn}]: {estimat} (konfidens {konfidens})")
+    return resultat
+
+
 def kör_sekventiellt(fraga: dict) -> list[dict]:
     """Agenterna gissar i tur och ordning och ser föregångarnas svar (inte facit)."""
     resultat = []
@@ -544,6 +650,8 @@ def main():
         svar = kör_oberoende(fraga, h)
     elif lage == "sekventiellt":
         svar = kör_sekventiellt(fraga)
+    elif lage == "kontrarian":
+        svar = kör_kontrarian(fraga, h)
     else:
         svar = kör_deliberativt(fraga)
 
