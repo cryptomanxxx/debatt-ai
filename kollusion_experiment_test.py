@@ -112,31 +112,45 @@ def avgor_oppna_spel() -> int:
     except Exception:
         return 0
 
+    idag = datetime.now(timezone.utc).date().isoformat()
     avgjorda = 0
     for s in spel:
+        # Vänta tills måldagen är SLUT (UTC) — annars kan spelet avgöras på en
+        # ofullständig intradagscandle som yfinance skrivit för innevarande dag.
+        if s["malda_datum"] >= idag:
+            continue
         utfall = hamta_utfall(s["symbol"], s["malda_datum"])
         if utfall is None:
             continue
         bets = {d["agent"]: d["bet"] for d in s["deltagare"]}
         payouts = berakna_kollusion_payouts(bets, utfall, float(s.get("ante") or ANTE))
+
+        # Claim-först: villkorad statusövergång öppen→avgjord INNAN plånböcker
+        # krediteras. Filtret på status gör övergången atomär — en andra körning
+        # matchar 0 rader och kan aldrig dubbelbetala.
+        try:
+            claim = httpx.patch(
+                f"{SB_URL}/rest/v1/kollusion_spel?id=eq.{s['id']}&status=eq.%C3%B6ppen",
+                json={"status": "avgjord", "utfall": utfall, "payouts": payouts,
+                      "avgjord_at": datetime.now(timezone.utc).isoformat()},
+                headers={**H, "Prefer": "return=representation"}, timeout=10,
+            )
+            if not claim.is_success or not claim.json():
+                print(f"  ⏭ Spel {s['id']}: kunde inte claimas (redan avgjort av annan körning?)")
+                continue
+        except Exception as e:
+            print(f"  ✗ Spel {s['id']}: claim misslyckades: {e}")
+            continue
+
         # Kreditera netto + återbetald ante (insatsen drogs vid skapandet):
         # vinnare får ante+netto tillbaka, förlorare 0, ingen-vinnare-fallet ante.
         for agent, netto in payouts.items():
             tillbaka = round(float(s.get("ante") or ANTE) + netto)
             if tillbaka > 0:
                 _uppdatera_saldo_spel(SB_KEY, agent, tillbaka)
-        try:
-            httpx.patch(
-                f"{SB_URL}/rest/v1/kollusion_spel?id=eq.{s['id']}",
-                json={"status": "avgjord", "utfall": utfall, "payouts": payouts,
-                      "avgjord_at": datetime.now(timezone.utc).isoformat()},
-                headers=H, timeout=10,
-            )
-            avgjorda += 1
-            print(f"  ✓ Spel {s['id']} ({s['typ']}, {s['symbol']}): utfall {utfall.upper()} — "
-                  + ", ".join(f"{a} {p:+.0f}" for a, p in payouts.items()))
-        except Exception as e:
-            print(f"  ✗ Spel {s['id']}: kunde inte spara avgörande: {e}")
+        avgjorda += 1
+        print(f"  ✓ Spel {s['id']} ({s['typ']}, {s['symbol']}): utfall {utfall.upper()} — "
+              + ", ".join(f"{a} {p:+.0f}" for a, p in payouts.items()))
     return avgjorda
 
 
