@@ -203,6 +203,7 @@ export default async function VisdomsspeletPage() {
       Math.min(Math.abs(Number(estimat) - facit) / Math.max(Math.abs(facit), 1) * 100, 300);
 
     const hist = {}; // agent -> { global: {sum,n}, kat: { [kategori]: {sum,n} } }
+    const diffar = []; // per-spel: statiskt fel − lärande fel (positivt = lärande bättre)
     let sumFel = 0, n = 0;
 
     for (const s of underlag) {
@@ -221,8 +222,13 @@ export default async function VisdomsspeletPage() {
       if (poster.length >= 3) {
         const estimat = viktadMedian(poster);
         if (estimat != null) {
-          sumFel += felAv(estimat, s.facit);
+          const larFel = felAv(estimat, s.facit);
+          sumFel += larFel;
           n += 1;
+          // Parad differens mot statiska kollektivet på SAMMA spel — underlag
+          // för bootstrap-testet av om förbättringen kan vara slump. Båda
+          // cappas likadant (samma estimator-konsekvens som crowd advantage).
+          diffar.push(Math.min(Number(s.kollektivt_fel), 300) - larFel);
         }
       }
 
@@ -238,7 +244,14 @@ export default async function VisdomsspeletPage() {
         }
       }
     }
-    return n >= 5 ? { snittFel: sumFel / n, n } : null;
+    if (n < 5) return null;
+    // Parat bootstrap-KI (2000 omsamplingar, seedad) på differenserna.
+    // Hela intervallet > 0 → förbättringen är inte slump. Testet är
+    // konservativt: kallstarten (tidiga spel utan historik, där lärande =
+    // statisk median) ingår i snittet och drar differensen mot noll.
+    const diffKI = bootstrapKI(diffar);
+    const snittDiff = diffar.length ? diffar.reduce((s, v) => s + v, 0) / diffar.length : null;
+    return { snittFel: sumFel / n, n, diffKI, snittDiff };
   })();
 
   if (larandeKollektiv) {
@@ -482,6 +495,22 @@ export default async function VisdomsspeletPage() {
               );
             })}
           </div>
+          {larandeKollektiv?.diffKI && (
+            <p style={{
+              fontSize: "12px", fontFamily: "monospace", margin: "12px 0 0",
+              color: larandeKollektiv.diffKI.lag > 0 ? C.green : larandeKollektiv.diffKI.hog < 0 ? C.red : C.dim,
+            }}>
+              🧠 vs 👥 — parat bootstrap på {larandeKollektiv.diffKI.n} spel: förbättring{" "}
+              {larandeKollektiv.snittDiff >= 0 ? "+" : ""}{larandeKollektiv.snittDiff.toFixed(1)} pp,
+              95% KI: {larandeKollektiv.diffKI.lag >= 0 ? "+" : ""}{larandeKollektiv.diffKI.lag.toFixed(1)} till{" "}
+              {larandeKollektiv.diffKI.hog >= 0 ? "+" : ""}{larandeKollektiv.diffKI.hog.toFixed(1)} pp
+              {larandeKollektiv.diffKI.lag > 0
+                ? " — slumpen utesluten"
+                : larandeKollektiv.diffKI.hog < 0
+                ? " — lärande kollektivet är sämre"
+                : " — kan ännu vara slump, fler spel behövs"}
+            </p>
+          )}
         </section>
       )}
 
