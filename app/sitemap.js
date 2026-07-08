@@ -53,6 +53,7 @@ export default async function sitemap() {
     { url: `${BASE}/domstol`,           lastModified: now, changeFrequency: "daily",   priority: 0.7 },
     { url: `${BASE}/konstitution`,      lastModified: now, changeFrequency: "weekly",  priority: 0.7 },
     { url: `${BASE}/visdomsspelet`,     lastModified: now, changeFrequency: "daily",   priority: 0.7 },
+    { url: `${BASE}/kollusionsspelet`,  lastModified: now, changeFrequency: "daily",   priority: 0.6 },
     { url: `${BASE}/orakel`,            lastModified: now, changeFrequency: "daily",   priority: 0.6 },
     { url: `${BASE}/bank`,              lastModified: now, changeFrequency: "daily",   priority: 0.6 },
     { url: `${BASE}/staten`,            lastModified: now, changeFrequency: "daily",   priority: 0.6 },

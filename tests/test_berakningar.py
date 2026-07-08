@@ -16,6 +16,7 @@ import pytest
 
 from supabase_utils import (
     SYSTEM_KONTON, EXKL_SYSTEM_QS, berakna_gini, berakna_insats, orakel_kohort,
+    berakna_kollusion_payouts,
 )
 from inflation import berakna_progressiv_skatt, berakna_policy_niva
 
@@ -172,3 +173,61 @@ def test_orakel_kohort_balans():
 
 def test_orakel_kohort_okand_agent():
     assert orakel_kohort("Finns Inte") == "kontroll"
+
+
+# ── Kollusionsexperimentet (Davidsson 2012, SSRN 2248357) ───────────
+# Testerna kodar in artikelns Exhibit-1 och EV-beräkningar exakt.
+
+def test_kollusion_alla_ratt_ger_noll():
+    # Alla tre rätt → var och en får tillbaka sin insats: payout 0
+    p = berakna_kollusion_payouts({"Dan": "ja", "Eric": "ja", "Nick": "ja"}, "ja")
+    assert p == {"Dan": 0.0, "Eric": 0.0, "Nick": 0.0}
+
+
+def test_kollusion_tva_ratt():
+    # Två rätt delar potten (6/2=3) → +1 vardera, förloraren −2
+    p = berakna_kollusion_payouts({"Dan": "ja", "Eric": "ja", "Nick": "nej"}, "ja")
+    assert p == {"Dan": 1.0, "Eric": 1.0, "Nick": -2.0}
+
+
+def test_kollusion_ensam_vinnare():
+    # En rätt tar hela potten (6) → +4, förlorarna −2
+    p = berakna_kollusion_payouts({"Dan": "ja", "Eric": "nej", "Nick": "nej"}, "ja")
+    assert p == {"Dan": 4.0, "Eric": -2.0, "Nick": -2.0}
+
+
+def test_kollusion_inga_vinnare_ger_aterbetalning():
+    # Alla fel → insatserna återbetalas (payout 0). Utan detta läcker värde ur
+    # spelet och även det ärliga spelet får negativ EV — brott mot artikelns modell.
+    p = berakna_kollusion_payouts({"Dan": "ja", "Eric": "ja", "Nick": "ja"}, "nej")
+    assert p == {"Dan": 0.0, "Eric": 0.0, "Nick": 0.0}
+
+
+def test_kollusion_ev_utan_kollusion_ar_noll():
+    # Rättvist spel: summera över alla 8 lika sannolika utfall
+    # (Dans gissning × Erics gissning × Nicks gissning mot ett fixt utfall
+    #  är ekvivalent med alla kombinationer rätt/fel) → EV = 0 för alla
+    from itertools import product
+    ev = {"Dan": 0.0, "Eric": 0.0, "Nick": 0.0}
+    for g_dan, g_eric, g_nick in product(["ja", "nej"], repeat=3):
+        p = berakna_kollusion_payouts({"Dan": g_dan, "Eric": g_eric, "Nick": g_nick}, "ja")
+        for agent in ev:
+            ev[agent] += p[agent] / 8
+    assert all(abs(v) < 1e-9 for v in ev.values())
+
+
+def test_kollusion_ev_med_kollusion():
+    # Artikelns kärnresultat: Eric och Nick bettar alltid motsatt.
+    # Fyra lika sannolika utfall (Dans gissning × myntet) →
+    # Dan EV = −0.5, kolluderarna +0.25 vardera.
+    ev = {"Dan": 0.0, "Eric": 0.0, "Nick": 0.0}
+    for g_dan in ["ja", "nej"]:
+        for mynt in ["ja", "nej"]:
+            g_eric = "ja"
+            g_nick = "nej"  # alltid motsatt Eric
+            p = berakna_kollusion_payouts({"Dan": g_dan, "Eric": g_eric, "Nick": g_nick}, mynt)
+            for agent in ev:
+                ev[agent] += p[agent] / 4
+    assert abs(ev["Dan"] - (-0.5)) < 1e-9
+    assert abs(ev["Eric"] - 0.25) < 1e-9
+    assert abs(ev["Nick"] - 0.25) < 1e-9

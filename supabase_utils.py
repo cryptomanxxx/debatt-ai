@@ -828,6 +828,28 @@ def berakna_insats(sannolikhet: int, insats_multiplikator: float = 1.0) -> int:
     return max(10, min(60, int((10 + int(confidence * 0.6)) * insats_multiplikator)))
 
 
+def berakna_kollusion_payouts(bets: dict, utfall: str, ante: float = 2.0) -> dict:
+    """Pott-delningsspelet i Kollusionsexperimentet (Davidsson 2012, SSRN 2248357).
+
+    Alla deltagare satsar `ante`; de som gissat rätt delar potten lika.
+    Returnerar netto-payout per agent (vinstandel − ante, förlorare −ante).
+    Inga vinnare → alla −ante och potten går till Statskassan (anroparens ansvar).
+
+    Med 3 spelare och ante 2 kr ger detta exakt artikelns Exhibit-1:
+    ensam vinnare +4, två vinnare +1 vardera, alla rätt ±0, förlorare −2.
+    Inga vinnare → alla får tillbaka insatsen (payout 0) — krävs för att det
+    ärliga spelet ska vara exakt noll-EV. Två kolluderare som alltid bettar
+    motsatt får EV +0.25 vardera medan offret får EV −0.5 — trots att myntet
+    är rättvist. (För kolluderarna kan inga-vinnare-fallet aldrig inträffa.)
+    """
+    pott = ante * len(bets)
+    vinnare = [agent for agent, bet in bets.items() if bet == utfall]
+    if not vinnare:
+        return {agent: 0.0 for agent in bets}
+    andel = pott / len(vinnare)
+    return {agent: (andel - ante if agent in vinnare else -ante) for agent in bets}
+
+
 def spara_bet(sb_key: str, market_id: int, agent_namn: str, sannolikhet: int, motivering: str, insats_multiplikator: float = 1.0) -> bool:
     """Sparar ett agent-bet i Supabase. Drar insats från saldo_spel."""
     try:

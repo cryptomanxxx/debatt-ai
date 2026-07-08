@@ -2192,6 +2192,29 @@ RCT som mäter var intelligensvärde faktiskt sitter: kan en rådgivare förbät
 | `app/orakel/page.js` | Dashboard: kohort-Brier, hjärna-mot-hjärna, följsamhet, bedömningslista. SSR 300s |
 | `.github/workflows/agent.yml` | `ANTHROPIC_API_KEY` tillagd i env |
 
+### ✅ 92. Kollusionsspelet (/kollusionsspelet) — Davidsson (2012) på AI-agenter – KLART
+Replikering av grundarens artikel "Community Investments and Collusion" (SSRN 2248357) på AI-agenter. Pott-delningsspel i 3-spelarformat: alla satsar 2 kr ur `saldo_spel`, rätt gissare delar potten. Myntet = om BTC/ETH/SOL/XRP stänger högre nästa handelsdag (avgörs mot `ohlcv_cache`).
+
+**Två spelformat per dag (2+2 spel, 12:15 svensk tid):**
+| Typ | Deltagare | Teoretisk EV/spel |
+|---|---|---|
+| kollusion | Den rike (ledare, LLM-bet) + Kryptoanalytiker (följare, bettar ALLTID motsatt) + roterande offer | kolluderare +0.25 · offer −0.50 |
+| kontroll | Tre roterande ärliga agenter | 0 |
+
+**Mekanik:** Kolluderarparet är fast genom hela experimentet (byte förstör mätserien). Offer/kontrollroller roterar deterministiskt genom de 22 ärliga agenterna via totalt spelantal — ingen extra tabell. Inga vinnare → insatserna återbetalas (krävs för exakt noll-EV i ärliga spelet). Nollsumme mellan deltagarna. Ante dras först efter att spelraden sparats.
+
+**Mätvärden på `/kollusionsspelet`:** empirisk vs teoretisk EV per roll, kollusionssignaturen (kolluderarparet bettar lika i exakt 0% av spelen vs ärliga par ~50%+ — LLM-agenter har korrelerade priors eftersom de delar grundmodell), senaste spel. Nästa fas: detektionslager (§6 i konstitutionen — kan agenterna/domstolen upptäcka kollusionen ur betting-mönstret?).
+
+**CI-tester:** `berakna_kollusion_payouts()` i `supabase_utils.py` — artikelns Exhibit-1 och EV-beräkningar (−0.5/+0.25/0) är inkodade som pytest-tester i `tests/test_berakningar.py`.
+
+| Fil | Roll |
+|---|---|
+| `supabase_kollusion.sql` | Tabell `kollusion_spel` (typ, symbol, deltagare jsonb med roller, utfall, payouts) + RLS |
+| `supabase_utils.py` → `berakna_kollusion_payouts()` | Ren pott-delningsfunktion — testbar, artikelns matte |
+| `kollusion_experiment_test.py` | Daglig körning: avgör öppna spel mot ohlcv_cache, skapar 2+2 nya |
+| `app/kollusionsspelet/page.js` | Dashboard: EV teori vs empiri per roll, kollusionssignaturen, spellista. SSR 300s |
+| `.github/workflows/kollusion-experiment.yml` | Kör dagligen 12:15 svensk tid (10:15 UTC) |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
