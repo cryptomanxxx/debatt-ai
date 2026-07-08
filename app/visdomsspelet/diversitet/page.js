@@ -73,8 +73,16 @@ export default async function DiversitetPage() {
     .sort();
 
   // ── Parvisa korrelationer (rå + residual) ─────────────────────────
-  const par = []; // { a, b, ra (rå), rr (residual), n }
-  const rrMap = {}; // "a|b" -> rr
+  // Rå- och residualsamlingarna hålls ISÄR: ett klonpar vars fel exakt följer
+  // medianen får konstant residualserie (spearman → null) men fullt giltig
+  // råkorrelation. Släpps paret helt försvinner det ur snittRa och "Effektiva
+  // hjärnor" blåses upp — i precis det kopierade-agenter-fall sidan ska
+  // diagnostisera. Därför: rå in i raPar oavsett residualstatus; residualen
+  // in i par/rrMap bara när den är definierad (heatmapceller utan värde
+  // renderas mörka som "otillräcklig data").
+  const raPar = [];   // alla par med giltig råkorrelation → snittRa, nEff
+  const par = [];     // par med giltig residualkorrelation → heatmap, listor
+  const rrMap = {};   // "a|b" -> rr
   for (let i = 0; i < agenter.length; i++) {
     for (let j = i + 1; j < agenter.length; j++) {
       const a = agenter[i], b = agenter[j];
@@ -88,14 +96,16 @@ export default async function DiversitetPage() {
       if (xr.length < MIN_GEMENSAMMA_SPEL) continue;
       const ra = spearman(xr, yr);
       const rr = spearman(xs, ys);
-      if (ra == null || rr == null) continue;
-      par.push({ a, b, ra, rr, n: xr.length });
-      rrMap[`${a}|${b}`] = rr;
-      rrMap[`${b}|${a}`] = rr;
+      if (ra != null) raPar.push(ra);
+      if (rr != null) {
+        par.push({ a, b, ra, rr, n: xr.length });
+        rrMap[`${a}|${b}`] = rr;
+        rrMap[`${b}|${a}`] = rr;
+      }
     }
   }
 
-  const snittRa = par.length ? par.reduce((s, p) => s + p.ra, 0) / par.length : null;
+  const snittRa = raPar.length ? raPar.reduce((s, v) => s + v, 0) / raPar.length : null;
   const snittRr = par.length ? par.reduce((s, p) => s + p.rr, 0) / par.length : null;
 
   // Effektiv poolstorlek: n / (1 + (n−1)·ρ̄) — hur många OBEROENDE
