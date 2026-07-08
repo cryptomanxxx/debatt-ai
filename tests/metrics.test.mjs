@@ -144,9 +144,23 @@ test("bootstrapKI: ignorerar NaN/Infinity", () => {
 
 // ── viktadMedian ────────────────────────────────────────────────────
 
-test("viktadMedian: likformiga vikter = vanlig median", () => {
+test("viktadMedian: likformiga vikter = vanlig median (udda antal)", () => {
   const poster = [10, 20, 30, 40, 50].map(v => ({ varde: v, vikt: 1 }));
   assert.equal(viktadMedian(poster), 30);
+});
+
+test("viktadMedian: jämnt antal med likformiga vikter = medel av mittvärdena", () => {
+  // Måste matcha Pythons statistics.median som beräknar Kollektivet-baslinjen —
+  // annars skiljer sig lärande kollektivet från baslinjen utan inlärningssignal
+  const poster = [10, 20, 30, 40].map(v => ({ varde: v, vikt: 1 }));
+  assert.equal(viktadMedian(poster), 25);
+});
+
+test("viktadMedian: jämnt antal med icke-exakta flyttalsvikter", () => {
+  // 1/160 är inte exakt representerbart binärt — EPS-toleransen ska ändå
+  // träffa exakt-halva-fallet vid likformiga vikter
+  const poster = [10, 20, 30, 40].map(v => ({ varde: v, vikt: 1 / 160 }));
+  assert.equal(viktadMedian(poster), 25);
 });
 
 test("viktadMedian: tung vikt drar medianen till sig", () => {

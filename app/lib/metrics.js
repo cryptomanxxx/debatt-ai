@@ -96,10 +96,19 @@ function viktadMedian(poster) {
   if (!v.length) return null;
   const sorted = [...v].sort((a, b) => a.varde - b.varde);
   const total = sorted.reduce((s, p) => s + p.vikt, 0);
+  const halva = total / 2;
+  const EPS = total * 1e-9; // flyttalstolerans för exakt-halva-jämförelsen
   let cum = 0;
-  for (const p of sorted) {
-    cum += p.vikt;
-    if (cum >= total / 2) return p.varde;
+  for (let i = 0; i < sorted.length; i++) {
+    cum += sorted[i].vikt;
+    if (cum > halva + EPS) return sorted[i].varde;
+    if (cum >= halva - EPS) {
+      // Exakt halva vikten under gränsen (t.ex. likformiga vikter, jämnt antal):
+      // medelvärdet av gränsvärdena — matchar Pythons statistics.median som
+      // beräknar det lagrade Kollektivet-baslinjevärdet. Utan detta skiljer sig
+      // det lärande kollektivet från baslinjen redan innan någon inlärning skett.
+      return i + 1 < sorted.length ? (sorted[i].varde + sorted[i + 1].varde) / 2 : sorted[i].varde;
+    }
   }
   return sorted[sorted.length - 1].varde;
 }
