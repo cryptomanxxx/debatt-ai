@@ -1,7 +1,7 @@
 export const revalidate = 300;
 
 import VisdomsspeletGraf from "./VisdomsspeletGraf";
-import { bootstrapKI } from "../lib/metrics";
+import { bootstrapKI, viktadMedian } from "../lib/metrics";
 
 export const metadata = {
   title: "Visdomsspelet – DEBATT-AI",
@@ -48,7 +48,7 @@ async function getData() {
     }),
     // Leaderboarden rankar på HELA spelhistoriken — inte rullande 60.
     // Hämtar bara fälten den behöver för att hålla payloaden nere.
-    fetch(`${SB_URL}/rest/v1/ki_spel?select=facit,kollektivt_fel,agent_svar&kollektivt_fel=not.is.null&order=skapad.desc&limit=2000`, {
+    fetch(`${SB_URL}/rest/v1/ki_spel?select=facit,kollektivt_fel,agent_svar,kategori,skapad&kollektivt_fel=not.is.null&order=skapad.desc&limit=2000`, {
       headers: h,
       next: { revalidate: 300 },
     }),
@@ -184,6 +184,67 @@ export default async function VisdomsspeletPage() {
       .map(([namn, v]) => ({ namn, snittFel: v.sum / v.n, n: v.n }))
       .sort((x, y) => x.snittFel - y.snittFel);
   })();
+
+  // "Det lärande kollektivet" — 26:e deltagaren. Expert-viktning à la
+  // multiplicative weights: vid varje spel viktas agenterna efter historisk
+  // träffsäkerhet i frågekategorin, beräknat ENBART på tidigare spel
+  // (walk-forward — ingen facit-läcka). Aggregator: viktad median.
+  // Få observationer krymps mot prior (skydd mot småurvalsbrus).
+  const larandeKollektiv = (() => {
+    const underlag = (allaSpel.length ? allaSpel : giltiga)
+      .filter(s => s.facit != null && s.kollektivt_fel != null)
+      .slice()
+      .sort((a, b) => new Date(a.skapad) - new Date(b.skapad));
+    if (underlag.length < 5) return null;
+
+    const KRYMP = 5;      // shrinkage-styrka: antal "virtuella" spel på prior
+    const PRIOR = 150;    // prior-snittfel (%) för okända agenter
+    const felAv = (estimat, facit) =>
+      Math.min(Math.abs(Number(estimat) - facit) / Math.max(Math.abs(facit), 1) * 100, 300);
+
+    const hist = {}; // agent -> { global: {sum,n}, kat: { [kategori]: {sum,n} } }
+    let sumFel = 0, n = 0;
+
+    for (const s of underlag) {
+      const poster = [];
+      for (const a of s.agent_svar || []) {
+        if (!a?.agent || a.estimat == null || isNaN(Number(a.estimat))) continue;
+        const h = hist[a.agent];
+        const kat = s.kategori && h ? h.kat[s.kategori] : null;
+        const kalla = kat && kat.n >= 3 ? kat : (h && h.global.n >= 3 ? h.global : null);
+        const krympt = kalla
+          ? (kalla.sum + KRYMP * PRIOR) / (kalla.n + KRYMP)
+          : PRIOR;
+        poster.push({ varde: Number(a.estimat), vikt: 1 / (krympt + 50), agent: a.agent });
+      }
+
+      if (poster.length >= 3) {
+        const estimat = viktadMedian(poster);
+        if (estimat != null) {
+          sumFel += felAv(estimat, s.facit);
+          n += 1;
+        }
+      }
+
+      // Uppdatera historiken EFTER att spelets estimat räknats — walk-forward
+      for (const d of poster) {
+        const fel = felAv(d.varde, s.facit);
+        if (!hist[d.agent]) hist[d.agent] = { global: { sum: 0, n: 0 }, kat: {} };
+        const h = hist[d.agent];
+        h.global.sum += fel; h.global.n += 1;
+        if (s.kategori) {
+          if (!h.kat[s.kategori]) h.kat[s.kategori] = { sum: 0, n: 0 };
+          h.kat[s.kategori].sum += fel; h.kat[s.kategori].n += 1;
+        }
+      }
+    }
+    return n >= 5 ? { snittFel: sumFel / n, n } : null;
+  })();
+
+  if (larandeKollektiv) {
+    leaderboard.push({ namn: "Det lärande kollektivet", snittFel: larandeKollektiv.snittFel, n: larandeKollektiv.n });
+    leaderboard.sort((x, y) => x.snittFel - y.snittFel);
+  }
 
   const grafData = giltiga.slice().reverse().map(s => ({
     label: kortLabel(s.skapad),
@@ -355,7 +416,7 @@ export default async function VisdomsspeletPage() {
         </section>
       )}
 
-      {/* Leaderboard — Kollektivet som 25:e deltagare */}
+      {/* Leaderboard — kollektiven tävlar mot agenterna */}
       {leaderboard.length > 1 && (
         <section style={{ marginBottom: "48px" }}>
           <h2 style={{
@@ -363,17 +424,27 @@ export default async function VisdomsspeletPage() {
             fontFamily: "monospace", letterSpacing: "0.12em",
             textTransform: "uppercase", marginBottom: "8px",
           }}>
-            Leaderboard — Kollektivet som 25:e deltagare
+            Leaderboard — kollektiven tävlar mot agenterna
           </h2>
           <p style={{ fontSize: "12px", color: C.dim, margin: "0 0 16px", lineHeight: 1.6, maxWidth: "680px" }}>
             Kumulativt snittfel över alla spel. &quot;Crowd vinner&quot;-måttet jämför mot rundans bästa
             individ — men den är oftast en annan agent varje gång, ofta av tur. Den ärliga frågan är om
-            kollektivet slår den <em>i förväg utpekade</em> bästa agenten över tid: ingen enskild agent är
-            konsekvent bäst, men kollektivet är konsekvent hyggligt — och konsekvens vinner maraton.
+            kollektivet slår den <em>i förväg utpekade</em> bästa agenten över tid.
+            <span style={{ color: C.gold }}> 👥 Kollektivet</span> är den oviktade medianen.
+            <span style={{ color: C.teal }}> 🧠 Det lärande kollektivet</span> viktar agenterna efter
+            historisk träffsäkerhet i frågekategorin — beräknat enbart på <em>tidigare</em> spel
+            (walk-forward, ingen facit-läcka), med krympning mot prior vid få observationer.
+            Expert-viktningsteorin (multiplicative weights) förutsäger att viktningen förbättrar
+            kollektivet över tid — om träffsäkerhetssignalen inte drunknar i agenternas delade bias.
+            Aggregatorn är en viktad median: robust mot extremgissningar, men den låter medvetet
+            ingen enskild &quot;expert&quot; dominera helt.
           </p>
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", overflow: "hidden" }}>
             {leaderboard.map((rad, i) => {
               const arKollektiv = rad.namn === "Kollektivet";
+              const arLarande   = rad.namn === "Det lärande kollektivet";
+              const farg = arLarande ? C.teal : arKollektiv ? C.gold : C.text;
+              const namnText = arLarande ? "🧠 Det lärande kollektivet" : arKollektiv ? "👥 Kollektivet" : rad.namn;
               const maxFel = leaderboard[leaderboard.length - 1].snittFel || 1;
               const bredd = Math.max(2, Math.round(rad.snittFel / maxFel * 100));
               return (
@@ -381,27 +452,27 @@ export default async function VisdomsspeletPage() {
                   display: "flex", alignItems: "center", gap: "12px",
                   padding: "8px 16px",
                   borderBottom: i < leaderboard.length - 1 ? `1px solid ${C.border}` : "none",
-                  background: arKollektiv ? "#141003" : "transparent",
+                  background: arLarande ? "#031412" : arKollektiv ? "#141003" : "transparent",
                 }}>
                   <span style={{ fontSize: "11px", color: i < 3 ? C.gold : C.dim, fontFamily: "monospace", width: "24px", flexShrink: 0, textAlign: "right" }}>
                     {i + 1}.
                   </span>
                   <span style={{
                     fontSize: "13px", width: "150px", flexShrink: 0,
-                    color: arKollektiv ? C.gold : C.text,
-                    fontWeight: arKollektiv ? 700 : 400,
+                    color: farg,
+                    fontWeight: (arKollektiv || arLarande) ? 700 : 400,
                     fontFamily: "Georgia, serif",
                   }}>
-                    {arKollektiv ? "👥 Kollektivet" : rad.namn}
+                    {namnText}
                   </span>
                   <div style={{ flex: 1, minWidth: "60px" }}>
                     <div style={{
                       height: "8px", borderRadius: "4px",
                       width: `${bredd}%`,
-                      background: arKollektiv ? C.gold : "#2a3a4a",
+                      background: arLarande ? C.teal : arKollektiv ? C.gold : "#2a3a4a",
                     }} />
                   </div>
-                  <span style={{ fontSize: "12px", color: arKollektiv ? C.gold : C.text, fontFamily: "monospace", width: "76px", flexShrink: 0, textAlign: "right", fontWeight: arKollektiv ? 700 : 400 }}>
+                  <span style={{ fontSize: "12px", color: farg, fontFamily: "monospace", width: "76px", flexShrink: 0, textAlign: "right", fontWeight: (arKollektiv || arLarande) ? 700 : 400 }}>
                     {rad.snittFel.toFixed(1)}%
                   </span>
                   <span style={{ fontSize: "10px", color: C.dimmer, fontFamily: "monospace", width: "56px", flexShrink: 0, textAlign: "right" }}>

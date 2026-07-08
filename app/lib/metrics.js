@@ -85,4 +85,32 @@ function bootstrapKI(varden, { iterationer = 2000, alfa = 0.05, seed = 42 } = {}
   return { lag: lo, hog: hi, n };
 }
 
-module.exports = { SYSTEM_KONTON, EXKL_SYSTEM_QS, filtreraSystemkonton, gini, toppAndel, bootstrapKI };
+/**
+ * Viktad median: sortera på värde, ackumulera vikter, returnera första värdet
+ * där den kumulativa vikten når halva totalvikten. Med likformiga vikter är
+ * detta den vanliga medianen (nedre vid jämnt antal). Används av "Det lärande
+ * kollektivet" i Visdomsspelet — expert-viktning à la multiplicative weights.
+ */
+function viktadMedian(poster) {
+  const v = (poster || []).filter(p => Number.isFinite(p?.varde) && Number.isFinite(p?.vikt) && p.vikt > 0);
+  if (!v.length) return null;
+  const sorted = [...v].sort((a, b) => a.varde - b.varde);
+  const total = sorted.reduce((s, p) => s + p.vikt, 0);
+  const halva = total / 2;
+  const EPS = total * 1e-9; // flyttalstolerans för exakt-halva-jämförelsen
+  let cum = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    cum += sorted[i].vikt;
+    if (cum > halva + EPS) return sorted[i].varde;
+    if (cum >= halva - EPS) {
+      // Exakt halva vikten under gränsen (t.ex. likformiga vikter, jämnt antal):
+      // medelvärdet av gränsvärdena — matchar Pythons statistics.median som
+      // beräknar det lagrade Kollektivet-baslinjevärdet. Utan detta skiljer sig
+      // det lärande kollektivet från baslinjen redan innan någon inlärning skett.
+      return i + 1 < sorted.length ? (sorted[i].varde + sorted[i + 1].varde) / 2 : sorted[i].varde;
+    }
+  }
+  return sorted[sorted.length - 1].varde;
+}
+
+module.exports = { SYSTEM_KONTON, EXKL_SYSTEM_QS, filtreraSystemkonton, gini, toppAndel, bootstrapKI, viktadMedian };
