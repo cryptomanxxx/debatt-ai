@@ -85,4 +85,23 @@ function bootstrapKI(varden, { iterationer = 2000, alfa = 0.05, seed = 42 } = {}
   return { lag: lo, hog: hi, n };
 }
 
-module.exports = { SYSTEM_KONTON, EXKL_SYSTEM_QS, filtreraSystemkonton, gini, toppAndel, bootstrapKI };
+/**
+ * Viktad median: sortera på värde, ackumulera vikter, returnera första värdet
+ * där den kumulativa vikten når halva totalvikten. Med likformiga vikter är
+ * detta den vanliga medianen (nedre vid jämnt antal). Används av "Det lärande
+ * kollektivet" i Visdomsspelet — expert-viktning à la multiplicative weights.
+ */
+function viktadMedian(poster) {
+  const v = (poster || []).filter(p => Number.isFinite(p?.varde) && Number.isFinite(p?.vikt) && p.vikt > 0);
+  if (!v.length) return null;
+  const sorted = [...v].sort((a, b) => a.varde - b.varde);
+  const total = sorted.reduce((s, p) => s + p.vikt, 0);
+  let cum = 0;
+  for (const p of sorted) {
+    cum += p.vikt;
+    if (cum >= total / 2) return p.varde;
+  }
+  return sorted[sorted.length - 1].varde;
+}
+
+module.exports = { SYSTEM_KONTON, EXKL_SYSTEM_QS, filtreraSystemkonton, gini, toppAndel, bootstrapKI, viktadMedian };

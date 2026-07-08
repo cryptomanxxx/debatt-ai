@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { SYSTEM_KONTON, EXKL_SYSTEM_QS, gini, toppAndel, filtreraSystemkonton, bootstrapKI } =
+const { SYSTEM_KONTON, EXKL_SYSTEM_QS, gini, toppAndel, filtreraSystemkonton, bootstrapKI, viktadMedian } =
   require("../app/lib/metrics.js");
 
 const approx = (a, b, eps = 1e-9) =>
@@ -140,4 +140,27 @@ test("bootstrapKI: tydligt positiv effekt → hela intervallet över 0", () => {
 test("bootstrapKI: ignorerar NaN/Infinity", () => {
   const ki = bootstrapKI([5, NaN, 6, Infinity, 7, 5, 6, 7]);
   assert.equal(ki.n, 6);
+});
+
+// ── viktadMedian ────────────────────────────────────────────────────
+
+test("viktadMedian: likformiga vikter = vanlig median", () => {
+  const poster = [10, 20, 30, 40, 50].map(v => ({ varde: v, vikt: 1 }));
+  assert.equal(viktadMedian(poster), 30);
+});
+
+test("viktadMedian: tung vikt drar medianen till sig", () => {
+  const poster = [
+    { varde: 10, vikt: 1 }, { varde: 20, vikt: 1 }, { varde: 100, vikt: 10 },
+  ];
+  assert.equal(viktadMedian(poster), 100);
+});
+
+test("viktadMedian: tom lista och ogiltiga poster → null", () => {
+  assert.equal(viktadMedian([]), null);
+  assert.equal(viktadMedian([{ varde: NaN, vikt: 1 }, { varde: 5, vikt: 0 }]), null);
+});
+
+test("viktadMedian: en post → dess värde", () => {
+  assert.equal(viktadMedian([{ varde: 42, vikt: 0.1 }]), 42);
 });
