@@ -76,6 +76,7 @@ export default function RootLayout({ children }) {
               <a href="/intelligens" className="neon-nav">Intelligens 🧠</a>
               <a href="/bors" className="neon-nav">Intern börs</a>
               <a href="/koalitioner" className="neon-nav">Koalitioner</a>
+              <a href="/kollusionsspelet" className="neon-nav">Kollusionsspelet 🪙</a>
               <a href="/?kontakt=1" className="neon-nav">Kontakt</a>
               <a href="/korruption" className="neon-nav">Korruption</a>
               <a href="/kris" className="neon-nav">Krisevents</a>

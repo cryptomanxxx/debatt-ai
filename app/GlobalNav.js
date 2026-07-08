@@ -91,6 +91,7 @@ const GRUPPER = [
     label: "Spel & Mer",
     items: [
       { href: "/snake",        label: "Snake 🐍" },
+      { href: "/kollusionsspelet", label: "Kollusionsspelet 🪙" },
       { href: "/territorium",  label: "Territorium 🎮" },
       { href: "/handel",       label: "Handelsimperium 🚢" },
       { href: "/mark",         label: "Markartan" },
