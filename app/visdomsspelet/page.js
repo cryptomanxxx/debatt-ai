@@ -38,15 +38,24 @@ const LAGE_LABEL = {
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { spel: [] };
+  if (!key) return { spel: [], allaSpel: [] };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
-  const res = await fetch(`${SB_URL}/rest/v1/ki_spel?order=skapad.desc&limit=60`, {
-    headers: h,
-    next: { revalidate: 300 },
-  });
+  const [res, allaRes] = await Promise.all([
+    fetch(`${SB_URL}/rest/v1/ki_spel?order=skapad.desc&limit=60`, {
+      headers: h,
+      next: { revalidate: 300 },
+    }),
+    // Leaderboarden rankar på HELA spelhistoriken — inte rullande 60.
+    // Hämtar bara fälten den behöver för att hålla payloaden nere.
+    fetch(`${SB_URL}/rest/v1/ki_spel?select=facit,kollektivt_fel,agent_svar&kollektivt_fel=not.is.null&order=skapad.desc&limit=2000`, {
+      headers: h,
+      next: { revalidate: 300 },
+    }),
+  ]);
   const spel = res.ok ? await res.json() : [];
-  return { spel };
+  const allaSpel = allaRes.ok ? await allaRes.json() : [];
+  return { spel, allaSpel };
 }
 
 function fmt(iso) {
@@ -103,7 +112,7 @@ function CrowdBadge({ vinner }) {
 }
 
 export default async function VisdomsspeletPage() {
-  const { spel } = await getData();
+  const { spel, allaSpel } = await getData();
 
   const FEL_TAK = 300;
   const capV = v => Math.min(v ?? 0, FEL_TAK);
@@ -158,8 +167,9 @@ export default async function VisdomsspeletPage() {
       acc[namn].sum += fel;
       acc[namn].n += 1;
     };
-    for (const s of giltiga) {
-      if (s.facit == null) continue;
+    const underlag = allaSpel.length ? allaSpel : giltiga;
+    for (const s of underlag) {
+      if (s.facit == null || s.kollektivt_fel == null) continue;
       laggTill("Kollektivet", capV(s.kollektivt_fel));
       for (const a of s.agent_svar || []) {
         if (!a?.agent || a.estimat == null || isNaN(Number(a.estimat))) continue;
@@ -167,7 +177,8 @@ export default async function VisdomsspeletPage() {
         laggTill(a.agent, capV(fel));
       }
     }
-    const minSpel = Math.max(5, Math.floor(antalSpel * 0.25));
+    const totaltUnderlag = (allaSpel.length ? allaSpel : giltiga).length;
+    const minSpel = Math.max(5, Math.floor(totaltUnderlag * 0.25));
     return Object.entries(acc)
       .filter(([namn, v]) => namn === "Kollektivet" || v.n >= minSpel)
       .map(([namn, v]) => ({ namn, snittFel: v.sum / v.n, n: v.n }))
