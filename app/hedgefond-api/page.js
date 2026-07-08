@@ -154,7 +154,7 @@ export default function HedgefondApiPage() {
           <a href="/om#hedgefond-api" style={{ fontSize: 11, color: C.dim, textDecoration: "none", fontFamily: "monospace", letterSpacing: ".06em" }}>← OM DEBATT-AI</a>
           <h1 style={{ fontSize: 28, fontWeight: 400, color: C.accent, margin: "12px 0 8px" }}>Hedgefond Signal API</h1>
           <p style={{ fontSize: 15, color: C.dim, lineHeight: 1.7, margin: 0 }}>
-            Öppet REST API för QUANT och STRAT paper trading-signaler. Ingen autentisering krävs.
+            Öppet REST API för QUANT, STRAT, ARBI och REVERT paper trading-signaler. Ingen autentisering krävs.
             Fiktivt startkapital 10 000 USD — inte finansiell rådgivning.
           </p>
         </div>
@@ -210,11 +210,11 @@ export default function HedgefondApiPage() {
 
         {result && tab === "signaler" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-            {["STRAT", "QUANT", "ARBI"].map((fund) => {
+            {["STRAT", "QUANT", "ARBI", "REVERT"].map((fund) => {
               const f = result.funds?.[fund];
               if (!f) return null;
-              const tagLabel = fund === "STRAT" ? "ALGORITMISK" : fund === "ARBI" ? "DELTA-NEUTRAL ARBITRAGE" : "SJÄLVLÄRANDE LLM";
-              const tagColor = fund === "STRAT" ? C.blue : fund === "ARBI" ? "#a78bfa" : C.amber;
+              const tagLabel = fund === "STRAT" ? "ALGORITMISK" : fund === "ARBI" ? "DELTA-NEUTRAL ARBITRAGE" : fund === "REVERT" ? "MEAN REVERSION" : "SJÄLVLÄRANDE LLM";
+              const tagColor = fund === "STRAT" ? C.blue : fund === "ARBI" ? "#a78bfa" : fund === "REVERT" ? "#2dd4bf" : C.amber;
               return (
                 <section key={fund}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
@@ -267,6 +267,18 @@ export default function HedgefondApiPage() {
                       </p>
                     </div>
                   )}
+                  {fund === "REVERT" && f.z_scores && (
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
+                      {Object.entries(f.z_scores).map(([sym, z]) => (
+                        <div key={sym} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: "10px 14px" }}>
+                          <p style={{ fontSize: 10, color: C.dim, margin: "0 0 2px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>{sym} z-score</p>
+                          <p style={{ fontSize: 16, fontWeight: 700, fontFamily: "monospace", margin: 0, color: Number(z) <= -1.5 ? C.green : Number(z) >= 1.5 ? C.red : C.text }}>
+                            {Number(z) >= 0 ? "+" : ""}{Number(z).toFixed(2)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {f.llm_motivering && (
                     <div style={{ background: "#07100a", border: `1px solid #1a3020`, borderRadius: 8, padding: 16, marginTop: 12 }}>
                       <p style={{ fontSize: 11, color: C.green, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em", fontFamily: "monospace" }}>LLM-motivering</p>
@@ -290,12 +302,12 @@ export default function HedgefondApiPage() {
 
         {result && tab === "nav" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
-            {["STRAT", "QUANT", "ARBI"].map((fund) => {
+            {["STRAT", "QUANT", "ARBI", "REVERT"].map((fund) => {
               const fd = result.funds?.[fund];
               if (!fd) return null;
               const hist = fd.history ?? [];
-              const tagLabel = fund === "STRAT" ? "ALGORITMISK" : fund === "ARBI" ? "DELTA-NEUTRAL ARBITRAGE" : "SJÄLVLÄRANDE LLM";
-              const tagColor = fund === "STRAT" ? C.blue : fund === "ARBI" ? "#a78bfa" : C.amber;
+              const tagLabel = fund === "STRAT" ? "ALGORITMISK" : fund === "ARBI" ? "DELTA-NEUTRAL ARBITRAGE" : fund === "REVERT" ? "MEAN REVERSION" : "SJÄLVLÄRANDE LLM";
+              const tagColor = fund === "STRAT" ? C.blue : fund === "ARBI" ? "#a78bfa" : fund === "REVERT" ? "#2dd4bf" : C.amber;
               return (
                 <section key={fund}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
@@ -382,7 +394,7 @@ export default function HedgefondApiPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[
               ["GET /api/hedgefonder", "Dokumentation — fondbeskrivningar, endpoint-lista, exempelsignal"],
-              ["GET /api/hedgefonder/signaler", "Senaste signal och innehav för QUANT, STRAT och ARBI"],
+              ["GET /api/hedgefonder/signaler", "Senaste signal och innehav för QUANT, STRAT, ARBI och REVERT"],
               ["GET /api/hedgefonder/nav", "NAV-historik med BTC/SPY benchmark. Param: ?limit=N (default 60, max 365)"],
             ].map(([endpoint, desc]) => (
               <div key={endpoint} style={{ display: "flex", gap: 16, alignItems: "baseline", flexWrap: "wrap" }}>

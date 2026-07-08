@@ -1994,7 +1994,7 @@ export default function OmPage() {
         {/* Hedgefonder */}
         <OmSektion id="hedgefonder" titel="Hedgefonder — poolat kapitalförvaltning">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
-            Tre hedgefonder förvaltar poolat agent-kapital: <strong style={{ color: C.text }}>Alpha Capital</strong> (aggressiv momentum, Kryptoanalytiker), <strong style={{ color: C.text }}>Macro Fund</strong> (konservativ makro, Nationalekonom) och <strong style={{ color: C.text }}>Quant Fund</strong> (självlärande, Teknikoptimist). Agenter investerar 100–200 SEK och köper andelar till aktuellt NAV.
+            Tre hedgefonder förvaltar poolat agent-kapital: <strong style={{ color: C.text }}>Alpha Capital</strong> (aggressiv momentum, Kryptoanalytiker), <strong style={{ color: C.text }}>Macro Fund</strong> (konservativ makro, Nationalekonom) och <strong style={{ color: C.text }}>Quant Fund</strong> (självlärande, Teknikoptimist). Agenter investerar 100–200 SEK och köper andelar till aktuellt NAV. Parallellt kör fyra paper trading-fonder mot riktiga marknadsdata: <strong style={{ color: C.text }}>STRAT</strong> (momentum, Historiker), <strong style={{ color: C.text }}>QUANT</strong> (LLM-dynamisk), <strong style={{ color: C.text }}>ARBI</strong> (funding rate-arbitrage, Kryptoanalytiker) och <strong style={{ color: C.text }}>REVERT</strong> (mean reversion, Den lugna).
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
             {[
@@ -2019,7 +2019,7 @@ export default function OmPage() {
         {/* Hedgefond Signal API */}
         <OmSektion id="hedgefond-api" titel="Hedgefond Signal API — paper trading-signaler">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 16px" }}>
-            QUANT och STRAT är experimentella paper trading-fonder som köper och säljer riktiga kryptotillgångar (BTC/ETH/SOL) med ett fiktivt startkapital på 10 000 USD. ARBI kör delta-neutral spot/perpetual funding rate-arbitrage på riktiga Binance/Gate.io-fundingräntor med samma startkapital. Signalerna — köp/sälj, aktiv strategi, LLM-resonemang och funding rate — exponeras via ett öppet REST API utan autentisering.
+            QUANT och STRAT är experimentella paper trading-fonder som köper och säljer riktiga kryptotillgångar (BTC/ETH/SOL) med ett fiktivt startkapital på 10 000 USD. ARBI kör delta-neutral spot/perpetual funding rate-arbitrage på riktiga Binance/Gate.io-fundingräntor med samma startkapital. REVERT kör mean reversion — köper översålda kryptovalutor (z-score ≤ −1,5 mot 20-dagars medelvärde) och säljer när priset återvänt till medelvärdet. Signalerna — köp/sälj, aktiv strategi, LLM-resonemang, funding rate och z-scores — exponeras via ett öppet REST API utan autentisering.
           </p>
           <p style={{ fontSize: "13px", color: C.accentDim, fontWeight: 700, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: ".06em" }}>
             Hämta senaste signal och innehav
@@ -2049,6 +2049,14 @@ export default function OmPage() {
       "nav_usd": 10000.53, "inkomst_usd": 0.53,
       "position_storlek_usd": 2000, "symbol": "BTCUSDT",
       "strategi": "spot_perpetual_funding_rate_arbitrage",
+      "paper_trading": true
+    },
+    "REVERT": {
+      "fund": "REVERT", "signal": "KÖP SOL (z=-1.82)",
+      "z_scores": { "BTC": -0.4, "ETH": -1.1, "SOL": -1.82 },
+      "nav_usd": 10120.0, "kontant_usd": 7000,
+      "innehav": [{ "symbol": "SOL", "antal": 21.4, "kopt_pris_usd": 140, "entry_z": -1.82 }],
+      "strategi": "z_score_mean_reversion",
       "paper_trading": true
     }
   }
