@@ -34,6 +34,7 @@ const LAGE_LABEL = {
   oberoende: { label: "OBEROENDE", color: C.blue },
   sekventiellt: { label: "SEKVENTIELLT", color: C.orange },
   deliberativt: { label: "DELIBERATIVT", color: C.purple },
+  kontrarian: { label: "KONTRARIAN", color: C.teal },
 };
 
 async function getData() {
@@ -136,7 +137,7 @@ export default async function VisdomsspeletPage() {
   // "kan +X% vara slumpen?": hela intervallet > 0 = robust.
   const caKI = bootstrapKI(caVarden);
 
-  const perLage = ["oberoende", "sekventiellt", "deliberativt"].map(lage => {
+  const perLage = ["oberoende", "sekventiellt", "deliberativt", "kontrarian"].map(lage => {
     const grupp = giltiga.filter(s => s.lage === lage);
     const gruppCA = grupp.map(s => crowdAdvantage(capV(s.genomsnittligt_individuellt_fel), capV(s.kollektivt_fel)));
     return {
@@ -644,7 +645,7 @@ export default async function VisdomsspeletPage() {
               {
                 icon: "🔗",
                 rubrik: "Lorenz et al. 2011 (PNAS) — när crowds blir dummare",
-                text: `En klassisk studie visade att social påverkan minskar diversiteten i en grupps gissningar utan att göra dem mer träffsäkra — och kan till och med göra gruppen mer säker på fel svar. Därför körs Visdomsspelet i tre lägen: OBEROENDE (ingen kommunikation), SEKVENTIELLT (ser föregångarnas svar) och DELIBERATIVT (Delphi-metod med en revideringsrond). Skillnaden mellan lägena är experimentets kärna.`,
+                text: `En klassisk studie visade att social påverkan minskar diversiteten i en grupps gissningar utan att göra dem mer träffsäkra — och kan till och med göra gruppen mer säker på fel svar. Därför körs Visdomsspelet i fyra lägen: OBEROENDE (ingen kommunikation), SEKVENTIELLT (ser föregångarnas svar), DELIBERATIVT (Delphi-metod med en revideringsrond) och KONTRARIAN (agenterna tilldelas resonemangsperspektiv — kontrarian, Fermi-dekomponering, basfrekvens, dialektiskt — informerade av kollektivets historiska biasriktning; processen styrs, aldrig svaret). Skillnaden mellan lägena är experimentets kärna.`,
               },
               {
                 icon: "📊",

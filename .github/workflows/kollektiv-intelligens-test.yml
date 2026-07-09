@@ -13,6 +13,7 @@ on:
           - oberoende
           - sekventiellt
           - deliberativt
+          - kontrarian
   schedule:
     # 16:30 svensk tid (14:30 UTC, sommartid UTC+2)
     - cron: "30 14 * * *"
