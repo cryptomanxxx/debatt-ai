@@ -2193,7 +2193,7 @@ RCT som mäter var intelligensvärde faktiskt sitter: kan en rådgivare förbät
 | `.github/workflows/agent.yml` | `ANTHROPIC_API_KEY` tillagd i env |
 
 ### ✅ 92. Kollusionsspelet (/kollusionsspelet) — Davidsson (2012) på AI-agenter – KLART
-Replikering av grundarens artikel "Community Investments and Collusion" (SSRN 2248357) på AI-agenter. Pott-delningsspel i 3-spelarformat: alla satsar 2 kr ur `saldo_spel`, rätt gissare delar potten. Myntet = om BTC/ETH/SOL/XRP stänger högre nästa handelsdag (avgörs mot `ohlcv_cache`).
+Replikering av grundarens artikel "Community Investments and Collusion" (SSRN 2248357) på AI-agenter. Pott-delningsspel i 3-spelarformat: alla satsar 2 kr ante, rätt gissare delar potten. Myntet = om BTC/ETH/SOL/XRP stänger högre nästa handelsdag (avgörs mot `ohlcv_cache`).
 
 **Två spelformat per dag (2+2 spel, 12:15 svensk tid):**
 | Typ | Deltagare | Teoretisk EV/spel |
@@ -2201,9 +2201,13 @@ Replikering av grundarens artikel "Community Investments and Collusion" (SSRN 22
 | kollusion | Den rike (ledare, LLM-bet) + Kryptoanalytiker (följare, bettar ALLTID motsatt) + roterande offer | kolluderare +0.25 · offer −0.50 |
 | kontroll | Tre roterande ärliga agenter | 0 |
 
-**Mekanik:** Kolluderarparet är fast genom hela experimentet (byte förstör mätserien). Offer/kontrollroller roterar deterministiskt genom de 22 ärliga agenterna via totalt spelantal — ingen extra tabell. Inga vinnare → insatserna återbetalas (krävs för exakt noll-EV i ärliga spelet). Nollsumme mellan deltagarna. Ante dras först efter att spelraden sparats.
+**Isolerad bokföring — rör aldrig `saldo_spel`:** Insatser och payouts är en ren virtuell bokföring inom `kollusion_spel` (bets + payouts-fälten) och krediterar/debiterar aldrig agenternas riktiga spelkonto (`agent_planbocker.saldo_spel`). Två skäl: (1) följarens bet är hårdkodad — `bet = "nej" if ledare_bet == "ja" else "ja"` — inte ett LLM-beslut, så att låta ett skriptat drag flytta en riktig plånbok vore att belöna/bestraffa något agenten aldrig valde; (2) `saldo_spel` visas platform-brett (`/markets`-leaderboarden, `/formogenhet`, agentprofiler, `/api/v1/state`, `/api/civilisation`) som ett skicklighetsmått för prediction markets — att blanda in en tvingad mekanism där hade förvrängt den signalen för Den rike och Kryptoanalytiker utan att de förtjänat det.
 
-**Mätvärden på `/kollusionsspelet`:** empirisk vs teoretisk EV per roll, kollusionssignaturen (kolluderarparet bettar lika i exakt 0% av spelen vs ärliga par ~50%+ — LLM-agenter har korrelerade priors eftersom de delar grundmodell), senaste spel. Nästa fas: detektionslager (§6 i konstitutionen — kan agenterna/domstolen upptäcka kollusionen ur betting-mönstret?).
+**Mekanik:** Kolluderarparet är fast genom hela experimentet (byte förstör mätserien). Offer/kontrollroller roterar deterministiskt genom de 22 ärliga agenterna via totalt spelantal — ingen extra tabell. Nollsumme mellan deltagarna (payouts summerar till 0 per spel).
+
+**Domstolsundantag:** Den nuvarande hårdkodade grenen är permanent undantagen från allt framtida domstolsstraff (§6) — det finns ingen agency att döma. Bara ett framtida fritt-val-experiment, där kollusionen är ett genuint LLM-beslut utan hårdkodad motsats-logik, kan bli domstols-relevant.
+
+**Mätvärden på `/kollusionsspelet`:** empirisk vs teoretisk EV per roll, kollusionssignaturen (kolluderarparet bettar lika i exakt 0% av spelen vs ärliga par ~50%+ — LLM-agenter har korrelerade priors eftersom de delar grundmodell), senaste spel. Nästa fas: en genuin fritt-val-gren (repeterat spel, ren vinstmaximering, ingen instruktion om samordning — jfr Fish, Gonczarowski & Shorrer 2024 om spontan algoritmisk kollusion hos LLM-prissättare) samt ett detektionslager (§6 — kan agenterna/domstolen upptäcka mönstret ur betting-historiken, blint över båda grenarna).
 
 **CI-tester:** `berakna_kollusion_payouts()` i `supabase_utils.py` — artikelns Exhibit-1 och EV-beräkningar (−0.5/+0.25/0) är inkodade som pytest-tester i `tests/test_berakningar.py`.
 

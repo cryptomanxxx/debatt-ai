@@ -4,7 +4,16 @@ kollusion_experiment_test.py – Kollusionsexperimentet
 
 Replikering av Davidsson (2012), "Community Investments and Collusion"
 (SSRN 2248357), på AI-agenter. Ett pott-delningsspel i 3-spelarformat:
-alla satsar 2 kr ur saldo_spel, den/de som gissar rätt delar potten.
+alla satsar 2 kr ante, den/de som gissar rätt delar potten.
+
+Insatser och payouts är en isolerad virtuell bokföring inom kollusion_spel
+självt (bets + payouts-fälten) — de rör ALDRIG agent_planbocker.saldo_spel.
+Två skäl: (1) följarens bet är hårdkodad, inte ett LLM-beslut — att låta ett
+skriptat drag påverka en riktig plånbok vore att bestraffa/belöna något
+agenten aldrig valde. (2) saldo_spel visas platform-brett (t.ex. /markets
+leaderboard, /formogenhet, agentprofiler) som ett skicklighetsmått för
+prediction markets — att blanda in en tvingad mekanism där hade förvrängt
+den signalen för Den rike och Kryptoanalytiker utan att de förtjänat det.
 
 Myntet: stänger {SYMBOL} högre imorgon än idag? (avgörs mot ohlcv_cache)
 
@@ -32,10 +41,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 
 from agenter import AGENTER
-from supabase_utils import (
-    SB_URL, berakna_kollusion_payouts, _llm_spel,
-    _hamta_saldo_spel, _uppdatera_saldo_spel,
-)
+from supabase_utils import SB_URL, berakna_kollusion_payouts, _llm_spel
 
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 if not SB_KEY:
@@ -142,12 +148,6 @@ def avgor_oppna_spel() -> int:
             print(f"  ✗ Spel {s['id']}: claim misslyckades: {e}")
             continue
 
-        # Kreditera netto + återbetald ante (insatsen drogs vid skapandet):
-        # vinnare får ante+netto tillbaka, förlorare 0, ingen-vinnare-fallet ante.
-        for agent, netto in payouts.items():
-            tillbaka = round(float(s.get("ante") or ANTE) + netto)
-            if tillbaka > 0:
-                _uppdatera_saldo_spel(SB_KEY, agent, tillbaka)
         avgjorda += 1
         print(f"  ✓ Spel {s['id']} ({s['typ']}, {s['symbol']}): utfall {utfall.upper()} — "
               + ", ".join(f"{a} {p:+.0f}" for a, p in payouts.items()))
@@ -170,12 +170,6 @@ def antal_spel() -> int:
 
 def skapa_spel(typ: str, symbol: str, deltagare_namn: list[str], malda_datum: str) -> bool:
     fraga = f"Stänger {symbol} högre {malda_datum} än föregående handelsdag?"
-
-    # Kontrollera saldo_spel och dra ante för alla deltagare
-    for namn in deltagare_namn:
-        if _hamta_saldo_spel(SB_KEY, namn) < ANTE:
-            print(f"  Hoppar över {typ}-spel: {namn} har inte råd med anten")
-            return False
 
     deltagare = []
     ledare_bet = None
@@ -209,10 +203,6 @@ def skapa_spel(typ: str, symbol: str, deltagare_namn: list[str], malda_datum: st
     except Exception as e:
         print(f"  ✗ {typ}-spel: {e}")
         return False
-
-    # Dra anten först när spelet är sparat — ingen saldo-ändring utan audit-rad
-    for namn in deltagare_namn:
-        _uppdatera_saldo_spel(SB_KEY, namn, -int(ANTE))
 
     print(f"  ✓ {typ} ({symbol}): " + ", ".join(f"{d['agent']}={d['bet']}" for d in deltagare))
     return True
