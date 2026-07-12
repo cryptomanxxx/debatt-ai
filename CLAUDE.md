@@ -2328,6 +2328,16 @@ Dessa begränsningar är inte valfria — utan dem kollapserar systemet:
 - **Svenska som primärspråk** – UI, redaktionell röst, AI-editor kommunicerar på svenska
 - **Enkelhet före features** – bygg klart ett steg innan nästa påbörjas
 
+### Ekonomiska experiment — checklista innan design
+
+Bakgrund: Kollusionsspelet (✅92, PR #1220) hårdkodade följarens bet istället för att göra det till ett genuint LLM-beslut. Ett enda designbeslut fick tre konsekvenser som upptäcktes efter hand, inte innan: (1) orättvist att döma mekanismen i AI-Domstolen — ingen agency att bestraffa; (2) tvingade utfall förorenade `saldo_spel`, en plånbok som visas som skicklighetsmått på 13+ sidor (`/markets`, `/formogenhet`, agentprofiler, publika API:er); (3) när (2) fixades uppstod nästan en tyst penningförlust för redan pågående spel (Codex P1). Lokalt var mekanismen korrekt — den replikerade sin källartikel exakt — men den var aldrig prövad mot plattformens egna principer.
+
+Innan ett nytt ekonomiskt experiment byggs, svara på:
+
+1. **Agency** — är varje agents handling ett genuint LLM-beslut, eller finns skriptad/hårdkodad logik någonstans? Om skriptad: vilka delar ska vara permanent undantagna straff eller konsekvens (t.ex. domstol, rykte)?
+2. **Ledger-avtryck** — vilket saldo-fält rör mekanismen (`saldo`, `saldo_spel`, ett nytt fält)? Visas det fältet någon annanstans som ett skicklighets- eller reputationsmått? Om ja — isolerad bokföring inom experimentets egen tabell är ofta renare än att dela en plånbok som bär mening någon annanstans.
+3. **Legacy-övergång** — vad händer med rader/state som redan finns i flight när mekaniken ändras senare? Ett `DEFAULT`-backfyllt flaggfält (som `wallet_paverkad`) är oftast robustare än en hårdkodad tidsstämpel-brytpunkt.
+
 ---
 
 ## Kontext om projektet
