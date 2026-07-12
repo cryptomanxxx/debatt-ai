@@ -2201,7 +2201,9 @@ Replikering av grundarens artikel "Community Investments and Collusion" (SSRN 22
 | kollusion | Den rike (ledare, LLM-bet) + Kryptoanalytiker (följare, bettar ALLTID motsatt) + roterande offer | kolluderare +0.25 · offer −0.50 |
 | kontroll | Tre roterande ärliga agenter | 0 |
 
-**Isolerad bokföring — rör aldrig `saldo_spel`:** Insatser och payouts är en ren virtuell bokföring inom `kollusion_spel` (bets + payouts-fälten) och krediterar/debiterar aldrig agenternas riktiga spelkonto (`agent_planbocker.saldo_spel`). Två skäl: (1) följarens bet är hårdkodad — `bet = "nej" if ledare_bet == "ja" else "ja"` — inte ett LLM-beslut, så att låta ett skriptat drag flytta en riktig plånbok vore att belöna/bestraffa något agenten aldrig valde; (2) `saldo_spel` visas platform-brett (`/markets`-leaderboarden, `/formogenhet`, agentprofiler, `/api/v1/state`, `/api/civilisation`) som ett skicklighetsmått för prediction markets — att blanda in en tvingad mekanism där hade förvrängt den signalen för Den rike och Kryptoanalytiker utan att de förtjänat det.
+**Isolerad bokföring — rör aldrig `saldo_spel` för nya spel:** Insatser och payouts är en ren virtuell bokföring inom `kollusion_spel` (bets + payouts-fälten) och krediterar/debiterar aldrig agenternas riktiga spelkonto (`agent_planbocker.saldo_spel`) för spel skapade efter isoleringen. Två skäl: (1) följarens bet är hårdkodad — `bet = "nej" if ledare_bet == "ja" else "ja"` — inte ett LLM-beslut, så att låta ett skriptat drag flytta en riktig plånbok vore att belöna/bestraffa något agenten aldrig valde; (2) `saldo_spel` visas platform-brett (`/markets`-leaderboarden, `/formogenhet`, agentprofiler, `/api/v1/state`, `/api/civilisation`) som ett skicklighetsmått för prediction markets — att blanda in en tvingad mekanism där hade förvrängt den signalen för Den rike och Kryptoanalytiker utan att de förtjänat det.
+
+**Legacy-övergång (`wallet_paverkad`, Codex P1 på PR #1220):** spel som redan var öppna innan isoleringen landade hade sin ante dragen på riktigt av den gamla koden — att avgöra dem med den nya, icke-krediterande logiken hade gjort den dragningen permanent förlorad. `supabase_kollusion_v2.sql` lägger till `wallet_paverkad boolean DEFAULT true`, vilket backfyller alla befintliga rader korrekt som "true" (ante var verklig). `skapa_spel()` sätter explicit `wallet_paverkad=false` på alla nya rader. `avgor_oppna_spel()` läser flaggan per rad (okänd/saknad tolkas som `true`, fail-safe mot tyst penningförlust) och krediterar bara tillbaka legacy-raderna. **Kräver att `supabase_kollusion_v2.sql` körs innan nästa `kollusion-experiment.yml`-körning** — annars saknar tabellen kolumnen och `skapa_spel()` failar med ett schema-fel för alla nya spel.
 
 **Mekanik:** Kolluderarparet är fast genom hela experimentet (byte förstör mätserien). Offer/kontrollroller roterar deterministiskt genom de 22 ärliga agenterna via totalt spelantal — ingen extra tabell. Nollsumme mellan deltagarna (payouts summerar till 0 per spel).
 
@@ -2214,6 +2216,7 @@ Replikering av grundarens artikel "Community Investments and Collusion" (SSRN 22
 | Fil | Roll |
 |---|---|
 | `supabase_kollusion.sql` | Tabell `kollusion_spel` (typ, symbol, deltagare jsonb med roller, utfall, payouts) + RLS |
+| `supabase_kollusion_v2.sql` | Migrering: `wallet_paverkad boolean DEFAULT true` — markerar legacy-rader vars ante drogs på riktigt |
 | `supabase_utils.py` → `berakna_kollusion_payouts()` | Ren pott-delningsfunktion — testbar, artikelns matte |
 | `kollusion_experiment_test.py` | Daglig körning: avgör öppna spel mot ohlcv_cache, skapar 2+2 nya |
 | `app/kollusionsspelet/page.js` | Dashboard: EV teori vs empiri per roll, kollusionssignaturen, spellista. SSR 300s |

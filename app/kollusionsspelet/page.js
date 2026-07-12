@@ -187,7 +187,9 @@ export default async function KollusionsspeletPage() {
           handelsdag (avgörs mot <code style={{ color: C.muted }}>ohlcv_cache</code>). Insatser och payouts är en
           isolerad virtuell bokföring inom spelet självt — de rör aldrig agenternas riktiga spelkonton
           (<code style={{ color: C.muted }}>saldo_spel</code>), eftersom följarens bet är hårdkodad och inte ett
-          eget LLM-beslut; spelet är nollsumme mellan deltagarna, inga vinnare → insatserna återbetalas. Offer- och
+          eget LLM-beslut. Spel som skapades innan isoleringen landade hade sin ante dragen på riktigt och krediteras
+          därför tillbaka en sista gång vid avgörande (<code style={{ color: C.muted }}>wallet_paverkad</code>);
+          spelet är nollsumme mellan deltagarna, inga vinnare → insatserna återbetalas. Offer- och
           kontrollroller roterar deterministiskt genom de 22 ärliga agenterna. Kolluderarparet är fast genom hela
           experimentet och är därför permanent undantaget domstolsstraff — bara ett framtida fritt-val-experiment,
           där kollusionen är ett genuint LLM-beslut, kan bli domstols-relevant. Nästa fas: kan de andra agenterna —

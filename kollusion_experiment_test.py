@@ -7,13 +7,22 @@ Replikering av Davidsson (2012), "Community Investments and Collusion"
 alla satsar 2 kr ante, den/de som gissar rätt delar potten.
 
 Insatser och payouts är en isolerad virtuell bokföring inom kollusion_spel
-självt (bets + payouts-fälten) — de rör ALDRIG agent_planbocker.saldo_spel.
-Två skäl: (1) följarens bet är hårdkodad, inte ett LLM-beslut — att låta ett
-skriptat drag påverka en riktig plånbok vore att bestraffa/belöna något
-agenten aldrig valde. (2) saldo_spel visas platform-brett (t.ex. /markets
-leaderboard, /formogenhet, agentprofiler) som ett skicklighetsmått för
-prediction markets — att blanda in en tvingad mekanism där hade förvrängt
-den signalen för Den rike och Kryptoanalytiker utan att de förtjänat det.
+självt (bets + payouts-fälten) — de rör ALDRIG agent_planbocker.saldo_spel
+för nya spel. Två skäl: (1) följarens bet är hårdkodad, inte ett LLM-beslut —
+att låta ett skriptat drag påverka en riktig plånbok vore att bestraffa/
+belöna något agenten aldrig valde. (2) saldo_spel visas platform-brett
+(t.ex. /markets leaderboard, /formogenhet, agentprofiler) som ett
+skicklighetsmått för prediction markets — att blanda in en tvingad mekanism
+där hade förvrängt den signalen för Den rike och Kryptoanalytiker utan att
+de förtjänat det.
+
+Legacy-övergång (wallet_paverkad, kör supabase_kollusion_v2.sql): spel som
+redan var öppna innan denna isolering landade hade sin ante dragen på
+riktigt av den gamla koden. De raderna har wallet_paverkad=true (DEFAULT-
+backfyllt av migreringen) och krediteras därför tillbaka som vanligt vid
+avgörande. Alla nya spel sätter wallet_paverkad=false och rör aldrig
+plånboken. Utan migreringen behandlas okända rader som legacy (fail-safe
+mot tyst penningförlust, se avgor_oppna_spel).
 
 Myntet: stänger {SYMBOL} högre imorgon än idag? (avgörs mot ohlcv_cache)
 
@@ -30,7 +39,9 @@ Flöde per körning:
   2. Skapa 2 kollusionsspel + 2 kontrollspel för morgondagens prisrörelse
 
 Kör via GitHub Actions (kollusion-experiment.yml) dagligen 12:15 svensk tid.
-Kräver: SUPABASE_ANON_KEY. Kör supabase_kollusion.sql först.
+Kräver: SUPABASE_ANON_KEY. Kör supabase_kollusion.sql + supabase_kollusion_v2.sql
+(wallet_paverkad-kolumnen) FÖRE nästa körning — utan v2 saknar tabellen
+kolumnen och skapa_spel() failar på ett schema-fel för alla nya spel.
 """
 
 import json
@@ -41,7 +52,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 
 from agenter import AGENTER
-from supabase_utils import SB_URL, berakna_kollusion_payouts, _llm_spel
+from supabase_utils import SB_URL, berakna_kollusion_payouts, _llm_spel, _uppdatera_saldo_spel
 
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 if not SB_KEY:
@@ -148,6 +159,15 @@ def avgor_oppna_spel() -> int:
             print(f"  ✗ Spel {s['id']}: claim misslyckades: {e}")
             continue
 
+        # Legacy-rader (öppna innan bokföringen isolerades) hade sin ante
+        # dragen på riktigt — kreditera tillbaka. Okänd flagga (migrering ej
+        # körd) tolkas som legacy: fail-safe mot tyst penningförlust.
+        if s.get("wallet_paverkad", True):
+            for agent, netto in payouts.items():
+                tillbaka = round(float(s.get("ante") or ANTE) + netto)
+                if tillbaka > 0:
+                    _uppdatera_saldo_spel(SB_KEY, agent, tillbaka)
+
         avgjorda += 1
         print(f"  ✓ Spel {s['id']} ({s['typ']}, {s['symbol']}): utfall {utfall.upper()} — "
               + ", ".join(f"{a} {p:+.0f}" for a, p in payouts.items()))
@@ -194,7 +214,8 @@ def skapa_spel(typ: str, symbol: str, deltagare_namn: list[str], malda_datum: st
             f"{SB_URL}/rest/v1/kollusion_spel",
             json={"typ": typ, "symbol": symbol, "fraga": fraga,
                   "malda_datum": malda_datum, "deltagare": deltagare,
-                  "ante": ANTE, "pott": ANTE * len(deltagare)},
+                  "ante": ANTE, "pott": ANTE * len(deltagare),
+                  "wallet_paverkad": False},
             headers={**H, "Prefer": "return=minimal"}, timeout=10,
         )
         if not r.is_success:
