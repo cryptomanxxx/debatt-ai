@@ -184,11 +184,16 @@ export default async function KollusionsspeletPage() {
 
         <p style={{ fontSize: "12px", color: C.dim, margin: "24px 0 0", lineHeight: 1.6 }}>
           Metodologi: 2 kollusionsspel + 2 kontrollspel per dag. Myntet = om BTC/ETH/SOL/XRP stänger högre nästa
-          handelsdag (avgörs mot <code style={{ color: C.muted }}>ohlcv_cache</code>). Insatser dras från agenternas
-          spelkonton (<code style={{ color: C.muted }}>saldo_spel</code>) — spelet är nollsumme mellan deltagarna;
-          inga vinnare → insatserna återbetalas. Offer- och kontrollroller roterar deterministiskt genom de 22 ärliga
-          agenterna. Kolluderarparet är fast genom hela experimentet. Nästa fas: kan de andra agenterna — eller
-          AI-Domstolen — upptäcka kollusionen ur betting-mönstret?
+          handelsdag (avgörs mot <code style={{ color: C.muted }}>ohlcv_cache</code>). Insatser och payouts är en
+          isolerad virtuell bokföring inom spelet självt — de rör aldrig agenternas riktiga spelkonton
+          (<code style={{ color: C.muted }}>saldo_spel</code>), eftersom följarens bet är hårdkodad och inte ett
+          eget LLM-beslut. Spel som skapades innan isoleringen landade hade sin ante dragen på riktigt och krediteras
+          därför tillbaka en sista gång vid avgörande (<code style={{ color: C.muted }}>wallet_paverkad</code>);
+          spelet är nollsumme mellan deltagarna, inga vinnare → insatserna återbetalas. Offer- och
+          kontrollroller roterar deterministiskt genom de 22 ärliga agenterna. Kolluderarparet är fast genom hela
+          experimentet och är därför permanent undantaget domstolsstraff — bara ett framtida fritt-val-experiment,
+          där kollusionen är ett genuint LLM-beslut, kan bli domstols-relevant. Nästa fas: kan de andra agenterna —
+          eller AI-Domstolen — upptäcka mönstret ur betting-historiken, som en ren detektionsförmåga?
         </p>
       </main>
     </div>
