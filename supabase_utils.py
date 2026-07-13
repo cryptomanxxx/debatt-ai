@@ -5260,6 +5260,23 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
                     return k
             return f"{bas} ({ledare}) x"
 
+        # Hämta befintliga partiers NAMN + MEDLEMMAR innan delete.
+        # Nyckeln är frozenset(medlemmar) — tål ledarskiften och namnbyten.
+        # gamla_namn_map: frozenset → befintligt partinamn (återanvänds om klustret är oförändrat).
+        try:
+            r_gamla = httpx.get(
+                f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn,medlemmar",
+                headers=h, timeout=8,
+            )
+            gamla_rader = r_gamla.json() if r_gamla.is_success else []
+            gamla_namn_map: dict[frozenset, str] = {
+                frozenset(p["medlemmar"]): p["namn"] for p in gamla_rader
+            }
+            gamla_kluster: set[frozenset] = set(gamla_namn_map.keys())
+        except Exception:
+            gamla_namn_map = {}
+            gamla_kluster = set()
+
         # Bygg lista med kommande partier för kassaöverföring.
         # Återanvänd befintliga namn för oförändrade kluster (samma logik som nedan).
         sedda_namn: set[str] = set()
@@ -5276,23 +5293,6 @@ def berakna_och_spara_partier(sb_key: str, min_styrka: int = 3, min_kluster: int
             sedda_namn.add(namn_k)
             kommande_partier.append({"ledare": ledare, "namn": namn_k})
         _overfor_parti_kassor(sb_key, kommande_partier)
-
-        # Hämta befintliga partiers NAMN + MEDLEMMAR innan delete.
-        # Nyckeln är frozenset(medlemmar) — tål ledarskiften och namnbyten.
-        # gamma_namn_map: frozenset → befintligt partinamn (återanvänds om klustret är oförändrat).
-        try:
-            r_gamla = httpx.get(
-                f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn,medlemmar",
-                headers=h, timeout=8,
-            )
-            gamla_rader = r_gamla.json() if r_gamla.is_success else []
-            gamla_namn_map: dict[frozenset, str] = {
-                frozenset(p["medlemmar"]): p["namn"] for p in gamla_rader
-            }
-            gamla_kluster: set[frozenset] = set(gamla_namn_map.keys())
-        except Exception:
-            gamla_namn_map = {}
-            gamla_kluster = set()
 
         # Ta bort gamla partier
         httpx.delete(f"{SB_URL}/rest/v1/politiska_partier?aktiv=eq.true", headers=h, timeout=8)
