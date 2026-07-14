@@ -92,8 +92,14 @@ def logga_429_passivt(provider: str) -> None:
 
 
 def _logga_ai_anrop(provider: str, source: str, status: str, latency_ms: int) -> None:
-    """Loggar ett AI-anrop till ai_log-tabellen i bakgrunden (fire-and-forget)."""
-    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    """Loggar ett AI-anrop till ai_log-tabellen i bakgrunden (fire-and-forget).
+
+    ai_log saknar anon-skrivpolicy (RLS) — service role krävs för att skriva.
+    Fallback till anon-nyckeln bevaras för miljöer utan secreten; posten
+    misslyckas då tyst (redan fire-and-forget, ingen funktionell påverkan
+    utöver ett hål i loggen för den körningen).
+    """
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY", "")
     if not sb_key:
         return
 
