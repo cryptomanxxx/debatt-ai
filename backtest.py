@@ -196,7 +196,7 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
 
 
 def spara(symbol, strategi, res, vol_threshold, lookback,
-          stoploss_pct, tc_pct, regime_filter):
+          stoploss_pct, tc_pct, regime_filter) -> bool:
     row = {
         "symbol":                  symbol,
         "strategi":                strategi,
@@ -230,6 +230,8 @@ def spara(symbol, strategi, res, vol_threshold, lookback,
     )
     if r.status_code not in (200, 201, 204):
         print(f"    ✗ Sparfel: {r.status_code} {r.text[:80]}", file=sys.stderr)
+        return False
+    return True
 
 
 def main():
@@ -256,6 +258,8 @@ def main():
 
     btc_trends = {lb: btc_uptrend_for(lb) for lb in LOOKBACKS}
 
+    sparfel_totalt = 0
+
     for symbol, namn in COINS:
         print(f"\n── {namn} ({symbol}) ──")
         data = btc_raw if symbol == "BTC" else hamta_ohlcv(symbol)
@@ -275,8 +279,10 @@ def main():
             res     = backtesta(data, uptrend, exit_d, vol_t, lb, sl, tc, rf)
             if res is None:
                 continue
-            spara(symbol, sid, res, vol_t, lb, sl, tc, rf)
-            sparade += 1
+            if spara(symbol, sid, res, vol_t, lb, sl, tc, rf):
+                sparade += 1
+            else:
+                sparfel_totalt += 1
 
             tot   = res.get("total_avkastning") or 0
             bh    = res.get("buyhold_avkastning") or 0
@@ -289,6 +295,13 @@ def main():
               f"bästa alpha: {basta_strategi} ({basta_alpha:+.0f}pp vs B&H)")
 
     print("\n=== KLART ===")
+    if sparfel_totalt:
+        # Låt CI-körningen synas som misslyckad om skrivningarna till
+        # backtest_resultat tystnat (t.ex. saknad SUPABASE_SERVICE_ROLE_KEY
+        # efter att RLS aktiverades) — annars går workflown grön medan
+        # tabellen slutar uppdateras helt utan spår i loggen.
+        print(f"FEL: {sparfel_totalt} sparningar misslyckades — se Sparfel-rader ovan", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
