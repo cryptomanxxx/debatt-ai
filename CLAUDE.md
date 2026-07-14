@@ -2340,6 +2340,12 @@ Innan ett nytt ekonomiskt experiment byggs, svara på:
 2. **Ledger-avtryck** — vilket saldo-fält rör mekanismen (`saldo`, `saldo_spel`, ett nytt fält)? Visas det fältet någon annanstans som ett skicklighets- eller reputationsmått? Om ja — isolerad bokföring inom experimentets egen tabell är ofta renare än att dela en plånbok som bär mening någon annanstans.
 3. **Legacy-övergång** — vad händer med rader/state som redan finns i flight när mekaniken ändras senare? Ett `DEFAULT`-backfyllt flaggfält (som `wallet_paverkad`) är oftast robustare än en hårdkodad tidsstämpel-brytpunkt.
 
+### RLS-härdning — pågående tabell-för-tabell-genomgång
+
+Efter Supabase-larmet "rls_disabled_in_public" (12 jul 2026) görs en planerad genomgång av tabeller utan verkligt RLS-skydd, en tabell i taget (se ✅-loggen för `amnes_prenumeranter`, `koalitioner`, `ai_log`). **Viktig fälla hittad av Codex (PR #1228):** `supabase_rls_fix.sql` (skapad 7 jul, okänt om körd) gav redan 18 tabeller "public full access"-policyer (`pub sel/ins/upd <tabell>`, `USING (true)`/`WITH CHECK (true)`) — funktionellt identiskt med RLS avstängt, bara för att tysta Advisor-varningen. Berörda tabeller: `krypto_historik`, `markets`, `agent_bets`, `backtest_resultat`, `ohlcv_cache`, `nyhetslog`, `ai_log`, `agent_koalitioner`, `agent_utmaningar`, `argument_roster`, `labb_log`, `platform_stamning`, `lagforslag`, `agent_roster_lag`, `ekonomi_spel`, `agent_transaktioner`, `agent_positioner`, `agent_planbocker`, `lobbying_log`.
+
+Postgres RLS-policyer är additiva (OR) — att bara lägga till en ny restriktiv policy utan att ta bort dessa gamla permissiva döljer inte skrivvägen, den lämnar den öppen. **Varje framtida fix för någon av tabellerna ovan måste explicit `DROP POLICY IF EXISTS "pub sel <tabell>"` och `"pub ins <tabell>"`/`"pub upd <tabell>"` innan en ny restriktiv policy skapas** — annars är fixen verkningslös oavsett om `supabase_rls_fix.sql` någonsin kördes.
+
 ---
 
 ## Kontext om projektet
