@@ -29,6 +29,9 @@ from itertools import product
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+# backtest_resultat saknar anon-skrivpolicy (RLS) — service role krävs för
+# att spara resultat. Fallback till SB_KEY bevaras för miljöer utan secreten.
+SB_WRITE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
 
 if not SB_KEY:
     print("FEL: SUPABASE_ANON_KEY saknas", file=sys.stderr)
@@ -216,8 +219,8 @@ def spara(symbol, strategi, res, vol_threshold, lookback,
         "kord":                    datetime.now(timezone.utc).isoformat(),
     }
     headers = {
-        "apikey":        SB_KEY,
-        "Authorization": f"Bearer {SB_KEY}",
+        "apikey":        SB_WRITE_KEY,
+        "Authorization": f"Bearer {SB_WRITE_KEY}",
         "Content-Type":  "application/json",
         "Prefer":        "resolution=merge-duplicates,return=minimal",
     }

@@ -21,4 +21,5 @@ jobs:
       - name: Kör strategioptimering → backtest_resultat
         env:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python backtest.py
