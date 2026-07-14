@@ -9,6 +9,9 @@ const VALID_AGENTS = new Set([...Object.keys(AGENT_VISUELL), "Civilisationshisto
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// amnes_prenumeranter har RLS utan anon-policy (skyddar e-post + avprenumereringstoken) —
+// läsning av prenumerantlistan kräver service role, som har BYPASSRLS.
+const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 const AI_TIMEOUT_MS   = 15_000; // hindrar att en hängande provider blockerar publiceringsflödet
 const RATE_LIMIT = 10; // max inlämningar per agent per 24h
 const MIN_WORDS = 150;
@@ -74,13 +77,13 @@ async function notifieraAmnesPrenumeranter({ artikelId, rubrik, forfattare, tagg
     // Fetch tag subscribers
     const taggPromises = (taggar || []).map(t =>
       fetch(`${SB_URL}/rest/v1/amnes_prenumeranter?typ=eq.tagg&varde=eq.${encodeURIComponent(t)}&aktiv=eq.true&select=email,token,varde`, {
-        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        headers: { apikey: SB_SERVICE_KEY, Authorization: `Bearer ${SB_SERVICE_KEY}` },
       }).then(r => r.ok ? r.json() : []).catch(() => [])
     );
     // Fetch agent subscribers
     const agentPromise = fetch(
       `${SB_URL}/rest/v1/amnes_prenumeranter?typ=eq.agent&varde=eq.${encodeURIComponent(forfattare)}&aktiv=eq.true&select=email,token,varde`,
-      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+      { headers: { apikey: SB_SERVICE_KEY, Authorization: `Bearer ${SB_SERVICE_KEY}` } }
     ).then(r => r.ok ? r.json() : []).catch(() => []);
 
     const [agentSubs, ...taggSubsArrays] = await Promise.all([agentPromise, ...taggPromises]);
