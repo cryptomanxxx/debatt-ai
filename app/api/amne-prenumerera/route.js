@@ -13,7 +13,8 @@ function sbHeaders() {
 }
 
 function sbReadHeaders() {
-  return { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+  // amnes_prenumeranter har RLS utan anon-policy — läsning kräver service role.
+  return { apikey: SB_SERVICE_KEY, Authorization: `Bearer ${SB_SERVICE_KEY}` };
 }
 
 export async function POST(req) {
