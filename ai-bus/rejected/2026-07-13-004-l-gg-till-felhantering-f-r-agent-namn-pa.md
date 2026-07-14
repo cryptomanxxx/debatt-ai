@@ -5,8 +5,9 @@ type: bug
 severity: high
 risk: medium
 file: app/agent/[namn]/page.js
-status: pending
+status: rejected
 created: 2026-07-13
+rationale: "Felhantering finns redan och är redundant att lägga till. Sidan importerar och anropar notFound() — saknas agentprofilen (if (!profil) notFound()) visas Next.js standard-404-sida, vilket är precis det användarvänliga felmeddelandet förslaget efterlyser. Alla ~18 datahämtningsfunktioner (getAgentArtiklar, getAgentStats, getAgentPlanbok m.fl.) kontrollerar redan res.ok och fail-openar till [] / null / 0, så ett misslyckat Supabase-anrop kraschar aldrig sidan. Den föreslagna <ErrorPage>-komponenten existerar inte i kodbasen, och att införa den vore att duplicera notFound()-mönstret som redan används."
 ---
 
 ## Problem

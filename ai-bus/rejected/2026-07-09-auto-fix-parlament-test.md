@@ -4,7 +4,8 @@ type: bug
 severity: low
 risk: low
 file: parlament_test.py
-status: suggestion
+status: rejected
+rationale: "Ingen kodfix möjlig eller motiverad. Den bifogade felloggen var tom, och förslagets egen verifiering (py_compile OK, alla sju supabase_utils-importer definierade, agent.py-reexporter resolverar) bekräftar att parlament_test.py är strukturellt intakt. De sannolika orsakerna är infrastrukturella (provider-uttömning/429, Supabase-timeout, jobb-timeout) och ligger utanför koden. Att ändra en fungerande fil på gissning skulle bara införa brus. Rätt hantering är att köra om workflowen och fånga en fullständig logg — inte att committa en kodändring."
 ---
 
 ## Sammanfattning
