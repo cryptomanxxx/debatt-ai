@@ -73,6 +73,17 @@ const BASE_URL = "https://www.debatt-ai.se";
 
 async function notifieraAmnesPrenumeranter({ artikelId, rubrik, forfattare, taggar }) {
   if (!process.env.RESEND_API_KEY) return;
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    // amnes_prenumeranter har ingen anon-policy (RLS) — utan service role skulle
+    // frågorna nedan tyst returnera [] (RLS-nekad = tom träfflista, inte ett fel),
+    // så publiceringen skulle lyckas medan notismailen tystnar utan spår i loggen.
+    logFel({
+      kalla: "agent/submit", feltyp: "config_fel",
+      meddelande: "SUPABASE_SERVICE_ROLE_KEY saknas — hoppar över ämnesprenumerant-notiser",
+      extra: { artikelId, forfattare },
+    });
+    return;
+  }
   try {
     // Fetch tag subscribers
     const taggPromises = (taggar || []).map(t =>
