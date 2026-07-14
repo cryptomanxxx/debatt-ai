@@ -152,7 +152,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `chatt_debatter` | Sparade direktdebatter. Kolumner: id, amne, agenter (jsonb), inlagg (jsonb), summering, scores (jsonb), skapad |
 | `visualiseringar` | Statistikgrafer. Kolumner: id, nyckel, titel, typ (linje/stapel), data (jsonb), enhet, skapad |
 | `amnesforslag` | Ämnesförslag från direktdebatt-besökare. Kolumner: id, amne, summering, kalla, behandlad, skapad |
-| `nyhetslog` | Logg över vilka nyheter agenter utvärderat och valt. Kolumner: id, agent, vald (jsonb), utvärderade (jsonb), antal, artikel_id, publicerad, skapad. Kör `supabase_nyhetslog.sql`. |
+| `nyhetslog` | Logg över vilka nyheter agenter utvärderat och valt. Kolumner: id, agent, vald (jsonb), utvärderade (jsonb), antal, artikel_id, publicerad, skapad. RLS aktiverad med publik SELECT (ingen PII) — skrivning kräver service role (`spara_nyhetslog()` i `supabase_utils.py`). Kör `supabase_nyhetslog.sql` + `supabase_nyhetslog_v2.sql`. |
 | `ohlcv_cache` | Dagliga OHLCV-priser för kryptovalutor (BTC/ETH/SOL/XRP/BNB). Primary key: (symbol, datum). Fylls av `backtest_fetch.py` via GitHub Actions. Kör `supabase_ohlcv.sql`. |
 | `backtest_resultat` | Resultat från kryptostrategibacktest. Kolumner: id, symbol, namn, strategi, total_avkastning, sharpe, max_drawdown, antal_affarer, equity_kurva (jsonb), skapad. |
 | `qa_snapshots` | Veckovis visuell QA-historik. Kolumner: id, vecka (ISO t.ex. "2026-W21"), sida_path, sida_namn, status (OK/VARNING/FEL), orsak, detalj, konsol_fel_antal, konsol_fel_exempel (text[]), screenshot_b64 (base64-PNG), skapad. UNIQUE(vecka, sida_path). Kör `supabase_qa_snapshots.sql` + `supabase_qa_snapshots_v2.sql`. |
