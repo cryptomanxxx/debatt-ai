@@ -65,8 +65,13 @@ async function sb(table, params = "") {
       `${SUPABASE_URL}/rest/v1/${table}?${params}`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
     );
-    return status === 200 && Array.isArray(data) ? data : [];
-  } catch { return []; }
+    if (status === 200 && Array.isArray(data)) return data;
+    console.warn(`[sb] ${table}: oväntat svar (status ${status}) — returnerar tom lista`);
+    return [];
+  } catch (e) {
+    console.warn(`[sb] ${table}: anrop misslyckades (${e?.message || e}) — returnerar tom lista`);
+    return [];
+  }
 }
 
 function isoVecka() {

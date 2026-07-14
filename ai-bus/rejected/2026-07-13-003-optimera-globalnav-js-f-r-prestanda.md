@@ -5,8 +5,9 @@ type: perf
 severity: medium
 risk: low
 file: app/GlobalNav.js
-status: pending
+status: rejected
 created: 2026-07-13
+rationale: "Bygger på en feldiagnos. GlobalNav.js hämtar ingen navigationsdata — TOPP och GRUPPER är statiska const-arrayer i modulen, och enda useEffect hanterar klick-utanför för dropdowns. Det finns alltså ingen 'navigationsdata' att klient-cacha. Dynamisk import av navkomponenter vore direkt kontraproduktivt: navraden ligger alltid ovanför vikningen och behövs på varje sida — att lazy-loada den skulle ge layouthopp och sämre upplevd prestanda, inte bättre. De två delkomponenter som faktiskt hämtar data (NavArkivLink/NavHistorikLink) är redan separata klientkomponenter."
 ---
 
 ## Problem

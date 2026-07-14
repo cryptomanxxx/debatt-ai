@@ -5,8 +5,9 @@ type: perf
 severity: medium
 risk: low
 file: agents/civilisations-historiker.js
-status: pending
+status: rejected
 created: 2026-07-13
+rationale: "Förslaget är faktiskt felaktigt. hämtaCivilisationsData() hämtar från 14 OLIKA tabeller (civilisations_minne, domstol_domar, kris_events, riksdagsval, politiska_partier, agent_planbocker, agent_koalitioner, lobbying_log, agent_roster_lag, bors_affarer, artiklar, strat/quant/revert_paper_nav). Supabase REST kan inte slå ihop frågor mot skilda tabeller till ett anrop, och den föreslagna exempel-frågan pekar på en 'händelser'-tabell som inte existerar. Anropen körs dessutom redan parallellt via Promise.all (rad 101), så latensen är redan minimerad — det finns ingen faktisk prestandavinst att hämta."
 ---
 
 ## Problem

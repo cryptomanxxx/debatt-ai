@@ -4,7 +4,8 @@ type: infrastructure
 severity: low
 risk: low
 file: .github/workflows/koalition-test.yml
-status: suggestion
+status: rejected
+rationale: "Transient GitHub-sidigt driftavbrott, ingen kodfix. Felet ('Service Unavailable' 503 / 'Bad Gateway' 502) uppstod i steget 'Getting action download info' — innan checkout, setup-python eller koalition_test.py kördes — när GitHub inte kunde slå upp nedladdningsinfo för uses:-actions. Ingen rad i loggen pekar på vår kod. koalition-test.yml är korrekt uppbyggd. Rätt hantering är att köra om workflowen; den föreslagna 'valfria härdningen' (extra retry-cron) är en separat robusthetsdiskussion, inte en fix för detta fel, och införs inte utan att koalitionsbildning bevisats drabbas återkommande."
 ---
 
 ## Sammanfattning
