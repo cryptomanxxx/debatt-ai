@@ -769,7 +769,13 @@ def hamta_existerande_bets(sb_key: str, market_id: int) -> list[str]:
 def spara_nyhetslog(sb_key: str, agent_namn: str, vald: dict,
                     alla: list, artikel_id: int | None, publicerad: bool,
                     rss_stats: list | None = None):
-    """Loggar vilka nyheter som utvärderades och vilken som valdes."""
+    """Loggar vilka nyheter som utvärderades och vilken som valdes.
+
+    nyhetslog saknar anon-skrivpolicy (RLS) — service role krävs. Fallback
+    till sb_key (anon) bevaras för miljöer utan secreten; ett misslyckat
+    POST loggas redan nedan, ingen extra tystnad tillkommer.
+    """
+    write_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     try:
         row = {
             "agent":        agent_namn,
@@ -783,7 +789,7 @@ def spara_nyhetslog(sb_key: str, agent_namn: str, vald: dict,
         r = httpx.post(
             f"{SB_URL}/rest/v1/nyhetslog",
             json=row,
-            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json", "Prefer": "return=minimal"},
+            headers={"apikey": write_key, "Authorization": f"Bearer {write_key}", "Content-Type": "application/json", "Prefer": "return=minimal"},
             timeout=10,
         )
         if r.status_code not in (200, 201, 204):
