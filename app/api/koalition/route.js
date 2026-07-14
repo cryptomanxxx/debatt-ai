@@ -18,11 +18,18 @@ async function getCount(agent) {
   return data?.[0]?.foljare ?? 0;
 }
 
-async function setCount(agent, val) {
+async function setCount(agent, val, ip) {
   const r = await fetch(
     `${SB_URL}/rest/v1/koalitioner?agent=eq.${encodeURIComponent(agent)}`,
     { method: "PATCH", headers: writeHdrs, body: JSON.stringify({ foljare: val }) }
   );
+  if (!r.ok) {
+    // Tyst skrivfel (t.ex. SUPABASE_SERVICE_ROLE_KEY saknas i miljön — koalitioner
+    // har ingen anon-skrivpolicy sedan RLS aktiverades) ska synas i loggen, inte
+    // bara försvinna som ett struket PATCH-svar.
+    const body = await r.text().catch(() => "");
+    logFel({ kalla: "api/koalition setCount", feltyp: "db_error", meddelande: `patch ${r.status}: ${body.slice(0, 200)}`, ip, extra: { agent, val } });
+  }
   return r.ok;
 }
 
@@ -51,7 +58,7 @@ export async function POST(req) {
   // Decrement previous agent if switching
   if (previousAgent && previousAgent !== agent) {
     const prev = await getCount(previousAgent);
-    if (prev !== null) await setCount(previousAgent, Math.max(0, prev - 1));
+    if (prev !== null) await setCount(previousAgent, Math.max(0, prev - 1), ip);
   }
 
   // Increment new agent
@@ -87,7 +94,8 @@ export async function DELETE(req) {
 
   const current = await getCount(agent);
   if (current === null) return Response.json({ error: "agent not found" }, { status: 500 });
-  await setCount(agent, Math.max(0, current - 1));
+  const skrivOk = await setCount(agent, Math.max(0, current - 1), ip);
+  if (!skrivOk) return Response.json({ error: "db error" }, { status: 500 });
 
   return Response.json({ ok: true });
 }
