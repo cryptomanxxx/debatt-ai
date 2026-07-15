@@ -256,10 +256,18 @@ def kop_etf_fond(sb_key: str, fond_symbol: str, crypto_symbol: str, belopp_kr: f
                   "belopp_kr": round(belopp_kr, 2), "pris_usd": round(pris_usd, 4)},
             timeout=8,
         )
-        # Spara i ohlcv_cache så /etf-sidan kan beräkna P&L
+        # Spara i ohlcv_cache så /etf-sidan kan beräkna P&L. Tabellen saknar
+        # anon-skrivpolicy (RLS) — service role krävs, fallback till sb_key
+        # bevaras för miljöer utan secreten.
+        _ohlcv_write_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
         httpx.post(
             f"{SB_URL}/rest/v1/ohlcv_cache?on_conflict=symbol,datum",
-            headers={**h, "Prefer": "resolution=merge-duplicates,return=minimal"},
+            headers={
+                "apikey": _ohlcv_write_key,
+                "Authorization": f"Bearer {_ohlcv_write_key}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates,return=minimal",
+            },
             json={"symbol": crypto_symbol, "datum": idag,
                   "pris": round(pris_usd, 2), "vol": 0},
             timeout=8,

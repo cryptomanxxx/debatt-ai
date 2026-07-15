@@ -15,6 +15,9 @@ import yfinance as yf
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+# ohlcv_cache saknar anon-skrivpolicy (RLS) — service role krävs. Fallback
+# till SB_KEY bevaras för miljöer utan secreten.
+SB_WRITE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
 
 if not SB_KEY:
     print("FEL: SUPABASE_ANON_KEY saknas", file=sys.stderr)
@@ -61,8 +64,8 @@ def hamta_yahoo(ticker: str) -> list[dict]:
 
 def spara_ohlcv(symbol: str, rows: list[dict]) -> bool:
     headers = {
-        "apikey":        SB_KEY,
-        "Authorization": f"Bearer {SB_KEY}",
+        "apikey":        SB_WRITE_KEY,
+        "Authorization": f"Bearer {SB_WRITE_KEY}",
         "Content-Type":  "application/json",
         "Prefer":        "resolution=merge-duplicates,return=minimal",
     }
