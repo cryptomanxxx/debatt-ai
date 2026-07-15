@@ -20,6 +20,9 @@ from datetime import datetime, timezone, timedelta
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+# krypto_historik saknar anon-skrivpolicy (RLS) — service role krävs.
+# Fallback till SB_KEY bevaras för miljöer utan secreten.
+SB_WRITE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
 CMC_API_KEY = os.environ.get("CMC_API_KEY", "")
 
 if not SB_KEY:
@@ -178,7 +181,11 @@ def spara_statistik(nyckel: str, namn: str, kategori: str, enhet: str,
 
 
 def spara_krypto_historik() -> int:
-    """Hämtar topp 50 kryptovalutor från CoinMarketCap och sparar daglig snapshot."""
+    """Hämtar topp 50 kryptovalutor från CoinMarketCap och sparar daglig snapshot.
+
+    Returnerar antal sparade mynt (0 = inget att göra, t.ex. saknad API-nyckel
+    eller tom respons), eller -1 om själva Supabase-sparningen misslyckades.
+    """
     if not CMC_API_KEY:
         print("  Hoppar CoinMarketCap: CMC_API_KEY saknas", file=sys.stderr)
         return 0
@@ -220,8 +227,8 @@ def spara_krypto_historik() -> int:
         })
 
     headers = {
-        "apikey": SB_KEY,
-        "Authorization": f"Bearer {SB_KEY}",
+        "apikey": SB_WRITE_KEY,
+        "Authorization": f"Bearer {SB_WRITE_KEY}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates,return=minimal",
     }
@@ -234,8 +241,12 @@ def spara_krypto_historik() -> int:
         print(f"  ✓ CoinMarketCap: {len(rows)} mynt sparade ({today})")
         return len(rows)
     else:
+        # Skiljer på "inget att spara" (0, mjukt) och "sparningen misslyckades"
+        # (-1, hårt) — t.ex. om SUPABASE_SERVICE_ROLE_KEY saknas och anon-
+        # fallbacken nekas av RLS. main() kraschar jobbet bara i det senare
+        # fallet, annars kunde krypto_historik tystna utan att workflown syns röd.
         print(f"  ✗ CoinMarketCap: HTTP {upsert.status_code} – {upsert.text[:200]}", file=sys.stderr)
-        return 0
+        return -1
 
 
 def skapa_krypto_markets():
@@ -381,8 +392,11 @@ def main():
     # CoinMarketCap – daglig kryptodata
     print("\n── CoinMarketCap ──")
     krypto_ok = spara_krypto_historik()
+    krypto_sparfel = krypto_ok < 0
     if krypto_ok > 0:
         ok += 1
+    elif krypto_sparfel:
+        fel += 1
 
     # Krypto-markets: lös utgångna, skapa nya
     print("\n── Krypto-markets ──")
@@ -390,8 +404,11 @@ def main():
     skapa_krypto_markets()
 
     print(f"\n=== KLART: {ok} uppdaterade, {fel} misslyckade ===")
-    # Krascha bara om ingenting alls lyckades
-    if ok == 0:
+    # Krascha om ingenting alls lyckades, ELLER om krypto-sparningen specifikt
+    # misslyckades (skiljt från "inget att göra") — annars kan World Bank-
+    # framgång dölja att RLS nekar CoinMarketCap-skrivningen och krypto_historik
+    # tystnar utan att workflown syns röd.
+    if ok == 0 or krypto_sparfel:
         sys.exit(1)
 
 
