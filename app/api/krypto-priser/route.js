@@ -12,6 +12,10 @@
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// ohlcv_cache saknar anon-skrivpolicy (RLS) — service role krävs för att
+// cacha priser. Fallback till anon-nyckeln bevaras för miljöer utan
+// secreten (routen fungerar ändå, bara utan cache-skrivning).
+const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
 const TILLÅTNA_SYMBOLER = new Set(["BTC", "ETH", "SOL", "XRP", "BNB"]);
 
@@ -48,10 +52,10 @@ async function hamtaOhlcvPris(symbol, datum) {
 }
 
 async function sparaPris(symbol, datum, pris) {
-  if (!SB_KEY) return;
+  if (!SB_WRITE_KEY) return;
   const h = {
-    apikey: SB_KEY,
-    Authorization: `Bearer ${SB_KEY}`,
+    apikey: SB_WRITE_KEY,
+    Authorization: `Bearer ${SB_WRITE_KEY}`,
     "Content-Type": "application/json",
     Prefer: "resolution=merge-duplicates,return=minimal",
   };
