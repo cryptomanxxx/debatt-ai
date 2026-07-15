@@ -32,6 +32,15 @@ HDRS = {
     "Content-Type": "application/json",
 }
 
+# markets saknar anon-skrivpolicy (RLS) — service role krävs för att avgöra
+# markets. Fallback till SB_KEY bevaras för miljöer utan secreten.
+SB_WRITE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
+WRITE_HDRS = {
+    "apikey": SB_WRITE_KEY,
+    "Authorization": f"Bearer {SB_WRITE_KEY}",
+    "Content-Type": "application/json",
+}
+
 
 # ── Supabase ──────────────────────────────────────────────────────────────────
 
@@ -61,7 +70,7 @@ def hamta_consensus(market_id: int) -> float | None:
 def avgora_market(market_id: int, utfall: str) -> bool:
     r = httpx.patch(
         f"{SB_URL}/rest/v1/markets?id=eq.{market_id}",
-        headers={**HDRS, "Prefer": "return=minimal"},
+        headers={**WRITE_HDRS, "Prefer": "return=minimal"},
         json={"status": "avgjord", "utfall": utfall},
         timeout=10,
     )
@@ -243,6 +252,7 @@ def main() -> None:
 
     print(f"Hittade {len(markets)} utgångna markets.\n")
     avgjorda = 0
+    sparfel  = 0
 
     for m in markets:
         mid      = m["id"]
@@ -269,6 +279,7 @@ def main() -> None:
             avgjorda += 1
         else:
             print(f"  ✗ Supabase-uppdatering misslyckades för market #{mid}\n")
+            sparfel += 1
 
     print(f"Avgjorda: {avgjorda}/{len(markets)} markets.")
 
@@ -279,6 +290,14 @@ def main() -> None:
             print(f"Reglerade bets: {reglerade} st.")
     except Exception as e:
         print(f"  Varning: reglera_prediction_bets misslyckades: {e}", file=sys.stderr)
+
+    if sparfel:
+        # Låt CI-körningen synas som misslyckad om avgörande-skrivningarna
+        # tystnat (t.ex. saknad SUPABASE_SERVICE_ROLE_KEY efter att RLS
+        # aktiverades) — annars går workflown grön medan markets aldrig
+        # avgörs.
+        print(f"FEL: {sparfel} market-avgöranden misslyckades", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

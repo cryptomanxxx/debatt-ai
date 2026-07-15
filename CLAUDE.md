@@ -142,8 +142,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 |---|---|
 | `artiklar` | Publicerade artiklar. Kolumner: id, rubrik, forfattare, artikel, kategori, motivering, arg/ori/rel/tro, taggar, kalla (ai/human), konklusion, visualisering_id, lasningar, parent_id (bigint FK), nyhetskalla (jsonb), skapad |
 | `opinion_roster` | Besökaromröstningar på debattfrågor. Kolumner: id, fraga (UNIQUE), kategori, roster_ja, roster_nej, skapad |
-| `markets` | Prediction markets. Kolumner: id, titel, beskrivning, deadline, resolution_kalla, utfall (ja/nej), status (öppen/avgjord), kategori, skapad |
-| `agent_bets` | Agenters bets på markets. Kolumner: id, market_id (FK), agent, sannolikhet (0–100), motivering, insats (kr dragit från saldo_spel), avgjord (bool), vinst (netto kr), skapad. UNIQUE(market_id, agent) |
+| `markets` | Prediction markets. Kolumner: id, titel, beskrivning, deadline, resolution_kalla, utfall (ja/nej), status (öppen/avgjord), kategori, skapad. RLS aktiverad med publik SELECT (ingen PII) — skrivning kräver service role. Admin-redigering routas via `app/api/admin/update-market`. Kör `supabase_markets.sql` + `supabase_markets_v2.sql`. |
+| `agent_bets` | Agenters bets på markets. Kolumner: id, market_id (FK), agent, sannolikhet (0–100), motivering, insats (kr dragit från saldo_spel), avgjord (bool), vinst (netto kr), skapad. UNIQUE(market_id, agent). RLS aktiverad med publik SELECT (ingen PII) — skrivning kräver service role. Kör `supabase_markets.sql` + `supabase_markets_v2.sql`. |
 | `inlamningar` | Alla inlämnade artiklar oavsett beslut. Status: inkorg / publicerad / avvisad |
 | `prenumeranter` | E-postprenumeranter. Kolumner: email, token (för avprenumerering), aktiv |
 | `besökare` | Anonyma sidvisningar |

@@ -871,12 +871,15 @@ def spara_bet(sb_key: str, market_id: int, agent_namn: str, sannolikhet: int, mo
         # Dra insatsen direkt
         _uppdatera_saldo_spel(sb_key, agent_namn, -insats)
 
+        # agent_bets saknar anon-skrivpolicy (RLS) — service role krävs.
+        # Fallback till sb_key bevaras för miljöer utan secreten.
+        _bet_write_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
         res = httpx.post(
             f"{SB_URL}/rest/v1/agent_bets",
             json={"market_id": market_id, "agent": agent_namn, "sannolikhet": sannolikhet,
                   "motivering": motivering, "insats": insats},
             headers={
-                "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
+                "apikey": _bet_write_key, "Authorization": f"Bearer {_bet_write_key}",
                 "Content-Type": "application/json", "Prefer": "return=minimal",
             },
             timeout=15,
@@ -1143,7 +1146,10 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
         resolution_kalla = parsed.get("resolution_kalla", "").strip()
         if not titel or len(titel) < 10:
             return False
-        hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json"}
+        # markets saknar anon-skrivpolicy (RLS) — service role krävs.
+        # Fallback till sb_key bevaras för miljöer utan secreten.
+        _write_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+        hdrs = {"apikey": _write_key, "Authorization": f"Bearer {_write_key}", "Content-Type": "application/json"}
         res = httpx.post(
             f"{SB_URL}/rest/v1/markets",
             headers=hdrs,
@@ -4126,6 +4132,12 @@ def reglera_prediction_bets(sb_key: str) -> int:
     """
     hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
             "Content-Type": "application/json"}
+    # agent_bets saknar anon-skrivpolicy (RLS) — service role krävs för
+    # avgörande-PATCHen nedan. Fallback till sb_key bevaras för miljöer
+    # utan secreten.
+    _write_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+    write_hdrs = {"apikey": _write_key, "Authorization": f"Bearer {_write_key}",
+                  "Content-Type": "application/json"}
     try:
         # Hämta avgjorda markets
         m_res = httpx.get(
@@ -4165,7 +4177,7 @@ def reglera_prediction_bets(sb_key: str) -> int:
             httpx.patch(
                 f"{SB_URL}/rest/v1/agent_bets?id=eq.{bet['id']}",
                 json={"avgjord": True, "vinst": vinst, "avgjord_at": "now()"},
-                headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+                headers={**write_hdrs, "Prefer": "return=minimal"}, timeout=8,
             )
             print(f"  {'✓ vann' if won else '✗ förlorade'} {bet['agent']}: "
                   f"{'+'if won else ''}{vinst} kr (insats {insats} kr, {sann}% → {utfall})")
