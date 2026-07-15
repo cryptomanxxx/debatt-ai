@@ -4171,14 +4171,24 @@ def reglera_prediction_bets(sb_key: str) -> int:
             won = (utfall == "ja" and sann > 50) or (utfall == "nej" and sann < 50)
             vinst = insats if won else -insats
 
+            # Claim-först: villkorad PATCH (avgjord=eq.false) INNAN saldot
+            # krediteras. Om PATCHen nekas (t.ex. RLS utan service role) ska
+            # vi aldrig betala ut — annars hittar nästa körning samma
+            # avgjord=false-bet igen och betalar ut vinsten på nytt varje
+            # gång (Codex P1 på PR #1233).
+            claim = httpx.patch(
+                f"{SB_URL}/rest/v1/agent_bets?id=eq.{bet['id']}&avgjord=eq.false",
+                json={"avgjord": True, "vinst": vinst, "avgjord_at": "now()"},
+                headers={**write_hdrs, "Prefer": "return=representation"}, timeout=8,
+            )
+            if not claim.is_success or not claim.json():
+                print(f"  ✗ Bet {bet['id']} ({bet['agent']}): kunde inte claimas "
+                      f"(redan reglerad av annan körning, eller nekad skrivning)", file=sys.stderr)
+                continue
+
             if won and insats > 0:
                 _uppdatera_saldo_spel(sb_key, bet["agent"], insats * 2)
 
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_bets?id=eq.{bet['id']}",
-                json={"avgjord": True, "vinst": vinst, "avgjord_at": "now()"},
-                headers={**write_hdrs, "Prefer": "return=minimal"}, timeout=8,
-            )
             print(f"  {'✓ vann' if won else '✗ förlorade'} {bet['agent']}: "
                   f"{'+'if won else ''}{vinst} kr (insats {insats} kr, {sann}% → {utfall})")
             settled += 1
