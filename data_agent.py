@@ -249,15 +249,20 @@ def spara_krypto_historik() -> int:
         return -1
 
 
-def skapa_krypto_markets():
-    """Skapar veckomarkets för topp-5 coins om inga öppna markets finns för dem."""
+def skapa_krypto_markets() -> int:
+    """Skapar veckomarkets för topp-5 coins om inga öppna markets finns för dem.
+
+    Returnerar antal misslyckade sparningar (0 = allt gick bra eller inget att göra).
+    """
+    # markets saknar anon-skrivpolicy (RLS) — service role krävs.
     hdrs = {
-        "apikey": SB_KEY,
-        "Authorization": f"Bearer {SB_KEY}",
+        "apikey": SB_WRITE_KEY,
+        "Authorization": f"Bearer {SB_WRITE_KEY}",
         "Content-Type": "application/json",
     }
     today = datetime.now(timezone.utc).date()
     deadline_iso = f"{(today + timedelta(days=7)).isoformat()}T23:59:00+00:00"
+    sparfel = 0
 
     for namn, symbol in KRYPTO_COINS:
         kalla = f"krypto_historik:{symbol}"
@@ -304,13 +309,20 @@ def skapa_krypto_markets():
             print(f"  ✓ Market skapat: {namn} @ {start_pris:,.0f} USD")
         else:
             print(f"  ✗ Market fel {namn}: {ins.status_code} {ins.text[:100]}", file=sys.stderr)
+            sparfel += 1
+
+    return sparfel
 
 
-def lös_krypto_markets():
-    """Löser utgångna krypto-markets genom att jämföra priser i krypto_historik."""
+def lös_krypto_markets() -> int:
+    """Löser utgångna krypto-markets genom att jämföra priser i krypto_historik.
+
+    Returnerar antal misslyckade sparningar (0 = allt gick bra eller inget att göra).
+    """
+    # markets saknar anon-skrivpolicy (RLS) — service role krävs.
     hdrs = {
-        "apikey": SB_KEY,
-        "Authorization": f"Bearer {SB_KEY}",
+        "apikey": SB_WRITE_KEY,
+        "Authorization": f"Bearer {SB_WRITE_KEY}",
         "Content-Type": "application/json",
     }
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -327,13 +339,14 @@ def lös_krypto_markets():
     )
     if res.status_code != 200:
         print(f"  Fel vid hämtning av markets: {res.status_code}", file=sys.stderr)
-        return
+        return 1
 
     utgångna = res.json()
     if not utgångna:
         print("  Inga krypto-markets att lösa")
-        return
+        return 0
 
+    sparfel = 0
     for m in utgångna:
         try:
             info = json.loads(m["beskrivning"])
@@ -368,6 +381,9 @@ def lös_krypto_markets():
             print(f"  ✓ Löst: {symbol} {start_pris:,.0f} → {slut_pris:,.0f} USD = {riktning}")
         else:
             print(f"  ✗ Uppdatering misslyckades: {upd.status_code} {upd.text[:100]}", file=sys.stderr)
+            sparfel += 1
+
+    return sparfel
 
 
 def main():
@@ -400,15 +416,14 @@ def main():
 
     # Krypto-markets: lös utgångna, skapa nya
     print("\n── Krypto-markets ──")
-    lös_krypto_markets()
-    skapa_krypto_markets()
+    markets_sparfel = lös_krypto_markets() + skapa_krypto_markets()
 
     print(f"\n=== KLART: {ok} uppdaterade, {fel} misslyckade ===")
-    # Krascha om ingenting alls lyckades, ELLER om krypto-sparningen specifikt
-    # misslyckades (skiljt från "inget att göra") — annars kan World Bank-
-    # framgång dölja att RLS nekar CoinMarketCap-skrivningen och krypto_historik
-    # tystnar utan att workflown syns röd.
-    if ok == 0 or krypto_sparfel:
+    # Krascha om ingenting alls lyckades, ELLER om krypto-/market-sparningen
+    # specifikt misslyckades (skiljt från "inget att göra") — annars kan
+    # World Bank-framgång dölja att RLS nekar dessa skrivningar och
+    # krypto_historik/markets tystnar utan att workflown syns röd.
+    if ok == 0 or krypto_sparfel or markets_sparfel:
         sys.exit(1)
 
 

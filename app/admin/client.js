@@ -1032,10 +1032,15 @@ function MarketsTab() {
 
   async function sparaMarket(id) {
     setMsg("");
-    const res = await fetch(`${SB_URL}/rest/v1/markets?id=eq.${id}`, {
-      method: "PATCH",
-      headers: { ...sbHeaders(), "Prefer": "return=minimal" },
-      body: JSON.stringify({ titel: editTitel.trim(), beskrivning: editBeskrivning.trim() || null }),
+    // Routed through server-side API så SUPABASE_SERVICE_ROLE_KEY används —
+    // anon-nyckeln saknar UPDATE på markets sedan RLS aktiverades
+    const res = await fetch("/api/admin/update-market", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pw: getStoredPw(), id,
+        changes: { titel: editTitel.trim(), beskrivning: editBeskrivning.trim() || null },
+      }),
     });
     setMsg(res.ok ? "✓ Market uppdaterat." : "✗ Fel vid uppdatering.");
     setEditId(null);
