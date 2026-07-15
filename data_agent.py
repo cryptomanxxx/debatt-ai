@@ -20,6 +20,9 @@ from datetime import datetime, timezone, timedelta
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+# krypto_historik saknar anon-skrivpolicy (RLS) — service role krävs.
+# Fallback till SB_KEY bevaras för miljöer utan secreten.
+SB_WRITE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
 CMC_API_KEY = os.environ.get("CMC_API_KEY", "")
 
 if not SB_KEY:
@@ -220,8 +223,8 @@ def spara_krypto_historik() -> int:
         })
 
     headers = {
-        "apikey": SB_KEY,
-        "Authorization": f"Bearer {SB_KEY}",
+        "apikey": SB_WRITE_KEY,
+        "Authorization": f"Bearer {SB_WRITE_KEY}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates,return=minimal",
     }
