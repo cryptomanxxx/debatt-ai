@@ -289,13 +289,20 @@ def main():
 
     # ── 1. Inflation: höj butikpriser med 3% ────────────────────────────────────
     print("── Inflation: höjer butikpriser 3% ──")
+    # butik_varor saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    _butik_write_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+    butik_h = {
+        "apikey": _butik_write_key, "Authorization": f"Bearer {_butik_write_key}",
+        "Content-Type": "application/json",
+    }
     varor_res = httpx.get(f"{SB_URL}/rest/v1/butik_varor?select=id,namn,pris", headers={**h, "Prefer": ""}, timeout=10)
     if varor_res.is_success:
         for vara in varor_res.json():
             nytt_pris = max(1, math.ceil(vara["pris"] * 1.03))
             httpx.patch(
                 f"{SB_URL}/rest/v1/butik_varor?id=eq.{vara['id']}",
-                headers=h, json={"pris": nytt_pris}, timeout=8,
+                headers=butik_h, json={"pris": nytt_pris}, timeout=8,
             )
         print(f"  ✓ {len(varor_res.json())} varor uppdaterade")
     else:

@@ -4207,6 +4207,11 @@ def kop_statussymbol(sb_key: str, agent_namn: str, preferenser: list = None) -> 
     Väljer bland prefererade symboler (65%) annars slumpmässigt bland tillgängliga.
     Returnerar symbolens namn om köpet lyckas, annars None.
     """
+    # agent_symboler saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten. Används
+    # genomgående i funktionen (även agent_planbocker/butik_varor-anropen)
+    # eftersom service role alltid är tillåtet oavsett dessa tabellers policy.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     hdrs = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
             "Content-Type": "application/json"}
     try:
@@ -4304,6 +4309,10 @@ def stang_auktioner(sb_key: str) -> int:
     """Stäng utgångna auktioner och genomför eventuella transaktioner."""
     try:
         import datetime, urllib.parse
+        # butik_auktioner/agent_symboler saknar anon-skrivpolicy (RLS) —
+        # service role krävs. Fallback till sb_key bevaras för miljöer utan
+        # secreten.
+        sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
         hdrs = {
             "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
             "Content-Type": "application/json",
@@ -4403,6 +4412,9 @@ def lista_symbol_for_forsaljning(sb_key: str, agent_namn: str) -> str | None:
     """Agenten listar en av sina symboler på andrahandsmarknaden (48h, reservpris = 60% av butikspris)."""
     try:
         import datetime, urllib.parse
+        # butik_auktioner saknar anon-skrivpolicy (RLS) — service role krävs.
+        # Fallback till sb_key bevaras för miljöer utan secreten.
+        sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
         hdrs = {
             "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
             "Content-Type": "application/json",
@@ -4468,6 +4480,9 @@ def buda_pa_auktion(sb_key: str, agent_namn: str) -> str | None:
     """Agenten lägger ett bud på en öppen auktion (inte sina egna, har råd med budet)."""
     try:
         import urllib.parse
+        # butik_bud/butik_auktioner saknar anon-skrivpolicy (RLS) — service
+        # role krävs. Fallback till sb_key bevaras för miljöer utan secreten.
+        sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
         hdrs = {
             "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
             "Content-Type": "application/json",
