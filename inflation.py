@@ -296,15 +296,22 @@ def main():
         "apikey": _butik_write_key, "Authorization": f"Bearer {_butik_write_key}",
         "Content-Type": "application/json",
     }
+    butik_sparfel = 0
     varor_res = httpx.get(f"{SB_URL}/rest/v1/butik_varor?select=id,namn,pris", headers={**h, "Prefer": ""}, timeout=10)
     if varor_res.is_success:
         for vara in varor_res.json():
             nytt_pris = max(1, math.ceil(vara["pris"] * 1.03))
-            httpx.patch(
+            pr = httpx.patch(
                 f"{SB_URL}/rest/v1/butik_varor?id=eq.{vara['id']}",
                 headers=butik_h, json={"pris": nytt_pris}, timeout=8,
             )
-        print(f"  ✓ {len(varor_res.json())} varor uppdaterade")
+            if not pr.is_success:
+                butik_sparfel += 1
+        if butik_sparfel:
+            print(f"  ✗ {butik_sparfel}/{len(varor_res.json())} varor kunde INTE uppdateras "
+                  f"(saknad service role?)", file=sys.stderr)
+        else:
+            print(f"  ✓ {len(varor_res.json())} varor uppdaterade")
     else:
         print(f"  ✗ Kunde inte hämta varor: {varor_res.status_code}", file=sys.stderr)
 
@@ -533,6 +540,14 @@ def main():
         print(f"  [VARNING] Börskassan-omfördelning: {e}")
 
     print("\n✓ Inflationscykeln klar.")
+
+    if butik_sparfel:
+        # Låt CI-körningen synas som misslyckad om butik_varor-uppräkningen
+        # tystnat (t.ex. saknad SUPABASE_SERVICE_ROLE_KEY efter att RLS
+        # aktiverades) — annars går workflown grön medan priserna aldrig
+        # uppdateras.
+        print(f"FEL: {butik_sparfel} butik_varor-uppdateringar misslyckades", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

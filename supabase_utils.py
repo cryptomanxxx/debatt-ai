@@ -4339,7 +4339,6 @@ def stang_auktioner(sb_key: str) -> int:
                 belopp = a["nuv_bud"]
                 vara_id = a["vara_id"]
 
-                # Dra från köparens saldo
                 kr = httpx.get(
                     f"{SB_URL}/rest/v1/agent_planbocker"
                     f"?agent=eq.{urllib.parse.quote(kopare)}&select=saldo",
@@ -4349,14 +4348,35 @@ def stang_auktioner(sb_key: str) -> int:
                     continue
                 saldo_kopare = kr.json()[0]["saldo"]
                 if saldo_kopare < belopp:
-                    httpx.patch(
-                        f"{SB_URL}/rest/v1/butik_auktioner?id=eq.{aid}",
+                    claim = httpx.patch(
+                        f"{SB_URL}/rest/v1/butik_auktioner?id=eq.{aid}&status=eq.öppen",
                         json={"status": "inställd"},
-                        headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+                        headers={**hdrs, "Prefer": "return=representation"}, timeout=8,
                     )
-                    stangda += 1
+                    if claim.is_success and claim.json():
+                        stangda += 1
+                    else:
+                        print(f"  ✗ Auktion {aid}: kunde inte claimas (inställd)", file=sys.stderr)
                     continue
 
+                # Claim-först: villkorad PATCH (status=eq.öppen) INNAN pengar
+                # och symbol flyttas. agent_planbocker har fortfarande
+                # permissiva policyer (eget separat projekt) medan
+                # agent_symboler/butik_auktioner inte har det längre — utan
+                # denna spärr skulle en nekad skrivning här (t.ex. saknad
+                # service role) lämna auktionen öppen medan köparen ändå
+                # debiterats, så nästa körning hittar samma auktion och
+                # debiterar på nytt varje gång (Codex P1 på PR #1234).
+                claim = httpx.patch(
+                    f"{SB_URL}/rest/v1/butik_auktioner?id=eq.{aid}&status=eq.öppen",
+                    json={"status": "avgjord"},
+                    headers={**hdrs, "Prefer": "return=representation"}, timeout=8,
+                )
+                if not claim.is_success or not claim.json():
+                    print(f"  ✗ Auktion {aid}: kunde inte claimas (avgjord) — hoppar över affären", file=sys.stderr)
+                    continue
+
+                # Dra från köparens saldo
                 httpx.patch(
                     f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(kopare)}",
                     json={"saldo": saldo_kopare - belopp},
@@ -4388,19 +4408,18 @@ def stang_auktioner(sb_key: str) -> int:
                     headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
                 )
 
-                httpx.patch(
-                    f"{SB_URL}/rest/v1/butik_auktioner?id=eq.{aid}",
-                    json={"status": "avgjord"},
-                    headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
-                )
+                stangda += 1
             else:
-                # Inga bud — inställd
-                httpx.patch(
-                    f"{SB_URL}/rest/v1/butik_auktioner?id=eq.{aid}",
+                # Inga bud — claim-först innan status ändras till inställd
+                claim = httpx.patch(
+                    f"{SB_URL}/rest/v1/butik_auktioner?id=eq.{aid}&status=eq.öppen",
                     json={"status": "inställd"},
-                    headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
+                    headers={**hdrs, "Prefer": "return=representation"}, timeout=8,
                 )
-            stangda += 1
+                if claim.is_success and claim.json():
+                    stangda += 1
+                else:
+                    print(f"  ✗ Auktion {aid}: kunde inte claimas (inställd)", file=sys.stderr)
 
         return stangda
     except Exception as e:
