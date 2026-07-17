@@ -461,7 +461,7 @@ def berakna_intakt_lobbybolag(h, foretag, anstallda_agenter, saldon):
             running_kassa  = round(running_kassa - LOBBYING_BELOPP, 2)
 
         # Logga i lobbying_log (klient = lobbying_agent, de gynnas av röständringen)
-        sb_post(h, "lobbying_log", {
+        if not sb_post(h, "lobbying_log", {
             "lagforslag_id": fid,
             "lobbying_agent": klient,
             "mal_agent":      mal,
@@ -470,7 +470,9 @@ def berakna_intakt_lobbybolag(h, foretag, anstallda_agenter, saldon):
             "resultat":       resultat,
             "rod_fore":       rod_fore,
             "rod_efter":      rod_efter,
-        })
+        }):
+            print(f"  ✗ lobbying_log-sparning misslyckades ({klient} → {mal}) — "
+                  f"röst/betalning redan genomförd, men saknar auditrad", file=sys.stderr)
 
         if resultat == "accepterat":
             sb_post(h, "civilisations_minne", {
@@ -630,7 +632,15 @@ def betala_dagsloner(h, foretag, anstallda, saldon):
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    sb_key = os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
+    # lobbying_log saknar anon-skrivpolicy (RLS) — service role krävs för att
+    # spara lobbybolagets loggrader. Prioriterar den riktiga
+    # SUPABASE_SERVICE_ROLE_KEY-secreten, med de befintliga (delvis
+    # feltänkta) namnen kvar som fallback för miljöer utan den.
+    sb_key = (
+        os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+        or os.environ.get("SUPABASE_SERVICE_KEY")
+    )
     if not sb_key:
         print("Saknar Supabase-nyckel.", file=sys.stderr)
         sys.exit(1)
