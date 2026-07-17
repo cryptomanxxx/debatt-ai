@@ -65,6 +65,17 @@ export async function POST(req) {
     if (!res.ok) sparfel++;
   }
 
-  if (sparfel) return Response.json({ error: "Kunde inte spara alla röster" }, { status: 502 });
+  if (sparfel === updates.length) {
+    // Inget skrevs alls — säkert att signalera fel, ingen delvis räknad röst
+    // att skydda mot dubbelräkning vid en klient-retry.
+    return Response.json({ error: "Kunde inte spara rösten" }, { status: 502 });
+  }
+  if (sparfel > 0) {
+    // Delvis lyckades: några parametrar redan inkrementerade. Att svara med
+    // ett fel här hade uppmuntrat klienten att göra om hela POST-anropet,
+    // vilket dubbelräknar de redan sparade parametrarna (Codex P2 på
+    // PR #1239) — logga istället bara server-side och svara ok som vanligt.
+    console.error(`[platform-stamning] ${sparfel}/${updates.length} parametrar kunde inte sparas (partiell röst)`);
+  }
   return Response.json({ ok: true });
 }
