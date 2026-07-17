@@ -7,6 +7,10 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// labb_log saknar anon-skrivpolicy (RLS) — service role krävs. Denna route
+// körs server-side (Vercel), så nyckeln exponeras aldrig till webbläsaren.
+// Fallback till anon bevaras för miljöer utan secreten.
+const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
 // Server-side deduplicering: blockerar identiska requests inom 10 sekunder
 const recentDedup = new Map();
@@ -23,7 +27,7 @@ async function logLabb({ amne, aggressivitet, faktafokus, humor, optimism, provi
   try {
     await fetch(`${SB_URL}/rest/v1/labb_log`, {
       method: "POST",
-      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+      headers: { apikey: SB_WRITE_KEY, Authorization: `Bearer ${SB_WRITE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({ amne: amne.slice(0, 300), aggressivitet, faktafokus, humor, optimism, provider }),
     });
   } catch {}
