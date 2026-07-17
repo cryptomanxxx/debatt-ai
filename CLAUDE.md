@@ -2343,9 +2343,13 @@ Innan ett nytt ekonomiskt experiment byggs, svara på:
 
 ### RLS-härdning — pågående tabell-för-tabell-genomgång
 
-Efter Supabase-larmet "rls_disabled_in_public" (12 jul 2026) görs en planerad genomgång av tabeller utan verkligt RLS-skydd, en tabell i taget (se ✅-loggen för `amnes_prenumeranter`, `koalitioner`, `ai_log`). **Viktig fälla hittad av Codex (PR #1228):** `supabase_rls_fix.sql` (skapad 7 jul, okänt om körd) gav redan 18 tabeller "public full access"-policyer (`pub sel/ins/upd <tabell>`, `USING (true)`/`WITH CHECK (true)`) — funktionellt identiskt med RLS avstängt, bara för att tysta Advisor-varningen. Berörda tabeller: `krypto_historik`, `markets`, `agent_bets`, `backtest_resultat`, `ohlcv_cache`, `nyhetslog`, `ai_log`, `agent_koalitioner`, `agent_utmaningar`, `argument_roster`, `labb_log`, `platform_stamning`, `lagforslag`, `agent_roster_lag`, `ekonomi_spel`, `agent_transaktioner`, `agent_positioner`, `agent_planbocker`, `lobbying_log`.
+Efter Supabase-larmet "rls_disabled_in_public" (12 jul 2026) görs en planerad genomgång av tabeller utan verkligt RLS-skydd, en tabell i taget (se ✅-loggen för `amnes_prenumeranter`, `koalitioner`, `ai_log`, `nyhetslog`, `backtest_resultat`, `krypto_historik`, `ohlcv_cache`, `markets`, `agent_bets`, `butik_varor`, `agent_symboler`, `butik_auktioner`, `butik_bud`, `tpp_spel`, `agent_koalitioner`, `agent_positioner`).
 
-Postgres RLS-policyer är additiva (OR) — att bara lägga till en ny restriktiv policy utan att ta bort dessa gamla permissiva döljer inte skrivvägen, den lämnar den öppen. **Varje framtida fix för någon av tabellerna ovan måste explicit `DROP POLICY IF EXISTS "pub sel <tabell>"` och `"pub ins <tabell>"`/`"pub upd <tabell>"` innan en ny restriktiv policy skapas** — annars är fixen verkningslös oavsett om `supabase_rls_fix.sql` någonsin kördes.
+**Historik:** `supabase_rls_fix.sql` (skapad 7 jul, okänt om körd) gav 18 tabeller "public full access"-policyer (`pub sel/ins/upd <tabell>`, `USING (true)`/`WITH CHECK (true)`) — funktionellt identiskt med RLS avstängt, bara för att tysta Advisor-varningen. **Filen togs bort** (Codex P2 på PR #1237): om den återkördes efter att en tabell redan fixats med en dedikerad v2-migrering skulle dess egna `IF NOT EXISTS`-kontroller tyst återskapa de permissiva policyerna och ångra fixen. Postgres RLS-policyer är additiva (OR) — att bara lägga till en ny restriktiv policy utan att ta bort en gammal permissiv lämnar skrivvägen öppen.
+
+**Varje framtida fix måste fortfarande explicit `DROP POLICY IF EXISTS "pub sel <tabell>"` och `"pub ins <tabell>"`/`"pub upd <tabell>"` innan en ny restriktiv policy skapas** — dessa policynamn kan redan finnas i den riktiga databasen även om källfilen nu är borttagen, om `supabase_rls_fix.sql` kördes innan den togs bort.
+
+Kvarvarande tabeller som ursprungligen täcktes av den borttagna filen och fortfarande väntar på en egen v2-fix: `agent_utmaningar`, `argument_roster`, `labb_log`, `platform_stamning`, `lagforslag`, `agent_roster_lag`, `ekonomi_spel`, `agent_transaktioner`, `lobbying_log`, samt `agent_planbocker` (eget separat, större projekt, se checklistan ovan).
 
 ---
 
