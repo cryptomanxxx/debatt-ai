@@ -2,8 +2,12 @@ import { checkRateLimit } from "../../lib/kanalRateLimit";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// argument_roster saknar anon-skrivpolicy (RLS) — service role krävs. Denna
+// route körs server-side (Vercel), så nyckeln exponeras aldrig till
+// webbläsaren. Fallback till anon bevaras för miljöer utan secreten.
+const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 const readHdrs = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
-const writeHdrs = { ...readHdrs, "Content-Type": "application/json", Prefer: "return=minimal" };
+const writeHdrs = { apikey: SB_WRITE_KEY, Authorization: `Bearer ${SB_WRITE_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" };
 
 export async function GET(req) {
   const ids = new URL(req.url).searchParams.get("artikel_ids");
@@ -33,16 +37,18 @@ export async function POST(req) {
 
   if (rows.length > 0) {
     const newCount = rows[0].roster + 1;
-    await fetch(
+    const patchRes = await fetch(
       `${SB_URL}/rest/v1/argument_roster?id=eq.${rows[0].id}`,
       { method: "PATCH", headers: writeHdrs, body: JSON.stringify({ roster: newCount }) }
     );
+    if (!patchRes.ok) return Response.json({ error: "Kunde inte spara rösten." }, { status: 502 });
     return Response.json({ roster: newCount });
   } else {
-    await fetch(
+    const postRes = await fetch(
       `${SB_URL}/rest/v1/argument_roster`,
       { method: "POST", headers: writeHdrs, body: JSON.stringify({ artikel_id, stycke_index, stycke_text: stycke_text.slice(0, 1000), roster: 1 }) }
     );
+    if (!postRes.ok) return Response.json({ error: "Kunde inte spara rösten." }, { status: 502 });
     return Response.json({ roster: 1 });
   }
 }
