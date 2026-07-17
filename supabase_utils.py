@@ -2915,6 +2915,12 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
     och separat i lobbying_log. Möjliggör Gilens-Page-analys.
     """
     agent_namn = agent["namn"]
+    # lobbying_log saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten. Används
+    # genomgående i funktionen — service role är alltid tillåtet oavsett
+    # övriga tabellers policy (agent_roster_lag, lagforslag,
+    # agent_planbocker, agent_transaktioner).
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
 
     try:
