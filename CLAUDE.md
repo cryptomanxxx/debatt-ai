@@ -2349,6 +2349,8 @@ Efter Supabase-larmet "rls_disabled_in_public" (12 jul 2026) görs en planerad g
 
 **Varje framtida fix måste fortfarande explicit `DROP POLICY IF EXISTS "pub sel <tabell>"` och `"pub ins <tabell>"`/`"pub upd <tabell>"` innan en ny restriktiv policy skapas** — dessa policynamn kan redan finnas i den riktiga databasen även om källfilen nu är borttagen, om `supabase_rls_fix.sql` kördes innan den togs bort.
 
+**Kartläggningsmetod — sök brett, inte bara `rest/v1/<tabell>`:** `agent_koalitioner`/`agent_positioner`-kartläggningen missade inga skrivare, men `lobbying_log` (PR #1238) missade `foretag_test.py` eftersom den anropar en generisk hjälpfunktion (`sb_post(h, "lobbying_log", ...)`) med tabellnamnet som strängargument istället för en `rest/v1/lobbying_log`-URL direkt i filen. `ohlcv_cache` (PR #1232) missade på liknande sätt en Vercel-route eftersom bara Python-filerna grep:ades för write-operationer, inte JS-filerna. **Sök alltid efter både `rest/v1/<tabell>` OCH bara tabellnamnet i citattecken (`"<tabell>"`/`'<tabell>'`) över hela repot (`.py` OCH `.js`) innan en tabell bedöms vara kartlagd** — annars missas skrivare som går via delade helper-funktioner.
+
 Kvarvarande tabeller som ursprungligen täcktes av den borttagna filen och fortfarande väntar på en egen v2-fix: `agent_utmaningar`, `argument_roster`, `labb_log`, `platform_stamning`, `lagforslag`, `agent_roster_lag`, `ekonomi_spel`, `agent_transaktioner`, `lobbying_log`, samt `agent_planbocker` (eget separat, större projekt, se checklistan ovan).
 
 ---

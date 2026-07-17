@@ -6,13 +6,19 @@
 -- (pub sel/ins) — droppas här explicit (additiva RLS-policyer, se
 -- CLAUDE.md).
 --
--- Kartläggning: enda skrivpunkten är supabase_utils.py → kör_lobbying(),
--- anropad från agent.py och lobbying_test.py (båda workflows har redan
--- SUPABASE_SERVICE_ROLE_KEY). Funktionen rör även agent_roster_lag,
--- lagforslag, agent_planbocker och agent_transaktioner i samma anrop —
--- hela sb_key rebinds till service role (säkert oavsett dessa
--- tabellers egen policy; agent_transaktioner/agent_roster_lag/
--- lagforslag hanteras med egna dedikerade v2-migreringar senare i
+-- Kartläggning: två skrivpunkter — supabase_utils.py → kör_lobbying()
+-- (agent.py + lobbying_test.py, båda workflows hade redan
+-- SUPABASE_SERVICE_ROLE_KEY) och foretag_test.py (lobbybolag-
+-- mekaniken, ✅83) — den senare missades i den första kartläggningen
+-- eftersom den anropar en generisk sb_post(h, "lobbying_log", ...)-
+-- hjälpfunktion med tabellnamnet som strängargument, inte en
+-- rest/v1/lobbying_log-URL direkt i filen (Codex P1 på PR #1238).
+-- foretag-test.yml saknade secreten helt — tillagd.
+--
+-- Båda skrivpunkterna rör även agent_roster_lag, lagforslag,
+-- agent_planbocker och agent_transaktioner i samma anrop — sb_key
+-- rebinds till service role (säkert oavsett dessa tabellers egen
+-- policy; de hanteras med egna dedikerade v2-migreringar senare i
 -- genomgången, agent_planbocker som eget separat större projekt).
 --
 -- Många läsare (/lobbying, /formogenhet, /trust, /narrativ, /hjarnan)
