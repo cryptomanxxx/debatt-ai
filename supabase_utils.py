@@ -3460,6 +3460,10 @@ def uppdatera_agent_positioner(sb_key: str, agent: dict) -> None:
     detekterar om positionen förändrats sedan föregående körning.
     """
     agent_namn = agent["namn"]
+    # agent_positioner saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten. Används
+    # genomgående i funktionen (artiklar-läsningen är publik oavsett).
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
 
     try:
