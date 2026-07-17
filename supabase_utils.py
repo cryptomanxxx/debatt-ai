@@ -4078,10 +4078,13 @@ MOTIVERING: [1–2 meningar som förklarar ditt beslut]"""
     straffeffekt_kr = straff_kr * 3
 
     # ── Spara spelet ────────────────────────────────────────────────────────
+    # tpp_spel saknar anon-skrivpolicy (RLS) — service role krävs. Fallback
+    # till sb_key bevaras för miljöer utan secreten.
+    _tpp_write_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     try:
         spel_r = httpx.post(
             f"{SB_URL}/rest/v1/tpp_spel",
-            headers={**_ekonomi_headers(sb_key), "Prefer": "return=representation"},
+            headers={**_ekonomi_headers(_tpp_write_key), "Prefer": "return=representation"},
             json={
                 "agent_a": agent["namn"], "agent_b": b_namn, "agent_c": c_namn,
                 "erbjudande": erbjudande, "behaller_a": behaller_a,
