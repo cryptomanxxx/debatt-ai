@@ -410,6 +410,9 @@ def hamta_relation(sb_key: str, agent_a: str, agent_b: str) -> str:
 
 def upsert_koalition(sb_key: str, agent_a: str, agent_b: str) -> int:
     """Skapar eller förstärker en koalition. Returnerar ny styrka (0 vid fel)."""
+    # agent_koalitioner saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json", "Prefer": "return=minimal",
@@ -2690,6 +2693,12 @@ def initiera_koalition(agent: dict, sb_key: str) -> bool:
     - Ge +3 styrka vid accept (vs +1 passivt)
     """
     agent_namn = agent["namn"]
+    # agent_koalitioner saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten. Används
+    # genomgående i funktionen (även för de efterföljande hjälpfunktions-
+    # anropen nedan) eftersom service role alltid är tillåtet oavsett
+    # tabellens policy.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
 
     try:
