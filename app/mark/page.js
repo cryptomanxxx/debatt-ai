@@ -1,4 +1,4 @@
-export const revalidate = 180;
+export const revalidate = 300;
 
 export const metadata = {
   title: "Markartan – DEBATT-AI",
@@ -12,7 +12,7 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 async function getData() {
   const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
-  const opts = { headers: h, next: { revalidate: 180 } };
+  const opts = { headers: h, next: { revalidate: 300 } };
   const now = new Date().toISOString();
 
   const [zonerRes, agareRes, transRes, auktRes, resursRes, lagerRes, handelRes, varaAuktRes, transClearingRes, handelClearingRes, zonEventsRes, kopOrdrarRes, foradlingRes] = await Promise.all([
@@ -26,7 +26,7 @@ async function getData() {
     fetch(`${SB_URL}/rest/v1/mark_vara_auktioner?select=*&status=eq.%C3%B6ppen&stanger_at=gt.${now}&order=stanger_at.asc&limit=20`, opts),
     fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=zon_namn,pris,skapad&kop_agent=neq.__passiv_inkomst__&order=skapad.desc&limit=1000`, opts),
     fetch(`${SB_URL}/rest/v1/mark_handel_log?select=vara,pris_per_enhet,skapad&order=skapad.desc&limit=500`, opts),
-    fetch(`${SB_URL}/rest/v1/zon_events?select=*&aktiv=eq.true&order=skapad.desc`, { headers: h, next: { revalidate: 60 } }),
+    fetch(`${SB_URL}/rest/v1/zon_events?select=*&aktiv=eq.true&order=skapad.desc`, { headers: h, next: { revalidate: 300 } }),
     fetch(`${SB_URL}/rest/v1/mark_kop_ordrar?status=eq.%C3%B6ppen&order=skapad.asc&limit=50`, opts),
     fetch(`${SB_URL}/rest/v1/mark_foradling_log?select=*&order=skapad.desc&limit=30`, opts),
   ]);
