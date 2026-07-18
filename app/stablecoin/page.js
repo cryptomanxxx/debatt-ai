@@ -39,13 +39,13 @@ async function getData() {
 
   const [vaultRes, prisRes, stabRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/stablecoin_vaults?aktiv=eq.true&order=collateral_sek.desc`, {
-      headers: h, next: { revalidate: 60 },
+      headers: h, next: { revalidate: 300 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_priser?symbol=eq.STAB&order=skapad.desc&limit=20`, {
-      headers: h, next: { revalidate: 60 },
+      headers: h, next: { revalidate: 300 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_tillgangar?symbol=eq.STAB&select=senaste_pris,forandring_pct`, {
-      headers: h, next: { revalidate: 60 },
+      headers: h, next: { revalidate: 300 },
     }),
   ]);
 

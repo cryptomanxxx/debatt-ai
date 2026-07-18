@@ -47,7 +47,7 @@ async function getData() {
       `${SB_URL}/rest/v1/diplomatiska_meddelanden` +
       `?select=id,riktning,avsandare,mottagare,amne,typ,status,svar_pa_id,kalla_url,meddelande,skapad,civ_id` +
       `&order=skapad.desc&limit=100`,
-      { headers: h, next: { revalidate: 60 } }
+      { headers: h, next: { revalidate: 300 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/community_civilisationer?select=id,namn,flagga,hemsida_url&status=eq.aktiv`,

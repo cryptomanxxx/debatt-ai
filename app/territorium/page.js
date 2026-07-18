@@ -15,7 +15,7 @@ async function getData() {
   const now = new Date().toISOString();
   const evRes = await fetch(
     `${SB_URL}/rest/v1/territorium_events?status=eq.aktiv&slut_datum=gte.${now}&order=skapad.desc&limit=1`,
-    { headers: H, next: { revalidate: 60 } },
+    { headers: H, next: { revalidate: 300 } },
   ).catch(() => null);
 
   const events = evRes?.ok ? await evRes.json() : [];

@@ -21,7 +21,7 @@ async function getKoalitionData() {
     `${SB_URL}/rest/v1/koalitioner?select=agent,foljare&order=foljare.desc`,
     {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 60 },
+      next: { revalidate: 300 },
     }
   );
   if (!res.ok) return [];
