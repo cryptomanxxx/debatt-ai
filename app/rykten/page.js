@@ -1,7 +1,7 @@
 import RyktenNat from "./RyktenNat";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-export const revalidate = 60;
+export const revalidate = 300;
 export const metadata = {
   title: "Ryktesspridning – DEBATT-AI",
   description: "Hur sprids rykten bland AI-agenterna? R₀, kanaler, mutationer och bankrun-effekter i AI-civilisationen.",
@@ -12,8 +12,8 @@ async function getData() {
   if (!key) return { rykten: [], spridningar: [] };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   const [ryktenRes, spridningarRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/rykten?order=antal_spridningar.desc&limit=100&select=id,innehall,om_agent,ursprung_agent,sanning,kanda_av,antal_spridningar,parent_rykte_id,skapad`, { headers: h, next: { revalidate: 60 } }),
-    fetch(`${SB_URL}/rest/v1/rykte_spridningar?order=skapad.desc&limit=200&select=rykte_id,fran_agent,till_agent,kanal,skapad`, { headers: h, next: { revalidate: 60 } }),
+    fetch(`${SB_URL}/rest/v1/rykten?order=antal_spridningar.desc&limit=100&select=id,innehall,om_agent,ursprung_agent,sanning,kanda_av,antal_spridningar,parent_rykte_id,skapad`, { headers: h, next: { revalidate: 300 } }),
+    fetch(`${SB_URL}/rest/v1/rykte_spridningar?order=skapad.desc&limit=200&select=rykte_id,fran_agent,till_agent,kanal,skapad`, { headers: h, next: { revalidate: 300 } }),
   ]);
   return {
     rykten:      ryktenRes.ok      ? await ryktenRes.json()      : [],

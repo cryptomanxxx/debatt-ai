@@ -1,6 +1,6 @@
 import HandelSpel from "./HandelSpel";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export const metadata = {
   title: "Handelsimperium — debatt.ai",
@@ -13,11 +13,11 @@ const H = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
 
 async function getData() {
   const [stRes, vaRes, prRes, ldRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/handel_städer?order=id.asc`,        { headers: H, next: { revalidate: 60 } }).catch(() => null),
-    fetch(`${SB_URL}/rest/v1/handel_varor?order=id.asc`,         { headers: H, next: { revalidate: 60 } }).catch(() => null),
-    fetch(`${SB_URL}/rest/v1/handel_priser?select=*`,            { headers: H, next: { revalidate: 60 } }).catch(() => null),
+    fetch(`${SB_URL}/rest/v1/handel_städer?order=id.asc`,        { headers: H, next: { revalidate: 300 } }).catch(() => null),
+    fetch(`${SB_URL}/rest/v1/handel_varor?order=id.asc`,         { headers: H, next: { revalidate: 300 } }).catch(() => null),
+    fetch(`${SB_URL}/rest/v1/handel_priser?select=*`,            { headers: H, next: { revalidate: 300 } }).catch(() => null),
     fetch(`${SB_URL}/rest/v1/handel_spelare?order=mynt.desc&limit=15&select=id,smeknamn,mynt,stad_id,spelare_typ`,
-                                                                  { headers: H, next: { revalidate: 60 } }).catch(() => null),
+                                                                  { headers: H, next: { revalidate: 300 } }).catch(() => null),
   ]);
   return {
     städer:      stRes?.ok ? await stRes.json() : [],

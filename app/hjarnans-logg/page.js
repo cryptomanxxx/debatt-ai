@@ -1,7 +1,7 @@
 import LoggVy from "./LoggVy";
 import AmneskluterGraf from "./AmneskluterGraf";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -23,17 +23,17 @@ async function getData() {
     // AI-agent rows only — never mixed with visitor rows in the same limit window.
     fetch(
       `${SB_URL}/rest/v1/civilisation_fragor?agent=neq.besökare&order=skapad.desc&limit=500&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
-      { headers: anonH, next: { revalidate: 60 } }
+      { headers: anonH, next: { revalidate: 300 } }
     ),
     // Visitor fallback rows from civilisation_fragor (present when civilisation_log insert failed).
     fetch(
       `${SB_URL}/rest/v1/civilisation_fragor?agent=eq.besökare&order=skapad.desc&limit=200&select=id,agent,fraga,typ,svar,latency_ms,skapad`,
-      { headers: anonH, next: { revalidate: 60 } }
+      { headers: anonH, next: { revalidate: 300 } }
     ),
     // Primary visitor log — requires service role to bypass SELECT RLS.
     fetch(
       `${SB_URL}/rest/v1/civilisation_log?kalltyp=eq.besökare&order=skapad.desc&limit=500&select=id,fraga,svar,endpoint,latency_ms,skapad`,
-      { headers: logH, next: { revalidate: 60 } }
+      { headers: logH, next: { revalidate: 300 } }
     ),
   ]);
 
