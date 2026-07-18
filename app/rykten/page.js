@@ -1,7 +1,7 @@
 import RyktenNat from "./RyktenNat";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-export const revalidate = 60;
+export const revalidate = 300;
 export const metadata = {
   title: "Ryktesspridning – DEBATT-AI",
   description: "Hur sprids rykten bland AI-agenterna? R₀, kanaler, mutationer och bankrun-effekter i AI-civilisationen.",

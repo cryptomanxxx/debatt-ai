@@ -1,6 +1,6 @@
 import TeritoriumSpel from "./TeritoriumSpel";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export const metadata = {
   title: "Territorium — debatt.ai",

@@ -3,7 +3,7 @@ import StakingTabell from "./StakingTabell";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export const metadata = {
   title: "Kryptobörsen – DEBATT-AI",

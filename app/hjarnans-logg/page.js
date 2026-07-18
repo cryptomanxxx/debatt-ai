@@ -1,7 +1,7 @@
 import LoggVy from "./LoggVy";
 import AmneskluterGraf from "./AmneskluterGraf";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 

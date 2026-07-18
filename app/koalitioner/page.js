@@ -3,7 +3,7 @@ import KoalitionClient from "./KoalitionClient";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export const metadata = {
   title: "Läsarkoalitioner – DEBATT-AI",

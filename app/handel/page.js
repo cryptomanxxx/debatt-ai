@@ -1,6 +1,6 @@
 import HandelSpel from "./HandelSpel";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export const metadata = {
   title: "Handelsimperium — debatt.ai",
