@@ -1,13 +1,15 @@
 import TileKarta from "./TileKarta";
 
+export const revalidate = 300;
+
 const SB  = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 async function fetchData() {
   const h = { apikey: KEY, Authorization: `Bearer ${KEY}` };
   const [zonerRes, agareRes] = await Promise.allSettled([
-    fetch(`${SB}/rest/v1/mark_zoner?select=id,namn,typ,hex_col,hex_row,koppris,veckoinkomst`, { headers: h, next: { revalidate: 120 } }),
-    fetch(`${SB}/rest/v1/mark_agare?select=zon_id,agent`, { headers: h, next: { revalidate: 60 } }),
+    fetch(`${SB}/rest/v1/mark_zoner?select=id,namn,typ,hex_col,hex_row,koppris,veckoinkomst`, { headers: h, next: { revalidate: 300 } }),
+    fetch(`${SB}/rest/v1/mark_agare?select=zon_id,agent`, { headers: h, next: { revalidate: 300 } }),
   ]);
   const zoner = zonerRes.status === "fulfilled" && zonerRes.value.ok ? await zonerRes.value.json() : [];
   const agare = agareRes.status === "fulfilled" && agareRes.value.ok ? await agareRes.value.json() : [];
