@@ -17,12 +17,16 @@ import httpx
 from supabase_utils import _llm_spel, _hamta_saldo, _ekonomi_headers, spara_civilisations_minne
 from agent import AGENTER
 
-SB_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY")
+_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY")
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
-if not SB_KEY:
+if not _ANON_KEY:
     print("SUPABASE_ANON_KEY saknas", file=sys.stderr)
     sys.exit(1)
+
+# agent_planbocker/feedback_rewards saknar anon-skrivpolicy (RLS) — service
+# role krävs. Fallback till anon-nyckeln bevaras för miljöer utan secreten.
+SB_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or _ANON_KEY
 
 KATEGORIER = ["världsbild", "håller_ord", "lobbyism", "negativ"]
 KATEGORI_ETIKETT = {
