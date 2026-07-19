@@ -3626,6 +3626,16 @@ def _ekonomi_headers(sb_key: str) -> dict:
     return {"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json"}
 
 
+def _ekonomi_spel_write_headers(sb_key: str) -> dict:
+    """Service-role headers scoped till skrivningar mot ekonomi_spel (RLS
+    aktiverad, saknar anon-skrivpolicy). Hålls separat från _ekonomi_headers()
+    eftersom samma funktioner även skriver till agent_planbocker/
+    agent_transaktioner, som ännu inte har egna RLS-fixar — en full
+    function-rebind skulle tyst föregripa de separata projekten."""
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+    return {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+
+
 def _hamta_saldo(sb_key: str, agent_namn: str) -> int:
     """Hämtar agentens saldo. Returnerar 0 om plånboken inte finns."""
     try:
@@ -3740,7 +3750,7 @@ MOTIVERING: [1–2 meningar som speglar din personlighet]"""
     # Spara spel
     spel_r = httpx.post(
         f"{SB_URL}/rest/v1/ekonomi_spel",
-        headers={**_ekonomi_headers(sb_key), "Prefer": "return=representation"},
+        headers={**_ekonomi_spel_write_headers(sb_key), "Prefer": "return=representation"},
         json={"typ": "diktatorn", "agent_a": agent["namn"], "agent_b": b_namn,
               "belopp_start": 100, "erbjudande": givet, "svar": "accepterat",
               "motivering_a": motivering, "avslutad": "now()"},
@@ -3830,7 +3840,7 @@ MOTIVERING: [1–2 meningar]"""
 
     httpx.post(
         f"{SB_URL}/rest/v1/ekonomi_spel",
-        headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+        headers={**_ekonomi_spel_write_headers(sb_key), "Prefer": "return=minimal"},
         json={"typ": "ultimatum", "agent_a": agent["namn"], "agent_b": b_namn,
               "belopp_start": 100, "erbjudande": erbjudande,
               "motivering_a": motivering},
@@ -3950,7 +3960,7 @@ MOTIVERING: [1–2 meningar]"""
     spel_id = spel["id"]
     httpx.patch(
         f"{SB_URL}/rest/v1/ekonomi_spel?id=eq.{spel_id}",
-        headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
+        headers={**_ekonomi_spel_write_headers(sb_key), "Prefer": "return=minimal"},
         json={"svar": beslut, "motivering_b": motivering_b, "avslutad": "now()"},
         timeout=8,
     )
