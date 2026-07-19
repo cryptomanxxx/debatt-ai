@@ -7,6 +7,11 @@ function sbHeaders() {
   return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
 }
 
+function sbWriteHeaders() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  return { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
+}
+
 function kategorifrånText(titel, beskrivning) {
   const text = ((titel || "") + " " + (beskrivning || "")).toLowerCase();
   if (/klimat|miljö|utsläpp|koldioxid|hållbar|energi|förnybar|kärnkraft|natur|biologisk mångfald|skog|vatten/.test(text)) return "Klimat & Miljö";
@@ -201,6 +206,16 @@ async function hämtaViaHtml() {
 }
 
 export async function POST(req) {
+  const pw = req.headers.get("x-admin-password");
+  // Endast server-only secrets — NEXT_PUBLIC_ADMIN_PASSWORD bäddas in i
+  // klientens JS-bundle (se app/admin/podd-test/page.js) och är därför inte
+  // hemlig. Denna route triggar extern skrapning + service-role-skrivningar,
+  // så den ska inte gå att nå med ett läckt publikt värde (Codex P2, PR #1246).
+  const giltiga = [process.env.RIKSDAG_IMPORT_TOKEN, process.env.ADMIN_SECRET].filter(Boolean);
+  if (!pw || !giltiga.includes(pw)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const befintliga = await getBefintligaData();
   let forslag = [];
   let metod = "";
@@ -234,7 +249,7 @@ export async function POST(req) {
           `${SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.${encodeURIComponent(d.dok_id)}`,
           {
             method: "PATCH",
-            headers: { ...sbHeaders(), Prefer: "return=minimal" },
+            headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
             body: JSON.stringify({
               kategori,
               beskrivning: d.beskrivning,
@@ -249,7 +264,7 @@ export async function POST(req) {
 
     const r = await fetch(`${SB_URL}/rest/v1/lagforslag`, {
       method: "POST",
-      headers: { ...sbHeaders(), Prefer: "return=minimal" },
+      headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
       body: JSON.stringify({
         titel: d.titel,
         beskrivning: d.beskrivning,

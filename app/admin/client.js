@@ -912,10 +912,15 @@ function ParlamentTab() {
   async function spara() {
     if (!form.titel.trim() || !form.beskrivning.trim()) { setMsg("Titel och beskrivning krävs."); return; }
     setSparar(true); setMsg("");
-    const r = await fetch(`${SB_URL}/rest/v1/lagforslag`, {
+    // Routed through server-side API så SUPABASE_SERVICE_ROLE_KEY används —
+    // anon-nyckeln saknar INSERT på lagforslag sedan RLS aktiverades
+    const r = await fetch("/api/admin/update-lagforslag", {
       method: "POST",
-      headers: { ...sbHeaders(), "Content-Type": "application/json", "Prefer": "return=minimal" },
-      body: JSON.stringify({ ...form, kalla: "riksdagen", status: "omrostning" }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pw: getStoredPw(), action: "create",
+        data: { ...form, kalla: "riksdagen", status: "omrostning" },
+      }),
     });
     setSparar(false);
     if (r.ok) { setMsg("✓ Förslag sparat!"); setForm({ titel: "", beskrivning: "", bakgrund: "", kategori: "Övrigt", riksdagen_url: "" }); load(); }
@@ -924,7 +929,11 @@ function ParlamentTab() {
 
   async function taBort(id) {
     if (!confirm("Ta bort detta förslag?")) return;
-    await fetch(`${SB_URL}/rest/v1/lagforslag?id=eq.${id}`, { method: "DELETE", headers: sbHeaders() });
+    await fetch("/api/admin/update-lagforslag", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pw: getStoredPw(), action: "delete", id }),
+    });
     load();
   }
 

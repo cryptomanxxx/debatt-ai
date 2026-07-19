@@ -2222,6 +2222,9 @@ def hamta_lag_roster_agenter(sb_key: str, lagforslag_id: int) -> list[str]:
 
 def spara_lag_rost(sb_key: str, lagforslag_id: int, agent_namn: str, rod: str, motivering: str) -> bool:
     """Sparar agentröst och uppdaterar räknare på lagförslaget. Returnerar True vid lyckad insert."""
+    # agent_roster_lag/lagforslag saknar anon-skrivpolicy (RLS) — service role
+    # krävs. Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json", "Prefer": "return=minimal",
@@ -2431,6 +2434,9 @@ def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str, return_id: bool = F
     """Agent formulerar ett nytt AI-lagförslag inspirerat av aktuellt ämne.
     Om return_id=True returneras lagforslag-id (int) vid lyckat skapande, None vid fel.
     Annars returneras bool."""
+    # lagforslag saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json",
@@ -2503,6 +2509,9 @@ def skapa_lagforslag_ai(agent: dict, sb_key: str, amne: str, return_id: bool = F
 
 def importera_riksdagen_forslag(sb_key: str) -> int:
     """Hämtar propositioner och motioner från riksdagen.se API och importerar nya. Returnerar antal importerade."""
+    # lagforslag saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json", "Prefer": "return=minimal",
@@ -3215,6 +3224,11 @@ def kör_bribe(agent: dict, sb_key: str) -> bool:
     - Kräver saldo > 300 kr (mutor är kostsamma)
     """
     agent_namn = agent["namn"]
+    # bribe_offers/bribe_scores saknar anon-skrivpolicy (RLS) — service role
+    # krävs. Fallback till sb_key bevaras för miljöer utan secreten. Används
+    # genomgående i funktionen — service role är alltid tillåtet oavsett
+    # övriga tabellers policy (agent_roster_lag, lagforslag, agent_planbocker).
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
 
     try:
