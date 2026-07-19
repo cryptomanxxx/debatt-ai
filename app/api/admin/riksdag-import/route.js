@@ -207,7 +207,11 @@ async function hämtaViaHtml() {
 
 export async function POST(req) {
   const pw = req.headers.get("x-admin-password");
-  const giltiga = [process.env.RIKSDAG_IMPORT_TOKEN, process.env.ADMIN_SECRET, process.env.NEXT_PUBLIC_ADMIN_PASSWORD].filter(Boolean);
+  // Endast server-only secrets — NEXT_PUBLIC_ADMIN_PASSWORD bäddas in i
+  // klientens JS-bundle (se app/admin/podd-test/page.js) och är därför inte
+  // hemlig. Denna route triggar extern skrapning + service-role-skrivningar,
+  // så den ska inte gå att nå med ett läckt publikt värde (Codex P2, PR #1246).
+  const giltiga = [process.env.RIKSDAG_IMPORT_TOKEN, process.env.ADMIN_SECRET].filter(Boolean);
   if (!pw || !giltiga.includes(pw)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
