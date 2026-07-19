@@ -2358,6 +2358,8 @@ Efter Supabase-larmet "rls_disabled_in_public" (12 jul 2026) görs en planerad g
 
 Alla 18 tabeller som ursprungligen täcktes av den borttagna filen har nu egna v2-fixar. Enda kvarvarande tabellen i RLS-genomgången är `agent_planbocker` (eget separat, större projekt, se checklistan ovan).
 
+**`agent_planbocker`-projektet — känt arkitekturproblem hittat under kartläggningen (Codex P2, PR #1257):** praktiskt taget alla saldo-skrivande funktioner (`kör_diktatorspel`, `kör_ultimatum_erbjudande`, `svara_ultimatum`, `kör_tpp`, `kör_lobbying`, `kör_bribe`, `uppdatera_agent_saldo` i `parti_ekonomi_test.py`, m.fl. — dussintals ställen över hela kodbasen) läser aktuellt saldo, räknar ut ett nytt värde i Python, och PATCHar sedan ett **absolut** tal — inte en atomisk SQL-increment (`saldo = saldo + delta`). Om två sådana operationer träffar samma agents saldo samtidigt (fullt möjligt — `agent.yml` och `parti-ekonomi-test.yml` kan båda köra kl 13:00 UTC, och separat kör 12+ andra dagliga workflows som alla rör `agent_planbocker`) kan den ena skrivningen tyst radera den andra (lost update). Mönstret är **inte** en regression från RLS-härdningsprojektet — det fanns redan innan, skrivningarna lyckades bara alltid tidigare eftersom anon-nyckeln inte var blockerad. RLS-fixarna i denna serie (#1250–) ändrar bara *vem* som får skriva, inte *hur* skrivningen är strukturerad. En riktig fix kräver att saldo-mutationer görs om till atomiska Postgres RPC-anrop (`UPDATE agent_planbocker SET saldo = saldo + $delta WHERE agent = $agent`) istället för read-modify-write — ett betydligt större separat refaktoreringsprojekt, medvetet inte påbörjat här.
+
 ---
 
 ## Kontext om projektet

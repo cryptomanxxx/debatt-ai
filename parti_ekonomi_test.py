@@ -62,9 +62,15 @@ def agent_saldo(agent: str) -> int:
 
 
 def uppdatera_agent_saldo(agent: str, nytt: int) -> None:
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — scoped service-role-
+    # nyckel bara för detta anrop (H_W används för parti_kassor/
+    # parti_utgifter på andra ställen i skriptet och rörs inte här).
+    _planbok_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
     httpx.patch(
         f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent)}",
-        headers=H_W, json={"saldo": nytt, "uppdaterad": "now()"}, timeout=8,
+        headers={"apikey": _planbok_key, "Authorization": f"Bearer {_planbok_key}",
+                 "Content-Type": "application/json", "Prefer": "return=minimal"},
+        json={"saldo": nytt, "uppdaterad": "now()"}, timeout=8,
     )
 
 
