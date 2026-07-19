@@ -423,13 +423,12 @@ def ico_avsluts_runda(sb_key: str) -> None:
 # ─── Huvudflöde ───────────────────────────────────────────────────────────────
 
 def main():
-    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
-    if not sb_key:
-        print("SUPABASE_ANON_KEY saknas — avbryter")
-        sys.exit(1)
     # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
     # Fallback till anon-nyckeln bevaras för miljöer utan secreten.
-    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY", "")
+    if not sb_key:
+        print("SUPABASE_ANON_KEY eller SUPABASE_SERVICE_ROLE_KEY saknas — avbryter")
+        sys.exit(1)
 
     print("=== Agent-token körning startar ===")
 
