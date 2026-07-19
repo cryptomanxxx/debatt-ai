@@ -3679,6 +3679,10 @@ def _uppdatera_planbok(sb_key: str, agent_namn: str, delta: int, givet: int = 0,
 
 
 def _spara_transaktion(sb_key: str, fran: str, till: str, belopp: int, typ: str, spel_id: int | None, motivering: str | None) -> None:
+    # agent_transaktioner saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten. Funktionen
+    # rör bara denna tabell, så en full rebind är säker.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     try:
         httpx.post(
             f"{SB_URL}/rest/v1/agent_transaktioner",
