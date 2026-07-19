@@ -20,13 +20,13 @@ from agent import AGENTER
 _ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY")
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
-if not _ANON_KEY:
-    print("SUPABASE_ANON_KEY saknas", file=sys.stderr)
-    sys.exit(1)
-
 # agent_planbocker/feedback_rewards saknar anon-skrivpolicy (RLS) — service
 # role krävs. Fallback till anon-nyckeln bevaras för miljöer utan secreten.
 SB_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or _ANON_KEY
+
+if not SB_KEY:
+    print("SUPABASE_ANON_KEY eller SUPABASE_SERVICE_ROLE_KEY saknas", file=sys.stderr)
+    sys.exit(1)
 
 KATEGORIER = ["världsbild", "håller_ord", "lobbyism", "negativ"]
 KATEGORI_ETIKETT = {
