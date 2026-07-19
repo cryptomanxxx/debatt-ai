@@ -803,6 +803,7 @@ def spara_nyhetslog(sb_key: str, agent_namn: str, vald: dict,
 
 def _hamta_saldo_spel(sb_key: str, agent_namn: str) -> int:
     """Hämtar agentens spelkonto (saldo_spel). Returnerar 0 om det inte finns."""
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     try:
         r = httpx.get(
             f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo_spel",
@@ -816,6 +817,7 @@ def _hamta_saldo_spel(sb_key: str, agent_namn: str) -> int:
 
 def _uppdatera_saldo_spel(sb_key: str, agent_namn: str, delta: int) -> None:
     """Justerar saldo_spel för en agent (delta kan vara positivt eller negativt)."""
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     try:
         saldo = _hamta_saldo_spel(sb_key, agent_namn)
         nytt = max(0, saldo + delta)
@@ -3649,35 +3651,6 @@ def _hamta_saldo(sb_key: str, agent_namn: str) -> int:
         return 0
 
 
-def _uppdatera_planbok(sb_key: str, agent_namn: str, delta: int, givet: int = 0, fatt: int = 0) -> bool:
-    """Justerar saldo och statistik för en agent."""
-    try:
-        saldo = _hamta_saldo(sb_key, agent_namn)
-        r = httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-            json={
-                "saldo": max(0, saldo + delta),
-                "totalt_givet": None,   # uppdateras separat nedan
-                "uppdaterad": "now()",
-            },
-            timeout=8,
-        )
-        # Separate patch for counters to avoid overwrite race
-        r2 = httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-            json={
-                "saldo": max(0, saldo + delta),
-                "uppdaterad": "now()",
-            },
-            timeout=8,
-        )
-        return r2.is_success
-    except Exception:
-        return False
-
-
 def _spara_transaktion(sb_key: str, fran: str, till: str, belopp: int, typ: str, spel_id: int | None, motivering: str | None) -> None:
     # agent_transaktioner saknar anon-skrivpolicy (RLS) — service role krävs.
     # Fallback till sb_key bevaras för miljöer utan secreten. Funktionen
@@ -3712,6 +3685,9 @@ def hamta_pending_ultimatum(sb_key: str, agent_namn: str) -> dict | None:
 
 def kör_diktatorspel(agent: dict, sb_key: str) -> bool:
     """Agent A delar 100 krediter ur eget saldo med en slumpmässig motpart."""
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     from agenter import AGENTER
     saldo_a = _hamta_saldo(sb_key, agent["namn"])
     if saldo_a < 100:
@@ -3908,6 +3884,9 @@ def _hamta_relation_ultimatum(sb_key: str, agent_a: str, agent_b: str) -> str:
 
 def svara_ultimatum(agent: dict, spel: dict, sb_key: str) -> bool:
     """Agent B svarar på ett väntande ultimatumerbjudande."""
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     saldo_b = _hamta_saldo(sb_key, agent["namn"])
     a_namn = spel["agent_a"]
     saldo_a = _hamta_saldo(sb_key, a_namn)
@@ -4049,6 +4028,9 @@ def kör_tpp(agent: dict, sb_key: str) -> bool:
     Agent C (slumpmässig observatör) kan betala 0–30 kr ur sitt saldo
     för att straffa A med 3× beloppet.
     """
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     from agenter import AGENTER
 
     saldo_a = _hamta_saldo(sb_key, agent["namn"])
@@ -5507,6 +5489,9 @@ def hamta_ledare_rost(sb_key: str, lagforslag_id: int, ledare: str) -> str | Non
 
 def kolla_och_bailout(sb_key: str, agent_namn: str) -> bool:
     """Ger 500 kr från centralbanken om agentens saldo < 100 kr. Returnerar True om bailout gavs."""
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json", "Prefer": "return=minimal",
@@ -5539,6 +5524,9 @@ def kolla_och_bailout(sb_key: str, agent_namn: str) -> bool:
 
 def ta_lan(sb_key: str, agent_namn: str) -> bool:
     """Agent tar ett frivilligt lån (200–500 kr) om saldo < 600 kr. Returnerar True om lån gavs."""
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json", "Prefer": "return=minimal",
@@ -5620,6 +5608,9 @@ def hamta_senaste_etf_pris(sb_key: str, symbol: str) -> float | None:
 
 def kop_etf(sb_key: str, agent_namn: str, symbol: str, belopp_kr: float) -> bool:
     """Agent köper ETF för belopp_kr. Pris hämtas från ohlcv_cache (USD)."""
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json", "Prefer": "return=minimal",
@@ -5695,6 +5686,9 @@ def salj_etf(sb_key: str, agent_namn: str, symbol: str, fraktion: float = 1.0) -
     Agent säljer fraktion (0–1) av sin {symbol}-position.
     Returnerar proceeds i kr, eller None om ingen position finns.
     """
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json", "Prefer": "return=minimal",
@@ -6028,6 +6022,9 @@ def kolla_reflexiv_bankrun(sb_key: str, agent_namn: str) -> bool:
 
 def aterbetala_lan_delvis(sb_key: str, agent_namn: str, belopp: float = 50.0) -> bool:
     """Agenten gör en panikbetalning på lånet (bankruns-beteende). Returnerar True om genomförd."""
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = {
         "apikey": sb_key, "Authorization": f"Bearer {sb_key}",
         "Content-Type": "application/json", "Prefer": "return=minimal",
