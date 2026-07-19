@@ -82,7 +82,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Installera Claude Code CLI
-        if: env.SKIP == 'false'
+        if: env.SKIP == 'false' && secrets.ANTHROPIC_API_KEY != ''
         run: |
           npm install -g @anthropic-ai/claude-code@latest 2>/dev/null || \
           npm install -g @anthropic-ai/claude-code 2>/dev/null || \
