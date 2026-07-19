@@ -9,7 +9,7 @@ Prisupptäckt via auktioner:
   3. Agenter budar baserat på ideologi och budget
   4. Clearing-priser uppdaterar resurspriser → inkomster och varupriser justeras
 """
-import os, random, urllib.parse
+import os, sys, random, urllib.parse
 from datetime import datetime, timezone, timedelta
 import httpx
 
@@ -141,9 +141,21 @@ def is_visitor(name: str) -> bool:
 def patch_saldo(name: str, nytt_saldo: float, saldon: dict):
     """Uppdaterar saldo i rätt tabell beroende på om det är en besökare eller AI-agent."""
     if is_visitor(name):
-        sb_patch(f"visitor_wallets?display_name=eq.{urllib.parse.quote(name)}", {"saldo": int(nytt_saldo)})
+        ok = sb_patch(f"visitor_wallets?display_name=eq.{urllib.parse.quote(name)}", {"saldo": int(nytt_saldo)})
     else:
-        sb_patch(f"agent_planbocker?agent=eq.{urllib.parse.quote(name)}", {"saldo": nytt_saldo})
+        # agent_planbocker saknar anon-skrivpolicy (RLS) — scoped
+        # service-role-nyckel bara för detta anrop (SB_KEY/_h() delas med
+        # många andra mark_*-tabeller som inte är i scope här).
+        _planbok_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
+        r = httpx.patch(
+            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(name)}",
+            headers={"apikey": _planbok_key, "Authorization": f"Bearer {_planbok_key}",
+                     "Content-Type": "application/json"},
+            json={"saldo": nytt_saldo}, timeout=15,
+        )
+        ok = r.is_success
+    if not ok:
+        print(f"  [VARNING] Saldo-uppdatering misslyckades för {name}", file=sys.stderr)
     saldon[name] = nytt_saldo
 
 

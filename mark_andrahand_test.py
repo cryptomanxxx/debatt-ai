@@ -51,6 +51,16 @@ def sb_patch(path, data):
     return r.is_success
 
 
+def sb_patch_planbok(path, data):
+    """Scoped service-role-skrivning för agent_planbocker (RLS, saknar
+    anon-skrivpolicy) — _h()/SB_KEY delas med många andra mark_*-tabeller
+    som inte är i scope här."""
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
+    h = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    r = httpx.patch(f"{SB_URL}/rest/v1/{path}", headers=h, json=data, timeout=15)
+    return r.is_success
+
+
 def stang_auktioner():
     """Stänger utgångna auktioner och genomför affärer om bud finns."""
     print("\n── Stänger utgångna auktioner ──")
@@ -83,7 +93,7 @@ def stang_auktioner():
             # Debitera köparen
             kop_pb = sb_get(f"agent_planbocker?agent=eq.{urllib.parse.quote(kop_agent)}&select=saldo")
             kop_s  = float(kop_pb[0]["saldo"]) if kop_pb else 0
-            sb_patch(
+            sb_patch_planbok(
                 f"agent_planbocker?agent=eq.{urllib.parse.quote(kop_agent)}",
                 {"saldo": round(kop_s - pris, 2), "uppdaterad": "now()"},
             )
@@ -91,7 +101,7 @@ def stang_auktioner():
             # Kreditera säljaren
             sal_pb = sb_get(f"agent_planbocker?agent=eq.{urllib.parse.quote(salj_agent)}&select=saldo")
             sal_s  = float(sal_pb[0]["saldo"]) if sal_pb else 0
-            sb_patch(
+            sb_patch_planbok(
                 f"agent_planbocker?agent=eq.{urllib.parse.quote(salj_agent)}",
                 {"saldo": round(sal_s + pris, 2), "uppdaterad": "now()"},
             )

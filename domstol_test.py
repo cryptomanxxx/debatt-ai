@@ -587,14 +587,12 @@ def verkstall_straff(h: dict, dom_id: int, svarande: str, belopp: int) -> bool:
 
 
 def main():
-    sb_key = (
-        os.environ.get("SUPABASE_SERVICE_KEY")
-        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-        or os.environ.get("SUPABASE_ANON_KEY")
-    )
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till anon-nyckeln bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
 
     if not sb_key:
-        print("FEL: SUPABASE_ANON_KEY saknas", file=sys.stderr)
+        print("FEL: SUPABASE_ANON_KEY eller SUPABASE_SERVICE_ROLE_KEY saknas", file=sys.stderr)
         sys.exit(1)
 
     h = {
