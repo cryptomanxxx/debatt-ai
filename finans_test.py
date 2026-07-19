@@ -119,6 +119,9 @@ def spara_i_bank(sb_key: str, agent_namn: str, saldo: float) -> int:
     belöning för explicit sparval.
     Returnerar utbetalt belopp.
     """
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     ranta = max(1, min(20, math.floor(saldo * 0.005)))
     h = _headers(sb_key)
     httpx.patch(
@@ -142,6 +145,9 @@ def ta_lan_frivilligt(sb_key: str, agent_namn: str, saldo: float) -> int:
     Frivilligt lån utan saldo-tröskel. Max ett aktivt lån per agent.
     Returnerar lånat belopp (0 om avvisat).
     """
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till sb_key bevaras för miljöer utan secreten.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     h = _headers(sb_key)
     h_get = {**h, "Prefer": ""}
 
