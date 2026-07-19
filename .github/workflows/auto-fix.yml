@@ -35,6 +35,8 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      HAS_ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
 
     steps:
       - uses: actions/checkout@v7
@@ -82,7 +84,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Installera Claude Code CLI
-        if: env.SKIP == 'false' && secrets.ANTHROPIC_API_KEY != ''
+        if: env.SKIP == 'false' && env.HAS_ANTHROPIC_KEY == 'true'
         run: |
           npm install -g @anthropic-ai/claude-code@latest 2>/dev/null || \
           npm install -g @anthropic-ai/claude-code 2>/dev/null || \
