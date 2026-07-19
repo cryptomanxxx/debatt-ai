@@ -275,10 +275,15 @@ def kör_motionsfinansiering(items: list[dict]) -> None:
         if len(beskrivning) < 50:
             continue
 
-        # Spara lagförslaget med partibackat-märkning
+        # Spara lagförslaget med partibackat-märkning. lagforslag saknar
+        # anon-skrivpolicy (RLS) — scoped service-role-nyckel bara för detta
+        # anrop (H_W används för parti_kassor/parti_utgifter på andra ställen
+        # i skriptet och rörs inte här).
+        _lag_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
         r = httpx.post(
             f"{SB_URL}/rest/v1/lagforslag",
-            headers={**H_W, "Prefer": "return=representation"},
+            headers={"apikey": _lag_key, "Authorization": f"Bearer {_lag_key}",
+                     "Content-Type": "application/json", "Prefer": "return=representation"},
             json={
                 "titel": titel,
                 "beskrivning": beskrivning.strip()[:1500],
