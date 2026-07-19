@@ -7,20 +7,27 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
-async function sparaUtmaning(agent, tes, motargument) {
+async function sparaUtmaning(agent, tes, motargument, ip) {
   try {
-    await fetch(`${SB_URL}/rest/v1/agent_utmaningar`, {
+    const r = await fetch(`${SB_URL}/rest/v1/agent_utmaningar`, {
       method: "POST",
       headers: {
-        apikey: SB_KEY,
-        Authorization: `Bearer ${SB_KEY}`,
+        apikey: SB_SERVICE,
+        Authorization: `Bearer ${SB_SERVICE}`,
         "Content-Type": "application/json",
         Prefer: "return=minimal",
       },
       body: JSON.stringify({ agent, tes, motargument }),
     });
-  } catch { /* fire-and-forget */ }
+    if (!r.ok) {
+      const body = await r.text().catch(() => "");
+      logFel({ kalla: "api/agent-utmaning sparaUtmaning", feltyp: "db_error", meddelande: `post ${r.status}: ${body.slice(0, 200)}`, ip, extra: { agent } });
+    }
+  } catch (e) {
+    logFel({ kalla: "api/agent-utmaning sparaUtmaning", feltyp: "db_exception", meddelande: String(e), ip, extra: { agent } });
+  }
 }
 
 const AGENTER = new Set([
@@ -98,7 +105,7 @@ export async function POST(req) {
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         if (text) {
           logAiCall({ provider: "groq", model: "openai/gpt-oss-120b", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
-          await sparaUtmaning(agent, tesTrimmed, text);
+          await sparaUtmaning(agent, tesTrimmed, text, ip);
           return Response.json({ motargument: text });
         }
       }
@@ -121,7 +128,7 @@ export async function POST(req) {
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         if (text) {
           logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
-          await sparaUtmaning(agent, tesTrimmed, text);
+          await sparaUtmaning(agent, tesTrimmed, text, ip);
           return Response.json({ motargument: text });
         }
       }
@@ -144,7 +151,7 @@ export async function POST(req) {
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         if (text) {
           logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
-          await sparaUtmaning(agent, tesTrimmed, text);
+          await sparaUtmaning(agent, tesTrimmed, text, ip);
           return Response.json({ motargument: text });
         }
       }
@@ -174,7 +181,7 @@ export async function POST(req) {
         const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
         if (text) {
           logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
-          await sparaUtmaning(agent, tesTrimmed, text);
+          await sparaUtmaning(agent, tesTrimmed, text, ip);
           return Response.json({ motargument: text });
         }
       }
@@ -197,7 +204,7 @@ export async function POST(req) {
         const text = json.choices?.[0]?.message?.content?.trim() ?? "";
         if (text) {
           logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
-          await sparaUtmaning(agent, tesTrimmed, text);
+          await sparaUtmaning(agent, tesTrimmed, text, ip);
           return Response.json({ motargument: text });
         }
       }
