@@ -3756,7 +3756,11 @@ MOTIVERING: [1–2 meningar som speglar din personlighet]"""
               "motivering_a": motivering, "avslutad": "now()"},
         timeout=8,
     )
-    spel_id = (spel_r.json()[0]["id"] if spel_r.is_success and spel_r.json() else None)
+    if not spel_r.is_success or not spel_r.json():
+        # Skrivningen nekades (t.ex. saknad/fel service-role-nyckel) — avbryt
+        # utan att flytta pengar (Codex P2, PR #1248).
+        return False
+    spel_id = spel_r.json()[0]["id"]
 
     # Uppdatera saldon
     ny_saldo_a = max(0, saldo_a - 100 + (100 - givet))
@@ -3838,7 +3842,7 @@ MOTIVERING: [1–2 meningar]"""
         elif rad.upper().startswith("MOTIVERING:"):
             motivering = rad.split(":", 1)[1].strip()
 
-    httpx.post(
+    erbjudande_r = httpx.post(
         f"{SB_URL}/rest/v1/ekonomi_spel",
         headers={**_ekonomi_spel_write_headers(sb_key), "Prefer": "return=minimal"},
         json={"typ": "ultimatum", "agent_a": agent["namn"], "agent_b": b_namn,
@@ -3846,6 +3850,8 @@ MOTIVERING: [1–2 meningar]"""
               "motivering_a": motivering},
         timeout=8,
     )
+    if not erbjudande_r.is_success:
+        return False
     print(f"  🤝 Ultimatum: {agent['namn']} erbjuder {erbjudande}/100 till {b_namn}")
     return True
 
@@ -3958,12 +3964,19 @@ MOTIVERING: [1–2 meningar]"""
             motivering_b = rad.split(":", 1)[1].strip()
 
     spel_id = spel["id"]
-    httpx.patch(
-        f"{SB_URL}/rest/v1/ekonomi_spel?id=eq.{spel_id}",
-        headers={**_ekonomi_spel_write_headers(sb_key), "Prefer": "return=minimal"},
+    # Claim-first: villkorad PATCH (svar=is.null) + kontroll av svaret innan
+    # pengar flyttas. Förhindrar dubbelbetalning om raden redan besvarats av
+    # en annan körning, eller om skrivningen nekas (t.ex. saknad/fel
+    # service-role-nyckel) — då förblir raden pending och skulle annars
+    # bearbetas om och om igen (Codex P2, PR #1248).
+    patch_r = httpx.patch(
+        f"{SB_URL}/rest/v1/ekonomi_spel?id=eq.{spel_id}&svar=is.null",
+        headers={**_ekonomi_spel_write_headers(sb_key), "Prefer": "return=representation"},
         json={"svar": beslut, "motivering_b": motivering_b, "avslutad": "now()"},
         timeout=8,
     )
+    if not patch_r.is_success or not patch_r.json():
+        return False
 
     if beslut == "accepterat":
         ny_saldo_a = max(0, saldo_a - 100 + behaller_a)
