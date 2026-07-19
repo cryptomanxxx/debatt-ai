@@ -76,7 +76,14 @@ def berakna_policy_niva(gini):
 
 
 def main():
-    sb_key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # OBS: variabeln hette tidigare SUPABASE_SERVICE_KEY men var i
+    # praktiken mappad till anon-nyckeln i inflation.yml (secrets.SUPABASE_ANON_KEY)
+    # — ett missvisande namn som dolde att skriptet faktiskt körde på
+    # anon-nyckeln trots att en äkta SUPABASE_SERVICE_ROLE_KEY fanns
+    # tillgänglig i samma workflow men aldrig lästes. Läser nu den
+    # riktiga secreten direkt.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     if not sb_key:
         print("Saknar Supabase-nyckel.", file=sys.stderr)
         sys.exit(1)
