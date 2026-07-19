@@ -1747,9 +1747,12 @@ def _sakerstall_borskassan_likviditet(sb_key: str) -> None:
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main():
-    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till anon-nyckeln bevaras för miljöer utan secreten. sb_key
+    # används genomgående nedströms av alla funktioner i skriptet.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY", "")
     if not sb_key:
-        print("FEL: SUPABASE_ANON_KEY saknas.")
+        print("FEL: SUPABASE_ANON_KEY eller SUPABASE_SERVICE_ROLE_KEY saknas.")
         sys.exit(1)
 
     print("=" * 60)

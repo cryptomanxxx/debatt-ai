@@ -287,9 +287,11 @@ def bygg_prompt(agent: dict, status: dict) -> tuple[str, str]:
 # ── Huvud ──────────────────────────────────────────────────────────────────────
 
 def main():
-    sb_key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
+    # spara_i_bank()/ta_lan_frivilligt() fungerar med enbart service-role-
+    # nyckeln (se resp. funktion) — kräv inte SUPABASE_ANON_KEY specifikt.
+    sb_key = (os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY", "")).strip()
     if not sb_key:
-        print("Fel: Sätt SUPABASE_ANON_KEY som miljövariabel.", file=sys.stderr)
+        print("Fel: Sätt SUPABASE_ANON_KEY eller SUPABASE_SERVICE_ROLE_KEY som miljövariabel.", file=sys.stderr)
         sys.exit(1)
 
     print("=" * 60)
