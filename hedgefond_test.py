@@ -823,9 +823,12 @@ def kolla_prestation(sb_key: str, fond_symbol: str, fond_id: int, nav: float, f�
 # ─── Huvudflöde ───────────────────────────────────────────────────────────────
 
 def main():
-    sb_key = os.environ.get("SUPABASE_ANON_KEY", "")
+    # agent_planbocker saknar anon-skrivpolicy (RLS) — service role krävs.
+    # Fallback till anon-nyckeln bevaras för miljöer utan secreten. sb_key
+    # används genomgående nedströms av alla funktioner i skriptet.
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY", "")
     if not sb_key:
-        print("SUPABASE_ANON_KEY saknas — avbryter")
+        print("SUPABASE_ANON_KEY eller SUPABASE_SERVICE_ROLE_KEY saknas — avbryter")
         sys.exit(1)
 
     print("=== Hedgefond körning startar ===")
