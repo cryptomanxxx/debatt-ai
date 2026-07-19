@@ -27,6 +27,12 @@
 --   #1258 inflation.py (rättade en vilseledande secret-mappning i
 --         inflation.yml som gjorde att skriptet i praktiken alltid körde
 --         på anon-nyckeln trots ett variabelnamn som antydde service role)
+--   #1259 mark_test.py, mark_andrahand_test.py, domstol_test.py (Codex P1
+--         på denna PR — missades av den ursprungliga kartläggningen
+--         eftersom tabellnamnet stod som prefix i en f-string-query-path,
+--         t.ex. f"agent_planbocker?agent=eq.{namn}", vilket varken
+--         rest/v1/-sökningen eller den bar-citerade-tabellnamn-sökningen
+--         fångade. Se "Tredje varianten av samma fälla" nedan.)
 --
 -- foretag_test.py var redan säkrad sedan tidigare (lobbying_log-fixen,
 -- PR #1238, rebindar hela main()).
@@ -43,7 +49,7 @@
 -- personuppgifter).
 --
 -- Kör i Supabase SQL Editor EFTER supabase_ekonomi.sql, och EFTER att
--- PR #1250–#1258 är mergade.
+-- PR #1250–#1259 är mergade.
 
 ALTER TABLE agent_planbocker ENABLE ROW LEVEL SECURITY;
 
