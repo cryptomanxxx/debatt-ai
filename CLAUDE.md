@@ -1848,6 +1848,8 @@ En GitHub Actions-workflow (`auto-fix.yml`) triggas automatiskt när någon av d
 
 **Effekt:** Stänger den sista loopen — plattformen reagerar autonomt på sina egna fel utan mänsklig inblandning. Kräver `ANTHROPIC_API_KEY` i GitHub Secrets.
 
+**⏸ Pausad (19 jul 2026):** `ANTHROPIC_API_KEY` togs bort ur `agent.yml`/`auto-fix.yml`/`auto-implement.yml` efter att Anthropic-orgens API-krediter tog slut och beslut togs att inte fylla på (för dyrt för det här bruket). "Installera Claude Code CLI"-steget i `auto-fix.yml`/`auto-implement.yml` villkoras nu på `secrets.ANTHROPIC_API_KEY != ''` och hoppar över resten av pipelinen rent istället för att krascha. Återaktiveras genom att lägga tillbaka secreten i GitHub — ingen kodändring behövs.
+
 | Fil | Roll |
 |---|---|
 | `.github/workflows/auto-fix.yml` | Triggas av workflow_run failure för 20 workflows (inkl. AI-bus Auto-implement). Installerar Claude Code CLI, kör fix, skapar PR. |
@@ -1861,6 +1863,8 @@ En GitHub Actions-workflow (`auto-implement.yml`) triggas vid push till `ai-bus/
 Om ändringar gjordes skapas en PR med `auto-implement`-label och auto-merge aktiveras. Dedupliceringscheck förhindrar dubbla PRs. Mänsklig inblandning krävs inte — ingen session behöver startas.
 
 **Effekt:** Stänger hela ai-bus-loopen. Codestral/vision-agent skriver förslag → Claude Code granskar och implementerar autonomt → PR skapas och mergas → outcome-observer utvärderar resultatet. Kräver `ANTHROPIC_API_KEY` i GitHub Secrets.
+
+**⏸ Pausad (19 jul 2026)** — se motivering under ✅78. `ai-bus/suggestions/`-förslag samlas fortfarande på hög men implementeras inte automatiskt förrän secreten läggs tillbaka.
 
 | Fil | Roll |
 |---|---|
@@ -2185,6 +2189,8 @@ RCT som mäter var intelligensvärde faktiskt sitter: kan en rådgivare förbät
 **Mätvärden på `/orakel`:** Brier score per kohort (bets efter 2026-07-05), hjärnans egen Brier per arm (hjärna-mot-hjärna), följsamhet (snittavstånd bet↔råd), kohorttilldelning, senaste bedömningar med utfall. Sportmarkets (avgörs inom dagar) driver datainsamlingen.
 
 **Regel:** Anthropic-anropet ligger i `ai_klient.py` (lint-regeln) men ingår INTE i fallback-kedjorna — arm B får aldrig tyst ersättas av en annan provider, då förstörs experimentet. Kohorttilldelningen speglas i `app/lib/orakel.js`; paritetstester i `tests/` låser att Python och JS ger identisk tilldelning. Ändra aldrig agentlistan utan att uppdatera båda testfilernas förväntningstabeller — kohortbyte mitt i experimentet förstör mätserien.
+
+**⏸ Arm B pausad (19 jul 2026):** `ANTHROPIC_API_KEY` togs bort ur `agent.yml` efter att Anthropic-orgens API-krediter tog slut (medvetet beslut, inte påfyllt). `anthropic_post()` är redan fail-open — saknad nyckel ger `""`, `orakel-b`-kohorten bettar helt enkelt utan råd tills vidare (`kontroll` och `orakel-a` opåverkade). Ingen kodändring gjordes. Återaktiveras genom att lägga tillbaka secreten.
 
 | Fil | Roll |
 |---|---|
