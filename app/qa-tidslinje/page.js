@@ -28,16 +28,18 @@ const SIDOR_ATT_VISA = [
 // ett värde som råkar vara större än vad som redan finns.
 const MAX_VECKOR_PER_SIDA = 6;
 
-async function fetchSnapshots() {
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return {};
-
-  const paths = SIDOR_ATT_VISA.map(s => `"${s.path}"`).join(",");
+// Hämtar en sidas snapshots med gränsen pålagd i själva Supabase-frågan
+// (limit=N), inte efteråt i JS — annars hade hela historiken laddats ner
+// och materialiserats (base64-payload och allt) innan den kastades bort,
+// vilket gör att fetchen fortsätter växa obegränsat med veckor även om
+// den slutgiltiga sidan är begränsad (Codex-fynd, PR #1263).
+async function fetchSidaSnapshots(path, key) {
   const url =
     `${SB_URL}/rest/v1/qa_snapshots` +
-    `?sida_path=in.(${paths})` +
+    `?sida_path=eq.${encodeURIComponent(path)}` +
     `&screenshot_b64=not.is.null` +
-    `&order=sida_path.asc,vecka.desc` +
+    `&order=vecka.desc` +
+    `&limit=${MAX_VECKOR_PER_SIDA}` +
     `&select=vecka,sida_path,sida_namn,status,screenshot_b64`;
 
   const r = await fetch(url, {
@@ -48,27 +50,30 @@ async function fetchSnapshots() {
     next: { revalidate: 3600 },
   }).catch(() => null);
 
-  if (!r?.ok) return {};
-
+  if (!r?.ok) return [];
   const rows = await r.json();
+  // Frågan gav nyast-först (vecka.desc) — vänd till kronologisk ordning
+  // (äldst → nyast) för korrekt tidslinjeanimering.
+  return rows.reverse().map(row => ({
+    vecka:     row.vecka,
+    status:    row.status,
+    bild:      row.screenshot_b64,
+    sida_namn: row.sida_namn,
+  }));
+}
 
-  // Gruppera per sida_path, behåll bara de MAX_VECKOR_PER_SIDA senaste
-  // veckorna per sida (raderna kommer nyast-först tack vare vecka.desc).
+async function fetchSnapshots() {
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!key) return {};
+
+  const resultat = await Promise.all(
+    SIDOR_ATT_VISA.map(s => fetchSidaSnapshots(s.path, key))
+  );
+
   const grouped = {};
-  for (const row of rows) {
-    if (!grouped[row.sida_path]) grouped[row.sida_path] = [];
-    if (grouped[row.sida_path].length >= MAX_VECKOR_PER_SIDA) continue;
-    grouped[row.sida_path].push({
-      vecka:     row.vecka,
-      status:    row.status,
-      bild:      row.screenshot_b64,
-      sida_namn: row.sida_namn,
-    });
-  }
-  // Tillbaka till kronologisk ordning (äldst → nyast) för korrekt tidslinje.
-  for (const path of Object.keys(grouped)) {
-    grouped[path].reverse();
-  }
+  SIDOR_ATT_VISA.forEach((s, i) => {
+    grouped[s.path] = resultat[i];
+  });
   return grouped;
 }
 
