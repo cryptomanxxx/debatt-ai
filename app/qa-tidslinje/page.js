@@ -18,6 +18,16 @@ const SIDOR_ATT_VISA = [
   { path: "/bors",     namn: "Kryptobörsen"     },
 ];
 
+// Max antal veckor per sida som embeddas i den prerendrade sidan. Utan tak
+// växer varje base64-skärmdump (sparas varje måndag, aldrig rensad) sidans
+// storlek obegränsat — orsakade en "Oversized Incremental Static
+// Regeneration"-deployfel på Vercel (19,75 MB, över gränsen) 20 jul 2026.
+// Satt lågt (6 veckor ≈ 1,5 månad) medvetet — okänt exakt hur många veckor
+// som redan hunnit ackumuleras, så en försiktig gräns garanterar att
+// nästa deploy faktiskt kommer under Vercels tak istället för att gissa
+// ett värde som råkar vara större än vad som redan finns.
+const MAX_VECKOR_PER_SIDA = 6;
+
 async function fetchSnapshots() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return {};
@@ -27,7 +37,7 @@ async function fetchSnapshots() {
     `${SB_URL}/rest/v1/qa_snapshots` +
     `?sida_path=in.(${paths})` +
     `&screenshot_b64=not.is.null` +
-    `&order=sida_path.asc,vecka.asc` +
+    `&order=sida_path.asc,vecka.desc` +
     `&select=vecka,sida_path,sida_namn,status,screenshot_b64`;
 
   const r = await fetch(url, {
@@ -42,16 +52,22 @@ async function fetchSnapshots() {
 
   const rows = await r.json();
 
-  // Gruppera per sida_path
+  // Gruppera per sida_path, behåll bara de MAX_VECKOR_PER_SIDA senaste
+  // veckorna per sida (raderna kommer nyast-först tack vare vecka.desc).
   const grouped = {};
   for (const row of rows) {
     if (!grouped[row.sida_path]) grouped[row.sida_path] = [];
+    if (grouped[row.sida_path].length >= MAX_VECKOR_PER_SIDA) continue;
     grouped[row.sida_path].push({
       vecka:     row.vecka,
       status:    row.status,
       bild:      row.screenshot_b64,
       sida_namn: row.sida_namn,
     });
+  }
+  // Tillbaka till kronologisk ordning (äldst → nyast) för korrekt tidslinje.
+  for (const path of Object.keys(grouped)) {
+    grouped[path].reverse();
   }
   return grouped;
 }
