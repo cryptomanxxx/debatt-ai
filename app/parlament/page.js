@@ -8,16 +8,16 @@ async function getData() {
   const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
   const [fRes, rRes, aRes, nyaRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/lagforslag?order=skapad.desc&limit=1000`, {
-      headers: hdrs, next: { revalidate: 60 },
+      headers: hdrs, next: { revalidate: 180 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=lagforslag_id,agent,rod,motivering&order=skapad.desc&limit=30000`, {
-      headers: hdrs, next: { revalidate: 60 },
+      headers: hdrs, next: { revalidate: 180 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,motivering,skapad,lagforslag_id,lagforslag(titel)&order=skapad.desc&limit=30`, {
-      headers: hdrs, next: { revalidate: 60 },
+      headers: hdrs, next: { revalidate: 180 },
     }),
     fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,kalla,skapad&order=skapad.desc&limit=30`, {
-      headers: hdrs, next: { revalidate: 60 },
+      headers: hdrs, next: { revalidate: 180 },
     }),
   ]);
 

@@ -295,7 +295,7 @@ async function getAgentFragor(namn) {
 async function getAgentActions(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_actions?agent=eq.${encodeURIComponent(namn)}&order=skapad.desc&limit=20&select=id,action_type,params,resultat,skapad`,
-    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 60 } }
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 180 } }
   );
   if (!res.ok) return [];
   return res.json();
@@ -319,7 +319,7 @@ async function getAgentMarketStats(namn) {
 async function getAgentFoljare(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/koalitioner?agent=eq.${encodeURIComponent(namn)}&select=foljare`,
-    { headers: sbHeaders(), next: { revalidate: 60 } }
+    { headers: sbHeaders(), next: { revalidate: 180 } }
   );
   if (!res.ok) return 0;
   const data = await res.json();
@@ -329,7 +329,7 @@ async function getAgentFoljare(namn) {
 async function getAgentPlanbok(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_planbocker?agent=eq.${encodeURIComponent(namn)}&select=saldo,saldo_spel,totalt_givet,totalt_fatt,antal_spel`,
-    { headers: sbHeaders(), next: { revalidate: 120 } }
+    { headers: sbHeaders(), next: { revalidate: 300 } }
   );
   if (!res.ok) return null;
   const data = await res.json();
@@ -339,7 +339,7 @@ async function getAgentPlanbok(namn) {
 async function getAgentPositioner(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_positioner?agent=eq.${encodeURIComponent(namn)}&order=styrka.desc&limit=10`,
-    { headers: sbHeaders(), next: { revalidate: 120 } }
+    { headers: sbHeaders(), next: { revalidate: 300 } }
   );
   if (!res.ok) return [];
   return res.json();
@@ -348,7 +348,7 @@ async function getAgentPositioner(namn) {
 async function getAgentDagbok(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_dagbok?agent=eq.${encodeURIComponent(namn)}&order=skapad.desc&limit=20&select=id,rubrik,reflektion,ar_replik,skapad`,
-    { headers: sbHeaders(), next: { revalidate: 120 } }
+    { headers: sbHeaders(), next: { revalidate: 300 } }
   );
   if (!res.ok) return [];
   return res.json();
@@ -366,7 +366,7 @@ async function getAgentBets(namn) {
 async function getAgentBilder(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_bilder?agent=eq.${encodeURIComponent(namn)}&order=skapad.desc&limit=12&select=id,prompt,bild_url,kontext,skapad`,
-    { headers: sbHeaders(), next: { revalidate: 120 } }
+    { headers: sbHeaders(), next: { revalidate: 300 } }
   );
   if (!res.ok) return [];
   return await res.json();
@@ -376,11 +376,11 @@ async function getAgentSymboler(namn) {
   const [symRes, varorRes] = await Promise.all([
     fetch(
       `${SB_URL}/rest/v1/agent_symboler?agent=eq.${encodeURIComponent(namn)}&select=vara_id,pris_betalt,kopt_at&order=pris_betalt.desc`,
-      { headers: sbHeaders(), next: { revalidate: 120 } }
+      { headers: sbHeaders(), next: { revalidate: 300 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/butik_varor?select=id,namn,beskrivning,kategori,pris,ikon`,
-      { headers: sbHeaders(), next: { revalidate: 300 } }
+      { headers: sbHeaders(), next: { revalidate: 600 } }
     ),
   ]);
   if (!symRes.ok || !varorRes.ok) return [];
@@ -393,11 +393,11 @@ async function getAgentEtf(namn) {
   const [innehavRes, ...prisResults] = await Promise.all([
     fetch(
       `${SB_URL}/rest/v1/agent_etf_innehav?agent=eq.${encodeURIComponent(namn)}&select=symbol,investerat_kr,kopt_pris_usd,uppdaterad`,
-      { headers: sbHeaders(), next: { revalidate: 120 } }
+      { headers: sbHeaders(), next: { revalidate: 300 } }
     ),
     ...["BTC", "ETH", "SOL", "XRP", "BNB"].map(s =>
       fetch(`${SB_URL}/rest/v1/ohlcv_cache?symbol=eq.${s}&order=datum.desc&limit=1&select=symbol,pris`, {
-        headers: sbHeaders(), next: { revalidate: 300 },
+        headers: sbHeaders(), next: { revalidate: 600 },
       }).then(r => r.ok ? r.json() : [])
     ),
   ]);
@@ -442,7 +442,7 @@ async function getAgentStats(namn) {
 async function getAgentKi(namn) {
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_ki?agent=eq.${encodeURIComponent(namn)}&order=skapad.desc&select=amne,insikt&limit=300`,
-    { headers: sbHeaders(), next: { revalidate: 300 } }
+    { headers: sbHeaders(), next: { revalidate: 600 } }
   );
   if (!res.ok) return [];
   return res.json();
