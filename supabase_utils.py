@@ -7,7 +7,7 @@ Innehåller:
                       hamta_all_statistik, hamta_senaste_visualisering,
                       hamta_oppna_markets, hamta_existerande_bets,
                       rakna_debattdjup, ar_duplikat,
-                      hamta_agent_positioner
+                      hamta_agent_positioner, hamta_publicerade_idag_per_typ
 
   Supabase-skrivning: markera_forslag_behandlat, publicera_visualisering,
                       spara_nyhetslog, spara_bet, logga_action,
@@ -158,6 +158,41 @@ def hamta_senaste_artiklar(sb_key: str) -> list:
     except Exception:
         pass
     return []
+
+
+def hamta_publicerade_idag_per_typ(sb_key: str) -> dict:
+    """Räknar dagens (UTC) AI-publicerade artiklar per typ: nyhet/replik/eget.
+
+    Används för att hålla 4+4+4-kvoten (nyhetsartiklar/repliker/egna ämnen)
+    robust mot extra GitHub Actions-körningar utanför det tänkta schemat —
+    utan denna räkning litar force_nyhet/force_replik/force_eget blint på
+    att exakt 12 körningar sker per dag, vilket bryter ihop om schemaläggaren
+    levererar fler (eller färre) triggers än de 12 deklarerade cron-raderna.
+    Fail-open: returnerar alla nollor vid fel — blockerar aldrig publicering
+    på grund av ett infrastrukturproblem.
+    """
+    idag_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00+00:00")
+    try:
+        r = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={
+                "select": "nyhetskalla,parent_id",
+                "kalla": "eq.ai",
+                "skapad": f"gte.{idag_utc}",
+                "limit": "200",
+            },
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
+            timeout=15,
+        )
+        if r.status_code != 200:
+            return {"nyhet": 0, "replik": 0, "eget": 0}
+        rader = r.json()
+        nyhet = sum(1 for a in rader if a.get("nyhetskalla"))
+        replik = sum(1 for a in rader if a.get("parent_id") and not a.get("nyhetskalla"))
+        eget = len(rader) - nyhet - replik
+        return {"nyhet": nyhet, "replik": replik, "eget": eget}
+    except Exception:
+        return {"nyhet": 0, "replik": 0, "eget": 0}
 
 
 def ar_duplikat(amne: str, senaste_titlar: list[str], troskel: float = 0.45) -> bool:
