@@ -88,7 +88,6 @@ export async function POST(req) {
   const groqKey = process.env.GROQ_API_KEY;
   const cbKey   = process.env.CEREBRAS_API_KEY;
   const sbKey   = process.env.SAMBANOVA_API_KEY;
-  const ghKey   = process.env.GITHUB_TOKEN;
 
   // Groq
   if (groqKey && providerReady("groq")) {
@@ -189,27 +188,7 @@ export async function POST(req) {
     } catch {}
   }
 
-  // GitHub Models (last resort)
-  if (ghKey) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://models.inference.ai.azure.com/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${ghKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "Llama-3.3-70B-Instruct", messages: msgs, max_tokens: 200, temperature: 0.9 }),
-        signal: AbortSignal.timeout(12000),
-      });
-      if (r.ok) {
-        const json = await r.json();
-        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-        if (text) {
-          logAiCall({ provider: "github_models", model: "Llama-3.3-70B-Instruct", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
-          await sparaUtmaning(agent, tesTrimmed, text, ip);
-          return Response.json({ motargument: text });
-        }
-      }
-    } catch {}
-  }
+  // GitHub Models (tidigare sista utväg) togs bort 30 aug 2026 — tjänsten stängde helt 30 jul 2026
 
   logFel({ kalla: "api/agent-utmaning", feltyp: "ai_fail", meddelande: "Alla providers misslyckades", ip });
   return Response.json({ error: "Agenten svarar inte just nu. Försök igen." }, { status: 503 });

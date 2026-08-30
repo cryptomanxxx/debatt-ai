@@ -172,30 +172,8 @@ async function testCodestral() {
   }
 }
 
-async function testGithubModels() {
-  const key = process.env.GITHUB_TOKEN;
-  if (!key) return { ok: false, error: "GITHUB_TOKEN saknas" };
-  const model = "Llama-3.3-70B-Instruct";
-  const t0 = Date.now();
-  try {
-    const r = await fetch("https://models.inference.ai.azure.com/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, messages: makeMessages("GitHub Models"), max_tokens: 30 }),
-      signal: AbortSignal.timeout(15000),
-    });
-    const latency = Date.now() - t0;
-    if (!r.ok) {
-      const err = await r.text();
-      return { ok: false, status: r.status, error: err.slice(0, 200), latency };
-    }
-    const json = await r.json();
-    const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-    return { ok: true, text, latency, model: json.model ?? model };
-  } catch (e) {
-    return { ok: false, error: e.message, latency: Date.now() - t0 };
-  }
-}
+// testGithubModels() borttagen 30 aug 2026 — GitHub Models stängde helt
+// 30 jul 2026, ingen väg tillbaka för denna provider.
 
 
 async function testDeepSeek() {
@@ -253,18 +231,17 @@ async function testCloudflare() {
 }
 
 export async function GET() {
-  const [groq, gemini, cerebras, sambanova, codestral, github_models, deepseek, cloudflare] = await Promise.all([
+  const [groq, gemini, cerebras, sambanova, codestral, deepseek, cloudflare] = await Promise.all([
     testGroq(),
     testGemini(),
     testCerebras(),
     testSambanova(),
     testCodestral(),
-    testGithubModels(),
     testDeepSeek(),
     testCloudflare(),
   ]);
   return Response.json(
-    { groq, gemini, cerebras, sambanova, codestral, github_models, deepseek, cloudflare },
+    { groq, gemini, cerebras, sambanova, codestral, deepseek, cloudflare },
     { headers: { "Cache-Control": "no-store" } }
   );
 }

@@ -138,9 +138,11 @@ def spara_och_kalibrera(results: list[dict]) -> None:
             existing_order = res[0].get("ranked_order") or []
     except Exception:
         pass
-    _DEFAULT = ["mistral", "sambanova", "deepseek", "groq", "cloudflare", "gemini", "github_models", "cerebras"]
+    _DEFAULT = ["mistral", "sambanova", "deepseek", "groq", "cloudflare", "gemini", "cerebras"]
     fallback = existing_order or _DEFAULT
-    ranked_order = ranked_benchmarked + [p for p in fallback if p not in ranked_benchmarked]
+    # github_models stängde helt 30 jul 2026 — filtreras bort även om den
+    # fortfarande ligger kvar i en tidigare sparad ranked_order i Supabase.
+    ranked_order = ranked_benchmarked + [p for p in fallback if p not in ranked_benchmarked and p != "github_models"]
 
     ok2 = _sb_upsert("provider_config", {
         "id": "current",
@@ -238,23 +240,6 @@ def _cerebras(n: int) -> str:
     return r.json()["choices"][0]["message"]["content"]
 
 
-def _github_models(n: int) -> str:
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        raise Exception("GITHUB_TOKEN saknas")
-    r = httpx.post(
-        "https://models.inference.ai.azure.com/chat/completions",
-        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
-        json={"model": "Llama-3.3-70B-Instruct",
-              "messages": [{"role": "system", "content": SYSTEM},
-                           {"role": "user", "content": PROMPT}],
-              "max_tokens": 200, "temperature": 0.35},
-        timeout=30,
-    )
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
-
-
 def _gemini(n: int) -> str:
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
@@ -329,8 +314,7 @@ PROVIDERS = {
     "groq":          ("Groq openai/gpt-oss-120b",     _groq),
     "sambanova":     ("Sambanova Meta-Llama-3.3-70B",      _sambanova),
     "cerebras":      ("Cerebras llama-3.3-70b",            _cerebras),
-    "github_models": ("GitHub Models Llama-3.3-70B",       _github_models),
-    "gemini":        ("Gemini 2.0 Flash-Lite",             _gemini),
+    "gemini":        ("Gemini 3.5 Flash-Lite",             _gemini),
     "mistral":       ("Mistral Codestral-latest",          _mistral),
     "deepseek":      ("DeepSeek V3 (deepseek-chat)",       _deepseek),
     "cloudflare":    ("Cloudflare Llama-3.3-70B",          _cloudflare),

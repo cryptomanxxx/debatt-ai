@@ -121,16 +121,15 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | **Codestral** (fallback 3) | `codestral-latest` | `MISTRAL_API_KEY` | Direktdebatt, artikelbedömning + **exklusivt** för AI-bus kodanalys |
 | **Cerebras** (fallback 3) | `gpt-oss-120b` | `CEREBRAS_API_KEY` | Direktdebatt, artikelbedömning, beslut-API |
 | **Sambanova** (fallback 4) | `Meta-Llama-3.3-70B-Instruct` | `SAMBANOVA_API_KEY` | Test-providers (ej i huvud-fallback-kedja ännu) |
-| **GitHub Models** (sista) | `Llama-3.3-70B-Instruct` | `GITHUB_TOKEN` | Alla routes — sista utväg om alla andra är nere |
 
 **Fallback-kedjor per kontext:**
-- **Artikelskrivning (Python):** Groq → Gemini → GitHub Models
-- **Direktdebatt (JS):** Groq → OpenRouter → Gemini → Codestral → Cerebras → GitHub Models
-- **Artikelbedömning (JS):** Groq → Codestral → Cerebras → GitHub Models
-- **Decision API (JS):** Groq → Gemini → Codestral → Cerebras → GitHub Models
+- **Artikelskrivning (Python):** Groq → Gemini
+- **Direktdebatt (JS):** Groq → OpenRouter → Gemini → Codestral → Cerebras
+- **Artikelbedömning (JS):** Groq → Codestral → Cerebras
+- **Decision API (JS):** Groq → Gemini → Codestral → Cerebras
 - **Kodanalys (Codestral-worker):** Codestral (exklusivt, ingen fallback)
 
-`GITHUB_TOKEN` är automatisk i GitHub Actions (kräver `models: read` permission). På Vercel krävs ett PAT med `models:read`-scope som manuell miljövariabel.
+**GitHub Models borttaget (30 aug 2026):** var tidigare sista-utväg-fallback i samtliga kedjor ovan (`GITHUB_TOKEN`, `Llama-3.3-70B-Instruct` via `models.inference.ai.azure.com`). Tjänsten stängde helt 30 juli 2026 — bekräftat via live 404/anslutningsfel i `/test-providers`. Borttaget ur `ai_klient.py`, `app/lib/aiRouter.js`, `provider_benchmark.py` och samtliga API-routes som hade en egen direktkopia av fallback-kedjan.
 
 **Regel — ingen hårdkodning av providerklienter:** Inga skript får instansiera en AI-providerklient direkt (t.ex. `groq.Groq()`, raw HTTP-anrop till en specifik providers API, eller en lokal `groq_anrop()`-helper) utanför `ai_klient.py`. All LLM-användning ska gå via den dynamiska fallback-kedjan: `hamta_kort_fns()` / `hamta_artikel_fns()` i `ai_klient.py`, eller `_llm_spel()`-wrappern i `supabase_utils.py`. Detta var orsaken till en återkommande bugg där flera skript (`cem_test.py`, `domstol_test.py`, `val_test.py`, m.fl.) hade egna hårdkodade Groq-anrop som föll platt när Groq nådde sin dagsgräns, trots att den dynamiska kedjan fanns och fungerade. Undantag: `provider_benchmark.py` och `test_groq_keys.py`, vars uttalade syfte är att testa enskilda providers. En GitHub Action (`lint-provider-usage.yml`) failar CI om regeln bryts.
 

@@ -79,7 +79,7 @@ async function llmCall(messages) {
     ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",                "llama3.1-8b",                 process.env.CEREBRAS_API_KEY],
     ["codestral",     "https://api.mistral.ai/v1/chat/completions",                 "codestral-latest",            process.env.MISTRAL_API_KEY],
     ["sambanova",     "https://api.sambanova.ai/v1/chat/completions",               "Meta-Llama-3.3-70B-Instruct", process.env.SAMBANOVA_API_KEY],
-    ["github_models", "https://models.inference.ai.azure.com/chat/completions",     "Llama-3.3-70B-Instruct",      process.env.GITHUB_TOKEN],
+    // github_models (GitHub Models) togs bort 30 aug 2026 — tjänsten stängde helt 30 jul 2026
   ];
   for (const [, url, model, key] of providers) {
     if (!key) continue;

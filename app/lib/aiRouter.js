@@ -7,7 +7,7 @@
  *   callProvider(name, messages, opts)        — anropa en specifik provider
  *   callWithFallback(chain, messages, opts)   — prova providers i tur och ordning
  *
- * Providers: groq | gemini | cerebras | sambanova | codestral | deepseek | github
+ * Providers: groq | gemini | cerebras | sambanova | codestral | deepseek
  *
  * opts:
  *   maxTokens    (default 800)
@@ -77,29 +77,24 @@ const PROVIDERS = {
     cbKey:   "deepseek",
     shape:   "openai",
   },
-  // Sista utväg — ingen circuit breaker (GitHub Actions har alltid GITHUB_TOKEN)
-  github: {
-    url:     "https://models.inference.ai.azure.com/chat/completions",
-    model:   "Llama-3.3-70B-Instruct",
-    key:     () => process.env.GITHUB_TOKEN,
-    timeout: 20_000,
-    cbKey:   null,
-    shape:   "openai",
-  },
 };
+
+// github (GitHub Models) togs bort 30 aug 2026 — tjänsten stängde helt
+// 30 jul 2026 (models.inference.ai.azure.com hade redan slutat fungera
+// dessförinnan). Var tidigare sista utväg i samtliga kedjor nedan.
 
 // Statiska kedjor — används om Supabase är otillgänglig
 export const CHAINS = {
-  general:      ["groq", "sambanova", "codestral", "deepseek", "cerebras", "gemini", "github"],
-  beslut:       ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini", "github"],
-  agent_submit: ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini", "github"],
-  pis:          ["groq", "sambanova", "codestral", "cerebras", "deepseek", "gemini", "github"],
-  chatt:        ["groq", "cerebras", "sambanova", "codestral", "deepseek", "gemini", "github"],
+  general:      ["groq", "sambanova", "codestral", "deepseek", "cerebras", "gemini"],
+  beslut:       ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini"],
+  agent_submit: ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini"],
+  pis:          ["groq", "sambanova", "codestral", "cerebras", "deepseek", "gemini"],
+  chatt:        ["groq", "cerebras", "sambanova", "codestral", "deepseek", "gemini"],
   // hjarnan: Cerebras (gpt-oss-120b, 120B params) prioriteras för starkare resonemang
-  hjarnan:      ["cerebras", "gemini", "groq", "sambanova", "codestral", "deepseek", "github"],
+  hjarnan:      ["cerebras", "gemini", "groq", "sambanova", "codestral", "deepseek"],
   // economy: samma resonemangsskäl som hjarnan — analysen är en 400-600 ords
   // syntes av många nyckeltal, inte ett kort svar
-  economy:      ["cerebras", "groq", "sambanova", "codestral", "deepseek", "gemini", "github"],
+  economy:      ["cerebras", "groq", "sambanova", "codestral", "deepseek", "gemini"],
 };
 
 // ── Dynamisk Supabase-ordning (1h cache) ────────────────────────────────────
@@ -140,8 +135,9 @@ export async function getDynamicChain(usecase = "general") {
   const base = CHAINS[usecase] ?? CHAINS.general;
   if (!_dynamicOrder) return base;
 
-  // Filtrera till providers som finns i PROVIDERS, behåll github sist
-  const ranked = _dynamicOrder.map(p => p.replace('mistral', 'codestral')).filter(p => p in PROVIDERS && p !== "github");
+  // Filtrera till providers som fortfarande finns i PROVIDERS (utesluter
+  // t.ex. en kvarliggande "github"-post i en gammal sparad Supabase-ordning)
+  const ranked = _dynamicOrder.map(p => p.replace('mistral', 'codestral')).filter(p => p in PROVIDERS);
   // Lägg till providers från statisk kedja som saknas i Supabase-ordningen
   for (const p of base) {
     if (!ranked.includes(p)) ranked.push(p);

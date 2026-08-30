@@ -8,8 +8,10 @@ Rate limits (free tier):
                 inte per nyckel — flera nycklar från samma konto kan dela samma TPD-kvot)
   Sambanova:    20 RPM,    20M TPD  ← bäst för batch
   Cerebras:     30 RPM,     1M TPD  ← näst bäst
-  GitHub Models: ~10 RPM,  ~50 RPD
   Gemini Flash:  15 RPM,   250 RPD
+
+GitHub Models (tidigare "sista utväg"-fallback) stängde helt 30 jul 2026 —
+borttaget ur alla kedjor (se CLAUDE.md).
 """
 
 import httpx
@@ -26,12 +28,12 @@ _groq_nere_keys: set[str] = set()
 
 # ── Dynamisk fallback-ordning ──────────────────────────────────────────────────
 
-_DEFAULT_ORDER = ["groq", "mistral", "sambanova", "deepseek", "cloudflare", "gemini", "github_models", "cerebras"]
+_DEFAULT_ORDER = ["groq", "mistral", "sambanova", "deepseek", "cloudflare", "gemini", "cerebras"]
 
 # Hårdkodad kedja för artikelskrivning — exkluderar Mistral/Codestral (kodmodell, sämre på
 # kreativ långform svenska) samt DeepSeek och Cloudflare (lägre kvalitet för långa texter).
 # Oberoende av den dynamiska benchmark-rankingen i _fallback_order.
-_ARTIKEL_CHAIN = ["groq", "deepseek", "sambanova", "cerebras", "github_models"]
+_ARTIKEL_CHAIN = ["groq", "deepseek", "sambanova", "cerebras"]
 _SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 
@@ -174,7 +176,6 @@ def hamta_artikel_fns(payload: dict, system: str, user_msg: str, max_tokens: int
         "sambanova":     ("Sambanova",      lambda: _nonempty(sambanova_post(payload).json()["choices"][0]["message"]["content"])),
         "deepseek":      ("DeepSeek",       lambda: _nonempty(deepseek_post(payload).json()["choices"][0]["message"]["content"])),
         "cerebras":      ("Cerebras",       lambda: _nonempty(cerebras_post(payload).json()["choices"][0]["message"]["content"])),
-        "github_models": ("GitHub Models",  lambda: _nonempty(github_models_post({**payload, "model": "Llama-3.3-70B-Instruct"}).json()["choices"][0]["message"]["content"])),
         "cloudflare":    ("Cloudflare",     lambda: _nonempty(cloudflare_post(system, user_msg, max_tokens=max_tokens))),
         "gemini":        ("Gemini",         lambda: _nonempty(gemini_post(system, user_msg, max_tokens=max_tokens))),
     }
@@ -189,7 +190,6 @@ def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int, sou
         "sambanova":     ("Sambanova",     lambda: sambanova_post(payload).json()["choices"][0]["message"]["content"].strip()),
         "deepseek":      ("DeepSeek",      lambda: deepseek_post(payload).json()["choices"][0]["message"]["content"].strip()),
         "cerebras":      ("Cerebras",      lambda: cerebras_post(payload).json()["choices"][0]["message"]["content"].strip()),
-        "github_models": ("GitHub Models", lambda: github_models_post(payload).json()["choices"][0]["message"]["content"].strip()),
         "cloudflare":    ("Cloudflare",    lambda: cloudflare_post(system[:600], prompt, max_tokens=max_tokens).strip()),
         "gemini":        ("Gemini",        lambda: (gemini_post(system[:600], prompt, max_tokens=max_tokens) or "").strip()),
     }
@@ -289,32 +289,6 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
             print("  Gemini dagsgräns nådd — markeras som nere för resten av körningen")
             break
     raise Exception(f"Gemini misslyckades: {last_err}")
-
-
-def github_models_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
-    """GitHub Models — gratis OpenAI-kompatibel access via GITHUB_TOKEN."""
-    if "github_models" in _nere:
-        raise Exception("GitHub Models markerad som nere denna körning — hoppar direkt till fallback")
-    token = os.environ.get("GITHUB_TOKEN")
-    if not token:
-        raise Exception("GITHUB_TOKEN saknas")
-    url = "https://models.inference.ai.azure.com/chat/completions"
-    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    payload = {**json_payload, "model": json_payload.get("model", "Llama-3.3-70B-Instruct")}
-    last_r = None
-    for attempt in range(3):
-        r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
-        last_r = r
-        if r.status_code == 429:
-            wait = min(int(r.headers.get("retry-after", 30)) + 5, 90)
-            print(f"  GitHub Models rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
-            time.sleep(wait)
-            continue
-        r.raise_for_status()
-        return r
-    logga_429_passivt("github_models")
-    _nere.add("github_models")
-    raise Exception(f"GitHub Models rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
 
 
 def sambanova_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
