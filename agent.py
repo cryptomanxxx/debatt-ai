@@ -314,13 +314,18 @@ def main():
     # räknar alltid mot "idag" enligt väggklockan, så att lita på gårdagens
     # cron-timme (t.ex. 21 för en 23:50-catch-up som startar 00:15) skulle
     # tvinga fram en artikel mot FEL dags kvot och aldrig åtgärda dagen som
-    # faktiskt hade underskott (Codex P2, PR #1278). En körning kan aldrig
-    # starta FÖRE sin egen trigger, så utc_now.hour < cron_hour (utan att
-    # veckodag/datum spelar roll här — alla våra crons ligger inom samma
-    # dygn) är ett entydigt tecken på att midnatt passerats sedan triggern.
-    # I så fall är cron-timmen stale — väggklockan används istället, vilket
-    # korrekt leder till att körningen inte matchar något fönster och
-    # avslutas utan publicering (samma säkra beteende som innan PR #1278).
+    # faktiskt hade underskott (Codex P2, PR #1278).
+    #
+    # En ren timjämförelse (utc_now.hour < cron_hour) räcker inte: om
+    # förseningen är så stor att den nya timmen råkar vara >= cron-timmen
+    # (t.ex. en 21:50-catch-up som startar nästa dag 22:00, eller en
+    # 05:00-körning som startar nästa dag efter 05:00) ser stale cron-tid ut
+    # som en giltig timme trots att dygnet redan bytts (Codex P2, PR #1280).
+    # AGENT_RUN_CREATED_AT (satt av agent.yml från GitHubs egen API för
+    # körningens skapelsetid — den faktiska avfyrningstidpunkten, oavsett hur
+    # länge jobbet sedan köade) ger ett exakt datum att jämföra mot väggklockans
+    # datum. Faller tillbaka på den gamla timheuristiken om tidsstämpeln
+    # saknas eller inte går att tolka (t.ex. API-anropet misslyckades).
     _CRON_TILL_TIMME = {
         "0 5 * * *": 5, "0 6 * * *": 6, "0 7 * * *": 7, "0 8 * * *": 8,
         "0 13 * * *": 13, "0 14 * * *": 14, "0 15 * * *": 15, "0 16 * * *": 16,
@@ -329,7 +334,17 @@ def main():
     }
     _utc_now = datetime.now(timezone.utc)
     _cron_hour = _CRON_TILL_TIMME.get(os.environ.get("AGENT_CRON", "").strip())
-    utc_hour = _cron_hour if (_cron_hour is not None and _utc_now.hour >= _cron_hour) else _utc_now.hour
+    _cron_stale = None
+    _run_created_raw = os.environ.get("AGENT_RUN_CREATED_AT", "").strip()
+    if _cron_hour is not None and _run_created_raw:
+        try:
+            _run_created = datetime.fromisoformat(_run_created_raw.replace("Z", "+00:00"))
+            _cron_stale = _run_created.date() != _utc_now.date()
+        except ValueError:
+            _cron_stale = None
+    if _cron_stale is None and _cron_hour is not None:
+        _cron_stale = _utc_now.hour < _cron_hour
+    utc_hour = _cron_hour if (_cron_hour is not None and not _cron_stale) else _utc_now.hour
     idag_publicerat = hamta_publicerade_idag_per_typ(sb_key) if sb_key else {"nyhet": 0, "replik": 0, "eget": 0}
     force_nyhet  = utc_hour in (5, 6, 7, 8)   and idag_publicerat["nyhet"]  < 4
     force_replik = utc_hour in (13, 14, 15, 16) and idag_publicerat["replik"] < 4

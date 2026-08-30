@@ -55,6 +55,7 @@ jobs:
     permissions:
       contents: write
       models: read
+      actions: read
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -66,6 +67,21 @@ jobs:
 
       - name: Installera beroenden
         run: pip install anthropic httpx youtube-transcript-api
+
+      # Hämtar körningens faktiska skapelsetidpunkt (när triggern verkligen
+      # avfyrades) via GitHub API, inte väggklockan vid jobbstart. Behövs för
+      # att agent.py ska kunna avgöra om en försenad cron-trigger är stale
+      # över en midnattsgräns — timjämförelse ensam räcker inte om
+      # förseningen är så stor att den nya timmen råkar vara >= cron-timmen
+      # (Codex P2, PR #1280). Faller tyst tillbaka till tom sträng vid fel —
+      # agent.py har en timbaserad reservlösning.
+      - name: Hämta körningens skapelsetid
+        id: run_meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CREATED_AT=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" --jq .created_at 2>/dev/null || echo "")
+          echo "created_at=$CREATED_AT" >> "$GITHUB_OUTPUT"
 
       - name: Kör agent
         env:
@@ -98,4 +114,9 @@ jobs:
           # försenad trigger (t.ex. en catch-up-cron köad bakom concurrency-
           # gruppen) hamna i fel eller inget fönster alls (Codex P2, PR #1277).
           AGENT_CRON: ${{ github.event.schedule }}
+          # Triggerns faktiska avfyrningstidpunkt (ISO 8601, UTC) — används för
+          # att avgöra om AGENT_CRON är stale över en midnattsgräns (se steget
+          # "Hämta körningens skapelsetid" ovan). Tom sträng om API-anropet
+          # misslyckades.
+          AGENT_RUN_CREATED_AT: ${{ steps.run_meta.outputs.created_at }}
         run: python -u agent.py
