@@ -300,7 +300,21 @@ def main():
     # räknar dagens redan publicerade artiklar per typ så att en extra körning
     # aldrig kan skjuta en typ över 4 — och en körning som varken hamnar i ett
     # fönster eller har en outnyttjad kvot avslutas utan att publicera något.
-    utc_hour = datetime.now(timezone.utc).hour
+    #
+    # utc_hour härleds i första hand ur det triggande cron-uttrycket
+    # (AGENT_CRON, satt av agent.yml från github.event.schedule) — inte
+    # väggklockan. En kraftigt försenad trigger (t.ex. en catch-up-cron köad
+    # bakom concurrency-gruppens queue: max) kan annars starta i nästa
+    # UTC-timme och tyst missa sitt fönster (Codex P2, PR #1277). Faller
+    # tillbaka på väggklockan för workflow_dispatch eller om cron-strängen
+    # inte känns igen.
+    _CRON_TILL_TIMME = {
+        "0 5 * * *": 5, "0 6 * * *": 6, "0 7 * * *": 7, "0 8 * * *": 8,
+        "0 13 * * *": 13, "0 14 * * *": 14, "0 15 * * *": 15, "0 16 * * *": 16,
+        "0 17 * * *": 17, "0 18 * * *": 18, "0 19 * * *": 19, "0 20 * * *": 20,
+        "30 21 * * *": 21, "40 21 * * *": 21, "50 21 * * *": 21,
+    }
+    utc_hour = _CRON_TILL_TIMME.get(os.environ.get("AGENT_CRON", "").strip(), datetime.now(timezone.utc).hour)
     idag_publicerat = hamta_publicerade_idag_per_typ(sb_key) if sb_key else {"nyhet": 0, "replik": 0, "eget": 0}
     force_nyhet  = utc_hour in (5, 6, 7, 8)   and idag_publicerat["nyhet"]  < 4
     force_replik = utc_hour in (13, 14, 15, 16) and idag_publicerat["replik"] < 4

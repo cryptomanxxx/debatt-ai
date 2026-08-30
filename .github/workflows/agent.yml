@@ -92,4 +92,10 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PYTHONUNBUFFERED: "1"
+          # Exakt cron-uttryck som triggade körningen (tomt vid workflow_dispatch).
+          # agent.py använder detta istället för väggklockans UTC-timme för att
+          # avgöra vilket publiceringsfönster som gäller — annars kan en kraftigt
+          # försenad trigger (t.ex. en catch-up-cron köad bakom concurrency-
+          # gruppen) hamna i fel eller inget fönster alls (Codex P2, PR #1277).
+          AGENT_CRON: ${{ github.event.schedule }}
         run: python -u agent.py
