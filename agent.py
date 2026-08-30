@@ -308,13 +308,28 @@ def main():
     # UTC-timme och tyst missa sitt fönster (Codex P2, PR #1277). Faller
     # tillbaka på väggklockan för workflow_dispatch eller om cron-strängen
     # inte känns igen.
+    #
+    # Om förseningen är så stor att körningen startar efter midnatt UTC är
+    # cron-timmen inte längre pålitlig: hamta_publicerade_idag_per_typ()
+    # räknar alltid mot "idag" enligt väggklockan, så att lita på gårdagens
+    # cron-timme (t.ex. 21 för en 23:50-catch-up som startar 00:15) skulle
+    # tvinga fram en artikel mot FEL dags kvot och aldrig åtgärda dagen som
+    # faktiskt hade underskott (Codex P2, PR #1278). En körning kan aldrig
+    # starta FÖRE sin egen trigger, så utc_now.hour < cron_hour (utan att
+    # veckodag/datum spelar roll här — alla våra crons ligger inom samma
+    # dygn) är ett entydigt tecken på att midnatt passerats sedan triggern.
+    # I så fall är cron-timmen stale — väggklockan används istället, vilket
+    # korrekt leder till att körningen inte matchar något fönster och
+    # avslutas utan publicering (samma säkra beteende som innan PR #1278).
     _CRON_TILL_TIMME = {
         "0 5 * * *": 5, "0 6 * * *": 6, "0 7 * * *": 7, "0 8 * * *": 8,
         "0 13 * * *": 13, "0 14 * * *": 14, "0 15 * * *": 15, "0 16 * * *": 16,
         "0 17 * * *": 17, "0 18 * * *": 18, "0 19 * * *": 19, "0 20 * * *": 20,
         "30 21 * * *": 21, "40 21 * * *": 21, "50 21 * * *": 21,
     }
-    utc_hour = _CRON_TILL_TIMME.get(os.environ.get("AGENT_CRON", "").strip(), datetime.now(timezone.utc).hour)
+    _utc_now = datetime.now(timezone.utc)
+    _cron_hour = _CRON_TILL_TIMME.get(os.environ.get("AGENT_CRON", "").strip())
+    utc_hour = _cron_hour if (_cron_hour is not None and _utc_now.hour >= _cron_hour) else _utc_now.hour
     idag_publicerat = hamta_publicerade_idag_per_typ(sb_key) if sb_key else {"nyhet": 0, "replik": 0, "eget": 0}
     force_nyhet  = utc_hour in (5, 6, 7, 8)   and idag_publicerat["nyhet"]  < 4
     force_replik = utc_hour in (13, 14, 15, 16) and idag_publicerat["replik"] < 4
