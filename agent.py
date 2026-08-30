@@ -35,6 +35,7 @@ from artikel import (
 )
 from supabase_utils import (
     hamta_statistik, hamta_senaste_artiklar, hamta_engagemang,
+    hamta_publicerade_idag_per_typ,
     hamta_agent_historik, hamta_amnesforslag, markera_forslag_behandlat,
     hamta_trendande_amnen, hamta_senaste_visualisering, publicera_visualisering,
     hamta_all_statistik, valj_visualisering, spara_nyhetslog,
@@ -290,10 +291,33 @@ def main():
     # 05:00–08:00 UTC (07:00–10:00 svensk tid) → garanterad nyhetsartikel (4 st/dag)
     # 13:00–16:00 UTC (15:00–18:00 svensk tid) → garanterad replik (4 st/dag)
     # 17:00–20:00 UTC (19:00–22:00 svensk tid) → garanterad eget ämne (4 st/dag)
+    #
+    # GitHub Actions garanterar INTE exakt en trigger per deklarerad cron-rad —
+    # schemaläggaren kan både hoppa över och (mindre vanligt men bekräftat
+    # förekommande) leverera extra triggers utanför alla tre fönster. Utan en
+    # kvotkontroll mot vad som faktiskt redan publicerats idag bryter
+    # 4+4+4-garantin ihop varje gång schemat avviker. hamta_publicerade_idag_per_typ()
+    # räknar dagens redan publicerade artiklar per typ så att en extra körning
+    # aldrig kan skjuta en typ över 4 — och en körning som varken hamnar i ett
+    # fönster eller har en outnyttjad kvot avslutas utan att publicera något.
     utc_hour = datetime.now(timezone.utc).hour
-    force_nyhet  = utc_hour in (5, 6, 7, 8)
-    force_replik = utc_hour in (13, 14, 15, 16)
-    force_eget   = utc_hour in (17, 18, 19, 20)
+    idag_publicerat = hamta_publicerade_idag_per_typ(sb_key) if sb_key else {"nyhet": 0, "replik": 0, "eget": 0}
+    force_nyhet  = utc_hour in (5, 6, 7, 8)   and idag_publicerat["nyhet"]  < 4
+    force_replik = utc_hour in (13, 14, 15, 16) and idag_publicerat["replik"] < 4
+    force_eget   = utc_hour in (17, 18, 19, 20) and idag_publicerat["eget"]   < 4
+
+    # Manuell workflow_dispatch-körning kringgår aldrig kvoten ovan (en agent
+    # publicerar aldrig en 5:e artikel av samma typ samma dag), men får — till
+    # skillnad från en oschemalagd extra cron-trigger — fortfarande skriva en
+    # artikel via den vanliga slumpmässiga logiken nedan när inget fönster
+    # gäller. En riktig extra cron-trigger (fel UTC-timme ELLER dagens kvot
+    # för den matchande typen redan uppnådd) avslutas tyst utan publicering.
+    ar_manuell_korning = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+    if not (force_nyhet or force_replik or force_eget) and not ar_manuell_korning:
+        print(f"Ingen artikel skriven — körningen (UTC-timme {utc_hour}) matchar inget öppet publiceringsfönster.")
+        print(f"Dagens läge hittills: {idag_publicerat['nyhet']} nyhet / {idag_publicerat['replik']} replik / {idag_publicerat['eget']} eget (mål: 4/4/4).")
+        print("(Extra körning utöver de 12 schemalagda, eller kvoten redan uppnådd — skrivs medvetet inte för att hålla 4+4+4 korrekt.)")
+        sys.exit(0)
 
     original = None
     forslag_id = None
