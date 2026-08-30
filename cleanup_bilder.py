@@ -95,7 +95,12 @@ def main():
         raderade_filer = 0
         for i in range(0, len(storage_filnamn), chunk_size):
             batch = storage_filnamn[i:i + chunk_size]
-            dr = httpx.delete(
+            # httpx.delete() saknar json=-stöd (bara post/put/patch har det i
+            # bekvämlighetswrapprarna) — httpx.request("DELETE", ...) stödjer
+            # body oavsett httpx-version, vilket krävs för Supabase Storages
+            # bulk-delete-API ({"prefixes": [...]}).
+            dr = httpx.request(
+                "DELETE",
                 f"{SB_URL}/storage/v1/object/{STORAGE_BUCKET}",
                 headers=h_write,
                 json={"prefixes": batch},
