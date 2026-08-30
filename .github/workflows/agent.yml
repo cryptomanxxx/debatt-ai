@@ -17,13 +17,18 @@ on:
     - cron: "0 18 * * *"  # 20:00 svensk tid
     - cron: "0 19 * * *"  # 21:00 svensk tid
     - cron: "0 20 * * *"  # 22:00 svensk tid
-    # Catch-up: 23:30 svensk tid (21:30 UTC) — inget eget fönster, men agent.py
-    # kollar dagens 4+4+4-kvot och tvingar fram en artikel av vilken typ som
-    # helst som fortfarande ligger under 4 (t.ex. om ett tidigare cron-pass
-    # missades eller inte gav en publicerbar artikel). No-op om kvoten redan
-    # är fylld. Minuttalet 30 (istället för :00) undviker medvetet GitHubs
-    # kända köbildning kring hela timmar.
-    - cron: "30 21 * * *"  # 23:30 svensk tid — catch-up
+    # Catch-up: 23:30–23:50 svensk tid (21:30–21:50 UTC), tre försök — inget
+    # eget fönster, men agent.py kollar dagens 4+4+4-kvot vid varje pass och
+    # tvingar fram en artikel av vilken typ som helst som fortfarande ligger
+    # under 4 (t.ex. om flera tidigare cron-pass missades eller inte gav en
+    # publicerbar artikel). Varje pass läser kvoten på nytt, så tre pass kan
+    # tillsammans täcka upp till tre missade artiklar samma dag (Codex P2,
+    # PR #1273 — ett enda pass täckte bara ett underskott). No-op så fort
+    # kvoten är fylld. Minuttalen (istället för :00) undviker medvetet
+    # GitHubs kända köbildning kring hela timmar.
+    - cron: "30 21 * * *"  # 23:30 svensk tid — catch-up 1/3
+    - cron: "40 21 * * *"  # 23:40 svensk tid — catch-up 2/3
+    - cron: "50 21 * * *"  # 23:50 svensk tid — catch-up 3/3
   workflow_dispatch:       # Kan också köras manuellt från GitHub
 
 # Serialiserar körningar istället för att låta dem köra parallellt — utan
