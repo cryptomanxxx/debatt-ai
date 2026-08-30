@@ -3,12 +3,16 @@
  * economy-observer.js
  *
  * Hämtar ekonomisk data från Supabase, beräknar nyckeltal och kallar
- * Cerebras (Llama 3.3 70B) för en strukturerad ekonomianalys av AI-civilisationen.
+ * plattformens centrala dynamiska AI-fallback-kedja (app/lib/aiRouter.js,
+ * usecase "economy" — Cerebras prioriterat för starkare resonemang, men
+ * med automatisk fallback till Groq/Gemini/m.fl. om Cerebras är
+ * otillgängligt eller slut på krediter) för en strukturerad ekonomianalys
+ * av AI-civilisationen.
  *
  * Sparar till ai-bus/discussions/YYYY-MM-DD-HHmm-economy.md
  *
  * Körs av GitHub Actions (economy-observer.yml) eller manuellt:
- *   CEREBRAS_API_KEY=xxx SUPABASE_ANON_KEY=xxx node agents/economy-observer.js
+ *   GROQ_API_KEY=xxx CEREBRAS_API_KEY=xxx SUPABASE_ANON_KEY=xxx node agents/economy-observer.js
  */
 
 const fs    = require("fs");
@@ -16,14 +20,12 @@ const path  = require("path");
 const https = require("https");
 const { EXKL_SYSTEM_QS, gini, toppAndel } = require(path.join(__dirname, "..", "app", "lib", "metrics.js"));
 
-const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
 const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_URL       = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const DISCUSSIONS  = path.join(__dirname, "../ai-bus/discussions");
 const ECONOMY_DIR  = path.join(DISCUSSIONS, "economy");
 
-if (!CEREBRAS_KEY) { console.error("CEREBRAS_API_KEY saknas"); process.exit(1); }
-if (!SB_KEY)       { console.error("SUPABASE_ANON_KEY saknas"); process.exit(1); }
+if (!SB_KEY) { console.error("SUPABASE_ANON_KEY saknas"); process.exit(1); }
 
 function tidsstämpel() {
   return new Date().toISOString().slice(0, 16).replace("T", "-").replace(":", "");
@@ -55,29 +57,6 @@ function httpGet(host, pathStr, headers) {
     );
     req.on("error", () => resolve([]));
     req.setTimeout(10000, () => { req.destroy(); resolve([]); });
-    req.end();
-  });
-}
-
-function httpPost(url, headers, body) {
-  return new Promise((resolve, reject) => {
-    const u   = new URL(url);
-    const buf = Buffer.from(body);
-    const req = https.request(
-      { hostname: u.hostname, path: u.pathname + u.search, method: "POST",
-        headers: { ...headers, "Content-Length": buf.length } },
-      (res) => {
-        let data = "";
-        res.on("data", c => data += c);
-        res.on("end", () => {
-          try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
-          catch { resolve({ status: res.statusCode, data }); }
-        });
-      }
-    );
-    req.on("error", reject);
-    req.setTimeout(60000, () => { req.destroy(); reject(new Error("timeout")); });
-    req.write(buf);
     req.end();
   });
 }
@@ -209,35 +188,18 @@ function byggPrompt(nyckeltal, data, datum) {
   return `Du är en ekonomisk analytiker som specialiserar dig på AI-civilisationer och emergenta ekonomier. Du analyserar debatt-ai — en plattform med 24 autonoma AI-agenter med egna virtuella ekonomier.\n\n## Ekonomidata — vecka ${vecka} (${datum})\n\n### Förmögenhetsfördelning\n- Gini-koefficient: ${k.senGini} (0=perfekt jämlikhet, 1=total koncentration)\n- Topp-3 agenter äger: ${k.t3}% av total förmögenhet\n- Total förmögenhet i omlopp: ${k.totalK} kr\n- Medelsaldo: ${k.medelS} kr\n- Rikast: ${k.rikastAgent} (${k.rikastSaldo} kr)\n- Fattigast: ${k.fattigAgent} (${k.fattigSaldo} kr)\n\nTopp 5 rikaste agenter:\n${topp5}\n\n### Statsbudget (vecka ${vecka})\n- Skatteintäkter: ${k.skattVecka} kr (2% förmögenhetsskatt > 1 000 kr)\n- Grundinkomst utbetald: ${k.grundVecka} kr\n- Bailouts: ${k.bailoutVecka} kr\n- Netto staten: ${k.skattVecka - k.grundVecka - k.bailoutVecka} kr\n\n### Kreditmarknaden\n- Aktiva lån: ${k.antalLan}\n- Total skuldbörda: ${k.totSkuld} kr\n${lanSamm}\n\n### Börsen (senaste 7 dagarna)\n- Handelsvolym: ${k.volym7d} kr (${k.antalAffarer7d} affärer)\n- Volym per token:\n${symbolSamm}\n\n### Ekonomispel (diktatorspelet / ultimatumspelet)\n- Accept-rate ultimatum: ${k.acceptRate !== null ? `${k.acceptRate}%` : "otillräcklig data"}\n\n### Socialt kapital (IFL)\n- Total social feedback-volym: ${k.totalFeedback} kr\n\n### Oligarkirisk-trend\n- Förändring senaste 7 dagarna: ${trendText} poäng\n\n---\n\n## Din uppgift\n\nSkriv en ekonomianalys (400-600 ord) på svenska för AI-civilisationens ekonomi. Formatet ska vara:\n\n# Ekonomianalys: [Rubrik som fångar veckans viktigaste trend]\n**Datum:** ${datum}\n**Vecka:** ${vecka}\n\n## Nuläge\n(3-4 meningar om det allmänna ekonomiska läget)\n\n## Nyckelobservationer\n(3-5 konkreta observationer med siffrorna som stöd)\n\n## Varningar\n(eventuella risker — hög skuldsättning, Gini > 0.5, handelsvolym faller, etc. Skriv "Inga kritiska varningar" om läget är stabilt)\n\n## Rekommendationer till systemet\n(2-3 konkreta åtgärder som civilisationen eller plattformsutvecklaren kan vidta)\n\n## Nästa vecka — vad att bevaka\n(1-2 konkreta saker att följa upp)\n\nVar analytisk och specifik. Referera till faktiska siffror. Jämför med ekonomisk teori när relevant (Gini, Pareto, Keynes, etc.).`;
 }
 
-async function kallaCerebras(prompt) {
-  const body = JSON.stringify({
-    model: "gpt-oss-120b",
-    messages: [{ role: "user", content: prompt }],
-    max_tokens: 1400,
-    temperature: 0.7,
-  });
-
-  let lastErr;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const { status, data } = await httpPost(
-        "https://api.cerebras.ai/v1/chat/completions",
-        { Authorization: `Bearer ${CEREBRAS_KEY}`, "Content-Type": "application/json" },
-        body
-      );
-      if (status !== 200) throw new Error(`Cerebras ${status}: ${JSON.stringify(data).slice(0, 200)}`);
-      const text = data?.choices?.[0]?.message?.content;
-      if (!text) throw new Error("Cerebras returnerade ingen text");
-      return text.trim();
-    } catch (e) {
-      lastErr = e;
-      if (attempt < 3) {
-        console.warn(`Cerebras försök ${attempt} misslyckades: ${e.message} — försöker igen om ${attempt * 2}s`);
-        await new Promise(r => setTimeout(r, attempt * 2000));
-      }
-    }
-  }
-  throw lastErr;
+async function kallaAi(prompt) {
+  // aiRouter.js är ESM — dynamisk import() krävs i detta CommonJS-skript.
+  const { getDynamicChain, callWithFallback } = await import(
+    path.join(__dirname, "..", "app", "lib", "aiRouter.js")
+  );
+  const chain = await getDynamicChain("economy");
+  const { text, provider, model } = await callWithFallback(
+    chain,
+    [{ role: "user", content: prompt }],
+    { maxTokens: 1400, temperature: 0.7, source: "economy-observer" }
+  );
+  return { text: text.trim(), provider, model };
 }
 
 async function main() {
@@ -254,12 +216,13 @@ async function main() {
 
   const prompt = byggPrompt(nyckeltal, data, datum);
 
-  console.log("Kallar Cerebras för ekonomianalys…");
-  let analys;
+  console.log("Kallar AI för ekonomianalys (dynamisk fallback-kedja)…");
+  let analys, anvandProvider, anvandModell;
   try {
-    analys = await kallaCerebras(prompt);
+    ({ text: analys, provider: anvandProvider, model: anvandModell } = await kallaAi(prompt));
+    console.log(`Ekonomianalys genererad av ${anvandProvider} (${anvandModell})`);
   } catch (e) {
-    console.error("Cerebras misslyckades:", e.message);
+    console.error("Alla AI-providers misslyckades:", e.message);
     process.exit(1);
   }
 
@@ -278,7 +241,7 @@ async function main() {
     "---",
   ].join("\n");
 
-  const innehall = `${frontmatter}\n\n${analys}\n\n---\n*Genererad av economy-observer.js med Cerebras Llama 3.3 70B, ${datum}*\n`;
+  const innehall = `${frontmatter}\n\n${analys}\n\n---\n*Genererad av economy-observer.js med ${anvandProvider} (${anvandModell}), ${datum}*\n`;
   fs.writeFileSync(utfil, innehall, "utf8");
   console.log(`Ekonomianalys sparad: ${utfil}`);
 }
