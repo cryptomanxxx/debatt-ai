@@ -309,11 +309,13 @@ def main():
     # 21:xx UTC (23:xx svensk tid) → catch-up-fönster. De tre fönstren ovan
     # garanterar bara att en typ INTE skjuts över 4 — de gör inget om ett
     # tidigare pass missades helt (GitHub hoppade över triggern) eller inte
-    # gav en publicerbar artikel den dagen. Om exakt ett catch-up-pass körs
-    # sent på kvällen (se agent.yml, 21:30 UTC) och något av de tre målen
-    # fortfarande ligger under 4 här, tvingas den mest eftersatta typen fram.
-    # Redan fylld kvot (alla tre = 4) gör ingenting — faller igenom till
-    # skip-kontrollen nedan precis som en vanlig extra körning.
+    # gav en publicerbar artikel den dagen. Tre catch-up-pass körs sent på
+    # kvällen (se agent.yml, 21:30/21:40/21:50 UTC); vid vart och ett läses
+    # dagens kvot på nytt, så upp till tre missade artiklar samma dag kan
+    # täckas — inte bara en (Codex P2, PR #1273). Varje pass tvingar fram
+    # den mest eftersatta typen. Redan fylld kvot (alla tre = 4) gör
+    # ingenting — faller igenom till skip-kontrollen nedan precis som en
+    # vanlig extra körning.
     if utc_hour == 21 and not (force_nyhet or force_replik or force_eget):
         brist = {
             "nyhet":  4 - idag_publicerat["nyhet"],
