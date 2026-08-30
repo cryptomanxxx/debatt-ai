@@ -306,6 +306,30 @@ def main():
     force_replik = utc_hour in (13, 14, 15, 16) and idag_publicerat["replik"] < 4
     force_eget   = utc_hour in (17, 18, 19, 20) and idag_publicerat["eget"]   < 4
 
+    # 21:xx UTC (23:xx svensk tid) → catch-up-fönster. De tre fönstren ovan
+    # garanterar bara att en typ INTE skjuts över 4 — de gör inget om ett
+    # tidigare pass missades helt (GitHub hoppade över triggern) eller inte
+    # gav en publicerbar artikel den dagen. Om exakt ett catch-up-pass körs
+    # sent på kvällen (se agent.yml, 21:30 UTC) och något av de tre målen
+    # fortfarande ligger under 4 här, tvingas den mest eftersatta typen fram.
+    # Redan fylld kvot (alla tre = 4) gör ingenting — faller igenom till
+    # skip-kontrollen nedan precis som en vanlig extra körning.
+    if utc_hour == 21 and not (force_nyhet or force_replik or force_eget):
+        brist = {
+            "nyhet":  4 - idag_publicerat["nyhet"],
+            "replik": 4 - idag_publicerat["replik"],
+            "eget":   4 - idag_publicerat["eget"],
+        }
+        # Prioritetsordning vid oavgjort underskott: nyhet > replik > eget
+        prio = {"nyhet": 2, "replik": 1, "eget": 0}
+        kandidater = [t for t, b in brist.items() if b > 0]
+        if kandidater:
+            vald_typ = max(kandidater, key=lambda t: (brist[t], prio[t]))
+            force_nyhet  = vald_typ == "nyhet"
+            force_replik = vald_typ == "replik"
+            force_eget   = vald_typ == "eget"
+            print(f"🕚 Catch-up: {vald_typ} ligger efter idag ({idag_publicerat[vald_typ]}/4) — tvingar en {vald_typ}-artikel.")
+
     # Manuell workflow_dispatch-körning kringgår aldrig kvoten ovan (en agent
     # publicerar aldrig en 5:e artikel av samma typ samma dag), men får — till
     # skillnad från en oschemalagd extra cron-trigger — fortfarande skriva en
