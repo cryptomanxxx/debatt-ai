@@ -15,8 +15,6 @@ const _downUntil = {
   groq_kanal: 0,
   gemini:     0,
   mistral:    0,
-  cerebras:   0,
-  sambanova:  0,
   deepseek:   0,
   cloudflare: 0,
 };

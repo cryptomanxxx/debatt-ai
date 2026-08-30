@@ -6,12 +6,14 @@ Faller tillbaka på hårdkodad standardordning om Supabase är otillgänglig.
 Rate limits (free tier):
   Groq:         30 RPM,  1 000 RPD, ~144k TPD  (gäller sannolikt per Groq-konto/org,
                 inte per nyckel — flera nycklar från samma konto kan dela samma TPD-kvot)
-  Sambanova:    20 RPM,    20M TPD  ← bäst för batch
-  Cerebras:     30 RPM,     1M TPD  ← näst bäst
   Gemini Flash:  15 RPM,   250 RPD
 
 GitHub Models (tidigare "sista utväg"-fallback) stängde helt 30 jul 2026 —
 borttaget ur alla kedjor (se CLAUDE.md).
+
+Cerebras och Sambanova borttagna 30 aug 2026 — båda kräver nu betalkort/
+betalning för fortsatt användning, vilket projektägaren valt att inte
+teckna (se CLAUDE.md).
 """
 
 import httpx
@@ -28,12 +30,12 @@ _groq_nere_keys: set[str] = set()
 
 # ── Dynamisk fallback-ordning ──────────────────────────────────────────────────
 
-_DEFAULT_ORDER = ["groq", "mistral", "sambanova", "deepseek", "cloudflare", "gemini", "cerebras"]
+_DEFAULT_ORDER = ["groq", "mistral", "deepseek", "cloudflare", "gemini"]
 
 # Hårdkodad kedja för artikelskrivning — exkluderar Mistral/Codestral (kodmodell, sämre på
 # kreativ långform svenska) samt DeepSeek och Cloudflare (lägre kvalitet för långa texter).
 # Oberoende av den dynamiska benchmark-rankingen i _fallback_order.
-_ARTIKEL_CHAIN = ["groq", "deepseek", "sambanova", "cerebras"]
+_ARTIKEL_CHAIN = ["groq", "deepseek"]
 _SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 
@@ -173,9 +175,7 @@ def hamta_artikel_fns(payload: dict, system: str, user_msg: str, max_tokens: int
     alla = {
         "groq":          ("Groq",          lambda: _nonempty(groq_post(payload).json()["choices"][0]["message"]["content"])),
         "mistral":       ("Mistral",        lambda: _nonempty(mistral_post(payload).json()["choices"][0]["message"]["content"])),
-        "sambanova":     ("Sambanova",      lambda: _nonempty(sambanova_post(payload).json()["choices"][0]["message"]["content"])),
         "deepseek":      ("DeepSeek",       lambda: _nonempty(deepseek_post(payload).json()["choices"][0]["message"]["content"])),
-        "cerebras":      ("Cerebras",       lambda: _nonempty(cerebras_post(payload).json()["choices"][0]["message"]["content"])),
         "cloudflare":    ("Cloudflare",     lambda: _nonempty(cloudflare_post(system, user_msg, max_tokens=max_tokens))),
         "gemini":        ("Gemini",         lambda: _nonempty(gemini_post(system, user_msg, max_tokens=max_tokens))),
     }
@@ -187,9 +187,7 @@ def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int, sou
     alla = {
         "groq":          ("Groq",         lambda: groq_post(payload).json()["choices"][0]["message"]["content"].strip()),
         "mistral":       ("Mistral",       lambda: mistral_post(payload).json()["choices"][0]["message"]["content"].strip()),
-        "sambanova":     ("Sambanova",     lambda: sambanova_post(payload).json()["choices"][0]["message"]["content"].strip()),
         "deepseek":      ("DeepSeek",      lambda: deepseek_post(payload).json()["choices"][0]["message"]["content"].strip()),
-        "cerebras":      ("Cerebras",      lambda: cerebras_post(payload).json()["choices"][0]["message"]["content"].strip()),
         "cloudflare":    ("Cloudflare",    lambda: cloudflare_post(system[:600], prompt, max_tokens=max_tokens).strip()),
         "gemini":        ("Gemini",        lambda: (gemini_post(system[:600], prompt, max_tokens=max_tokens) or "").strip()),
     }
@@ -289,66 +287,6 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
             print("  Gemini dagsgräns nådd — markeras som nere för resten av körningen")
             break
     raise Exception(f"Gemini misslyckades: {last_err}")
-
-
-def sambanova_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
-    """Sambanova Cloud — 20M tokens/dag gratis, 20 RPM. OpenAI-kompatibel."""
-    if "sambanova" in _nere:
-        raise Exception("Sambanova markerad som nere denna körning — hoppar direkt till fallback")
-    api_key = os.environ.get("SAMBANOVA_API_KEY")
-    if not api_key:
-        _nere.add("sambanova")
-        raise Exception("SAMBANOVA_API_KEY saknas")
-    url = "https://api.sambanova.ai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {**json_payload, "model": "Meta-Llama-3.3-70B-Instruct"}
-    last_r = None
-    for attempt in range(3):
-        r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
-        last_r = r
-        if r.status_code == 429:
-            wait = min(int(r.headers.get("retry-after", 15)) + 2, 60)
-            print(f"  Sambanova rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
-            time.sleep(wait)
-            continue
-        if r.status_code in (401, 403):
-            _nere.add("sambanova")
-            raise Exception(f"Sambanova autentiseringsfel: {r.status_code}")
-        r.raise_for_status()
-        return r
-    logga_429_passivt("sambanova")
-    _nere.add("sambanova")
-    raise Exception(f"Sambanova rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
-
-
-def cerebras_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
-    """Cerebras — 1M tokens/dag gratis, 30 RPM. OpenAI-kompatibel."""
-    if "cerebras" in _nere:
-        raise Exception("Cerebras markerad som nere denna körning — hoppar direkt till fallback")
-    api_key = os.environ.get("CEREBRAS_API_KEY")
-    if not api_key:
-        _nere.add("cerebras")
-        raise Exception("CEREBRAS_API_KEY saknas")
-    url = "https://api.cerebras.ai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {**json_payload, "model": "gemma-4-31b", "stream": False}
-    last_r = None
-    for attempt in range(3):
-        r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
-        last_r = r
-        if r.status_code == 429:
-            wait = min(int(r.headers.get("retry-after", 10)) + 2, 60)
-            print(f"  Cerebras rate-limit (429) — väntar {wait}s (försök {attempt + 1}/3)…")
-            time.sleep(wait)
-            continue
-        if r.status_code in (401, 403):
-            _nere.add("cerebras")
-            raise Exception(f"Cerebras autentiseringsfel: {r.status_code}")
-        r.raise_for_status()
-        return r
-    logga_429_passivt("cerebras")
-    _nere.add("cerebras")
-    raise Exception(f"Cerebras rate-limit kvarstår efter 3 försök — markeras som nere. Svar: {last_r.text[:200] if last_r else 'okänt'}")
 
 
 def deepseek_post(json_payload: dict, timeout: int = 60) -> httpx.Response:

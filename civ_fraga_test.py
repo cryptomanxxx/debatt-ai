@@ -9,8 +9,6 @@ Miljövariabler:
   GROQ_API_KEY          (primär LLM)
   GEMINI_API_KEY        (fallback)
   MISTRAL_API_KEY       (fallback)
-  CEREBRAS_API_KEY      (fallback)
-  GITHUB_TOKEN          (sista utväg)
 
 Valfri env:
   AGENTER_SUBSET   komma-separerade agentnamn, t.ex. "Filosof,Juristen"

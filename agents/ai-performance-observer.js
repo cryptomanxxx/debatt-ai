@@ -14,7 +14,6 @@ const path  = require("path");
 const https = require("https");
 
 const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const CEREBRAS_KEY = process.env.CEREBRAS_API_KEY;
 const SB_URL       = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const DISCUSSIONS  = path.join(__dirname, "../ai-bus/discussions");
 const PERF_DIR     = path.join(DISCUSSIONS, "ai-performance");
@@ -58,30 +57,6 @@ function httpGet(host, pathStr, headers) {
     );
     req.on("error", () => resolve([]));
     req.setTimeout(15000, () => { req.destroy(); resolve([]); });
-    req.end();
-  });
-}
-
-function httpPost(urlStr, headers, body) {
-  return new Promise((resolve) => {
-    const u = new URL(urlStr);
-    const bodyStr = JSON.stringify(body);
-    const req = https.request(
-      {
-        hostname: u.hostname,
-        path: u.pathname,
-        method: "POST",
-        headers: { ...headers, "Content-Length": Buffer.byteLength(bodyStr) },
-      },
-      (res) => {
-        let data = "";
-        res.on("data", c => data += c);
-        res.on("end", () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
-      }
-    );
-    req.on("error", () => resolve(null));
-    req.setTimeout(30000, () => { req.destroy(); resolve(null); });
-    req.write(bodyStr);
     req.end();
   });
 }
@@ -300,10 +275,11 @@ async function main() {
     return `  ${p}:\n    anrop: ${tot}\n    ok: ${s?.ok ?? 0}\n    rate_limits: ${s?.rate_limits ?? 0}\n    errors: ${s?.errors ?? 0}\n    snitt_ms: ${ms ?? "null"}`;
   }).join("\n");
 
-  // Cerebras-analys (körs bara om nyckel finns)
+  // LLM-analys via central dynamisk fallback-kedja (app/lib/aiRouter.js,
+  // usecase "general") — tidigare hårdkodad mot Cerebras direkt.
   let analys = "";
-  if (CEREBRAS_KEY && allProviders.length > 0) {
-    console.log("Genererar LLM-analys med Cerebras…");
+  if (allProviders.length > 0) {
+    console.log("Genererar LLM-analys (dynamisk fallback-kedja)…");
     const summary = allProviders.map(p => {
       const s   = stats24[p];
       const b   = benchByProvider[p];
@@ -316,14 +292,15 @@ async function main() {
       return `${p}: ${tot} anrop, ${okPct ?? "–"}% ok, ${s?.rate_limits ?? 0} rate-limits, ${ms ?? "–"} ms${benchNote}`;
     }).join("\n");
 
-    const result = await httpPost(
-      "https://api.cerebras.ai/v1/chat/completions",
-      { Authorization: `Bearer ${CEREBRAS_KEY}`, "Content-Type": "application/json" },
-      {
-        model: "gpt-oss-120b",
-        max_tokens: 350,
-        temperature: 0.5,
-        messages: [{
+    try {
+      // aiRouter.js är ESM — dynamisk import() krävs i detta CommonJS-skript.
+      const { getDynamicChain, callWithFallback } = await import(
+        path.join(__dirname, "..", "app", "lib", "aiRouter.js")
+      );
+      const chain = await getDynamicChain("general");
+      const { text } = await callWithFallback(
+        chain,
+        [{
           role: "user",
           content: `Du är en teknisk systemobservatör för AI-plattformen debatt-ai.se.
 Skriv 3-4 meningar på svenska om AI-provider-prestandan senaste 24h.
@@ -338,9 +315,12 @@ Problemleverantörer (>30% rl eller <50% ok): ${problemProviders.join(", ") || "
 Per provider:
 ${summary}`,
         }],
-      }
-    );
-    analys = result?.choices?.[0]?.message?.content?.trim() || "";
+        { maxTokens: 350, temperature: 0.5, source: "ai-performance-observer" }
+      );
+      analys = text.trim();
+    } catch (e) {
+      console.error("LLM-analys misslyckades:", e.message);
+    }
   }
 
   // Groq nyckelrad för YAML och markdown — TPD-kvoten gäller sannolikt per konto, inte per nyckel

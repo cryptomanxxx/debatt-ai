@@ -86,8 +86,6 @@ export async function POST(req) {
 
   const gemKey  = process.env.GEMINI_API_KEY;
   const groqKey = process.env.GROQ_API_KEY;
-  const cbKey   = process.env.CEREBRAS_API_KEY;
-  const sbKey   = process.env.SAMBANOVA_API_KEY;
 
   // Groq
   if (groqKey && providerReady("groq")) {
@@ -112,51 +110,7 @@ export async function POST(req) {
     } catch {}
   }
 
-  // Cerebras
-  if (cbKey && providerReady("cerebras")) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://api.cerebras.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${cbKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "gpt-oss-120b", messages: msgs, max_tokens: 200, temperature: 0.9 }),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (r.ok) {
-        const json = await r.json();
-        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-        if (text) {
-          logAiCall({ provider: "cerebras", model: "gpt-oss-120b", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
-          await sparaUtmaning(agent, tesTrimmed, text, ip);
-          return Response.json({ motargument: text });
-        }
-      }
-      if (r.status === 429) markProviderDown("cerebras");
-    } catch {}
-  }
-
-  // Sambanova
-  if (sbKey && providerReady("sambanova")) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://api.sambanova.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${sbKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "Meta-Llama-3.3-70B-Instruct", messages: msgs, max_tokens: 200, temperature: 0.9 }),
-        signal: AbortSignal.timeout(10000),
-      });
-      if (r.ok) {
-        const json = await r.json();
-        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-        if (text) {
-          logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
-          await sparaUtmaning(agent, tesTrimmed, text, ip);
-          return Response.json({ motargument: text });
-        }
-      }
-      if (r.status === 429) markProviderDown("sambanova");
-    } catch {}
-  }
+  // Cerebras/Sambanova (kräver nu betalning) togs bort 30 aug 2026
 
   // Gemini
   if (gemKey && providerReady("gemini")) {

@@ -7,23 +7,20 @@
  * LLM-genererad utfallsbedömning baserad på aktuell plattformsstatistik.
  *
  * Körs varje måndag (outcome-observer.yml) eller manuellt:
- *   CEREBRAS_API_KEY=xxx SUPABASE_ANON_KEY=xxx node agents/outcome-observer.js
+ *   GROQ_API_KEY=xxx SUPABASE_ANON_KEY=xxx node agents/outcome-observer.js
+ *
+ * LLM-anrop går via den centrala dynamiska fallback-kedjan (app/lib/aiRouter.js,
+ * usecase "general") — inte hårdkodat mot en enskild provider.
  */
 
 const fs   = require("fs");
 const path = require("path");
 const https = require("https");
 
-const CEREBRAS_KEY    = process.env.CEREBRAS_API_KEY;
 const SUPABASE_URL    = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SUPABASE_KEY    = process.env.SUPABASE_ANON_KEY;
 const IMPLEMENTED_DIR = path.join(__dirname, "../ai-bus/implemented");
 const DISCUSSIONS_DIR = path.join(__dirname, "../ai-bus/discussions");
-
-if (!CEREBRAS_KEY) {
-  console.error("CEREBRAS_API_KEY saknas — avbryter");
-  process.exit(1);
-}
 
 // ── Hjälpfunktioner ────────────────────────────────────────────────────────
 
@@ -150,37 +147,20 @@ function readRecentDiscussions(n = 4) {
   }).filter(Boolean).join("\n---\n");
 }
 
-// ── LLM-anrop med retry ────────────────────────────────────────────────────
+// ── LLM-anrop via central fallback-kedja ────────────────────────────────────
 
-async function kallaCerebras(prompt) {
-  const body = JSON.stringify({
-    model: "gpt-oss-120b",
-    messages: [{ role: "user", content: prompt }],
-    max_tokens: 700,
-    temperature: 0.5,
-  });
-
-  let lastErr;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const { status, data } = await httpJson("https://api.cerebras.ai/v1/chat/completions", {
-        method:  "POST",
-        headers: { Authorization: `Bearer ${CEREBRAS_KEY}`, "Content-Type": "application/json" },
-        body,
-      });
-      if (status !== 200) throw new Error(`Cerebras API ${status}: ${JSON.stringify(data).slice(0, 200)}`);
-      const text = data?.choices?.[0]?.message?.content;
-      if (!text) throw new Error("Cerebras returnerade ingen text");
-      return text.trim();
-    } catch (e) {
-      lastErr = e;
-      if (attempt < 3) {
-        console.warn(`Cerebras försök ${attempt} misslyckades: ${e.message} — försöker igen om ${attempt * 2}s`);
-        await new Promise(r => setTimeout(r, attempt * 2000));
-      }
-    }
-  }
-  throw lastErr;
+async function kallaAi(prompt) {
+  // aiRouter.js är ESM — dynamisk import() krävs i detta CommonJS-skript.
+  const { getDynamicChain, callWithFallback } = await import(
+    path.join(__dirname, "..", "app", "lib", "aiRouter.js")
+  );
+  const chain = await getDynamicChain("general");
+  const { text, provider, model } = await callWithFallback(
+    chain,
+    [{ role: "user", content: prompt }],
+    { maxTokens: 700, temperature: 0.5, source: "outcome-observer" }
+  );
+  return { text: text.trim(), provider, model };
 }
 
 // ── Huvud ──────────────────────────────────────────────────────────────────
@@ -237,7 +217,7 @@ async function main() {
     const prompt = `Du är en kritisk systemobservatör för plattformen Debatt-AI — en autonom AI-civilisationssimulering. Du bedömer om nyligen implementerade förbättringar faktiskt har gjort skillnad.\n\n## Implementering att bedöma\n- **Titel:** ${fm.title || "okänd"}\n- **Typ:** ${fm.type || "?"}\n- **Fil/komponent:** ${fm.file || "?"}\n- **Risk:** ${fm.risk || "?"}\n- **Implementerad:** ${fm.implemented || fm.created} (${dagSedanImpl} dagar sedan)\n- **Åtgärd/Beskrivning:**\n${åtgärd}\n\n## Plattformshälsa nu (${dagens})\n- Artiklar senaste 7 dagarna: ${metrics.artiklarTotalt} (AI: ${metrics.aiArtiklar})\n- Aktiva agenter: ${metrics.aktivaAgenter}\n- Total ekonomi: ${metrics.totalEkonomi} kr\n- Medel koalitionsstyrka: ${metrics.medelKoalitionStyrka}\n${metrics.lobbyingFramgangPct != null ? `- Lobbyingframgång: ${metrics.lobbyingFramgangPct}%` : ""}\n${metrics.parlamentRosterJaPct != null ? `- Ja-andel i parlamentet: ${metrics.parlamentRosterJaPct}%` : ""}\n- Skandaler senaste 7d: ${metrics.skandalerSenaste7d}\n- Triumfer senaste 7d: ${metrics.triumferSenaste7d}\n\n## Senaste AI-analyser (kontext)\n${diskussioner.slice(0, 600)}\n\n## Din uppgift\nSkriv en konkret utfallsbedömning (150–220 ord) på svenska. Svara på:\n1. Har implementeringen troligen haft effekt? (Ja/Nej/Svårt att mäta)\n2. Vilka plattformsmätvärden stöder eller motbevisar effekten?\n3. Finns tecken på kvarvarande problem i samma område?\n4. Slutrekommendation: Avsluta / Följ upp / Utöka\n\nAvsluta alltid med en rad i formatet:\n**Bedömning: POSITIV / NEUTRAL / NEGATIV**`;
 
     try {
-      const assessment = await kallaCerebras(prompt);
+      const { text: assessment, provider, model } = await kallaAi(prompt);
 
       // Parse verdict and inject lyckad into frontmatter
       const verdictMatch = assessment.match(/\*\*Bedömning:\s*(POSITIV|NEUTRAL|NEGATIV)\*\*/i);
@@ -253,7 +233,7 @@ async function main() {
         );
       }
 
-      const appendix = `\n\n---\n\n## Utfall\n*Bedömt ${dagens} av outcome-observer.js (Cerebras gpt-oss-120b)*\n\n${assessment}\n`;
+      const appendix = `\n\n---\n\n## Utfall\n*Bedömt ${dagens} av outcome-observer.js (${provider} ${model})*\n\n${assessment}\n`;
       fs.writeFileSync(fp, uppdateratInnehall + appendix, "utf8");
       console.log(`  ✓ Utfall tillagt (${verdict ?? "ingen bedömning"}): ${fil}`);
       bedömdaAntal++;
