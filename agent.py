@@ -330,14 +330,15 @@ def main():
             force_eget   = vald_typ == "eget"
             print(f"🕚 Catch-up: {vald_typ} ligger efter idag ({idag_publicerat[vald_typ]}/4) — tvingar en {vald_typ}-artikel.")
 
-    # Manuell workflow_dispatch-körning kringgår aldrig kvoten ovan (en agent
-    # publicerar aldrig en 5:e artikel av samma typ samma dag), men får — till
-    # skillnad från en oschemalagd extra cron-trigger — fortfarande skriva en
-    # artikel via den vanliga slumpmässiga logiken nedan när inget fönster
-    # gäller. En riktig extra cron-trigger (fel UTC-timme ELLER dagens kvot
-    # för den matchande typen redan uppnådd) avslutas tyst utan publicering.
+    # Manuell workflow_dispatch-körning får — till skillnad från en
+    # oschemalagd extra cron-trigger — fortfarande skriva en artikel via den
+    # vanliga slumpmässiga logiken nedan när inget fönster gäller. Den
+    # kringgår dock aldrig en redan helt fylld kvot (alla tre = 4): den
+    # slumpmässiga logiken nedan är inte typmedveten och skulle annars kunna
+    # producera en 5:e artikel av en redan mättad typ (Codex P2, PR #1272).
     ar_manuell_korning = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
-    if not (force_nyhet or force_replik or force_eget) and not ar_manuell_korning:
+    nagon_kvot_kvar = any(v < 4 for v in idag_publicerat.values())
+    if not (force_nyhet or force_replik or force_eget) and not (ar_manuell_korning and nagon_kvot_kvar):
         print(f"Ingen artikel skriven — körningen (UTC-timme {utc_hour}) matchar inget öppet publiceringsfönster.")
         print(f"Dagens läge hittills: {idag_publicerat['nyhet']} nyhet / {idag_publicerat['replik']} replik / {idag_publicerat['eget']} eget (mål: 4/4/4).")
         print("(Extra körning utöver de 12 schemalagda, eller kvoten redan uppnådd — skrivs medvetet inte för att hålla 4+4+4 korrekt.)")

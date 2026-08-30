@@ -26,6 +26,16 @@ on:
     - cron: "30 21 * * *"  # 23:30 svensk tid — catch-up
   workflow_dispatch:       # Kan också köras manuellt från GitHub
 
+# Serialiserar körningar istället för att låta dem köra parallellt — utan
+# detta kan två överlappande triggers (t.ex. en kraftigt försenad cron plus
+# en ny) båda läsa samma dagskvot innan någon hinner publicera, och
+# tillsammans skjuta en typ över 4 (Codex P2, PR #1272). cancel-in-progress
+# är false eftersom en redan påbörjad körning ska tillåtas slutföra sin
+# publicering, inte avbrytas mitt i.
+concurrency:
+  group: debatt-agent-publish
+  cancel-in-progress: false
+
 jobs:
   publicera:
     runs-on: ubuntu-latest

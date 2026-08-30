@@ -187,8 +187,12 @@ def hamta_publicerade_idag_per_typ(sb_key: str) -> dict:
         if r.status_code != 200:
             return {"nyhet": 0, "replik": 0, "eget": 0}
         rader = r.json()
-        nyhet = sum(1 for a in rader if a.get("nyhetskalla"))
-        replik = sum(1 for a in rader if a.get("parent_id") and not a.get("nyhetskalla"))
+        # parent_id är den entydiga signalen för en replik — repliker får ETT
+        # eget nyhetskalla-objekt (typ: "replik", för att kunna länka till
+        # originalartikeln, se skicka_artikel() i agent.py) som annars felaktigt
+        # skulle räkna varje replik som en nyhetsartikel (Codex P2, PR #1272).
+        replik = sum(1 for a in rader if a.get("parent_id"))
+        nyhet = sum(1 for a in rader if a.get("nyhetskalla") and not a.get("parent_id"))
         eget = len(rader) - nyhet - replik
         return {"nyhet": nyhet, "replik": replik, "eget": eget}
     except Exception:
