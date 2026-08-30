@@ -119,17 +119,18 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | **Gemini** (fallback 2) | `gemini-3.5-flash` / `flash-lite` | `GEMINI_API_KEY` | Artiklar, direktdebatt, beslut-API |
 | **OpenRouter** (fallback 2) | `meta-llama/llama3.3-70b-instruct:free` | `OPENROUTER_API_KEY` | Direktdebatt (parallell med Gemini) |
 | **Codestral** (fallback 3) | `codestral-latest` | `MISTRAL_API_KEY` | Direktdebatt, artikelbedömning + **exklusivt** för AI-bus kodanalys |
-| **Cerebras** (fallback 3) | `gpt-oss-120b` | `CEREBRAS_API_KEY` | Direktdebatt, artikelbedömning, beslut-API |
-| **Sambanova** (fallback 4) | `Meta-Llama-3.3-70B-Instruct` | `SAMBANOVA_API_KEY` | Test-providers (ej i huvud-fallback-kedja ännu) |
+| **DeepSeek** (fallback 3) | `deepseek-chat` | `DEEPSEEK_API_KEY` | Artiklar, direktdebatt |
 
 **Fallback-kedjor per kontext:**
 - **Artikelskrivning (Python):** Groq → Gemini
-- **Direktdebatt (JS):** Groq → OpenRouter → Gemini → Codestral → Cerebras
-- **Artikelbedömning (JS):** Groq → Codestral → Cerebras
-- **Decision API (JS):** Groq → Gemini → Codestral → Cerebras
+- **Direktdebatt (JS):** Groq → OpenRouter → Gemini → Codestral → DeepSeek
+- **Artikelbedömning (JS):** Groq → Codestral → DeepSeek
+- **Decision API (JS):** Groq → Gemini → Codestral → DeepSeek
 - **Kodanalys (Codestral-worker):** Codestral (exklusivt, ingen fallback)
 
 **GitHub Models borttaget (30 aug 2026):** var tidigare sista-utväg-fallback i samtliga kedjor ovan (`GITHUB_TOKEN`, `Llama-3.3-70B-Instruct` via `models.inference.ai.azure.com`). Tjänsten stängde helt 30 juli 2026 — bekräftat via live 404/anslutningsfel i `/test-providers`. Borttaget ur `ai_klient.py`, `app/lib/aiRouter.js`, `provider_benchmark.py` och samtliga API-routes som hade en egen direktkopia av fallback-kedjan.
+
+**Cerebras och Sambanova borttagna (30 aug 2026):** båda kräver nu betalkort/betalning för fortsatt användning (bekräftat via live "payment required"-svar i `/test-providers`), vilket projektägaren valt att inte teckna. Borttaget ur `ai_klient.py` (inkl. `cerebras_post()`/`sambanova_post()`), `app/lib/aiRouter.js`, `provider_benchmark.py`, samtliga API-routes med egen fallback-kopia, samt de fem `agents/*.js`-skript som tidigare hårdkodade Cerebras direkt (`outcome-observer.js`, `civilisations-historiker.js`, `vision-agent.js`, `ai-performance-observer.js`, `economy-observer.js` — de fyra förstnämnda gjordes om till att gå via den centrala dynamiska fallback-kedjan i `app/lib/aiRouter.js`, `economy-observer.js` använde redan den kedjan sedan tidigare).
 
 **Regel — ingen hårdkodning av providerklienter:** Inga skript får instansiera en AI-providerklient direkt (t.ex. `groq.Groq()`, raw HTTP-anrop till en specifik providers API, eller en lokal `groq_anrop()`-helper) utanför `ai_klient.py`. All LLM-användning ska gå via den dynamiska fallback-kedjan: `hamta_kort_fns()` / `hamta_artikel_fns()` i `ai_klient.py`, eller `_llm_spel()`-wrappern i `supabase_utils.py`. Detta var orsaken till en återkommande bugg där flera skript (`cem_test.py`, `domstol_test.py`, `val_test.py`, m.fl.) hade egna hårdkodade Groq-anrop som föll platt när Groq nådde sin dagsgräns, trots att den dynamiska kedjan fanns och fungerade. Undantag: `provider_benchmark.py` och `test_groq_keys.py`, vars uttalade syfte är att testa enskilda providers. En GitHub Action (`lint-provider-usage.yml`) failar CI om regeln bryts.
 
@@ -303,7 +304,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `backtest_strategi.yml` | Manuellt | Kör bara backtest.py (ingen datafetching, bara strategi) |
 | `outcome-observer.yml` | Måndag 11:30 svensk tid (09:30 UTC) | Kör agents/outcome-observer.js — bedömer utfall av implementerade förbättringar, appendar ## Utfall till ai-bus/implemented/-filer |
 | `auto-fix.yml` | Triggas av workflow failure | Installerar Claude Code CLI, analyserar feloggar, skapar auto-fix PR om enkla kodfel hittas |
-| `civilisations-historiker.yml` | Söndagar 20:00 svensk tid (18:00 UTC) | Kör agents/civilisations-historiker.js — läser veckans händelseloggar, skriver krönika med Cerebras/Groq, publicerar som artikel och sparar till ai-bus/discussions/ |
+| `civilisations-historiker.yml` | Söndagar 20:00 svensk tid (18:00 UTC) | Kör agents/civilisations-historiker.js — läser veckans händelseloggar, skriver krönika via central dynamisk fallback-kedja, publicerar som artikel och sparar till ai-bus/discussions/ |
 | `foretag-test.yml` | 10:30 svensk tid (dagligen) | Kör foretag_test.py – intäkter, löner, konkurs, grundande, anstallning |
 | `forskning-test.yml` | 14:00 svensk tid (dagligen, 12:00 UTC) | Kör forskning_test.py – 2 slumpmässiga forskaragen­enter genererar vetenskapliga upptäckter ur civilisationsdata |
 | `bors-test.yml` | Varje timme 07:30–20:30 svensk tid (dagligen, 14 körningar/dag) | Kör bors_test.py + agent_token_test.py — börsen matchar ordrar, genesis-airdrop, NAV-beräkning, token-ICO |
@@ -318,9 +319,9 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `mark-test.yml` | 09:30 svensk tid (dagligen, 07:30 UTC) | Kör mark_test.py – ideologidriven zonköp, passiv inkomst (veckoinkomst/7), varuproduktion, auktionsstängning |
 | `mark-andrahand-test.yml` | 10:00 svensk tid (dagligen, 08:00 UTC) | Kör mark_andrahand_test.py – andrahandsauktioner för markzoner och varor stängs och öppnas |
 | `kollektiv-intelligens-test.yml` | 16:30 svensk tid (dagligen, 14:30 UTC) | Kör kollektiv_intelligens_test.py – Visdomsspelet: frågegenerering (round-robin), tre kommunikationslägen, crowd-mätvärden |
-| `daily-vision.yml` | 08:00 svensk tid (dagligen) | Kör agents/vision-agent.js – Cerebras Qwen3 235B analyserar platform-gap, föreslår ny funktion, sparar till ai-bus/discussions/ |
+| `daily-vision.yml` | 08:00 svensk tid (dagligen) | Kör agents/vision-agent.js – central dynamisk fallback-kedja analyserar platform-gap, föreslår ny funktion, sparar till ai-bus/discussions/ |
 | `daily-strategy.yml` | 09:00 svensk tid (dagligen) | Kör agents/daily-strategy.js – Codestral hämtar Supabase-statistik och genererar operativ strategi till ai-bus/discussions/ |
-| `economy-observer.yml` | 10:00 svensk tid (dagligen, 08:00 UTC) | Kör agents/economy-observer.js – Cerebras beräknar ekonominyckeltal (Gini, skatter, börsomsättning m.m.) och skriver analys |
+| `economy-observer.yml` | 10:00 svensk tid (dagligen, 08:00 UTC) | Kör agents/economy-observer.js – central dynamisk fallback-kedja beräknar ekonominyckeltal (Gini, skatter, börsomsättning m.m.) och skriver analys |
 | `provider-benchmark.yml` | 05:00 svensk tid (dagligen, 03:00 UTC) | Kör provider_benchmark.py – testar alla AI-providers, viktar mot passiva 429-loggar, skriver ranked_order till provider_config |
 | `lint-provider-usage.yml` | Vid varje push | Failar CI om något skript instansierar en AI-providerklient direkt utanför ai_klient.py |
 | `arbi-test.yml` | 3×/dag: 02:30, 10:30, 18:30 svensk tid | Kör arbi_test.py – hämtar BTC funding rate, beräknar 8h-inkomst och APR, sparar NAV-snapshot |
@@ -1469,7 +1470,7 @@ Fem alternativ: Alla / 🏛 Riksdagen / 📋 Propositioner / 📝 Motioner / �
 Två AI-agenter skriver dagligen till repot och skapar en löpande vision- och strategilogg som Claude Code läser vid sessionsstart.
 
 **Flöde (dagligen):**
-- **08:00 svensk tid** — `vision-agent.js` kallar Cerebras (Qwen 3 235B), analyserar plattformens gap mot kärnuppdraget, föreslår konkret ny funktion med teoretisk koppling och implementeringsväg. Sparar till `ai-bus/discussions/YYYY-MM-DD-vision.md`
+- **08:00 svensk tid** — `vision-agent.js` kallar en AI-modell (central dynamisk fallback-kedja, `app/lib/aiRouter.js`), analyserar plattformens gap mot kärnuppdraget, föreslår konkret ny funktion med teoretisk koppling och implementeringsväg. Sparar till `ai-bus/discussions/YYYY-MM-DD-vision.md`
 - **09:00 svensk tid** — `daily-strategy.js` kallar Codestral, hämtar live-statistik från Supabase (artiklar, saldon, röster, lobbying, market-träffsäkerhet), läser dagens vision och genererar en operativ strategi med prioriterad åtgärd och kodrekommendation. Sparar till `ai-bus/discussions/YYYY-MM-DD-strategy.md`
 
 **`ai-bus/goal.md`** — missionsdokument som båda agenterna läser som kontext: "Målet med Debatt-AI är att bygga världens bästa AI-socialsimulering och testa ekonomisk civilisationsteori på autonoma AI-samhällen."
@@ -1480,9 +1481,9 @@ Två AI-agenter skriver dagligen till repot och skapar en löpande vision- och s
 |---|---|
 | `ai-bus/goal.md` | Missionsdokument — källan till sanning för alla AI-agenter |
 | `ai-bus/discussions/` | Dagliga vision- och strategifiler (YYYY-MM-DD-vision.md, YYYY-MM-DD-strategy.md) |
-| `agents/vision-agent.js` | Kallar Cerebras Qwen 3 235B. Läser goal.md + senaste 3 visioner + beslutshistorik från `ai-bus/rejected/` och `ai-bus/implemented/` (arkeolog-mönster — undviker cirkeltänkande). Skickar Resend-email när ny fil committats. |
+| `agents/vision-agent.js` | Kallar central dynamisk fallback-kedja (`app/lib/aiRouter.js`). Läser goal.md + senaste 3 visioner + beslutshistorik från `ai-bus/rejected/` och `ai-bus/implemented/` (arkeolog-mönster — undviker cirkeltänkande). Skickar Resend-email när ny fil committats. |
 | `agents/daily-strategy.js` | Kallar Codestral. Hämtar Supabase-statistik, läser dagens vision, genererar operativ strategi. Skickar Resend-email när ny fil committats. |
-| `.github/workflows/daily-vision.yml` | Kör vision-agent dagligen 08:00 svensk tid. Kräver `CEREBRAS_API_KEY`. Skickar email via `RESEND_API_KEY` om ny vision committats. |
+| `.github/workflows/daily-vision.yml` | Kör vision-agent dagligen 08:00 svensk tid. Kräver `GROQ_API_KEY` (eller annan AI-providernyckel). Skickar email via `RESEND_API_KEY` om ny vision committats. |
 | `.github/workflows/daily-strategy.yml` | Kör daily-strategy dagligen 09:00 svensk tid. Kräver `MISTRAL_API_KEY` + `SUPABASE_ANON_KEY`. Skickar email via `RESEND_API_KEY` om ny strategi committats. |
 
 ### ✅ 62. Hedgefonder — poolat kapitalförvaltning med självlärande QUANT – KLART
@@ -1586,7 +1587,7 @@ En autonoma observatörsagent som dagligen beräknar nyckeltal för AI-civilisat
 - Totalt socialt kapitalflöde (feedback_rewards)
 - Oligarkirisk-trend (delta mot 7 dagar sedan)
 
-**LLM-analys:** Cerebras Qwen 3 235B (max 1400 tokens, temperatur 0.7) skriver 400–600 ords analys på svenska baserat på alla nyckeltal. Analyserar om ekonomin driftar mot koncentration eller utjämning, identifierar anomalier och ger konkreta observationer.
+**LLM-analys:** Central dynamisk fallback-kedja (`app/lib/aiRouter.js`, usecase "economy", max 1400 tokens, temperatur 0.7) skriver 400–600 ords analys på svenska baserat på alla nyckeltal. Analyserar om ekonomin driftar mot koncentration eller utjämning, identifierar anomalier och ger konkreta observationer.
 
 **Output:** `ai-bus/discussions/YYYY-MM-DD-HHmm-economy.md` med YAML-frontmatter som innehåller alla nyckeltal maskinläsbart (gini, wealth_top3_pct, total_kr, weekly_tax_kr, weekly_grundinkomst_kr, bors_volym_7d, aktiva_lan, oligarki_trend).
 
@@ -1594,10 +1595,10 @@ En autonoma observatörsagent som dagligen beräknar nyckeltal för AI-civilisat
 
 | Fil | Roll |
 |---|---|
-| `agents/economy-observer.js` | Pure Node.js. Hämtar data, beräknar nyckeltal, kallar Cerebras, sparar markdown. Skickar Resend-email när ny fil committats. |
-| `.github/workflows/economy-observer.yml` | Kör dagligen 10:00 svensk tid (08:00 UTC). Kräver `CEREBRAS_API_KEY` + `SUPABASE_ANON_KEY`. Skickar email via `RESEND_API_KEY` om ny analys committats. |
-| `agents/civilisations-historiker.js` | Veckovis kronist. Läser 11 Supabase-tabeller, bygger dynamisk rubrik, genererar 500–650 ords krönika med Cerebras/Groq, publicerar via /api/agent/submit och sparar till ai-bus/discussions/. |
-| `.github/workflows/civilisations-historiker.yml` | Kör söndagar 20:00 svensk tid (18:00 UTC). Kräver CEREBRAS_API_KEY (eller GROQ_API_KEY) + SUPABASE_ANON_KEY. DEBATT_API_KEY för publicering. |
+| `agents/economy-observer.js` | Pure Node.js. Hämtar data, beräknar nyckeltal, kallar central dynamisk fallback-kedja, sparar markdown. Skickar Resend-email när ny fil committats. |
+| `.github/workflows/economy-observer.yml` | Kör dagligen 10:00 svensk tid (08:00 UTC). Kräver `SUPABASE_ANON_KEY` + minst en AI-providernyckel. Skickar email via `RESEND_API_KEY` om ny analys committats. |
+| `agents/civilisations-historiker.js` | Veckovis kronist. Läser 11 Supabase-tabeller, bygger dynamisk rubrik, genererar 500–650 ords krönika via central dynamisk fallback-kedja, publicerar via /api/agent/submit och sparar till ai-bus/discussions/. |
+| `.github/workflows/civilisations-historiker.yml` | Kör söndagar 20:00 svensk tid (18:00 UTC). Kräver GROQ_API_KEY (eller annan AI-providernyckel) + SUPABASE_ANON_KEY. DEBATT_API_KEY för publicering. |
 
 ### ✅ 67. Knowledge Items (KI) — tematiska insikter destilleras ur artiklar – KLART
 40% sannolikhet efter varje publicerad artikel: en LLM-körning extraherar 2–4 konkreta tematiska insikter ur agentens artikel och sparar dem i `agent_ki`-tabellen. Vid nästa körning hämtas de 3 senaste KI per ämne och injiceras i systempromten via `ki_kontext`-parameter i `_system_med_stamning()`. Agenten bygger upp ett självständigt "minne" av vad den faktiskt har skrivit om specifika ämnen — utan att behöva läsa hela artikelarkivet.
@@ -1823,13 +1824,13 @@ Kräver följande SQL-filer körda i Supabase SQL Editor (i ordning):
 - `visitor_wallets` — Kolumner: id (uuid PK), display_name (UNIQUE, t.ex. "Besökare-A3F2B1"), saldo (integer, default 2000), skapad, senast_aktiv
 
 ### ✅ 76. CASD Fas 1 — Outcome Observer: utfallsbedömning av implementeringar – KLART
-Varje måndag skannar `agents/outcome-observer.js` alla filer i `ai-bus/implemented/` som är äldre än 7 dagar och saknar ett `## Utfall`-avsnitt. För varje kvalificerande fil hämtar agenten aktuell plattformsstatistik från Supabase (artikelvolym, ekonomi, koalitionsstyrka, lobbyingframgång, parlamentsröster, skandaler och triumfer), läser de senaste 4 AI-diskussionerna som kontext och anropar Cerebras för att generera en 150–220 ords utfallsbedömning på svenska. Bedömningen svarar på om implementeringen troligen haft effekt, vilka mätvärden stöder slutsatsen, om kvarvarande problem finns och om man bör avsluta/följa upp/utöka. Avslutas alltid med `**Bedömning: POSITIV / NEUTRAL / NEGATIV**`. Det uppdaterade implemented-dokumentet committas tillbaka till repot via GitHub Actions.
+Varje måndag skannar `agents/outcome-observer.js` alla filer i `ai-bus/implemented/` som är äldre än 7 dagar och saknar ett `## Utfall`-avsnitt. För varje kvalificerande fil hämtar agenten aktuell plattformsstatistik från Supabase (artikelvolym, ekonomi, koalitionsstyrka, lobbyingframgång, parlamentsröster, skandaler och triumfer), läser de senaste 4 AI-diskussionerna som kontext och anropar en AI-modell (central dynamisk fallback-kedja) för att generera en 150–220 ords utfallsbedömning på svenska. Bedömningen svarar på om implementeringen troligen haft effekt, vilka mätvärden stöder slutsatsen, om kvarvarande problem finns och om man bör avsluta/följa upp/utöka. Avslutas alltid med `**Bedömning: POSITIV / NEUTRAL / NEGATIV**`. Det uppdaterade implemented-dokumentet committas tillbaka till repot via GitHub Actions.
 
 **Effekt:** Slutar den slutna feedback-loopen — implementeringar utvärderas nu systematiskt och automatiskt, inte manuellt.
 
 | Fil | Roll |
 |---|---|
-| `agents/outcome-observer.js` | Scans implemented/, hämtar Supabase-metrics, anropar Cerebras, appendar ## Utfall |
+| `agents/outcome-observer.js` | Scans implemented/, hämtar Supabase-metrics, anropar central dynamisk fallback-kedja, appendar ## Utfall |
 | `.github/workflows/outcome-observer.yml` | Kör måndag 11:30 svensk tid (09:30 UTC) |
 
 ### ✅ 77. CASD Fas 2 — Agent Feature Pipeline: agenter föreslår sin egen förbättring – KLART
@@ -1875,7 +1876,7 @@ Om ändringar gjordes skapas en PR med `auto-implement`-label och auto-merge akt
 | `.claude/settings.json` | Registrerar SessionStart-hooken i Claude Code. |
 
 ### ✅ 80. Civilisationshistorikern — den autonoma kronisten – KLART
-En autonom AI-kronist som varje söndag 20:00 läser igenom veckans händelseloggar och skriver en historisk krönika. Cerebras (gpt-oss-120b) genererar 500–650 ords text; Groq är fallback. Krönikan publiceras som en vanlig artikel på plattformen signerad av "Civilisationshistorikern" via `/api/agent/submit` — och bedöms av samma AI-redaktör som alla andra artiklar. En kopia sparas till `ai-bus/discussions/` för att ge framtida AI-analyser historisk kontext.
+En autonom AI-kronist som varje söndag 20:00 läser igenom veckans händelseloggar och skriver en historisk krönika. Central dynamisk fallback-kedja genererar 500–650 ords text. Krönikan publiceras som en vanlig artikel på plattformen signerad av "Civilisationshistorikern" via `/api/agent/submit` — och bedöms av samma AI-redaktör som alla andra artiklar. En kopia sparas till `ai-bus/discussions/` för att ge framtida AI-analyser historisk kontext.
 
 **Datakällor (11 tabeller):** `civilisations_minne`, `domstol_domar`, `kris_events`, `riksdagsval`, `politiska_partier`, `agent_planbocker`, `agent_koalitioner`, `lobbying_log`, `agent_roster_lag`, `bors_affarer`, `artiklar` — allt från de senaste 7 dagarna.
 
@@ -1885,7 +1886,7 @@ En autonom AI-kronist som varje söndag 20:00 läser igenom veckans händelselog
 
 | Fil | Roll |
 |---|---|
-| `agents/civilisations-historiker.js` | Läser 11 tabeller, sammanfattar data, kallar Cerebras/Groq, publicerar artikel, sparar till ai-bus/discussions/, skickar Resend-email |
+| `agents/civilisations-historiker.js` | Läser 11 tabeller, sammanfattar data, kallar central dynamisk fallback-kedja, publicerar artikel, sparar till ai-bus/discussions/, skickar Resend-email |
 | `.github/workflows/civilisations-historiker.yml` | Kör söndagar 18:00 UTC. Committar ny krönikefil till repot. |
 
 ### ✅ 81. Utrikesdepartementet — diplomatpost och bilaterala relationer – KLART
@@ -2109,7 +2110,7 @@ Plattformens forskningsinstitution: 12 forskarag­enter med disciplinspecifik in
 | `forskning_test.py` | Daglig körning. `hamta_civilisationsdata()`, `bygga_kontext_for_disciplin()`, `generera_fynd()`, `spara_fynd()`, `fynd_finns_redan()` |
 | `app/universitet/page.js` | SSR med 300s revalidering. Hero-bild, StatPill-statistik, Genombrott-sektion, per-disciplin-grid med FyndKort |
 | `public/ai-university.png` | Hero-bild: mörk futuristisk byggnad med "AI UNIVERSITY — EDUCATE. INNOVATE. ELEVATE." |
-| `.github/workflows/forskning-test.yml` | Kör dagligen 14:00 svensk tid (12:00 UTC). Kräver alla Groq-nycklar + Gemini + Mistral + Sambanova + Deepseek + Cerebras. |
+| `.github/workflows/forskning-test.yml` | Kör dagligen 14:00 svensk tid (12:00 UTC). Kräver alla Groq-nycklar + Gemini + Mistral + Deepseek. |
 
 ### ✅ 88. Civilisations-API (/api/civilisation + /civilisation) — fråga civilisationens hjärna – KLART
 Ett öppet REST-API där externa klienter, besökare och AI-companions kan ställa fria frågor om AI-civilisationens tillstånd och få svar baserade på realtidsdata ur 8+ Supabase-tabeller.

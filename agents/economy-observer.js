@@ -4,15 +4,12 @@
  *
  * Hämtar ekonomisk data från Supabase, beräknar nyckeltal och kallar
  * plattformens centrala dynamiska AI-fallback-kedja (app/lib/aiRouter.js,
- * usecase "economy" — Cerebras prioriterat för starkare resonemang, men
- * med automatisk fallback till Groq/Gemini/m.fl. om Cerebras är
- * otillgängligt eller slut på krediter) för en strukturerad ekonomianalys
- * av AI-civilisationen.
+ * usecase "economy") för en strukturerad ekonomianalys av AI-civilisationen.
  *
  * Sparar till ai-bus/discussions/YYYY-MM-DD-HHmm-economy.md
  *
  * Körs av GitHub Actions (economy-observer.yml) eller manuellt:
- *   GROQ_API_KEY=xxx CEREBRAS_API_KEY=xxx SUPABASE_ANON_KEY=xxx node agents/economy-observer.js
+ *   GROQ_API_KEY=xxx SUPABASE_ANON_KEY=xxx node agents/economy-observer.js
  */
 
 const fs    = require("fs");

@@ -8,27 +8,23 @@
  *
  * Körs varje söndag 20:00 svensk tid (18:00 UTC) via civilisations-historiker.yml
  * eller manuellt:
- *   CEREBRAS_API_KEY=xxx SUPABASE_ANON_KEY=xxx DEBATT_API_KEY=xxx \
+ *   GROQ_API_KEY=xxx SUPABASE_ANON_KEY=xxx DEBATT_API_KEY=xxx \
  *   node agents/civilisations-historiker.js
+ *
+ * LLM-anrop går via den centrala dynamiska fallback-kedjan (app/lib/aiRouter.js,
+ * usecase "general") — inte hårdkodat mot en enskild provider.
  */
 
 const fs   = require("fs");
 const path = require("path");
 const https = require("https");
 
-const CEREBRAS_KEY     = process.env.CEREBRAS_API_KEY;
-const GROQ_KEY         = process.env.GROQ_API_KEY;
 const SUPABASE_URL     = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SUPABASE_KEY     = process.env.SUPABASE_ANON_KEY;
 const DEBATT_API_KEY   = process.env.DEBATT_API_KEY;
 const DEBATT_SITE_URL  = process.env.DEBATT_SITE_URL || "https://www.debatt-ai.se";
 const DISCUSSIONS_DIR  = path.join(__dirname, "../ai-bus/discussions");
 const KRONIKA_DIR      = path.join(DISCUSSIONS_DIR, "kronika");
-
-if (!CEREBRAS_KEY && !GROQ_KEY) {
-  console.error("CEREBRAS_API_KEY eller GROQ_API_KEY saknas — avbryter");
-  process.exit(1);
-}
 
 // ── Hjälpfunktioner ────────────────────────────────────────────────────────
 
@@ -286,37 +282,18 @@ Skriv i en kunnig, något högtidlig stil — som en historiker som dokumenterar
 
 Svara BARA med artikeltexten — ingen rubrik, ingen inledning, ingen avslutning utöver texten.`;
 
-  const leverantörer = [];
-  if (CEREBRAS_KEY) leverantörer.push(["Cerebras", "https://api.cerebras.ai/v1/chat/completions",   "gpt-oss-120b",              CEREBRAS_KEY]);
-  if (GROQ_KEY)     leverantörer.push(["Groq",     "https://api.groq.com/openai/v1/chat/completions", "openai/gpt-oss-120b", GROQ_KEY]);
-
-  let sista;
-  for (let försök = 1; försök <= 3; försök++) {
-    for (const [namn, url, modell, nyckel] of leverantörer) {
-      try {
-        const { status, data } = await httpJson(url, {
-          method:  "POST",
-          headers: { Authorization: `Bearer ${nyckel}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model:       modell,
-            messages:    [{ role: "user", content: prompt }],
-            max_tokens:  1400,
-            temperature: 0.75,
-          }),
-        });
-        if (status !== 200) throw new Error(`${namn} ${status}: ${JSON.stringify(data).slice(0, 120)}`);
-        const text = data?.choices?.[0]?.message?.content;
-        if (!text) throw new Error(`${namn} returnerade ingen text`);
-        console.log(`LLM: ${namn} lyckades`);
-        return text.trim();
-      } catch (e) {
-        sista = e;
-        console.warn(`${namn} försök ${försök} misslyckades: ${e.message}`);
-      }
-    }
-    if (försök < 3) await new Promise(r => setTimeout(r, försök * 2000));
-  }
-  throw sista;
+  // aiRouter.js är ESM — dynamisk import() krävs i detta CommonJS-skript.
+  const { getDynamicChain, callWithFallback } = await import(
+    path.join(__dirname, "..", "app", "lib", "aiRouter.js")
+  );
+  const chain = await getDynamicChain("general");
+  const { text, provider, model } = await callWithFallback(
+    chain,
+    [{ role: "user", content: prompt }],
+    { maxTokens: 1400, temperature: 0.75, source: "civilisations-historiker" }
+  );
+  console.log(`LLM: ${provider} (${model}) lyckades`);
+  return text.trim();
 }
 
 // ── Publicering ────────────────────────────────────────────────────────────

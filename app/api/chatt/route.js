@@ -64,8 +64,6 @@ const ps = {
   groq:          { remaining: null, limit: 30, resetAt: null, ts: 0, status: "unknown" },
   gemini:        { remaining: null, limit: 15, resetAt: null, ts: 0, status: "unknown" },
   codestral:     { ts: 0, status: "unknown" },
-  sambanova:     { ts: 0, status: "unknown" },
-  cerebras:      { ts: 0, status: "unknown" },
 };
 
 function groqReady() {
@@ -79,8 +77,6 @@ export async function GET() {
     groq:          { ...ps.groq,          keySet: !!process.env.GROQ_API_KEY },
     gemini:        { ...ps.gemini,        keySet: !!process.env.GEMINI_API_KEY },
     codestral:     { ...ps.codestral,     keySet: !!process.env.MISTRAL_API_KEY },
-    sambanova:     { ...ps.sambanova,     keySet: !!process.env.SAMBANOVA_API_KEY },
-    cerebras:      { ...ps.cerebras,      keySet: !!process.env.CEREBRAS_API_KEY },
     ts: Date.now(),
   });
 }
@@ -218,9 +214,8 @@ REGLER — viktiga:
   ];
   for (const [name, url, model, key] of [
     ["codestral",     "https://api.mistral.ai/v1/chat/completions",                 "codestral-latest",            process.env.MISTRAL_API_KEY],
-    ["sambanova",     "https://api.sambanova.ai/v1/chat/completions",               "Meta-Llama-3.3-70B-Instruct", process.env.SAMBANOVA_API_KEY],
-    ["cerebras",      "https://api.cerebras.ai/v1/chat/completions",                "llama3.1-8b",                 process.env.CEREBRAS_API_KEY],
-    // github_models (GitHub Models) togs bort 30 aug 2026 — tjänsten stängde helt 30 jul 2026
+    // cerebras/sambanova (kräver nu betalning) och github_models (tjänsten stängde
+    // helt 30 jul 2026) togs bort 30 aug 2026
   ]) {
     if (!key) continue;
     try {

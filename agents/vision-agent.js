@@ -2,21 +2,22 @@
 /**
  * vision-agent.js
  *
- * Kallar Cerebras (Llama 3.3 70B) dagligen och genererar en visionär text
- * om nya funktioner och idéer för att uppfylla Debatt-AI:s syfte.
+ * Kallar en AI-modell dagligen och genererar en visionär text om nya
+ * funktioner och idéer för att uppfylla Debatt-AI:s syfte.
  *
  * Sparar till ai-bus/discussions/YYYY-MM-DD-vision.md
  *
  * Körs av GitHub Actions (daily-vision.yml) eller manuellt:
- *   CEREBRAS_API_KEY=xxx node agents/vision-agent.js
+ *   GROQ_API_KEY=xxx node agents/vision-agent.js
+ *
+ * LLM-anrop går via den centrala dynamiska fallback-kedjan (app/lib/aiRouter.js,
+ * usecase "general") — inte hårdkodat mot en enskild provider.
  */
 
 const fs   = require("fs");
 const path = require("path");
 const https = require("https");
 
-const CEREBRAS_API_KEY  = process.env.CEREBRAS_API_KEY;
-const GROQ_API_KEY      = process.env.GROQ_API_KEY;
 const DISCUSSIONS_DIR       = path.join(__dirname, "../ai-bus/discussions");
 const VISION_DIR            = path.join(DISCUSSIONS_DIR, "vision");
 const KRONIKA_DIR           = path.join(DISCUSSIONS_DIR, "kronika");
@@ -26,11 +27,6 @@ const GOAL_PATH         = path.join(__dirname, "../ai-bus/goal.md");
 const CLAUDE_MD_PATH    = path.join(__dirname, "../CLAUDE.md");
 const REJECTED_DIR      = path.join(__dirname, "../ai-bus/rejected");
 const IMPLEMENTED_DIR   = path.join(__dirname, "../ai-bus/implemented");
-
-if (!CEREBRAS_API_KEY && !GROQ_API_KEY) {
-  console.error("Varken CEREBRAS_API_KEY eller GROQ_API_KEY finns — avbryter");
-  process.exit(1);
-}
 
 function dagensDatum() {
   return new Date().toISOString().slice(0, 10);
@@ -324,76 +320,17 @@ ${r.beskrivning || ""}
   return nyaSkapta;
 }
 
-function httpPost(url, headers, body) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const buf = Buffer.from(body);
-    const req = https.request(
-      { hostname: u.hostname, path: u.pathname + u.search, method: "POST",
-        headers: { ...headers, "Content-Length": buf.length } },
-      (res) => {
-        let data = "";
-        res.on("data", c => data += c);
-        res.on("end", () => {
-          try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
-          catch { resolve({ status: res.statusCode, data }); }
-        });
-      }
-    );
-    req.on("error", reject);
-    req.setTimeout(60000, () => { req.destroy(); reject(new Error("Cerebras timeout")); });
-    req.write(buf);
-    req.end();
-  });
-}
-
-async function callCerebras(prompt) {
-  const body = JSON.stringify({
-    model: "gpt-oss-120b",
-    messages: [{ role: "user", content: prompt }],
-    max_tokens: 1200,
-    temperature: 0.9,
-  });
-
-  const delays = [5000, 15000, 30000];
-  for (let attempt = 0; attempt <= delays.length; attempt++) {
-    const { status, data } = await httpPost(
-      "https://api.cerebras.ai/v1/chat/completions",
-      { Authorization: `Bearer ${CEREBRAS_API_KEY}`, "Content-Type": "application/json" },
-      body
-    );
-    if (status === 200) {
-      const text = data?.choices?.[0]?.message?.content;
-      if (!text) throw new Error("Cerebras returnerade ingen text");
-      return text.trim();
-    }
-    if ((status === 429 || status >= 500) && attempt < delays.length) {
-      console.log(`  Cerebras ${status} — väntar ${delays[attempt] / 1000}s innan retry ${attempt + 1}/${delays.length}…`);
-      await new Promise(r => setTimeout(r, delays[attempt]));
-      continue;
-    }
-    throw new Error(`Cerebras API ${status}: ${JSON.stringify(data).slice(0, 200)}`);
-  }
-}
-
-async function callGroq(prompt) {
-  const body = JSON.stringify({
-    model: "openai/gpt-oss-120b",
-    messages: [{ role: "user", content: prompt }],
-    max_tokens: 1200,
-    temperature: 0.9,
-  });
-
-  const { status, data } = await httpPost(
-    "https://api.groq.com/openai/v1/chat/completions",
-    { Authorization: `Bearer ${GROQ_API_KEY}`, "Content-Type": "application/json" },
-    body
+async function kallaAi(prompt) {
+  // aiRouter.js är ESM — dynamisk import() krävs i detta CommonJS-skript.
+  const { getDynamicChain, callWithFallback } = await import(
+    path.join(__dirname, "..", "app", "lib", "aiRouter.js")
   );
-
-  if (status !== 200) throw new Error(`Groq API ${status}: ${JSON.stringify(data).slice(0, 200)}`);
-  const text = data?.choices?.[0]?.message?.content;
-  if (!text) throw new Error("Groq returnerade ingen text");
-  return text.trim();
+  const chain = await getDynamicChain("general");
+  return callWithFallback(
+    chain,
+    [{ role: "user", content: prompt }],
+    { maxTokens: 1200, temperature: 0.9, source: "vision-agent" }
+  );
 }
 
 async function main() {
@@ -433,26 +370,13 @@ async function main() {
 
   let vision;
   let modell;
-  if (CEREBRAS_API_KEY) {
-    console.log(`Kallar Cerebras (gpt-oss-120b) för vision ${datum}…`);
-    try {
-      vision = await callCerebras(prompt);
-      modell = "Cerebras gpt-oss-120b";
-    } catch (e) {
-      console.error("Cerebras misslyckades efter retries:", e.message);
-    }
-  }
-  if (!vision && GROQ_API_KEY) {
-    console.log("Faller tillbaka till Groq (openai/gpt-oss-120b)…");
-    try {
-      vision = await callGroq(prompt);
-      modell = "Groq openai/gpt-oss-120b";
-    } catch (e) {
-      console.error("Groq misslyckades:", e.message);
-    }
-  }
-  if (!vision) {
-    console.error("Alla providers misslyckades — avbryter");
+  console.log(`Kallar AI för vision ${datum} (dynamisk fallback-kedja)…`);
+  try {
+    const { text, provider, model } = await kallaAi(prompt);
+    vision = text.trim();
+    modell = `${provider} ${model}`;
+  } catch (e) {
+    console.error("Alla providers misslyckades:", e.message);
     process.exit(1);
   }
 

@@ -7,7 +7,7 @@
  *   callProvider(name, messages, opts)        — anropa en specifik provider
  *   callWithFallback(chain, messages, opts)   — prova providers i tur och ordning
  *
- * Providers: groq | gemini | cerebras | sambanova | codestral | deepseek
+ * Providers: groq | gemini | codestral | deepseek
  *
  * opts:
  *   maxTokens    (default 800)
@@ -45,22 +45,6 @@ const PROVIDERS = {
     cbKey:   "gemini",
     shape:   "gemini",
   },
-  cerebras: {
-    url:     "https://api.cerebras.ai/v1/chat/completions",
-    model:   "gpt-oss-120b",
-    key:     () => process.env.CEREBRAS_API_KEY,
-    timeout: 15_000,
-    cbKey:   "cerebras",
-    shape:   "openai",
-  },
-  sambanova: {
-    url:     "https://api.sambanova.ai/v1/chat/completions",
-    model:   "Meta-Llama-3.3-70B-Instruct",
-    key:     () => process.env.SAMBANOVA_API_KEY,
-    timeout: 15_000,
-    cbKey:   "sambanova",
-    shape:   "openai",
-  },
   codestral: {
     url:     "https://api.mistral.ai/v1/chat/completions",
     model:   "codestral-latest",
@@ -82,19 +66,22 @@ const PROVIDERS = {
 // github (GitHub Models) togs bort 30 aug 2026 — tjänsten stängde helt
 // 30 jul 2026 (models.inference.ai.azure.com hade redan slutat fungera
 // dessförinnan). Var tidigare sista utväg i samtliga kedjor nedan.
+//
+// cerebras och sambanova togs bort 30 aug 2026 — båda kräver nu betalkort/
+// betalning för fortsatt användning, vilket projektägaren valt att inte
+// teckna. hjarnan/economy hade Cerebras som primär (starkare resonemang för
+// långa syntesuppgifter) — Gemini är nu primär i de kedjorna istället, av
+// samma skäl.
 
 // Statiska kedjor — används om Supabase är otillgänglig
 export const CHAINS = {
-  general:      ["groq", "sambanova", "codestral", "deepseek", "cerebras", "gemini"],
-  beslut:       ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini"],
-  agent_submit: ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini"],
-  pis:          ["groq", "sambanova", "codestral", "cerebras", "deepseek", "gemini"],
-  chatt:        ["groq", "cerebras", "sambanova", "codestral", "deepseek", "gemini"],
-  // hjarnan: Cerebras (gpt-oss-120b, 120B params) prioriteras för starkare resonemang
-  hjarnan:      ["cerebras", "gemini", "groq", "sambanova", "codestral", "deepseek"],
-  // economy: samma resonemangsskäl som hjarnan — analysen är en 400-600 ords
-  // syntes av många nyckeltal, inte ett kort svar
-  economy:      ["cerebras", "groq", "sambanova", "codestral", "deepseek", "gemini"],
+  general:      ["groq", "codestral", "deepseek", "gemini"],
+  beslut:       ["groq", "codestral", "deepseek", "gemini"],
+  agent_submit: ["groq", "codestral", "deepseek", "gemini"],
+  pis:          ["groq", "codestral", "deepseek", "gemini"],
+  chatt:        ["groq", "codestral", "deepseek", "gemini"],
+  hjarnan:      ["gemini", "groq", "codestral", "deepseek"],
+  economy:      ["gemini", "groq", "codestral", "deepseek"],
 };
 
 // ── Dynamisk Supabase-ordning (1h cache) ────────────────────────────────────

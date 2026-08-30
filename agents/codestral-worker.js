@@ -267,7 +267,7 @@ function saveWeeklySnapshot(data, buildFailures) {
   } = data;
 
   // ── AI providers ──
-  const providers = ["groq", "gemini", "codestral", "cerebras", "openrouter", "sambanova"];
+  const providers = ["groq", "gemini", "codestral", "openrouter"];
   const ai_providers = {};
   for (const p of providers) {
     const rows = aiRows.filter(r => r.provider === p);
@@ -398,7 +398,7 @@ function buildRuntimeSummary(data, buildFailures) {
   lines.push("\n## AI-providers (senaste 7 dagarna)");
   lines.push("| Provider | OK | Rate-limited | Fel | Snitt-latens |");
   lines.push("|---|---|---|---|---|");
-  const providers = ["groq", "gemini", "codestral", "cerebras", "openrouter", "sambanova"];
+  const providers = ["groq", "gemini", "codestral", "openrouter"];
   for (const p of providers) {
     const rows = aiRows.filter(r => r.provider === p);
     if (!rows.length) continue;

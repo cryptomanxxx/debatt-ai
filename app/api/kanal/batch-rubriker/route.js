@@ -36,7 +36,6 @@ export async function POST(req) {
   const msgs = [{ role: "system", content: system }, { role: "user", content: user }];
 
   const csKey  = process.env.MISTRAL_API_KEY;
-  const sbKey  = process.env.SAMBANOVA_API_KEY;
   const dsKey  = process.env.DEEPSEEK_API_KEY;
   const cfAcc  = process.env.CF_ACCOUNT_ID;
   const cfTok  = process.env.CF_API_TOKEN;
@@ -70,33 +69,7 @@ export async function POST(req) {
     }
   }
 
-  // 2. Sambanova — 10/10, 1.41s
-  if (sbKey && providerReady("sambanova")) {
-    const t0 = Date.now();
-    try {
-      const r = await fetch("https://api.sambanova.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${sbKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "Meta-Llama-3.3-70B-Instruct", messages: msgs, max_tokens: 600, temperature: 0.1 }),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (r.ok) {
-        const json = await r.json();
-        const text = json.choices?.[0]?.message?.content?.trim() ?? "";
-        const parsed = parseNumberedList(text, rubriker.length);
-        if (parsed) {
-          logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "kanal-batch-en", status: "ok", latency_ms: Date.now() - t0, input_tokens: json.usage?.prompt_tokens ?? null, output_tokens: json.usage?.completion_tokens ?? null });
-          return Response.json({ translated: parsed });
-        }
-        logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "kanal-batch-en", status: "parse_fail", latency_ms: Date.now() - t0 });
-      } else {
-        if (r.status === 429) markProviderDown("sambanova");
-        logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "kanal-batch-en", status: `error_${r.status}`, latency_ms: Date.now() - t0 });
-      }
-    } catch {
-      logAiCall({ provider: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", source: "kanal-batch-en", status: "timeout", latency_ms: Date.now() - t0 });
-    }
-  }
+  // Sambanova (kräver nu betalning) togs bort 30 aug 2026
 
   // 3. DeepSeek — 10/10, 2.67s
   if (dsKey && providerReady("deepseek")) {
