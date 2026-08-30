@@ -206,13 +206,26 @@ async function hämtaViaHtml() {
 }
 
 export async function POST(req) {
-  const pw = req.headers.get("x-admin-password");
+  // .trim() skyddar mot att GitHub Actions-secreten eller Vercel-env-varen
+  // fått en osynlig trailing newline/whitespace vid copy-paste — annars ser
+  // värdena identiska ut för ett mänskligt öga men matchar aldrig.
+  const pw = req.headers.get("x-admin-password")?.trim();
   // Endast server-only secrets — NEXT_PUBLIC_ADMIN_PASSWORD bäddas in i
   // klientens JS-bundle (se app/admin/podd-test/page.js) och är därför inte
   // hemlig. Denna route triggar extern skrapning + service-role-skrivningar,
   // så den ska inte gå att nå med ett läckt publikt värde (Codex P2, PR #1246).
-  const giltiga = [process.env.RIKSDAG_IMPORT_TOKEN, process.env.ADMIN_SECRET].filter(Boolean);
+  const riksdagToken = process.env.RIKSDAG_IMPORT_TOKEN?.trim();
+  const adminSecret = process.env.ADMIN_SECRET?.trim();
+  const giltiga = [riksdagToken, adminSecret].filter(Boolean);
   if (!pw || !giltiga.includes(pw)) {
+    // Läcker aldrig faktiska värden — bara närvaro/längd, för att kunna
+    // särskilja "saknas i denna deployment" från "värdena skiljer sig åt"
+    // via Vercel Function-loggarna nästa gång riksdag-import.yml failar.
+    console.warn(
+      `riksdag-import: 401. header=${pw ? `len ${pw.length}` : "saknas"} | ` +
+      `RIKSDAG_IMPORT_TOKEN=${riksdagToken ? `satt (len ${riksdagToken.length})` : "EJ satt i denna deployment"} | ` +
+      `ADMIN_SECRET=${adminSecret ? `satt (len ${adminSecret.length})` : "EJ satt i denna deployment"}`
+    );
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
