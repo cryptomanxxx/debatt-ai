@@ -32,9 +32,17 @@ on:
 # tillsammans skjuta en typ över 4 (Codex P2, PR #1272). cancel-in-progress
 # är false eftersom en redan påbörjad körning ska tillåtas slutföra sin
 # publicering, inte avbrytas mitt i.
+#
+# queue: max krävs utöver cancel-in-progress: false — utan den behåller
+# GitHub bara EN väntande körning per grupp och ersätter tyst den gamla när
+# en tredje trigger anländer (dokumenterat GitHub-beteende, se
+# github.blog/changelog/2026-05-07). Utan queue: max hade konkurrensgruppen
+# alltså kunnat tappa hela publiceringspass i stället för att bara förhindra
+# överskjuten kvot (Codex P2, PR #1275).
 concurrency:
   group: debatt-agent-publish
   cancel-in-progress: false
+  queue: max
 
 jobs:
   publicera:
