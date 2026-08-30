@@ -260,7 +260,7 @@ def _gemini(n: int) -> str:
     if not key:
         raise Exception("GEMINI_API_KEY saknas")
     r = httpx.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key={key}",
+        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key={key}",
         headers={"Content-Type": "application/json"},
         json={"contents": [{"role": "user", "parts": [{"text": PROMPT}]}],
               "systemInstruction": {"parts": [{"text": SYSTEM}]},

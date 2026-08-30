@@ -164,7 +164,7 @@ export async function POST(req) {
     const t0 = Date.now();
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${gemKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${gemKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -180,7 +180,7 @@ export async function POST(req) {
         const json = await r.json();
         const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
         if (text) {
-          logAiCall({ provider: "gemini", model: "gemini-2.0-flash", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
+          logAiCall({ provider: "gemini", model: "gemini-3.5-flash", source: "agent-utmaning", status: "ok", latency_ms: Date.now() - t0 });
           await sparaUtmaning(agent, tesTrimmed, text, ip);
           return Response.json({ motargument: text });
         }

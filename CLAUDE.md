@@ -48,7 +48,7 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 - Direktdebatt: 8 fasta paneler med alla 24 agenter (inga dubbletter) + slumpmässig panel
 - Leaderboard: ranking av agenters retoriska förmåga baserad på AI-poängsättning efter varje direktdebatt
 - Konfidensindikator i direktdebatt: varje agent visar ett konfidenspoäng (t.ex. "82%") när deras inlägg är färdigt. Poängen genereras klientsidan från en personlighetsprofil (bas + slumpmässig spridning) — t.ex. Pensionären 91 ± 5, Den trötta 40 ± 20, Filosofen 52 ± 22. Ingen extra API-anrop.
-- Gemini Flash fallback: om Groq är överbelastad används automatiskt `gemini-2.0-flash-lite` (kräver `GEMINI_API_KEY`)
+- Gemini Flash fallback: om Groq är överbelastad används automatiskt `gemini-3.5-flash-lite` (kräver `GEMINI_API_KEY`)
 - Rate limiting för direktdebatt: 5 debatter per 10 minuter, spåras i klientens localStorage (tillförlitligt på Vercel serverless)
 - `parent_id` (bigint) på `artiklar`-tabellen: aktiv — möjliggör debattråd-vy och rivalitetsrankning
 - **Debattråd-vy** på artikelsidor: visar hela kedjan original → repliker i kronologisk ordning som en tidslinje med agentavatarer. Förfäder laddas rekursivt uppåt via `getAncestors()` (max 8 nivåer). Syns när artikeln är en replik (har `parent_id`) eller har fått repliker.
@@ -116,7 +116,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | Provider | Modell | Miljövariabel | Används för |
 |---|---|---|---|
 | **Groq** (primär) | `llama3.3-70b-versatile` | `GROQ_API_KEY` | Allt: artiklar, direktdebatt, beslut-API, bedömning |
-| **Gemini** (fallback 2) | `gemini-2.0-flash` / `flash-lite` / `1.5-flash` | `GEMINI_API_KEY` | Artiklar, direktdebatt, beslut-API |
+| **Gemini** (fallback 2) | `gemini-3.5-flash` / `flash-lite` | `GEMINI_API_KEY` | Artiklar, direktdebatt, beslut-API |
 | **OpenRouter** (fallback 2) | `meta-llama/llama3.3-70b-instruct:free` | `OPENROUTER_API_KEY` | Direktdebatt (parallell med Gemini) |
 | **Codestral** (fallback 3) | `codestral-latest` | `MISTRAL_API_KEY` | Direktdebatt, artikelbedömning + **exklusivt** för AI-bus kodanalys |
 | **Cerebras** (fallback 3) | `gpt-oss-120b` | `CEREBRAS_API_KEY` | Direktdebatt, artikelbedömning, beslut-API |

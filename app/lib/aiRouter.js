@@ -34,9 +34,12 @@ const PROVIDERS = {
     cbKey:   "groq",
     shape:   "openai",
   },
+  // gemini-2.0-flash stängdes ner av Google 1 jun 2026. gemini-3.5-flash är
+  // GA sedan 19 maj 2026 (bekräftat via /api/test-providers live 404-svar
+  // pekade ut gemini-3.5-flash-lite som direkt ersättare för lite-varianten).
   gemini: {
-    url:     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-    model:   "gemini-2.0-flash",
+    url:     "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+    model:   "gemini-3.5-flash",
     key:     () => process.env.GEMINI_API_KEY,
     timeout: 15_000,
     cbKey:   "gemini",

@@ -11,7 +11,7 @@ const LABELS = {
   cerebras:     "Cerebras — gemma-4-31b",
   sambanova:    "Sambanova — Meta-Llama-3.3-70B",
 codestral:    "Codestral — codestral-latest",
-  gemini:       "Gemini — gemini-2.0-flash-lite",
+  gemini:       "Gemini — gemini-3.5-flash-lite",
 };
 
 export default function TestProviders() {

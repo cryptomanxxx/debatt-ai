@@ -262,7 +262,11 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
     if not api_key:
         _nere.add("gemini")
         raise Exception("GEMINI_API_KEY saknas")
-    models = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"]
+    # gemini-2.0-flash/-lite och gemini-1.5-flash stängdes ner av Google 1 jun
+    # 2026 (bekräftat via live 404-svar: "no longer available"). gemini-3.5-flash
+    # är GA sedan 19 maj 2026, gemini-3.5-flash-lite är modellen Googles eget
+    # API-felmeddelande pekade ut som direkt ersättare.
+    models = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
     payload = {
         "contents": [{"role": "user", "parts": [{"text": user_message}]}],
         "systemInstruction": {"parts": [{"text": system_prompt}]},

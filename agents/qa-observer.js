@@ -253,7 +253,7 @@ async function analyseraGemini(sidnamn, b64, konsolfEl) {
   if (!GEMINI_KEY) return null;
   const res = await httpsPost(
     "generativelanguage.googleapis.com",
-    `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+    `/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_KEY}`,
     {},
     {
       contents: [{ parts: [

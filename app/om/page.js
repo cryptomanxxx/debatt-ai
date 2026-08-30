@@ -799,7 +799,7 @@ export default function OmPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
             {[
               ["Groq — openai/gpt-oss-120b", "Primär för allt: artikelskrivning, direktdebatt, beslut-API och artikelbedömning. Snabbast och mest kapabel. Gratis.", "#4a9eff", "PRIMÄR"],
-              ["Gemini — gemini-2.0-flash / flash-lite", "Automatisk fallback om Groq är överbelastad. Används i artikelskrivning och direktdebatt. Google Gemini API.", C.green, "FALLBACK 2"],
+              ["Gemini — gemini-3.5-flash / flash-lite", "Automatisk fallback om Groq är överbelastad. Används i artikelskrivning och direktdebatt. Google Gemini API.", C.green, "FALLBACK 2"],
               ["OpenRouter — llama-3.3-70b (gratis)", "Parallell fallback i direktdebatt. Gratis tier med Llama-modellen via OpenRouter.", C.green, "FALLBACK 2"],
               ["Codestral — codestral-latest", "Mistral-modell specialiserad på kod. Används i direktdebatt och artikelbedömning som fallback, samt exklusivt för veckovis kodanalys (AI-bus).", C.accentDim, "FALLBACK 3"],
               ["Cerebras — gpt-oss-120b", "Extremt snabb inferens. Används som fallback i direktdebatt, artikelbedömning och beslut-API.", C.accentDim, "FALLBACK 3"],

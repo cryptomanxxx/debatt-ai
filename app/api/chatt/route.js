@@ -255,7 +255,8 @@ REGLER — viktiga:
       systemInstruction: { parts: [{ text: systemPrompt }] },
       generationConfig: { maxOutputTokens: 250, temperature: 0.88 },
     });
-    for (const model of ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-latest"]) {
+    // gemini-2.0-*/gemini-1.5-flash stängdes ner av Google 1 jun 2026
+    for (const model of ["gemini-3.5-flash", "gemini-3.5-flash-lite"]) {
       const gemT0 = Date.now();
       try {
         const r = await fetch(

@@ -50,7 +50,7 @@ async function testGroq() {
 async function testGemini() {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return { ok: false, error: "GEMINI_API_KEY saknas" };
-  const model = "gemini-2.0-flash-lite";
+  const model = "gemini-3.5-flash-lite"; // gemini-2.0-flash-lite stängdes ner av Google 1 jun 2026
   const t0 = Date.now();
   try {
     const r = await fetch(
