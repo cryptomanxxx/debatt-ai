@@ -830,10 +830,9 @@ function ApiStatusTab() {
           <ProviderCard name="Codestral" model="codestral-latest · fallback 2" p={health?.codestral} />
           <ProviderCard name="Cerebras" model="gpt-oss-120b · fallback 3" p={health?.cerebras} />
           <ProviderCard name="OpenRouter" model="llama-3.3-70b (free) · fallback 4 / nyhetskanal" p={health?.or} />
-          <ProviderCard name="GitHub Models" model="Llama-3.3-70B-Instruct · fallback 5" p={health?.github_models} />
-          <ProviderCard name="Cloudflare" model="llama-3.3-70b-fp8-fast · fallback 6" p={health?.cloudflare} />
-          <ProviderCard name="Sambanova" model="Meta-Llama-3.3-70B · fallback 7" p={health?.sambanova} />
-          <ProviderCard name="Gemini" model="2.0 Flash / 1.5 Flash · sista utväg" p={health?.gemini} />
+          <ProviderCard name="Cloudflare" model="llama-3.3-70b-fp8-fast · fallback 5" p={health?.cloudflare} />
+          <ProviderCard name="Sambanova" model="Meta-Llama-3.3-70B · fallback 6" p={health?.sambanova} />
+          <ProviderCard name="Gemini" model="3.5 Flash / 3.5 Flash-Lite · sista utväg" p={health?.gemini} />
 
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "20px", marginTop: "8px" }}>
             <p style={{ fontSize: "11px", color: C.accentDim, textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px", fontFamily: "monospace" }}>Tips</p>
@@ -1404,7 +1403,7 @@ function MatningTab() {
   );
 }
 
-const AI_COLORS = { groq: "#4a9eff", deepseek: "#60a5fa", gemini: "#4ade80", openrouter: "#f8954d", cerebras: "#a78bfa", sambanova: "#fb923c", github_models: "#e2c08d", codestral: "#f472b6", cloudflare: "#f97316", none: "#f87171" };
+const AI_COLORS = { groq: "#4a9eff", deepseek: "#60a5fa", gemini: "#4ade80", openrouter: "#f8954d", cerebras: "#a78bfa", sambanova: "#fb923c", codestral: "#f472b6", cloudflare: "#f97316", none: "#f87171" };
 const GROQ_DAILY_LIMIT = 100_000;
 
 // ── AiBusTab ──────────────────────────────────────────────────────────────────
@@ -2429,8 +2428,8 @@ const PERIOD_OPTIONS = [
   { label: "2 veckor", days: 14, limit: 20000 },
   { label: "4 veckor", days: 28, limit: 40000 },
 ];
-const AI_PROVIDER_ORDER = ["groq", "deepseek", "codestral", "cerebras", "openrouter", "github_models", "cloudflare", "sambanova", "gemini"];
-const AI_PROVIDER_LABELS = { groq: "Groq", deepseek: "DeepSeek", codestral: "Codestral", cerebras: "Cerebras", sambanova: "Sambanova", gemini: "Gemini", openrouter: "OpenRouter", github_models: "GitHub Models", cloudflare: "Cloudflare" };
+const AI_PROVIDER_ORDER = ["groq", "deepseek", "codestral", "cerebras", "openrouter", "cloudflare", "sambanova", "gemini"];
+const AI_PROVIDER_LABELS = { groq: "Groq", deepseek: "DeepSeek", codestral: "Codestral", cerebras: "Cerebras", sambanova: "Sambanova", gemini: "Gemini", openrouter: "OpenRouter", cloudflare: "Cloudflare" };
 const SOURCE_LABELS_MAP = { "kanal": "Kanal (expand)", "kanal-batch": "Kanal (batch sv)", "kanal-batch-en": "Kanal (batch en)", "chatt": "Direktdebatt", "chatt-summering": "Debatt summering", "agent-fraga": "Fråga agenten", "agent-utmaning": "Utmaning", "labb": "Labb", "beslut": "Decision API" };
 const SOURCE_COLORS_MAP = { "kanal": "#60a5fa", "kanal-batch": "#38bdf8", "kanal-batch-en": "#93c5fd", "chatt": "#a78bfa", "chatt-summering": "#c4b5fd", "agent-fraga": "#fb923c", "agent-utmaning": "#34d399", "labb": "#e879f9", "beslut": "#f59e0b" };
 
@@ -2543,7 +2542,7 @@ function AiStatistikTab() {
     const byDay = {};
     for (const r of effectiveRows) {
       const day = r.ts.slice(0, 10);
-      if (!byDay[day]) byDay[day] = { day, groq: 0, codestral: 0, cerebras: 0, sambanova: 0, gemini: 0, openrouter: 0, github_models: 0, none: 0 };
+      if (!byDay[day]) byDay[day] = { day, groq: 0, codestral: 0, cerebras: 0, sambanova: 0, gemini: 0, openrouter: 0, none: 0 };
       const p = r.provider || "none";
       byDay[day][p] = (byDay[day][p] || 0) + 1;
     }
@@ -2758,7 +2757,6 @@ function AiStatistikTab() {
             <Bar dataKey="sambanova"     name="Sambanova"     stackId="a" fill={AI_COLORS.sambanova}     radius={[0,0,0,0]} />
             <Bar dataKey="gemini"        name="Gemini"        stackId="a" fill={AI_COLORS.gemini}        radius={[0,0,0,0]} />
             <Bar dataKey="openrouter"    name="OpenRouter"    stackId="a" fill={AI_COLORS.openrouter}    radius={[0,0,0,0]} />
-            <Bar dataKey="github_models" name="GitHub Models" stackId="a" fill={AI_COLORS.github_models} radius={[0,0,0,0]} />
             <Bar dataKey="none"          name="Fallback"      stackId="a" fill={AI_COLORS.none}          radius={[2,2,0,0]} />
           </BarChart>
         </ResponsiveContainer>

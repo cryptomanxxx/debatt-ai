@@ -7,7 +7,7 @@
  *   callProvider(name, messages, opts)        — anropa en specifik provider
  *   callWithFallback(chain, messages, opts)   — prova providers i tur och ordning
  *
- * Providers: groq | gemini | cerebras | sambanova | codestral | deepseek | github
+ * Providers: groq | gemini | cerebras | sambanova | codestral | deepseek
  *
  * opts:
  *   maxTokens    (default 800)
@@ -34,9 +34,12 @@ const PROVIDERS = {
     cbKey:   "groq",
     shape:   "openai",
   },
+  // gemini-2.0-flash stängdes ner av Google 1 jun 2026. gemini-3.5-flash är
+  // GA sedan 19 maj 2026 (bekräftat via /api/test-providers live 404-svar
+  // pekade ut gemini-3.5-flash-lite som direkt ersättare för lite-varianten).
   gemini: {
-    url:     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-    model:   "gemini-2.0-flash",
+    url:     "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
+    model:   "gemini-3.5-flash",
     key:     () => process.env.GEMINI_API_KEY,
     timeout: 15_000,
     cbKey:   "gemini",
@@ -74,29 +77,24 @@ const PROVIDERS = {
     cbKey:   "deepseek",
     shape:   "openai",
   },
-  // Sista utväg — ingen circuit breaker (GitHub Actions har alltid GITHUB_TOKEN)
-  github: {
-    url:     "https://models.inference.ai.azure.com/chat/completions",
-    model:   "Llama-3.3-70B-Instruct",
-    key:     () => process.env.GITHUB_TOKEN,
-    timeout: 20_000,
-    cbKey:   null,
-    shape:   "openai",
-  },
 };
+
+// github (GitHub Models) togs bort 30 aug 2026 — tjänsten stängde helt
+// 30 jul 2026 (models.inference.ai.azure.com hade redan slutat fungera
+// dessförinnan). Var tidigare sista utväg i samtliga kedjor nedan.
 
 // Statiska kedjor — används om Supabase är otillgänglig
 export const CHAINS = {
-  general:      ["groq", "sambanova", "codestral", "deepseek", "cerebras", "gemini", "github"],
-  beslut:       ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini", "github"],
-  agent_submit: ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini", "github"],
-  pis:          ["groq", "sambanova", "codestral", "cerebras", "deepseek", "gemini", "github"],
-  chatt:        ["groq", "cerebras", "sambanova", "codestral", "deepseek", "gemini", "github"],
+  general:      ["groq", "sambanova", "codestral", "deepseek", "cerebras", "gemini"],
+  beslut:       ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini"],
+  agent_submit: ["groq", "codestral", "sambanova", "cerebras", "deepseek", "gemini"],
+  pis:          ["groq", "sambanova", "codestral", "cerebras", "deepseek", "gemini"],
+  chatt:        ["groq", "cerebras", "sambanova", "codestral", "deepseek", "gemini"],
   // hjarnan: Cerebras (gpt-oss-120b, 120B params) prioriteras för starkare resonemang
-  hjarnan:      ["cerebras", "gemini", "groq", "sambanova", "codestral", "deepseek", "github"],
+  hjarnan:      ["cerebras", "gemini", "groq", "sambanova", "codestral", "deepseek"],
   // economy: samma resonemangsskäl som hjarnan — analysen är en 400-600 ords
   // syntes av många nyckeltal, inte ett kort svar
-  economy:      ["cerebras", "groq", "sambanova", "codestral", "deepseek", "gemini", "github"],
+  economy:      ["cerebras", "groq", "sambanova", "codestral", "deepseek", "gemini"],
 };
 
 // ── Dynamisk Supabase-ordning (1h cache) ────────────────────────────────────
@@ -137,8 +135,9 @@ export async function getDynamicChain(usecase = "general") {
   const base = CHAINS[usecase] ?? CHAINS.general;
   if (!_dynamicOrder) return base;
 
-  // Filtrera till providers som finns i PROVIDERS, behåll github sist
-  const ranked = _dynamicOrder.map(p => p.replace('mistral', 'codestral')).filter(p => p in PROVIDERS && p !== "github");
+  // Filtrera till providers som fortfarande finns i PROVIDERS (utesluter
+  // t.ex. en kvarliggande "github"-post i en gammal sparad Supabase-ordning)
+  const ranked = _dynamicOrder.map(p => p.replace('mistral', 'codestral')).filter(p => p in PROVIDERS);
   // Lägg till providers från statisk kedja som saknas i Supabase-ordningen
   for (const p of base) {
     if (!ranked.includes(p)) ranked.push(p);

@@ -7,7 +7,6 @@ export const dynamic = "force-dynamic";
 const SB_URL  = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const GROQ_KEY   = process.env.GROQ_API_KEY;
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const GITHUB_KEY = process.env.GITHUB_TOKEN;
 const SB_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 // Taggar och ämnesord som kopplar till varje agent
@@ -122,7 +121,7 @@ async function genereraKommentar(agentNamn, artikel) {
   if (GEMINI_KEY) {
     try {
       const r = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${GEMINI_KEY}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -140,20 +139,7 @@ async function genereraKommentar(agentNamn, artikel) {
     } catch {}
   }
 
-  if (GITHUB_KEY) {
-    try {
-      const r = await fetch("https://models.inference.ai.azure.com/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${GITHUB_KEY}` },
-        signal: AbortSignal.timeout(10000),
-        body: JSON.stringify({ ...body, model: "Llama-3.3-70B-Instruct" }),
-      });
-      if (r.ok) {
-        const d = await r.json();
-        return d.choices?.[0]?.message?.content?.trim() ?? null;
-      }
-    } catch {}
-  }
+  // GitHub Models (tidigare sista utväg) togs bort 30 aug 2026 — tjänsten stängde helt 30 jul 2026
 
   return null;
 }

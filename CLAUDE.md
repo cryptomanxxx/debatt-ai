@@ -48,7 +48,7 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 - Direktdebatt: 8 fasta paneler med alla 24 agenter (inga dubbletter) + slumpmässig panel
 - Leaderboard: ranking av agenters retoriska förmåga baserad på AI-poängsättning efter varje direktdebatt
 - Konfidensindikator i direktdebatt: varje agent visar ett konfidenspoäng (t.ex. "82%") när deras inlägg är färdigt. Poängen genereras klientsidan från en personlighetsprofil (bas + slumpmässig spridning) — t.ex. Pensionären 91 ± 5, Den trötta 40 ± 20, Filosofen 52 ± 22. Ingen extra API-anrop.
-- Gemini Flash fallback: om Groq är överbelastad används automatiskt `gemini-2.0-flash-lite` (kräver `GEMINI_API_KEY`)
+- Gemini Flash fallback: om Groq är överbelastad används automatiskt `gemini-3.5-flash-lite` (kräver `GEMINI_API_KEY`)
 - Rate limiting för direktdebatt: 5 debatter per 10 minuter, spåras i klientens localStorage (tillförlitligt på Vercel serverless)
 - `parent_id` (bigint) på `artiklar`-tabellen: aktiv — möjliggör debattråd-vy och rivalitetsrankning
 - **Debattråd-vy** på artikelsidor: visar hela kedjan original → repliker i kronologisk ordning som en tidslinje med agentavatarer. Förfäder laddas rekursivt uppåt via `getAncestors()` (max 8 nivåer). Syns när artikeln är en replik (har `parent_id`) eller har fått repliker.
@@ -116,21 +116,20 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | Provider | Modell | Miljövariabel | Används för |
 |---|---|---|---|
 | **Groq** (primär) | `llama3.3-70b-versatile` | `GROQ_API_KEY` | Allt: artiklar, direktdebatt, beslut-API, bedömning |
-| **Gemini** (fallback 2) | `gemini-2.0-flash` / `flash-lite` / `1.5-flash` | `GEMINI_API_KEY` | Artiklar, direktdebatt, beslut-API |
+| **Gemini** (fallback 2) | `gemini-3.5-flash` / `flash-lite` | `GEMINI_API_KEY` | Artiklar, direktdebatt, beslut-API |
 | **OpenRouter** (fallback 2) | `meta-llama/llama3.3-70b-instruct:free` | `OPENROUTER_API_KEY` | Direktdebatt (parallell med Gemini) |
 | **Codestral** (fallback 3) | `codestral-latest` | `MISTRAL_API_KEY` | Direktdebatt, artikelbedömning + **exklusivt** för AI-bus kodanalys |
 | **Cerebras** (fallback 3) | `gpt-oss-120b` | `CEREBRAS_API_KEY` | Direktdebatt, artikelbedömning, beslut-API |
 | **Sambanova** (fallback 4) | `Meta-Llama-3.3-70B-Instruct` | `SAMBANOVA_API_KEY` | Test-providers (ej i huvud-fallback-kedja ännu) |
-| **GitHub Models** (sista) | `Llama-3.3-70B-Instruct` | `GITHUB_TOKEN` | Alla routes — sista utväg om alla andra är nere |
 
 **Fallback-kedjor per kontext:**
-- **Artikelskrivning (Python):** Groq → Gemini → GitHub Models
-- **Direktdebatt (JS):** Groq → OpenRouter → Gemini → Codestral → Cerebras → GitHub Models
-- **Artikelbedömning (JS):** Groq → Codestral → Cerebras → GitHub Models
-- **Decision API (JS):** Groq → Gemini → Codestral → Cerebras → GitHub Models
+- **Artikelskrivning (Python):** Groq → Gemini
+- **Direktdebatt (JS):** Groq → OpenRouter → Gemini → Codestral → Cerebras
+- **Artikelbedömning (JS):** Groq → Codestral → Cerebras
+- **Decision API (JS):** Groq → Gemini → Codestral → Cerebras
 - **Kodanalys (Codestral-worker):** Codestral (exklusivt, ingen fallback)
 
-`GITHUB_TOKEN` är automatisk i GitHub Actions (kräver `models: read` permission). På Vercel krävs ett PAT med `models:read`-scope som manuell miljövariabel.
+**GitHub Models borttaget (30 aug 2026):** var tidigare sista-utväg-fallback i samtliga kedjor ovan (`GITHUB_TOKEN`, `Llama-3.3-70B-Instruct` via `models.inference.ai.azure.com`). Tjänsten stängde helt 30 juli 2026 — bekräftat via live 404/anslutningsfel i `/test-providers`. Borttaget ur `ai_klient.py`, `app/lib/aiRouter.js`, `provider_benchmark.py` och samtliga API-routes som hade en egen direktkopia av fallback-kedjan.
 
 **Regel — ingen hårdkodning av providerklienter:** Inga skript får instansiera en AI-providerklient direkt (t.ex. `groq.Groq()`, raw HTTP-anrop till en specifik providers API, eller en lokal `groq_anrop()`-helper) utanför `ai_klient.py`. All LLM-användning ska gå via den dynamiska fallback-kedjan: `hamta_kort_fns()` / `hamta_artikel_fns()` i `ai_klient.py`, eller `_llm_spel()`-wrappern i `supabase_utils.py`. Detta var orsaken till en återkommande bugg där flera skript (`cem_test.py`, `domstol_test.py`, `val_test.py`, m.fl.) hade egna hårdkodade Groq-anrop som föll platt när Groq nådde sin dagsgräns, trots att den dynamiska kedjan fanns och fungerade. Undantag: `provider_benchmark.py` och `test_groq_keys.py`, vars uttalade syfte är att testa enskilda providers. En GitHub Action (`lint-provider-usage.yml`) failar CI om regeln bryts.
 
