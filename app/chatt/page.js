@@ -486,24 +486,34 @@ export default function ChattPage() {
       setTänkande(agent);
       setTänker(true);
       setStreaming(null);
-      const abort = new AbortController();
-      abortRef.current = abort;
       try {
-        let gotFirst = false;
         let text = null;
-        text = await streamSvar({
-          amne: valtAmne, historik: h, agent, signal: abort.signal,
-          artikelTitel: artikel?.titel, artikelSammanfattning: artikel?.sammanfattning,
-          onToken: (t) => {
-            if (!gotFirst) { gotFirst = true; setTänker(false); }
-            setStreaming({ agent, text: t });
-          },
-          onRateLimit: (info) => setRateLimitInfo(info),
-          onProvider: (p) => { providersRef.current.add(p); setUsedProviders(new Set(providersRef.current)); },
-        });
+        // En leverantörsström som stängs utan "data: [DONE]" (avbruten anslutning,
+        // inte ett fel som kastas) lämnar text tom utan att streamSvar() kastar —
+        // /api/chatt övervakar inte strömmen efter att svarshuvudena kommit in, så
+        // ett sådant avbrott upptäcks aldrig eller görs om av servern. Ett enda
+        // tyst omförsök här räcker för de flesta transienta avbrott. Riktiga fel
+        // (429/502/abort, som KASTAS av streamSvar) hanteras oförändrat i catch
+        // nedan — de görs inte om här.
+        for (let forsok = 0; forsok < 2 && !text && !stoppRef.current; forsok++) {
+          if (forsok > 0) { setStreaming(null); await new Promise(r => setTimeout(r, 400)); }
+          let gotFirst = false;
+          const abort = new AbortController();
+          abortRef.current = abort;
+          text = await streamSvar({
+            amne: valtAmne, historik: h, agent, signal: abort.signal,
+            artikelTitel: artikel?.titel, artikelSammanfattning: artikel?.sammanfattning,
+            onToken: (t) => {
+              if (!gotFirst) { gotFirst = true; setTänker(false); }
+              setStreaming({ agent, text: t });
+            },
+            onRateLimit: (info) => setRateLimitInfo(info),
+            onProvider: (p) => { providersRef.current.add(p); setUsedProviders(new Set(providersRef.current)); },
+          });
+        }
         if (stoppRef.current) break;
         if (!text) {
-          setFelmeddelande("Debatten avbröts oväntat. Försök igen.");
+          setFelmeddelande("Debatten avbröts oväntat efter ett omförsök. Försök igen.");
           break;
         }
         setStreaming(null);

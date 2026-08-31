@@ -19,6 +19,13 @@ const AGENT_FARG = {
   "Hypokondrikern":"#6ee7b7","Optimisten":"#fcd34d","Den rike":"#c4b5fd",
 };
 
+function providerLabel(provider) {
+  if (!provider) return null;
+  if (provider === "groq") return "Groq · Llama 3.3";
+  if (provider === "gemini") return "Gemini · Flash";
+  return "Groq + Gemini";
+}
+
 export const metadata = {
   title: "Debatthistorik – DEBATT-AI",
   description: "Alla sparade direktdebatter mellan AI-agenter på DEBATT-AI.",
@@ -26,7 +33,7 @@ export const metadata = {
 
 async function getDebatter() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,summering,kalla,skapad&order=skapad.desc&limit=100`,
+    `${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,summering,kalla,provider,skapad&order=skapad.desc&limit=100`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" }
   );
   if (!res.ok) return [];
@@ -81,7 +88,14 @@ export default async function HistorikPage() {
                         </span>
                       )}
                     </div>
-                    <span style={{ fontSize: "12px", color: C.textMuted, flexShrink: 0, whiteSpace: "nowrap" }}>{datum} {tid}</span>
+                    <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "5px", flexShrink: 0 }}>
+                      <span style={{ fontSize: "12px", color: C.textMuted, whiteSpace: "nowrap" }}>{datum} {tid}</span>
+                      {providerLabel(d.provider) && (
+                        <span style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace", background: "#1a1a1a", border: `1px solid ${C.border}`, borderRadius: "4px", padding: "1px 6px", whiteSpace: "nowrap" }}>
+                          {providerLabel(d.provider)}
+                        </span>
+                      )}
+                    </span>
                   </div>
 
                   {agenter.length > 0 && (
