@@ -179,6 +179,18 @@ function peekLocalRL() {
   return { remaining: Math.max(0, RL_LIMIT - count), resetAt: windowStart + RL_WINDOW };
 }
 
+// En avbruten leverantörsström lämnar inte alltid text helt tom — en anslutning
+// som dör tidigt kan lika gärna lämna ett kort, mitt-i-meningen-avhugget fragment
+// ("Jag ser", "...hotar håll", "...omedelbara int") som passerar ett rent
+// !text-test. Systemprompten kräver alltid 2–3 fullständiga meningar, så ett svar
+// som är onaturligt kort ELLER inte slutar med normal meningsavslutning är ett
+// starkt tecken på att strömmen kapades, inte att agenten faktiskt svarade kort.
+function arTroligenAvbruten(text) {
+  const t = (text || "").trim();
+  if (t.length < 20) return true;
+  return !/[.!?…][”"')\]]*$/.test(t);
+}
+
 async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfattning, onToken, signal, onRateLimit, onProvider }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
@@ -489,13 +501,14 @@ export default function ChattPage() {
       try {
         let text = null;
         // En leverantörsström som stängs utan "data: [DONE]" (avbruten anslutning,
-        // inte ett fel som kastas) lämnar text tom utan att streamSvar() kastar —
+        // inte ett fel som kastas) lämnar text tom — eller värre, ett kort
+        // mitt-i-meningen-avhugget fragment — utan att streamSvar() kastar.
         // /api/chatt övervakar inte strömmen efter att svarshuvudena kommit in, så
         // ett sådant avbrott upptäcks aldrig eller görs om av servern. Ett enda
         // tyst omförsök här räcker för de flesta transienta avbrott. Riktiga fel
         // (429/502/abort, som KASTAS av streamSvar) hanteras oförändrat i catch
         // nedan — de görs inte om här.
-        for (let forsok = 0; forsok < 2 && !text && !stoppRef.current; forsok++) {
+        for (let forsok = 0; forsok < 2 && arTroligenAvbruten(text) && !stoppRef.current; forsok++) {
           if (forsok > 0) { setStreaming(null); await new Promise(r => setTimeout(r, 400)); }
           let gotFirst = false;
           const abort = new AbortController();
@@ -516,6 +529,8 @@ export default function ChattPage() {
           setFelmeddelande("Debatten avbröts oväntat efter ett omförsök. Försök igen.");
           break;
         }
+        // Om texten fortfarande verkar avhuggen efter omförsöket används den ändå —
+        // en kort replik är bättre för debatten än att avbryta den helt.
         setStreaming(null);
         const inlagg = { agent, text: text.trim(), id: i, konfidensPoang: genereraKonfidensPoang(agent) };
         h = [...h, inlagg];
