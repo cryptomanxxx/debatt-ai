@@ -1,3 +1,4 @@
+import { chattProviderLabel as providerLabel } from "../../lib/chattProvider";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -18,13 +19,6 @@ const AGENT_FARG = {
   "Pensionären":"#d8b4fe","Tonåringen":"#fdba74","Den nostalgiske":"#fde68a",
   "Hypokondrikern":"#6ee7b7","Optimisten":"#fcd34d","Den rike":"#c4b5fd",
 };
-
-function providerLabel(provider) {
-  if (!provider) return null;
-  if (provider === "groq") return "Groq · Llama 3.3";
-  if (provider === "gemini") return "Gemini · Flash";
-  return "Groq + Gemini";
-}
 
 export const metadata = {
   title: "Debatthistorik – DEBATT-AI",

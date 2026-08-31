@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import ChattShareButtons from "./ChattShareButtons";
 import ChattLyssna from "./ChattLyssna";
+import { chattProviderLabel } from "../../lib/chattProvider";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -77,11 +78,9 @@ export default async function ChattDebattPage({ params }) {
               <span style={{ color: "#3a7a3a", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", fontFamily: "monospace" }}>DIREKTDEBATT</span>
             </span>
             {datum && <span style={{ fontSize: "12px", color: C.textMuted }}>{datum}</span>}
-          {debatt.provider && (
+          {chattProviderLabel(debatt.provider) && (
             <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "4px", padding: "2px 8px" }}>
-              {debatt.provider === "groq" ? "Groq · Llama 3.3"
-                : debatt.provider === "gemini" ? "Gemini · Flash"
-                : "Groq + Gemini"}
+              {chattProviderLabel(debatt.provider)}
             </span>
           )}
           </div>

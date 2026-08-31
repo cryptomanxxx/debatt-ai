@@ -191,11 +191,11 @@ function arTroligenAvbruten(text) {
   return !/[.!?…][”"')\]]*$/.test(t);
 }
 
-async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfattning, onToken, signal, onRateLimit, onProvider }) {
+async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfattning, debattId, onToken, signal, onRateLimit, onProvider }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amne, historik, agent, artikelTitel, artikelSammanfattning }),
+    body: JSON.stringify({ amne, historik, agent, artikelTitel, artikelSammanfattning, debattId }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -222,7 +222,7 @@ async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfa
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const raw = line.slice(6).trim();
-        if (raw === "[DONE]") return text;
+        if (raw === "[DONE]") return { text, klar: true };
         try {
           const token = JSON.parse(raw).choices?.[0]?.delta?.content ?? "";
           if (token) { text += token; onToken(text); }
@@ -230,7 +230,10 @@ async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfa
       }
     }
   } catch (e) { if (e.name !== "AbortError") throw e; }
-  return text;
+  // Strömmen tog slut utan "data: [DONE]" — anslutningen dog, det var inte en
+  // ren avslutning. klar: false är den auktoritativa signalen på det, mer
+  // tillförlitlig än att gissa utifrån hur texten råkar sluta (Codex P2, PR #1286).
+  return { text, klar: false };
 }
 
 async function fetchSummering(amne, inlagg) {
@@ -471,6 +474,16 @@ export default function ChattPage() {
     // och en sparad debatt som (fel) ser ut som artikelbaserad hela vägen (Codex P2, PR #1284).
     const artikel = artikelKontextRef.current;
 
+    // Egen slumpmässig id för DENNA debattstart — skickas till /api/chatt så servern
+    // kan känna igen ett omförsök av tur 1 som EXAKT samma debatt (och undanta den
+    // från kvoten en gång, se konsumeraGratisOmforsok i app/api/chatt/route.js)
+    // istället för att lita på ett rent klientstyrt booleskt fält som vem som helst
+    // kunde skicka obegränsat (Codex P1, PR #1287). Inte samma sak som debattId-state
+    // (Supabase-radens id, satt först efter att debatten sparats i avsluta()).
+    const kvotId = (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? slumpAgenter;
     const valtAmne = amne.trim() || slumpaAmne();
@@ -500,22 +513,32 @@ export default function ChattPage() {
       setStreaming(null);
       try {
         let text = null;
+        let klar = false;
         // En leverantörsström som stängs utan "data: [DONE]" (avbruten anslutning,
         // inte ett fel som kastas) lämnar text tom — eller värre, ett kort
-        // mitt-i-meningen-avhugget fragment — utan att streamSvar() kastar.
-        // /api/chatt övervakar inte strömmen efter att svarshuvudena kommit in, så
-        // ett sådant avbrott upptäcks aldrig eller görs om av servern. Ett enda
-        // tyst omförsök här räcker för de flesta transienta avbrott. Riktiga fel
-        // (429/502/abort, som KASTAS av streamSvar) hanteras oförändrat i catch
-        // nedan — de görs inte om här.
-        for (let forsok = 0; forsok < 2 && arTroligenAvbruten(text) && !stoppRef.current; forsok++) {
-          if (forsok > 0) { setStreaming(null); await new Promise(r => setTimeout(r, 400)); }
+        // mitt-i-meningen-avhugget fragment — utan att streamSvar() kastar. klar
+        // (satt av streamSvar() beroende på om "data: [DONE]" faktiskt sågs) är den
+        // auktoritativa signalen på ett sådant avbrott — mer tillförlitlig än att
+        // gissa utifrån hur texten råkar sluta, eftersom en ström kan avbrytas
+        // precis efter en fullt grammatisk mening (arTroligenAvbruten missar då,
+        // men klar avslöjar det ändå). /api/chatt övervakar inte strömmen efter att
+        // svarshuvudena kommit in, så ett sådant avbrott upptäcks aldrig eller görs
+        // om av servern. Ett enda tyst omförsök här räcker för de flesta transienta
+        // avbrott. Riktiga fel (429/502/abort, som KASTAS av streamSvar) hanteras
+        // oförändrat i catch nedan — de görs inte om här.
+        for (let forsok = 0; forsok < 2 && (!klar || arTroligenAvbruten(text)) && !stoppRef.current; forsok++) {
+          if (forsok > 0) {
+            setStreaming(null);
+            await new Promise(r => setTimeout(r, 400));
+            if (stoppRef.current) break; // användaren tryckte Avsluta under väntetiden — starta inte ett nytt anrop
+          }
           let gotFirst = false;
           const abort = new AbortController();
           abortRef.current = abort;
-          text = await streamSvar({
+          const resultat = await streamSvar({
             amne: valtAmne, historik: h, agent, signal: abort.signal,
             artikelTitel: artikel?.titel, artikelSammanfattning: artikel?.sammanfattning,
+            debattId: kvotId,
             onToken: (t) => {
               if (!gotFirst) { gotFirst = true; setTänker(false); }
               setStreaming({ agent, text: t });
@@ -523,6 +546,8 @@ export default function ChattPage() {
             onRateLimit: (info) => setRateLimitInfo(info),
             onProvider: (p) => { providersRef.current.add(p); setUsedProviders(new Set(providersRef.current)); },
           });
+          text = resultat.text;
+          klar = resultat.klar;
         }
         if (stoppRef.current) break;
         if (!text) {
