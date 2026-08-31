@@ -425,7 +425,7 @@ export default function ChattPage() {
     setAiVäljer(false);
   }
 
-  async function avsluta(h, valtAmne, valdaAgenter) {
+  async function avsluta(h, valtAmne, valdaAgenter, artikel) {
     setStreaming(null);
     setTänker(false);
     if (h.length >= 3) {
@@ -435,7 +435,6 @@ export default function ChattPage() {
       const ps = providersRef.current;
       const provider = ps.has("groq") && ps.has("gemini") ? "groq+gemini"
         : ps.has("gemini") ? "gemini" : "groq";
-      const artikel = artikelKontextRef.current;
       const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider, kalla: kallaAmne, kallaUrl: artikel?.url ?? null, kallaTitel: artikel?.titel ?? null });
       setDebattId(id);
       setFelmeddelande(""); // debate saved — clear any mid-stream error
@@ -451,6 +450,14 @@ export default function ChattPage() {
       setFelmeddelande(`Gränsen nådd (${RL_LIMIT} debatter/10 min). Försök igen om ${min} minut${min === 1 ? "" : "er"}.`);
       return;
     }
+    if (hamtarArtikel) return; // en artikel-hämtning pågår — vänta så att alla repliker och sparningen ser samma kontext
+
+    // Ögonblicksbild tagen EN gång här och återanvänd i varje repliks streamSvar()-anrop
+    // och i avsluta()s sparning — läser man artikelKontextRef.current live vid varje
+    // anrop kan värdet hinna ändras mitt i debatten om hamtaArtikel() fortfarande var i
+    // flykt när debatten startades, vilket ger tidiga repliker utan kontext och sena med,
+    // och en sparad debatt som (fel) ser ut som artikelbaserad hela vägen (Codex P2, PR #1284).
+    const artikel = artikelKontextRef.current;
 
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? slumpAgenter;
@@ -486,7 +493,7 @@ export default function ChattPage() {
         let text = null;
         text = await streamSvar({
           amne: valtAmne, historik: h, agent, signal: abort.signal,
-          artikelTitel: artikelKontextRef.current?.titel, artikelSammanfattning: artikelKontextRef.current?.sammanfattning,
+          artikelTitel: artikel?.titel, artikelSammanfattning: artikel?.sammanfattning,
           onToken: (t) => {
             if (!gotFirst) { gotFirst = true; setTänker(false); }
             setStreaming({ agent, text: t });
@@ -514,7 +521,7 @@ export default function ChattPage() {
       }
       if (!stoppRef.current && i < 9) await new Promise(r => setTimeout(r, 300));
     }
-    await avsluta(h, valtAmne, valdaAgenter);
+    await avsluta(h, valtAmne, valdaAgenter, artikel);
   }
 
   function stoppa() {
@@ -772,8 +779,8 @@ export default function ChattPage() {
               );
             })()}
 
-            <button onClick={starta} style={{ width: "100%", padding: "14px", background: C.accent, border: "none", borderRadius: "6px", color: C.bg, fontSize: "15px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer", letterSpacing: "0.04em" }}>
-              Starta direktdebatt →
+            <button onClick={starta} disabled={hamtarArtikel} style={{ width: "100%", padding: "14px", background: hamtarArtikel ? C.border : C.accent, border: "none", borderRadius: "6px", color: hamtarArtikel ? C.textMuted : C.bg, fontSize: "15px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: hamtarArtikel ? "default" : "pointer", letterSpacing: "0.04em" }}>
+              {hamtarArtikel ? "Hämtar artikel…" : "Starta direktdebatt →"}
             </button>
           </div>
         )}
