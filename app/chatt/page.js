@@ -357,6 +357,10 @@ export default function ChattPage() {
   const lyssnaStoppRef = useRef(false);
   const bottomRef = useRef(null);
   const providersRef = useRef(new Set());
+  // Mirrors artikelKontext synchronously — starta()/avsluta() read this instead of the state
+  // value, so the attached article can never be lost to a stale closure regardless of how long
+  // the debate's chain of awaits runs or how many re-renders happen while it's in flight.
+  const artikelKontextRef = useRef(null);
 
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
@@ -379,6 +383,7 @@ export default function ChattPage() {
     setArtikelFel("");
     try {
       const kontext = await fetchArtikelKontext(url);
+      artikelKontextRef.current = kontext;
       setArtikelKontext(kontext);
     } catch (e) {
       setArtikelFel(e.message || "Kunde inte hämta artikeln.");
@@ -388,6 +393,7 @@ export default function ChattPage() {
   }
 
   function taBortArtikel() {
+    artikelKontextRef.current = null;
     setArtikelKontext(null);
     setArtikelUrl("");
     setArtikelFel("");
@@ -412,7 +418,8 @@ export default function ChattPage() {
       const ps = providersRef.current;
       const provider = ps.has("groq") && ps.has("gemini") ? "groq+gemini"
         : ps.has("gemini") ? "gemini" : "groq";
-      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider, kalla: kallaAmne, kallaUrl: artikelKontext?.url ?? null, kallaTitel: artikelKontext?.titel ?? null });
+      const artikel = artikelKontextRef.current;
+      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider, kalla: kallaAmne, kallaUrl: artikel?.url ?? null, kallaTitel: artikel?.titel ?? null });
       setDebattId(id);
       setFelmeddelande(""); // debate saved — clear any mid-stream error
     }
@@ -462,7 +469,7 @@ export default function ChattPage() {
         let text = null;
         text = await streamSvar({
           amne: valtAmne, historik: h, agent, signal: abort.signal,
-          artikelTitel: artikelKontext?.titel, artikelSammanfattning: artikelKontext?.sammanfattning,
+          artikelTitel: artikelKontextRef.current?.titel, artikelSammanfattning: artikelKontextRef.current?.sammanfattning,
           onToken: (t) => {
             if (!gotFirst) { gotFirst = true; setTänker(false); }
             setStreaming({ agent, text: t });
