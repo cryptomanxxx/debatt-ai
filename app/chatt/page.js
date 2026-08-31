@@ -258,18 +258,35 @@ async function fetchArtikelKontext(url) {
   return { titel: data.titel ?? null, sammanfattning: data.sammanfattning ?? "", url: data.url ?? url };
 }
 
+function postDebatt(payload) {
+  return fetch(`${SB_URL}/rest/v1/chatt_debatter`, {
+    method: "POST",
+    headers: {
+      "apikey": SB_KEY,
+      "Authorization": `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=representation",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider, kalla, kallaUrl, kallaTitel }) {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/chatt_debatter`, {
-      method: "POST",
-      headers: {
-        "apikey": SB_KEY,
-        "Authorization": `Bearer ${SB_KEY}`,
-        "Content-Type": "application/json",
-        "Prefer": "return=representation",
-      },
-      body: JSON.stringify({ amne, agenter, inlagg, summering, scores: scores ?? null, provider: provider ?? null, kalla: kalla ?? "inbyggt", kalla_url: kallaUrl ?? null, kalla_titel: kallaTitel ?? null }),
-    });
+    const bas = { amne, agenter, inlagg, summering, scores: scores ?? null, provider: provider ?? null, kalla: kalla ?? "inbyggt" };
+    const harArtikel = kallaUrl != null || kallaTitel != null;
+    let res = await postDebatt(harArtikel ? { ...bas, kalla_url: kallaUrl ?? null, kalla_titel: kallaTitel ?? null } : bas);
+    if (!res.ok && harArtikel) {
+      // Om kalla_url/kalla_titel-kolumnerna inte finns än (t.ex. en deploy som
+      // landar innan supabase_chatt_kalla_url.sql körts) avvisar PostgREST HELA
+      // insert:en, inte bara de okända fälten — utan den här reserven skulle
+      // varenda debatt sluta osparad och odelbar under det fönstret. Försök
+      // igen utan artikelfälten så att debatten i alla fall sparas.
+      const body = await res.text().catch(() => "");
+      if (/kalla_url|kalla_titel|schema cache/i.test(body)) {
+        res = await postDebatt(bas);
+      }
+    }
     if (!res.ok) return null;
     const data = await res.json();
     return data[0]?.id ?? null;
