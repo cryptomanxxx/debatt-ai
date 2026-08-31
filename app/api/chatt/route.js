@@ -44,19 +44,55 @@ const PERSONLIGHETER = {
 const rateLimitStore = new Map();
 const LIMIT = 5;
 const WINDOW_MS = 10 * 60 * 1000;
+// En genuin omförsök av EXAKT samma debattstart (matchande debattId) får högst
+// så här många gratis fortsättningar innan den räknas som en ny debatt igen —
+// matchar klientens eget tak på ett omförsök per tur. Utan detta tak (en tidigare
+// version använde en oautentiserad omforsok:true-flagga direkt från klienten)
+// kunde vem som helst POSTa historik:[] + samma flagga upprepade gånger och helt
+// kringgå kvoten på den AI-anropande endpointen (Codex P1, PR #1287).
+const MAX_GRATIS_OMFORSOK_PER_DEBATT = 1;
 
-function getRateLimitInfo(ip) {
+function getEntry(ip) {
   const now = Date.now();
   const entry = rateLimitStore.get(ip);
-  if (!entry || now - entry.start > WINDOW_MS) return { remaining: LIMIT, resetAt: null };
+  if (!entry || now - entry.start > WINDOW_MS) return null;
+  return entry;
+}
+
+function getRateLimitInfo(ip) {
+  const entry = getEntry(ip);
+  if (!entry) return { remaining: LIMIT, resetAt: null };
   return { remaining: Math.max(0, LIMIT - entry.count), resetAt: entry.start + WINDOW_MS };
 }
 
-function consumeRateLimit(ip) {
+// Drar av en gratis omförsök för debattId om ett sådant tillgodohavande finns
+// (satt av consumeRateLimit när debatten först betalade sin plats). Returnerar
+// true om anropet ska tillåtas UTAN att tära på kvoten.
+function konsumeraGratisOmforsok(ip, debattId) {
+  if (!debattId) return false;
+  const entry = getEntry(ip);
+  if (!entry) return false;
+  const kvar = entry.gratisOmforsok.get(debattId) ?? 0;
+  if (kvar <= 0) return false;
+  entry.gratisOmforsok.set(debattId, kvar - 1);
+  return true;
+}
+
+function consumeRateLimit(ip, debattId) {
   const now = Date.now();
-  const entry = rateLimitStore.get(ip);
-  if (!entry || now - entry.start > WINDOW_MS) rateLimitStore.set(ip, { count: 1, start: now });
-  else entry.count++;
+  let entry = rateLimitStore.get(ip);
+  if (!entry || now - entry.start > WINDOW_MS) {
+    entry = { count: 0, start: now, gratisOmforsok: new Map() };
+    rateLimitStore.set(ip, entry);
+  }
+  entry.count++;
+  // Sätts bara vid FÖRSTA debiteringen av detta id — om samma id debiteras igen
+  // (efter att dess enda gratisomförsök redan förbrukats) ska det INTE fylla på
+  // budgeten igen, annars kan ett återanvänt id växla betalt/gratis obegränsat och
+  // i praktiken fördubbla kvoten istället för att kosta som en vanlig ny debatt.
+  if (debattId && !entry.gratisOmforsok.has(debattId)) {
+    entry.gratisOmforsok.set(debattId, MAX_GRATIS_OMFORSOK_PER_DEBATT);
+  }
 }
 
 // ── Provider health state (per Edge isolate, best-effort) ────────────────────────────────────────
@@ -95,28 +131,32 @@ async function handlePost(request) {
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
-  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, omforsok } = body;
+  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, debattId } = body;
   const isEn = lang === "en";
   // Client re-sends this on every turn (no server-side session state) — validated/capped
   // here too, defense in depth, since the client's own cap isn't trusted.
   const artikelTitelSafe = typeof artikelTitel === "string" ? artikelTitel.slice(0, 200) : "";
   const artikelSammanfattningSafe = typeof artikelSammanfattning === "string" ? artikelSammanfattning.slice(0, 500) : "";
   const harArtikelKontext = artikelSammanfattningSafe.length > 0;
+  const debattIdSafe = typeof debattId === "string" && debattId.length > 0 && debattId.length <= 100 ? debattId : null;
 
-  // omforsok=true markerar ett klient-drivet omförsök av tur 1 efter en avhuggen/tom
-  // ström (se app/chatt/page.js) — historik är fortfarande [] då precis som vid en
-  // riktig ny debatt, men det är INTE en ny debatt och ska inte tära på kvoten en
-  // gång till (Codex P1, PR #1285): den ursprungliga första förfrågan har redan
-  // passerat kontrollen och konsumerat sin plats.
-  const isFirstCall = (!Array.isArray(historik) || historik.length === 0) && !omforsok;
-  if (isFirstCall) {
+  // debattId identifierar EN debattstart hos klienten (genererad en gång i starta(),
+  // återanvänd på ett ev. omförsök av tur 1 efter en avhuggen/tom ström). historik
+  // är fortfarande [] på ett sådant omförsök precis som vid en riktig ny debatt, men
+  // det är INTE en ny debatt och ska inte tära på kvoten en gång till — dock får
+  // samma debattId bara ETT sådant gratispass (MAX_GRATIS_OMFORSOK_PER_DEBATT) innan
+  // den räknas som ny igen, så ett server-okontrollerat booleskt fält (den tidigare
+  // omforsok:true-varianten) inte kan missbrukas till obegränsade gratis AI-anrop
+  // (Codex P1, PR #1287).
+  const isFirstCall = !Array.isArray(historik) || historik.length === 0;
+  if (isFirstCall && !konsumeraGratisOmforsok(ip, debattIdSafe)) {
     const info = getRateLimitInfo(ip);
     if (info.remaining <= 0) {
       const minutesLeft = info.resetAt ? Math.ceil((info.resetAt - Date.now()) / 60000) : 10;
       logFel({ kalla: "chatt", feltyp: "rate_limit", meddelande: "429 rate limit direktdebatt", ip, extra: { minutesLeft } });
       return Response.json({ error: "rate_limit", remaining: 0, resetAt: info.resetAt, minutesLeft }, { status: 429 });
     }
-    consumeRateLimit(ip);
+    consumeRateLimit(ip, debattIdSafe);
   }
 
   if (!agent || !AGENTER.has(agent))

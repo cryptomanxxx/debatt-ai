@@ -191,11 +191,11 @@ function arTroligenAvbruten(text) {
   return !/[.!?…][”"')\]]*$/.test(t);
 }
 
-async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfattning, omforsok, onToken, signal, onRateLimit, onProvider }) {
+async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfattning, debattId, onToken, signal, onRateLimit, onProvider }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amne, historik, agent, artikelTitel, artikelSammanfattning, omforsok }),
+    body: JSON.stringify({ amne, historik, agent, artikelTitel, artikelSammanfattning, debattId }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -474,6 +474,16 @@ export default function ChattPage() {
     // och en sparad debatt som (fel) ser ut som artikelbaserad hela vägen (Codex P2, PR #1284).
     const artikel = artikelKontextRef.current;
 
+    // Egen slumpmässig id för DENNA debattstart — skickas till /api/chatt så servern
+    // kan känna igen ett omförsök av tur 1 som EXAKT samma debatt (och undanta den
+    // från kvoten en gång, se konsumeraGratisOmforsok i app/api/chatt/route.js)
+    // istället för att lita på ett rent klientstyrt booleskt fält som vem som helst
+    // kunde skicka obegränsat (Codex P1, PR #1287). Inte samma sak som debattId-state
+    // (Supabase-radens id, satt först efter att debatten sparats i avsluta()).
+    const kvotId = (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? slumpAgenter;
     const valtAmne = amne.trim() || slumpaAmne();
@@ -528,7 +538,7 @@ export default function ChattPage() {
           const resultat = await streamSvar({
             amne: valtAmne, historik: h, agent, signal: abort.signal,
             artikelTitel: artikel?.titel, artikelSammanfattning: artikel?.sammanfattning,
-            omforsok: forsok > 0,
+            debattId: kvotId,
             onToken: (t) => {
               if (!gotFirst) { gotFirst = true; setTänker(false); }
               setStreaming({ agent, text: t });
