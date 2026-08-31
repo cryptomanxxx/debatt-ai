@@ -85,7 +85,12 @@ export default async function ChattDebattPage({ params }) {
             </span>
           )}
           </div>
-          <h1 style={{ fontSize: "26px", fontWeight: 400, color: C.accent, margin: "0 0 20px 0", lineHeight: 1.3 }}>{debatt.amne}</h1>
+          <h1 style={{ fontSize: "26px", fontWeight: 400, color: C.accent, margin: "0 0 16px 0", lineHeight: 1.3 }}>{debatt.amne}</h1>
+          {debatt.kalla_url && (
+            <a href={debatt.kalla_url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", color: C.accentDim, textDecoration: "none", padding: "4px 10px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "20px", marginBottom: "20px" }}>
+              📰 {debatt.kalla_titel || "Baserat på en nyhetsartikel"}
+            </a>
+          )}
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {agenter.map(a => (
               <span key={a} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", background: `${af(a)}12`, border: `1px solid ${af(a)}35`, borderRadius: "20px" }}>
