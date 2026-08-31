@@ -95,7 +95,7 @@ async function handlePost(request) {
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
-  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning } = body;
+  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, omforsok } = body;
   const isEn = lang === "en";
   // Client re-sends this on every turn (no server-side session state) — validated/capped
   // here too, defense in depth, since the client's own cap isn't trusted.
@@ -103,7 +103,12 @@ async function handlePost(request) {
   const artikelSammanfattningSafe = typeof artikelSammanfattning === "string" ? artikelSammanfattning.slice(0, 500) : "";
   const harArtikelKontext = artikelSammanfattningSafe.length > 0;
 
-  const isFirstCall = !Array.isArray(historik) || historik.length === 0;
+  // omforsok=true markerar ett klient-drivet omförsök av tur 1 efter en avhuggen/tom
+  // ström (se app/chatt/page.js) — historik är fortfarande [] då precis som vid en
+  // riktig ny debatt, men det är INTE en ny debatt och ska inte tära på kvoten en
+  // gång till (Codex P1, PR #1285): den ursprungliga första förfrågan har redan
+  // passerat kontrollen och konsumerat sin plats.
+  const isFirstCall = (!Array.isArray(historik) || historik.length === 0) && !omforsok;
   if (isFirstCall) {
     const info = getRateLimitInfo(ip);
     if (info.remaining <= 0) {

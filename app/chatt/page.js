@@ -191,11 +191,11 @@ function arTroligenAvbruten(text) {
   return !/[.!?…][”"')\]]*$/.test(t);
 }
 
-async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfattning, onToken, signal, onRateLimit, onProvider }) {
+async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfattning, omforsok, onToken, signal, onRateLimit, onProvider }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amne, historik, agent, artikelTitel, artikelSammanfattning }),
+    body: JSON.stringify({ amne, historik, agent, artikelTitel, artikelSammanfattning, omforsok }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -509,13 +509,18 @@ export default function ChattPage() {
         // (429/502/abort, som KASTAS av streamSvar) hanteras oförändrat i catch
         // nedan — de görs inte om här.
         for (let forsok = 0; forsok < 2 && arTroligenAvbruten(text) && !stoppRef.current; forsok++) {
-          if (forsok > 0) { setStreaming(null); await new Promise(r => setTimeout(r, 400)); }
+          if (forsok > 0) {
+            setStreaming(null);
+            await new Promise(r => setTimeout(r, 400));
+            if (stoppRef.current) break; // användaren tryckte Avsluta under väntetiden — starta inte ett nytt anrop
+          }
           let gotFirst = false;
           const abort = new AbortController();
           abortRef.current = abort;
           text = await streamSvar({
             amne: valtAmne, historik: h, agent, signal: abort.signal,
             artikelTitel: artikel?.titel, artikelSammanfattning: artikel?.sammanfattning,
+            omforsok: forsok > 0,
             onToken: (t) => {
               if (!gotFirst) { gotFirst = true; setTänker(false); }
               setStreaming({ agent, text: t });
