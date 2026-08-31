@@ -1,6 +1,10 @@
-// No edge runtime — Node.js ger oss dns.lookup() för SSRF-skydd mot privata IP-intervall.
+// No edge runtime — Node.js ger oss dns.lookup() + net.BlockList + https.request()
+// för SSRF-skydd mot privata IP-intervall, med anslutningen pinnad till den
+// validerade adressen (se motivering nedan).
 
 import dns from "node:dns/promises";
+import https from "node:https";
+import net from "node:net";
 import { checkRateLimit } from "../../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../../lib/logFel";
 import { decodeHtmlEntities } from "../../../lib/escapeHtml";
@@ -11,23 +15,50 @@ const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2MB
 const TITEL_MAX = 200;
 const SAMMANFATTNING_MAX = 500;
 
-function isPrivateIp(ip) {
-  if (ip.includes(".")) {
-    const parts = ip.split(".").map(Number);
-    if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return true;
-    const [a, b] = parts;
-    if (a === 10 || a === 127 || a === 0) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
-    return false;
+// Två separata BlockList-instanser — net.BlockList slår ihop IPv4- och
+// IPv6-regler i EN instans på ett sätt som gör att en ::ffff:0:0/96-regel
+// (IPv4-mapped) tyst matchar ALLA vanliga IPv4-adresser även vid en ren
+// "ipv4"-kontroll (verifierat empiriskt, inte dokumenterat beteende) — att
+// blanda dem i samma BlockList hade blockerat all trafik. Verifierat att
+// separata instanser INTE har den kollisionen.
+const blockListV4 = new net.BlockList();
+blockListV4.addSubnet("10.0.0.0", 8, "ipv4");
+blockListV4.addSubnet("127.0.0.0", 8, "ipv4");
+blockListV4.addSubnet("0.0.0.0", 8, "ipv4");
+blockListV4.addSubnet("169.254.0.0", 16, "ipv4"); // inkl. molnmetadata-IP:t 169.254.169.254
+blockListV4.addSubnet("172.16.0.0", 12, "ipv4");
+blockListV4.addSubnet("192.168.0.0", 16, "ipv4");
+blockListV4.addSubnet("100.64.0.0", 10, "ipv4"); // CGNAT
+
+const blockListV6 = new net.BlockList();
+blockListV6.addSubnet("::1", 128, "ipv6"); // loopback
+blockListV6.addSubnet("::", 128, "ipv6"); // ospecificerad
+blockListV6.addSubnet("fc00::", 7, "ipv6"); // unique local (fc00::/7 — hela intervallet, inte bara fc00-prefixet)
+blockListV6.addSubnet("fe80::", 10, "ipv6"); // link-local (fe80::/10 — hela intervallet, inte bara fe80-prefixet)
+blockListV6.addSubnet("ff00::", 8, "ipv6"); // multicast
+blockListV6.addSubnet("64:ff9b::", 96, "ipv6"); // NAT64
+blockListV6.addSubnet("100::", 64, "ipv6"); // discard-only
+
+// Extraherar en inbäddad IPv4-adress ur en IPv4-mapped IPv6-adress, i BÅDA
+// textformerna DNS kan returnera dem i: "::ffff:169.254.169.254" (dotted)
+// och "::ffff:a9fe:a9fe" (hex-grupper — samma adress, annan notation).
+function ipv4FranMapped(adress) {
+  const dotted = adress.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i);
+  if (dotted) return dotted[1];
+  const hex = adress.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/i);
+  if (hex) {
+    const a = parseInt(hex[1], 16), b = parseInt(hex[2], 16);
+    if (Number.isNaN(a) || Number.isNaN(b)) return null;
+    return [(a >> 8) & 0xff, a & 0xff, (b >> 8) & 0xff, b & 0xff].join(".");
   }
-  const lower = ip.toLowerCase();
-  if (lower === "::1") return true;
-  if (lower.startsWith("::ffff:")) return isPrivateIp(lower.slice(7));
-  if (lower.startsWith("fe80:") || lower.startsWith("fc") || lower.startsWith("fd")) return true;
-  return false;
+  return null;
+}
+
+function arPrivatAdress(address, family) {
+  if (family === 4) return blockListV4.check(address, "ipv4");
+  if (blockListV6.check(address, "ipv6")) return true;
+  const mapped = ipv4FranMapped(address.toLowerCase());
+  return mapped ? blockListV4.check(mapped, "ipv4") : false;
 }
 
 // Snabb, synkron formatkontroll — filtrerar bort uppenbart olämpliga URL:er
@@ -41,80 +72,101 @@ function harRimligtVardformat(url) {
   return true;
 }
 
-// Fullständig kontroll (inkl. DNS-uppslag) — körs för varje hopp i en redirect-kedja,
-// eftersom ett domännamn kan peka på en privat IP oavsett hur "riktigt" det ser ut.
-async function ärSakerAttHamta(url) {
-  if (!harRimligtVardformat(url)) return false;
+// DNS-uppslag + val av EN specifik säker adress att pinna anslutningen till.
+// Att bara validera med dns.lookup() och sedan låta fetch()/https.request()
+// göra ett EGET nytt uppslag är en TOCTOU-lucka (DNS-rebinding): svaret kan
+// hinna ändras mellan kontrollen och den faktiska anslutningen. Genom att
+// koppla upp mot exakt den adress vi själva validerat elimineras luckan.
+async function hittaSakerAdress(hostname) {
+  let addresses;
   try {
-    const addresses = await dns.lookup(url.hostname, { all: true });
-    return addresses.length > 0 && addresses.every((a) => !isPrivateIp(a.address));
+    addresses = await dns.lookup(hostname, { all: true, verbatim: true });
   } catch {
-    return false;
+    return null;
   }
+  return addresses.find((a) => !arPrivatAdress(a.address, a.family)) ?? null;
 }
 
-async function lasBegransat(response, maxBytes) {
-  if (!response.body) return await response.text();
-  const reader = response.body.getReader();
+// Ett enskilt hopp — ansluter till den pinnade IP-adressen men behåller det
+// riktiga värdnamnet för TLS SNI/certifikatvalidering (servername) och
+// HTTP Host-headern, annars skulle anslutningen antingen misslyckas mot
+// CDN-frontade sajter eller läcka fel certifikat.
+function hamtaEttHopp(url, safeAddress, signal) {
+  return new Promise((resolve) => {
+    const req = https.request(
+      {
+        hostname: safeAddress.address,
+        family: safeAddress.family,
+        servername: url.hostname,
+        port: url.port || 443,
+        path: url.pathname + url.search,
+        method: "GET",
+        headers: {
+          Host: url.hostname,
+          "User-Agent": "Mozilla/5.0 (compatible; DebattAI/1.0; +https://www.debatt-ai.se)",
+        },
+        signal,
+      },
+      (res) => resolve({ res })
+    );
+    req.on("error", (e) => resolve({ fel: e.name === "AbortError" ? "timeout" : "fetch_fel" }));
+    req.end();
+  });
+}
+
+async function lasBegransat(res, maxBytes) {
   const chunks = [];
   let total = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    chunks.push(value);
-    if (total > maxBytes) { reader.cancel().catch(() => {}); break; }
+  for await (const chunk of res) {
+    total += chunk.length;
+    if (total > maxBytes) { res.destroy(); break; }
+    chunks.push(chunk);
   }
-  const kapadLangd = Math.min(total, maxBytes);
-  const merged = new Uint8Array(kapadLangd);
-  let offset = 0;
-  for (const chunk of chunks) {
-    const kvar = merged.length - offset;
-    if (kvar <= 0) break;
-    merged.set(chunk.subarray(0, kvar), offset);
-    offset += Math.min(chunk.byteLength, kvar);
-  }
-  return new TextDecoder("utf-8").decode(merged);
+  return Buffer.concat(chunks).subarray(0, maxBytes).toString("utf-8");
 }
 
 async function hamtaArtikelHtml(startUrl) {
-  let current = startUrl;
-  for (let i = 0; i <= MAX_REDIRECTS; i++) {
-    if (!(await ärSakerAttHamta(current))) return { fel: "otillåten_url" };
+  // EN gemensam timeout-budget för HELA operationen (alla hopp + hela
+  // bodyläsningen) — att bara skydda anslutningsfasen och sedan rensa
+  // timeouten så fort svarshuvudena kommit in lämnar en långsamt
+  // dröppelmatad body helt oskyddad mot en frusen/hängande koppling.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    let current = startUrl;
+    for (let i = 0; i <= MAX_REDIRECTS; i++) {
+      if (!harRimligtVardformat(current)) return { fel: "otillåten_url" };
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    let res;
-    try {
-      res = await fetch(current.toString(), {
-        redirect: "manual",
-        signal: controller.signal,
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; DebattAI/1.0; +https://www.debatt-ai.se)" },
-      });
-    } catch (e) {
-      return { fel: e.name === "AbortError" ? "timeout" : "fetch_fel" };
-    } finally {
-      clearTimeout(timeout);
+      const safeAddress = await hittaSakerAdress(current.hostname);
+      if (!safeAddress) return { fel: "otillåten_url" };
+
+      const { res, fel } = await hamtaEttHopp(current, safeAddress, controller.signal);
+      if (fel) return { fel };
+
+      if (res.statusCode >= 300 && res.statusCode < 400) {
+        const loc = res.headers.location;
+        res.resume(); // dränera svaret så sockeln frigörs innan nästa hopp
+        if (!loc) return { fel: "redirect_utan_mal" };
+        try { current = new URL(loc, current); } catch { return { fel: "ogiltig_redirect" }; }
+        continue;
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) { res.resume(); return { fel: `http_${res.statusCode}` }; }
+
+      const contentType = res.headers["content-type"] || "";
+      if (!contentType.includes("text/html")) { res.resume(); return { fel: "fel_content_type" }; }
+
+      const contentLength = parseInt(res.headers["content-length"] || "0", 10);
+      if (contentLength && contentLength > MAX_BODY_BYTES) { res.resume(); return { fel: "for_stor" }; }
+
+      const html = await lasBegransat(res, MAX_BODY_BYTES);
+      return { html, slutgiltigUrl: current.toString() };
     }
-
-    if (res.status >= 300 && res.status < 400) {
-      const loc = res.headers.get("location");
-      if (!loc) return { fel: "redirect_utan_mal" };
-      try { current = new URL(loc, current); } catch { return { fel: "ogiltig_redirect" }; }
-      continue;
-    }
-    if (!res.ok) return { fel: `http_${res.status}` };
-
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("text/html")) return { fel: "fel_content_type" };
-
-    const contentLength = parseInt(res.headers.get("content-length") || "0", 10);
-    if (contentLength && contentLength > MAX_BODY_BYTES) return { fel: "for_stor" };
-
-    const html = await lasBegransat(res, MAX_BODY_BYTES);
-    return { html, slutgiltigUrl: current.toString() };
+    return { fel: "for_manga_redirects" };
+  } catch (e) {
+    return { fel: e.name === "AbortError" ? "timeout" : "fetch_fel" };
+  } finally {
+    clearTimeout(timeout);
   }
-  return { fel: "for_manga_redirects" };
 }
 
 function extraheraMeta(html, re) {

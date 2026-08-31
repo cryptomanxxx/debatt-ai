@@ -258,18 +258,35 @@ async function fetchArtikelKontext(url) {
   return { titel: data.titel ?? null, sammanfattning: data.sammanfattning ?? "", url: data.url ?? url };
 }
 
+function postDebatt(payload) {
+  return fetch(`${SB_URL}/rest/v1/chatt_debatter`, {
+    method: "POST",
+    headers: {
+      "apikey": SB_KEY,
+      "Authorization": `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=representation",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
 async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider, kalla, kallaUrl, kallaTitel }) {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/chatt_debatter`, {
-      method: "POST",
-      headers: {
-        "apikey": SB_KEY,
-        "Authorization": `Bearer ${SB_KEY}`,
-        "Content-Type": "application/json",
-        "Prefer": "return=representation",
-      },
-      body: JSON.stringify({ amne, agenter, inlagg, summering, scores: scores ?? null, provider: provider ?? null, kalla: kalla ?? "inbyggt", kalla_url: kallaUrl ?? null, kalla_titel: kallaTitel ?? null }),
-    });
+    const bas = { amne, agenter, inlagg, summering, scores: scores ?? null, provider: provider ?? null, kalla: kalla ?? "inbyggt" };
+    const harArtikel = kallaUrl != null || kallaTitel != null;
+    let res = await postDebatt(harArtikel ? { ...bas, kalla_url: kallaUrl ?? null, kalla_titel: kallaTitel ?? null } : bas);
+    if (!res.ok && harArtikel) {
+      // Om kalla_url/kalla_titel-kolumnerna inte finns än (t.ex. en deploy som
+      // landar innan supabase_chatt_kalla_url.sql körts) avvisar PostgREST HELA
+      // insert:en, inte bara de okända fälten — utan den här reserven skulle
+      // varenda debatt sluta osparad och odelbar under det fönstret. Försök
+      // igen utan artikelfälten så att debatten i alla fall sparas.
+      const body = await res.text().catch(() => "");
+      if (/kalla_url|kalla_titel|schema cache/i.test(body)) {
+        res = await postDebatt(bas);
+      }
+    }
     if (!res.ok) return null;
     const data = await res.json();
     return data[0]?.id ?? null;
@@ -357,6 +374,10 @@ export default function ChattPage() {
   const lyssnaStoppRef = useRef(false);
   const bottomRef = useRef(null);
   const providersRef = useRef(new Set());
+  // Mirrors artikelKontext synchronously — starta()/avsluta() read this instead of the state
+  // value, so the attached article can never be lost to a stale closure regardless of how long
+  // the debate's chain of awaits runs or how many re-renders happen while it's in flight.
+  const artikelKontextRef = useRef(null);
 
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
@@ -379,6 +400,7 @@ export default function ChattPage() {
     setArtikelFel("");
     try {
       const kontext = await fetchArtikelKontext(url);
+      artikelKontextRef.current = kontext;
       setArtikelKontext(kontext);
     } catch (e) {
       setArtikelFel(e.message || "Kunde inte hämta artikeln.");
@@ -388,6 +410,7 @@ export default function ChattPage() {
   }
 
   function taBortArtikel() {
+    artikelKontextRef.current = null;
     setArtikelKontext(null);
     setArtikelUrl("");
     setArtikelFel("");
@@ -402,7 +425,7 @@ export default function ChattPage() {
     setAiVäljer(false);
   }
 
-  async function avsluta(h, valtAmne, valdaAgenter) {
+  async function avsluta(h, valtAmne, valdaAgenter, artikel) {
     setStreaming(null);
     setTänker(false);
     if (h.length >= 3) {
@@ -412,7 +435,7 @@ export default function ChattPage() {
       const ps = providersRef.current;
       const provider = ps.has("groq") && ps.has("gemini") ? "groq+gemini"
         : ps.has("gemini") ? "gemini" : "groq";
-      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider, kalla: kallaAmne, kallaUrl: artikelKontext?.url ?? null, kallaTitel: artikelKontext?.titel ?? null });
+      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider, kalla: kallaAmne, kallaUrl: artikel?.url ?? null, kallaTitel: artikel?.titel ?? null });
       setDebattId(id);
       setFelmeddelande(""); // debate saved — clear any mid-stream error
     }
@@ -427,6 +450,14 @@ export default function ChattPage() {
       setFelmeddelande(`Gränsen nådd (${RL_LIMIT} debatter/10 min). Försök igen om ${min} minut${min === 1 ? "" : "er"}.`);
       return;
     }
+    if (hamtarArtikel) return; // en artikel-hämtning pågår — vänta så att alla repliker och sparningen ser samma kontext
+
+    // Ögonblicksbild tagen EN gång här och återanvänd i varje repliks streamSvar()-anrop
+    // och i avsluta()s sparning — läser man artikelKontextRef.current live vid varje
+    // anrop kan värdet hinna ändras mitt i debatten om hamtaArtikel() fortfarande var i
+    // flykt när debatten startades, vilket ger tidiga repliker utan kontext och sena med,
+    // och en sparad debatt som (fel) ser ut som artikelbaserad hela vägen (Codex P2, PR #1284).
+    const artikel = artikelKontextRef.current;
 
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? slumpAgenter;
@@ -462,7 +493,7 @@ export default function ChattPage() {
         let text = null;
         text = await streamSvar({
           amne: valtAmne, historik: h, agent, signal: abort.signal,
-          artikelTitel: artikelKontext?.titel, artikelSammanfattning: artikelKontext?.sammanfattning,
+          artikelTitel: artikel?.titel, artikelSammanfattning: artikel?.sammanfattning,
           onToken: (t) => {
             if (!gotFirst) { gotFirst = true; setTänker(false); }
             setStreaming({ agent, text: t });
@@ -490,7 +521,7 @@ export default function ChattPage() {
       }
       if (!stoppRef.current && i < 9) await new Promise(r => setTimeout(r, 300));
     }
-    await avsluta(h, valtAmne, valdaAgenter);
+    await avsluta(h, valtAmne, valdaAgenter, artikel);
   }
 
   function stoppa() {
@@ -748,8 +779,8 @@ export default function ChattPage() {
               );
             })()}
 
-            <button onClick={starta} style={{ width: "100%", padding: "14px", background: C.accent, border: "none", borderRadius: "6px", color: C.bg, fontSize: "15px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: "pointer", letterSpacing: "0.04em" }}>
-              Starta direktdebatt →
+            <button onClick={starta} disabled={hamtarArtikel} style={{ width: "100%", padding: "14px", background: hamtarArtikel ? C.border : C.accent, border: "none", borderRadius: "6px", color: hamtarArtikel ? C.textMuted : C.bg, fontSize: "15px", fontWeight: 700, fontFamily: "Georgia, serif", cursor: hamtarArtikel ? "default" : "pointer", letterSpacing: "0.04em" }}>
+              {hamtarArtikel ? "Hämtar artikel…" : "Starta direktdebatt →"}
             </button>
           </div>
         )}
