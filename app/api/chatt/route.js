@@ -95,8 +95,13 @@ async function handlePost(request) {
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
-  const { amne, historik, agent, lang } = body;
+  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning } = body;
   const isEn = lang === "en";
+  // Client re-sends this on every turn (no server-side session state) — validated/capped
+  // here too, defense in depth, since the client's own cap isn't trusted.
+  const artikelTitelSafe = typeof artikelTitel === "string" ? artikelTitel.slice(0, 200) : "";
+  const artikelSammanfattningSafe = typeof artikelSammanfattning === "string" ? artikelSammanfattning.slice(0, 500) : "";
+  const harArtikelKontext = artikelSammanfattningSafe.length > 0;
 
   const isFirstCall = !Array.isArray(historik) || historik.length === 0;
   if (isFirstCall) {
@@ -119,11 +124,18 @@ async function handlePost(request) {
   const kontext = historik.length > 0
     ? historik.map(h => `${h.agent}: ${h.text}`).join("\n") : null;
 
+  const artikelBlockSv = harArtikelKontext
+    ? `\nBakgrundsartikel: "${artikelTitelSafe || "utan titel"}" — ${artikelSammanfattningSafe}\n`
+    : "";
+  const artikelBlockEn = harArtikelKontext
+    ? `\nBackground article: "${artikelTitelSafe || "untitled"}" — ${artikelSammanfattningSafe}\n`
+    : "";
+
   const systemPrompt = isEn
     ? `You are ${PERSONLIGHETER[agent]}
 
 You are taking part in a rapid debate about: "${amne.slice(0, 200)}"
-
+${artikelBlockEn}
 RULES — important:
 - Answer with EXACTLY 2–3 sentences. Never more.
 - Be sharp and take a clear position. No filler.
@@ -134,7 +146,7 @@ RULES — important:
     : `Du är ${PERSONLIGHETER[agent]}
 
 Du deltar i en snabbdebatt om: "${amne.slice(0, 200)}"
-
+${artikelBlockSv}
 REGLER — viktiga:
 - Svara med EXAKT 2–3 meningar. Aldrig mer.
 - Var skarp och ta tydlig ställning. Ingen fluff.

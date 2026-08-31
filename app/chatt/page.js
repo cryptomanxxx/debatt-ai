@@ -179,11 +179,11 @@ function peekLocalRL() {
   return { remaining: Math.max(0, RL_LIMIT - count), resetAt: windowStart + RL_WINDOW };
 }
 
-async function streamSvar({ amne, historik, agent, onToken, signal, onRateLimit, onProvider }) {
+async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfattning, onToken, signal, onRateLimit, onProvider }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amne, historik, agent }),
+    body: JSON.stringify({ amne, historik, agent, artikelTitel, artikelSammanfattning }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -247,7 +247,18 @@ async function fetchAiAmne(agenter) {
   } catch { return ""; }
 }
 
-async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider, kalla }) {
+async function fetchArtikelKontext(url) {
+  const res = await fetch("/api/chatt/artikel-kontext", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Kunde inte hämta artikeln.");
+  return { titel: data.titel ?? null, sammanfattning: data.sammanfattning ?? "", url: data.url ?? url };
+}
+
+async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider, kalla, kallaUrl, kallaTitel }) {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/chatt_debatter`, {
       method: "POST",
@@ -257,7 +268,7 @@ async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider,
         "Content-Type": "application/json",
         "Prefer": "return=representation",
       },
-      body: JSON.stringify({ amne, agenter, inlagg, summering, scores: scores ?? null, provider: provider ?? null, kalla: kalla ?? "inbyggt" }),
+      body: JSON.stringify({ amne, agenter, inlagg, summering, scores: scores ?? null, provider: provider ?? null, kalla: kalla ?? "inbyggt", kalla_url: kallaUrl ?? null, kalla_titel: kallaTitel ?? null }),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -337,6 +348,10 @@ export default function ChattPage() {
   const [lyssnaFas, setLyssnaFas] = useState("idle"); // idle | spelar | pausad
   const [arkivAntal, setArkivAntal] = useState(null);
   const [aiVäljer, setAiVäljer] = useState(false);
+  const [artikelUrl, setArtikelUrl] = useState("");
+  const [artikelKontext, setArtikelKontext] = useState(null); // { titel, sammanfattning, url } | null
+  const [hamtarArtikel, setHamtarArtikel] = useState(false);
+  const [artikelFel, setArtikelFel] = useState("");
   const stoppRef = useRef(false);
   const abortRef = useRef(null);
   const lyssnaStoppRef = useRef(false);
@@ -357,6 +372,27 @@ export default function ChattPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [historik, streaming, tänker, summering]);
 
+  async function hamtaArtikel() {
+    const url = artikelUrl.trim();
+    if (!url) return;
+    setHamtarArtikel(true);
+    setArtikelFel("");
+    try {
+      const kontext = await fetchArtikelKontext(url);
+      setArtikelKontext(kontext);
+    } catch (e) {
+      setArtikelFel(e.message || "Kunde inte hämta artikeln.");
+    } finally {
+      setHamtarArtikel(false);
+    }
+  }
+
+  function taBortArtikel() {
+    setArtikelKontext(null);
+    setArtikelUrl("");
+    setArtikelFel("");
+  }
+
   async function väljaAiAmne() {
     const panel = PANELER[valdPanel];
     const valdaAgenter = panel.agenter ?? slumpAgenter;
@@ -376,7 +412,7 @@ export default function ChattPage() {
       const ps = providersRef.current;
       const provider = ps.has("groq") && ps.has("gemini") ? "groq+gemini"
         : ps.has("gemini") ? "gemini" : "groq";
-      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider, kalla: kallaAmne });
+      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider, kalla: kallaAmne, kallaUrl: artikelKontext?.url ?? null, kallaTitel: artikelKontext?.titel ?? null });
       setDebattId(id);
       setFelmeddelande(""); // debate saved — clear any mid-stream error
     }
@@ -426,6 +462,7 @@ export default function ChattPage() {
         let text = null;
         text = await streamSvar({
           amne: valtAmne, historik: h, agent, signal: abort.signal,
+          artikelTitel: artikelKontext?.titel, artikelSammanfattning: artikelKontext?.sammanfattning,
           onToken: (t) => {
             if (!gotFirst) { gotFirst = true; setTänker(false); }
             setStreaming({ agent, text: t });
@@ -517,6 +554,7 @@ export default function ChattPage() {
     setKallaAmne("inbyggt");
     setFelmeddelande("");
     setFöreslagStatus(null);
+    taBortArtikel();
     setRateLimitInfo(peekLocalRL());
     stoppRef.current = false;
   }
@@ -606,6 +644,31 @@ export default function ChattPage() {
                   ? <><span style={{ display: "inline-flex", gap: "3px" }}>{[0,1,2].map(j => <span key={j} style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.textMuted, display: "inline-block", animation: `dot 1.2s ease-in-out ${j*0.2}s infinite` }} />)}</span> AI väljer ämne…</>
                   : "✦ Låt AI välja ämne"}
               </button>
+
+              {/* Nyhetsartikel som kontext (valfritt) */}
+              <div style={{ marginTop: "16px" }}>
+                <label style={{ display: "block", fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: "8px" }}>Nyhetsartikel (valfritt)</label>
+                {artikelKontext ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "9px 12px", background: `${C.accent}0c`, border: `1px solid ${C.accent}30`, borderRadius: "6px" }}>
+                    <span style={{ fontSize: "13px", color: C.accent, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>📰 {artikelKontext.titel || artikelUrl}</span>
+                    <button onClick={taBortArtikel} title="Ta bort artikel" style={{ background: "transparent", border: "none", color: C.textMuted, cursor: "pointer", fontSize: "14px", flexShrink: 0 }}>✕</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <input value={artikelUrl} onChange={e => { setArtikelUrl(e.target.value); setArtikelFel(""); }} placeholder="Klistra in en länk till en nyhetsartikel…"
+                      style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "10px 14px", color: C.text, fontSize: "14px", fontFamily: "Georgia, serif", outline: "none" }}
+                      onKeyDown={e => e.key === "Enter" && hamtaArtikel()} />
+                    <button onClick={hamtaArtikel} disabled={hamtarArtikel || !artikelUrl.trim()}
+                      style={{ padding: "10px 16px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", color: hamtarArtikel || !artikelUrl.trim() ? C.textMuted : C.accentDim, fontSize: "14px", fontFamily: "Georgia, serif", cursor: hamtarArtikel || !artikelUrl.trim() ? "default" : "pointer", flexShrink: 0 }}>
+                      {hamtarArtikel ? "Hämtar…" : "Hämta"}
+                    </button>
+                  </div>
+                )}
+                {artikelFel && <p style={{ fontSize: "12px", color: "#f87171", margin: "6px 0 0" }}>{artikelFel}</p>}
+                <p style={{ fontSize: "11px", color: C.textMuted, margin: "6px 0 0", lineHeight: 1.5 }}>
+                  Ger agenterna mer kontext än bara ämnesrubriken — bra för att debattera en specifik nyhet.
+                </p>
+              </div>
             </div>
 
             {/* Panel */}
@@ -698,6 +761,11 @@ export default function ChattPage() {
             <div style={{ marginBottom: "24px" }}>
               <p style={{ fontSize: "11px", color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", margin: "0 0 10px 0" }}>Ämne</p>
               <p style={{ fontSize: "17px", color: C.accent, margin: "0 0 16px 0", lineHeight: 1.4 }}>{faktisktAmne}</p>
+              {artikelKontext && (
+                <a href={artikelKontext.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", color: C.accentDim, textDecoration: "none", padding: "4px 10px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "20px", marginBottom: "12px" }}>
+                  📰 {artikelKontext.titel || "Baserat på en nyhetsartikel"}
+                </a>
+              )}
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
                 {agenter.map(a => (
                   <span key={a} style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 12px", background: `${af(a)}12`, border: `1px solid ${af(a)}35`, borderRadius: "20px" }}>
