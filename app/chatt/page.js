@@ -34,6 +34,10 @@ const ALLA_AGENTER = [
 ];
 
 
+// Stabil visningsordning för providers-strängen som sparas på en debatt
+// (t.ex. "groq+codestral") — hålls i synk med app/lib/chattProvider.js.
+const PROVIDER_VISNINGSORDNING = ["groq", "codestral", "gemini"];
+
 const AGENT_FARG = {
   "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
   "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#f8fafc",
@@ -447,9 +451,13 @@ export default function ChattPage() {
       setFas("summering");
       const { summering: sum, scores } = await fetchSummering(valtAmne, h);
       setSummering(sum);
+      // Bygger provider-strängen dynamiskt ur ALLA leverantörer som faktiskt svarat
+      // under debatten (i en stabil, förutsägbar ordning) — inte bara groq/gemini.
+      // Sedan hoppaOverGroq (se streamSvar-anropet nedan) kan Codestral numera svara
+      // på ett omförsök lika gärna som Gemini, och en debatt där det händer ska inte
+      // sparas/visas som ren Groq-debatt (Codex P2, PR #1288).
       const ps = providersRef.current;
-      const provider = ps.has("groq") && ps.has("gemini") ? "groq+gemini"
-        : ps.has("gemini") ? "gemini" : "groq";
+      const provider = PROVIDER_VISNINGSORDNING.filter(p => ps.has(p)).join("+") || null;
       const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider, kalla: kallaAmne, kallaUrl: artikel?.url ?? null, kallaTitel: artikel?.titel ?? null });
       setDebattId(id);
       setFelmeddelande(""); // debate saved — clear any mid-stream error
