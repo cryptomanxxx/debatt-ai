@@ -235,6 +235,11 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "Reddit Science":      ["forskning", "medicin"],
     "Google Research":     ["ai", "forskning"],
     "TED Talks":           ["forskning", "samhälle", "tech"],
+    "arXiv: AI":                  ["ai", "forskning"],
+    "arXiv: Machine Learning":    ["ai", "forskning", "tech"],
+    "arXiv: Ekonomi":             ["ekonomi", "forskning"],
+    "arXiv: Computers & Society": ["tech", "samhälle", "forskning"],
+    "arXiv: Robotik":             ["tech", "forskning"],
 }
 
 # Kategorier för YouTube-källor — nyckeln är kanalnamnet UTAN "YouTube: "-prefixet
@@ -379,6 +384,14 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         # AI-forskning & populärvetenskap
         ("Google Research",    _p("https://research.google/blog/rss/")),
         ("TED Talks",          _p("https://www.ted.com/talks/rss")),
+        # arXiv — riktiga vetenskapliga papers (rubrik + abstract), inte bara
+        # nyhetsrapportering om forskning. Litet startset, kan utökas efter
+        # hur volym och kvalitet ser ut i praktiken.
+        ("arXiv: AI",                  _p("https://rss.arxiv.org/rss/cs.AI")),
+        ("arXiv: Machine Learning",    _p("https://rss.arxiv.org/rss/cs.LG")),
+        ("arXiv: Ekonomi",             _p("https://rss.arxiv.org/rss/econ.GN")),
+        ("arXiv: Computers & Society", _p("https://rss.arxiv.org/rss/cs.CY")),
+        ("arXiv: Robotik",             _p("https://rss.arxiv.org/rss/cs.RO")),
     ]
 
     if agent_namn:
@@ -442,6 +455,11 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
                 # på Reddits svar). Rent brus utan informationsvärde — töm den istället.
                 if kalla.startswith("Reddit") and re.fullmatch(r"submitted by\s+/?u/\S+\s*\[link\]\s*\[\w+\]", text, re.IGNORECASE):
                     text = ""
+                # arXiv:s beskrivning inleds med metadata-brus ("arXiv:2501.12345v1
+                # Announce Type: new") innan själva abstractet — klipp bort allt
+                # fram till "Abstract:" om det finns, annars lämna texten orörd.
+                if kalla.startswith("arXiv"):
+                    text = re.sub(r"^.*?Abstract:\s*", "", text, count=1, flags=re.IGNORECASE | re.DOTALL)
                 link_el = (item.find("link") or
                            item.find("atom:link", ns) or
                            item.find(f"{{{ATOM}}}link"))
