@@ -1,21 +1,16 @@
-name: Nyhetsflöde
+name: Automatisk nyhetsanalys
 
 on:
   schedule:
-    # 6 körningar/dag — RSS-flöden visar bara sina ~10 senaste poster, så
-    # tätare körningar fångar fler artiklar innan de rullar ur fönstret
-    # (jfr en enda körning/dag som skulle missa mycket av dygnets volym).
-    - cron: "0 2 * * *"   # 04:00 svensk tid
-    - cron: "0 6 * * *"   # 08:00 svensk tid
-    - cron: "0 10 * * *"  # 12:00 svensk tid
-    - cron: "0 14 * * *"  # 16:00 svensk tid
-    - cron: "0 18 * * *"  # 20:00 svensk tid
-    - cron: "0 22 * * *"  # 00:00 svensk tid
+    # Var 20:e minut — så en ny nyhet i nyhetsflode får en AI-reaktion inom
+    # kort tid utan att en besökare behöver klicka något på /nyhetskallor.
+    - cron: "*/20 * * * *"
   workflow_dispatch:
 
 jobs:
-  nyhetsflode:
+  nyhetsanalys-auto:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -28,7 +23,7 @@ jobs:
       - name: Installera beroenden
         run: pip install httpx
 
-      - name: Kör nyhetsflode_test.py
+      - name: Kör nyhetsanalys_auto_test.py
         env:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -43,4 +38,4 @@ jobs:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           PYTHONUNBUFFERED: "1"
-        run: python -u nyhetsflode_test.py
+        run: python -u nyhetsanalys_auto_test.py
