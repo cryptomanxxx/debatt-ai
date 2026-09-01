@@ -211,8 +211,13 @@ async function handlePost(request) {
   // vald nyhet, inte en flertursdebatt — den delar INTE Direktdebattens kvot (5
   // debatter/10 min). Väljer en besökare 5 agenter för samma nyhet skulle det annars
   // tömma hela debattkvoten på en enda nyhetsanalys. Egen, lättare gräns istället.
+  // Gränsen måste rymma en besökare som väljer ALLA 24 agenter på en gång (panelen
+  // sätter inget tak på urvalet) plus omförsök vid avhugget/tomt svar (hoppaOverGroq-
+  // vägen i analyseraMedAgent() kan ge upp till 2 anrop per agent) — annars fick en
+  // fullt legitim "analysera alla"-körning tysta 429-fel mitt i (Codex-review-fynd,
+  // PR #1293).
   if (typ === "nyhetsanalys") {
-    const rl = checkRateLimit(request, "nyhetsanalys", 20, 10 * 60 * 1000);
+    const rl = checkRateLimit(request, "nyhetsanalys", 50, 10 * 60 * 1000);
     if (!rl.ok) {
       logFel({ kalla: "chatt", feltyp: "rate_limit", meddelande: "429 rate limit nyhetsanalys", ip, extra: { retryAfter: rl.retryAfter } });
       return Response.json({ error: "rate_limit", remaining: 0, minutesLeft: Math.ceil(rl.retryAfter / 60) }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
