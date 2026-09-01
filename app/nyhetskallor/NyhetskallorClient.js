@@ -64,11 +64,11 @@ function arTroligenAvbruten(text) {
   return !/[.!?…][”"')\]]*$/.test(t);
 }
 
-async function streamAgentAnalys({ agent, amne, artikelTitel, artikelSammanfattning, hoppaOverGroq, onToken, signal }) {
+async function streamAgentAnalys({ agent, amne, artikelTitel, artikelSammanfattning, hoppaOverGroq, nyhetId, onToken, signal }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ typ: "nyhetsanalys", amne, historik: [], agent, artikelTitel, artikelSammanfattning, hoppaOverGroq }),
+    body: JSON.stringify({ typ: "nyhetsanalys", amne, historik: [], agent, artikelTitel, artikelSammanfattning, hoppaOverGroq, nyhetId }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -109,7 +109,7 @@ async function analyseraMedAgent(agent, n, uppdatera) {
     try {
       const resultat = await streamAgentAnalys({
         agent, amne: n.rubrik, artikelTitel: n.rubrik, artikelSammanfattning: n.beskrivning,
-        hoppaOverGroq: forsok > 0,
+        hoppaOverGroq: forsok > 0, nyhetId: n.id,
         onToken: (t) => uppdatera({ status: "laddar", text: t }),
       });
       text = resultat.text;
