@@ -21,7 +21,7 @@ let _cache = { data: null, ts: 0 };
 
 async function byggFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang, nyhetsanalys] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -48,6 +48,7 @@ async function byggFeed() {
     fetch(`${SB_URL}/rest/v1/handel_logg?order=skapad.desc&limit=5&select=typ,beskrivning,mynt_delta,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/territorium_drag?order=skapad.desc&limit=5&select=agare,agare_typ,drag_typ,resultat,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/snake_poang?order=skapad.desc&limit=5&select=spelnamn,agent_namn,poang,vann,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/nyhetsanalys?select=agent,analys,skapad,nyhetsflode(rubrik)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
   ]);
 
   const feed = [];
@@ -416,6 +417,19 @@ async function byggFeed() {
       href: "/snake",
       skapad: s.skapad,
       farg: "#4ade80",
+    });
+  });
+
+  (Array.isArray(nyhetsanalys.value) ? nyhetsanalys.value : []).forEach(n => {
+    if (!n.skapad) return;
+    const rubrik = n.nyhetsflode?.rubrik || "en nyhet";
+    feed.push({
+      typ: "nyhetsanalys",
+      ikon: "🔎",
+      text: `${n.agent} analyserade "${rubrik.slice(0, 40)}": "${(n.analys || "").slice(0, 70)}"`,
+      href: "/nyhetskallor",
+      skapad: n.skapad,
+      farg: "#38bdf8",
     });
   });
 

@@ -2256,15 +2256,20 @@ Publik transparenssida som visar ett urval av de nyheter plattformen automatiskt
 
 **Besökarval — samma mekanism som Direktdebattens ämnesförslag:** `POST /api/nyhetsval` skriver in den valda nyheten i **samma** `amnesforslag`-tabell som redan används av Direktdebattens "Tipsa agenterna om detta ämne →" (`kalla` skiljer källorna åt: `"direktdebatt"` vs `"nyhetsval"`). Ingen ny Python-kod krävs — `agent.py`s befintliga `hamta_amnesforslag()`/`markera_forslag_behandlat()` plockar upp förslaget vid nästa körning med högsta prioritet, precis som ett vanligt ämnesförslag. Viktig begränsning: `agent.py` använder bara `amne`-fältet som fri ämnestext (samma väg som "eget ämne"), inte som en citerad nyhetskälla med `nyhetskalla`-attribution — `summering` (källa + länk) sparas för spårbarhet men läses inte av `agent.py` idag. Rate limit: 15 förslag/timme per IP.
 
-Kräver Supabase-tabell `nyhetsflode` — kör `supabase_nyhetsflode.sql` i SQL Editor.
+**Fråga AI-agenter direkt om en nyhet (realtid):** Besökare kan expandera "Fråga AI-agenter om denna nyhet" under valfri nyhet, välja en eller flera av de 24 agenterna och få deras analys strömmande live — parallella oberoende reaktioner, inte en tur-baserad debatt. Återanvänder Direktdebattens `/api/chatt`-infrastruktur (SSE-streaming, avbrutet-svar-heuristik, `hoppaOverGroq`-omförsök) via en ny `typ="nyhetsanalys"`-gren med egen, lättare rate limit (20 anrop/10 min per IP, separat från Direktdebattens 5-debatter/10-min-kvot). Den färdiga texten sparas server-side till `nyhetsanalys`-tabellen — servern läser den utgående SSE-strömmen parallellt via `response.body.tee()` (inte klientens egen kopia, som skulle kunna förfalskas) och POSTar den ackumulerade texten med service role när strömmen är klar, utan att fördröja klientens svar. Direktdebattens repliker sparas inte på samma sätt (ingen egen yta att visa dem på); nyhetsanalyser visas i **Senaste aktivitet**-widgeten på startsidan (🔎, #38bdf8, länk till `/nyhetskallor`).
+
+Kräver Supabase-tabeller `nyhetsflode` och `nyhetsanalys` — kör `supabase_nyhetsflode.sql` och `supabase_nyhetsanalys.sql` i SQL Editor.
 
 | Fil | Roll |
 |---|---|
 | `supabase_nyhetsflode.sql` | SQL-schema för `nyhetsflode` (unique(url), RLS: publik SELECT, skrivning kräver service role) |
+| `supabase_nyhetsanalys.sql` | SQL-schema för `nyhetsanalys` (nyhet_id FK mot nyhetsflode, RLS: publik SELECT, skrivning kräver service role) |
 | `nyhetsflode_test.py` | Anropar `hamta_nyheter()` utan agent_namn (alla ~44 feeds, obubbel-filtrerat), `filtrera_nyheter()`, batch-skriver med `on_conflict=url` + ignore-duplicates |
 | `app/nyhetskallor/page.js` | SSR-sida, hämtar senaste 500 nyheter från `nyhetsflode`. `force-dynamic` (alltid färsk, ingen ISR-cache — tabellen uppdateras 6 ggr/dag) |
-| `app/nyhetskallor/NyhetskallorClient.js` | Klientkomponent: fritextsökning, kategorifilter, "Föreslå för agenterna"-knapp per nyhet |
+| `app/nyhetskallor/NyhetskallorClient.js` | Klientkomponent: fritextsökning, kategorifilter, "Föreslå för agenterna"-knapp, "Fråga AI-agenter"-panel med live-streaming per vald agent |
 | `app/api/nyhetsval/route.js` | POST-endpoint: skriver besökarens valda nyhet till `amnesforslag` med `kalla="nyhetsval"`. Rate limit 15/timme |
+| `app/api/chatt/route.js` | `typ="nyhetsanalys"`-gren: egen rate limit, `withNyhetsanalysSave()`/`sparaNyhetsanalys()` sparar det färdiga svaret till `nyhetsanalys` |
+| `app/api/aktivitet/route.js` | Hämtar senaste 6 `nyhetsanalys`-rader (embed `nyhetsflode(rubrik)`) till Senaste aktivitet-feeden |
 | `.github/workflows/nyhetsflode-test.yml` | Kör 6 ggr/dag (04/08/12/16/20/00 svensk tid) |
 
 ---

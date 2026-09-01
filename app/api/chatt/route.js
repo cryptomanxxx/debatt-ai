@@ -4,6 +4,62 @@ import { logAiCall } from "../../lib/logAiCall";
 import { logFel } from "../../lib/logFel";
 import { checkRateLimit } from "../../lib/kanalRateLimit";
 
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+async function sparaNyhetsanalys({ nyhetId, agent, text }) {
+  if (!SB_URL || !SB_SERVICE_KEY || !nyhetId) return;
+  try {
+    await fetch(`${SB_URL}/rest/v1/nyhetsanalys`, {
+      method: "POST",
+      headers: {
+        apikey: SB_SERVICE_KEY,
+        Authorization: `Bearer ${SB_SERVICE_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ nyhet_id: nyhetId, agent, analys: text.slice(0, 1500) }),
+    });
+  } catch {}
+}
+
+// Läser den utgående SSE-strömmen parallellt med att den vidarebefordras till klienten
+// (via tee()) och sparar den färdiga texten till Supabase när strömmen är klar — utan
+// att fördröja eller på något sätt påverka klientens svar. Gäller bara typ="nyhetsanalys"
+// (nyhetId är då satt); Direktdebattens repliker sparas inte här — historiken lever bara
+// i klienten där och det finns ingen egen yta att visa dem på (till skillnad från
+// nyhetsanalyser, som ska synas i Senaste aktivitet på startsidan).
+function withNyhetsanalysSave(response, { nyhetId, agent }) {
+  if (!nyhetId || !response.body) return response;
+  const [clientStream, saveStream] = response.body.tee();
+  (async () => {
+    try {
+      const reader = saveStream.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "", text = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (raw === "[DONE]") continue;
+          try {
+            const token = JSON.parse(raw).choices?.[0]?.delta?.content ?? "";
+            if (token) text += token;
+          } catch { /* ignore malformed chunk */ }
+        }
+      }
+      const trimmed = text.trim();
+      if (trimmed.length >= 10) await sparaNyhetsanalys({ nyhetId, agent, text: trimmed });
+    } catch { /* best-effort — analysen visas ändå hos klienten oavsett */ }
+  })();
+  return new Response(clientStream, { headers: response.headers, status: response.status });
+}
+
 const AGENTER = new Set([
   "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
   "Jurist","Journalist","Filosof","Läkare","Psykolog","Historiker",
@@ -132,7 +188,7 @@ async function handlePost(request) {
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
-  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, debattId, hoppaOverGroq, typ } = body;
+  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, debattId, hoppaOverGroq, typ, nyhetId } = body;
   const isEn = lang === "en";
   // Client re-sends this on every turn (no server-side session state) — validated/capped
   // here too, defense in depth, since the client's own cap isn't trusted.
@@ -140,6 +196,9 @@ async function handlePost(request) {
   const artikelSammanfattningSafe = typeof artikelSammanfattning === "string" ? artikelSammanfattning.slice(0, 500) : "";
   const harArtikelKontext = artikelSammanfattningSafe.length > 0;
   const debattIdSafe = typeof debattId === "string" && debattId.length > 0 && debattId.length <= 100 ? debattId : null;
+  // Bara satt för typ="nyhetsanalys" — styr om/vart det färdiga svaret sparas
+  // (se withNyhetsanalysSave nedan). Direktdebattens turer skickar aldrig nyhetId.
+  const nyhetIdSafe = typ === "nyhetsanalys" && Number.isInteger(Number(nyhetId)) && Number(nyhetId) > 0 ? Number(nyhetId) : null;
 
   // typ="nyhetsanalys" (från /nyhetskallor) är ett fristående enskilt agentsvar på en
   // vald nyhet, inte en flertursdebatt — den delar INTE Direktdebattens kvot (5
@@ -289,7 +348,10 @@ REGLER — viktiga:
       if (groqRes.ok) {
         ps.groq = { remaining: rem >= 0 ? rem : ps.groq.remaining, limit: 30, resetAt: rst, ts: Date.now(), status: rem <= 5 ? "warn" : "ok" };
         logAiCall({ provider: "groq", model: "openai/gpt-oss-120b", source: "chatt", status: "ok", latency_ms: Date.now() - groqT0 });
-        return new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } });
+        return withNyhetsanalysSave(
+          new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } }),
+          { nyhetId: nyhetIdSafe, agent }
+        );
       }
       if (groqRes.status === 429) {
         ps.groq = { remaining: 0, limit: 30, resetAt: rst, ts: Date.now(), status: "limited" };
@@ -331,7 +393,10 @@ REGLER — viktiga:
           logAiCall({ provider: name, model, source: "chatt", status: "ok", latency_ms: Date.now() - t0 });
           const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
           const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
-          return new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": name } });
+          return withNyhetsanalysSave(
+            new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": name } }),
+            { nyhetId: nyhetIdSafe, agent }
+          );
         }
       }
       logAiCall({ provider: name, model, source: "chatt", status: r.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - t0 });
@@ -362,7 +427,10 @@ REGLER — viktiga:
             logAiCall({ provider: "gemini", model, source: "chatt", status: "ok", latency_ms: Date.now() - gemT0, input_tokens: data?.usageMetadata?.promptTokenCount, output_tokens: data?.usageMetadata?.candidatesTokenCount });
             const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
             const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
-            return new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": "gemini" } });
+            return withNyhetsanalysSave(
+              new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": "gemini" } }),
+              { nyhetId: nyhetIdSafe, agent }
+            );
           }
         }
         const status = r.status === 429 ? "rate_limited" : "error";
