@@ -15,6 +15,7 @@ import httpx
 import os
 import re
 import sys
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
@@ -160,6 +161,23 @@ def hamta_youtube_nyheter() -> list:
 
     print(f"  YouTube: {rss_ok} RSS ok / {rss_blockad} blockade — {transkript_ok} transkript / {transkript_fel} utan transkript")
     return nyheter
+
+
+def _forsta_traff(*element):
+    """Returnerar första icke-None elementet i `element`.
+
+    xml.etree.ElementTree.Element har en föråldrad __bool__ som är False
+    för alla element UTAN barn-element — vilket träffar praktiskt taget
+    alla <title>/<description>/<link>/<pubDate>-element, eftersom de bara
+    innehåller text, inga undertaggar. Ett uttryck som `a or b or c` med
+    Element-objekt kastar därför tyst bort ett fullt giltigt, textfyllt
+    element och faller vidare till nästa alternativ (eller None) — inte
+    "det första som hittades", som avsikten är. Måste jämföra mot None
+    explicit istället för att lita på sanningsvärdet."""
+    for el in element:
+        if el is not None:
+            return el
+    return None
 
 
 def hamta_reddit_kommentarer(post_url: str, max_kommentarer: int = 5) -> str:
@@ -409,7 +427,14 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         "content": "http://purl.org/rss/1.0/modules/content/",
         "atom":    ATOM,
     }
-    for kalla, url in feeds:
+    for i, (kalla, url) in enumerate(feeds):
+        if i > 0:
+            # Kort paus mellan varje flöde — utan den avfyras ~45 anrop mot en
+            # handfull olika värdar (flera reddit.com-URL:er) inom loppet av
+            # några sekunder, vilket i praktiken triggar Reddits burst-baserade
+            # rate limit (HTTP 429) för en stor andel av dem. En sekvens av
+            # riktiga användarbesök hade aldrig sett ut så här.
+            time.sleep(0.3)
         fore = len(nyheter)
         try:
             res = httpx.get(url, timeout=15, follow_redirects=True,
@@ -426,18 +451,18 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
                 snippet = res.text[:200].strip().replace("\n", " ")
                 print(f"  ⚠ {kalla}: 0 items — HTTP {res.status_code}, content-type={res.headers.get('content-type','?')!r}, snippet={snippet!r}", file=sys.stderr)
             for item in items[:10]:
-                title = (item.find("title") or
-                         item.find(f"{{{ATOM}}}title") or
-                         item.find("atom:title", ns))
+                title = _forsta_traff(item.find("title"),
+                                       item.find(f"{{{ATOM}}}title"),
+                                       item.find("atom:title", ns))
                 rubrik = re.sub(r"\s+", " ", html.unescape(title.text or "")).strip() if title is not None else ""
                 if len(rubrik) <= 10:
                     continue
                 fulltext = item.find("content:encoded", ns)
-                desc = (item.find("description") or
-                        item.find(f"{{{ATOM}}}summary") or
-                        item.find("atom:summary", ns) or
-                        item.find(f"{{{ATOM}}}content") or
-                        item.find("atom:content", ns))
+                desc = _forsta_traff(item.find("description"),
+                                      item.find(f"{{{ATOM}}}summary"),
+                                      item.find("atom:summary", ns),
+                                      item.find(f"{{{ATOM}}}content"),
+                                      item.find("atom:content", ns))
                 # Ordning spelar roll: HTML-entiteter (&#32;, &amp; m.fl.) avkodas FÖRE
                 # whitespace-hopfällningen (en avkodad &#32; blir ett nytt mellanslag som
                 # annars aldrig fälls ihop) och FÖRE truncation (annars kan en entitet
@@ -460,21 +485,21 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
                 # fram till "Abstract:" om det finns, annars lämna texten orörd.
                 if kalla.startswith("arXiv"):
                     text = re.sub(r"^.*?Abstract:\s*", "", text, count=1, flags=re.IGNORECASE | re.DOTALL)
-                link_el = (item.find("link") or
-                           item.find("atom:link", ns) or
-                           item.find(f"{{{ATOM}}}link"))
+                link_el = _forsta_traff(item.find("link"),
+                                         item.find("atom:link", ns),
+                                         item.find(f"{{{ATOM}}}link"))
                 item_url = ""
                 if link_el is not None:
                     if link_el.text and link_el.text.strip():
                         item_url = link_el.text.strip()
                     elif link_el.get("href"):
                         item_url = link_el.get("href", "")
-                pub_el = (item.find("pubDate") or
-                          item.find("published") or
-                          item.find(f"{{{ATOM}}}published") or
-                          item.find("atom:published", ns) or
-                          item.find(f"{{{ATOM}}}updated") or
-                          item.find("atom:updated", ns))
+                pub_el = _forsta_traff(item.find("pubDate"),
+                                        item.find("published"),
+                                        item.find(f"{{{ATOM}}}published"),
+                                        item.find("atom:published", ns),
+                                        item.find(f"{{{ATOM}}}updated"),
+                                        item.find("atom:updated", ns))
                 publicerad = ""
                 if pub_el is not None and pub_el.text:
                     publicerad = pub_el.text.strip()
