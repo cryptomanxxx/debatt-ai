@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from "react";
 // Per-agent overlay-konfiguration. Anna har fullständiga blink+mun-frames
 // (samma som /kanal). Andra agenter (t.ex. Nationalekonomen från /podd) har
 // bara fyra munlägen utan blink-varianter — hasBlink: false hoppar över
-// ögonanimationen och visar bara idle/mun-frames.
-const AGENTER = {
+// ögonanimationen och visar bara idle/mun-frames. Exporteras tillsammans med
+// AnchorImage/WaveformBar/useBlinkState så StudioOverlay.js (Anna+Peter i
+// samma studio) kan återanvända exakt samma animationslogik.
+export const AGENTER = {
   Anna: {
     farg: "#a0c8f0",
     roll: "Nyhetsankare",
@@ -33,7 +35,7 @@ const AGENTER = {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── Blink-hook (samma logik som /kanal) ─────────────────────────────────────
-function useBlinkState(active) {
+export function useBlinkState(active) {
   const [blinkState, setBlinkState] = useState("open");
   const timerRef = useRef(null);
 
@@ -83,7 +85,7 @@ function useAmplitude(isSpeaking) {
   return amplitudeRef;
 }
 
-function WaveformBar({ isSpeaking, isThinking, farg }) {
+export function WaveformBar({ isSpeaking, isThinking, farg }) {
   const canvasRef = useRef(null);
   const amplitudeRef = useAmplitude(isSpeaking);
 
@@ -136,7 +138,7 @@ function WaveformBar({ isSpeaking, isThinking, farg }) {
   return <canvas ref={canvasRef} width={240} height={12} style={{ width: "100%", height: "12px", display: "block" }} />;
 }
 
-function AnchorImage({ cfg, blinkState, isSpeaking }) {
+export function AnchorImage({ cfg, blinkState, isSpeaking }) {
   const [mouthIdx, setMouthIdx] = useState(1);
   useEffect(() => {
     if (!isSpeaking) { setMouthIdx(1); return; }
