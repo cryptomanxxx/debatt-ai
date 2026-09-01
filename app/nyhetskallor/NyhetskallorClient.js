@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import AnnaOverlay from "./AnnaOverlay";
+import NyhetsTicker from "./NyhetsTicker";
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
@@ -278,6 +279,7 @@ export default function NyhetskallorClient({ nyheter }) {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
+      <NyhetsTicker nyheter={nyheter} />
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "48px 20px" }}>
         <div style={{ marginBottom: "32px", paddingBottom: "24px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
