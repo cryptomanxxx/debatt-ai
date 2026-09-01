@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import AnnaOverlay from "./AnnaOverlay";
+import AgentOverlay from "./AgentOverlay";
 import NyhetsTicker from "./NyhetsTicker";
 import NastaHamtningRaknare from "./NastaHamtningRaknare";
 
@@ -172,7 +172,12 @@ function AgentAnalysPanel({ n, expanderad, onToggle, valda, onToggleAgent, analy
   );
 }
 
-function NyhetsRad({ n, status, onForesla, onAnnaLas, analysProps }) {
+const LASARE = [
+  { agent: "Anna", farg: ANNA_FARG, ikon: "🎙️" },
+  { agent: "Nationalekonom", farg: "#6abf6a", ikon: "📊" },
+];
+
+function NyhetsRad({ n, status, onForesla, onLas, analysProps }) {
   const [expanderad, setExpanderad] = useState(false);
   const kortText = (n.beskrivning || "").length > 220;
   const visadText = expanderad || !kortText ? n.beskrivning : n.beskrivning.slice(0, 220) + "…";
@@ -216,12 +221,15 @@ function NyhetsRad({ n, status, onForesla, onAnnaLas, analysProps }) {
             {status === "laddar" ? "Skickar…" : "Föreslå för agenterna →"}
           </button>
         )}
-        <button
-          onClick={onAnnaLas}
-          style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${ANNA_FARG}50`, color: ANNA_FARG, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
-        >
-          🎙️ Anna läser
-        </button>
+        {LASARE.map(({ agent, farg, ikon }) => (
+          <button
+            key={agent}
+            onClick={() => onLas(agent)}
+            style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${farg}50`, color: farg, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
+          >
+            {ikon} {agent} läser
+          </button>
+        ))}
       </div>
       <AgentAnalysPanel n={n} {...analysProps} />
     </div>
@@ -237,7 +245,7 @@ export default function NyhetskallorClient({ nyheter }) {
   const [expanderade, setExpanderade] = useState(() => new Set());
   const [valdaAgenter, setValdaAgenter] = useState({}); // { [id]: Set<agent> }
   const [analyser, setAnalyser] = useState({}); // { [id]: { [agent]: { status, text } } }
-  const [annaLasning, setAnnaLasning] = useState(null); // { id, text } | null
+  const [lasning, setLasning] = useState(null); // { id, agent, text } | null
 
   // Källor byggs dynamiskt ur den faktiska datan istället för en hårdkodad
   // lista — det finns ~49 RSS-flöden + 28 YouTube-kanaler, för många och för
@@ -391,7 +399,7 @@ export default function NyhetskallorClient({ nyheter }) {
               n={n}
               status={statusar[n.id]}
               onForesla={() => foreslaNyhet(n)}
-              onAnnaLas={() => setAnnaLasning({ id: n.id, text: n.beskrivning ? `${n.rubrik}. ${n.beskrivning}` : n.rubrik })}
+              onLas={(agent) => setLasning({ id: n.id, agent, text: n.beskrivning ? `${n.rubrik}. ${n.beskrivning}` : n.rubrik })}
               analysProps={{
                 expanderad: expanderade.has(n.id),
                 onToggle: () => toggleExpand(n.id),
@@ -404,8 +412,8 @@ export default function NyhetskallorClient({ nyheter }) {
           ))
         )}
       </main>
-      {annaLasning && (
-        <AnnaOverlay key={annaLasning.id} text={annaLasning.text} onClose={() => setAnnaLasning(null)} />
+      {lasning && (
+        <AgentOverlay key={`${lasning.id}-${lasning.agent}`} agent={lasning.agent} text={lasning.text} onClose={() => setLasning(null)} />
       )}
       <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
     </div>
