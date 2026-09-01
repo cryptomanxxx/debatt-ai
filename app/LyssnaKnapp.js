@@ -14,7 +14,7 @@ const knappStyle = {
   letterSpacing: "0.03em",
 };
 
-export default function LyssnaKnapp({ text, forfattare, rost, style }) {
+export default function LyssnaKnapp({ text, forfattare, rost, style, label = "🎧 Lyssna" }) {
   const valdRost = rost ?? (KVINNLIGA_AGENTER.has(forfattare) ? "Swedish Female" : "Swedish Male");
   const [fas, setFas] = useState("idle"); // idle | spelar | pausad
 
@@ -45,7 +45,7 @@ export default function LyssnaKnapp({ text, forfattare, rost, style }) {
   if (fas === "idle") {
     return (
       <button onClick={lyssna} style={{ ...knappStyle, ...style }}>
-        🎧 Lyssna
+        {label}
       </button>
     );
   }

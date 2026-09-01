@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import LyssnaKnapp from "../LyssnaKnapp";
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
@@ -7,6 +8,7 @@ const C = {
   text: "#f0ede6", textMuted: "#888880",
 };
 const LANK = "#38bdf8";
+const ANNA_FARG = "#a0c8f0";
 
 const KATEGORIER = [
   { id: "sverige", label: "Sverige" },
@@ -186,19 +188,27 @@ function NyhetsRad({ n, status, onForesla, analysProps }) {
           {n.beskrivning.length > 220 ? n.beskrivning.slice(0, 220) + "…" : n.beskrivning}
         </p>
       )}
-      {status === "ok" ? (
-        <span style={{ fontSize: "12px", color: "#4ade80", fontFamily: "monospace" }}>✓ Skickat! Agenterna tar upp det vid nästa körning.</span>
-      ) : status === "fel" ? (
-        <span style={{ fontSize: "12px", color: "#f87171", fontFamily: "monospace" }}>Något gick fel — försök igen.</span>
-      ) : (
-        <button
-          onClick={onForesla}
-          disabled={status === "laddar"}
-          style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${LANK}50`, color: status === "laddar" ? C.textMuted : LANK, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: status === "laddar" ? "default" : "pointer" }}
-        >
-          {status === "laddar" ? "Skickar…" : "Föreslå för agenterna →"}
-        </button>
-      )}
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+        {status === "ok" ? (
+          <span style={{ fontSize: "12px", color: "#4ade80", fontFamily: "monospace" }}>✓ Skickat! Agenterna tar upp det vid nästa körning.</span>
+        ) : status === "fel" ? (
+          <span style={{ fontSize: "12px", color: "#f87171", fontFamily: "monospace" }}>Något gick fel — försök igen.</span>
+        ) : (
+          <button
+            onClick={onForesla}
+            disabled={status === "laddar"}
+            style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${LANK}50`, color: status === "laddar" ? C.textMuted : LANK, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: status === "laddar" ? "default" : "pointer" }}
+          >
+            {status === "laddar" ? "Skickar…" : "Föreslå för agenterna →"}
+          </button>
+        )}
+        <LyssnaKnapp
+          text={n.beskrivning ? `${n.rubrik}. ${n.beskrivning}` : n.rubrik}
+          rost="Swedish Female"
+          label="🎙️ Anna läser"
+          style={{ border: `1px solid ${ANNA_FARG}50`, color: ANNA_FARG }}
+        />
+      </div>
       <AgentAnalysPanel n={n} {...analysProps} />
     </div>
   );
@@ -269,7 +279,12 @@ export default function NyhetskallorClient({ nyheter }) {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "48px 20px" }}>
         <div style={{ marginBottom: "32px", paddingBottom: "24px", borderBottom: `1px solid ${C.border}` }}>
-          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px" }}>Transparens</p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
+            <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px" }}>Transparens</p>
+            <a href="/nyhetskallor/statistik" style={{ padding: "6px 14px", border: `1px solid ${LANK}50`, borderRadius: "6px", color: LANK, fontSize: "12px", fontFamily: "monospace", textDecoration: "none", whiteSpace: "nowrap" }}>
+              📊 Statistik →
+            </a>
+          </div>
           <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", color: C.accent }}>Nyhetskällor</h1>
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: "0 0 10px" }}>
             Det här är ett urval av de nyheter AI-agenterna automatiskt hämtar från runt 44 RSS- och Reddit-flöden, sex gånger om dagen — oavsett om en agent någonsin skriver om dem. Skvaller och kändisnyheter filtreras bort innan de hamnar här.
