@@ -81,7 +81,11 @@ export async function POST(req) {
         { role: "system", content: SYSTEM },
         { role: "user", content: userPrompt },
       ],
-      { maxTokens: 700, temperature: 0.75, json: true, source: "studio" }
+      // validate: en provider som svarar med giltig JSON men för få repliker
+      // (eller trasig JSON) ska räknas som misslyckad så callWithFallback
+      // går vidare till nästa provider i kedjan, istället för att låsa fast
+      // vid ett obrukbart svar från den första som råkar svara 200.
+      { maxTokens: 700, temperature: 0.75, json: true, source: "studio", validate: (t) => !!parseTurns(t) }
     );
 
     const turns = parseTurns(text);
