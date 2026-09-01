@@ -180,6 +180,26 @@ def _forsta_traff(*element):
     return None
 
 
+_ANVANDARAGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+
+def _hamta_flode(url: str, kalla: str):
+    """GET med ett enda omförsök vid 429 — väntar enligt Retry-After-headern
+    (eller en rimlig standard om den saknas/inte är numerisk). Utan detta
+    tappar en enskild, tillfällig rate-limit-träff källan helt för hela
+    körningen istället för att bara vänta ut den."""
+    res = httpx.get(url, timeout=15, follow_redirects=True, headers={"User-Agent": _ANVANDARAGENT})
+    if res.status_code == 429:
+        try:
+            vantetid = min(int(res.headers.get("retry-after", 5)), 20)
+        except (TypeError, ValueError):
+            vantetid = 5
+        print(f"  ⏳ {kalla}: 429, väntar {vantetid}s och försöker igen...")
+        time.sleep(vantetid)
+        res = httpx.get(url, timeout=15, follow_redirects=True, headers={"User-Agent": _ANVANDARAGENT})
+    return res
+
+
 def hamta_reddit_kommentarer(post_url: str, max_kommentarer: int = 5) -> str:
     """Hämta toppkommentarer för ett Reddit-inlägg."""
     try:
@@ -430,15 +450,15 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
     for i, (kalla, url) in enumerate(feeds):
         if i > 0:
             # Kort paus mellan varje flöde — utan den avfyras ~45 anrop mot en
-            # handfull olika värdar (flera reddit.com-URL:er) inom loppet av
-            # några sekunder, vilket i praktiken triggar Reddits burst-baserade
-            # rate limit (HTTP 429) för en stor andel av dem. En sekvens av
-            # riktiga användarbesök hade aldrig sett ut så här.
-            time.sleep(0.3)
+            # handfull olika värdar inom loppet av några sekunder, vilket i
+            # praktiken triggar burst-baserade rate limits. En sekvens av
+            # riktiga användarbesök hade aldrig sett ut så här. reddit.com får
+            # en längre paus — ~25 av de här flödena går mot samma värd, så
+            # 0,3s räckte inte för att undvika 429 på en stor andel av dem.
+            time.sleep(1.2 if kalla.startswith("Reddit") else 0.3)
         fore = len(nyheter)
         try:
-            res = httpx.get(url, timeout=15, follow_redirects=True,
-                            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"})
+            res = _hamta_flode(url, kalla)
             if res.status_code != 200:
                 misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
                 rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
