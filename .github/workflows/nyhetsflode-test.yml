@@ -1,0 +1,35 @@
+name: Nyhetsflöde
+
+on:
+  schedule:
+    # 6 körningar/dag — RSS-flöden visar bara sina ~10 senaste poster, så
+    # tätare körningar fångar fler artiklar innan de rullar ur fönstret
+    # (jfr en enda körning/dag som skulle missa mycket av dygnets volym).
+    - cron: "0 2 * * *"   # 04:00 svensk tid
+    - cron: "0 6 * * *"   # 08:00 svensk tid
+    - cron: "0 10 * * *"  # 12:00 svensk tid
+    - cron: "0 14 * * *"  # 16:00 svensk tid
+    - cron: "0 18 * * *"  # 20:00 svensk tid
+    - cron: "0 22 * * *"  # 00:00 svensk tid
+  workflow_dispatch:
+
+jobs:
+  nyhetsflode:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Kör nyhetsflode_test.py
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python -u nyhetsflode_test.py
