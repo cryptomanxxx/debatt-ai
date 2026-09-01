@@ -1,5 +1,6 @@
 export const runtime = "edge";
 
+import { after } from "next/server";
 import { logAiCall } from "../../lib/logAiCall";
 import { logFel } from "../../lib/logFel";
 import { checkRateLimit } from "../../lib/kanalRateLimit";
@@ -29,10 +30,16 @@ async function sparaNyhetsanalys({ nyhetId, agent, text }) {
 // (nyhetId är då satt); Direktdebattens repliker sparas inte här — historiken lever bara
 // i klienten där och det finns ingen egen yta att visa dem på (till skillnad från
 // nyhetsanalyser, som ska synas i Senaste aktivitet på startsidan).
+//
+// Måste köras via after() — en vanlig oawaitad promise här kan tystas ner av edge-
+// runtimen så fort svarsströmmen är helt levererad till klienten, eftersom inget
+// då längre håller request-kontexten vid liv. after() är Next.js egen mekanism
+// för just detta: garanterat exekverad efter att svaret skickats klart, även på
+// edge runtime (till skillnad från ett rått "kör async utan await").
 function withNyhetsanalysSave(response, { nyhetId, agent }) {
   if (!nyhetId || !response.body) return response;
   const [clientStream, saveStream] = response.body.tee();
-  (async () => {
+  after(async () => {
     try {
       const reader = saveStream.getReader();
       const decoder = new TextDecoder();
@@ -56,7 +63,7 @@ function withNyhetsanalysSave(response, { nyhetId, agent }) {
       const trimmed = text.trim();
       if (trimmed.length >= 10) await sparaNyhetsanalys({ nyhetId, agent, text: trimmed });
     } catch { /* best-effort — analysen visas ändå hos klienten oavsett */ }
-  })();
+  });
   return new Response(clientStream, { headers: response.headers, status: response.status });
 }
 
