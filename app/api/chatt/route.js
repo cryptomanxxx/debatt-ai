@@ -176,6 +176,25 @@ async function handlePost(request) {
     ? `\nBackground article: "${artikelTitelSafe || "untitled"}" — ${artikelSammanfattningSafe}\n`
     : "";
 
+  // Två villkorade regler som specifikt motverkar generiska floskler ("fullständigt
+  // oacceptabelt", "vi måste agera nu") istället för substantiell argumentation:
+  // (1) tvingar agenten att bemöta FÖREGÅENDE TALARES namngivna, specifika argument
+  // — inte bara reagera löst på "det senaste inlägget" i allmänhet — och (2) tvingar
+  // agenten att förankra svaret i en konkret detalj ur bakgrundsartikeln när en sådan
+  // finns, istället för att bara referera till ämnet ytligt.
+  const bemotForegaendeSv = kontext
+    ? `\n- Namnge föregående talare (t.ex. "Historikern missar att...") och bemöt DERAS specifika argument rakt av — inte bara ämnet i stort.`
+    : "";
+  const forankraArtikelnSv = harArtikelKontext
+    ? `\n- Utgå konkret från bakgrundsartikeln ovan — nämn en specifik detalj, siffra eller händelse ur den. Floskler som "detta är oacceptabelt" eller "vi måste agera nu" är bara tillåtna om de kopplas till något konkret i artikeln.`
+    : "";
+  const rebutPreviousEn = kontext
+    ? `\n- Name the previous speaker (e.g. "The historian is wrong that...") and directly counter THEIR specific argument — not just the topic in general.`
+    : "";
+  const groundInArticleEn = harArtikelKontext
+    ? `\n- Ground your answer concretely in the background article above — name a specific detail, figure or event from it. Platitudes like "this is unacceptable" or "we must act now" are only allowed if tied to something concrete in the article.`
+    : "";
+
   const systemPrompt = isEn
     ? `You are ${PERSONLIGHETER[agent]}
 
@@ -183,8 +202,7 @@ You are taking part in a rapid debate about: "${amne.slice(0, 200)}"
 ${artikelBlockEn}
 RULES — important:
 - Answer with EXACTLY 2–3 sentences. Never more.
-- Be sharp and take a clear position. No filler.
-- React specifically to the latest post if there is one.
+- Be sharp and take a clear position. No filler.${rebutPreviousEn}${groundInArticleEn}
 - Never say you are an AI. Always speak in first person.
 - Reply only in English.
 - Do NOT start with "I agree", "As [your role]" or similar opening phrases.`
@@ -194,8 +212,7 @@ Du deltar i en snabbdebatt om: "${amne.slice(0, 200)}"
 ${artikelBlockSv}
 REGLER — viktiga:
 - Svara med EXAKT 2–3 meningar. Aldrig mer.
-- Var skarp och ta tydlig ställning. Ingen fluff.
-- Reagera specifikt på det senaste inlägget om det finns ett.
+- Var skarp och ta tydlig ställning. Ingen fluff.${bemotForegaendeSv}${forankraArtikelnSv}
 - Tala aldrig om att du är en AI. Tala alltid i första person.
 - Svara bara på svenska.
 - Börja INTE med "Jag håller med", "Som [din roll]" eller liknande inledningsfraser.`;
