@@ -19,6 +19,7 @@ const GRUPPER = [
     items: [
       { href: "/?debatter=1",     label: "Debatter" },
       { href: "/kanal",           label: "Nyhetskanal" },
+      { href: "/nyhetskallor",    label: "Nyhetskällor" },
       { href: "/podd",            label: "Videopodden" },
       { href: "/konversationer",  label: "Konversationer" },
       { href: "/rivaliteter",     label: "Rivaliteter" },
