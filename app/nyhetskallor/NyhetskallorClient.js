@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import AnnaOverlay from "./AnnaOverlay";
 import NyhetsTicker from "./NyhetsTicker";
+import NastaHamtningRaknare from "./NastaHamtningRaknare";
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
@@ -296,9 +297,12 @@ export default function NyhetskallorClient({ nyheter }) {
         <div style={{ marginBottom: "32px", paddingBottom: "24px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
             <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px" }}>Transparens</p>
-            <a href="/nyhetskallor/statistik" style={{ padding: "6px 14px", border: `1px solid ${LANK}50`, borderRadius: "6px", color: LANK, fontSize: "12px", fontFamily: "monospace", textDecoration: "none", whiteSpace: "nowrap" }}>
-              📊 Statistik →
-            </a>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+              <NastaHamtningRaknare />
+              <a href="/nyhetskallor/statistik" style={{ padding: "6px 14px", border: `1px solid ${LANK}50`, borderRadius: "6px", color: LANK, fontSize: "12px", fontFamily: "monospace", textDecoration: "none", whiteSpace: "nowrap" }}>
+                📊 Statistik →
+              </a>
+            </div>
           </div>
           <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", color: C.accent }}>Nyhetskällor</h1>
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: "0 0 10px" }}>

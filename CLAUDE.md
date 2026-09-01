@@ -2268,6 +2268,8 @@ Publik transparenssida som visar ett urval av de nyheter plattformen automatiskt
 
 **Live-ticker högst upp:** En scrollande rubrikremsa (`app/nyhetskallor/NyhetsTicker.js`) visar de 20 senaste hämtade nyheterna, längst upp på sidan ovanför huvudinnehållet. Samma tekniska mönster (dubblad lista + CSS `translateX(-50%)`-loop) som `app/NewsTicker.js` på `/kanal`, men egen kopia sourcad direkt ur `nyheter`-propen (redan hämtad server-side från hela `nyhetsflode`) istället för `/api/ticker`, som bara täcker 4 svenska källor — för snävt för en sida vars poäng är att visa alla ~44 källor. Varje post visar rubrik (länk), källa och relativ tid ("X min sedan").
 
+**Nedräkning till nästa hämtning:** `app/nyhetskallor/NastaHamtningRaknare.js` visar en sekundvis nedräkning (HH:MM:SS) i sidhuvudet till nästa av de 6 dagliga `nyhetsflode`-hämtningarna (04/08/12/16/20/00 svensk tid — måste hållas i synk med cron-tiderna i `nyhetsflode-test.yml`). Samma `Intl.DateTimeFormat`-baserade Stockholm-tidszonsteknik som `useNastaKorning()`/`svTidSek()` på startsidan (`app/client.js`), men en egen, mycket enklare kopia skopad till bara dessa 6 tider istället för hela det 25-punkters dagsschemat.
+
 Kräver Supabase-tabeller `nyhetsflode` och `nyhetsanalys` — kör `supabase_nyhetsflode.sql` och `supabase_nyhetsanalys.sql` i SQL Editor.
 
 | Fil | Roll |
@@ -2280,6 +2282,7 @@ Kräver Supabase-tabeller `nyhetsflode` och `nyhetsanalys` — kör `supabase_ny
 | `app/nyhetskallor/NyhetskallorClient.js` | Klientkomponent: fritextsökning, kategorifilter, "Föreslå för agenterna"-knapp, "Fråga AI-agenter"-panel med live-streaming per vald agent, "🎙️ Anna läser"-knapp (öppnar AnnaOverlay), länk till statistiksidan |
 | `app/nyhetskallor/AnnaOverlay.js` | Fullskärmsoverlay: animerad Anna (blink, munrörelser, waveform) + `responsiveVoice`-uppläsning av en enskild nyhet. Samma visuella logik som `/kanal/page.js`, egen kopia (inte en delad modul) |
 | `app/nyhetskallor/NyhetsTicker.js` | Scrollande live-ticker längst upp — de 20 senaste hämtade nyheterna, sourcad ur `nyheter`-propen (inte `/api/ticker`) |
+| `app/nyhetskallor/NastaHamtningRaknare.js` | Sekundvis nedräkning i sidhuvudet till nästa av de 6 dagliga nyhetsflode-hämtningarna |
 | `app/nyhetskallor/statistik/page.js` | SSR-sida för nyhetsstatistik. Aggregerar `nyhetsflode`/`nyhetsanalys`/`artiklar` per dag över 90 dagar |
 | `app/nyhetskallor/statistik/NyhetsstatistikVy.js` | Klientkomponent: statistikpiller, två Recharts-grafer, tidsintervalljusterare |
 | `app/api/nyhetsval/route.js` | POST-endpoint: skriver besökarens valda nyhet till `amnesforslag` med `kalla="nyhetsval"`. Rate limit 15/timme |
