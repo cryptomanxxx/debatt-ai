@@ -10,6 +10,7 @@ Innehåller:
   valj_nyhet_med_groq()     – Låter Groq välja bästa nyheten för agenten
 """
 
+import html
 import httpx
 import os
 import re
@@ -372,7 +373,7 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
                 title = (item.find("title") or
                          item.find(f"{{{ATOM}}}title") or
                          item.find("atom:title", ns))
-                rubrik = (title.text or "").strip() if title is not None else ""
+                rubrik = re.sub(r"\s+", " ", html.unescape(title.text or "")).strip() if title is not None else ""
                 if len(rubrik) <= 10:
                     continue
                 fulltext = item.find("content:encoded", ns)
@@ -381,12 +382,23 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
                         item.find("atom:summary", ns) or
                         item.find(f"{{{ATOM}}}content") or
                         item.find("atom:content", ns))
+                # Ordning spelar roll: HTML-entiteter (&#32;, &amp; m.fl.) avkodas FÖRE
+                # whitespace-hopfällningen (en avkodad &#32; blir ett nytt mellanslag som
+                # annars aldrig fälls ihop) och FÖRE truncation (annars kan en entitet
+                # klippas av mitt i och lämnas som en trasig rest i texten).
                 text = ""
                 if fulltext is not None and fulltext.text:
-                    text = re.sub(r"<[^>]+>", " ", fulltext.text).strip()
-                    text = re.sub(r"\s+", " ", text)[:800]
+                    text = re.sub(r"<[^>]+>", " ", fulltext.text)
+                    text = re.sub(r"\s+", " ", html.unescape(text)).strip()[:800]
                 elif desc is not None and desc.text:
-                    text = re.sub(r"<[^>]+>", " ", desc.text).strip()[:300]
+                    text = re.sub(r"<[^>]+>", " ", desc.text)
+                    text = re.sub(r"\s+", " ", html.unescape(text)).strip()[:300]
+                # Reddits RSS-beskrivning för länk-inlägg (till skillnad från text-inlägg)
+                # innehåller aldrig ett riktigt utdrag — bara ett genererat "submitted by
+                # /u/x [link] [comments]"-fotnot (kan lokaliseras till andra språk beroende
+                # på Reddits svar). Rent brus utan informationsvärde — töm den istället.
+                if kalla.startswith("Reddit") and re.fullmatch(r"submitted by\s+/?u/\S+\s*\[link\]\s*\[\w+\]", text, re.IGNORECASE):
+                    text = ""
                 link_el = (item.find("link") or
                            item.find("atom:link", ns) or
                            item.find(f"{{{ATOM}}}link"))

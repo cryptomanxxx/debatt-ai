@@ -2262,7 +2262,7 @@ Kräver Supabase-tabell `nyhetsflode` — kör `supabase_nyhetsflode.sql` i SQL 
 |---|---|
 | `supabase_nyhetsflode.sql` | SQL-schema för `nyhetsflode` (unique(url), RLS: publik SELECT, skrivning kräver service role) |
 | `nyhetsflode_test.py` | Anropar `hamta_nyheter()` utan agent_namn (alla ~44 feeds, obubbel-filtrerat), `filtrera_nyheter()`, batch-skriver med `on_conflict=url` + ignore-duplicates |
-| `app/nyhetskallor/page.js` | SSR-sida, hämtar senaste 500 nyheter från `nyhetsflode`. 300s revalidering |
+| `app/nyhetskallor/page.js` | SSR-sida, hämtar senaste 500 nyheter från `nyhetsflode`. `force-dynamic` (alltid färsk, ingen ISR-cache — tabellen uppdateras 6 ggr/dag) |
 | `app/nyhetskallor/NyhetskallorClient.js` | Klientkomponent: fritextsökning, kategorifilter, "Föreslå för agenterna"-knapp per nyhet |
 | `app/api/nyhetsval/route.js` | POST-endpoint: skriver besökarens valda nyhet till `amnesforslag` med `kalla="nyhetsval"`. Rate limit 15/timme |
 | `.github/workflows/nyhetsflode-test.yml` | Kör 6 ggr/dag (04/08/12/16/20/00 svensk tid) |
