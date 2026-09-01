@@ -231,20 +231,48 @@ function NyhetsRad({ n, status, onForesla, onAnnaLas, analysProps }) {
 export default function NyhetskallorClient({ nyheter }) {
   const [sok, setSok] = useState("");
   const [valdKategori, setValdKategori] = useState(null);
+  const [valdKalla, setValdKalla] = useState(null);
+  const [visaAllaKallor, setVisaAllaKallor] = useState(false);
   const [statusar, setStatusar] = useState({}); // { [id]: "laddar" | "ok" | "fel" }
   const [expanderade, setExpanderade] = useState(() => new Set());
   const [valdaAgenter, setValdaAgenter] = useState({}); // { [id]: Set<agent> }
   const [analyser, setAnalyser] = useState({}); // { [id]: { [agent]: { status, text } } }
   const [annaLasning, setAnnaLasning] = useState(null); // { id, text } | null
 
+  // Källor byggs dynamiskt ur den faktiska datan istället för en hårdkodad
+  // lista — det finns ~49 RSS-flöden + 28 YouTube-kanaler, för många och för
+  // rörligt (nya källor läggs till då och då) för att underhålla för hand som
+  // KATEGORIER ovan. Sorterat efter frekvens så de mest aktiva källorna syns
+  // först utan att behöva expandera.
+  const kallor = useMemo(() => {
+    const antal = {};
+    for (const n of nyheter) antal[n.kalla] = (antal[n.kalla] || 0) + 1;
+    return Object.entries(antal)
+      .map(([kalla, antal]) => ({ kalla, antal }))
+      .sort((a, b) => b.antal - a.antal || a.kalla.localeCompare(b.kalla, "sv"));
+  }, [nyheter]);
+  const KALLOR_STANDARD = 14;
+  const synligaKallor = useMemo(() => {
+    if (visaAllaKallor) return kallor;
+    const topp = kallor.slice(0, KALLOR_STANDARD);
+    // Håller den valda källans pill synlig även om den ligger utanför topp-14,
+    // så filtret aldrig "försvinner ur sikte" bara för att listan är hopfälld.
+    if (valdKalla && !topp.some(k => k.kalla === valdKalla)) {
+      const vald = kallor.find(k => k.kalla === valdKalla);
+      if (vald) return [...topp, vald];
+    }
+    return topp;
+  }, [kallor, visaAllaKallor, valdKalla]);
+
   const filtrerade = useMemo(() => {
     const s = sok.trim().toLowerCase();
     return nyheter.filter(n => {
       if (valdKategori && !(n.kategori || []).includes(valdKategori)) return false;
+      if (valdKalla && n.kalla !== valdKalla) return false;
       if (s && !(n.rubrik.toLowerCase().includes(s) || n.kalla.toLowerCase().includes(s))) return false;
       return true;
     });
-  }, [nyheter, sok, valdKategori]);
+  }, [nyheter, sok, valdKategori, valdKalla]);
 
   async function foreslaNyhet(n) {
     setStatusar(s => ({ ...s, [n.id]: "laddar" }));
@@ -332,6 +360,21 @@ export default function NyhetskallorClient({ nyheter }) {
                 {k.label}
               </button>
             ))}
+          </div>
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "8px" }}>
+            <button onClick={() => setValdKalla(null)} style={{ padding: "4px 11px", borderRadius: "20px", border: `1px solid ${!valdKalla ? ANNA_FARG + "80" : C.border}`, background: !valdKalla ? `${ANNA_FARG}12` : "transparent", color: !valdKalla ? ANNA_FARG : "#666", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}>
+              Alla källor
+            </button>
+            {synligaKallor.map(({ kalla, antal }) => (
+              <button key={kalla} onClick={() => setValdKalla(kalla === valdKalla ? null : kalla)} style={{ padding: "4px 11px", borderRadius: "20px", border: `1px solid ${valdKalla === kalla ? ANNA_FARG + "80" : C.border}`, background: valdKalla === kalla ? `${ANNA_FARG}12` : "transparent", color: valdKalla === kalla ? ANNA_FARG : "#666", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}>
+                {kalla} <span style={{ opacity: 0.6 }}>{antal}</span>
+              </button>
+            ))}
+            {kallor.length > KALLOR_STANDARD && (
+              <button onClick={() => setVisaAllaKallor(v => !v)} style={{ padding: "4px 11px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "transparent", color: "#666", fontSize: "11px", fontFamily: "monospace", cursor: "pointer" }}>
+                {visaAllaKallor ? "Färre källor ↑" : `+${kallor.length - KALLOR_STANDARD} fler källor ↓`}
+              </button>
+            )}
           </div>
         </div>
 
