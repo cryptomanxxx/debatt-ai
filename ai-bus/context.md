@@ -62,10 +62,17 @@ Stack: Next.js App Router, Supabase, Groq (primär AI), Gemini Flash (fallback),
 
 ## Bildmappning för Anna (`/public/avatarer/podd/`)
 
+Sedan sep 2026: pixelstabilt bildset (ChatGPT-genererat) där alla frames delar
+exakt samma masterduk — bara mun-/ögonregionen skiljer sig, huvudet hoppar
+inte längre mellan frames. Setet saknar dedikerade m1-varianter för
+half/closed, så koden (`AgentOverlay.js`, `kanal/page.js`) återanvänder
+m0-half/m0-closed på index 1 istället — de gamla `anna-m1-half.png`/
+`anna-m1-closed.png` (annan upplösning, ej pixelstabila) är borttagna.
+
 | Position | Öppna ögon | Halvöppna ögon | Stängda ögon |
 |---|---|---|---|
 | m0 stängd mun | `anna.png` | `anna-m0-half.png` | `anna-m0-closed.png` |
-| m1 liten mun | `anna-small.png` | `anna-m1-half.png` | `anna-m1-closed.png` |
+| m1 liten mun | `anna-small.png` | `anna-m0-half.png` (delad m0) | `anna-m0-closed.png` (delad m0) |
 | m2 medium mun | `anna-medium.png` | `anna-m2-half.png` | `anna-m2-closed.png` |
 | m3 stor mun | `anna-large.png` | `anna-m3-half.png` | `anna-m3-closed.png` |
 

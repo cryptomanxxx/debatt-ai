@@ -207,8 +207,12 @@ function WaveformBar({ isSpeaking, isThinking }) {
 // ── AnchorImage ───────────────────────────────────────────────────────────────
 // Open-eye mouth frames: anna.png (m0), anna-small.png (m1), anna-medium.png (m2), anna-large.png (m3)
 const MOUTH_OPEN   = ["anna.png", "anna-small.png", "anna-medium.png", "anna-large.png"];
-const MOUTH_HALF   = ["anna-m0-half.png", "anna-m1-half.png", "anna-m2-half.png", "anna-m3-half.png"];
-const MOUTH_CLOSED = ["anna-m0-closed.png", "anna-m1-closed.png", "anna-m2-closed.png", "anna-m3-closed.png"];
+// Index 1 (m1) återanvänder m0-frames för blink-varianterna — det pixelstabila
+// bildsetet (sep 2026) täcker bara m0/m2/m3 för half/closed, så en referens till
+// de gamla anna-m1-*.png (annan upplösning/beskärning) hade återinfört exakt
+// det "hoppande huvudet"-problemet bildsetet skulle lösa.
+const MOUTH_HALF   = ["anna-m0-half.png", "anna-m0-half.png", "anna-m2-half.png", "anna-m3-half.png"];
+const MOUTH_CLOSED = ["anna-m0-closed.png", "anna-m0-closed.png", "anna-m2-closed.png", "anna-m3-closed.png"];
 
 function AnchorImage({ blinkState, isSpeaking }) {
   const [mouthIdx, setMouthIdx] = useState(1);
