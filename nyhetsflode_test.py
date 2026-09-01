@@ -27,7 +27,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 
-from nyheter import hamta_nyheter, filtrera_nyheter, FEED_KATEGORIER
+from nyheter import hamta_nyheter, filtrera_nyheter, hamta_kategorier
 from supabase_utils import _llm_spel
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
@@ -152,7 +152,7 @@ def main():
             "kalla": n["kalla"][:100],
             "url": url[:500],
             "publicerad": (n.get("publicerad") or "")[:100] or None,
-            "kategori": FEED_KATEGORIER.get(n["kalla"], []),
+            "kategori": hamta_kategorier(n["kalla"]),
         })
 
     if not rader:

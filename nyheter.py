@@ -237,6 +237,49 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "TED Talks":           ["forskning", "samhälle", "tech"],
 }
 
+# Kategorier för YouTube-källor — nyckeln är kanalnamnet UTAN "YouTube: "-prefixet
+# (kalla-fältet från hamta_youtube_nyheter() är formaterat "YouTube: {kanal_namn}",
+# så en direkt FEED_KATEGORIER.get(kalla)-slagning missar alltid dessa 28 kanaler).
+YOUTUBE_KATEGORIER: dict[str, list[str]] = {
+    "SVT":                 ["sverige", "samhälle"],
+    "TV4 Nyheterna":       ["sverige", "samhälle"],
+    "Expressen":           ["sverige", "samhälle"],
+    "Aftonbladet":         ["sverige", "samhälle"],
+    "Riksdagen":           ["sverige", "politik"],
+    "OpenAI":              ["ai", "tech"],
+    "Anthropic":           ["ai", "tech"],
+    "Google DeepMind":     ["ai", "tech"],
+    "NVIDIA":              ["ai", "tech"],
+    "Lex Fridman":         ["ai", "forskning", "samhälle"],
+    "Two Minute Papers":   ["ai", "forskning"],
+    "Fireship":            ["tech"],
+    "Isaac Arthur":        ["forskning", "tech"],
+    "ColdFusion":          ["tech", "forskning"],
+    "Kurzgesagt":          ["forskning", "samhälle"],
+    "Sabine Hossenfelder": ["forskning"],
+    "BBC News":            ["international", "politik"],
+    "DW News":             ["international", "politik"],
+    "Reuters":             ["international", "politik"],
+    "Associated Press":    ["international", "politik"],
+    "Patrick Boyle":       ["ekonomi"],
+    "Economics Explained": ["ekonomi"],
+    "Bloomberg Originals": ["ekonomi"],
+    "The Economist":       ["ekonomi", "politik", "international"],
+    "TED":                 ["forskning", "samhälle", "tech"],
+    "Engadget":            ["tech"],
+    "The Verge":           ["tech", "ai"],
+    "Forbes":              ["ekonomi", "tech"],
+}
+
+
+def hamta_kategorier(kalla: str) -> list[str]:
+    """Slår upp kategorier för en källa — hanterar både RSS-flöden (FEED_KATEGORIER)
+    och YouTube-kanaler (YOUTUBE_KATEGORIER, nyckel utan "YouTube: "-prefix)."""
+    if kalla.startswith("YouTube: "):
+        return YOUTUBE_KATEGORIER.get(kalla[len("YouTube: "):], [])
+    return FEED_KATEGORIER.get(kalla, [])
+
+
 AGENT_NYHETSBUBBLA: dict[str, list[str]] = {
     "Kryptoanalytiker":       ["krypto", "ekonomi", "tech"],
     "Nationalekonom":         ["ekonomi", "politik", "sverige"],
@@ -273,7 +316,7 @@ def filtrera_feeds_for_agent(agent_namn: str, feeds: list[tuple]) -> list[tuple]
     bubbla_set = set(bubbla)
     return [
         (kalla, url) for kalla, url in feeds
-        if bubbla_set & set(FEED_KATEGORIER.get(kalla, ["sverige"]))
+        if bubbla_set & set(hamta_kategorier(kalla) or ["sverige"])
     ] or feeds  # fail open: om filtret ger tomt resultat, visa allt
 
 
