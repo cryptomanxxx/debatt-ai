@@ -43,7 +43,7 @@ function withNyhetsanalysSave(response, { nyhetId, agent }) {
     try {
       const reader = saveStream.getReader();
       const decoder = new TextDecoder();
-      let buffer = "", text = "";
+      let buffer = "", text = "", klar = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -53,15 +53,20 @@ function withNyhetsanalysSave(response, { nyhetId, agent }) {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const raw = line.slice(6).trim();
-          if (raw === "[DONE]") continue;
+          if (raw === "[DONE]") { klar = true; continue; }
           try {
             const token = JSON.parse(raw).choices?.[0]?.delta?.content ?? "";
             if (token) text += token;
           } catch { /* ignore malformed chunk */ }
         }
       }
+      // Bara spara om strömmen faktiskt avslutades med [DONE] — annars kan en
+      // avhuggen Groq-ström sparas som en ofullständig rad, och klientens egen
+      // omförsök (analyseraMedAgent) sedan sparar en andra, komplett rad för
+      // samma nyhet+agent. Ingen UNIQUE-constraint på (nyhet_id, agent) städar
+      // bort dubbletten, så båda hade synts i Senaste aktivitet (Codex-fynd).
       const trimmed = text.trim();
-      if (trimmed.length >= 10) await sparaNyhetsanalys({ nyhetId, agent, text: trimmed });
+      if (klar && trimmed.length >= 10) await sparaNyhetsanalys({ nyhetId, agent, text: trimmed });
     } catch { /* best-effort — analysen visas ändå hos klienten oavsett */ }
   });
   return new Response(clientStream, { headers: response.headers, status: response.status });
