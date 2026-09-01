@@ -43,7 +43,7 @@ function withNyhetsanalysSave(response, { nyhetId, agent }) {
     try {
       const reader = saveStream.getReader();
       const decoder = new TextDecoder();
-      let buffer = "", text = "";
+      let buffer = "", text = "", klar = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -53,15 +53,20 @@ function withNyhetsanalysSave(response, { nyhetId, agent }) {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const raw = line.slice(6).trim();
-          if (raw === "[DONE]") continue;
+          if (raw === "[DONE]") { klar = true; continue; }
           try {
             const token = JSON.parse(raw).choices?.[0]?.delta?.content ?? "";
             if (token) text += token;
           } catch { /* ignore malformed chunk */ }
         }
       }
+      // Bara spara om strömmen faktiskt avslutades med [DONE] — annars kan en
+      // avhuggen Groq-ström sparas som en ofullständig rad, och klientens egen
+      // omförsök (analyseraMedAgent) sedan sparar en andra, komplett rad för
+      // samma nyhet+agent. Ingen UNIQUE-constraint på (nyhet_id, agent) städar
+      // bort dubbletten, så båda hade synts i Senaste aktivitet (Codex-fynd).
       const trimmed = text.trim();
-      if (trimmed.length >= 10) await sparaNyhetsanalys({ nyhetId, agent, text: trimmed });
+      if (klar && trimmed.length >= 10) await sparaNyhetsanalys({ nyhetId, agent, text: trimmed });
     } catch { /* best-effort — analysen visas ändå hos klienten oavsett */ }
   });
   return new Response(clientStream, { headers: response.headers, status: response.status });
@@ -211,8 +216,13 @@ async function handlePost(request) {
   // vald nyhet, inte en flertursdebatt — den delar INTE Direktdebattens kvot (5
   // debatter/10 min). Väljer en besökare 5 agenter för samma nyhet skulle det annars
   // tömma hela debattkvoten på en enda nyhetsanalys. Egen, lättare gräns istället.
+  // Gränsen måste rymma en besökare som väljer ALLA 24 agenter på en gång (panelen
+  // sätter inget tak på urvalet) plus omförsök vid avhugget/tomt svar (hoppaOverGroq-
+  // vägen i analyseraMedAgent() kan ge upp till 2 anrop per agent) — annars fick en
+  // fullt legitim "analysera alla"-körning tysta 429-fel mitt i (Codex-review-fynd,
+  // PR #1293).
   if (typ === "nyhetsanalys") {
-    const rl = checkRateLimit(request, "nyhetsanalys", 20, 10 * 60 * 1000);
+    const rl = checkRateLimit(request, "nyhetsanalys", 50, 10 * 60 * 1000);
     if (!rl.ok) {
       logFel({ kalla: "chatt", feltyp: "rate_limit", meddelande: "429 rate limit nyhetsanalys", ip, extra: { retryAfter: rl.retryAfter } });
       return Response.json({ error: "rate_limit", remaining: 0, minutesLeft: Math.ceil(rl.retryAfter / 60) }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
