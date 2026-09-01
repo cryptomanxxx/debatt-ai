@@ -478,7 +478,7 @@ Vilket publiceringsfönster som gäller härleds i första hand ur det triggande
 | `supabase_qa_snapshots_v2.sql` | Migrering v2: lägger till `screenshot_b64 text` på `qa_snapshots`. |
 | `.github/workflows/backtest.yml` | Kör backtest_fetch.py + backtest.py sekventiellt |
 | `.github/workflows/backtest_strategi.yml` | Kör bara backtest.py (manuellt, ingen Yahoo Finance-hämtning) |
-| `forskning_test.py` | Vetenskaplig forskning. 12 forskarag­enter mappade till 8 discipliner. Hämtar civilisationsdata (planbocker, koalitioner, lobbying, bets, rykten, domar m.m.), genererar fynd via central LLM-router (`hamta_kort_fns`), sparar till `vetenskapliga_upptagter`. 2 agenter per körning, deduplicering på titel. |
+| `forskning_test.py` | Vetenskaplig forskning. 12 forskarag­enter mappade till 8 discipliner. Hämtar civilisationsdata (planbocker, koalitioner, lobbying, bets, rykten, domar m.m.) och ibland (40% chans) en matchande arXiv-artikel ur `nyhetsflode` som inspiration, genererar fynd via central LLM-router (`hamta_kort_fns`), sparar till `vetenskapliga_upptagter`. 2 agenter per körning, deduplicering på titel. |
 | `supabase_universitet.sql` | SQL-schema för `vetenskapliga_upptagter` med RLS-policies. |
 | `app/universitet/page.js` | AI-Universitetet. SSR med 300s revalidering. Hero-bild (`public/ai-university.png`), genombrott-sektion, per-disciplin-grid, FyndKort-komponent med impakt-badge, StatPill. |
 | `app/hjarnan/page.js` | Civilisationens hjärna — redesignad SVG-kunskapsgraf. Tre ringar: yttre (24 agenter med maktindex-aura), mellannivå (7 institutions-hexagoner + 3 hedgefond-trianglar + AI-Bus-romb), centerhärna. Klickpaneler för all detaljinfo. 180s revalidering. |
@@ -2114,13 +2114,18 @@ Plattformens forskningsinstitution: 12 forskarag­enter med disciplinspecifik in
 
 **Regel:** `forskning_test.py` använder aldrig hårdkodad Groq-klient — all LLM-kommunikation sker via `hamta_kort_fns()` i `ai_klient.py`.
 
+**arXiv som forskningsinspiration:** Med `ARXIV_SANNOLIKHET` (40%) chans per forskare hämtas en riktig, nyligen publicerad arXiv-artikel ur `nyhetsflode` (samma data som `/nyhetskallor` visar — se ✅93) och injiceras i LLM-prompten som teoretisk/metodologisk utgångspunkt, istället för att forskaren bara utgår från civilisationens egen simuleringsdata. `ARXIV_DISCIPLIN` mappar de 5 arXiv-källorna (`kalla`-fältet: "arXiv: AI", "arXiv: Machine Learning", "arXiv: Ekonomi", "arXiv: Computers & Society", "arXiv: Robotik") till relevanta discipliner — `valj_arxiv_artikel()` väljer bara bland artiklar som matchar forskarens disciplin. Prompten instruerar uttryckligen att inte hitta på detaljer om artikeln utöver rubrik + de första 400 tecknen av dess sammanfattning (samma anti-hallucination-princip som `nyhetskalla` på vanliga artiklar, ✅17). Den använda artikeln sparas i `arxiv_kalla` (jsonb: `{titel, url, kalla}`) och visas som en klickbar "📄 Inspirerad av: ..."-rad längst ner på fyndkortet på `/universitet`. Fail-open: `hamta_arxiv_artiklar()` returnerar `[]` om `nyhetsflode` saknas/är otillgänglig — resten av körningen (civilisationsdata-baserad forskning) påverkas inte.
+
 **Aktivitetsfeed:** Nya upptäckter visas i Senaste aktivitet-widgeten på startsidan — 🔬 (lila #8b5cf6) för vanliga fynd, 🏆 (guld #facc15) för genombrottsfynd, länk till `/universitet`.
+
+Kräver `supabase_universitet_v2.sql` (lägger till `arxiv_kalla jsonb` på `vetenskapliga_upptagter`) — kör i Supabase SQL Editor efter `supabase_universitet.sql`.
 
 | Fil | Roll |
 |---|---|
 | `supabase_universitet.sql` | SQL-schema för `vetenskapliga_upptagter` med RLS-policies |
-| `forskning_test.py` | Daglig körning. `hamta_civilisationsdata()`, `bygga_kontext_for_disciplin()`, `generera_fynd()`, `spara_fynd()`, `fynd_finns_redan()` |
-| `app/universitet/page.js` | SSR med 300s revalidering. Hero-bild, StatPill-statistik, Genombrott-sektion, per-disciplin-grid med FyndKort |
+| `supabase_universitet_v2.sql` | Migrering: lägger till `arxiv_kalla jsonb`-kolumn för arXiv-källhänvisning |
+| `forskning_test.py` | Daglig körning. `hamta_civilisationsdata()`, `hamta_arxiv_artiklar()`, `valj_arxiv_artikel()`, `bygga_kontext_for_disciplin()`, `generera_fynd()`, `spara_fynd()`, `fynd_finns_redan()` |
+| `app/universitet/page.js` | SSR med 300s revalidering. Hero-bild, StatPill-statistik, Genombrott-sektion, per-disciplin-grid med FyndKort (visar arXiv-källa när `arxiv_kalla` finns) |
 | `public/ai-university.png` | Hero-bild: mörk futuristisk byggnad med "AI UNIVERSITY — EDUCATE. INNOVATE. ELEVATE." |
 | `.github/workflows/forskning-test.yml` | Kör dagligen 14:00 svensk tid (12:00 UTC). Kräver alla Groq-nycklar + Gemini + Mistral + Deepseek. |
 

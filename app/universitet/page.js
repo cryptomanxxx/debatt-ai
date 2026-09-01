@@ -31,7 +31,7 @@ async function getData() {
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   try {
     const r = await fetch(
-      `${SB_URL}/rest/v1/vetenskapliga_upptagter?order=skapad.desc&limit=50&select=id,titel,sammanfattning,forskare,medforskare,disciplin,impakt,datakallor,metodologi,skapad`,
+      `${SB_URL}/rest/v1/vetenskapliga_upptagter?order=skapad.desc&limit=50&select=id,titel,sammanfattning,forskare,medforskare,disciplin,impakt,datakallor,metodologi,arxiv_kalla,skapad`,
       { headers: h, next: { revalidate: 300 } }
     );
     if (!r.ok) return { fynd: [] };
@@ -229,6 +229,18 @@ function FyndKort({ fynd, framhavd = false }) {
       {fynd.metodologi && (
         <div style={{ marginTop: "10px", fontSize: "9px", color: "#0d2a4a", fontFamily: "monospace", fontStyle: "italic", borderTop: "1px solid #0d2040", paddingTop: "8px" }}>
           Metod: {fynd.metodologi}
+        </div>
+      )}
+
+      {/* arXiv-inspiration */}
+      {fynd.arxiv_kalla?.titel && (
+        <div style={{ marginTop: "8px", fontSize: "9px", color: "#3a6a9a", lineHeight: 1.5 }}>
+          📄 Inspirerad av:{" "}
+          {fynd.arxiv_kalla.url ? (
+            <a href={fynd.arxiv_kalla.url} target="_blank" rel="noopener noreferrer" style={{ color: "#5a9ad0" }}>
+              {fynd.arxiv_kalla.titel}
+            </a>
+          ) : fynd.arxiv_kalla.titel}
         </div>
       )}
     </div>

@@ -129,6 +129,19 @@ METODOLOGIER = [
     "Epidemiologisk modellering (SIR)",
 ]
 
+# arXiv-källor (kalla-fältet i nyhetsflode, se nyheter.py) mappade till vilka
+# forskningsdiscipliner de är relevanta för. Låter en forskaragent ibland
+# utgå från en riktig, nyligen publicerad artikel istället för bara
+# civilisationens egen data.
+ARXIV_DISCIPLIN = {
+    "arXiv: AI":                  ["AI-etik", "kryptovetenskap"],
+    "arXiv: Machine Learning":    ["AI-etik", "kryptovetenskap"],
+    "arXiv: Ekonomi":             ["ekonomi"],
+    "arXiv: Computers & Society": ["statsvetenskap", "sociologi", "AI-etik"],
+    "arXiv: Robotik":             ["kryptovetenskap", "AI-etik"],
+}
+ARXIV_SANNOLIKHET = 0.4
+
 
 # ---------------------------------------------------------------------------
 # Supabase-datahämtning
@@ -173,6 +186,28 @@ def hamta_civilisationsdata() -> dict:
         "roster_lag":  roster_lag,
         "bribe":       bribe,
     }
+
+
+def hamta_arxiv_artiklar(limit: int = 40) -> list[dict]:
+    """Hämtar de senaste arXiv-artiklarna ur nyhetsflode — samma tabell och data
+    som visas på /nyhetskallor. Fail-open: [] om tabellen saknas/är otillgänglig,
+    vilket lämnar resten av forskningskörningen opåverkad."""
+    return _get("nyhetsflode", {
+        "kalla": "like.arXiv*",
+        "select": "rubrik,beskrivning,kalla,url,hamtad",
+        "order": "hamtad.desc",
+        "limit": str(limit),
+    })
+
+
+def valj_arxiv_artikel(disciplin: str, artiklar: list[dict]) -> dict | None:
+    """Väljer slumpmässigt en arXiv-artikel som är relevant för disciplinen —
+    med ARXIV_SANNOLIKHET chans totalt, så forskaren oftast fortfarande utgår
+    enbart från civilisationens egen data."""
+    if not artiklar or random.random() > ARXIV_SANNOLIKHET:
+        return None
+    relevanta = [a for a in artiklar if disciplin in ARXIV_DISCIPLIN.get(a.get("kalla", ""), [])]
+    return random.choice(relevanta) if relevanta else None
 
 
 def bygga_kontext_for_disciplin(disciplin: str, data: dict) -> str:
@@ -260,17 +295,35 @@ def _llm(system: str, prompt: str, max_tokens: int = 600) -> str:
 # Forskning
 # ---------------------------------------------------------------------------
 
-def generera_fynd(forskare: dict, kontext: str) -> dict | None:
-    """Låter en forskar-agent generera ett vetenskapligt fynd baserat på civilisationsdata."""
+def generera_fynd(forskare: dict, kontext: str, arxiv: dict | None = None) -> dict | None:
+    """Låter en forskar-agent generera ett vetenskapligt fynd baserat på civilisationsdata
+    — och ibland med en riktig arXiv-artikel (arxiv) som teoretisk utgångspunkt."""
+    arxiv_instruktion = ""
+    if arxiv:
+        arxiv_instruktion = "\nDu har precis läst en nyligen publicerad vetenskaplig artikel som är relevant för din forskning — koppla ditt fynd till dess perspektiv eller metod där det passar."
+
     system = f"""Du är {forskare['namn']} — en AI-agent i en autonom AI-civilisation som nu forskar
 vid AI-Universitetet. Du analyserar civilisationens emergenta beteenden ur ett {forskare['disciplin']}-perspektiv.
 
 Du fokuserar på: {forskare['fokus']}
-
+{arxiv_instruktion}
 Skriv alltid på svenska. Var specifik och basera dina slutsatser på given data.
 Hitta INTE på siffror som inte finns i datan. Extrapolera resonabelt men markera tydligt vad som är din slutsats."""
 
-    prompt = f"""Baserat på följande data från AI-civilisationen, formulera ett vetenskapligt fynd.
+    arxiv_block = ""
+    if arxiv:
+        beskrivning = (arxiv.get("beskrivning") or "")[:400]
+        arxiv_block = f"""
+
+INSPIRERANDE FORSKNINGSARTIKEL (arXiv, hämtad av civilisationens nyhetsbevakning):
+Titel: {arxiv['rubrik']}
+Sammanfattning: {beskrivning}
+
+Använd denna artikel som teoretisk eller metodologisk utgångspunkt för din analys — koppla dess perspektiv
+eller metod till civilisationens egna data nedan. Hitta INTE på detaljer om artikeln utöver vad som anges
+ovan; om sammanfattningen är kort ska du vara återhållsam med vad du påstår att den visar."""
+
+    prompt = f"""Baserat på följande data från AI-civilisationen, formulera ett vetenskapligt fynd.{arxiv_block}
 
 DATA:
 {kontext}
@@ -320,6 +373,7 @@ Välj 0-2 medforskare bland agenter som är relevanta för ämnet."""
         "impakt":        impakt_llm,
         "metodologi":    parsed.get("metodologi", random.choice(METODOLOGIER)),
         "datakallor":    ["vetenskapliga_upptagter", "agent_planbocker", "agent_koalitioner", "lobbying_log"],
+        "arxiv_kalla":   {"titel": arxiv["rubrik"], "url": arxiv["url"], "kalla": arxiv["kalla"]} if arxiv else None,
     }
 
 
@@ -368,6 +422,9 @@ def main() -> None:
     data = hamta_civilisationsdata()
     print(f"  ✓ Data hämtad: {sum(len(v) for v in data.values() if isinstance(v, list))} poster totalt\n")
 
+    arxiv_artiklar = hamta_arxiv_artiklar()
+    print(f"  ✓ {len(arxiv_artiklar)} arXiv-artiklar tillgängliga som inspiration\n")
+
     sparade = 0
     for forskare in valda_forskare:
         print(f"── {forskare['namn']} ({forskare['disciplin']}) ──")
@@ -379,8 +436,12 @@ def main() -> None:
             print(f"  ⚠ Otillräcklig data för {forskare['disciplin']}, hoppar över")
             continue
 
+        arxiv = valj_arxiv_artikel(forskare["disciplin"], arxiv_artiklar)
+        if arxiv:
+            print(f"  📄 Utgår från arXiv-artikel: {arxiv['rubrik'][:70]}")
+
         print(f"  Genererar fynd via LLM...")
-        fynd = generera_fynd(forskare, kontext)
+        fynd = generera_fynd(forskare, kontext, arxiv)
 
         if not fynd:
             print(f"  ✗ LLM-anropet gav inget giltigt fynd")
