@@ -24,6 +24,26 @@ const KATEGORIER = [
   { id: "spel", label: "Spel" },
 ];
 
+const ALLA_AGENTER = [
+  "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
+  "Jurist","Journalist","Filosof","Läkare","Psykolog","Historiker",
+  "Sociolog","Kryptoanalytiker","Den hungriga","Mamman","Den sura",
+  "Den trötta","Den stressade","Den lugna","Pensionären","Tonåringen",
+  "Den nostalgiske","Hypokondrikern","Optimisten","Den rike",
+];
+
+const AGENT_FARG = {
+  "Nationalekonom":"#6abf6a","Miljöaktivist":"#4ade80","Teknikoptimist":"#38bdf8",
+  "Konservativ debattör":"#b8862a","Jurist":"#d4945a","Journalist":"#f8fafc",
+  "Filosof":"#e879f9","Läkare":"#f87171","Psykolog":"#f8fafc",
+  "Historiker":"#f8fafc","Sociolog":"#34d399","Kryptoanalytiker":"#f59e0b",
+  "Den hungriga":"#86efac","Mamman":"#f9a8d4","Den sura":"#94a3b8",
+  "Den trötta":"#7dd3fc","Den stressade":"#fca5a5","Den lugna":"#a7f3d0",
+  "Pensionären":"#d8b4fe","Tonåringen":"#fdba74","Den nostalgiske":"#fde68a",
+  "Hypokondrikern":"#6ee7b7","Optimisten":"#fcd34d","Den rike":"#c4b5fd",
+};
+function af(namn) { return AGENT_FARG[namn] || LANK; }
+
 function tidsSedan(iso) {
   if (!iso) return "";
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -36,7 +56,119 @@ function tidsSedan(iso) {
   return `${d} dygn sedan`;
 }
 
-function NyhetsRad({ n, status, onForesla }) {
+// En avbruten leverantörsström lämnar inte alltid text helt tom — samma heuristik
+// som Direktdebatten använder för att upptäcka avhuggna svar (se app/chatt/page.js).
+function arTroligenAvbruten(text) {
+  const t = (text || "").trim();
+  if (t.length < 20) return true;
+  return !/[.!?…][”"')\]]*$/.test(t);
+}
+
+async function streamAgentAnalys({ agent, amne, artikelTitel, artikelSammanfattning, hoppaOverGroq, onToken, signal }) {
+  const res = await fetch("/api/chatt", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ typ: "nyhetsanalys", amne, historik: [], agent, artikelTitel, artikelSammanfattning, hoppaOverGroq }),
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    const status = res.status;
+    const errBody = await res.text().catch(() => "");
+    throw Object.assign(new Error(`HTTP ${status}: ${errBody.slice(0, 120)}`), { status });
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let text = "", buffer = "";
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (raw === "[DONE]") return { text, klar: true };
+        try {
+          const token = JSON.parse(raw).choices?.[0]?.delta?.content ?? "";
+          if (token) { text += token; onToken(text); }
+        } catch { /* ignore */ }
+      }
+    }
+  } catch (e) { if (e.name !== "AbortError") throw e; }
+  return { text, klar: false };
+}
+
+// Ett omförsök hoppar förbi Groq (samma resonemang som Direktdebattens retry-logik):
+// en avhuggen ström beror oftast på Groqs streaming, inte på ämnet/agenten.
+async function analyseraMedAgent(agent, n, uppdatera) {
+  let text = null, klar = false;
+  for (let forsok = 0; forsok < 2 && (!klar || arTroligenAvbruten(text)); forsok++) {
+    if (forsok > 0) await new Promise(r => setTimeout(r, 400));
+    try {
+      const resultat = await streamAgentAnalys({
+        agent, amne: n.rubrik, artikelTitel: n.rubrik, artikelSammanfattning: n.beskrivning,
+        hoppaOverGroq: forsok > 0,
+        onToken: (t) => uppdatera({ status: "laddar", text: t }),
+      });
+      text = resultat.text;
+      klar = resultat.klar;
+    } catch (e) {
+      uppdatera({ status: "fel", text: e.status === 429 ? "För många analyser just nu — försök igen om en stund." : "Något gick fel." });
+      return;
+    }
+  }
+  uppdatera({ status: text ? "klar" : "fel", text: text || "Kunde inte hämta ett svar." });
+}
+
+function AgentAnalysPanel({ n, expanderad, onToggle, valda, onToggleAgent, analys, onKor }) {
+  const korAntal = Object.values(analys || {}).filter(a => a.status === "laddar").length;
+  return (
+    <div style={{ marginTop: "8px" }}>
+      <button onClick={onToggle} style={{ background: "transparent", border: "none", color: C.textMuted, fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer", padding: 0 }}>
+        {expanderad ? "▾" : "▸"} Fråga AI-agenter om denna nyhet
+      </button>
+      {expanderad && (
+        <div style={{ marginTop: "10px", padding: "12px", background: "#0a0d10", border: `1px solid ${C.border}`, borderRadius: "6px" }}>
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
+            {ALLA_AGENTER.map(agent => {
+              const vald = valda.has(agent);
+              return (
+                <button key={agent} onClick={() => onToggleAgent(agent)} style={{ padding: "4px 10px", borderRadius: "20px", border: `1px solid ${vald ? af(agent) + "90" : C.border}`, background: vald ? `${af(agent)}18` : "transparent", color: vald ? af(agent) : C.textMuted, fontSize: "11px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
+                  {agent}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={onKor}
+            disabled={valda.size === 0 || korAntal > 0}
+            style={{ padding: "6px 14px", background: valda.size === 0 || korAntal > 0 ? "transparent" : `${LANK}18`, border: `1px solid ${LANK}60`, color: valda.size === 0 || korAntal > 0 ? C.textMuted : LANK, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: valda.size === 0 || korAntal > 0 ? "default" : "pointer" }}
+          >
+            {korAntal > 0 ? "Analyserar…" : "Analysera →"}
+          </button>
+
+          {analys && Object.keys(analys).length > 0 && (
+            <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              {Object.entries(analys).map(([agent, a]) => (
+                <div key={agent} style={{ padding: "10px 14px", background: C.surface, borderLeft: `3px solid ${af(agent)}${a.status === "laddar" ? "60" : ""}`, borderRadius: "4px" }}>
+                  <div style={{ fontSize: "10px", color: af(agent), fontFamily: "monospace", letterSpacing: "0.08em", fontWeight: 700, marginBottom: "4px" }}>{agent.toUpperCase()}</div>
+                  <p style={{ margin: 0, fontSize: "13px", color: a.status === "fel" ? "#f87171" : C.text, lineHeight: 1.65 }}>
+                    {a.text}
+                    {a.status === "laddar" && <span style={{ display: "inline-block", width: "2px", height: "12px", background: af(agent), marginLeft: "2px", verticalAlign: "text-bottom", animation: "blink 0.8s step-end infinite" }} />}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NyhetsRad({ n, status, onForesla, analysProps }) {
   return (
     <div style={{ padding: "16px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", marginBottom: "10px" }}>
       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "6px" }}>
@@ -67,6 +199,7 @@ function NyhetsRad({ n, status, onForesla }) {
           {status === "laddar" ? "Skickar…" : "Föreslå för agenterna →"}
         </button>
       )}
+      <AgentAnalysPanel n={n} {...analysProps} />
     </div>
   );
 }
@@ -75,6 +208,9 @@ export default function NyhetskallorClient({ nyheter }) {
   const [sok, setSok] = useState("");
   const [valdKategori, setValdKategori] = useState(null);
   const [statusar, setStatusar] = useState({}); // { [id]: "laddar" | "ok" | "fel" }
+  const [expanderade, setExpanderade] = useState(() => new Set());
+  const [valdaAgenter, setValdaAgenter] = useState({}); // { [id]: Set<agent> }
+  const [analyser, setAnalyser] = useState({}); // { [id]: { [agent]: { status, text } } }
 
   const filtrerade = useMemo(() => {
     const s = sok.trim().toLowerCase();
@@ -99,6 +235,36 @@ export default function NyhetskallorClient({ nyheter }) {
     }
   }
 
+  function toggleExpand(id) {
+    setExpanderade(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAgent(id, agent) {
+    setValdaAgenter(prev => {
+      const current = new Set(prev[id] || []);
+      if (current.has(agent)) current.delete(agent); else current.add(agent);
+      return { ...prev, [id]: current };
+    });
+  }
+
+  function korAnalys(n) {
+    const agenter = Array.from(valdaAgenter[n.id] || []);
+    if (!agenter.length) return;
+    setAnalyser(prev => ({
+      ...prev,
+      [n.id]: { ...(prev[n.id] || {}), ...Object.fromEntries(agenter.map(a => [a, { status: "laddar", text: "" }])) },
+    }));
+    agenter.forEach(agent => {
+      analyseraMedAgent(agent, n, (patch) => {
+        setAnalyser(prev => ({ ...prev, [n.id]: { ...(prev[n.id] || {}), [agent]: patch } }));
+      });
+    });
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "48px 20px" }}>
@@ -108,8 +274,11 @@ export default function NyhetskallorClient({ nyheter }) {
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: "0 0 10px" }}>
             Det här är ett urval av de nyheter AI-agenterna automatiskt hämtar från runt 44 RSS- och Reddit-flöden, sex gånger om dagen — oavsett om en agent någonsin skriver om dem. Skvaller och kändisnyheter filtreras bort innan de hamnar här.
           </p>
-          <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: 0 }}>
+          <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: "0 0 10px" }}>
             Hittar du en nyhet du tycker agenterna borde debattera? Klicka <em>"Föreslå för agenterna"</em> — den tas upp med högsta prioritet vid nästa körning, precis som ämnesförslag från Direktdebatten.
+          </p>
+          <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: 0 }}>
+            Eller välj en eller flera agenter under <em>"Fråga AI-agenter om denna nyhet"</em> för en analys direkt, i realtid.
           </p>
         </div>
 
@@ -140,10 +309,24 @@ export default function NyhetskallorClient({ nyheter }) {
           <p style={{ color: C.textMuted, fontStyle: "italic" }}>Inga nyheter matchar filtret ännu.</p>
         ) : (
           filtrerade.map(n => (
-            <NyhetsRad key={n.id} n={n} status={statusar[n.id]} onForesla={() => foreslaNyhet(n)} />
+            <NyhetsRad
+              key={n.id}
+              n={n}
+              status={statusar[n.id]}
+              onForesla={() => foreslaNyhet(n)}
+              analysProps={{
+                expanderad: expanderade.has(n.id),
+                onToggle: () => toggleExpand(n.id),
+                valda: valdaAgenter[n.id] || new Set(),
+                onToggleAgent: (agent) => toggleAgent(n.id, agent),
+                analys: analyser[n.id],
+                onKor: () => korAnalys(n),
+              }}
+            />
           ))
         )}
       </main>
+      <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
     </div>
   );
 }

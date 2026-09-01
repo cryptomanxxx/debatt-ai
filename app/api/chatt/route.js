@@ -2,6 +2,7 @@ export const runtime = "edge";
 
 import { logAiCall } from "../../lib/logAiCall";
 import { logFel } from "../../lib/logFel";
+import { checkRateLimit } from "../../lib/kanalRateLimit";
 
 const AGENTER = new Set([
   "Nationalekonom","Miljöaktivist","Teknikoptimist","Konservativ debattör",
@@ -131,7 +132,7 @@ async function handlePost(request) {
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
-  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, debattId, hoppaOverGroq } = body;
+  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, debattId, hoppaOverGroq, typ } = body;
   const isEn = lang === "en";
   // Client re-sends this on every turn (no server-side session state) — validated/capped
   // here too, defense in depth, since the client's own cap isn't trusted.
@@ -140,23 +141,35 @@ async function handlePost(request) {
   const harArtikelKontext = artikelSammanfattningSafe.length > 0;
   const debattIdSafe = typeof debattId === "string" && debattId.length > 0 && debattId.length <= 100 ? debattId : null;
 
-  // debattId identifierar EN debattstart hos klienten (genererad en gång i starta(),
-  // återanvänd på ett ev. omförsök av tur 1 efter en avhuggen/tom ström). historik
-  // är fortfarande [] på ett sådant omförsök precis som vid en riktig ny debatt, men
-  // det är INTE en ny debatt och ska inte tära på kvoten en gång till — dock får
-  // samma debattId bara ETT sådant gratispass (MAX_GRATIS_OMFORSOK_PER_DEBATT) innan
-  // den räknas som ny igen, så ett server-okontrollerat booleskt fält (den tidigare
-  // omforsok:true-varianten) inte kan missbrukas till obegränsade gratis AI-anrop
-  // (Codex P1, PR #1287).
-  const isFirstCall = !Array.isArray(historik) || historik.length === 0;
-  if (isFirstCall && !konsumeraGratisOmforsok(ip, debattIdSafe)) {
-    const info = getRateLimitInfo(ip);
-    if (info.remaining <= 0) {
-      const minutesLeft = info.resetAt ? Math.ceil((info.resetAt - Date.now()) / 60000) : 10;
-      logFel({ kalla: "chatt", feltyp: "rate_limit", meddelande: "429 rate limit direktdebatt", ip, extra: { minutesLeft } });
-      return Response.json({ error: "rate_limit", remaining: 0, resetAt: info.resetAt, minutesLeft }, { status: 429 });
+  // typ="nyhetsanalys" (från /nyhetskallor) är ett fristående enskilt agentsvar på en
+  // vald nyhet, inte en flertursdebatt — den delar INTE Direktdebattens kvot (5
+  // debatter/10 min). Väljer en besökare 5 agenter för samma nyhet skulle det annars
+  // tömma hela debattkvoten på en enda nyhetsanalys. Egen, lättare gräns istället.
+  if (typ === "nyhetsanalys") {
+    const rl = checkRateLimit(request, "nyhetsanalys", 20, 10 * 60 * 1000);
+    if (!rl.ok) {
+      logFel({ kalla: "chatt", feltyp: "rate_limit", meddelande: "429 rate limit nyhetsanalys", ip, extra: { retryAfter: rl.retryAfter } });
+      return Response.json({ error: "rate_limit", remaining: 0, minutesLeft: Math.ceil(rl.retryAfter / 60) }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
     }
-    consumeRateLimit(ip, debattIdSafe);
+  } else {
+    // debattId identifierar EN debattstart hos klienten (genererad en gång i starta(),
+    // återanvänd på ett ev. omförsök av tur 1 efter en avhuggen/tom ström). historik
+    // är fortfarande [] på ett sådant omförsök precis som vid en riktig ny debatt, men
+    // det är INTE en ny debatt och ska inte tära på kvoten en gång till — dock får
+    // samma debattId bara ETT sådant gratispass (MAX_GRATIS_OMFORSOK_PER_DEBATT) innan
+    // den räknas som ny igen, så ett server-okontrollerat booleskt fält (den tidigare
+    // omforsok:true-varianten) inte kan missbrukas till obegränsade gratis AI-anrop
+    // (Codex P1, PR #1287).
+    const isFirstCall = !Array.isArray(historik) || historik.length === 0;
+    if (isFirstCall && !konsumeraGratisOmforsok(ip, debattIdSafe)) {
+      const info = getRateLimitInfo(ip);
+      if (info.remaining <= 0) {
+        const minutesLeft = info.resetAt ? Math.ceil((info.resetAt - Date.now()) / 60000) : 10;
+        logFel({ kalla: "chatt", feltyp: "rate_limit", meddelande: "429 rate limit direktdebatt", ip, extra: { minutesLeft } });
+        return Response.json({ error: "rate_limit", remaining: 0, resetAt: info.resetAt, minutesLeft }, { status: 429 });
+      }
+      consumeRateLimit(ip, debattIdSafe);
+    }
   }
 
   if (!agent || !AGENTER.has(agent))
