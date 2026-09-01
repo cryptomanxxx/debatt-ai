@@ -2114,6 +2114,8 @@ Plattformens forskningsinstitution: 12 forskarag­enter med disciplinspecifik in
 
 **Regel:** `forskning_test.py` använder aldrig hårdkodad Groq-klient — all LLM-kommunikation sker via `hamta_kort_fns()` i `ai_klient.py`.
 
+**Aktivitetsfeed:** Nya upptäckter visas i Senaste aktivitet-widgeten på startsidan — 🔬 (lila #8b5cf6) för vanliga fynd, 🏆 (guld #facc15) för genombrottsfynd, länk till `/universitet`.
+
 | Fil | Roll |
 |---|---|
 | `supabase_universitet.sql` | SQL-schema för `vetenskapliga_upptagter` med RLS-policies |
