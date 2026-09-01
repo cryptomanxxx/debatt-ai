@@ -131,7 +131,7 @@ async function handlePost(request) {
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
-  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, debattId } = body;
+  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, debattId, hoppaOverGroq } = body;
   const isEn = lang === "en";
   // Client re-sends this on every turn (no server-side session state) — validated/capped
   // here too, defense in depth, since the client's own cap isn't trusted.
@@ -219,8 +219,19 @@ REGLER — viktiga:
   };
 
   // ── Try Groq first ──────────────────────────────────────────────────────────────────────────────────────
+  // hoppaOverGroq skickas av klienten bara på ett omförsök efter en avhuggen/tom
+  // Groq-ström (se app/chatt/page.js) — Groqs råa stream kan avbrytas mitt i utan
+  // att HTTP-anropet självt misslyckas (groqRes.ok är fortfarande true), så ett
+  // vanligt omförsök hamnar annars i Groq igen och riskerar samma avbrott en gång
+  // till. Fallback-leverantörerna nedan hämtar hela svaret i ett enda icke-
+  // strömmande anrop och kan därför strukturellt inte klippas av mitt i en mening.
+  // Säkert att låta klienten styra — påverkar bara VILKEN leverantör som svarar,
+  // inte kvoten eller något annat säkerhetsrelevant (till skillnad från den
+  // tidigare omforsok-flaggan, se Codex P1, PR #1287).
   let groqFailReason = "";
-  if (!process.env.GROQ_API_KEY) {
+  if (hoppaOverGroq) {
+    groqFailReason = "Groq överhoppad (omförsök efter avhuggen ström)";
+  } else if (!process.env.GROQ_API_KEY) {
     groqFailReason = "GROQ_API_KEY saknas";
   } else if (!groqReady()) {
     groqFailReason = `Groq rate-limited (reset: ${ps.groq.resetAt ?? "okänt"})`;

@@ -191,11 +191,11 @@ function arTroligenAvbruten(text) {
   return !/[.!?…][”"')\]]*$/.test(t);
 }
 
-async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfattning, debattId, onToken, signal, onRateLimit, onProvider }) {
+async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfattning, debattId, hoppaOverGroq, onToken, signal, onRateLimit, onProvider }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amne, historik, agent, artikelTitel, artikelSammanfattning, debattId }),
+    body: JSON.stringify({ amne, historik, agent, artikelTitel, artikelSammanfattning, debattId, hoppaOverGroq }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -539,6 +539,12 @@ export default function ChattPage() {
             amne: valtAmne, historik: h, agent, signal: abort.signal,
             artikelTitel: artikel?.titel, artikelSammanfattning: artikel?.sammanfattning,
             debattId: kvotId,
+            // Groqs råa ström kan avbrytas mitt i utan att själva HTTP-anropet
+            // misslyckas — ett omförsök mot Groq igen riskerar samma avbrott en
+            // gång till. Fallback-leverantörerna hämtar hela svaret i ett enda
+            // icke-strömmande anrop och kan strukturellt inte klippas av på samma
+            // sätt, så ett omförsök hoppar förbi Groq och går direkt dit.
+            hoppaOverGroq: forsok > 0,
             onToken: (t) => {
               if (!gotFirst) { gotFirst = true; setTänker(false); }
               setStreaming({ agent, text: t });
