@@ -10,6 +10,7 @@ const TILLÅTNA_DOMÄNER = [
   "reddit.com", "old.reddit.com",
   "youtube.com",
   "coindesk.com",
+  "arxiv.org",
 ];
 
 export async function GET(request) {
