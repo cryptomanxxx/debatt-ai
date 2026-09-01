@@ -1,7 +1,34 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
-const ANCHOR_FARG = "#a0c8f0";
+// Per-agent overlay-konfiguration. Anna har fullständiga blink+mun-frames
+// (samma som /kanal). Andra agenter (t.ex. Nationalekonomen från /podd) har
+// bara fyra munlägen utan blink-varianter — hasBlink: false hoppar över
+// ögonanimationen och visar bara idle/mun-frames.
+const AGENTER = {
+  Anna: {
+    farg: "#a0c8f0",
+    roll: "Nyhetsankare",
+    rvVoice: "Swedish Female",
+    pitch: 1.0,
+    rate: 1.0,
+    hasBlink: true,
+    mouthOpen:   ["anna.png", "anna-small.png", "anna-medium.png", "anna-large.png"],
+    mouthHalf:   ["anna-m0-half.png", "anna-m1-half.png", "anna-m2-half.png", "anna-m3-half.png"],
+    mouthClosed: ["anna-m0-closed.png", "anna-m1-closed.png", "anna-m2-closed.png", "anna-m3-closed.png"],
+    idleOpen: "anna.png", idleHalf: "anna-m0-half.png", idleClosed: "anna-m0-closed.png",
+  },
+  Nationalekonom: {
+    farg: "#6abf6a",
+    roll: "Nationalekonom",
+    rvVoice: "Swedish Male",
+    pitch: 0.85,
+    rate: 0.88,
+    hasBlink: false,
+    mouthOpen: ["nationalekonom.png", "nationalekonom-small.png", "nationalekonom-medium.png", "nationalekonom-large.png"],
+    idleOpen: "nationalekonom.png",
+  },
+};
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -56,7 +83,7 @@ function useAmplitude(isSpeaking) {
   return amplitudeRef;
 }
 
-function WaveformBar({ isSpeaking, isThinking }) {
+function WaveformBar({ isSpeaking, isThinking, farg }) {
   const canvasRef = useRef(null);
   const amplitudeRef = useAmplitude(isSpeaking);
 
@@ -81,8 +108,10 @@ function WaveformBar({ isSpeaking, isThinking }) {
           const scale = 0.6 + 0.4 * (0.5 + 0.5 * Math.sin(phase));
           ctx.beginPath();
           ctx.arc(startX + d * (dotR * 2 + 10) + dotR, cy, dotR * scale, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(160, 200, 240, ${opacity})`;
+          ctx.fillStyle = farg;
+          ctx.globalAlpha = opacity;
           ctx.fill();
+          ctx.globalAlpha = 1;
         }
       } else {
         for (let b = 0; b < BARS; b++) {
@@ -90,27 +119,24 @@ function WaveformBar({ isSpeaking, isThinking }) {
           const noise = 0.4 + Math.random() * 0.6;
           const height = Math.max(2, (H * amp * noise) * (isSpeaking ? 1 : 0.12));
           const x = b * (barW + GAP), y = (H - height) / 2;
-          ctx.fillStyle = "rgba(160, 200, 240, 0.85)";
+          ctx.fillStyle = farg;
+          ctx.globalAlpha = 0.85;
           ctx.beginPath();
           ctx.roundRect(x, y, barW, height, 2);
           ctx.fill();
+          ctx.globalAlpha = 1;
         }
       }
       frameId = requestAnimationFrame(draw);
     };
     frameId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frameId);
-  }, [isSpeaking, isThinking, amplitudeRef]);
+  }, [isSpeaking, isThinking, amplitudeRef, farg]);
 
   return <canvas ref={canvasRef} width={240} height={12} style={{ width: "100%", height: "12px", display: "block" }} />;
 }
 
-// Open-eye mouth frames: anna.png (m0), anna-small.png (m1), anna-medium.png (m2), anna-large.png (m3)
-const MOUTH_OPEN   = ["anna.png", "anna-small.png", "anna-medium.png", "anna-large.png"];
-const MOUTH_HALF   = ["anna-m0-half.png", "anna-m1-half.png", "anna-m2-half.png", "anna-m3-half.png"];
-const MOUTH_CLOSED = ["anna-m0-closed.png", "anna-m1-closed.png", "anna-m2-closed.png", "anna-m3-closed.png"];
-
-function AnchorImage({ blinkState, isSpeaking }) {
+function AnchorImage({ cfg, blinkState, isSpeaking }) {
   const [mouthIdx, setMouthIdx] = useState(1);
   useEffect(() => {
     if (!isSpeaking) { setMouthIdx(1); return; }
@@ -120,27 +146,33 @@ function AnchorImage({ blinkState, isSpeaking }) {
 
   let src;
   if (isSpeaking) {
-    const frames = blinkState === "closed" ? MOUTH_CLOSED : blinkState === "half" ? MOUTH_HALF : MOUTH_OPEN;
+    const frames = cfg.hasBlink
+      ? (blinkState === "closed" ? cfg.mouthClosed : blinkState === "half" ? cfg.mouthHalf : cfg.mouthOpen)
+      : cfg.mouthOpen;
     src = `/avatarer/podd/${frames[mouthIdx]}`;
+  } else if (cfg.hasBlink) {
+    src = blinkState === "open" ? `/avatarer/podd/${cfg.idleOpen}`
+        : blinkState === "half" ? `/avatarer/podd/${cfg.idleHalf}`
+        : `/avatarer/podd/${cfg.idleClosed}`;
   } else {
-    src = blinkState === "open" ? `/avatarer/podd/anna.png`
-        : blinkState === "half" ? `/avatarer/podd/anna-m0-half.png`
-        : `/avatarer/podd/anna-m0-closed.png`;
+    src = `/avatarer/podd/${cfg.idleOpen}`;
   }
 
-  return <img src={src} alt="Anna" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }} />;
+  return <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }} />;
 }
 
-// Fristående overlay som visar Anna (video + röst) precis som på /kanal, men
-// för en enskild nyhet i taget istället för en löpande sändning. Ett enda
-// instans monteras i taget från NyhetskallorClient (key=nyhet-id tvingar en
-// ren remount — och därmed cancel() av föregående uppläsning — när besökaren
-// klickar "Anna läser" på en annan nyhet medan overlayen redan är öppen).
-export default function AnnaOverlay({ text, onClose }) {
+// Fristående overlay som visar en agent (video + röst) precis som på /kanal
+// och /podd, men för en enskild nyhet i taget istället för en löpande
+// sändning eller debatt. Ett enda instans monteras i taget från
+// NyhetskallorClient (key=`${nyhet-id}-${agent}` tvingar en ren remount —
+// och därmed cancel() av föregående uppläsning — när besökaren klickar en
+// annan nyhets eller agents läs-knapp medan overlayen redan är öppen).
+export default function AgentOverlay({ agent, text, onClose }) {
+  const cfg = AGENTER[agent] || AGENTER.Anna;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(true);
   const running = isSpeaking || isThinking;
-  const blinkState = useBlinkState(true);
+  const blinkState = useBlinkState(cfg.hasBlink);
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -150,9 +182,9 @@ export default function AnnaOverlay({ text, onClose }) {
       setIsThinking(false);
       return;
     }
-    window.responsiveVoice.speak(text, "Swedish Female", {
-      rate: 1.0,
-      pitch: 1.0,
+    window.responsiveVoice.speak(text, cfg.rvVoice, {
+      rate: cfg.rate,
+      pitch: cfg.pitch,
       onstart: () => { setIsThinking(false); setIsSpeaking(true); },
       onend:   () => { setIsSpeaking(false); onClose(); },
       onerror: () => { setIsSpeaking(false); onClose(); },
@@ -174,7 +206,7 @@ export default function AnnaOverlay({ text, onClose }) {
     >
       <div onClick={e => e.stopPropagation()} style={{ width: "min(380px, 92vw)" }}>
         <div style={{ position: "relative", borderRadius: "12px", overflow: "hidden", border: "1px solid #1a1a1a", aspectRatio: "4/3", background: "#050505" }}>
-          <AnchorImage blinkState={blinkState} isSpeaking={isSpeaking} />
+          <AnchorImage cfg={cfg} blinkState={blinkState} isSpeaking={isSpeaking} />
 
           <div style={{
             position: "absolute", top: "12px", left: "12px",
@@ -192,10 +224,10 @@ export default function AnnaOverlay({ text, onClose }) {
           </div>
 
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.85))", padding: "20px 14px 10px" }}>
-            <div style={{ fontSize: "20px", fontWeight: 400, lineHeight: 1, color: ANCHOR_FARG }}>Anna</div>
-            <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", marginTop: "2px" }}>Nyhetsankare</div>
+            <div style={{ fontSize: "20px", fontWeight: 400, lineHeight: 1, color: cfg.farg }}>{agent}</div>
+            <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", marginTop: "2px" }}>{cfg.roll}</div>
             <div style={{ marginTop: "8px" }}>
-              <WaveformBar isSpeaking={isSpeaking} isThinking={isThinking} />
+              <WaveformBar isSpeaking={isSpeaking} isThinking={isThinking} farg={cfg.farg} />
             </div>
           </div>
         </div>
