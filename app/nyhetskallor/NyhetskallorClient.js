@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import LyssnaKnapp from "../LyssnaKnapp";
+import AnnaOverlay from "./AnnaOverlay";
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
@@ -170,7 +170,7 @@ function AgentAnalysPanel({ n, expanderad, onToggle, valda, onToggleAgent, analy
   );
 }
 
-function NyhetsRad({ n, status, onForesla, analysProps }) {
+function NyhetsRad({ n, status, onForesla, onAnnaLas, analysProps }) {
   return (
     <div style={{ padding: "16px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", marginBottom: "10px" }}>
       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "6px" }}>
@@ -202,12 +202,12 @@ function NyhetsRad({ n, status, onForesla, analysProps }) {
             {status === "laddar" ? "Skickar…" : "Föreslå för agenterna →"}
           </button>
         )}
-        <LyssnaKnapp
-          text={n.beskrivning ? `${n.rubrik}. ${n.beskrivning}` : n.rubrik}
-          rost="Swedish Female"
-          label="🎙️ Anna läser"
-          style={{ border: `1px solid ${ANNA_FARG}50`, color: ANNA_FARG }}
-        />
+        <button
+          onClick={onAnnaLas}
+          style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${ANNA_FARG}50`, color: ANNA_FARG, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
+        >
+          🎙️ Anna läser
+        </button>
       </div>
       <AgentAnalysPanel n={n} {...analysProps} />
     </div>
@@ -221,6 +221,7 @@ export default function NyhetskallorClient({ nyheter }) {
   const [expanderade, setExpanderade] = useState(() => new Set());
   const [valdaAgenter, setValdaAgenter] = useState({}); // { [id]: Set<agent> }
   const [analyser, setAnalyser] = useState({}); // { [id]: { [agent]: { status, text } } }
+  const [annaLasning, setAnnaLasning] = useState(null); // { id, text } | null
 
   const filtrerade = useMemo(() => {
     const s = sok.trim().toLowerCase();
@@ -329,6 +330,7 @@ export default function NyhetskallorClient({ nyheter }) {
               n={n}
               status={statusar[n.id]}
               onForesla={() => foreslaNyhet(n)}
+              onAnnaLas={() => setAnnaLasning({ id: n.id, text: n.beskrivning ? `${n.rubrik}. ${n.beskrivning}` : n.rubrik })}
               analysProps={{
                 expanderad: expanderade.has(n.id),
                 onToggle: () => toggleExpand(n.id),
@@ -341,6 +343,9 @@ export default function NyhetskallorClient({ nyheter }) {
           ))
         )}
       </main>
+      {annaLasning && (
+        <AnnaOverlay key={annaLasning.id} text={annaLasning.text} onClose={() => setAnnaLasning(null)} />
+      )}
       <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
     </div>
   );
