@@ -172,6 +172,10 @@ function AgentAnalysPanel({ n, expanderad, onToggle, valda, onToggleAgent, analy
 }
 
 function NyhetsRad({ n, status, onForesla, onAnnaLas, analysProps }) {
+  const [expanderad, setExpanderad] = useState(false);
+  const kortText = (n.beskrivning || "").length > 220;
+  const visadText = expanderad || !kortText ? n.beskrivning : n.beskrivning.slice(0, 220) + "…";
+
   return (
     <div style={{ padding: "16px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", marginBottom: "10px" }}>
       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", marginBottom: "6px" }}>
@@ -185,9 +189,17 @@ function NyhetsRad({ n, status, onForesla, onAnnaLas, analysProps }) {
         {n.rubrik}
       </a>
       {n.beskrivning && (
-        <p style={{ margin: "0 0 10px", fontSize: "13px", color: C.textMuted, lineHeight: 1.6 }}>
-          {n.beskrivning.length > 220 ? n.beskrivning.slice(0, 220) + "…" : n.beskrivning}
+        <p style={{ margin: "0 0 4px", fontSize: "13px", color: C.textMuted, lineHeight: 1.6 }}>
+          {visadText}
         </p>
+      )}
+      {kortText && (
+        <button
+          onClick={() => setExpanderad(e => !e)}
+          style={{ display: "block", background: "transparent", border: "none", color: LANK, fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer", padding: 0, marginBottom: "10px" }}
+        >
+          {expanderad ? "Visa mindre ↑" : "Visa mer ↓"}
+        </button>
       )}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
         {status === "ok" ? (
