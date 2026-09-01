@@ -167,8 +167,9 @@ function AnchorImage({ cfg, blinkState, isSpeaking }) {
 // NyhetskallorClient (key=`${nyhet-id}-${agent}` tvingar en ren remount —
 // och därmed cancel() av föregående uppläsning — när besökaren klickar en
 // annan nyhets eller agents läs-knapp medan overlayen redan är öppen).
-export default function AgentOverlay({ agent, text, onClose }) {
+export default function AgentOverlay({ agent, namn, text, onClose }) {
   const cfg = AGENTER[agent] || AGENTER.Anna;
+  const visningsnamn = namn || agent;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(true);
   const running = isSpeaking || isThinking;
@@ -224,7 +225,7 @@ export default function AgentOverlay({ agent, text, onClose }) {
           </div>
 
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.85))", padding: "20px 14px 10px" }}>
-            <div style={{ fontSize: "20px", fontWeight: 400, lineHeight: 1, color: cfg.farg }}>{agent}</div>
+            <div style={{ fontSize: "20px", fontWeight: 400, lineHeight: 1, color: cfg.farg }}>{visningsnamn}</div>
             <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", marginTop: "2px" }}>{cfg.roll}</div>
             <div style={{ marginTop: "8px" }}>
               <WaveformBar isSpeaking={isSpeaking} isThinking={isThinking} farg={cfg.farg} />
