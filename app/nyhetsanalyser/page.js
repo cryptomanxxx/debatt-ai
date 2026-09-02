@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AGENT_VISUELL } from "../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
@@ -47,6 +47,12 @@ export default function NyhetsanalyserPage() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(null);
+  // Codex-fynd (PR #1319): utan detta kan ett byte av agentFilter medan en
+  // tidigare fetch fortfarande är i luften låta det GAMLA svaret landa efter
+  // det nya och skriva över/lägga till fel agents rader — dropdownen visar
+  // ett filter medan listan innehåller ett annat. abortRef håller den senast
+  // startade requestens controller; en ny load() avbryter alltid föregående.
+  const abortRef = useRef(null);
 
   const buildQuery = useCallback((pageIdx, currentAgent) => {
     const offset = pageIdx * PAGE_SIZE;
@@ -56,23 +62,30 @@ export default function NyhetsanalyserPage() {
   }, []);
 
   const load = useCallback(async (pageIdx, currentAgent, reset = false) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
     try {
       const q = buildQuery(pageIdx, currentAgent);
-      const res = await fetch(q, { headers: { ...sbH(), Prefer: "count=exact" } });
+      const res = await fetch(q, { headers: { ...sbH(), Prefer: "count=exact" }, signal: controller.signal });
       const cr = res.headers.get("Content-Range");
       if (cr) {
         const tot = parseInt(cr.split("/")[1]);
         if (!isNaN(tot)) setTotal(tot);
       }
       const data = await res.json();
-      if (!Array.isArray(data)) { setLoading(false); return; }
+      if (!Array.isArray(data)) return;
       setRows(prev => reset ? data : [...prev, ...data]);
       setHasMore(data.length === PAGE_SIZE);
+    } catch (e) {
+      if (e.name === "AbortError") return; // ersatt av en nyare request — den äger loading-state nu
     } finally {
-      setLoading(false);
+      if (abortRef.current === controller) setLoading(false);
     }
   }, [buildQuery]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
     setPage(0);
