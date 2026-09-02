@@ -247,7 +247,7 @@ function NyhetsRad({ n, status, onForesla, onLas, onStudio, analysProps }) {
   );
 }
 
-export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize = 150 }) {
+export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize = 150, order = "hamtad.desc,id.desc" }) {
   const [nyheter, setNyheter] = useState(initialNyheter);
   // Vi hämtade en full sida vid SSR → det KAN finnas fler äldre rader att
   // ladda. Om SSR-fetchen misslyckats/gett tomt vet vi inte om det beror på
@@ -270,12 +270,23 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
   // för offset — offset skulle kunna hoppa över eller dubblettvisa rader om
   // nyhetsflode_test.py skriver nya rader mellan två "Ladda fler"-klick,
   // eftersom offset räknas mot en tabell som hela tiden växer i toppen.
+  //
+  // Codex-fynd (PR #1319): en ren hamtad-cursor är inte entydig — Postgres
+  // now() fryser till EN tidsstämpel per INSERT-sats, och nyhetsflode_test.py
+  // skriver batchar på upp till 200 rader åt gången, så flera rader kan dela
+  // exakt samma hamtad-värde. `hamtad=lt.<X>` exkluderar då ALLA rader med
+  // det värdet, inklusive de som inte fick plats på förra sidan — de skulle
+  // aldrig kunna laddas. id (bigserial, monotont) som sekundär cursor-nyckel
+  // (samma NYHETSFLODE_ORDER som SSR-fetchen i page.js) gör gränsen entydig:
+  // "hamtad < X, ELLER hamtad = X och id < senaste id".
   async function laddaFler() {
     if (laddarMer || !harMer || nyheter.length === 0) return;
     setLaddarMer(true);
     try {
-      const sistaHamtad = nyheter[nyheter.length - 1].hamtad;
-      const url = `${SB_URL}/rest/v1/nyhetsflode?select=id,rubrik,beskrivning,kalla,url,publicerad,kategori,hamtad&order=hamtad.desc&hamtad=lt.${encodeURIComponent(sistaHamtad)}&limit=${pageSize}`;
+      const sista = nyheter[nyheter.length - 1];
+      const h = encodeURIComponent(sista.hamtad);
+      const cursor = `or=(hamtad.lt.${h},and(hamtad.eq.${h},id.lt.${sista.id}))`;
+      const url = `${SB_URL}/rest/v1/nyhetsflode?select=id,rubrik,beskrivning,kalla,url,publicerad,kategori,hamtad&order=${order}&${cursor}&limit=${pageSize}`;
       const res = await fetch(url, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } });
       const fler = res.ok ? await res.json() : [];
       setNyheter(prev => [...prev, ...fler]);
