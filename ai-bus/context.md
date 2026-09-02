@@ -62,14 +62,28 @@ Stack: Next.js App Router, Supabase, Groq (primär AI), Gemini Flash (fallback),
 
 ## Bildmappning för Anna (`/public/avatarer/podd/`)
 
-Sedan sep 2026 (v3): pixelstabilt bildset där alla 12 frames delar exakt
-samma masterduk — bara den lokala mun-/ögonmasken skiljer sig, huvudet
-hoppar inte mellan frames (0 ändrade pixlar utanför masken, verifierat
-oberoende med pixel-diff). Till skillnad från v1 (aug/sep 2026, samma
-pixelstabila metod men i praktiken näst intill statisk mun — small/medium/
-large var visuellt identiska) har v3 en verifierat tydlig, monotont ökande
-munöppning m0→m1→m2→m3 och genuint slutna ögonlock i closed-frames. Alla
-12 filer finns nu, inklusive m1-half/m1-closed som saknades i v1.
+Sedan sep 2026 (v4): pixelstabilt via lokal ansiktsjustering + kompositering,
+byggt av Claude Code snarare än levererat direkt av en bildgenerator. v1
+(pixelstabil metod, näst intill statisk mun — small/medium/large visuellt
+identiska) och v3 (bra mun-/ögonvariation, PÅSTODS pixelstabil men var det
+inte — Codex-granskning + oberoende pixel-diff visade 50%+ ändrade pixlar i
+pannan/kinderna/näsan mellan frames, dvs. hela ansiktet "skimrade" subtilt
+vid mun-cykling) löste var för sig bara hälften av problemet.
+
+v4-metod: en tredje bildkälla gav frames med genuint bra mun-/ögonvariation
+men (precis som v3) inget delat masterduk — MediaPipe FaceMesh använder
+landmärken (ögonhörn, nästipp, panna — punkter som inte rör sig vid
+mun-/blinkrörelse) för att beräkna en similarity-transform (rotation+skala+
+translation) som geometriskt riktar in varje frames ansikte mot en vald
+masterbild. Ett feathrat ansiktsmask-lager kompositerar bara den inriktade
+ansiktsregionen ovanpå masterbildens OFÖRÄNDRADE bakgrund/hår/axlar.
+Resultat, verifierat oberoende (inte bara självrapporterat): bakgrund/axlar
+= 0 ändrad pixel (max=0) på alla 11 frames mot mastern, garanterat av
+kompositeringen — inte bara påstått. Mun-/ögonvariationen bevaras oförändrad
+från källbilderna (samma metod som gav bra uttryck i det tidigare, icke-
+stabila försöket). Alla 12 filer klassificerades objektivt via landmärke-
+härledda mått (eye aspect ratio, mouth aspect ratio) istället för att gissas
+fram visuellt.
 
 | Position | Öppna ögon | Halvöppna ögon | Stängda ögon |
 |---|---|---|---|
