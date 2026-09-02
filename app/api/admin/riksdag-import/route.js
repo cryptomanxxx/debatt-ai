@@ -37,25 +37,23 @@ function normTitle(s) {
 }
 
 async function getBefintligaData() {
-  // Fail-open: en tillfällig Supabase-hicka (nätverksfel eller trasig JSON)
-  // ska aldrig krascha hela importen — då hade cronen returnerat en tom
-  // generisk HTTP 500 utan JSON-kropp, precis det som gjorde detta fel
-  // odiagnostiserbart tidigare (se riksdag-import.yml-loggarna).
-  try {
-    const r = await fetch(
-      `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&select=riksdagen_id,titel`,
-      { headers: sbHeaders() }
-    );
-    if (!r.ok) return { ids: new Set(), titlar: new Set() };
-    const data = await r.json();
-    return {
-      ids: new Set(data.map(d => d.riksdagen_id).filter(Boolean)),
-      titlar: new Set(data.map(d => normTitle(d.titel)).filter(Boolean)),
-    };
-  } catch (e) {
-    console.error("riksdag-import: getBefintligaData misslyckades:", e);
-    return { ids: new Set(), titlar: new Set() };
-  }
+  // Får INTE fail-opena till tomma Set:ar: riksdagen_id har ett DB-constraint
+  // (UNIQUE) så ID-dedup är säker även utan denna data, men titel-dedup
+  // (finnsByTitle) har ingen DB-backing — om vi låtsas att inget finns kan
+  // en proposition och dess motsvarande motion/betänkande med matchande
+  // normaliserad titel men olika dok_id båda importeras som synliga
+  // dubbletter på /parlament. Kastar hellre och låter POST-handlerns
+  // toppnivå-catch avbryta hela importen med ett tydligt felsvar.
+  const r = await fetch(
+    `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&select=riksdagen_id,titel`,
+    { headers: sbHeaders() }
+  );
+  if (!r.ok) throw new Error(`getBefintligaData: Supabase HTTP ${r.status}`);
+  const data = await r.json();
+  return {
+    ids: new Set(data.map(d => d.riksdagen_id).filter(Boolean)),
+    titlar: new Set(data.map(d => normTitle(d.titel)).filter(Boolean)),
+  };
 }
 
 function byggUrl(d) {
@@ -320,6 +318,16 @@ async function körImport() {
       console.error(`riksdag-import: skrivning misslyckades för "${d.titel?.slice(0, 60)}":`, e);
       fel.push(d.titel?.slice(0, 40));
     }
+  }
+
+  // Om det fanns förslag att skriva men INGET skrivförsök lyckades (varken
+  // nya poster eller omkategoriseringar) är det ett tecken på ett systemfel
+  // (t.ex. Supabase helt onåbart) snarare än enstaka dubbletter/valideringsfel
+  // — cronen (riksdag-import.yml) tolkar bara icke-200 som fel, så ett "tyst"
+  // 200-svar hade dolt en fullständig utebliven import.
+  const alltMisslyckades = forslag.length > 0 && importerade === 0 && omkategoriserade === 0 && fel.length === forslag.length;
+  if (alltMisslyckades) {
+    return NextResponse.json({ error: "Alla skrivningar misslyckades", importerade, omkategoriserade, totalt: forslag.length, metod, fel }, { status: 502 });
   }
 
   return NextResponse.json({ importerade, omkategoriserade, totalt: forslag.length, metod, fel });
