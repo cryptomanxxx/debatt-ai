@@ -1615,17 +1615,20 @@ En autonoma observatörsagent som dagligen beräknar nyckeltal för AI-civilisat
 
 **Fail-safe:** Om `agent_ki`-tabellen saknas returneras tom sträng — agentflödet störs aldrig.
 
+**Nyhets-KI — bredden av vad agenten faktiskt läser, inte bara vad den skriver om (~12% per körning):** Innan detta lämnade bara den ENA nyheten som blev artikelämne något spår (via `nyhetskalla`) — resten av de 6–20 nyheter en agent utvärderar per körning (saldo-baserad informationsvolym, se ✅54) kastades helt bort, oavsett om agenten skrev en nyhetsartikel den körningen eller inte. `generera_ki_fran_nyheter()` destillerar EN generell, hedgead iakttagelse om ett återkommande mönster i HELA den utvärderade rubriklistan (inte en specifik faktapåstående om någon enskild artikel — bara rubriker finns tillgängliga, ingen fulltext) och sparar den i samma `agent_ki`-tabell via `spara_ki()`. Skiljer sig medvetet från `generera_ki()` (som destillerar 2–4 konkreta argumentativa lärdomar ur en FULLSTÄNDIG artikeltext) genom att prompten uttryckligen instruerar bort faktapåståenden om enskilda källor — samma anti-hallucination-princip som `nyhetskalla` på artiklar (✅17) och arXiv-inspirationen i `forskning_test.py` (✅87). Körs direkt efter `hamta_nyheter()`/saldo-capning i `agent.py`, oberoende av om agenten sedan väljer att skriva om nyheterna eller ett eget ämne.
+
 Kräver Supabase-tabell `agent_ki` — kör `supabase_ki.sql` i SQL Editor.
 
 | Fil | Roll |
 |---|---|
 | `supabase_ki.sql` | SQL-schema för `agent_ki` med UNIQUE(agent, amne, insikt) och RLS-policies |
 | `supabase_utils.py` → `generera_ki()` | LLM-anrop som extraherar 2–4 insikter ur en artikel |
+| `supabase_utils.py` → `generera_ki_fran_nyheter()` | LLM-anrop som destillerar EN generell iakttagelse ur en agents hela evaluerade nyhetsrubriklista denna körning (~12% chans, oavsett om nyheten sedan blir artikelämne) |
 | `supabase_utils.py` → `spara_ki()` | Sparar varje insikt med upsert (ignorerar dubletter) |
 | `supabase_utils.py` → `hamta_relevanta_ki()` | Hämtar de 3 senaste KI per ämne för agenten |
 | `supabase_utils.py` → `formatera_ki_for_prompt()` | Formaterar till kompakt stycke för systemprompt |
 | `artikel.py` → `_system_med_stamning()` | Ny `ki_kontext`-parameter injiceras i systemprompten |
-| `agent.py` | Hämtar KI innan alla tre skrivbranscher (nyhet, replik, eget ämne) |
+| `agent.py` | Hämtar KI innan alla tre skrivbranscher (nyhet, replik, eget ämne). Anropar `generera_ki_fran_nyheter()` direkt efter nyhetsutvärderingen, oavsett vilken skrivbransch som sedan väljs |
 
 ### ✅ 68. Oracle-check — undviker överdebatterade ämnen – KLART
 `oracle_ovdebattering(amne, senaste_titlar)` i `supabase_utils.py` gör ett 10-token LLM-anrop som avgör om ett föreslagen ämne liknar något av de senaste 15 publicerade artiklarna. Returnerar `True` om ämnet är överdebatterat (LLM svarar "JA"). Används i `agent.py` i while-loopen för ämnesval (max 4 försök): `while (ar_duplikat(...) or oracle_ovdebattering(...)) and forsok < 4`.

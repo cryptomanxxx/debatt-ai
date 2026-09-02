@@ -1559,6 +1559,47 @@ def generera_ki_fran_svar(sb_key: str, agent_namn: str, fraga: str, svar: str, t
         spara_ki(sb_key, agent_namn, typ, f"[{_date.today().isoformat()}] {svar[:240]}")
 
 
+def generera_ki_fran_nyheter(agent_namn: str, nyheter: list[dict]) -> list[dict]:
+    """Destillerar EN generell iakttagelse ur nyhetsrubriker en agent utvärderat den här
+    körningen — oavsett om agenten sedan skriver om någon av dem eller ej. Utan detta
+    försvann all bredd agenten faktiskt "läser" varje körning spårlöst (bara den enda
+    valda nyheten lämnade tidigare något spår, via nyhetskalla på artikeln).
+
+    Skiljer sig medvetet från generera_ki() (som destillerar ur en FULLSTÄNDIG artikeltext,
+    så kan extrahera konkreta argumentativa lärdomar): här finns bara rubriker tillgängliga,
+    så prompten instruerar uttryckligen bort specifika faktapåståenden om enskilda artiklar
+    — bara en generell, hedgead reflektion om ett återkommande mönster/tema i det agenten
+    skummat igenom. Samma anti-hallucination-princip som nyhetskalla på artiklar (✅17) och
+    arXiv-inspirationen i forskning_test.py (✅87): grunda dig bara i det som faktiskt gavs."""
+    import re as _re, json as _json
+    rubriker = "\n".join(
+        f"- [{n.get('kalla', '?')}] {n['rubrik']}" for n in nyheter[:15] if n.get("rubrik")
+    )
+    if not rubriker:
+        return []
+    system = "Du är en debattanalytiker. Svara ALLTID som JSON-array och inget annat."
+    prompt = (
+        f"Agent '{agent_namn}' skummade idag igenom följande nyhetsrubriker (utan att "
+        f"nödvändigtvis skriva om någon av dem):\n\n{rubriker}\n\n"
+        "Destillera EN kort iakttagelse om ett återkommande mönster eller tema du märker "
+        "i denna nyhetsbild. Detta är INTE ett faktapåstående om en enskild artikel — du "
+        "har bara sett rubriken, inte texten — utan en generell, försiktig reflektion om "
+        "vad som verkar hända i omvärlden just nu, i första person. Om inget tydligt "
+        "mönster finns bland rubrikerna: returnera en tom lista.\n\n"
+        'Format (JSON-array, inget annat): [{"amne": "kort ämnesord (max 60 tecken)", '
+        '"insikt": "generell iakttagelse, hedgead (max 200 tecken)"}]'
+    )
+    svar = _llm_spel(system, prompt, max_tokens=180)
+    try:
+        m = _re.search(r'\[.*\]', svar, _re.DOTALL)
+        if m:
+            data = _json.loads(m.group())
+            return [d for d in data if d.get("amne") and d.get("insikt")][:1]
+    except Exception:
+        pass
+    return []
+
+
 def _hamta_extern_kontext_py(fraga: str, typ: str = "general") -> str:
     """Hämtar aktuella nyheter/data från omvärlden baserat på frågans ämne.
     Returnerar formatterad sträng att injicera som extern kontext, eller '' vid ej relevant fråga."""
