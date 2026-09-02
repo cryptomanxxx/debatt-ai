@@ -375,11 +375,6 @@ REDDIT_GRUPPER: list[tuple[str, list[str]]] = [
     ("Reddit-grupp: Spel",                    ["gaming", "Games", "television"]),
 ]
 
-# Hur många poster som hämtas ur varje Reddit-grupp — proportionellt mot
-# gruppens storlek (annars skulle en grupp med 5 hopslagna subs bara ge lika
-# många poster totalt som en enda sub gav innan sammanslagningen).
-REDDIT_GRUPP_TAK: dict[str, int] = {label: min(10 * len(subs), 50) for label, subs in REDDIT_GRUPPER}
-
 _REDDIT_SUB_RE = re.compile(r"reddit\.com/r/([A-Za-z0-9_]+)/comments/", re.IGNORECASE)
 
 
@@ -391,6 +386,37 @@ def _reddit_kalla_for_url(url: str, fallback: str) -> str:
     if not m:
         return fallback
     return REDDIT_UNDER_KALLOR.get(m.group(1).lower(), fallback)
+
+
+def _reddit_grupp_kvoterad(items, ns):
+    """Reddits multireddit-RSS interfolierar poster från alla medlemssubs i
+    EN tidsordnad lista. Codex-fynd (PR #1318): ett globalt tak på den
+    hopslagna listan (t.ex. de första 50 posterna totalt) kan låta en enda
+    högaktiv subreddit i gruppen dominera hela taket och tränga ut en
+    tystare medlem helt — till skillnad från innan sammanslagningen då
+    varje subreddit garanterat fick upp till 10 platser oavsett hur aktiva
+    de andra var. Denna pre-pass läser bara ut länken (billigt, ingen full
+    parsning) per post, avgör den RIKTIGA ursprungskällan, och behåller max
+    10 poster per ursprunglig subreddit — i feedens egen tidsordning —
+    INNAN huvudloopens fullständiga per-post-bearbetning körs. Ger samma
+    per-källa-rättvisa som innan, bara med 7 HTTP-anrop istället för 31."""
+    ATOM = "http://www.w3.org/2005/Atom"
+    raknare: dict[str, int] = {}
+    behall = []
+    for item in items:
+        link_el = _forsta_traff(item.find("link"), item.find("atom:link", ns), item.find(f"{{{ATOM}}}link"))
+        url = ""
+        if link_el is not None:
+            if link_el.text and link_el.text.strip():
+                url = link_el.text.strip()
+            elif link_el.get("href"):
+                url = link_el.get("href", "")
+        kalla = _reddit_kalla_for_url(url, "?")
+        if raknare.get(kalla, 0) >= 10:
+            continue
+        raknare[kalla] = raknare.get(kalla, 0) + 1
+        behall.append(item)
+    return behall
 
 
 # Kategorier för YouTube-källor — nyckeln är kanalnamnet UTAN "YouTube: "-prefixet
@@ -486,7 +512,7 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         # Reddit — 7 grupperade multi-subreddit-flöden istället för 31
         # separata anrop (se REDDIT_GRUPPER ovan i filen). Varje post taggas
         # om till sin riktiga individuella källa efter fetch.
-        *[(label, _p(f"https://www.reddit.com/r/{'+'.join(subs)}/.rss?limit=50")) for label, subs in REDDIT_GRUPPER],
+        *[(label, _p(f"https://www.reddit.com/r/{'+'.join(subs)}/.rss?limit=100")) for label, subs in REDDIT_GRUPPER],
         # Tech
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
         ("TechCrunch",         _p("https://techcrunch.com/feed/")),
@@ -557,8 +583,12 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
             if not items:
                 snippet = res.text[:200].strip().replace("\n", " ")
                 print(f"  ⚠ {kalla}: 0 items — HTTP {res.status_code}, content-type={res.headers.get('content-type','?')!r}, snippet={snippet!r}", file=sys.stderr)
-            max_items = REDDIT_GRUPP_TAK.get(kalla, 10)
-            for item in items[:max_items]:
+            # Reddit-grupper: kvotera per ursprunglig subreddit (max 10 var,
+            # se _reddit_grupp_kvoterad) istället för att bara klippa av den
+            # hopslagna listan — annars kan en enda aktiv medlemssub tränga
+            # ut en tystare helt. Övriga feeds: oförändrat items[:10].
+            valda_items = _reddit_grupp_kvoterad(items, ns) if kalla.startswith("Reddit-grupp:") else items[:10]
+            for item in valda_items:
                 title = _forsta_traff(item.find("title"),
                                        item.find(f"{{{ATOM}}}title"),
                                        item.find("atom:title", ns))
