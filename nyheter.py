@@ -64,9 +64,18 @@ def hamta_kryptodata() -> str:
 _VERCEL_URL = os.getenv("VERCEL_URL", "https://www.debatt-ai.se")
 _YT_SECRET  = os.getenv("YOUTUBE_PROXY_SECRET", "")
 
+# app/api/youtube-transcript/route.js svarar 401 av två olika, urskiljbara
+# anledningar (se dess källa: `!SECRET || secret !== SECRET`) — och vilken av
+# dem det är pekar ut EXAKT var felet ska rättas (GitHub Actions-secrets vs.
+# Vercel-miljövariabler). Utan denna åtskillnad var alla 28 videor bara en
+# identisk "HTTP 401"-rad, omöjlig att felsöka på utan att gissa. Visas bara
+# en gång per körning — inte en gång per video — för att inte dränka loggen.
+_yt_401_diagnos_visad = False
+
 
 def _hamta_transkript_via_vercel(video_id: str) -> str:
     """Hämtar YouTube-transkript via Vercel-proxy (undviker GitHub Actions IP-blockering)."""
+    global _yt_401_diagnos_visad
     try:
         url = f"{_VERCEL_URL}/api/youtube-transcript?video_id={video_id}"
         headers = {}
@@ -75,6 +84,28 @@ def _hamta_transkript_via_vercel(video_id: str) -> str:
         res = httpx.get(url, timeout=15, headers=headers)
         if res.status_code == 200:
             return res.json().get("transcript", "")
+        if res.status_code == 401 and not _yt_401_diagnos_visad:
+            _yt_401_diagnos_visad = True
+            if not _YT_SECRET:
+                print(
+                    "  ⚠ YOUTUBE_PROXY_SECRET är TOM i denna GitHub Actions-körning "
+                    "— inget x-proxy-secret-anrop skickas alls, så "
+                    "/api/youtube-transcript avvisar varje anrop per definition. "
+                    "Fix: lägg till/kontrollera secreten YOUTUBE_PROXY_SECRET under "
+                    "GitHub → repo Settings → Secrets and variables → Actions.",
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    "  ⚠ YOUTUBE_PROXY_SECRET skickades men avvisades (401) — "
+                    "värdet i GitHub Actions-secreten matchar INTE "
+                    "YOUTUBE_PROXY_SECRET i Vercels miljövariabler (eller så "
+                    "saknas den där helt). Fix: synka exakt samma värde på båda "
+                    "ställen — GitHub → repo Settings → Secrets and variables → "
+                    "Actions → YOUTUBE_PROXY_SECRET, och Vercel → Project → "
+                    "Settings → Environment Variables → YOUTUBE_PROXY_SECRET.",
+                    file=sys.stderr,
+                )
         print(f"  ✗ Vercel transcript proxy HTTP {res.status_code} för {video_id}", file=sys.stderr)
         return ""
     except Exception as e:

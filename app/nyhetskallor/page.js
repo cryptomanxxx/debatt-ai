@@ -14,10 +14,17 @@ export const metadata = {
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// Måste matcha PAGE_SIZE i NyhetskallorClient.js — sidan hämtar bara den
+// FÖRSTA sidan här (SSR); "Ladda fler"-knappen hämtar resten datumbaserat
+// (hamtad=lt.<senaste laddade tidsstämpel>) client-side. Tidigare en
+// hårdkodad limit=500 utan paginering, vilket dolde all äldre historik och
+// gav en missvisande "500 av 500"-etikett även när fler nyheter fanns.
+export const NYHETSFLODE_PAGE_SIZE = 150;
+
 async function fetchNyhetsflode() {
   try {
     const res = await fetch(
-      `${SB_URL}/rest/v1/nyhetsflode?select=id,rubrik,beskrivning,kalla,url,publicerad,kategori,hamtad&order=hamtad.desc&limit=500`,
+      `${SB_URL}/rest/v1/nyhetsflode?select=id,rubrik,beskrivning,kalla,url,publicerad,kategori,hamtad&order=hamtad.desc&limit=${NYHETSFLODE_PAGE_SIZE}`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" }
     );
     return res.ok ? res.json() : [];
@@ -26,5 +33,5 @@ async function fetchNyhetsflode() {
 
 export default async function NyhetskallorPage() {
   const nyheter = await fetchNyhetsflode();
-  return <NyhetskallorClient nyheter={nyheter} />;
+  return <NyhetskallorClient nyheter={nyheter} pageSize={NYHETSFLODE_PAGE_SIZE} />;
 }

@@ -5,6 +5,9 @@ import StudioOverlay from "./StudioOverlay";
 import NyhetsTicker from "./NyhetsTicker";
 import NastaHamtningRaknare from "./NastaHamtningRaknare";
 
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
   accent: "#f8fafc", accentDim: "#aaaaaa",
@@ -244,7 +247,14 @@ function NyhetsRad({ n, status, onForesla, onLas, onStudio, analysProps }) {
   );
 }
 
-export default function NyhetskallorClient({ nyheter }) {
+export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize = 150 }) {
+  const [nyheter, setNyheter] = useState(initialNyheter);
+  // Vi hämtade en full sida vid SSR → det KAN finnas fler äldre rader att
+  // ladda. Om SSR-fetchen misslyckats/gett tomt vet vi inte om det beror på
+  // att tabellen är tom eller ett nätverksfel — döljer hellre knappen än
+  // visar den mot en trasig fetch, den kan visas igen efter en omladdning.
+  const [harMer, setHarMer] = useState(initialNyheter.length >= pageSize);
+  const [laddarMer, setLaddarMer] = useState(false);
   const [sok, setSok] = useState("");
   const [valdKategori, setValdKategori] = useState(null);
   const [valdKalla, setValdKalla] = useState(null);
@@ -255,6 +265,27 @@ export default function NyhetskallorClient({ nyheter }) {
   const [analyser, setAnalyser] = useState({}); // { [id]: { [agent]: { status, text } } }
   const [lasning, setLasning] = useState(null); // { id, agent, namn, text } | null
   const [studio, setStudio] = useState(null); // { id, rubrik, beskrivning } | null
+
+  // Datumbaserad paginering (hamtad < senaste laddade tidsstämpel) istället
+  // för offset — offset skulle kunna hoppa över eller dubblettvisa rader om
+  // nyhetsflode_test.py skriver nya rader mellan två "Ladda fler"-klick,
+  // eftersom offset räknas mot en tabell som hela tiden växer i toppen.
+  async function laddaFler() {
+    if (laddarMer || !harMer || nyheter.length === 0) return;
+    setLaddarMer(true);
+    try {
+      const sistaHamtad = nyheter[nyheter.length - 1].hamtad;
+      const url = `${SB_URL}/rest/v1/nyhetsflode?select=id,rubrik,beskrivning,kalla,url,publicerad,kategori,hamtad&order=hamtad.desc&hamtad=lt.${encodeURIComponent(sistaHamtad)}&limit=${pageSize}`;
+      const res = await fetch(url, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } });
+      const fler = res.ok ? await res.json() : [];
+      setNyheter(prev => [...prev, ...fler]);
+      setHarMer(fler.length === pageSize);
+    } catch {
+      setHarMer(false);
+    } finally {
+      setLaddarMer(false);
+    }
+  }
 
   // Källor byggs dynamiskt ur den faktiska datan istället för en hårdkodad
   // lista — det finns ~49 RSS-flöden + 28 YouTube-kanaler, för många och för
@@ -344,6 +375,9 @@ export default function NyhetskallorClient({ nyheter }) {
             <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px" }}>Transparens</p>
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
               <NastaHamtningRaknare />
+              <a href="/nyhetsanalyser" style={{ padding: "6px 14px", border: `1px solid ${LANK}50`, borderRadius: "6px", color: LANK, fontSize: "12px", fontFamily: "monospace", textDecoration: "none", whiteSpace: "nowrap" }}>
+                🔎 Alla analyser →
+              </a>
               <a href="/nyhetskallor/statistik" style={{ padding: "6px 14px", border: `1px solid ${LANK}50`, borderRadius: "6px", color: LANK, fontSize: "12px", fontFamily: "monospace", textDecoration: "none", whiteSpace: "nowrap" }}>
                 📊 Statistik →
               </a>
@@ -396,7 +430,7 @@ export default function NyhetskallorClient({ nyheter }) {
         </div>
 
         <p style={{ fontSize: "12px", color: "#555", fontFamily: "monospace", margin: "0 0 16px" }}>
-          {filtrerade.length} av {nyheter.length} hämtade nyheter
+          {filtrerade.length} av {nyheter.length} laddade nyheter{harMer ? " — fler kan laddas nedan" : ""}
         </p>
 
         {filtrerade.length === 0 ? (
@@ -420,6 +454,18 @@ export default function NyhetskallorClient({ nyheter }) {
               }}
             />
           ))
+        )}
+
+        {harMer && (
+          <div style={{ textAlign: "center", marginTop: "8px" }}>
+            <button
+              onClick={laddaFler}
+              disabled={laddarMer}
+              style={{ padding: "10px 28px", background: "transparent", border: `1px solid ${C.border}`, color: laddarMer ? C.textMuted : C.text, borderRadius: "8px", fontSize: "12px", fontFamily: "monospace", letterSpacing: "0.08em", cursor: laddarMer ? "default" : "pointer" }}
+            >
+              {laddarMer ? "Laddar…" : "Ladda fler nyheter ↓"}
+            </button>
+          </div>
         )}
       </main>
       {lasning && (
