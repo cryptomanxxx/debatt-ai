@@ -267,6 +267,9 @@ async function körImport() {
 
   let importerade = 0;
   let omkategoriserade = 0;
+  let skrivförsök = 0; // räknar faktiska PATCH/POST-anrop — inte samma som forslag.length,
+                        // eftersom rader som redan är kända via titel-dedup hoppas över
+                        // helt (continue) utan att någon skrivning ens försöks.
   const fel = [];
 
   for (const d of forslag) {
@@ -282,7 +285,8 @@ async function körImport() {
     try {
       if (finnsByID || finnsByTitle) {
         if (finnsByID) {
-          await fetch(
+          skrivförsök++;
+          const pr = await fetch(
             `${SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.${encodeURIComponent(d.dok_id)}`,
             {
               method: "PATCH",
@@ -294,11 +298,17 @@ async function körImport() {
               }),
             }
           );
-          omkategoriserade++;
+          // Kollar faktiskt pr.ok istället för att räkna PATCH:en som lyckad
+          // per automatik — annars hade en misslyckad omkategorisering ändå
+          // räknats som framgång, vilket i sin tur hade dolt ett totalt
+          // Supabase-avbrott för alltMisslyckades-kontrollen nedan.
+          if (pr.ok) omkategoriserade++;
+          else fel.push(d.titel?.slice(0, 40));
         }
         continue;
       }
 
+      skrivförsök++;
       const r = await fetch(`${SB_URL}/rest/v1/lagforslag`, {
         method: "POST",
         headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
@@ -320,14 +330,17 @@ async function körImport() {
     }
   }
 
-  // Om det fanns förslag att skriva men INGET skrivförsök lyckades (varken
-  // nya poster eller omkategoriseringar) är det ett tecken på ett systemfel
-  // (t.ex. Supabase helt onåbart) snarare än enstaka dubbletter/valideringsfel
-  // — cronen (riksdag-import.yml) tolkar bara icke-200 som fel, så ett "tyst"
-  // 200-svar hade dolt en fullständig utebliven import.
-  const alltMisslyckades = forslag.length > 0 && importerade === 0 && omkategoriserade === 0 && fel.length === forslag.length;
+  // Om det gjordes skrivförsök men INGET lyckades (varken nya poster eller
+  // omkategoriseringar) är det ett tecken på ett systemfel (t.ex. Supabase
+  // helt onåbart) snarare än enstaka dubbletter/valideringsfel — cronen
+  // (riksdag-import.yml) tolkar bara icke-200 som fel, så ett "tyst"
+  // 200-svar hade dolt en fullständig utebliven import. Jämförs mot
+  // skrivförsök (faktiska PATCH/POST-anrop) — INTE forslag.length, eftersom
+  // rader som hoppas över helt via titel-dedup aldrig blir ett skrivförsök
+  // och annars hade kunnat maskera ett 100%-misslyckande som "inte alla".
+  const alltMisslyckades = skrivförsök > 0 && importerade === 0 && omkategoriserade === 0;
   if (alltMisslyckades) {
-    return NextResponse.json({ error: "Alla skrivningar misslyckades", importerade, omkategoriserade, totalt: forslag.length, metod, fel }, { status: 502 });
+    return NextResponse.json({ error: "Alla skrivningar misslyckades", importerade, omkategoriserade, totalt: forslag.length, skrivförsök, metod, fel }, { status: 502 });
   }
 
   return NextResponse.json({ importerade, omkategoriserade, totalt: forslag.length, metod, fel });
