@@ -16,12 +16,8 @@ export const AGENTER = {
     rate: 1.0,
     hasBlink: true,
     mouthOpen:   ["anna.png", "anna-small.png", "anna-medium.png", "anna-large.png"],
-    // Index 1 (m1) återanvänder m0-frames för blink-varianterna — det
-    // pixelstabila bildsetet (sep 2026) täcker bara m0/m2/m3 för half/closed,
-    // så att referera de gamla anna-m1-*.png (annan upplösning/beskärning)
-    // hade återinfört exakt det "hoppande huvudet"-problemet bildsetet skulle lösa.
-    mouthHalf:   ["anna-m0-half.png", "anna-m0-half.png", "anna-m2-half.png", "anna-m3-half.png"],
-    mouthClosed: ["anna-m0-closed.png", "anna-m0-closed.png", "anna-m2-closed.png", "anna-m3-closed.png"],
+    mouthHalf:   ["anna-m0-half.png", "anna-m1-half.png", "anna-m2-half.png", "anna-m3-half.png"],
+    mouthClosed: ["anna-m0-closed.png", "anna-m1-closed.png", "anna-m2-closed.png", "anna-m3-closed.png"],
     idleOpen: "anna.png", idleHalf: "anna-m0-half.png", idleClosed: "anna-m0-closed.png",
   },
   Nationalekonom: {
