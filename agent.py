@@ -70,6 +70,7 @@ from supabase_utils import (
     generera_stafett_utmaning, spara_stafett_utmaning,
     hamta_stafett_utmaning, markera_stafett_behandlad,
     generera_ki, spara_ki, hamta_relevanta_ki, formatera_ki_for_prompt, hamta_ki_antal,
+    generera_ki_fran_nyheter,
     hamta_agent_strategi, formatera_strategi_for_prompt, uppdatera_strategi,
     hamta_agent_mark, formatera_mark_for_prompt,
     hamta_agent_foretag, formatera_foretag_for_prompt,
@@ -631,6 +632,16 @@ def main():
                 max_nyheter = 6   # begränsad tillgång
             nyheter = nyheter[:max_nyheter]
             print(f"  💰 Informationsvolym: saldo {_saldo:.0f} kr → utvärderar max {max_nyheter} nyheter")
+            # Nyhets-KI (~12% chans): destillerar en generell iakttagelse ur HELA den
+            # utvärderade nyhetslistan — oavsett om agenten sedan skriver om en av dem
+            # eller inte. Utan detta lämnar all bredd agenten faktiskt "läser" varje
+            # körning inget spår; bara den EN valda nyheten gjorde det tidigare.
+            if sb_key and nyheter and random.random() < 0.12:
+                nyhets_ki = generera_ki_fran_nyheter(agent["namn"], nyheter)
+                for ki in nyhets_ki:
+                    spara_ki(sb_key, agent["namn"], ki["amne"], ki["insikt"])
+                if nyhets_ki:
+                    print(f"  📰 Nyhets-KI destillerat: {nyhets_ki[0]['amne']}")
             if nyheter and (force_nyhet or random.random() < 0.5):
                 nyhet = valj_nyhet_med_groq(nyheter, agent)
                 if nyhet and "reddit.com" in nyhet.get("url", ""):
