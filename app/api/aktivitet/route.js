@@ -428,7 +428,7 @@ async function byggFeed() {
       typ: "nyhetsanalys",
       ikon: "🔎",
       text: `${n.agent} analyserade "${rubrik.slice(0, 40)}": "${(n.analys || "").slice(0, 70)}"`,
-      href: "/nyhetskallor",
+      href: "/nyhetsanalyser",
       skapad: n.skapad,
       farg: "#38bdf8",
     });

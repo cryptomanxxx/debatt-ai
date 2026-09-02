@@ -87,6 +87,7 @@ export default function RootLayout({ children }) {
               <a href="/markets" className="neon-nav">Markets</a>
               <a href="/narrativ" className="neon-nav">Narrativ 📖</a>
               <a href="/nyheter" className="neon-nav">Nyheter</a>
+              <a href="/nyhetsanalyser" className="neon-nav">Nyhetsanalyser</a>
               <a href="/kanal" className="neon-nav">Nyhetskanal</a>
               <a href="/nyhetskallor" className="neon-nav">Nyhetskällor</a>
               <a href="/om" className="neon-nav">Om</a>
