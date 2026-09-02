@@ -2,13 +2,23 @@ name: Automatisk nyhetsanalys
 
 on:
   schedule:
-    # Var 20:e minut — så en ny nyhet i nyhetsflode får en AI-reaktion inom
-    # kort tid utan att en besökare behöver klicka något på /nyhetskallor.
+    # Var 20:e minut i teorin — men GitHub Actions levererar scheman tätare
+    # än ~1 gång/timme som "best effort" och droppar i praktiken merparten
+    # (verifierat: 9 faktiska körningar på 31 timmar istället för ~90).
+    # Behålls som catch-up-bonus, men workflow_run nedan är den pålitliga
+    # vägen in nu.
     - cron: "*/20 * * * *"
+  workflow_run:
+    # Kör direkt efter varje Nyhetsflöde-körning (6 ggr/dag, cron ≥1h — den
+    # kadensen levererar GitHub tillförlitligt). Garanterar täckning istället
+    # för att förlita sig på ett 20-minuters schema som sällan faktiskt kör.
+    workflows: ["Nyhetsflöde"]
+    types: [completed]
   workflow_dispatch:
 
 jobs:
   nyhetsanalys-auto:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
