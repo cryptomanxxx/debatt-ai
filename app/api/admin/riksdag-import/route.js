@@ -37,16 +37,25 @@ function normTitle(s) {
 }
 
 async function getBefintligaData() {
-  const r = await fetch(
-    `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&select=riksdagen_id,titel`,
-    { headers: sbHeaders() }
-  );
-  if (!r.ok) return { ids: new Set(), titlar: new Set() };
-  const data = await r.json();
-  return {
-    ids: new Set(data.map(d => d.riksdagen_id).filter(Boolean)),
-    titlar: new Set(data.map(d => normTitle(d.titel)).filter(Boolean)),
-  };
+  // Fail-open: en tillfällig Supabase-hicka (nätverksfel eller trasig JSON)
+  // ska aldrig krascha hela importen — då hade cronen returnerat en tom
+  // generisk HTTP 500 utan JSON-kropp, precis det som gjorde detta fel
+  // odiagnostiserbart tidigare (se riksdag-import.yml-loggarna).
+  try {
+    const r = await fetch(
+      `${SB_URL}/rest/v1/lagforslag?kalla=eq.riksdagen&select=riksdagen_id,titel`,
+      { headers: sbHeaders() }
+    );
+    if (!r.ok) return { ids: new Set(), titlar: new Set() };
+    const data = await r.json();
+    return {
+      ids: new Set(data.map(d => d.riksdagen_id).filter(Boolean)),
+      titlar: new Set(data.map(d => normTitle(d.titel)).filter(Boolean)),
+    };
+  } catch (e) {
+    console.error("riksdag-import: getBefintligaData misslyckades:", e);
+    return { ids: new Set(), titlar: new Set() };
+  }
 }
 
 function byggUrl(d) {
@@ -229,6 +238,19 @@ export async function POST(req) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Toppnivå-skyddsnät: en oväntad kastad exception någonstans i importen
+  // ska aldrig ge Next.js generiska, tomma HTTP 500-svar (utan JSON-kropp) —
+  // det var precis det som gjorde tidigare fel odiagnostiserbara från
+  // riksdag-import.yml-loggarna (cat body.json visade ingenting).
+  try {
+    return await körImport();
+  } catch (e) {
+    console.error("riksdag-import: ofångat fel:", e);
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
+  }
+}
+
+async function körImport() {
   const befintliga = await getBefintligaData();
   let forslag = [];
   let metod = "";
@@ -256,40 +278,48 @@ export async function POST(req) {
     const isBetankande = d.riksdagen_url?.includes("/betankande/");
     const finnsByTitle = !isBetankande && befintliga.titlar.has(normTitle(d.titel));
 
-    if (finnsByID || finnsByTitle) {
-      if (finnsByID) {
-        await fetch(
-          `${SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.${encodeURIComponent(d.dok_id)}`,
-          {
-            method: "PATCH",
-            headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
-            body: JSON.stringify({
-              kategori,
-              beskrivning: d.beskrivning,
-              ...(d.riksdagen_url ? { riksdagen_url: d.riksdagen_url } : {}),
-            }),
-          }
-        );
-        omkategoriserade++;
+    // try/catch per post: ett nätverksfel (inte bara ett icke-OK-svar) på en
+    // enskild Supabase-skrivning ska inte krascha hela importen och ge en
+    // odiagnostiserbar HTTP 500 utan JSON-kropp — resten av listan ska ändå bearbetas.
+    try {
+      if (finnsByID || finnsByTitle) {
+        if (finnsByID) {
+          await fetch(
+            `${SB_URL}/rest/v1/lagforslag?riksdagen_id=eq.${encodeURIComponent(d.dok_id)}`,
+            {
+              method: "PATCH",
+              headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
+              body: JSON.stringify({
+                kategori,
+                beskrivning: d.beskrivning,
+                ...(d.riksdagen_url ? { riksdagen_url: d.riksdagen_url } : {}),
+              }),
+            }
+          );
+          omkategoriserade++;
+        }
+        continue;
       }
-      continue;
-    }
 
-    const r = await fetch(`${SB_URL}/rest/v1/lagforslag`, {
-      method: "POST",
-      headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
-      body: JSON.stringify({
-        titel: d.titel,
-        beskrivning: d.beskrivning,
-        kategori,
-        kalla: "riksdagen",
-        riksdagen_id: d.dok_id,
-        riksdagen_url: d.riksdagen_url,
-        status: "omrostning",
-      }),
-    });
-    if (r.ok) importerade++;
-    else fel.push(d.titel?.slice(0, 40));
+      const r = await fetch(`${SB_URL}/rest/v1/lagforslag`, {
+        method: "POST",
+        headers: { ...sbWriteHeaders(), Prefer: "return=minimal" },
+        body: JSON.stringify({
+          titel: d.titel,
+          beskrivning: d.beskrivning,
+          kategori,
+          kalla: "riksdagen",
+          riksdagen_id: d.dok_id,
+          riksdagen_url: d.riksdagen_url,
+          status: "omrostning",
+        }),
+      });
+      if (r.ok) importerade++;
+      else fel.push(d.titel?.slice(0, 40));
+    } catch (e) {
+      console.error(`riksdag-import: skrivning misslyckades för "${d.titel?.slice(0, 60)}":`, e);
+      fel.push(d.titel?.slice(0, 40));
+    }
   }
 
   return NextResponse.json({ importerade, omkategoriserade, totalt: forslag.length, metod, fel });
