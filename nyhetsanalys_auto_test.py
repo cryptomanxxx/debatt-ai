@@ -3,10 +3,13 @@
 nyhetsanalys_auto_test.py — Automatisk AI-analys av nyanlända nyheter i
 nyhetsflode, utan att en besökare behöver klicka något på /nyhetskallor.
 
-Körs tätt (var 20:e minut) av GitHub Actions för att kännas nära realtid:
-så fort en nyhet dyker upp i nyhetsflode (skrivet av nyhetsflode_test.py,
-6 ggr/dag) plockar denna körning upp den inom max ~20 minuter, låter en
-slumpmässig agent reagera i karaktär, och skriver reaktionen till
+Triggas av GitHub Actions dels via workflow_run direkt efter varje
+Nyhetsflöde-körning (6 ggr/dag, den pålitliga vägen — se
+nyhetsanalys-auto.yml), dels som catch-up-bonus på ett */20-schema (GitHub
+levererar scheman tätare än ~1h som "best effort" och droppar i praktiken
+merparten — 20-minutersschemat är alltså inte den huvudsakliga leveransvägen
+längre, bara extra täckning). Låter en slumpmässig agent reagera i karaktär
+på nyanlända nyheter i nyhetsflode och skriver reaktionen till
 nyhetsanalys — SAMMA tabell som besökarutlösta analyser från
 POST /api/chatt (typ="nyhetsanalys", se app/api/chatt/route.js), så båda
 syns identiskt i "Fråga AI-agenter"-panelen på /nyhetskallor och i
@@ -39,12 +42,12 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-MAX_PER_KORNING = 5
+MAX_PER_KORNING = 15
 # Större än vad en enskild körning hinner beta av (se workflow-kommentaren om
 # kapacitet mellan ingest-omgångar) — annars kan äldre nyheter i en stor
 # insamlingsbatch trängas ut ur fönstret av nyare innan de någonsin hunnit
 # analyseras, eftersom frågan bara ser de N senaste raderna.
-NYHETER_ATT_GRANSKA = 40
+NYHETER_ATT_GRANSKA = 120
 
 
 def hamta_nyheter_utan_analys() -> list[dict]:

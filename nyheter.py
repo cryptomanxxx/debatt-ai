@@ -278,7 +278,89 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "arXiv: Ekonomi":             ["ekonomi", "forskning"],
     "arXiv: Computers & Society": ["tech", "samhälle", "forskning"],
     "arXiv: Robotik":             ["tech", "forskning"],
+    # Reddit-gruppernas kategorier = unionen av medlemssubbarnas kategorier
+    # ovan (se REDDIT_GRUPPER nedan). Används bara för att avgöra OM en
+    # agents nyhetsbubbla ska trigga hämtning av gruppen — varje post
+    # taggas om till sin RIKTIGA individuella "kalla" efter fetch, så den
+    # faktiska kategorin en post sparas med kommer alltid från raderna ovan.
+    "Reddit-grupp: Sverige/samhälle":       ["sverige", "samhälle", "international", "politik", "medicin"],
+    "Reddit-grupp: AI":                     ["ai", "forskning", "tech"],
+    "Reddit-grupp: Tech/vetenskap":         ["forskning", "tech", "ai", "medicin"],
+    "Reddit-grupp: Politik/internationellt":["international", "politik", "samhälle", "forskning"],
+    "Reddit-grupp: Ekonomi/krypto":         ["ekonomi", "krypto"],
+    "Reddit-grupp: Energi/klimat":          ["klimat", "energi", "forskning"],
+    "Reddit-grupp: Spel":                   ["spel"],
 }
+
+# Reddit rate-limitar per HTTP-anrop (inte per subreddit) — 31 separata
+# /r/<sub>/.rss-anrop mot samma Vercel-proxy-IP utlöste 429 på ~80% av dem i
+# en verklig körning (2026-09-02). Reddits multireddit-syntax
+# (r/sub1+sub2+sub3/.rss) hämtar flera subs i EN request. Varje post taggas
+# om efter fetch till sin riktiga ursprungliga "kalla" (utläst ur postens
+# länk via REDDIT_UNDER_KALLOR) så att kategorisering, agent-nyhetsbubblor
+# och källattributionen läsare ser på publicerade artiklar (nyhet["kalla"])
+# blir identisk med innan — bara antalet HTTP-anrop minskar (31 → 7).
+REDDIT_UNDER_KALLOR: dict[str, str] = {
+    "sweden": "Reddit Sverige",
+    "economics": "Reddit Ekonomi",
+    "environment": "Reddit Klimat",
+    "europe": "Reddit Samhälle",
+    "europeanunion": "Reddit EU",
+    "medicine": "Reddit Sjukvård",
+    "urbanplanning": "Reddit Bostäder",
+    "artificial": "Reddit AI",
+    "singularity": "Reddit Singularity",
+    "openai": "Reddit OpenAI",
+    "localllama": "Reddit LocalLLM",
+    "futurology": "Reddit Futurology",
+    "technology": "Reddit Technology",
+    "machinelearning": "Reddit ML",
+    "geopolitics": "Reddit Geopolitics",
+    "philosophy": "Reddit Philosophy",
+    "changemyview": "Reddit ChangeMyView",
+    "worldpolitics": "Reddit WorldPolitics",
+    "worldnews": "Reddit World News",
+    "finance": "Reddit Finance",
+    "stocks": "Reddit Stocks",
+    "energy": "Reddit Energy",
+    "renewableenergy": "Reddit Renewable",
+    "climatechange": "Reddit Climate",
+    "nuclear": "Reddit Nuclear",
+    "cryptocurrency": "Reddit Crypto",
+    "bitcoin": "Reddit Bitcoin",
+    "gaming": "Reddit Gaming",
+    "games": "Reddit Games",
+    "television": "Reddit TV",
+    "science": "Reddit Science",
+}
+
+REDDIT_GRUPPER: list[tuple[str, list[str]]] = [
+    ("Reddit-grupp: Sverige/samhälle",        ["sweden", "europe", "europeanunion", "medicine", "urbanplanning"]),
+    ("Reddit-grupp: AI",                      ["artificial", "singularity", "OpenAI", "LocalLLaMA", "MachineLearning"]),
+    ("Reddit-grupp: Tech/vetenskap",          ["Futurology", "technology", "science"]),
+    ("Reddit-grupp: Politik/internationellt", ["geopolitics", "philosophy", "changemyview", "worldpolitics", "worldnews"]),
+    ("Reddit-grupp: Ekonomi/krypto",          ["Economics", "finance", "stocks", "CryptoCurrency", "Bitcoin"]),
+    ("Reddit-grupp: Energi/klimat",           ["environment", "energy", "RenewableEnergy", "climatechange", "nuclear"]),
+    ("Reddit-grupp: Spel",                    ["gaming", "Games", "television"]),
+]
+
+# Hur många poster som hämtas ur varje Reddit-grupp — proportionellt mot
+# gruppens storlek (annars skulle en grupp med 5 hopslagna subs bara ge lika
+# många poster totalt som en enda sub gav innan sammanslagningen).
+REDDIT_GRUPP_TAK: dict[str, int] = {label: min(10 * len(subs), 50) for label, subs in REDDIT_GRUPPER}
+
+_REDDIT_SUB_RE = re.compile(r"reddit\.com/r/([A-Za-z0-9_]+)/comments/", re.IGNORECASE)
+
+
+def _reddit_kalla_for_url(url: str, fallback: str) -> str:
+    """Läser ut vilken subreddit en post faktiskt kom ifrån (ur länken) och
+    slår upp dess ursprungliga, finkorniga "kalla"-namn. Fallback = gruppens
+    egna etikett om subreddit inte kan läsas ut eller inte känns igen."""
+    m = _REDDIT_SUB_RE.search(url or "")
+    if not m:
+        return fallback
+    return REDDIT_UNDER_KALLOR.get(m.group(1).lower(), fallback)
+
 
 # Kategorier för YouTube-källor — nyckeln är kanalnamnet UTAN "YouTube: "-prefixet
 # (kalla-fältet från hamta_youtube_nyheter() är formaterat "YouTube: {kanal_namn}",
@@ -370,14 +452,10 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         ("SVT Nyheter",        _p("https://www.svt.se/nyheter/rss.xml")),
         ("Aftonbladet",        _p("https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/")),
         ("Dagens Arena",       _p("https://www.dagensarena.se/feed/")),
-        # Svenska ämnen – Reddit (via proxy, Atom-format)
-        ("Reddit Sverige",     _p("https://www.reddit.com/r/sweden/.rss")),
-        ("Reddit Ekonomi",     _p("https://www.reddit.com/r/Economics/.rss")),
-        ("Reddit Klimat",      _p("https://www.reddit.com/r/environment/.rss")),
-        ("Reddit Samhälle",    _p("https://www.reddit.com/r/europe/.rss")),
-        ("Reddit EU",          _p("https://www.reddit.com/r/europeanunion/.rss")),
-        ("Reddit Sjukvård",    _p("https://www.reddit.com/r/medicine/.rss")),
-        ("Reddit Bostäder",    _p("https://www.reddit.com/r/urbanplanning/.rss")),
+        # Reddit — 7 grupperade multi-subreddit-flöden istället för 31
+        # separata anrop (se REDDIT_GRUPPER ovan i filen). Varje post taggas
+        # om till sin riktiga individuella källa efter fetch.
+        *[(label, _p(f"https://www.reddit.com/r/{'+'.join(subs)}/.rss?limit=50")) for label, subs in REDDIT_GRUPPER],
         # Tech
         ("The Verge",          "https://www.theverge.com/rss/index.xml"),
         ("TechCrunch",         _p("https://techcrunch.com/feed/")),
@@ -388,37 +466,6 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         # Internationella nyheter
         ("BBC News",           _p("https://feeds.bbci.co.uk/news/rss.xml")),
         ("Al Jazeera",         _p("https://www.aljazeera.com/xml/rss/all.xml")),
-        # Tech & AI – Reddit (via proxy)
-        ("Reddit AI",          _p("https://www.reddit.com/r/artificial/.rss")),
-        ("Reddit Singularity", _p("https://www.reddit.com/r/singularity/.rss")),
-        ("Reddit OpenAI",      _p("https://www.reddit.com/r/OpenAI/.rss")),
-        ("Reddit LocalLLM",    _p("https://www.reddit.com/r/LocalLLaMA/.rss")),
-        ("Reddit Futurology",  _p("https://www.reddit.com/r/Futurology/.rss")),
-        ("Reddit Technology",  _p("https://www.reddit.com/r/technology/.rss")),
-        ("Reddit ML",          _p("https://www.reddit.com/r/MachineLearning/.rss")),
-        # Politik & samhälle – Reddit (via proxy)
-        ("Reddit Geopolitics", _p("https://www.reddit.com/r/geopolitics/.rss")),
-        ("Reddit Philosophy",  _p("https://www.reddit.com/r/philosophy/.rss")),
-        ("Reddit ChangeMyView",_p("https://www.reddit.com/r/changemyview/.rss")),
-        ("Reddit WorldPolitics",_p("https://www.reddit.com/r/worldpolitics/.rss")),
-        ("Reddit World News",  _p("https://www.reddit.com/r/worldnews/.rss")),
-        # Ekonomi – Reddit (via proxy)
-        ("Reddit Finance",     _p("https://www.reddit.com/r/finance/.rss")),
-        ("Reddit Stocks",      _p("https://www.reddit.com/r/stocks/.rss")),
-        # Energi & klimat – Reddit (via proxy)
-        ("Reddit Energy",      _p("https://www.reddit.com/r/energy/.rss")),
-        ("Reddit Renewable",   _p("https://www.reddit.com/r/RenewableEnergy/.rss")),
-        ("Reddit Climate",     _p("https://www.reddit.com/r/climatechange/.rss")),
-        ("Reddit Nuclear",     _p("https://www.reddit.com/r/nuclear/.rss")),
-        # Kryptovalutor – Reddit (via proxy)
-        ("Reddit Crypto",      _p("https://www.reddit.com/r/CryptoCurrency/.rss")),
-        ("Reddit Bitcoin",     _p("https://www.reddit.com/r/Bitcoin/.rss")),
-        # Spel & underhållning – Reddit (via proxy)
-        ("Reddit Gaming",      _p("https://www.reddit.com/r/gaming/.rss")),
-        ("Reddit Games",       _p("https://www.reddit.com/r/Games/.rss")),
-        ("Reddit TV",          _p("https://www.reddit.com/r/television/.rss")),
-        # Medicin & forskning
-        ("Reddit Science",     _p("https://www.reddit.com/r/science/.rss")),
         # AI-forskning & populärvetenskap
         ("Google Research",    _p("https://research.google/blog/rss/")),
         ("TED Talks",          _p("https://www.ted.com/talks/rss")),
@@ -437,6 +484,15 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         feeds = filtrera_feeds_for_agent(agent_namn, feeds)
         bubbla = AGENT_NYHETSBUBBLA.get(agent_namn, [])
         print(f"  📡 Nyhetsbubbla för {agent_namn}: {bubbla} → {len(feeds)}/{feeds_fore} feeds")
+
+    # En Reddit-grupp hämtas så fort NÅGON medlem matchar agentens bubbla
+    # (unionskategorierna i FEED_KATEGORIER ovan) — men enskilda poster i
+    # samma grupp kan komma från en annan medlem som INTE matchar. Detta
+    # efterfiltrerar per post (bara för Reddit-grupper, se nedan) så att
+    # bubbel-precisionen blir identisk med innan gruppindelningen infördes.
+    # Tom mängd = inget filter, exakt som `filtrera_feeds_for_agent()`s eget
+    # fail-open för agent_namn="" eller en okänd agent.
+    _agent_bubbla_set = set(AGENT_NYHETSBUBBLA.get(agent_namn, [])) if agent_namn else set()
 
     nyheter = []
     rss_stats = []
@@ -470,7 +526,8 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
             if not items:
                 snippet = res.text[:200].strip().replace("\n", " ")
                 print(f"  ⚠ {kalla}: 0 items — HTTP {res.status_code}, content-type={res.headers.get('content-type','?')!r}, snippet={snippet!r}", file=sys.stderr)
-            for item in items[:10]:
+            max_items = REDDIT_GRUPP_TAK.get(kalla, 10)
+            for item in items[:max_items]:
                 title = _forsta_traff(item.find("title"),
                                        item.find(f"{{{ATOM}}}title"),
                                        item.find("atom:title", ns))
@@ -514,6 +571,13 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
                         item_url = link_el.text.strip()
                     elif link_el.get("href"):
                         item_url = link_el.get("href", "")
+
+                item_kalla = kalla
+                if kalla.startswith("Reddit-grupp:"):
+                    item_kalla = _reddit_kalla_for_url(item_url, kalla)
+                    if _agent_bubbla_set and not (_agent_bubbla_set & set(hamta_kategorier(item_kalla) or ["sverige"])):
+                        continue
+
                 pub_el = _forsta_traff(item.find("pubDate"),
                                         item.find("published"),
                                         item.find(f"{{{ATOM}}}published"),
@@ -526,7 +590,7 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
                 nyheter.append({
                     "rubrik": rubrik,
                     "beskrivning": text,
-                    "kalla": kalla,
+                    "kalla": item_kalla,
                     "url": item_url,
                     "publicerad": publicerad,
                 })
