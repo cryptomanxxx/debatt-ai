@@ -314,13 +314,25 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     # agents nyhetsbubbla ska trigga hämtning av gruppen — varje post
     # taggas om till sin RIKTIGA individuella "kalla" efter fetch, så den
     # faktiska kategorin en post sparas med kommer alltid från raderna ovan.
-    "Reddit-grupp: Sverige/samhälle":       ["sverige", "samhälle", "international", "politik", "medicin"],
-    "Reddit-grupp: AI":                     ["ai", "forskning", "tech"],
-    "Reddit-grupp: Tech/vetenskap":         ["forskning", "tech", "ai", "medicin"],
-    "Reddit-grupp: Politik/internationellt":["international", "politik", "samhälle", "forskning"],
-    "Reddit-grupp: Ekonomi/krypto":         ["ekonomi", "krypto"],
-    "Reddit-grupp: Energi/klimat":          ["klimat", "energi", "forskning"],
-    "Reddit-grupp: Spel":                   ["spel"],
+    "Reddit-grupp: Sverige/samhälle 1":         ["sverige", "samhälle", "international"],
+    "Reddit-grupp: Sverige/samhälle 2":         ["politik", "international", "medicin"],
+    "Reddit-grupp: Sverige/samhälle 3":         ["samhälle", "sverige"],
+    "Reddit-grupp: AI 1":                       ["ai", "forskning", "tech"],
+    "Reddit-grupp: AI 2":                       ["ai", "tech"],
+    "Reddit-grupp: AI 3":                       ["ai", "forskning"],
+    "Reddit-grupp: Tech/vetenskap 1":           ["forskning", "tech", "ai"],
+    "Reddit-grupp: Tech/vetenskap 2":           ["forskning", "medicin"],
+    "Reddit-grupp: Politik/internationellt 1":  ["international", "politik", "samhälle", "forskning"],
+    "Reddit-grupp: Politik/internationellt 2":  ["samhälle", "politik", "international"],
+    "Reddit-grupp: Politik/internationellt 3":  ["international"],
+    "Reddit-grupp: Ekonomi/krypto 1":           ["ekonomi"],
+    "Reddit-grupp: Ekonomi/krypto 2":           ["ekonomi", "krypto"],
+    "Reddit-grupp: Ekonomi/krypto 3":           ["krypto"],
+    "Reddit-grupp: Energi/klimat 1":            ["klimat", "energi"],
+    "Reddit-grupp: Energi/klimat 2":            ["energi", "klimat"],
+    "Reddit-grupp: Energi/klimat 3":            ["energi", "forskning"],
+    "Reddit-grupp: Spel 1":                     ["spel"],
+    "Reddit-grupp: Spel 2":                     ["spel"],
 }
 
 # Reddit rate-limitar per HTTP-anrop (inte per subreddit) — 31 separata
@@ -330,7 +342,23 @@ FEED_KATEGORIER: dict[str, list[str]] = {
 # om efter fetch till sin riktiga ursprungliga "kalla" (utläst ur postens
 # länk via REDDIT_UNDER_KALLOR) så att kategorisering, agent-nyhetsbubblor
 # och källattributionen läsare ser på publicerade artiklar (nyhet["kalla"])
-# blir identisk med innan — bara antalet HTTP-anrop minskar (31 → 7).
+# blir identisk med innan — bara antalet HTTP-anrop minskar.
+#
+# Codex-fynd (PR #1318, verifierat rimligt): en FEMvägs grupp delar samma
+# hopslagna svar (max ~100 poster, se ?limit=100 nedan) INNAN kvoteringen
+# (_reddit_grupp_kvoterad, max 10/sub) körs — om en enda medlemssub är mycket
+# mer aktiv än de andra kan den fylla hela svaret och trycka undan upp till
+# 4 tystare medlemmar helt, eftersom kvoteringen bara kan omfördela poster
+# som faktiskt kom med i svaret, inte återskapa poster som aldrig hämtades.
+# Reddits .rss-endpoint saknar tillförlitlig cursor-paginering, så en
+# vattentät garanti (hämta tills ALLA medlemmar är representerade) är inte
+# praktiskt möjlig utan att gå tillbaka till separata anrop per subreddit —
+# vilket skulle återinföra 429-problemet detta helt existerar för att lösa.
+# Kompromiss: grupper på MAX 2 medlemmar (istället för upp till 5) — det
+# begränsar värsta scenariot till "1 tystare medlem kan trängas undan per
+# anrop" istället för "upp till 4", till priset av fler HTTP-anrop (31 → 19,
+# fortfarande en påtaglig minskning från de ursprungliga 31 som gav 429).
+# Ingen matematisk garanti, men en verifierbar övre gräns på skadan.
 REDDIT_UNDER_KALLOR: dict[str, str] = {
     "sweden": "Reddit Sverige",
     "economics": "Reddit Ekonomi",
@@ -366,13 +394,25 @@ REDDIT_UNDER_KALLOR: dict[str, str] = {
 }
 
 REDDIT_GRUPPER: list[tuple[str, list[str]]] = [
-    ("Reddit-grupp: Sverige/samhälle",        ["sweden", "europe", "europeanunion", "medicine", "urbanplanning"]),
-    ("Reddit-grupp: AI",                      ["artificial", "singularity", "OpenAI", "LocalLLaMA", "MachineLearning"]),
-    ("Reddit-grupp: Tech/vetenskap",          ["Futurology", "technology", "science"]),
-    ("Reddit-grupp: Politik/internationellt", ["geopolitics", "philosophy", "changemyview", "worldpolitics", "worldnews"]),
-    ("Reddit-grupp: Ekonomi/krypto",          ["Economics", "finance", "stocks", "CryptoCurrency", "Bitcoin"]),
-    ("Reddit-grupp: Energi/klimat",           ["environment", "energy", "RenewableEnergy", "climatechange", "nuclear"]),
-    ("Reddit-grupp: Spel",                    ["gaming", "Games", "television"]),
+    ("Reddit-grupp: Sverige/samhälle 1",        ["sweden", "europe"]),
+    ("Reddit-grupp: Sverige/samhälle 2",        ["europeanunion", "medicine"]),
+    ("Reddit-grupp: Sverige/samhälle 3",        ["urbanplanning"]),
+    ("Reddit-grupp: AI 1",                      ["artificial", "singularity"]),
+    ("Reddit-grupp: AI 2",                      ["OpenAI", "LocalLLaMA"]),
+    ("Reddit-grupp: AI 3",                      ["MachineLearning"]),
+    ("Reddit-grupp: Tech/vetenskap 1",          ["Futurology", "technology"]),
+    ("Reddit-grupp: Tech/vetenskap 2",          ["science"]),
+    ("Reddit-grupp: Politik/internationellt 1", ["geopolitics", "philosophy"]),
+    ("Reddit-grupp: Politik/internationellt 2", ["changemyview", "worldpolitics"]),
+    ("Reddit-grupp: Politik/internationellt 3", ["worldnews"]),
+    ("Reddit-grupp: Ekonomi/krypto 1",          ["Economics", "finance"]),
+    ("Reddit-grupp: Ekonomi/krypto 2",          ["stocks", "CryptoCurrency"]),
+    ("Reddit-grupp: Ekonomi/krypto 3",          ["Bitcoin"]),
+    ("Reddit-grupp: Energi/klimat 1",           ["environment", "energy"]),
+    ("Reddit-grupp: Energi/klimat 2",           ["RenewableEnergy", "climatechange"]),
+    ("Reddit-grupp: Energi/klimat 3",           ["nuclear"]),
+    ("Reddit-grupp: Spel 1",                    ["gaming"]),
+    ("Reddit-grupp: Spel 2",                    ["Games", "television"]),
 ]
 
 _REDDIT_SUB_RE = re.compile(r"reddit\.com/r/([A-Za-z0-9_]+)/comments/", re.IGNORECASE)
