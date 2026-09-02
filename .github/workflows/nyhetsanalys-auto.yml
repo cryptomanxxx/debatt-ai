@@ -16,6 +16,17 @@ on:
     types: [completed]
   workflow_dispatch:
 
+# Codex-fynd (PR #1318): utan detta kan en workflow_run-triggad körning och
+# en samtidig */20-schema-tick (eller manuell dispatch) båda läsa samma
+# "saknar analys"-rader innan endera hinner skriva — nyhetsanalys saknar en
+# UNIQUE-constraint på nyhet_id, så resultatet blir dubbla AI-reaktioner på
+# samma nyhet och bortkastad providerbudget. Samma mönster som agent.yml
+# använder för att serialisera sina egna överlappande triggers.
+concurrency:
+  group: nyhetsanalys-auto
+  cancel-in-progress: false
+  queue: max
+
 jobs:
   nyhetsanalys-auto:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
