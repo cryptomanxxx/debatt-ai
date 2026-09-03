@@ -507,3 +507,31 @@ båda ställena manuellt:
 Utan steg 2 (eller med olika värden på de två ställena) kvarstår 401:an
 — `/api/youtube-transcript/route.js` jämför direkt (`secret !== SECRET`)
 och kräver identisk sträng på båda sidor.
+
+**Uppföljning samma dag — 401 löst, men ett NYTT fel upptäckt (502):**
+projektägaren hade redan lagt in secreten i både GitHub och Vercel. Efter
+merge triggades `Nyhetsflöde` manuellt (`workflow_dispatch`) för att
+verifiera. Körningen tog ~9m46s (längre än vanligt eftersom transkript-
+anropen nu faktiskt gör riktigt arbete istället för att fastna direkt på
+401 — 28 YouTube-kanaler utan fördröjning mellan dem, upp till ~15s/anrop
+i värsta fall, förklarar tidsåtgången utan att något var hängt).
+
+Loggen bekräftade: `YouTube: 28 RSS ok / 0 blockade — 0 transkript / 28
+utan transkript` — 401-problemet är borta (anropen når fram), men
+**samtliga 28 anrop fick istället HTTP 502** från `/api/youtube-
+transcript`. Att alla 28 olika videor från 28 olika kanaler misslyckas
+identiskt pekar på ett systemiskt fel i själva Vercel-funktionen, inte
+enskilda videor utan undertexter.
+
+Problemet: den befintliga loggningen (`print(f"HTTP {res.status_code}
+för {video_id}")`) visade bara statuskoden, aldrig felmeddelandet som
+`/api/youtube-transcript/route.js` faktiskt skickar med i JSON-kroppen
+(`{"error": "..."}`) på alla icke-200-svar — omöjligt att skilja "inga
+undertexter tillgängliga" från "YouTube blockerar Vercels IP" från
+"sidstrukturen ändrad, hittar inte ytInitialPlayerResponse" utan att
+gissa. Lade till body-parsning (`res.json().get("error")`) i
+`_hamta_transkript_via_vercel()` i `nyheter.py` så nästa körnings logg
+visar den faktiska orsaken. Medvetet INTE gissat en fix i `route.js` än
+— fel gissning där hade bara dolt den verkliga orsaken bakom en ny,
+annorlunda gissning. Nästa steg: kör `Nyhetsflöde` igen efter denna
+diagnostik-fix är på main, läs det nya felmeddelandet, fixa roten.
