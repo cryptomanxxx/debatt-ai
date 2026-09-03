@@ -273,3 +273,71 @@ skickades in för TTS (`rubrik. beskrivning` från `NyhetskallorClient.js`)
 
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
+
+## Bildmappning för Peter/Nationalekonom (`/public/avatarer/podd/`)
+
+**v5.9 (3 sep 2026) — Peter får mun- och blinkanimation, ny skäggfri
+masterbild:** projektägaren + ChatGPT byggde ett helt nytt Peter-paket
+("peter_animation_for_claude_code_v14") med samma lagerbaserade,
+pixelstabila arkitektur som Anna v5 — men med en HELT NY masterbild
+(1536×1229, tidigare skäggig 1024×672-bild ersatt). Anledning: det gamla
+skägget var statiskt målat på originalbilden medan munlagret rörde sig
+ovanpå, vilket gjorde att underläppen hamnade synligt UNDER det stilla
+skägget vid tal. Den nya bilden är skäggfri och visar en bredare miljö
+(bokhylla, ram på väggen, ljusare kontor) istället för den gamla tighta
+mörka headshoten — en betydande visuell förändring, inte bara en
+animationsförbättring.
+
+**Paketets struktur skiljer sig från Annas:** istället för transparenta
+RGBA-overlays som `alpha_composite`:as rakt av innehöll paketet ogenomskinliga
+RGB-lager (`peter_mouth_small/medium/large.png`, `peter_eyes_half/closed.png`)
+plus separata gråskale-alfamasker (`mouth_inner_blend_mask.png`,
+`eye_mask_LOCKED.png`) som styr en mjuk blend: `resultat = bas×(1−mask) +
+lager×mask`. Verifierat innan användning: samtliga fem lager skiljer sig
+från basbilden UTESLUTANDE inom sin respektive masks gränser (0 pixlar
+förändring utanför masken, per lager) — samma pixelstabilitetsgaranti som
+Anna v5, fast med en annan kompositeringsmekanik. 12 kombinationer
+genererade (4 munlägen × 3 ögonlägen, inkl. bas=stängd mun/öppna ögon) och
+verifierade på samma sätt.
+
+**Kända skuggartefakter — delvis åtgärdade:** paketet kom med en tredje
+mask (`skin_restore_three_areas.png`) som markerade tre kvarvarande
+skuggfel projektägaren/ChatGPT inte lyckats lösa: insidan av vänster öra,
+insidan av höger öra (svagare), och en skugga vid näsroten nära vänster
+öga. Verifierat att felen fanns redan i RÅ BASBILDEN (syns i `m0_open`,
+som är pixelidentisk med `peter_base.png` — alltså inte en blend-artefakt
+från kompositeringen). Ett första försök med `cv2.inpaint` (Telea)
+misslyckades tydligt — algoritmen har ingen giltig källtextur att
+rekonstruera ett helt öra från och suddade ut öronen till oigenkännlighet.
+Övergick till en försiktigare, verifierat säker metod: lokal
+skugg-mjukning — pixlar mörkare än ett kraftigt Gaussian-blurrat
+lokalgenomsnitt dras mot det blurrade värdet (max 55% blandning), vilket
+bevarar örats form och textur men jämnar ut den mörka fläcken. Tydlig,
+synlig förbättring för båda öronen (jämfört före/efter i zoomade crops).
+För näsa/öga-artefakten gav samma teknik ingen tydligt mätbar förändring
+(artefakten verkar inte vara en enkel "mörkare än omgivningen"-skugga) —
+en svagare, ovillkorad lokal blend applicerades där också som en säker men
+osäker förbättring; kvarstår som en genuint olöst, väldigt subtil
+kvarleva. Reparationen applicerades på basbilden EN gång, sedan
+återgenererades alla 12 kombinationer därifrån — verifierat att inga
+pixlar ändrades utanför de tre flaggade zonerna.
+
+**Filer:** de fyra befintliga `nationalekonom(-small/-medium/-large).png`
+ersattes med den nya bilden (samma filnamn, ny bildkälla). Åtta nya filer
+tillkom: `nationalekonom-m{0-3}-half.png` och `nationalekonom-m{0-3}-closed.png`.
+1024px bred (proportionerlig höjd 819px, ny bildproportion 1536:1229 ≈
+1,25:1 — annorlunda än gamla 1024:672 ≈ 1,52:1). ~795KB/fil (större än
+Annas ~620KB — mer detaljerad bakgrund komprimerar sämre).
+
+**Kodändringar:** `AGENTER.Nationalekonom` i `AgentOverlay.js` fick
+`hasBlink: true` + `mouthHalf`/`mouthClosed`/`idleHalf`/`idleClosed` —
+samma fullständiga struktur som Anna. `StudioOverlay.js`s blink-villkor
+var hårdkodat till `rolle.agent === "Anna"` — generaliserat till
+`cfg.hasBlink` så Peter nu blinkar i Studio-samtalet också.
+
+**Sidoeffekt att känna till:** `/podd/page.js` återanvänder samma fyra
+`nationalekonom(-small/-medium/-large).png`-filer för sin egen
+amplitud-styrda munanimation (`TalkingFace`) — ingen kodändring krävdes
+där, men Peters nya utseende (ingen skägg, ny bakgrund) syns nu även på
+`/podd`, inte bara `/nyhetskallor`. `/kanal` påverkas INTE — den sidans
+`AnchorImage` är hårdkodad till bara Anna.
