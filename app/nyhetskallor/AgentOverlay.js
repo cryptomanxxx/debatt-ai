@@ -138,30 +138,53 @@ export function WaveformBar({ isSpeaking, isThinking, farg }) {
   return <canvas ref={canvasRef} width={240} height={12} style={{ width: "100%", height: "12px", display: "block" }} />;
 }
 
+// mouthIdx nedan startar på 1 och växlar bara 1↔2 — index 0 (idle) och 3
+// ("large") visas aldrig under tal. Förladdning ska bara hämta det som
+// animationen faktiskt kan visa, annars slösas nätverk/mobildata på döda
+// frames (Codex-fynd, PR #1326).
+const ANVANDA_MUNINDEX = [0, 1, 2];
+
 // Värmer webbläsarens bildcache för alla frames en agent kan tänkas visa,
-// innan blink/mun-animationen börjar cykla. Utan detta byter <img src> till
-// en okänd fil första gången ett state (t.ex. "closed") träffas — under kall
-// cache (inkognito, mobilnät) hinner den 620–644KB stora filen ofta inte
-// laddas+avkodas inom det 80–120ms långa blinkfönstret, så bytet ritas
-// aldrig upp och blinkningen ser ut att helt utebli trots korrekt logik och
-// korrekta bildfiler (bekräftat med bildruteanalys av en inspelad video).
-function usePreload(cfg) {
+// innan blink/mun-animationen börjar cykla, och signalerar när det är klart.
+// Utan detta byter <img src> till en okänd fil första gången ett state (t.ex.
+// "closed") träffas — under kall cache (inkognito, mobilnät) hinner den
+// 620–644KB stora filen ofta inte laddas+avkodas inom det 80–120ms långa
+// blinkfönstret, så bytet ritas aldrig upp och blinkningen ser ut att helt
+// utebli trots korrekt logik och korrekta bildfiler (bekräftat med
+// bildruteanalys av en inspelad video). Att bara starta hämtningen räckte
+// inte — utan att invänta den kunde ändå de första blinkningarna träffa
+// ofärdiga resurser (Codex-fynd, PR #1326) — därför returneras `ready` som
+// callern gatear blink-timern på.
+export function usePreload(cfg) {
+  const [ready, setReady] = useState(false);
   useEffect(() => {
+    setReady(false);
     const filnamn = new Set([
       cfg.idleOpen, cfg.idleHalf, cfg.idleClosed,
-      ...(cfg.mouthOpen || []), ...(cfg.mouthHalf || []), ...(cfg.mouthClosed || []),
+      ...ANVANDA_MUNINDEX.map(i => cfg.mouthOpen?.[i]),
+      ...ANVANDA_MUNINDEX.map(i => cfg.mouthHalf?.[i]),
+      ...ANVANDA_MUNINDEX.map(i => cfg.mouthClosed?.[i]),
     ].filter(Boolean));
+    let cancelled = false;
     const bilder = [...filnamn].map(namn => {
       const img = new window.Image();
+      const klar = new Promise(resolve => {
+        img.onload = resolve;
+        img.onerror = resolve; // en trasig fil ska inte blockera animationen för evigt
+      });
       img.src = `/avatarer/podd/${namn}`;
-      return img;
+      return { img, klar };
     });
-    return () => { bilder.forEach(img => { img.src = ""; }); };
+    Promise.all(bilder.map(b => b.klar)).then(() => { if (!cancelled) setReady(true); });
+    return () => {
+      cancelled = true;
+      bilder.forEach(({ img }) => { img.onload = null; img.onerror = null; img.src = ""; });
+    };
   }, [cfg]);
+  return ready;
 }
 
 export function AnchorImage({ cfg, blinkState, isSpeaking }) {
-  usePreload(cfg);
   const [mouthIdx, setMouthIdx] = useState(1);
   useEffect(() => {
     if (!isSpeaking) { setMouthIdx(1); return; }
@@ -198,7 +221,8 @@ export default function AgentOverlay({ agent, namn, text, onClose }) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(true);
   const running = isSpeaking || isThinking;
-  const blinkState = useBlinkState(cfg.hasBlink);
+  const framesReady = usePreload(cfg);
+  const blinkState = useBlinkState(cfg.hasBlink && framesReady);
   const startedRef = useRef(false);
 
   useEffect(() => {

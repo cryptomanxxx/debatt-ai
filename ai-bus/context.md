@@ -139,5 +139,19 @@ efterföljande blinkningar (3–7s mellanrum). Gäller automatiskt både
 samma delade `AnchorImage`-komponent). **Bekräftat av projektägaren i
 produktion (3 sep 2026): blinkningen syns igen.**
 
+**v5.3 (3 sep 2026) — två Codex-fynd på PR #1326, adresserade i efterhand:**
+(1) `usePreload` startade bara hämtningen utan att invänta den — de första
+blinkningarna (timern startar redan 1–3s efter montering) kunde fortfarande
+träffa ofärdiga resurser på riktigt långsamma nät. `usePreload` returnerar nu
+`ready` (sant först när samtliga frames triggat `onload`/`onerror`), och
+`useBlinkState`s `active`-flagga är nu `cfg.hasBlink && ready` i både
+`AgentOverlay` och `StudioOverlay` — blinkanimationen startar inte förrän
+bildmaterialet faktiskt är laddat. (2) `mouthIdx` i `AnchorImage` växlar bara
+mellan index 1 och 2 (`m === 1 ? 2 : 1`, startvärde 1) — index 0 syns bara i
+viloläge och index 3 ("large") visas ALDRIG. `usePreload` laddade ändå ner
+alla fyra munlägen per blink-state (12 filer, ~1,9MB för Anna + ~0,6MB extra
+för Peter i Studion) — nu begränsat till `ANVANDA_MUNINDEX = [0,1,2]`, 9
+filer, exakt det som animationen kan visa.
+
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
