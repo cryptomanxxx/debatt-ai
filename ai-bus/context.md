@@ -248,5 +248,28 @@ när innehållet är högre än skärmen — till skillnad från
 `alignItems:"center"` ger detta ALDRIG onåbart innehåll, oavsett
 webbläsarens stöd för `safe center`.
 
+**v5.8 (3 sep 2026) — lästexten synlig bredvid avataren i solo-läget:**
+`AgentOverlay` (den enskilda "Anna/Peter läser"-uppläsningen) visade
+tidigare aldrig den faktiska nyhetstexten som lästes upp — bara ljud, ingen
+synlig text, till skillnad från `StudioOverlay` som redan visar den aktiva
+repliken i en textremsa. Projektägaren föreslog att placera texten till
+HÖGER om avataren i solo-läget (istället för under, som i Studio) eftersom
+Studio redan använder bredden fullt ut (två avatarer sida vid sida) medan
+solo-rutan (520px, `3/4`-proportioner sedan v5.6) lämnar gott om ledigt
+utrymme åt sidorna på breda skärmar — att lägga texten under hade istället
+gjort popupen ännu högre och återinfört risken från v5.6/v5.7.
+
+Layout: en ny flex-rad (`flexWrap:"wrap"`) omsluter både den befintliga
+avatarkolumnen (kort + Stäng-knapp, oförändrad) och en ny textpanel
+(`min(320px,94vw)`, mörk bakgrund matchande kortstilen, `overflowY:"auto"`
+för längre texter). Ingen fast brytpunkt — flexbox wrapar automatiskt ner
+textpanelen under avataren på smala skärmar, samma "låt webbläsaren
+avgöra"-mönster som bredd-/höjd-caparna i v5.5–v5.7. `margin:"auto 0"`
+(scroll-säker centrering från v5.7) flyttades till den nya yttre raden så
+hela raden (båda kolumnerna tillsammans) centreras och förblir scrollbar
+som en enhet. Texten kommer från samma `lasning.text`-prop som redan
+skickades in för TTS (`rubrik. beskrivning` från `NyhetskallorClient.js`)
+— ingen ny datakälla behövdes, bara ny visning av befintlig data.
+
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
