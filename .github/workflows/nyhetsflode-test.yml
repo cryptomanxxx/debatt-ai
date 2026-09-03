@@ -42,5 +42,6 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          YOUTUBE_PROXY_SECRET: ${{ secrets.YOUTUBE_PROXY_SECRET }}
           PYTHONUNBUFFERED: "1"
         run: python -u nyhetsflode_test.py

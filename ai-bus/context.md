@@ -455,3 +455,55 @@ källor finns i `feeds`-listan OCH har en matchande `FEED_KATEGORIER`-post
 (29 statiska feeds + 18 Reddit-grupper = 47 totalt, i linje med CLAUDE.md:s
 tidigare "~44"-uppskattning). Verifierat att alla 11 nya URL:ers domäner
 (efter www-strippning) matchar `rss-proxy`s allowlist-logik.
+
+---
+
+## YouTube-transkript-problemet — kod-wiring fixad, secret-värde krävs från projektägaren (3 sep 2026)
+
+Projektägaren klistrade in en diagnostikrad från en Nyhetsflöde-körning:
+`YOUTUBE_PROXY_SECRET` var TOM i GitHub Actions, så `/api/youtube-transcript`
+avvisade varje anrop. Denna diagnostik fanns redan väl inbyggd i
+`nyheter.py` (`_hamta_transkript_via_vercel()`) — någon tidigare session
+hade redan förutsett exakt detta scenario och skrivit två olika
+felmeddelanden beroende på VILKEN av de två möjliga orsakerna det är
+(secret helt tom vs. secret skickad men fel värde), pekade på rätt fix
+för respektive fall.
+
+**Grävde djupare än diagnostikraden själv sa — hittade ett andra,
+strukturellt problem:** även om secreten läggs till i GitHub-inställningarna
+räcker inte det, eftersom INGEN av de workflow-YAML-filer som faktiskt
+kör kod som anropar `hamta_nyheter()` (och därmed `hamta_youtube_nyheter()`
+→ `_hamta_transkript_via_vercel()`) hade `YOUTUBE_PROXY_SECRET` med i sitt
+`env:`-block. Ett `${{ secrets.X }}`-värde flödar aldrig in i ett skripts
+miljö om inte workflowen explicit mappar det i `env:` — att bara skapa
+secreten i GitHub-inställningarna hade inte räckt.
+
+**Verifierade noggrant VILKA workflows som faktiskt är berörda** innan
+någon ändring gjordes — en bred grepp efter "nyheter.py|hamta_nyheter"
+gav falska positiver: `forskning_test.py` nämner bara "nyheter.py" i en
+kommentar (anropar det aldrig), och `kanal_debatt.py` har en egen, helt
+fristående lokalt definierad `hamta_nyheter()`-funktion (importerar
+ALDRIG från `nyheter.py`, ingen YouTube-logik alls). Bara **två**
+workflows anropar på riktigt den kedja som slutar i YouTube-transkript-
+hämtning: `agent.yml` (via `agent.py` rad 613) och `nyhetsflode-test.yml`
+(via `nyhetsflode_test.py` rad 139). Lade till
+`YOUTUBE_PROXY_SECRET: ${{ secrets.YOUTUBE_PROXY_SECRET }}` i båda
+dessa två `env:`-block — INTE i `forskning-test.yml`/`kanal_debatt.yml`,
+som hade blivit death-code/missvisande dokumentation av vad skripten
+faktiskt behöver.
+
+**Vad Claude Code INTE kan göra:** skapa eller läsa det faktiska
+secret-värdet i GitHub repo-inställningar eller Vercels miljövariabler —
+det kräver kontoåtkomst till respektive tjänst som bara projektägaren
+har, och GitHub-verktygen som finns tillgängliga i den här sessionen
+saknar en "sätt repo-secret"-funktion (secrets är krypterade och kan
+inte sättas via filredigeringar). Genererade istället ett kryptografiskt
+slumpmässigt förslagsvärde (`secrets.token_urlsafe(32)` i Python) att
+lämna över till projektägaren, som måste klistra in EXAKT SAMMA värde på
+båda ställena manuellt:
+1. GitHub → repo Settings → Secrets and variables → Actions → New repository secret → `YOUTUBE_PROXY_SECRET`
+2. Vercel → Project → Settings → Environment Variables → `YOUTUBE_PROXY_SECRET`
+
+Utan steg 2 (eller med olika värden på de två ställena) kvarstår 401:an
+— `/api/youtube-transcript/route.js` jämför direkt (`secret !== SECRET`)
+och kräver identisk sträng på båda sidor.
