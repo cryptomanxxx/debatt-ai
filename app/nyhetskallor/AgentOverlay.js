@@ -138,7 +138,30 @@ export function WaveformBar({ isSpeaking, isThinking, farg }) {
   return <canvas ref={canvasRef} width={240} height={12} style={{ width: "100%", height: "12px", display: "block" }} />;
 }
 
+// Värmer webbläsarens bildcache för alla frames en agent kan tänkas visa,
+// innan blink/mun-animationen börjar cykla. Utan detta byter <img src> till
+// en okänd fil första gången ett state (t.ex. "closed") träffas — under kall
+// cache (inkognito, mobilnät) hinner den 620–644KB stora filen ofta inte
+// laddas+avkodas inom det 80–120ms långa blinkfönstret, så bytet ritas
+// aldrig upp och blinkningen ser ut att helt utebli trots korrekt logik och
+// korrekta bildfiler (bekräftat med bildruteanalys av en inspelad video).
+function usePreload(cfg) {
+  useEffect(() => {
+    const filnamn = new Set([
+      cfg.idleOpen, cfg.idleHalf, cfg.idleClosed,
+      ...(cfg.mouthOpen || []), ...(cfg.mouthHalf || []), ...(cfg.mouthClosed || []),
+    ].filter(Boolean));
+    const bilder = [...filnamn].map(namn => {
+      const img = new window.Image();
+      img.src = `/avatarer/podd/${namn}`;
+      return img;
+    });
+    return () => { bilder.forEach(img => { img.src = ""; }); };
+  }, [cfg]);
+}
+
 export function AnchorImage({ cfg, blinkState, isSpeaking }) {
+  usePreload(cfg);
   const [mouthIdx, setMouthIdx] = useState(1);
   useEffect(() => {
     if (!isSpeaking) { setMouthIdx(1); return; }

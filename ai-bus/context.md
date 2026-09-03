@@ -115,5 +115,28 @@ byggde v5 från grunden med en helt annan (enklare, mer robust) arkitektur.
 
 Oanvända filer: `anna-eyes-half.png`, `anna-eyes-closed.png`, `anna-blink-half.png`, `anna-blink-closed.png`
 
+**v5.2 (3 sep 2026) — bildförladdning, fixar "blinkar inte i praktiken" (PR
+#1326):** projektägaren rapporterade att Anna inte längre blinkade synligt
+efter v5/v5.1, även i inkognitofönster (uteslöt cache som förklaring). Video
+från mobil (Samsung Browser) bekräftade problemet kvantitativt: bildruteanalys
+(opencv, `dark_frac`-metrik i ögonregionen, kalibrerad mot de statiska
+sprite-filerna som gav en tydlig 34% nedgång open→closed) visade NOLL
+detekterbar blinkvariation över 21 sekunder video. Samtidigt bekräftades att
+(a) sprite-filerna på `main` faktiskt skiljer sig korrekt mellan
+open/half/closed, och (b) JS-logiken i `AgentOverlay.js` är oförändrad sedan
+långt innan denna sessions sprite-arbete (`git log`/`git diff` verifierat) —
+alltså varken fel bilder eller trasig logik. Rotorsaken: `<img src>` byter
+inte visning förrän NYA filen laddats+avkodats, `AnchorImage` förladdade
+aldrig några frames, filerna är 620–644KB styck, och blink-states varar bara
+80–120ms (halv→stängd→halv). Under kall cache (inkognito, mobilnät — exakt
+scenariot i videon) hinner "closed"-framen ofta aldrig ritas upp innan
+React redan gått vidare till nästa state. Fix: `usePreload(cfg)`-hook i
+`AnchorImage` värmer webbläsarcachen för agentens samtliga frames
+(`new Image().src = ...`) vid montering — långt innan första blinkförsöket
+(1–3s fördröjning inbyggd i `useBlinkState`) och gott om marginal innan
+efterföljande blinkningar (3–7s mellanrum). Gäller automatiskt både
+`/nyhetskallor`s enskilda uppläsning och Studio-samtalet (båda återanvänder
+samma delade `AnchorImage`-komponent).
+
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
