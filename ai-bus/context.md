@@ -153,5 +153,31 @@ alla fyra munlägen per blink-state (12 filer, ~1,9MB för Anna + ~0,6MB extra
 för Peter i Studion) — nu begränsat till `ANVANDA_MUNINDEX = [0,1,2]`, 9
 filer, exakt det som animationen kan visa.
 
+**v5.4 (3 sep 2026) — alla fyra munstorlekar tillbaka, viktad slumpvandring
+istället för fast 1↔2-toggle:** projektägaren påpekade att v5.3s begränsning
+till `[0,1,2]` byggde på ett skäl som inte längre gäller — den ursprungliga
+1↔2-togglingen (kommentar hittad i `app/kanal/page.js`: "avoids jumping back
+to m0 which shifts the head") kom från de äldre AI-genererade helbildsframen
+(v1–v4) där huvudets position kunde skilja marginellt mellan frames. I v5s
+lagerbaserade arkitektur delar SAMTLIGA tolv mun-/ögonkombinationer exakt
+samma omutliga bas-canvas — 0 pixlars skillnad utanför den aktiva masken är
+en garanti by construction, inte något som kan variera. `ANVANDA_MUNINDEX`
+är nu `[0,1,2,3]` (alla fyra storlekar, 12 förladdade filer för Anna).
+Togglingslogiken ersatt: `nastaMunIndex()` gör en viktad slumpvandring som
+föredrar grannsteg (±1, vikt 5) framför större hopp (±2 vikt 2, ±3 vikt 1)
+och aldrig upprepar samma index två gånger i rad — verifierat med en
+200 000-iterationers simulering (0 upprepningar, 0 utanför intervallet,
+~42% grannsteg / ~17-25% större hopp per riktning). Diskuterades även:
+riktig ljudamplitud-styrd munstorlek är INTE möjlig utan att byta
+TTS-lösning — `responsiveVoice.speak()` exponerar inget råljud till sidan
+(bekräftat: ingen `AudioContext`/`AnalyserNode`/`getUserMedia` någonstans i
+kodbasen), och `WaveformBar`s "amplitud" är redan idag helt påhittad
+(`Math.random()`-baserad, ingen äkta ljuddata). Den viktade slumpvandringen
+valdes som näst bästa lösning utan att kräva ny ljudinfrastruktur.
+`app/kanal/page.js` har en egen, oberoende kopia av samma ursprungsmönster
+(inte en delad komponent) och lämnades medvetet orörd — samma resonemang
+skulle gälla där, men projektet har redan valt att inte röra KanalPage (se
+"Ska INTE göras" ovan) utan explicit begäran.
+
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
