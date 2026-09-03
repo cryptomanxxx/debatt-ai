@@ -579,3 +579,35 @@ undertexter-fall. Felmeddelandet i `fetchTranscript()` inkluderar nu
 finns i svaret. Nästa steg: projektägaren testar endpointen igen efter
 denna merge — svaret pekar nu ut den faktiska orsaken direkt istället
 för att kräva ännu en gissningsrunda.
+
+**Slutresultat — roten är känd, medvetet INTE fixad, ärendet stängt
+(samma dag):** diagnostiken visade den verkliga orsaken:
+`playability: LOGIN_REQUIRED — "Sign in to confirm you're not a bot"`.
+Det är YouTubes aktiva, medvetna bot-detektering mot molnserver-IP:er
+(Vercel, AWS, GCP m.fl. drabbas alla) — inte en bugg i vår kod, och inte
+något en cookie/header-justering löser pålitligt.
+
+Diskuterade fyra vägar framåt med projektägaren: (1) acceptera
+RSS-beskrivnings-fallbacken som redan finns och fungerar, (2) en
+betald residential-proxy-tjänst, (3) logga in med projektägarens eget
+YouTube-konto (avrådde tydligt — bryter mot YouTubes användarvillkor
+för ett personligt konto, sessionscookies är känsligare än ett vanligt
+API-lösenord, och de går ut och kräver återkommande underhåll), (4)
+skrapa en tredjepartswebbsida (t.ex. tactiq.io) som själva löst
+IP-blockeringen — avrådde också: samma skörhets- och villkorsproblem
+som att skrapa YouTube direkt, bara flyttat ett steg, om det inte finns
+en riktig betald API att tillgå.
+
+**Beslut: projektägaren vill inte betala för en transkript-tjänst.**
+Ärendet avslutas här — ingen ytterligare kod ändras.
+`_hamta_transkript_via_vercel()` i `nyheter.py` och
+`/api/youtube-transcript/route.js` lämnas som de är (inkl.
+diagnostikloggningen och CONSENT-cookien, som inte skadar även om de
+inte löser hela problemet). YouTube-nyheter fortsätter fungera via
+`[YouTube-beskrivning]`-fallbacken (RSS-beskrivningen) istället för
+fullt transkript — det var redan det designade beteendet för
+"inga undertexter tillgängliga"-fallet, det är bara det att ALLA 28
+kanaler hamnar där nu istället för ett fåtal. Om någon framtida session
+funderar på att återuppta det här: läs det här avsnittet först — roten
+är redan känd (IP-baserad bot-detektering), inte något som behöver
+omutredas.
