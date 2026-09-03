@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { AGENTER, AnchorImage, WaveformBar, useBlinkState } from "./AgentOverlay";
+import { AGENTER, AnchorImage, WaveformBar, useBlinkState, usePreload } from "./AgentOverlay";
 
 // Vem som pratar (speaker-nyckeln i LLM-svaret) mappat till agentens faktiska
 // röst/bildkonfiguration i AGENTER — samma "Peter"-visningsnamn-mönster som
@@ -17,7 +17,8 @@ function rolleFor(speaker) {
 
 function StudioPerson({ rolle, isSpeaking, dimmed }) {
   const cfg = AGENTER[rolle.agent];
-  const blinkState = useBlinkState(rolle.agent === "Anna" && isSpeaking);
+  const framesReady = usePreload(cfg);
+  const blinkState = useBlinkState(rolle.agent === "Anna" && isSpeaking && framesReady);
 
   return (
     <div style={{
