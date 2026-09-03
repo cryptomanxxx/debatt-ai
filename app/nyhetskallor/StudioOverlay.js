@@ -18,7 +18,7 @@ function rolleFor(speaker) {
 function StudioPerson({ rolle, isSpeaking, dimmed }) {
   const cfg = AGENTER[rolle.agent];
   const framesReady = usePreload(cfg);
-  const blinkState = useBlinkState(rolle.agent === "Anna" && isSpeaking && framesReady);
+  const blinkState = useBlinkState(cfg.hasBlink && isSpeaking && framesReady);
 
   return (
     <div style={{

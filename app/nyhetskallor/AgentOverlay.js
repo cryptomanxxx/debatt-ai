@@ -1,10 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
-// Per-agent overlay-konfiguration. Anna har fullständiga blink+mun-frames
-// (samma som /kanal). Andra agenter (t.ex. Nationalekonomen från /podd) har
-// bara fyra munlägen utan blink-varianter — hasBlink: false hoppar över
-// ögonanimationen och visar bara idle/mun-frames. Exporteras tillsammans med
+// Per-agent overlay-konfiguration. Anna OCH Nationalekonom (Peter) har nu
+// båda fullständiga blink+mun-frames (samma lagerbaserade, pixelstabila
+// arkitektur — se ai-bus/context.md v5.9). Exporteras tillsammans med
 // AnchorImage/WaveformBar/useBlinkState så StudioOverlay.js (Anna+Peter i
 // samma studio) kan återanvända exakt samma animationslogik.
 export const AGENTER = {
@@ -26,9 +25,11 @@ export const AGENTER = {
     rvVoice: "Swedish Male",
     pitch: 0.85,
     rate: 0.88,
-    hasBlink: false,
-    mouthOpen: ["nationalekonom.png", "nationalekonom-small.png", "nationalekonom-medium.png", "nationalekonom-large.png"],
-    idleOpen: "nationalekonom.png",
+    hasBlink: true,
+    mouthOpen:   ["nationalekonom.png", "nationalekonom-small.png", "nationalekonom-medium.png", "nationalekonom-large.png"],
+    mouthHalf:   ["nationalekonom-m0-half.png", "nationalekonom-m1-half.png", "nationalekonom-m2-half.png", "nationalekonom-m3-half.png"],
+    mouthClosed: ["nationalekonom-m0-closed.png", "nationalekonom-m1-closed.png", "nationalekonom-m2-closed.png", "nationalekonom-m3-closed.png"],
+    idleOpen: "nationalekonom.png", idleHalf: "nationalekonom-m0-half.png", idleClosed: "nationalekonom-m0-closed.png",
   },
 };
 
