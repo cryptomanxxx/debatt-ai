@@ -106,7 +106,18 @@ def _hamta_transkript_via_vercel(video_id: str) -> str:
                     "Settings → Environment Variables → YOUTUBE_PROXY_SECRET.",
                     file=sys.stderr,
                 )
-        print(f"  ✗ Vercel transcript proxy HTTP {res.status_code} för {video_id}", file=sys.stderr)
+        # /api/youtube-transcript svarar med {"error": "..."} i kroppen på alla
+        # icke-200-fel (t.ex. 502 vid ett internt fel i fetchTranscript()) —
+        # utan att logga den kroppen var alla icke-401-fel bara en anonym
+        # statuskod, omöjlig att skilja från varandra (saknade undertexter?
+        # YouTube blockerar Vercels IP? sidstrukturen ändrad?).
+        felmeddelande = ""
+        try:
+            felmeddelande = res.json().get("error", "")
+        except Exception:
+            pass
+        detalj = f" — {felmeddelande}" if felmeddelande else ""
+        print(f"  ✗ Vercel transcript proxy HTTP {res.status_code} för {video_id}{detalj}", file=sys.stderr)
         return ""
     except Exception as e:
         print(f"  ✗ Vercel transcript proxy fel ({video_id}): {type(e).__name__}", file=sys.stderr)
