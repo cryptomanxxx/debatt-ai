@@ -396,3 +396,62 @@ skrev själva analysen (samma mönster som förut — en liten fast uppsättning
 "uppläsarpersonas", inte kopplat till vem som "äger" texten), eftersom
 `AgentOverlay`/`StudioOverlay` bara har röst/bildkonfiguration för Anna
 och Nationalekonom.
+
+---
+
+## Nyhetskällor återinförda — Expressen + 10 gamla källor (3 sep 2026)
+
+Projektägaren saknade Expressen på `/nyhetskallor` och frågade om fler
+källor saknades. Kollade `nyheter.py`s faktiska `feeds`-lista mot vad
+CLAUDE.md dokumenterar — betydande drift: Expressen, CoinDesk,
+Cointelegraph, IGN, The Lancet, MDPI Healthcare, Nature, Science Alert,
+Quanta Magazine, Amazon Science och Big Think fanns alla dokumenterade
+men saknades helt i den faktiska koden (troligen borttagna vid någon
+tidigare omarbetning, förmodligen när Reddit-grupperingen byggdes ut för
+att komma runt 429-problem, utan att CLAUDE.md uppdaterades — `coindesk.com`
+fanns kvar som en föräldralös post i rss-proxyns allowlist, ett spår av
+detta). Projektägaren ville ha tillbaka alla ("Ju mer nyhetskällor vi har
+ju bättre blir det").
+
+**Återinfört (11 källor):**
+| Källa | Kategori(er) |
+|---|---|
+| Expressen | sverige, samhälle |
+| CoinDesk | krypto, ekonomi |
+| Cointelegraph | krypto, ekonomi |
+| IGN | spel |
+| The Lancet | medicin, forskning |
+| MDPI Healthcare | medicin, forskning |
+| Nature | forskning, medicin |
+| Science Alert | forskning |
+| Quanta Magazine | forskning, ai |
+| Amazon Science | ai, forskning, tech |
+| Big Think | forskning, samhälle |
+
+**Tre ställen ändrade** (alla tre krävdes — att bara lägga till i `feeds`
+hade gett `403 Domän inte tillåten` för alla nya källor):
+1. `nyheter.py` → `feeds`-listan i `hamta_nyheter()`: nya `(kalla, _p(url))`-rader
+2. `nyheter.py` → `FEED_KATEGORIER`: en kategori-post per ny källa (annars
+   faller den tillbaka på `["sverige"]` som standard, se `filtrera_feeds_for_agent()`,
+   och hamnar fel i agenternas nyhetsbubblor)
+3. `app/api/rss-proxy/route.js` → `TILLÅTNA_DOMÄNER`: proxyn (som kringgår
+   GitHub Actions IP-block) har en explicit domän-allowlist av SSRF-skäl —
+   nya domäner måste läggas till där oavsett vad `nyheter.py` gör
+
+**Viktig brasklapp — RSS-URL:erna är INTE verifierade live.** Sandboxen
+saknar generell internetåtkomst (bara en allowlistad proxy för verktygsanrop,
+inte fria HTTP-anrop till godtyckliga nyhetssajter), så URL:erna är
+skrivna utifrån tidigare kännedom om respektive sajts vanliga RSS-mönster,
+inte testade mot de faktiska adresserna. Kodens befintliga felhantering
+(`misslyckade`/`rss_stats` med per-källa ok/fel-status, `HTTP {status}`-
+loggning) gör att en trasig URL failar tyst utan att krascha något — men
+projektägaren bör kolla admin-panelens nyhetslogg eller `/nyhetskallor`s
+källfilter efter nästa `Nyhetsflöde`-körning (var 4:e timme) för att se
+vilka av de 11 nya källorna som faktiskt levererar och vilka som
+behöver en URL-korrigering.
+
+Verifierat isolerat (AST-parsning av `nyheter.py`): samtliga 11 nya
+källor finns i `feeds`-listan OCH har en matchande `FEED_KATEGORIER`-post
+(29 statiska feeds + 18 Reddit-grupper = 47 totalt, i linje med CLAUDE.md:s
+tidigare "~44"-uppskattning). Verifierat att alla 11 nya URL:ers domäner
+(efter www-strippning) matchar `rss-proxy`s allowlist-logik.
