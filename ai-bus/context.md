@@ -81,6 +81,20 @@ open/half/closed). Detta är den första versionen där både "pixelstabilt"
 OCH "verkligt uttrycksfull mun/ögon" är sanna SAMTIDIGT, verifierat med
 samma rigorösa mätmetod som avslöjade att v3 inte var det den påstods vara.
 
+**v5.1 (3 sep 2026) — feathering-fix på Codex-fynd (PR #1324):** källagrens
+alfakanaler hade en mycket brant övergång (0→255 på 2–5px, praktiskt taget
+en hård urklippskant) — synligt som en svag oval söm/kant kring munnen (mest
+under underläppen och i mungiporna) när `AnchorImage` alternerar mun-frames
+var 220:e ms under tal. Verifierat visuellt (zoomade in 3× på munregionen)
+innan fix, inte bara Codex ord för det. Fix: `ImageFilter.GaussianBlur(6)`
+på varje lagers ALFAKANAL innan kompositering (RGB-innehållet orört) —
+mjukar upp övergångszonen utan att blanda ut mun-/ögondetaljerna själva.
+Omverifierat efter fix: fortfarande exakt 0 pixlars skillnad utanför en
+generöst breddad maskeringszon (samma garanti som v5, bara med bredare
+marginal för den nu mjukare kanten), munregionens variation oförändrad
+(32,9/47,0/57,9% — inom brus från v5:s 32,7/46,9/56,0%), och synlig söm
+borta i en ny visuell 12-rutors kontaktkarta av alla mun-/ögonkombinationer.
+
 Tidigare versioner (för historik): v1 (pixelstabil metod, näst intill
 statisk mun — small/medium/large visuellt identiska) och v3 (bra
 mun-/ögonvariation, PÅSTODS pixelstabil men var det inte — Codex-granskning
