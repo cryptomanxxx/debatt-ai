@@ -138,11 +138,14 @@ export function WaveformBar({ isSpeaking, isThinking, farg }) {
   return <canvas ref={canvasRef} width={240} height={12} style={{ width: "100%", height: "12px", display: "block" }} />;
 }
 
-// mouthIdx nedan startar på 1 och växlar bara 1↔2 — index 0 (idle) och 3
-// ("large") visas aldrig under tal. Förladdning ska bara hämta det som
-// animationen faktiskt kan visa, annars slösas nätverk/mobildata på döda
-// frames (Codex-fynd, PR #1326).
-const ANVANDA_MUNINDEX = [0, 1, 2];
+// mouthIdx nedan gör en viktad slumpvandring över hela indexintervallet
+// (se nastaMunIndex) medan agenten talar — alla fyra munstorlekar (stängd/
+// liten/medium/stor) kan visas, så samtliga förladdas. I v5s lagerbaserade
+// spritearkitektur delar alla mun-lägen exakt samma bas-canvas (0 pixlars
+// skillnad utanför den aktiva mun-masken, verifierat) — det gamla skälet
+// att undvika index 0 (huvudet "hoppade" mellan de äldre AI-genererade
+// helbildsframen) gäller alltså inte längre.
+const ANVANDA_MUNINDEX = [0, 1, 2, 3];
 
 // Värmer webbläsarens bildcache för alla frames en agent kan tänkas visa,
 // innan blink/mun-animationen börjar cykla, och signalerar när det är klart.
@@ -184,11 +187,30 @@ export function usePreload(cfg) {
   return ready;
 }
 
+// Nästa munindex under tal: viktad slumpvandring i intervallet
+// [0, ANVANDA_MUNINDEX.length-1] som föredrar ett steg åt gången (grannsteg)
+// framför fria hopp mellan ytterligheter — utan riktig ljudamplitud att
+// synka mot (responsiveVoice exponerar inget råljud till sidan; se
+// diskussion i PR) ger detta en mjukare, mindre ryckig rörelse än ren
+// oviktad slump, utan att kräva ny ljudinfrastruktur. Upprepar aldrig
+// samma index två gånger i rad.
+function nastaMunIndex(nuvarande, maxIndex) {
+  const kandidater = [];
+  for (let i = 0; i <= maxIndex; i++) {
+    if (i === nuvarande) continue;
+    const steg = Math.abs(i - nuvarande);
+    const vikt = steg === 1 ? 5 : steg === 2 ? 2 : 1;
+    for (let k = 0; k < vikt; k++) kandidater.push(i);
+  }
+  return kandidater[Math.floor(Math.random() * kandidater.length)];
+}
+
 export function AnchorImage({ cfg, blinkState, isSpeaking }) {
   const [mouthIdx, setMouthIdx] = useState(1);
   useEffect(() => {
     if (!isSpeaking) { setMouthIdx(1); return; }
-    const id = setInterval(() => setMouthIdx(m => m === 1 ? 2 : 1), 220);
+    const maxIndex = ANVANDA_MUNINDEX.length - 1;
+    const id = setInterval(() => setMouthIdx(m => nastaMunIndex(m, maxIndex)), 220);
     return () => clearInterval(id);
   }, [isSpeaking]);
 
