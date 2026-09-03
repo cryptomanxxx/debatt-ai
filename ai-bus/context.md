@@ -179,5 +179,26 @@ valdes som näst bästa lösning utan att kräva ny ljudinfrastruktur.
 skulle gälla där, men projektet har redan valt att inte röra KanalPage (se
 "Ska INTE göras" ovan) utan explicit begäran.
 
+**v5.5 (3 sep 2026) — Anna/Peter större på skärmen i `/nyhetskallor`-overlayerna:**
+projektägaren skickade två skärminspelningar och påpekade att Anna syns för
+lite, både i den enskilda uppläsningen och i Studio-samtalet. Mätt direkt i
+video-pixelrymden (samma bildruteanalys-metod som blink-diagnosen): kortets
+faktiska bredd var ~430px (solo) resp. ~638px (studio, ~320px per person) av
+en ~1728px bred inspelning. Genom att jämföra mot de kända CSS-breddtaken
+(`min(380px,92vw)` solo, `min(560px,94vw)` studio) gick det att räkna ut att
+användarens enhet har en ovanligt bred CSS-viewport (~1527px — sannolikt en
+Samsung-surfplatta i liggande/DeX-läge, inte en vanlig telefon), vilket
+innebär att det var PX-TAKET (380/560) som styrde bredden hela tiden, inte
+vw-andelen — höjer man taket blir kortet proportionerligt större på just den
+här enhetens skärmtyp. Fix: `min(380px,92vw)` → `min(520px,94vw)` (solo),
+`min(560px,94vw)` → `min(760px,96vw)` (studio) — ca 36–37% större kort på
+breda skärmar, marginellt större även på vanliga telefoner (vw-andelen höjd
+något också). En första version använde `calc(100vw - 40px)` istället för
+vw-procent för att exakt respektera den 20px-paddingen på ytterlagret, men
+det visade sig faktiskt bli MINDRE än originalet på smala telefoner (372px
+mot ursprungliga 379px) — övergavs till förmån för den enklare vw-baserade
+lösningen som matchar den redan existerande (och ofarliga) marginella
+padding-överlappningen som fanns redan innan denna ändring.
+
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
