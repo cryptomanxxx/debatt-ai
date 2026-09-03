@@ -320,16 +320,20 @@ export default function AgentOverlay({ agent, namn, text, onClose }) {
               width: "100%", marginTop: "10px", padding: "10px",
               borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif",
               border: "1px solid #5a2020", background: "#1a0808", color: "#e05050",
-              cursor: "pointer", letterSpacing: "0.06em",
+              cursor: "pointer", letterSpacing: "0.06em", boxSizing: "border-box",
             }}
           >
             ⏹ Stäng
           </button>
         </div>
 
+        {/* boxSizing:"border-box" — utan den (ingen global reset finns i
+            projektet) räknas padding+border UTANPÅ width:min(320px,94vw),
+            vilket gör panelen bredare än 94vw och orsakar horisontell
+            scroll på smala telefoner (~320–354px), Codex-fynd på PR #1334. */}
         <div style={{
           width: "min(320px, 94vw)", background: "#050505", border: "1px solid #1a1a1a",
-          borderRadius: "12px", padding: "16px", overflowY: "auto",
+          borderRadius: "12px", padding: "16px", overflowY: "auto", boxSizing: "border-box",
         }}>
           <div style={{ fontSize: "10px", letterSpacing: "0.12em", fontFamily: "monospace", color: "#555", marginBottom: "10px" }}>
             TEXT

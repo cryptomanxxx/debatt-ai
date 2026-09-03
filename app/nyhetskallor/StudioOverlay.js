@@ -174,7 +174,7 @@ export default function StudioOverlay({ rubrik, beskrivning, onClose }) {
             width: "100%", marginTop: "10px", padding: "10px",
             borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif",
             border: "1px solid #5a2020", background: "#1a0808", color: "#e05050",
-            cursor: "pointer", letterSpacing: "0.06em",
+            cursor: "pointer", letterSpacing: "0.06em", boxSizing: "border-box",
           }}
         >
           ⏹ Stäng
