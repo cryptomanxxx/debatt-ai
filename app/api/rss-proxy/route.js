@@ -1,15 +1,17 @@
 // RSS-proxy: fetchar externa feeds via Vercels servrar (kringgår GitHub Actions IP-block).
 // Säkerhet: bara tillåtna domäner accepteras för att undvika öppen SSRF-proxy.
 const TILLÅTNA_DOMÄNER = [
-  "svt.se", "aftonbladet.se", "dagensarena.se", "omni.se",
+  "svt.se", "aftonbladet.se", "dagensarena.se", "omni.se", "expressen.se",
   "techcrunch.com", "wired.com", "arstechnica.com", "feeds.arstechnica.com",
-  "hnrss.org", "engadget.com",
+  "hnrss.org", "engadget.com", "ign.com", "feeds.ign.com",
   "feeds.bbci.co.uk", "aljazeera.com",
-  "ted.com", "research.google",
+  "ted.com", "research.google", "amazon.science", "bigthink.com",
+  "sciencealert.com", "quantamagazine.org",
+  "thelancet.com", "mdpi.com", "nature.com",
   "theverge.com",
   "reddit.com", "old.reddit.com",
   "youtube.com",
-  "coindesk.com",
+  "coindesk.com", "cointelegraph.com",
   "arxiv.org",
 ];
 

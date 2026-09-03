@@ -263,6 +263,7 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "SVT Nyheter":         ["sverige", "politik", "samhälle"],
     "Aftonbladet":         ["sverige", "samhälle"],
     "Dagens Arena":        ["politik", "samhälle", "sverige"],
+    "Expressen":           ["sverige", "samhälle"],
     "Reddit Sverige":      ["sverige", "samhälle"],
     "Reddit Ekonomi":      ["ekonomi"],
     "Reddit Klimat":       ["klimat", "energi"],
@@ -276,6 +277,9 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "Ars Technica":        ["tech", "forskning"],
     "Hacker News":         ["tech", "ai"],
     "Engadget":            ["tech"],
+    "IGN":                 ["spel"],
+    "CoinDesk":            ["krypto", "ekonomi"],
+    "Cointelegraph":       ["krypto", "ekonomi"],
     "BBC News":            ["international", "politik"],
     "Al Jazeera":          ["international", "politik"],
     "Reddit AI":           ["ai", "forskning"],
@@ -304,6 +308,13 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "Reddit Science":      ["forskning", "medicin"],
     "Google Research":     ["ai", "forskning"],
     "TED Talks":           ["forskning", "samhälle", "tech"],
+    "Amazon Science":      ["ai", "forskning", "tech"],
+    "Big Think":           ["forskning", "samhälle"],
+    "Science Alert":       ["forskning"],
+    "Quanta Magazine":     ["forskning", "ai"],
+    "The Lancet":          ["medicin", "forskning"],
+    "MDPI Healthcare":     ["medicin", "forskning"],
+    "Nature":              ["forskning", "medicin"],
     "arXiv: AI":                  ["ai", "forskning"],
     "arXiv: Machine Learning":    ["ai", "forskning", "tech"],
     "arXiv: Ekonomi":             ["ekonomi", "forskning"],
@@ -549,6 +560,7 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         ("SVT Nyheter",        _p("https://www.svt.se/nyheter/rss.xml")),
         ("Aftonbladet",        _p("https://rss.aftonbladet.se/rss2/small/pages/sections/senastenytt/")),
         ("Dagens Arena",       _p("https://www.dagensarena.se/feed/")),
+        ("Expressen",          _p("https://feeds.expressen.se/nyheter/")),
         # Reddit — 7 grupperade multi-subreddit-flöden istället för 31
         # separata anrop (se REDDIT_GRUPPER ovan i filen). Varje post taggas
         # om till sin riktiga individuella källa efter fetch.
@@ -560,12 +572,27 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         ("Ars Technica",       _p("https://feeds.arstechnica.com/arstechnica/index")),
         ("Hacker News",        _p("https://hnrss.org/frontpage")),
         ("Engadget",           _p("https://www.engadget.com/rss.xml")),
+        ("IGN",                _p("https://feeds.ign.com/ign/all")),
+        # Kryptovalutor — återinförda efter att ha saknats en tid (täcktes
+        # delvis av Reddit Crypto/Bitcoin, men de dedikerade branschsajterna
+        # gick förlorade i en tidigare omarbetning utan att CLAUDE.md
+        # uppdaterades — se ai-bus/context.md)
+        ("CoinDesk",           _p("https://www.coindesk.com/arc/outboundfeeds/rss/")),
+        ("Cointelegraph",      _p("https://cointelegraph.com/rss")),
         # Internationella nyheter
         ("BBC News",           _p("https://feeds.bbci.co.uk/news/rss.xml")),
         ("Al Jazeera",         _p("https://www.aljazeera.com/xml/rss/all.xml")),
         # AI-forskning & populärvetenskap
         ("Google Research",    _p("https://research.google/blog/rss/")),
         ("TED Talks",          _p("https://www.ted.com/talks/rss")),
+        ("Amazon Science",     _p("https://www.amazon.science/index.rss")),
+        ("Big Think",          _p("https://bigthink.com/feed/")),
+        ("Science Alert",      _p("https://www.sciencealert.com/feed")),
+        ("Quanta Magazine",    _p("https://www.quantamagazine.org/feed/")),
+        # Medicin/forskning — samma tidigare-borttagna kategori som krypto ovan
+        ("The Lancet",         _p("https://www.thelancet.com/rssfeed/lancet_current.xml")),
+        ("MDPI Healthcare",    _p("https://www.mdpi.com/rss/journal/healthcare")),
+        ("Nature",             _p("https://www.nature.com/nature.rss")),
         # arXiv — riktiga vetenskapliga papers (rubrik + abstract), inte bara
         # nyhetsrapportering om forskning. Litet startset, kan utökas efter
         # hur volym och kvalitet ser ut i praktiken.
