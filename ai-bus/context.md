@@ -226,7 +226,8 @@ v5.5 gjorde båda overlayerna påtagligt större). Lades till som skyddsnät:
 `overflowY: "auto"` på båda overlayernas yttre `position:fixed`-lager —
 om innehållet någon gång blir högre än skärmen går det att scrolla istället
 för att tyst försvinna utanför synfältet, utan att ändra något visuellt på
-enheter där innehållet redan får plats.
+enheter där innehållet redan får plats. **Bekräftat av projektägaren i
+produktion (3 sep 2026): ser bra ut.**
 
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
