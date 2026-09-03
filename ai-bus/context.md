@@ -271,6 +271,19 @@ som en enhet. Texten kommer från samma `lasning.text`-prop som redan
 skickades in för TTS (`rubrik. beskrivning` från `NyhetskallorClient.js`)
 — ingen ny datakälla behövdes, bara ny visning av befintlig data.
 
+**Codex-fynd på PR #1334, adresserat i efterhand:** textpanelen
+(`width:min(320px,94vw)` + `padding:16px` + `border:1px`) hade ingen
+`boxSizing:"border-box"` — projektet saknar en global `box-sizing`-reset,
+så padding+border adderas UTANPÅ den angivna bredden i standardläget
+(`content-box`). Vid viewports smalare än ~354px CSS-px (t.ex. 320px)
+blev panelens faktiska renderade bredd ~335px — bredare än skärmen,
+vilket kunde orsaka horisontell scroll. Fix: `boxSizing:"border-box"`
+tillagd på textpanelen. Samma exakta mönster (`width:"100%"` + padding +
+border, utan border-box) fanns redan sedan tidigare på båda "⏹ Stäng"-
+knapparna i `AgentOverlay.js` och `StudioOverlay.js` — fixade båda
+proaktivt samtidigt eftersom det är identisk bugklass, inte bara det
+enda Codex råkade flagga.
+
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
 
@@ -341,3 +354,6 @@ amplitud-styrda munanimation (`TalkingFace`) — ingen kodändring krävdes
 där, men Peters nya utseende (ingen skägg, ny bakgrund) syns nu även på
 `/podd`, inte bara `/nyhetskallor`. `/kanal` påverkas INTE — den sidans
 `AnchorImage` är hårdkodad till bara Anna.
+
+**Bekräftat av projektägaren i produktion (3 sep 2026): blinkningen
+fungerar bra.**
