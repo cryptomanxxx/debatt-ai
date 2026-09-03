@@ -341,3 +341,6 @@ amplitud-styrda munanimation (`TalkingFace`) — ingen kodändring krävdes
 där, men Peters nya utseende (ingen skägg, ny bakgrund) syns nu även på
 `/podd`, inte bara `/nyhetskallor`. `/kanal` påverkas INTE — den sidans
 `AnchorImage` är hårdkodad till bara Anna.
+
+**Bekräftat av projektägaren i produktion (3 sep 2026): blinkningen
+fungerar bra.**
