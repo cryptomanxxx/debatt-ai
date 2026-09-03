@@ -565,3 +565,17 @@ cookie-historik. Kunde inte testa live (sandboxen saknar
 internetåtkomst till youtube.com/debatt-ai.se) — nästa steg efter merge
 är samma verifieringsloop igen: projektägaren testar endpointen direkt,
 eller väntar på nästa `Nyhetsflöde`-körning och läser loggen.
+
+**Uppföljning — CONSENT-cookien räckte INTE:** projektägaren testade
+endpointen igen efter merge, exakt samma `{"error":"Inga undertexter
+tillgängliga"}`. Gissningen (samtyckessida) var antingen fel eller bara
+en del av orsaken. Istället för att gissa en tredje gång: lade till
+riktig diagnostik. `playerResponse.playabilityStatus` är YouTubes eget
+fält för VARFÖR en video inte spelas upp normalt (`"LOGIN_REQUIRED"`,
+`"AGE_CHECK_REQUIRED"`, `"ERROR"`, `"UNPLAYABLE"` m.fl.) — hade aldrig
+loggats, så felet gick inte att skilja från ett genuint saknat-
+undertexter-fall. Felmeddelandet i `fetchTranscript()` inkluderar nu
+`playability`-status, ev. `reason`-text, och om `captions`-nyckeln ens
+finns i svaret. Nästa steg: projektägaren testar endpointen igen efter
+denna merge — svaret pekar nu ut den faktiska orsaken direkt istället
+för att kräva ännu en gissningsrunda.
