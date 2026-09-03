@@ -28,6 +28,15 @@ async function fetchTranscript(videoId) {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
       "Accept-Language": "en-US,en;q=0.9",
       "Accept": "text/html,application/xhtml+xml",
+      // Utan en tidigare cookie-historik serverar YouTube ofta en förenklad
+      // "godkänn cookies"-sida till serverside-anrop (t.ex. från Vercels
+      // datacenter-IP) istället för den riktiga spelarsidan — giltig JSON,
+      // men utan captions-fältet, vilket gav "Inga undertexter tillgängliga"
+      // för videor som faktiskt HAR undertexter (verifierat manuellt:
+      // videon visar CC-knappen på youtube.com). CONSENT-cookien är ett
+      // väldokumenterat sätt (används av bl.a. yt-dlp) att förbikoppla
+      // samtyckessidan och få den fullständiga spelarsidan direkt.
+      "Cookie": "CONSENT=YES+1",
     },
     signal: AbortSignal.timeout(10000),
   });

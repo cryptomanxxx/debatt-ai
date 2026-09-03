@@ -535,3 +535,33 @@ visar den faktiska orsaken. Medvetet INTE gissat en fix i `route.js` än
 — fel gissning där hade bara dolt den verkliga orsaken bakom en ny,
 annorlunda gissning. Nästa steg: kör `Nyhetsflöde` igen efter denna
 diagnostik-fix är på main, läs det nya felmeddelandet, fixa roten.
+
+**Uppföljning — roten hittad och fixad (samma dag):** diagnostik-fixen
+mergades, `Nyhetsflöde` kördes igen manuellt. Nya loggen visade exakt
+felmeddelandet för alla 28 videor: `"Inga undertexter tillgängliga"`.
+Statistiskt osannolikt att ALLA 28 slumpmässiga videor från stora aktiva
+kanaler (OpenAI, Anthropic, Google DeepMind, NVIDIA, Lex Fridman m.fl.)
+saknar undertexter — misstänkte att YouTube serverar Vercels server en
+förenklad "godkänn cookies"-sida (giltig JSON, men utan captions-fältet)
+istället för den riktiga spelarsidan, eftersom inga cookies skickades
+med i anropet.
+
+**Verifierade misstanken korrekt innan någon kodändring** (samma
+"gissa inte blint"-disciplin som tidigare i den här tråden): bad
+projektägaren dels testa `/api/youtube-transcript`-endpointen direkt i
+sin egen webbläsare (visade samma fel — men avslöjade att det testet
+inte isolerar Vercel-IP:n, eftersom anropet till YouTube alltid görs
+FRÅN Vercels server oavsett vem som anropar vår endpoint), dels — den
+avgörande testen — kolla den faktiska videon (`_6jZlnRsXXQ`) direkt på
+youtube.com efter CC-knappen. Projektägaren bekräftade: videon HAR
+undertexter på riktigt. Det bevisade att felet satt i vår
+skrapningskod, inte i verkligheten.
+
+Fix: lade till `Cookie: "CONSENT=YES+1"` i request-headers i
+`fetchTranscript()` (`app/api/youtube-transcript/route.js`) — en
+väldokumenterad, allmänt känd teknik (används bl.a. av `yt-dlp`) för att
+förbikoppla YouTubes samtyckessida för anrop utan tidigare
+cookie-historik. Kunde inte testa live (sandboxen saknar
+internetåtkomst till youtube.com/debatt-ai.se) — nästa steg efter merge
+är samma verifieringsloop igen: projektägaren testar endpointen direkt,
+eller väntar på nästa `Nyhetsflöde`-körning och läser loggen.
