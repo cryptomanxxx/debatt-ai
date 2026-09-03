@@ -276,45 +276,65 @@ export default function AgentOverlay({ agent, namn, text, onClose }) {
       onClick={onClose}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px", overflowY: "auto" }}
     >
-      <div onClick={e => e.stopPropagation()} style={{ width: "min(520px, 94vw)", margin: "auto 0" }}>
-        <div style={{ position: "relative", borderRadius: "12px", overflow: "hidden", border: "1px solid #1a1a1a", aspectRatio: "3/4", background: "#050505" }}>
-          <AnchorImage cfg={cfg} blinkState={blinkState} isSpeaking={isSpeaking} />
+      {/* Rad med avataren till vänster och lästexten till höger — wrapar ner
+          textpanelen under avataren på smala skärmar istället för en fast
+          brytpunkt, samma "låt flexbox avgöra"-mönster som bredd/höjd-caparna
+          ovan. Till skillnad från Studio (som lägger texten UNDER två
+          sida-vid-sida-avatarer, där bredden redan är upptagen) har den
+          enskilda uppläsningen gott om ledigt utrymme till höger om den
+          ganska smala avatarrutan — använd det istället för att göra rutan
+          högre. */}
+      <div onClick={e => e.stopPropagation()} style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "16px", margin: "auto 0" }}>
+        <div style={{ width: "min(520px, 94vw)" }}>
+          <div style={{ position: "relative", borderRadius: "12px", overflow: "hidden", border: "1px solid #1a1a1a", aspectRatio: "3/4", background: "#050505" }}>
+            <AnchorImage cfg={cfg} blinkState={blinkState} isSpeaking={isSpeaking} />
 
-          <div style={{
-            position: "absolute", top: "12px", left: "12px",
-            display: "flex", alignItems: "center", gap: "6px",
-            background: "rgba(0,0,0,0.7)", borderRadius: "4px", padding: "4px 8px",
-          }}>
-            <span style={{
-              width: "6px", height: "6px", borderRadius: "50%",
-              background: running ? "#e05050" : "#444",
-              boxShadow: running ? "0 0 6px #e05050" : "none",
-            }} />
-            <span style={{ fontSize: "10px", letterSpacing: "0.12em", fontFamily: "monospace", color: running ? "#e05050" : "#555" }}>
-              LIVE
-            </span>
-          </div>
+            <div style={{
+              position: "absolute", top: "12px", left: "12px",
+              display: "flex", alignItems: "center", gap: "6px",
+              background: "rgba(0,0,0,0.7)", borderRadius: "4px", padding: "4px 8px",
+            }}>
+              <span style={{
+                width: "6px", height: "6px", borderRadius: "50%",
+                background: running ? "#e05050" : "#444",
+                boxShadow: running ? "0 0 6px #e05050" : "none",
+              }} />
+              <span style={{ fontSize: "10px", letterSpacing: "0.12em", fontFamily: "monospace", color: running ? "#e05050" : "#555" }}>
+                LIVE
+              </span>
+            </div>
 
-          <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.85))", padding: "20px 14px 10px" }}>
-            <div style={{ fontSize: "20px", fontWeight: 400, lineHeight: 1, color: cfg.farg }}>{visningsnamn}</div>
-            <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", marginTop: "2px" }}>{cfg.roll}</div>
-            <div style={{ marginTop: "8px" }}>
-              <WaveformBar isSpeaking={isSpeaking} isThinking={isThinking} farg={cfg.farg} />
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "linear-gradient(transparent, rgba(0,0,0,0.85))", padding: "20px 14px 10px" }}>
+              <div style={{ fontSize: "20px", fontWeight: 400, lineHeight: 1, color: cfg.farg }}>{visningsnamn}</div>
+              <div style={{ fontSize: "11px", color: "#888", letterSpacing: "0.08em", marginTop: "2px" }}>{cfg.roll}</div>
+              <div style={{ marginTop: "8px" }}>
+                <WaveformBar isSpeaking={isSpeaking} isThinking={isThinking} farg={cfg.farg} />
+              </div>
             </div>
           </div>
+
+          <button
+            onClick={onClose}
+            style={{
+              width: "100%", marginTop: "10px", padding: "10px",
+              borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif",
+              border: "1px solid #5a2020", background: "#1a0808", color: "#e05050",
+              cursor: "pointer", letterSpacing: "0.06em",
+            }}
+          >
+            ⏹ Stäng
+          </button>
         </div>
 
-        <button
-          onClick={onClose}
-          style={{
-            width: "100%", marginTop: "10px", padding: "10px",
-            borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif",
-            border: "1px solid #5a2020", background: "#1a0808", color: "#e05050",
-            cursor: "pointer", letterSpacing: "0.06em",
-          }}
-        >
-          ⏹ Stäng
-        </button>
+        <div style={{
+          width: "min(320px, 94vw)", background: "#050505", border: "1px solid #1a1a1a",
+          borderRadius: "12px", padding: "16px", overflowY: "auto",
+        }}>
+          <div style={{ fontSize: "10px", letterSpacing: "0.12em", fontFamily: "monospace", color: "#555", marginBottom: "10px" }}>
+            TEXT
+          </div>
+          <p style={{ margin: 0, fontSize: "14px", color: "#ccc", lineHeight: 1.7 }}>{text}</p>
+        </div>
       </div>
     </div>
   );
