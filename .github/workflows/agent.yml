@@ -107,6 +107,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          YOUTUBE_PROXY_SECRET: ${{ secrets.YOUTUBE_PROXY_SECRET }}
           PYTHONUNBUFFERED: "1"
           # Exakt cron-uttryck som triggade körningen (tomt vid workflow_dispatch).
           # agent.py använder detta istället för väggklockans UTC-timme för att
