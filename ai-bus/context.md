@@ -62,28 +62,35 @@ Stack: Next.js App Router, Supabase, Groq (primär AI), Gemini Flash (fallback),
 
 ## Bildmappning för Anna (`/public/avatarer/podd/`)
 
-Sedan sep 2026 (v4): pixelstabilt via lokal ansiktsjustering + kompositering,
-byggt av Claude Code snarare än levererat direkt av en bildgenerator. v1
-(pixelstabil metod, näst intill statisk mun — small/medium/large visuellt
-identiska) och v3 (bra mun-/ögonvariation, PÅSTODS pixelstabil men var det
-inte — Codex-granskning + oberoende pixel-diff visade 50%+ ändrade pixlar i
-pannan/kinderna/näsan mellan frames, dvs. hela ansiktet "skimrade" subtilt
-vid mun-cykling) löste var för sig bara hälften av problemet.
+**v5 (3 sep 2026, aktuell) — "anna_locked_final_v1", byggd av projektägaren + ChatGPT (~4h arbete), inte av Claude Code.**
+Helt annan arkitektur än v1–v4: inte 12 separat AI-genererade helbildsframes
+som efterhandsjusteras, utan EN omutlig masterduk (`anna_base.png`, 1536×1536)
++ 5 oberoende, alfamaskerade overlay-lager (`mouth_small/medium/large.png`,
+`eyes_half/closed.png`) som var för sig bara täcker en liten, tight region
+(mun ≈210×180px, ögon ≈375×115px — mätt, inte antaget). Pixelstabilitet är
+garanterad by construction: allt utanför de aktiva maskerna är exakt 0
+ändrade pixlar per design, inte något som behöver efterhandsverifieras och
+råka stämma. Claude Code komponerade de 12 kombinationerna själv (bas +
+valfri mun-lager + valfritt ögon-lager, `Image.alpha_composite` vid x=0,y=0
+enligt medföljande README) och verifierade ANDRA gången oberoende — inte
+bara tog leverantörens ord för det — innan filerna lades in: 0 pixlars
+skillnad utanför mun/ögon-boxarna på samtliga 12 kombinationer, både före
+och efter nedskalning 1536→1024px, plus riktig variation inuti boxarna
+(32–56% av munregionen ändras mellan mun-lägen, 41% av ögonregionen mellan
+open/half/closed). Detta är den första versionen där både "pixelstabilt"
+OCH "verkligt uttrycksfull mun/ögon" är sanna SAMTIDIGT, verifierat med
+samma rigorösa mätmetod som avslöjade att v3 inte var det den påstods vara.
 
-v4-metod: en tredje bildkälla gav frames med genuint bra mun-/ögonvariation
-men (precis som v3) inget delat masterduk — MediaPipe FaceMesh använder
-landmärken (ögonhörn, nästipp, panna — punkter som inte rör sig vid
-mun-/blinkrörelse) för att beräkna en similarity-transform (rotation+skala+
-translation) som geometriskt riktar in varje frames ansikte mot en vald
-masterbild. Ett feathrat ansiktsmask-lager kompositerar bara den inriktade
-ansiktsregionen ovanpå masterbildens OFÖRÄNDRADE bakgrund/hår/axlar.
-Resultat, verifierat oberoende (inte bara självrapporterat): bakgrund/axlar
-= 0 ändrad pixel (max=0) på alla 11 frames mot mastern, garanterat av
-kompositeringen — inte bara påstått. Mun-/ögonvariationen bevaras oförändrad
-från källbilderna (samma metod som gav bra uttryck i det tidigare, icke-
-stabila försöket). Alla 12 filer klassificerades objektivt via landmärke-
-härledda mått (eye aspect ratio, mouth aspect ratio) istället för att gissas
-fram visuellt.
+Tidigare versioner (för historik): v1 (pixelstabil metod, näst intill
+statisk mun — small/medium/large visuellt identiska) och v3 (bra
+mun-/ögonvariation, PÅSTODS pixelstabil men var det inte — Codex-granskning
++ oberoende pixel-diff visade 50%+ ändrade pixlar i pannan/kinderna/näsan
+mellan frames) löste var för sig bara hälften av problemet. v4 (Claude
+Codes egen MediaPipe FaceMesh-baserade similarity-transform +
+maskkompositering ovanpå en vald masterbild) löste båda halvorna men
+lämnade kvar en mindre "pannan rör sig i sidled"-artefakt som användaren
+själv upptäckte i video — det som ledde till att projektägaren och ChatGPT
+byggde v5 från grunden med en helt annan (enklare, mer robust) arkitektur.
 
 | Position | Öppna ögon | Halvöppna ögon | Stängda ögon |
 |---|---|---|---|
@@ -93,3 +100,6 @@ fram visuellt.
 | m3 stor mun | `anna-large.png` | `anna-m3-half.png` | `anna-m3-closed.png` |
 
 Oanvända filer: `anna-eyes-half.png`, `anna-eyes-closed.png`, `anna-blink-half.png`, `anna-blink-closed.png`
+
+**Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
+process planeras för Peter/Nationalekonom-karaktärens sprites.
