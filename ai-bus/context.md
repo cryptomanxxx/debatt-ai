@@ -136,7 +136,8 @@ React redan gått vidare till nästa state. Fix: `usePreload(cfg)`-hook i
 (1–3s fördröjning inbyggd i `useBlinkState`) och gott om marginal innan
 efterföljande blinkningar (3–7s mellanrum). Gäller automatiskt både
 `/nyhetskallor`s enskilda uppläsning och Studio-samtalet (båda återanvänder
-samma delade `AnchorImage`-komponent).
+samma delade `AnchorImage`-komponent). **Bekräftat av projektägaren i
+produktion (3 sep 2026): blinkningen syns igen.**
 
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
