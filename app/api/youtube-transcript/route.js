@@ -64,7 +64,20 @@ async function fetchTranscript(videoId) {
   }
 
   const tracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-  if (!tracks?.length) throw new Error("Inga undertexter tillgängliga");
+  if (!tracks?.length) {
+    // Konsekvent "Inga undertexter tillgängliga" på videor som VERIFIERAT har
+    // undertexter (CC-knappen syns på youtube.com) — CONSENT-cookien löste
+    // det inte ensam. playabilityStatus är YouTubes egna fält för VARFÖR en
+    // spelare inte fungerar normalt (t.ex. "LOGIN_REQUIRED", "AGE_CHECK
+    // _REQUIRED", "ERROR") — hade aldrig loggats innan, så felet gick inte
+    // att skilja från ett genuint saknat-undertexter-fall utan att gissa.
+    const status = playerResponse?.playabilityStatus?.status || "okänd";
+    const reason = playerResponse?.playabilityStatus?.reason || "";
+    const harCaptionsNyckel = playerResponse?.captions ? "ja" : "nej";
+    throw new Error(
+      `Inga undertexter tillgängliga (playability: ${status}${reason ? " — " + reason : ""}, captions-nyckel finns: ${harCaptionsNyckel})`
+    );
+  }
 
   // Prioritera svenska, sedan engelska
   let track = null;
