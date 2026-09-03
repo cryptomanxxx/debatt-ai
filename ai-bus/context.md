@@ -357,3 +357,42 @@ där, men Peters nya utseende (ingen skägg, ny bakgrund) syns nu även på
 
 **Bekräftat av projektägaren i produktion (3 sep 2026): blinkningen
 fungerar bra.**
+
+---
+
+## Uppläsningsfunktionen flyttad: /nyhetskallor → /nyhetsanalyser (3 sep 2026)
+
+Projektägaren observerade att `/nyhetskallor` i praktiken är rå, ibland
+maskinöversatt RSS-text, medan `/nyhetsanalyser` innehåller faktisk
+agent-författad kommentar — och att Anna/Peters uppläsning hörde
+tematiskt hemma på den senare, inte den förra. Efter diskussion (se
+"Vad tycker du om..." i sessionshistoriken) flyttades funktionen rakt av:
+
+- **Togs bort från `/nyhetskallor`:** `LASARE`-arrayen, `STUDIO_FARG`,
+  `onLas`/`onStudio`-proppar på `NyhetsRad`, `lasning`/`studio`-state,
+  och `<AgentOverlay>`/`<StudioOverlay>`-renderingen i
+  `NyhetskallorClient.js`. "Fråga AI-agenter"-panelen (`AgentAnalysPanel`,
+  separat feature) rördes INTE.
+- **Tillagd på `/nyhetsanalyser`:** samma tre knappar (🎙️ Anna läser /
+  📊 Peter läser / 🎭 Anna & Peter i studion) per analysrad i
+  `app/nyhetsanalyser/page.js`. `AgentOverlay`/`StudioOverlay` importeras
+  korsmapp från `app/nyhetskallor/` (komponentfilerna flyttades INTE —
+  ingen anledning att röra filplatsen bara för att funktionen flyttar).
+- **Vad som läses upp ändrades medvetet:** solo-uppläsningen läser nu
+  `rubrik. analys` (agentens egen kommentartext) istället för
+  `rubrik. beskrivning` (rå RSS-text) — det är hela poängen med flytten.
+  Studio-samtalet genererar precis som förut ett NYTT Anna+Peter-samtal
+  om den underliggande nyheten (via `/api/studio`, rubrik+beskrivning),
+  oförändrad logik — bara omkopplad till att triggas från
+  `nyhetsanalys`-radens länkade `nyhetsflode`-post istället för en
+  `nyhetsflode`-rad direkt. `beskrivning`-fältet lades till i
+  `nyhetsanalyser`s Supabase-select (`nyhetsflode(...,beskrivning)`) för
+  att Studio ska ha samma kontext som förut.
+- **`/api/studio/route.js`s toppkommentar uppdaterad** för att referera
+  `/nyhetsanalyser` istället för den nu inaktuella `/nyhetskallor`.
+
+Läs-knapparna gäller Anna/Peter oavsett vilken av de 24 agenterna som
+skrev själva analysen (samma mönster som förut — en liten fast uppsättning
+"uppläsarpersonas", inte kopplat till vem som "äger" texten), eftersom
+`AgentOverlay`/`StudioOverlay` bara har röst/bildkonfiguration för Anna
+och Nationalekonom.

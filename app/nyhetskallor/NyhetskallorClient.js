@@ -1,7 +1,5 @@
 "use client";
 import { useMemo, useState } from "react";
-import AgentOverlay from "./AgentOverlay";
-import StudioOverlay from "./StudioOverlay";
 import NyhetsTicker from "./NyhetsTicker";
 import NastaHamtningRaknare from "./NastaHamtningRaknare";
 
@@ -176,13 +174,7 @@ function AgentAnalysPanel({ n, expanderad, onToggle, valda, onToggleAgent, analy
   );
 }
 
-const LASARE = [
-  { agent: "Anna", namn: "Anna", farg: ANNA_FARG, ikon: "🎙️" },
-  { agent: "Nationalekonom", namn: "Peter", farg: "#6abf6a", ikon: "📊" },
-];
-const STUDIO_FARG = "#c084fc";
-
-function NyhetsRad({ n, status, onForesla, onLas, onStudio, analysProps }) {
+function NyhetsRad({ n, status, onForesla, analysProps }) {
   const [expanderad, setExpanderad] = useState(false);
   const kortText = (n.beskrivning || "").length > 220;
   const visadText = expanderad || !kortText ? n.beskrivning : n.beskrivning.slice(0, 220) + "…";
@@ -226,21 +218,6 @@ function NyhetsRad({ n, status, onForesla, onLas, onStudio, analysProps }) {
             {status === "laddar" ? "Skickar…" : "Föreslå för agenterna →"}
           </button>
         )}
-        {LASARE.map(({ agent, namn, farg, ikon }) => (
-          <button
-            key={agent}
-            onClick={() => onLas(agent, namn)}
-            style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${farg}50`, color: farg, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
-          >
-            {ikon} {namn} läser
-          </button>
-        ))}
-        <button
-          onClick={onStudio}
-          style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${STUDIO_FARG}50`, color: STUDIO_FARG, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
-        >
-          🎭 Anna & Peter i studion
-        </button>
       </div>
       <AgentAnalysPanel n={n} {...analysProps} />
     </div>
@@ -263,8 +240,6 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
   const [expanderade, setExpanderade] = useState(() => new Set());
   const [valdaAgenter, setValdaAgenter] = useState({}); // { [id]: Set<agent> }
   const [analyser, setAnalyser] = useState({}); // { [id]: { [agent]: { status, text } } }
-  const [lasning, setLasning] = useState(null); // { id, agent, namn, text } | null
-  const [studio, setStudio] = useState(null); // { id, rubrik, beskrivning } | null
 
   // Datumbaserad paginering (hamtad < senaste laddade tidsstämpel) istället
   // för offset — offset skulle kunna hoppa över eller dubblettvisa rader om
@@ -453,8 +428,6 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
               n={n}
               status={statusar[n.id]}
               onForesla={() => foreslaNyhet(n)}
-              onLas={(agent, namn) => setLasning({ id: n.id, agent, namn, text: n.beskrivning ? `${n.rubrik}. ${n.beskrivning}` : n.rubrik })}
-              onStudio={() => setStudio({ id: n.id, rubrik: n.rubrik, beskrivning: n.beskrivning })}
               analysProps={{
                 expanderad: expanderade.has(n.id),
                 onToggle: () => toggleExpand(n.id),
@@ -479,12 +452,6 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
           </div>
         )}
       </main>
-      {lasning && (
-        <AgentOverlay key={`${lasning.id}-${lasning.agent}`} agent={lasning.agent} namn={lasning.namn} text={lasning.text} onClose={() => setLasning(null)} />
-      )}
-      {studio && (
-        <StudioOverlay key={`studio-${studio.id}`} rubrik={studio.rubrik} beskrivning={studio.beskrivning} onClose={() => setStudio(null)} />
-      )}
       <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
     </div>
   );

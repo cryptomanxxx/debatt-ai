@@ -1,6 +1,7 @@
 /**
  * POST /api/studio — genererar ett kort Anna+Peter-studiosamtal om en enskild
- * nyhet från /nyhetskallor. Ren textdialog via den centrala LLM-routern
+ * nyhet, utlöst från /nyhetsanalyser (flyttades dit från /nyhetskallor, se
+ * ai-bus/context.md). Ren textdialog via den centrala LLM-routern
  * (callWithFallback + getDynamicChain) — ljuduppspelningen sker helt
  * klientsidan i StudioOverlay.js via responsiveVoice, precis som den
  * befintliga uppläsningsfunktionen (AgentOverlay.js).
