@@ -1,6 +1,14 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AGENT_VISUELL } from "../agentData";
+// Uppläsnings-/studiofunktionen (tidigare på /nyhetskallor) flyttades hit
+// eftersom analystexten är agent-författad kommentar snarare än rå,
+// ibland maskinöversatt RSS-text — Annas/Peters röst passar bättre mot
+// innehåll som redan ÄR agent-röst. Komponenterna bor kvar i sin
+// ursprungliga mapp (ingen anledning att flytta filerna bara för att
+// funktionen flyttar) och importeras korsmapp precis som React tillåter.
+import AgentOverlay, { AGENTER } from "../nyhetskallor/AgentOverlay";
+import StudioOverlay from "../nyhetskallor/StudioOverlay";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -11,6 +19,13 @@ const C = {
   text: "#f0ede6", textMuted: "#888880", accentDim: "#aaaaaa",
 };
 const LANK = "#38bdf8";
+const STUDIO_FARG = "#c084fc";
+// Färgerna hämtas från AGENTER (AgentOverlay.js) istället för att dupliceras
+// som egna hex-koder, så de aldrig kan glida isär från uppläsningsoverlayen.
+const LASARE = [
+  { agent: "Anna", namn: "Anna", farg: AGENTER.Anna.farg, ikon: "🎙️" },
+  { agent: "Nationalekonom", namn: "Peter", farg: AGENTER.Nationalekonom.farg, ikon: "📊" },
+];
 
 const ALLA_AGENTER = Object.keys(AGENT_VISUELL).sort();
 const PAGE_SIZE = 15;
@@ -47,6 +62,8 @@ export default function NyhetsanalyserPage() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(null);
+  const [lasning, setLasning] = useState(null); // { id, agent, namn, text } | null
+  const [studio, setStudio] = useState(null); // { id, rubrik, beskrivning } | null
   // Codex-fynd (PR #1319): utan detta kan ett byte av agentFilter medan en
   // tidigare fetch fortfarande är i luften låta det GAMLA svaret landa efter
   // det nya och skriva över/lägga till fel agents rader — dropdownen visar
@@ -56,7 +73,7 @@ export default function NyhetsanalyserPage() {
 
   const buildQuery = useCallback((pageIdx, currentAgent) => {
     const offset = pageIdx * PAGE_SIZE;
-    let q = `${SB_URL}/rest/v1/nyhetsanalys?order=skapad.desc&limit=${PAGE_SIZE}&offset=${offset}&select=id,agent,analys,skapad,nyhetsflode(id,rubrik,kalla,url)`;
+    let q = `${SB_URL}/rest/v1/nyhetsanalys?order=skapad.desc&limit=${PAGE_SIZE}&offset=${offset}&select=id,agent,analys,skapad,nyhetsflode(id,rubrik,kalla,url,beskrivning)`;
     if (currentAgent) q += `&agent=eq.${encodeURIComponent(currentAgent)}`;
     return q;
   }, []);
@@ -215,6 +232,25 @@ export default function NyhetsanalyserPage() {
                       {isOpen ? "▲ Visa mindre" : "▼ Läs hela analysen"}
                     </button>
                   )}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                    {LASARE.map(({ agent, namn, farg: lasFarg, ikon }) => (
+                      <button
+                        key={agent}
+                        onClick={() => setLasning({ id: r.id, agent, namn, text: rubrik ? `${rubrik}. ${r.analys}` : r.analys })}
+                        style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${lasFarg}50`, color: lasFarg, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
+                      >
+                        {ikon} {namn} läser
+                      </button>
+                    ))}
+                    {rubrik && (
+                      <button
+                        onClick={() => setStudio({ id: r.id, rubrik, beskrivning: r.nyhetsflode?.beskrivning || "" })}
+                        style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${STUDIO_FARG}50`, color: STUDIO_FARG, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
+                      >
+                        🎭 Anna & Peter i studion
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -241,6 +277,12 @@ export default function NyhetsanalyserPage() {
           <p style={{ color: C.textMuted, textAlign: "center", padding: "60px 0", fontFamily: "monospace" }}>Laddar…</p>
         )}
       </div>
+      {lasning && (
+        <AgentOverlay key={`${lasning.id}-${lasning.agent}`} agent={lasning.agent} namn={lasning.namn} text={lasning.text} onClose={() => setLasning(null)} />
+      )}
+      {studio && (
+        <StudioOverlay key={`studio-${studio.id}`} rubrik={studio.rubrik} beskrivning={studio.beskrivning} onClose={() => setStudio(null)} />
+      )}
     </div>
   );
 }
