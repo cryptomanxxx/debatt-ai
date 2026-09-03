@@ -200,5 +200,33 @@ mot ursprungliga 379px) — övergavs till förmån för den enklare vw-baserade
 lösningen som matchar den redan existerande (och ofarliga) marginella
 padding-överlappningen som fanns redan innan denna ändring.
 
+**v5.6 (3 sep 2026) — solo-croppen fixad (kapades vid hakan), skyddsnät mot
+att popupen blir högre än skärmen:** v5.5 gjorde bara popup-fönstren
+BREDARE, inte annat — men projektägaren rapporterade att bilden fortfarande
+kapas: vid hakan i solo-läget, under axlarna i Studio. Simulerade CSS
+`object-fit:cover`+`object-position:center top`-croppen exakt med PIL på de
+faktiska sprite-filerna (`anna.png` 1024×1024, `nationalekonom.png`
+1024×672) istället för att gissa. Bekräftat: solo-kortets `aspectRatio:
+"4/3"` (liggande) på en fyrkantig, tajt beskuren källbild gav ett
+matematiskt konstant croppat 25% av bildens underkant — munnen hamnade
+bokstavligen i nederkant, ingen hals synlig, OBEROENDE av kortets
+absoluta storlek (samma crop-andel fanns redan innan v5.5, blev bara mer
+påtaglig när kortet blev större). Studio-per-person-rutans `aspectRatio:
+"3/4"` (stående) gav i simuleringen en korrekt, ocroppad bild ner till
+kavaj/krage för både Anna och Peter — inget crop-fel där enligt matematiken.
+Fix: solo-kortets aspectRatio ändrad `4/3` → `3/4` (samma proportioner som
+Studio) — verifierat visuellt att båda agenter nu visas ner till
+kavaj/krage utan att hakan skärs av. Bieffekt av fixen: en `3/4`-ruta är
+~78% högre än en `4/3`-ruta vid samma bredd, vilket ökar risken att hela
+popupen (kort + textremsa + Stäng-knapp) blir högre än skärmens synliga
+yta på kortare enheter — exakt den typ av "osynlig avklippning bortom
+skärmkanten" som troligen redan drabbade Studio-läget (ingen `maxHeight`
+eller `overflow`-hantering fanns någonstans innan denna fix, trots att
+v5.5 gjorde båda overlayerna påtagligt större). Lades till som skyddsnät:
+`overflowY: "auto"` på båda overlayernas yttre `position:fixed`-lager —
+om innehållet någon gång blir högre än skärmen går det att scrolla istället
+för att tyst försvinna utanför synfältet, utan att ändra något visuellt på
+enheter där innehållet redan får plats.
+
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
