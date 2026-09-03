@@ -274,9 +274,9 @@ export default function AgentOverlay({ agent, namn, text, onClose }) {
   return (
     <div
       onClick={onClose}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", overflowY: "auto" }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px", overflowY: "auto" }}
     >
-      <div onClick={e => e.stopPropagation()} style={{ width: "min(520px, 94vw)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "min(520px, 94vw)", margin: "auto 0" }}>
         <div style={{ position: "relative", borderRadius: "12px", overflow: "hidden", border: "1px solid #1a1a1a", aspectRatio: "3/4", background: "#050505" }}>
           <AnchorImage cfg={cfg} blinkState={blinkState} isSpeaking={isSpeaking} />
 

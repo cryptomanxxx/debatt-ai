@@ -229,5 +229,24 @@ för att tyst försvinna utanför synfältet, utan att ändra något visuellt p�
 enheter där innehållet redan får plats. **Bekräftat av projektägaren i
 produktion (3 sep 2026): ser bra ut.**
 
+**v5.7 (3 sep 2026) — två Codex-fynd på PR #1330/#1331, adresserade i
+efterhand:** (1) bekräftade konkret att den förstorade solo-/studio-rutan
+kan bli högre än korta liggande viewports (t.ex. 844×390, 1024×600) —
+samma risk jag redan misstänkt i v5.6, nu med konkreta exempel. (2) mer
+allvarligt: `overflowY:"auto"`-skyddsnätet jag lade till i v5.6 löste INTE
+problemet fullt ut — `alignItems:"center"` i kombination med `overflow`
+är en känd CSS-fälla: innehåll som hamnar OVANFÖR den centrerade
+positionen blir inte nåbart via scroll i många webbläsare (flexboxens
+statiska centreringsalgoritm skapar ett "osynligt" överflödesområde som
+`safe`-nyckelordet — inte brett stött ännu — specifikt uppfanns för att
+lösa). Fix: bytte centreringsmetod till den vedertagna scroll-säkra
+varianten — ytterlagrets `alignItems` ändrad `"center"` → `"flex-start"`,
+och kortets egen `margin: "auto 0"` centrerar det vertikalt genom att
+absorbera ledigt utrymme (samma visuella resultat när allt får plats),
+men kollapsar till normalt boxflöde (top-startpunkt, fullt scrollbart)
+när innehållet är högre än skärmen — till skillnad från
+`alignItems:"center"` ger detta ALDRIG onåbart innehåll, oavsett
+webbläsarens stöd för `safe center`.
+
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
