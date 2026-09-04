@@ -51,7 +51,7 @@ async function getData() {
 export default async function UniversitetPage() {
   const { fynd, nyheter } = await getData();
 
-  const discipliner = new Set(fynd.map(f => f.disciplin).filter(Boolean));
+  const discipliner = new Set(fynd.map(f => f.disciplin || "övrigt"));
   const genombrott = fynd.filter(f => f.impakt === "genombrottsfynd").length;
 
   return (

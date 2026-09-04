@@ -10,7 +10,7 @@ function VetenskapsRad({ item }) {
   const arXiv = (item.kalla || "").startsWith("arXiv");
   const farg = arXiv ? "#fb923c" : "#38bdf8";
   const datum = item.hamtad
-    ? new Date(item.hamtad).toLocaleDateString("sv-SE", { year: "numeric", month: "short", day: "numeric" })
+    ? new Date(item.hamtad).toLocaleDateString("sv-SE", { year: "numeric", month: "short", day: "numeric", timeZone: "Europe/Stockholm" })
     : "";
 
   return (
