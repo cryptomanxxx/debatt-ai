@@ -56,6 +56,15 @@ export async function POST(req) {
   if (typ === "url" && (!kallaUrl || !/^https:\/\//.test(kallaUrl))) {
     return Response.json({ error: "Ogiltig URL." }, { status: 400 });
   }
+  // Utan detta kunde ett anrop med aktion="diskussion" men saknad/ogiltig
+  // dialog (t.ex. direkt mot den här publika routen, utanför sidans egen
+  // /api/studio-flöde) spara en permanent rad som ser ut som ett
+  // studiosamtal men aldrig kan expanderas eller spelas upp — sidan gate:ar
+  // "Spela upp igen" strikt på rad.aktion === "diskussion" (Codex-fynd,
+  // PR #1345/#1346).
+  if (aktion === "diskussion" && !dialog) {
+    return Response.json({ error: "Ogiltig eller saknad dialog." }, { status: 400 });
+  }
 
   const res = await fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log`, {
     method: "POST",
