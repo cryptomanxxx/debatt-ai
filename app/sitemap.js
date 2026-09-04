@@ -95,6 +95,7 @@ export default async function sitemap() {
     { url: `${BASE}/agentforslag`,      lastModified: now, changeFrequency: "daily",   priority: 0.5 },
     { url: `${BASE}/community`,         lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE}/podd`,              lastModified: now, changeFrequency: "weekly",  priority: 0.6 },
+    { url: `${BASE}/fraga-anna-och-peter`, lastModified: now, changeFrequency: "weekly", priority: 0.5 },
     { url: `${BASE}/redaktion`,         lastModified: now, changeFrequency: "weekly",  priority: 0.5 },
     { url: `${BASE}/tidsgraf`,          lastModified: now, changeFrequency: "daily",   priority: 0.5 },
     { url: `${BASE}/labb`,              lastModified: now, changeFrequency: "monthly", priority: 0.5 },

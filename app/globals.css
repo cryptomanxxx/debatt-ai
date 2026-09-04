@@ -111,6 +111,21 @@
   box-shadow: 0 0 6px #e879f9;
 }
 
+.ny-badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 5px;
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: 800;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+  color: #0a0a0a;
+  background: #4ade80;
+  border-radius: 3px;
+  line-height: 1.5;
+}
+
 .artikel-kort {
   transition: border-color 0.15s;
 }
