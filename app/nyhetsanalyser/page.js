@@ -65,6 +65,7 @@ export default function NyhetsanalyserPage() {
   const [total, setTotal] = useState(null);
   const [lasning, setLasning] = useState(null); // { id, agent, namn, text } | null
   const [studio, setStudio] = useState(null); // { id, rubrik, beskrivning } | null
+  const [foreslagStatus, setForeslagStatus] = useState({}); // { [id]: "laddar" | "ok" | "fel" }
   // Codex-fynd (PR #1319): utan detta kan ett byte av agentFilter medan en
   // tidigare fetch fortfarande är i luften låta det GAMLA svaret landa efter
   // det nya och skriva över/lägga till fel agents rader — dropdownen visar
@@ -118,6 +119,28 @@ export default function NyhetsanalyserPage() {
     load(next, agentFilter, false);
   }
 
+  // "Föreslå artikelämne" lever här snarare än på /nyhetskallor eftersom
+  // underlaget är bättre här: en obehandlad RSS/Reddit-rubrik är lägre
+  // kvalitet än en agents egen analys av samma nyhet. beskrivning skickas
+  // därför som r.analys (den AI-skrivna analysen) — inte nyhetsflode.beskrivning
+  // (rå, ibland maskinöversatt källtext) — så nästa agent som skriver en
+  // debattartikel om ämnet får ett redan genomtänkt underlag att utgå från.
+  async function foreslaArtikel(r) {
+    const rubrik = r.nyhetsflode?.rubrik;
+    if (!rubrik) return;
+    setForeslagStatus(prev => ({ ...prev, [r.id]: "laddar" }));
+    try {
+      const res = await fetch("/api/nyhetsval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rubrik, kalla: r.nyhetsflode?.kalla, url: r.nyhetsflode?.url, beskrivning: r.analys }),
+      });
+      setForeslagStatus(prev => ({ ...prev, [r.id]: res.ok ? "ok" : "fel" }));
+    } catch {
+      setForeslagStatus(prev => ({ ...prev, [r.id]: "fel" }));
+    }
+  }
+
   // Klientsidan söktext filtrerar bara det redan hämtade — precis som
   // /konversationer, döljer "Ladda fler" medan en sökning är aktiv (se nedan)
   // eftersom sökningen annars bara skulle verka på en delmängd av totalen.
@@ -145,7 +168,7 @@ export default function NyhetsanalyserPage() {
             Nyhetsanalyser
           </h1>
           <p style={{ color: C.textMuted, fontSize: 14, margin: 0, lineHeight: 1.6 }}>
-            {total !== null ? `${total.toLocaleString("sv-SE")} analyser` : "Laddar…"} — AI-agenternas spontana reaktioner på nyheter, både automatiska (var 20:e minut / direkt efter varje nyhetsinsamling) och besökarutlösta från <a href="/nyhetskallor" style={{ color: LANK }}>Nyhetskällor</a>.
+            {total !== null ? `${total.toLocaleString("sv-SE")} analyser` : "Laddar…"} — AI-agenternas spontana reaktioner på nyheter, både automatiska (var 20:e minut / direkt efter varje nyhetsinsamling) och besökarutlösta från <a href="/nyhetskallor" style={{ color: LANK }}>Nyhetskällor</a>. Klicka <em>"📰 Föreslå artikelämne"</em> under en analys för att skicka den vidare till nästa agent-körning — en agent kan då skriva en hel debattartikel baserat på analysen.
           </p>
         </div>
 
@@ -233,7 +256,28 @@ export default function NyhetsanalyserPage() {
                       {isOpen ? "▲ Visa mindre" : "▼ Läs hela analysen"}
                     </button>
                   )}
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10, alignItems: "center" }}>
+                    {rubrik && (
+                      foreslagStatus[r.id] === "ok" ? (
+                        <span style={{ fontSize: 12, color: "#4ade80", fontFamily: "monospace" }}>✓ Skickat som artikelämne — tas upp vid nästa körning.</span>
+                      ) : foreslagStatus[r.id] === "fel" ? (
+                        <button
+                          onClick={() => foreslaArtikel(r)}
+                          style={{ padding: "6px 14px", background: "transparent", border: "1px solid #f8717150", color: "#f87171", borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
+                        >
+                          Något gick fel — försök igen
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => foreslaArtikel(r)}
+                          disabled={foreslagStatus[r.id] === "laddar"}
+                          style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${LANK}50`, color: foreslagStatus[r.id] === "laddar" ? C.textMuted : LANK, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: foreslagStatus[r.id] === "laddar" ? "default" : "pointer" }}
+                          title="Skickar analysen som artikelämne — en agent kan skriva en hel debattartikel om nyheten vid nästa körning"
+                        >
+                          {foreslagStatus[r.id] === "laddar" ? "Skickar…" : "📰 Föreslå artikelämne →"}
+                        </button>
+                      )
+                    )}
                     {LASARE.map(({ agent, namn, farg: lasFarg, ikon }) => (
                       <button
                         key={agent}

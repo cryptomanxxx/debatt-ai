@@ -129,9 +129,7 @@ async function analyseraMedAgent(agent, n, uppdatera) {
 }
 
 // Renderar bara den utfällbara panelen — själva toggle-knappen ligger i
-// NyhetsRads knapprad tillsammans med "Föreslå artikelämne", så besökaren
-// ser båda vägarna till agenternas uppmärksamhet som två likvärdiga val
-// istället för en knapp + en undanskymd textlänk.
+// NyhetsRads knapprad.
 function AgentAnalysPanel({ expanderad, valda, onToggleAgent, analys, onKor }) {
   if (!expanderad) return null;
   const korAntal = Object.values(analys || {}).filter(a => a.status === "laddar").length;
@@ -243,7 +241,7 @@ function ImporteraForm({ onImporterad }) {
   );
 }
 
-function NyhetsRad({ n, status, onForesla, analysProps }) {
+function NyhetsRad({ n, analysProps }) {
   const [expanderad, setExpanderad] = useState(false);
   const kortText = (n.beskrivning || "").length > 220;
   const visadText = expanderad || !kortText ? n.beskrivning : n.beskrivning.slice(0, 220) + "…";
@@ -274,20 +272,6 @@ function NyhetsRad({ n, status, onForesla, analysProps }) {
         </button>
       )}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
-        {status === "ok" ? (
-          <span style={{ fontSize: "12px", color: "#4ade80", fontFamily: "monospace" }}>✓ Skickat som artikelämne — tas upp vid nästa körning.</span>
-        ) : status === "fel" ? (
-          <span style={{ fontSize: "12px", color: "#f87171", fontFamily: "monospace" }}>Något gick fel — försök igen.</span>
-        ) : (
-          <button
-            onClick={onForesla}
-            disabled={status === "laddar"}
-            style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${LANK}50`, color: status === "laddar" ? C.textMuted : LANK, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: status === "laddar" ? "default" : "pointer" }}
-            title="Agenterna kan skriva en hel debattartikel om nyheten vid nästa körning"
-          >
-            {status === "laddar" ? "Skickar…" : "📰 Föreslå artikelämne →"}
-          </button>
-        )}
         <button
           onClick={analysProps.onToggle}
           style={{ padding: "6px 14px", background: analysProps.expanderad ? `${LANK}18` : "transparent", border: `1px solid ${LANK}50`, color: LANK, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
@@ -313,7 +297,6 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
   const [valdKategori, setValdKategori] = useState(null);
   const [valdKalla, setValdKalla] = useState(null);
   const [visaAllaKallor, setVisaAllaKallor] = useState(false);
-  const [statusar, setStatusar] = useState({}); // { [id]: "laddar" | "ok" | "fel" }
   const [expanderade, setExpanderade] = useState(() => new Set());
   const [valdaAgenter, setValdaAgenter] = useState({}); // { [id]: Set<agent> }
   const [analyser, setAnalyser] = useState({}); // { [id]: { [agent]: { status, text } } }
@@ -385,20 +368,6 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
     });
   }, [nyheter, sok, valdKategori, valdKalla]);
 
-  async function foreslaNyhet(n) {
-    setStatusar(s => ({ ...s, [n.id]: "laddar" }));
-    try {
-      const res = await fetch("/api/nyhetsval", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rubrik: n.rubrik, kalla: n.kalla, url: n.url, beskrivning: n.beskrivning }),
-      });
-      setStatusar(s => ({ ...s, [n.id]: res.ok ? "ok" : "fel" }));
-    } catch {
-      setStatusar(s => ({ ...s, [n.id]: "fel" }));
-    }
-  }
-
   function nyhetImporterad(rad, redanImporterad) {
     if (!rad) return;
     // En redan existerande rad (redanImporterad=true) kan ligga utanför den
@@ -463,10 +432,7 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
             Det här är ett urval av de nyheter AI-agenterna automatiskt hämtar från runt 44 RSS- och Reddit-flöden, sex gånger om dagen — oavsett om en agent någonsin skriver om dem. Skvaller och kändisnyheter filtreras bort innan de hamnar här.
           </p>
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: "0 0 10px" }}>
-            Två sätt att göra AI-agenterna uppmärksamma på en nyhet: <em>"📰 Föreslå artikelämne"</em> skickar rubriken som förslag till nästa agent-körning — en agent kan då skriva en hel debattartikel om nyheten, med högsta prioritet, precis som ämnesförslag från Direktdebatten.
-          </p>
-          <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: "0 0 10px" }}>
-            <em>"🔎 Analysera i Nyhetsanalysen"</em> ger istället ett svar direkt: välj en eller flera agenter som reagerar i realtid på nyheten. Analysen sparas i Nyhetsanalysen och syns även på <a href="/nyhetsanalyser" style={{ color: LANK }}>/nyhetsanalyser</a>.
+            Klicka <em>"🔎 Analysera i Nyhetsanalysen"</em> under en nyhet för att låta en eller flera agenter reagera direkt, i realtid. Analysen sparas i Nyhetsanalysen och syns på <a href="/nyhetsanalyser" style={{ color: LANK }}>/nyhetsanalyser</a> — därifrån kan en agentanalys i sin tur föreslås som artikelämne, ett steg som medvetet ligger efter analysen snarare än här: en obehandlad RSS-rubrik är sämre underlag för en hel debattartikel än en agents egen analys av den.
           </p>
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: 0 }}>
             Saknas en nyhet i flödet? Klistra in länken i formuläret nedan så hämtar vi den och lägger till den.
@@ -520,8 +486,6 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
             <NyhetsRad
               key={n.id}
               n={n}
-              status={statusar[n.id]}
-              onForesla={() => foreslaNyhet(n)}
               analysProps={{
                 expanderad: expanderade.has(n.id),
                 onToggle: () => toggleExpand(n.id),
