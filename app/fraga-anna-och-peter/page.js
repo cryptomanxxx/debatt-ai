@@ -19,6 +19,9 @@ const LANK = "#38bdf8";
 const TEXT_MAX = 1500;
 const URL_MAX = 2000;
 const PAGE_SIZE = 15;
+// Tröskel för när "Visa hela frågan"-knappen dyker upp i historiken — ingen
+// hård gräns, texten kapas aldrig bortom det som faktiskt sparades.
+const BRODTEXT_GRANS = 400;
 
 // /api/studio kräver en "rubrik" (≤300 tecken) — fri text har ingen egen
 // rubrik, så en kort sammanfattning av inledningen används istället. Hela
@@ -72,10 +75,18 @@ function AktionsKnapp({ farg, onClick, disabled, children }) {
 
 function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
   const info = AKTION_INFO[rad.aktion] || AKTION_INFO.anna_sager;
-  const rubrikText = rad.titel || (rad.typ === "fritext" ? kortRubrik(rad.input_text || "") : "");
-  const brodtext = rad.typ === "url" ? rad.sammanfattning : rad.input_text;
+  const ärUrl = rad.typ === "url";
   const dialog = Array.isArray(rad.dialog) ? rad.dialog : null;
-  const kanSpelaUpp = rad.aktion !== "diskussion" ? !!brodtext || !!rubrikText : !!dialog?.length;
+  // Fri text-frågan (eller URL-artikelns sammanfattning) visas i sin helhet
+  // — tidigare kapades fri text hårt vid 120 tecken via kortRubrik() med
+  // ingen väg att se resten alls när aktionen var "diskussion" (den
+  // truncated bilden var den ENDA representationen). BRODTEXT_GRANS är bara
+  // var expand/collapse-knappen dyker upp, inte en hård gräns — "Visa hela
+  // frågan" avslöjar alltid allt (upp till serverns 1500-teckensgräns).
+  const brodtext = ärUrl ? (rad.sammanfattning || "") : (rad.input_text || "");
+  const brodtextArLang = brodtext.length > BRODTEXT_GRANS;
+  const kanExpandera = brodtextArLang || !!dialog;
+  const kanSpelaUpp = dialog ? dialog.length > 0 : !!(brodtext || rad.titel);
 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
@@ -90,46 +101,48 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
       </div>
 
       <div style={{ padding: "12px 16px 14px" }}>
-        {rubrikText && (
+        {ärUrl && rad.titel && (
           rad.kalla_url ? (
             <a href={rad.kalla_url} target="_blank" rel="noopener noreferrer" style={{ color: LANK, fontSize: 14, fontWeight: 700, textDecoration: "none", lineHeight: 1.5, display: "block", marginBottom: 4 }}>
-              {rubrikText}
+              {rad.titel}
             </a>
           ) : (
-            <p style={{ color: C.text, fontSize: 14, fontWeight: 700, margin: "0 0 4px", lineHeight: 1.5 }}>{rubrikText}</p>
+            <p style={{ color: C.text, fontSize: 14, fontWeight: 700, margin: "0 0 4px", lineHeight: 1.5 }}>{rad.titel}</p>
           )
         )}
-        {!dialog && brodtext && (
-          <p style={{ color: C.textMuted, fontSize: 13, margin: 0, lineHeight: 1.6 }}>
-            {brodtext.length > 220 ? brodtext.slice(0, 220) + "…" : brodtext}
+
+        {brodtext && (
+          <p style={{ color: ärUrl ? C.textMuted : C.text, fontSize: 13, margin: dialog ? "0 0 10px" : 0, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+            {!brodtextArLang || expanded ? brodtext : brodtext.slice(0, BRODTEXT_GRANS) + "…"}
           </p>
         )}
 
         {dialog && (
-          <>
-            {!expanded ? (
-              <p style={{ color: C.textMuted, fontSize: 13, margin: 0, lineHeight: 1.6, fontStyle: "italic" }}>
-                {dialog.length} repliker mellan Anna och Peter.
-              </p>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 4 }}>
-                {dialog.map((t, i) => (
-                  <p key={i} style={{ margin: 0, fontSize: 13, color: C.text, lineHeight: 1.6 }}>
-                    <span style={{ color: t.speaker === "anna" ? ANNA_FARG : PETER_FARG, fontWeight: 700 }}>
-                      {t.speaker === "anna" ? "Anna" : "Peter"}:{" "}
-                    </span>
-                    {t.text}
-                  </p>
-                ))}
-              </div>
-            )}
-            <button
-              onClick={onToggle}
-              style={{ marginTop: 8, background: "none", border: "none", cursor: "pointer", color: STUDIO_FARG, fontSize: 11, fontFamily: "monospace", padding: 0, letterSpacing: "0.06em" }}
-            >
-              {expanded ? "▲ Visa mindre" : "▼ Läs hela samtalet"}
-            </button>
-          </>
+          !expanded ? (
+            <p style={{ color: C.textMuted, fontSize: 13, margin: 0, lineHeight: 1.6, fontStyle: "italic" }}>
+              {dialog.length} repliker mellan Anna och Peter.
+            </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 4 }}>
+              {dialog.map((t, i) => (
+                <p key={i} style={{ margin: 0, fontSize: 13, color: C.text, lineHeight: 1.6 }}>
+                  <span style={{ color: t.speaker === "anna" ? ANNA_FARG : PETER_FARG, fontWeight: 700 }}>
+                    {t.speaker === "anna" ? "Anna" : "Peter"}:{" "}
+                  </span>
+                  {t.text}
+                </p>
+              ))}
+            </div>
+          )
+        )}
+
+        {kanExpandera && (
+          <button
+            onClick={onToggle}
+            style={{ marginTop: 8, background: "none", border: "none", cursor: "pointer", color: STUDIO_FARG, fontSize: 11, fontFamily: "monospace", padding: 0, letterSpacing: "0.06em" }}
+          >
+            {expanded ? "▲ Visa mindre" : dialog ? "▼ Visa hela frågan och samtalet" : "▼ Visa hela frågan"}
+          </button>
         )}
 
         {kanSpelaUpp && (
