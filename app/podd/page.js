@@ -164,11 +164,20 @@ function peekLocalRL() {
   return { remaining: Math.max(0, RL_LIMIT - count), resetAt: windowStart + RL_WINDOW };
 }
 
-async function streamSvar({ amne, historik, agent, lang, onToken, signal }) {
+// En avbruten leverantörsström lämnar inte alltid text helt tom — en anslutning
+// som dör tidigt kan lika gärna lämna ett kort, mitt-i-meningen-avhugget fragment
+// som passerar ett rent !text-test. Samma heuristik som /chatt/page.js.
+function arTroligenAvbruten(text) {
+  const t = (text || "").trim();
+  if (t.length < 20) return true;
+  return !/[.!?…][”"')\]]*$/.test(t);
+}
+
+async function streamSvar({ amne, historik, agent, lang, debattId, hoppaOverGroq, onToken, signal }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amne, historik, agent, lang }),
+    body: JSON.stringify({ amne, historik, agent, lang, debattId, hoppaOverGroq }),
     signal,
   });
   if (!res.ok) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
@@ -185,7 +194,7 @@ async function streamSvar({ amne, historik, agent, lang, onToken, signal }) {
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const raw = line.slice(6).trim();
-        if (raw === "[DONE]") return text;
+        if (raw === "[DONE]") return { text, klar: true };
         try {
           const token = JSON.parse(raw).choices?.[0]?.delta?.content ?? "";
           if (token) { text += token; onToken(text); }
@@ -193,7 +202,8 @@ async function streamSvar({ amne, historik, agent, lang, onToken, signal }) {
       }
     }
   } catch (e) { if (e.name !== "AbortError") throw e; }
-  return text;
+  // Strömmen tog slut utan "data: [DONE]" — anslutningen dog, ingen ren avslutning.
+  return { text, klar: false };
 }
 
 async function fetchSummering(amne, inlagg) {
@@ -235,14 +245,29 @@ function Waveform({ amplitude, farg }) {
 
 const MOUTH_STATES = new Set(["Nationalekonom"]);
 
+// Rena tröskelvärden gör att bilden flimrar (snabb växling fram och tillbaka
+// mellan två lägen) varje gång den kontinuerliga amplituden ligger still precis
+// vid en brytpunkt — en ren step-funktion har inget minne av vilket läge den
+// redan är i. MARGIN lägger till ett dödband: nästa läge kräver att amplituden
+// passerar tydligt förbi tröskeln (inte bara nuddar den) innan bilden byts,
+// och bara ETT steg åt gången per tick — mjukare övergång, inget flimmer.
+const MOUTH_THRESH = [0.08, 0.35, 0.65];
+const MOUTH_MARGIN = 0.04;
+function nastaMunlage(nuvarande, amp) {
+  if (nuvarande < 3 && amp > MOUTH_THRESH[nuvarande] + MOUTH_MARGIN) return nuvarande + 1;
+  if (nuvarande > 0 && amp < MOUTH_THRESH[nuvarande - 1] - MOUTH_MARGIN) return nuvarande - 1;
+  return nuvarande;
+}
+
 function TalkingFace({ namn, amplitude, speaking }) {
   const slug = agentSlug(namn);
   const base = `/avatarer/podd/${slug}`;
   const amp = speaking ? amplitude : 0;
-  let state = 0;
-  if (amp > 0.65) state = 3;
-  else if (amp > 0.35) state = 2;
-  else if (amp > 0.08) state = 1;
+  const [state, setState] = useState(0);
+  useEffect(() => {
+    if (!speaking) { setState(0); return; }
+    setState(prev => nastaMunlage(prev, amp));
+  }, [amp, speaking]);
   const srcs = [`${base}.png`, `${base}-small.png`, `${base}-medium.png`, `${base}-large.png`];
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
@@ -434,11 +459,18 @@ export default function PoddPage() {
     min: "min",
   };
 
-  const stöderInspelning = typeof navigator !== "undefined" &&
-    typeof navigator.mediaDevices?.getDisplayMedia === "function";
+  // Beräknad i en useEffect (körs bara klientsidan, efter hydrering) istället för
+  // direkt vid render — ett värde av typeof navigator/navigator.mediaDevices skiljer
+  // sig mellan server (alltid false) och klient (kan vara true), vilket annars ger
+  // ett hydration mismatch-fel på varje sidladdning eftersom checkboxen för
+  // "Spela in video" bara finns i klientens första render, inte i serverns HTML.
+  const [stöderInspelning, setStöderInspelning] = useState(false);
 
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
+    setStöderInspelning(
+      typeof navigator !== "undefined" && typeof navigator.mediaDevices?.getDisplayMedia === "function"
+    );
     return () => { autoplayRef.current = false; };
   }, []);
 
@@ -584,10 +616,16 @@ export default function PoddPage() {
     }
     const cached = await sokCachadDebatt(valtAmne, valdaAgenter);
     if (cached) { await replay(cached); return; }
-    await startaNy(valdaAgenter, valtAmne);
+    // Egen id för DENNA debattstart — skickas till /api/chatt så ett omförsök av
+    // samma tur (se retry-loopen i startaNy) inte tär på 5-debatter/10-min-kvoten
+    // en gång till. Samma mönster som /chatt/page.js.
+    const kvotId = (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    await startaNy(valdaAgenter, valtAmne, kvotId);
   }
 
-  async function startaNy(valdaAgenter, valtAmne) {
+  async function startaNy(valdaAgenter, valtAmne, kvotId) {
     const rl = peekLocalRL();
     if (rl.remaining <= 0) return;
     setRateLimitInfo(consumeLocalRL());
@@ -602,15 +640,32 @@ export default function PoddPage() {
       if (stoppRef.current) break;
       const agent = valdaAgenter[i % valdaAgenter.length];
       setTänkande(agent); setStreaming(null);
-      const abort = new AbortController(); abortRef.current = abort;
       try {
-        let gotFirst = false;
-        const text = await streamSvar({
-          amne: valtAmne, historik: h, agent, lang: langRef.current, signal: abort.signal,
-          onToken: (t) => { if (!gotFirst) { gotFirst = true; setTänkande(""); } setStreaming({ agent, text: t }); },
-        });
+        let text = "", klar = false;
+        // Groqs råa ström kan avbrytas mitt i utan att HTTP-anropet självt
+        // misslyckas (groqRes.ok förblir true, se app/api/chatt/route.js) — utan
+        // omförsök avslutade ett enda sådant avbrott hela podden i förtid
+        // (t.ex. direkt efter första agentens tur). Ett tyst omförsök som
+        // hoppar förbi Groq andra gången räcker för de flesta transienta
+        // avbrott — samma mönster som /chatt/page.js.
+        for (let forsok = 0; forsok < 2 && (!klar || arTroligenAvbruten(text)) && !stoppRef.current; forsok++) {
+          if (forsok > 0) {
+            setStreaming(null);
+            await new Promise(r => setTimeout(r, 400));
+            if (stoppRef.current) break;
+          }
+          let gotFirst = false;
+          const abort = new AbortController(); abortRef.current = abort;
+          const resultat = await streamSvar({
+            amne: valtAmne, historik: h, agent, lang: langRef.current, signal: abort.signal,
+            debattId: kvotId,
+            hoppaOverGroq: forsok > 0,
+            onToken: (t) => { if (!gotFirst) { gotFirst = true; setTänkande(""); } setStreaming({ agent, text: t }); },
+          });
+          text = resultat.text; klar = resultat.klar;
+        }
         if (stoppRef.current) break;
-        if (!text) { setFel("Debatten avbröts oväntat."); break; }
+        if (!text) { setFel("Debatten avbröts oväntat efter ett omförsök. Försök igen."); break; }
         setStreaming(null);
         const inlagg = { agent, text: text.trim(), id: i };
         h = [...h, inlagg]; setHistorik([...h]);
