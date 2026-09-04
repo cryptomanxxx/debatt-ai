@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
-// Per-agent overlay-konfiguration. Anna OCH Nationalekonom (Peter) har nu
-// båda fullständiga blink+mun-frames (samma lagerbaserade, pixelstabila
-// arkitektur — se ai-bus/context.md v5.9). Exporteras tillsammans med
-// AnchorImage/WaveformBar/useBlinkState så StudioOverlay.js (Anna+Peter i
-// samma studio) kan återanvända exakt samma animationslogik.
+// Per-agent overlay-konfiguration. Anna, Nationalekonom (Peter) och
+// Teknikoptimist (Johan) har alla tre fullständiga blink+mun-frames (samma
+// lagerbaserade, pixelstabila arkitektur — se ai-bus/context.md v5.9).
+// Exporteras tillsammans med AnchorImage/WaveformBar/useBlinkState så
+// StudioOverlay.js (Anna+Peter+Johan i samma studio) kan återanvända exakt
+// samma animationslogik.
 export const AGENTER = {
   Anna: {
     farg: "#a0c8f0",
@@ -30,6 +31,18 @@ export const AGENTER = {
     mouthHalf:   ["nationalekonom-m0-half.png", "nationalekonom-m1-half.png", "nationalekonom-m2-half.png", "nationalekonom-m3-half.png"],
     mouthClosed: ["nationalekonom-m0-closed.png", "nationalekonom-m1-closed.png", "nationalekonom-m2-closed.png", "nationalekonom-m3-closed.png"],
     idleOpen: "nationalekonom.png", idleHalf: "nationalekonom-m0-half.png", idleClosed: "nationalekonom-m0-closed.png",
+  },
+  Teknikoptimist: {
+    farg: "#f0b050",
+    roll: "Teknikoptimist",
+    rvVoice: "Swedish Male",
+    pitch: 1.06,
+    rate: 1.12,
+    hasBlink: true,
+    mouthOpen:   ["johan.png", "johan-small.png", "johan-medium.png", "johan-large.png"],
+    mouthHalf:   ["johan-m0-half.png", "johan-m1-half.png", "johan-m2-half.png", "johan-m3-half.png"],
+    mouthClosed: ["johan-m0-closed.png", "johan-m1-closed.png", "johan-m2-closed.png", "johan-m3-closed.png"],
+    idleOpen: "johan.png", idleHalf: "johan-m0-half.png", idleClosed: "johan-m0-closed.png",
   },
 };
 

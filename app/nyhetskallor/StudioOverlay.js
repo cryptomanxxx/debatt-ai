@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { AGENTER, AnchorImage, WaveformBar, useBlinkState, usePreload } from "./AgentOverlay";
 
 // Vem som pratar (speaker-nyckeln i LLM-svaret) mappat till agentens faktiska
-// röst/bildkonfiguration i AGENTER — samma "Peter"-visningsnamn-mönster som
-// AgentOverlay: rösten och avataren hämtas via agentnyckeln "Nationalekonom",
-// bara namnet som visas skiljer sig.
+// röst/bildkonfiguration i AGENTER — samma "Peter"/"Johan"-visningsnamn-
+// mönster som AgentOverlay: rösten och avataren hämtas via agentnyckeln
+// ("Nationalekonom"/"Teknikoptimist"), bara namnet som visas skiljer sig.
 const ROLLER = [
   { speaker: "anna", agent: "Anna", namn: "Anna" },
   { speaker: "peter", agent: "Nationalekonom", namn: "Peter" },
+  { speaker: "johan", agent: "Teknikoptimist", namn: "Johan" },
 ];
 
 function rolleFor(speaker) {
@@ -36,11 +37,13 @@ function StudioPerson({ rolle, isSpeaking, dimmed }) {
   );
 }
 
-// Anna och Peter i samma studio — genererar en kort dialog om en nyhet via
-// /api/studio (ren text, ingen streaming) och spelar sedan upp replikerna i
-// tur och ordning med responsiveVoice, med visuell fokusväxling mellan de två
-// (opacity/scale/brightness) istället för riktig videogenerering. v1 av det
-// tvåankars-studiokoncept som efterfrågades efter AgentOverlay-uppläsningen.
+// Anna, Peter och Johan i samma studio — genererar en kort dialog om en
+// nyhet via /api/studio (ren text, ingen streaming) och spelar sedan upp
+// replikerna i tur och ordning med responsiveVoice, med visuell
+// fokusväxling mellan de tre (opacity/scale/brightness) istället för riktig
+// videogenerering. Utökades från två till tre ankare (Johan/Teknikoptimist
+// tillagd) — layouten loopar över ROLLER istället för att hårdkoda två
+// StudioPerson-instanser, så antalet ankare inte längre är bakat in i JSX:en.
 //
 // `turns` (valfri): en redan färdig dialog (t.ex. hämtad från
 // fraga_anna_peter_log-historiken på /fraga-anna-och-peter) — hoppar över
@@ -122,15 +125,15 @@ export default function StudioOverlay({ rubrik, beskrivning, turns: forcedTurns,
 
   const turn = turns[activeIdx];
   const aktivRolle = turn ? rolleFor(turn.speaker) : null;
-  const annaAktiv = fas === "spelar" && aktivRolle?.speaker === "anna";
-  const peterAktiv = fas === "spelar" && aktivRolle?.speaker === "peter";
 
   return (
     <div
       onClick={onClose}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 1000, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "20px", overflowY: "auto" }}
     >
-      <div onClick={e => e.stopPropagation()} style={{ width: "min(760px, 96vw)", margin: "auto 0" }}>
+      {/* Bredare än tvåpersonersversionen (760px) — tre 3:4-porträtt i rad
+          behöver mer plats per ansikte för att inte kännas trångt. */}
+      <div onClick={e => e.stopPropagation()} style={{ width: "min(920px, 96vw)", margin: "auto 0" }}>
         <div style={{ position: "relative", borderRadius: "12px", overflow: "hidden", border: "1px solid #1a1a1a", background: "#050505" }}>
           <div style={{
             position: "absolute", top: "12px", left: "12px", zIndex: 1,
@@ -148,8 +151,10 @@ export default function StudioOverlay({ rubrik, beskrivning, turns: forcedTurns,
           </div>
 
           <div style={{ display: "flex" }}>
-            <StudioPerson rolle={ROLLER[0]} isSpeaking={annaAktiv} dimmed={fas === "spelar" && !annaAktiv} />
-            <StudioPerson rolle={ROLLER[1]} isSpeaking={peterAktiv} dimmed={fas === "spelar" && !peterAktiv} />
+            {ROLLER.map(rolle => {
+              const aktiv = fas === "spelar" && aktivRolle?.speaker === rolle.speaker;
+              return <StudioPerson key={rolle.speaker} rolle={rolle} isSpeaking={aktiv} dimmed={fas === "spelar" && !aktiv} />;
+            })}
           </div>
 
           <div style={{ padding: "14px 16px", borderTop: "1px solid #1a1a1a", minHeight: "76px" }}>

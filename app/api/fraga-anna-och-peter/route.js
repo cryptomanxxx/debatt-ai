@@ -1,8 +1,8 @@
 // Sparar en historikpost från /fraga-anna-och-peter varje gång en besökare
-// låter Anna eller Peter läsa upp fri text/en nyhetsartikel, eller låter dem
-// diskutera den i studion. Ren loggning — texten läses/spelas upp helt
-// klientsidan (responsiveVoice/StudioOverlay), den här routen skriver bara
-// undan en rad så historiken kan visas på sidan.
+// låter Anna, Peter eller Johan läsa upp fri text/en nyhetsartikel, eller
+// låter dem diskutera den i studion. Ren loggning — texten läses/spelas upp
+// helt klientsidan (responsiveVoice/StudioOverlay), den här routen skriver
+// bara undan en rad så historiken kan visas på sidan.
 import { checkRateLimit } from "../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../lib/logFel";
 
@@ -15,14 +15,14 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
 const TYPER = new Set(["fritext", "url"]);
-const AKTIONER = new Set(["anna_sager", "peter_sager", "diskussion"]);
-const MAX_TURNS = 6;
+const AKTIONER = new Set(["anna_sager", "peter_sager", "johan_sager", "diskussion"]);
+const MAX_TURNS = 9;
 const MAX_TURN_LEN = 400;
 
 function stadaDialog(dialog) {
   if (!Array.isArray(dialog)) return null;
   const turns = dialog
-    .filter(t => t && (t.speaker === "anna" || t.speaker === "peter") && typeof t.text === "string" && t.text.trim())
+    .filter(t => t && (t.speaker === "anna" || t.speaker === "peter" || t.speaker === "johan") && typeof t.text === "string" && t.text.trim())
     .slice(0, MAX_TURNS)
     .map(t => ({ speaker: t.speaker, text: t.text.trim().slice(0, MAX_TURN_LEN) }));
   return turns.length ? turns : null;

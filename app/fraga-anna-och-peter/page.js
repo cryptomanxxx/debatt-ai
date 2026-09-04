@@ -13,6 +13,7 @@ const C = {
 };
 const ANNA_FARG = "#a0c8f0";
 const PETER_FARG = "#6abf6a";
+const JOHAN_FARG = "#f0b050";
 const STUDIO_FARG = "#c084fc";
 const LANK = "#38bdf8";
 
@@ -48,8 +49,20 @@ function tidsAgo(iso) {
 const AKTION_INFO = {
   anna_sager: { ikon: "🎙️", namn: "Anna", farg: ANNA_FARG },
   peter_sager: { ikon: "📊", namn: "Peter", farg: PETER_FARG },
+  johan_sager: { ikon: "💡", namn: "Johan", farg: JOHAN_FARG },
   diskussion: { ikon: "🎭", namn: "Studio", farg: STUDIO_FARG },
 };
+
+const SPEAKER_INFO = {
+  anna: { namn: "Anna", farg: ANNA_FARG },
+  peter: { namn: "Peter", farg: PETER_FARG },
+  johan: { namn: "Johan", farg: JOHAN_FARG },
+};
+
+// Mappar AGENTER-nyckeln (som styr röst/avatar i AgentOverlay) mot aktion-
+// strängen som sparas i historiken, och tillbaka igen vid "Spela upp igen".
+const AGENT_TILL_AKTION = { Anna: "anna_sager", Nationalekonom: "peter_sager", Teknikoptimist: "johan_sager" };
+const AKTION_TILL_AGENT = { anna_sager: { agent: "Anna", namn: "Anna" }, peter_sager: { agent: "Nationalekonom", namn: "Peter" }, johan_sager: { agent: "Teknikoptimist", namn: "Johan" } };
 
 function AktionsKnapp({ farg, onClick, disabled, children }) {
   return (
@@ -126,18 +139,21 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
         {dialog && (
           !expanded ? (
             <p style={{ color: C.textMuted, fontSize: 13, margin: 0, lineHeight: 1.6, fontStyle: "italic" }}>
-              {dialog.length} repliker mellan Anna och Peter.
+              {dialog.length} repliker mellan Anna, Peter och Johan.
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 4 }}>
-              {dialog.map((t, i) => (
-                <p key={i} style={{ margin: 0, fontSize: 13, color: C.text, lineHeight: 1.6 }}>
-                  <span style={{ color: t.speaker === "anna" ? ANNA_FARG : PETER_FARG, fontWeight: 700 }}>
-                    {t.speaker === "anna" ? "Anna" : "Peter"}:{" "}
-                  </span>
-                  {t.text}
-                </p>
-              ))}
+              {dialog.map((t, i) => {
+                const info = SPEAKER_INFO[t.speaker] || SPEAKER_INFO.anna;
+                return (
+                  <p key={i} style={{ margin: 0, fontSize: 13, color: C.text, lineHeight: 1.6 }}>
+                    <span style={{ color: info.farg, fontWeight: 700 }}>
+                      {info.namn}:{" "}
+                    </span>
+                    {t.text}
+                  </p>
+                );
+              })}
             </div>
           )
         )}
@@ -258,7 +274,7 @@ export default function FragaAnnaOchPeterPage() {
   function sagFritext(agent, namn) {
     if (!fritextTrimmed) return;
     setLasning({ agent, namn, text: fritextTrimmed });
-    sparaHistorik({ typ: "fritext", aktion: agent === "Anna" ? "anna_sager" : "peter_sager", text: fritextTrimmed });
+    sparaHistorik({ typ: "fritext", aktion: AGENT_TILL_AKTION[agent] || "anna_sager", text: fritextTrimmed });
   }
   function diskuteraFritext() {
     if (!fritextTrimmed) return;
@@ -274,7 +290,7 @@ export default function FragaAnnaOchPeterPage() {
     const text = [urlResultat.titel, urlResultat.sammanfattning].filter(Boolean).join(". ");
     setLasning({ agent, namn, text });
     sparaHistorik({
-      typ: "url", aktion: agent === "Anna" ? "anna_sager" : "peter_sager",
+      typ: "url", aktion: AGENT_TILL_AKTION[agent] || "anna_sager",
       url: urlResultat.url, titel: urlResultat.titel, sammanfattning: urlResultat.sammanfattning,
     });
   }
@@ -292,8 +308,7 @@ export default function FragaAnnaOchPeterPage() {
       if (!Array.isArray(rad.dialog) || rad.dialog.length === 0) return;
       setStudio({ rubrik: rad.titel || kortRubrik(rad.input_text || ""), beskrivning: rad.sammanfattning || "", turns: rad.dialog });
     } else {
-      const agent = rad.aktion === "anna_sager" ? "Anna" : "Nationalekonom";
-      const namn = agent === "Anna" ? "Anna" : "Peter";
+      const { agent, namn } = AKTION_TILL_AGENT[rad.aktion] || AKTION_TILL_AGENT.anna_sager;
       const text = rad.typ === "url" ? [rad.titel, rad.sammanfattning].filter(Boolean).join(". ") : rad.input_text;
       if (text) setLasning({ agent, namn, text });
     }
@@ -308,13 +323,14 @@ export default function FragaAnnaOchPeterPage() {
             ← Nyhetsanalyser
           </a>
           <h1 style={{ color: C.text, fontSize: 26, fontWeight: 700, margin: "16px 0 6px", fontFamily: "Georgia, serif" }}>
-            Fråga Anna och Peter
+            Fråga Anna, Peter och Johan
           </h1>
           <p style={{ color: C.textMuted, fontSize: 14, margin: 0, lineHeight: 1.7 }}>
             Klistra in valfri text — eller en länk till en nyhetsartikel — och låt{" "}
-            <span style={{ color: ANNA_FARG }}>Anna</span> (nyhetsankare) eller{" "}
-            <span style={{ color: PETER_FARG }}>Peter</span> (nationalekonom) läsa upp den,
-            eller låt dem diskutera den tillsammans i studion. Samma röster och animerade
+            <span style={{ color: ANNA_FARG }}>Anna</span> (nyhetsankare),{" "}
+            <span style={{ color: PETER_FARG }}>Peter</span> (nationalekonom) eller{" "}
+            <span style={{ color: JOHAN_FARG }}>Johan</span> (teknikoptimist) läsa upp den,
+            eller låt alla tre diskutera den tillsammans i studion. Samma röster och animerade
             ansikten som på{" "}
             <a href="/nyhetsanalyser" style={{ color: LANK }}>Nyhetsanalyser</a>,{" "}
             <a href="/kanal" style={{ color: LANK }}>Nyhetskanalen</a> och{" "}
@@ -330,7 +346,7 @@ export default function FragaAnnaOchPeterPage() {
           <textarea
             value={fritext}
             onChange={e => setFritext(e.target.value.slice(0, TEXT_MAX))}
-            placeholder="Skriv eller klistra in text som Anna eller Peter ska säga eller diskutera…"
+            placeholder="Skriv eller klistra in text som Anna, Peter eller Johan ska säga eller diskutera…"
             rows={5}
             style={{
               width: "100%", boxSizing: "border-box", padding: "10px 12px",
@@ -349,8 +365,11 @@ export default function FragaAnnaOchPeterPage() {
             <AktionsKnapp farg={PETER_FARG} disabled={!fritextTrimmed} onClick={() => sagFritext("Nationalekonom", "Peter")}>
               📊 Peter säger det
             </AktionsKnapp>
+            <AktionsKnapp farg={JOHAN_FARG} disabled={!fritextTrimmed} onClick={() => sagFritext("Teknikoptimist", "Johan")}>
+              💡 Johan säger det
+            </AktionsKnapp>
             <AktionsKnapp farg={STUDIO_FARG} disabled={!fritextTrimmed} onClick={diskuteraFritext}>
-              🎭 Anna &amp; Peter diskuterar det
+              🎭 Anna, Peter &amp; Johan diskuterar det
             </AktionsKnapp>
           </div>
         </div>
@@ -406,8 +425,11 @@ export default function FragaAnnaOchPeterPage() {
                 <AktionsKnapp farg={PETER_FARG} onClick={() => sagUrlResultat("Nationalekonom", "Peter")}>
                   📊 Peter läser den
                 </AktionsKnapp>
+                <AktionsKnapp farg={JOHAN_FARG} onClick={() => sagUrlResultat("Teknikoptimist", "Johan")}>
+                  💡 Johan läser den
+                </AktionsKnapp>
                 <AktionsKnapp farg={STUDIO_FARG} onClick={diskuteraUrlResultat}>
-                  🎭 Anna &amp; Peter diskuterar den
+                  🎭 Anna, Peter &amp; Johan diskuterar den
                 </AktionsKnapp>
               </div>
             </div>
@@ -422,7 +444,7 @@ export default function FragaAnnaOchPeterPage() {
 
           {historik.length === 0 && !historikLaddar && (
             <p style={{ color: C.textMuted, fontSize: 13, fontFamily: "monospace", padding: "20px 0", textAlign: "center" }}>
-              Inget sparat än — bli den första att fråga Anna eller Peter.
+              Inget sparat än — bli den första att fråga Anna, Peter eller Johan.
             </p>
           )}
 

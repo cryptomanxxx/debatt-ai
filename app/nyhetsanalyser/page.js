@@ -25,6 +25,7 @@ const STUDIO_FARG = "#c084fc";
 const LASARE = [
   { agent: "Anna", namn: "Anna", farg: AGENTER.Anna.farg, ikon: "🎙️" },
   { agent: "Nationalekonom", namn: "Peter", farg: AGENTER.Nationalekonom.farg, ikon: "📊" },
+  { agent: "Teknikoptimist", namn: "Johan", farg: AGENTER.Teknikoptimist.farg, ikon: "💡" },
 ];
 
 const ALLA_AGENTER = Object.keys(AGENT_VISUELL).sort();
@@ -247,7 +248,7 @@ export default function NyhetsanalyserPage() {
                         onClick={() => setStudio({ id: r.id, rubrik, beskrivning: r.nyhetsflode?.beskrivning || "" })}
                         style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${STUDIO_FARG}50`, color: STUDIO_FARG, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
                       >
-                        🎭 Anna & Peter i studion
+                        🎭 Anna, Peter &amp; Johan i studion
                       </button>
                     )}
                   </div>
