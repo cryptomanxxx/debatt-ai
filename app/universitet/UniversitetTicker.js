@@ -1,5 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+// Önskad läshastighet i pixlar/sekund för den utritade banan (dubblade listan).
+// Ett fast "N sekunder per post"-antagande (som NyhetsTicker.js fortfarande
+// använder) ger fel resultat här: translateX(-50%) mäts mot bandets FAKTISKA
+// bredd (width:max-content nedan, se PR #1357), inte mot antalet poster — långa
+// forskningstitlar gör banan bredare än motsvarande antal korta nyhetsrubriker,
+// så samma "sekunder per post" täcker då fler faktiska pixlar per sekund och
+// känns snabbare (Codex-fynd: användarrapport 2026-09-04, "rullar för snabbt").
+const PX_PER_SEK = 55;
+const MIN_DURATION_S = 15;
 
 function tidsSedan(iso) {
   if (!iso) return "";
@@ -31,6 +41,12 @@ export default function UniversitetTicker({ fynd, nyheter }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
 
+  // Startvärde innan mätning: samma grova per-post-gissning som förut, bara
+  // för att banan har en giltig animationstid innan useEffect nedan hunnit
+  // mäta dess faktiska bredd efter render.
+  const [duration, setDuration] = useState(20);
+  const trackRef = useRef(null);
+
   const a = fynd.map(f => ({
     id: `f-${f.id}`, text: f.titel, kalla: f.forskare || "AI-forskning",
     tid: f.skapad, url: null, ikon: "🔬", farg: "#38bdf8",
@@ -45,10 +61,21 @@ export default function UniversitetTicker({ fynd, nyheter }) {
     .sort((x, y) => new Date(y.tid) - new Date(x.tid))
     .slice(0, 20);
 
+  // Mäter banans faktiska bredd (width:max-content, se style nedan) efter
+  // render och räknar om animationstiden till en fast läshastighet i px/sek
+  // — robust oavsett hur många poster eller hur långa titlarna är, till
+  // skillnad från den tidigare "N sekunder per post"-gissningen. Måste ligga
+  // före det villkorade return:et nedan — hooks får aldrig anropas villkorat.
+  useEffect(() => {
+    if (!trackRef.current) return;
+    const helaBredden = trackRef.current.scrollWidth;
+    if (!helaBredden) return;
+    setDuration(Math.max(helaBredden / 2 / PX_PER_SEK, MIN_DURATION_S));
+  }, [senaste.length]);
+
   if (!senaste.length) return null;
 
   const items = [...senaste, ...senaste];
-  const duration = Math.max(senaste.length * 3, 20);
 
   return (
     <div style={{
@@ -63,7 +90,7 @@ export default function UniversitetTicker({ fynd, nyheter }) {
         LIVE
       </div>
       <div style={{ overflow: "hidden", flex: 1 }}>
-        <div style={{ display: "flex", width: "max-content", animation: `universitet-ticker ${duration}s linear infinite`, whiteSpace: "nowrap", willChange: "transform" }}>
+        <div ref={trackRef} style={{ display: "flex", width: "max-content", animation: `universitet-ticker ${duration}s linear infinite`, whiteSpace: "nowrap", willChange: "transform" }}>
           {items.map((n, i) => {
             const inner = (
               <>
