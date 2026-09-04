@@ -20,6 +20,18 @@ const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
 const NYHETSFLODE_SELECT = "id,rubrik,beskrivning,kalla,url,publicerad,kategori,hamtad";
 
+// hamtaArtikelInnehall() extraherar kalla ur SIDANS EGNA metataggar (og:site_name)
+// eller värdnamnet — det betyder att den importerade sidan själv väljer sitt
+// visade källnamn. En illvillig sida kan sätta og:site_name till "SVT Nyheter"
+// eller registrera en subdomän som "svt.se.attacker.example" (vars hostname-
+// fallback ger "Svt") för att låtsas vara en riktig, automatiskt bevakad källa
+// (Codex-fynd, PR #1359). Suffixet gör varje importerad rad permanent och
+// synligt urskiljbar från de genuina RSS/Reddit-källorna — den fångas som en
+// egen källpill (källfiltret byggs redan dynamiskt ur faktisk kalla-text) och
+// kan aldrig råka kollidera med eller maskera en riktig bevakad källa.
+const BESOKARIMPORT_SUFFIX = " (besökarimport)";
+const KALLA_BAS_MAX = 100 - BESOKARIMPORT_SUFFIX.length;
+
 export async function POST(req) {
   const ip = getIp(req);
   const rl = checkRateLimit(req, "nyhetsflode-importera", 10, 60 * 60 * 1000);
@@ -46,6 +58,7 @@ export async function POST(req) {
   // saknas även när sammanfattning hittades (t.ex. en sida utan <title>-tagg
   // men med meta description). Faller tillbaka på ett utdrag av sammanfattningen.
   const rubrik = (result.titel || result.sammanfattning.slice(0, 120)).slice(0, 500);
+  const kalla = `${(result.kalla || "Okänd källa").slice(0, KALLA_BAS_MAX)}${BESOKARIMPORT_SUFFIX}`;
 
   const insertRes = await fetch(`${SB_URL}/rest/v1/nyhetsflode`, {
     method: "POST",
@@ -58,7 +71,7 @@ export async function POST(req) {
     body: JSON.stringify({
       rubrik,
       beskrivning: result.sammanfattning,
-      kalla: result.kalla,
+      kalla,
       url: result.url,
       kategori: [],
     }),
