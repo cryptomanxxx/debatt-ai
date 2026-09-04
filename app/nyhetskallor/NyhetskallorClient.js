@@ -202,7 +202,7 @@ function ImporteraForm({ onImporterad }) {
         setFelText(data.fel || "Kunde inte importera artikeln.");
         return;
       }
-      onImporterad(data.rad);
+      onImporterad(data.rad, !!data.redanImporterad);
       setStatus(data.redanImporterad ? "dubblett" : "ok");
       setUrl("");
     } catch {
@@ -393,8 +393,15 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
     }
   }
 
-  function nyhetImporterad(rad) {
+  function nyhetImporterad(rad, redanImporterad) {
     if (!rad) return;
+    // En redan existerande rad (redanImporterad=true) kan ligga utanför den
+    // just nu laddade sidan, med en gammal hamtad-tidsstämpel — att ändå
+    // prependa den skulle visa den som nyast och riskera en dubblett-rad
+    // (och dubblett-React-key) den dag "Ladda fler" paginerar fram till dess
+    // riktiga plats (Codex-fynd, PR #1358). Bara genuint nya importer läggs
+    // överst; en redan känd rad som redan finns i listan är redan synlig.
+    if (redanImporterad) return;
     setNyheter(prev => (prev.some(n => n.id === rad.id) ? prev : [rad, ...prev]));
   }
 
