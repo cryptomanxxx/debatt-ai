@@ -128,46 +128,44 @@ async function analyseraMedAgent(agent, n, uppdatera) {
   uppdatera({ status: text ? "klar" : "fel", text: text || "Kunde inte hämta ett svar." });
 }
 
-function AgentAnalysPanel({ n, expanderad, onToggle, valda, onToggleAgent, analys, onKor }) {
+// Renderar bara den utfällbara panelen — själva toggle-knappen ligger i
+// NyhetsRads knapprad tillsammans med "Föreslå artikelämne", så besökaren
+// ser båda vägarna till agenternas uppmärksamhet som två likvärdiga val
+// istället för en knapp + en undanskymd textlänk.
+function AgentAnalysPanel({ expanderad, valda, onToggleAgent, analys, onKor }) {
+  if (!expanderad) return null;
   const korAntal = Object.values(analys || {}).filter(a => a.status === "laddar").length;
   return (
-    <div style={{ marginTop: "8px" }}>
-      <button onClick={onToggle} style={{ background: "transparent", border: "none", color: C.textMuted, fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer", padding: 0 }}>
-        {expanderad ? "▾" : "▸"} Fråga AI-agenter om denna nyhet
+    <div style={{ marginTop: "10px", padding: "12px", background: "#0a0d10", border: `1px solid ${C.border}`, borderRadius: "6px" }}>
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
+        {ALLA_AGENTER.map(agent => {
+          const vald = valda.has(agent);
+          return (
+            <button key={agent} onClick={() => onToggleAgent(agent)} style={{ padding: "4px 10px", borderRadius: "20px", border: `1px solid ${vald ? af(agent) + "90" : C.border}`, background: vald ? `${af(agent)}18` : "transparent", color: vald ? af(agent) : C.textMuted, fontSize: "11px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
+              {agent}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        onClick={onKor}
+        disabled={valda.size === 0 || korAntal > 0}
+        style={{ padding: "6px 14px", background: valda.size === 0 || korAntal > 0 ? "transparent" : `${LANK}18`, border: `1px solid ${LANK}60`, color: valda.size === 0 || korAntal > 0 ? C.textMuted : LANK, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: valda.size === 0 || korAntal > 0 ? "default" : "pointer" }}
+      >
+        {korAntal > 0 ? "Analyserar…" : "Analysera →"}
       </button>
-      {expanderad && (
-        <div style={{ marginTop: "10px", padding: "12px", background: "#0a0d10", border: `1px solid ${C.border}`, borderRadius: "6px" }}>
-          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
-            {ALLA_AGENTER.map(agent => {
-              const vald = valda.has(agent);
-              return (
-                <button key={agent} onClick={() => onToggleAgent(agent)} style={{ padding: "4px 10px", borderRadius: "20px", border: `1px solid ${vald ? af(agent) + "90" : C.border}`, background: vald ? `${af(agent)}18` : "transparent", color: vald ? af(agent) : C.textMuted, fontSize: "11px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
-                  {agent}
-                </button>
-              );
-            })}
-          </div>
-          <button
-            onClick={onKor}
-            disabled={valda.size === 0 || korAntal > 0}
-            style={{ padding: "6px 14px", background: valda.size === 0 || korAntal > 0 ? "transparent" : `${LANK}18`, border: `1px solid ${LANK}60`, color: valda.size === 0 || korAntal > 0 ? C.textMuted : LANK, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: valda.size === 0 || korAntal > 0 ? "default" : "pointer" }}
-          >
-            {korAntal > 0 ? "Analyserar…" : "Analysera →"}
-          </button>
 
-          {analys && Object.keys(analys).length > 0 && (
-            <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
-              {Object.entries(analys).map(([agent, a]) => (
-                <div key={agent} style={{ padding: "10px 14px", background: C.surface, borderLeft: `3px solid ${af(agent)}${a.status === "laddar" ? "60" : ""}`, borderRadius: "4px" }}>
-                  <div style={{ fontSize: "10px", color: af(agent), fontFamily: "monospace", letterSpacing: "0.08em", fontWeight: 700, marginBottom: "4px" }}>{agent.toUpperCase()}</div>
-                  <p style={{ margin: 0, fontSize: "13px", color: a.status === "fel" ? "#f87171" : C.text, lineHeight: 1.65 }}>
-                    {a.text}
-                    {a.status === "laddar" && <span style={{ display: "inline-block", width: "2px", height: "12px", background: af(agent), marginLeft: "2px", verticalAlign: "text-bottom", animation: "blink 0.8s step-end infinite" }} />}
-                  </p>
-                </div>
-              ))}
+      {analys && Object.keys(analys).length > 0 && (
+        <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+          {Object.entries(analys).map(([agent, a]) => (
+            <div key={agent} style={{ padding: "10px 14px", background: C.surface, borderLeft: `3px solid ${af(agent)}${a.status === "laddar" ? "60" : ""}`, borderRadius: "4px" }}>
+              <div style={{ fontSize: "10px", color: af(agent), fontFamily: "monospace", letterSpacing: "0.08em", fontWeight: 700, marginBottom: "4px" }}>{agent.toUpperCase()}</div>
+              <p style={{ margin: 0, fontSize: "13px", color: a.status === "fel" ? "#f87171" : C.text, lineHeight: 1.65 }}>
+                {a.text}
+                {a.status === "laddar" && <span style={{ display: "inline-block", width: "2px", height: "12px", background: af(agent), marginLeft: "2px", verticalAlign: "text-bottom", animation: "blink 0.8s step-end infinite" }} />}
+              </p>
             </div>
-          )}
+          ))}
         </div>
       )}
     </div>
@@ -277,7 +275,7 @@ function NyhetsRad({ n, status, onForesla, analysProps }) {
       )}
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
         {status === "ok" ? (
-          <span style={{ fontSize: "12px", color: "#4ade80", fontFamily: "monospace" }}>✓ Skickat! Agenterna tar upp det vid nästa körning.</span>
+          <span style={{ fontSize: "12px", color: "#4ade80", fontFamily: "monospace" }}>✓ Skickat som artikelämne — tas upp vid nästa körning.</span>
         ) : status === "fel" ? (
           <span style={{ fontSize: "12px", color: "#f87171", fontFamily: "monospace" }}>Något gick fel — försök igen.</span>
         ) : (
@@ -285,12 +283,20 @@ function NyhetsRad({ n, status, onForesla, analysProps }) {
             onClick={onForesla}
             disabled={status === "laddar"}
             style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${LANK}50`, color: status === "laddar" ? C.textMuted : LANK, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: status === "laddar" ? "default" : "pointer" }}
+            title="Agenterna kan skriva en hel debattartikel om nyheten vid nästa körning"
           >
-            {status === "laddar" ? "Skickar…" : "Föreslå för agenterna →"}
+            {status === "laddar" ? "Skickar…" : "📰 Föreslå artikelämne →"}
           </button>
         )}
+        <button
+          onClick={analysProps.onToggle}
+          style={{ padding: "6px 14px", background: analysProps.expanderad ? `${LANK}18` : "transparent", border: `1px solid ${LANK}50`, color: LANK, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
+          title="Låt en eller flera agenter reagera direkt — sparas i Nyhetsanalysen"
+        >
+          {analysProps.expanderad ? "▾" : "🔎"} Analysera i Nyhetsanalysen
+        </button>
       </div>
-      <AgentAnalysPanel n={n} {...analysProps} />
+      <AgentAnalysPanel {...analysProps} />
     </div>
   );
 }
@@ -457,10 +463,10 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
             Det här är ett urval av de nyheter AI-agenterna automatiskt hämtar från runt 44 RSS- och Reddit-flöden, sex gånger om dagen — oavsett om en agent någonsin skriver om dem. Skvaller och kändisnyheter filtreras bort innan de hamnar här.
           </p>
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: "0 0 10px" }}>
-            Hittar du en nyhet du tycker agenterna borde debattera? Klicka <em>"Föreslå för agenterna"</em> — den tas upp med högsta prioritet vid nästa körning, precis som ämnesförslag från Direktdebatten.
+            Två sätt att göra AI-agenterna uppmärksamma på en nyhet: <em>"📰 Föreslå artikelämne"</em> skickar rubriken som förslag till nästa agent-körning — en agent kan då skriva en hel debattartikel om nyheten, med högsta prioritet, precis som ämnesförslag från Direktdebatten.
           </p>
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: "0 0 10px" }}>
-            Eller välj en eller flera agenter under <em>"Fråga AI-agenter om denna nyhet"</em> för en analys direkt, i realtid.
+            <em>"🔎 Analysera i Nyhetsanalysen"</em> ger istället ett svar direkt: välj en eller flera agenter som reagerar i realtid på nyheten. Analysen sparas i Nyhetsanalysen och syns även på <a href="/nyhetsanalyser" style={{ color: LANK }}>/nyhetsanalyser</a>.
           </p>
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: 0 }}>
             Saknas en nyhet i flödet? Klistra in länken i formuläret nedan så hämtar vi den och lägger till den.
