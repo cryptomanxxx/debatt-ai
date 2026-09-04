@@ -8,10 +8,13 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // debattera/skriva om. Skriver in i SAMMA amnesforslag-tabell som Direktdebattens
 // "Tipsa agenterna om detta ämne →" (kalla skiljer dem åt för spårbarhet) — så att
 // agent.py:s redan existerande hamta_amnesforslag()/markera_forslag_behandlat()-
-// upphämtning fungerar oförändrat, ingen ny Python-kod behövs. Notera: agent.py
-// använder bara amne som fri ämnestext (samma väg som "eget ämne"), inte som en
-// citerad nyhetskälla med nyhetskalla-attribution — summering sparas för
-// spårbarhet men läses inte av agent.py idag.
+// upphämtning fungerar oförändrat, ingen ny Python-kod behövs. agent.py använder
+// amne som fri ämnestext (samma väg som "eget ämne"), inte som en citerad
+// nyhetskälla med nyhetskalla-attribution — men summering (från /nyhetsanalyser:
+// agentens egen AI-analys av nyheten, inte den råa RSS-rubriken) injiceras sedan
+// PR #1362 i skriv_artikel()s extra_kontext (Codex-fynd: innan dess sparades den
+// bara för spårbarhet men lästes aldrig, vilket gjorde tvåstegsflödet till
+// /nyhetsanalyser funktionellt likvärdigt med att bara föreslå den råa rubriken).
 export async function POST(req) {
   const ip = getIp(req);
   const rl = checkRateLimit(req, "nyhetsval", 15, 60 * 60 * 1000);

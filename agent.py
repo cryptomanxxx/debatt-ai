@@ -553,11 +553,13 @@ def main():
 
         forslag_amne = None
         forslag_id = None
+        forslag_summering = None
         if sb_key:
             forslag = hamta_amnesforslag(sb_key)
             if forslag:
                 forslag_amne = forslag["amne"]
                 forslag_id = forslag["id"]
+                forslag_summering = (forslag.get("summering") or "").strip() or None
                 print(f"Hittade ämnesförslag från direktdebatten: \"{forslag_amne[:60]}\"")
 
         extra_kontext = ""
@@ -725,6 +727,16 @@ def main():
             hist_kontext = "\n\n".join(filter(None, [mkt_hist, civ_digest, civ_svar]))
             if hist_kontext:
                 print(f"  🌍 Civilisationskontext injicerad")
+            if forslag_summering:
+                # Underlag till förslaget — för ett nyhetsval-förslag (kalla="nyhetsval",
+                # se /api/nyhetsval) är detta sedan PR #1361 en agents egen AI-analys av
+                # nyheten (nyhetsanalys.analys), inte den råa RSS-rubriken. Utan denna
+                # injektion användes bara `amne` (fri ämnestext) i skriv_artikel() och hela
+                # poängen med att flytta "Föreslå artikelämne" till /nyhetsanalyser gick
+                # förlorad (Codex-fynd, PR #1361-granskning) — förslaget blev funktionellt
+                # identiskt med att föreslå den råa rubriken.
+                extra_kontext = (extra_kontext + "\n\n" + f"Bakgrund till ämnesförslaget:\n{forslag_summering}").strip()
+                print(f"  📎 Ämnesförslagets underlag injicerat ({len(forslag_summering)} tecken)")
             print("Skriver artikel (Groq med Gemini-fallback)...")
             artikel = skriv_artikel(agent, amne, extra_kontext, fmt=artikelfmt, buffs=buffs, status=agent_status, koalitions_kontext=koalitions_kontext, kris_kontext=kris_kontext, minne_kontext=minne_kontext, ki_kontext=ki_kontext, strategi_kontext=strategi_kontext, mark_kontext=mark_kontext, foretag_kontext=foretag_kontext, hist_kontext=hist_kontext)
             if not artikel:
