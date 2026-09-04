@@ -86,7 +86,13 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
   const brodtext = ärUrl ? (rad.sammanfattning || "") : (rad.input_text || "");
   const brodtextArLang = brodtext.length > BRODTEXT_GRANS;
   const kanExpandera = brodtextArLang || !!dialog;
-  const kanSpelaUpp = dialog ? dialog.length > 0 : !!(brodtext || rad.titel);
+  // Måste gate:as på rad.aktion — inte bara på om `dialog` råkar finnas —
+  // så den här knappen aldrig kan visas för en "diskussion"-post vars
+  // dialog blivit null (t.ex. sanerad bort av stadaDialog() på servern):
+  // spelaUppHistorik() nedan gör exakt samma aktion-check och avbryter
+  // annars tyst, vilket gjorde knappen klickbar men verkningslös
+  // (Codex-fynd, PR #1346).
+  const kanSpelaUpp = rad.aktion === "diskussion" ? !!dialog?.length : !!(brodtext || rad.titel);
 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
@@ -172,23 +178,26 @@ export default function FragaAnnaOchPeterPage() {
 
   const [historik, setHistorik] = useState([]);
   const [historikLaddar, setHistorikLaddar] = useState(true);
-  const [historikSida, setHistorikSida] = useState(0);
   const [historikMer, setHistorikMer] = useState(true);
   const [expanderad, setExpanderad] = useState({});
 
   const fritextTrimmed = fritext.trim();
 
-  async function laddaHistorik(sida) {
+  // Cursor-baserad paginering på `id` (bigserial, strikt stigande med
+  // infogningsordning) istället för offset — en offset skiftar så fort en
+  // ny post prependas lokalt efter en sparning, eller en annan besökare
+  // hinner spara något mellan två "Ladda fler"-klick, vilket dubblettvisar
+  // (inkl. dubblerad React key) raden som råkar hamna vid sidbrytningen
+  // (Codex-fynd, PR #1345).
+  async function laddaHistorik(cursor) {
     setHistorikLaddar(true);
     try {
-      const offset = sida * PAGE_SIZE;
-      const res = await fetch(
-        `${SB_URL}/rest/v1/fraga_anna_peter_log?select=*&order=skapad.desc&limit=${PAGE_SIZE}&offset=${offset}`,
-        { headers: sbH() }
-      );
+      let q = `${SB_URL}/rest/v1/fraga_anna_peter_log?select=*&order=id.desc&limit=${PAGE_SIZE}`;
+      if (cursor != null) q += `&id=lt.${cursor}`;
+      const res = await fetch(q, { headers: sbH() });
       const data = await res.json().catch(() => []);
       if (Array.isArray(data)) {
-        setHistorik(prev => (sida === 0 ? data : [...prev, ...data]));
+        setHistorik(prev => (cursor == null ? data : [...prev, ...data]));
         setHistorikMer(data.length === PAGE_SIZE);
       }
     } catch {
@@ -198,12 +207,12 @@ export default function FragaAnnaOchPeterPage() {
     }
   }
 
-  useEffect(() => { laddaHistorik(0); }, []);
+  useEffect(() => { laddaHistorik(null); }, []);
 
   function laddaFlerHistorik() {
-    const nasta = historikSida + 1;
-    setHistorikSida(nasta);
-    laddaHistorik(nasta);
+    const sista = historik[historik.length - 1];
+    if (!sista) return;
+    laddaHistorik(sista.id);
   }
 
   async function sparaHistorik(entry) {

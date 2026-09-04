@@ -50,7 +50,7 @@ async function byggFeed() {
     fetch(`${SB_URL}/rest/v1/snake_poang?order=skapad.desc&limit=5&select=spelnamn,agent_namn,poang,vann,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/nyhetsanalys?select=agent,analys,skapad,nyhetsflode(rubrik)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/vetenskapliga_upptagter?select=titel,forskare,disciplin,impakt,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log?select=aktion,titel,input_text,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log?select=aktion,titel,input_text,sammanfattning,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
   ]);
 
   const feed = [];
@@ -456,7 +456,7 @@ async function byggFeed() {
   (Array.isArray(fragaAnnaPeter.value) ? fragaAnnaPeter.value : []).forEach(f => {
     if (!f.skapad) return;
     const info = FRAGA_ANNA_PETER_INFO[f.aktion] || FRAGA_ANNA_PETER_INFO.anna_sager;
-    const snippet = (f.titel || f.input_text || "").slice(0, 60);
+    const snippet = (f.titel || f.input_text || f.sammanfattning || "").slice(0, 60);
     const text = f.aktion === "diskussion"
       ? `Anna & Peter diskuterade: "${snippet}"`
       : `${f.aktion === "anna_sager" ? "Anna" : "Peter"} läste upp: "${snippet}"`;
