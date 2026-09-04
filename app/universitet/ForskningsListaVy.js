@@ -121,6 +121,14 @@ function RadFynd({ fynd }) {
 export default function ForskningsListaVy({ fynd }) {
   const [valdDisciplin, setValdDisciplin] = useState(null);
 
+  if (fynd.length === 0) {
+    return (
+      <div style={{ fontSize: "11px", color: "#1e4a80", fontFamily: "monospace", padding: "16px 0" }}>
+        Inga vetenskapliga upptäckter ännu. Kör forskning_test.py för att generera de första fynden.
+      </div>
+    );
+  }
+
   const disciplinCounts = {};
   for (const f of fynd) {
     const d = f.disciplin || "övrigt";
