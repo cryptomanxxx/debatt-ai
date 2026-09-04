@@ -86,7 +86,13 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
   const brodtext = ärUrl ? (rad.sammanfattning || "") : (rad.input_text || "");
   const brodtextArLang = brodtext.length > BRODTEXT_GRANS;
   const kanExpandera = brodtextArLang || !!dialog;
-  const kanSpelaUpp = dialog ? dialog.length > 0 : !!(brodtext || rad.titel);
+  // Måste gate:as på rad.aktion — inte bara på om `dialog` råkar finnas —
+  // så den här knappen aldrig kan visas för en "diskussion"-post vars
+  // dialog blivit null (t.ex. sanerad bort av stadaDialog() på servern):
+  // spelaUppHistorik() nedan gör exakt samma aktion-check och avbryter
+  // annars tyst, vilket gjorde knappen klickbar men verkningslös
+  // (Codex-fynd, PR #1346).
+  const kanSpelaUpp = rad.aktion === "diskussion" ? !!dialog?.length : !!(brodtext || rad.titel);
 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
