@@ -1,5 +1,5 @@
-import ForskningsListaVy from "./ForskningsListaVy";
-import VetenskapsFlodeVy from "./VetenskapsFlodeVy";
+import UniversitetTicker from "./UniversitetTicker";
+import UniversitetVy from "./UniversitetVy";
 
 export const revalidate = 300;
 
@@ -56,14 +56,18 @@ export default async function UniversitetPage() {
 
   return (
     <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 0 80px", background: "#020a1a", minHeight: "100vh" }}>
-      {/* Hero image */}
-      <div style={{ position: "relative", width: "100%" }}>
+      <UniversitetTicker fynd={fynd} nyheter={nyheter} />
+
+      {/* Hero image — höjdbegränsad (object-fit: cover) istället för fullbredd i
+          naturlig bildproportion, som på mobil tog upp en stor del av skärmen
+          innan besökaren nått något innehåll. */}
+      <div style={{ position: "relative", width: "100%", height: "clamp(110px, 18vw, 200px)", overflow: "hidden" }}>
         <img
           src="/ai-university.png"
           alt="AI University — Educate. Innovate. Elevate."
-          style={{ width: "100%", height: "auto", display: "block" }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 35%", display: "block" }}
         />
-        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 60%, #020a1a 100%)" }} />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 40%, #020a1a 100%)" }} />
       </div>
 
       {/* Hero text */}
@@ -105,7 +109,7 @@ export default async function UniversitetPage() {
       </div>
 
       <div style={{ padding: "40px 24px" }}>
-        {fynd.length === 0 ? (
+        {fynd.length === 0 && nyheter.length === 0 ? (
           <div style={{ textAlign: "center", padding: "80px 20px" }}>
             <div style={{ fontSize: "40px", marginBottom: "16px", opacity: 0.3 }}>🎓</div>
             <div style={{ fontSize: "14px", color: "#1e4a80", fontFamily: "monospace" }}>
@@ -116,16 +120,8 @@ export default async function UniversitetPage() {
             </div>
           </div>
         ) : (
-          <ForskningsListaVy fynd={fynd} />
+          <UniversitetVy fynd={fynd} nyheter={nyheter} />
         )}
-      </div>
-
-      {/* ArXiv & vetenskapliga nyheter */}
-      <div style={{ padding: "0 24px 40px" }}>
-        <div style={{ fontSize: "9px", color: "#fb923c", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "16px", paddingBottom: "8px", borderBottom: "1px solid #fb923c22" }}>
-          📡 ArXiv &amp; Vetenskapliga Nyheter
-        </div>
-        <VetenskapsFlodeVy nyheter={nyheter} />
       </div>
 
       {/* Footer */}
