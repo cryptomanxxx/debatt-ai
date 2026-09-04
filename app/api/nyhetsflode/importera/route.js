@@ -18,7 +18,6 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // mot RLS istället för att krascha routen).
 const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
-const KALLA_BESOKARIMPORT = "Besökarimport";
 const NYHETSFLODE_SELECT = "id,rubrik,beskrivning,kalla,url,publicerad,kategori,hamtad";
 
 export async function POST(req) {
@@ -59,7 +58,7 @@ export async function POST(req) {
     body: JSON.stringify({
       rubrik,
       beskrivning: result.sammanfattning,
-      kalla: KALLA_BESOKARIMPORT,
+      kalla: result.kalla,
       url: result.url,
       kategori: [],
     }),

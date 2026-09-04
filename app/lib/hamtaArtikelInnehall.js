@@ -18,6 +18,7 @@ const FETCH_TIMEOUT_MS = 8000;
 const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2MB
 const TITEL_MAX = 200;
 const SAMMANFATTNING_MAX = 500;
+const KALLA_MAX = 100;
 
 // Två separata BlockList-instanser — net.BlockList slår ihop IPv4- och
 // IPv6-regler i EN instans på ett sätt som gör att en ::ffff:0:0/96-regel
@@ -189,6 +190,9 @@ function extraheraArtikel(html) {
   const metaBeskrivning =
     extraheraMeta(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i) ||
     extraheraMeta(html, /<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["']/i);
+  const ogSiteName =
+    extraheraMeta(html, /<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']*)["']/i) ||
+    extraheraMeta(html, /<meta[^>]+content=["']([^"']*)["'][^>]+property=["']og:site_name["']/i);
 
   const titel = (ogTitel || titleTag || "").slice(0, TITEL_MAX);
   let sammanfattning = ogBeskrivning || metaBeskrivning;
@@ -202,7 +206,20 @@ function extraheraArtikel(html) {
       .trim();
   }
 
-  return { titel, sammanfattning: sammanfattning.slice(0, SAMMANFATTNING_MAX) };
+  return {
+    titel,
+    sammanfattning: sammanfattning.slice(0, SAMMANFATTNING_MAX),
+    kalla: ogSiteName.slice(0, KALLA_MAX),
+  };
+}
+
+// Fallback när sidan saknar og:site_name — härleder ett läsbart källnamn ur
+// värdnamnet ("omni.se" -> "Omni", "www.svt.se" -> "Svt"). Ofullständigt för
+// versaliseringskänsliga förkortningar, men bättre än att visa den råa URL:en
+// eller en generisk platshållare.
+function kallaFranHostname(hostname) {
+  const forsta = hostname.replace(/^www\./i, "").split(".")[0] || hostname;
+  return forsta.charAt(0).toUpperCase() + forsta.slice(1);
 }
 
 export const PUBLIKA_FEL = {
@@ -213,8 +230,9 @@ export const PUBLIKA_FEL = {
 
 /**
  * Validerar och hämtar en artikel-URL server-side med SSRF-skydd, extraherar
- * titel + sammanfattning. Returnerar antingen
- * { ok: true, titel, sammanfattning, url } eller { ok: false, fel, publiktFel }.
+ * titel + sammanfattning + källnamn (og:site_name, annars härlett ur
+ * värdnamnet). Returnerar antingen
+ * { ok: true, titel, sammanfattning, kalla, url } eller { ok: false, fel, publiktFel }.
  */
 export async function hamtaArtikelInnehall(urlStr) {
   let parsed;
@@ -237,10 +255,22 @@ export async function hamtaArtikelInnehall(urlStr) {
     return { ok: false, fel: result.fel, publiktFel: PUBLIKA_FEL[result.fel] || "Kunde inte hämta artikeln" };
   }
 
-  const { titel, sammanfattning } = extraheraArtikel(result.html);
+  const { titel, sammanfattning, kalla } = extraheraArtikel(result.html);
   if (!sammanfattning) {
     return { ok: false, fel: "ingen_text", publiktFel: "Hittade ingen läsbar text på sidan" };
   }
 
-  return { ok: true, titel: titel || null, sammanfattning, url: result.slutgiltigUrl };
+  // Slutgiltig URL (efter ev. redirects) används för hostname-fallbacken —
+  // annars hade en redirect från en förkortningstjänst till den riktiga
+  // sajten kunnat ge fel källnamn.
+  let hostnameFallback = parsed.hostname;
+  try { hostnameFallback = new URL(result.slutgiltigUrl).hostname; } catch {}
+
+  return {
+    ok: true,
+    titel: titel || null,
+    sammanfattning,
+    kalla: kalla || kallaFranHostname(hostnameFallback),
+    url: result.slutgiltigUrl,
+  };
 }
