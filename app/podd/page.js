@@ -501,7 +501,9 @@ export default function PoddPage() {
         iv = setInterval(() => {
           if (!autoplayRef.current) { clearInterval(iv); return; }
           const t = Date.now();
-          setAmplitude(Math.max(0.05, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
+          // Golvet måste ligga under MOUTH_THRESH[0] - MOUTH_MARGIN (0.04) — annars
+          // kan munnen aldrig gå tillbaka till stängt läge under tal (Codex-fynd, PR #1351).
+          setAmplitude(Math.max(0.02, 0.35 + 0.55 * Math.sin(t * 0.009) * Math.abs(Math.cos(t * 0.014))));
         }, 70);
       };
       const stopAnim = () => { if (iv) clearInterval(iv); setAmplitude(0); resolve(); };
