@@ -49,7 +49,7 @@ function RadFynd({ fynd }) {
   const badge = IMPAKT_BADGE[fynd.impakt];
   const farg = DISCIPLIN_FARG[fynd.disciplin] || "#38bdf8";
   const datum = fynd.skapad
-    ? new Date(fynd.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "short", day: "numeric" })
+    ? new Date(fynd.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "short", day: "numeric", timeZone: "Europe/Stockholm" })
     : "";
   const forfattare = [fynd.forskare, ...(fynd.medforskare || [])].filter(Boolean).join(", ");
 
