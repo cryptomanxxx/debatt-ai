@@ -55,7 +55,18 @@ function parseTurns(raw) {
     .slice(0, MAX_TURNS)
     .map(t => ({ speaker: t.speaker, text: t.text.trim().slice(0, MAX_TURN_LEN) }));
 
-  return turns.length >= 2 ? turns : null;
+  if (turns.length < 2) return null;
+
+  // Codex-fynd (PR #1356): turns.length >= 2 ensamt accepterade även ett svar
+  // där LLM:en glömde en av de tre ankarna (t.ex. bara anna+peter) — StudioOverlay
+  // hade då tyst renderat en "3-vägs"-studio där Johans porträtt aldrig blir
+  // aktivt. Kräv att alla tre faktiskt förekommer minst en gång innan svaret
+  // räknas som lyckat, så en ofullständig dialog istället går vidare till
+  // nästa provider i callWithFallback-kedjan (via `validate`-callbacken).
+  const speakers = new Set(turns.map(t => t.speaker));
+  if (!speakers.has("anna") || !speakers.has("peter") || !speakers.has("johan")) return null;
+
+  return turns;
 }
 
 export async function POST(req) {
