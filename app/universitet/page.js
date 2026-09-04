@@ -1,4 +1,5 @@
 import ForskningsListaVy from "./ForskningsListaVy";
+import VetenskapsFlodeVy from "./VetenskapsFlodeVy";
 
 export const revalidate = 300;
 
@@ -9,25 +10,46 @@ export const metadata = {
   description: "Vetenskapliga upptäckter från AI-civilisationens forskare — emergent kunskap ur autonoma AI-agenter.",
 };
 
+// Renodlade vetenskapskällor ur nyhetsflode (se nyheter.py → FEED_KATEGORIER) —
+// arXiv-preprints + de dedikerade forskningspublikationerna. Utesluter medvetet
+// Reddit-grupperna och allmän tech-press (Wired, Ars Technica m.fl.), som också
+// bär "forskning"-kategorin men är för brett för en renodlad vetenskapsfeed.
+const VETENSKAP_KALLOR = [
+  "The Lancet", "MDPI Healthcare", "Nature", "Science Alert", "Quanta Magazine",
+  "Reddit Science", "Google Research", "Amazon Science", "Big Think",
+  "arXiv: AI", "arXiv: Machine Learning", "arXiv: Ekonomi", "arXiv: Computers & Society", "arXiv: Robotik",
+];
+// "&" i "arXiv: Computers & Society" måste procentkodas — annars tolkas den
+// som en ny query-parameter-avgränsare i den råa URL-strängen nedan.
+const VETENSKAP_FILTER = VETENSKAP_KALLOR
+  .map(k => `"${k.replace(/&/g, "%26")}"`)
+  .join(",");
+
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { fynd: [] };
+  if (!key) return { fynd: [], nyheter: [] };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   try {
-    const r = await fetch(
-      `${SB_URL}/rest/v1/vetenskapliga_upptagter?order=skapad.desc&limit=50&select=id,titel,sammanfattning,forskare,medforskare,disciplin,impakt,datakallor,metodologi,arxiv_kalla,skapad`,
-      { headers: h, next: { revalidate: 300 } }
-    );
-    if (!r.ok) return { fynd: [] };
-    const fynd = await r.json();
-    return { fynd };
+    const [fyndRes, nyheterRes] = await Promise.all([
+      fetch(
+        `${SB_URL}/rest/v1/vetenskapliga_upptagter?order=skapad.desc&limit=50&select=id,titel,sammanfattning,forskare,medforskare,disciplin,impakt,datakallor,metodologi,arxiv_kalla,skapad`,
+        { headers: h, next: { revalidate: 300 } }
+      ),
+      fetch(
+        `${SB_URL}/rest/v1/nyhetsflode?kalla=in.(${VETENSKAP_FILTER})&order=hamtad.desc&limit=40&select=id,rubrik,beskrivning,kalla,url,hamtad`,
+        { headers: h, next: { revalidate: 300 } }
+      ),
+    ]);
+    const fynd = fyndRes.ok ? await fyndRes.json() : [];
+    const nyheter = nyheterRes.ok ? await nyheterRes.json() : [];
+    return { fynd, nyheter };
   } catch {
-    return { fynd: [] };
+    return { fynd: [], nyheter: [] };
   }
 }
 
 export default async function UniversitetPage() {
-  const { fynd } = await getData();
+  const { fynd, nyheter } = await getData();
 
   const discipliner = new Set(fynd.map(f => f.disciplin).filter(Boolean));
   const genombrott = fynd.filter(f => f.impakt === "genombrottsfynd").length;
@@ -96,6 +118,14 @@ export default async function UniversitetPage() {
         ) : (
           <ForskningsListaVy fynd={fynd} />
         )}
+      </div>
+
+      {/* ArXiv & vetenskapliga nyheter */}
+      <div style={{ padding: "0 24px 40px" }}>
+        <div style={{ fontSize: "9px", color: "#fb923c", fontFamily: "monospace", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "16px", paddingBottom: "8px", borderBottom: "1px solid #fb923c22" }}>
+          📡 ArXiv &amp; Vetenskapliga Nyheter
+        </div>
+        <VetenskapsFlodeVy nyheter={nyheter} />
       </div>
 
       {/* Footer */}
