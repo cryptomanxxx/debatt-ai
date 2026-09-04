@@ -1,36 +1,37 @@
 /**
- * POST /api/studio — genererar ett kort Anna+Peter-studiosamtal om en enskild
- * nyhet, utlöst från /nyhetsanalyser (flyttades dit från /nyhetskallor, se
- * ai-bus/context.md). Ren textdialog via den centrala LLM-routern
- * (callWithFallback + getDynamicChain) — ljuduppspelningen sker helt
- * klientsidan i StudioOverlay.js via responsiveVoice, precis som den
+ * POST /api/studio — genererar ett kort Anna+Peter+Johan-studiosamtal om en
+ * enskild nyhet, utlöst från /nyhetsanalyser (flyttades dit från
+ * /nyhetskallor, se ai-bus/context.md). Ren textdialog via den centrala
+ * LLM-routern (callWithFallback + getDynamicChain) — ljuduppspelningen sker
+ * helt klientsidan i StudioOverlay.js via responsiveVoice, precis som den
  * befintliga uppläsningsfunktionen (AgentOverlay.js).
  */
 
 import { callWithFallback, getDynamicChain } from "../../lib/aiRouter.js";
 import { checkRateLimit } from "../../lib/kanalRateLimit";
 
-const SYSTEM = `Du producerar ett kort studiosamtal för Debatt-AI om en nyhet.
+const SYSTEM = `Du producerar ett kort studiosamtal för Debatt-AI om en nyhet, med tre ankare.
 
 Anna är nyhetsankare — neutral, tydlig, ställer korta följdfrågor.
 Peter är nationalekonom — analyserar ekonomiska konsekvenser, incitament, risker och samhällseffekter i karaktär.
+Johan är teknikoptimist — ser möjligheter och innovation i det nya, kommenterar hur teknik, AI och förändring driver eller påverkar det som diskuteras, i karaktär.
 
 Utgå ENDAST från den nyhet som anges i användarmeddelandet. Hitta INTE på fakta, siffror eller detaljer
-som inte finns i materialet — om nyheten saknar tillräckligt underlag för ekonomisk analys ska Peter säga
+som inte finns i materialet — om nyheten saknar tillräckligt underlag för analys ska Peter/Johan säga
 det rakt ut och resonera försiktigt istället för att gissa.
 
 Regler:
-- 4–6 repliker totalt, växelvis mellan Anna och Peter. Anna börjar.
+- 6–9 repliker totalt, rotera mellan Anna, Peter och Johan så att alla tre kommer till tals minst en gång. Anna börjar.
 - Varje replik: 1–3 meningar, naturligt talspråk. Inga listor, rubriker eller emojis.
-- Anna presenterar nyheten kort och ställer minst en fråga till Peter.
-- Peter tillför analys och perspektiv — inte bara en omformulering av nyheten.
+- Anna presenterar nyheten kort och styr samtalet med korta frågor till Peter och/eller Johan.
+- Peter och Johan tillför var sitt tydligt annorlunda perspektiv — inte bara omformuleringar av nyheten eller varandra.
 - Undvik klyschor och generiska avslutningar ("framtiden får utvisa" och liknande).
 - Skriv på svenska.
 
 Svara ENDAST med giltig JSON i exakt detta format — inga andra fält, ingen markdown, ingen förklaring:
-{"turns":[{"speaker":"anna","text":"..."},{"speaker":"peter","text":"..."}]}`;
+{"turns":[{"speaker":"anna","text":"..."},{"speaker":"peter","text":"..."},{"speaker":"johan","text":"..."}]}`;
 
-const MAX_TURNS = 6;
+const MAX_TURNS = 9;
 const MAX_TURN_LEN = 400;
 
 function parseTurns(raw) {
@@ -50,7 +51,7 @@ function parseTurns(raw) {
   if (!Array.isArray(parsed?.turns)) return null;
 
   const turns = parsed.turns
-    .filter(t => t && (t.speaker === "anna" || t.speaker === "peter") && typeof t.text === "string" && t.text.trim().length >= 5)
+    .filter(t => t && (t.speaker === "anna" || t.speaker === "peter" || t.speaker === "johan") && typeof t.text === "string" && t.text.trim().length >= 5)
     .slice(0, MAX_TURNS)
     .map(t => ({ speaker: t.speaker, text: t.text.trim().slice(0, MAX_TURN_LEN) }));
 
@@ -86,7 +87,7 @@ export async function POST(req) {
       // (eller trasig JSON) ska räknas som misslyckad så callWithFallback
       // går vidare till nästa provider i kedjan, istället för att låsa fast
       // vid ett obrukbart svar från den första som råkar svara 200.
-      { maxTokens: 700, temperature: 0.75, json: true, source: "studio", validate: (t) => !!parseTurns(t) }
+      { maxTokens: 1000, temperature: 0.75, json: true, source: "studio", validate: (t) => !!parseTurns(t) }
     );
 
     const turns = parseTurns(text);
