@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 
 function tidsSedan(iso) {
   if (!iso) return "";
@@ -19,6 +20,17 @@ function tidsSedan(iso) {
 // inline-expanderbara i listan nedanför) så de renderas som ren text; externa
 // nyheter länkar ut till originalkällan precis som i NyhetsTicker.
 export default function UniversitetTicker({ fynd, nyheter }) {
+  // Sidan cachas med 5 minuters ISR (revalidate=300 i page.js) — till
+  // skillnad från NyhetsTicker.js (force-dynamic, hydrerar inom
+  // millisekunder av sin egen render) kan "X min sedan" här vara flera
+  // minuter inaktuellt när en besökare hydrerar en cachad sida. Att köra
+  // tidsSedan() direkt i render ger då olika text server- och klientsidan
+  // (Codex-fynd, PR #1355) → hydration-mismatch. mounted-gaten säkerställer
+  // att server-HTML och klientens FÖRSTA render matchar (båda tomma), sedan
+  // fylls den riktiga texten i efter mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const a = fynd.map(f => ({
     id: `f-${f.id}`, text: f.titel, kalla: f.forskare || "AI-forskning",
     tid: f.skapad, url: null, ikon: "🔬", farg: "#38bdf8",
@@ -51,14 +63,14 @@ export default function UniversitetTicker({ fynd, nyheter }) {
         LIVE
       </div>
       <div style={{ overflow: "hidden", flex: 1 }}>
-        <div style={{ display: "flex", animation: `universitet-ticker ${duration}s linear infinite`, whiteSpace: "nowrap", willChange: "transform" }}>
+        <div style={{ display: "flex", width: "max-content", animation: `universitet-ticker ${duration}s linear infinite`, whiteSpace: "nowrap", willChange: "transform" }}>
           {items.map((n, i) => {
             const inner = (
               <>
                 <span style={{ fontSize: "10px", marginRight: "6px" }}>{n.ikon}</span>
                 <span style={{ fontSize: "12px", color: "#b8d8ff", fontFamily: "Georgia, serif", marginRight: "8px" }}>{n.text}</span>
                 <span style={{ fontSize: "9px", color: n.farg + "aa", fontFamily: "monospace", marginRight: "6px" }}>{n.kalla}</span>
-                <span style={{ fontSize: "9px", color: "#1e4a80", fontFamily: "monospace", marginRight: "16px" }}>· {tidsSedan(n.tid)}</span>
+                <span style={{ fontSize: "9px", color: "#1e4a80", fontFamily: "monospace", marginRight: "16px" }}>· {mounted ? tidsSedan(n.tid) : ""}</span>
                 <span style={{ color: "#0d2040", marginRight: "16px" }}>◆</span>
               </>
             );
