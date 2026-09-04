@@ -41,14 +41,23 @@ function StudioPerson({ rolle, isSpeaking, dimmed }) {
 // tur och ordning med responsiveVoice, med visuell fokusväxling mellan de två
 // (opacity/scale/brightness) istället för riktig videogenerering. v1 av det
 // tvåankars-studiokoncept som efterfrågades efter AgentOverlay-uppläsningen.
-export default function StudioOverlay({ rubrik, beskrivning, onClose }) {
-  const [fas, setFas] = useState("laddar"); // laddar | spelar | klar | fel
-  const [turns, setTurns] = useState([]);
+//
+// `turns` (valfri): en redan färdig dialog (t.ex. hämtad från
+// fraga_anna_peter_log-historiken på /fraga-anna-och-peter) — hoppar över
+// /api/studio-anropet och spelar upp den direkt, ingen ny LLM-kostnad.
+// `onTurns` (valfri): callback som körs EN gång när en NY dialog just har
+// hämtats från /api/studio (aldrig vid en `turns`-styrd replay) — used av
+// sidan för att spara historikposten med den färdiga dialogen.
+export default function StudioOverlay({ rubrik, beskrivning, turns: forcedTurns, onTurns, onClose }) {
+  const harForcedTurns = Array.isArray(forcedTurns) && forcedTurns.length > 0;
+  const [fas, setFas] = useState(harForcedTurns ? "spelar" : "laddar"); // laddar | spelar | klar | fel
+  const [turns, setTurns] = useState(harForcedTurns ? forcedTurns : []);
   const [activeIdx, setActiveIdx] = useState(0);
   const [fel, setFel] = useState("");
 
-  // Hämta dialogen
+  // Hämta dialogen (hoppas över om en färdig dialog redan skickats in)
   useEffect(() => {
+    if (harForcedTurns) return;
     let cancelled = false;
     (async () => {
       try {
@@ -66,6 +75,7 @@ export default function StudioOverlay({ rubrik, beskrivning, onClose }) {
         }
         setTurns(data.turns);
         setFas("spelar");
+        onTurns?.(data.turns);
       } catch {
         if (!cancelled) { setFel("Nätverksfel — försök igen."); setFas("fel"); }
       }

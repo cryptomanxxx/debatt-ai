@@ -1,0 +1,85 @@
+// Sparar en historikpost från /fraga-anna-och-peter varje gång en besökare
+// låter Anna eller Peter läsa upp fri text/en nyhetsartikel, eller låter dem
+// diskutera den i studion. Ren loggning — texten läses/spelas upp helt
+// klientsidan (responsiveVoice/StudioOverlay), den här routen skriver bara
+// undan en rad så historiken kan visas på sidan.
+import { checkRateLimit } from "../../lib/kanalRateLimit";
+import { logFel, getIp } from "../../lib/logFel";
+
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// fraga_anna_peter_log saknar anon-skrivpolicy (RLS) — service role krävs,
+// samma mönster som labb_log/nyhetsanalys. Fallback till anon bevaras för
+// miljöer utan secreten (skrivningen misslyckas då tyst mot RLS istället för
+// att krascha routen).
+const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
+
+const TYPER = new Set(["fritext", "url"]);
+const AKTIONER = new Set(["anna_sager", "peter_sager", "diskussion"]);
+const MAX_TURNS = 6;
+const MAX_TURN_LEN = 400;
+
+function stadaDialog(dialog) {
+  if (!Array.isArray(dialog)) return null;
+  const turns = dialog
+    .filter(t => t && (t.speaker === "anna" || t.speaker === "peter") && typeof t.text === "string" && t.text.trim())
+    .slice(0, MAX_TURNS)
+    .map(t => ({ speaker: t.speaker, text: t.text.trim().slice(0, MAX_TURN_LEN) }));
+  return turns.length ? turns : null;
+}
+
+export async function POST(req) {
+  const ip = getIp(req);
+  const rl = checkRateLimit(req, "fraga-anna-peter-log", 40, 10 * 60 * 1000);
+  if (!rl.ok) {
+    return Response.json({ error: "För många förfrågningar." }, { status: 429, headers: { "Retry-After": String(rl.retryAfter) } });
+  }
+
+  let body;
+  try { body = await req.json(); } catch { return Response.json({ error: "Ogiltig JSON" }, { status: 400 }); }
+
+  const typ = body?.typ;
+  const aktion = body?.aktion;
+  if (!TYPER.has(typ) || !AKTIONER.has(aktion)) {
+    return Response.json({ error: "Ogiltig typ eller aktion." }, { status: 400 });
+  }
+
+  const inputText = typeof body?.text === "string" ? body.text.trim().slice(0, 1500) : null;
+  const kallaUrl = typeof body?.url === "string" ? body.url.trim().slice(0, 2000) : null;
+  const titel = typeof body?.titel === "string" ? body.titel.trim().slice(0, 200) : null;
+  const sammanfattning = typeof body?.sammanfattning === "string" ? body.sammanfattning.trim().slice(0, 800) : null;
+  const dialog = stadaDialog(body?.dialog);
+
+  if (typ === "fritext" && !inputText) {
+    return Response.json({ error: "Text saknas." }, { status: 400 });
+  }
+  if (typ === "url" && (!kallaUrl || !/^https:\/\//.test(kallaUrl))) {
+    return Response.json({ error: "Ogiltig URL." }, { status: 400 });
+  }
+
+  const res = await fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log`, {
+    method: "POST",
+    headers: {
+      apikey: SB_WRITE_KEY,
+      Authorization: `Bearer ${SB_WRITE_KEY}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({
+      typ, aktion,
+      input_text: inputText,
+      kalla_url: kallaUrl,
+      titel, sammanfattning,
+      dialog,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    logFel({ kalla: "fraga-anna-och-peter", feltyp: "supabase_fail", meddelande: `HTTP ${res.status}`, ip, extra: { errText: errText.slice(0, 300) } });
+    return Response.json({ error: "Kunde inte spara." }, { status: 500 });
+  }
+
+  const rader = await res.json().catch(() => []);
+  return Response.json({ ok: true, rad: rader?.[0] || null });
+}
