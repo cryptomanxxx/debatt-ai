@@ -21,7 +21,7 @@ let _cache = { data: null, ts: 0 };
 
 async function byggFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang, nyhetsanalys, upptackter] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang, nyhetsanalys, upptackter, fragaAnnaPeter] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -50,6 +50,7 @@ async function byggFeed() {
     fetch(`${SB_URL}/rest/v1/snake_poang?order=skapad.desc&limit=5&select=spelnamn,agent_namn,poang,vann,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/nyhetsanalys?select=agent,analys,skapad,nyhetsflode(rubrik)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/vetenskapliga_upptagter?select=titel,forskare,disciplin,impakt,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log?select=aktion,titel,input_text,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
   ]);
 
   const feed = [];
@@ -444,6 +445,28 @@ async function byggFeed() {
       href: "/universitet",
       skapad: u.skapad,
       farg: genombrott ? "#facc15" : "#8b5cf6",
+    });
+  });
+
+  const FRAGA_ANNA_PETER_INFO = {
+    anna_sager:  { ikon: "🎙️", farg: "#a0c8f0" },
+    peter_sager: { ikon: "📊", farg: "#6abf6a" },
+    diskussion:  { ikon: "🎭", farg: "#c084fc" },
+  };
+  (Array.isArray(fragaAnnaPeter.value) ? fragaAnnaPeter.value : []).forEach(f => {
+    if (!f.skapad) return;
+    const info = FRAGA_ANNA_PETER_INFO[f.aktion] || FRAGA_ANNA_PETER_INFO.anna_sager;
+    const snippet = (f.titel || f.input_text || "").slice(0, 60);
+    const text = f.aktion === "diskussion"
+      ? `Anna & Peter diskuterade: "${snippet}"`
+      : `${f.aktion === "anna_sager" ? "Anna" : "Peter"} läste upp: "${snippet}"`;
+    feed.push({
+      typ: `fraga-anna-peter-${f.aktion}`,
+      ikon: info.ikon,
+      text,
+      href: "/fraga-anna-och-peter",
+      skapad: f.skapad,
+      farg: info.farg,
     });
   });
 
