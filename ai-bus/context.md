@@ -611,3 +611,12 @@ kanaler hamnar där nu istället för ett fåtal. Om någon framtida session
 funderar på att återuppta det här: läs det här avsnittet först — roten
 är redan känd (IP-baserad bot-detektering), inte något som behöver
 omutredas.
+
+**Uppföljning (4 sep 2026, Codex-fynd på PR #1343):** eftersom anropet är
+garanterat misslyckat gav det ingen mening att fortsätta anropa Vercel-
+proxyn 28 gånger per körning bara för att alltid landa i samma RSS-
+fallback ändå — ren onödig latens och Vercel-anropskostnad i `agent.yml`
+och `nyhetsflode-test.yml`. Anropsstället i `hamta_youtube_nyheter()`
+(`nyheter.py`) hoppar nu direkt till `rss_beskrivning`/`titel`-fallbacken.
+`_hamta_transkript_via_vercel()` och `/api/youtube-transcript/route.js`
+lämnas orörda (inte borttagna) ifall YouTube någon gång ändrar beteende.

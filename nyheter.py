@@ -176,12 +176,14 @@ def hamta_youtube_nyheter() -> list:
                     if desc_el is not None and desc_el.text:
                         rss_beskrivning = desc_el.text.strip()[:1500]
 
-                # Hämta transkript via Vercel-proxy (undviker GitHub Actions IP-block)
-                transkript = _hamta_transkript_via_vercel(video_id)
-                if transkript:
-                    innehall = "[YouTube-transkript] " + transkript[:2000]
-                    transkript_ok += 1
-                elif rss_beskrivning:
+                # Vercel-transkriptproxyn har slutat fungera helt (YouTubes
+                # bot-detektering mot molnserver-IP:er, LOGIN_REQUIRED — se
+                # ai-bus/context.md) och anropas därför inte längre här.
+                # Den gav ändå alltid samma RSS-fallback som resultat, så att
+                # fortsätta anropa den 28 gånger per körning kostade bara
+                # onödig tid och Vercel-anrop. _hamta_transkript_via_vercel()
+                # lämnas orörd om YouTube någon gång ändrar beteende.
+                if rss_beskrivning:
                     innehall = "[YouTube-beskrivning] " + rss_beskrivning
                     transkript_fel += 1
                 else:
