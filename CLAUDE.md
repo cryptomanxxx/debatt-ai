@@ -93,8 +93,11 @@ Inte bara ett verktyg för människor att skriva debattartiklar — utan en infr
 | Civilisationsminne: marknadskrasch | 📉 | Röd | /historia |
 | Civilisationsminne: förräderi/skandal | 🗡️/😱 | Orange/Röd | /historia |
 | Civilisationsminne: symbolkup | 👑 | Lila (#e879f9) | /historia |
+| Fråga Anna och Peter: Anna läste upp | 🎙️ | Ljusblå (#a0c8f0) | /fraga-anna-och-peter |
+| Fråga Anna och Peter: Peter läste upp | 📊 | Grön (#6abf6a) | /fraga-anna-och-peter |
+| Fråga Anna och Peter: studiosamtal | 🎭 | Lila (#c084fc) | /fraga-anna-och-peter |
 
-Implementerat i `fetchAktivitetsFeed()` i `app/client.js`. Fetchar 12 Supabase-tabeller parallellt med `Promise.allSettled`. Visar max 10 händelser sorterade efter timestamp.
+Feeden byggs server-side i `app/api/aktivitet/route.js` (25s in-memory-cache + CDN `s-maxage=25`) — flyttades dit från `fetchAktivitetsFeed()` i `app/client.js` för att undvika att varje besökare gjorde alla Supabase-fetchar själv var 30:e sekund; `fetchAktivitetsFeed()` anropar numera bara `/api/aktivitet`. Ett tjugotal Supabase-tabeller fetchas parallellt med `Promise.allSettled`. Visar max 10 händelser sorterade efter timestamp.
 
 ---
 
@@ -2325,7 +2328,7 @@ Kräver Supabase-tabeller `nyhetsflode` och `nyhetsanalys` — kör `supabase_ny
 | `app/nyhetskallor/statistik/NyhetsstatistikVy.js` | Klientkomponent: statistikpiller, två Recharts-grafer, tidsintervalljusterare |
 | `app/api/nyhetsval/route.js` | POST-endpoint: skriver besökarens valda nyhet till `amnesforslag` med `kalla="nyhetsval"`. Rate limit 15/timme |
 | `app/api/chatt/route.js` | `typ="nyhetsanalys"`-gren: egen rate limit, `withNyhetsanalysSave()`/`sparaNyhetsanalys()` sparar det färdiga svaret till `nyhetsanalys` |
-| `app/api/aktivitet/route.js` | Hämtar senaste 6 `nyhetsanalys`-rader (embed `nyhetsflode(rubrik)`) till Senaste aktivitet-feeden, länkar till `/nyhetsanalyser` |
+| `app/api/aktivitet/route.js` | Bygger hela Senaste aktivitet-feeden server-side (25s cache) — ~28 parallella Supabase-fetchar med `Promise.allSettled`, inkl. senaste 6 `nyhetsanalys`-rader (länkar till `/nyhetsanalyser`) och senaste 6 `fraga_anna_peter_log`-rader (länkar till `/fraga-anna-och-peter`) |
 | `.github/workflows/nyhetsflode-test.yml` | Kör 6 ggr/dag (04/08/12/16/20/00 svensk tid) |
 | `.github/workflows/nyhetsanalys-auto.yml` | Triggas av `workflow_run` direkt efter `Nyhetsflöde` (den pålitliga vägen) + `*/20`-schema som bonus (GitHub levererar tätare scheman opålitligt i praktiken, se ✅93) |
 
