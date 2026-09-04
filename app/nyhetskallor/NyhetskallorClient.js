@@ -174,6 +174,77 @@ function AgentAnalysPanel({ n, expanderad, onToggle, valda, onToggleAgent, analy
   );
 }
 
+// Besökare klistrar in en länk till en nyhetsartikel som inte täcks av de
+// automatiskt bevakade källorna. Servern hämtar och extraherar titel/text
+// själv (SSRF-säkert, samma logik som artikelkontexten på /chatt) — vi litar
+// aldrig på klient-inskickad text för en tabell som presenteras som "vad
+// plattformen faktiskt hämtat". Se app/api/nyhetsflode/importera/route.js.
+function ImporteraForm({ onImporterad }) {
+  const [url, setUrl] = useState("");
+  const [status, setStatus] = useState(null); // null | "laddar" | "ok" | "dubblett" | "fel"
+  const [felText, setFelText] = useState("");
+
+  async function importera(e) {
+    e.preventDefault();
+    const trimmed = url.trim();
+    if (!trimmed || status === "laddar") return;
+    setStatus("laddar");
+    setFelText("");
+    try {
+      const res = await fetch("/api/nyhetsflode/importera", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStatus("fel");
+        setFelText(data.fel || "Kunde inte importera artikeln.");
+        return;
+      }
+      onImporterad(data.rad);
+      setStatus(data.redanImporterad ? "dubblett" : "ok");
+      setUrl("");
+    } catch {
+      setStatus("fel");
+      setFelText("Nätverksfel — försök igen.");
+    }
+  }
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 18px", marginBottom: "24px" }}>
+      <div style={{ fontSize: "11px", letterSpacing: "0.1em", fontFamily: "monospace", color: C.textMuted, marginBottom: "10px" }}>
+        IMPORTERA EN NYHETSARTIKEL
+      </div>
+      <form onSubmit={importera} style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <input
+          type="text"
+          value={url}
+          onChange={e => { setUrl(e.target.value); if (status && status !== "laddar") setStatus(null); }}
+          placeholder="https://exempel.se/en-nyhetsartikel"
+          style={{ flex: 1, minWidth: "220px", padding: "10px 12px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: "6px", color: C.text, fontSize: "13px", fontFamily: "monospace", outline: "none" }}
+        />
+        <button
+          type="submit"
+          disabled={!url.trim() || status === "laddar"}
+          style={{ padding: "10px 18px", borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif", border: `1px solid ${LANK}50`, background: "transparent", color: !url.trim() || status === "laddar" ? C.textMuted : LANK, cursor: !url.trim() || status === "laddar" ? "default" : "pointer" }}
+        >
+          {status === "laddar" ? "Hämtar…" : "Importera →"}
+        </button>
+      </form>
+      {status === "ok" && (
+        <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#4ade80", fontFamily: "monospace" }}>✓ Importerad — visas överst i listan nedan.</p>
+      )}
+      {status === "dubblett" && (
+        <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#fbbf24", fontFamily: "monospace" }}>Nyheten fanns redan i nyhetsflödet.</p>
+      )}
+      {status === "fel" && (
+        <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#f87171", fontFamily: "monospace" }}>{felText}</p>
+      )}
+    </div>
+  );
+}
+
 function NyhetsRad({ n, status, onForesla, analysProps }) {
   const [expanderad, setExpanderad] = useState(false);
   const kortText = (n.beskrivning || "").length > 220;
@@ -322,6 +393,11 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
     }
   }
 
+  function nyhetImporterad(rad) {
+    if (!rad) return;
+    setNyheter(prev => (prev.some(n => n.id === rad.id) ? prev : [rad, ...prev]));
+  }
+
   function toggleExpand(id) {
     setExpanderade(prev => {
       const next = new Set(prev);
@@ -376,10 +452,15 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: "0 0 10px" }}>
             Hittar du en nyhet du tycker agenterna borde debattera? Klicka <em>"Föreslå för agenterna"</em> — den tas upp med högsta prioritet vid nästa körning, precis som ämnesförslag från Direktdebatten.
           </p>
-          <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: 0 }}>
+          <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: "0 0 10px" }}>
             Eller välj en eller flera agenter under <em>"Fråga AI-agenter om denna nyhet"</em> för en analys direkt, i realtid.
           </p>
+          <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: 0 }}>
+            Saknas en nyhet i flödet? Klistra in länken i formuläret nedan så hämtar vi den och lägger till den.
+          </p>
         </div>
+
+        <ImporteraForm onImporterad={nyhetImporterad} />
 
         <div style={{ marginBottom: "20px" }}>
           <input
