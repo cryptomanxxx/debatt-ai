@@ -66,12 +66,17 @@ export default function UniversitetTicker({ fynd, nyheter }) {
   // — robust oavsett hur många poster eller hur långa titlarna är, till
   // skillnad från den tidigare "N sekunder per post"-gissningen. Måste ligga
   // före det villkorade return:et nedan — hooks får aldrig anropas villkorat.
+  // Beroende på `mounted` (Codex-fynd, PR #1362): mounted-flippen och den här
+  // mätningen körs annars i SAMMA passiva-effekt-flush efter första render,
+  // medan tidsstämplarna fortfarande är tomma ("· ", se mounted-gaten ovan)
+  // — banan mäts då smalare än den blir efter att "X min sedan"-texten
+  // fyllts i, vilket gjorde hastigheten snabbare än avsedda 55 px/sek.
   useEffect(() => {
     if (!trackRef.current) return;
     const helaBredden = trackRef.current.scrollWidth;
     if (!helaBredden) return;
     setDuration(Math.max(helaBredden / 2 / PX_PER_SEK, MIN_DURATION_S));
-  }, [senaste.length]);
+  }, [senaste.length, mounted]);
 
   if (!senaste.length) return null;
 
