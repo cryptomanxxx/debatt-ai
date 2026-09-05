@@ -179,6 +179,22 @@ function extraheraMeta(html, re) {
   return m ? decodeHtmlEntities(m[1].trim()) : "";
 }
 
+// Postgres text-kolumner kan aldrig lagra en NUL-byte (U+0000) — ett INSERT
+// med en sådan avvisas alltid med "unsupported Unicode escape sequence"
+// (SQLSTATE 22P05), oavsett var i strängen tecknet hamnar. Bekräftat i
+// produktion (fel_log): import av en riktig artikel (arbetet.se) misslyckades
+// upprepade gånger med exakt detta fel. Källan är sannolikt en numerisk
+// HTML-entitet som &#0;/&#x0; i sidans källkod, som decodeHtmlEntities()
+// ovan legitimt avkodar till en faktisk NUL via String.fromCodePoint(0).
+// Städas bort här, en gång, på de tre fält som faktiskt sparas till
+// databasen — täcker både råa NUL-byte i HTTP-svaret och entity-avkodade
+// sådana. Övriga C0-kontrolltecken (utom tab/newline/CR) städas bort av
+// samma försiktighetsskäl — aldrig avsiktligt innehåll i artikeltext.
+const OGILTIGA_TECKEN_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
+function taBortOgiltigaTecken(s) {
+  return (s ?? "").replace(OGILTIGA_TECKEN_RE, "");
+}
+
 function extraheraArtikel(html) {
   const ogTitel =
     extraheraMeta(html, /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)["']/i) ||
@@ -207,9 +223,9 @@ function extraheraArtikel(html) {
   }
 
   return {
-    titel,
-    sammanfattning: sammanfattning.slice(0, SAMMANFATTNING_MAX),
-    kalla: ogSiteName.slice(0, KALLA_MAX),
+    titel: taBortOgiltigaTecken(titel),
+    sammanfattning: taBortOgiltigaTecken(sammanfattning.slice(0, SAMMANFATTNING_MAX)),
+    kalla: taBortOgiltigaTecken(ogSiteName.slice(0, KALLA_MAX)),
   };
 }
 
