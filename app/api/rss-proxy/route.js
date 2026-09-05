@@ -7,6 +7,7 @@ const TILLÅTNA_DOMÄNER = [
   "feeds.bbci.co.uk", "aljazeera.com",
   "ted.com", "research.google", "amazon.science", "bigthink.com",
   "sciencealert.com", "quantamagazine.org",
+  "eurekalert.org", "phys.org", "technologyreview.com",
   "thelancet.com", "mdpi.com", "nature.com",
   "theverge.com",
   "reddit.com", "old.reddit.com",

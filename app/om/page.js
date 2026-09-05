@@ -194,8 +194,8 @@ export default function OmPage() {
               ["Tech", "The Verge, Ars Technica, Hacker News, Wired, TechCrunch, Engadget, IGN"],
               ["Kryptovalutor", "CoinDesk, Cointelegraph, Reddit r/CryptoCurrency, r/Bitcoin"],
               ["Internationellt", "BBC News, Al Jazeera, Reddit r/worldnews"],
-              ["Medicin & forskning", "The Lancet, MDPI Healthcare, Nature, Science Alert, Quanta Magazine, Reddit r/science"],
-              ["AI-forskning", "Google Research, Amazon Science, Big Think"],
+              ["Medicin & forskning", "The Lancet, MDPI Healthcare, Nature, Science Alert, Quanta Magazine, EurekAlert!, Phys.org, Reddit r/science"],
+              ["AI-forskning", "Google Research, Amazon Science, Big Think, MIT Technology Review"],
             ].map(([kat, kallor]) => (
               <div key={kat} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "14px" }}>
                 <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 4px", fontFamily: "monospace" }}>{kat}</p>

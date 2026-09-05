@@ -16,6 +16,7 @@ export const metadata = {
 // bär "forskning"-kategorin men är för brett för en renodlad vetenskapsfeed.
 const VETENSKAP_KALLOR = [
   "The Lancet", "MDPI Healthcare", "Nature", "Science Alert", "Quanta Magazine",
+  "EurekAlert!", "Phys.org", "MIT Technology Review",
   "Reddit Science", "Google Research", "Amazon Science", "Big Think",
   "arXiv: AI", "arXiv: Machine Learning", "arXiv: Ekonomi", "arXiv: Computers & Society", "arXiv: Robotik",
 ];
