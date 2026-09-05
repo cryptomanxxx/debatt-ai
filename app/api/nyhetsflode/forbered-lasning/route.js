@@ -46,9 +46,11 @@ const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 const SAMMANFATTNING_MAX = 1200;
 // Hur mycket rått källmaterial (brödtext eller fallback-beskrivning) som
 // skickas in i sammanfattningsprompten. Matchar hamtaArtikelInnehall.js
-// HEL_TEXT_MAX — vi trimmar inte bort något extra här, LLM:en får se allt
-// den redan hämtade texten innehåller.
-const KALLMATERIAL_MAX = 4000;
+// HEL_TEXT_MAX (höjd 4000 → 8000, Codex-fynd PR #1373-granskning — en lägre
+// gräns kunde tysta klippa bort artikelns mitt/slut redan innan den nådde
+// LLM:en) — vi trimmar inte bort något extra här, LLM:en får se allt den
+// redan hämtade texten innehåller.
+const KALLMATERIAL_MAX = 8000;
 
 function parseSammanfattning(raw) {
   let text = (raw || "").trim();
