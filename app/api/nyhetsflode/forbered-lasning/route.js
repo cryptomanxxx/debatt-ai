@@ -33,17 +33,12 @@
 import { checkRateLimit } from "../../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../../lib/logFel";
 import { hamtaArtikelInnehall } from "../../../lib/hamtaArtikelInnehall";
-import { callWithFallback, getDynamicChain } from "../../../lib/aiRouter.js";
+import { sammanfattaForOraklet } from "../../../lib/sammanfattaForOraklet";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
-// Övre gräns för en genuin sammanfattning — betydligt lägre än den råa
-// brödtextens HEL_TEXT_MAX (4000, se hamtaArtikelInnehall.js), eftersom en
-// sammanfattning ska vara just kort och koncis (5–8 meningar), inte en
-// nästan lika lång återgivning av hela artikeln.
-const SAMMANFATTNING_MAX = 1200;
 // Hur mycket rått källmaterial (brödtext eller fallback-beskrivning) som
 // skickas in i sammanfattningsprompten. Matchar hamtaArtikelInnehall.js
 // HEL_TEXT_MAX (höjd 4000 → 8000, Codex-fynd PR #1373-granskning — en lägre
@@ -52,63 +47,10 @@ const SAMMANFATTNING_MAX = 1200;
 // redan hämtade texten innehåller.
 const KALLMATERIAL_MAX = 8000;
 
-function parseSammanfattning(raw) {
-  let text = (raw || "").trim();
-  if (text.startsWith("```")) {
-    text = text.replace(/^```(json)?\s*/i, "").replace(/\s*```$/, "").trim();
-  }
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end === -1 || end < start) return null;
-  let parsed;
-  try { parsed = JSON.parse(text.slice(start, end + 1)); } catch { return null; }
-  if (typeof parsed?.sammanfattning !== "string" || !parsed.sammanfattning.trim()) return null;
-  return {
-    rubrik: typeof parsed.rubrik === "string" && parsed.rubrik.trim() ? parsed.rubrik.trim().slice(0, 500) : null,
-    sammanfattning: parsed.sammanfattning.trim().slice(0, SAMMANFATTNING_MAX),
-  };
-}
-
-// Ett enda LLM-anrop gör både jobbet: skriver en tydlig svensk sammanfattning
-// av artikelns FAKTISKA innehåll (oavsett källspråk) och, om rubriken inte
-// redan är på svenska, en översatt rubrik — ersätter den tidigare separata
-// två-stegs verkarSvensk()/oversattTillSvenska()-logiken, som bara
-// översatte ordagrant istället för att sammanfatta.
-async function sammanfattaForOraklet(rubrik, kallmaterial) {
-  const chain = await getDynamicChain("chatt");
-  const { text } = await callWithFallback(
-    chain,
-    [
-      {
-        role: "system",
-        content:
-          "Du är Professor Oraklet, en AI-professor som förklarar nyhetsartiklar för lyssnare som inte har läst dem själva. " +
-          "Du får rubriken och råtext hämtad direkt från en nyhetssida. Råtexten kan innehålla sidnavigering, cookie-notiser, " +
-          "prenumerationserbjudanden, sidfötter, relaterade artiklar och annat webbplats-skräp blandat med den faktiska " +
-          "artikeltexten — IGNORERA allt sådant helt, nämn det aldrig, och låtsas inte att det är en del av nyheten. " +
-          "Skriv en sammanfattning av vad ARTIKELN FAKTISKT HANDLAR OM: 5–8 sammanhängande meningar, löpande prosa (inga " +
-          "punktlistor eller rubriker), tydlig och lättbegriplig svenska — som om du förklarar nyheten muntligt för någon. " +
-          "Hitta aldrig på fakta, siffror eller detaljer som inte finns i texten. Om råtexten är för skräpig eller kort för " +
-          "att förstå vad artikeln handlar om, sammanfatta det du faktiskt kan utläsa av rubriken och det som finns. " +
-          "Om rubriken inte redan är på svenska, ge även en naturlig svensk översättning av den. " +
-          'Svara ENDAST med giltig JSON i exakt detta format, ingen markdown, ingen förklaring: ' +
-          '{"rubrik":"...","sammanfattning":"..."}',
-      },
-      {
-        role: "user",
-        content: `Rubrik: ${rubrik || "(okänd)"}\n\nRåtext från sidan:\n${kallmaterial || "(ingen text tillgänglig, utgå bara från rubriken)"}`,
-      },
-    ],
-    {
-      maxTokens: 700,
-      temperature: 0.5,
-      json: true,
-      source: "oraklet-sammanfattning",
-      validate: (t) => !!parseSammanfattning(t),
-    }
-  );
-  return parseSammanfattning(text);
-}
+// sammanfattaForOraklet()/parseSammanfattning() bor nu i
+// app/lib/sammanfattaForOraklet.js — delad med
+// app/api/fraga-anna-och-peter/oraklet-sammanfattning/route.js så samma
+// sammanfattnings-/översättningslogik inte dupliceras på två ställen.
 
 export async function POST(req) {
   const ip = getIp(req);
