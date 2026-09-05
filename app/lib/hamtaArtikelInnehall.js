@@ -282,20 +282,30 @@ function extraheraMeta(html, re) {
   return m ? taBortOgiltigaTecken(decodeHtmlEntities(m[1].trim())) : "";
 }
 
-// Tar bort de vanligaste "sidchrome"-blocken (navigering, sidhuvud, sidfot,
-// sidopanel) INNAN generisk tag-strippning och avkapning vid HEL_TEXT_MAX.
-// Codex-fynd (PR #1373-granskning): utan detta kunde nav/sidfot-text (som
-// ofta ligger FÖRE eller EFTER själva artikeln i HTML-källan) tränga undan
-// faktisk artikeltext ur det avkapade fönstret — sammanfattningen som sedan
-// cachas byggde då bara på sidans skal, inte artikelns mitt/slut. Ren
-// strukturell taggmatchning, ingen innehållsanalys — fångar inte allt (t.ex.
-// en cookie-banner utan <aside>-tagg), men eliminerar de vanligaste källorna
+// Tar bort de vanligaste "sidchrome"-blocken (navigering, sidfot, sidopanel)
+// INNAN generisk tag-strippning och avkapning vid HEL_TEXT_MAX. Codex-fynd
+// (PR #1373-granskning): utan detta kunde nav/sidfot-text (som ofta ligger
+// FÖRE eller EFTER själva artikeln i HTML-källan) tränga undan faktisk
+// artikeltext ur det avkapade fönstret — sammanfattningen som sedan cachas
+// byggde då bara på sidans skal, inte artikelns mitt/slut. Ren strukturell
+// taggmatchning, ingen innehållsanalys — fångar inte allt (t.ex. en
+// cookie-banner utan <aside>-tagg), men eliminerar de vanligaste källorna
 // utan risk att klippa bort riktig artikeltext (till skillnad från en
 // text-baserad heuristik, som lättare ger falska positiva).
+//
+// <header> tas MEDVETET INTE bort (Codex-fynd, PR #1376-granskning): giltig
+// semantisk HTML-markup som <article><header>...</header>...</article> är
+// vanlig på nyhetssajter, och den nästlade artikelheadern innehåller ofta
+// själva ingressen/standfirst-stycket — genuint central artikeltext, inte
+// sidchrome. En regex kan inte tillförlitligt skilja en sid-header (menyn
+// högst upp) från en artikel-header (ingressen) i nästlad HTML, så
+// blankettborttagning av alla <header>-block riskerade att permanent cacha
+// en sammanfattning utan artikelns viktigaste inledande kontext. nav/footer/
+// aside är betydligt säkrare att strippa blankt — de förekommer i princip
+// aldrig nästlat inuti <article> med genuint artikelinnehåll.
 function taBortSidchrome(html) {
   return html
     .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
-    .replace(/<header[\s\S]*?<\/header>/gi, " ")
     .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
     .replace(/<aside[\s\S]*?<\/aside>/gi, " ");
 }
