@@ -42,6 +42,18 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
+# vetenskapliga_upptagter saknar numera anon-skrivpolicy (se
+# supabase_universitet_v3.sql) — service role krävs för INSERT, samma
+# mönster som övriga härdade tabeller. Fallback till anon-nyckeln om
+# secreten saknas i miljön (skrivningen misslyckas då tyst mot RLS istället
+# för att krascha skriptet).
+_WRITE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
+WRITE_HEADERS = {
+    "apikey": _WRITE_KEY,
+    "Authorization": f"Bearer {_WRITE_KEY}",
+    "Content-Type": "application/json",
+}
+
 # ---------------------------------------------------------------------------
 # Disciplin-konfiguration per forskartyp
 # ---------------------------------------------------------------------------
@@ -382,7 +394,7 @@ def spara_fynd(fynd: dict) -> bool:
     try:
         r = httpx.post(
             f"{SB_URL}/rest/v1/vetenskapliga_upptagter",
-            headers={**HEADERS, "Prefer": "return=minimal"},
+            headers={**WRITE_HEADERS, "Prefer": "return=minimal"},
             json=fynd,
             timeout=10,
         )

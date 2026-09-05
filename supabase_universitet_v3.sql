@@ -1,0 +1,21 @@
+-- AI-Universitetet v3: stänger en anon-skriv-hål på vetenskapliga_upptagter
+-- Kör i Supabase SQL Editor efter supabase_universitet_v2.sql
+--
+-- supabase_universitet.sql gav ursprungligen anon-nyckeln (som är publikt
+-- exponerad client-side som NEXT_PUBLIC_SUPABASE_ANON_KEY) full INSERT-rätt
+-- (WITH CHECK (true)) på vetenskapliga_upptagter, så att forskning_test.py
+-- kunde skriva utan en service-role-secret. Codex-fynd (PR #1367-granskning):
+-- eftersom /api/oraklet-lasning (se CLAUDE.md ✅87) litar på att en rads
+-- titel i vetenskapliga_upptagter är äkta innan den loggas i den publika
+-- Senaste aktivitet-feeden, kunde en obehörig anropare med bara anon-nyckeln
+-- INSERTa en rad med en helt påhittad titel, hämta dess id, och skicka in
+-- det id:t till /api/oraklet-lasning för att få den påhittade titeln
+-- publicerad i aktivitetsfeeden — utan att någonsin behöva service role.
+--
+-- forskning_test.py skriver nu istället med SUPABASE_SERVICE_ROLE_KEY
+-- (fallback till anon om secreten saknas, samma mönster som övriga
+-- härdade tabeller — se CLAUDE.md "RLS-härdning") och anon-INSERT-policyn
+-- tas bort. Publik SELECT (för /universitet, /hjarnan, /civilisation m.fl.)
+-- är opåverkad.
+
+drop policy if exists "anon_insert_upptagter" on vetenskapliga_upptagter;
