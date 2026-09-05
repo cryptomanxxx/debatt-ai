@@ -135,7 +135,7 @@ export async function POST(req) {
 
   if (Object.keys(patch).length > 0) {
     try {
-      await fetch(`${SB_URL}/rest/v1/nyhetsflode?id=eq.${radId}`, {
+      const patchRes = await fetch(`${SB_URL}/rest/v1/nyhetsflode?id=eq.${radId}`, {
         method: "PATCH",
         headers: {
           apikey: SB_WRITE_KEY,
@@ -145,6 +145,15 @@ export async function POST(req) {
         },
         body: JSON.stringify(patch),
       });
+      // fetch() resolves även vid t.ex. RLS-avslag (saknad SUPABASE_SERVICE_ROLE_KEY
+      // faller tillbaka på anon, som saknar UPDATE-policy) — utan denna koll
+      // trodde vi tyst att berikningen/översättningen sparades, och nästa
+      // uppläsning gjorde om samma jobb (inkl. ett nytt betalt LLM-anrop)
+      // istället för att läsa den redan sparade texten (Codex-fynd, PR #1365-review).
+      if (!patchRes.ok) {
+        const errText = await patchRes.text().catch(() => "");
+        logFel({ kalla: "nyhetsflode/forbered-lasning", feltyp: "supabase_patch_fail", meddelande: `HTTP ${patchRes.status}`, ip, extra: { id: radId, errText: errText.slice(0, 300) } });
+      }
     } catch (e) {
       logFel({ kalla: "nyhetsflode/forbered-lasning", feltyp: "supabase_patch_fail", meddelande: String(e?.message || e), ip, extra: { id: radId } });
     }

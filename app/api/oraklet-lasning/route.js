@@ -14,7 +14,12 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // samma mönster som fraga_anna_peter_log/nyhetsanalys/labb_log.
 const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
-const TYPER = new Set(["forskning", "nyhet"]);
+// Mappar typ → (tabell, kolumn) att slå upp den faktiska titeln ur — se
+// nedan för varför klient-inskickad titel inte litas på.
+const TYP_KALLA = {
+  forskning: { tabell: "vetenskapliga_upptagter", kolumn: "titel" },
+  nyhet: { tabell: "nyhetsflode", kolumn: "rubrik" },
+};
 
 export async function POST(req) {
   const ip = getIp(req);
@@ -27,12 +32,28 @@ export async function POST(req) {
   try { body = await req.json(); } catch { return Response.json({ error: "Ogiltig JSON" }, { status: 400 }); }
 
   const typ = body?.typ;
-  if (!TYPER.has(typ)) {
+  const kalla = TYP_KALLA[typ];
+  if (!kalla) {
     return Response.json({ error: "Ogiltig typ." }, { status: 400 });
   }
-  const titel = typeof body?.titel === "string" ? body.titel.trim().slice(0, 300) : null;
-  if (!titel) return Response.json({ error: "Titel saknas." }, { status: 400 });
-  const refId = Number.isInteger(body?.ref_id) ? body.ref_id : null;
+  // ref_id krävs (inte bara giltig om satt) och titeln slås upp server-side
+  // ur den refererade raden — annars kan en obehörig anropare posta valfri
+  // text med ref_id=null och fylla Senaste aktivitet-feeden med påhittade
+  // uppläsningar trots RLS på oraklet_lasningar (Codex-fynd, PR #1365-review).
+  const refId = Number(body?.ref_id);
+  if (!Number.isInteger(refId) || refId <= 0) {
+    return Response.json({ error: "Ogiltigt ref_id." }, { status: 400 });
+  }
+
+  const lookupRes = await fetch(
+    `${SB_URL}/rest/v1/${kalla.tabell}?id=eq.${refId}&select=${kalla.kolumn}`,
+    { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
+  );
+  const lookupRows = lookupRes.ok ? await lookupRes.json().catch(() => []) : [];
+  const titel = (lookupRows?.[0]?.[kalla.kolumn] || "").toString().trim().slice(0, 300);
+  if (!titel) {
+    return Response.json({ error: "Referensen hittades inte." }, { status: 404 });
+  }
 
   const res = await fetch(`${SB_URL}/rest/v1/oraklet_lasningar`, {
     method: "POST",

@@ -2172,11 +2172,15 @@ Fail-open genomgående: misslyckas berikningen eller översättningen (nätverks
 
 Kräver Supabase-tabell `oraklet_lasningar` — kör `supabase_oraklet_lasningar.sql` i SQL Editor.
 
+**Codex-fynd (PR #1365-granskning, efter merge):** två separata problem hittades av Codex på den redan mergade koden.
+- **P1 — `/api/oraklet-lasning` litade på klient-inskickad `titel` och tillät `ref_id: null`.** En obehörig anropare kunde POSTa valfri påhittad text utan att referera till en riktig rad, vilket hade fyllt Senaste aktivitet-feeden med falsk aktivitet trots att `oraklet_lasningar` har RLS (RLS skyddar bara mot obehörig LÄSNING/SKRIVNING av service-role-skyddade fält, inte mot att en godkänd skrivning innehåller påhittat innehåll). Fixat: `ref_id` är nu obligatoriskt och måste vara ett positivt heltal, och `titel` slås istället upp server-side ur den refererade `vetenskapliga_upptagter`- eller `nyhetsflode`-raden (`TYP_KALLA`-mappningen) — klientens `titel`-fält ignoreras helt. En referens som inte hittas ger 404 istället för att spara en tom/falsk titel.
+- **P2 — `/api/nyhetsflode/forbered-lasning` kollade inte PATCH-svarets status.** `fetch()` resolvar även vid RLS-avslag (t.ex. saknad `SUPABASE_SERVICE_ROLE_KEY` som faller tillbaka på anon, vilken saknar UPDATE-policy) — utan en `res.ok`-koll trodde routen tyst att berikningen/översättningen sparats, och nästa uppläsning gjorde om samma jobb (inklusive ett nytt betalt LLM-anrop för översättningen) istället för att läsa den redan sparade texten. Fixat: PATCH-svaret kollas explicit och ett icke-2xx-svar loggas via `logFel()`.
+
 | Fil | Roll |
 |---|---|
 | `supabase_oraklet_lasningar.sql` | SQL-schema för `oraklet_lasningar` (typ-check, index på skapad desc, RLS med publik SELECT) |
-| `app/api/oraklet-lasning/route.js` | POST: loggar en uppläsning (typ, ref_id, titel). Service role-skrivning, fail-open (svarar `{ok:false}` vid DB-fel istället för att bubbla upp ett fel mot en redan lyckad uppläsning) |
-| `app/api/nyhetsflode/forbered-lasning/route.js` | POST `{id}`: berikar för kort text via `hamtaArtikelInnehall()` och/eller översätter till svenska via central LLM-router, patchar `nyhetsflode`, returnerar bästa tillgängliga `{rubrik, beskrivning}` |
+| `app/api/oraklet-lasning/route.js` | POST: kräver giltigt `ref_id`, slår upp titeln server-side ur `vetenskapliga_upptagter`/`nyhetsflode` (litar aldrig på klient-`titel`), loggar en uppläsning. Service role-skrivning, fail-open (svarar `{ok:false}` vid DB-fel istället för att bubbla upp ett fel mot en redan lyckad uppläsning) |
+| `app/api/nyhetsflode/forbered-lasning/route.js` | POST `{id}`: berikar för kort text via `hamtaArtikelInnehall()` och/eller översätter till svenska via central LLM-router, patchar `nyhetsflode` (kollar `res.ok`, loggar icke-2xx), returnerar bästa tillgängliga `{rubrik, beskrivning}` |
 | `app/api/aktivitet/route.js` | Ny datakälla `oraklet_lasningar` (6 senaste) + feed-block med 🎓-ikon och länk till `/universitet` |
 | `app/universitet/page.js` | Ny länkrad: "📡 Nyhetskällor →" och "🔎 Nyhetsanalyser →" i sidhuvudet |
 
