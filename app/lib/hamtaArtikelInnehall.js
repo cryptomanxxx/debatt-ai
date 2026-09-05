@@ -11,6 +11,7 @@
 import dns from "node:dns/promises";
 import https from "node:https";
 import net from "node:net";
+import zlib from "node:zlib";
 import { decodeHtmlEntities } from "./escapeHtml";
 
 const MAX_REDIRECTS = 3;
@@ -109,6 +110,11 @@ function hamtaEttHopp(url, safeAddress, signal) {
         headers: {
           Host: url.hostname,
           "User-Agent": "Mozilla/5.0 (compatible; DebattAI/1.0; +https://www.debatt-ai.se)",
+          // Node's https-modul (till skillnad från fetch/undici) avkodar ALDRIG
+          // komprimerade svar automatiskt — utan denna header och den explicita
+          // avkodningen i valjAvkodningsstrom() nedan hade en komprimerad kropp
+          // tolkats rakt av som UTF-8-text, vilket ger rent skräp.
+          "Accept-Encoding": "gzip, deflate, br",
         },
         signal,
       },
@@ -119,12 +125,29 @@ function hamtaEttHopp(url, safeAddress, signal) {
   });
 }
 
-async function lasBegransat(res, maxBytes) {
+// Många sajter (CDN:er, Varnish-cachar, WordPress-hosting) skickar ett
+// komprimerat svar OAVSETT vad klienten bad om i Accept-Encoding — RFC 7231
+// tillåter servern att göra det, och flera vanliga uppsättningar gör det i
+// praktiken. Verifierat i produktion: en import av en arbetet.se-artikel gav
+// synligt binärt skräp (U+FFFD-tecken, mojibake) i den sparade titeln/
+// sammanfattningen eftersom en gzip/br-komprimerad kropp lästes rakt av som
+// UTF-8-text. Avkodar baserat på det FAKTISKA Content-Encoding-svarshuvudet
+// — inte bara vad vi bad om — så en server som ignorerar Accept-Encoding
+// fortfarande hanteras korrekt.
+function valjAvkodningsstrom(res) {
+  const encoding = (res.headers["content-encoding"] || "").toLowerCase();
+  if (encoding === "br") return res.pipe(zlib.createBrotliDecompress());
+  if (encoding === "gzip" || encoding === "x-gzip") return res.pipe(zlib.createGunzip());
+  if (encoding === "deflate") return res.pipe(zlib.createInflate());
+  return res;
+}
+
+async function lasBegransat(stream, maxBytes) {
   const chunks = [];
   let total = 0;
-  for await (const chunk of res) {
+  for await (const chunk of stream) {
     total += chunk.length;
-    if (total > maxBytes) { res.destroy(); break; }
+    if (total > maxBytes) { stream.destroy(); break; }
     chunks.push(chunk);
   }
   return Buffer.concat(chunks).subarray(0, maxBytes).toString("utf-8");
@@ -161,9 +184,13 @@ async function hamtaArtikelHtml(startUrl) {
       if (!contentType.includes("text/html")) { res.resume(); return { fel: "fel_content_type" }; }
 
       const contentLength = parseInt(res.headers["content-length"] || "0", 10);
+      // content-length avser den KOMPRIMERADE storleken om svaret är
+      // komprimerat — ett mjukt försteg som bara fångar uppenbart för stora
+      // svar tidigt. Den faktiska gränsen (efter ev. avkodning) sätts av
+      // lasBegransat() nedan, som räknar riktiga (avkodade) bytes.
       if (contentLength && contentLength > MAX_BODY_BYTES) { res.resume(); return { fel: "for_stor" }; }
 
-      const html = await lasBegransat(res, MAX_BODY_BYTES);
+      const html = await lasBegransat(valjAvkodningsstrom(res), MAX_BODY_BYTES);
       return { html, slutgiltigUrl: current.toString() };
     }
     return { fel: "for_manga_redirects" };
