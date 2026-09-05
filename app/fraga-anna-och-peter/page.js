@@ -193,6 +193,13 @@ export default function FragaAnnaOchPeterPage() {
 
   const [lasning, setLasning] = useState(null); // { agent, namn, text }
   const [studio, setStudio] = useState(null); // { rubrik, beskrivning, turns?, meta? }
+  // Privat läge — samma "spara inte"-princip som den privata frågeknappen på
+  // agentprofilsidorna (✅23). Uppläsningen/studiosamtalet fungerar identiskt,
+  // men ingen historikpost skrivs: sagFritext()/sagUrlResultat() hoppar över
+  // sparaHistorik(), och diskuteraFritext()/diskuteraUrlResultat() utelämnar
+  // studio.meta helt (onTurns-callbacken nedan är redan villkorad på att meta
+  // finns, så en tom meta räcker för att inget studiosamtal sparas heller).
+  const [privat, setPrivat] = useState(false);
 
   const [historik, setHistorik] = useState([]);
   const [historikLaddar, setHistorikLaddar] = useState(true);
@@ -276,14 +283,14 @@ export default function FragaAnnaOchPeterPage() {
   function sagFritext(agent, namn) {
     if (!fritextTrimmed) return;
     setLasning({ agent, namn, text: fritextTrimmed });
-    sparaHistorik({ typ: "fritext", aktion: AGENT_TILL_AKTION[agent] || "anna_sager", text: fritextTrimmed });
+    if (!privat) sparaHistorik({ typ: "fritext", aktion: AGENT_TILL_AKTION[agent] || "anna_sager", text: fritextTrimmed });
   }
   function diskuteraFritext() {
     if (!fritextTrimmed) return;
     setStudio({
       rubrik: kortRubrik(fritextTrimmed),
       beskrivning: fritextTrimmed.slice(0, 800),
-      meta: { typ: "fritext", text: fritextTrimmed },
+      meta: privat ? undefined : { typ: "fritext", text: fritextTrimmed },
     });
   }
 
@@ -291,17 +298,19 @@ export default function FragaAnnaOchPeterPage() {
     if (!urlResultat) return;
     const text = [urlResultat.titel, urlResultat.sammanfattning].filter(Boolean).join(". ");
     setLasning({ agent, namn, text });
-    sparaHistorik({
-      typ: "url", aktion: AGENT_TILL_AKTION[agent] || "anna_sager",
-      url: urlResultat.url, titel: urlResultat.titel, sammanfattning: urlResultat.sammanfattning,
-    });
+    if (!privat) {
+      sparaHistorik({
+        typ: "url", aktion: AGENT_TILL_AKTION[agent] || "anna_sager",
+        url: urlResultat.url, titel: urlResultat.titel, sammanfattning: urlResultat.sammanfattning,
+      });
+    }
   }
   function diskuteraUrlResultat() {
     if (!urlResultat) return;
     setStudio({
       rubrik: urlResultat.titel || kortRubrik(urlResultat.sammanfattning || ""),
       beskrivning: urlResultat.sammanfattning || "",
-      meta: { typ: "url", url: urlResultat.url, titel: urlResultat.titel, sammanfattning: urlResultat.sammanfattning },
+      meta: privat ? undefined : { typ: "url", url: urlResultat.url, titel: urlResultat.titel, sammanfattning: urlResultat.sammanfattning },
     });
   }
 
@@ -340,6 +349,28 @@ export default function FragaAnnaOchPeterPage() {
             <a href="/podd" style={{ color: LANK }}>Videopodden</a>.
           </p>
         </div>
+
+        {/* ── Privat läge ──────────────────────────────────────── */}
+        <label
+          style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 20,
+            padding: "10px 14px", background: C.surface, border: `1px solid ${privat ? "#e879f950" : C.border}`,
+            borderRadius: 8, cursor: "pointer", userSelect: "none",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={privat}
+            onChange={e => setPrivat(e.target.checked)}
+            style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#e879f9" }}
+          />
+          <span style={{ fontSize: 13, color: privat ? "#e879f9" : C.text, fontFamily: "Georgia, serif" }}>
+            🔒 Privat
+          </span>
+          <span style={{ fontSize: 12, color: C.textMuted, marginLeft: 4 }}>
+            — sparas inte i historiken nedan
+          </span>
+        </label>
 
         {/* ── Fri text ─────────────────────────────────────────── */}
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 18, marginBottom: 20 }}>
