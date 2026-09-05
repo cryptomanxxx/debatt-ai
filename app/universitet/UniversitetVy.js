@@ -2,6 +2,7 @@
 import { useCallback, useState } from "react";
 import ForskningsListaVy from "./ForskningsListaVy";
 import VetenskapsFlodeVy from "./VetenskapsFlodeVy";
+import OrakletsLaslistaVy from "./OrakletsLaslistaVy";
 import AgentOverlay from "../nyhetskallor/AgentOverlay";
 
 function TypTab({ label, count, active, onClick, farg }) {
@@ -36,8 +37,10 @@ function TypTab({ label, count, active, onClick, farg }) {
 // till 50 rader) bara för att nå vetenskapsnyheterna längst ner. En
 // typväxlare löser det genom att bara visa EN lista åt gången — inget
 // skrollberg att ta sig förbi för att nå den andra.
-export default function UniversitetVy({ fynd, nyheter }) {
-  const [typ, setTyp] = useState(fynd.length > 0 || nyheter.length === 0 ? "forskning" : "nyheter");
+export default function UniversitetVy({ fynd, nyheter, urval }) {
+  const [typ, setTyp] = useState(
+    fynd.length > 0 ? "forskning" : nyheter.length > 0 ? "nyheter" : urval.length > 0 ? "urval" : "forskning"
+  );
   // Professor Oraklet läser ett enskilt fynd/nyhet i taget — samma
   // AgentOverlay-mönster som "🎙️ Anna läser" m.fl. på /nyhetsanalyser, men
   // med bara EN läsare (ingen trevägsväljare) eftersom det bara finns en
@@ -78,11 +81,20 @@ export default function UniversitetVy({ fynd, nyheter }) {
           onClick={() => setTyp("nyheter")}
           farg="#fb923c"
         />
+        <TypTab
+          label="🎓 Professor Oraklets Läslista"
+          count={urval.length}
+          active={typ === "urval"}
+          onClick={() => setTyp("urval")}
+          farg="#dd6e5f"
+        />
       </div>
 
       {typ === "forskning"
         ? <ForskningsListaVy fynd={fynd} onLasa={handleLasa} />
-        : <VetenskapsFlodeVy nyheter={nyheter} onLasa={handleLasa} />}
+        : typ === "nyheter"
+        ? <VetenskapsFlodeVy nyheter={nyheter} onLasa={handleLasa} />
+        : <OrakletsLaslistaVy urval={urval} onLasa={handleLasa} />}
 
       {lasning && (
         // Nyckeln inkluderar typ eftersom fynd (vetenskapliga_upptagter) och

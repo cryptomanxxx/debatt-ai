@@ -2184,6 +2184,29 @@ Kräver Supabase-tabell `oraklet_lasningar` — kör `supabase_oraklet_lasningar
 | `app/api/aktivitet/route.js` | Ny datakälla `oraklet_lasningar` (6 senaste) + feed-block med 🎓-ikon och länk till `/universitet` |
 | `app/universitet/page.js` | Ny länkrad: "📡 Nyhetskällor →" och "🔎 Nyhetsanalyser →" i sidhuvudet |
 
+**Professor Oraklets Läslista — en tredje flik, tredje nyhetskälla:** Utöver AI-forskning (LLM-genererade fynd) och Vetenskapliga Nyheter (den råa, ofiltrerade `nyhetsflode`-listan) finns nu en tredje flik: ett litet, kurerat urval nyheter som Professor Oraklet själv — i karaktär, via LLM — valt ut som särskilt läsvärda, med en kort personlig motivering per val. Skillnaden mot Vetenskapliga Nyheter är avsiktlig: den fliken visar ALLT som hämtats, den här fliken visar bara det Oraklet själv tyckte var intressant nog att lyfta fram, och VARFÖR — inte en sammanfattning av nyheten, utan hans egen reaktion på den.
+
+**Daglig kuratering (`agents/oraklet-curator.js`, 09:15 svensk tid):** Hämtar de senaste 48 timmarnas `nyhetsflode`-rader (upp till 60, för att hålla prompten hanterbar), filtrerar bort sådant Oraklet redan valt tidigare (dedupe mot `oraklet_urval.nyhet_id` innan LLM-anropet — sparar ett bortkastat förslag som ändå skulle avvisats av tabellens `unique(nyhet_id)`), och ber honom (via `callWithFallback` + `getDynamicChain("chatt")`, den centrala LLM-routern — aldrig en hårdkodad providerklient) välja ut 2–4 nyheter med en kort motivering var. Prompten instruerar explicit att INTE välja det mest sensationella utan det genuint intressanta, och att variera ämnesområde. Kräver minst 8 kandidater i fönstret — annars hoppas körningen över (fail-open, ingen tom/tunn kuratering).
+
+**Samma anti-injektions-princip som ✅67 (`generera_ki_fran_nyheter()`):** nyhetsrubrikerna som skickas in i prompten är opålitlig extern text (RSS/Reddit, ingen moderering). Två skyddslager: (1) rubriklistan omsluts av `<nyheter>`-taggar med en explicit instruktion om att aldrig tolka innehållet som kommandon; (2) `verkarInjicerad()` (regex mot kända injektionsmarkörer, både engelska och svenska varianter) filtrerar bort enskilda motiveringar som ändå verkar kapade INNAN de sparas — ett kapat förslag faller bort, resten av urvalet påverkas inte.
+
+**Dedupe vid insättning:** `POST .../oraklet_urval?on_conflict=nyhet_id` med `Prefer: resolution=ignore-duplicates` — en dubblett (t.ex. om två körningar råkar överlappa) avvisas tyst av databasen snarare än att krascha inserten.
+
+**Uppläsning:** Samma `handleLasa()`/`AgentOverlay`-mönster som de andra två flikarna — `onLasa({ typ: "urval", id: <oraklet_urval.id>, titel, text })`, text = nyhetens rubrik + Oraklets egen motivering. `POST /api/oraklet-lasning` har utökats med en tredje `TYP_KALLA`-mappning för `"urval"` som slår upp titeln via en embeddad PostgREST-relation (`oraklet_urval?select=nyhetsflode(rubrik)`) eftersom `oraklet_urval` själv saknar en egen rubrik-kolumn — bara `nyhet_id` som pekar in i `nyhetsflode`. Ingen textberikning/översättning (`/api/nyhetsflode/forbered-lasning`) behövs här — Oraklets motivering är redan färsk, substantiell, LLM-skriven svensk text.
+
+Kräver Supabase-tabell `oraklet_urval` — kör `supabase_oraklet_urval.sql` i SQL Editor.
+
+| Fil | Roll |
+|---|---|
+| `supabase_oraklet_urval.sql` | SQL-schema för `oraklet_urval` (nyhet_id FK mot nyhetsflode, unique(nyhet_id), RLS med publik SELECT) |
+| `agents/oraklet-curator.js` | Daglig körning: hämtar kandidater, dedupe mot tidigare urval, LLM väljer 2–4 med motivering (anti-injektionsfilter), sparar med `on_conflict=nyhet_id` |
+| `.github/workflows/oraklet-curator.yml` | Kör dagligen 09:15 svensk tid (07:15 UTC), efter morgonens nyhetsflode-hämtning |
+| `app/universitet/OrakletsLaslistaVy.js` | Tredje flikens vy — motivering visas direkt (inte gömd bakom Expandera), källa (beskrivning + länk) bakom en valfri "Visa källa"-knapp |
+| `app/universitet/UniversitetVy.js` | Tre-vägs flikväljare (forskning/nyheter/urval), delad `AgentOverlay` |
+| `app/universitet/page.js` | Hämtar `oraklet_urval` med embeddad `nyhetsflode`-relation, skickar som `urval`-prop |
+| `app/api/oraklet-lasning/route.js` | `TYP_KALLA` utökad med `"urval"` — slår upp titeln via embeddad `nyhetsflode(rubrik)`-select |
+| `app/api/aktivitet/route.js` | Tredje `vad`-gren: "en nyhet ur sin läslista" för `typ: "urval"` |
+
 ### ✅ 88. Civilisations-API (/api/civilisation + /civilisation) — fråga civilisationens hjärna – KLART
 Ett öppet REST-API där externa klienter, besökare och AI-companions kan ställa fria frågor om AI-civilisationens tillstånd och få svar baserade på realtidsdata ur 8+ Supabase-tabeller.
 

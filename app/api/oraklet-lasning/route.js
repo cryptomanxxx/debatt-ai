@@ -14,11 +14,15 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // samma mönster som fraga_anna_peter_log/nyhetsanalys/labb_log.
 const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
-// Mappar typ → (tabell, kolumn) att slå upp den faktiska titeln ur — se
-// nedan för varför klient-inskickad titel inte litas på.
+// Mappar typ → (tabell, PostgREST select, extraktor) för att slå upp den
+// faktiska titeln server-side — se nedan för varför klient-inskickad titel
+// inte litas på. "urval" (Professor Oraklets Läslista) refererar en rad i
+// oraklet_urval, vars titel hämtas via en embeddad nyhetsflode-relation
+// (FK nyhet_id) snarare än en egen kolumn.
 const TYP_KALLA = {
-  forskning: { tabell: "vetenskapliga_upptagter", kolumn: "titel" },
-  nyhet: { tabell: "nyhetsflode", kolumn: "rubrik" },
+  forskning: { tabell: "vetenskapliga_upptagter", select: "titel", extract: r => r?.titel },
+  nyhet: { tabell: "nyhetsflode", select: "rubrik", extract: r => r?.rubrik },
+  urval: { tabell: "oraklet_urval", select: "nyhetsflode(rubrik)", extract: r => r?.nyhetsflode?.rubrik },
 };
 
 export async function POST(req) {
@@ -46,11 +50,11 @@ export async function POST(req) {
   }
 
   const lookupRes = await fetch(
-    `${SB_URL}/rest/v1/${kalla.tabell}?id=eq.${refId}&select=${kalla.kolumn}`,
+    `${SB_URL}/rest/v1/${kalla.tabell}?id=eq.${refId}&select=${kalla.select}`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
   );
   const lookupRows = lookupRes.ok ? await lookupRes.json().catch(() => []) : [];
-  const titel = (lookupRows?.[0]?.[kalla.kolumn] || "").toString().trim().slice(0, 300);
+  const titel = (kalla.extract(lookupRows?.[0]) || "").toString().trim().slice(0, 300);
   if (!titel) {
     return Response.json({ error: "Referensen hittades inte." }, { status: 404 });
   }
