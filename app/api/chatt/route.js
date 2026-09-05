@@ -8,18 +8,26 @@ import { checkRateLimit } from "../../lib/kanalRateLimit";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+// Upsert på (nyhet_id, agent) istället för en ren INSERT — se supabase_nyhetsanalys_v2.sql.
+// analyseraMedAgent() på klienten gör om anropet när ett SVAR SOM REDAN AVSLUTADES
+// MED [DONE] ändå "verkar avbrutet" (kort text eller saknar avslutande skiljetecken),
+// vilket kan ge två separata, var för sig kompletta strömmar för samma klick. Utan
+// en UNIQUE-constraint + upsert skrevs tidigare båda som separata rader — en synlig
+// dubblett i Senaste aktivitet för exakt samma händelse (Codex-fynd, se CLAUDE.md
+// ✅93). on_conflict kräver att v2-migreringen körts; misslyckas den tyst (fail-open,
+// samma som resten av denna best-effort-loggning) sparas analysen inte förrän den kört.
 async function sparaNyhetsanalys({ nyhetId, agent, text }) {
   if (!SB_URL || !SB_SERVICE_KEY || !nyhetId) return;
   try {
-    await fetch(`${SB_URL}/rest/v1/nyhetsanalys`, {
+    await fetch(`${SB_URL}/rest/v1/nyhetsanalys?on_conflict=nyhet_id,agent`, {
       method: "POST",
       headers: {
         apikey: SB_SERVICE_KEY,
         Authorization: `Bearer ${SB_SERVICE_KEY}`,
         "Content-Type": "application/json",
-        Prefer: "return=minimal",
+        Prefer: "return=minimal,resolution=merge-duplicates",
       },
-      body: JSON.stringify({ nyhet_id: nyhetId, agent, analys: text.slice(0, 1500) }),
+      body: JSON.stringify({ nyhet_id: nyhetId, agent, analys: text.slice(0, 4000) }),
     });
   } catch {}
 }
@@ -60,11 +68,12 @@ function withNyhetsanalysSave(response, { nyhetId, agent }) {
           } catch { /* ignore malformed chunk */ }
         }
       }
-      // Bara spara om strömmen faktiskt avslutades med [DONE] — annars kan en
-      // avhuggen Groq-ström sparas som en ofullständig rad, och klientens egen
-      // omförsök (analyseraMedAgent) sedan sparar en andra, komplett rad för
-      // samma nyhet+agent. Ingen UNIQUE-constraint på (nyhet_id, agent) städar
-      // bort dubbletten, så båda hade synts i Senaste aktivitet (Codex-fynd).
+      // Bara spara om strömmen faktiskt avslutades med [DONE] — en avhuggen ström
+      // sparas inte som en ofullständig rad. Ett ev. omförsök (analyseraMedAgent)
+      // sparar då en andra, fullständig version — men sparaNyhetsanalys() gör nu
+      // en upsert på (nyhet_id, agent) istället för en ren INSERT, så omförsökets
+      // (förhoppningsvis bättre) analys ERSÄTTER den första istället för att
+      // dubbleras (se supabase_nyhetsanalys_v2.sql).
       const trimmed = text.trim();
       if (klar && trimmed.length >= 10) await sparaNyhetsanalys({ nyhetId, agent, text: trimmed });
     } catch { /* best-effort — analysen visas ändå hos klienten oavsett */ }
@@ -211,6 +220,11 @@ async function handlePost(request) {
   // Bara satt för typ="nyhetsanalys" — styr om/vart det färdiga svaret sparas
   // (se withNyhetsanalysSave nedan). Direktdebattens turer skickar aldrig nyhetId.
   const nyhetIdSafe = typ === "nyhetsanalys" && Number.isInteger(Number(nyhetId)) && Number(nyhetId) > 0 ? Number(nyhetId) : null;
+  // nyhetsanalys är inte en snabb debattreplik — texten läses upp högt av Anna/Peter/
+  // Johan i AgentOverlay/StudioOverlay (se CLAUDE.md ✅93) och behöver därför betydligt
+  // mer substans än Direktdebattens 2–3-meningarsregel. Egen prompt + högre tak nedan.
+  const erNyhetsanalys = typ === "nyhetsanalys";
+  const maxTokensForRequest = erNyhetsanalys ? 700 : 250;
 
   // typ="nyhetsanalys" (från /nyhetskallor) är ett fristående enskilt agentsvar på en
   // vald nyhet, inte en flertursdebatt — den delar INTE Direktdebattens kvot (5
@@ -284,7 +298,26 @@ async function handlePost(request) {
     ? `\n- Ground your answer concretely in the background article above — name a specific detail, figure or event from it. Platitudes like "this is unacceptable" or "we must act now" are only allowed if tied to something concrete in the article.`
     : "";
 
-  const systemPrompt = isEn
+  // nyhetsanalys har ingen historik/motpart (klienten skickar alltid historik:[]) och
+  // ska aldrig vara på engelska i UI — men texten måste ha substans: den läses upp
+  // högt (video), inte bara visas som en kort inline-kommentar som Direktdebattens
+  // repliker. En för kort/tunn text var både en direkt kvalitetsbrist och en orsak
+  // till fler omförsök via arTroligenAvbruten() på klienten (se sparaNyhetsanalys).
+  const systemPrompt = erNyhetsanalys
+    ? `Du är ${PERSONLIGHETER[agent]}
+
+Du analyserar följande nyhet i karaktär: "${amne.slice(0, 200)}"
+${artikelBlockSv}
+Texten du skriver kommer att läsas upp högt för en lyssnare (i en video) — inte bara visas som text. Den måste därför ha substans och inte vara en kort kommentar.
+
+REGLER — viktiga:
+- Skriv en sammanhängande, flytande analys på 6–10 meningar. Aldrig kortare än 5 fullständiga meningar.
+- Förklara varför nyheten spelar roll ur ditt perspektiv, väv in en konkret detalj, siffra eller händelse ur nyheten ovan, och avsluta med en tydlig egen ståndpunkt.
+- Skriv i löpande prosa — inga punktlistor, inga rubriker, inga radbrytningar.
+- Tala aldrig om att du är en AI. Tala alltid i första person.
+- Svara bara på svenska.
+- Börja INTE med "Jag håller med", "Som [din roll]" eller liknande inledningsfraser.`
+    : isEn
     ? `You are ${PERSONLIGHETER[agent]}
 
 You are taking part in a rapid debate about: "${amne.slice(0, 200)}"
@@ -306,13 +339,15 @@ REGLER — viktiga:
 - Svara bara på svenska.
 - Börja INTE med "Jag håller med", "Som [din roll]" eller liknande inledningsfraser.`;
 
-  const userMessage = kontext
-    ? isEn
-      ? `What the others just said:\n${kontext}\n\nNow it's your turn. Respond briefly and directly.`
-      : `Vad de andra just sagt:\n${kontext}\n\nNu är det din tur. Svara kort och direkt.`
-    : isEn
-      ? `Open the debate about "${amne.slice(0, 200)}". Be sharp and concise.`
-      : `Öppna debatten om "${amne.slice(0, 200)}". Var skarp och kortfattad.`;
+  const userMessage = erNyhetsanalys
+    ? `Analysera nyheten "${amne.slice(0, 200)}" i karaktär. Ge en fyllig, substantiell analys på 6–10 meningar — kom ihåg att den ska läsas upp högt för en lyssnare.`
+    : kontext
+      ? isEn
+        ? `What the others just said:\n${kontext}\n\nNow it's your turn. Respond briefly and directly.`
+        : `Vad de andra just sagt:\n${kontext}\n\nNu är det din tur. Svara kort och direkt.`
+      : isEn
+        ? `Open the debate about "${amne.slice(0, 200)}". Be sharp and concise.`
+        : `Öppna debatten om "${amne.slice(0, 200)}". Var skarp och kortfattad.`;
 
   const info = getRateLimitInfo(ip);
   const rlHeaders = {
@@ -353,7 +388,7 @@ REGLER — viktiga:
         body: JSON.stringify({
           model: "openai/gpt-oss-120b",
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
-          max_tokens: 250,
+          max_tokens: maxTokensForRequest,
           temperature: 0.88,
           stream: true,
         }),
@@ -400,7 +435,7 @@ REGLER — viktiga:
       const r = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model, messages: oaiMessages, max_tokens: 250, temperature: 0.88 }),
+        body: JSON.stringify({ model, messages: oaiMessages, max_tokens: maxTokensForRequest, temperature: 0.88 }),
         signal: AbortSignal.timeout(15000),
       });
       if (r.ok) {
@@ -426,7 +461,7 @@ REGLER — viktiga:
     const geminiPayload = JSON.stringify({
       contents: [{ role: "user", parts: [{ text: userMessage }] }],
       systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: { maxOutputTokens: 250, temperature: 0.88 },
+      generationConfig: { maxOutputTokens: maxTokensForRequest, temperature: 0.88 },
     });
     // gemini-2.0-*/gemini-1.5-flash stängdes ner av Google 1 jun 2026
     for (const model of ["gemini-3.5-flash", "gemini-3.5-flash-lite"]) {
