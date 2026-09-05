@@ -12,11 +12,47 @@ const ORAKLET_FARG = AGENTER.Oraklet.farg;
 // personliga kommentaren är själva poängen med fliken).
 function UrvalRad({ item, onLasa }) {
   const [open, setOpen] = useState(false);
+  const [forbereder, setForbereder] = useState(false);
   const nyhet = item.nyhetsflode || {};
   const datum = item.skapad
     ? new Date(item.skapad).toLocaleDateString("sv-SE", { year: "numeric", month: "short", day: "numeric", timeZone: "Europe/Stockholm" })
     : "";
   const harKalla = !!(nyhet.beskrivning || nyhet.url);
+
+  // Oraklets motivering är redan substantiell text (varför HAN valde nyheten)
+  // men förklarar inte artikelns FAKTISKA innehåll — samma anledning som
+  // fick oss att bygga sammanfattningscachen för Vetenskapliga Nyheter-fliken.
+  // Återanvänder samma cache (oraklet_sammanfattning på nyhetsflode, via
+  // /api/nyhetsflode/forbered-lasning): en nyhet som redan sammanfattats när
+  // en besökare lyssnade på den i Vetenskapliga Nyheter-fliken kostar inget
+  // nytt LLM-anrop här, och tvärtom. Fail-open: misslyckas anropet läser
+  // Oraklet bara upp rubrik + sin egen motivering, precis som innan.
+  async function handleLasa() {
+    setForbereder(true);
+    let sammanfattning = null;
+    if (nyhet.id) {
+      try {
+        const res = await fetch("/api/nyhetsflode/forbered-lasning", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: nyhet.id }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          sammanfattning = data.beskrivning || null;
+        }
+      } catch {
+        // fail-open — läser upp rubrik + motivering utan artikelsammanfattning
+      }
+    }
+    setForbereder(false);
+    onLasa({
+      typ: "urval",
+      id: item.id,
+      titel: nyhet.rubrik,
+      text: [nyhet.rubrik, sammanfattning, item.motivering].filter(Boolean).join(". "),
+    });
+  }
 
   return (
     <div style={{ borderBottom: "1px solid #0d2040", padding: "16px 0" }}>
@@ -44,15 +80,16 @@ function UrvalRad({ item, onLasa }) {
 
           <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
             <button
-              onClick={() => onLasa({
-                typ: "urval",
-                id: item.id,
-                titel: nyhet.rubrik,
-                text: [nyhet.rubrik, item.motivering].filter(Boolean).join(". "),
-              })}
-              style={{ padding: "5px 12px", background: "transparent", border: `1px solid ${ORAKLET_FARG}50`, color: ORAKLET_FARG, borderRadius: "6px", fontSize: "11px", fontFamily: "Georgia, serif", cursor: "pointer" }}
+              onClick={handleLasa}
+              disabled={forbereder}
+              style={{
+                padding: "5px 12px", background: "transparent",
+                border: `1px solid ${ORAKLET_FARG}50`, color: ORAKLET_FARG, borderRadius: "6px",
+                fontSize: "11px", fontFamily: "Georgia, serif",
+                cursor: forbereder ? "default" : "pointer", opacity: forbereder ? 0.6 : 1,
+              }}
             >
-              🎓 Professor Oraklet läser
+              {forbereder ? "🎓 Förbereder…" : "🎓 Professor Oraklet läser"}
             </button>
             {harKalla && (
               <button
