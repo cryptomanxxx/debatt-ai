@@ -201,25 +201,33 @@ async function hamtaArtikelHtml(startUrl) {
   }
 }
 
-function extraheraMeta(html, re) {
-  const m = html.match(re);
-  return m ? decodeHtmlEntities(m[1].trim()) : "";
-}
-
 // Postgres text-kolumner kan aldrig lagra en NUL-byte (U+0000) — ett INSERT
 // med en sådan avvisas alltid med "unsupported Unicode escape sequence"
 // (SQLSTATE 22P05), oavsett var i strängen tecknet hamnar. Bekräftat i
 // produktion (fel_log): import av en riktig artikel (arbetet.se) misslyckades
 // upprepade gånger med exakt detta fel. Källan är sannolikt en numerisk
 // HTML-entitet som &#0;/&#x0; i sidans källkod, som decodeHtmlEntities()
-// ovan legitimt avkodar till en faktisk NUL via String.fromCodePoint(0).
-// Städas bort här, en gång, på de tre fält som faktiskt sparas till
-// databasen — täcker både råa NUL-byte i HTTP-svaret och entity-avkodade
-// sådana. Övriga C0-kontrolltecken (utom tab/newline/CR) städas bort av
-// samma försiktighetsskäl — aldrig avsiktligt innehåll i artikeltext.
+// nedan legitimt avkodar till en faktisk NUL via String.fromCodePoint(0).
+// Övriga C0-kontrolltecken (utom tab/newline/CR) städas bort av samma
+// försiktighetsskäl — aldrig avsiktligt innehåll i artikeltext.
 const OGILTIGA_TECKEN_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
 function taBortOgiltigaTecken(s) {
   return (s ?? "").replace(OGILTIGA_TECKEN_RE, "");
+}
+
+// Sanerad HÄR, innan något värde väljs via en ||-fallbackkedja nedan.
+// Codex-fynd (PR #1370-granskning): sanering gjordes tidigare bara på det
+// SLUTLIGT valda värdet, efter att || redan valt kandidat. En og:description
+// som (t.ex. via en "&#0;"-entitet) avkodas till enbart ogiltiga tecken är
+// fortfarande truthy — || väljer den, metaBeskrivning/body-fallbacken provas
+// aldrig, och saneringen längre ner tömmer strängen till "" i efterhand.
+// Resultatet: hamtaArtikelInnehall() returnerar ingen_text (422 från
+// /api/chatt) trots att en giltig meta-description eller läsbar brödtext
+// fanns tillgänglig. Genom att sanera varje kandidat direkt vid extraktion
+// blir en helt degenererad kandidat korrekt falsy redan innan || väljer.
+function extraheraMeta(html, re) {
+  const m = html.match(re);
+  return m ? taBortOgiltigaTecken(decodeHtmlEntities(m[1].trim())) : "";
 }
 
 function extraheraArtikel(html) {
@@ -244,15 +252,17 @@ function extraheraArtikel(html) {
     const utanSkript = html
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
       .replace(/<style[\s\S]*?<\/style>/gi, " ");
-    sammanfattning = decodeHtmlEntities(utanSkript.replace(/<[^>]+>/g, " "))
-      .replace(/\s+/g, " ")
-      .trim();
+    sammanfattning = taBortOgiltigaTecken(
+      decodeHtmlEntities(utanSkript.replace(/<[^>]+>/g, " "))
+        .replace(/\s+/g, " ")
+        .trim()
+    );
   }
 
   return {
-    titel: taBortOgiltigaTecken(titel),
-    sammanfattning: taBortOgiltigaTecken(sammanfattning.slice(0, SAMMANFATTNING_MAX)),
-    kalla: taBortOgiltigaTecken(ogSiteName.slice(0, KALLA_MAX)),
+    titel,
+    sammanfattning: sammanfattning.slice(0, SAMMANFATTNING_MAX),
+    kalla: ogSiteName.slice(0, KALLA_MAX),
   };
 }
 
