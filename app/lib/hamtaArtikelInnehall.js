@@ -293,21 +293,54 @@ function extraheraMeta(html, re) {
 // utan risk att klippa bort riktig artikeltext (till skillnad från en
 // text-baserad heuristik, som lättare ger falska positiva).
 //
-// <header> tas MEDVETET INTE bort (Codex-fynd, PR #1376-granskning): giltig
-// semantisk HTML-markup som <article><header>...</header>...</article> är
-// vanlig på nyhetssajter, och den nästlade artikelheadern innehåller ofta
-// själva ingressen/standfirst-stycket — genuint central artikeltext, inte
-// sidchrome. En regex kan inte tillförlitligt skilja en sid-header (menyn
-// högst upp) från en artikel-header (ingressen) i nästlad HTML, så
-// blankettborttagning av alla <header>-block riskerade att permanent cacha
-// en sammanfattning utan artikelns viktigaste inledande kontext. nav/footer/
-// aside är betydligt säkrare att strippa blankt — de förekommer i princip
-// aldrig nästlat inuti <article> med genuint artikelinnehåll.
+// <header> hanteras positionsberoende (Codex-fynd, PR #1376- OCH #1377-
+// granskning — två motstridiga risker som båda är verkliga):
+//   - PR #1376: giltig semantisk markup som <article><header>…</header>…
+//     </article> är vanlig på nyhetssajter, och den NÄSTLADE artikel-
+//     headern innehåller ofta själva ingressen/standfirst-stycket —
+//     genuint central artikeltext, inte sidchrome. Blankettborttagning av
+//     ALLA <header>-block (den ursprungliga fixen) kunde alltså radera
+//     artikelns viktigaste inledande kontext.
+//   - PR #1377 tog då bort header-strippningen helt — men det öppnade
+//     tillbaka det URSPRUNGLIGA problemet för en SID-nivå <header> vars
+//     meny inte råkar vara inlindad i <nav> (t.ex. <header><div>…mega-
+//     meny…</div></header> före <article>): den chrome-texten blir kvar
+//     längst fram i extraheraBrodtext(), och kan i default-läget (500
+//     tecken) tränga undan HELA artikeltexten, eller i helText-läget fylla
+//     en del av det 8000-teckensfönstret vars sammanfattning sedan cachas.
+//
+// Lösningen: en <article>…</article>-blockmatchning används som gräns.
+// <header> UTANFÖR ett hittat <article>-block är per definition sidnivå
+// (menyn högst upp, innan/efter själva artikeln) och strippas — precis som
+// nav/footer/aside. <header> INUTI ett <article>-block lämnas orört, det
+// är där en genuin standfirst/ingress typiskt bor. Hittas inget
+// <article>-element alls (vanligt förekommande, inte alla sajter
+// semantiskt uppmärkta) strippas <header> överallt — utan en pålitlig
+// artikelgräns att skilja mot är sannolikheten mycket högre att ett
+// fristående <header> är sidchrome (en riktig ingress ligger normalt i en
+// vanlig <p>, inte inbäddad i ett oparat toppnivå-<header> helt utan
+// <article> runt sig).
+//
+// Ren strukturell taggmatchning, ingen innehållsanalys — fångar inte allt
+// (t.ex. en cookie-banner utan <aside>-tagg, eller ett sidhuvud som råkar
+// ligga INUTI samma <article>-element som sajten återanvänder för hela
+// sidan), men eliminerar de vanligaste källorna utan att gissa på textnivå.
 function taBortSidchrome(html) {
-  return html
-    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
-    .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
-    .replace(/<aside[\s\S]*?<\/aside>/gi, " ");
+  const delar = html.split(/(<article[\s\S]*?<\/article>)/gi);
+  const harArtikelblock = delar.length > 1;
+  return delar
+    .map((del, i) => {
+      const arArtikelblock = harArtikelblock && i % 2 === 1; // split() med en fångstgrupp lägger matchningen på udda index
+      let stadad = del
+        .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+        .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
+        .replace(/<aside[\s\S]*?<\/aside>/gi, " ");
+      if (!arArtikelblock) {
+        stadad = stadad.replace(/<header[\s\S]*?<\/header>/gi, " ");
+      }
+      return stadad;
+    })
+    .join("");
 }
 
 function extraheraBrodtext(html) {
