@@ -84,6 +84,12 @@ function RadFynd({ fynd, onLasa }) {
               🔬 {forfattare}
             </div>
           )}
+          <button
+            onClick={e => { e.stopPropagation(); onLasa({ id: fynd.id, text: [fynd.titel, fynd.sammanfattning].filter(Boolean).join(". ") }); }}
+            style={{ marginTop: "8px", padding: "5px 12px", background: "transparent", border: `1px solid ${ORAKLET_FARG}50`, color: ORAKLET_FARG, borderRadius: "6px", fontSize: "11px", fontFamily: "Georgia, serif", cursor: "pointer" }}
+          >
+            🎓 Professor Oraklet läser
+          </button>
         </div>
         <button
           onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
@@ -115,12 +121,6 @@ function RadFynd({ fynd, onLasa }) {
               ) : fynd.arxiv_kalla.titel}
             </p>
           )}
-          <button
-            onClick={() => onLasa({ id: fynd.id, text: [fynd.titel, fynd.sammanfattning].filter(Boolean).join(". ") })}
-            style={{ marginTop: "10px", padding: "6px 14px", background: "transparent", border: `1px solid ${ORAKLET_FARG}50`, color: ORAKLET_FARG, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
-          >
-            🎓 Professor Oraklet läser
-          </button>
         </div>
       )}
     </div>

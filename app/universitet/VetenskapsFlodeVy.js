@@ -35,6 +35,12 @@ function VetenskapsRad({ item, onLasa }) {
           <div style={{ fontSize: "13px", color: "#8fb8e8", fontFamily: "Georgia, serif", fontWeight: 600, lineHeight: 1.4 }}>
             {item.rubrik}
           </div>
+          <button
+            onClick={e => { e.stopPropagation(); onLasa({ id: item.id, text: [item.rubrik, item.beskrivning].filter(Boolean).join(". ") }); }}
+            style={{ marginTop: "8px", padding: "5px 12px", background: "transparent", border: `1px solid ${ORAKLET_FARG}50`, color: ORAKLET_FARG, borderRadius: "6px", fontSize: "11px", fontFamily: "Georgia, serif", cursor: "pointer" }}
+          >
+            🎓 Professor Oraklet läser
+          </button>
         </div>
         <button
           onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
@@ -56,14 +62,6 @@ function VetenskapsRad({ item, onLasa }) {
               Läs originalkälla →
             </a>
           )}
-          <div style={{ marginTop: "10px" }}>
-            <button
-              onClick={() => onLasa({ id: item.id, text: [item.rubrik, item.beskrivning].filter(Boolean).join(". ") })}
-              style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${ORAKLET_FARG}50`, color: ORAKLET_FARG, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
-            >
-              🎓 Professor Oraklet läser
-            </button>
-          </div>
         </div>
       )}
     </div>
