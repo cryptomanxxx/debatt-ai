@@ -1,11 +1,14 @@
 "use client";
 import { useState } from "react";
+import { AGENTER } from "../nyhetskallor/AgentOverlay";
+
+const ORAKLET_FARG = AGENTER.Oraklet.farg;
 
 // Rå RSS/arXiv-poster ur nyhetsflode — samma datakälla som /nyhetskallor,
 // men filtrerad till enbart arXiv-preprints och renodlade vetenskapskällor
 // (se VETENSKAP_KALLOR i page.js). Skiljer sig medvetet från ForskningsListaVy
 // ovanför: det här är obehandlade externa rubriker, inte AI-genererade fynd.
-function VetenskapsRad({ item }) {
+function VetenskapsRad({ item, onLasa }) {
   const [open, setOpen] = useState(false);
   const arXiv = (item.kalla || "").startsWith("arXiv");
   const farg = arXiv ? "#fb923c" : "#38bdf8";
@@ -53,13 +56,21 @@ function VetenskapsRad({ item }) {
               Läs originalkälla →
             </a>
           )}
+          <div style={{ marginTop: "10px" }}>
+            <button
+              onClick={() => onLasa({ id: item.id, text: [item.rubrik, item.beskrivning].filter(Boolean).join(". ") })}
+              style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${ORAKLET_FARG}50`, color: ORAKLET_FARG, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
+            >
+              🎓 Professor Oraklet läser
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-export default function VetenskapsFlodeVy({ nyheter }) {
+export default function VetenskapsFlodeVy({ nyheter, onLasa }) {
   if (!nyheter || nyheter.length === 0) {
     return (
       <div style={{ fontSize: "11px", color: "#1e4a80", fontFamily: "monospace", padding: "16px 0" }}>
@@ -70,7 +81,7 @@ export default function VetenskapsFlodeVy({ nyheter }) {
 
   return (
     <div>
-      {nyheter.map(n => <VetenskapsRad key={n.id} item={n} />)}
+      {nyheter.map(n => <VetenskapsRad key={n.id} item={n} onLasa={onLasa} />)}
     </div>
   );
 }

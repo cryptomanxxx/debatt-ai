@@ -1,5 +1,8 @@
 "use client";
 import { useState } from "react";
+import { AGENTER } from "../nyhetskallor/AgentOverlay";
+
+const ORAKLET_FARG = AGENTER.Oraklet.farg;
 
 const DISCIPLIN_FARG = {
   ekonomi:           "#22d3ee",
@@ -44,7 +47,7 @@ function TagPill({ label, count, active, onClick, farg }) {
 // En rad per fynd — datum, rubrik och författare syns alltid; resten (sammanfattning,
 // metodologi, arXiv-källa) döljs bakom "Expandera" så listan förblir kompakt och
 // kronologiskt skannbar istället för att fyllas av stora kort.
-function RadFynd({ fynd }) {
+function RadFynd({ fynd, onLasa }) {
   const [open, setOpen] = useState(false);
   const badge = IMPAKT_BADGE[fynd.impakt];
   const farg = DISCIPLIN_FARG[fynd.disciplin] || "#38bdf8";
@@ -112,13 +115,19 @@ function RadFynd({ fynd }) {
               ) : fynd.arxiv_kalla.titel}
             </p>
           )}
+          <button
+            onClick={() => onLasa({ id: fynd.id, text: [fynd.titel, fynd.sammanfattning].filter(Boolean).join(". ") })}
+            style={{ marginTop: "10px", padding: "6px 14px", background: "transparent", border: `1px solid ${ORAKLET_FARG}50`, color: ORAKLET_FARG, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: "pointer" }}
+          >
+            🎓 Professor Oraklet läser
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-export default function ForskningsListaVy({ fynd }) {
+export default function ForskningsListaVy({ fynd, onLasa }) {
   const [valdDisciplin, setValdDisciplin] = useState(null);
 
   if (fynd.length === 0) {
@@ -159,7 +168,7 @@ export default function ForskningsListaVy({ fynd }) {
       </div>
 
       <div>
-        {filtrerade.map(f => <RadFynd key={f.id} fynd={f} />)}
+        {filtrerade.map(f => <RadFynd key={f.id} fynd={f} onLasa={onLasa} />)}
       </div>
     </div>
   );
