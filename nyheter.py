@@ -665,7 +665,15 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         fore = len(nyheter)
         try:
             res = _hamta_flode(url, kalla)
-            if res.status_code != 200:
+            # Godtar hela 2xx-intervallet, inte bara exakt 200 — verklig körning
+            # (2026-09-05) visade att eurekalert.org kan svara med HTTP 202
+            # (Accepted) på ett giltigt RSS-anrop via proxyn, troligen en
+            # asynkron generering/soft-throttling mot molninfrastruktur-IP:n.
+            # En strikt "!= 200"-koll kastade bort svaret innan XML-parsningen
+            # ens fick chansen att avgöra om kroppen faktiskt var användbar.
+            # Existerande try/except nedan fångar redan en tom/trasig kropp
+            # (ParseError) precis lika säkert som förut — ingen ny felyta.
+            if not (200 <= res.status_code < 300):
                 misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
                 rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
                 continue
