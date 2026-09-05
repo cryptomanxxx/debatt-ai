@@ -325,7 +325,6 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "Big Think":           ["forskning", "samhälle"],
     "Science Alert":       ["forskning"],
     "Quanta Magazine":     ["forskning", "ai"],
-    "EurekAlert!":         ["forskning", "medicin"],
     "Phys.org":            ["forskning", "tech"],
     "MIT Technology Review": ["tech", "ai", "forskning"],
     "The Lancet":          ["medicin", "forskning"],
@@ -605,14 +604,15 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         ("Big Think",          _p("https://bigthink.com/feed/")),
         ("Science Alert",      _p("https://www.sciencealert.com/feed")),
         ("Quanta Magazine",    _p("https://www.quantamagazine.org/feed/")),
-        # Tre högkvalitativa vetenskapskällor tillagda på ägarens begäran för
+        # Två högkvalitativa vetenskapskällor tillagda på ägarens begäran för
         # att stärka /universitet Vetenskapliga Nyheter-fliken (se
         # VETENSKAP_KALLOR i app/universitet/page.js, som listar dessa
-        # explicit) — EurekAlert! aggregerar granskade forskningsmeddelanden
-        # direkt från universitet/institutioner (samma primärkälla journalister
-        # använder), Phys.org är en etablerad bred vetenskapsaggregator, MIT
+        # explicit) — Phys.org är en etablerad bred vetenskapsaggregator, MIT
         # Technology Review ger djupare tech-/AI-analys än ren nyhetsrapportering.
-        ("EurekAlert!",        _p("https://www.eurekalert.org/rss")),
+        # EurekAlert! provades också men togs bort — deras RSS-endpoint
+        # svarar 202 med en tom HTML-kropp via vår proxy, ett mönster typiskt
+        # för anti-bot-verifieringsköer mot delad molninfrastruktur-IP:n, inte
+        # ett kodfel. Se Codex/CLAUDE.md-historik för utredningen.
         ("Phys.org",           _p("https://phys.org/rss-feed/")),
         ("MIT Technology Review", _p("https://www.technologyreview.com/feed/")),
         # Medicin/forskning — samma tidigare-borttagna kategori som krypto ovan
