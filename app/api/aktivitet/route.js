@@ -453,15 +453,18 @@ async function byggFeed() {
     anna_sager:  { ikon: "🎙️", farg: "#a0c8f0" },
     peter_sager: { ikon: "📊", farg: "#6abf6a" },
     johan_sager: { ikon: "💡", farg: "#f0b050" },
+    oraklet_forklarar: { ikon: "🎓", farg: "#dd6e5f" },
     diskussion:  { ikon: "🎭", farg: "#c084fc" },
   };
-  const FRAGA_ANNA_PETER_NAMN = { anna_sager: "Anna", peter_sager: "Peter", johan_sager: "Johan" };
+  const FRAGA_ANNA_PETER_NAMN = { anna_sager: "Anna", peter_sager: "Peter", johan_sager: "Johan", oraklet_forklarar: "Professor Oraklet" };
   (Array.isArray(fragaAnnaPeter.value) ? fragaAnnaPeter.value : []).forEach(f => {
     if (!f.skapad) return;
     const info = FRAGA_ANNA_PETER_INFO[f.aktion] || FRAGA_ANNA_PETER_INFO.anna_sager;
     const snippet = (f.titel || f.input_text || f.sammanfattning || "").slice(0, 60);
     const text = f.aktion === "diskussion"
       ? `Anna, Peter & Johan diskuterade: "${snippet}"`
+      : f.aktion === "oraklet_forklarar"
+      ? `Professor Oraklet förklarade: "${snippet}"`
       : `${FRAGA_ANNA_PETER_NAMN[f.aktion] || "Anna"} läste upp: "${snippet}"`;
     feed.push({
       typ: `fraga-anna-peter-${f.aktion}`,
