@@ -666,6 +666,12 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
             # 0,3s räckte inte för att undvika 429 på en stor andel av dem.
             time.sleep(1.2 if kalla.startswith("Reddit") else 0.3)
         fore = len(nyheter)
+        # Nollställd per iteration — Codex-fynd (PR #1381-granskning): utan
+        # detta behåller `res` föregående lyckade flödes svarsobjekt om
+        # _hamta_flode() kastar INNAN tilldelningen hinner ske (t.ex. en
+        # timeout), vilket fick diagnostiken i except-blocket nedan att
+        # felaktigt visa en HELT ANNAN källas status/innehåll.
+        res = None
         try:
             res = _hamta_flode(url, kalla)
             # Godtar hela 2xx-intervallet, inte bara exakt 200 — verklig körning
@@ -792,11 +798,12 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
             # rss-proxy, sep 2026: 2xx-statusen är nu accepterad men kroppen
             # gick ändå inte att parsa som XML — okänt om den är HTML,
             # tom, eller trasig utan att se den).
-            try:
-                snippet = res.text[:200].strip().replace("\n", " ")
-                print(f"  ⚠ {kalla}: {type(e).__name__} — HTTP {res.status_code}, content-type={res.headers.get('content-type','?')!r}, snippet={snippet!r}", file=sys.stderr)
-            except Exception:
-                pass
+            if res is not None:
+                try:
+                    snippet = res.text[:200].strip().replace("\n", " ")
+                    print(f"  ⚠ {kalla}: {type(e).__name__} — HTTP {res.status_code}, content-type={res.headers.get('content-type','?')!r}, snippet={snippet!r}", file=sys.stderr)
+                except Exception:
+                    pass
             misslyckade.append(f"  ✗ {kalla} ({type(e).__name__})")
             rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": type(e).__name__})
             continue
