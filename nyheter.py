@@ -783,6 +783,17 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
             lyckade.append(f"  ✓ {kalla} ({antal} artiklar)")
             rss_stats.append({"kalla": kalla, "ok": True, "antal": antal, "fel": ""})
         except Exception as e:
+            # Samma diagnostik-princip som ⚠-loggen ovan (status/0 items) —
+            # utan att se den FAKTISKA svarskroppen är ett ParseError bara
+            # en gissning om orsaken (t.ex. EurekAlert!s HTTP 202-svar via
+            # rss-proxy, sep 2026: 2xx-statusen är nu accepterad men kroppen
+            # gick ändå inte att parsa som XML — okänt om den är HTML,
+            # tom, eller trasig utan att se den).
+            try:
+                snippet = res.text[:200].strip().replace("\n", " ")
+                print(f"  ⚠ {kalla}: {type(e).__name__} — HTTP {res.status_code}, content-type={res.headers.get('content-type','?')!r}, snippet={snippet!r}", file=sys.stderr)
+            except Exception:
+                pass
             misslyckade.append(f"  ✗ {kalla} ({type(e).__name__})")
             rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": type(e).__name__})
             continue
