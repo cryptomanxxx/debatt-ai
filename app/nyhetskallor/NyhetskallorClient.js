@@ -70,11 +70,11 @@ function arTroligenAvbruten(text) {
   return !/[.!?…][”"')\]]*$/.test(t);
 }
 
-async function streamAgentAnalys({ agent, amne, artikelTitel, artikelSammanfattning, hoppaOverGroq, nyhetId, onToken, signal }) {
+async function streamAgentAnalys({ agent, amne, artikelTitel, artikelSammanfattning, hoppaOverGroq, nyhetId, requestId, onToken, signal }) {
   const res = await fetch("/api/chatt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ typ: "nyhetsanalys", amne, historik: [], agent, artikelTitel, artikelSammanfattning, hoppaOverGroq, nyhetId }),
+    body: JSON.stringify({ typ: "nyhetsanalys", amne, historik: [], agent, artikelTitel, artikelSammanfattning, hoppaOverGroq, nyhetId, requestId }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -108,14 +108,24 @@ async function streamAgentAnalys({ agent, amne, artikelTitel, artikelSammanfattn
 
 // Ett omförsök hoppar förbi Groq (samma resonemang som Direktdebattens retry-logik):
 // en avhuggen ström beror oftast på Groqs streaming, inte på ämnet/agenten.
+//
+// requestId genereras EN gång per klick (utanför omförsöksloopen) och skickas
+// med på VARJE försök av detta klick — servern upsertar på (nyhet_id, agent,
+// request_id), så ett omförsök av SAMMA klick ersätter den första (ofta
+// avhuggna) versionen istället för att dubbleras, men ett SENARE, oberoende
+// klick på samma agent+nyhet (en annan besökare, eller samma besökare en
+// annan dag) får en ny requestId och skriver en egen rad istället för att
+// tyst skriva över en tidigare arkiverad analys (Codex-fynd, se
+// supabase_nyhetsanalys_v3.sql).
 async function analyseraMedAgent(agent, n, uppdatera) {
+  const requestId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   let text = null, klar = false;
   for (let forsok = 0; forsok < 2 && (!klar || arTroligenAvbruten(text)); forsok++) {
     if (forsok > 0) await new Promise(r => setTimeout(r, 400));
     try {
       const resultat = await streamAgentAnalys({
         agent, amne: n.rubrik, artikelTitel: n.rubrik, artikelSammanfattning: n.beskrivning,
-        hoppaOverGroq: forsok > 0, nyhetId: n.id,
+        hoppaOverGroq: forsok > 0, nyhetId: n.id, requestId,
         onToken: (t) => uppdatera({ status: "laddar", text: t }),
       });
       text = resultat.text;

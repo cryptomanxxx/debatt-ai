@@ -8,18 +8,32 @@ import { checkRateLimit } from "../../lib/kanalRateLimit";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Upsert på (nyhet_id, agent) istället för en ren INSERT — se supabase_nyhetsanalys_v2.sql.
-// analyseraMedAgent() på klienten gör om anropet när ett SVAR SOM REDAN AVSLUTADES
-// MED [DONE] ändå "verkar avbrutet" (kort text eller saknar avslutande skiljetecken),
-// vilket kan ge två separata, var för sig kompletta strömmar för samma klick. Utan
-// en UNIQUE-constraint + upsert skrevs tidigare båda som separata rader — en synlig
-// dubblett i Senaste aktivitet för exakt samma händelse (Codex-fynd, se CLAUDE.md
-// ✅93). on_conflict kräver att v2-migreringen körts; misslyckas den tyst (fail-open,
-// samma som resten av denna best-effort-loggning) sparas analysen inte förrän den kört.
-async function sparaNyhetsanalys({ nyhetId, agent, text }) {
+// Upsert på (nyhet_id, agent, request_id) istället för en ren INSERT — se
+// supabase_nyhetsanalys_v2.sql/_v3.sql. analyseraMedAgent() på klienten gör om
+// anropet när ett SVAR SOM REDAN AVSLUTADES MED [DONE] ändå "verkar avbrutet"
+// (kort text eller saknar avslutande skiljetecken), vilket kan ge två separata,
+// var för sig kompletta strömmar för samma klick. Utan en UNIQUE-constraint +
+// upsert skrevs tidigare båda som separata rader — en synlig dubblett i
+// Senaste aktivitet för exakt samma händelse (Codex-fynd, se CLAUDE.md ✅93).
+//
+// request_id (Codex-uppföljning, PR #1370-granskning): v2:s unique-scope var
+// bara (nyhet_id, agent) — GLOBALT unikt, inte per klick. Det gjorde att en
+// senare, HELT LEGITIM analys av samma agent på samma nyhet (en annan
+// besökare, eller samma besökare en annan dag) tyst skrev över den arkiverade
+// föregångaren via upserten, och eftersom `skapad` inte ingick i payloaden
+// behöll den ersatta raden sin URSPRUNGLIGA tidsstämpel — syntes aldrig som
+// ny aktivitet. request_id är en per-klick idempotensnyckel klienten
+// genererar en gång per analyseraMedAgent()-anrop (delad mellan ev. omförsök
+// av SAMMA klick) — bara riktiga retries av samma klick kolliderar nu, inte
+// framtida oberoende analyser av samma agent+nyhet.
+//
+// on_conflict kräver att v2+v3-migreringarna körts; misslyckas det tyst
+// (fail-open, samma som resten av denna best-effort-loggning) sparas
+// analysen inte förrän de kört.
+async function sparaNyhetsanalys({ nyhetId, agent, text, requestId }) {
   if (!SB_URL || !SB_SERVICE_KEY || !nyhetId) return;
   try {
-    await fetch(`${SB_URL}/rest/v1/nyhetsanalys?on_conflict=nyhet_id,agent`, {
+    await fetch(`${SB_URL}/rest/v1/nyhetsanalys?on_conflict=nyhet_id,agent,request_id`, {
       method: "POST",
       headers: {
         apikey: SB_SERVICE_KEY,
@@ -27,7 +41,7 @@ async function sparaNyhetsanalys({ nyhetId, agent, text }) {
         "Content-Type": "application/json",
         Prefer: "return=minimal,resolution=merge-duplicates",
       },
-      body: JSON.stringify({ nyhet_id: nyhetId, agent, analys: text.slice(0, 4000) }),
+      body: JSON.stringify({ nyhet_id: nyhetId, agent, analys: text.slice(0, 4000), request_id: requestId }),
     });
   } catch {}
 }
@@ -44,7 +58,7 @@ async function sparaNyhetsanalys({ nyhetId, agent, text }) {
 // då längre håller request-kontexten vid liv. after() är Next.js egen mekanism
 // för just detta: garanterat exekverad efter att svaret skickats klart, även på
 // edge runtime (till skillnad från ett rått "kör async utan await").
-function withNyhetsanalysSave(response, { nyhetId, agent }) {
+function withNyhetsanalysSave(response, { nyhetId, agent, requestId }) {
   if (!nyhetId || !response.body) return response;
   const [clientStream, saveStream] = response.body.tee();
   after(async () => {
@@ -69,13 +83,15 @@ function withNyhetsanalysSave(response, { nyhetId, agent }) {
         }
       }
       // Bara spara om strömmen faktiskt avslutades med [DONE] — en avhuggen ström
-      // sparas inte som en ofullständig rad. Ett ev. omförsök (analyseraMedAgent)
-      // sparar då en andra, fullständig version — men sparaNyhetsanalys() gör nu
-      // en upsert på (nyhet_id, agent) istället för en ren INSERT, så omförsökets
-      // (förhoppningsvis bättre) analys ERSÄTTER den första istället för att
-      // dubbleras (se supabase_nyhetsanalys_v2.sql).
+      // sparas inte som en ofullständig rad. Ett ev. omförsök av SAMMA klick
+      // (analyseraMedAgent) delar samma requestId, så sparaNyhetsanalys()s upsert
+      // på (nyhet_id, agent, request_id) ersätter den första versionen med
+      // omförsökets (förhoppningsvis bättre) istället för att dubbleras — men en
+      // SENARE, oberoende analys (nytt klick, ny requestId) skriver en ny rad
+      // istället för att skriva över den arkiverade föregångaren (se
+      // supabase_nyhetsanalys_v3.sql).
       const trimmed = text.trim();
-      if (klar && trimmed.length >= 10) await sparaNyhetsanalys({ nyhetId, agent, text: trimmed });
+      if (klar && trimmed.length >= 10) await sparaNyhetsanalys({ nyhetId, agent, text: trimmed, requestId });
     } catch { /* best-effort — analysen visas ändå hos klienten oavsett */ }
   });
   return new Response(clientStream, { headers: response.headers, status: response.status });
@@ -209,7 +225,7 @@ async function handlePost(request) {
   const body = await request.json().catch(() => null);
   if (!body) return Response.json({ error: "Ogiltig förfrågan" }, { status: 400 });
 
-  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, debattId, hoppaOverGroq, typ, nyhetId } = body;
+  const { amne, historik, agent, lang, artikelTitel, artikelSammanfattning, debattId, hoppaOverGroq, typ, nyhetId, requestId } = body;
   const isEn = lang === "en";
   // Client re-sends this on every turn (no server-side session state) — validated/capped
   // here too, defense in depth, since the client's own cap isn't trusted.
@@ -220,6 +236,10 @@ async function handlePost(request) {
   // Bara satt för typ="nyhetsanalys" — styr om/vart det färdiga svaret sparas
   // (se withNyhetsanalysSave nedan). Direktdebattens turer skickar aldrig nyhetId.
   const nyhetIdSafe = typ === "nyhetsanalys" && Number.isInteger(Number(nyhetId)) && Number(nyhetId) > 0 ? Number(nyhetId) : null;
+  // Per-klick idempotensnyckel klienten genererar en gång per analyseraMedAgent()-
+  // anrop (delad mellan ev. omförsök av samma klick) — se sparaNyhetsanalys() ovan
+  // för varför detta är den korrekta dedupe-scopen, inte bara (nyhet_id, agent).
+  const requestIdSafe = typeof requestId === "string" && requestId.length > 0 && requestId.length <= 100 ? requestId : null;
   // nyhetsanalys är inte en snabb debattreplik — texten läses upp högt av Anna/Peter/
   // Johan i AgentOverlay/StudioOverlay (se CLAUDE.md ✅93) och behöver därför betydligt
   // mer substans än Direktdebattens 2–3-meningarsregel. Egen prompt + högre tak nedan.
@@ -402,7 +422,7 @@ REGLER — viktiga:
         logAiCall({ provider: "groq", model: "openai/gpt-oss-120b", source: "chatt", status: "ok", latency_ms: Date.now() - groqT0 });
         return withNyhetsanalysSave(
           new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } }),
-          { nyhetId: nyhetIdSafe, agent }
+          { nyhetId: nyhetIdSafe, agent, requestId: requestIdSafe }
         );
       }
       if (groqRes.status === 429) {
@@ -447,7 +467,7 @@ REGLER — viktiga:
           const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
           return withNyhetsanalysSave(
             new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": name } }),
-            { nyhetId: nyhetIdSafe, agent }
+            { nyhetId: nyhetIdSafe, agent, requestId: requestIdSafe }
           );
         }
       }
@@ -481,7 +501,7 @@ REGLER — viktiga:
             const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
             return withNyhetsanalysSave(
               new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": "gemini" } }),
-              { nyhetId: nyhetIdSafe, agent }
+              { nyhetId: nyhetIdSafe, agent, requestId: requestIdSafe }
             );
           }
         }
