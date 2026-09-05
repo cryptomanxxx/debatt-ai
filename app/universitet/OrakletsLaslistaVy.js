@@ -89,7 +89,7 @@ function UrvalRad({ item, onLasa }) {
                 cursor: forbereder ? "default" : "pointer", opacity: forbereder ? 0.6 : 1,
               }}
             >
-              {forbereder ? "🎓 Förbereder…" : "🎓 Professor Oraklet läser"}
+              {forbereder ? "🎓 Förbereder…" : "🎓 Professor Oraklet förklarar"}
             </button>
             {harKalla && (
               <button

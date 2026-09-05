@@ -88,7 +88,7 @@ function RadFynd({ fynd, onLasa }) {
             onClick={e => { e.stopPropagation(); onLasa({ typ: "forskning", id: fynd.id, titel: fynd.titel, text: [fynd.titel, fynd.sammanfattning].filter(Boolean).join(". ") }); }}
             style={{ marginTop: "8px", padding: "5px 12px", background: "transparent", border: `1px solid ${ORAKLET_FARG}50`, color: ORAKLET_FARG, borderRadius: "6px", fontSize: "11px", fontFamily: "Georgia, serif", cursor: "pointer" }}
           >
-            🎓 Professor Oraklet läser
+            🎓 Professor Oraklet förklarar
           </button>
         </div>
         <button

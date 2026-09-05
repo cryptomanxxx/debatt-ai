@@ -14,6 +14,7 @@ const C = {
 const ANNA_FARG = "#a0c8f0";
 const PETER_FARG = "#6abf6a";
 const JOHAN_FARG = "#f0b050";
+const ORAKLET_FARG = "#dd6e5f"; // samma accentfärg som AGENTER.Oraklet.farg i AgentOverlay.js
 const STUDIO_FARG = "#c084fc";
 const LANK = "#38bdf8";
 
@@ -50,6 +51,7 @@ const AKTION_INFO = {
   anna_sager: { ikon: "🎙️", namn: "Anna", farg: ANNA_FARG },
   peter_sager: { ikon: "📊", namn: "Peter", farg: PETER_FARG },
   johan_sager: { ikon: "💡", namn: "Johan", farg: JOHAN_FARG },
+  oraklet_forklarar: { ikon: "🎓", namn: "Oraklet", farg: ORAKLET_FARG },
   diskussion: { ikon: "🎭", namn: "Studio", farg: STUDIO_FARG },
 };
 
@@ -61,8 +63,8 @@ const SPEAKER_INFO = {
 
 // Mappar AGENTER-nyckeln (som styr röst/avatar i AgentOverlay) mot aktion-
 // strängen som sparas i historiken, och tillbaka igen vid "Spela upp igen".
-const AGENT_TILL_AKTION = { Anna: "anna_sager", Nationalekonom: "peter_sager", Teknikoptimist: "johan_sager" };
-const AKTION_TILL_AGENT = { anna_sager: { agent: "Anna", namn: "Anna" }, peter_sager: { agent: "Nationalekonom", namn: "Peter" }, johan_sager: { agent: "Teknikoptimist", namn: "Johan" } };
+const AGENT_TILL_AKTION = { Anna: "anna_sager", Nationalekonom: "peter_sager", Teknikoptimist: "johan_sager", Oraklet: "oraklet_forklarar" };
+const AKTION_TILL_AGENT = { anna_sager: { agent: "Anna", namn: "Anna" }, peter_sager: { agent: "Nationalekonom", namn: "Peter" }, johan_sager: { agent: "Teknikoptimist", namn: "Johan" }, oraklet_forklarar: { agent: "Oraklet", namn: "Professor Oraklet" } };
 
 function AktionsKnapp({ farg, onClick, disabled, children }) {
   return (
@@ -111,7 +113,7 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
       <div style={{ padding: "10px 16px", background: `${info.farg}0d`, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: 10, color: info.farg, fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>
-          {info.ikon} {info.namn.toUpperCase()}{rad.aktion === "diskussion" ? " DISKUTERAR" : " SÄGER"}
+          {info.ikon} {info.namn.toUpperCase()}{rad.aktion === "diskussion" ? " DISKUTERAR" : rad.aktion === "oraklet_forklarar" ? " FÖRKLARAR" : " SÄGER"}
         </span>
         <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>
           {rad.typ === "url" ? "🔗 länk" : "✏️ fri text"}
@@ -323,15 +325,16 @@ export default function FragaAnnaOchPeterPage() {
             ← Nyhetsanalyser
           </a>
           <h1 style={{ color: C.text, fontSize: 26, fontWeight: 700, margin: "16px 0 6px", fontFamily: "Georgia, serif" }}>
-            Fråga Anna, Peter och Johan
+            Fråga AI-agenterna
           </h1>
           <p style={{ color: C.textMuted, fontSize: 14, margin: 0, lineHeight: 1.7 }}>
             Klistra in valfri text — eller en länk till en nyhetsartikel — och låt{" "}
             <span style={{ color: ANNA_FARG }}>Anna</span> (nyhetsankare),{" "}
-            <span style={{ color: PETER_FARG }}>Peter</span> (nationalekonom) eller{" "}
-            <span style={{ color: JOHAN_FARG }}>Johan</span> (teknikoptimist) läsa upp den,
-            eller låt alla tre diskutera den tillsammans i studion. Samma röster och animerade
-            ansikten som på{" "}
+            <span style={{ color: PETER_FARG }}>Peter</span> (nationalekonom),{" "}
+            <span style={{ color: JOHAN_FARG }}>Johan</span> (teknikoptimist) läsa upp den, eller{" "}
+            <span style={{ color: ORAKLET_FARG }}>Professor Oraklet</span> förklara den,
+            eller låt Anna, Peter och Johan diskutera den tillsammans i studion. Samma röster och
+            animerade ansikten som på{" "}
             <a href="/nyhetsanalyser" style={{ color: LANK }}>Nyhetsanalyser</a>,{" "}
             <a href="/kanal" style={{ color: LANK }}>Nyhetskanalen</a> och{" "}
             <a href="/podd" style={{ color: LANK }}>Videopodden</a>.
@@ -367,6 +370,9 @@ export default function FragaAnnaOchPeterPage() {
             </AktionsKnapp>
             <AktionsKnapp farg={JOHAN_FARG} disabled={!fritextTrimmed} onClick={() => sagFritext("Teknikoptimist", "Johan")}>
               💡 Johan säger det
+            </AktionsKnapp>
+            <AktionsKnapp farg={ORAKLET_FARG} disabled={!fritextTrimmed} onClick={() => sagFritext("Oraklet", "Professor Oraklet")}>
+              🎓 Oraklet förklarar det
             </AktionsKnapp>
             <AktionsKnapp farg={STUDIO_FARG} disabled={!fritextTrimmed} onClick={diskuteraFritext}>
               🎭 Anna, Peter &amp; Johan diskuterar det
@@ -427,6 +433,9 @@ export default function FragaAnnaOchPeterPage() {
                 </AktionsKnapp>
                 <AktionsKnapp farg={JOHAN_FARG} onClick={() => sagUrlResultat("Teknikoptimist", "Johan")}>
                   💡 Johan läser den
+                </AktionsKnapp>
+                <AktionsKnapp farg={ORAKLET_FARG} onClick={() => sagUrlResultat("Oraklet", "Professor Oraklet")}>
+                  🎓 Oraklet förklarar den
                 </AktionsKnapp>
                 <AktionsKnapp farg={STUDIO_FARG} onClick={diskuteraUrlResultat}>
                   🎭 Anna, Peter &amp; Johan diskuterar den

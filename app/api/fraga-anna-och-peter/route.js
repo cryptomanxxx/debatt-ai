@@ -15,7 +15,7 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
 const TYPER = new Set(["fritext", "url"]);
-const AKTIONER = new Set(["anna_sager", "peter_sager", "johan_sager", "diskussion"]);
+const AKTIONER = new Set(["anna_sager", "peter_sager", "johan_sager", "oraklet_forklarar", "diskussion"]);
 const MAX_TURNS = 9;
 const MAX_TURN_LEN = 400;
 
