@@ -27,10 +27,10 @@ const VETENSKAP_FILTER = VETENSKAP_KALLOR
 
 async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!key) return { fynd: [], nyheter: [] };
+  if (!key) return { fynd: [], nyheter: [], urval: [] };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   try {
-    const [fyndRes, nyheterRes] = await Promise.all([
+    const [fyndRes, nyheterRes, urvalRes] = await Promise.all([
       fetch(
         `${SB_URL}/rest/v1/vetenskapliga_upptagter?order=skapad.desc&limit=50&select=id,titel,sammanfattning,forskare,medforskare,disciplin,impakt,datakallor,metodologi,arxiv_kalla,skapad`,
         { headers: h, next: { revalidate: 300 } }
@@ -39,17 +39,24 @@ async function getData() {
         `${SB_URL}/rest/v1/nyhetsflode?kalla=in.(${VETENSKAP_FILTER})&order=hamtad.desc&limit=40&select=id,rubrik,beskrivning,kalla,url,hamtad`,
         { headers: h, next: { revalidate: 300 } }
       ),
+      // Oraklets kurerade urval — embeddar nyhetsflode-raden via FK (nyhet_id)
+      // så rubrik/beskrivning/källa/url kommer med i samma fetch.
+      fetch(
+        `${SB_URL}/rest/v1/oraklet_urval?order=skapad.desc&limit=30&select=id,motivering,skapad,nyhetsflode(id,rubrik,beskrivning,kalla,url)`,
+        { headers: h, next: { revalidate: 300 } }
+      ),
     ]);
     const fynd = fyndRes.ok ? await fyndRes.json() : [];
     const nyheter = nyheterRes.ok ? await nyheterRes.json() : [];
-    return { fynd, nyheter };
+    const urval = urvalRes.ok ? await urvalRes.json() : [];
+    return { fynd, nyheter, urval };
   } catch {
-    return { fynd: [], nyheter: [] };
+    return { fynd: [], nyheter: [], urval: [] };
   }
 }
 
 export default async function UniversitetPage() {
-  const { fynd, nyheter } = await getData();
+  const { fynd, nyheter, urval } = await getData();
 
   const discipliner = new Set(fynd.map(f => f.disciplin || "övrigt"));
   const genombrott = fynd.filter(f => f.impakt === "genombrottsfynd").length;
@@ -118,7 +125,7 @@ export default async function UniversitetPage() {
       </div>
 
       <div style={{ padding: "40px 24px" }}>
-        {fynd.length === 0 && nyheter.length === 0 ? (
+        {fynd.length === 0 && nyheter.length === 0 && urval.length === 0 ? (
           <div style={{ textAlign: "center", padding: "80px 20px" }}>
             <div style={{ fontSize: "40px", marginBottom: "16px", opacity: 0.3 }}>🎓</div>
             <div style={{ fontSize: "14px", color: "#1e4a80", fontFamily: "monospace" }}>
@@ -129,7 +136,7 @@ export default async function UniversitetPage() {
             </div>
           </div>
         ) : (
-          <UniversitetVy fynd={fynd} nyheter={nyheter} />
+          <UniversitetVy fynd={fynd} nyheter={nyheter} urval={urval} />
         )}
       </div>
 

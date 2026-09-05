@@ -475,7 +475,7 @@ async function byggFeed() {
 
   (Array.isArray(orakletLasningar.value) ? orakletLasningar.value : []).forEach(o => {
     if (!o.skapad) return;
-    const vad = o.typ === "nyhet" ? "en vetenskaplig nyhet" : "ett forskningsfynd";
+    const vad = o.typ === "nyhet" ? "en vetenskaplig nyhet" : o.typ === "urval" ? "en nyhet ur sin läslista" : "ett forskningsfynd";
     feed.push({
       typ: "oraklet-lasning",
       ikon: "🎓",
