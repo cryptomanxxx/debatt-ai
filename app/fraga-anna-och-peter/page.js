@@ -520,8 +520,9 @@ export default function FragaAnnaOchPeterPage() {
         <p style={{ color: "#444", fontSize: 11, marginTop: 24, lineHeight: 1.7 }}>
           Uppläsning sker direkt i webbläsaren via ResponsiveVoice. Studiosamtal genereras
           av en AI-modell utifrån enbart den text eller artikel du anger — hittar aldrig
-          på fakta som inte finns i underlaget. Alla frågor och diskussioner sparas och
-          visas offentligt i historiken ovan.
+          på fakta som inte finns i underlaget. Frågor och diskussioner sparas och visas
+          offentligt i historiken ovan — förutom när "🔒 Privat" är ikryssad ovan, då sparas
+          ingenting.
         </p>
       </div>
 
