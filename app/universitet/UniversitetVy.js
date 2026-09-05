@@ -2,6 +2,7 @@
 import { useState } from "react";
 import ForskningsListaVy from "./ForskningsListaVy";
 import VetenskapsFlodeVy from "./VetenskapsFlodeVy";
+import AgentOverlay from "../nyhetskallor/AgentOverlay";
 
 function TypTab({ label, count, active, onClick, farg }) {
   return (
@@ -37,6 +38,14 @@ function TypTab({ label, count, active, onClick, farg }) {
 // skrollberg att ta sig förbi för att nå den andra.
 export default function UniversitetVy({ fynd, nyheter }) {
   const [typ, setTyp] = useState(fynd.length > 0 || nyheter.length === 0 ? "forskning" : "nyheter");
+  // Professor Oraklet läser ett enskilt fynd/nyhet i taget — samma
+  // AgentOverlay-mönster som "🎙️ Anna läser" m.fl. på /nyhetsanalyser, men
+  // med bara EN läsare (ingen trevägsväljare) eftersom det bara finns en
+  // föreläsande professor på universitetet. Lyfts hit till den gemensamma
+  // föräldern istället för att dupliceras i både ForskningsListaVy och
+  // VetenskapsFlodeVy, så bara en overlay-instans kan vara öppen åt gången
+  // oavsett vilken flik besökaren står på.
+  const [lasning, setLasning] = useState(null);
 
   return (
     <div>
@@ -57,7 +66,19 @@ export default function UniversitetVy({ fynd, nyheter }) {
         />
       </div>
 
-      {typ === "forskning" ? <ForskningsListaVy fynd={fynd} /> : <VetenskapsFlodeVy nyheter={nyheter} />}
+      {typ === "forskning"
+        ? <ForskningsListaVy fynd={fynd} onLasa={setLasning} />
+        : <VetenskapsFlodeVy nyheter={nyheter} onLasa={setLasning} />}
+
+      {lasning && (
+        <AgentOverlay
+          key={`oraklet-${lasning.id}`}
+          agent="Oraklet"
+          namn="Professor Oraklet"
+          text={lasning.text}
+          onClose={() => setLasning(null)}
+        />
+      )}
     </div>
   );
 }

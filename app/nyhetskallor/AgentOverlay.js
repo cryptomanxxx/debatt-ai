@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
-// Per-agent overlay-konfiguration. Anna, Nationalekonom (Peter) och
-// Teknikoptimist (Johan) har alla tre fullständiga blink+mun-frames (samma
-// lagerbaserade, pixelstabila arkitektur — se ai-bus/context.md v5.9).
-// Exporteras tillsammans med AnchorImage/WaveformBar/useBlinkState så
-// StudioOverlay.js (Anna+Peter+Johan i samma studio) kan återanvända exakt
-// samma animationslogik.
+// Per-agent overlay-konfiguration. Anna, Nationalekonom (Peter),
+// Teknikoptimist (Johan) och Oraklet har alla fyra fullständiga blink+mun-
+// frames (samma lagerbaserade, pixelstabila arkitektur — se
+// ai-bus/context.md v5.9). Exporteras tillsammans med
+// AnchorImage/WaveformBar/useBlinkState så StudioOverlay.js (Anna+Peter+Johan
+// i samma studio) kan återanvända exakt samma animationslogik.
 export const AGENTER = {
   Anna: {
     farg: "#a0c8f0",
@@ -43,6 +43,33 @@ export const AGENTER = {
     mouthHalf:   ["johan-m0-half.png", "johan-m1-half.png", "johan-m2-half.png", "johan-m3-half.png"],
     mouthClosed: ["johan-m0-closed.png", "johan-m1-closed.png", "johan-m2-closed.png", "johan-m3-closed.png"],
     idleOpen: "johan.png", idleHalf: "johan-m0-half.png", idleClosed: "johan-m0-closed.png",
+  },
+  // Professor Oraklet — läser AI-forskningsfynd och vetenskapliga nyheter på
+  // /universitet (se app/universitet/UniversitetVy.js). Levererades som ett
+  // låst tillgångspaket (bas-master + låsta ögon-/munmasker + sex källbilder:
+  // neutral/small/medium/large + eyes_half/eyes_closed) utan den fulla
+  // mun×blink-korsprodukten Anna/Peter/Johan har. De åtta saknade m1–m3-half/
+  // closed-bilderna genererades offline med Pillow — ett rent maskbaserat
+  // alpha-paste av respektive mun-tillstånds mask (masks/mouth_*_feature_mask.png)
+  // ovanpå eyes_half/eyes_closed-basen, verifierat med samma "0 pixlar ändrade
+  // utanför masken"-metod som paketets egen docs/qc_metrics.json — INGEN
+  // generativ AI-bildredigering av hela bilden, vilket paketets README
+  // uttryckligen förbjuder. Bara mun+blink-regionerna komponerades ihop.
+  // rate: 1.0 hålls omedveten (användarens uttryckliga önskan — "jag gillar
+  // inte när man ändrar hastighet på rösten"); pitch 0.75 (djupare, äldre
+  // röst) skiljer honom hörbart från Peter (0.85) och Johan (1.06) utan att
+  // röra rate. Färgen är samplad ur hans egen rosett i konstverket.
+  Oraklet: {
+    farg: "#dd6e5f",
+    roll: "Professor",
+    rvVoice: "Swedish Male",
+    pitch: 0.75,
+    rate: 1.0,
+    hasBlink: true,
+    mouthOpen:   ["oraklet.png", "oraklet-small.png", "oraklet-medium.png", "oraklet-large.png"],
+    mouthHalf:   ["oraklet-m0-half.png", "oraklet-m1-half.png", "oraklet-m2-half.png", "oraklet-m3-half.png"],
+    mouthClosed: ["oraklet-m0-closed.png", "oraklet-m1-closed.png", "oraklet-m2-closed.png", "oraklet-m3-closed.png"],
+    idleOpen: "oraklet.png", idleHalf: "oraklet-m0-half.png", idleClosed: "oraklet-m0-closed.png",
   },
 };
 
