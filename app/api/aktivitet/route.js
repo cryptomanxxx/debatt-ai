@@ -21,7 +21,7 @@ let _cache = { data: null, ts: 0 };
 
 async function byggFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang, nyhetsanalys, upptackter, fragaAnnaPeter] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang, nyhetsanalys, upptackter, fragaAnnaPeter, orakletLasningar] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -51,6 +51,7 @@ async function byggFeed() {
     fetch(`${SB_URL}/rest/v1/nyhetsanalys?select=agent,analys,skapad,nyhetsflode(rubrik)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/vetenskapliga_upptagter?select=titel,forskare,disciplin,impakt,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log?select=aktion,titel,input_text,sammanfattning,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/oraklet_lasningar?select=typ,titel,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
   ]);
 
   const feed = [];
@@ -469,6 +470,19 @@ async function byggFeed() {
       href: "/fraga-anna-och-peter",
       skapad: f.skapad,
       farg: info.farg,
+    });
+  });
+
+  (Array.isArray(orakletLasningar.value) ? orakletLasningar.value : []).forEach(o => {
+    if (!o.skapad) return;
+    const vad = o.typ === "nyhet" ? "en vetenskaplig nyhet" : "ett forskningsfynd";
+    feed.push({
+      typ: "oraklet-lasning",
+      ikon: "🎓",
+      text: `Professor Oraklet läste upp ${vad}: "${(o.titel || "").slice(0, 60)}"`,
+      href: "/universitet",
+      skapad: o.skapad,
+      farg: "#dd6e5f",
     });
   });
 
