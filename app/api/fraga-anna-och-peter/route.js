@@ -5,6 +5,7 @@
 // bara undan en rad så historiken kan visas på sidan.
 import { checkRateLimit } from "../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../lib/logFel";
+import { SAMMANFATTNING_MAX as ORAKLET_SAMMANFATTNING_MAX } from "../../lib/sammanfattaForOraklet";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -47,7 +48,15 @@ export async function POST(req) {
   const inputText = typeof body?.text === "string" ? body.text.trim().slice(0, 1500) : null;
   const kallaUrl = typeof body?.url === "string" ? body.url.trim().slice(0, 2000) : null;
   const titel = typeof body?.titel === "string" ? body.titel.trim().slice(0, 200) : null;
-  const sammanfattning = typeof body?.sammanfattning === "string" ? body.sammanfattning.trim().slice(0, 800) : null;
+  // Gränsen matchar ORAKLET_SAMMANFATTNING_MAX (1200, se
+  // app/lib/sammanfattaForOraklet.js) istället för ett eget hårdkodat värde
+  // (tidigare 800) — Codex-fynd, PR #1378-granskning: Oraklets nya
+  // full-text-sammanfattningspipeline (sagUrlOraklet()) kan generera upp
+  // till 1200 tecken, vilket AgentOverlay redan läser upp i sin helhet, men
+  // den gamla 800-teckensgränsen här klippte tyst av svansen innan den
+  // sparades — "Spela upp igen" i historiken återgav då bara en avkortad
+  // version av det Oraklet faktiskt sade.
+  const sammanfattning = typeof body?.sammanfattning === "string" ? body.sammanfattning.trim().slice(0, ORAKLET_SAMMANFATTNING_MAX) : null;
   const dialog = stadaDialog(body?.dialog);
 
   if (typ === "fritext" && !inputText) {
