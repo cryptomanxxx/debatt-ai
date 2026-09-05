@@ -293,21 +293,77 @@ function extraheraMeta(html, re) {
 // utan risk att klippa bort riktig artikeltext (till skillnad från en
 // text-baserad heuristik, som lättare ger falska positiva).
 //
-// <header> tas MEDVETET INTE bort (Codex-fynd, PR #1376-granskning): giltig
-// semantisk HTML-markup som <article><header>...</header>...</article> är
-// vanlig på nyhetssajter, och den nästlade artikelheadern innehåller ofta
-// själva ingressen/standfirst-stycket — genuint central artikeltext, inte
-// sidchrome. En regex kan inte tillförlitligt skilja en sid-header (menyn
-// högst upp) från en artikel-header (ingressen) i nästlad HTML, så
-// blankettborttagning av alla <header>-block riskerade att permanent cacha
-// en sammanfattning utan artikelns viktigaste inledande kontext. nav/footer/
-// aside är betydligt säkrare att strippa blankt — de förekommer i princip
-// aldrig nästlat inuti <article> med genuint artikelinnehåll.
+// <header> hanteras positionsberoende (Codex-fynd, PR #1376/#1377/#1379-
+// granskning — tre motstridiga risker som alla är verkliga):
+//   - PR #1376: giltig semantisk markup som <article><header>…</header>…
+//     </article> är vanlig på nyhetssajter, och den NÄSTLADE artikel-
+//     headern innehåller ofta själva ingressen/standfirst-stycket —
+//     genuint central artikeltext, inte sidchrome. Blankettborttagning av
+//     ALLA <header>-block (den ursprungliga fixen) kunde alltså radera
+//     artikelns viktigaste inledande kontext.
+//   - PR #1377 tog då bort header-strippningen helt — men det öppnade
+//     tillbaka det URSPRUNGLIGA problemet för en SID-nivå <header> vars
+//     meny inte råkar vara inlindad i <nav> (t.ex. <header><div>…mega-
+//     meny…</div></header> före <article>): den chrome-texten blev kvar
+//     längst fram i extraheraBrodtext(), och kunde i default-läget (500
+//     tecken) tränga undan HELA artikeltexten.
+//   - PR #1379 löste det med en <article>-gränsbaserad regel via
+//     html.split(/(<article...<\/article>)/) — men en STRING-split
+//     fragmenterar öppnings-/stängningstaggen på VILKEN sidchrome-wrapper
+//     som helst (nav/header/footer/aside) som råkar OMSLUTA ett nästlat
+//     <article>-kort (vanligt i mega-menyer och "relaterat"-widgets):
+//     ingen regex kan då längre matcha wrapperns kompletta taggpar, dess
+//     menytext läcker OSTRIPPAD igenom, och textet i det nästlade kortet
+//     hamnade dessutom felaktigt i "bevara"-kategorin (Codex-fynd, PR
+//     #1379-granskning, samma bugg för nav/footer/aside OCH header).
+//
+// Lösningen: två steg, ingen destruktiv textsplit.
+//   1. nav/footer/aside stripps FÖRST, på det HELA ostyckade dokumentet —
+//      de är ALLTID sidchrome oavsett vad de råkar omsluta (inklusive ett
+//      nästlat <article>-kort), så det finns ingen anledning att någonsin
+//      bevara dem eller riskera att splitta sönder deras taggpar.
+//   2. <header> avgörs per hittat block via SPANN-innehållning (indexjäm-
+//      förelse, inte en textsplit som permanent klipper strängen): ett
+//      <header>…</header>-block bevaras BARA om hela dess spann ligger
+//      INUTI ett hittat <article>…</article>-spann (artikelns egen
+//      ingress/standfirst). Ett fristående sidnivå-<header> (inget
+//      artikelspann alls, eller helt utanför alla) OCH en headerwrapper
+//      som själv OMSLUTER ett artikelkort (dess spann är då STÖRRE än och
+//      omsluter artikelspannet, aldrig tvärtom — innehållningstestet
+//      särskiljer de två motsatta nästlingsriktningarna korrekt) stripps
+//      båda, utan att något taggpar någonsin fragmenteras av en split.
+//
+// Ren strukturell taggmatchning, ingen innehållsanalys — fångar inte allt
+// (t.ex. en cookie-banner utan <aside>-tagg, en nästlad <header> inuti en
+// annan <header> — samma icke-greedy-begränsning som gäller nav-i-nav),
+// men eliminerar de vanligaste källorna utan att gissa på textnivå.
 function taBortSidchrome(html) {
-  return html
+  const utanNavFooterAside = html
     .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
     .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
     .replace(/<aside[\s\S]*?<\/aside>/gi, " ");
+
+  const artikelSpann = [];
+  const artikelRe = /<article[\s\S]*?<\/article>/gi;
+  let am;
+  while ((am = artikelRe.exec(utanNavFooterAside))) {
+    artikelSpann.push([am.index, am.index + am[0].length]);
+  }
+
+  let resultat = "";
+  let sistaIndex = 0;
+  const headerRe = /<header[\s\S]*?<\/header>/gi;
+  let hm;
+  while ((hm = headerRe.exec(utanNavFooterAside))) {
+    const start = hm.index;
+    const slut = start + hm[0].length;
+    const inutiArtikel = artikelSpann.some(([aStart, aSlut]) => start >= aStart && slut <= aSlut);
+    resultat += utanNavFooterAside.slice(sistaIndex, start);
+    resultat += inutiArtikel ? hm[0] : " ";
+    sistaIndex = slut;
+  }
+  resultat += utanNavFooterAside.slice(sistaIndex);
+  return resultat;
 }
 
 function extraheraBrodtext(html) {
