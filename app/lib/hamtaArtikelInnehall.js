@@ -29,13 +29,20 @@ const MAX_ENCODED_BYTES = MAX_BODY_BYTES * 10;
 const TITEL_MAX = 200;
 const SAMMANFATTNING_MAX = 500;
 // Tak för { helText: true }-läget (se extraheraArtikel() nedan) — används av
-// Professor Oraklets läs-upp-flöde (/api/nyhetsflode/forbered-lasning) där
-// SAMMANFATTNING_MAX (en kort teaser) gör läsningen meningslös: poängen med
-// att lyssna på Oraklet är att få en komplex artikel FÖRKLARAD, inte en
-// tvåradig sammanfattning uppläst. Samma 4000-teckensgräns som redan
-// etablerats för uppläst text i sparaNyhetsanalys() (se CLAUDE.md ✅93) —
-// ~600–700 ord, en rimlig övre gräns för en TTS-uppläsning.
-const HEL_TEXT_MAX = 4000;
+// Professor Oraklets sammanfattningsflöde (/api/nyhetsflode/forbered-lasning,
+// sammanfattaForOraklet()) som RÅMATERIAL åt en LLM-sammanfattare, inte som
+// uppläst text direkt. Höjd från 4000 till 8000 tecken (Codex-fynd, PR
+// #1373-granskning): den råa brödtexten saknar innehållsavgränsning och
+// börjar ofta med sidnavigering/sidfot/cookie-notiser INNAN själva
+// artikeltexten — vid en lägre gräns kunde en lång artikels faktiska
+// innehåll (mitten/slutet) helt hamna utanför det avkapade fönstret,
+// permanent (sammanfattningen cachas). extraheraBrodtext() nedan städar nu
+// bort de vanligaste chrome-blocken (nav/header/footer/aside) INNAN
+// avkapningen, vilket flyttar mer av den faktiska artikeltexten inom
+// gränsen — men löser inte problemet helt för extremt långa artiklar, så
+// gränsen höjs också som ett andra skyddslager. 8000 tecken ryms gott och
+// väl inom kontextfönstret för sammanfattningsanropets LLM.
+const HEL_TEXT_MAX = 8000;
 const KALLA_MAX = 100;
 
 // Två separata BlockList-instanser — net.BlockList slår ihop IPv4- och
@@ -275,8 +282,26 @@ function extraheraMeta(html, re) {
   return m ? taBortOgiltigaTecken(decodeHtmlEntities(m[1].trim())) : "";
 }
 
+// Tar bort de vanligaste "sidchrome"-blocken (navigering, sidhuvud, sidfot,
+// sidopanel) INNAN generisk tag-strippning och avkapning vid HEL_TEXT_MAX.
+// Codex-fynd (PR #1373-granskning): utan detta kunde nav/sidfot-text (som
+// ofta ligger FÖRE eller EFTER själva artikeln i HTML-källan) tränga undan
+// faktisk artikeltext ur det avkapade fönstret — sammanfattningen som sedan
+// cachas byggde då bara på sidans skal, inte artikelns mitt/slut. Ren
+// strukturell taggmatchning, ingen innehållsanalys — fångar inte allt (t.ex.
+// en cookie-banner utan <aside>-tagg), men eliminerar de vanligaste källorna
+// utan risk att klippa bort riktig artikeltext (till skillnad från en
+// text-baserad heuristik, som lättare ger falska positiva).
+function taBortSidchrome(html) {
+  return html
+    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<header[\s\S]*?<\/header>/gi, " ")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
+    .replace(/<aside[\s\S]*?<\/aside>/gi, " ");
+}
+
 function extraheraBrodtext(html) {
-  const utanSkript = html
+  const utanSkript = taBortSidchrome(html)
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ");
   return taBortOgiltigaTecken(
