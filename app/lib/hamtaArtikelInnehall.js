@@ -293,8 +293,8 @@ function extraheraMeta(html, re) {
 // utan risk att klippa bort riktig artikeltext (till skillnad från en
 // text-baserad heuristik, som lättare ger falska positiva).
 //
-// <header> hanteras positionsberoende (Codex-fynd, PR #1376- OCH #1377-
-// granskning — två motstridiga risker som båda är verkliga):
+// <header> hanteras positionsberoende (Codex-fynd, PR #1376/#1377/#1379-
+// granskning — tre motstridiga risker som alla är verkliga):
 //   - PR #1376: giltig semantisk markup som <article><header>…</header>…
 //     </article> är vanlig på nyhetssajter, och den NÄSTLADE artikel-
 //     headern innehåller ofta själva ingressen/standfirst-stycket —
@@ -304,43 +304,66 @@ function extraheraMeta(html, re) {
 //   - PR #1377 tog då bort header-strippningen helt — men det öppnade
 //     tillbaka det URSPRUNGLIGA problemet för en SID-nivå <header> vars
 //     meny inte råkar vara inlindad i <nav> (t.ex. <header><div>…mega-
-//     meny…</div></header> före <article>): den chrome-texten blir kvar
-//     längst fram i extraheraBrodtext(), och kan i default-läget (500
-//     tecken) tränga undan HELA artikeltexten, eller i helText-läget fylla
-//     en del av det 8000-teckensfönstret vars sammanfattning sedan cachas.
+//     meny…</div></header> före <article>): den chrome-texten blev kvar
+//     längst fram i extraheraBrodtext(), och kunde i default-läget (500
+//     tecken) tränga undan HELA artikeltexten.
+//   - PR #1379 löste det med en <article>-gränsbaserad regel via
+//     html.split(/(<article...<\/article>)/) — men en STRING-split
+//     fragmenterar öppnings-/stängningstaggen på VILKEN sidchrome-wrapper
+//     som helst (nav/header/footer/aside) som råkar OMSLUTA ett nästlat
+//     <article>-kort (vanligt i mega-menyer och "relaterat"-widgets):
+//     ingen regex kan då längre matcha wrapperns kompletta taggpar, dess
+//     menytext läcker OSTRIPPAD igenom, och textet i det nästlade kortet
+//     hamnade dessutom felaktigt i "bevara"-kategorin (Codex-fynd, PR
+//     #1379-granskning, samma bugg för nav/footer/aside OCH header).
 //
-// Lösningen: en <article>…</article>-blockmatchning används som gräns.
-// <header> UTANFÖR ett hittat <article>-block är per definition sidnivå
-// (menyn högst upp, innan/efter själva artikeln) och strippas — precis som
-// nav/footer/aside. <header> INUTI ett <article>-block lämnas orört, det
-// är där en genuin standfirst/ingress typiskt bor. Hittas inget
-// <article>-element alls (vanligt förekommande, inte alla sajter
-// semantiskt uppmärkta) strippas <header> överallt — utan en pålitlig
-// artikelgräns att skilja mot är sannolikheten mycket högre att ett
-// fristående <header> är sidchrome (en riktig ingress ligger normalt i en
-// vanlig <p>, inte inbäddad i ett oparat toppnivå-<header> helt utan
-// <article> runt sig).
+// Lösningen: två steg, ingen destruktiv textsplit.
+//   1. nav/footer/aside stripps FÖRST, på det HELA ostyckade dokumentet —
+//      de är ALLTID sidchrome oavsett vad de råkar omsluta (inklusive ett
+//      nästlat <article>-kort), så det finns ingen anledning att någonsin
+//      bevara dem eller riskera att splitta sönder deras taggpar.
+//   2. <header> avgörs per hittat block via SPANN-innehållning (indexjäm-
+//      förelse, inte en textsplit som permanent klipper strängen): ett
+//      <header>…</header>-block bevaras BARA om hela dess spann ligger
+//      INUTI ett hittat <article>…</article>-spann (artikelns egen
+//      ingress/standfirst). Ett fristående sidnivå-<header> (inget
+//      artikelspann alls, eller helt utanför alla) OCH en headerwrapper
+//      som själv OMSLUTER ett artikelkort (dess spann är då STÖRRE än och
+//      omsluter artikelspannet, aldrig tvärtom — innehållningstestet
+//      särskiljer de två motsatta nästlingsriktningarna korrekt) stripps
+//      båda, utan att något taggpar någonsin fragmenteras av en split.
 //
 // Ren strukturell taggmatchning, ingen innehållsanalys — fångar inte allt
-// (t.ex. en cookie-banner utan <aside>-tagg, eller ett sidhuvud som råkar
-// ligga INUTI samma <article>-element som sajten återanvänder för hela
-// sidan), men eliminerar de vanligaste källorna utan att gissa på textnivå.
+// (t.ex. en cookie-banner utan <aside>-tagg, en nästlad <header> inuti en
+// annan <header> — samma icke-greedy-begränsning som gäller nav-i-nav),
+// men eliminerar de vanligaste källorna utan att gissa på textnivå.
 function taBortSidchrome(html) {
-  const delar = html.split(/(<article[\s\S]*?<\/article>)/gi);
-  const harArtikelblock = delar.length > 1;
-  return delar
-    .map((del, i) => {
-      const arArtikelblock = harArtikelblock && i % 2 === 1; // split() med en fångstgrupp lägger matchningen på udda index
-      let stadad = del
-        .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
-        .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
-        .replace(/<aside[\s\S]*?<\/aside>/gi, " ");
-      if (!arArtikelblock) {
-        stadad = stadad.replace(/<header[\s\S]*?<\/header>/gi, " ");
-      }
-      return stadad;
-    })
-    .join("");
+  const utanNavFooterAside = html
+    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
+    .replace(/<aside[\s\S]*?<\/aside>/gi, " ");
+
+  const artikelSpann = [];
+  const artikelRe = /<article[\s\S]*?<\/article>/gi;
+  let am;
+  while ((am = artikelRe.exec(utanNavFooterAside))) {
+    artikelSpann.push([am.index, am.index + am[0].length]);
+  }
+
+  let resultat = "";
+  let sistaIndex = 0;
+  const headerRe = /<header[\s\S]*?<\/header>/gi;
+  let hm;
+  while ((hm = headerRe.exec(utanNavFooterAside))) {
+    const start = hm.index;
+    const slut = start + hm[0].length;
+    const inutiArtikel = artikelSpann.some(([aStart, aSlut]) => start >= aStart && slut <= aSlut);
+    resultat += utanNavFooterAside.slice(sistaIndex, start);
+    resultat += inutiArtikel ? hm[0] : " ";
+    sistaIndex = slut;
+  }
+  resultat += utanNavFooterAside.slice(sistaIndex);
+  return resultat;
 }
 
 function extraheraBrodtext(html) {
