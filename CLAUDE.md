@@ -2154,9 +2154,31 @@ Alla 12 slutgiltiga bilder ligger i `public/avatarer/podd/oraklet*.png`, exakt s
 |---|---|
 | `app/nyhetskallor/AgentOverlay.js` → `AGENTER.Oraklet` | Röst-/bildkonfiguration: `pitch: 0.75`, `rate: 1.0`, `farg: "#dd6e5f"`, `hasBlink: true` med full 12-bilders mun×blink-grid |
 | `public/avatarer/podd/oraklet*.png` | 12 bildramar (4 munlägen × 3 ögonlägen). 6 är direkta omdöpningar av paketets källbilder, 6 är offline-komponerade (mask-baserat alpha-paste, ingen generativ ombildning) |
-| `app/universitet/UniversitetVy.js` | Äger `lasning`-state, renderar `AgentOverlay` en gång delad mellan `ForskningsListaVy`/`VetenskapsFlodeVy` via `onLasa`-callback |
+| `app/universitet/UniversitetVy.js` | Äger `lasning`-state, renderar `AgentOverlay` en gång delad mellan `ForskningsListaVy`/`VetenskapsFlodeVy` via `onLasa`-callback, loggar varje uppläsning till `/api/oraklet-lasning` |
 | `app/universitet/ForskningsListaVy.js` | "🎓 Professor Oraklet läser"-knapp i `RadFynd`s expanderade vy, text = titel + sammanfattning |
-| `app/universitet/VetenskapsFlodeVy.js` | Samma knapp i `VetenskapsRad`s expanderade vy, text = rubrik + beskrivning |
+| `app/universitet/VetenskapsFlodeVy.js` | Samma knapp i `VetenskapsRad`, samt källfilter och förbered-innan-läsning-anrop (se nedan) |
+
+**Källtaggar på Vetenskapliga Nyheter:** `VetenskapsFlodeVy` saknade ett sätt att filtrera de ~15 vetenskapskällorna (Nature, arXiv-flödena, Quanta Magazine m.fl.) från varandra — varje rad visade sin källa men det gick inte att isolera en enskild källa i listan. Samma `TagPill`-mönster som disciplinfiltret i `ForskningsListaVy` (se ✅87 ovan) återanvänds som `KallaPill`, byggd dynamiskt ur den faktiska `kalla`-fördelningen i den laddade nyhetslistan och sorterad efter frekvens (flest nyheter syns först) — samma princip som källfiltret på `/nyhetskallor`.
+
+**Oraklet-uppläsningar syns nu i Senaste aktivitet:** innan detta lämnade en uppläsning inget spår alls i databasen — startsidans aktivitetsfeed fick aldrig reda på att den skett. Ny tabell `oraklet_lasningar` (typ: forskning/nyhet, ref_id, titel, skapad) loggas fire-and-forget från `UniversitetVy.js`s `handleLasa()` via `POST /api/oraklet-lasning` varje gång overlayen öppnas — ett loggningsfel blockerar aldrig själva uppläsningen, som redan startat klientsidan. `app/api/aktivitet/route.js` hämtar de 6 senaste raderna och visar dem med 🎓-ikon, `#dd6e5f`-färg (samma accentfärg som Oraklets övriga UI) och länk till `/universitet`.
+
+**Översättning och textberikning innan uppläsning (endast Vetenskapliga Nyheter-fliken):** AI-forskning-fliken (`ForskningsListaVy`) läser redan AI-genererad svensk text och behöver ingen förbehandling. Den råa RSS-/arXiv-flikens rader (`nyhetsflode`) kan däremot vara på engelska eller ha för kort `beskrivning` för en meningsfull uppläsning — särskilt äldre rader från innan ✅93s automatiska översättning vid insamling, eller besökarimporterade artiklar. `VetenskapsRad`s läs-knapp anropar därför `POST /api/nyhetsflode/forbered-lasning` (ny route) innan `onLasa()` triggas, med en `"🎓 Förbereder…"`-mellantillstånd på knappen under anropet:
+1. **Textberikning** — om rubrik+beskrivning tillsammans är kortare än 120 tecken hämtas mer text från originalkällan via samma SSRF-säkra `hamtaArtikelInnehall()` som `/api/nyhetsflode/importera` redan använder (✅93), och sparas tillbaka på raden så framtida analyser/uppläsningar också får glädje av den.
+2. **Översättning** — en billig heuristik (`verkarSvensk()`: å/ä/ö-tecken eller minst två träffar mot en liten svensk stoppordslista) avgör om texten redan är svensk, vilket är det vanliga fallet efter ✅93 och undviker ett onödigt LLM-anrop. Om inte: ett anrop via den centrala LLM-routern (`callWithFallback` + `getDynamicChain("chatt")`, samma mönster som `/api/studio`) översätter rubrik och beskrivning, och resultatet sparas tillbaka till `nyhetsflode`.
+
+Fail-open genomgående: misslyckas berikningen eller översättningen (nätverksfel, LLM nere, för kort text ändå) läser Oraklet upp den bästa tillgängliga texten — hellre originaltexten eller på engelska än ingen uppläsning alls.
+
+**Länkar till Nyhetskällor och Nyhetsanalyser:** `/universitet`s sidhuvud länkade tidigare bara till `/hjarnan`/`/civilisation`, trots att Vetenskapliga Nyheter-fliken bygger direkt på samma `nyhetsflode`-data som `/nyhetskallor` visar i sin helhet, och att en nyhet redan kan ha en AI-analys på `/nyhetsanalyser`. En andra länkrad ("📡 Nyhetskällor →" / "🔎 Nyhetsanalyser →") gör den kopplingen synlig utan att kräva att besökaren redan känner till de sidorna.
+
+Kräver Supabase-tabell `oraklet_lasningar` — kör `supabase_oraklet_lasningar.sql` i SQL Editor.
+
+| Fil | Roll |
+|---|---|
+| `supabase_oraklet_lasningar.sql` | SQL-schema för `oraklet_lasningar` (typ-check, index på skapad desc, RLS med publik SELECT) |
+| `app/api/oraklet-lasning/route.js` | POST: loggar en uppläsning (typ, ref_id, titel). Service role-skrivning, fail-open (svarar `{ok:false}` vid DB-fel istället för att bubbla upp ett fel mot en redan lyckad uppläsning) |
+| `app/api/nyhetsflode/forbered-lasning/route.js` | POST `{id}`: berikar för kort text via `hamtaArtikelInnehall()` och/eller översätter till svenska via central LLM-router, patchar `nyhetsflode`, returnerar bästa tillgängliga `{rubrik, beskrivning}` |
+| `app/api/aktivitet/route.js` | Ny datakälla `oraklet_lasningar` (6 senaste) + feed-block med 🎓-ikon och länk till `/universitet` |
+| `app/universitet/page.js` | Ny länkrad: "📡 Nyhetskällor →" och "🔎 Nyhetsanalyser →" i sidhuvudet |
 
 ### ✅ 88. Civilisations-API (/api/civilisation + /civilisation) — fråga civilisationens hjärna – KLART
 Ett öppet REST-API där externa klienter, besökare och AI-companions kan ställa fria frågor om AI-civilisationens tillstånd och få svar baserade på realtidsdata ur 8+ Supabase-tabeller.

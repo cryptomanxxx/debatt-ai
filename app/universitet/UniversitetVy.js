@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import ForskningsListaVy from "./ForskningsListaVy";
 import VetenskapsFlodeVy from "./VetenskapsFlodeVy";
 import AgentOverlay from "../nyhetskallor/AgentOverlay";
@@ -47,6 +47,20 @@ export default function UniversitetVy({ fynd, nyheter }) {
   // oavsett vilken flik besökaren står på.
   const [lasning, setLasning] = useState(null);
 
+  // Loggar uppläsningen (fire-and-forget) så den syns i Senaste
+  // aktivitet-feeden på startsidan (se app/api/aktivitet/route.js) — utan
+  // detta lämnade en Oraklet-uppläsning inget spår alls i databasen. Ett
+  // loggningsfel ska aldrig hindra själva uppläsningen, som redan startat
+  // klientsidan (overlayen öppnas synkront via setLasning).
+  const handleLasa = useCallback((payload) => {
+    setLasning(payload);
+    fetch("/api/oraklet-lasning", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ typ: payload.typ, ref_id: payload.id, titel: payload.titel }),
+    }).catch(() => {});
+  }, []);
+
   return (
     <div>
       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "24px" }}>
@@ -67,12 +81,16 @@ export default function UniversitetVy({ fynd, nyheter }) {
       </div>
 
       {typ === "forskning"
-        ? <ForskningsListaVy fynd={fynd} onLasa={setLasning} />
-        : <VetenskapsFlodeVy nyheter={nyheter} onLasa={setLasning} />}
+        ? <ForskningsListaVy fynd={fynd} onLasa={handleLasa} />
+        : <VetenskapsFlodeVy nyheter={nyheter} onLasa={handleLasa} />}
 
       {lasning && (
+        // Nyckeln inkluderar typ eftersom fynd (vetenskapliga_upptagter) och
+        // nyheter (nyhetsflode) har separata id-sekvenser — utan typ-prefixet
+        // kunde en fynd-id och en nyhet-id råka kollidera och overlayen då
+        // inte remounta (och därmed inte byta uppläst text) vid klick.
         <AgentOverlay
-          key={`oraklet-${lasning.id}`}
+          key={`oraklet-${lasning.typ}-${lasning.id}`}
           agent="Oraklet"
           namn="Professor Oraklet"
           text={lasning.text}

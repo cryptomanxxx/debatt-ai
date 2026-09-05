@@ -82,9 +82,18 @@ export default async function UniversitetPage() {
         <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(#0a2040 1px, transparent 1px), linear-gradient(90deg, #0a2040 1px, transparent 1px)", backgroundSize: "40px 40px", opacity: 0.3, pointerEvents: "none" }} />
 
         <div style={{ position: "relative", maxWidth: "800px", margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px", flexWrap: "wrap", gap: "12px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px", flexWrap: "wrap", gap: "12px" }}>
             <a href="/hjarnan" style={{ fontSize: "11px", color: "#1e4a80", fontFamily: "monospace", textDecoration: "none" }}>← Civilisationens hjärna</a>
             <a href="/civilisation" style={{ fontSize: "11px", color: "#38bdf8", fontFamily: "monospace", textDecoration: "none" }}>Fråga hjärnan →</a>
+          </div>
+          {/* Vetenskapliga Nyheter-fliken nedan bygger direkt på nyhetsflode
+              (samma data som /nyhetskallor) och Professor Oraklet-uppläsningar
+              syns i /nyhetsanalyser-arkivet om en agent redan analyserat en
+              nyhet — länkar hit gör den kopplingen synlig istället för att
+              kräva att besökaren redan känner till de sidorna. */}
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "24px" }}>
+            <a href="/nyhetskallor" style={{ fontSize: "11px", color: "#fb923c", fontFamily: "monospace", textDecoration: "none" }}>📡 Nyhetskällor →</a>
+            <a href="/nyhetsanalyser" style={{ fontSize: "11px", color: "#38bdf8", fontFamily: "monospace", textDecoration: "none" }}>🔎 Nyhetsanalyser →</a>
           </div>
 
           <div style={{ marginBottom: "16px" }}>
