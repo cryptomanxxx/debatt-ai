@@ -190,6 +190,7 @@ export default function FragaAnnaOchPeterPage() {
   const [urlLaddar, setUrlLaddar] = useState(false);
   const [urlFel, setUrlFel] = useState("");
   const [urlResultat, setUrlResultat] = useState(null); // { titel, sammanfattning, url }
+  const [orakelLaddar, setOrakelLaddar] = useState(false);
 
   const [lasning, setLasning] = useState(null); // { agent, namn, text }
   const [studio, setStudio] = useState(null); // { rubrik, beskrivning, turns?, meta? }
@@ -305,6 +306,42 @@ export default function FragaAnnaOchPeterPage() {
       });
     }
   }
+
+  // Oraklet får en egen, djupare pipeline istället för den korta
+  // og:description-teasern Anna/Peter/Johan läser: hämtar HELA artikelns
+  // brödtext och kör den genom en LLM som sammanfattar OCH översätter till
+  // svenska (samma sammanfattaForOraklet()-pipeline som /universitet
+  // använder). Fail-open: misslyckas anropet (nätverksfel, för kort text,
+  // LLM nere) faller vi tillbaka på den vanliga korta teasern istället för
+  // att inte läsa alls.
+  async function sagUrlOraklet() {
+    if (!urlResultat) return;
+    setOrakelLaddar(true);
+    try {
+      const res = await fetch("/api/fraga-anna-och-peter/oraklet-sammanfattning", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: urlResultat.url }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.sammanfattning) {
+        sagUrlResultat("Oraklet", "Professor Oraklet");
+        return;
+      }
+      const text = [data.titel, data.sammanfattning].filter(Boolean).join(". ");
+      setLasning({ agent: "Oraklet", namn: "Professor Oraklet", text });
+      if (!privat) {
+        sparaHistorik({
+          typ: "url", aktion: "oraklet_forklarar",
+          url: data.url || urlResultat.url, titel: data.titel || urlResultat.titel, sammanfattning: data.sammanfattning,
+        });
+      }
+    } catch {
+      sagUrlResultat("Oraklet", "Professor Oraklet");
+    } finally {
+      setOrakelLaddar(false);
+    }
+  }
   function diskuteraUrlResultat() {
     if (!urlResultat) return;
     setStudio({
@@ -341,8 +378,9 @@ export default function FragaAnnaOchPeterPage() {
             <span style={{ color: ANNA_FARG }}>Anna</span> (nyhetsankare),{" "}
             <span style={{ color: PETER_FARG }}>Peter</span> (nationalekonom),{" "}
             <span style={{ color: JOHAN_FARG }}>Johan</span> (teknikoptimist) läsa upp den, eller{" "}
-            <span style={{ color: ORAKLET_FARG }}>Professor Oraklet</span> förklara den,
-            eller låt Anna, Peter och Johan diskutera den tillsammans i studion. Samma röster och
+            <span style={{ color: ORAKLET_FARG }}>Professor Oraklet</span> förklara den — han hämtar
+            hela artikeltexten, sammanfattar och översätter till svenska om källan är på ett annat
+            språk — eller låt Anna, Peter och Johan diskutera den tillsammans i studion. Samma röster och
             animerade ansikten som på{" "}
             <a href="/nyhetsanalyser" style={{ color: LANK }}>Nyhetsanalyser</a>,{" "}
             <a href="/kanal" style={{ color: LANK }}>Nyhetskanalen</a> och{" "}
@@ -465,8 +503,8 @@ export default function FragaAnnaOchPeterPage() {
                 <AktionsKnapp farg={JOHAN_FARG} onClick={() => sagUrlResultat("Teknikoptimist", "Johan")}>
                   💡 Johan läser den
                 </AktionsKnapp>
-                <AktionsKnapp farg={ORAKLET_FARG} onClick={() => sagUrlResultat("Oraklet", "Professor Oraklet")}>
-                  🎓 Oraklet förklarar den
+                <AktionsKnapp farg={ORAKLET_FARG} disabled={orakelLaddar} onClick={sagUrlOraklet}>
+                  {orakelLaddar ? "🎓 Förbereder…" : "🎓 Oraklet förklarar den"}
                 </AktionsKnapp>
                 <AktionsKnapp farg={STUDIO_FARG} onClick={diskuteraUrlResultat}>
                   🎭 Anna, Peter &amp; Johan diskuterar den
