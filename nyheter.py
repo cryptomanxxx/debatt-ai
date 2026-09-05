@@ -325,7 +325,6 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "Big Think":           ["forskning", "samhälle"],
     "Science Alert":       ["forskning"],
     "Quanta Magazine":     ["forskning", "ai"],
-    "EurekAlert!":         ["forskning", "medicin"],
     "Phys.org":            ["forskning", "tech"],
     "MIT Technology Review": ["tech", "ai", "forskning"],
     "The Lancet":          ["medicin", "forskning"],
@@ -605,14 +604,16 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         ("Big Think",          _p("https://bigthink.com/feed/")),
         ("Science Alert",      _p("https://www.sciencealert.com/feed")),
         ("Quanta Magazine",    _p("https://www.quantamagazine.org/feed/")),
-        # Tre högkvalitativa vetenskapskällor tillagda på ägarens begäran för
+        # Två högkvalitativa vetenskapskällor tillagda på ägarens begäran för
         # att stärka /universitet Vetenskapliga Nyheter-fliken (se
         # VETENSKAP_KALLOR i app/universitet/page.js, som listar dessa
-        # explicit) — EurekAlert! aggregerar granskade forskningsmeddelanden
-        # direkt från universitet/institutioner (samma primärkälla journalister
-        # använder), Phys.org är en etablerad bred vetenskapsaggregator, MIT
+        # explicit) — Phys.org är en etablerad bred vetenskapsaggregator, MIT
         # Technology Review ger djupare tech-/AI-analys än ren nyhetsrapportering.
-        ("EurekAlert!",        _p("https://www.eurekalert.org/rss")),
+        # EurekAlert! provades två gånger (sep 2026) och togs bort båda
+        # gångerna: .../rss gav HTTP 202 + tom HTML-kropp (Codex misstänkte
+        # fel endpoint), .../rss.xml (Codex-fyndets föreslagna korrigering)
+        # gav HTTP 404 istället. Ingen känd korrekt URL just nu — se
+        # CLAUDE.md ✅93 för hela utredningen innan ett tredje försök görs.
         ("Phys.org",           _p("https://phys.org/rss-feed/")),
         ("MIT Technology Review", _p("https://www.technologyreview.com/feed/")),
         # Medicin/forskning — samma tidigare-borttagna kategori som krypto ovan
@@ -663,9 +664,23 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
             # 0,3s räckte inte för att undvika 429 på en stor andel av dem.
             time.sleep(1.2 if kalla.startswith("Reddit") else 0.3)
         fore = len(nyheter)
+        # Nollställd per iteration — Codex-fynd (PR #1381-granskning): utan
+        # detta behåller `res` föregående lyckade flödes svarsobjekt om
+        # _hamta_flode() kastar INNAN tilldelningen hinner ske (t.ex. en
+        # timeout), vilket fick diagnostiken i except-blocket nedan att
+        # felaktigt visa en HELT ANNAN källas status/innehåll.
+        res = None
         try:
             res = _hamta_flode(url, kalla)
-            if res.status_code != 200:
+            # Godtar hela 2xx-intervallet, inte bara exakt 200 — verklig körning
+            # (2026-09-05) visade att eurekalert.org kan svara med HTTP 202
+            # (Accepted) på ett giltigt RSS-anrop via proxyn, troligen en
+            # asynkron generering/soft-throttling mot molninfrastruktur-IP:n.
+            # En strikt "!= 200"-koll kastade bort svaret innan XML-parsningen
+            # ens fick chansen att avgöra om kroppen faktiskt var användbar.
+            # Existerande try/except nedan fångar redan en tom/trasig kropp
+            # (ParseError) precis lika säkert som förut — ingen ny felyta.
+            if not (200 <= res.status_code < 300):
                 misslyckade.append(f"  ✗ {kalla} (HTTP {res.status_code})")
                 rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
                 continue
@@ -775,6 +790,18 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
             lyckade.append(f"  ✓ {kalla} ({antal} artiklar)")
             rss_stats.append({"kalla": kalla, "ok": True, "antal": antal, "fel": ""})
         except Exception as e:
+            # Samma diagnostik-princip som ⚠-loggen ovan (status/0 items) —
+            # utan att se den FAKTISKA svarskroppen är ett ParseError bara
+            # en gissning om orsaken (t.ex. EurekAlert!s HTTP 202-svar via
+            # rss-proxy, sep 2026: 2xx-statusen är nu accepterad men kroppen
+            # gick ändå inte att parsa som XML — okänt om den är HTML,
+            # tom, eller trasig utan att se den).
+            if res is not None:
+                try:
+                    snippet = res.text[:200].strip().replace("\n", " ")
+                    print(f"  ⚠ {kalla}: {type(e).__name__} — HTTP {res.status_code}, content-type={res.headers.get('content-type','?')!r}, snippet={snippet!r}", file=sys.stderr)
+                except Exception:
+                    pass
             misslyckade.append(f"  ✗ {kalla} ({type(e).__name__})")
             rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": type(e).__name__})
             continue
