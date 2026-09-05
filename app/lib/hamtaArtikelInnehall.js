@@ -17,6 +17,15 @@ import { decodeHtmlEntities } from "./escapeHtml";
 const MAX_REDIRECTS = 3;
 const FETCH_TIMEOUT_MS = 8000;
 const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2MB
+// Tak på RÅA (komprimerade) bytes lästa från svaret, oberoende av
+// MAX_BODY_BYTES (som bara begränsar den AVKODADE storleken). Skydd mot
+// dekomprimeringsbomber — en komprimerad ström med extrem kompressionsgrad
+// (t.ex. många sammanfogade tomma gzip-medlemmar) kan producera lite avkodad
+// data men kräva att servern läser och packar upp betydligt mer rådata än
+// MAX_BODY_BYTES innan den delade 8-sekunders timeouten hinner slå till.
+// Codex-fynd (PR #1369-granskning). Multipeln är generös nog för normal
+// textkompression (~10×) men sätter ett verifierbart tak.
+const MAX_ENCODED_BYTES = MAX_BODY_BYTES * 10;
 const TITEL_MAX = 200;
 const SAMMANFATTNING_MAX = 500;
 const KALLA_MAX = 100;
@@ -142,13 +151,39 @@ function valjAvkodningsstrom(res) {
   return res;
 }
 
-async function lasBegransat(stream, maxBytes) {
+// Tar emot BÅDE den rå HTTP-responsen (res) och den ström som faktiskt ska
+// läsas ur (stream — antingen res själv vid okomprimerat svar, eller en
+// zlib-transform piped från res vid ett komprimerat). Läser via `stream` men
+// destruerar alltid `res` direkt när vi är klara — oavsett om vi läste ur
+// res själv eller en transform piped från den. Codex-fynd (PR #1369-
+// granskning): att bara destruera `stream` för ett komprimerat svar
+// destruerar bara zlib-transformen, inte den underliggande HTTP-anslutningen
+// — den lämnades öppen på obestämd tid vid varje gräns-överskridande svar.
+async function lasBegransat(res, stream, maxBytes) {
+  let kodadeTotal = 0;
+  const kollaKodadGrans = (chunk) => {
+    kodadeTotal += chunk.length;
+    if (kodadeTotal > MAX_ENCODED_BYTES) {
+      stream.destroy();
+      res.destroy();
+    }
+  };
+  res.on("data", kollaKodadGrans);
+
   const chunks = [];
   let total = 0;
-  for await (const chunk of stream) {
-    total += chunk.length;
-    if (total > maxBytes) { stream.destroy(); break; }
-    chunks.push(chunk);
+  try {
+    for await (const chunk of stream) {
+      total += chunk.length;
+      if (total > maxBytes) { stream.destroy(); break; }
+      chunks.push(chunk);
+    }
+  } catch {
+    // stream kan avslutas med fel om den destruerades ovan (gräns för
+    // komprimerad storlek nådd) — redan hanterat, returnera det vi hunnit läsa.
+  } finally {
+    res.destroy();
+    res.off("data", kollaKodadGrans);
   }
   return Buffer.concat(chunks).subarray(0, maxBytes).toString("utf-8");
 }
@@ -186,11 +221,13 @@ async function hamtaArtikelHtml(startUrl) {
       const contentLength = parseInt(res.headers["content-length"] || "0", 10);
       // content-length avser den KOMPRIMERADE storleken om svaret är
       // komprimerat — ett mjukt försteg som bara fångar uppenbart för stora
-      // svar tidigt. Den faktiska gränsen (efter ev. avkodning) sätts av
-      // lasBegransat() nedan, som räknar riktiga (avkodade) bytes.
+      // svar tidigt (och kan inte litas på ensamt — en illvillig server kan
+      // sätta ett lågt/inget content-length). Den faktiska gränsen (efter
+      // ev. avkodning, OCH på rådata via MAX_ENCODED_BYTES) sätts av
+      // lasBegransat() nedan.
       if (contentLength && contentLength > MAX_BODY_BYTES) { res.resume(); return { fel: "for_stor" }; }
 
-      const html = await lasBegransat(valjAvkodningsstrom(res), MAX_BODY_BYTES);
+      const html = await lasBegransat(res, valjAvkodningsstrom(res), MAX_BODY_BYTES);
       return { html, slutgiltigUrl: current.toString() };
     }
     return { fel: "for_manga_redirects" };
