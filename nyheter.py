@@ -325,7 +325,6 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "Big Think":           ["forskning", "samhälle"],
     "Science Alert":       ["forskning"],
     "Quanta Magazine":     ["forskning", "ai"],
-    "EurekAlert!":         ["forskning", "medicin"],
     "Phys.org":            ["forskning", "tech"],
     "MIT Technology Review": ["tech", "ai", "forskning"],
     "The Lancet":          ["medicin", "forskning"],
@@ -605,17 +604,16 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         ("Big Think",          _p("https://bigthink.com/feed/")),
         ("Science Alert",      _p("https://www.sciencealert.com/feed")),
         ("Quanta Magazine",    _p("https://www.quantamagazine.org/feed/")),
-        # Tre högkvalitativa vetenskapskällor tillagda på ägarens begäran för
+        # Två högkvalitativa vetenskapskällor tillagda på ägarens begäran för
         # att stärka /universitet Vetenskapliga Nyheter-fliken (se
         # VETENSKAP_KALLOR i app/universitet/page.js, som listar dessa
-        # explicit) — EurekAlert! aggregerar granskade forskningsmeddelanden
-        # direkt från universitet/institutioner, Phys.org är en etablerad
-        # bred vetenskapsaggregator, MIT Technology Review ger djupare
-        # tech-/AI-analys än ren nyhetsrapportering.
-        # EurekAlert!-URL: en första körning mot .../rss gav HTTP 202 + tom
-        # HTML-kropp (Codex-fynd, PR #1381-granskning: fel endpoint, /rss är
-        # en HTML-infosida — inte det faktiska flödet). Testar nu .../rss.xml.
-        ("EurekAlert!",        _p("https://www.eurekalert.org/rss.xml")),
+        # explicit) — Phys.org är en etablerad bred vetenskapsaggregator, MIT
+        # Technology Review ger djupare tech-/AI-analys än ren nyhetsrapportering.
+        # EurekAlert! provades två gånger (sep 2026) och togs bort båda
+        # gångerna: .../rss gav HTTP 202 + tom HTML-kropp (Codex misstänkte
+        # fel endpoint), .../rss.xml (Codex-fyndets föreslagna korrigering)
+        # gav HTTP 404 istället. Ingen känd korrekt URL just nu — se
+        # CLAUDE.md ✅93 för hela utredningen innan ett tredje försök görs.
         ("Phys.org",           _p("https://phys.org/rss-feed/")),
         ("MIT Technology Review", _p("https://www.technologyreview.com/feed/")),
         # Medicin/forskning — samma tidigare-borttagna kategori som krypto ovan
