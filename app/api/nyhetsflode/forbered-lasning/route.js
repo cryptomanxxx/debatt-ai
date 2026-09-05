@@ -3,11 +3,18 @@
 // Nyheter"-fliken). Två oberoende steg körs i ordning innan uppläsningen
 // startar:
 //
-// 1. Textberikning — om rubrik+beskrivning tillsammans är för kort för en
-//    meningsfull uppläsning försöker vi hämta mer text från originalkällan
-//    via samma SSRF-säkra hämtare som /api/nyhetsflode/importera
-//    (app/lib/hamtaArtikelInnehall.js) och sparar den tillbaka på raden, så
-//    framtida analyser/uppläsningar också får glädje av den.
+// 1. Textberikning — den ursprungligen sparade beskrivningen är bara en
+//    RSS-teaser (ofta en enda mening) — otillräckligt för att Oraklet ska
+//    kunna FÖRKLARA en komplex artikel, vilket är hela poängen med att
+//    lyssna på honom (användarrapport). Vi hämtar därför praktiskt taget
+//    ALLTID hela artikelns brödtext från originalkällan via samma SSRF-
+//    säkra hämtare som /api/nyhetsflode/importera
+//    (app/lib/hamtaArtikelInnehall.js, { helText: true } — se den filen för
+//    varför det läget prioriterar brödtext framför en kort og:description)
+//    och sparar den tillbaka på raden, så framtida analyser/uppläsningar
+//    också får glädje av den utan en ny nätverksfetch (se HELTEXT_TROSKEL
+//    nedan — hoppar bara över hämtningen om raden redan har lång text från
+//    en tidigare berikning).
 // 2. Översättning — många av de ~44 bevakade källorna är engelskspråkiga.
 //    nyhetsflode_test.py översätter redan NYA rader vid insamling (se
 //    CLAUDE.md ✅93), men äldre rader eller besökarimporterade artiklar kan
@@ -27,7 +34,18 @@ const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
-const MIN_TEXT_LEN = 120;
+// Tröskel för att HOPPA ÖVER en ny fulltext-hämtning — inte för att avgöra
+// om texten "räcker" för uppläsning (den ska nästan alltid berikas). Om
+// beskrivningen redan är minst så här lång har en tidigare { helText: true }-
+// berikning sannolikt redan lyckats (en ren RSS-teaser blir aldrig såhär
+// lång) — då hoppas en onödig upprepad nätverksfetch över.
+const HELTEXT_TROSKEL = 1000;
+// Matchar HEL_TEXT_MAX i app/lib/hamtaArtikelInnehall.js — steg 1 kan nu ge
+// en beskrivning upp till den längden, så översättningens output-tak
+// (parseOversattning nedan) och maxTokens (oversattTillSvenska) måste rymma
+// en fullängds Svensk översättning av den, inte bara den gamla korta
+// 500-teckens-teasern.
+const BESKRIVNING_MAX = 4000;
 
 const SVENSKA_TECKEN = /[åäöÅÄÖ]/;
 const SVENSKA_STOPPORD = new Set([
@@ -61,7 +79,7 @@ function parseOversattning(raw) {
   let parsed;
   try { parsed = JSON.parse(text.slice(start, end + 1)); } catch { return null; }
   if (typeof parsed?.rubrik !== "string" || typeof parsed?.beskrivning !== "string") return null;
-  return { rubrik: parsed.rubrik.trim().slice(0, 500), beskrivning: parsed.beskrivning.trim().slice(0, 2000) };
+  return { rubrik: parsed.rubrik.trim().slice(0, 500), beskrivning: parsed.beskrivning.trim().slice(0, BESKRIVNING_MAX) };
 }
 
 async function oversattTillSvenska(rubrik, beskrivning) {
@@ -74,7 +92,10 @@ async function oversattTillSvenska(rubrik, beskrivning) {
       },
       { role: "user", content: `Rubrik: ${rubrik}\nBeskrivning: ${beskrivning || "(ingen beskrivning tillgänglig)"}` },
     ],
-    { maxTokens: 600, temperature: 0.3, json: true, source: "oraklet-forbered-lasning", validate: (t) => !!parseOversattning(t) }
+    // maxTokens höjt från 600: steg 1 kan nu ge upp till BESKRIVNING_MAX (4000)
+    // tecken engelsk text att översätta — en Svensk översättning av den
+    // längden kräver betydligt mer output-budget än den gamla korta teasern.
+    { maxTokens: 2200, temperature: 0.3, json: true, source: "oraklet-forbered-lasning", validate: (t) => !!parseOversattning(t) }
   );
   return parseOversattning(text);
 }
@@ -104,11 +125,13 @@ export async function POST(req) {
   let beskrivning = rad.beskrivning || "";
   const patch = {};
 
-  // Steg 1: berika för kort text via originalkällan (samma hämtare som besökarimport)
-  const totalLen = `${rubrik} ${beskrivning}`.trim().length;
-  if (totalLen < MIN_TEXT_LEN && rad.url) {
+  // Steg 1: hämta hela artikelns brödtext via originalkällan (samma hämtare
+  // som besökarimport, men i { helText: true }-läge — se filhuvudkommentaren
+  // ovan). Körs så gott som alltid; hoppas bara över om raden redan har lång
+  // text sedan en tidigare berikning.
+  if (beskrivning.length < HELTEXT_TROSKEL && rad.url) {
     try {
-      const result = await hamtaArtikelInnehall(rad.url);
+      const result = await hamtaArtikelInnehall(rad.url, { helText: true });
       if (result.ok && result.sammanfattning && result.sammanfattning.length > beskrivning.length) {
         beskrivning = result.sammanfattning;
         patch.beskrivning = beskrivning;

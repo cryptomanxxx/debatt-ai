@@ -28,6 +28,14 @@ const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2MB
 const MAX_ENCODED_BYTES = MAX_BODY_BYTES * 10;
 const TITEL_MAX = 200;
 const SAMMANFATTNING_MAX = 500;
+// Tak för { helText: true }-läget (se extraheraArtikel() nedan) — används av
+// Professor Oraklets läs-upp-flöde (/api/nyhetsflode/forbered-lasning) där
+// SAMMANFATTNING_MAX (en kort teaser) gör läsningen meningslös: poängen med
+// att lyssna på Oraklet är att få en komplex artikel FÖRKLARAD, inte en
+// tvåradig sammanfattning uppläst. Samma 4000-teckensgräns som redan
+// etablerats för uppläst text i sparaNyhetsanalys() (se CLAUDE.md ✅93) —
+// ~600–700 ord, en rimlig övre gräns för en TTS-uppläsning.
+const HEL_TEXT_MAX = 4000;
 const KALLA_MAX = 100;
 
 // Två separata BlockList-instanser — net.BlockList slår ihop IPv4- och
@@ -267,7 +275,27 @@ function extraheraMeta(html, re) {
   return m ? taBortOgiltigaTecken(decodeHtmlEntities(m[1].trim())) : "";
 }
 
-function extraheraArtikel(html) {
+function extraheraBrodtext(html) {
+  const utanSkript = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ");
+  return taBortOgiltigaTecken(
+    decodeHtmlEntities(utanSkript.replace(/<[^>]+>/g, " "))
+      .replace(/\s+/g, " ")
+      .trim()
+  );
+}
+
+// helText: true (Oraklets läs-upp-flöde) prioriterar den faktiska
+// BRÖDTEXTEN framför sidans korta og:description/meta-description —
+// omvänd ordning mot standardläget nedan, som medvetet vill ha en kort
+// sammanfattning (besökarimport, Direktdebattens artikelkontext). En
+// og:description är nästan alltid en tvåradig teaser skriven för sociala
+// mediekort, aldrig hela artikeln. Faller tillbaka till og/meta-description
+// bara om den extraherade brödtexten blir orimligt kort (t.ex. en
+// JS-renderad sida utan serverrenderad text) — annars ingen mening med att
+// hellre returnera "" än en kort men läsbar teaser.
+function extraheraArtikel(html, { helText = false } = {}) {
   const ogTitel =
     extraheraMeta(html, /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']*)["']/i) ||
     extraheraMeta(html, /<meta[^>]+content=["']([^"']*)["'][^>]+property=["']og:title["']/i);
@@ -283,22 +311,21 @@ function extraheraArtikel(html) {
     extraheraMeta(html, /<meta[^>]+content=["']([^"']*)["'][^>]+property=["']og:site_name["']/i);
 
   const titel = (ogTitel || titleTag || "").slice(0, TITEL_MAX);
-  let sammanfattning = ogBeskrivning || metaBeskrivning;
 
-  if (!sammanfattning) {
-    const utanSkript = html
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ");
-    sammanfattning = taBortOgiltigaTecken(
-      decodeHtmlEntities(utanSkript.replace(/<[^>]+>/g, " "))
-        .replace(/\s+/g, " ")
-        .trim()
-    );
+  let sammanfattning;
+  let maxLen;
+  if (helText) {
+    const brodtext = extraheraBrodtext(html);
+    sammanfattning = brodtext.length >= 200 ? brodtext : (brodtext || ogBeskrivning || metaBeskrivning);
+    maxLen = HEL_TEXT_MAX;
+  } else {
+    sammanfattning = ogBeskrivning || metaBeskrivning || extraheraBrodtext(html);
+    maxLen = SAMMANFATTNING_MAX;
   }
 
   return {
     titel,
-    sammanfattning: sammanfattning.slice(0, SAMMANFATTNING_MAX),
+    sammanfattning: sammanfattning.slice(0, maxLen),
     kalla: ogSiteName.slice(0, KALLA_MAX),
   };
 }
@@ -323,8 +350,13 @@ export const PUBLIKA_FEL = {
  * titel + sammanfattning + källnamn (og:site_name, annars härlett ur
  * värdnamnet). Returnerar antingen
  * { ok: true, titel, sammanfattning, kalla, url } eller { ok: false, fel, publiktFel }.
+ *
+ * @param {string} urlStr
+ * @param {{ helText?: boolean }} [opts] - helText: true returnerar den
+ *   faktiska artikelbrödtexten (upp till HEL_TEXT_MAX tecken) istället för
+ *   en kort og:description-sammanfattning — se extraheraArtikel() ovan.
  */
-export async function hamtaArtikelInnehall(urlStr) {
+export async function hamtaArtikelInnehall(urlStr, opts = {}) {
   let parsed;
   try {
     parsed = new URL(urlStr.trim());
@@ -345,7 +377,7 @@ export async function hamtaArtikelInnehall(urlStr) {
     return { ok: false, fel: result.fel, publiktFel: PUBLIKA_FEL[result.fel] || "Kunde inte hämta artikeln" };
   }
 
-  const { titel, sammanfattning, kalla } = extraheraArtikel(result.html);
+  const { titel, sammanfattning, kalla } = extraheraArtikel(result.html, opts);
   if (!sammanfattning) {
     return { ok: false, fel: "ingen_text", publiktFel: "Hittade ingen läsbar text på sidan" };
   }
