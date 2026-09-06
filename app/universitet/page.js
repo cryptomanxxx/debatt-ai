@@ -36,8 +36,19 @@ async function getData() {
         `${SB_URL}/rest/v1/vetenskapliga_upptagter?order=skapad.desc&limit=50&select=id,titel,sammanfattning,forskare,medforskare,disciplin,impakt,datakallor,metodologi,arxiv_kalla,skapad`,
         { headers: h, next: { revalidate: 900 } }
       ),
+      // Källfiltret (KallaPill i VetenskapsFlodeVy.js) byggs bara ur DE RADER
+      // som faktiskt laddas här — det finns ingen separat "vilka källor finns"-
+      // fråga. Med den gamla gränsen (40) kunde ett fåtal högfrekventa källor
+      // (Reddit Science, Phys.org, Science Alert — alla publicerar flera
+      // gånger/dag) fylla hela fönstret och tränga ut lågfrekventa källor
+      // (Nature/Lancet/MDPI ~veckovis, Quanta/Google Research/Amazon Science
+      // ~någon gång/vecka) helt ur listan, trots att alla 16 VETENSKAP_KALLOR
+      // fortsatt hämtas normalt av nyhetsflode_test.py — deras rader fanns
+      // bara längre bak i tabellen än de 40 senaste (användarrapport, sep
+      // 2026: bara 3 av 16 källor syntes i källfiltret). Höjd till 200 för
+      // att ge lågfrekventa källor en rimlig chans att synas.
       fetch(
-        `${SB_URL}/rest/v1/nyhetsflode?kalla=in.(${VETENSKAP_FILTER})&order=hamtad.desc&limit=40&select=id,rubrik,beskrivning,kalla,url,hamtad`,
+        `${SB_URL}/rest/v1/nyhetsflode?kalla=in.(${VETENSKAP_FILTER})&order=hamtad.desc&limit=200&select=id,rubrik,beskrivning,kalla,url,hamtad`,
         { headers: h, next: { revalidate: 900 } }
       ),
       // Oraklets kurerade urval — embeddar nyhetsflode-raden via FK (nyhet_id)
