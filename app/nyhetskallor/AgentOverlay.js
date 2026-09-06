@@ -284,22 +284,29 @@ export function AnchorImage({ cfg, blinkState, isSpeaking }) {
 // NyhetskallorClient (key=`${nyhet-id}-${agent}` tvingar en ren remount —
 // och därmed cancel() av föregående uppläsning — när besökaren klickar en
 // annan nyhets eller agents läs-knapp medan overlayen redan är öppen).
-export default function AgentOverlay({ agent, namn, text, shareUrl, onClose }) {
+export default function AgentOverlay({ agent, namn, text, shareUrl, sharePending, onClose }) {
   const cfg = AGENTER[agent] || AGENTER.Anna;
   const visningsnamn = namn || agent;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(true);
   const [kopierat, setKopierat] = useState(false);
+  // Tal-uppspelningen kan sluta LÅNGT innan sparningen (som ger shareUrl)
+  // hunnit svara — särskilt vid en kort text. Att stänga overlayen direkt i
+  // onend/onerror (som tidigare) tappade då share-länken permanent: när
+  // sparningen väl svarade var overlayen redan avmonterad och förälderns
+  // state redan null (Codex-fynd, PR #1389-granskning). speechEnded +
+  // sharePending gör istället stängningen villkorad på att BÅDA talet är
+  // klart OCH ingen sparning fortfarande är i luften.
+  const [speechEnded, setSpeechEnded] = useState(false);
   const running = isSpeaking || isThinking;
   const framesReady = usePreload(cfg);
   const blinkState = useBlinkState(cfg.hasBlink && framesReady);
   const startedRef = useRef(false);
-  // shareUrl kan dyka upp asynkront (efter att sidan hunnit spara en
-  // historikpost) en bra stund efter mount — speak()-effekten nedan har
-  // tomma deps och läser därför bara det INITIALA värdet direkt, så en ref
-  // håller den senaste versionen tillgänglig i onend/onerror-callbacken.
-  const shareUrlRef = useRef(shareUrl);
-  useEffect(() => { shareUrlRef.current = shareUrl; }, [shareUrl]);
+
+  useEffect(() => {
+    if (speechEnded && !sharePending && !shareUrl) onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speechEnded, sharePending, shareUrl]);
 
   async function kopieraLank() {
     if (!shareUrl) return;
@@ -323,12 +330,13 @@ export default function AgentOverlay({ agent, namn, text, shareUrl, onClose }) {
       rate: cfg.rate,
       pitch: cfg.pitch,
       onstart: () => { setIsThinking(false); setIsSpeaking(true); },
-      // Stänger inte automatiskt om en delningslänk finns — samma resonemang
-      // som StudioOverlay: besökaren ska hinna hitta och klicka
+      // Stänger inte automatiskt förrän varken en delningslänk finns eller
+      // en sparning fortfarande pågår (se speechEnded-effekten ovan) — samma
+      // resonemang som StudioOverlay: besökaren ska hinna hitta och klicka
       // "🔗 Dela"-knappen istället för att overlayen försvinner direkt när
       // uppläsningen tar slut.
-      onend:   () => { setIsSpeaking(false); if (!shareUrlRef.current) onClose(); },
-      onerror: () => { setIsSpeaking(false); if (!shareUrlRef.current) onClose(); },
+      onend:   () => { setIsSpeaking(false); setSpeechEnded(true); },
+      onerror: () => { setIsSpeaking(false); setSpeechEnded(true); },
     });
     return () => { window.responsiveVoice?.cancel(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps

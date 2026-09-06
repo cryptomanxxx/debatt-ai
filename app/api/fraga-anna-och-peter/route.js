@@ -22,10 +22,18 @@ const MAX_TURN_LEN = 400;
 // Codex-fynd, PR #1390-granskning: Oraklets sammanslagna uppläsningstext
 // (rubrik upp till 500 + sammanfattning upp till ORAKLET_SAMMANFATTNING_MAX
 // 1200 + ev. motivering upp till 500 på Läslistan, se
-// app/universitet/OrakletsLaslistaVy.js) kan bli upp till ~2200 tecken —
-// den gamla 1500-teckensgränsen här klippte tyst av svansen innan sparning,
-// så en delad länk återgav mindre än vad Oraklet faktiskt läste upp live.
-const MAX_INPUT_TEXT = 2500;
+// app/universitet/OrakletsLaslistaVy.js) kan bli upp till ~2200 tecken.
+// Codex-fynd, PR #1389-granskning: den enskilda "Anna/Peter/Johan
+// läser"-uppläsningen på /nyhetsanalyser (sparaLasningHistorik i
+// app/nyhetsanalyser/page.js) skickar rubrik + ". " + hela nyhetsanalysen,
+// och en analys kan sparas med upp till 4000 tecken (se
+// app/api/chatt/route.js) — så textkolumnen behöver rymma betydligt mer än
+// Oraklets 2200. `input_text` är en obegränsad Postgres text-kolumn (se
+// supabase_fraga_anna_peter.sql) — den här gränsen är bara ett
+// applikationslager-skydd mot orimligt stora payloads, inte en
+// databasbegränsning, så den sätts generöst med marginal ovanför det
+// största kända legitima fallet.
+const MAX_INPUT_TEXT = 5000;
 
 function stadaDialog(dialog) {
   if (!Array.isArray(dialog)) return null;

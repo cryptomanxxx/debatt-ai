@@ -67,7 +67,7 @@ export default function NyhetsanalyserPage() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(null);
-  const [lasning, setLasning] = useState(null); // { id, invocationId, agent, namn, text, shareUrl? } | null
+  const [lasning, setLasning] = useState(null); // { id, invocationId, agent, namn, text, sharePending, shareUrl? } | null
   const [studio, setStudio] = useState(null); // { id, invocationId, rubrik, beskrivning, url, delLank? } | null
   const [foreslagStatus, setForeslagStatus] = useState({}); // { [id]: "laddar" | "ok" | "fel" }
   // Codex-fynd (PR #1319): utan detta kan ett byte av agentFilter medan en
@@ -186,6 +186,12 @@ export default function NyhetsanalyserPage() {
   // att särskilja) så den kan delas via samma ?visa=<id>-permalänk som
   // studiosamtal. Matchar på ett unikt invocationId per klick — samma
   // race-skydd som sparaStudioHistorik ovan (Codex-fynd, PR #1387).
+  //
+  // Rensar alltid sharePending när anropet är klart (lyckat eller ej) —
+  // AgentOverlay håller overlayen öppen tills sharePending går till false,
+  // annars kunde en kort uppläsning hinna avsluta talet och stänga overlayen
+  // innan den här sparningen ens svarat, vilket permanent tappade
+  // share-länken (Codex-fynd, PR #1389-granskning).
   async function sparaLasningHistorik(meta) {
     try {
       const aktion = AGENT_TILL_AKTION[meta.agent] || "anna_sager";
@@ -196,12 +202,14 @@ export default function NyhetsanalyserPage() {
       });
       const data = await res.json().catch(() => ({}));
       const id = data?.rad?.id;
-      if (id) {
-        const shareUrl = `${window.location.origin}/fraga-anna-och-peter?visa=${id}`;
-        setLasning(prev => (prev && prev.invocationId === meta.invocationId ? { ...prev, shareUrl } : prev));
-      }
+      setLasning(prev => {
+        if (!prev || prev.invocationId !== meta.invocationId) return prev;
+        return id
+          ? { ...prev, shareUrl: `${window.location.origin}/fraga-anna-och-peter?visa=${id}`, sharePending: false }
+          : { ...prev, sharePending: false };
+      });
     } catch {
-      // tyst — se kommentar på sparaStudioHistorik ovan
+      setLasning(prev => (prev && prev.invocationId === meta.invocationId ? { ...prev, sharePending: false } : prev));
     }
   }
 
@@ -347,7 +355,7 @@ export default function NyhetsanalyserPage() {
                         key={agent}
                         onClick={() => {
                           const text = rubrik ? `${rubrik}. ${r.analys}` : r.analys;
-                          const meta = { id: r.id, invocationId: `${r.id}-${agent}-${Date.now()}`, agent, namn, text };
+                          const meta = { id: r.id, invocationId: `${r.id}-${agent}-${Date.now()}`, agent, namn, text, sharePending: true };
                           setLasning(meta);
                           sparaLasningHistorik(meta);
                         }}
@@ -398,6 +406,7 @@ export default function NyhetsanalyserPage() {
           namn={lasning.namn}
           text={lasning.text}
           shareUrl={lasning.shareUrl}
+          sharePending={lasning.sharePending}
           onClose={() => setLasning(null)}
         />
       )}
