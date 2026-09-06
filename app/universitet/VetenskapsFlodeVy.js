@@ -67,7 +67,7 @@ function VetenskapsRad({ item, onLasa }) {
       // fail-open — läser upp originaltexten nedan
     }
     setForbereder(false);
-    onLasa({ typ: "nyhet", id: item.id, titel: rubrik, text: [rubrik, beskrivning].filter(Boolean).join(". ") });
+    onLasa({ typ: "nyhet", id: item.id, titel: rubrik, url: item.url || null, text: [rubrik, beskrivning].filter(Boolean).join(". ") });
   }
 
   return (

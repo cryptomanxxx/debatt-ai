@@ -50,6 +50,7 @@ function UrvalRad({ item, onLasa }) {
       typ: "urval",
       id: item.id,
       titel: nyhet.rubrik,
+      url: nyhet.url || null,
       text: [nyhet.rubrik, sammanfattning, item.motivering].filter(Boolean).join(". "),
     });
   }

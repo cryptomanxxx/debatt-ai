@@ -171,6 +171,25 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
           )
         )}
 
+        {/* Länk till källartikeln direkt under den lästa/diskuterade texten
+            — separat från titel-länken ovan (som bara visas om rad.titel
+            finns) så en källa alltid syns oavsett om titeln saknas.
+            Samma "Läs originalkälla →"-idiom som redan används på
+            /universitet (VetenskapsFlodeVy/OrakletsLaslistaVy). Utan detta
+            saknade varje uppläsning som byggde på en riktig nyhetsartikel
+            (Anna/Peter/Johan/Oraklet via /nyhetsanalyser eller /universitet)
+            en synlig länk tillbaka till källan (användarrapport, sep 2026). */}
+        {rad.kalla_url && (
+          <a
+            href={rad.kalla_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "block", marginTop: 8, fontSize: 11, color: LANK, fontFamily: "monospace", textDecoration: "none" }}
+          >
+            🔗 Läs originalkälla →
+          </a>
+        )}
+
         {kanExpandera && (
           <button
             onClick={onToggle}

@@ -5,7 +5,6 @@
 // bara undan en rad så historiken kan visas på sidan.
 import { checkRateLimit } from "../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../lib/logFel";
-import { SAMMANFATTNING_MAX as ORAKLET_SAMMANFATTNING_MAX } from "../../lib/sammanfattaForOraklet";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -20,9 +19,10 @@ const AKTIONER = new Set(["anna_sager", "peter_sager", "johan_sager", "oraklet_f
 const MAX_TURNS = 9;
 const MAX_TURN_LEN = 400;
 // Codex-fynd, PR #1390-granskning: Oraklets sammanslagna uppläsningstext
-// (rubrik upp till 500 + sammanfattning upp till ORAKLET_SAMMANFATTNING_MAX
-// 1200 + ev. motivering upp till 500 på Läslistan, se
-// app/universitet/OrakletsLaslistaVy.js) kan bli upp till ~2200 tecken.
+// (rubrik upp till 500 + sammanfattning upp till 1200, se
+// app/lib/sammanfattaForOraklet.js, + ev. motivering upp till 500 på
+// Läslistan, se app/universitet/OrakletsLaslistaVy.js) kan bli upp till
+// ~2200 tecken.
 // Codex-fynd, PR #1389-granskning: den enskilda "Anna/Peter/Johan
 // läser"-uppläsningen på /nyhetsanalyser (sparaLasningHistorik i
 // app/nyhetsanalyser/page.js) skickar rubrik + ". " + hela nyhetsanalysen,
@@ -63,15 +63,20 @@ export async function POST(req) {
   const inputText = typeof body?.text === "string" ? body.text.trim().slice(0, MAX_INPUT_TEXT) : null;
   const kallaUrl = typeof body?.url === "string" ? body.url.trim().slice(0, 2000) : null;
   const titel = typeof body?.titel === "string" ? body.titel.trim().slice(0, 200) : null;
-  // Gränsen matchar ORAKLET_SAMMANFATTNING_MAX (1200, se
-  // app/lib/sammanfattaForOraklet.js) istället för ett eget hårdkodat värde
-  // (tidigare 800) — Codex-fynd, PR #1378-granskning: Oraklets nya
-  // full-text-sammanfattningspipeline (sagUrlOraklet()) kan generera upp
-  // till 1200 tecken, vilket AgentOverlay redan läser upp i sin helhet, men
-  // den gamla 800-teckensgränsen här klippte tyst av svansen innan den
-  // sparades — "Spela upp igen" i historiken återgav då bara en avkortad
-  // version av det Oraklet faktiskt sade.
-  const sammanfattning = typeof body?.sammanfattning === "string" ? body.sammanfattning.trim().slice(0, ORAKLET_SAMMANFATTNING_MAX) : null;
+  // Gränsen matchade ursprungligen bara ORAKLET_SAMMANFATTNING_MAX (1200,
+  // se app/lib/sammanfattaForOraklet.js) — Codex-fynd, PR #1378-granskning:
+  // Oraklets full-text-sammanfattningspipeline (sagUrlOraklet()) kan
+  // generera upp till 1200 tecken, och den gamla 800-teckensgränsen här
+  // klippte tyst av svansen innan sparning.
+  //
+  // Höjd till MAX_INPUT_TEXT (5000, se ovan) sedan "sammanfattning"-fältet
+  // började återanvändas för den enskilda uppläsningens nyhetsanalys-text
+  // (`sparaLasningHistorik` i app/nyhetsanalyser/page.js, som skickar
+  // typ "url" när nyheten har en källartikel, för att HistorikPost ska
+  // kunna länka till den) — en nyhetsanalys kan vara upp till 4000 tecken
+  // (se app/api/chatt/route.js), vilket den gamla 1200-gränsen hade klippt
+  // av på precis samma sätt som MAX_INPUT_TEXT-fyndet ovan.
+  const sammanfattning = typeof body?.sammanfattning === "string" ? body.sammanfattning.trim().slice(0, MAX_INPUT_TEXT) : null;
   const dialog = stadaDialog(body?.dialog);
 
   if (typ === "fritext" && !inputText) {
