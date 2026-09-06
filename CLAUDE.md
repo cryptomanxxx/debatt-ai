@@ -2557,11 +2557,18 @@ Studiosamtal som startas från `/nyhetsanalyser` ("🎭 Anna, Peter & Johan i st
 
 **Känd begränsning:** `/fraga-anna-och-peter?visa=<id>` är samma klientrenderade sida som vanligt, ingen dedikerad SSR-route med egna OG-metataggar (jfr `/chatt/[id]`) — en delad länk fungerar (öppnar sidan och spelar upp rätt inlägg) men ger ingen anpassad förhandsgranskningsbild/-titel vid delning i sociala medier. Proportionerlig avvägning mot en betydligt större separat route+metadata-generering, som inte byggdes här.
 
+**Codex-fynd (PR #1387-granskning): autoplay hade kunnat blockeras tyst.** Den ursprungliga versionen spelade upp det delade inlägget direkt i ett `useEffect` vid mount — utan en föregående klickhändelse saknar det den "user gesture" som Mobile Safari (och andra webbläsare med autoplay-restriktioner) kräver för att inte blockera `responsiveVoice.speak()`. En delad länk hade då kunnat öppna overlayen helt ljudlöst. Fixat: hämtningen sparar nu bara raden i `delatInlagg`-state; en liten banner ("🔗 Någon delade ... med dig" + "▶ Spela upp"-knapp) låter besökaren själv trigga uppspelningen — samma mönster som alla andra läs-/studioknappar på sidan redan använder (klick → state-ändring → `AgentOverlay`/`StudioOverlay` startar uppspelning i sin egen effekt, inom webbläsarens gest-fönster).
+
+**Codex-fynd (PR #1387-granskning): delningslänken kunde peka på fel studiosamtal vid snabb stäng/återöppna.** `sparaStudioHistorik()`s asynkrona callback matchade tidigare på `meta.id` — nyhetsanalysens `id`, som är detsamma varje gång SAMMA nyhet öppnas i studion. Stängde en besökare studion medan sparningen fortfarande var i luften och öppnade den omedelbart igen för samma nyhet, kunde den FÖRSTA (nu inaktuella) sparningens `delLank` tilldelas den ANDRA, nyare dialogen — eftersom `prev.id === meta.id` fortfarande stämde trots att det rörde sig om två separata `/api/studio`-anrop med olika repliker. Fixat: varje öppning får ett unikt `invocationId` (`${r.id}-${Date.now()}`), och matchningen sker mot det istället — bara den sparning som faktiskt hör till den aktuella öppningen kan sätta dess `shareUrl`.
+
+**Codex-fynd (PR #1386-granskning): Johans röst var fortfarande snabb i Direktdebatt/`/chatt`.** Rate-sänkningen (1.12 → 0.95) missade `AGENT_ROST` i `app/agentData.js` — en tredje, separat kopia av röstprofilen som `agentRost()` exponerar för `/chatt`s live-debatter och sparade debattreplays (`/chatt/[id]`). De två andra kopiorna (`AgentOverlay.js`, `podd/page.js`) fixades redan i föregående PR, men denna tredje användningsväg missades i den ursprungliga grep-genomgången. Fixat: samma värde, 0.95, satt även här.
+
 | Fil | Roll |
 |---|---|
 | `app/nyhetskallor/StudioOverlay.js` | Ny `shareUrl`-prop + "🔗 Dela samtalet"-knapp med kopiera-till-urklipp. Auto-stäng-timern hoppas över när `shareUrl` finns. |
-| `app/nyhetsanalyser/page.js` | `sparaStudioHistorik()` sparar studiosamtalet via `/api/fraga-anna-och-peter` (typ url/fritext beroende på om nyheten har en källa), bygger `delLank` av det returnerade id:t, skickar den som `shareUrl` till `StudioOverlay` |
-| `app/fraga-anna-och-peter/page.js` | Ny `useEffect` som läser `?visa=<id>`, hämtar raden och återanvänder `spelaUppHistorik()`. `HistorikPost` fick en `kopieraLank()`-funktion + "🔗 Kopiera länk"-knapp bredvid "🔁 Spela upp igen" |
+| `app/nyhetsanalyser/page.js` | `sparaStudioHistorik()` sparar studiosamtalet via `/api/fraga-anna-och-peter` (typ url/fritext beroende på om nyheten har en källa), bygger `delLank` av det returnerade id:t, skickar den som `shareUrl` till `StudioOverlay`. Matchar på ett unikt `invocationId` per öppning, inte analysens `id` |
+| `app/fraga-anna-och-peter/page.js` | Ny `useEffect` som läser `?visa=<id>` och sparar raden i `delatInlagg`-state (spelar INTE upp direkt — kräver ett klick på en banner-knapp, se Codex-fynd). `HistorikPost` fick en `kopieraLank()`-funktion + "🔗 Kopiera länk"-knapp bredvid "🔁 Spela upp igen" |
+| `app/agentData.js` | `AGENT_ROST.Teknikoptimist.rate` sänkt 1.12 → 0.95 — tredje kopian av samma röstvärde, missad i föregående PR |
 
 ---
 

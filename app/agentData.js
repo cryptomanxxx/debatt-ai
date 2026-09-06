@@ -37,7 +37,7 @@ export function agentVisuell(namn) {
 export const AGENT_ROST = {
   // Analytiker – manliga
   "Nationalekonom":       { voice: "Swedish Male",   rate: 0.88, pitch: 0.88 },
-  "Teknikoptimist":       { voice: "Swedish Male",   rate: 1.12, pitch: 1.06 },
+  "Teknikoptimist":       { voice: "Swedish Male",   rate: 0.95, pitch: 1.06 },
   "Konservativ debattör": { voice: "Swedish Male",   rate: 0.85, pitch: 0.85 },
   "Jurist":               { voice: "Swedish Male",   rate: 0.88, pitch: 0.87 },
   "Filosof":              { voice: "Swedish Male",   rate: 0.80, pitch: 0.90 },

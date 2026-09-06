@@ -219,6 +219,10 @@ export default function FragaAnnaOchPeterPage() {
   // finns, så en tom meta räcker för att inget studiosamtal sparas heller).
   const [privat, setPrivat] = useState(false);
 
+  // Delat inlägg som väntar på ett klick innan uppspelning (se effekten
+  // nedan) — { ...rad från fraga_anna_peter_log } | null
+  const [delatInlagg, setDelatInlagg] = useState(null);
+
   const [historik, setHistorik] = useState([]);
   const [historikLaddar, setHistorikLaddar] = useState(true);
   const [historikMer, setHistorikMer] = useState(true);
@@ -255,10 +259,19 @@ export default function FragaAnnaOchPeterPage() {
   // Delningslänkar — en besökare som klickar "🔗 Kopiera länk" på ett
   // historikinlägg (eller på ett nyss avslutat studiosamtal på
   // /nyhetsanalyser) får en URL på formen ?visa=<fraga_anna_peter_log.id>.
-  // Läses av här vid mount och spelas upp precis som "🔁 Spela upp igen" i
-  // historiken — spelaUppHistorik() är samma funktion, ingen dubblerad logik.
-  // window.location istället för useSearchParams() undviker Next.js-kravet
-  // på en Suspense-gräns runt useSearchParams i App Router.
+  // Läses av här vid mount. window.location istället för useSearchParams()
+  // undviker Next.js-kravet på en Suspense-gräns runt useSearchParams i App
+  // Router.
+  //
+  // Sparar bara raden i `delatInlagg` — spelar INTE upp den direkt
+  // (Codex-fynd, PR #1387-granskning): ett `useEffect` som triggar
+  // responsiveVoice.speak() utan en föregående klickhändelse saknar den
+  // "user gesture" webbläsare som Mobile Safari kräver för att inte blockera
+  // autoplay av ljud, så en delad länk hade riskerat att öppna overlayen
+  // helt tyst. En liten banner (se render nedan) låter besökaren själv
+  // trycka "▶ Spela upp" — samma mönster som varje annan läs-/studioknapp på
+  // sidan redan använder (klick → state-ändring → AgentOverlay/StudioOverlay
+  // startar uppspelning i sin egen effekt, inom webbläsarens gest-fönster).
   useEffect(() => {
     const visaId = new URLSearchParams(window.location.search).get("visa");
     if (!visaId) return;
@@ -267,7 +280,7 @@ export default function FragaAnnaOchPeterPage() {
         const res = await fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log?id=eq.${encodeURIComponent(visaId)}&select=*`, { headers: sbH() });
         const data = await res.json().catch(() => []);
         const rad = Array.isArray(data) ? data[0] : null;
-        if (rad) spelaUppHistorik(rad);
+        if (rad) setDelatInlagg(rad);
       } catch {
         // tyst — en trasig eller borttagen delningslänk ska aldrig krascha sidan
       }
@@ -427,6 +440,30 @@ export default function FragaAnnaOchPeterPage() {
             <a href="/podd" style={{ color: LANK }}>Videopodden</a>.
           </p>
         </div>
+
+        {/* ── Delat inlägg — väntar på ett klick innan uppspelning ── */}
+        {delatInlagg && (
+          <div
+            style={{
+              display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap",
+              padding: "12px 16px", background: `${STUDIO_FARG}0d`, border: `1px solid ${STUDIO_FARG}50`, borderRadius: 8,
+            }}
+          >
+            <span style={{ fontSize: 13, color: C.text, fontFamily: "Georgia, serif" }}>
+              🔗 Någon delade {delatInlagg.aktion === "diskussion" ? "ett studiosamtal" : "en uppläsning"} med dig.
+            </span>
+            <button
+              onClick={() => { spelaUppHistorik(delatInlagg); setDelatInlagg(null); }}
+              style={{
+                marginLeft: "auto", padding: "8px 16px", background: "transparent",
+                border: `1px solid ${STUDIO_FARG}`, color: STUDIO_FARG, borderRadius: 6,
+                fontSize: 13, fontFamily: "Georgia, serif", cursor: "pointer",
+              }}
+            >
+              ▶ Spela upp
+            </button>
+          </div>
+        )}
 
         {/* ── Privat läge ──────────────────────────────────────── */}
         <label
