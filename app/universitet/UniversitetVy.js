@@ -73,6 +73,15 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
   // prefixet klipps bort igen för sammanfattning-fältet istället för att
   // dupliceras vid uppspelning (som slår ihop titel+sammanfattning igen).
   //
+  // Codex-fynd, PR #1392-granskning: om nyheten saknar beskrivning/motivering
+  // (t.ex. /api/nyhetsflode/forbered-lasning misslyckades eller är rate-
+  // limited) blir meta.text bara rubriken själv, utan "titel. "-separatorn —
+  // startsWith()-kollen missar då detta fallet och den ANDRA grenen ("annars
+  // meta.text") sparade tyst hela rubriken en gång till som sammanfattning,
+  // vilket dubblerade titeln vid uppspelning ("Rubrik. Rubrik."). En explicit
+  // exakt-match-koll mot meta.titel behandlar det fallet som "ingen
+  // sammanfattning" istället.
+  //
   // Rensar alltid sharePending när anropet är klart (lyckat eller ej) —
   // AgentOverlay håller overlayen öppen tills sharePending går till false,
   // annars kunde en kort uppläsning hinna avsluta talet och stänga overlayen
@@ -82,7 +91,14 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
   async function sparaLasningHistorik(meta) {
     try {
       const titelPrefix = meta.titel ? `${meta.titel}. ` : null;
-      const resten = titelPrefix && meta.text.startsWith(titelPrefix) ? meta.text.slice(titelPrefix.length) : meta.text;
+      let resten;
+      if (titelPrefix && meta.text.startsWith(titelPrefix)) {
+        resten = meta.text.slice(titelPrefix.length);
+      } else if (meta.titel && meta.text === meta.titel) {
+        resten = null;
+      } else {
+        resten = meta.text;
+      }
       const body = meta.url
         ? { typ: "url", aktion: "oraklet_forklarar", url: meta.url, titel: meta.titel, sammanfattning: resten }
         : { typ: "fritext", aktion: "oraklet_forklarar", text: meta.text };
