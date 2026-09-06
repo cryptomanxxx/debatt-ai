@@ -3,6 +3,8 @@ import { useState, useRef, useEffect } from "react";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Flyttat till Supabase Storage sep 2026 — se app/nyhetskallor/AgentOverlay.js
+const PODD_AVATAR_BASE = "https://fmwxftnistkoqazfwnuj.supabase.co/storage/v1/object/public/podd-avatarer";
 
 const C = {
   bg: "#080808", surface: "#0f0f0f", panel: "#111111", border: "#1a1a1a",
@@ -17,7 +19,7 @@ function agentSlug(namn) {
 const PODD_AVATARER = new Set(["Nationalekonom", "Miljöaktivist", "Teknikoptimist", "Filosof", "Journalist", "Jurist", "Konservativ debattör"]);
 function avatarSrc(namn) {
   return PODD_AVATARER.has(namn)
-    ? `/avatarer/podd/${agentSlug(namn)}.png`
+    ? `${PODD_AVATAR_BASE}/${agentSlug(namn)}.png`
     : `/avatarer/${agentSlug(namn)}.png`;
 }
 
@@ -261,7 +263,7 @@ function nastaMunlage(nuvarande, amp) {
 
 function TalkingFace({ namn, amplitude, speaking }) {
   const slug = agentSlug(namn);
-  const base = `/avatarer/podd/${slug}`;
+  const base = `${PODD_AVATAR_BASE}/${slug}`;
   const amp = speaking ? amplitude : 0;
   const [state, setState] = useState(0);
   useEffect(() => {

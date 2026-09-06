@@ -3,6 +3,8 @@ import { useState, useRef } from "react";
 import { KVINNLIGA_AGENTER } from "../../agentData";
 
 const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
+// Flyttat till Supabase Storage sep 2026 — se app/nyhetskallor/AgentOverlay.js
+const PODD_AVATAR_BASE = "https://fmwxftnistkoqazfwnuj.supabase.co/storage/v1/object/public/podd-avatarer";
 
 const C = {
   bg: "#080808", surface: "#0f0f0f", border: "#1a1a1a",
@@ -41,7 +43,7 @@ function AgentTestCard({ namn, amplitude, speaking, onTest, onRecord, localState
           boxShadow: speaking ? `0 0 ${glow}px ${farg}70, 0 0 ${glow*2}px ${farg}25` : "none",
           transform: `scale(${scale})`, transition: "transform 0.07s ease-out",
         }}>
-          <img src={`/avatarer/podd/${slug}.png`} alt={namn}
+          <img src={`${PODD_AVATAR_BASE}/${slug}.png`} alt={namn}
             style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       </div>
@@ -198,9 +200,10 @@ export default function PoddTestPage() {
 
     try {
       const img = new Image();
+      img.crossOrigin = "anonymous"; // bilden ligger nu på Supabase Storage (annan origin) — canvas.captureStream() nedan kräver detta för att inte bli "tainted"
       await new Promise((resolve, reject) => {
         img.onload = resolve; img.onerror = reject;
-        img.src = `/avatarer/podd/${slug}.png`;
+        img.src = `${PODD_AVATAR_BASE}/${slug}.png`;
       });
 
       const canvas = document.createElement("canvas");
