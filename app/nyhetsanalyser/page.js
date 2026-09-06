@@ -181,11 +181,18 @@ export default function NyhetsanalyserPage() {
   }
 
   // Sparar en enskild "Anna/Peter/Johan läser"-uppläsning till samma
-  // fraga_anna_peter_log-tabell (typ "fritext", eftersom den lästa texten
-  // redan är en sammanslagen rubrik+analys-sträng — ingen separat titel/URL
-  // att särskilja) så den kan delas via samma ?visa=<id>-permalänk som
-  // studiosamtal. Matchar på ett unikt invocationId per klick — samma
-  // race-skydd som sparaStudioHistorik ovan (Codex-fynd, PR #1387).
+  // fraga_anna_peter_log-tabell så den kan delas via samma ?visa=<id>-
+  // permalänk som studiosamtal. Matchar på ett unikt invocationId per klick
+  // — samma race-skydd som sparaStudioHistorik ovan (Codex-fynd, PR #1387).
+  //
+  // Sparas som typ "url" (med rubrik+analys uppdelat i titel/sammanfattning)
+  // när nyheten har en riktig källartikel-URL, annars typ "fritext" med hela
+  // texten — samma url-kontrollerade gren som sparaStudioHistorik redan
+  // använder. Utan detta (den ursprungliga implementationen skickade alltid
+  // "fritext") saknade HistorikPost helt en klickbar länk till källartikeln
+  // under den lästa texten, trots att uppläsningen bygger direkt på en
+  // konkret nyhet med en riktig URL — endast studiosamtalet fick länken
+  // (användarrapport, sep 2026).
   //
   // Rensar alltid sharePending när anropet är klart (lyckat eller ej) —
   // AgentOverlay håller overlayen öppen tills sharePending går till false,
@@ -195,10 +202,13 @@ export default function NyhetsanalyserPage() {
   async function sparaLasningHistorik(meta) {
     try {
       const aktion = AGENT_TILL_AKTION[meta.agent] || "anna_sager";
+      const body = meta.url
+        ? { typ: "url", aktion, url: meta.url, titel: meta.rubrik, sammanfattning: meta.analys }
+        : { typ: "fritext", aktion, text: meta.text };
       const res = await fetch("/api/fraga-anna-och-peter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ typ: "fritext", aktion, text: meta.text }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       const id = data?.rad?.id;
@@ -355,7 +365,11 @@ export default function NyhetsanalyserPage() {
                         key={agent}
                         onClick={() => {
                           const text = rubrik ? `${rubrik}. ${r.analys}` : r.analys;
-                          const meta = { id: r.id, invocationId: `${r.id}-${agent}-${Date.now()}`, agent, namn, text, sharePending: true };
+                          const meta = {
+                            id: r.id, invocationId: `${r.id}-${agent}-${Date.now()}`, agent, namn, text,
+                            url: r.nyhetsflode?.url || null, rubrik, analys: r.analys,
+                            sharePending: true,
+                          };
                           setLasning(meta);
                           sparaLasningHistorik(meta);
                         }}

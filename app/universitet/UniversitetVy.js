@@ -61,6 +61,18 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
   // fynd/nyhet kan öppnas flera gånger och en tidigare, fortfarande
   // pågående sparning annars kunde hamna på en senare öppning (samma
   // race-skydd som redan finns på /nyhetsanalyser).
+  //
+  // Sparas som typ "url" när fyndet/nyheten har en riktig källartikel-URL
+  // (VetenskapsFlodeVy/OrakletsLaslistaVy — inte ForskningsListaVy, vars
+  // fynd är plattformens EGNA forskningsresultat och inte "baserade på" en
+  // extern artikel), annars typ "fritext". Utan detta saknade HistorikPost
+  // helt en klickbar länk till källartikeln under Oraklets uppläsning
+  // (användarrapport, sep 2026) — samma bugg som fanns på /nyhetsanalyser.
+  // `meta.text` är redan en sammanslagen "titel. resten"-sträng (se
+  // ForskningsListaVy/VetenskapsFlodeVy/OrakletsLaslistaVy), så titel-
+  // prefixet klipps bort igen för sammanfattning-fältet istället för att
+  // dupliceras vid uppspelning (som slår ihop titel+sammanfattning igen).
+  //
   // Rensar alltid sharePending när anropet är klart (lyckat eller ej) —
   // AgentOverlay håller overlayen öppen tills sharePending går till false,
   // annars kunde en kort uppläsning hinna avsluta talet och stänga overlayen
@@ -69,10 +81,15 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
   // PR #1389-granskning).
   async function sparaLasningHistorik(meta) {
     try {
+      const titelPrefix = meta.titel ? `${meta.titel}. ` : null;
+      const resten = titelPrefix && meta.text.startsWith(titelPrefix) ? meta.text.slice(titelPrefix.length) : meta.text;
+      const body = meta.url
+        ? { typ: "url", aktion: "oraklet_forklarar", url: meta.url, titel: meta.titel, sammanfattning: resten }
+        : { typ: "fritext", aktion: "oraklet_forklarar", text: meta.text };
       const res = await fetch("/api/fraga-anna-och-peter", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ typ: "fritext", aktion: "oraklet_forklarar", text: meta.text }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       const id = data?.rad?.id;
