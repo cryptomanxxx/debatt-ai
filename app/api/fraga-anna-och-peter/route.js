@@ -19,6 +19,13 @@ const TYPER = new Set(["fritext", "url"]);
 const AKTIONER = new Set(["anna_sager", "peter_sager", "johan_sager", "oraklet_forklarar", "diskussion"]);
 const MAX_TURNS = 9;
 const MAX_TURN_LEN = 400;
+// Codex-fynd, PR #1390-granskning: Oraklets sammanslagna uppläsningstext
+// (rubrik upp till 500 + sammanfattning upp till ORAKLET_SAMMANFATTNING_MAX
+// 1200 + ev. motivering upp till 500 på Läslistan, se
+// app/universitet/OrakletsLaslistaVy.js) kan bli upp till ~2200 tecken —
+// den gamla 1500-teckensgränsen här klippte tyst av svansen innan sparning,
+// så en delad länk återgav mindre än vad Oraklet faktiskt läste upp live.
+const MAX_INPUT_TEXT = 2500;
 
 function stadaDialog(dialog) {
   if (!Array.isArray(dialog)) return null;
@@ -45,7 +52,7 @@ export async function POST(req) {
     return Response.json({ error: "Ogiltig typ eller aktion." }, { status: 400 });
   }
 
-  const inputText = typeof body?.text === "string" ? body.text.trim().slice(0, 1500) : null;
+  const inputText = typeof body?.text === "string" ? body.text.trim().slice(0, MAX_INPUT_TEXT) : null;
   const kallaUrl = typeof body?.url === "string" ? body.url.trim().slice(0, 2000) : null;
   const titel = typeof body?.titel === "string" ? body.titel.trim().slice(0, 200) : null;
   // Gränsen matchar ORAKLET_SAMMANFATTNING_MAX (1200, se
