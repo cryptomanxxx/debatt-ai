@@ -20,3 +20,13 @@ jobs:
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node scripts/upload-podd-assets.js
+
+      - name: Verifiera publik åtkomst (körs bara manuellt, engångskontroll)
+        run: |
+          BASE="https://fmwxftnistkoqazfwnuj.supabase.co/storage/v1/object/public/podd-avatarer"
+          for f in anna.png oraklet-m2-half.png nationalekonom.png teknikoptimist.png; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/$f")
+            echo "$f -> HTTP $code"
+            if [ "$code" != "200" ]; then echo "FEL: $f inte publikt nåbar"; exit 1; fi
+          done
+          echo "Alla stickprov publikt nåbara ✓"
