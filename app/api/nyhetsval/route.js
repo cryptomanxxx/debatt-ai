@@ -8,13 +8,15 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // debattera/skriva om. Skriver in i SAMMA amnesforslag-tabell som Direktdebattens
 // "Tipsa agenterna om detta ämne →" (kalla skiljer dem åt för spårbarhet) — så att
 // agent.py:s redan existerande hamta_amnesforslag()/markera_forslag_behandlat()-
-// upphämtning fungerar oförändrat, ingen ny Python-kod behövs. agent.py använder
-// amne som fri ämnestext (samma väg som "eget ämne"), inte som en citerad
-// nyhetskälla med nyhetskalla-attribution — men summering (från /nyhetsanalyser:
-// agentens egen AI-analys av nyheten, inte den råa RSS-rubriken) injiceras sedan
-// PR #1362 i skriv_artikel()s extra_kontext (Codex-fynd: innan dess sparades den
-// bara för spårbarhet men lästes aldrig, vilket gjorde tvåstegsflödet till
-// /nyhetsanalyser funktionellt likvärdigt med att bara föreslå den råa rubriken).
+// upphämtning fungerar oförändrat, ingen ny Python-kod behövs. summering (från
+// /nyhetsanalyser: agentens egen AI-analys av nyheten, inte den råa RSS-rubriken)
+// injiceras sedan PR #1362 i skriv_artikel()s extra_kontext.
+//
+// kalla_namn/kalla_url sparas ÄVEN strukturerat (utöver att ingå i den fria
+// summering-texten) så att agent.py kan bygga en riktig nyhetskalla-post på
+// artikeln — annars fick debattartiklar skrivna om en föreslagen nyhet ingen
+// källänk alls, varken i metadata-boxen eller inline i artikeltexten (se
+// supabase_amnesforslag_v2.sql).
 export async function POST(req) {
   const ip = getIp(req);
   const rl = checkRateLimit(req, "nyhetsval", 15, 60 * 60 * 1000);
@@ -53,6 +55,8 @@ export async function POST(req) {
       amne: amne.slice(0, 300),
       summering: summeringDelar.join("\n").slice(0, 1000) || null,
       kalla: "nyhetsval",
+      kalla_namn: kalla || null,
+      kalla_url: url || null,
     }),
   });
 
