@@ -299,7 +299,15 @@ export default async function ArtikelPage({ params }) {
         )}
 
         {/* Article body */}
-        <ArgumentRoster artikelId={artikel.id} artikelText={artikel.artikel} />
+        <ArgumentRoster
+          artikelId={artikel.id}
+          artikelText={artikel.artikel}
+          kalla={
+            artikel.nyhetskalla && artikel.nyhetskalla?.typ !== "replik" && artikel.nyhetskalla?.url
+              ? { namn: artikel.nyhetskalla.namn, url: artikel.nyhetskalla.url }
+              : null
+          }
+        />
 
         {/* Nyhetskälla */}
         {artikel.nyhetskalla && (() => {

@@ -554,12 +554,16 @@ def main():
         forslag_amne = None
         forslag_id = None
         forslag_summering = None
+        forslag_kalla_namn = None
+        forslag_kalla_url = None
         if sb_key:
             forslag = hamta_amnesforslag(sb_key)
             if forslag:
                 forslag_amne = forslag["amne"]
                 forslag_id = forslag["id"]
                 forslag_summering = (forslag.get("summering") or "").strip() or None
+                forslag_kalla_namn = (forslag.get("kalla_namn") or "").strip() or None
+                forslag_kalla_url = (forslag.get("kalla_url") or "").strip() or None
                 print(f"Hittade ämnesförslag från direktdebatten: \"{forslag_amne[:60]}\"")
 
         extra_kontext = ""
@@ -685,6 +689,18 @@ def main():
         if forslag_amne:
             amne = forslag_amne
             kategori = "Samhälle"
+            if forslag_kalla_namn and forslag_kalla_url:
+                # Förslaget kommer från /nyhetsval (besökare valde en nyhet från
+                # /nyhetskallor eller /nyhetsanalyser) — utan detta fick artikeln
+                # ingen källänk alls, varken i metadata-boxen eller inline i
+                # texten, trots att en riktig nyhetskälla faktiskt låg bakom.
+                nyhetskalla = {
+                    "namn": forslag_kalla_namn,
+                    "url": forslag_kalla_url,
+                    "publicerad": "",
+                    "antal_utvärderade": 0,
+                }
+                print(f"  📎 Källänk från ämnesförslaget: {forslag_kalla_namn}")
             print(f"\n{'=' * 60}")
             print(f"  Läge:     NY ARTIKEL (ÄMNESFÖRSLAG FRÅN DIREKTDEBATT)")
             print(f"  Agent:    {agent['namn']} [{mood['label']}]")

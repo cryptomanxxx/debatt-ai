@@ -1,8 +1,63 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 
-export default function ArgumentRoster({ artikelId, artikelText }) {
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Länkar den FÖRSTA förekomsten av källnamnet i brödtexten till källans URL —
+// best-effort, eftersom artikeltexten är fri LLM-genererad prosa och inte
+// alltid nämner källan ordagrant (då används fallback-raden istället).
+//
+// Matchar MEDVETET bara det fullständiga källnamnet, inte en utbruten
+// sista/första-ords-substräng (t.ex. "Nyheter" ur "SVT Nyheter", "Sverige"
+// ur "Reddit Sverige"). Många av plattformens källnamn (se nyheter.py) är
+// sammansatta av vanliga svenska/engelska ord — "Sverige", "Nyheter",
+// "Ekonomi", "Klimat", "Samhälle", "News" m.fl. — som med hög sannolikhet
+// förekommer på helt orelaterade ställen i en debattartikel. Att länka en
+// sådan förekomst hade gett en felaktig källattribution (Codex-fynd,
+// PR #1382-granskning). Det fullständiga namnet är i praktiken alltid
+// distinkt nog för en säker matchning.
+function linkifyKalla(paragraphs, kalla) {
+  if (!kalla?.url || !kalla?.namn) return { noder: paragraphs, matchIndex: -1 };
+  const namn = kalla.namn.trim();
+  if (namn) {
+    const re = new RegExp(`\\b(${escapeRegExp(namn)})\\b`, "i");
+    for (let i = 0; i < paragraphs.length; i++) {
+      const p = paragraphs[i];
+      const m = p.match(re);
+      if (!m) continue;
+      const start = m.index;
+      const slut = start + m[0].length;
+      const noder = paragraphs.map((pp, j) => {
+        if (j !== i) return pp;
+        return (
+          <Fragment key={`kalla-${j}`}>
+            {pp.slice(0, start)}
+            <a
+              href={kalla.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "#38bdf8", textDecoration: "underline", textDecorationColor: "#38bdf850" }}
+            >
+              {pp.slice(start, slut)}
+            </a>
+            {pp.slice(slut)}
+          </Fragment>
+        );
+      });
+      return { noder, matchIndex: i };
+    }
+  }
+  return { noder: paragraphs, matchIndex: -1 };
+}
+
+export default function ArgumentRoster({ artikelId, artikelText, kalla }) {
   const paragraphs = (artikelText || "").split("\n\n").filter(Boolean);
+  const { noder: renderedParagraphs, matchIndex } = useMemo(
+    () => linkifyKalla(paragraphs, kalla),
+    [artikelText, kalla?.namn, kalla?.url]
+  );
   const [votes, setVotes] = useState({});
   const [voted, setVoted] = useState({});
   const [hovered, setHovered] = useState(null);
@@ -68,7 +123,7 @@ export default function ArgumentRoster({ artikelId, artikelText }) {
             onMouseEnter={() => setHovered(i)}
             onMouseLeave={() => setHovered(null)}
           >
-            <p style={{ fontSize: "18px", lineHeight: 2, color: "#f0ede6", margin: 0, paddingRight: "48px" }}>{p}</p>
+            <p style={{ fontSize: "18px", lineHeight: 2, color: "#f0ede6", margin: 0, paddingRight: "48px" }}>{renderedParagraphs[i]}</p>
             <button
               onClick={() => vote(i)}
               title={isVoted ? "Röstad" : "Lyft fram detta argument"}
@@ -99,6 +154,15 @@ export default function ArgumentRoster({ artikelId, artikelText }) {
           </div>
         );
       })}
+
+      {/* Fallback när källnamnet inte nämns ordagrant i brödtexten — garanterar
+          att en klickbar källänk alltid finns direkt i artikelflödet, inte bara
+          i den separata metadata-boxen under artikeln. */}
+      {matchIndex === -1 && kalla?.url && (
+        <p style={{ fontSize: "15px", lineHeight: 1.8, color: "#8a8a8a", fontStyle: "italic", margin: "-4px 0 0 0" }}>
+          Läs källan: <a href={kalla.url} target="_blank" rel="noopener noreferrer" style={{ color: "#38bdf8", textDecoration: "underline", textDecorationColor: "#38bdf850" }}>{kalla.namn}</a>
+        </p>
+      )}
     </div>
   );
 }
