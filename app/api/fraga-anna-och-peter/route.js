@@ -62,7 +62,16 @@ export async function POST(req) {
 
   const inputText = typeof body?.text === "string" ? body.text.trim().slice(0, MAX_INPUT_TEXT) : null;
   const kallaUrl = typeof body?.url === "string" ? body.url.trim().slice(0, 2000) : null;
-  const titel = typeof body?.titel === "string" ? body.titel.trim().slice(0, 200) : null;
+  // Codex-fynd, PR #1392-granskning: 200 tecken var för snålt för rubriker
+  // från vissa producenter — nyhetsflode.rubrik kan vara upp till 300 tecken
+  // (nyhetsflode_test.py) och Oraklets egen sammanfattningspipeline
+  // (sammanfattaForOraklet.js) genererar rubriker upp till 500 tecken. En
+  // avhuggen titel gjorde att spelaUppHistorik() ([rad.titel, rad.sammanfattning]
+  // .join(". ")) tappade svansen av rubriken permanent — tidigare (innan
+  // typ:"url" återanvändes för dessa uppläsningar) sparades hela den
+  // sammanslagna texten som input_text under en betydligt högre gräns, så
+  // förlusten är ny. Höjd till 500 för att täcka det största kända fallet.
+  const titel = typeof body?.titel === "string" ? body.titel.trim().slice(0, 500) : null;
   // Gränsen matchade ursprungligen bara ORAKLET_SAMMANFATTNING_MAX (1200,
   // se app/lib/sammanfattaForOraklet.js) — Codex-fynd, PR #1378-granskning:
   // Oraklets full-text-sammanfattningspipeline (sagUrlOraklet()) kan
