@@ -284,15 +284,33 @@ export function AnchorImage({ cfg, blinkState, isSpeaking }) {
 // NyhetskallorClient (key=`${nyhet-id}-${agent}` tvingar en ren remount —
 // och därmed cancel() av föregående uppläsning — när besökaren klickar en
 // annan nyhets eller agents läs-knapp medan overlayen redan är öppen).
-export default function AgentOverlay({ agent, namn, text, onClose }) {
+export default function AgentOverlay({ agent, namn, text, shareUrl, onClose }) {
   const cfg = AGENTER[agent] || AGENTER.Anna;
   const visningsnamn = namn || agent;
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(true);
+  const [kopierat, setKopierat] = useState(false);
   const running = isSpeaking || isThinking;
   const framesReady = usePreload(cfg);
   const blinkState = useBlinkState(cfg.hasBlink && framesReady);
   const startedRef = useRef(false);
+  // shareUrl kan dyka upp asynkront (efter att sidan hunnit spara en
+  // historikpost) en bra stund efter mount — speak()-effekten nedan har
+  // tomma deps och läser därför bara det INITIALA värdet direkt, så en ref
+  // håller den senaste versionen tillgänglig i onend/onerror-callbacken.
+  const shareUrlRef = useRef(shareUrl);
+  useEffect(() => { shareUrlRef.current = shareUrl; }, [shareUrl]);
+
+  async function kopieraLank() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setKopierat(true);
+      setTimeout(() => setKopierat(false), 2000);
+    } catch {
+      // clipboard kan vara blockerad (behörighet nekad, icke-https m.m.) — tyst
+    }
+  }
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -305,8 +323,12 @@ export default function AgentOverlay({ agent, namn, text, onClose }) {
       rate: cfg.rate,
       pitch: cfg.pitch,
       onstart: () => { setIsThinking(false); setIsSpeaking(true); },
-      onend:   () => { setIsSpeaking(false); onClose(); },
-      onerror: () => { setIsSpeaking(false); onClose(); },
+      // Stänger inte automatiskt om en delningslänk finns — samma resonemang
+      // som StudioOverlay: besökaren ska hinna hitta och klicka
+      // "🔗 Dela"-knappen istället för att overlayen försvinner direkt när
+      // uppläsningen tar slut.
+      onend:   () => { setIsSpeaking(false); if (!shareUrlRef.current) onClose(); },
+      onerror: () => { setIsSpeaking(false); if (!shareUrlRef.current) onClose(); },
     });
     return () => { window.responsiveVoice?.cancel(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -360,17 +382,32 @@ export default function AgentOverlay({ agent, namn, text, onClose }) {
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            style={{
-              width: "100%", marginTop: "10px", padding: "10px",
-              borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif",
-              border: "1px solid #5a2020", background: "#1a0808", color: "#e05050",
-              cursor: "pointer", letterSpacing: "0.06em", boxSizing: "border-box",
-            }}
-          >
-            ⏹ Stäng
-          </button>
+          <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+            {shareUrl && (
+              <button
+                onClick={kopieraLank}
+                style={{
+                  flex: 1, padding: "10px",
+                  borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif",
+                  border: "1px solid #1a4a6a", background: "#081218", color: "#38bdf8",
+                  cursor: "pointer", letterSpacing: "0.06em", boxSizing: "border-box",
+                }}
+              >
+                {kopierat ? "✓ Länk kopierad" : "🔗 Dela"}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              style={{
+                flex: 1, padding: "10px",
+                borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif",
+                border: "1px solid #5a2020", background: "#1a0808", color: "#e05050",
+                cursor: "pointer", letterSpacing: "0.06em", boxSizing: "border-box",
+              }}
+            >
+              ⏹ Stäng
+            </button>
+          </div>
         </div>
 
         {/* boxSizing:"border-box" — utan den (ingen global reset finns i
