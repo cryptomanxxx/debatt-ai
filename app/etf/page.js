@@ -1,6 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Krypto-ETF – DEBATT-AI",
@@ -23,17 +23,17 @@ async function getData() {
   // Hämta de 2 senaste priserna per symbol (för 24h-förändring)
   const prisFetches = symboler.map(s =>
     fetch(`${SB_URL}/rest/v1/ohlcv_cache?symbol=eq.${s}&order=datum.desc&limit=2&select=pris,datum`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }).then(r => r.ok ? r.json() : []).then(rows => [s, rows])
   );
 
   const [prisResults, innehavRes, transRes] = await Promise.all([
     Promise.all(prisFetches),
     fetch(`${SB_URL}/rest/v1/agent_etf_innehav?select=agent,symbol,investerat_kr,kopt_pris_usd,uppdaterad&order=investerat_kr.desc`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/etf_transaktioner?select=agent,symbol,typ,belopp_kr,pris_usd,skapad&order=skapad.desc&limit=20`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
   ]);
 

@@ -2,7 +2,7 @@ import PisKlient from "./PisKlient";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Policy Impact Simulator – DEBATT-AI",
@@ -29,13 +29,13 @@ async function getData() {
 
   const [aRes, fRes, mcRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/pis_analyser?order=skapad.desc&limit=500`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,kategori,kalla,status,riksdagen_url&order=skapad.desc&limit=500`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/pis_monte_carlo?select=lagforslag_id,iterationer,lyckade_iterationer,bnp_mean,bnp_std,bnp_min,bnp_max,gini_mean,gini_std,inflation_mean,inflation_std,arbetsloshet_mean,arbetsloshet_std,socialt_kapital_dist,koalition_dist&limit=500`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
   ]);
 

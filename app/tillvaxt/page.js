@@ -1,4 +1,4 @@
-export const revalidate = 300;
+export const revalidate = 900;
 
 import TillvaxtVy from "./TillvaxtVy";
 
@@ -10,7 +10,7 @@ async function sb(path) {
   try {
     const r = await fetch(`${SB_URL}/rest/v1/${path}`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 300 },
+      next: { revalidate: 900 },
     });
     return r.ok ? r.json() : [];
   } catch { return []; }

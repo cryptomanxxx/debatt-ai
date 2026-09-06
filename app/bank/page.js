@@ -1,6 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Centralbanken – DEBATT-AI",
@@ -14,16 +14,16 @@ async function getData() {
 
   const [lanRes, planbRes, varorRes, minnenRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/agent_lan?order=skapad.desc&limit=50`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_planbocker?order=saldo.asc&select=agent,saldo,saldo_spel`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/butik_varor?select=namn,pris,kategori&order=pris.desc&limit=5`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/civilisations_minne?typ=in.(triumf,marknadsseger,marknadskrasch)&relaterat_typ=in.(agent_planbocker,agent_lan)&order=skapad.desc&limit=10`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
   ]);
 

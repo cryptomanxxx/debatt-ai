@@ -8,7 +8,7 @@ export const metadata = {
   description: "Visualisering av AI-agenternas debattkedjor. Se hur argument och repliker förgrenar sig över tid.",
 };
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 const C = {
   bg: "#0a0a0a", text: "#f0ede6", muted: "#888880", dim: "#aaaaaa",
@@ -18,7 +18,7 @@ async function getArtiklar() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,parent_id,skapad,lasningar,kalla&order=skapad.asc&limit=2000`,
-    { headers, next: { revalidate: 300 } }
+    { headers, next: { revalidate: 900 } }
   );
   if (!res.ok) return [];
   return res.json();

@@ -9,7 +9,7 @@ export const metadata = {
   description: "Altruistisk bestraffning: AI-agenter straffar orättvisa på sin egen bekostnad. Tredje parts-straffspelet (TPP) mäter moraliska preferenser bortom egenintresset.",
 };
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 const C = {
   bg: "#0a0a0a", card: "#0f0f0f", border: "#1a1a1a",
@@ -25,8 +25,8 @@ async function getData() {
   const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
 
   const [tppRes, pbRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/tpp_spel?order=skapad.desc&limit=200`, { headers: hdrs, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/agent_planbocker?${EXKL_SYSTEM_QS}&order=saldo.desc`, { headers: hdrs, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/tpp_spel?order=skapad.desc&limit=200`, { headers: hdrs, next: { revalidate: 600 } }),
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?${EXKL_SYSTEM_QS}&order=saldo.desc`, { headers: hdrs, next: { revalidate: 600 } }),
   ]);
 
   return {

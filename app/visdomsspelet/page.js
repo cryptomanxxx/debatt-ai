@@ -1,4 +1,4 @@
-export const revalidate = 300;
+export const revalidate = 900;
 
 import VisdomsspeletGraf from "./VisdomsspeletGraf";
 import { bootstrapKI, viktadMedian } from "../lib/metrics";
@@ -45,13 +45,13 @@ async function getData() {
   const [res, allaRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/ki_spel?order=skapad.desc&limit=60`, {
       headers: h,
-      next: { revalidate: 300 },
+      next: { revalidate: 900 },
     }),
     // Leaderboarden rankar på HELA spelhistoriken — inte rullande 60.
     // Hämtar bara fälten den behöver för att hålla payloaden nere.
     fetch(`${SB_URL}/rest/v1/ki_spel?select=facit,kollektivt_fel,agent_svar,kategori,skapad&kollektivt_fel=not.is.null&order=skapad.desc&limit=2000`, {
       headers: h,
-      next: { revalidate: 300 },
+      next: { revalidate: 900 },
     }),
   ]);
   const spel = res.ok ? await res.json() : [];

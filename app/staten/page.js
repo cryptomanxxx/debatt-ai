@@ -3,7 +3,7 @@ import { EXKL_SYSTEM_QS } from "../lib/metrics";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Staten — Statskassa & skattebudget – DEBATT-AI",
@@ -126,23 +126,23 @@ async function getData() {
   const [skRes, agRes, logRes, domRes, giniRes] = await Promise.all([
     fetch(
       `${SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo`,
-      { headers: h, next: { revalidate: 120 } }
+      { headers: h, next: { revalidate: 600 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/agent_planbocker?${EXKL_SYSTEM_QS}&select=agent,saldo&order=saldo.desc`,
-      { headers: h, next: { revalidate: 120 } }
+      { headers: h, next: { revalidate: 600 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/stats_budget_log?order=skapad.desc&limit=50`,
-      { headers: h, next: { revalidate: 120 } }
+      { headers: h, next: { revalidate: 600 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/domstol_domar?select=straff_belopp,skapad,domstol_arenden!arende_id(svarande)&utfall=eq.fälld&order=skapad.desc&limit=20`,
-      { headers: h, next: { revalidate: 120 } }
+      { headers: h, next: { revalidate: 600 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/oligarki_historik?select=datum,gini,mobilitet,top3_andel&order=datum.desc&limit=8`,
-      { headers: h, next: { revalidate: 120 } }
+      { headers: h, next: { revalidate: 600 } }
     ),
   ]);
 

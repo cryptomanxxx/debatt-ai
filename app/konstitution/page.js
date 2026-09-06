@@ -1,4 +1,4 @@
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Grundlagen – DEBATT-AI",
@@ -65,12 +65,12 @@ async function getData() {
 
   const [reglerRes, amendmentsRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/constitution_rules?order=id.asc`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(
       `${SB_URL}/rest/v1/constitution_amendments` +
       `?order=skapad.desc&limit=20&select=*,constitution_roster(agent,rod,maktindex,motivering)`,
-      { headers: h, next: { revalidate: 300 } }
+      { headers: h, next: { revalidate: 900 } }
     ),
   ]);
 

@@ -1,7 +1,7 @@
 import BildKortImg from "./BildKortImg";
 import { AGENT_VISUELL } from "../agentData";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "AI-bilder – DEBATT-AI",
@@ -68,7 +68,7 @@ async function hamtaBilder(agent = "", typ = "") {
   try {
     const r = await fetch(url, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 120 },
+      next: { revalidate: 600 },
     });
     return r.ok ? r.json() : [];
   } catch { return []; }

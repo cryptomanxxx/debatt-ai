@@ -1,6 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 180;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Krisevents – DEBATT-AI",
@@ -31,7 +31,7 @@ async function hamtaKriser() {
   try {
     const r = await fetch(
       `${SB_URL}/rest/v1/kris_events?order=skapad.desc&limit=20&select=*`,
-      { headers: h, next: { revalidate: 180 } },
+      { headers: h, next: { revalidate: 600 } },
     );
     if (!r.ok) return [];
     return await r.json();

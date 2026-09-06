@@ -1,6 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "AI-Domstolen – DEBATT-AI",
@@ -61,11 +61,11 @@ async function getData() {
   const [arendenRes, domarRes] = await Promise.all([
     fetch(
       `${SB_URL}/rest/v1/domstol_arenden?order=skapad.desc&limit=30&select=*`,
-      { headers: h, next: { revalidate: 120 } }
+      { headers: h, next: { revalidate: 600 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/domstol_domar?order=skapad.desc&limit=20&select=*,domstol_arenden(arende_nr,svarande,artikel_nr,beskrivning)`,
-      { headers: h, next: { revalidate: 120 } }
+      { headers: h, next: { revalidate: 600 } }
     ),
   ]);
 

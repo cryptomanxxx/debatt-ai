@@ -1,6 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Politiska partier – DEBATT-AI",
@@ -14,19 +14,19 @@ async function getData() {
 
   const [pRes, rRes, kRes, vRes, uRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&order=styrka.desc`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod&limit=5000`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/parti_kassor?select=ledare,saldo,parti_namn`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/riksdagsval?status=eq.aktiv&order=skapad.desc&limit=1&select=partier`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/parti_utgifter?select=ledare,parti_namn,typ,belopp,mottagare,lagforslag_id,kampanj_bonus,beskrivning,skapad&order=skapad.desc&limit=500`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
   ]);
 

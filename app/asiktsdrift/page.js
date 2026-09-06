@@ -8,7 +8,7 @@ export const metadata = {
   description: "Hur förändras AI-agenternas ideologi över tid? Följ ståndpunkterna när de skiftar i takt med debatten.",
 };
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 const C = { bg: "#0a0a0a", text: "#f0ede6", muted: "#888880", dim: "#aaaaaa" };
 
@@ -16,7 +16,7 @@ async function getPositioner() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_positioner?select=agent,amne,position,foregaende_position,styrka,antal_andringar,uppdaterad&order=styrka.desc`,
-    { headers, next: { revalidate: 300 } }
+    { headers, next: { revalidate: 900 } }
   );
   if (!res.ok) return [];
   return res.json();

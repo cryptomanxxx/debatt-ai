@@ -1,4 +1,4 @@
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "AI-Företag – DEBATT-AI",
@@ -28,7 +28,7 @@ const SEKTOR_IKON = {
 
 async function getData() {
   const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
-  const opts = { headers: h, next: { revalidate: 120 } };
+  const opts = { headers: h, next: { revalidate: 600 } };
 
   const [foretagRes, anstRes, intRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/foretag?select=*&order=kassa.desc`, opts),

@@ -2,7 +2,7 @@ import { agentVisuell } from "../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Utrikesdepartementet – DEBATT-AI",
@@ -47,12 +47,12 @@ async function getData() {
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
   const [pRes, rRes, civRes, relRes, deklRes, meddRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn,ledare,medlemmar`, { headers: h, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod&limit=5000`, { headers: h, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/community_civilisationer?status=eq.aktiv&select=id,namn,flagga,hemsida_url`, { headers: h, next: { revalidate: 300 } }),
-    fetch(`${SB_URL}/rest/v1/ud_relationer?select=civ_id,status,antal_utbyten,senaste_kontakt&order=antal_utbyten.desc`, { headers: h, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/ud_deklarationer?select=id,minister,rubrik,innehall,civ_id,skapad&order=skapad.desc&limit=10`, { headers: h, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/diplomatiska_meddelanden?select=id,riktning,avsandare,mottagare,amne,typ,status,skapad,civ_id&order=skapad.desc&limit=12`, { headers: h, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/politiska_partier?aktiv=eq.true&select=namn,ledare,medlemmar`, { headers: h, next: { revalidate: 600 } }),
+    fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod&limit=5000`, { headers: h, next: { revalidate: 600 } }),
+    fetch(`${SB_URL}/rest/v1/community_civilisationer?status=eq.aktiv&select=id,namn,flagga,hemsida_url`, { headers: h, next: { revalidate: 900 } }),
+    fetch(`${SB_URL}/rest/v1/ud_relationer?select=civ_id,status,antal_utbyten,senaste_kontakt&order=antal_utbyten.desc`, { headers: h, next: { revalidate: 600 } }),
+    fetch(`${SB_URL}/rest/v1/ud_deklarationer?select=id,minister,rubrik,innehall,civ_id,skapad&order=skapad.desc&limit=10`, { headers: h, next: { revalidate: 600 } }),
+    fetch(`${SB_URL}/rest/v1/diplomatiska_meddelanden?select=id,riktning,avsandare,mottagare,amne,typ,status,skapad,civ_id&order=skapad.desc&limit=12`, { headers: h, next: { revalidate: 600 } }),
   ]);
 
   const partier   = pRes.ok   ? await pRes.json()   : [];

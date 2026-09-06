@@ -1,4 +1,4 @@
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Vad tycker du? – DEBATT-AI",
@@ -22,7 +22,7 @@ export default async function OpinionPage() {
       `${SB_URL}/rest/v1/opinion_roster?select=fraga,kategori,roster_ja,roster_nej,roster_osaker,ai_ja,ai_nej,ai_osaker&order=fraga.asc`,
       {
         headers: { apikey: key, Authorization: `Bearer ${key}` },
-        next: { revalidate: 300 },
+        next: { revalidate: 900 },
       }
     );
     if (res.ok) initialData = await res.json();

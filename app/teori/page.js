@@ -1,4 +1,4 @@
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Ekonomisk teori – DEBATT-AI",
@@ -24,7 +24,7 @@ async function fetchData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return null;
   const h = { apikey: key, Authorization: `Bearer ${key}` };
-  const r = (path) => fetch(`${SB_URL}/rest/v1/${path}`, { headers: h, next: { revalidate: 300 } });
+  const r = (path) => fetch(`${SB_URL}/rest/v1/${path}`, { headers: h, next: { revalidate: 900 } });
 
   const sju = new Date(Date.now() - 7 * 864e5).toISOString();
   const fjorton = new Date(Date.now() - 14 * 864e5).toISOString();

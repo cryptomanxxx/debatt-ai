@@ -1,4 +1,4 @@
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Oraklet – DEBATT-AI",
@@ -30,7 +30,7 @@ async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return null;
   const h = { apikey: key, Authorization: `Bearer ${key}` };
-  const o = { headers: h, next: { revalidate: 300 } };
+  const o = { headers: h, next: { revalidate: 900 } };
 
   const [radRes, betsRes, marketsRes] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/hjarna_rad?select=market_id,arm,sannolikhet,motivering,model,skapad&order=skapad.desc&limit=400`, o),

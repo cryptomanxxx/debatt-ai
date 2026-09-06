@@ -1,7 +1,7 @@
 import UniversitetTicker from "./UniversitetTicker";
 import UniversitetVy from "./UniversitetVy";
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -34,17 +34,17 @@ async function getData() {
     const [fyndRes, nyheterRes, urvalRes] = await Promise.all([
       fetch(
         `${SB_URL}/rest/v1/vetenskapliga_upptagter?order=skapad.desc&limit=50&select=id,titel,sammanfattning,forskare,medforskare,disciplin,impakt,datakallor,metodologi,arxiv_kalla,skapad`,
-        { headers: h, next: { revalidate: 300 } }
+        { headers: h, next: { revalidate: 900 } }
       ),
       fetch(
         `${SB_URL}/rest/v1/nyhetsflode?kalla=in.(${VETENSKAP_FILTER})&order=hamtad.desc&limit=40&select=id,rubrik,beskrivning,kalla,url,hamtad`,
-        { headers: h, next: { revalidate: 300 } }
+        { headers: h, next: { revalidate: 900 } }
       ),
       // Oraklets kurerade urval — embeddar nyhetsflode-raden via FK (nyhet_id)
       // så rubrik/beskrivning/källa/url kommer med i samma fetch.
       fetch(
         `${SB_URL}/rest/v1/oraklet_urval?order=skapad.desc&limit=30&select=id,motivering,skapad,nyhetsflode(id,rubrik,beskrivning,kalla,url)`,
-        { headers: h, next: { revalidate: 300 } }
+        { headers: h, next: { revalidate: 900 } }
       ),
     ]);
     const fynd = fyndRes.ok ? await fyndRes.json() : [];

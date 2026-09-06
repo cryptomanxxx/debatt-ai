@@ -1,4 +1,4 @@
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Förmögenheter – DEBATT-AI",
@@ -14,7 +14,7 @@ async function getData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return {};
   const h = { apikey: key, Authorization: `Bearer ${key}` };
-  const o = { headers: h, next: { revalidate: 120 } };
+  const o = { headers: h, next: { revalidate: 600 } };
 
   const [
     planbockerRes,

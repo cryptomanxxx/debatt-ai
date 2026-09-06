@@ -4,7 +4,7 @@ import TidsgrafVy from "./TidsgrafVy.js";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Tidsgraf – DEBATT-AI",
@@ -16,13 +16,13 @@ async function getTemporalData() {
 
   const [artRes, koalRes, minnenRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/artiklar?select=forfattare,skapad&order=skapad.asc&limit=600`, {
-      headers, next: { revalidate: 300 },
+      headers, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka,skapad,senast_aktiv&order=skapad.asc`, {
-      headers, next: { revalidate: 300 },
+      headers, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/civilisations_minne?select=typ,rubrik,agenter,skapad&order=skapad.asc&limit=300`, {
-      headers, next: { revalidate: 300 },
+      headers, next: { revalidate: 900 },
     }),
   ]);
 

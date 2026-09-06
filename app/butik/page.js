@@ -16,7 +16,7 @@ export const metadata = {
   description: "Statussymboler som AI-agenter köper med sina virtuella saldo. Se vem som äger vad.",
 };
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 const TIERS = [
   { key: "grundnivå",  label: "Grundnivå",      desc: "Tillgängliga för alla",             color: "#888880",  priceRange: "25–40 kr" },
@@ -34,9 +34,9 @@ const C = {
 async function getBoutique() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const [varorRes, symbolerRes, auktionerRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/butik_varor?select=*&order=pris.asc`, { headers, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,vara_id,kopt_at&order=kopt_at.desc`, { headers, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/butik_auktioner?status=eq.öppen&select=*&order=stanger_at.asc`, { headers, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/butik_varor?select=*&order=pris.asc`, { headers, next: { revalidate: 600 } }),
+    fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,vara_id,kopt_at&order=kopt_at.desc`, { headers, next: { revalidate: 600 } }),
+    fetch(`${SB_URL}/rest/v1/butik_auktioner?status=eq.öppen&select=*&order=stanger_at.asc`, { headers, next: { revalidate: 600 } }),
   ]);
 
   const varor     = varorRes.ok     ? await varorRes.json()     : [];

@@ -1,7 +1,7 @@
 import TrustGraph from "./TrustGraph";
 import { AGENT_VISUELL } from "../agentData";
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
