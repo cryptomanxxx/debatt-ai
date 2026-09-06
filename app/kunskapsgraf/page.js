@@ -3,7 +3,7 @@ import { AGENT_VISUELL } from "../agentData.js";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Kunskapsgraf – DEBATT-AI",
@@ -22,10 +22,10 @@ async function getGraphData() {
 
   const [artRes, koalRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,parent_id,taggar,skapad&order=skapad.desc&limit=120`, {
-      headers, next: { revalidate: 120 },
+      headers, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka&order=styrka.desc&limit=60`, {
-      headers, next: { revalidate: 120 },
+      headers, next: { revalidate: 600 },
     }),
   ]);
 

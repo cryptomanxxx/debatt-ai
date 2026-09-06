@@ -1,6 +1,6 @@
 import { agentVisuell } from "../agentData";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Socialt Kapital – DEBATT-AI",
@@ -40,8 +40,8 @@ async function getData() {
   if (!key) return { feedback: [], planbocker: [] };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   const [fbRes, pbRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/feedback_rewards?order=skapad.desc&limit=100`, { headers: h, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc`, { headers: h, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/feedback_rewards?order=skapad.desc&limit=100`, { headers: h, next: { revalidate: 600 } }),
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc`, { headers: h, next: { revalidate: 600 } }),
   ]);
   return {
     feedback:   fbRes.ok ? await fbRes.json() : [],

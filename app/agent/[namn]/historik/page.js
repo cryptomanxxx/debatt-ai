@@ -4,7 +4,7 @@ import HistorikVy from "./HistorikVy";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 export async function generateMetadata({ params }) {
   const { namn } = await params;
@@ -31,7 +31,7 @@ export default async function HistorikPage({ params }) {
   const enc = encodeURIComponent(namn);
 
   const fetchJson = (url) =>
-    fetch(url, { headers: h, next: { revalidate: 300 } })
+    fetch(url, { headers: h, next: { revalidate: 900 } })
       .then(r => r.ok ? r.json() : [])
       .catch(() => []);
 

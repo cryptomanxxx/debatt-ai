@@ -1,6 +1,6 @@
 import TeritoriumSpel from "./TeritoriumSpel";
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Territorium — debatt.ai",
@@ -15,7 +15,7 @@ async function getData() {
   const now = new Date().toISOString();
   const evRes = await fetch(
     `${SB_URL}/rest/v1/territorium_events?status=eq.aktiv&slut_datum=gte.${now}&order=skapad.desc&limit=1`,
-    { headers: H, next: { revalidate: 300 } },
+    { headers: H, next: { revalidate: 900 } },
   ).catch(() => null);
 
   const events = evRes?.ok ? await evRes.json() : [];

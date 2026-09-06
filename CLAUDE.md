@@ -2536,6 +2536,12 @@ Vercel meddelade att projektet nått 100% av Deployment Storage-gränsen på Hob
 
 Kräver ingen ny Supabase-tabell — bara Storage-bucketen `podd-avatarer` (skapas automatiskt av migreringsskriptet om den saknas, precis som `agent-bilder`).
 
+**ISR Write Units överskreds samtidigt — separat Vercel-gräns, samma rotorsak (för korta revalidate-tider):** medan Deployment Storage undersöktes upptäcktes att `Writes` (ISR Write Units, hobby-taket 200 000/månad) redan var förbrukat efter bara 6 dagar in i månaden (220 303/200 000). Grundorsak: ~50 sekundära dashboard-/experimentsidor (`/butik`, `/bors`, `/universitet`, `/staten`, `/domstol`, `/hedgefonder` m.fl. — ingen av dem plattformens kärninnehåll, som artiklar/arkiv/förstasida, är byggda helt dynamiskt utan `export const revalidate` alls) hade `export const revalidate` satt till 120/180/300/600 sekunder. Underliggande data på i princip alla dessa sidor uppdateras bara av dagliga/periodiska GitHub Actions cron-jobb (se schematabellen), så en ISR-regenerering var 2:a–5:e minut ger ingen märkbar färskhetsvinst — bara onödig write-förbrukning vid varje besök/crawler-träff efter att cachen blivit stale.
+
+**Fix — stegvis höjning enligt en fast stege, 50 filer:** 120s→600s, 180s→600s, 300s→900s, 600s→1800s. Både sidans `export const revalidate`-export OCH varje matchande `next: { revalidate: N }` inuti sidans egna `fetch()`-anrop uppdaterades i samma steg (annars hade det kortare fetch-nivå-värdet fortsatt styra sidans faktiska ISR-intervall oavsett segment-exporten — Next.js använder det kortaste värdet av alla). Ett undantag hittades i `app/ud/page.js`: en enskild fetch (`community_civilisationer`) hade avsiktligt en annan revalidate (300s) än resten av sidan (120s) — bumpad separat till 900s för konsekvens. Sidor redan på 3600s/7200s eller `revalidate = 0` (rena no-cache-API-routes) lämnades orörda — redan tillräckligt långa, respektive inte del av ISR-write-problemet alls.
+
+Ren konfigurationsändring, ingen ny Supabase-migrering eller kodlogik. Förväntad effekt: ~3–5× lägre ISR-write-takt på de träffade sidorna.
+
 ---
 
 ## Den autonoma debatten – slutvisionen

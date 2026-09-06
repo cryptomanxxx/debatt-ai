@@ -1,6 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Diplomatisk kommunikation – DEBATT-AI",
@@ -47,11 +47,11 @@ async function getData() {
       `${SB_URL}/rest/v1/diplomatiska_meddelanden` +
       `?select=id,riktning,avsandare,mottagare,amne,typ,status,svar_pa_id,kalla_url,meddelande,skapad,civ_id` +
       `&order=skapad.desc&limit=100`,
-      { headers: h, next: { revalidate: 300 } }
+      { headers: h, next: { revalidate: 900 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/community_civilisationer?select=id,namn,flagga,hemsida_url&status=eq.aktiv`,
-      { headers: h, next: { revalidate: 300 } }
+      { headers: h, next: { revalidate: 900 } }
     ),
   ]);
 

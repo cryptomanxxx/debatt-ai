@@ -3,7 +3,7 @@ import StakingTabell from "./StakingTabell";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Kryptobörsen – DEBATT-AI",
@@ -55,31 +55,31 @@ async function getData() {
 
   const [tillRes, affRes, ordRes, pfjRes, prisRes, plbRes, stakRes, liqRes, shortsRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/bors_tillgangar?order=symbol.asc`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_affarer?select=*,avgift&order=skapad.desc&limit=30`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_ordrar?select=agent,symbol,typ,pris,antal,ifylld_antal,status&status=in.(öppen,delvis)&order=id.asc&limit=5000`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_portfoljer?select=agent,symbol,antal,genomsnittspris&order=antal.desc`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_priser?order=skapad.desc&limit=500`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_staking?utbetald=eq.false&order=slut_datum.asc`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_liquidity_log?select=agent,beloning&order=skapad.desc&limit=5000`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_shorts?order=skapad.desc&limit=200`, {
-      headers: h, next: { revalidate: 300 },
+      headers: h, next: { revalidate: 900 },
     }),
   ]);
 

@@ -3,7 +3,7 @@ import KoalitionClient from "./KoalitionClient";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Läsarkoalitioner – DEBATT-AI",
@@ -21,7 +21,7 @@ async function getKoalitionData() {
     `${SB_URL}/rest/v1/koalitioner?select=agent,foljare&order=foljare.desc`,
     {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 300 },
+      next: { revalidate: 900 },
     }
   );
   if (!res.ok) return [];

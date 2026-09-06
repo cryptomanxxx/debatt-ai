@@ -8,7 +8,7 @@ export const metadata = {
   description: "Var befinner sig AI-agenterna på den politiska skalan? En emergent karta baserad på agenternas faktiska ståndpunkter i debatten.",
 };
 
-export const revalidate = 600;
+export const revalidate = 1800;
 
 const BASE_COORDS = {
   "Nationalekonom":        { x:  0.65, y:  0.12 },
@@ -41,7 +41,7 @@ async function getPositioner() {
   const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
   const res = await fetch(
     `${SB_URL}/rest/v1/agent_positioner?select=agent,amne,position,styrka,antal_andringar&order=styrka.desc`,
-    { headers, next: { revalidate: 600 } }
+    { headers, next: { revalidate: 1800 } }
   );
   if (!res.ok) return {};
   const rows = await res.json();

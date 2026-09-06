@@ -1,4 +1,4 @@
-export const revalidate = 300;
+export const revalidate = 900;
 
 export const metadata = {
   title: "Kollusionsspelet – DEBATT-AI",
@@ -31,7 +31,7 @@ async function getData() {
   const h = { apikey: key, Authorization: `Bearer ${key}` };
   const res = await fetch(
     `${SB_URL}/rest/v1/kollusion_spel?order=skapad.desc&limit=500`,
-    { headers: h, next: { revalidate: 300 } }
+    { headers: h, next: { revalidate: 900 } }
   );
   return res.ok ? res.json() : [];
 }

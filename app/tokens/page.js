@@ -1,6 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Agent-skapade tokens – DEBATT-AI",
@@ -37,10 +37,10 @@ async function getData() {
 
   const [tokRes, pfRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/agent_tokens?select=*&order=skapad.desc`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/bors_portfoljer?select=agent,symbol,antal&order=antal.desc`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
   ]);
 
@@ -54,7 +54,7 @@ async function getData() {
     const symStr = noteradeSym.map(s => `"${s}"`).join(",");
     const bRes = await fetch(
       `${SB_URL}/rest/v1/bors_tillgangar?symbol=in.(${symStr})&select=symbol,senaste_pris,forandring_pct,volym_24h,antal_affarer`,
-      { headers: h, next: { revalidate: 120 } }
+      { headers: h, next: { revalidate: 600 } }
     );
     borsData = bRes.ok ? await bRes.json() : [];
   }

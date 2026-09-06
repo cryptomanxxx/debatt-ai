@@ -1,4 +1,4 @@
-export const revalidate = 300;
+export const revalidate = 900;
 
 import KalibreringGraf from "./KalibreringGraf";
 
@@ -52,7 +52,7 @@ async function getData() {
 
   const res = await fetch(
     `${SB_URL}/rest/v1/ki_spel?lage=eq.oberoende&kategori=not.is.null&order=skapad.asc&limit=500`,
-    { headers: h, next: { revalidate: 300 } }
+    { headers: h, next: { revalidate: 900 } }
   );
   const spel = res.ok ? await res.json() : [];
   return { spel };

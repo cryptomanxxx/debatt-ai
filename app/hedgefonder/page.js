@@ -3,7 +3,7 @@ import { computeMetrics } from "./metrics";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Hedgefonder – DEBATT-AI",
@@ -46,42 +46,42 @@ async function getData() {
 
   const [fondRes, invRes, navRes, tradeRes, plbRes, paperNavRes, paperInnehavRes, stratNavRes, stratInnehavRes, arbiNavRes, revertNavRes, revertInnehavRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/hedgefonder?aktiv=eq.true&order=symbol.asc`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/hedgefond_investerare?select=*&order=investerat_sek.desc`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/hedgefond_nav_historik?order=skapad.desc&limit=200`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/hedgefond_trades?order=skapad.desc&limit=50`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/quant_paper_nav?order=skapad.desc&limit=60`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/quant_paper_innehav?order=symbol.asc`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/strat_paper_nav?order=skapad.desc&limit=60`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/strat_paper_innehav?order=symbol.asc`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     // ARBI tar 3 NAV-snapshots/dag (STRAT/QUANT tar 1/dag) — limit 180 ger samma
     // ungefärliga kalenderfönster (~60 dagar) som STRAT/QUANT:s limit=60.
     fetch(`${SB_URL}/rest/v1/arbi_paper_nav?order=skapad.desc&limit=180`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/revert_paper_nav?order=skapad.desc&limit=60`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
     fetch(`${SB_URL}/rest/v1/revert_paper_innehav?order=symbol.asc`, {
-      headers: h, next: { revalidate: 120 },
+      headers: h, next: { revalidate: 600 },
     }),
   ]);
 
