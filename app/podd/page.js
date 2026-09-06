@@ -47,7 +47,7 @@ const AGENT_FARG = {
 const AGENT_ROST = {
   "Nationalekonom":       { pitch: 0.85, rate: 0.88 },
   "Miljöaktivist":        { pitch: 1.10, rate: 1.06 },
-  "Teknikoptimist":       { pitch: 1.00, rate: 1.12 },
+  "Teknikoptimist":       { pitch: 1.00, rate: 0.95 },
   "Konservativ debattör": { pitch: 0.78, rate: 0.86 },
   "Jurist":               { pitch: 0.88, rate: 0.84 },
   "Journalist":           { pitch: 1.00, rate: 1.04 },

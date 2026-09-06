@@ -43,7 +43,7 @@ export const AGENTER = {
     roll: "Teknikoptimist",
     rvVoice: "Swedish Male",
     pitch: 1.06,
-    rate: 1.12,
+    rate: 0.95,
     hasBlink: true,
     mouthOpen:   ["johan.png", "johan-small.png", "johan-medium.png", "johan-large.png"],
     mouthHalf:   ["johan-m0-half.png", "johan-m1-half.png", "johan-m2-half.png", "johan-m3-half.png"],
