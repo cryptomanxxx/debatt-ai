@@ -1,6 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
+// Bildramarna (anna/nationalekonom/johan/oraklet, 58 filer) flyttades till
+// Supabase Storage sep 2026 — Vercels Deployment Storage-gräns (10 GB free
+// tier) nåddes delvis eftersom public/avatarer/podd/ (45 MB) buntades in i
+// VARJE deployment. Se scripts/upload-podd-assets.js för migreringen.
+export const PODD_AVATAR_BASE = "https://fmwxftnistkoqazfwnuj.supabase.co/storage/v1/object/public/podd-avatarer";
+
 // Per-agent overlay-konfiguration. Anna, Nationalekonom (Peter),
 // Teknikoptimist (Johan) och Oraklet har alla fyra fullständiga blink+mun-
 // frames (samma lagerbaserade, pixelstabila arkitektur — se
@@ -216,7 +222,7 @@ export function usePreload(cfg) {
         img.onload = resolve;
         img.onerror = resolve; // en trasig fil ska inte blockera animationen för evigt
       });
-      img.src = `/avatarer/podd/${namn}`;
+      img.src = `${PODD_AVATAR_BASE}/${namn}`;
       return { img, klar };
     });
     Promise.all(bilder.map(b => b.klar)).then(() => { if (!cancelled) setReady(true); });
@@ -260,13 +266,13 @@ export function AnchorImage({ cfg, blinkState, isSpeaking }) {
     const frames = cfg.hasBlink
       ? (blinkState === "closed" ? cfg.mouthClosed : blinkState === "half" ? cfg.mouthHalf : cfg.mouthOpen)
       : cfg.mouthOpen;
-    src = `/avatarer/podd/${frames[mouthIdx]}`;
+    src = `${PODD_AVATAR_BASE}/${frames[mouthIdx]}`;
   } else if (cfg.hasBlink) {
-    src = blinkState === "open" ? `/avatarer/podd/${cfg.idleOpen}`
-        : blinkState === "half" ? `/avatarer/podd/${cfg.idleHalf}`
-        : `/avatarer/podd/${cfg.idleClosed}`;
+    src = blinkState === "open" ? `${PODD_AVATAR_BASE}/${cfg.idleOpen}`
+        : blinkState === "half" ? `${PODD_AVATAR_BASE}/${cfg.idleHalf}`
+        : `${PODD_AVATAR_BASE}/${cfg.idleClosed}`;
   } else {
-    src = `/avatarer/podd/${cfg.idleOpen}`;
+    src = `${PODD_AVATAR_BASE}/${cfg.idleOpen}`;
   }
 
   return <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }} />;

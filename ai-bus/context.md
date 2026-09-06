@@ -60,7 +60,7 @@ Stack: Next.js App Router, Supabase, Groq (primär AI), Gemini Flash (fallback),
 
 ---
 
-## Bildmappning för Anna (`/public/avatarer/podd/`)
+## Bildmappning för Anna (Supabase Storage `podd-avatarer`, tidigare `/public/avatarer/podd/` — flyttat sep 2026 för att minska Vercel Deployment Storage, se CLAUDE.md ✅94)
 
 **v5 (3 sep 2026, aktuell) — "anna_locked_final_v1", byggd av projektägaren + ChatGPT (~4h arbete), inte av Claude Code.**
 Helt annan arkitektur än v1–v4: inte 12 separat AI-genererade helbildsframes
@@ -287,7 +287,7 @@ enda Codex råkade flagga.
 **Nästa steg (enligt projektägaren):** samma lager-baserade arkitektur och
 process planeras för Peter/Nationalekonom-karaktärens sprites.
 
-## Bildmappning för Peter/Nationalekonom (`/public/avatarer/podd/`)
+## Bildmappning för Peter/Nationalekonom (Supabase Storage `podd-avatarer`, tidigare `/public/avatarer/podd/` — se CLAUDE.md ✅94)
 
 **v5.9 (3 sep 2026) — Peter får mun- och blinkanimation, ny skäggfri
 masterbild:** projektägaren + ChatGPT byggde ett helt nytt Peter-paket

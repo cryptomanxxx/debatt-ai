@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 const DID_API  = "https://api.d-id.com";
-const SITE_URL = "https://www.debatt-ai.se";
+// Flyttat till Supabase Storage sep 2026 — se app/nyhetskallor/AgentOverlay.js
+const PODD_AVATAR_BASE = "https://fmwxftnistkoqazfwnuj.supabase.co/storage/v1/object/public/podd-avatarer";
 
 function didHeaders() {
   const encoded = Buffer.from(`${process.env.D_ID_API_KEY}:`).toString("base64");
@@ -52,7 +53,7 @@ export async function POST(req) {
   if (!agent || !text) return NextResponse.json({ error: "agent och text krävs" }, { status: 400 });
 
   const slug     = agentSlug(agent);
-  const imageUrl = `${SITE_URL}/avatarer/podd/${slug}.png`;
+  const imageUrl = `${PODD_AVATAR_BASE}/${slug}.png`;
   const voice    = kon === "kvinna"
     ? "sv-SE-SofieNeural"
     : kon === "man"

@@ -2523,6 +2523,19 @@ Kräver Supabase-tabeller `nyhetsflode` och `nyhetsanalys` — kör `supabase_ny
 | `.github/workflows/nyhetsflode-test.yml` | Kör 6 ggr/dag (04/08/12/16/20/00 svensk tid) |
 | `.github/workflows/nyhetsanalys-auto.yml` | Triggas av `workflow_run` direkt efter `Nyhetsflöde` (den pålitliga vägen) + `*/20`-schema som bonus (GitHub levererar tätare scheman opålitligt i praktiken, se ✅93) |
 
+### ✅ 94. Podd-avatarer flyttade till Supabase Storage — Vercel Deployment Storage-tak – KLART
+Vercel meddelade att projektet nått 100% av Deployment Storage-gränsen på Hobby/free tier (10 GB). Grundorsak: `public/avatarer/podd/` (Anna/Peter/Johan/Oraklet-animationsbilderna, 58 PNG-filer, 45 MB) låg i Next.js `public/`-mapp och buntades därför in i **varje** deployment — vid den här projektets deploy-kadens (varje merge till `main` skapar en ny) räckte det för att nå taket på relativt kort tid, oavsett faktisk besökstrafik (Deployment Storage är kumulativ lagring av sparade deployments, inte bandbredd).
+
+**Fix:** alla 58 filer flyttade till Supabase Storage (publik bucket `podd-avatarer`, samma mönster som `agent-bilder` i `supabase_utils.py`: `PUT /storage/v1/object/<bucket>/<fil>` med service role key, publik läsning via `/storage/v1/object/public/<bucket>/<fil>`). `public/avatarer/podd/` borttagen helt ur repot — `public/` gick från 92 MB till 47 MB, vilket halverar varje framtida deployments storleksavtryck.
+
+**Migrering (engångsprocess, redan genomförd och borttagen ur repot):** `scripts/upload-podd-assets.js` + en temporär `workflow_dispatch`-only workflow laddade upp filerna och verifierade publik åtkomst (HTTP 200 på stickprov) innan koden pekades om och de lokala filerna togs bort. Body/skript/workflow togs bort igen efter genomförd migrering — engångsverktyg, inte tänkt att finnas kvar i repot.
+
+**Kodreferenser uppdaterade (5 filer, alla hade egen kopia av bas-sökvägen `/avatarer/podd/`):** `app/nyhetskallor/AgentOverlay.js` (exporterar `PODD_AVATAR_BASE`, används av `/nyhetsanalyser` och `/fraga-anna-och-peter`), `app/podd/page.js`, `app/kanal/page.js` (Anna på startsidans nattliga AI-TV), `app/api/did/route.js` (D-ID-integrationens `source_url` — en publik Storage-URL fungerar lika bra som den gamla site-relativa), `app/admin/podd-test/page.js`.
+
+**Cross-origin-fälla i admin-testsidan (upptäckt under migreringen, inte av Codex):** `app/admin/podd-test/page.js` ritar avatarbilden på en `<canvas>` och spelar in den via `canvas.captureStream()` + `MediaRecorder` (för att testa lip-sync-video). En bild laddad från en ANNAN origin (nu `supabase.co` istället för samma site) gör canvasen "tainted" om `<img>`-elementets `crossOrigin`-attribut inte sätts INNAN bilden laddas — även om servern faktiskt tillåter CORS. Fixat genom att sätta `img.crossOrigin = "anonymous"` före `img.src` sätts till Storage-URL:en. Ingen av de andra fyra filerna berörs — de renderar bara `<img src>` direkt, vilket aldrig är CORS-känsligt.
+
+Kräver ingen ny Supabase-tabell — bara Storage-bucketen `podd-avatarer` (skapas automatiskt av migreringsskriptet om den saknas, precis som `agent-bilder`).
+
 ---
 
 ## Den autonoma debatten – slutvisionen

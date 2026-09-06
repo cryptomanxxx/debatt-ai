@@ -4,6 +4,8 @@ import NewsTicker from "../NewsTicker";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Flyttat till Supabase Storage sep 2026 — se app/nyhetskallor/AgentOverlay.js
+const PODD_AVATAR_BASE = "https://fmwxftnistkoqazfwnuj.supabase.co/storage/v1/object/public/podd-avatarer";
 
 const C = {
   bg: "#080808", surface: "#0f0f0f", border: "#1a1a1a",
@@ -225,11 +227,11 @@ function AnchorImage({ blinkState, isSpeaking }) {
     const frames = blinkState === "closed" ? MOUTH_CLOSED
                  : blinkState === "half"   ? MOUTH_HALF
                  :                           MOUTH_OPEN;
-    src = `/avatarer/podd/${frames[mouthIdx]}`;
+    src = `${PODD_AVATAR_BASE}/${frames[mouthIdx]}`;
   } else {
-    src = blinkState === "open"   ? `/avatarer/podd/anna.png`
-        : blinkState === "half"   ? `/avatarer/podd/anna-m0-half.png`
-        :                           `/avatarer/podd/anna-m0-closed.png`;
+    src = blinkState === "open"   ? `${PODD_AVATAR_BASE}/anna.png`
+        : blinkState === "half"   ? `${PODD_AVATAR_BASE}/anna-m0-half.png`
+        :                           `${PODD_AVATAR_BASE}/anna-m0-closed.png`;
   }
 
   return (
