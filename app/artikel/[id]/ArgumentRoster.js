@@ -5,32 +5,24 @@ function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Kandidatsträngar att leta efter i brödtexten, från mest till minst specifik:
-// hela källnamnet, sedan (för flerordsnamn) sista respektive första ordet —
-// t.ex. "SVT Nyheter" ger även "SVT", "MIT Technology Review" ger även "MIT"/"Review".
-// Korta eller generiska ord filtreras bort för att undvika falska träffar.
-const GENERISKA_ORD = new Set(["the", "reddit", "youtube", "arxiv", "r", "al", "big"]);
-function kallaKandidater(namn) {
-  if (!namn) return [];
-  const kandidater = [namn.trim()];
-  const delar = namn.trim().split(/\s+/).filter(Boolean);
-  if (delar.length > 1) {
-    const sista = delar[delar.length - 1].replace(/[:,]/g, "");
-    const forsta = delar[0].replace(/[:,]/g, "");
-    if (sista.length >= 4 && !GENERISKA_ORD.has(sista.toLowerCase())) kandidater.push(sista);
-    if (forsta.length >= 4 && !GENERISKA_ORD.has(forsta.toLowerCase())) kandidater.push(forsta);
-  }
-  return [...new Set(kandidater)];
-}
-
-// Länkar den FÖRSTA förekomsten av källnamnet (eller en kandidatsubsträng av det)
-// i brödtexten till källans URL — best-effort, eftersom artikeltexten är fri
-// LLM-genererad prosa och inte alltid nämner källan ordagrant.
+// Länkar den FÖRSTA förekomsten av källnamnet i brödtexten till källans URL —
+// best-effort, eftersom artikeltexten är fri LLM-genererad prosa och inte
+// alltid nämner källan ordagrant (då används fallback-raden istället).
+//
+// Matchar MEDVETET bara det fullständiga källnamnet, inte en utbruten
+// sista/första-ords-substräng (t.ex. "Nyheter" ur "SVT Nyheter", "Sverige"
+// ur "Reddit Sverige"). Många av plattformens källnamn (se nyheter.py) är
+// sammansatta av vanliga svenska/engelska ord — "Sverige", "Nyheter",
+// "Ekonomi", "Klimat", "Samhälle", "News" m.fl. — som med hög sannolikhet
+// förekommer på helt orelaterade ställen i en debattartikel. Att länka en
+// sådan förekomst hade gett en felaktig källattribution (Codex-fynd,
+// PR #1382-granskning). Det fullständiga namnet är i praktiken alltid
+// distinkt nog för en säker matchning.
 function linkifyKalla(paragraphs, kalla) {
   if (!kalla?.url || !kalla?.namn) return { noder: paragraphs, matchIndex: -1 };
-  const kandidater = kallaKandidater(kalla.namn);
-  for (const kand of kandidater) {
-    const re = new RegExp(`\\b(${escapeRegExp(kand)})\\b`, "i");
+  const namn = kalla.namn.trim();
+  if (namn) {
+    const re = new RegExp(`\\b(${escapeRegExp(namn)})\\b`, "i");
     for (let i = 0; i < paragraphs.length; i++) {
       const p = paragraphs[i];
       const m = p.match(re);
