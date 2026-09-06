@@ -61,6 +61,12 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
   // fynd/nyhet kan öppnas flera gånger och en tidigare, fortfarande
   // pågående sparning annars kunde hamna på en senare öppning (samma
   // race-skydd som redan finns på /nyhetsanalyser).
+  // Rensar alltid sharePending när anropet är klart (lyckat eller ej) —
+  // AgentOverlay håller overlayen öppen tills sharePending går till false,
+  // annars kunde en kort uppläsning hinna avsluta talet och stänga overlayen
+  // innan den här sparningen ens svarat, vilket permanent tappade
+  // share-länken (samma race som fixades på /nyhetsanalyser, Codex-fynd
+  // PR #1389-granskning).
   async function sparaLasningHistorik(meta) {
     try {
       const res = await fetch("/api/fraga-anna-och-peter", {
@@ -70,12 +76,14 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
       });
       const data = await res.json().catch(() => ({}));
       const id = data?.rad?.id;
-      if (id) {
-        const shareUrl = `${window.location.origin}/fraga-anna-och-peter?visa=${id}`;
-        setLasning(prev => (prev && prev.invocationId === meta.invocationId ? { ...prev, shareUrl } : prev));
-      }
+      setLasning(prev => {
+        if (!prev || prev.invocationId !== meta.invocationId) return prev;
+        return id
+          ? { ...prev, shareUrl: `${window.location.origin}/fraga-anna-och-peter?visa=${id}`, sharePending: false }
+          : { ...prev, sharePending: false };
+      });
     } catch {
-      // tyst — en misslyckad sparning ska aldrig störa den redan pågående uppläsningen
+      setLasning(prev => (prev && prev.invocationId === meta.invocationId ? { ...prev, sharePending: false } : prev));
     }
   }
 
@@ -85,7 +93,7 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
   // loggningsfel ska aldrig hindra själva uppläsningen, som redan startat
   // klientsidan (overlayen öppnas synkront via setLasning).
   const handleLasa = useCallback((payload) => {
-    const entry = { ...payload, invocationId: `${payload.typ}-${payload.id}-${Date.now()}` };
+    const entry = { ...payload, invocationId: `${payload.typ}-${payload.id}-${Date.now()}`, sharePending: true };
     setLasning(entry);
     fetch("/api/oraklet-lasning", {
       method: "POST",
@@ -139,6 +147,7 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
           namn="Professor Oraklet"
           text={lasning.text}
           shareUrl={lasning.shareUrl}
+          sharePending={lasning.sharePending}
           onClose={() => setLasning(null)}
         />
       )}
