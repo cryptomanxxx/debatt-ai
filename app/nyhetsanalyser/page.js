@@ -28,6 +28,10 @@ const LASARE = [
   { agent: "Teknikoptimist", namn: "Johan", farg: AGENTER.Teknikoptimist.farg, ikon: "💡" },
 ];
 
+// Mappar AGENTER-nyckeln mot aktion-strängen fraga_anna_peter_log förväntar
+// sig — samma mönster som AGENT_TILL_AKTION i /fraga-anna-och-peter/page.js.
+const AGENT_TILL_AKTION = { Anna: "anna_sager", Nationalekonom: "peter_sager", Teknikoptimist: "johan_sager" };
+
 const ALLA_AGENTER = Object.keys(AGENT_VISUELL).sort();
 const PAGE_SIZE = 15;
 
@@ -63,7 +67,7 @@ export default function NyhetsanalyserPage() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(null);
-  const [lasning, setLasning] = useState(null); // { id, agent, namn, text } | null
+  const [lasning, setLasning] = useState(null); // { id, invocationId, agent, namn, text, shareUrl? } | null
   const [studio, setStudio] = useState(null); // { id, invocationId, rubrik, beskrivning, url, delLank? } | null
   const [foreslagStatus, setForeslagStatus] = useState({}); // { [id]: "laddar" | "ok" | "fel" }
   // Codex-fynd (PR #1319): utan detta kan ett byte av agentFilter medan en
@@ -173,6 +177,31 @@ export default function NyhetsanalyserPage() {
       }
     } catch {
       // tyst — se kommentar ovan
+    }
+  }
+
+  // Sparar en enskild "Anna/Peter/Johan läser"-uppläsning till samma
+  // fraga_anna_peter_log-tabell (typ "fritext", eftersom den lästa texten
+  // redan är en sammanslagen rubrik+analys-sträng — ingen separat titel/URL
+  // att särskilja) så den kan delas via samma ?visa=<id>-permalänk som
+  // studiosamtal. Matchar på ett unikt invocationId per klick — samma
+  // race-skydd som sparaStudioHistorik ovan (Codex-fynd, PR #1387).
+  async function sparaLasningHistorik(meta) {
+    try {
+      const aktion = AGENT_TILL_AKTION[meta.agent] || "anna_sager";
+      const res = await fetch("/api/fraga-anna-och-peter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ typ: "fritext", aktion, text: meta.text }),
+      });
+      const data = await res.json().catch(() => ({}));
+      const id = data?.rad?.id;
+      if (id) {
+        const shareUrl = `${window.location.origin}/fraga-anna-och-peter?visa=${id}`;
+        setLasning(prev => (prev && prev.invocationId === meta.invocationId ? { ...prev, shareUrl } : prev));
+      }
+    } catch {
+      // tyst — se kommentar på sparaStudioHistorik ovan
     }
   }
 
@@ -316,7 +345,12 @@ export default function NyhetsanalyserPage() {
                     {LASARE.map(({ agent, namn, farg: lasFarg, ikon }) => (
                       <button
                         key={agent}
-                        onClick={() => setLasning({ id: r.id, agent, namn, text: rubrik ? `${rubrik}. ${r.analys}` : r.analys })}
+                        onClick={() => {
+                          const text = rubrik ? `${rubrik}. ${r.analys}` : r.analys;
+                          const meta = { id: r.id, invocationId: `${r.id}-${agent}-${Date.now()}`, agent, namn, text };
+                          setLasning(meta);
+                          sparaLasningHistorik(meta);
+                        }}
                         style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${lasFarg}50`, color: lasFarg, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
                       >
                         {ikon} {namn} läser
@@ -358,7 +392,14 @@ export default function NyhetsanalyserPage() {
         )}
       </div>
       {lasning && (
-        <AgentOverlay key={`${lasning.id}-${lasning.agent}`} agent={lasning.agent} namn={lasning.namn} text={lasning.text} onClose={() => setLasning(null)} />
+        <AgentOverlay
+          key={`lasning-${lasning.invocationId}`}
+          agent={lasning.agent}
+          namn={lasning.namn}
+          text={lasning.text}
+          shareUrl={lasning.shareUrl}
+          onClose={() => setLasning(null)}
+        />
       )}
       {studio && (
         <StudioOverlay
