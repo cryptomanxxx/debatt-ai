@@ -51,12 +51,29 @@ function StudioPerson({ rolle, isSpeaking, dimmed }) {
 // `onTurns` (valfri): callback som körs EN gång när en NY dialog just har
 // hämtats från /api/studio (aldrig vid en `turns`-styrd replay) — used av
 // sidan för att spara historikposten med den färdiga dialogen.
-export default function StudioOverlay({ rubrik, beskrivning, turns: forcedTurns, onTurns, onClose }) {
+// `shareUrl` (valfri): en permalänk (t.ex. /fraga-anna-och-peter?visa=<id>)
+// som, om satt, ger en "🔗 Dela samtalet"-knapp som kopierar länken till
+// urklipp. Sidan sätter den asynkront efter att onTurns sparat dialogen och
+// fått tillbaka radens id — knappen dyker därför upp en kort stund efter att
+// samtalet börjat spelas, inte direkt.
+export default function StudioOverlay({ rubrik, beskrivning, turns: forcedTurns, onTurns, shareUrl, onClose }) {
   const harForcedTurns = Array.isArray(forcedTurns) && forcedTurns.length > 0;
   const [fas, setFas] = useState(harForcedTurns ? "spelar" : "laddar"); // laddar | spelar | klar | fel
   const [turns, setTurns] = useState(harForcedTurns ? forcedTurns : []);
   const [activeIdx, setActiveIdx] = useState(0);
   const [fel, setFel] = useState("");
+  const [kopierat, setKopierat] = useState(false);
+
+  async function kopieraLank() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setKopierat(true);
+      setTimeout(() => setKopierat(false), 2000);
+    } catch {
+      // clipboard kan vara blockerad (behörighet nekad, icke-https m.m.) — tyst
+    }
+  }
 
   // Hämta dialogen (hoppas över om en färdig dialog redan skickats in)
   useEffect(() => {
@@ -110,12 +127,14 @@ export default function StudioOverlay({ rubrik, beskrivning, turns: forcedTurns,
     return () => { window.responsiveVoice?.cancel(); };
   }, [fas, activeIdx, turns]);
 
-  // Stäng automatiskt en liten stund efter sista repliken
+  // Stäng automatiskt en liten stund efter sista repliken — men inte om en
+  // delningslänk finns, så besökaren hinner klicka "🔗 Dela samtalet" istället
+  // för att overlayen försvinner under näsan på dem.
   useEffect(() => {
-    if (fas !== "klar") return;
+    if (fas !== "klar" || shareUrl) return;
     const t = setTimeout(onClose, 1500);
     return () => clearTimeout(t);
-  }, [fas, onClose]);
+  }, [fas, onClose, shareUrl]);
 
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") onClose(); }
@@ -183,17 +202,32 @@ export default function StudioOverlay({ rubrik, beskrivning, turns: forcedTurns,
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          style={{
-            width: "100%", marginTop: "10px", padding: "10px",
-            borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif",
-            border: "1px solid #5a2020", background: "#1a0808", color: "#e05050",
-            cursor: "pointer", letterSpacing: "0.06em", boxSizing: "border-box",
-          }}
-        >
-          ⏹ Stäng
-        </button>
+        <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+          {shareUrl && (
+            <button
+              onClick={kopieraLank}
+              style={{
+                flex: 1, padding: "10px",
+                borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif",
+                border: "1px solid #1a4a6a", background: "#081218", color: "#38bdf8",
+                cursor: "pointer", letterSpacing: "0.06em", boxSizing: "border-box",
+              }}
+            >
+              {kopierat ? "✓ Länk kopierad" : "🔗 Dela samtalet"}
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, padding: "10px",
+              borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif",
+              border: "1px solid #5a2020", background: "#1a0808", color: "#e05050",
+              cursor: "pointer", letterSpacing: "0.06em", boxSizing: "border-box",
+            }}
+          >
+            ⏹ Stäng
+          </button>
+        </div>
       </div>
     </div>
   );

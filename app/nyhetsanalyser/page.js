@@ -64,7 +64,7 @@ export default function NyhetsanalyserPage() {
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(null);
   const [lasning, setLasning] = useState(null); // { id, agent, namn, text } | null
-  const [studio, setStudio] = useState(null); // { id, rubrik, beskrivning } | null
+  const [studio, setStudio] = useState(null); // { id, rubrik, beskrivning, url, delLank? } | null
   const [foreslagStatus, setForeslagStatus] = useState({}); // { [id]: "laddar" | "ok" | "fel" }
   // Codex-fynd (PR #1319): utan detta kan ett byte av agentFilter medan en
   // tidigare fetch fortfarande är i luften låta det GAMLA svaret landa efter
@@ -138,6 +138,34 @@ export default function NyhetsanalyserPage() {
       setForeslagStatus(prev => ({ ...prev, [r.id]: res.ok ? "ok" : "fel" }));
     } catch {
       setForeslagStatus(prev => ({ ...prev, [r.id]: "fel" }));
+    }
+  }
+
+  // Sparar studiosamtalet till fraga_anna_peter_log (samma tabell/route som
+  // /fraga-anna-och-peter använder för "diskussion"-poster) så det kan delas
+  // via en permalänk. typ="url" när nyheten har en riktig källa (ger en
+  // klickbar rubrik-länk i historiken via HistorikPost) — annars fritext med
+  // rubriken som text. Fire-and-forget: en misslyckad sparning ska aldrig
+  // störa det redan pågående samtalet, bara innebära att "🔗 Dela"-knappen
+  // aldrig dyker upp.
+  async function sparaStudioHistorik(meta, turns) {
+    try {
+      const body = meta.url
+        ? { typ: "url", aktion: "diskussion", url: meta.url, titel: meta.rubrik, sammanfattning: meta.beskrivning, dialog: turns }
+        : { typ: "fritext", aktion: "diskussion", text: meta.rubrik, dialog: turns };
+      const res = await fetch("/api/fraga-anna-och-peter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      const id = data?.rad?.id;
+      if (id) {
+        const delLank = `${window.location.origin}/fraga-anna-och-peter?visa=${id}`;
+        setStudio(prev => (prev && prev.id === meta.id ? { ...prev, delLank } : prev));
+      }
+    } catch {
+      // tyst — se kommentar ovan
     }
   }
 
@@ -289,7 +317,7 @@ export default function NyhetsanalyserPage() {
                     ))}
                     {rubrik && (
                       <button
-                        onClick={() => setStudio({ id: r.id, rubrik, beskrivning: r.nyhetsflode?.beskrivning || "" })}
+                        onClick={() => setStudio({ id: r.id, rubrik, beskrivning: r.nyhetsflode?.beskrivning || "", url: r.nyhetsflode?.url || null })}
                         style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${STUDIO_FARG}50`, color: STUDIO_FARG, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
                       >
                         🎭 Anna, Peter &amp; Johan i studion
@@ -326,7 +354,14 @@ export default function NyhetsanalyserPage() {
         <AgentOverlay key={`${lasning.id}-${lasning.agent}`} agent={lasning.agent} namn={lasning.namn} text={lasning.text} onClose={() => setLasning(null)} />
       )}
       {studio && (
-        <StudioOverlay key={`studio-${studio.id}`} rubrik={studio.rubrik} beskrivning={studio.beskrivning} onClose={() => setStudio(null)} />
+        <StudioOverlay
+          key={`studio-${studio.id}`}
+          rubrik={studio.rubrik}
+          beskrivning={studio.beskrivning}
+          shareUrl={studio.delLank}
+          onTurns={(turns) => sparaStudioHistorik(studio, turns)}
+          onClose={() => setStudio(null)}
+        />
       )}
     </div>
   );

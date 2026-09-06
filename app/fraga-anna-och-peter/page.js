@@ -89,6 +89,7 @@ function AktionsKnapp({ farg, onClick, disabled, children }) {
 }
 
 function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
+  const [kopierat, setKopierat] = useState(false);
   const info = AKTION_INFO[rad.aktion] || AKTION_INFO.anna_sager;
   const ärUrl = rad.typ === "url";
   const dialog = Array.isArray(rad.dialog) ? rad.dialog : null;
@@ -108,6 +109,16 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
   // annars tyst, vilket gjorde knappen klickbar men verkningslös
   // (Codex-fynd, PR #1346).
   const kanSpelaUpp = rad.aktion === "diskussion" ? !!dialog?.length : !!(brodtext || rad.titel);
+
+  async function kopieraLank() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/fraga-anna-och-peter?visa=${rad.id}`);
+      setKopierat(true);
+      setTimeout(() => setKopierat(false), 2000);
+    } catch {
+      // clipboard kan vara blockerad (behörighet nekad, icke-https m.m.) — tyst
+    }
+  }
 
   return (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
@@ -170,12 +181,18 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
         )}
 
         {kanSpelaUpp && (
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               onClick={onSpelaUpp}
               style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${info.farg}50`, color: info.farg, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
             >
               🔁 Spela upp igen
+            </button>
+            <button
+              onClick={kopieraLank}
+              style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${LANK}50`, color: LANK, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
+            >
+              {kopierat ? "✓ Länk kopierad" : "🔗 Kopiera länk"}
             </button>
           </div>
         )}
@@ -234,6 +251,29 @@ export default function FragaAnnaOchPeterPage() {
   }
 
   useEffect(() => { laddaHistorik(null); }, []);
+
+  // Delningslänkar — en besökare som klickar "🔗 Kopiera länk" på ett
+  // historikinlägg (eller på ett nyss avslutat studiosamtal på
+  // /nyhetsanalyser) får en URL på formen ?visa=<fraga_anna_peter_log.id>.
+  // Läses av här vid mount och spelas upp precis som "🔁 Spela upp igen" i
+  // historiken — spelaUppHistorik() är samma funktion, ingen dubblerad logik.
+  // window.location istället för useSearchParams() undviker Next.js-kravet
+  // på en Suspense-gräns runt useSearchParams i App Router.
+  useEffect(() => {
+    const visaId = new URLSearchParams(window.location.search).get("visa");
+    if (!visaId) return;
+    (async () => {
+      try {
+        const res = await fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log?id=eq.${encodeURIComponent(visaId)}&select=*`, { headers: sbH() });
+        const data = await res.json().catch(() => []);
+        const rad = Array.isArray(data) ? data[0] : null;
+        if (rad) spelaUppHistorik(rad);
+      } catch {
+        // tyst — en trasig eller borttagen delningslänk ska aldrig krascha sidan
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function laddaFlerHistorik() {
     const sista = historik[historik.length - 1];
