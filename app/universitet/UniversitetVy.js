@@ -50,18 +50,49 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
   // oavsett vilken flik besökaren står på.
   const [lasning, setLasning] = useState(null);
 
+  // Sparar uppläsningen till fraga_anna_peter_log (samma tabell/route och
+  // aktion "oraklet_forklarar" som Oraklets URL-förklaring på
+  // /fraga-anna-och-peter redan använder) så den kan delas via en
+  // ?visa=<id>-permalänk — samma mönster som "🔗 Dela"-knappen på
+  // /nyhetsanalyser. En separat sparning från den fire-and-forget-loggning
+  // som redan finns till /api/oraklet-lasning (som bara är till för
+  // Senaste aktivitet-feeden och inte sparar den lästa texten). Matchar på
+  // ett unikt invocationId per klick, inte payload.id, eftersom samma
+  // fynd/nyhet kan öppnas flera gånger och en tidigare, fortfarande
+  // pågående sparning annars kunde hamna på en senare öppning (samma
+  // race-skydd som redan finns på /nyhetsanalyser).
+  async function sparaLasningHistorik(meta) {
+    try {
+      const res = await fetch("/api/fraga-anna-och-peter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ typ: "fritext", aktion: "oraklet_forklarar", text: meta.text }),
+      });
+      const data = await res.json().catch(() => ({}));
+      const id = data?.rad?.id;
+      if (id) {
+        const shareUrl = `${window.location.origin}/fraga-anna-och-peter?visa=${id}`;
+        setLasning(prev => (prev && prev.invocationId === meta.invocationId ? { ...prev, shareUrl } : prev));
+      }
+    } catch {
+      // tyst — en misslyckad sparning ska aldrig störa den redan pågående uppläsningen
+    }
+  }
+
   // Loggar uppläsningen (fire-and-forget) så den syns i Senaste
   // aktivitet-feeden på startsidan (se app/api/aktivitet/route.js) — utan
   // detta lämnade en Oraklet-uppläsning inget spår alls i databasen. Ett
   // loggningsfel ska aldrig hindra själva uppläsningen, som redan startat
   // klientsidan (overlayen öppnas synkront via setLasning).
   const handleLasa = useCallback((payload) => {
-    setLasning(payload);
+    const entry = { ...payload, invocationId: `${payload.typ}-${payload.id}-${Date.now()}` };
+    setLasning(entry);
     fetch("/api/oraklet-lasning", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ typ: payload.typ, ref_id: payload.id, titel: payload.titel }),
     }).catch(() => {});
+    sparaLasningHistorik(entry);
   }, []);
 
   return (
@@ -97,15 +128,17 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
         : <OrakletsLaslistaVy urval={urval} onLasa={handleLasa} />}
 
       {lasning && (
-        // Nyckeln inkluderar typ eftersom fynd (vetenskapliga_upptagter) och
-        // nyheter (nyhetsflode) har separata id-sekvenser — utan typ-prefixet
-        // kunde en fynd-id och en nyhet-id råka kollidera och overlayen då
-        // inte remounta (och därmed inte byta uppläst text) vid klick.
+        // Nyckeln använder invocationId (unikt per klick) snarare än bara
+        // typ+id — utan det kunde en snabb stäng+återöppna av SAMMA fynd/
+        // nyhet återanvända samma nyckel och overlayen då inte remounta
+        // korrekt mellan de två separata sparningarna (samma race som
+        // åtgärdats på /nyhetsanalyser).
         <AgentOverlay
-          key={`oraklet-${lasning.typ}-${lasning.id}`}
+          key={`oraklet-${lasning.invocationId}`}
           agent="Oraklet"
           namn="Professor Oraklet"
           text={lasning.text}
+          shareUrl={lasning.shareUrl}
           onClose={() => setLasning(null)}
         />
       )}
