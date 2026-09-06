@@ -2542,6 +2542,27 @@ Kräver ingen ny Supabase-tabell — bara Storage-bucketen `podd-avatarer` (skap
 
 Ren konfigurationsändring, ingen ny Supabase-migrering eller kodlogik. Förväntad effekt: ~3–5× lägre ISR-write-takt på de träffade sidorna.
 
+### ✅ 95. Delningslänkar för Fråga AI-agenterna-historiken (inkl. studiosamtal från Nyhetsanalyser) – KLART
+Studiosamtal som startas från `/nyhetsanalyser` ("🎭 Anna, Peter & Johan i studion") sparades tidigare ingenstans — `StudioOverlay` fick ingen `onTurns`-callback där, till skillnad från `/fraga-anna-och-peter` som redan loggade sina studiosamtal till `fraga_anna_peter_log`. En besökare kunde alltså inte dela ett studiosamtal de precis lyssnat på, och `/fraga-anna-och-peter`s egen historik hade ingen permalänk till ett enskilt inlägg heller — bara ett "🔁 Spela upp igen" som fungerade inline på sidan.
+
+**Ingen ny tabell eller schemaändring** — bygger helt på den redan befintliga `fraga_anna_peter_log` (✅93) och dess `/api/fraga-anna-och-peter`-route, som redan stödjer `aktion: "diskussion"` med en sparad `dialog`.
+
+**`/nyhetsanalyser` sparar nu studiosamtal:** `StudioOverlay` får ett `onTurns`-callback (`sparaStudioHistorik()`) som POSTar dialogen till `/api/fraga-anna-och-peter` så fort den genererats — `typ: "url"` (med `nyhetsflode.url` som källa, ger en klickbar rubrik i historiken) om nyheten har en riktig URL, annars `typ: "fritext"` med rubriken som text. Den sparade radens `id` används för att bygga en permalänk `/fraga-anna-och-peter?visa=<id>`.
+
+**Delningslänk konsumeras på `/fraga-anna-och-peter`:** en `useEffect` läser `?visa=<id>` ur `window.location.search` vid mount (`window.location` istället för `useSearchParams()` för att slippa Next.js App Routers Suspense-krav), hämtar den enskilda raden och spelar upp den med **exakt samma** `spelaUppHistorik()`-funktion som redan driver "🔁 Spela upp igen" i historiken — ingen dubblerad uppspelningslogik. En trasig eller borttagen länk (`rad` hittas inte) är tyst — sidan laddas som vanligt utan felmeddelande.
+
+**"🔗 Dela samtalet"-knapp i `StudioOverlay`:** ny valfri `shareUrl`-prop — när satt visas en knapp bredvid "⏹ Stäng" som kopierar länken till urklipp (`navigator.clipboard.writeText`, tyst fail om blockerad) med en kort "✓ Länk kopierad"-bekräftelse. `shareUrl` sätts asynkront av sidan efter att dialogen sparats (samma runda trip som ger tillbaka radens `id`), så knappen dyker upp en kort stund in i uppspelningen — inte direkt. Auto-stäng-timern (1,5 s efter sista repliken) skippas helt när `shareUrl` finns, så besökaren hinner hitta och klicka knappen istället för att overlayen försvinner under näsan på dem.
+
+**"🔗 Kopiera länk"-knapp i historiken:** varje inlägg i `/fraga-anna-och-peter`s historiklista (`HistorikPost`) fick samma knapp bredvid "🔁 Spela upp igen" — gäller alla tre aktionstyper (uppläsning, URL-uppläsning, studiosamtal), inte bara studio, eftersom infrastrukturen (radens `id` + samma uppspelningsfunktion) redan är identisk för alla.
+
+**Känd begränsning:** `/fraga-anna-och-peter?visa=<id>` är samma klientrenderade sida som vanligt, ingen dedikerad SSR-route med egna OG-metataggar (jfr `/chatt/[id]`) — en delad länk fungerar (öppnar sidan och spelar upp rätt inlägg) men ger ingen anpassad förhandsgranskningsbild/-titel vid delning i sociala medier. Proportionerlig avvägning mot en betydligt större separat route+metadata-generering, som inte byggdes här.
+
+| Fil | Roll |
+|---|---|
+| `app/nyhetskallor/StudioOverlay.js` | Ny `shareUrl`-prop + "🔗 Dela samtalet"-knapp med kopiera-till-urklipp. Auto-stäng-timern hoppas över när `shareUrl` finns. |
+| `app/nyhetsanalyser/page.js` | `sparaStudioHistorik()` sparar studiosamtalet via `/api/fraga-anna-och-peter` (typ url/fritext beroende på om nyheten har en källa), bygger `delLank` av det returnerade id:t, skickar den som `shareUrl` till `StudioOverlay` |
+| `app/fraga-anna-och-peter/page.js` | Ny `useEffect` som läser `?visa=<id>`, hämtar raden och återanvänder `spelaUppHistorik()`. `HistorikPost` fick en `kopieraLank()`-funktion + "🔗 Kopiera länk"-knapp bredvid "🔁 Spela upp igen" |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
