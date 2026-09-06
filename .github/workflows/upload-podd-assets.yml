@@ -1,0 +1,22 @@
+name: Engångsmigrering – podd-avatarer till Storage
+
+# Temporär, manuellt triggad engångsmigrering (se scripts/upload-podd-assets.js).
+# Tas bort ur repot i samma PR när migreringen är verifierad — inte tänkt att
+# köras mer än en gång.
+on:
+  workflow_dispatch:
+
+jobs:
+  upload-podd-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Ladda upp podd-avatarer till Supabase Storage
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/upload-podd-assets.js
