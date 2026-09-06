@@ -64,7 +64,7 @@ export default function NyhetsanalyserPage() {
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(null);
   const [lasning, setLasning] = useState(null); // { id, agent, namn, text } | null
-  const [studio, setStudio] = useState(null); // { id, rubrik, beskrivning, url, delLank? } | null
+  const [studio, setStudio] = useState(null); // { id, invocationId, rubrik, beskrivning, url, delLank? } | null
   const [foreslagStatus, setForeslagStatus] = useState({}); // { [id]: "laddar" | "ok" | "fel" }
   // Codex-fynd (PR #1319): utan detta kan ett byte av agentFilter medan en
   // tidigare fetch fortfarande är i luften låta det GAMLA svaret landa efter
@@ -148,6 +148,13 @@ export default function NyhetsanalyserPage() {
   // rubriken som text. Fire-and-forget: en misslyckad sparning ska aldrig
   // störa det redan pågående samtalet, bara innebära att "🔗 Dela"-knappen
   // aldrig dyker upp.
+  //
+  // Matchar på meta.invocationId (unikt per öppning), inte meta.id (nyhets-
+  // analysens id, som är detsamma om samma nyhet öppnas i studion flera
+  // gånger) — Codex-fynd, PR #1387-granskning: utan detta kunde en
+  // stängd+återöppnad studio för SAMMA nyhet få den GAMLA, redan i luften
+  // varande sparningens delLank tilldelad sig själv, eftersom prev.id och
+  // meta.id då råkade matcha trots att det var två separata dialoger.
   async function sparaStudioHistorik(meta, turns) {
     try {
       const body = meta.url
@@ -162,7 +169,7 @@ export default function NyhetsanalyserPage() {
       const id = data?.rad?.id;
       if (id) {
         const delLank = `${window.location.origin}/fraga-anna-och-peter?visa=${id}`;
-        setStudio(prev => (prev && prev.id === meta.id ? { ...prev, delLank } : prev));
+        setStudio(prev => (prev && prev.invocationId === meta.invocationId ? { ...prev, delLank } : prev));
       }
     } catch {
       // tyst — se kommentar ovan
@@ -317,7 +324,7 @@ export default function NyhetsanalyserPage() {
                     ))}
                     {rubrik && (
                       <button
-                        onClick={() => setStudio({ id: r.id, rubrik, beskrivning: r.nyhetsflode?.beskrivning || "", url: r.nyhetsflode?.url || null })}
+                        onClick={() => setStudio({ id: r.id, invocationId: `${r.id}-${Date.now()}`, rubrik, beskrivning: r.nyhetsflode?.beskrivning || "", url: r.nyhetsflode?.url || null })}
                         style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${STUDIO_FARG}50`, color: STUDIO_FARG, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
                       >
                         🎭 Anna, Peter &amp; Johan i studion
@@ -355,7 +362,7 @@ export default function NyhetsanalyserPage() {
       )}
       {studio && (
         <StudioOverlay
-          key={`studio-${studio.id}`}
+          key={`studio-${studio.invocationId}`}
           rubrik={studio.rubrik}
           beskrivning={studio.beskrivning}
           shareUrl={studio.delLank}
