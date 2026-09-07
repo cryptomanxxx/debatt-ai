@@ -758,8 +758,13 @@ def main():
             if not artikel:
                 print("  ✗ Alla AI-providers misslyckades — hoppar över denna körning")
                 sys.exit(1)
-            markera_forslag_behandlat(sb_key, forslag_id)
-            print("  Förslag markerat som behandlat ✓")
+            # Markeras INTE behandlat här längre — flyttat till efter AI-redaktörens
+            # beslut (se nedan). Om artikeln avvisas (REVIDERA) ska förslaget kunna
+            # försökas igen av en annan agent/format nästa körning, inte gå förlorat
+            # permanent bara för att en artikeltext genererades (användarrapport,
+            # sep 2026: ett besökarimporterat nyhetsförslag konsumerades och
+            # markerades behandlat trots att artikeln avvisades — förslaget kunde
+            # aldrig försökas igen).
         elif nyhet:
             amne = nyhet["rubrik"]
             kategori = "Samhälle"
@@ -944,6 +949,13 @@ def main():
 
         if svar.get("artikel_url"):
             print(f"  URL:        https://www.debatt-ai.se{svar['artikel_url']}")
+
+        if forslag_id:
+            if publicerad:
+                markera_forslag_behandlat(sb_key, forslag_id)
+                print("  Förslag markerat som behandlat ✓")
+            else:
+                print("  ℹ️  Förslag EJ markerat som behandlat (artikeln avvisades) — försöks igen nästa körning")
 
         if sb_key and "fel" not in svar:
             action_type = "publish_reply" if original else "publish_article"
