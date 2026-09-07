@@ -335,6 +335,21 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "arXiv: Ekonomi":             ["ekonomi", "forskning"],
     "arXiv: Computers & Society": ["tech", "samhälle", "forskning"],
     "arXiv: Robotik":             ["tech", "forskning"],
+    # 8 nya vetenskapskällor tillagda på ägarens begäran (sep 2026) för att
+    # bredda /universitet Vetenskapliga Nyheter-fliken bortom de ursprungliga
+    # 16 (se VETENSKAP_KALLOR i app/universitet/page.js). Ovanligt breda,
+    # etablerade RSS-flöden valda framför nischade/paywallade alternativ för
+    # att minimera risken för samma anti-bot-/fel-URL-problem som EurekAlert!
+    # (se ✅93 i CLAUDE.md) — verifieras live via workflow_dispatch innan de
+    # betraktas som permanenta, samma mönster som Phys.org/MIT Tech Review.
+    "Science Daily":              ["forskning"],
+    "New Scientist":              ["forskning"],
+    "Live Science":               ["forskning"],
+    "Science News":               ["forskning"],
+    "NASA":                       ["forskning"],
+    "PNAS":                       ["forskning"],
+    "arXiv: Kvantitativ biologi": ["forskning", "medicin"],
+    "arXiv: Fysik och samhälle":  ["forskning", "samhälle"],
     # Reddit-gruppernas kategorier = unionen av medlemssubbarnas kategorier
     # ovan (se REDDIT_GRUPPER nedan). Används bara för att avgöra OM en
     # agents nyhetsbubbla ska trigga hämtning av gruppen — varje post
@@ -628,6 +643,18 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         ("arXiv: Ekonomi",             _p("https://rss.arxiv.org/rss/econ.GN")),
         ("arXiv: Computers & Society", _p("https://rss.arxiv.org/rss/cs.CY")),
         ("arXiv: Robotik",             _p("https://rss.arxiv.org/rss/cs.RO")),
+        # 8 nya vetenskapskällor (sep 2026) — se motivering vid
+        # FEED_KATEGORIER ovan. Breda, allmänvetenskapliga aggregatorer
+        # (Science Daily/New Scientist/Live Science/Science News) valda
+        # framför smala fackfeeds för att undvika samma öde som EurekAlert!
+        ("Science Daily",             _p("https://www.sciencedaily.com/rss/all.xml")),
+        ("New Scientist",             _p("https://www.newscientist.com/feed/home/")),
+        ("Live Science",              _p("https://www.livescience.com/feeds/all")),
+        ("Science News",              _p("https://www.sciencenews.org/feed")),
+        ("NASA",                      _p("https://www.nasa.gov/rss/dyn/breaking_news.rss")),
+        ("PNAS",                      _p("https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=pnas")),
+        ("arXiv: Kvantitativ biologi", _p("https://rss.arxiv.org/rss/q-bio")),
+        ("arXiv: Fysik och samhälle",  _p("https://rss.arxiv.org/rss/physics.soc-ph")),
     ]
 
     if agent_namn:

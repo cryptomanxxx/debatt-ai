@@ -19,6 +19,9 @@ const VETENSKAP_KALLOR = [
   "Phys.org", "MIT Technology Review",
   "Reddit Science", "Google Research", "Amazon Science", "Big Think",
   "arXiv: AI", "arXiv: Machine Learning", "arXiv: Ekonomi", "arXiv: Computers & Society", "arXiv: Robotik",
+  // 8 nya källor (sep 2026) — se nyheter.py FEED_KATEGORIER för motivering.
+  "Science Daily", "New Scientist", "Live Science", "Science News", "NASA", "PNAS",
+  "arXiv: Kvantitativ biologi", "arXiv: Fysik och samhälle",
 ];
 // "&" i "arXiv: Computers & Society" måste procentkodas — annars tolkas den
 // som en ny query-parameter-avgränsare i den råa URL-strängen nedan.
