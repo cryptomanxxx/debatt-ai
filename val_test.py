@@ -83,10 +83,10 @@ def generera_manifesto(ledare: str, parti_namn: str) -> str:
     return manifesto or f"{parti_namn} för en bättre AI-civilisation. Rösta på oss!"
 
 
-def starta_val(partier: list) -> bool:
+def starta_val(partier: list) -> dict | None:
     if not partier:
         print("  Inga aktiva partier — kan inte starta val")
-        return False
+        return None
 
     print(f"\n  Startar nytt riksdagsval med {len(partier)} partier...")
     parti_data = []
@@ -123,10 +123,17 @@ def starta_val(partier: list) -> bool:
             f"{len(parti_data)} partier ställer upp. Besökare kan rösta på /val.",
             [p["ledare"] for p in parti_data],
         )
-        return True
+        # H sätter Prefer: return=representation — svaret innehåller den
+        # nyskapade raden, så vi slipper ett extra GET för att kunna låta
+        # agenterna rösta direkt (se anropet i main()).
+        try:
+            skapade = r.json()
+            return skapade[0] if skapade else None
+        except Exception:
+            return None
     else:
         print(f"  [FEL] {r.status_code}: {r.text[:200]}")
-        return False
+        return None
 
 
 def avgjor_val(val: dict) -> None:
@@ -303,7 +310,14 @@ def main() -> None:
         print(f"  • {p['namn']} (ledare: {p['ledare']}, {len(p.get('medlemmar',[]))} agenter)")
 
     if len(partier) >= 2:
-        starta_val(partier)
+        nytt_val = starta_val(partier)
+        # Utan detta röstade agenterna aldrig samma dag ett val startade —
+        # rostar_agenter() anropades bara i grenen ovanför (redan aktivt
+        # val), så ett nystartat val visade "0 röster inkomna" tills
+        # NÄSTA dags cron-körning (användarrapport, sep 2026).
+        if nytt_val:
+            print("  Agenter röstar direkt...")
+            rostar_agenter(nytt_val)
     else:
         print("  Behöver minst 2 partier för val — avbryter")
 

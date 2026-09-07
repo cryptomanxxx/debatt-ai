@@ -130,11 +130,6 @@ export default function ValPage() {
   const [meddelande, setMeddelande] = useState(null);
 
   useEffect(() => {
-    const sparat = localStorage.getItem("val_rostat_parti");
-    if (sparat) {
-      setHarRostat(true);
-      setValdPartii(sparat);
-    }
     hamtaVal();
   }, []);
 
@@ -151,6 +146,19 @@ export default function ValPage() {
 
       const v = data[0];
       setVal(v);
+
+      // Röststatus måste hållas per val_id — utan detta läser localStorage en
+      // röst från ETT tidigare avslutat val och visar "redan röstat" på ett
+      // helt nytt val som ingen ännu röstat i (användarrapport, sep 2026:
+      // "0 röster inkomna" men UI visade ändå "Du har redan röstat").
+      const sparat = localStorage.getItem(`val_rostat_${v.id}`);
+      if (sparat) {
+        setHarRostat(true);
+        setValdPartii(sparat);
+      } else {
+        setHarRostat(false);
+        setValdPartii(null);
+      }
 
       // Fetch vote counts with kalla breakdown
       const rostRes = await fetch(
@@ -209,7 +217,7 @@ export default function ValPage() {
 
       setHarRostat(true);
       setValdPartii(partiNamn);
-      localStorage.setItem("val_rostat_parti", partiNamn);
+      localStorage.setItem(`val_rostat_${val.id}`, partiNamn);
       setMeddelande(`Din röst på ${partiNamn} är registrerad!`);
 
       // Update counts from response
