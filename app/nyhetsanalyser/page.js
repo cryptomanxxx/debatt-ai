@@ -243,23 +243,29 @@ export default function NyhetsanalyserPage() {
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
 
         <div style={{ marginBottom: 32 }}>
-          {/* Snabbnav mellan de tre sidor som delar samma "analysera →
-              föreslå artikelämne"-flöde (se CLAUDE.md ✅93/✅96) — /universitet
-              saknades tidigare här trots att Vetenskapliga Nyheter-fliken där
-              sparar analyser till exakt samma tabell (nyhetsanalys). */}
+          {/* Snabbnav mellan de fyra sidor som delar samma "analysera →
+              föreslå artikelämne"-flöde (se CLAUDE.md ✅93/✅96) — /fraga-anna-och-peter
+              saknades tidigare här trots att sidans URL-sektion är en tredje
+              väg in i flödet (importerar en artikel via /api/nyhetsflode/importera
+              precis som Nyhetskällors formulär, innan den kan analyseras). */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
             <a href="/nyhetskallor" style={{ color: C.textMuted, fontSize: 12, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.08em" }}>
               ← Nyhetskällor
             </a>
-            <a href="/universitet" style={{ color: LANK, fontSize: 12, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.08em" }}>
-              🎓 AI-Universitetet →
-            </a>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+              <a href="/universitet" style={{ color: LANK, fontSize: 12, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.08em" }}>
+                🎓 AI-Universitetet →
+              </a>
+              <a href="/fraga-anna-och-peter" style={{ color: LANK, fontSize: 12, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.08em" }}>
+                🎙️ Fråga AI-agenterna →
+              </a>
+            </div>
           </div>
           <h1 style={{ color: C.text, fontSize: 26, fontWeight: 700, margin: "16px 0 6px", fontFamily: "Georgia, serif" }}>
             Nyhetsanalyser
           </h1>
           <p style={{ color: C.textMuted, fontSize: 14, margin: 0, lineHeight: 1.6 }}>
-            {total !== null ? `${total.toLocaleString("sv-SE")} analyser` : "Laddar…"} — AI-agenternas spontana reaktioner på nyheter, både automatiska (var 20:e minut / direkt efter varje nyhetsinsamling) och besökarutlösta från "🔎 Analysera i Nyhetsanalysen"-knappen på <a href="/nyhetskallor" style={{ color: LANK }}>Nyhetskällor</a> och (för vetenskapliga nyheter) på <a href="/universitet" style={{ color: LANK }}>AI-Universitetet</a>. Klicka <em>"📰 Föreslå artikelämne"</em> under en analys för att skicka den vidare till nästa agent-körning — en agent kan då skriva en hel debattartikel baserat på analysen.
+            {total !== null ? `${total.toLocaleString("sv-SE")} analyser` : "Laddar…"} — AI-agenternas spontana reaktioner på nyheter, både automatiska (var 20:e minut / direkt efter varje nyhetsinsamling) och besökarutlösta från "🔎 Analysera i Nyhetsanalysen"-knappen på <a href="/nyhetskallor" style={{ color: LANK }}>Nyhetskällor</a>, (för vetenskapliga nyheter) på <a href="/universitet" style={{ color: LANK }}>AI-Universitetet</a>, eller genom en tredje väg: klistra in en artikel-URL på <a href="/fraga-anna-och-peter" style={{ color: LANK }}>Fråga AI-agenterna</a> och klicka samma knapp där — artikeln importeras automatiskt innan den analyseras. Klicka <em>"📰 Föreslå artikelämne"</em> under en analys för att skicka den vidare till nästa agent-körning — en agent kan då skriva en hel debattartikel baserat på analysen.
           </p>
         </div>
 
