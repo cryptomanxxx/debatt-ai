@@ -496,12 +496,36 @@ def upsert_koalition(sb_key: str, agent_a: str, agent_b: str) -> int:
 MAX_FORSLAG_FORSOK = 3
 
 
-def hamta_amnesforslag(sb_key: str) -> dict | None:
-    """Hämtar ett obehandlat ämnesförslag från direktdebatten, eller None."""
+def hamta_amnesforslag(sb_key: str, kraver_kalla: bool | None = None) -> dict | None:
+    """Hämtar ett obehandlat ämnesförslag från direktdebatten/nyhetsval, eller None.
+
+    kraver_kalla styr vilken sorts förslag som får väljas — avgörande för att
+    hålla nyhet-/eget-kvoterna isär (✅100, Codex-fynd på PR #1412-granskning).
+    Ett förslag med kalla_namn+kalla_url (kommer från /nyhetsval — besökaren
+    valde en riktig nyhet) sätter nyhetskalla på den färdiga artikeln och
+    räknas därför alltid som "nyhet" av hamta_publicerade_idag_per_typ() i
+    agent.py. Ett förslag UTAN källa (kommer från Direktdebattens "Tipsa
+    agenterna om detta ämne →") sätter aldrig nyhetskalla och räknas alltid
+    som "eget". Om agent.py plockade fel typ förslag i fel fönster skulle
+    samma kvot-starvning som ✅100 fixade uppstå fast i motsatt riktning —
+    källösa förslag konsumerade under nyhets-fönstret hade tyst räknats som
+    "eget" istället, vilket aldrig fyller nyhetskvoten och ger eget en
+    oförtjänt kredit.
+    True  = bara källbackade förslag (blir "nyhet") — använd i nyhets-fönstret.
+    False = bara källösa förslag (blir "eget") — använd i eget-fönstret.
+    None  = inget filter (används inte av agent.py, men bevarat för enkel
+    testbarhet/bakåtkompatibilitet).
+    """
     try:
+        params = {"select": "id,amne,summering,kalla_namn,kalla_url,forsok", "behandlad": "eq.false", "order": "roster.desc,skapad.asc", "limit": "1"}
+        if kraver_kalla is True:
+            params["kalla_namn"] = "not.is.null"
+            params["kalla_url"] = "not.is.null"
+        elif kraver_kalla is False:
+            params["or"] = "(kalla_namn.is.null,kalla_url.is.null)"
         res = httpx.get(
             f"{SB_URL}/rest/v1/amnesforslag",
-            params={"select": "id,amne,summering,kalla_namn,kalla_url,forsok", "behandlad": "eq.false", "order": "roster.desc,skapad.asc", "limit": "1"},
+            params=params,
             headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
             timeout=10,
         )

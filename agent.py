@@ -558,21 +558,27 @@ def main():
         forslag_summering = None
         forslag_kalla_namn = None
         forslag_kalla_url = None
-        # Ämnesförslag hämtas medvetet INTE under force_eget (✅100, ägarbegäran
-        # sep 2026). Ämnesförslag har absolut prioritet (✅11) men ett förslag
-        # som fått en riktig extern källa (kalla_namn/kalla_url, ✅93) sätter
-        # nyhetskalla på den färdiga artikeln — vilket hamta_publicerade_idag_
-        # per_typ() räknar som "nyhet", inte "eget", oavsett vilket fönster
-        # körningen faktiskt föll i. Utan denna spärr kunde ett ständigt
-        # påfyllt kösystem (från /nyhetsval) kapa VARJE körning i eget-
-        # fönstret om och om igen — eget-kvoten fylldes då aldrig, och
-        # force_eget triggade om, bara för att kapas på nytt (bekräftat: en
-        # hel svensk dag, 2026-09-07, utan en enda genuin debattartikel,
-        # trots 13 publicerade artiklar totalt den dagen). Förslaget rörs
-        # inte (varken hämtat eller markerat) och plockas upp igen av nästa
-        # icke-eget körning — dagen efter om dagens nyhetskvot redan är full.
-        if not force_eget and sb_key:
-            forslag = hamta_amnesforslag(sb_key)
+        # Ämnesförslag väljs fönster-medvetet (✅100 + Codex-fynd, PR #1412-
+        # granskning) — inte bara på/av per force_eget, utan filtrerat på
+        # VILKEN typ förslag som får väljas i respektive fönster. Ämnesförslag
+        # har absolut prioritet (✅11), men ett förslag med en riktig extern
+        # källa (kalla_namn/kalla_url, ✅93) sätter nyhetskalla på den färdiga
+        # artikeln — vilket hamta_publicerade_idag_per_typ() räknar som
+        # "nyhet", aldrig "eget". Ett förslag UTAN källa sätter aldrig
+        # nyhetskalla och räknas alltid som "eget". Utan denna filtrering
+        # kunde ena hållet av kvot-starvning bara bytas mot det andra: ett
+        # källbackat förslag konsumerat under eget-fönstret räknades tyst som
+        # "nyhet" (den ursprungliga ✅100-buggen — en hel dag, 2026-09-07,
+        # utan en enda genuin debattartikel trots 13 publicerade artiklar) —
+        # men ett KÄLLLÖST förslag konsumerat under nyhets-fönstret hade
+        # räknats som "eget" istället, vilket aldrig fyller nyhetskvoten och
+        # ger eget en oförtjänt kredit — samma klass av bugg, motsatt riktning.
+        # kraver_kalla=False i eget-fönstret (bara källlösa förslag — blir
+        # korrekt "eget"), kraver_kalla=True annars (bara källbackade — blir
+        # korrekt "nyhet"). Hittas inget förslag av rätt typ lämnas kön orörd
+        # och nästa körning av rätt fönstertyp får chansen istället.
+        if sb_key:
+            forslag = hamta_amnesforslag(sb_key, kraver_kalla=not force_eget)
             if forslag:
                 forslag_amne = forslag["amne"]
                 forslag_id = forslag["id"]

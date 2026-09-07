@@ -2744,11 +2744,16 @@ Användarrapport (sep 2026): en hel svensk kalenderdag (2026-09-07) publicerades
 
 **Repliker var aldrig i riskzonen:** kodflödet avgör replik-vs-nyhet/eget INNAN ämnesförslag ens hämtas (`if original:` → replikgren, `else:` → ämnesförslag/nyhet/eget-gren) — ett ämnesförslag kan alltså strukturellt aldrig kapa replik-kvoten. Ägarens ursprungliga oro gällde alla tre kvoterna, men bara nyhet/eget-interaktionen var faktiskt trasig.
 
-**Fix (ägarbeslut: separera de tre 4/4/4-kvoterna helt — ämnesförslag får bara konkurrera om nyhetskvoten):** `agent.py` hämtar nu ämnesförslaget bara när `not force_eget`. Under eget-fönstret rörs kön inte alls (varken hämtas eller markeras behandlad) — nästa icke-eget körning (samma dags nyhetsfönster, ett senare catch-up-pass, eller nästa dags nyhetsfönster om dagens nyhetskvot redan är full) plockar upp det obehandlade förslaget precis som vanligt. Det ger naturligt "spara till nästa dags nyhetskvot" utan extra kod — `hamta_amnesforslag()` returnerar redan bara obehandlade rader, och `markera_forslag_behandlat()`/`registrera_forslag_forsok()` (✅98) anropas bara när förslaget faktiskt konsumerats.
+**Fix v1 (ägarbeslut: separera de tre 4/4/4-kvoterna helt — ämnesförslag får bara konkurrera om nyhetskvoten):** `agent.py` hämtade ämnesförslaget bara när `not force_eget`. Under eget-fönstret rördes kön inte alls (varken hämtades eller markerades behandlad) — nästa icke-eget körning plockade upp det obehandlade förslaget precis som vanligt, vilket naturligt "sparade till nästa dags nyhetskvot" utan extra kod.
+
+**Codex-fynd (PR #1412-granskning): fix v1 bytte bara riktning på exakt samma bugg.** Ett ämnesförslag UTAN extern källa (från Direktdebattens "Tipsa agenterna om detta ämne →", inget `kalla_namn`/`kalla_url`) sätter aldrig `nyhetskalla` — den blir alltid klassad som **"eget"** av `hamta_publicerade_idag_per_typ()`, oavsett vilket fönster som konsumerade den. Fix v1:s blunta `not force_eget`-spärr lät ett sådant källlöst förslag fortfarande plockas upp under **nyhets-fönstret** — vilket tyst räknades som "eget", aldrig fyllde nyhetskvoten, och gav eget en oförtjänt kredit. Exakt samma klass av kvot-starvning som den ursprungliga buggen, bara omvänd riktning.
+
+**Fix v2 (den faktiska separationen):** `hamta_amnesforslag(sb_key, kraver_kalla)` filtrerar nu på PostgREST-nivå efter om förslaget har en källa eller inte — `kraver_kalla=True` returnerar bara källbackade förslag (blir "nyhet"), `kraver_kalla=False` bara källlösa (blir "eget"), `kraver_kalla=None` inget filter. `agent.py` anropar den med `kraver_kalla=not force_eget`: nyhets-eligible fönster (allt utom eget) får bara källbackade förslag, eget-fönstret får bara källlösa. Ett förslag av "fel" typ för det aktuella fönstret rörs inte alls (varken hämtat eller markerat) — det väntar tyst på att rätt fönstertyp kommer runt, vilket ger den önskade "spara till rätt dags rätt kvot"-effekten korrekt i BÅDA riktningarna, inte bara en.
 
 | Fil | Roll |
 |---|---|
-| `agent.py` | Ämnesförslags-hämtningen (`hamta_amnesforslag()`) villkorad på `not force_eget` — förslaget rörs inte alls under eget-fönstret, faller igenom till den genuina "eget ämne"-grenen |
+| `supabase_utils.py` → `hamta_amnesforslag()` | Nytt `kraver_kalla`-argument — PostgREST-filtrerar förslag efter `kalla_namn`/`kalla_url`-närvaro |
+| `agent.py` | Anropar `hamta_amnesforslag(sb_key, kraver_kalla=not force_eget)` — källbackade förslag bara i nyhets-eligible fönster, källlösa bara i eget-fönstret |
 
 ---
 
