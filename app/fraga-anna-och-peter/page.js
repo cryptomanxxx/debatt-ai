@@ -92,6 +92,67 @@ function AktionsKnapp({ farg, onClick, disabled, children }) {
 
 function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
   const [kopierat, setKopierat] = useState(false);
+  // "Analysera i Nyhetsanalysen" för gamla historikposter — samma flöde som
+  // URL-sektionen ovan (se analyseraUrl() i FragaAnnaOchPeterPage), men
+  // lokalt per rad eftersom flera historikposter kan analyseras oberoende
+  // av varandra samtidigt. Bara relevant för rader med en riktig källartikel
+  // (rad.kalla_url) — fri text (typ:"fritext" utan url) har ingen
+  // nyhetsflode-rad att knyta en analys till (samma princip som ovan).
+  const [analysOppen, setAnalysOppen] = useState(false);
+  const [analysNyhet, setAnalysNyhet] = useState(null);
+  const [analysImporterar, setAnalysImporterar] = useState(false);
+  const [analysFel, setAnalysFel] = useState("");
+  const [analysValda, setAnalysValda] = useState(new Set());
+  const [analys, setAnalys] = useState(null);
+
+  async function analyseraUrl() {
+    if (analysNyhet) { setAnalysOppen(o => !o); return; }
+    if (!rad.kalla_url) return;
+    setAnalysImporterar(true);
+    setAnalysFel("");
+    try {
+      const res = await fetch("/api/nyhetsflode/importera", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: rad.kalla_url }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.rad) {
+        setAnalysFel(data.fel || "Kunde inte förbereda analysen — försök igen.");
+        return;
+      }
+      setAnalysNyhet(data.rad);
+      setAnalysOppen(true);
+    } catch {
+      setAnalysFel("Nätverksfel — försök igen.");
+    } finally {
+      setAnalysImporterar(false);
+    }
+  }
+
+  function toggleAnalysAgent(agent) {
+    setAnalysValda(prev => {
+      const next = new Set(prev);
+      if (next.has(agent)) next.delete(agent); else next.add(agent);
+      return next;
+    });
+  }
+
+  function korAnalys() {
+    if (!analysNyhet) return;
+    const agenter = Array.from(analysValda);
+    if (!agenter.length) return;
+    setAnalys(prev => ({
+      ...(prev || {}),
+      ...Object.fromEntries(agenter.map(a => [a, { status: "laddar", text: "" }])),
+    }));
+    agenter.forEach(agent => {
+      analyseraMedAgent(agent, analysNyhet, (patch) => {
+        setAnalys(prev => ({ ...(prev || {}), [agent]: patch }));
+      });
+    });
+  }
+
   const info = AKTION_INFO[rad.aktion] || AKTION_INFO.anna_sager;
   const ärUrl = rad.typ === "url";
   const dialog = Array.isArray(rad.dialog) ? rad.dialog : null;
@@ -201,21 +262,55 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
           </button>
         )}
 
-        {kanSpelaUpp && (
+        {(kanSpelaUpp || rad.kalla_url) && (
           <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              onClick={onSpelaUpp}
-              style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${info.farg}50`, color: info.farg, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
-            >
-              🔁 Spela upp igen
-            </button>
-            <button
-              onClick={kopieraLank}
-              style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${LANK}50`, color: LANK, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
-            >
-              {kopierat ? "✓ Länk kopierad" : "🔗 Kopiera länk"}
-            </button>
+            {kanSpelaUpp && (
+              <button
+                onClick={onSpelaUpp}
+                style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${info.farg}50`, color: info.farg, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
+              >
+                🔁 Spela upp igen
+              </button>
+            )}
+            {kanSpelaUpp && (
+              <button
+                onClick={kopieraLank}
+                style={{ padding: "6px 14px", background: "transparent", border: `1px solid ${LANK}50`, color: LANK, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: "pointer" }}
+              >
+                {kopierat ? "✓ Länk kopierad" : "🔗 Kopiera länk"}
+              </button>
+            )}
+            {rad.kalla_url && (
+              <button
+                onClick={analyseraUrl}
+                disabled={analysImporterar}
+                style={{ padding: "6px 14px", background: analysOppen ? `${LANK}18` : "transparent", border: `1px solid ${analysImporterar ? C.border : LANK + "50"}`, color: analysImporterar ? C.textMuted : LANK, borderRadius: 6, fontSize: 12, fontFamily: "Georgia, serif", cursor: analysImporterar ? "default" : "pointer" }}
+              >
+                {analysImporterar ? "🔎 Förbereder…" : analysOppen ? "🔎 Analysera i Nyhetsanalysen ▾" : "🔎 Analysera i Nyhetsanalysen"}
+              </button>
+            )}
           </div>
+        )}
+
+        {analysFel && (
+          <p style={{ color: "#e05050", fontSize: 13, marginTop: 8 }}>{analysFel}</p>
+        )}
+
+        {rad.kalla_url && (
+          <AgentAnalysPanel
+            expanderad={analysOppen}
+            valda={analysValda}
+            onToggleAgent={toggleAnalysAgent}
+            analys={analys}
+            onKor={korAnalys}
+            theme={{ bg: C.bg, surface: C.surface, border: C.border, text: C.text, textMuted: C.textMuted }}
+            accent={LANK}
+            footerNote={
+              <>
+                Sparas till <a href="/nyhetsanalyser" style={{ color: LANK }}>/nyhetsanalyser</a> — därifrån kan analysen föreslås som artikelämne åt AI-agenterna.
+              </>
+            }
+          />
         )}
       </div>
     </div>
