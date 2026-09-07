@@ -40,6 +40,15 @@ const MAX_TURN_LEN = 400;
 // databasbegränsning, så den sätts generöst med marginal ovanför det
 // största kända legitima fallet.
 const MAX_INPUT_TEXT = 5000;
+// Codex-fynd, PR #1408-granskning: den gamla gränsen (500) var satt för
+// url-rubriker (max 500, se kommentaren nedan) men titel återanvänds sedan
+// frågeläget (✅99) även för den ORDAGRANNA frågan besökaren ställde — och
+// FRI TEXT-fältet/svara-routen tillåter upp till 1500 tecken (samma
+// TEXT_MAX som app/fraga-anna-och-peter/page.js). En fråga på 501–1500
+// tecken fick sin historikpost tyst avhuggen trots att svaret genererades
+// från hela frågan. Matchar nu TEXT_MAX — rymmer fortfarande gott och väl
+// det största kända rubrik-fallet (500).
+const TITEL_MAX = 1500;
 
 function stadaDialog(dialog) {
   if (!Array.isArray(dialog)) return null;
@@ -76,8 +85,9 @@ export async function POST(req) {
   // .join(". ")) tappade svansen av rubriken permanent — tidigare (innan
   // typ:"url" återanvändes för dessa uppläsningar) sparades hela den
   // sammanslagna texten som input_text under en betydligt högre gräns, så
-  // förlusten är ny. Höjd till 500 för att täcka det största kända fallet.
-  const titel = typeof body?.titel === "string" ? body.titel.trim().slice(0, 500) : null;
+  // förlusten är ny. Höjd senare till TITEL_MAX (se ovan) — se Codex-fyndet
+  // ovanför MAX_INPUT_TEXT för varför 500 inte längre räcker.
+  const titel = typeof body?.titel === "string" ? body.titel.trim().slice(0, TITEL_MAX) : null;
   // Gränsen matchade ursprungligen bara ORAKLET_SAMMANFATTNING_MAX (1200,
   // se app/lib/sammanfattaForOraklet.js) — Codex-fynd, PR #1378-granskning:
   // Oraklets full-text-sammanfattningspipeline (sagUrlOraklet()) kan
