@@ -12,7 +12,7 @@ innehåller:
 
 import re
 
-from ai_klient import hamta_artikel_fns, hamta_kort_fns
+from ai_klient import hamta_artikel_fns, hamta_kort_fns, hamta_kort_fns_med_trunkering
 from agenter import ARTIKELFORMAT, get_agent_mood
 
 
@@ -221,7 +221,7 @@ def generera_konklusion(original: dict, replik_text: str) -> str:
     return ""
 
 
-RUBRIK_MIN_LANGD = 15  # kortare rubriker är nästan alltid avhuggna LLM-svar, inte genuint korta headlines
+RUBRIK_MIN_LANGD = 15  # säkerhetsgolv ENDAST för providers utan finish_reason (Cloudflare/Gemini, se nedan)
 
 def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = None) -> str:
     """Generera en skärpare rubrik baserad på artikelns innehåll."""
@@ -264,15 +264,25 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
                 return line
         return candidate.strip().strip("\"'")
 
-    for _name, fn in hamta_kort_fns(payload, agent["system"], prompt, 150, source="rubrik"):
+    for _name, fn in hamta_kort_fns_med_trunkering(payload, agent["system"], prompt, 150, source="rubrik"):
         try:
-            rubrik = _rensa_rubrik(fn())
+            text, mojligen_trunkerad = fn()
+            rubrik = _rensa_rubrik(text)
             # Ett avhugget LLM-svar (max_tokens nått mitt i gpt-oss-120b:s svar,
-            # ingen kontroll av reasoning-tokens finns) ger ofta en truthy men
-            # orimligt kort fragment ("Om fem år", "FN-för") — samma klass av
-            # bugg som MANIFESTO_MIN_LANGD fångar för partimanifest (✅55).
-            # len(rubrik) > 5 var för svagt för att fånga detta.
-            if len(rubrik) >= RUBRIK_MIN_LANGD:
+            # ingen kontroll av reasoning-tokens finns) gav tidigare en truthy men
+            # orimligt kort fragment ("Om fem år", "FN-för") som en ren
+            # teckenlängdströskel felaktigt skulle förkasta ÄVEN legitima korta
+            # rubriker som "Sänk skatten" (Codex-fynd, PR #1404-granskning).
+            # mojligen_trunkerad kommer direkt från providerns finish_reason
+            # (Groq/Mistral/DeepSeek) — ett betydligt pålitligare facit än
+            # textlängd. Signalerar providern truncation: hoppa till nästa
+            # provider oavsett längd. Annars (naturligt avslutat, eller
+            # Cloudflare/Gemini som saknar finish_reason): acceptera, med
+            # RUBRIK_MIN_LANGD som ett kvarvarande säkerhetsgolv bara för de
+            # två providers vi inte kan inspektera.
+            if mojligen_trunkerad or len(rubrik) < 3:
+                continue
+            if _name in ("Groq", "Mistral", "DeepSeek") or len(rubrik) >= RUBRIK_MIN_LANGD:
                 return rubrik
         except Exception:
             continue

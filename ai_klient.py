@@ -194,6 +194,35 @@ def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int, sou
     return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _fallback_order if p in alla]
 
 
+def hamta_kort_fns_med_trunkering(payload: dict, system: str, prompt: str, max_tokens: int, source: str = "agent") -> list[tuple[str, callable]]:
+    """Som hamta_kort_fns(), men fn() returnerar (text, mojligen_trunkerad) istället
+    för bara text.
+
+    mojligen_trunkerad är True om providern själv rapporterar att svaret klipptes
+    av max_tokens (finish_reason == "length") snarare än avslutades naturligt —
+    ett betydligt pålitligare trunkeringssignal än textlängd (Codex-fynd,
+    PR #1404-granskning: en ren teckenlängdströskel förkastar även legitima korta
+    svar som "Sänk skatten", inte bara genuint avhuggna fragment). Groq/Mistral/
+    DeepSeek är OpenAI-kompatibla och exponerar finish_reason via redan hämtade
+    httpx.Response-objekt — inga ändringar av deras delade funktioner krävs.
+    Cloudflare/Gemini-wrapperna returnerar bara text (oförändrade signaturer här
+    med, används på fler ställen) — mojligen_trunkerad är alltid False för dem,
+    samma "vet inte"-fallback som innan denna funktion fanns.
+    """
+    def _oai(post_fn):
+        val = post_fn().json()["choices"][0]
+        text = (val.get("message", {}).get("content") or "").strip()
+        return text, val.get("finish_reason") == "length"
+    alla = {
+        "groq":          ("Groq",         lambda: _oai(lambda: groq_post(payload))),
+        "mistral":       ("Mistral",       lambda: _oai(lambda: mistral_post(payload))),
+        "deepseek":      ("DeepSeek",      lambda: _oai(lambda: deepseek_post(payload))),
+        "cloudflare":    ("Cloudflare",    lambda: (cloudflare_post(system[:600], prompt, max_tokens=max_tokens).strip(), False)),
+        "gemini":        ("Gemini",        lambda: ((gemini_post(system[:600], prompt, max_tokens=max_tokens) or "").strip(), False)),
+    }
+    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _fallback_order if p in alla]
+
+
 def _groq_api_keys() -> list[tuple[str, str]]:
     """Returnerar (env_variabelnamn, nyckel) för alla satta Groq-nycklar i prioritetsordning.
     Läser GROQ_API_KEY samt GROQ_API_KEY_2 … GROQ_API_KEY_12 (hoppar saknade/uttömda).
