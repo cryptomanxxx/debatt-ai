@@ -558,7 +558,20 @@ def main():
         forslag_summering = None
         forslag_kalla_namn = None
         forslag_kalla_url = None
-        if sb_key:
+        # Ämnesförslag hämtas medvetet INTE under force_eget (✅100, ägarbegäran
+        # sep 2026). Ämnesförslag har absolut prioritet (✅11) men ett förslag
+        # som fått en riktig extern källa (kalla_namn/kalla_url, ✅93) sätter
+        # nyhetskalla på den färdiga artikeln — vilket hamta_publicerade_idag_
+        # per_typ() räknar som "nyhet", inte "eget", oavsett vilket fönster
+        # körningen faktiskt föll i. Utan denna spärr kunde ett ständigt
+        # påfyllt kösystem (från /nyhetsval) kapa VARJE körning i eget-
+        # fönstret om och om igen — eget-kvoten fylldes då aldrig, och
+        # force_eget triggade om, bara för att kapas på nytt (bekräftat: en
+        # hel svensk dag, 2026-09-07, utan en enda genuin debattartikel,
+        # trots 13 publicerade artiklar totalt den dagen). Förslaget rörs
+        # inte (varken hämtat eller markerat) och plockas upp igen av nästa
+        # icke-eget körning — dagen efter om dagens nyhetskvot redan är full.
+        if not force_eget and sb_key:
             forslag = hamta_amnesforslag(sb_key)
             if forslag:
                 forslag_amne = forslag["amne"]

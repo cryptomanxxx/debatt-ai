@@ -2737,6 +2737,19 @@ Kräver `supabase_fraga_anna_peter_v4.sql` (vidgar `aktion`-CHECK-constraint med
 | `app/api/fraga-anna-och-peter/route.js` | `AKTIONER`-setet utökat med de fyra `_svarar`-värdena |
 | `supabase_fraga_anna_peter_v4.sql` | Migrering: vidgar `aktion`-CHECK-constraint med `anna_svarar`/`peter_svarar`/`johan_svarar`/`oraklet_svarar` |
 
+### ✅ 100. Ämnesförslag åt aldrig eget-kvoten — bara nyhetskvoten – KLART
+Användarrapport (sep 2026): en hel svensk kalenderdag (2026-09-07) publicerades 13 artiklar, men noll av dem var genuina debattartiklar — startsidans "Senaste debatterna"-widget (`fetchLatestArtikel()`, filtrerar `nyhetskalla=is.null`) visade bara poster från dagen innan. Verifierat direkt mot GitHub Actions-loggarna för `agent.yml`: två separata körningar under eget-fönstret (19–22 svensk tid) hade båda plockat upp ett väntande ämnesförslag med en riktig extern källa ("📎 Källänk från ämnesförslaget: Science Alert" / "Omni") och blev artiklarna 1638/1639 — synliga i "Senaste NYHETERNA", inte "Senaste debatterna".
+
+**Rotorsak:** Ämnesförslag har absolut prioritet i `agent.py` (✅11), oavsett vilket tidsfönster körningen råkar falla i — kollen låg helt utanför `force_nyhet`/`force_eget`-logiken. Sedan ✅93 kan ett förslag (från `/nyhetsval`) bära en riktig extern källa (`kalla_namn`/`kalla_url`), vilket sätter `nyhetskalla` på den färdiga artikeln. `hamta_publicerade_idag_per_typ()` (`supabase_utils.py`) klassificerar strikt efter datan: `nyhetskalla` satt + ingen `parent_id` → räknas som **"nyhet"**, aldrig "eget" — oavsett att artikeln skrevs under eget-fönstret och konsumerade den slotten. Så länge kön av källbackade ämnesförslag inte var tom kapades *varje* körning i eget-fönstret om och om igen, eget-kvoten fylldes aldrig internt, och `force_eget` triggade om utan att den genuina "eget ämne"-grenen (`agent.py`s sista `else`, `Läge: NY ARTIKEL (eget ämne)`) någonsin nåddes.
+
+**Repliker var aldrig i riskzonen:** kodflödet avgör replik-vs-nyhet/eget INNAN ämnesförslag ens hämtas (`if original:` → replikgren, `else:` → ämnesförslag/nyhet/eget-gren) — ett ämnesförslag kan alltså strukturellt aldrig kapa replik-kvoten. Ägarens ursprungliga oro gällde alla tre kvoterna, men bara nyhet/eget-interaktionen var faktiskt trasig.
+
+**Fix (ägarbeslut: separera de tre 4/4/4-kvoterna helt — ämnesförslag får bara konkurrera om nyhetskvoten):** `agent.py` hämtar nu ämnesförslaget bara när `not force_eget`. Under eget-fönstret rörs kön inte alls (varken hämtas eller markeras behandlad) — nästa icke-eget körning (samma dags nyhetsfönster, ett senare catch-up-pass, eller nästa dags nyhetsfönster om dagens nyhetskvot redan är full) plockar upp det obehandlade förslaget precis som vanligt. Det ger naturligt "spara till nästa dags nyhetskvot" utan extra kod — `hamta_amnesforslag()` returnerar redan bara obehandlade rader, och `markera_forslag_behandlat()`/`registrera_forslag_forsok()` (✅98) anropas bara när förslaget faktiskt konsumerats.
+
+| Fil | Roll |
+|---|---|
+| `agent.py` | Ämnesförslags-hämtningen (`hamta_amnesforslag()`) villkorad på `not force_eget` — förslaget rörs inte alls under eget-fönstret, faller igenom till den genuina "eget ämne"-grenen |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
