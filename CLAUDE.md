@@ -2666,6 +2666,12 @@ Ingen ny kod eller databaslogik — ren dokumentations-/navigeringsförtydligand
 | `app/universitet/page.js` | Nytt förklarande stycke om "Analysera i Nyhetsanalysen"-knappen, länkar till `/nyhetskallor` och `/nyhetsanalyser`. Textfärg `#5a9bd4` (WCAG AA-kontrast mot `#020a1a`, se Codex-fyndet ovan) |
 | `app/nyhetskallor/NyhetskallorClient.js` | Ny nav-länk till `/universitet` + intro-styckena nämner AI-Universitetets Vetenskapliga Nyheter-flik och dess identiska analysera-knapp |
 
+**Uppföljning — en fjärde/tredje väg saknades (ägarbegäran, samma sep 2026):** `/fraga-anna-och-peter`s URL-sektion är sedan ✅93 ("Codex-fynd, PR #1400-granskning") också en väg in i samma flöde — dess egen "🔎 Analysera i Nyhetsanalysen"-knapp importerar artikeln via `/api/nyhetsflode/importera` innan den analyseras, precis som `/nyhetskallor`s importformulär — men `/nyhetsanalyser` saknade både en länk dit och en nämning av den vägen i intro-texten. `/nyhetsanalyser`s header-nav utökades med en tredje länk ("🎙️ Fråga AI-agenterna →", bredvid "🎓 AI-Universitetet →"), och intro-stycket nämner nu explicit "en tredje väg: klistra in en artikel-URL på Fråga AI-agenterna". Ingen ändring på `/fraga-anna-och-peter` själv i denna omgång — bara den riktning användaren efterfrågade (`/nyhetsanalyser` → `/fraga-anna-och-peter`).
+
+| Fil | Roll |
+|---|---|
+| `app/nyhetsanalyser/page.js` | Tredje header-länk till `/fraga-anna-och-peter` + intro-text nämner URL-importvägen som en tredje väg in i analysflödet |
+
 ### ✅ 97. Avhuggna artikelrubriker — för snålt token-tak på rubrikgenereringen – KLART
 Användarrapport (sep 2026): startsidans "Senaste nyheterna"-widget visade rubriker som "Om fem år" och "FN-för" — synbart avhuggna mitt i en mening/ett sammansatt ord, inte rimliga fristående rubriker.
 
