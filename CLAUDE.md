@@ -2713,6 +2713,32 @@ Användarrapport (sep 2026): en besökarimporterad nyhetsartikel (skickad in av 
 
 ---
 
+### ✅ 99. Frågeläge på /fraga-anna-och-peter – KLART
+Sidan hette ursprungligen "Fråga Anna, Peter och Johan" men blev i praktiken bara en uppläsningssida — fri text i FRI TEXT-panelen lästes ordagrant av vald röst via `AgentOverlay`/`responsiveVoice`, ingen LLM inblandad i det steget. Ägarbegäran (sep 2026): låt en riktig fråga i samma fält få ett SVAR uppläst istället för att bara höra frågan läsas upp ordagrant, utan att tappa dagens uppläsningsläge för vanlig text.
+
+**Detektering — ren klientside-heuristik, ingen extra LLM-klassificering:** `arFraga(text)` i `page.js` avgör om den inklistrade texten är en fråga: texten slutar med "?" ELLER börjar med ett vanligt svenskt frågeord (vad/hur/varför/vem/vilken/vilka/vilket/när/var/kan/är/finns/ska/skulle/har/gör/borde/får/hade/vore). Körs live medan besökaren skriver, kostar inget nätverksanrop. Knapptexterna på FRI TEXT-panelen byter dynamiskt ("Anna säger det" → "Anna svarar" osv.) så besökaren ser vilket läge som gäller INNAN de klickar — transparens som kompenserar för att en ren heuristik oundvikligen kan missa ovanliga formuleringar eller felaktigt trigga på text som råkar sluta med "?" men var tänkt att läsas upp ordagrant (t.ex. ett citat).
+
+**Vem svarar:** alla fyra röster (Anna, Peter, Johan, Oraklet) kan svara i karaktär — inte bara de två med redan etablerade plattformspersonas (Peter/Nationalekonom, Johan/Teknikoptimist). Ny backend-route `POST /api/fraga-anna-och-peter/svara` (samma mönster som redan befintliga `/api/studio/route.js`: central LLM-router `callWithFallback` + `getDynamicChain("chatt")` i `app/lib/aiRouter.js`, aldrig en hårdkodad providerklient) med en kort persona per röst — Anna/Peter/Johans beskrivningar är medvetet identiska med dem i `/api/studio/route.js` så de aldrig kan glida isär mellan sidorna; Oraklet fick en ny beskrivning som matchar hans redan etablerade "pedagogisk professor"-persona från `/universitet` (✅87), eftersom han saknar en motsvarighet i studiosamtalet. Systemprompten instruerar uttryckligen att **aldrig hitta på specifika fakta, siffror eller aktuella händelser** modellen inte är säker på — frågan saknar (till skillnad från nyhetsanalys) en given källa att grunda ett svar i, så samma anti-hallucination-princip som resten av plattformen tillämpas: resonera allmänt eller säg uttryckligen att man är osäker istället för att gissa. Rate limit 20/10 min per IP (`checkRateLimit`, samma härdningsnivå som `/api/studio`s 15/10 min).
+
+**Flöde vid klick:** `sagFritext()` grenar på `arFraga()`. Vid en fråga: visar "🤔 [Namn] funderar…" på den klickade knappen (övriga knappar disablade under tiden), anropar svara-routen, läser SVARET (inte den råa frågan) via `AgentOverlay`, och sparar — om inte 🔒 Privat är ikryssad — en historikpost med `titel` = den ursprungliga frågan och `input_text` = svaret, under en ny `aktion`-variant (`anna_svarar`/`peter_svarar`/`johan_svarar`/`oraklet_svarar`, kräver `supabase_fraga_anna_peter_v4.sql`). Misslyckas generationen visas ett kort felmeddelande och INGET läses upp — ingen fallback till att läsa upp den råa frågan, det hade varit missvisande (besökaren bad om ett svar, inte en uppläsning).
+
+**Historik:** `HistorikPost` visar frågan som en tydligt märkt kursiv rad ("❓ Fråga: ...") ovanför svaret för poster med en `_svarar`-aktion — `titel`-fältet renderades tidigare bara för `typ:"url"`-poster, nu även för fritext när aktionen indikerar frågeläge. "Spela upp igen" fungerar oförändrat (läser redan sparat `input_text` = svaret, ingen ny LLM-kostnad vid replay — samma cache-en-gång-princip som resten av plattformen). Badge-header-texten ("... SÄGER"/"... FÖRKLARAR"/"... DISKUTERAR"/"... SVARAR") byggs nu av en liten `aktionsVerb()`-hjälpfunktion istället för en växande inline-ternary.
+
+**Ej ändrat i denna omgång:** studiosamtalet ("Anna, Peter & Johan diskuterar det") reagerar inte olika på en fråga kontra vanlig text — samma befintliga beteende oavsett. Kan byggas som uppföljning om agenterna även ska "svara" på frågan tillsammans i studion istället för att bara diskutera den som ett ämne.
+
+Kräver `supabase_fraga_anna_peter_v4.sql` (vidgar `aktion`-CHECK-constraint med de fyra nya värdena, samma mönster som v2/v3) — kör i Supabase SQL Editor efter `supabase_fraga_anna_peter_v3.sql`.
+
+| Fil | Roll |
+|---|---|
+| `app/api/fraga-anna-och-peter/svara/route.js` | Ny route. Genererar ett kort (2–5 meningar) svar i karaktär för en av de fyra rösterna via central LLM-router. Rate limit 20/10 min |
+| `app/fraga-anna-och-peter/page.js` → `arFraga()` | Klientside-heuristik för frågedetektering (frågetecken/frågeord) |
+| `app/fraga-anna-och-peter/page.js` → `sagFritext()` | Grenar på `arFraga()`: läser texten ordagrant (oförändrat) eller anropar svara-routen och läser/sparar svaret istället |
+| `app/fraga-anna-och-peter/page.js` → `aktionsVerb()` | Badge-verbet i historikkortets header, utbruten ur en tidigare inline-ternary |
+| `app/api/fraga-anna-och-peter/route.js` | `AKTIONER`-setet utökat med de fyra `_svarar`-värdena |
+| `supabase_fraga_anna_peter_v4.sql` | Migrering: vidgar `aktion`-CHECK-constraint med `anna_svarar`/`peter_svarar`/`johan_svarar`/`oraklet_svarar` |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
