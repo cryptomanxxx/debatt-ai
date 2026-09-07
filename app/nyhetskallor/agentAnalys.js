@@ -85,12 +85,18 @@ export async function streamAgentAnalys({ agent, amne, artikelTitel, artikelSamm
 // supabase_nyhetsanalys_v3.sql).
 export async function analyseraMedAgent(agent, n, uppdatera) {
   const requestId = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  // n.rubrik kan vara upp till 300 tecken (nyhetsflode_test.py klipper vid
+  // [:300]) men /api/chatt avvisar amne > 200 tecken med ett 400-fel
+  // (Codex-fynd, PR #1401-granskning) — utan klippning misslyckades varje
+  // analysförsök på en historisk rad med en lång rubrik, för alla agenter,
+  // med bara ett generiskt "Något gick fel."
+  const amneSakert = (n.rubrik || "").slice(0, 200);
   let text = null, klar = false;
   for (let forsok = 0; forsok < 2 && (!klar || arTroligenAvbruten(text)); forsok++) {
     if (forsok > 0) await new Promise(r => setTimeout(r, 400));
     try {
       const resultat = await streamAgentAnalys({
-        agent, amne: n.rubrik, artikelTitel: n.rubrik, artikelSammanfattning: n.beskrivning,
+        agent, amne: amneSakert, artikelTitel: n.rubrik, artikelSammanfattning: n.beskrivning,
         hoppaOverGroq: forsok > 0, nyhetId: n.id, requestId,
         onToken: (t) => uppdatera({ status: "laddar", text: t }),
       });

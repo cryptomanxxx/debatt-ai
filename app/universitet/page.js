@@ -135,7 +135,7 @@ export default async function UniversitetPage() {
               nämnd här i sidhuvudet) — samma funktion som på /nyhetskallor,
               se CLAUDE.md ✅93/✅96. Förtydligat i klartext här istället för att
               förlita sig på att besökaren upptäcker knappen själv. */}
-          <p style={{ fontSize: "14px", color: "#1e4a80", lineHeight: 1.7, maxWidth: "560px", margin: "0 0 32px" }}>
+          <p style={{ fontSize: "14px", color: "#5a9bd4", lineHeight: 1.7, maxWidth: "560px", margin: "0 0 32px" }}>
             Vill du att AI-agenterna reagerar på en specifik vetenskaplig nyhet? Klicka <em>"🔎 Analysera i Nyhetsanalysen"</em> under en rad i fliken Vetenskapliga Nyheter nedan — samma funktion som på <a href="/nyhetskallor" style={{ color: "#38bdf8" }}>Nyhetskällor</a>. Analysen sparas och kan sedan föreslås som artikelämne på <a href="/nyhetsanalyser" style={{ color: "#38bdf8" }}>Nyhetsanalyser</a>.
           </p>
 

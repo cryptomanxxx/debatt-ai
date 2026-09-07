@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AgentOverlay from "../nyhetskallor/AgentOverlay";
 import StudioOverlay from "../nyhetskallor/StudioOverlay";
 import AgentAnalysPanel from "../nyhetskallor/AgentAnalysPanel";
@@ -341,6 +341,12 @@ export default function FragaAnnaOchPeterPage() {
   const [analysOppen, setAnalysOppen] = useState(false);
   const [analysValda, setAnalysValda] = useState(new Set());
   const [analys, setAnalys] = useState(null);
+  // Request-id som bumpas varje gång en ny artikel hämtas eller en import
+  // startas — ett kvarvarande analyseraUrl()-svar för en artikel besökaren
+  // redan lämnat jämförs mot detta och ignoreras om det inte längre matchar
+  // (Codex-fynd, PR #1400-granskning, P2: annars kunde artikel A:s sena
+  // importsvar installeras som analys-state under artikel B:s panel).
+  const analysReqIdRef = useRef(0);
 
   const [lasning, setLasning] = useState(null); // { agent, namn, text }
   const [studio, setStudio] = useState(null); // { rubrik, beskrivning, turns?, meta? }
@@ -445,12 +451,16 @@ export default function FragaAnnaOchPeterPage() {
     const trimmed = url.trim();
     setUrlFel("");
     setUrlResultat(null);
-    // Ny URL → gammal analys (om någon) hör till en annan artikel.
+    // Ny URL → gammal analys (om någon) hör till en annan artikel. Bumpar
+    // request-id:t så ett kvarvarande analyseraUrl()-svar för FÖREGÅENDE
+    // artikel ignoreras även om det löser ut efter denna reset.
+    analysReqIdRef.current += 1;
     setAnalysNyhet(null);
     setAnalysFel("");
     setAnalysOppen(false);
     setAnalysValda(new Set());
     setAnalys(null);
+    setAnalysImporterar(false);
     if (!trimmed) { setUrlFel("Klistra in en länk till en nyhetsartikel först."); return; }
 
     setUrlLaddar(true);
@@ -538,8 +548,18 @@ export default function FragaAnnaOchPeterPage() {
   // in i nyhetsflode och fäller ut agentvalspanelen. Ett andra klick — när
   // analysNyhet redan finns — bara togglar panelen, ingen ny import.
   async function analyseraUrl() {
+    // Privat läge skyddar bara historikposten (fraga_anna_peter_log) — men
+    // en import skriver ALLTID till den publikt läsbara nyhetsflode-tabellen
+    // (och en körd analys till nyhetsanalys), oavsett kryssruta. Att låta
+    // den knappen fungera under 🔒 Privat hade brutit sidans "sparas inte"-
+    // löfte (Codex-fynd, PR #1400-granskning, P1).
+    if (privat) {
+      setAnalysFel("Avmarkera 🔒 Privat överst på sidan för att analysera artikeln — importen och analysen sparas alltid offentligt i Nyhetsanalysen.");
+      return;
+    }
     if (analysNyhet) { setAnalysOppen(o => !o); return; }
     if (!urlResultat) return;
+    const reqId = ++analysReqIdRef.current;
     setAnalysImporterar(true);
     setAnalysFel("");
     try {
@@ -549,6 +569,11 @@ export default function FragaAnnaOchPeterPage() {
         body: JSON.stringify({ url: urlResultat.url }),
       });
       const data = await res.json().catch(() => ({}));
+      // Besökaren kan ha hämtat en ANNAN artikel (eller startat en ny import)
+      // medan det här anropet var i luften — ett inaktuellt svar ska aldrig
+      // installeras som analys-state under fel artikels panel (Codex-fynd,
+      // PR #1400-granskning, P2).
+      if (analysReqIdRef.current !== reqId) return;
       if (!res.ok || !data?.rad) {
         setAnalysFel(data.fel || "Kunde inte förbereda analysen — försök igen.");
         return;
@@ -556,9 +581,10 @@ export default function FragaAnnaOchPeterPage() {
       setAnalysNyhet(data.rad);
       setAnalysOppen(true);
     } catch {
+      if (analysReqIdRef.current !== reqId) return;
       setAnalysFel("Nätverksfel — försök igen.");
     } finally {
-      setAnalysImporterar(false);
+      if (analysReqIdRef.current === reqId) setAnalysImporterar(false);
     }
   }
 
@@ -776,8 +802,8 @@ export default function FragaAnnaOchPeterPage() {
                 <AktionsKnapp farg={STUDIO_FARG} onClick={diskuteraUrlResultat}>
                   🎭 Anna, Peter &amp; Johan diskuterar den
                 </AktionsKnapp>
-                <AktionsKnapp farg={LANK} disabled={analysImporterar} onClick={analyseraUrl}>
-                  {analysImporterar ? "🔎 Förbereder…" : analysOppen ? "🔎 Analysera i Nyhetsanalysen ▾" : "🔎 Analysera i Nyhetsanalysen"}
+                <AktionsKnapp farg={LANK} disabled={analysImporterar || privat} onClick={analyseraUrl}>
+                  {privat ? "🔎 Analysera (avmarkera Privat)" : analysImporterar ? "🔎 Förbereder…" : analysOppen ? "🔎 Analysera i Nyhetsanalysen ▾" : "🔎 Analysera i Nyhetsanalysen"}
                 </AktionsKnapp>
               </div>
 
