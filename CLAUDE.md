@@ -2666,6 +2666,19 @@ Ingen ny kod eller databaslogik — ren dokumentations-/navigeringsförtydligand
 | `app/universitet/page.js` | Nytt förklarande stycke om "Analysera i Nyhetsanalysen"-knappen, länkar till `/nyhetskallor` och `/nyhetsanalyser`. Textfärg `#5a9bd4` (WCAG AA-kontrast mot `#020a1a`, se Codex-fyndet ovan) |
 | `app/nyhetskallor/NyhetskallorClient.js` | Ny nav-länk till `/universitet` + intro-styckena nämner AI-Universitetets Vetenskapliga Nyheter-flik och dess identiska analysera-knapp |
 
+### ✅ 97. Avhuggna artikelrubriker — för snålt token-tak på rubrikgenereringen – KLART
+Användarrapport (sep 2026): startsidans "Senaste nyheterna"-widget visade rubriker som "Om fem år" och "FN-för" — synbart avhuggna mitt i en mening/ett sammansatt ord, inte rimliga fristående rubriker.
+
+**Rotorsak:** `generera_rubrik()` i `artikel.py` (ett separat, dedikerat LLM-anrop som skärper artikelns rubrik EFTER att brödtexten redan skrivits) hade `max_tokens: 60` — för snålt för `openai/gpt-oss-120b`, en reasoning-modell utan någon `reasoning_effort`-kontroll satt någonstans i `ai_klient.py`. Om modellen lägger en del av sin tokenbudget på interna resonemangs-/preambeltokens innan den börjar skriva den synliga rubriken hinner svaret klippas av `max_tokens` mitt i rubriktexten. Det enda accept-villkoret var `len(rubrik) > 5` — en avhuggen 6–9-teckens rubrikfragment ("FN-för", "Om fem år") är fortfarande truthy och klarade den gränsen galant, så det avhuggna resultatet publicerades rakt av. Samma klass av bugg som `MANIFESTO_MIN_LANGD`-fixen för partimanifest (✅55) — ett för svagt "är svaret icke-tomt"-villkor istället för ett "är svaret rimligt fullständigt"-villkor.
+
+**Fix:** `max_tokens` höjt 60 → 150 (både i `payload["max_tokens"]` och i anropet till `hamta_kort_fns()`, vars fjärde positionsargument styr Cloudflare-/Gemini-fallbackens egen `max_tokens`) — samma nivå som `skriv_kommentar()` redan använder för en jämförbart kort textgenre. Ny konstant `RUBRIK_MIN_LANGD = 15` ersätter det gamla `len(rubrik) > 5`-villkoret: ett för kort resultat räknas nu som ett misslyckat försök och loopen går vidare till nästa providerfallback (Groq → Mistral → DeepSeek → Cloudflare → Gemini) istället för att acceptera fragmentet, precis som loopen redan gjorde vid ett kastat undantag.
+
+**Känd begränsning:** redan publicerade artiklar med en avhuggen rubrik (t.ex. de två i användarrapporten) förblir avhuggna — fixen påverkar bara framtida `generera_rubrik()`-anrop, ingen efterhandsreparation av redan sparade `artiklar`-rader byggdes här. Samma självläkande-princip som redan etablerats för andra engångsdataproblem i den här loggen (jfr "Kvarvarande skräprader" under ✅93).
+
+| Fil | Roll |
+|---|---|
+| `artikel.py` → `generera_rubrik()` | `max_tokens` 60→150, ny `RUBRIK_MIN_LANGD`-konstant (15 tecken) ersätter `len(rubrik) > 5` som accept-villkor innan providerloopen går vidare |
+
 ---
 
 ## Den autonoma debatten – slutvisionen

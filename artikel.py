@@ -221,6 +221,8 @@ def generera_konklusion(original: dict, replik_text: str) -> str:
     return ""
 
 
+RUBRIK_MIN_LANGD = 15  # kortare rubriker är nästan alltid avhuggna LLM-svar, inte genuint korta headlines
+
 def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = None) -> str:
     """Generera en skärpare rubrik baserad på artikelns innehåll."""
     rubrik_tips = fmt["rubrik_tips"] if fmt else "Ska innehålla en konflikt eller ett kontroversiellt påstående"
@@ -237,7 +239,7 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
     )
     payload = {
         "model": "openai/gpt-oss-120b",
-        "max_tokens": 60,
+        "max_tokens": 150,
         "temperature": 0.7,
         "messages": [
             {"role": "system", "content": agent["system"]},
@@ -262,10 +264,15 @@ def generera_rubrik(agent: dict, amne: str, artikel: str, fmt: dict | None = Non
                 return line
         return candidate.strip().strip("\"'")
 
-    for _name, fn in hamta_kort_fns(payload, agent["system"], prompt, 60, source="rubrik"):
+    for _name, fn in hamta_kort_fns(payload, agent["system"], prompt, 150, source="rubrik"):
         try:
             rubrik = _rensa_rubrik(fn())
-            if len(rubrik) > 5:
+            # Ett avhugget LLM-svar (max_tokens nått mitt i gpt-oss-120b:s svar,
+            # ingen kontroll av reasoning-tokens finns) ger ofta en truthy men
+            # orimligt kort fragment ("Om fem år", "FN-för") — samma klass av
+            # bugg som MANIFESTO_MIN_LANGD fångar för partimanifest (✅55).
+            # len(rubrik) > 5 var för svagt för att fånga detta.
+            if len(rubrik) >= RUBRIK_MIN_LANGD:
                 return rubrik
         except Exception:
             continue
