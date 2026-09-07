@@ -836,7 +836,7 @@ export default function FragaAnnaOchPeterPage() {
               {svarLaddar === "Teknikoptimist" ? "🤔 Johan funderar…" : fragaDetekterad ? "💡 Johan svarar" : "💡 Johan säger det"}
             </AktionsKnapp>
             <AktionsKnapp farg={ORAKLET_FARG} disabled={!fritextTrimmed || !!svarLaddar} onClick={() => sagFritext("Oraklet", "Professor Oraklet")}>
-              {svarLaddar === "Oraklet" ? "🤔 Oraklet funderar…" : fragaDetekterad ? "🎓 Oraklet svarar" : "🎓 Oraklet förklarar det"}
+              {svarLaddar === "Oraklet" ? "🤔 Oraklet funderar…" : fragaDetekterad ? "🎓 Oraklet svarar" : "🎓 Oraklet säger det"}
             </AktionsKnapp>
             <AktionsKnapp farg={STUDIO_FARG} disabled={!fritextTrimmed || !!svarLaddar} onClick={diskuteraFritext}>
               🎭 Anna, Peter &amp; Johan diskuterar det
