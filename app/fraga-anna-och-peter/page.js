@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import AgentOverlay from "../nyhetskallor/AgentOverlay";
 import StudioOverlay from "../nyhetskallor/StudioOverlay";
+import AgentAnalysPanel from "../nyhetskallor/AgentAnalysPanel";
+import { analyseraMedAgent } from "../nyhetskallor/agentAnalys";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -228,6 +230,23 @@ export default function FragaAnnaOchPeterPage() {
   const [urlResultat, setUrlResultat] = useState(null); // { titel, sammanfattning, url }
   const [orakelLaddar, setOrakelLaddar] = useState(false);
 
+  // "Analysera i Nyhetsanalysen" — samma flöde som /nyhetskallor och
+  // /universitet (se agentAnalys.js), men den här sidans URL-hämtning
+  // (/api/chatt/artikel-kontext) sparar aldrig till nyhetsflode — bara en
+  // teaser i klientens state. Analysen kräver en riktig nyhetsflode-rad
+  // (nyhet_id är NOT NULL i schemat), så första klicket importerar URL:en
+  // via /api/nyhetsflode/importera (samma route som "IMPORTERA EN
+  // NYHETSARTIKEL"-formuläret på /nyhetskallor — dedupar på unique(url),
+  // så en redan bevakad/importerad artikel bara hämtar sin befintliga rad
+  // istället för att skapa en dubblett). Fri text har ingen motsvarande
+  // knapp — det finns ingen nyhetsflode-rad en fri text kan knytas till.
+  const [analysNyhet, setAnalysNyhet] = useState(null); // { id, rubrik, beskrivning, url }
+  const [analysImporterar, setAnalysImporterar] = useState(false);
+  const [analysFel, setAnalysFel] = useState("");
+  const [analysOppen, setAnalysOppen] = useState(false);
+  const [analysValda, setAnalysValda] = useState(new Set());
+  const [analys, setAnalys] = useState(null);
+
   const [lasning, setLasning] = useState(null); // { agent, namn, text }
   const [studio, setStudio] = useState(null); // { rubrik, beskrivning, turns?, meta? }
   // Privat läge — samma "spara inte"-princip som den privata frågeknappen på
@@ -331,6 +350,12 @@ export default function FragaAnnaOchPeterPage() {
     const trimmed = url.trim();
     setUrlFel("");
     setUrlResultat(null);
+    // Ny URL → gammal analys (om någon) hör till en annan artikel.
+    setAnalysNyhet(null);
+    setAnalysFel("");
+    setAnalysOppen(false);
+    setAnalysValda(new Set());
+    setAnalys(null);
     if (!trimmed) { setUrlFel("Klistra in en länk till en nyhetsartikel först."); return; }
 
     setUrlLaddar(true);
@@ -414,6 +439,57 @@ export default function FragaAnnaOchPeterPage() {
       setOrakelLaddar(false);
     }
   }
+  // Importerar (eller hämtar den redan befintliga raden för) urlResultat.url
+  // in i nyhetsflode och fäller ut agentvalspanelen. Ett andra klick — när
+  // analysNyhet redan finns — bara togglar panelen, ingen ny import.
+  async function analyseraUrl() {
+    if (analysNyhet) { setAnalysOppen(o => !o); return; }
+    if (!urlResultat) return;
+    setAnalysImporterar(true);
+    setAnalysFel("");
+    try {
+      const res = await fetch("/api/nyhetsflode/importera", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: urlResultat.url }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.rad) {
+        setAnalysFel(data.fel || "Kunde inte förbereda analysen — försök igen.");
+        return;
+      }
+      setAnalysNyhet(data.rad);
+      setAnalysOppen(true);
+    } catch {
+      setAnalysFel("Nätverksfel — försök igen.");
+    } finally {
+      setAnalysImporterar(false);
+    }
+  }
+
+  function toggleAnalysAgent(agent) {
+    setAnalysValda(prev => {
+      const next = new Set(prev);
+      if (next.has(agent)) next.delete(agent); else next.add(agent);
+      return next;
+    });
+  }
+
+  function korAnalys() {
+    if (!analysNyhet) return;
+    const agenter = Array.from(analysValda);
+    if (!agenter.length) return;
+    setAnalys(prev => ({
+      ...(prev || {}),
+      ...Object.fromEntries(agenter.map(a => [a, { status: "laddar", text: "" }])),
+    }));
+    agenter.forEach(agent => {
+      analyseraMedAgent(agent, analysNyhet, (patch) => {
+        setAnalys(prev => ({ ...(prev || {}), [agent]: patch }));
+      });
+    });
+  }
+
   function diskuteraUrlResultat() {
     if (!urlResultat) return;
     setStudio({
@@ -605,7 +681,29 @@ export default function FragaAnnaOchPeterPage() {
                 <AktionsKnapp farg={STUDIO_FARG} onClick={diskuteraUrlResultat}>
                   🎭 Anna, Peter &amp; Johan diskuterar den
                 </AktionsKnapp>
+                <AktionsKnapp farg={LANK} disabled={analysImporterar} onClick={analyseraUrl}>
+                  {analysImporterar ? "🔎 Förbereder…" : analysOppen ? "🔎 Analysera i Nyhetsanalysen ▾" : "🔎 Analysera i Nyhetsanalysen"}
+                </AktionsKnapp>
               </div>
+
+              {analysFel && (
+                <p style={{ color: "#e05050", fontSize: 13, marginTop: 12 }}>{analysFel}</p>
+              )}
+
+              <AgentAnalysPanel
+                expanderad={analysOppen}
+                valda={analysValda}
+                onToggleAgent={toggleAnalysAgent}
+                analys={analys}
+                onKor={korAnalys}
+                theme={{ bg: C.bg, surface: C.surface, border: C.border, text: C.text, textMuted: C.textMuted }}
+                accent={LANK}
+                footerNote={
+                  <>
+                    Sparas till <a href="/nyhetsanalyser" style={{ color: LANK }}>/nyhetsanalyser</a> — därifrån kan analysen föreslås som artikelämne åt AI-agenterna.
+                  </>
+                }
+              />
             </div>
           )}
         </div>
