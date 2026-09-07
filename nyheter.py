@@ -224,6 +224,24 @@ def _forsta_traff(*element):
     return None
 
 
+def _lokalt_barn(el, namn: str):
+    """Hittar ett direkt barn-element via LOKALT taggnamn, oavsett namnrymd.
+
+    RSS 1.0/RDF-flöden (Lancet, Nature, PNAS m.fl.) sätter en standard-
+    namespace på rdf:RDF-roten (xmlns="http://purl.org/rss/1.0/") — alla
+    element utan prefix, inklusive <title>/<description>/<link> under
+    <item>, blir då implicit namnrymdsatta i ElementTree
+    ({http://purl.org/rss/1.0/}title osv). item.find("title") (barnamn,
+    ingen namnrymd) matchar aldrig dessa. Sista fallback i title/desc/
+    link-kedjorna nedan — körs bara om ingen av de tidigare (bara/Atom-
+    namnrymdade) varianterna gav träff, så normalfallet kostar ingenting
+    extra."""
+    for child in el:
+        if child.tag.rsplit("}", 1)[-1] == namn:
+            return child
+    return None
+
+
 _ANVANDARAGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
 
@@ -712,9 +730,20 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
                 rss_stats.append({"kalla": kalla, "ok": False, "antal": 0, "fel": f"HTTP {res.status_code}"})
                 continue
             root = ET.fromstring(res.content)
+            # RSS 1.0/RDF-flöden (Lancet, Nature, PNAS m.fl.) deklarerar en
+            # STANDARD-namespace på rdf:RDF-roten (xmlns="http://purl.org/
+            # rss/1.0/") — alla obarnamnsatta element, inklusive <item>, blir
+            # då implicit namnrymdsatta ({http://purl.org/rss/1.0/}item) i
+            # ElementTree. Ett bart root.findall(".//item") matchar aldrig
+            # dessa, vilket gav "0 items" trots giltig HTTP 200-XML (upptäckt
+            # sep 2026: påverkade tyst Lancet/Nature sedan tidigare, inte bara
+            # nytillagda PNAS). Sista fallbacket matchar item-taggens LOKALA
+            # namn oavsett namnrymd — fångar RDF-varianten utan att behöva
+            # hårdkoda varje käll-specifik namespace-URI.
             items = (root.findall(".//item") or
                      root.findall(f".//{{{ATOM}}}entry") or
-                     root.findall(".//atom:entry", ns))
+                     root.findall(".//atom:entry", ns) or
+                     [el for el in root.iter() if el.tag.rsplit("}", 1)[-1] == "item"])
             if not items:
                 snippet = res.text[:200].strip().replace("\n", " ")
                 print(f"  ⚠ {kalla}: 0 items — HTTP {res.status_code}, content-type={res.headers.get('content-type','?')!r}, snippet={snippet!r}", file=sys.stderr)
@@ -726,7 +755,8 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
             for item in valda_items:
                 title = _forsta_traff(item.find("title"),
                                        item.find(f"{{{ATOM}}}title"),
-                                       item.find("atom:title", ns))
+                                       item.find("atom:title", ns),
+                                       _lokalt_barn(item, "title"))
                 rubrik = re.sub(r"\s+", " ", html.unescape(title.text or "")).strip() if title is not None else ""
                 if len(rubrik) <= 10:
                     continue
@@ -735,7 +765,8 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
                                       item.find(f"{{{ATOM}}}summary"),
                                       item.find("atom:summary", ns),
                                       item.find(f"{{{ATOM}}}content"),
-                                      item.find("atom:content", ns))
+                                      item.find("atom:content", ns),
+                                      _lokalt_barn(item, "description"))
                 # Ordning spelar roll: HTML-entiteter (&#32;, &amp; m.fl.) avkodas FÖRE
                 # whitespace-hopfällningen (en avkodad &#32; blir ett nytt mellanslag som
                 # annars aldrig fälls ihop). Truncation (max_len) sker allra SIST, efter
@@ -783,7 +814,8 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
                 text = text[:max_len]
                 link_el = _forsta_traff(item.find("link"),
                                          item.find("atom:link", ns),
-                                         item.find(f"{{{ATOM}}}link"))
+                                         item.find(f"{{{ATOM}}}link"),
+                                         _lokalt_barn(item, "link"))
                 item_url = ""
                 if link_el is not None:
                     if link_el.text and link_el.text.strip():
