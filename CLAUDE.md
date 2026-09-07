@@ -2658,10 +2658,12 @@ Uppföljande ägarbegäran (sep 2026), direkt efter PR #1399/#1400: `/nyhetsanal
 
 Ingen ny kod eller databaslogik — ren dokumentations-/navigeringsförtydligande ovanpå det redan befintliga tvåstegsflödet (se ✅93). Alla tre sidors intro-text pekar nu på varandra istället för att bara en riktning (`/nyhetskallor` → `/nyhetsanalyser`) var förklarad.
 
+**Codex-fynd (PR #1402-granskning, efter merge): otillräcklig färgkontrast på det nya förklarande stycket.** Det nya stycket på `/universitet` sattes i `#1e4a80` mot sidans `#020a1a`-bakgrund — en kontrastkvot på ~2,2:1, långt under WCAG AA:s krav på 4,5:1 för brödtext (14px räknas inte som "stor text", vars lägre 3:1-tröskel annars hade räckt). Just detta stycke ska aktivt göra en funktion upptäckbar, så låg läsbarhet motverkade sitt eget syfte särskilt illa. Fixat genom att byta textfärgen till `#5a9bd4` (~6,7:1 mot samma bakgrund, godkänt även för normal brödtext) — en ljusare men fortfarande dämpad blåton, distinkt från de klarare länkfärgerna (`#38bdf8`) i samma stycke. Gäller bara den nya paragrafen som introducerades i #1402; sidans redan befintliga introstycke (`#2a5a8a`) rördes inte — utanför denna PR:s scope.
+
 | Fil | Roll |
 |---|---|
 | `app/nyhetsanalyser/page.js` | Header-länk till `/universitet` + intro-text som nämner båda analyskällorna |
-| `app/universitet/page.js` | Nytt förklarande stycke om "Analysera i Nyhetsanalysen"-knappen, länkar till `/nyhetskallor` och `/nyhetsanalyser` |
+| `app/universitet/page.js` | Nytt förklarande stycke om "Analysera i Nyhetsanalysen"-knappen, länkar till `/nyhetskallor` och `/nyhetsanalyser`. Textfärg `#5a9bd4` (WCAG AA-kontrast mot `#020a1a`, se Codex-fyndet ovan) |
 | `app/nyhetskallor/NyhetskallorClient.js` | Ny nav-länk till `/universitet` + intro-styckena nämner AI-Universitetets Vetenskapliga Nyheter-flik och dess identiska analysera-knapp |
 
 ---
