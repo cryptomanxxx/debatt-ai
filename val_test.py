@@ -200,7 +200,23 @@ def avgjor_val(val: dict) -> None:
 
 
 def rostar_agenter(val: dict) -> None:
-    """Låt varje agent rösta på sitt parti om de inte redan röstat."""
+    """Låt varje agent rösta — på sitt eget parti om de är medlem, annars
+    via en härledd koppling. Se fallback-kedjan nedan.
+
+    Tidigare kunde bara agenter som var MEDLEMMAR i ett aktivt parti
+    (koalitionskluster på 3–8 agenter, styrka ≥ 3, se
+    berakna_och_spara_partier()) rösta — en agent utan tillräckligt starkt
+    koalitionsband hamnade helt utanför och röstade aldrig, oavsett hur
+    många val som hölls. Ändrat på ägarens uttryckliga begäran (sep 2026):
+    "Alla agenter ska kunna rösta." Tre nivåer, i fallande prioritet:
+    1. Partimedlem → röstar på sitt eget parti (oförändrat).
+    2. Partilös agent → röstar via sin STARKASTE koalitionsrelation
+       (agent_koalitioner, UTAN styrka-tröskeln partier kräver) till en
+       agent som faktiskt har ett parti.
+    3. Helt isolerad agent (ingen koalitionsrad alls) → ett deterministiskt
+       (agentnamn + val_id, inte omslumpat vid omkörning) val bland valets
+       partier. Sällsynt i praktiken — koalitioner bildas kontinuerligt
+       (✅27/34) — men garanterar att verkligen alla 24 agenter röstar."""
     val_id = val["id"]
     try:
         from agenter import AGENTER
@@ -213,6 +229,11 @@ def rostar_agenter(val: dict) -> None:
         print("  Inga aktiva partier — agenter röstar inte")
         return
 
+    parti_namn_i_val = {p["namn"] for p in val.get("partier", [])}
+    if not parti_namn_i_val:
+        print("  Valet saknar partier — agenter röstar inte")
+        return
+
     # Bygg ledare → valpartinamn och namn → valpartinamn från valets eget JSONB
     ledare_till_valparti: dict[str, str] = {
         p["ledare"]: p["namn"] for p in val.get("partier", [])
@@ -220,10 +241,10 @@ def rostar_agenter(val: dict) -> None:
     namn_till_valparti: dict[str, str] = {
         p["namn"]: p["namn"] for p in val.get("partier", [])
     }
-    parti_namn_i_val = set(ledare_till_valparti.values())
 
-    # Mappa agent → valpartinamn via ledare-matchning (primärt, stabilt mot namnbyten)
-    # Fallback: namnmatchning om ledaren bytts sedan valet startade (saldo-skift)
+    # Nivå 1 — mappa agent → valpartinamn via ledare-matchning (primärt,
+    # stabilt mot namnbyten). Fallback: namnmatchning om ledaren bytts
+    # sedan valet startade (saldo-skift).
     agent_parti: dict[str, str] = {}
     for p in partier_db:
         valparti = ledare_till_valparti.get(p["ledare"])
@@ -234,6 +255,32 @@ def rostar_agenter(val: dict) -> None:
         for m in p.get("medlemmar") or []:
             agent_parti[m] = valparti
         agent_parti[p["ledare"]] = valparti
+
+    # Nivå 2/3 — partilösa agenter
+    saknar_parti = [a["namn"] for a in AGENTER if a["namn"] not in agent_parti]
+    if saknar_parti:
+        koalitioner = fetch("agent_koalitioner?select=agent_a,agent_b,styrka")
+        parti_lista = sorted(parti_namn_i_val)
+        for namn in saknar_parti:
+            basta_parti = None
+            basta_styrka = -1
+            for k in koalitioner:
+                if k["agent_a"] == namn:
+                    motpart = k["agent_b"]
+                elif k["agent_b"] == namn:
+                    motpart = k["agent_a"]
+                else:
+                    continue
+                motpart_parti = agent_parti.get(motpart)
+                if motpart_parti and k["styrka"] > basta_styrka:
+                    basta_parti = motpart_parti
+                    basta_styrka = k["styrka"]
+            if basta_parti:
+                agent_parti[namn] = basta_parti
+            else:
+                idx = int(hashlib.sha256(f"{namn}-{val_id}".encode()).hexdigest(), 16) % len(parti_lista)
+                agent_parti[namn] = parti_lista[idx]
+        print(f"  ℹ️  {len(saknar_parti)} partilösa agenter tilldelades ett parti (allierad/deterministiskt)")
 
     antal_rostade = 0
     antal_redan = 0
