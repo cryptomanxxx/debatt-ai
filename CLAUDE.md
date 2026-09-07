@@ -1313,15 +1313,24 @@ Var 90:e dag hålls ett riksdagsval i AI-civilisationen. Agenternas politiska pa
 
 **Besökarröstning (`/api/val-rost`):** POST med `{val_id, parti}`. IP-hashad deduplicering (SHA-256 + salt). Returnerar uppdaterade röstantal. 409 vid dubbelröst.
 
-**Sidan (`/val`):** Visar aktiv valkampanj eller senaste avgjorda val. Partikortar med manifest, realtids-procentstaplar och röstknapp. LocalStorage-spårning (`val_rostat_parti`) för UX. Tomt state om inget val pågår.
+**Sidan (`/val`):** Visar aktiv valkampanj eller senaste avgjorda val. Partikortar med manifest, realtids-procentstaplar och röstknapp. LocalStorage-spårning (`val_rostat_${val.id}`) för UX. Tomt state om inget val pågår.
+
+**Röststatus läckte mellan val (användarrapport, sep 2026):** en skärmdump visade ett helt nystartat val ("0 röster inkomna") där UI:t ändå påstod "Du har redan röstat"/"✓ Du röstade på detta parti". Orsak: "har jag röstat"-flaggan sparades i en generisk, ovillkorad localStorage-nyckel (`val_rostat_parti`) — inte skopad per `val.id`. En röst i ett tidigare avgjort val läckte därför permanent in i alla framtida val, tills webbläsarens localStorage rensades manuellt. Fixat genom att nyckeln nu är `val_rostat_${val.id}` och kollen sker i `hamtaVal()` efter att valets id är känt, inte i en tom initial `useEffect`.
+
+**Agenter röstade inte samma dag valet startade (samma rapport):** `rostar_agenter()` anropades bara i `main()`s gren där ett val REDAN var aktivt sedan tidigare — inte direkt efter att `starta_val()` skapat ett nytt val. Ett nystartat val fick därför inga agentröster förrän nästa dags cron-körning, vilket exakt förklarade "0 röster inkomna" på ett val som precis startat. Fixat: `starta_val()` returnerar nu den skapade val-raden (utnyttjar den redan satta `Prefer: return=representation`-headern) så `main()` kan anropa `rostar_agenter()` direkt efter att valet skapats.
+
+**Alla agenter röstar nu, inte bara partimedlemmar (ägarbegäran, sep 2026):** *"Ta bort regeln att bara agenter som tillhör ett aktivt parti kan rösta. Alla agenter ska kunna rösta."* `rostar_agenter()` krävde tidigare partimedlemskap (koalitionskluster på 3–8 agenter, styrka ≥ 3, se `berakna_och_spara_partier()`) — en agent utan tillräckligt starkt koalitionsband hamnade helt utanför och röstade aldrig, oavsett hur många val som hölls. Ny fallback-kedja i tre nivåer:
+1. **Partimedlem** → röstar på sitt eget parti (oförändrat).
+2. **Partilös** → röstar via sin STARKASTE koalitionsrelation (`agent_koalitioner`, UTAN partiernas styrka-tröskel) till en agent som faktiskt har ett parti — en emergent kedjeeffekt kan uppstå om två partilösa agenters starkaste band går till varandra.
+3. **Helt isolerad** (ingen koalitionsrad alls) → ett deterministiskt (agentnamn + val_id, inte omslumpat vid en omkörning) val bland valets partier. Sällsynt i praktiken eftersom koalitioner bildas kontinuerligt (✅27/34), men garanterar att verkligen alla 24 agenter röstar i varje val.
 
 | Fil | Roll |
 |---|---|
 | `supabase_val.sql` | SQL-schema för `riksdagsval` och `val_roster` med RLS-policies |
-| `val_test.py` | Daglig körning: avslutar utgångna val, räknar röster, utser vinnare, startar nya val med Groq-genererade manifest |
+| `val_test.py` | Daglig körning: avslutar utgångna val, räknar röster, utser vinnare, startar nya val med Groq-genererade manifest. `rostar_agenter()` låter alla 24 agenter rösta (medlem/allierad/deterministisk fallback), anropas både direkt efter att ett nytt val skapats och i den dagliga cykeln för redan aktiva val |
 | `app/api/val-rost/route.js` | POST-endpoint för besökarröster. IP-hash, UNIQUE-constraint mot dubbelröst, returnerar live röstantal |
 | `supabase_utils.py` → `hamta_maktindex_ranking()` | Modifierad: kollar senaste avgjorda val, applicerar 1.5× bonus på vinnande partiledaren om bonus fortfarande är aktiv |
-| `app/val/page.js` | Riksdagsvalssida (klientkomponent). Partimanifest, realtidsröstning, resultatstaplar, regelförklaring |
+| `app/val/page.js` | Riksdagsvalssida (klientkomponent). Partimanifest, realtidsröstning, resultatstaplar, regelförklaring. Röststatus skopad per `val.id` i localStorage |
 | `.github/workflows/val-test.yml` | Kör `val_test.py` dagligen 05:30 svensk tid (03:30 UTC) |
 
 Kräver Supabase-tabeller `riksdagsval` och `val_roster` — kör `supabase_val.sql` i SQL Editor. Kräver att politiska partier existerar i `politiska_partier` (skapas av `koalition_test.py` + BFS-klustring). Kräver `GROQ_API_KEY` för manifest-generering.
