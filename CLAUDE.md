@@ -2675,9 +2675,12 @@ Användarrapport (sep 2026): startsidans "Senaste nyheterna"-widget visade rubri
 
 **Känd begränsning:** redan publicerade artiklar med en avhuggen rubrik (t.ex. de två i användarrapporten) förblir avhuggna — fixen påverkar bara framtida `generera_rubrik()`-anrop, ingen efterhandsreparation av redan sparade `artiklar`-rader byggdes här. Samma självläkande-princip som redan etablerats för andra engångsdataproblem i den här loggen (jfr "Kvarvarande skräprader" under ✅93).
 
+**Codex-fynd (PR #1404-granskning): en ren teckenlängdströskel förkastar även legitima korta rubriker.** `RUBRIK_MIN_LANGD = 15` fångade båda de rapporterade avhuggna fragmenten ("FN-för" 6 tecken, "Om fem år" 9 tecken) — men samma tröskel skulle lika gärna förkasta ett genuint kort och komplett svar som "Sänk skatten" (12 tecken) eftersom textlängd i sig aldrig kan skilja "avhugget av max_tokens" från "medvetet kort". Fixat med en ny `hamta_kort_fns_med_trunkering()` i `ai_klient.py`: Groq/Mistral/DeepSeek är OpenAI-kompatibla och exponerar `finish_reason` via redan hämtade `httpx.Response`-objekt (ingen ändring av deras delade funktionssignaturer krävdes) — `finish_reason == "length"` är providerns egen, betydligt pålitligare signal om att svaret klipptes av. `generera_rubrik()` hoppar nu till nästa providerfallback ENDAST om providern själv rapporterar trunkering, och accepterar annars rubriken oavsett längd för dessa tre providers (med ett minimalt 3-teckensgolv kvar mot tomma/degenererade svar). Cloudflare/Gemini-wrapperfunktionerna returnerar bara text utan `finish_reason` (oförändrade — används på fler ställen i kodbasen) — för dem gäller fortfarande det gamla `RUBRIK_MIN_LANGD`-teckengolvet som en "vet inte"-fallback, samma restrisk som innan men bara för de två mer sällan använda fallback-providrarna.
+
 | Fil | Roll |
 |---|---|
-| `artikel.py` → `generera_rubrik()` | `max_tokens` 60→150, ny `RUBRIK_MIN_LANGD`-konstant (15 tecken) ersätter `len(rubrik) > 5` som accept-villkor innan providerloopen går vidare |
+| `artikel.py` → `generera_rubrik()` | `max_tokens` 60→150, ny `RUBRIK_MIN_LANGD`-konstant (15 tecken, nu bara säkerhetsgolv för Cloudflare/Gemini). Loopen använder `hamta_kort_fns_med_trunkering()` och hoppar bara vid `finish_reason == "length"`, inte vid kort-men-komplett text från Groq/Mistral/DeepSeek |
+| `ai_klient.py` → `hamta_kort_fns_med_trunkering()` | Ny funktion, additiv (bryter inte `hamta_kort_fns()`s befintliga anropare). `fn()` returnerar `(text, mojligen_trunkerad)` — `mojligen_trunkerad` läst direkt ur providerns `finish_reason` för de tre OpenAI-kompatibla providrarna |
 
 ---
 
