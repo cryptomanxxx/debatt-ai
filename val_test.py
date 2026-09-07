@@ -65,8 +65,26 @@ def hamta_partier() -> list:
     return fetch("politiska_partier?aktiv=eq.true&select=namn,ledare,medlemmar&order=styrka.desc")
 
 
+MANIFESTO_MIN_LANGD = 30  # tecken — se motivering vid MANIFESTO_STANDARD nedan
+
+
+def _manifesto_standard(parti_namn: str) -> str:
+    return f"{parti_namn} för en bättre AI-civilisation. Rösta på oss!"
+
+
 def generera_manifesto(ledare: str, parti_namn: str) -> str:
-    """Generera ett kort valkampanjsmanifest i agentens röst."""
+    """Generera ett kort valkampanjsmanifest i agentens röst.
+
+    Kräver minst MANIFESTO_MIN_LANGD tecken innan resultatet accepteras —
+    en riktig 2–3-meningars text på svenska blir alltid betydligt längre.
+    Utan denna spärr kunde ett avhugget/trasigt LLM-svar (t.ex. "I",
+    "Under mina fyrtio år", "Medan mänsk" — verifierat live i produktion,
+    sep 2026) sparas rakt av, eftersom den gamla `manifesto or …`-kollen
+    bara fångade ett TOMT svar, inte ett orimligt kort ett. Ett
+    genuint kort men giltigt svar (sällsynt, modellen ignorerar sällan
+    "2–3 meningar" helt) hanteras likadant som ett trasigt — fail-safe
+    mot en tom/meningslös kortare text är viktigare än att bevara ett
+    enstaka udda men äkta kort svar."""
     from agenter import AGENTER  # lazy import — filen kan sakna agenter
     agent = next((a for a in AGENTER if a["namn"] == ledare), None)
     system = agent["system"][:600] if agent else f"Du är {ledare}, partiledare."
@@ -80,7 +98,39 @@ def generera_manifesto(ledare: str, parti_namn: str) -> str:
         ),
         max_tokens=150,
     )
-    return manifesto or f"{parti_namn} för en bättre AI-civilisation. Rösta på oss!"
+    if manifesto and len(manifesto.strip()) >= MANIFESTO_MIN_LANGD:
+        return manifesto
+    return _manifesto_standard(parti_namn)
+
+
+def reparera_korta_manifest(val: dict) -> None:
+    """Regenererar manifest som är kortare än MANIFESTO_MIN_LANGD.
+
+    Skyddar bara mot NYA trasiga manifest vid valstart (se
+    generera_manifesto() ovan) — ett val som redan var aktivt när fixen
+    landade kunde ha manifest sparade INNAN spärren fanns. Körs varje
+    dag ett val är aktivt (samma gren som rostar_agenter()), så ett
+    redan pågående val självläker vid nästa cron-körning istället för
+    att förbli trasigt i hela valperioden."""
+    val_id = val["id"]
+    partier = val.get("partier", [])
+    trasiga = [p for p in partier if len((p.get("manifesto") or "").strip()) < MANIFESTO_MIN_LANGD]
+    if not trasiga:
+        return
+
+    print(f"  {len(trasiga)} parti(er) hade ett för kort manifest — regenererar...")
+    for p in trasiga:
+        p["manifesto"] = generera_manifesto(p["ledare"], p["namn"])
+
+    r = httpx.patch(
+        f"{SB_URL}/rest/v1/riksdagsval?id=eq.{val_id}",
+        json={"partier": partier},
+        headers=H, timeout=10,
+    )
+    if r.is_success:
+        print(f"  ✓ {len(trasiga)} manifest reparerade")
+    else:
+        print(f"  [VARNING] Kunde inte spara reparerade manifest: {r.status_code}")
 
 
 def starta_val(partier: list) -> dict | None:
@@ -325,6 +375,8 @@ def main() -> None:
         startad = datetime.datetime.fromisoformat(val["startad"].replace("Z", "+00:00"))
         alder_dagar = (datetime.datetime.now(datetime.timezone.utc) - startad).days
         print(f"\nAktivt val sedan {alder_dagar} dagar")
+
+        reparera_korta_manifest(val)
 
         print("  Agenter röstar...")
         rostar_agenter(val)
