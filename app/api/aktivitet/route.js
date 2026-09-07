@@ -455,16 +455,34 @@ async function byggFeed() {
     johan_sager: { ikon: "💡", farg: "#f0b050" },
     oraklet_forklarar: { ikon: "🎓", farg: "#dd6e5f" },
     diskussion:  { ikon: "🎭", farg: "#c084fc" },
+    // Frågeläget (✅99) — samma ikon/färg som respektive uppläsningsvariant
+    // ovan. Utan dessa föll okänd aktion tillbaka på anna_sager, vilket
+    // visade t.ex. Oraklets svar som "Anna läste upp" i feeden.
+    anna_svarar:  { ikon: "🎙️", farg: "#a0c8f0" },
+    peter_svarar: { ikon: "📊", farg: "#6abf6a" },
+    johan_svarar: { ikon: "💡", farg: "#f0b050" },
+    oraklet_svarar: { ikon: "🎓", farg: "#dd6e5f" },
   };
-  const FRAGA_ANNA_PETER_NAMN = { anna_sager: "Anna", peter_sager: "Peter", johan_sager: "Johan", oraklet_forklarar: "Professor Oraklet" };
+  const FRAGA_ANNA_PETER_NAMN = {
+    anna_sager: "Anna", peter_sager: "Peter", johan_sager: "Johan", oraklet_forklarar: "Professor Oraklet",
+    anna_svarar: "Anna", peter_svarar: "Peter", johan_svarar: "Johan", oraklet_svarar: "Professor Oraklet",
+  };
   (Array.isArray(fragaAnnaPeter.value) ? fragaAnnaPeter.value : []).forEach(f => {
     if (!f.skapad) return;
     const info = FRAGA_ANNA_PETER_INFO[f.aktion] || FRAGA_ANNA_PETER_INFO.anna_sager;
-    const snippet = (f.titel || f.input_text || f.sammanfattning || "").slice(0, 60);
+    // Frågeläget sparar frågan i titel och svaret i input_text (se
+    // sagFritext() i app/fraga-anna-och-peter/page.js) — titel är alltså
+    // det mest relevanta att visa i feeden här (frågan som ställdes),
+    // till skillnad från uppläsnings-/URL-varianterna där titel är
+    // artikelrubriken och input_text/sammanfattning är den upplästa texten.
+    const arSvarar = f.aktion?.endsWith("_svarar");
+    const snippet = (arSvarar ? (f.titel || f.input_text || "") : (f.titel || f.input_text || f.sammanfattning || "")).slice(0, 60);
     const text = f.aktion === "diskussion"
       ? `Anna, Peter & Johan diskuterade: "${snippet}"`
       : f.aktion === "oraklet_forklarar"
       ? `Professor Oraklet förklarade: "${snippet}"`
+      : arSvarar
+      ? `${FRAGA_ANNA_PETER_NAMN[f.aktion] || "Anna"} svarade på: "${snippet}"`
       : `${FRAGA_ANNA_PETER_NAMN[f.aktion] || "Anna"} läste upp: "${snippet}"`;
     feed.push({
       typ: `fraga-anna-peter-${f.aktion}`,
