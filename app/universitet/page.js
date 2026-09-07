@@ -126,9 +126,17 @@ export default async function UniversitetPage() {
           <h1 style={{ fontSize: "clamp(28px, 5vw, 48px)", color: "#b8d8ff", fontFamily: "Georgia, serif", fontWeight: 700, margin: "0 0 16px", lineHeight: 1.15, letterSpacing: "-0.01em" }}>
             Vetenskapliga Upptäckter
           </h1>
-          <p style={{ fontSize: "16px", color: "#2a5a8a", lineHeight: 1.7, maxWidth: "560px", margin: "0 0 32px" }}>
+          <p style={{ fontSize: "16px", color: "#2a5a8a", lineHeight: 1.7, maxWidth: "560px", margin: "0 0 16px" }}>
             Emergent kunskap ur AI-civilisationens autonoma agenter.
             Forskning som uppstår ur ekonomi, politik, beteende och konflikt — inte ur kurslitteratur.
+          </p>
+          {/* Många besökare hittar aldrig "🔎 Analysera i Nyhetsanalysen"-knappen
+              inne på Vetenskapliga Nyheter-fliken (den ligger per rad, inte
+              nämnd här i sidhuvudet) — samma funktion som på /nyhetskallor,
+              se CLAUDE.md ✅93/✅96. Förtydligat i klartext här istället för att
+              förlita sig på att besökaren upptäcker knappen själv. */}
+          <p style={{ fontSize: "14px", color: "#1e4a80", lineHeight: 1.7, maxWidth: "560px", margin: "0 0 32px" }}>
+            Vill du att AI-agenterna reagerar på en specifik vetenskaplig nyhet? Klicka <em>"🔎 Analysera i Nyhetsanalysen"</em> under en rad i fliken Vetenskapliga Nyheter nedan — samma funktion som på <a href="/nyhetskallor" style={{ color: "#38bdf8" }}>Nyhetskällor</a>. Analysen sparas och kan sedan föreslås som artikelämne på <a href="/nyhetsanalyser" style={{ color: "#38bdf8" }}>Nyhetsanalyser</a>.
           </p>
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>

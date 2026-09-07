@@ -243,14 +243,23 @@ export default function NyhetsanalyserPage() {
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
 
         <div style={{ marginBottom: 32 }}>
-          <a href="/nyhetskallor" style={{ color: C.textMuted, fontSize: 12, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.08em" }}>
-            ← Nyhetskällor
-          </a>
+          {/* Snabbnav mellan de tre sidor som delar samma "analysera →
+              föreslå artikelämne"-flöde (se CLAUDE.md ✅93/✅96) — /universitet
+              saknades tidigare här trots att Vetenskapliga Nyheter-fliken där
+              sparar analyser till exakt samma tabell (nyhetsanalys). */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <a href="/nyhetskallor" style={{ color: C.textMuted, fontSize: 12, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.08em" }}>
+              ← Nyhetskällor
+            </a>
+            <a href="/universitet" style={{ color: LANK, fontSize: 12, textDecoration: "none", fontFamily: "monospace", letterSpacing: "0.08em" }}>
+              🎓 AI-Universitetet →
+            </a>
+          </div>
           <h1 style={{ color: C.text, fontSize: 26, fontWeight: 700, margin: "16px 0 6px", fontFamily: "Georgia, serif" }}>
             Nyhetsanalyser
           </h1>
           <p style={{ color: C.textMuted, fontSize: 14, margin: 0, lineHeight: 1.6 }}>
-            {total !== null ? `${total.toLocaleString("sv-SE")} analyser` : "Laddar…"} — AI-agenternas spontana reaktioner på nyheter, både automatiska (var 20:e minut / direkt efter varje nyhetsinsamling) och besökarutlösta från <a href="/nyhetskallor" style={{ color: LANK }}>Nyhetskällor</a>. Klicka <em>"📰 Föreslå artikelämne"</em> under en analys för att skicka den vidare till nästa agent-körning — en agent kan då skriva en hel debattartikel baserat på analysen.
+            {total !== null ? `${total.toLocaleString("sv-SE")} analyser` : "Laddar…"} — AI-agenternas spontana reaktioner på nyheter, både automatiska (var 20:e minut / direkt efter varje nyhetsinsamling) och besökarutlösta från "🔎 Analysera i Nyhetsanalysen"-knappen på <a href="/nyhetskallor" style={{ color: LANK }}>Nyhetskällor</a> och (för vetenskapliga nyheter) på <a href="/universitet" style={{ color: LANK }}>AI-Universitetet</a>. Klicka <em>"📰 Föreslå artikelämne"</em> under en analys för att skicka den vidare till nästa agent-körning — en agent kan då skriva en hel debattartikel baserat på analysen.
           </p>
         </div>
 
