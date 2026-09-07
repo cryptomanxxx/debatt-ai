@@ -2,7 +2,8 @@
 import { useMemo, useState } from "react";
 import NyhetsTicker from "./NyhetsTicker";
 import NastaHamtningRaknare from "./NastaHamtningRaknare";
-import { ALLA_AGENTER, af, analyseraMedAgent } from "./agentAnalys";
+import { analyseraMedAgent } from "./agentAnalys";
+import AgentAnalysPanel from "./AgentAnalysPanel";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -41,48 +42,6 @@ function tidsSedan(iso) {
   if (h < 24) return `${h} tim sedan`;
   const d = Math.floor(h / 24);
   return `${d} dygn sedan`;
-}
-
-// Renderar bara den utfällbara panelen — själva toggle-knappen ligger i
-// NyhetsRads knapprad.
-function AgentAnalysPanel({ expanderad, valda, onToggleAgent, analys, onKor }) {
-  if (!expanderad) return null;
-  const korAntal = Object.values(analys || {}).filter(a => a.status === "laddar").length;
-  return (
-    <div style={{ marginTop: "10px", padding: "12px", background: "#0a0d10", border: `1px solid ${C.border}`, borderRadius: "6px" }}>
-      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
-        {ALLA_AGENTER.map(agent => {
-          const vald = valda.has(agent);
-          return (
-            <button key={agent} onClick={() => onToggleAgent(agent)} style={{ padding: "4px 10px", borderRadius: "20px", border: `1px solid ${vald ? af(agent) + "90" : C.border}`, background: vald ? `${af(agent)}18` : "transparent", color: vald ? af(agent) : C.textMuted, fontSize: "11px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
-              {agent}
-            </button>
-          );
-        })}
-      </div>
-      <button
-        onClick={onKor}
-        disabled={valda.size === 0 || korAntal > 0}
-        style={{ padding: "6px 14px", background: valda.size === 0 || korAntal > 0 ? "transparent" : `${LANK}18`, border: `1px solid ${LANK}60`, color: valda.size === 0 || korAntal > 0 ? C.textMuted : LANK, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: valda.size === 0 || korAntal > 0 ? "default" : "pointer" }}
-      >
-        {korAntal > 0 ? "Analyserar…" : "Analysera →"}
-      </button>
-
-      {analys && Object.keys(analys).length > 0 && (
-        <div style={{ marginTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          {Object.entries(analys).map(([agent, a]) => (
-            <div key={agent} style={{ padding: "10px 14px", background: C.surface, borderLeft: `3px solid ${af(agent)}${a.status === "laddar" ? "60" : ""}`, borderRadius: "4px" }}>
-              <div style={{ fontSize: "10px", color: af(agent), fontFamily: "monospace", letterSpacing: "0.08em", fontWeight: 700, marginBottom: "4px" }}>{agent.toUpperCase()}</div>
-              <p style={{ margin: 0, fontSize: "13px", color: a.status === "fel" ? "#f87171" : C.text, lineHeight: 1.65 }}>
-                {a.text}
-                {a.status === "laddar" && <span style={{ display: "inline-block", width: "2px", height: "12px", background: af(agent), marginLeft: "2px", verticalAlign: "text-bottom", animation: "blink 0.8s step-end infinite" }} />}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // Besökare klistrar in en länk till en nyhetsartikel som inte täcks av de
