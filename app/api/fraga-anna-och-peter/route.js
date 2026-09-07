@@ -15,7 +15,13 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_KEY;
 
 const TYPER = new Set(["fritext", "url"]);
-const AKTIONER = new Set(["anna_sager", "peter_sager", "johan_sager", "oraklet_forklarar", "diskussion"]);
+const AKTIONER = new Set([
+  "anna_sager", "peter_sager", "johan_sager", "oraklet_forklarar", "diskussion",
+  // Frågeläget (heuristiskt detekterat, se arFraga() i page.js) — agenten
+  // svarar på en fråga istället för att läsa upp den ordagrant. Kräver
+  // supabase_fraga_anna_peter_v4.sql.
+  "anna_svarar", "peter_svarar", "johan_svarar", "oraklet_svarar",
+]);
 const MAX_TURNS = 9;
 const MAX_TURN_LEN = 400;
 // Codex-fynd, PR #1390-granskning: Oraklets sammanslagna uppläsningstext

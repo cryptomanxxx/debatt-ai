@@ -36,6 +36,24 @@ function kortRubrik(text) {
   return rad.length > 120 ? rad.slice(0, 119) + "…" : rad;
 }
 
+// Frågeläget: en ren klientside-heuristik avgör om den inklistrade fria
+// texten är en fråga (istället för text som ska läsas upp ordagrant) —
+// ingen extra LLM-klassificering, ingen kostnad. Slutar texten med "?" ELLER
+// börjar den med ett vanligt svenskt frågeord räknas den som en fråga.
+// Missar oundvikligen ovanliga formuleringar utan frågetecken/frågeord, och
+// kan felaktigt trigga på text som råkar sluta med "?" men var tänkt att
+// läsas upp ordagrant (t.ex. ett citat) — knapptexterna nedan byter
+// dynamiskt så besökaren ser vilket läge som gäller INNAN de klickar.
+const FRAGEORD = ["vad", "varför", "hur", "vem", "vilken", "vilka", "vilket", "när", "var",
+  "kan", "är", "finns", "ska", "skulle", "har", "gör", "borde", "får", "hade", "vore"];
+function arFraga(text) {
+  const t = text.trim();
+  if (!t) return false;
+  if (t.endsWith("?")) return true;
+  const forstaOrd = t.split(/\s+/)[0]?.toLowerCase().replace(/[^a-zåäö]/g, "");
+  return FRAGEORD.includes(forstaOrd);
+}
+
 function tidsAgo(iso) {
   if (!iso) return "";
   const diff = Date.now() - new Date(iso).getTime();
@@ -55,7 +73,23 @@ const AKTION_INFO = {
   johan_sager: { ikon: "💡", namn: "Johan", farg: JOHAN_FARG },
   oraklet_forklarar: { ikon: "🎓", namn: "Oraklet", farg: ORAKLET_FARG },
   diskussion: { ikon: "🎭", namn: "Studio", farg: STUDIO_FARG },
+  // Frågeläget — samma ikon/färg som respektive uppläsningsvariant ovan,
+  // bara aktion-strängen skiljer dem åt (se aktionsVerb() för badge-texten).
+  anna_svarar: { ikon: "🎙️", namn: "Anna", farg: ANNA_FARG },
+  peter_svarar: { ikon: "📊", namn: "Peter", farg: PETER_FARG },
+  johan_svarar: { ikon: "💡", namn: "Johan", farg: JOHAN_FARG },
+  oraklet_svarar: { ikon: "🎓", namn: "Oraklet", farg: ORAKLET_FARG },
 };
+
+// Badge-verbet i historikkortets header ("... SÄGER"/"... SVARAR" osv.) —
+// utbrutet ur en tidigare inline-ternary så frågeläget kunde läggas till
+// utan att den bli en olöslig kedja av villkor.
+function aktionsVerb(aktion) {
+  if (aktion === "diskussion") return "DISKUTERAR";
+  if (aktion === "oraklet_forklarar") return "FÖRKLARAR";
+  if (aktion?.endsWith("_svarar")) return "SVARAR";
+  return "SÄGER";
+}
 
 const SPEAKER_INFO = {
   anna: { namn: "Anna", farg: ANNA_FARG },
@@ -66,7 +100,12 @@ const SPEAKER_INFO = {
 // Mappar AGENTER-nyckeln (som styr röst/avatar i AgentOverlay) mot aktion-
 // strängen som sparas i historiken, och tillbaka igen vid "Spela upp igen".
 const AGENT_TILL_AKTION = { Anna: "anna_sager", Nationalekonom: "peter_sager", Teknikoptimist: "johan_sager", Oraklet: "oraklet_forklarar" };
-const AKTION_TILL_AGENT = { anna_sager: { agent: "Anna", namn: "Anna" }, peter_sager: { agent: "Nationalekonom", namn: "Peter" }, johan_sager: { agent: "Teknikoptimist", namn: "Johan" }, oraklet_forklarar: { agent: "Oraklet", namn: "Professor Oraklet" } };
+// Frågeläget — samma agentnycklar som ovan, men mot "_svarar"-aktionerna.
+const AGENT_TILL_AKTION_SVARAR = { Anna: "anna_svarar", Nationalekonom: "peter_svarar", Teknikoptimist: "johan_svarar", Oraklet: "oraklet_svarar" };
+const AKTION_TILL_AGENT = {
+  anna_sager: { agent: "Anna", namn: "Anna" }, peter_sager: { agent: "Nationalekonom", namn: "Peter" }, johan_sager: { agent: "Teknikoptimist", namn: "Johan" }, oraklet_forklarar: { agent: "Oraklet", namn: "Professor Oraklet" },
+  anna_svarar: { agent: "Anna", namn: "Anna" }, peter_svarar: { agent: "Nationalekonom", namn: "Peter" }, johan_svarar: { agent: "Teknikoptimist", namn: "Johan" }, oraklet_svarar: { agent: "Oraklet", namn: "Professor Oraklet" },
+};
 
 function AktionsKnapp({ farg, onClick, disabled, children }) {
   return (
@@ -187,7 +226,7 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
       <div style={{ padding: "10px 16px", background: `${info.farg}0d`, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ fontSize: 10, color: info.farg, fontFamily: "monospace", fontWeight: 700, letterSpacing: "0.08em" }}>
-          {info.ikon} {info.namn.toUpperCase()}{rad.aktion === "diskussion" ? " DISKUTERAR" : rad.aktion === "oraklet_forklarar" ? " FÖRKLARAR" : " SÄGER"}
+          {info.ikon} {info.namn.toUpperCase()} {aktionsVerb(rad.aktion)}
         </span>
         <span style={{ fontSize: 10, color: C.textMuted, fontFamily: "monospace" }}>
           {rad.typ === "url" ? "🔗 länk" : "✏️ fri text"}
@@ -204,6 +243,17 @@ function HistorikPost({ rad, expanded, onToggle, onSpelaUpp }) {
           ) : (
             <p style={{ color: C.text, fontSize: 14, fontWeight: 700, margin: "0 0 4px", lineHeight: 1.5 }}>{rad.titel}</p>
           )
+        )}
+
+        {/* Frågeläget: den ursprungliga frågan sparas i rad.titel (även för
+            typ:"fritext", som annars aldrig visar titel-fältet) medan
+            brodtext nedan redan visar rad.input_text — här är det svaret,
+            inte en uppläst text. Visas bara ovanpå svaret, aldrig istället
+            för det. */}
+        {!ärUrl && rad.aktion?.endsWith("_svarar") && rad.titel && (
+          <p style={{ color: C.textMuted, fontSize: 13, fontStyle: "italic", margin: "0 0 8px", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+            ❓ Fråga: {rad.titel}
+          </p>
         )}
 
         {brodtext && (
@@ -348,6 +398,13 @@ export default function FragaAnnaOchPeterPage() {
   // importsvar installeras som analys-state under artikel B:s panel).
   const analysReqIdRef = useRef(0);
 
+  // Frågeläget: svarLaddar håller agentnyckeln (Anna/Nationalekonom/
+  // Teknikoptimist/Oraklet) som just nu väntar på ett genererat svar, eller
+  // null. svarFel visar ett kort felmeddelande om generationen misslyckas —
+  // ingen fallback till att bara läsa upp den råa frågan (missvisande).
+  const [svarLaddar, setSvarLaddar] = useState(null);
+  const [svarFel, setSvarFel] = useState("");
+
   const [lasning, setLasning] = useState(null); // { agent, namn, text }
   const [studio, setStudio] = useState(null); // { rubrik, beskrivning, turns?, meta? }
   // Privat läge — samma "spara inte"-princip som den privata frågeknappen på
@@ -368,6 +425,10 @@ export default function FragaAnnaOchPeterPage() {
   const [expanderad, setExpanderad] = useState({});
 
   const fritextTrimmed = fritext.trim();
+  // Beräknas live medan besökaren skriver — styr knapptexterna nedan
+  // (transparens innan klick) och hint-texten under textarean. sagFritext()
+  // gör samma kontroll själv innan den bestämmer läge.
+  const fragaDetekterad = arFraga(fritextTrimmed);
 
   // Cursor-baserad paginering på `id` (bigserial, strikt stigande med
   // infogningsordning) istället för offset — en offset skiftar så fort en
@@ -483,10 +544,46 @@ export default function FragaAnnaOchPeterPage() {
     }
   }
 
-  function sagFritext(agent, namn) {
+  // Fråga vs. vanlig text avgörs live med arFraga() (klientside-heuristik,
+  // se ovan) — vid en fråga genereras ett svar via /api/fraga-anna-och-peter/
+  // svara istället för att den råa texten bara läses upp ordagrant.
+  async function sagFritext(agent, namn) {
     if (!fritextTrimmed) return;
-    setLasning({ agent, namn, text: fritextTrimmed });
-    if (!privat) sparaHistorik({ typ: "fritext", aktion: AGENT_TILL_AKTION[agent] || "anna_sager", text: fritextTrimmed });
+    setSvarFel("");
+    if (!arFraga(fritextTrimmed)) {
+      setLasning({ agent, namn, text: fritextTrimmed });
+      if (!privat) sparaHistorik({ typ: "fritext", aktion: AGENT_TILL_AKTION[agent] || "anna_sager", text: fritextTrimmed });
+      return;
+    }
+    setSvarLaddar(agent);
+    try {
+      const res = await fetch("/api/fraga-anna-och-peter/svara", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent, fraga: fritextTrimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.svar) {
+        setSvarFel(data.error || "Kunde inte generera ett svar — försök igen om en stund.");
+        return;
+      }
+      setLasning({ agent, namn, text: data.svar });
+      // titel bär den ursprungliga frågan (visas i historiken, se
+      // HistorikPost) — input_text (skickas som "text") bär svaret, samma
+      // fält "Spela upp igen" redan läser oavsett aktion.
+      if (!privat) {
+        sparaHistorik({
+          typ: "fritext",
+          aktion: AGENT_TILL_AKTION_SVARAR[agent] || "anna_svarar",
+          text: data.svar,
+          titel: fritextTrimmed,
+        });
+      }
+    } catch {
+      setSvarFel("Nätverksfel — försök igen.");
+    } finally {
+      setSvarLaddar(null);
+    }
   }
   function diskuteraFritext() {
     if (!fritextTrimmed) return;
@@ -723,23 +820,31 @@ export default function FragaAnnaOchPeterPage() {
           <div style={{ textAlign: "right", fontSize: 11, color: C.textMuted, fontFamily: "monospace", margin: "4px 0 12px" }}>
             {fritextTrimmed.length} / {TEXT_MAX}
           </div>
+          {fragaDetekterad && (
+            <p style={{ color: STUDIO_FARG, fontSize: 12, margin: "0 0 12px", fontFamily: "Georgia, serif" }}>
+              ❓ Det här ser ut som en fråga — agenten svarar på den istället för att läsa upp den.
+            </p>
+          )}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <AktionsKnapp farg={ANNA_FARG} disabled={!fritextTrimmed} onClick={() => sagFritext("Anna", "Anna")}>
-              🎙️ Anna säger det
+            <AktionsKnapp farg={ANNA_FARG} disabled={!fritextTrimmed || !!svarLaddar} onClick={() => sagFritext("Anna", "Anna")}>
+              {svarLaddar === "Anna" ? "🤔 Anna funderar…" : fragaDetekterad ? "🎙️ Anna svarar" : "🎙️ Anna säger det"}
             </AktionsKnapp>
-            <AktionsKnapp farg={PETER_FARG} disabled={!fritextTrimmed} onClick={() => sagFritext("Nationalekonom", "Peter")}>
-              📊 Peter säger det
+            <AktionsKnapp farg={PETER_FARG} disabled={!fritextTrimmed || !!svarLaddar} onClick={() => sagFritext("Nationalekonom", "Peter")}>
+              {svarLaddar === "Nationalekonom" ? "🤔 Peter funderar…" : fragaDetekterad ? "📊 Peter svarar" : "📊 Peter säger det"}
             </AktionsKnapp>
-            <AktionsKnapp farg={JOHAN_FARG} disabled={!fritextTrimmed} onClick={() => sagFritext("Teknikoptimist", "Johan")}>
-              💡 Johan säger det
+            <AktionsKnapp farg={JOHAN_FARG} disabled={!fritextTrimmed || !!svarLaddar} onClick={() => sagFritext("Teknikoptimist", "Johan")}>
+              {svarLaddar === "Teknikoptimist" ? "🤔 Johan funderar…" : fragaDetekterad ? "💡 Johan svarar" : "💡 Johan säger det"}
             </AktionsKnapp>
-            <AktionsKnapp farg={ORAKLET_FARG} disabled={!fritextTrimmed} onClick={() => sagFritext("Oraklet", "Professor Oraklet")}>
-              🎓 Oraklet förklarar det
+            <AktionsKnapp farg={ORAKLET_FARG} disabled={!fritextTrimmed || !!svarLaddar} onClick={() => sagFritext("Oraklet", "Professor Oraklet")}>
+              {svarLaddar === "Oraklet" ? "🤔 Oraklet funderar…" : fragaDetekterad ? "🎓 Oraklet svarar" : "🎓 Oraklet förklarar det"}
             </AktionsKnapp>
-            <AktionsKnapp farg={STUDIO_FARG} disabled={!fritextTrimmed} onClick={diskuteraFritext}>
+            <AktionsKnapp farg={STUDIO_FARG} disabled={!fritextTrimmed || !!svarLaddar} onClick={diskuteraFritext}>
               🎭 Anna, Peter &amp; Johan diskuterar det
             </AktionsKnapp>
           </div>
+          {svarFel && (
+            <p style={{ color: "#e05050", fontSize: 13, marginTop: 12 }}>{svarFel}</p>
+          )}
         </div>
 
         {/* ── Nyhetsartikel-URL ────────────────────────────────── */}
