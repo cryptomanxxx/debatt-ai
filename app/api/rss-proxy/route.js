@@ -14,6 +14,9 @@ const TILLÅTNA_DOMÄNER = [
   "youtube.com",
   "coindesk.com", "cointelegraph.com",
   "arxiv.org",
+  // 8 nya vetenskapskällor (sep 2026) — se nyheter.py FEED_KATEGORIER.
+  "sciencedaily.com", "newscientist.com", "livescience.com",
+  "sciencenews.org", "nasa.gov", "pnas.org",
 ];
 
 export async function GET(request) {
