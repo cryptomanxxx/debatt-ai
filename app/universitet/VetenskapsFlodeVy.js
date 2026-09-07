@@ -24,14 +24,14 @@ function AgentAnalysPanel({ expanderad, valda, onToggleAgent, analys, onKor }) {
           const vald = valda.has(agent);
           const farg = af(agent, ANALYS_FARG);
           return (
-            <button key={agent} onClick={() => onToggleAgent(agent)} style={{ padding: "4px 10px", borderRadius: "20px", border: `1px solid ${vald ? farg + "90" : "#0d2040"}`, background: vald ? `${farg}18` : "transparent", color: vald ? farg : "#1e4a80", fontSize: "11px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
+            <button key={agent} onClick={(e) => { e.stopPropagation(); onToggleAgent(agent); }} style={{ padding: "4px 10px", borderRadius: "20px", border: `1px solid ${vald ? farg + "90" : "#0d2040"}`, background: vald ? `${farg}18` : "transparent", color: vald ? farg : "#1e4a80", fontSize: "11px", fontFamily: "Georgia, serif", cursor: "pointer" }}>
               {agent}
             </button>
           );
         })}
       </div>
       <button
-        onClick={onKor}
+        onClick={(e) => { e.stopPropagation(); onKor(); }}
         disabled={valda.size === 0 || korAntal > 0}
         style={{ padding: "6px 14px", background: valda.size === 0 || korAntal > 0 ? "transparent" : `${ANALYS_FARG}18`, border: `1px solid ${ANALYS_FARG}60`, color: valda.size === 0 || korAntal > 0 ? "#1e4a80" : ANALYS_FARG, borderRadius: "6px", fontSize: "12px", fontFamily: "Georgia, serif", cursor: valda.size === 0 || korAntal > 0 ? "default" : "pointer" }}
       >
