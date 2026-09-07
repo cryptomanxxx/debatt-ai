@@ -37,6 +37,7 @@ from supabase_utils import (
     hamta_statistik, hamta_senaste_artiklar, hamta_engagemang,
     hamta_publicerade_idag_per_typ,
     hamta_agent_historik, hamta_amnesforslag, markera_forslag_behandlat,
+    registrera_forslag_forsok, MAX_FORSLAG_FORSOK,
     hamta_trendande_amnen, hamta_senaste_visualisering, publicera_visualisering,
     hamta_all_statistik, valj_visualisering, spara_nyhetslog,
     hamta_oppna_markets, hamta_existerande_bets, estimera_sannolikhet,
@@ -553,6 +554,7 @@ def main():
 
         forslag_amne = None
         forslag_id = None
+        forslag_forsok = 0
         forslag_summering = None
         forslag_kalla_namn = None
         forslag_kalla_url = None
@@ -561,10 +563,11 @@ def main():
             if forslag:
                 forslag_amne = forslag["amne"]
                 forslag_id = forslag["id"]
+                forslag_forsok = forslag.get("forsok") or 0
                 forslag_summering = (forslag.get("summering") or "").strip() or None
                 forslag_kalla_namn = (forslag.get("kalla_namn") or "").strip() or None
                 forslag_kalla_url = (forslag.get("kalla_url") or "").strip() or None
-                print(f"Hittade ämnesförslag från direktdebatten: \"{forslag_amne[:60]}\"")
+                print(f"Hittade ämnesförslag från direktdebatten: \"{forslag_amne[:60]}\"" + (f" (försök {forslag_forsok + 1}/{MAX_FORSLAG_FORSOK})" if forslag_forsok else ""))
 
         extra_kontext = ""
         if agent["namn"] == "Kryptoanalytiker":
@@ -955,7 +958,11 @@ def main():
                 markera_forslag_behandlat(sb_key, forslag_id)
                 print("  Förslag markerat som behandlat ✓")
             else:
-                print("  ℹ️  Förslag EJ markerat som behandlat (artikeln avvisades) — försöks igen nästa körning")
+                gav_upp = registrera_forslag_forsok(sb_key, forslag_id, forslag_forsok)
+                if gav_upp:
+                    print(f"  ⚠️  Förslag gav upp efter {MAX_FORSLAG_FORSOK} avvisade försök — markerat behandlat utan publicerad artikel")
+                else:
+                    print(f"  ℹ️  Förslag EJ markerat som behandlat (artikeln avvisades, försök {forslag_forsok + 1}/{MAX_FORSLAG_FORSOK}) — försöks igen nästa körning")
 
         if sb_key and "fel" not in svar:
             action_type = "publish_reply" if original else "publish_article"

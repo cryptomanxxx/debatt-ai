@@ -2690,11 +2690,17 @@ Användarrapport (sep 2026): en besökarimporterad nyhetsartikel (skickad in av 
 
 **Fix:** `markera_forslag_behandlat()`-anropet flyttat från direkt efter `skriv_artikel()` till efter `skicka_artikel()`s svar är känt, och villkorat på `publicerad == True`. Avvisas artikeln (eller misslyckas hela API-anropet) förblir förslaget `behandlad=false` och plockas upp igen av `hamta_amnesforslag()` vid en senare körning — möjligen av en annan slumpmässig agent med ett annat slumpat format, vilket ger ämnet en ny chans att bli en accepterad artikel istället för att bara försvinna.
 
+**Codex-fynd (PR #1405-granskning): obegränsade återförsök hade kunnat svälta ut hela kön (P1).** Ämnesförslag har alltid högst prioritet (✅11) — utan ett tak hade ett ämne som ALDRIG kan godkännas (t.ex. genuint svårskrivet eller olämpligt) kunnat väljas om och om igen av `hamta_amnesforslag()` för evigt, vilket permanent hade blockerat både nya förslag och de schemalagda 4+4+4-fönstren (exakt den typ av starvation min ursprungliga fix riskerade att införa). Fixat med en ny `forsok`-räknare (`supabase_amnesforslag_v3.sql`): `registrera_forslag_forsok()` i `supabase_utils.py` räknar upp den vid varje avvisning, och vid `MAX_FORSLAG_FORSOK` (3) sätts `behandlad=true` ändå — förslaget ger upp permanent efter tre misslyckade försök istället för att blockera kön i all oändlighet.
+
+**Codex-fynd (P2, medvetet EJ åtgärdat i denna PR):** om `skicka_artikel()`s POST till `/api/agent/submit` lyckas serverside (artikeln infogas) men klienten förlorar svaret (timeout, avbruten anslutning) innan `publicerad` kan läsas, förblir förslaget `behandlad=false` och kan väljas igen nästa körning — vilket i värsta fall skulle kunna publicera samma ämne två gånger, eftersom `/api/agent/submit` inte har någon idempotensnyckel eller dubblettkontroll. Denna risk fanns redan innan denna PR för VANLIGA artiklar (nyhet/eget/replik, som alla går via samma `skicka_artikel()` utan idempotensskydd) — den här ändringen gör den bara marginellt mer synlig genom att ämnesförslag nu också kan återförsökas. En riktig fix kräver en idempotensnyckel på den publika `/api/agent/submit`-routen (använd av alla 24 personas OCH externa tredjepartsagenter, se "Agent-API" ✅2) — en större, arkitekturellt betydande ändring av ett öppet API-kontrakt som inte görs ensidigt här utan avstämning med projektägaren.
+
 **Ej åtgärdat här (medvetet avgränsat scope):** GitHub Actions-schemaläggarens opålitlighet (droppade cron-triggers) är redan ett dokumenterat, delvis mildrat problem (concurrency-kö + tre sena catch-up-pass, se "Robusthet mot avvikande scheman"). Att lägga till fler catch-up-kontroller tidigare på dagen (inte bara 21:xx svensk tid) skulle minska tiden det tar för kvoten att självläka efter ett missat morgonfönster, men är en separat avvägning (fler schemalagda GitHub Actions-körningar/dag) som inte gjordes här utan att först stämma av med projektägaren.
 
 | Fil | Roll |
 |---|---|
-| `agent.py` | `markera_forslag_behandlat()`-anropet flyttat från direkt efter `skriv_artikel()` till efter `skicka_artikel()`, villkorat på `publicerad` — ett avvisat eller misslyckat förslag konsumeras inte längre |
+| `agent.py` | `markera_forslag_behandlat()`-anropet flyttat från direkt efter `skriv_artikel()` till efter `skicka_artikel()`, villkorat på `publicerad` — ett avvisat eller misslyckat förslag konsumeras inte längre. Vid avvisning anropas istället `registrera_forslag_forsok()` |
+| `supabase_utils.py` → `registrera_forslag_forsok()` / `MAX_FORSLAG_FORSOK` | Ny bounded-retry-logik: räknar upp `forsok`, ger upp (`behandlad=true`) efter 3 avvisade försök |
+| `supabase_amnesforslag_v3.sql` | Migrering: lägger till `forsok integer not null default 0`-kolumn på `amnesforslag` |
 
 ---
 

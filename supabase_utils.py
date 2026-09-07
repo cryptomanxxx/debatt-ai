@@ -487,12 +487,21 @@ def upsert_koalition(sb_key: str, agent_a: str, agent_b: str) -> int:
         return 0
 
 
+# Ett ämnesförslag som konsekvent avvisas av AI-redaktören (t.ex. ett ämne som
+# helt enkelt är svårt att skriva en godkänd artikel om) ska inte kunna
+# blockera ämnesförslags-kön för evigt — förslag har alltid högst prioritet
+# (se ✅11/✅98 i CLAUDE.md) så en obegränsat återförsökt rad skulle annars
+# kunna trängas fram om och om igen och svälta ut både nya förslag och de
+# schemalagda publiceringsfönstren (Codex-fynd, PR #1405-granskning).
+MAX_FORSLAG_FORSOK = 3
+
+
 def hamta_amnesforslag(sb_key: str) -> dict | None:
     """Hämtar ett obehandlat ämnesförslag från direktdebatten, eller None."""
     try:
         res = httpx.get(
             f"{SB_URL}/rest/v1/amnesforslag",
-            params={"select": "id,amne,summering,kalla_namn,kalla_url", "behandlad": "eq.false", "order": "roster.desc,skapad.asc", "limit": "1"},
+            params={"select": "id,amne,summering,kalla_namn,kalla_url,forsok", "behandlad": "eq.false", "order": "roster.desc,skapad.asc", "limit": "1"},
             headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
             timeout=10,
         )
@@ -505,7 +514,7 @@ def hamta_amnesforslag(sb_key: str) -> dict | None:
 
 
 def markera_forslag_behandlat(sb_key: str, forslag_id: str) -> None:
-    """Markerar ett ämnesförslag som behandlat."""
+    """Markerar ett ämnesförslag som behandlat (publicerad artikel)."""
     try:
         httpx.patch(
             f"{SB_URL}/rest/v1/amnesforslag",
@@ -516,6 +525,30 @@ def markera_forslag_behandlat(sb_key: str, forslag_id: str) -> None:
         )
     except Exception:
         pass
+
+
+def registrera_forslag_forsok(sb_key: str, forslag_id: str, foregaende_forsok: int) -> bool:
+    """Räknar upp ett ämnesförslags försöksräknare efter en AI-redaktörsavvisning.
+
+    Ger upp (sätter behandlad=true) och lämnar förslaget permanent oanvänt om
+    MAX_FORSLAG_FORSOK nås — annars förblir behandlad=false så förslaget kan
+    väljas igen av en senare körning (se registrera_forslag_forsok()s docstring
+    ovan för varför en obegränsad kö vore farlig). Returnerar True om förslaget
+    gav upp denna gång (för loggningssyfte i agent.py).
+    """
+    nytt_forsok = foregaende_forsok + 1
+    gav_upp = nytt_forsok >= MAX_FORSLAG_FORSOK
+    try:
+        httpx.patch(
+            f"{SB_URL}/rest/v1/amnesforslag",
+            params={"id": f"eq.{forslag_id}"},
+            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}", "Content-Type": "application/json"},
+            json={"forsok": nytt_forsok, "behandlad": gav_upp},
+            timeout=10,
+        )
+    except Exception:
+        pass
+    return gav_upp
 
 
 def generera_stafett_utmaning(agent_namn: str, rubrik: str, artikel_text: str, alla_agenter: list) -> dict | None:
