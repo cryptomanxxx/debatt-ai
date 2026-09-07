@@ -2640,6 +2640,22 @@ Fixat genom att threda källans URL genom hela kedjan: `/nyhetsanalyser`s LASARE
 | `app/api/fraga-anna-och-peter/route.js` | `MAX_INPUT_TEXT` höjd 1500→2500→5000. `sammanfattning`-fältets egen gräns bytt från `ORAKLET_SAMMANFATTNING_MAX` (1200) till samma `MAX_INPUT_TEXT`, sedan fältet började återanvändas för nyhetsanalys-texter |
 | `app/agentData.js` | `AGENT_ROST.Teknikoptimist.rate` sänkt 1.12 → 0.95 — tredje kopian av samma röstvärde, missad i föregående PR |
 
+### ✅ 96. Korsnavigering och tydligare förklaring av "Analysera i Nyhetsanalysen"-flödet – KLART
+Uppföljande ägarbegäran (sep 2026), direkt efter PR #1399/#1400: `/nyhetsanalyser` saknade en länk till `/universitet` trots att sidan är slutstationen för analyser som sparas därifrån (sedan PR #1399s "Analysera i Nyhetsanalysen"-knapp på Vetenskapliga Nyheter-fliken) lika väl som från `/nyhetskallor`. Dessutom nämnde `/universitet`s sidhuvud aldrig att knappen finns — den satt bara per rad inne i en av tre flikar, upptäckbar bara genom att bläddra dit, inte genom en förklaring i sidhuvudet likt den `/nyhetskallor` redan hade sedan tidigare (se ✅93s "Fråga AI-agenter direkt om en nyhet").
+
+**Tre sidor, ett gemensamt flöde — nu korslänkade i alla riktningar:**
+- `/nyhetsanalyser` fick en andra header-länk ("🎓 AI-Universitetet →") bredvid den befintliga "← Nyhetskällor", plus att intro-stycket nu nämner båda källorna till analyserna ("... från '🔎 Analysera i Nyhetsanalysen'-knappen på Nyhetskällor och (för vetenskapliga nyheter) på AI-Universitetet").
+- `/universitet`s sidhuvud fick ett nytt förklarande stycke direkt under introtexten: "Vill du att AI-agenterna reagerar på en specifik vetenskaplig nyhet? Klicka '🔎 Analysera i Nyhetsanalysen' under en rad i fliken Vetenskapliga Nyheter nedan — samma funktion som på Nyhetskällor..." — länkar till både `/nyhetskallor` och `/nyhetsanalyser`.
+- `/nyhetskallor` fick en ny nav-länk ("🎓 AI-Universitetet →") i header-raden bredvid "🔎 Alla analyser →"/"📊 Statistik →", och båda introstyckena uppdaterades för att nämna att samma vetenskapsnyheter och samma analysera-knapp finns på AI-Universitetet.
+
+Ingen ny kod eller databaslogik — ren dokumentations-/navigeringsförtydligande ovanpå det redan befintliga tvåstegsflödet (se ✅93). Alla tre sidors intro-text pekar nu på varandra istället för att bara en riktning (`/nyhetskallor` → `/nyhetsanalyser`) var förklarad.
+
+| Fil | Roll |
+|---|---|
+| `app/nyhetsanalyser/page.js` | Header-länk till `/universitet` + intro-text som nämner båda analyskällorna |
+| `app/universitet/page.js` | Nytt förklarande stycke om "Analysera i Nyhetsanalysen"-knappen, länkar till `/nyhetskallor` och `/nyhetsanalyser` |
+| `app/nyhetskallor/NyhetskallorClient.js` | Ny nav-länk till `/universitet` + intro-styckena nämner AI-Universitetets Vetenskapliga Nyheter-flik och dess identiska analysera-knapp |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
