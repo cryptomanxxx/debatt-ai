@@ -747,7 +747,19 @@ export default function ChattPage() {
 
               {/* Input + slumpa-knapp */}
               <div style={{ display: "flex", gap: "8px" }}>
-                <input value={amne} onChange={e => { setAmne(e.target.value); setKallaAmne("besökare"); amneAngettAvBesokareRef.current = true; }} placeholder="Skriv ett ämne…"
+                <input value={amne} onChange={e => {
+                    const v = e.target.value;
+                    setAmne(v);
+                    setKallaAmne("besökare");
+                    // Till skillnad från de andra fyra setAmne()-anropen (som alltid sätter ett
+                    // icke-tomt värde) kan besökaren här radera fältet helt. Sätts referensen
+                    // ändå till true rakt av (som innan) fastnar den permanent i "besökaren har
+                    // valt" trots att fältet nu är tomt igen — en artikel som sedan pastas kan då
+                    // aldrig auto-fylla ämnet, vilket återskapar exakt den bugg ✅102 fixade
+                    // (Codex-fynd, PR #1418-granskning). Referensen speglar nu om fältet FAKTISKT
+                    // har ett icke-tomt, besökarskrivet värde just nu — inte om det NÅGONSIN skrivits i.
+                    amneAngettAvBesokareRef.current = v.trim().length > 0;
+                  }} placeholder="Skriv ett ämne…"
                   style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "10px 14px", color: C.text, fontSize: "15px", fontFamily: "Georgia, serif", outline: "none" }}
                   onKeyDown={e => e.key === "Enter" && starta()} />
                 <button onClick={() => { setAmne(slumpaAmne()); setKallaAmne("inbyggt"); amneAngettAvBesokareRef.current = true; }} title="Slumpa ämne"
