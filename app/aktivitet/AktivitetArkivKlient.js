@@ -44,9 +44,16 @@ function HandelseRad({ item }) {
   );
 }
 
-export default function AktivitetArkivKlient({ initialHandelser, initialCursor }) {
+export default function AktivitetArkivKlient({ initialHandelser, initialCursor, initialVid }) {
   const [handelser, setHandelser] = useState(initialHandelser || []);
   const [cursor, setCursor] = useState(initialCursor);
+  // vid: identiteterna för rader med EXAKT cursorns tidsstämpel som redan
+  // visats — krävs för att "Ladda fler" inte ska hoppa över hela kluster av
+  // händelser som delar samma tidsstämpel. Identitetsbaserad snarare än ett
+  // rent antal, eftersom servern kan lösa upp cursorn mot en helt annan
+  // hämtning av samma data varje gång (Codex-fynd, PR #1431-granskning, se
+  // paginateAktivitet() i app/lib/aktivitetFeed.js).
+  const [vid, setVid] = useState(initialVid || []);
   const [laddar, setLaddar] = useState(false);
   const [fel, setFel] = useState(null);
   const [sok, setSok] = useState("");
@@ -56,11 +63,12 @@ export default function AktivitetArkivKlient({ initialHandelser, initialCursor }
     setLaddar(true);
     setFel(null);
     try {
-      const res = await fetch(`/api/aktivitet/arkiv?cursor=${encodeURIComponent(cursor)}`);
+      const res = await fetch(`/api/aktivitet/arkiv?cursor=${encodeURIComponent(cursor)}&vid=${encodeURIComponent(JSON.stringify(vid))}`);
       if (!res.ok) throw new Error("fel");
       const data = await res.json();
       setHandelser(prev => [...prev, ...(data.handelser || [])]);
       setCursor(data.nastaCursor || null);
+      setVid(data.nastaVid || []);
     } catch {
       setFel("Kunde inte hämta fler händelser just nu. Försök igen om en stund.");
     } finally {

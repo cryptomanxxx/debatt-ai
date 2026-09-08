@@ -1,5 +1,5 @@
 import AktivitetArkivKlient from "./AktivitetArkivKlient";
-import { hamtaAktivitetHandelser, AKTIVITET_ARKIV_SID_STORLEK, AKTIVITET_ARKIV_LIMIT_PER_KALLA } from "../lib/aktivitetFeed";
+import { hamtaAktivitetArkivCachat, paginateAktivitet } from "../lib/aktivitetFeed";
 
 // Alltid färsk läsning — det här är ett arkiv över allt som just hänt på
 // plattformen, en ISR-cache skulle bara göra det förvirrande ("varför syns
@@ -14,16 +14,19 @@ export const metadata = {
 export default async function AktivitetPage() {
   let forstaSidan = [];
   let nastaCursor = null;
+  let nastaVid = [];
   try {
-    const alla = await hamtaAktivitetHandelser({ limit: AKTIVITET_ARKIV_LIMIT_PER_KALLA });
-    forstaSidan = alla.slice(0, AKTIVITET_ARKIV_SID_STORLEK);
-    nastaCursor = forstaSidan.length === AKTIVITET_ARKIV_SID_STORLEK
-      ? forstaSidan[forstaSidan.length - 1].skapad
-      : null;
+    // Använder samma paginateAktivitet() som /api/aktivitet/arkiv — cursorn
+    // den producerar är identitetsbaserad (se app/lib/aktivitetFeed.js) och
+    // fungerar korrekt oavsett om den här sidans och API-ruttens efterföljande
+    // "Ladda fler"-anrop råkar hämta olika ögonblicksbilder av samma data
+    // (separata Vercel-funktioner, Codex-fynd PR #1431-granskning).
+    const alla = await hamtaAktivitetArkivCachat();
+    ({ sida: forstaSidan, nastaCursor, nastaVid } = paginateAktivitet(alla, null, []));
   } catch {
     // Fail-open — klienten visar "Inga händelser ännu" och kan fortfarande
     // försöka "Ladda fler" om servern var tillfälligt otillgänglig.
   }
 
-  return <AktivitetArkivKlient initialHandelser={forstaSidan} initialCursor={nastaCursor} />;
+  return <AktivitetArkivKlient initialHandelser={forstaSidan} initialCursor={nastaCursor} initialVid={nastaVid} />;
 }

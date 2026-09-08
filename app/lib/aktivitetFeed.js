@@ -27,6 +27,91 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export const AKTIVITET_ARKIV_SID_STORLEK = 30;
 export const AKTIVITET_ARKIV_LIMIT_PER_KALLA = 200;
 
+// Kortlivad, per-instans cache av arkiv-batchen — ren prestandaoptimering,
+// INTE en korrekthetsgaranti (se Codex-fynd, PR #1431-granskning, nedan för
+// varför den tidigare kommentaren här hävdade fel sak). En Vercel-driftsatt
+// Next.js-app kör /aktivitet (sidan) och /api/aktivitet/arkiv (API-rutten)
+// som SEPARATA serverless-funktioner, var och en med sin egen bundlade
+// kopia av den här modulen — `_arkivCache` delas alltså varken mellan dem
+// eller mellan olika instanser av samma rutt. Sparar bara upprepade
+// Supabase-anrop på en och samma varma instans inom 60s.
+let _arkivCache = { data: null, ts: 0 };
+const ARKIV_CACHE_MS = 60_000;
+
+export async function hamtaAktivitetArkivCachat() {
+  if (_arkivCache.data && Date.now() - _arkivCache.ts < ARKIV_CACHE_MS) return _arkivCache.data;
+  const alla = await hamtaAktivitetHandelser({ limit: AKTIVITET_ARKIV_LIMIT_PER_KALLA });
+  _arkivCache = { data: alla, ts: Date.now() };
+  return alla;
+}
+
+// Stabil identitet för en händelse, härledd ur dess EGET innehåll — inte
+// dess position i en viss array. `href` är ofta generiskt och delas av
+// FLERA olika händelser av samma typ (t.ex. alla koalitionshändelser pekar
+// på /dynamik, alla AI-till-AI-konversationer på /konversationer), så
+// `typ+href+skapad` ensamt räcker inte för att skilja två olika händelser
+// med samma tidsstämpel åt — en bit av texten läggs till som sista
+// urskiljning.
+function identitetFor(h) {
+  return `${h.typ}|${h.href}|${h.skapad}|${(h.text || "").slice(0, 80)}`;
+}
+
+/**
+ * Sidindelning med stabil tie-breaker mot delade tidsstämplar.
+ *
+ * Cursorn kodas som `(skapad, vidLista)` — INTE som ett positionellt index/
+ * antal ("hopp") i en specifik array. Codex-fynd (PR #1431-granskning): en
+ * tidigare version räknade "hur många rader med den här tidsstämpeln har
+ * redan visats" som ett rent antal, vilket bara stämmer om exakt SAMMA
+ * array-instans (samma ordning, samma innehåll) används för att lösa upp
+ * cursorn nästa gång. Det håller inte i produktion — /aktivitet och
+ * /api/aktivitet/arkiv är separata Vercel-funktioner med varsin bundlade
+ * kopia av cachen ovan, och även inom EN funktion kan cachen ha hunnit
+ * förnyas till en annan ögonblicksbild mellan två anrop. `vidLista`
+ * innehåller istället de FAKTISKA identiteterna (se identitetFor ovan) för
+ * redan visade rader vid gränstidsstämpeln — det fungerar korrekt oavsett
+ * vilken oberoende hämtning av samma underliggande Supabase-data filtret
+ * körs mot, eftersom det aldrig behöver "räkna position i en array" utan
+ * bara jämför innehåll.
+ *
+ * Känd kvarstående begränsning: om en källa var TILLFÄLLIGT nere när en
+ * tidigare sida byggdes (så en händelse saknades helt då) och sedan
+ * återhämtar sig, kan den återupptäckta händelsen ändå ha en tidsstämpel
+ * som redan ligger BORTOM (äldre än) besökarens nuvarande cursor-position
+ * — då visas den aldrig för just den sessionen. Ingen cursor-design utan
+ * ett persisterat, versionerat flöde kan lösa det fallet fullt ut; en
+ * proportionerlig avvägning, samma princip som redan används på flera
+ * andra ställen i den här kodbasen (se t.ex. ✅93 "Kvarvarande skräprader").
+ */
+export function paginateAktivitet(alla, cursorSkapad, cursorVidLista = []) {
+  let filtrerad = alla;
+  const cursorMs = cursorSkapad ? new Date(cursorSkapad).getTime() : null;
+  if (cursorMs != null && !Number.isNaN(cursorMs)) {
+    const cursorVid = new Set(cursorVidLista);
+    filtrerad = alla.filter(h => {
+      const t = new Date(h.skapad).getTime();
+      if (t < cursorMs) return true;
+      if (t === cursorMs) return !cursorVid.has(identitetFor(h));
+      return false; // t > cursorMs — nyare än cursor, redan visad i en tidigare sida
+    });
+  }
+
+  const sida = filtrerad.slice(0, AKTIVITET_ARKIV_SID_STORLEK);
+  let nastaCursor = null;
+  let nastaVid = [];
+  if (sida.length === AKTIVITET_ARKIV_SID_STORLEK) {
+    const sistaSkapad = sida[sida.length - 1].skapad;
+    const sistaMs = new Date(sistaSkapad).getTime();
+    const idsISidan = sida.filter(h => new Date(h.skapad).getTime() === sistaMs).map(identitetFor);
+    nastaCursor = sistaSkapad;
+    // Om den här sidan fortfarande ligger inom SAMMA gränstidsstämpel som
+    // föregående cursor (ett kluster större än en sida), byggs vidLista
+    // kumulativt vidare — annars börjar den om för den nya tidsstämpeln.
+    nastaVid = cursorMs === sistaMs ? [...cursorVidLista, ...idsISidan] : idsISidan;
+  }
+  return { sida, nastaCursor, nastaVid };
+}
+
 export async function hamtaAktivitetHandelser({ limit = 8 } = {}) {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
   const L = limit;

@@ -316,20 +316,40 @@ const AVHUGGEN_SLUTORD = new Set([
   "vi", "man", "sig", "sin", "sitt", "sina", "har", "kan", "ska", "vill",
 ]);
 
+// En KORT rubrik som börjar med en preposition och inte fortsätter till ett
+// fullständigt påstående ("Om fem år") är nästan alltid avhuggen — en
+// riktig rubrik som börjar så är i praktiken alltid längre ("Om fem år
+// kommer klimatkrisen förändra allt"). Bara "om" ingår — det enda ordet
+// med faktiskt belägg (✅97s ursprungliga buggexempel); att gissa på fler
+// prepositioner utan belägg riskerar bara nya falska larm av samma sort
+// som "Codex-fynd, PR #1428-granskning" nedan redan hittat en gång.
+const AVHUGGEN_STARTORD = new Set(["om"]);
+const KORT_STARTORD_TROSKEL = 20;
+
 function verkarAvhuggen(rubrik) {
   const r = (rubrik || "").trim();
-  if (r.length < 12) return true;
+  // Codex-fynd (PR #1428-granskning, efter merge): ett blankt "< 12 tecken
+  // = avhuggen"-villkor flaggade ALLA korta men fullständiga rubriker (t.ex.
+  // "Stoppa AI", 9 tecken) — motsäger dessutom generera_rubrik()s egen
+  // 3-teckensgolv i artikel.py (✅97), som uttryckligen tillåter korta
+  // rubriker när providerns finish_reason bekräftar att de INTE klipptes
+  // av. Ersatt av (1) ett minimalt golv mot i praktiken tomma svar och (2)
+  // två riktade signaler — sista ord i en stoppordslista, eller första ord
+  // en preposition i en tillräckligt kort rubrik — istället för att gissa
+  // på ren längd.
+  if (r.length < 4) return true;
   if (/[.!?"'…”]$/.test(r)) return false;
-  const sistaOrdRaw = r.split(/\s+/).pop() || "";
-  const sistaOrdRen = sistaOrdRaw.toLowerCase().replace(/[^a-zåäö]/g, "");
-  // Bara stoppordslistan avgör härifrån — ett rent "kort sista ord"-villkor
-  // (t.ex. < 3 tecken) gav falska larm på fullt legitima svenska ord som
-  // "år"/"nu"/"få" (bekräftat live: "...dödliga inom fem år" flaggades
-  // felaktigt vid den allra första produktionskörningen, 8 sep 2026).
-  // Rubriker under 12 tecken fångas redan av längdvillkoret ovan — de två
-  // ursprungliga ✅97-buggexemplen ("Om fem år", "FN-för") täcks av det,
-  // inte av ordlängd.
-  return AVHUGGEN_SLUTORD.has(sistaOrdRen);
+
+  // Dela på blanksteg OCH bindestreck — annars slås "FN-för" ihop till
+  // "fnför" och missar stoppordsträffen på "för" helt.
+  const ord = r.split(/[\s-]+/).filter(Boolean);
+  const sistaOrdRen = (ord[ord.length - 1] || "").toLowerCase().replace(/[^a-zåäö]/g, "");
+  if (AVHUGGEN_SLUTORD.has(sistaOrdRen)) return true;
+
+  const forstaOrdRen = (ord[0] || "").toLowerCase().replace(/[^a-zåäö]/g, "");
+  if (r.length < KORT_STARTORD_TROSKEL && AVHUGGEN_STARTORD.has(forstaOrdRen)) return true;
+
+  return false;
 }
 
 async function checkAvhuggnaRubriker() {
@@ -374,6 +394,16 @@ async function main() {
 
   console.log(`\n${resultat.length} checkar körda — ${antalFail} fail, ${antalError} error.`);
 
+  // Codex-fynd (PR #1428-granskning, efter merge): en misslyckad sparning
+  // till Supabase påverkade tidigare bara console.error — exit-koden
+  // berodde uteslutande på check-utfallen. En trasig migrering, en saknad
+  // service-role-secret eller ett RLS-avslag hade då kunnat lämna
+  // workflowen GRÖN i GitHub Actions samtidigt som /status tyst visade
+  // gammal eller ingen data — precis den typen av tyst fel dashboarden
+  // finns till för att avslöja. `sparningLyckades` räknas nu in i
+  // exit-koden på samma sätt som ett fail/error-utfall.
+  let sparningLyckades = true;
+
   if (SB_WRITE_KEY) {
     try {
       const rows = resultat.map(r => ({
@@ -393,16 +423,19 @@ async function main() {
         body: JSON.stringify(rows),
       });
       if (!res.ok) {
+        sparningLyckades = false;
         console.error(`Kunde inte spara resultat till Supabase: ${res.status} ${await res.text().catch(() => "")}`);
       }
     } catch (e) {
+      sparningLyckades = false;
       console.error("Kunde inte spara resultat till Supabase:", e.message || e);
     }
   } else {
+    sparningLyckades = false;
     console.error("SUPABASE_SERVICE_ROLE_KEY/SUPABASE_ANON_KEY saknas — resultat sparas inte till /status");
   }
 
-  if (antalFail > 0 || antalError > 0) {
+  if (antalFail > 0 || antalError > 0 || !sparningLyckades) {
     process.exitCode = 1;
   }
 }

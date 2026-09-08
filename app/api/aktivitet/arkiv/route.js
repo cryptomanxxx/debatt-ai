@@ -1,6 +1,6 @@
 /**
- * GET /api/aktivitet/arkiv?cursor=<ISO> — paginerad fortsättning av
- * Senaste aktivitet-arkivet på /aktivitet (✅107).
+ * GET /api/aktivitet/arkiv?cursor=<ISO>&vid=<JSON> — paginerad fortsättning
+ * av Senaste aktivitet-arkivet på /aktivitet (✅107).
  *
  * Till skillnad från /api/aktivitet (startsidans widget, fast topp-10 med
  * garanterade artikelplatser) returnerar den här routen SIDA EFTER SIDA av
@@ -8,56 +8,55 @@
  * prioriteras, allt visas i sin genuina kronologiska ordning.
  *
  * Cursor-baserad paginering (samma mönster som /nyhetskallors "Ladda fler",
- * ✅93): `cursor` är den senast visade radens `skapad`-tidsstämpel, nästa
- * sida är allt äldre än den. En bred, kortlivad batch (60s in-memory-cache,
- * samma princip som /api/aktivitet) hämtas med ett större per-källa-urval
- * (ARKIV_LIMIT_PER_KALLA) än startsidans widget — annars skulle en enskild
- * "Ladda fler"-sida längre bak i tiden kunna sakna kandidater från
- * lågfrekventa källor bara för att de redan runnit ut ur den mindre
- * widget-batchen.
+ * ✅93): `cursor` är den senast visade radens `skapad`-tidsstämpel, `vid`
+ * (JSON-array, Codex-fynd PR #1431-granskning) identiteterna för de rader
+ * med EXAKT den tidsstämpeln som redan visats — se paginateAktivitet() i
+ * app/lib/aktivitetFeed.js för varför cursorn kodas så istället för ett
+ * rent antal ("hopp"): ett antal förutsätter att nästa anrop löses upp mot
+ * exakt samma array-instans, vilket INTE stämmer i produktion (/aktivitet
+ * och den här routen är separata Vercel-funktioner, var och en med sin
+ * egen bundlade kopia av cachen). Identitetsbaserad tie-breaking fungerar
+ * korrekt oavsett vilken oberoende hämtning av samma underliggande data
+ * som filtret körs mot.
  *
- * Känd begränsning: paginering längre tillbaka än vad ARKIV_LIMIT_PER_KALLA
- * rader/källa täcker kan ge samma typ av "vissa källor trängs ut"-problem
- * som ✅106 löste för startsidan, fast i miniatyr vid den bortre kanten av
- * arkivet — en högfrekvent källa (t.ex. bors_affarer) kan ha uttömt sin
- * batch innan en lågfrekvent källas äldre rader når fram. En proportionerlig
- * avvägning, inte en fullständig lösning — samma princip som redan används
- * på flera ställen i den här kodbasen (se t.ex. ✅93 "Kvarvarande
- * skräprader").
+ * Känd begränsning: paginering längre tillbaka än vad
+ * AKTIVITET_ARKIV_LIMIT_PER_KALLA rader/källa täcker kan ge samma typ av
+ * "vissa källor trängs ut"-problem som ✅106 löste för startsidan, fast i
+ * miniatyr vid den bortre kanten av arkivet — en högfrekvent källa (t.ex.
+ * bors_affarer) kan ha uttömt sin batch innan en lågfrekvent källas äldre
+ * rader når fram. En proportionerlig avvägning, inte en fullständig
+ * lösning — samma princip som redan används på flera ställen i den här
+ * kodbasen (se t.ex. ✅93 "Kvarvarande skräprader").
  */
 
 import { NextResponse } from "next/server";
-import { hamtaAktivitetHandelser, AKTIVITET_ARKIV_SID_STORLEK, AKTIVITET_ARKIV_LIMIT_PER_KALLA } from "../../../lib/aktivitetFeed";
+import { hamtaAktivitetArkivCachat, paginateAktivitet } from "../../../lib/aktivitetFeed";
 
 export const dynamic = "force-dynamic";
 
-const CACHE_MS = 60_000;
-let _cache = { data: null, ts: 0 };
-
-async function hamtaAllaCachat() {
-  if (_cache.data && Date.now() - _cache.ts < CACHE_MS) return _cache.data;
-  const alla = await hamtaAktivitetHandelser({ limit: AKTIVITET_ARKIV_LIMIT_PER_KALLA });
-  _cache = { data: alla, ts: Date.now() };
-  return alla;
+function parseraVid(rawVid) {
+  if (!rawVid) return [];
+  try {
+    const parsed = JSON.parse(rawVid);
+    return Array.isArray(parsed) ? parsed.filter(v => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const cursor = searchParams.get("cursor");
+  const vid = parseraVid(searchParams.get("vid"));
 
   try {
-    const alla = await hamtaAllaCachat();
-    const cursorMs = cursor ? new Date(cursor).getTime() : null;
-    const filtrerad = cursorMs && !Number.isNaN(cursorMs)
-      ? alla.filter(h => new Date(h.skapad).getTime() < cursorMs)
-      : alla;
-    const sida = filtrerad.slice(0, AKTIVITET_ARKIV_SID_STORLEK);
-    const nastaCursor = sida.length === AKTIVITET_ARKIV_SID_STORLEK ? sida[sida.length - 1].skapad : null;
+    const alla = await hamtaAktivitetArkivCachat();
+    const { sida, nastaCursor, nastaVid } = paginateAktivitet(alla, cursor, vid);
     return NextResponse.json(
-      { handelser: sida, nastaCursor },
+      { handelser: sida, nastaCursor, nastaVid },
       { headers: { "Cache-Control": "no-store" } }
     );
   } catch {
-    return NextResponse.json({ handelser: [], nastaCursor: null }, { status: 200 });
+    return NextResponse.json({ handelser: [], nastaCursor: null, nastaVid: [] }, { status: 200 });
   }
 }
