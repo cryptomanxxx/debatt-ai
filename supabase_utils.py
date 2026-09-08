@@ -3257,8 +3257,12 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
             )
             rod_efter = "ja"
 
-            # Kreditöverföring — atomiskt (_justera_planbok, ✅104)
-            _justera_planbok(sb_key, agent_namn, saldo_delta=-belopp)
+            # Kreditöverföring — atomiskt (_justera_planbok, ✅104). Kollar
+            # explicit att debiteringen lyckades innan mottagaren
+            # krediteras (Codex-fynd, PR #1422-granskning).
+            if _justera_planbok(sb_key, agent_namn, saldo_delta=-belopp) is None:
+                print(f"  ✗ Lobbying: saldo-debitering misslyckades för {agent_namn} — {mal_namn} krediteras inte", file=sys.stderr)
+                return False
             _justera_planbok(sb_key, mal_namn, saldo_delta=belopp)
 
             # Transaktion
@@ -3547,8 +3551,12 @@ def kör_bribe(agent: dict, sb_key: str) -> bool:
                     headers=h_min2, json=patch, timeout=8,
                 )
 
-            # Kreditöverföring — atomiskt (_justera_planbok, ✅104)
-            _justera_planbok(sb_key, agent_namn, saldo_delta=-belopp)
+            # Kreditöverföring — atomiskt (_justera_planbok, ✅104). Kollar
+            # explicit att debiteringen lyckades innan mottagaren
+            # krediteras (Codex-fynd, PR #1422-granskning).
+            if _justera_planbok(sb_key, agent_namn, saldo_delta=-belopp) is None:
+                print(f"  ✗ Bribe: saldo-debitering misslyckades för {agent_namn} — {mal_namn} krediteras inte", file=sys.stderr)
+                return False
             _justera_planbok(sb_key, mal_namn, saldo_delta=belopp)
 
             # Uppdatera bribe_scores för BÅDA parter
@@ -3944,8 +3952,18 @@ MOTIVERING: [1–2 meningar som speglar din personlighet]"""
     # totalt_fatt/antal_spel — den senare med en egen GET emellan). B:s
     # antal_spel räknas medvetet inte upp här (bara A:s), samma asymmetri
     # som fanns i den ursprungliga koden.
-    _justera_planbok(sb_key, agent["namn"], saldo_delta=-givet,
-                      totalt_givet_delta=givet, antal_spel_delta=1)
+    #
+    # Kollar explicit att A:s debitering lyckades innan B krediteras.
+    # _justera_planbok() fångar sina egna undantag och returnerar None
+    # istället för att propagera dem, till skillnad från den tidigare bara
+    # httpx.patch()-koden — ett nätverksfel stoppade då hela funktionen
+    # (ingen try/except finns runt kör_diktatorspel) innan B:s kreditering
+    # ens nåddes. Utan denna koll kunde B få pengar utan att A debiterats
+    # (Codex-fynd, PR #1422-granskning).
+    if _justera_planbok(sb_key, agent["namn"], saldo_delta=-givet,
+                         totalt_givet_delta=givet, antal_spel_delta=1) is None:
+        print(f"  ✗ Diktatorspel: saldo-debitering misslyckades för {agent['namn']} — {b_namn} krediteras inte", file=sys.stderr)
+        return False
     _justera_planbok(sb_key, b_namn, saldo_delta=givet, totalt_fatt_delta=givet)
 
     _spara_transaktion(sb_key, agent["namn"], b_namn, givet, "diktatorn", spel_id, motivering)
@@ -4136,9 +4154,14 @@ MOTIVERING: [1–2 meningar]"""
     if beslut == "accepterat":
         # Atomiskt per agent (_justera_planbok, ✅104) — ersätter två separata
         # read-modify-write-par (saldo, sedan counters med en egen GET emellan)
-        # med en RPC vardera.
-        _justera_planbok(sb_key, a_namn, saldo_delta=-erbjudande,
-                          totalt_givet_delta=erbjudande, antal_spel_delta=1)
+        # med en RPC vardera. Kollar explicit att A:s debitering lyckades
+        # innan B krediteras — annars kunde B få pengar utan att A
+        # debiterats om RPC-anropet misslyckas tyst (Codex-fynd, PR
+        # #1422-granskning).
+        if _justera_planbok(sb_key, a_namn, saldo_delta=-erbjudande,
+                             totalt_givet_delta=erbjudande, antal_spel_delta=1) is None:
+            print(f"  ✗ Ultimatum: saldo-debitering misslyckades för {a_namn} — {agent['namn']} krediteras inte", file=sys.stderr)
+            return False
         _justera_planbok(sb_key, agent["namn"], saldo_delta=erbjudande,
                           totalt_fatt_delta=erbjudande, antal_spel_delta=1)
         _spara_transaktion(sb_key, a_namn, agent["namn"], erbjudande, "ultimatum_accepterat", spel_id, motivering_b)
@@ -4298,7 +4321,14 @@ MOTIVERING: [1–2 meningar som förklarar ditt beslut]"""
     # A: betalar 100 kr ur saldo, får tillbaka behaller_a minus straffet
     # (= saldo_a - 100 + behaller_a - straffeffekt_kr, och eftersom
     # behaller_a = 100 - erbjudande blir nettodeltat -(erbjudande + straffeffekt_kr))
-    _justera_planbok(sb_key, agent["namn"], saldo_delta=-(erbjudande + straffeffekt_kr))
+    #
+    # B:s kreditering kollas mot att A:s debitering faktiskt lyckades —
+    # annars kunde B få erbjudandet utan att A betalat för det (Codex-fynd,
+    # PR #1422-granskning). C:s straffavgift är oberoende av A/B (C betalar
+    # sitt eget straff oavsett) och behöver ingen sådan koppling.
+    if _justera_planbok(sb_key, agent["namn"], saldo_delta=-(erbjudande + straffeffekt_kr)) is None:
+        print(f"  ✗ TPP: saldo-debitering misslyckades för {agent['namn']} — {b_namn} krediteras inte", file=sys.stderr)
+        return False
     # B: får erbjudandet
     _justera_planbok(sb_key, b_namn, saldo_delta=erbjudande)
     # C: betalar straffet
@@ -4558,8 +4588,17 @@ def stang_auktioner(sb_key: str) -> int:
 
                 # Dra från köparens saldo, lägg till säljarens — atomiskt
                 # (_justera_planbok, ✅104), ingen mellanliggande GET av
-                # säljarens saldo behövs längre.
-                _justera_planbok(sb_key, kopare, saldo_delta=-belopp)
+                # säljarens saldo behövs längre. Kollar explicit att
+                # köparens debitering lyckades innan säljaren krediteras
+                # och symbolen flyttas — annars kunde säljaren få betalt
+                # (och symbolen bytas ägare) utan att köparen faktiskt
+                # debiterats (Codex-fynd, PR #1422-granskning). Auktionen
+                # är redan claimad som "avgjord" ovan — ett misslyckande
+                # här lämnar den i det läget utan genomförd affär, samma
+                # kända avvägning som redan gäller för claim-först-mönstret.
+                if _justera_planbok(sb_key, kopare, saldo_delta=-belopp) is None:
+                    print(f"  ✗ Auktion {aid}: saldo-debitering misslyckades för köparen {kopare} — affären avbryts", file=sys.stderr)
+                    continue
                 _justera_planbok(sb_key, saljare, saldo_delta=belopp)
 
                 # Flytta symbol: ta bort från säljare, lägg till köpare
@@ -5670,8 +5709,13 @@ def ta_lan(sb_key: str, agent_namn: str) -> bool:
         if lan_r.is_success and lan_r.json():
             return False  # Bara ett lån åt gången
         belopp = random.choice([200, 300, 400, 500])
-        # Ge pengarna — atomiskt (_justera_planbok, ✅104)
-        _justera_planbok(sb_key, agent_namn, saldo_delta=belopp)
+        # Ge pengarna — atomiskt (_justera_planbok, ✅104). Kollar explicit
+        # att krediteringen lyckades innan lånet registreras — annars kunde
+        # agenten få en skuld utan att faktiskt ha fått pengarna (Codex-fynd,
+        # PR #1422-granskning).
+        if _justera_planbok(sb_key, agent_namn, saldo_delta=belopp) is None:
+            print(f"  ✗ Lån: saldo-kreditering misslyckades för {agent_namn} — inget lån registrerat", file=sys.stderr)
+            return False
         # Registrera lånet
         httpx.post(
             f"{SB_URL}/rest/v1/agent_lan",
@@ -5758,6 +5802,14 @@ def kop_etf(sb_key: str, agent_namn: str, symbol: str, belopp_kr: float) -> bool
         )
         innehav = ih_r.json() if ih_r.is_success else []
 
+        # Dra från saldo FÖRST — atomiskt (_justera_planbok, ✅104). Positionen
+        # läggs bara till om debiteringen faktiskt lyckas, annars kunde
+        # agenten få en ETF-position utan att betala för den (Codex-fynd,
+        # PR #1422-granskning).
+        if _justera_planbok(sb_key, agent_namn, saldo_delta=-belopp_kr) is None:
+            print(f"  ✗ ETF-köp: saldo-debitering misslyckades för {agent_namn} — ingen position läggs till", file=sys.stderr)
+            return False
+
         if innehav:
             old_inv  = float(innehav[0]["investerat_kr"])
             old_pris = float(innehav[0]["kopt_pris_usd"])
@@ -5779,9 +5831,6 @@ def kop_etf(sb_key: str, agent_namn: str, symbol: str, belopp_kr: float) -> bool
                       "investerat_kr": round(belopp_kr, 2), "kopt_pris_usd": round(pris_usd, 4)},
                 timeout=8,
             )
-
-        # Dra från saldo — atomiskt (_justera_planbok, ✅104)
-        _justera_planbok(sb_key, agent_namn, saldo_delta=-belopp_kr)
 
         # Logga
         httpx.post(f"{SB_URL}/rest/v1/etf_transaktioner", headers=h,
@@ -6159,16 +6208,20 @@ def aterbetala_lan_delvis(sb_key: str, agent_namn: str, belopp: float = 50.0) ->
             return False
         nytt_saldo_kvar = float(lan["saldo_kvar"]) - aterbetal
         aktiv = nytt_saldo_kvar > 0
+        # Debitera FÖRST (atomiskt, _justera_planbok, ✅104) och sänk skulden
+        # bara om debiteringen faktiskt lyckades — annars kunde skulden
+        # efterskänkas utan att agenten betalat något (Codex-fynd, PR
+        # #1422-granskning; ersätter samtidigt den PATCH som tidigare skrev
+        # ett absolut tal beräknat ur ett redan inaktuellt läst saldo).
+        if _justera_planbok(sb_key, agent_namn, saldo_delta=-aterbetal) is None:
+            print(f"  ✗ Återbetalning: saldo-debitering misslyckades för {agent_namn} — lånet lämnas orört", file=sys.stderr)
+            return False
         httpx.patch(
             f"{SB_URL}/rest/v1/agent_lan?id=eq.{lan['id']}",
             headers=h,
             json={"saldo_kvar": round(nytt_saldo_kvar, 2), "aktiv": aktiv},
             timeout=8,
         )
-        # Atomiskt (_justera_planbok, ✅104) — ersätter den PATCH som tidigare
-        # skrev ett absolut tal beräknat ur den ovan redan (potentiellt
-        # inaktuella) lästa saldot.
-        _justera_planbok(sb_key, agent_namn, saldo_delta=-aterbetal)
         print(f"  🏦 BANKRUN-PANIK: {agent_namn} återbetalar {aterbetal:.0f} kr av lån (rykte om insolvens!)")
         return True
     except Exception as e:

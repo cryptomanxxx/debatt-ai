@@ -2864,6 +2864,21 @@ Kräver `supabase_agent_planbocker_v3.sql` — kör i Supabase SQL Editor EFTER 
 | `mark_andrahand_test.py` | `sb_patch_planbok()` → `justera_saldo()` (delta-baserad), används av auktionsavgöranden |
 | `domstol_test.py` | `verkstall_straff()` migrerad — se särskild hantering ovan |
 
+**Codex-fynd (PR #1422-granskning, efter merge): `_justera_planbok()` fångar sina egna undantag, vilket kunde låta en misslyckad debitering ändå krediteras på andra sidan.** Innan detta var praktiskt taget alla drabbade skrivningar bara ett bart `httpx.patch()`-anrop utan try/except runt just det anropet — om RPC:n var otillgänglig (t.ex. kod deployad innan `supabase_agent_planbocker_v3.sql` körts) eller nätverksanropet fick timeout, kastade `httpx.patch()` ett undantag som propagerade upp till FUNKTIONENS egen (ofta yttre) `try/except`, vilket avbröt HELA funktionen innan en efterföljande kredit-skrivning hann köras. `_justera_planbok()` fångar däremot sitt eget undantag internt och returnerar bara `None` — anropande kod som inte kollar returvärdet fortsätter då förbi felet och kör den beroende skrivningen ändå. I flera funktioner betyder det att part B kunde krediteras trots att part A:s debitering misslyckats — pengar skapade ur tomma intet.
+
+Fixat genom att explicit kolla returvärdet (`is None`) på den FÖRSTA (debiterande) sidan av varje beroende par, innan den andra (krediterande) sidan körs, och avbryta (`return False`/`continue` beroende på funktionens kontrollflöde) om debiteringen misslyckades:
+- `kör_diktatorspel()`, `svara_ultimatum()` (accept-grenen), `kör_lobbying()`, `kör_bribe()`, `kör_tpp()` — A:s debitering kollas innan B (eller B och C) krediteras.
+- `stang_auktioner()` — köparens debitering kollas innan säljaren krediteras och symbolen flyttas (`continue` till nästa auktion, inte `return`, eftersom funktionen bearbetar en hel lista auktioner per körning).
+- `ta_lan()` — krediteringen kollas innan lånet registreras i `agent_lan` (annars skuld utan att pengarna faktiskt betalats ut).
+- `aterbetala_lan_delvis()` — ordningen byttes: debiteringen görs FÖRST och skulden i `agent_lan.saldo_kvar` sänks bara om den lyckades (tidigare gjordes skuldsänkningen först, vilket kunde efterskänka skuld utan betalning).
+- `kop_etf()` — samma ordningsbyte: debiteringen görs FÖRST, ETF-positionen läggs bara till om den lyckades (tidigare kunde en agent få en position utan att betala för den — detta var egentligen ett förelegat ordningsproblem, inte en regression från denna PR, men samma felklass och fixad i samma veva).
+
+**Medvetet ej ändrat:** `salj_etf()` (kreditering efter att positionen redan sålts/minskats — om krediteringen misslyckas förlorar agenten positionen utan betalning, en sämre affär för AGENTEN men ingen pengaskapande-risk för plattformen som helhet, lägre allvarlighetsgrad) och `kop_statussymbol()`s återbetalningsgren vid misslyckad insert (redan best-effort, samma lägre allvarlighetsgrad). De tolv fristående skriptens motsvarande skrivpar (`bors_test.py → execute_trade()`, `mark_test.py`/`mark_andrahand_test.py`s auktionsavgöranden, `foretag_test.py`s handel/lobbying, `inflation.py`s skatt/omfördelningar, `domstol_test.py → verkstall_straff()` m.fl.) har samma latenta riskklass men granskades inte här — Codex-fyndet var scopat till `supabase_utils.py` (den enda filen i PR #1422); en motsvarande genomgång av skripten är separat uppföljningsarbete.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `supabase_utils.py` | `kör_diktatorspel`, `svara_ultimatum`, `kör_lobbying`, `kör_bribe`, `kör_tpp`, `stang_auktioner`, `ta_lan`, `aterbetala_lan_delvis`, `kop_etf` kollar nu explicit att den första (debiterande) `_justera_planbok()`-skrivningen lyckades innan den beroende krediteringen/skrivningen körs |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
