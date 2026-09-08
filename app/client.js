@@ -230,7 +230,14 @@ async function fetchSenasteReplik() {
 }
 
 async function fetchLatestArtikel() {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&nyhetskalla=is.null&order=skapad.desc&limit=4`, {
+  // Repliker har alltid nyhetskalla satt (agent.py sätter den till replik_kalla,
+  // en pekare tillbaka till originalartikeln — se ✅17) — nyhetskalla=is.null
+  // ensamt utesluter därför ALLA repliker, oavsett hur nya de är. parent_id
+  // sätts bara på repliker, aldrig på riktiga nyhetsartiklar, så
+  // "nyhetskalla saknas ELLER har en parent_id" fångar både eget ämne och
+  // repliker medan genuina nyhetsartiklar (nyhetskalla satt, ingen parent_id)
+  // fortsatt utesluts — de har redan sin egen "Senaste NYHETERNA"-sektion.
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&or=(nyhetskalla.is.null,parent_id.not.is.null)&order=skapad.desc&limit=4`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
   });
   if (!res.ok) return [];
