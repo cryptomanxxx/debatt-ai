@@ -2844,15 +2844,16 @@ Uppföljning på användarens fråga "vad mer skulle du föreslå att vi bygger 
 
 **Två filer med särskild hantering:**
 - **`mark_test.py`/`foretag_test.py`** håller en lokal `saldon`/`lager`-cache (dict) som fylls en gång vid skriptstart och uppdateras i minnet efter varje operation, för att undvika ett GET per delbeslut inom SAMMA körning. Skrivfunktionen (`patch_saldo()`/`justera_saldo()`) tar nu ett delta, uppdaterar den lokala cachen (`saldon[agent] = saldon.get(agent, 0) + delta`) OCH gör den faktiska DB-skrivningen atomiskt via `_justera_planbok()` — cachen förblir korrekt för skriptets EGNA efterföljande beslut inom samma körning, medan den faktiska databasskrivningen inte längre kan tappa en samtidig extern uppdatering (t.ex. från `agent.py` som körs parallellt).
-- **`domstol_test.py` → `verkstall_straff()`** behöll sin inledande GET av `nuvarande_saldo` (rent informativt, för loggtexten "saldo: X → Y kr") men skrivningen görs nu som `_justera_planbok(..., saldo_delta=-belopp)`, och `nytt_saldo`/`faktisk_bot` härleds ur RPC-svarets returnerade rad istället för ett eget PATCH-beräknat värde — statskassans kreditering blev därmed också en ren delta-atomisk `_justera_planbok(..., saldo_delta=faktisk_bot)`.
+- **`domstol_test.py` → `verkstall_straff()`** hade ursprungligen kvar sin inledande separata GET av `nuvarande_saldo` (rent informativt, för loggtexten "saldo: X → Y kr") — men det visade sig vara en genuin race (se "Codex-fynd, PR #1423-granskning" nedan) och togs bort helt. `nuvarande_saldo` härleds numera ur samma RPC-anrops `saldo_fore`-fält (v4, se nedan) istället för en egen separat läsning, så hela beräkningen av `faktisk_bot` sker atomiskt i en enda operation.
 
 **Medvetet oförändrad utanför `kolla_och_bailout()`:** `_sakerstall_borskassan_likviditet()` i `bors_test.py` sätter Börskassan till ett FAST absolutvärde (`BORSKASSAN_MIN_SALDO`) när saldot understiger tröskeln — samma idempotent-under-race-resonemang som `kolla_och_bailout()` (se ovan), plus att funktionen redan hanterar både PATCH (raden finns) och upsert-INSERT (raden saknas), vilket den generella RPC:n (bara UPDATE) inte kan göra ensam. Lämnad oförändrad som samma medvetna scope-beslut.
 
-Kräver `supabase_agent_planbocker_v3.sql` — kör i Supabase SQL Editor EFTER `supabase_agent_planbocker_v2.sql`.
+Kräver `supabase_agent_planbocker_v3.sql` — kör i Supabase SQL Editor EFTER `supabase_agent_planbocker_v2.sql`. Kräver även `supabase_agent_planbocker_v4.sql` (se "Codex-fynd, PR #1423-granskning" nedan) — kör EFTER v3.
 
 | Fil | Roll |
 |---|---|
 | `supabase_agent_planbocker_v3.sql` | Ny Postgres-funktion `justera_agent_planbok()` — atomisk delta-justering av saldo/saldo_spel/totalt_givet/totalt_fatt/antal_spel, golvar vid 0 som default, `SECURITY DEFINER` + service-role-only EXECUTE |
+| `supabase_agent_planbocker_v4.sql` | Migrering: `justera_agent_planbok()` (DROP+CREATE, ändrad `RETURNS TABLE`) returnerar nu även `saldo_fore`/`saldo_spel_fore` — saldot precis INNAN justeringen, radlåst med `FOR UPDATE` i SAMMA atomiska operation. Se "Codex-fynd, PR #1423-granskning" nedan |
 | `supabase_utils.py` → `_justera_planbok()` | Ny Python-helper, POSTar mot `rpc/justera_agent_planbok`, returnerar uppdaterad rad eller `None` |
 | `supabase_utils.py` | Alla `agent_planbocker`-skrivningar migrerade till `_justera_planbok()`: `_uppdatera_saldo_spel`, `kör_diktatorspel`, `svara_ultimatum`, `kör_lobbying`, `kör_bribe`, `kör_tpp`, `kop_statussymbol`, `stang_auktioner`, `ta_lan`, `kop_etf`, `salj_etf`, `aterbetala_lan_delvis`. `kolla_och_bailout` medvetet oförändrad (redan race-säker, se ovan) |
 | `finans_test.py` | `spara_i_bank()`/`ta_lan_frivilligt()` migrerade till `_justera_planbok()` |
@@ -2866,7 +2867,7 @@ Kräver `supabase_agent_planbocker_v3.sql` — kör i Supabase SQL Editor EFTER 
 | `parti_ekonomi_test.py` | `uppdatera_agent_saldo()` → `justera_agent_saldo()`, används av stipendiemekanismen |
 | `foretag_test.py` | Ny `justera_saldo(h, agent, delta)`-helper, används av råvaruhandel, advokatbyråarvode, lobbybolagets klientavgift/motpartsbetalning, bolagsgrundande och dagslöner |
 | `mark_andrahand_test.py` | `sb_patch_planbok()` → `justera_saldo()` (delta-baserad), används av auktionsavgöranden |
-| `domstol_test.py` | `verkstall_straff()` migrerad — se särskild hantering ovan |
+| `domstol_test.py` | `verkstall_straff()` migrerad — se särskild hantering ovan samt "Codex-fynd, PR #1423-granskning" nedan |
 
 **Codex-fynd (PR #1422-granskning, efter merge): `_justera_planbok()` fångar sina egna undantag, vilket kunde låta en misslyckad debitering ändå krediteras på andra sidan.** Innan detta var praktiskt taget alla drabbade skrivningar bara ett bart `httpx.patch()`-anrop utan try/except runt just det anropet — om RPC:n var otillgänglig (t.ex. kod deployad innan `supabase_agent_planbocker_v3.sql` körts) eller nätverksanropet fick timeout, kastade `httpx.patch()` ett undantag som propagerade upp till FUNKTIONENS egen (ofta yttre) `try/except`, vilket avbröt HELA funktionen innan en efterföljande kredit-skrivning hann köras. `_justera_planbok()` fångar däremot sitt eget undantag internt och returnerar bara `None` — anropande kod som inte kollar returvärdet fortsätter då förbi felet och kör den beroende skrivningen ändå. I flera funktioner betyder det att part B kunde krediteras trots att part A:s debitering misslyckats — pengar skapade ur tomma intet.
 
@@ -2882,6 +2883,16 @@ Fixat genom att explicit kolla returvärdet (`is None`) på den FÖRSTA (debiter
 | Fil | Roll (tillägg) |
 |---|---|
 | `supabase_utils.py` | `kör_diktatorspel`, `svara_ultimatum`, `kör_lobbying`, `kör_bribe`, `kör_tpp`, `stang_auktioner`, `ta_lan`, `aterbetala_lan_delvis`, `kop_etf` kollar nu explicit att den första (debiterande) `_justera_planbok()`-skrivningen lyckades innan den beroende krediteringen/skrivningen körs |
+
+**Codex-fynd (PR #1423-granskning): `domstol_test.py → verkstall_straff()` blandade en stale separat läsning med RPC-svaret, vilket i värsta fall kunde DEBITERA Statskassan istället för att kreditera den.** Efter ✅104-migreringen ovan gjorde funktionen fortfarande en egen `sb_get(...)` av agentens saldo INNAN det atomiska `_justera_planbok(..., saldo_delta=-belopp)`-anropet — bara för att räkna ut `faktisk_bot = nuvarande_saldo − nytt_saldo` (böterna golvas vid agentens saldo: en fattig agent kan inte betala mer än den har, så det faktiskt uttagna beloppet kan vara mindre än det nominella bötesbeloppet). Om ett annat samtidigt anrop (t.ex. `agent.py` eller något av de dussintals andra dagliga experiment-skripten som rör `agent_planbocker`, se schematabellen) ändrade AGENTENS saldo mellan den separata GET:en och det atomiska RPC-anropet blev "saldot innan" inaktuellt medan "saldot efter" (RPC-svaret) fortfarande var korrekt — differensen mellan dem kunde då bli fel, eller rentav NEGATIV om en samtidig kreditering hann ske emellan. En negativ `faktisk_bot` skickades sedan rakt in som `saldo_delta` till Statskassans egna `_justera_planbok()`-anrop, vilket i så fall hade DEBITERAT Statskassan istället för att kreditera den — motsatsen till vad ett bötesbeslut ska göra. Exakt den typ av race ✅104-migreringen som helhet fanns till för att eliminera, fast här återinförd av en enda kvarlämnad separat läsning ovanpå den redan atomiska skrivningen.
+
+Fixat genom att låta RPC:n själv rapportera saldot både före och efter — atomiskt, inom SAMMA operation. `supabase_agent_planbocker_v4.sql` byter `justera_agent_planbok()`s implementation: en `SELECT ... FOR UPDATE` radlåser agentens rad och läser `saldo`/`saldo_spel` INNAN uppdateringen (radlåset blockerar alla andra samtidiga skrivningar mot SAMMA agent tills den här transaktionen är klar, så värdena kan aldrig bli inaktuella av att ett annat anrop hinner emellan), och `RETURNS TABLE`-kolumnlistan utökas med `saldo_fore`/`saldo_spel_fore`. Migreringen kräver `DROP FUNCTION` + `CREATE FUNCTION` (inte bara `CREATE OR REPLACE`) eftersom Postgres inte tillåter att en funktions returtyp ändras med REPLACE. `domstol_test.py` läser nu `nuvarande_saldo = result["saldo_fore"]` direkt ur samma RPC-svar som redan gav `nytt_saldo` — den separata `sb_get()`-läsningen togs bort helt, ingen mellanliggande lucka finns kvar att race:a i.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `supabase_agent_planbocker_v4.sql` | Ny migrering: `justera_agent_planbok()` (DROP+CREATE) radlåser raden med `FOR UPDATE` och returnerar `saldo_fore`/`saldo_spel_fore` utöver de befintliga fälten |
+| `supabase_utils.py` → `_justera_planbok()` | Docstring uppdaterad: dokumenterar de nya `saldo_fore`/`saldo_spel_fore`-fälten i returraden |
+| `domstol_test.py` → `verkstall_straff()` | Separat `sb_get()`-läsning av `nuvarande_saldo` borttagen — härleds nu ur RPC-svarets `saldo_fore` istället, eliminerar racet mellan en tidigare separat läsning och det atomiska anropet |
 
 ---
 

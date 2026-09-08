@@ -3814,24 +3814,30 @@ def _justera_planbok(sb_key: str, agent_namn: str, *, saldo_delta: int | float =
                       totalt_fatt_delta: int = 0, antal_spel_delta: int = 0,
                       golv_noll: bool = True) -> dict | None:
     """Atomisk saldo-justering via Postgres-funktionen justera_agent_planbok()
-    (supabase_agent_planbocker_v3.sql) — ersätter mönstret "GET aktuellt saldo →
-    räkna nytt värde i Python → PATCH ett absolut tal", som kan tappa en
-    uppdatering om två skrivningar mot SAMMA agent sker samtidigt (dokumenterat
-    känt problem, se CLAUDE.md "agent_planbocker-projektet"). Alla deltan är
-    relativa (kan vara negativa) — själva additionen sker i EN atomisk SQL-sats
-    i databasen, inte i Python, så det finns ingen läsning som kan bli
-    inaktuell mellan att den görs och att skrivningen tillämpas.
+    (supabase_agent_planbocker_v3.sql + v4) — ersätter mönstret "GET aktuellt
+    saldo → räkna nytt värde i Python → PATCH ett absolut tal", som kan tappa
+    en uppdatering om två skrivningar mot SAMMA agent sker samtidigt
+    (dokumenterat känt problem, se CLAUDE.md "agent_planbocker-projektet").
+    Alla deltan är relativa (kan vara negativa) — själva additionen sker i EN
+    atomisk SQL-sats i databasen, inte i Python, så det finns ingen läsning
+    som kan bli inaktuell mellan att den görs och att skrivningen tillämpas.
 
     saldo_delta/saldo_spel_delta accepterar även float (t.ex. ETF-köp/-sälj som
     räknar i kr härledda ur USD-priser) — RPC-parametrarna är NUMERIC, och
     saldo/saldo_spel-kolumnernas egen INTEGER-typ avrundar automatiskt vid
     tilldelning, precis som den tidigare round()-innan-PATCH-koden gjorde.
 
-    Returnerar den uppdaterade raden (inkl. nytt saldo) vid lyckad skrivning,
-    annars None — anropande kod som redan tolererar en misslyckad PATCH
-    (samma fail-safe-nivå som resten av ekonomimodulen) kan ignorera None,
-    men kod som behöver det nya saldot för loggning/visning slipper ett
-    extra GET efteråt."""
+    Returnerar den uppdaterade raden vid lyckad skrivning, annars None —
+    anropande kod som redan tolererar en misslyckad PATCH (samma
+    fail-safe-nivå som resten av ekonomimodulen) kan ignorera None, men kod
+    som behöver det nya saldot för loggning/visning slipper ett extra GET
+    efteråt. Raden innehåller sedan v4 även `saldo_fore`/`saldo_spel_fore`
+    (saldot precis INNAN denna justering, radlåst med FOR UPDATE i samma
+    atomiska operation) — använd dessa istället för en egen separat GET om
+    du behöver räkna ut hur mycket som FAKTISKT drogs/lades till (t.ex. vid
+    ett golvat delta), annars kan en tidigare separat läsning bli inaktuell
+    mot RPC-svaret under en race (Codex-fynd, PR #1423-granskning på
+    domstol_test.py → verkstall_straff())."""
     key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     try:
         r = httpx.post(
