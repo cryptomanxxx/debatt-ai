@@ -2763,6 +2763,25 @@ Användarrapport (sep 2026): en hel svensk kalenderdag (2026-09-07) publicerades
 
 ---
 
+### ✅ 101. Avhuggna repliker i Direktdebatt — samma reasoning-token-bugg som ✅97, fast i live-debattflödet – KLART
+Användarrapport (sep 2026, skärmdump av en sparad `/chatt/[id]`-debatt): 5 av 6 repliker i en sparad direktdebatt var synligt avhuggna mitt i en mening — "När vi bjuder", "Att legitimera extremism i riksdagen", "Som läkare ser jag hur", "När vi öppnar demokratins", "Att bjuda in terrorhyllare" — bara den allra sista repliken var ett fullständigt, välformat 2-meningarssvar.
+
+**Rotorsak (samma klass av bugg som ✅97, fast i JS-motsvarigheten):** `app/api/chatt/route.js` sätter `maxTokensForRequest = 250` för vanliga Direktdebatt-repliker (`erNyhetsanalys ? 700 : 250`), skickat rakt av som `max_tokens` till Groqs `openai/gpt-oss-120b` — samma reasoning-modell som `generera_rubrik()` i `artikel.py` redan identifierats använda. Reasoning-modeller spenderar en del av `max_tokens`-budgeten på interna resonemangstokens INNAN de börjar skriva det synliga svaret, utan att något `reasoning_effort`/`reasoning_format`-fält sätts någonstans i den här routen (bekräftat via grep — parametern förekommer aldrig). Vid 250 kunde reasoning-overheaden ensam äta hela eller nästan hela budgeten, vilket klippte det synliga 2–3-meningarssvaret mitt i en mening — exakt det mönster skärmdumpen visar, och det matchar att fragmenten ("När vi bjuder", "Som läkare ser jag hur") är genuina meningsbörjor, inte skräptext.
+
+**Varför den befintliga omförsöksskyddet inte räcker fullt ut:** `app/chatt/page.js` har redan en `arTroligenAvbruten()`-heuristik (textform-baserad: kortare än 20 tecken ELLER saknar avslutande skiljetecken) och ett ENDA omförsök (`for (let forsok = 0; forsok < 2 ...)`, rad ~537) som hoppar förbi Groq (`hoppaOverGroq: true`) till en icke-strömmande fallback-leverantör (Codestral, annars Gemini som "sista utväg — 99% rate-limitad"). Men koden accepterar uttryckligen texten ändå om den fortfarande verkar avhuggen efter det enda omförsöket — kommentaren i koden säger rent ut "en kort replik är bättre för debatten än att avbryta den helt" (rad ~571). Med ett så snålt `max_tokens`-tak kunde ANDRA försöket också träffas av samma reasoning-overhead-problem (om Codestral/Gemini inte var tillgängliga och det föll tillbaka till Groq igen, eller om Codestral/Gemini själva har låg svarslängd vid samma tak), vilket förklarar varför nästan hela debatten i rapporten var trasig snarare än ett enstaka undantag.
+
+**Varför `route.js` inte kan göra samma `finish_reason`-baserade fix som `ai_klient.py`/`artikel.py`:** Groqs svar strömmas rakt igenom till klienten (`new Response(groqRes.body, ...)`) för att bevara den token-för-token-live-känslan i UI:t — till skillnad från Python-artikelflödet, som väntar in hela svaret innan det används. Vid det laget `finish_reason` syns i den sista SSE-chunken har strömmen redan levererats till besökaren, så server-side `finish_reason`-inspektion här hade inte kunnat förhindra den enskilda avhuggningen (bara upptäcka den i efterhand, utan möjlighet att byta leverantör mitt i en redan skickad ström) — `arTroligenAvbruten()`-heuristiken på klienten gör redan ungefär samma jobb, fast textform-baserat istället för via den auktoritativa signalen.
+
+**Fix:** `maxTokensForRequest` för vanliga Direktdebatt-repliker höjt 250 → 500 (nyhetsanalys-grenens 700 orörd — den kräver redan betydligt mer text, 6–10 meningar). Ger reasoning-overheaden mer utrymme att inrymmas innan den synliga 2–3-meningarstexten (typiskt 40–90 tokens på svenska) börjar, utan att sidoeffekt-mässigt förlänga svaren — modellen stannar fortfarande naturligt vid `finish_reason: "stop"` när den är klar, taket bara höjer säkerhetsmarginalen. Minskar FREKVENSEN av avhuggning; åtgärdar inte den strukturella begränsningen (ingen `finish_reason`-kontroll möjlig i en ren proxy-ström) — samma restrisk som redan dokumenterad för Cloudflare-/Gemini-fallbacken i ✅97s Python-fix.
+
+**Ej åtgärdat här (medvetet avgränsat scope):** en riktig strukturell fix (t.ex. buffra Groq-svaret server-side, kolla `finish_reason`, och bara streama till klienten när svaret bekräftat är komplett) hade krävt att offra den live token-för-token-strömningen som är hela poängen med Direktdebattens UX — en betydligt större avvägning som inte görs ensidigt här utan avstämning med projektägaren.
+
+| Fil | Roll |
+|---|---|
+| `app/api/chatt/route.js` | `maxTokensForRequest` för vanliga debattrepliker höjt 250 → 500 (`nyhetsanalys`-grenens 700 oförändrad) |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
