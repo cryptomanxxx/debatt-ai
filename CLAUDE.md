@@ -3037,6 +3037,12 @@ Uppföljande diskussion (sep 2026), direkt efter ✅105–✅107: projektägaren
 |---|---|
 | `agents/invariant-checker.js` | `verkarAvhuggen()` omskriven (se P1 ovan). `main()`s persist-block sätter nu `process.exitCode = 1` även vid misslyckad Supabase-skrivning (P2) |
 
+**Codex-fynd (PR #1429-granskning, sent inkommen — granskade en commit som redan hunnit ersättas av P1 ovan, men konkret pekade på ett giltigt kvarstående recall-problem i den då gällande koden.** När kort-sista-ord-grenen togs bort helt (se "Falskt larm..." ovan) försvann all detektering av korta AVHUGGNA ORDRESTER som inte råkar stå i stoppordslistan — t.ex. "Regeringen vill införa ett nytt sk" (en riktig titel avhuggen mitt i "skatteavdrag" eller liknande). Codex konkretiserade exakt det scenariot. Fixat med en ny, medvetet snäv `KORT_SLUTORD_TILLATNA`-allowlist: ett sista ord på högst 2 tecken flaggas nu som avhugget OM det inte står på listan (år, nu, få, ny, jo, ja, bo, gå, se, ai, eu, fn) — omvänd logik mot stoppordslistan (som blockar KÄNT DÅLIGA slutord oavsett längd), men samma iterativa "lägg till varje bekräftat legitimt undantag"-princip. Måste medvetet inkludera "ai" (annars återskapas P1:s "Stoppa AI"-falsklarm igen, eftersom "AI" råkar vara exakt 2 tecken) — ett bra exempel på hur nära dessa två krav (fånga trunkering, undvik falska larm) ligger varandra. Verifierat mot 22 testfall (alla 16 tidigare + Codex nya exempel + fem ytterligare legitima korta ord-slut) — extraherat och kört direkt mot den FAKTISKA filens kod (inte en separat kopia) för att utesluta drift mellan test och implementation.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | Ny `KORT_SLUTORD_TILLATNA`-allowlist + villkor i `verkarAvhuggen()`: sista ord ≤ 2 tecken flaggas om inte allowlistat |
+
 Kräver Supabase-tabell `invariant_checks` — kör `supabase_invariant_checks.sql` i SQL Editor.
 
 | Fil | Roll |

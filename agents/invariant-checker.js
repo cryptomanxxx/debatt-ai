@@ -326,6 +326,17 @@ const AVHUGGEN_SLUTORD = new Set([
 const AVHUGGEN_STARTORD = new Set(["om"]);
 const KORT_STARTORD_TROSKEL = 20;
 
+// Korta (högst 2 tecken) ord som ÄR legitima svenska ord/vanliga
+// förkortningar trots sin längd — en avhuggen ordrest ("...ett nytt sk")
+// är annars i praktiken omöjlig att skilja från ett kort men fullständigt
+// sista ord utan en sådan lista (Codex-fynd, PR #1429-granskning, efter
+// merge: den tidigare versionen tappade HELA den signalen och missade
+// därmed just den typen av avhuggning). Byggd genom att lägga till varje
+// ord som visat sig ge ett falskt larm i produktion eller test — samma
+// iterativa process som redan format AVHUGGEN_SLUTORD/-STARTORD ovan.
+// Inte uttömmande, se "Känd begränsning" i CLAUDE.md.
+const KORT_SLUTORD_TILLATNA = new Set(["år", "nu", "få", "ny", "jo", "ja", "bo", "gå", "se", "ai", "eu", "fn"]);
+
 function verkarAvhuggen(rubrik) {
   const r = (rubrik || "").trim();
   // Codex-fynd (PR #1428-granskning, efter merge): ett blankt "< 12 tecken
@@ -345,6 +356,10 @@ function verkarAvhuggen(rubrik) {
   const ord = r.split(/[\s-]+/).filter(Boolean);
   const sistaOrdRen = (ord[ord.length - 1] || "").toLowerCase().replace(/[^a-zåäö]/g, "");
   if (AVHUGGEN_SLUTORD.has(sistaOrdRen)) return true;
+  // Ett sista ord på högst två tecken är i praktiken alltid antingen ett
+  // stoppord (redan fångat ovan) eller en avhuggen ordrest — flaggas om
+  // det inte står på den medvetet snäva allowlistan ovan.
+  if (sistaOrdRen.length > 0 && sistaOrdRen.length <= 2 && !KORT_SLUTORD_TILLATNA.has(sistaOrdRen)) return true;
 
   const forstaOrdRen = (ord[0] || "").toLowerCase().replace(/[^a-zåäö]/g, "");
   if (r.length < KORT_STARTORD_TROSKEL && AVHUGGEN_STARTORD.has(forstaOrdRen)) return true;
