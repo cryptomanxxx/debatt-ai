@@ -2961,6 +2961,52 @@ Uppföljande användarrapport (sep 2026), direkt efter ✅106: *"klickar man på
 
 ---
 
+### ✅ 108. Invariant-checkaren (/status) — buggklasser som permanenta regressionsskydd – KLART
+
+Uppföljande diskussion (sep 2026), direkt efter ✅105–✅107: projektägaren beskrev en genuin smärtpunkt — de senaste buggarna (✅97, ✅98, ✅100, ✅101, ✅103, ✅105, ✅106, ✅107) är nästan alla av samma familj: fel i hur DELAR AV PLATTFORMEN SAMVERKAR (en delad feed, en länk mellan två sidor, en kvotlogik som interagerar med en annan), inte fel i en enskild funktion. Den typen av bugg är svår att hitta genom kodläsning (varje enskild fil är lokalt korrekt) och svår att hitta som besökare (kräver att man aktivt "granskar hemsidan som en hök"). Beslutat: bygg en automatisk invariant-checkare som omvandlar varje redan hittad bugg till ett permanent, körande påstående om hur systemet SKA bete sig — så att samma buggklass inte kan smyga sig tillbaka obemärkt, och så att nya instanser av samma mönster upptäcks utan manuell granskning.
+
+**Två typer av checkar, körda i samma skript:**
+- **Källkodskontroller** — läser filer direkt ur den incheckade repot (skriptet körs som en GitHub Action med `actions/checkout`) och grep:ar efter de exakta markörer en tidigare fix lämnade kvar (en konstant, en villkorssträng, ett tröskelvärde). Billiga, deterministiska, kräver inget nätverk för själva kontrollen — fångar "råkade någon återinföra/reverta en fix".
+- **Livedatakontroller** — anropar produktionssajten (`https://www.debatt-ai.se`) och Supabase REST direkt. Fångar "beter sig systemet FAKTISKT korrekt just nu i produktion", inklusive NYA instanser av samma buggmönster som källkodskontrollerna aldrig kan se (t.ex. en ny avhuggen rubrik på en artikel källkodskontrollen inte känner till).
+
+**Elva checkar i v1, varje en direkt regressionsguard för en redan dokumenterad bugg:**
+| Check | Typ | Bugg den skyddar mot |
+|---|---|---|
+| `aktivitet-widget-lank` | Källkod | "Se alla"-länken på Senaste aktivitet pekar på `/aktivitet`, inte `/historia` (✅107) |
+| `aktivitet-reserverade-platser` | Källkod | `ARTIKEL_MIN_SLOTS`-reservationen i `/api/aktivitet` finns kvar (✅106) |
+| `senaste-debatterna-filter` | Källkod | `fetchLatestArtikel()` filtrerar fortfarande in repliker (✅105) |
+| `rubrik-trunkeringsskydd` | Källkod | `generera_rubrik()`s `max_tokens` ≥ 150 + `RUBRIK_MIN_LANGD` finns kvar (✅97) |
+| `direktdebatt-repliker-tokentak` | Källkod | Direktdebattens `maxTokensForRequest` för vanliga repliker ≥ 500 (✅101) |
+| `amnesforslag-inte-konsumerat-vid-avvisning` | Källkod | `markera_forslag_behandlat()` är fortfarande villkorad på `if publicerad` + `registrera_forslag_forsok` finns kvar (✅98) |
+| `amnesforslag-kvotseparation` | Källkod | `kraver_kalla`-separationen mellan nyhets- och eget-kvoten finns kvar (✅100) |
+| `aktivitet-har-artikel-typer` | Livedata | Om artiklar publicerats senaste 48h innehåller `/api/aktivitet`s topp-10 faktiskt minst en artikel/replik-rad (✅106, i produktion) |
+| `daglig-publiceringskvot` | Livedata | Dagens publicerade artiklar (UTC-dygn, samma klassificering som `hamta_publicerade_idag_per_typ()`) överskrider aldrig 4 per typ |
+| `aktivitet-arkiv-sida-svarar` | Livedata | `/aktivitet` svarar 200 och renderar faktiskt (✅107 fortsatt live) |
+| `avhuggna-rubriker` | Livedata | De 20 senaste publicerade artikelrubrikerna ser inte avhuggna ut — en heuristik (inget avslutande skiljetecken + kort eller vanligt svenskt "hänger i luften"-slutord som och/för/att/som) som fångar NYA avhuggningar, inte bara den ursprungliga ✅97-platsen |
+
+**Ingen AI-provider inblandad** — skriptet kan aldrig misslyckas för att Groq/Gemini/etc. är nere eller rate-limitade, till skillnad från nästan alla andra dagliga agent-körningar i schemat.
+
+**Körning:** `.github/workflows/invariant-check.yml`, var 3:e timme (`0 */3 * * *`) + manuell `workflow_dispatch`. Processen avslutas med exit code 1 om någon check `fail`:ar eller `error`:ar — synligt direkt som en röd körning i GitHub Actions-listan, ingen loggläsning krävs för att märka att något gått sönder (adresserar direkt "jag ser [...] lite vad som händer på github Action workflow").
+
+**Resultat sparas och visas — `/status`:** varje körning skriver en rad per check till `invariant_checks` (service role-skrivning, publik SELECT). Ny sida `/status` (länkad i huvudnav under "Spel & Mer" och i footerns alfabetiska index) visar senaste körningens checkar med grön/röd status och detaljtext, plus en kort historik över de senaste 20 körningarna — en dashboard att kolla istället för att behöva läsa Action-loggar eller granska hela sajten manuellt.
+
+**Designval — varför källkod OCH livedata, inte bara ett av dem:** en ren källkodskontroll fångar bara "reverterades fixen" — den kan inte upptäcka en HELT NY instans av samma buggklass (t.ex. en avhuggen rubrik som uppstår trots att `RUBRIK_MIN_LANGD` fortfarande finns kvar, om trunkeringen sker på ett annat ställe). En ren livedatakontroll är dyrare (nätverksanrop, kan ge falska utslag av transienta orsaker) och upptäcker inte "koden har redan brutits, bara ingen ny data har hunnit exponera det än". Kombinationen ger båda skydden till en låg kostnad.
+
+**Känd begränsning:** elva checkar täcker bara de buggklasser som redan hittats och fixats — invariant-checkaren är per definition reaktiv, den kan aldrig förutse en helt ny sorts bugg. Värdet växer över tid i takt med att fler checkar läggs till (se instruktionen i skriptets header: "Lägg till fler checkar allt eftersom nya buggklasser hittas och fixas — det är hela poängen med det här skriptet"). `avhuggna-rubriker`-heuristiken är en approximation (ingen NLP, bara skiljetecken + en liten stoppordslista) — kan missa avhuggningar som råkar sluta på ett fullständigt ord, och kan i teorin flagga en legitim men ovanligt formulerad rubrik (inga sådana falska positiver observerade i test mot verkliga rubrikexempel från plattformen).
+
+Kräver Supabase-tabell `invariant_checks` — kör `supabase_invariant_checks.sql` i SQL Editor.
+
+| Fil | Roll |
+|---|---|
+| `supabase_invariant_checks.sql` | SQL-schema för `invariant_checks` (kord_at, check_namn, status, detalj) med RLS: publik SELECT, service-role-krävande skrivning |
+| `agents/invariant-checker.js` | Elva checkar (7 källkod, 4 livedata), skriver resultat till Supabase, exit code 1 vid fail/error. Ingen AI-provider — rent deterministiskt |
+| `.github/workflows/invariant-check.yml` | Kör `invariant-checker.js` var 3:e timme + manuell `workflow_dispatch` |
+| `app/status/page.js` | Dashboard: senaste körningens checkar med status/detalj, 20 körningars historik. `force-dynamic`, ingen cache |
+| `app/GlobalNav.js` | Ny länk "Systemstatus" → `/status` i gruppen "Spel & Mer" |
+| `app/layout.js` | Ny länk "Systemstatus" i footerns alfabetiska sidindex |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:

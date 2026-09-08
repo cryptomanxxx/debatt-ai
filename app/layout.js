@@ -102,6 +102,7 @@ export default function RootLayout({ children }) {
               <a href="/feedback" className="neon-nav">Socialt kapital</a>
               <a href="/stablecoin" className="neon-nav">Stablecoin STAB</a>
               <a href="/staten" className="neon-nav">Staten</a>
+              <a href="/status" className="neon-nav">Systemstatus</a>
               <a href="/snake" className="neon-nav">Snake 🐍</a>
               <a href="/territorium" className="neon-nav">Territorium 🎮</a>
               <a href="/handel" className="neon-nav">Handelsimperium 🚢</a>
