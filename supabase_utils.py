@@ -912,20 +912,12 @@ def _hamta_saldo_spel(sb_key: str, agent_namn: str) -> int:
 
 
 def _uppdatera_saldo_spel(sb_key: str, agent_namn: str, delta: int) -> None:
-    """Justerar saldo_spel för en agent (delta kan vara positivt eller negativt)."""
-    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
-    try:
-        saldo = _hamta_saldo_spel(sb_key, agent_namn)
-        nytt = max(0, saldo + delta)
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-            json={"saldo_spel": nytt, "uppdaterad": "now()"},
-            headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}",
-                     "Content-Type": "application/json", "Prefer": "return=minimal"},
-            timeout=8,
-        )
-    except Exception:
-        pass
+    """Justerar saldo_spel för en agent (delta kan vara positivt eller negativt).
+    Atomisk (_justera_planbok, se ✅104 i CLAUDE.md) — tidigare läste funktionen
+    saldo_spel, räknade ut ett nytt absolut värde i Python och PATCHade det,
+    vilket kunde tappa en samtidig uppdatering från en annan skrivning mot
+    samma agent."""
+    _justera_planbok(sb_key, agent_namn, saldo_spel_delta=delta)
 
 
 def berakna_insats(sannolikhet: int, insats_multiplikator: float = 1.0) -> int:
@@ -3265,19 +3257,9 @@ def kör_lobbying(agent: dict, sb_key: str) -> bool:
             )
             rod_efter = "ja"
 
-            # Kreditöverföring
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-                json={"saldo": max(0, saldo - belopp), "uppdaterad": "now()"},
-                headers={**h, "Content-Type": "application/json", "Prefer": "return=minimal"},
-                timeout=8,
-            )
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(mal_namn)}",
-                json={"saldo": mal_saldo + belopp, "uppdaterad": "now()"},
-                headers={**h, "Content-Type": "application/json", "Prefer": "return=minimal"},
-                timeout=8,
-            )
+            # Kreditöverföring — atomiskt (_justera_planbok, ✅104)
+            _justera_planbok(sb_key, agent_namn, saldo_delta=-belopp)
+            _justera_planbok(sb_key, mal_namn, saldo_delta=belopp)
 
             # Transaktion
             httpx.post(
@@ -3565,18 +3547,9 @@ def kör_bribe(agent: dict, sb_key: str) -> bool:
                     headers=h_min2, json=patch, timeout=8,
                 )
 
-            # Kreditöverföring
-            h_min = {**h, "Content-Type": "application/json", "Prefer": "return=minimal"}
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-                json={"saldo": max(0, saldo - belopp), "uppdaterad": "now()"},
-                headers=h_min, timeout=8,
-            )
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(mal_namn)}",
-                json={"saldo": mal_saldo + belopp, "uppdaterad": "now()"},
-                headers=h_min, timeout=8,
-            )
+            # Kreditöverföring — atomiskt (_justera_planbok, ✅104)
+            _justera_planbok(sb_key, agent_namn, saldo_delta=-belopp)
+            _justera_planbok(sb_key, mal_namn, saldo_delta=belopp)
 
             # Uppdatera bribe_scores för BÅDA parter
             _uppdatera_bribe_score(sb_key, agent_namn, "givare", belopp)
@@ -3828,6 +3801,52 @@ def _hamta_saldo(sb_key: str, agent_namn: str) -> int:
         return 0
 
 
+def _justera_planbok(sb_key: str, agent_namn: str, *, saldo_delta: int | float = 0,
+                      saldo_spel_delta: int | float = 0, totalt_givet_delta: int = 0,
+                      totalt_fatt_delta: int = 0, antal_spel_delta: int = 0,
+                      golv_noll: bool = True) -> dict | None:
+    """Atomisk saldo-justering via Postgres-funktionen justera_agent_planbok()
+    (supabase_agent_planbocker_v3.sql) — ersätter mönstret "GET aktuellt saldo →
+    räkna nytt värde i Python → PATCH ett absolut tal", som kan tappa en
+    uppdatering om två skrivningar mot SAMMA agent sker samtidigt (dokumenterat
+    känt problem, se CLAUDE.md "agent_planbocker-projektet"). Alla deltan är
+    relativa (kan vara negativa) — själva additionen sker i EN atomisk SQL-sats
+    i databasen, inte i Python, så det finns ingen läsning som kan bli
+    inaktuell mellan att den görs och att skrivningen tillämpas.
+
+    saldo_delta/saldo_spel_delta accepterar även float (t.ex. ETF-köp/-sälj som
+    räknar i kr härledda ur USD-priser) — RPC-parametrarna är NUMERIC, och
+    saldo/saldo_spel-kolumnernas egen INTEGER-typ avrundar automatiskt vid
+    tilldelning, precis som den tidigare round()-innan-PATCH-koden gjorde.
+
+    Returnerar den uppdaterade raden (inkl. nytt saldo) vid lyckad skrivning,
+    annars None — anropande kod som redan tolererar en misslyckad PATCH
+    (samma fail-safe-nivå som resten av ekonomimodulen) kan ignorera None,
+    men kod som behöver det nya saldot för loggning/visning slipper ett
+    extra GET efteråt."""
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
+    try:
+        r = httpx.post(
+            f"{SB_URL}/rest/v1/rpc/justera_agent_planbok",
+            headers={"apikey": key, "Authorization": f"Bearer {key}",
+                     "Content-Type": "application/json"},
+            json={
+                "p_agent": agent_namn,
+                "p_saldo_delta": saldo_delta,
+                "p_saldo_spel_delta": saldo_spel_delta,
+                "p_totalt_givet_delta": totalt_givet_delta,
+                "p_totalt_fatt_delta": totalt_fatt_delta,
+                "p_antal_spel_delta": antal_spel_delta,
+                "p_golv_noll": golv_noll,
+            },
+            timeout=8,
+        )
+        rows = r.json() if r.is_success else []
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
 def _spara_transaktion(sb_key: str, fran: str, till: str, belopp: int, typ: str, spel_id: int | None, motivering: str | None) -> None:
     # agent_transaktioner saknar anon-skrivpolicy (RLS) — service role krävs.
     # Fallback till sb_key bevaras för miljöer utan secreten. Funktionen
@@ -3919,39 +3938,15 @@ MOTIVERING: [1–2 meningar som speglar din personlighet]"""
         return False
     spel_id = spel_r.json()[0]["id"]
 
-    # Uppdatera saldon
-    ny_saldo_a = max(0, saldo_a - 100 + (100 - givet))
-    ny_saldo_b = saldo_b + givet
-
-    for namn, ny, delta_givet, delta_fatt in [
-        (agent["namn"], ny_saldo_a, givet, 0),
-        (b_namn,        ny_saldo_b, 0,     givet),
-    ]:
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}",
-            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-            json={"saldo": ny, "uppdaterad": "now()"},
-            timeout=8,
-        )
-
-    # Patch counters separately
-    for namn, dg, df, ds in [
-        (agent["namn"], givet, 0, 1),
-        (b_namn, 0, givet, 0),
-    ]:
-        r_cur = httpx.get(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}&select=totalt_givet,totalt_fatt,antal_spel",
-            headers=_ekonomi_headers(sb_key), timeout=8,
-        )
-        cur = (r_cur.json()[0] if r_cur.is_success and r_cur.json() else {})
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}",
-            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-            json={"totalt_givet": (cur.get("totalt_givet") or 0) + dg,
-                  "totalt_fatt": (cur.get("totalt_fatt") or 0) + df,
-                  "antal_spel": (cur.get("antal_spel") or 0) + ds},
-            timeout=8,
-        )
+    # Uppdatera saldon och räknare atomiskt (_justera_planbok, se ✅104 i
+    # CLAUDE.md) — en RPC per agent ersätter vad som tidigare var två
+    # separata read-modify-write-par (saldo, sedan totalt_givet/
+    # totalt_fatt/antal_spel — den senare med en egen GET emellan). B:s
+    # antal_spel räknas medvetet inte upp här (bara A:s), samma asymmetri
+    # som fanns i den ursprungliga koden.
+    _justera_planbok(sb_key, agent["namn"], saldo_delta=-givet,
+                      totalt_givet_delta=givet, antal_spel_delta=1)
+    _justera_planbok(sb_key, b_namn, saldo_delta=givet, totalt_fatt_delta=givet)
 
     _spara_transaktion(sb_key, agent["namn"], b_namn, givet, "diktatorn", spel_id, motivering)
     print(f"  💰 Diktatorspel: {agent['namn']} gav {givet}/100 till {b_namn} — \"{motivering[:60]}\"")
@@ -4139,39 +4134,18 @@ MOTIVERING: [1–2 meningar]"""
         return False
 
     if beslut == "accepterat":
-        ny_saldo_a = max(0, saldo_a - 100 + behaller_a)
-        ny_saldo_b = saldo_b + erbjudande
-        for namn, ny in [(a_namn, ny_saldo_a), (agent["namn"], ny_saldo_b)]:
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}",
-                headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-                json={"saldo": ny, "uppdaterad": "now()"},
-                timeout=8,
-            )
-        # Update counters
-        for namn, dg, df, ds in [(a_namn, erbjudande, 0, 1), (agent["namn"], 0, erbjudande, 1)]:
-            r_cur = httpx.get(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}&select=totalt_givet,totalt_fatt,antal_spel",
-                headers=_ekonomi_headers(sb_key), timeout=8,
-            )
-            cur = (r_cur.json()[0] if r_cur.is_success and r_cur.json() else {})
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}",
-                headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-                json={"totalt_givet": (cur.get("totalt_givet") or 0) + dg,
-                      "totalt_fatt": (cur.get("totalt_fatt") or 0) + df,
-                      "antal_spel": (cur.get("antal_spel") or 0) + ds},
-                timeout=8,
-            )
+        # Atomiskt per agent (_justera_planbok, ✅104) — ersätter två separata
+        # read-modify-write-par (saldo, sedan counters med en egen GET emellan)
+        # med en RPC vardera.
+        _justera_planbok(sb_key, a_namn, saldo_delta=-erbjudande,
+                          totalt_givet_delta=erbjudande, antal_spel_delta=1)
+        _justera_planbok(sb_key, agent["namn"], saldo_delta=erbjudande,
+                          totalt_fatt_delta=erbjudande, antal_spel_delta=1)
         _spara_transaktion(sb_key, a_namn, agent["namn"], erbjudande, "ultimatum_accepterat", spel_id, motivering_b)
     else:
-        # Deduct the pot from A anyway (they offered it)
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(a_namn)}",
-            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-            json={"saldo": max(0, saldo_a - 100), "uppdaterad": "now()"},
-            timeout=8,
-        )
+        # Deduct the pot from A anyway (they offered it) — counters medvetet
+        # orörda i avvisat-fallet, samma som i den ursprungliga koden.
+        _justera_planbok(sb_key, a_namn, saldo_delta=-100)
 
     emoji = "✓" if beslut == "accepterat" else "✗"
     print(f"  {emoji} Ultimatum: {agent['namn']} {beslut} {a_namn}s erbjudande ({erbjudande}/100)")
@@ -4320,24 +4294,15 @@ MOTIVERING: [1–2 meningar som förklarar ditt beslut]"""
         print(f"  ✗ TPP: DB-insert misslyckades ({spel_r.status_code}): {spel_r.text[:200]}", file=sys.stderr)
         return False
 
-    # ── Uppdatera saldon ────────────────────────────────────────────────────
+    # ── Uppdatera saldon — atomiskt (_justera_planbok, ✅104) ───────────────
     # A: betalar 100 kr ur saldo, får tillbaka behaller_a minus straffet
-    ny_saldo_a = max(0, saldo_a - 100 + behaller_a - straffeffekt_kr)
+    # (= saldo_a - 100 + behaller_a - straffeffekt_kr, och eftersom
+    # behaller_a = 100 - erbjudande blir nettodeltat -(erbjudande + straffeffekt_kr))
+    _justera_planbok(sb_key, agent["namn"], saldo_delta=-(erbjudande + straffeffekt_kr))
     # B: får erbjudandet
-    ny_saldo_b = saldo_b + erbjudande
+    _justera_planbok(sb_key, b_namn, saldo_delta=erbjudande)
     # C: betalar straffet
-    ny_saldo_c = max(0, saldo_c - straff_kr)
-
-    for namn, ny in [(agent["namn"], ny_saldo_a), (b_namn, ny_saldo_b), (c_namn, ny_saldo_c)]:
-        try:
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(namn)}",
-                headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-                json={"saldo": ny, "uppdaterad": "now()"},
-                timeout=8,
-            )
-        except Exception:
-            pass
+    _justera_planbok(sb_key, c_namn, saldo_delta=-straff_kr)
 
     straff_symbol = f"⚖️ straffar {straffeffekt_kr} kr" if straff_kr > 0 else "🤝 straffar inte"
     print(f"  🎭 TPP: {agent['namn']} gav {erbjudande}/100 → {c_namn} {straff_symbol} (kostnad {straff_kr} kr)")
@@ -4495,13 +4460,9 @@ def kop_statussymbol(sb_key: str, agent_namn: str, preferenser: list = None) -> 
         if vald is None:
             vald = random.choice(tillgangliga)
 
-        # Dra saldo
-        patch_r = httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-            json={"saldo": saldo - vald["pris"]},
-            headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
-        )
-        if not patch_r.is_success:
+        # Dra saldo — atomiskt (_justera_planbok, ✅104)
+        justerad = _justera_planbok(sb_key, agent_namn, saldo_delta=-vald["pris"])
+        if justerad is None:
             return None
 
         # Spara kopet
@@ -4511,12 +4472,9 @@ def kop_statussymbol(sb_key: str, agent_namn: str, preferenser: list = None) -> 
             headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
         )
         if not ins_r.is_success:
-            # Aterbetala om insert misslyckades
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-                json={"saldo": saldo},
-                headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
-            )
+            # Aterbetala om insert misslyckades — atomiskt, ovillkorat av det
+            # saldo som lästes vid körningens start (som nu kan vara inaktuellt)
+            _justera_planbok(sb_key, agent_namn, saldo_delta=vald["pris"])
             return None
 
         return vald["namn"]
@@ -4598,25 +4556,11 @@ def stang_auktioner(sb_key: str) -> int:
                     print(f"  ✗ Auktion {aid}: kunde inte claimas (avgjord) — hoppar över affären", file=sys.stderr)
                     continue
 
-                # Dra från köparens saldo
-                httpx.patch(
-                    f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(kopare)}",
-                    json={"saldo": saldo_kopare - belopp},
-                    headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
-                )
-
-                # Lägg till säljares saldo
-                sr = httpx.get(
-                    f"{SB_URL}/rest/v1/agent_planbocker"
-                    f"?agent=eq.{urllib.parse.quote(saljare)}&select=saldo",
-                    headers=hdrs, timeout=8,
-                )
-                if sr.is_success and sr.json():
-                    httpx.patch(
-                        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(saljare)}",
-                        json={"saldo": sr.json()[0]["saldo"] + belopp},
-                        headers={**hdrs, "Prefer": "return=minimal"}, timeout=8,
-                    )
+                # Dra från köparens saldo, lägg till säljarens — atomiskt
+                # (_justera_planbok, ✅104), ingen mellanliggande GET av
+                # säljarens saldo behövs längre.
+                _justera_planbok(sb_key, kopare, saldo_delta=-belopp)
+                _justera_planbok(sb_key, saljare, saldo_delta=belopp)
 
                 # Flytta symbol: ta bort från säljare, lägg till köpare
                 httpx.delete(
@@ -5726,11 +5670,8 @@ def ta_lan(sb_key: str, agent_namn: str) -> bool:
         if lan_r.is_success and lan_r.json():
             return False  # Bara ett lån åt gången
         belopp = random.choice([200, 300, 400, 500])
-        # Ge pengarna
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-            headers=h, json={"saldo": saldo + belopp, "uppdaterad": "now()"}, timeout=8,
-        )
+        # Ge pengarna — atomiskt (_justera_planbok, ✅104)
+        _justera_planbok(sb_key, agent_namn, saldo_delta=belopp)
         # Registrera lånet
         httpx.post(
             f"{SB_URL}/rest/v1/agent_lan",
@@ -5839,11 +5780,8 @@ def kop_etf(sb_key: str, agent_namn: str, symbol: str, belopp_kr: float) -> bool
                 timeout=8,
             )
 
-        # Dra från saldo
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-            headers=h, json={"saldo": round(saldo - belopp_kr, 2), "uppdaterad": "now()"}, timeout=8,
-        )
+        # Dra från saldo — atomiskt (_justera_planbok, ✅104)
+        _justera_planbok(sb_key, agent_namn, saldo_delta=-belopp_kr)
 
         # Logga
         httpx.post(f"{SB_URL}/rest/v1/etf_transaktioner", headers=h,
@@ -5905,19 +5843,12 @@ def salj_etf(sb_key: str, agent_namn: str, symbol: str, fraktion: float = 1.0) -
                 headers=h, json={"investerat_kr": kvar, "uppdaterad": "now()"}, timeout=8,
             )
 
-        # Lägg till proceeds i saldo
-        saldo_r = httpx.get(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}&select=saldo",
-            headers={**h, "Prefer": ""}, timeout=6,
-        )
-        saldo_efter = 500.0
-        if saldo_r.is_success and saldo_r.json():
-            saldo = float(saldo_r.json()[0]["saldo"])
-            saldo_efter = round(saldo + proceeds, 2)
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-                headers=h, json={"saldo": saldo_efter, "uppdaterad": "now()"}, timeout=8,
-            )
+        # Lägg till proceeds i saldo — atomiskt (_justera_planbok, ✅104).
+        # Returnerar den uppdaterade raden direkt, så ingen separat GET
+        # (som tidigare kunde bli inaktuell mellan läsning och skrivning)
+        # behövs för att veta saldot efteråt.
+        justerad = _justera_planbok(sb_key, agent_namn, saldo_delta=proceeds)
+        saldo_efter = float(justerad["saldo"]) if justerad else 500.0
 
         # Logga
         httpx.post(f"{SB_URL}/rest/v1/etf_transaktioner", headers=h,
@@ -6234,12 +6165,10 @@ def aterbetala_lan_delvis(sb_key: str, agent_namn: str, belopp: float = 50.0) ->
             json={"saldo_kvar": round(nytt_saldo_kvar, 2), "aktiv": aktiv},
             timeout=8,
         )
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-            headers=h,
-            json={"saldo": round(saldo - aterbetal, 2), "uppdaterad": "now()"},
-            timeout=8,
-        )
+        # Atomiskt (_justera_planbok, ✅104) — ersätter den PATCH som tidigare
+        # skrev ett absolut tal beräknat ur den ovan redan (potentiellt
+        # inaktuella) lästa saldot.
+        _justera_planbok(sb_key, agent_namn, saldo_delta=-aterbetal)
         print(f"  🏦 BANKRUN-PANIK: {agent_namn} återbetalar {aterbetal:.0f} kr av lån (rykte om insolvens!)")
         return True
     except Exception as e:
