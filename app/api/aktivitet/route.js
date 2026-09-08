@@ -21,7 +21,7 @@ let _cache = { data: null, ts: 0 };
 
 async function byggFeed() {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang, nyhetsanalys, upptackter, fragaAnnaPeter] = await Promise.allSettled([
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang, nyhetsanalys, upptackter, fragaAnnaPeter, orakletLasningar] = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=8`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
     fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()),
@@ -51,6 +51,7 @@ async function byggFeed() {
     fetch(`${SB_URL}/rest/v1/nyhetsanalys?select=agent,analys,skapad,nyhetsflode(rubrik)&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/vetenskapliga_upptagter?select=titel,forskare,disciplin,impakt,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
     fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log?select=aktion,titel,input_text,sammanfattning,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
+    fetch(`${SB_URL}/rest/v1/oraklet_lasningar?select=typ,titel,skapad&order=skapad.desc&limit=6`, { headers: h }).then(r => r.json()).catch(() => []),
   ]);
 
   const feed = [];
@@ -466,8 +467,14 @@ async function byggFeed() {
     anna_sager: "Anna", peter_sager: "Peter", johan_sager: "Johan", oraklet_forklarar: "Professor Oraklet",
     anna_svarar: "Anna", peter_svarar: "Peter", johan_svarar: "Johan", oraklet_svarar: "Professor Oraklet",
   };
+  // Tidsstämplar för fraga_anna_peter_logs "oraklet_forklarar"-rader — används
+  // av oraklet_lasningar-fallbacken nedan för att avgöra om en uppläsning
+  // redan syns i feeden via den raden, eller om bara oraklet_lasningar-
+  // skrivningen lyckades (se dedup-kommentaren där för varför).
+  const orakletForklaradeTider = [];
   (Array.isArray(fragaAnnaPeter.value) ? fragaAnnaPeter.value : []).forEach(f => {
     if (!f.skapad) return;
+    if (f.aktion === "oraklet_forklarar") orakletForklaradeTider.push(new Date(f.skapad).getTime());
     const info = FRAGA_ANNA_PETER_INFO[f.aktion] || FRAGA_ANNA_PETER_INFO.anna_sager;
     // Frågeläget sparar frågan i titel och svaret i input_text (se
     // sagFritext() i app/fraga-anna-och-peter/page.js) — titel är alltså
@@ -490,6 +497,37 @@ async function byggFeed() {
       href: "/fraga-anna-och-peter",
       skapad: f.skapad,
       farg: info.farg,
+    });
+  });
+
+  // oraklet_lasningar är en HELT separat, fire-and-forget-loggning (skild från
+  // fraga_anna_peter_log, se handleLasa() i app/universitet/UniversitetVy.js)
+  // med sin egen rate limit (60/10min, mot fraga_anna_peter_logs 40/10min för
+  // "fraga-anna-peter-log") — de två skrivningarna för samma klick kan alltså
+  // genuint diverge: en rate-limitning eller transient nätverksfel på BARA en
+  // av de två gör att bara EN av raderna faktiskt sparas (Codex-fynd, PR
+  // #1419-granskning — tidigare togs oraklet_lasningar bort ur feeden helt för
+  // att fixa synliga dubbletter, vilket löste dubbletten men lät en uppläsning
+  // tyst försvinna ur feeden om just fraga_anna_peter_log-skrivningen
+  // misslyckades). Visas därför bara som FALLBACK: en rad läggs bara till om
+  // ingen fraga_anna_peter_log-rad (oraklet_forklarar) redan finns inom ett
+  // kort tidsfönster — båda skrivningarna triggas i praktiken från samma
+  // synkrona handleLasa()-anrop och landar därför normalt inom någon sekund
+  // av varandra.
+  const ORAKLET_DEDUP_FONSTER_MS = 15_000;
+  (Array.isArray(orakletLasningar.value) ? orakletLasningar.value : []).forEach(o => {
+    if (!o.skapad) return;
+    const t = new Date(o.skapad).getTime();
+    const redanTackt = orakletForklaradeTider.some(ft => Math.abs(ft - t) < ORAKLET_DEDUP_FONSTER_MS);
+    if (redanTackt) return;
+    const vad = o.typ === "nyhet" ? "en vetenskaplig nyhet" : o.typ === "urval" ? "en nyhet ur sin läslista" : "ett forskningsfynd";
+    feed.push({
+      typ: "oraklet-lasning",
+      ikon: "🎓",
+      text: `Professor Oraklet läste upp ${vad}: "${(o.titel || "").slice(0, 60)}"`,
+      href: "/universitet",
+      skapad: o.skapad,
+      farg: "#dd6e5f",
     });
   });
 
