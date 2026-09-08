@@ -610,7 +610,24 @@ def main():
         elif idag_publicerat["eget"] < 4:
             kraver_kalla = False
         else:
-            kraver_kalla = None
+            # Codex-fynd, PR #1415-granskning: att bara sätta kraver_kalla=None
+            # (hoppa över ämnesförslags-hämtningen) räckte inte — vi har redan
+            # hamnat i "skriv ny artikel"-grenen via myntkastet vid rad ~401,
+            # INNAN denna kvotkontroll körs. Är både nyhet OCH eget redan
+            # fyllda (bara replik har kvot kvar den här manuella körningen)
+            # fortsatte koden annars rakt in i den vanliga nyhet/eget-
+            # skrivlogiken längre ner, som inte är kvotmedveten utanför
+            # force_nyhet/force_eget-fönstren — och kunde därför fortfarande
+            # publicera en 5:e artikel av en redan fylld typ, trots att inget
+            # ämnesförslag konsumerades. Avbryter hela körningen istället,
+            # samma mönster som skip-kontrollen vid rad ~389.
+            print(
+                f"Ingen artikel skriven — manuell körning hamnade i grenen för "
+                f"ny artikel, men nyhet ({idag_publicerat['nyhet']}/4) och eget "
+                f"({idag_publicerat['eget']}/4) är redan fyllda idag. Bara "
+                f"replik har kvot kvar."
+            )
+            sys.exit(0)
         if sb_key and kraver_kalla is not None:
             forslag = hamta_amnesforslag(sb_key, kraver_kalla=kraver_kalla)
             if forslag:
