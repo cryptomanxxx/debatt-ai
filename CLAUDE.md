@@ -2780,6 +2780,23 @@ Användarrapport (sep 2026, skärmdump av en sparad `/chatt/[id]`-debatt): 5 av 
 |---|---|
 | `app/api/chatt/route.js` | `maxTokensForRequest` för vanliga debattrepliker höjt 250 → 500 (`nyhetsanalys`-grenens 700 oförändrad) |
 
+### ✅ 102. Pastad artikel ignorerades av debattämnet — sidans initiala slumpämne vann alltid – KLART
+Användarrapport (sep 2026): *"Nu klistrade jag in den här nyheten på direktdebatten. https://omni.se/a/q6xw5E Då började AI agenter plötsligt diskutera om barn ska ha mobiltelefon 😂"* — en pastad Omni-artikel om något helt annat gav en debatt om "Ska barn ha egna mobiltelefoner?" där agenterna ändå tvingades citera artikeln (bl.a. felaktiga referenser till en "Trump-karta"), ett synligt osammanhängande resultat.
+
+**Rotorsak:** `amne`-fältet (debattämnet) och den pastade artikeln (`artikelKontext`) är helt oberoende state i `app/chatt/page.js`. `amne` initieras dessutom ALDRIG tomt — `useState(() => slumpaAmne())` fyller det med ett slumpat ämne direkt vid sidladdning, och "Ska barn ha egna mobiltelefoner?" är rentav den FÖRSTA frågan i `AMNEN.vardag`-listan, vilket gör den till ett sannolikt slumputfall. `hamtaArtikel()` (som hämtar artikelns titel/sammanfattning via `/api/chatt/artikel-kontext`) rörde aldrig `amne` — bara `starta()` läser `valtAmne = amne.trim() || slumpaAmne()`, en fallback som i praktiken aldrig triggas eftersom `amne.trim()` alltid redan har ett värde. En besökare som scrollar rakt ner till "Nyhetsartikel (valfritt)"-fältet och klistrar in en länk utan att först röra ämnesfältet ovanför fick alltså debatten köra på det redan slumpade förvalsämnet, medan artikeln ändå tvingades in som "Bakgrundsartikel" i systemprompten (`forankraArtikelnSv`-regeln instruerar agenterna att konkret referera en detalj ur den) — vilket producerade exakt den typ av osammanhängande blandning användaren rapporterade.
+
+**Fix:** en ny `amneAngettAvBesokareRef` (boolean, `useRef(false)`) håller reda på om besökaren NÅGONSIN gjort ett eget medvetet ämnesval — skrivit i fältet, klickat en kategori-chip, slumpat med 🎲, eller låtit AI välja (`väljaAiAmne()`). Alla fem ställena som anropar `setAmne()` av en explicit besökarhandling sätter nu även `amneAngettAvBesokareRef.current = true`. `hamtaArtikel()` sätter `amne` till artikelns rubrik (`kontext.titel`, redan kapad till 200 tecken av `TITEL_MAX` i `app/lib/hamtaArtikelInnehall.js` — samma gräns som `/api/chatt/route.js` kräver för `amne`) **bara** om referensen fortfarande är `false`, dvs. besökaren aldrig gjort ett eget val — annars respekteras det befintliga ämnet oförändrat. `nyDebatt()` (knappen "Ny debatt" efter en avslutad session) nollställer referensen till `false` igen tillsammans med sin befintliga `taBortArtikel()`-anrop, så en ny debattsession kan auto-fylla ämnet från en artikel på nytt.
+
+**Kedjade artikelpastningar hanteras naturligt:** om besökaren pastar en andra artikel utan att någonsin ha rört ämnesfältet manuellt (referensen fortfarande `false`) uppdateras ämnet till den NYA artikelns rubrik — rimligt beteende, inte en bugg, eftersom det fortfarande inte finns något medvetet besökarval att skydda.
+
+**UI-text uppdaterad:** hjälptexten under artikelfältet ("Ger agenterna mer kontext än bara ämnesrubriken — bra för att debattera en specifik nyhet.") fick tillägget "Sätter automatiskt artikelns rubrik som debattämne om du inte redan valt ett eget ovan." — gör det nya beteendet transparent innan klick, samma princip som redan används för Oraklets läsknappar och andra automatiska sidoeffekter i denna logg.
+
+**Ej åtgärdat här:** ingen ändring av `/chatt/historik`s `kalla`-baserade badge (`besökare`/`ai`/`inbyggt`) — ett artikel-avlett ämne fortsätter visa "inbyggt" (ingen badge), eftersom `/chatt/[id]` redan visar en tydlig "📰 [artikeltitel] / Baserat på en nyhetsartikel"-badge oberoende av `kalla` (via `kalla_url`/`kalla_titel`, se ✅9) — en andra, delvis överlappande badge bedömdes inte tillföra tillräckligt för att motivera en ny `kalla`-variant i denna fix.
+
+| Fil | Roll |
+|---|---|
+| `app/chatt/page.js` | Ny `amneAngettAvBesokareRef`. `hamtaArtikel()` sätter `amne` till artikelns rubrik bara om referensen är `false`. De fem explicita `setAmne()`-anropen (kategori-chip, manuell input, 🎲-knapp, `väljaAiAmne()`) sätter referensen till `true`; `nyDebatt()` nollställer den till `false`. Hjälptext under artikelfältet uppdaterad |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
