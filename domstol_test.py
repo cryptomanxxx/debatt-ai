@@ -526,21 +526,19 @@ def hall_forhandling(arende: dict) -> dict:
 
 def verkstall_straff(h: dict, dom_id: int, svarande: str, belopp: int) -> bool:
     """Dra böter från agentens saldo och logga som skandal."""
-    # Hämta nuvarande saldo — informativt för loggtexten, själva skrivningen
-    # nedan är atomisk och beror inte på detta värde
-    planbok = sb_get(h, f"agent_planbocker?agent=eq.{svarande}&select=saldo")
-    if not planbok:
-        print(f"  [FEL] Kunde inte hämta saldo för {svarande}")
-        return False
-
-    nuvarande_saldo = planbok[0].get("saldo", 0)
-
     # Atomiskt (_justera_planbok, ✅104) — golvar vid 0 som default, matchar
-    # den tidigare max(0, ...)-semantiken
+    # den tidigare max(0, ...)-semantiken. Läser saldot FÖRE justeringen ur
+    # RPC-svarets saldo_fore (v4, radlåst i samma atomiska operation) istället
+    # för en egen separat GET — en tidigare separat läsning kunde bli
+    # inaktuell mot RPC-svaret om ett samtidigt anrop ändrade agentens saldo
+    # emellan, vilket kunde ge ett felaktigt (eller negativt) "faktiskt
+    # uttaget bötesbelopp" och i så fall DEBITERA Statskassan istället för
+    # att kreditera den (Codex-fynd, PR #1423-granskning).
     result = _justera_planbok(h.get("apikey"), svarande, saldo_delta=-belopp)
     if result is None:
         print(f"  [FEL] Kunde inte uppdatera saldo för {svarande}")
         return False
+    nuvarande_saldo = result["saldo_fore"]
     nytt_saldo = result["saldo"]
 
     faktisk_bot = nuvarande_saldo - nytt_saldo

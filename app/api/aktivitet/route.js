@@ -467,14 +467,31 @@ async function byggFeed() {
     anna_sager: "Anna", peter_sager: "Peter", johan_sager: "Johan", oraklet_forklarar: "Professor Oraklet",
     anna_svarar: "Anna", peter_svarar: "Peter", johan_svarar: "Johan", oraklet_svarar: "Professor Oraklet",
   };
-  // Tidsstämplar för fraga_anna_peter_logs "oraklet_forklarar"-rader — används
+  // Kandidatlista av fraga_anna_peter_logs "oraklet_forklarar"-rader — används
   // av oraklet_lasningar-fallbacken nedan för att avgöra om en uppläsning
   // redan syns i feeden via den raden, eller om bara oraklet_lasningar-
-  // skrivningen lyckades (se dedup-kommentaren där för varför).
-  const orakletForklaradeTider = [];
+  // skrivningen lyckades (se dedup-kommentaren där för varför). Varje
+  // kandidat bär sin egen titel/text OCH en `anvand`-flagga — matchningen
+  // nedan är en-till-en (identitet + tidsfönster), inte bara "finns någon
+  // rad inom 15s" (Codex-fynd, PR #1421-granskning: en ren tidsmatchning
+  // kunde låta EN fraga_anna_peter_log-rad dölja FLERA oraklet_lasningar-
+  // rader som råkade hamna inom samma 15s-fönster, t.ex. vid flera snabba
+  // klick där bara fraga-anna-peter-logs striktare rate limit (40/10min mot
+  // oraklet-lasning-logs 60/10min) träffade några av dem — och kunde även
+  // låta en HELT orelaterad oraklet_forklarar-rad från /fraga-anna-och-
+  // peters egen URL-förklaring (se ✅93) tyst dölja en riktig
+  // universitets-uppläsning bara för att tiderna råkade ligga nära).
+  const orakletForklaradeKandidater = [];
   (Array.isArray(fragaAnnaPeter.value) ? fragaAnnaPeter.value : []).forEach(f => {
     if (!f.skapad) return;
-    if (f.aktion === "oraklet_forklarar") orakletForklaradeTider.push(new Date(f.skapad).getTime());
+    if (f.aktion === "oraklet_forklarar") {
+      orakletForklaradeKandidater.push({
+        tid: new Date(f.skapad).getTime(),
+        titel: (f.titel || "").trim(),
+        text: f.input_text || f.sammanfattning || "",
+        anvand: false,
+      });
+    }
     const info = FRAGA_ANNA_PETER_INFO[f.aktion] || FRAGA_ANNA_PETER_INFO.anna_sager;
     // Frågeläget sparar frågan i titel och svaret i input_text (se
     // sagFritext() i app/fraga-anna-och-peter/page.js) — titel är alltså
@@ -518,8 +535,40 @@ async function byggFeed() {
   (Array.isArray(orakletLasningar.value) ? orakletLasningar.value : []).forEach(o => {
     if (!o.skapad) return;
     const t = new Date(o.skapad).getTime();
-    const redanTackt = orakletForklaradeTider.some(ft => Math.abs(ft - t) < ORAKLET_DEDUP_FONSTER_MS);
-    if (redanTackt) return;
+    const oTitel = (o.titel || "").trim();
+    // Matcha på händelseidentitet (titel), inte bara tid, och konsumera
+    // matchningen en gång — den närmsta i tid bland de obrukade kandidater
+    // vars titel/text faktiskt hör ihop med denna rad.
+    let bastMatch = null;
+    let bastDelta = Infinity;
+    for (const k of orakletForklaradeKandidater) {
+      if (k.anvand || !oTitel) continue;
+      const delta = Math.abs(k.tid - t);
+      if (delta >= ORAKLET_DEDUP_FONSTER_MS) continue;
+      // k.titel finns bara satt när fraga_anna_peter_log-raden kom från en
+      // URL-baserad förklaring (samma titel-fält som oraklet_lasningar.titel,
+      // se sparaLasningHistorik() i UniversitetVy.js). Fritext-fallet (t.ex.
+      // AI-forskning-fliken, utan url) sparar ingen egen titel-kolumn —
+      // där matchar vi istället mot att den sammanslagna texten börjar med
+      // titeln.
+      //
+      // Prefix-matchning (startsWith), inte exakt likhet: /api/oraklet-lasning
+      // kapar alltid oraklet_lasningar.titel vid 300 tecken, medan
+      // fraga_anna_peter_log.titel tillåter upp till 1500 (och vetenskapliga_
+      // upptagter.titel/nyhetsflode.rubrik/oraklet_urval saknar egen
+      // teckengräns) — för en titel längre än 300 tecken gav exakt-likhet-
+      // jämförelsen (och ". "-suffixkravet i fritext-grenen) ALDRIG en
+      // matchning, vilket återskapade den ursprungliga synliga dubbletten
+      // för just sådana rader (Codex-fynd, PR #1424-granskning). oTitel är
+      // redan garanterat ≤300 tecken (samma källsträng, bara kortare kapad),
+      // så den fungerar som en pålitlig prefix att matcha mot oavsett hur
+      // långt k.titel/k.text är.
+      const matchar = k.titel ? k.titel.startsWith(oTitel) : k.text.startsWith(oTitel);
+      if (!matchar || delta >= bastDelta) continue;
+      bastDelta = delta;
+      bastMatch = k;
+    }
+    if (bastMatch) { bastMatch.anvand = true; return; }
     const vad = o.typ === "nyhet" ? "en vetenskaplig nyhet" : o.typ === "urval" ? "en nyhet ur sin läslista" : "ett forskningsfynd";
     feed.push({
       typ: "oraklet-lasning",
