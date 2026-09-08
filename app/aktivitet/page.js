@@ -14,18 +14,19 @@ export const metadata = {
 export default async function AktivitetPage() {
   let forstaSidan = [];
   let nastaCursor = null;
-  let nastaHopp = 0;
+  let nastaVid = [];
   try {
-    // Delar samma cachade batch och samma tie-break-säkra sidindelning som
-    // /api/aktivitet/arkiv (Codex-fynd, PR #1427-granskning) — annars kunde
-    // den här sidans "första sida" och API-ruttens efterföljande "Ladda
-    // fler" komma från två olika ögonblicksbilder och tyst tappa rader.
+    // Använder samma paginateAktivitet() som /api/aktivitet/arkiv — cursorn
+    // den producerar är identitetsbaserad (se app/lib/aktivitetFeed.js) och
+    // fungerar korrekt oavsett om den här sidans och API-ruttens efterföljande
+    // "Ladda fler"-anrop råkar hämta olika ögonblicksbilder av samma data
+    // (separata Vercel-funktioner, Codex-fynd PR #1431-granskning).
     const alla = await hamtaAktivitetArkivCachat();
-    ({ sida: forstaSidan, nastaCursor, nastaHopp } = paginateAktivitet(alla, null, 0));
+    ({ sida: forstaSidan, nastaCursor, nastaVid } = paginateAktivitet(alla, null, []));
   } catch {
     // Fail-open — klienten visar "Inga händelser ännu" och kan fortfarande
     // försöka "Ladda fler" om servern var tillfälligt otillgänglig.
   }
 
-  return <AktivitetArkivKlient initialHandelser={forstaSidan} initialCursor={nastaCursor} initialHopp={nastaHopp} />;
+  return <AktivitetArkivKlient initialHandelser={forstaSidan} initialCursor={nastaCursor} initialVid={nastaVid} />;
 }

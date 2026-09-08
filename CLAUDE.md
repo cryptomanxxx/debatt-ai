@@ -2974,6 +2974,23 @@ Klientkomponenten (`AktivitetArkivKlient.js`) skickar nu både `cursor` och `hop
 | `app/aktivitet/page.js` | Hämtar första sidan via samma delade cache + `paginateAktivitet()` istället för en egen fräsch `hamtaAktivitetHandelser()`-hämtning |
 | `app/aktivitet/AktivitetArkivKlient.js` | Ny `hopp`-state, skickas och uppdateras tillsammans med `cursor` |
 
+**Codex-fynd (PR #1431-granskning, efter merge, P1): "delad cache" garanterar inte alls samma ögonblicksbild i produktion.** Fixen ovan (P1, ✅) antog att `hamtaAktivitetArkivCachat()`s modul-lokala `_arkivCache`-variabel faktiskt DELAS mellan `/aktivitet`-sidan och `/api/aktivitet/arkiv`-routen. Det stämmer inte i en Vercel-driftsättning: Next.js bygger varje route (sida och API-route) som en SEPARAT serverless-funktion, var och en med sin egen bundlade kopia av `app/lib/aktivitetFeed.js` — modul-lokalt minne delas alltså varken mellan dem eller mellan olika instanser av SAMMA route. Ett `hopp`-baserat cursor-schema (räkna antal rader vid en tidsstämpel i EN specifik array) är i grunden beroende av att nästa anrop löser upp cursorn mot exakt den arrayen — annars kan resultatet bli fel, exakt det ursprungliga Codex-fyndet (P2 ovan) varnade för, fast nu via en annan mekanism (olika instanser/bundlar istället för olika hämtningstillfällen).
+
+**Fix — identitetsbaserad cursor, inte positionell.** `paginateAktivitet()` skrevs om: cursorn kodas nu som `(skapad, vidLista)` där `vidLista` är en lista av STABILA IDENTITETER (härledda ur varje händelses eget innehåll — `typ+href+skapad+textutdrag`, se `identitetFor()`) för redan visade rader vid gränstidsstämpeln, istället för ett rent antal. Filtreringen jämför innehåll (`!cursorVid.has(identitetFor(h))`), aldrig array-position — vilket gör den korrekt oavsett vilken OBEROENDE hämtning av samma underliggande Supabase-data den körs mot, eftersom alla instanser/bundlar/hämtningstillfällen delar samma databas även om de aldrig delar samma JS-minne. Verifierat med ett dedikerat test som medvetet kör sida 1 mot en array och sida 2 mot en HELT ANNAN array-instans (`JSON.parse(JSON.stringify(...))`, garanterat olika minnesidentitet) — noll överlapp, noll luckor.
+
+`href` ensamt räcker inte som del av identiteten eftersom flera händelsetyper delar en GENERISK href (alla koalitionshändelser pekar t.ex. på `/dynamik`) — två olika koalitioner bildade inom samma millisekund hade annars kunnat förväxlas med varandra. Ett textutdrag läggs till som sista urskiljning.
+
+Den kortlivade cachen (`hamtaAktivitetArkivCachat()`) finns kvar — men bara som prestandaoptimering (färre Supabase-anrop på en och samma varma instans), inte längre som en (falsk) korrekthetsgaranti. Kommentarerna i koden omskrivna för att inte längre hävda att den delas mellan routes.
+
+**Känd kvarstående begränsning (dokumenterad direkt i koden):** om en källa var TILLFÄLLIGT nere när en tidigare sida byggdes (händelsen saknades helt då) och sedan återhämtar sig, kan den återupptäckta händelsen ha en tidsstämpel som redan ligger bortom besökarens nuvarande cursor-position — då visas den aldrig för just den sessionen. Ingen cursor-design utan ett persisterat, versionerat flöde (en riktig materialiserad feed-tabell) kan lösa det fallet fullt ut — bedömt som en rimlig avvägning snarare än att bygga om hela arkitekturen, samma princip som redan används på flera andra ställen i den här loggen.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/lib/aktivitetFeed.js` | `paginateAktivitet()` omskriven till identitetsbaserad `(skapad, vidLista)`-cursor via ny `identitetFor()`. `hamtaAktivitetArkivCachat()`s dokumentation korrigerad — ren prestandaoptimering, ingen korrekthetsgaranti |
+| `app/api/aktivitet/arkiv/route.js` | Tar emot `?vid=<JSON-array>` istället för `?hopp=<N>` |
+| `app/aktivitet/page.js` | Använder `nastaVid` istället för `nastaHopp` |
+| `app/aktivitet/AktivitetArkivKlient.js` | `vid`-state (array) istället för `hopp`-state (tal), JSON-kodas i query-strängen |
+
 ---
 
 ### ✅ 108. Invariant-checkaren (/status) — buggklasser som permanenta regressionsskydd – KLART
