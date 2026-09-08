@@ -298,12 +298,14 @@ function verkarAvhuggen(rubrik) {
   if (/[.!?"'…”]$/.test(r)) return false;
   const sistaOrdRaw = r.split(/\s+/).pop() || "";
   const sistaOrdRen = sistaOrdRaw.toLowerCase().replace(/[^a-zåäö]/g, "");
-  if (AVHUGGEN_SLUTORD.has(sistaOrdRen)) return true;
-  // Samma grundidé som klientens arTroligenAvbruten()-heuristik
-  // (app/chatt/page.js): inget avslutande skiljetecken OCH ett kort/
-  // avhugget sista ord är misstänkt, inte bara "kort rubrik" i sig.
-  if (sistaOrdRaw.length >= 3) return false;
-  return true;
+  // Bara stoppordslistan avgör härifrån — ett rent "kort sista ord"-villkor
+  // (t.ex. < 3 tecken) gav falska larm på fullt legitima svenska ord som
+  // "år"/"nu"/"få" (bekräftat live: "...dödliga inom fem år" flaggades
+  // felaktigt vid den allra första produktionskörningen, 8 sep 2026).
+  // Rubriker under 12 tecken fångas redan av längdvillkoret ovan — de två
+  // ursprungliga ✅97-buggexemplen ("Om fem år", "FN-för") täcks av det,
+  // inte av ordlängd.
+  return AVHUGGEN_SLUTORD.has(sistaOrdRen);
 }
 
 async function checkAvhuggnaRubriker() {
