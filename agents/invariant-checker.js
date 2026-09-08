@@ -211,8 +211,15 @@ function checkRedaktionRaknarRepliker() {
       rapportera(namn, "fail", "dagligData hoppar fortfarande över repliker helt — kan vara ✅109 återinförd");
       return;
     }
-    if (!fonster.includes(".repliker")) {
-      rapportera(namn, "fail", "dagligData saknar en repliker-nyckel — ✅109 kan vara borttagen");
+    // Codex-fynd (PR #1430-granskning, efter merge): att bara leta efter
+    // ".repliker" som substräng matchar redan objekt-initieringen
+    // (`repliker: 0`) — även om själva uppräkningen (`.repliker++`) togs
+    // bort helt hade den här checken ändå rapporterat OK, exakt den
+    // regression den finns till för att fånga. Letar nu specifikt efter
+    // själva ökningsuttrycket, ihopkopplat med parent_id-villkoret som styr
+    // det — inte bara att fältnamnet förekommer någonstans i fönstret.
+    if (!fonster.includes("parent_id != null) dagMap[key].repliker++")) {
+      rapportera(namn, "fail", "dagMap[key].repliker++ hittas inte kopplat till parent_id-villkoret — repliker kanske inte längre räknas (✅109)");
       return;
     }
     rapportera(namn, "ok");
