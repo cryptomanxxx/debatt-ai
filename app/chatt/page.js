@@ -397,6 +397,15 @@ export default function ChattPage() {
   // value, so the attached article can never be lost to a stale closure regardless of how long
   // the debate's chain of awaits runs or how many re-renders happen while it's in flight.
   const artikelKontextRef = useRef(null);
+  // amne-fältet startar ALDRIG tomt (useState(() => slumpaAmne()) ovan) — en ren
+  // "amne.trim() || ..."-koll i starta() kan alltså aldrig upptäcka att besökaren
+  // faktiskt aldrig valt ett eget ämne, bara läst av vilket slumpat ämne som råkade
+  // ligga där sedan sidladdningen. Denna ref håller reda på om besökaren NÅGONSIN
+  // gjort ett eget medvetet ämnesval (skrivit, klickat en kategori-chip, slumpat med
+  // 🎲, eller låtit AI välja) — false betyder "fortfarande bara sidans initiala
+  // slumpval". Används av hamtaArtikel() nedan för att avgöra om en pastad artikels
+  // rubrik säkert kan bli debattämnet utan att skriva över ett medvetet val.
+  const amneAngettAvBesokareRef = useRef(false);
 
   useEffect(() => {
     setRateLimitInfo(peekLocalRL());
@@ -421,6 +430,20 @@ export default function ChattPage() {
       const kontext = await fetchArtikelKontext(url);
       artikelKontextRef.current = kontext;
       setArtikelKontext(kontext);
+      // amne-fältet är ALDRIG tomt (startar med ett slumpat ämne, se amneAngettAvBesokareRef
+      // ovan) — utan denna koll skulle en pastad artikel bara ligga oanvänd som tvingande
+      // "Bakgrundsartikel" i systemprompten (se forankraArtikelnSv i /api/chatt/route.js)
+      // medan debatten fortsatte på sidans slumpade förvalsämne, helt orelaterat till
+      // artikeln (användarrapport, sep 2026: en pastad Omni-artikel om något helt annat
+      // gav en debatt om barns mobiltelefoner — sidans initiala slumpval — där agenterna
+      // ändå tvingades citera artikeln). Sätter artikelns rubrik som debattämne bara om
+      // besökaren aldrig gjort ett eget medvetet ämnesval — annars respekteras det valet.
+      // kontext.titel är redan kapad till 200 tecken (TITEL_MAX i
+      // app/lib/hamtaArtikelInnehall.js), samma gräns som /api/chatt/route.js kräver för
+      // amne, så ingen ytterligare truncation behövs här.
+      if (!amneAngettAvBesokareRef.current && kontext?.titel) {
+        setAmne(kontext.titel);
+      }
     } catch (e) {
       setArtikelFel(e.message || "Kunde inte hämta artikeln.");
     } finally {
@@ -440,7 +463,7 @@ export default function ChattPage() {
     const valdaAgenter = panel.agenter ?? slumpAgenter;
     setAiVäljer(true);
     const genererat = await fetchAiAmne(valdaAgenter);
-    if (genererat) { setAmne(genererat); setKallaAmne("ai"); }
+    if (genererat) { setAmne(genererat); setKallaAmne("ai"); amneAngettAvBesokareRef.current = true; }
     setAiVäljer(false);
   }
 
@@ -647,6 +670,7 @@ export default function ChattPage() {
     setDebattId(null);
     setAmne(slumpaAmne());
     setKallaAmne("inbyggt");
+    amneAngettAvBesokareRef.current = false; // ny debattsession — ett nytt artikel-paste ska få auto-sätta ämnet igen
     setFelmeddelande("");
     setFöreslagStatus(null);
     taBortArtikel();
@@ -712,7 +736,7 @@ export default function ChattPage() {
               {/* Kategori-chips */}
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
                 {KATEGORIER.map(k => (
-                  <button key={k.id} onClick={() => { setAmne(slumpaAmne(k.id)); setKallaAmne("inbyggt"); }}
+                  <button key={k.id} onClick={() => { setAmne(slumpaAmne(k.id)); setKallaAmne("inbyggt"); amneAngettAvBesokareRef.current = true; }}
                     style={{ padding: "8px 16px", borderRadius: "20px", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: "14px", fontFamily: "Georgia, serif", cursor: "pointer", transition: "all 0.15s" }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = C.accentDim; e.currentTarget.style.color = C.accent; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textMuted; }}>
@@ -723,10 +747,10 @@ export default function ChattPage() {
 
               {/* Input + slumpa-knapp */}
               <div style={{ display: "flex", gap: "8px" }}>
-                <input value={amne} onChange={e => { setAmne(e.target.value); setKallaAmne("besökare"); }} placeholder="Skriv ett ämne…"
+                <input value={amne} onChange={e => { setAmne(e.target.value); setKallaAmne("besökare"); amneAngettAvBesokareRef.current = true; }} placeholder="Skriv ett ämne…"
                   style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "10px 14px", color: C.text, fontSize: "15px", fontFamily: "Georgia, serif", outline: "none" }}
                   onKeyDown={e => e.key === "Enter" && starta()} />
-                <button onClick={() => { setAmne(slumpaAmne()); setKallaAmne("inbyggt"); }} title="Slumpa ämne"
+                <button onClick={() => { setAmne(slumpaAmne()); setKallaAmne("inbyggt"); amneAngettAvBesokareRef.current = true; }} title="Slumpa ämne"
                   style={{ padding: "10px 14px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "6px", color: C.textMuted, fontSize: "16px", cursor: "pointer", flexShrink: 0 }}>
                   🎲
                 </button>
@@ -761,7 +785,7 @@ export default function ChattPage() {
                 )}
                 {artikelFel && <p style={{ fontSize: "12px", color: "#f87171", margin: "6px 0 0" }}>{artikelFel}</p>}
                 <p style={{ fontSize: "11px", color: C.textMuted, margin: "6px 0 0", lineHeight: 1.5 }}>
-                  Ger agenterna mer kontext än bara ämnesrubriken — bra för att debattera en specifik nyhet.
+                  Ger agenterna mer kontext än bara ämnesrubriken — bra för att debattera en specifik nyhet. Sätter automatiskt artikelns rubrik som debattämne om du inte redan valt ett eget ovan.
                 </p>
               </div>
             </div>
