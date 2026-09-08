@@ -3043,6 +3043,12 @@ Uppföljande diskussion (sep 2026), direkt efter ✅105–✅107: projektägaren
 |---|---|
 | `agents/invariant-checker.js` | Ny `KORT_SLUTORD_TILLATNA`-allowlist + villkor i `verkarAvhuggen()`: sista ord ≤ 2 tecken flaggas om inte allowlistat |
 
+**Codex-fynd (PR #1434-granskning): whack-a-mole-allowlistan för korta sista ord riskerade permanent falska larm.** `KORT_SLUTORD_TILLATNA` (den snäva allowlistan för sista ord ≤ 2 tecken, se PR #1429-notisen ovan) täcker per definition bara ORD SOM REDAN GETT ETT FALSKT LARM en gång — svenska har gott om legitima korta ord (el, by, ja, nu) och korta versaler/förkortningar (UK, Xi, EU) den aldrig kan täcka uttömmande. En rubrik som "Sverige behöver mer el" eller "Nya avtalet med UK" hade flaggats som avhuggen och gjort `avhuggna-rubriker`-checken RÖD för hela sajten tills artikeln åldrats ur de 20 senaste — exakt samma ihållande falskt-larm-problem som redan en gång tvingat fram en omskrivning (PR #1428). Fixat genom att ta bort hela ≤2-tecken-regeln (och `KORT_SLUTORD_TILLATNA`) helt: teckenlängd i sig kan inte skilja "kort men fullständigt ord" från "avhuggen ordrest" utan en riktig ordlista, så signalen bedömdes inte pålitlig nog för att motivera återkommande falska larm. Verifierat mot Codex konkreta motexempel (el/by/UK/Xi ger nu korrekt `false`) plus samtliga tidigare kända sant-positiva fall (`AVHUGGEN_SLUTORD`-stoppord, "Om fem år", "FN-för"). **Känd begränsning:** en rubrik avhuggen exakt vid en 1–2-tecken ordrest utan att sluta på ett stoppord (t.ex. "...ett nytt sk") missas nu av checken — samma medvetna "färre falska larm före fullständig täckning"-avvägning som redan används på flera andra ställen i den här loggen.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | `KORT_SLUTORD_TILLATNA`-allowlistan och dess villkor i `verkarAvhuggen()` borttagna helt — ersätter inte med ny logik, accepterar den smalare recall-förlusten |
+
 Kräver Supabase-tabell `invariant_checks` — kör `supabase_invariant_checks.sql` i SQL Editor.
 
 | Fil | Roll |
