@@ -749,8 +749,8 @@ export default function ChattPage() {
               <div style={{ display: "flex", gap: "8px" }}>
                 <input value={amne} onChange={e => {
                     const v = e.target.value;
+                    const angett = v.trim().length > 0;
                     setAmne(v);
-                    setKallaAmne("besökare");
                     // Till skillnad från de andra fyra setAmne()-anropen (som alltid sätter ett
                     // icke-tomt värde) kan besökaren här radera fältet helt. Sätts referensen
                     // ändå till true rakt av (som innan) fastnar den permanent i "besökaren har
@@ -758,7 +758,13 @@ export default function ChattPage() {
                     // aldrig auto-fylla ämnet, vilket återskapar exakt den bugg ✅102 fixade
                     // (Codex-fynd, PR #1418-granskning). Referensen speglar nu om fältet FAKTISKT
                     // har ett icke-tomt, besökarskrivet värde just nu — inte om det NÅGONSIN skrivits i.
-                    amneAngettAvBesokareRef.current = v.trim().length > 0;
+                    // Samma sak gäller kallaAmne: ett tomt fält är inte längre "besökare"-källan
+                    // (annars visar /chatt/historik en felaktig "Besökarämne"-badge på en debatt
+                    // vars ämne sedan auto-fylldes från en pastad artikel — Codex-fynd,
+                    // PR #1420-granskning). "inbyggt" är samma neutrala förval som sidans
+                    // initiala slumpval, alltså ingen badge, tills besökaren faktiskt skrivit något.
+                    setKallaAmne(angett ? "besökare" : "inbyggt");
+                    amneAngettAvBesokareRef.current = angett;
                   }} placeholder="Skriv ett ämne…"
                   style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "10px 14px", color: C.text, fontSize: "15px", fontFamily: "Georgia, serif", outline: "none" }}
                   onKeyDown={e => e.key === "Enter" && starta()} />
