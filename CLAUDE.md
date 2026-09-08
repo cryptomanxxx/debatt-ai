@@ -2914,6 +2914,24 @@ Ingen UI-ändring behövdes utöver fetch-frågan — kortkomponenten renderar r
 
 ---
 
+### ✅ 106. Publicerade artiklar trängdes ut ur Senaste aktivitet-widgeten av växande antal andra aktivitetstyper – KLART
+
+Uppföljande användarrapport (sep 2026), direkt efter ✅105: *"kolla så att publicerade nyhetsartiklar, debattartiklar och repliker också syns i Senaste aktivitet widgeten? Det gjorde dom innan men nu så tycker jag inte att jag ser dom där längre."*
+
+**Rotorsak — inte ett filterfel den här gången, utan crowding.** `app/api/aktivitet/route.js` bygger hela feeden som ett rent GLOBALT topp-10 sorterat på tidsstämpel (rad 583, `feed.sort(...).slice(0, 10)`), hämtat parallellt från **30 olika Supabase-tabeller**. Själva artikel-hämtningen (`artiklar?...&limit=8`, rad 25) är oförändrad och korrekt — den har inget `nyhetskalla`-filter och fångar redan nyhetsartiklar, debattartiklar (båda `typ: "artikel-ai"`/`"artikel-human"`, kalla=ai/människa) och repliker (`typ: "replik"`, `parent_id` satt). Problemet är att de konkurrerar direkt mot ALLA andra 29 källor i samma topp-10-pool, utan någon garanterad plats.
+
+Den här filen har fått **14 separata PR:ar** över tid, var och en av dem lade till en ny aktivitetstyp (AI-bilder, socialt kapital/feedback, nyhetsanalyser, vetenskapliga upptäckter, Fråga AI-agenterna m.fl.) — men ingen av dem införde en garanti om att artiklar/repliker alltid får plats i de 10 synliga raderna. Artiklar/repliker publiceras bara ~16–19 gånger/dag (4 nyheter + 4 repliker + 4 eget ämne + upp till 3 catch-up), medan flera andra källor är betydligt mer högfrekventa eller klungar ihop sig: `bors_affarer` (14 körningar/dag, kan ge flera affärer per körning), plus dussintals dagliga cron-jobb (lobbying/koalition/ekonomi/parlament/mark/handel/rykte/feedback/AI-bilder m.fl.) som ofta kör tätt inpå varandra mitt på dagen (09:30–16:30 svensk tid, se schematabellen). Ju fler aktivitetstyper som lagts till, desto lättare har publicerade artiklar/repliker trängts ut helt ur den fasta 10-platsers poolen — exakt det användaren beskrev.
+
+**Fix:** reserverar minst `ARTIKEL_MIN_SLOTS` (3) av de 10 platserna specifikt åt de senaste artiklarna/replikerna (`typ` i `{"artikel-ai","artikel-human","replik"}`), oavsett hur många andra händelser som konkurrerar. De återstående platserna fylls precis som förut av det mest aktuella oavsett typ, och hela listan sorteras om på tidsstämpel innan den returneras — så artiklar inte staplas överst utanför sin kronologiska plats, bara garanterat FINNS med.
+
+Ingen ny databaskolumn eller schemaändring — ren omprioritering av redan hämtad data i minnet.
+
+| Fil | Roll |
+|---|---|
+| `app/api/aktivitet/route.js` → `byggFeed()` | Ny reserverad-slots-logik: minst 3 av 10 platser garanteras åt de senaste `artikel-ai`/`artikel-human`/`replik`-händelserna innan resten fylls på och hela listan sorteras om kronologiskt |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
