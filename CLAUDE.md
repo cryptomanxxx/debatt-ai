@@ -2959,6 +2959,21 @@ Uppföljande användarrapport (sep 2026), direkt efter ✅106: *"klickar man på
 | `app/aktivitet/AktivitetArkivKlient.js` | Klientkomponent: sökfilter över laddade händelser, "Ladda fler"-knapp mot `/api/aktivitet/arkiv` |
 | `app/client.js` | "Se alla →"-länken på Senaste aktivitet-widgeten ändrad från `/historia` till `/aktivitet` |
 
+**Codex-fynd (PR #1427-granskning, efter merge): SSR-sidan och paginerings-API:et kunde läsa ur två olika ögonblicksbilder, och cursorn saknade en tie-breaker mot delade tidsstämplar.**
+
+- **P1 — separata cache-instanser.** `app/aktivitet/page.js` anropade `hamtaAktivitetHandelser()` FRÄSCHT vid varje sidladdning, medan `app/api/aktivitet/arkiv/route.js` hade sin egen, oberoende 60s-cachade batch. Om API-ruttens cache var populerad från tidigare medan SSR-sidan råkade göra en färskare hämtning (eller tvärtom) kunde en cursor utfärdad av den ena peka på en position som inte fanns — eller betydde något annat — i den andras separat hämtade snapshot. I värsta fall hoppade "Ladda fler" permanent över rader för just den besökarens session. Fixat: cachen bröts ut till en delad `hamtaAktivitetArkivCachat()` i `app/lib/aktivitetFeed.js`, som både SSR-sidan och API-rutten nu anropar — samma ögonblicksbild så länge cachen inte hunnit förnyas mellan anropen.
+- **P2 — ingen tie-breaker mot delade tidsstämplar.** En ren `skapad < cursor`-filtrering exkluderar ALLT som delar exakt cursorns tidsstämpel — inklusive andra rader som genuint har samma millisekund (flera händelser skrivna i samma batch), eller vars Postgres-tidsstämpel med finare precision trunkeras till samma millisekund av `Date#getTime()`. Sådana rader föll permanent bort ur arkivet. Fixat med `paginateAktivitet()`, en delad sidindelningsfunktion i `app/lib/aktivitetFeed.js`: cursorn är nu ett par `(skapad, hopp)` där `hopp` räknar hur många rader med EXAKT den tidsstämpeln som redan konsumerats i en tidigare sida — nästa sida hoppar bara över precis så många av dem, resten av klustret tas med.
+- **Egen bugg upptäckt under verifiering av P2:** den första implementationen av `paginateAktivitet()` hade en logikinversion — rader i samma tidsstämpelkluster som låg BORTOM `hopp` (dvs. de som INTE ännu visats) exkluderades felaktigt istället för att inkluderas, vilket hade gett precis samma dataförlust Codex-fyndet varnade för, fast dold bakom en till synes korrekt fix. Upptäckt genom att skriva ett syntetiskt test (8 händelser med identisk tidsstämpel som spänner över en sidgräns på 5) INNAN fixen skickades — testet visade genast att bara 9 av 12 rader syntes. Rättat och om-testat mot fyra scenarier (stort kluster som spänner en sidgräns, normalfall utan delade tidsstämplar, kluster som fyller en sida exakt, tom lista) — alla fyra ger nu korrekt antal rader utan dubbletter eller luckor.
+
+Klientkomponenten (`AktivitetArkivKlient.js`) skickar nu både `cursor` och `hopp` i "Ladda fler"-anropet och uppdaterar båda från svaret.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/lib/aktivitetFeed.js` | Ny `hamtaAktivitetArkivCachat()` (delad 60s-cache) och `paginateAktivitet()` (tie-break-säker sidindelning med `(skapad, hopp)`-cursor) |
+| `app/api/aktivitet/arkiv/route.js` | Använder de två delade funktionerna istället för egen cache/filtreringslogik. Tar emot `?hopp=` utöver `?cursor=` |
+| `app/aktivitet/page.js` | Hämtar första sidan via samma delade cache + `paginateAktivitet()` istället för en egen fräsch `hamtaAktivitetHandelser()`-hämtning |
+| `app/aktivitet/AktivitetArkivKlient.js` | Ny `hopp`-state, skickas och uppdateras tillsammans med `cursor` |
+
 ---
 
 ### ✅ 108. Invariant-checkaren (/status) — buggklasser som permanenta regressionsskydd – KLART

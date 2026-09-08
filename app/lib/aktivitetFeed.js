@@ -27,6 +27,69 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export const AKTIVITET_ARKIV_SID_STORLEK = 30;
 export const AKTIVITET_ARKIV_LIMIT_PER_KALLA = 200;
 
+// Delad 60s-cache av arkiv-batchen (Codex-fynd, PR #1427-granskning): SSR-
+// sidan (app/aktivitet/page.js) och paginerings-API:et
+// (app/api/aktivitet/arkiv/route.js) hämtade tidigare VARSIN egen kopia av
+// den stora batchen — om API-rutans egen cache råkade vara populerad från
+// tidigare medan SSR-sidan gjorde en helt fräsch hämtning (eller tvärtom)
+// kunde en cursor utfärdad av den ena peka på en position som inte finns,
+// eller betyder något annat, i den andras separat hämtade ögonblicksbild.
+// I värsta fall hoppade "Ladda fler" permanent över rader för just den
+// besökarens session. Genom att båda anropar SAMMA cachade funktion delar
+// de nu identisk data så länge cachen inte hunnit förnyas mellan anropen.
+let _arkivCache = { data: null, ts: 0 };
+const ARKIV_CACHE_MS = 60_000;
+
+export async function hamtaAktivitetArkivCachat() {
+  if (_arkivCache.data && Date.now() - _arkivCache.ts < ARKIV_CACHE_MS) return _arkivCache.data;
+  const alla = await hamtaAktivitetHandelser({ limit: AKTIVITET_ARKIV_LIMIT_PER_KALLA });
+  _arkivCache = { data: alla, ts: Date.now() };
+  return alla;
+}
+
+/**
+ * Sidindelning med stabil tie-breaker mot delade tidsstämplar (Codex-fynd,
+ * PR #1427-granskning). En ren `skapad < cursor`-filtrering hoppar tyst
+ * över ALLA rader som råkar dela exakt cursorns tidsstämpel — antingen för
+ * att flera händelser genuint skrevs inom samma millisekund, eller för att
+ * `Date#getTime()` trunkerar Postgres-tidsstämplar med finare precision till
+ * millisekunder. `hopp` räknar hur många av de raderna som redan konsumerats
+ * i en tidigare sida, så nästa sida kan fortsätta EXAKT där den förra slutade
+ * istället för att antingen upprepa eller permanent hoppa över resten av
+ * klustret.
+ */
+export function paginateAktivitet(alla, cursorSkapad, cursorHopp = 0) {
+  let filtrerad = alla;
+  const cursorMs = cursorSkapad ? new Date(cursorSkapad).getTime() : null;
+  if (cursorMs != null && !Number.isNaN(cursorMs)) {
+    let hoppadeOver = 0;
+    filtrerad = alla.filter(h => {
+      const t = new Date(h.skapad).getTime();
+      if (t < cursorMs) return true;
+      if (t === cursorMs) {
+        // De första `cursorHopp` av dem (i array-ordning) visades redan i
+        // en tidigare sida — hoppa över dem igen. Resten av klustret (som
+        // aldrig visats) ska däremot vara med i den fortsatta filtreringen.
+        if (hoppadeOver < cursorHopp) { hoppadeOver++; return false; }
+        return true;
+      }
+      return false; // t > cursorMs — nyare än cursor, redan visad i en tidigare sida
+    });
+  }
+
+  const sida = filtrerad.slice(0, AKTIVITET_ARKIV_SID_STORLEK);
+  let nastaCursor = null;
+  let nastaHopp = 0;
+  if (sida.length === AKTIVITET_ARKIV_SID_STORLEK) {
+    const sistaSkapad = sida[sida.length - 1].skapad;
+    const sistaMs = new Date(sistaSkapad).getTime();
+    const antalMedSammaTidISidan = sida.filter(h => new Date(h.skapad).getTime() === sistaMs).length;
+    nastaCursor = sistaSkapad;
+    nastaHopp = (cursorMs === sistaMs ? cursorHopp : 0) + antalMedSammaTidISidan;
+  }
+  return { sida, nastaCursor, nastaHopp };
+}
+
 export async function hamtaAktivitetHandelser({ limit = 8 } = {}) {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
   const L = limit;
