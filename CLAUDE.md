@@ -2932,6 +2932,35 @@ Ingen ny databaskolumn eller schemaändring — ren omprioritering av redan häm
 
 ---
 
+### ✅ 107. "Se alla" på Senaste aktivitet ledde till /historia — en helt annan, smalare funktion – KLART
+
+Uppföljande användarrapport (sep 2026), direkt efter ✅106: *"klickar man på 'se alla' på senaste aktivitet feeded på hemsidans framsida så öppnas /historia men den sidan ser inte ut som en senaste aktivitets feeded [...] man ser aktiva relationer [...] jag hittar inte senaste publicerade nyhetsartiklar, debattartiklar och repliker i den listan [...] sidan verkar vara något annat än en ren dynamisk feed för alla händelser"*.
+
+**Rotorsak:** "Se alla →"-länken på widgeten (`app/client.js`) pekade på `/historia` — men `/historia` är en helt separat, tidigare byggd funktion (✅45, "Civilisationsminne + relationsgrafen"). Den hämtar bara ur `civilisations_minne` (8 fasta narrativa händelsetyper: koalition_bildad/allians_bruten/förräderi/triumf/skandal/marknadsseger/marknadskrasch/symbolkup) plus `agent_relationer` ("Aktiva relationer"-sektionen användaren såg). Ingen koppling alls till `/api/aktivitet`, som är den faktiska källan till startsidans widget — `civilisations_minne` loggar aldrig artikelpublicering, kommentarer, börsaffärer eller något av de övriga ~29 händelsetyperna widgeten bygger av. Ingen sida som visar en fullständig, paginerad version av samma ~30-källors-feed existerade överhuvudtaget — `/api/aktivitet` konsumerades bara av startsidans widget och saknade helt paginerings-/limit-stöd.
+
+**Fix — en riktig arkivsida, inte bara en omdirigerad länk:**
+
+- **`app/lib/aktivitetFeed.js`** — hela händelsebygget (30 parallella Supabase-fetchar → enhetlig `{typ,ikon,text,href,skapad,farg}`-lista) bröts ut ur `app/api/aktivitet/route.js` till en delad, parametriserad funktion `hamtaAktivitetHandelser({ limit })`. `limit` styr hur många rader som hämtas PER KÄLLA (samma tal för alla ~30 tabeller) — så både startsidans widget (litet urval, snabbt) och det nya arkivet (stort urval, för djupare paginering) delar exakt samma händelsedefinitioner istället för att de dupliceras och kan glida isär nästa gång en ny aktivitetstyp läggs till.
+- **`app/api/aktivitet/route.js`** — oförändrat beteende (topp-10, reserverade artikelplatser från ✅106, 25s cache), men bygger nu på den delade funktionen istället för en egen kopia.
+- **`app/api/aktivitet/arkiv/route.js`** — ny paginerad endpoint. `GET ?cursor=<ISO>` returnerar nästa 30 händelser äldre än cursorn, cursor-baserad (samma "Ladda fler"-mönster som redan etablerat på `/nyhetskallor`, ✅93) snarare än offset-paginering, eftersom nya händelser hela tiden skrivs in längst fram. Hämtar en betydligt större batch per källa (200 rader/tabell) än widgeten och cachar den batchen 60s i minnet — annars hade varje "Ladda fler"-klick krävt 30 nya parallella Supabase-frågor.
+- **`app/aktivitet/page.js` + `AktivitetArkivKlient.js`** — ny SSR-sida som visar HELA den kronologiska feeden (ingen typ prioriteras, till skillnad från widgetens reserverade artikelplatser — här behövs ingen reservation eftersom sidan i sin helhet är sökbar/bläddringsbar, inte begränsad till 10 rader), med en sökruta som filtrerar redan laddade händelser och en "Ladda fler händelser ↓"-knapp.
+- **`app/client.js`** — "Se alla →" pekar nu på `/aktivitet` istället för `/historia`. Widgeten själv är oförändrad (fortfarande topp-10, live-pollande var 25–30:e sekund).
+
+**Känd begränsning:** paginering längre tillbaka än vad de 200 raderna/källa i arkiv-batchen täcker kan ge samma typ av "vissa källor trängs ut"-problem som ✅106 löste för startsidan, fast i miniatyr vid den bortre kanten av arkivet — en högfrekvent källa (t.ex. `bors_affarer`) kan ha uttömt sin batch innan en lågfrekvent källas äldre rader når fram i den kombinerade sorteringen. En proportionerlig avvägning, inte en fullständig lösning — samma princip som redan används på flera andra ställen i den här loggen (se t.ex. ✅93 "Kvarvarande skräprader").
+
+`/historia` självt är oförändrat och kvar som egen sida (länkad separat från footer/Om-sidan sedan tidigare) — bara "Se alla"-genvägen från widgeten pekar rätt nu.
+
+| Fil | Roll |
+|---|---|
+| `app/lib/aktivitetFeed.js` | Ny delad modul. `hamtaAktivitetHandelser({limit})` — samma 30-källors händelsebygge som tidigare låg direkt i `route.js`, nu parametriserat och återanvänt av både widgeten och arkivet. Exporterar `AKTIVITET_ARKIV_SID_STORLEK`/`AKTIVITET_ARKIV_LIMIT_PER_KALLA` som delas mellan SSR-sidan och paginerings-API:et |
+| `app/api/aktivitet/route.js` | Importerar `hamtaAktivitetHandelser()` istället för egen kopia av händelsebygget. Reserverad-slots-logiken från ✅106 oförändrad |
+| `app/api/aktivitet/arkiv/route.js` | Ny cursor-paginerad endpoint, 60s in-memory-cache av en stor per-källa-batch |
+| `app/aktivitet/page.js` | Ny SSR-sida — hämtar första sidan direkt via `hamtaAktivitetHandelser()`, ingen intern HTTP-omväg |
+| `app/aktivitet/AktivitetArkivKlient.js` | Klientkomponent: sökfilter över laddade händelser, "Ladda fler"-knapp mot `/api/aktivitet/arkiv` |
+| `app/client.js` | "Se alla →"-länken på Senaste aktivitet-widgeten ändrad från `/historia` till `/aktivitet` |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
