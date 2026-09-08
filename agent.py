@@ -577,8 +577,26 @@ def main():
         # korrekt "eget"), kraver_kalla=True annars (bara källbackade — blir
         # korrekt "nyhet"). Hittas inget förslag av rätt typ lämnas kön orörd
         # och nästa körning av rätt fönstertyp får chansen istället.
+        #
+        # Codex-fynd, PR #1413-granskning: `not force_eget` är fel signal
+        # för en manuell workflow_dispatch-körning UTANFÖR alla fönster
+        # (force_nyhet/force_eget båda False, körningen tillåts ändå vidare
+        # av ar_manuell_korning-undantaget vid rad ~389). Där är
+        # `not force_eget` alltid True oavsett faktiskt kvotläge — en manuell
+        # körning som bara skulle behövt fylla en eftersatt EGET-kvot hade
+        # ändå tvingats leta efter enbart källbackade förslag (och kunnat
+        # trycka in ännu en "nyhet"-klassad artikel även om nyhetskvoten
+        # redan var full). I ett riktigt fönster (force_nyhet eller
+        # force_eget satt) är `not force_eget` fortsatt korrekt eftersom
+        # fönstret redan pekar ut rätt typ. Utanför alla fönster härleds
+        # målet istället ur dagens faktiska kvotläge — samma prioritetsordning
+        # (nyhet före eget) som catch-up-logiken ovan använder.
+        if force_nyhet or force_eget:
+            kraver_kalla = not force_eget
+        else:
+            kraver_kalla = idag_publicerat["nyhet"] < 4
         if sb_key:
-            forslag = hamta_amnesforslag(sb_key, kraver_kalla=not force_eget)
+            forslag = hamta_amnesforslag(sb_key, kraver_kalla=kraver_kalla)
             if forslag:
                 forslag_amne = forslag["amne"]
                 forslag_id = forslag["id"]
