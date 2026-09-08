@@ -550,10 +550,20 @@ async function byggFeed() {
       // se sparaLasningHistorik() i UniversitetVy.js). Fritext-fallet (t.ex.
       // AI-forskning-fliken, utan url) sparar ingen egen titel-kolumn —
       // där matchar vi istället mot att den sammanslagna texten börjar med
-      // "titel. " eller är exakt titeln.
-      const matchar = k.titel
-        ? k.titel === oTitel
-        : k.text === oTitel || k.text.startsWith(`${oTitel}. `);
+      // titeln.
+      //
+      // Prefix-matchning (startsWith), inte exakt likhet: /api/oraklet-lasning
+      // kapar alltid oraklet_lasningar.titel vid 300 tecken, medan
+      // fraga_anna_peter_log.titel tillåter upp till 1500 (och vetenskapliga_
+      // upptagter.titel/nyhetsflode.rubrik/oraklet_urval saknar egen
+      // teckengräns) — för en titel längre än 300 tecken gav exakt-likhet-
+      // jämförelsen (och ". "-suffixkravet i fritext-grenen) ALDRIG en
+      // matchning, vilket återskapade den ursprungliga synliga dubbletten
+      // för just sådana rader (Codex-fynd, PR #1424-granskning). oTitel är
+      // redan garanterat ≤300 tecken (samma källsträng, bara kortare kapad),
+      // så den fungerar som en pålitlig prefix att matcha mot oavsett hur
+      // långt k.titel/k.text är.
+      const matchar = k.titel ? k.titel.startsWith(oTitel) : k.text.startsWith(oTitel);
       if (!matchar || delta >= bastDelta) continue;
       bastDelta = delta;
       bastMatch = k;
