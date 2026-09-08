@@ -2797,6 +2797,19 @@ Användarrapport (sep 2026): *"Nu klistrade jag in den här nyheten på direktde
 |---|---|
 | `app/chatt/page.js` | Ny `amneAngettAvBesokareRef`. `hamtaArtikel()` sätter `amne` till artikelns rubrik bara om referensen är `false`. De fem explicita `setAmne()`-anropen (kategori-chip, manuell input, 🎲-knapp, `väljaAiAmne()`) sätter referensen till `true`; `nyDebatt()` nollställer den till `false`. Hjälptext under artikelfältet uppdaterad |
 
+### ✅ 103. Dubbla Oraklet-poster i Senaste aktivitet — samma klick loggades till två tabeller, båda visade – KLART
+Användarrapport (sep 2026, skärmdump av startsidans Senaste aktivitet-widget): varje Oraklet-uppläsning från `/universitet` visade sig som TVÅ rader i följd med i princip identisk tidsstämpel — "Professor Oraklet läste upp en vetenskaplig nyhet: '...'" direkt följt av "Professor Oraklet förklarade: '...'" med exakt samma citerade titel. Önskat: bara raden "Professor Oraklet förklarade".
+
+**Rotorsak:** sedan ✅95 sparar `UniversitetVy.js`s `handleLasa()` två SEPARATA loggposter för samma klick — den ursprungliga fire-and-forget-loggningen till `oraklet_lasningar` (införd i ✅87, uteslutande för att ge Senaste aktivitet-feeden ett spår av uppläsningen) körs parallellt med den nyare `sparaLasningHistorik()` (✅95, sparar till `fraga_anna_peter_log` med `aktion: "oraklet_forklarar"` — samma tabell/aktion som delningslänks-featuren och Oraklets URL-förklaringar på `/fraga-anna-och-peter` redan använder). `app/api/aktivitet/route.js` byggde feeden ur BÅDA tabellerna oberoende av varandra — `oraklet_lasningar` gav raden "läste upp ...", `fraga_anna_peter_log` gav raden "förklarade ...". Eftersom `fraga_anna_peter_log`s täckning redan är fullständig för alla Oraklet-uppläsningar från `/universitet` (dokumenterat i ✅95: "Delade Oraklet-uppläsningar (från alla tre flikarna...) syns identiskt i `/fraga-anna-och-peter`s publika historik") var `oraklet_lasningar`-radens enda effekt i feeden att duplicera samma händelse.
+
+**Fix:** `app/api/aktivitet/route.js` hämtar och renderar inte längre `oraklet_lasningar` i feeden — fetchen mot tabellen togs bort helt (en onödig Supabase-query), liksom `forEach`-blocket som pushade "läste upp"-raden. `fraga_anna_peter_log`s `oraklet_forklarar`-rad (redan i feeden sedan tidigare) är nu den enda källan för Oraklet-aktivitet i widgeten.
+
+**Medvetet inte ändrat:** `POST /api/oraklet-lasning` och dess skrivning till `oraklet_lasningar`-tabellen (i `UniversitetVy.js`s `handleLasa()`) rörs inte — att ta bort hela skrivpipelinen (routen, tabellen, anropet) hade varit en större, separat städning utanför vad denna bugrapport bad om. Tabellen blir därmed skriv-utan-läsare i den här yttan specifikt, men lämnas orörd ifall den får användning någon annanstans senare (t.ex. egen statistik).
+
+| Fil | Roll |
+|---|---|
+| `app/api/aktivitet/route.js` | Tog bort `oraklet_lasningar`-fetchen och dess feed-block — `fraga_anna_peter_log`s `oraklet_forklarar`-rad täcker redan samma händelser |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
