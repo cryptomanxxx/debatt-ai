@@ -26,7 +26,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 
 from agenter import AGENTER
-from supabase_utils import SB_URL, spara_civilisations_minne
+from supabase_utils import SB_URL, spara_civilisations_minne, _justera_planbok
 from ai_klient import hamta_kort_fns
 
 # ─── Konstanter ───────────────────────────────────────────────────────────────
@@ -98,17 +98,11 @@ def hamta_saldo(sb_key: str, agent: str) -> float:
     return 0.0
 
 
-def uppdatera_saldo(sb_key: str, agent: str, nytt_saldo: float) -> None:
-    try:
-        h_min = {**_h(sb_key), "Prefer": "return=minimal"}
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent)}",
-            headers=h_min,
-            json={"saldo": round(nytt_saldo, 2), "uppdaterad": "now()"},
-            timeout=8,
-        )
-    except Exception as e:
-        print(f"  [uppdatera_saldo] {agent}: {e}")
+def justera_saldo(sb_key: str, agent: str, delta: float) -> None:
+    """Atomisk saldo-justering (_justera_planbok, ✅104) — ersätter den tidigare
+    uppdatera_saldo() som PATCHade ett absolut tal beräknat ur ett tidigare
+    (potentiellt inaktuellt) läst saldo."""
+    _justera_planbok(sb_key, agent, saldo_delta=delta)
 
 
 def agent_har_token(sb_key: str, agent: str) -> bool:
@@ -334,12 +328,11 @@ def ico_runda(sb_key: str) -> None:
                 continue
 
             # Köp tokens
-            uppdatera_saldo(sb_key, agent, saldo - kostnad)
+            justera_saldo(sb_key, agent, -kostnad)
             lagg_till_i_portfolj(sb_key, agent, symbol, antal, ico_pris)
 
             # Kreditera skaparen
-            skapare_saldo = hamta_saldo(sb_key, skapare)
-            uppdatera_saldo(sb_key, skapare, skapare_saldo + kostnad)
+            justera_saldo(sb_key, skapare, kostnad)
 
             # Uppdatera cirkulerande_utbud
             ny_circ = cirkulerande + antal

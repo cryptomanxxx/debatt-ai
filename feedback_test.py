@@ -14,7 +14,7 @@ import urllib.parse
 
 import httpx
 
-from supabase_utils import _llm_spel, _hamta_saldo, _ekonomi_headers, spara_civilisations_minne
+from supabase_utils import _llm_spel, _hamta_saldo, _ekonomi_headers, spara_civilisations_minne, _justera_planbok
 from agent import AGENTER
 
 _ANON_KEY = os.environ.get("SUPABASE_ANON_KEY") or os.environ.get("SUPABASE_KEY")
@@ -75,29 +75,16 @@ def överför_saldo(sb_key: str, fran: str, till: str, belopp: float) -> bool:
         saldo_fran = _hamta_saldo(sb_key, fran)
         if saldo_fran < belopp:
             return False
-        r1 = httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(fran)}",
-            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-            json={"saldo": int(round(saldo_fran - belopp)), "uppdaterad": "now()"},
-            timeout=8,
-        )
-        if not r1.is_success:
+        # Atomiskt (_justera_planbok, ✅104) — draget är ett relativt delta,
+        # inte ett absolut tal beräknat ur den ovan lästa (potentiellt
+        # inaktuella) saldo_fran.
+        if _justera_planbok(sb_key, fran, saldo_delta=-belopp) is None:
             return False
-        saldo_till = _hamta_saldo(sb_key, till)
-        r2 = httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(till)}",
-            headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-            json={"saldo": int(round(saldo_till + belopp)), "uppdaterad": "now()"},
-            timeout=8,
-        )
-        if not r2.is_success:
-            # Rollback: återställ avsändarens saldo
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(fran)}",
-                headers={**_ekonomi_headers(sb_key), "Prefer": "return=minimal"},
-                json={"saldo": saldo_fran, "uppdaterad": "now()"},
-                timeout=8,
-            )
+        if _justera_planbok(sb_key, till, saldo_delta=belopp) is None:
+            # Rollback: kreditera avsändaren tillbaka med samma delta —
+            # aldrig en återställning till den ursprungligen lästa
+            # saldo_fran, som kan ha blivit inaktuell under tiden.
+            _justera_planbok(sb_key, fran, saldo_delta=belopp)
             return False
         return True
     except Exception:

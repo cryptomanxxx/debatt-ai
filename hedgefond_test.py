@@ -32,7 +32,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 
 from agenter import AGENTER
-from supabase_utils import SB_URL, spara_civilisations_minne, kolla_och_bailout, kop_etf, salj_etf
+from supabase_utils import SB_URL, spara_civilisations_minne, kolla_och_bailout, kop_etf, salj_etf, _justera_planbok
 from ai_klient import hamta_kort_fns
 
 # ─── Konstanter ───────────────────────────────────────────────────────────────
@@ -148,13 +148,11 @@ def hamta_saldo(sb_key: str, agent: str) -> float:
     return 0.0
 
 
-def uppdatera_saldo(sb_key: str, agent: str, nytt_saldo: float) -> None:
-    try:
-        h_min = {**_h(sb_key), "Prefer": "return=minimal"}
-        url = f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent)}"
-        httpx.patch(url, headers=h_min, json={"saldo": round(nytt_saldo, 2), "uppdaterad": "now()"}, timeout=8)
-    except Exception as e:
-        print(f"  [uppdatera_saldo] {agent}: {e}")
+def justera_saldo(sb_key: str, agent: str, delta: float) -> None:
+    """Atomisk saldo-justering (_justera_planbok, ✅104) — ersätter den tidigare
+    uppdatera_saldo() som PATCHade ett absolut tal beräknat ur ett tidigare
+    (potentiellt inaktuellt) läst saldo."""
+    _justera_planbok(sb_key, agent, saldo_delta=delta)
 
 
 VERCEL_URL = "https://www.debatt-ai.se"
@@ -565,7 +563,7 @@ def bootstrap_fond(sb_key: str, fond_symbol: str, fond: dict) -> None:
             "investerat_sek": belopp,
         }, timeout=8)
         if r.is_success:
-            uppdatera_saldo(sb_key, förvaltare, saldo - belopp)
+            justera_saldo(sb_key, förvaltare, -belopp)
             ny_total = float(fond.get("total_andelar", 0)) + andelar
             uppdatera_fond_nav(sb_key, fond_id, nav, ny_total)
             print(f"  BOOTSTRAP: {förvaltare} investerar {belopp:.0f} SEK i sin egna fond {fond_symbol} ({andelar:.2f} andelar)")
@@ -613,7 +611,7 @@ def investeringsrunda(sb_key: str, agenter: list[dict]) -> None:
         andelar = round(belopp / nav, 4)
 
         # Dra saldo
-        uppdatera_saldo(sb_key, agent, saldo - belopp)
+        justera_saldo(sb_key, agent, -belopp)
 
         # Spara investering
         try:
@@ -675,9 +673,8 @@ def uttagsrunda(sb_key: str, agenter: list[dict]) -> None:
             if pl_pct < 10:
                 continue  # Bara ta ut om vinst > 10%
 
-            # Lös in andelar
-            saldo = hamta_saldo(sb_key, agent)
-            uppdatera_saldo(sb_key, agent, saldo + aktuellt_varde)
+            # Lös in andelar — atomiskt (_justera_planbok, ✅104)
+            justera_saldo(sb_key, agent, aktuellt_varde)
 
             # Ta bort investerarrad
             try:

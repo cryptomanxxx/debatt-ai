@@ -21,7 +21,7 @@ import httpx
 from agenter import AGENTER
 from supabase_utils import (
     SB_URL, kop_etf, spara_civilisations_minne,
-    ETF_KRYPTO_PREFERENSER,
+    ETF_KRYPTO_PREFERENSER, _justera_planbok,
 )
 from ai_klient import hamta_kort_fns
 
@@ -123,13 +123,9 @@ def spara_i_bank(sb_key: str, agent_namn: str, saldo: float) -> int:
     # Fallback till sb_key bevaras för miljöer utan secreten.
     sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or sb_key
     ranta = max(1, min(20, math.floor(saldo * 0.005)))
-    h = _headers(sb_key)
-    httpx.patch(
-        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-        headers=h,
-        json={"saldo": round(saldo + ranta, 2), "uppdaterad": "now()"},
-        timeout=8,
-    )
+    # Atomiskt (_justera_planbok, ✅104) — ersätter en PATCH baserad på det
+    # redan lästa (potentiellt inaktuella) saldot.
+    _justera_planbok(sb_key, agent_namn, saldo_delta=ranta)
     spara_civilisations_minne(
         sb_key, typ="marknadsseger",
         rubrik=f"{agent_namn} satte in pengar på banken",
@@ -161,11 +157,8 @@ def ta_lan_frivilligt(sb_key: str, agent_namn: str, saldo: float) -> int:
 
     belopp = random.choice([200, 300, 400, 500])
 
-    # Utbetala
-    httpx.patch(
-        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent_namn)}",
-        headers=h, json={"saldo": round(saldo + belopp, 2), "uppdaterad": "now()"}, timeout=8,
-    )
+    # Utbetala — atomiskt (_justera_planbok, ✅104)
+    _justera_planbok(sb_key, agent_namn, saldo_delta=belopp)
     # Registrera lån
     httpx.post(
         f"{SB_URL}/rest/v1/agent_lan", headers=h,

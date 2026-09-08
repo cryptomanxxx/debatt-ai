@@ -61,17 +61,12 @@ def agent_saldo(agent: str) -> int:
     return int(float(rows[0].get("saldo") or 0)) if rows else 0
 
 
-def uppdatera_agent_saldo(agent: str, nytt: int) -> None:
-    # agent_planbocker saknar anon-skrivpolicy (RLS) — scoped service-role-
-    # nyckel bara för detta anrop (H_W används för parti_kassor/
-    # parti_utgifter på andra ställen i skriptet och rörs inte här).
-    _planbok_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
-    httpx.patch(
-        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent)}",
-        headers={"apikey": _planbok_key, "Authorization": f"Bearer {_planbok_key}",
-                 "Content-Type": "application/json", "Prefer": "return=minimal"},
-        json={"saldo": nytt, "uppdaterad": "now()"}, timeout=8,
-    )
+def justera_agent_saldo(agent: str, delta: int) -> None:
+    """Atomisk saldo-justering (_justera_planbok, ✅104) — ersätter den tidigare
+    uppdatera_agent_saldo() som PATCHade ett absolut tal beräknat ur ett
+    tidigare (potentiellt inaktuellt) läst saldo."""
+    from supabase_utils import _justera_planbok
+    _justera_planbok(SB_KEY, agent, saldo_delta=delta)
 
 
 def uppdatera_kassa(ledare: str, nytt_saldo: int, falt: dict | None = None) -> None:
@@ -115,8 +110,7 @@ def kör_stipendium(items: list[dict]) -> None:
 
         utbetalt = 0
         for agent in medlemmar:
-            gammalt = agent_saldo(agent)
-            uppdatera_agent_saldo(agent, gammalt + per_medlem)
+            justera_agent_saldo(agent, per_medlem)
             logga_utgift(
                 parti["namn"], parti["ledare"], "stipendium", -per_medlem,
                 mottagare=agent,

@@ -125,6 +125,14 @@ def sb_patch(h, table, filter_str, data):
     except Exception:
         pass
 
+def justera_saldo(h, agent, delta):
+    """Atomisk saldo-justering (_justera_planbok, ✅104) — ersätter det tidigare
+    mönstret där en lokal saldon-cache räknade ut ett absolut tal som
+    PATCHades rakt av, vilket kunde tappa en samtidig skrivning mot samma
+    agents saldo (t.ex. från agent.py)."""
+    from supabase_utils import _justera_planbok
+    _justera_planbok(h["apikey"], agent, saldo_delta=delta)
+
 def sb_upsert(h, table, data, on_conflict):
     try:
         url = f"{SB_URL}/rest/v1/{table}?on_conflict={on_conflict}"
@@ -189,7 +197,7 @@ def handel_for_foretag(h, foretag, lager, saldon, mult_dict):
         sb_upsert(h, "mark_lager", {"agent": saljare, "vara": vara, "antal": ny_sl, "uppdaterad": "now()"}, "agent,vara")
         lager.setdefault(saljare, {})[vara] = ny_sl
         saldon[saljare] = round(saldon.get(saljare, 0) + kop_tot, 2)
-        sb_patch(h, "agent_planbocker", f"agent=eq.{quote(saljare)}", {"saldo": saldon[saljare], "uppdaterad": "now()"})
+        justera_saldo(h, saljare, kop_tot)
         running_kassa = round(running_kassa - kop_tot, 2)
         sb_post(h, "mark_handel_log", {"kop_agent": foretag["namn"], "salj_agent": saljare,
                                         "vara": vara, "antal": KOP_ANTAL, "pris_per_enhet": kop_pu, "totalt": kop_tot})
@@ -199,7 +207,7 @@ def handel_for_foretag(h, foretag, lager, saldon, mult_dict):
         sb_upsert(h, "mark_lager", {"agent": kopare, "vara": vara, "antal": ny_kl, "uppdaterad": "now()"}, "agent,vara")
         lager.setdefault(kopare, {})[vara] = ny_kl
         saldon[kopare] = round(saldon.get(kopare, 0) - salj_tot, 2)
-        sb_patch(h, "agent_planbocker", f"agent=eq.{quote(kopare)}", {"saldo": saldon[kopare], "uppdaterad": "now()"})
+        justera_saldo(h, kopare, -salj_tot)
         running_kassa = round(running_kassa + salj_tot, 2)
         sb_post(h, "mark_handel_log", {"kop_agent": kopare, "salj_agent": foretag["namn"],
                                         "vara": vara, "antal": KOP_ANTAL, "pris_per_enhet": salj_pu, "totalt": salj_tot})
@@ -288,9 +296,8 @@ def berakna_intakt_advokatbyra(h, foretag, anstallda_agenter, saldon):
         # Debitera arvode från klienten om de har råd (> 100 kr efter avgiften)
         klient_saldo = float(saldon.get(svarande, 0))
         if klient_saldo >= ARVODE + 100:
-            ny_klient_saldo = round(klient_saldo - ARVODE, 2)
-            sb_patch(h, "agent_planbocker", f"agent=eq.{quote(svarande)}", {"saldo": ny_klient_saldo, "uppdaterad": "now()"})
-            saldon[svarande] = ny_klient_saldo
+            justera_saldo(h, svarande, -ARVODE)
+            saldon[svarande] = round(klient_saldo - ARVODE, 2)
             intakt_total = round(intakt_total + ARVODE, 2)
         else:
             pro_bono += 1
@@ -388,12 +395,10 @@ def berakna_intakt_lobbybolag(h, foretag, anstallda_agenter, saldon):
     for fid, klient, motparter, titel in uppdrag:
         mal = random.choice(motparter)
 
-        # Debitera klienten upfront
+        # Debitera klienten upfront — atomiskt (_justera_planbok, ✅104)
         k_saldo = float(saldon.get(klient, 0))
-        ny_k = round(k_saldo - AVGIFT, 2)
-        sb_patch(h, "agent_planbocker", f"agent=eq.{quote(klient)}",
-                 {"saldo": ny_k, "uppdaterad": "now()"})
-        saldon[klient] = ny_k
+        justera_saldo(h, klient, -AVGIFT)
+        saldon[klient] = round(k_saldo - AVGIFT, 2)
         running_kassa  = round(running_kassa + AVGIFT, 2)
         intakt_total   = round(intakt_total + AVGIFT, 2)
 
@@ -411,8 +416,7 @@ def berakna_intakt_lobbybolag(h, foretag, anstallda_agenter, saldon):
         argument = _llm(system, prompt, max_tokens=150)
         if not argument:
             print(f"  ⚠️  {foretag['namn']}: kunde inte generera argument för {klient} → refunderar avgift")
-            sb_patch(h, "agent_planbocker", f"agent=eq.{quote(klient)}",
-                     {"saldo": k_saldo, "uppdaterad": "now()"})
+            justera_saldo(h, klient, AVGIFT)
             saldon[klient] = k_saldo
             running_kassa  = round(running_kassa - AVGIFT, 2)
             intakt_total   = round(intakt_total - AVGIFT, 2)
@@ -453,11 +457,9 @@ def berakna_intakt_lobbybolag(h, foretag, anstallda_agenter, saldon):
             rod_efter = "ja"
             # Synka röstkolumnerna på lagforslag (nej→ja, eller ej röstat→ja)
             _uppdatera_lagforslag_raknare(h, fid, rod_fore, "ja")
-            # Betala motparten — dras från company kassa
-            ny_mal = round(mal_saldo + LOBBYING_BELOPP, 2)
-            sb_patch(h, "agent_planbocker", f"agent=eq.{quote(mal)}",
-                     {"saldo": ny_mal, "uppdaterad": "now()"})
-            saldon[mal]    = ny_mal
+            # Betala motparten — dras från company kassa. Atomiskt (_justera_planbok, ✅104)
+            justera_saldo(h, mal, LOBBYING_BELOPP)
+            saldon[mal]    = round(mal_saldo + LOBBYING_BELOPP, 2)
             running_kassa  = round(running_kassa - LOBBYING_BELOPP, 2)
 
         # Logga i lobbying_log (klient = lobbying_agent, de gynnas av röständringen)
@@ -540,8 +542,8 @@ def grundar_foretag(h, agent_namn, saldo, befintliga_grundare):
     if not ok:
         print(f"  ✗ INSERT foretag misslyckades — saldo oförändrat")
         return False
-    ny_saldo = round(float(saldo) - STARTKAPITAL, 2)
-    sb_patch(h, "agent_planbocker", f"agent=eq.{quote(agent_namn)}", {"saldo": ny_saldo, "uppdaterad": "now()"})
+    # Atomiskt (_justera_planbok, ✅104)
+    justera_saldo(h, agent_namn, -STARTKAPITAL)
     # Logga grundandet
     sb_post(h, "civilisations_minne", {
         "typ": "triumf",
@@ -624,8 +626,8 @@ def betala_dagsloner(h, foretag, anstallda, saldon):
         foretag["kassa"] = kassa_ny
         sb_patch(h, "foretag", f"id=eq.{foretag['id']}", {"kassa": kassa_ny, "uppdaterad": "now()"})
         agent = emp["agent"]
-        gammal = float(saldon.get(agent, 0))
-        sb_patch(h, "agent_planbocker", f"agent=eq.{quote(agent)}", {"saldo": round(gammal + dagslon, 2), "uppdaterad": "now()"})
+        # Atomiskt (_justera_planbok, ✅104)
+        justera_saldo(h, agent, dagslon)
     return foretag
 
 

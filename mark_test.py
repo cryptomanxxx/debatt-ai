@@ -13,6 +13,8 @@ import os, sys, random, urllib.parse
 from datetime import datetime, timezone, timedelta
 import httpx
 
+from supabase_utils import _justera_planbok
+
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ["SUPABASE_ANON_KEY"]
 
@@ -138,22 +140,17 @@ def is_visitor(name: str) -> bool:
     return isinstance(name, str) and name.startswith("Besökare-")
 
 
-def patch_saldo(name: str, nytt_saldo: float, saldon: dict):
-    """Uppdaterar saldo i rätt tabell beroende på om det är en besökare eller AI-agent."""
+def patch_saldo(name: str, delta: float, saldon: dict):
+    """Justerar saldo med ett relativt delta (kan vara negativt) i rätt tabell
+    beroende på om det är en besökare eller AI-agent."""
+    nytt_saldo = round(saldon.get(name, 0) + delta, 2)
     if is_visitor(name):
         ok = sb_patch(f"visitor_wallets?display_name=eq.{urllib.parse.quote(name)}", {"saldo": int(nytt_saldo)})
     else:
-        # agent_planbocker saknar anon-skrivpolicy (RLS) — scoped
-        # service-role-nyckel bara för detta anrop (SB_KEY/_h() delas med
-        # många andra mark_*-tabeller som inte är i scope här).
-        _planbok_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
-        r = httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(name)}",
-            headers={"apikey": _planbok_key, "Authorization": f"Bearer {_planbok_key}",
-                     "Content-Type": "application/json"},
-            json={"saldo": nytt_saldo}, timeout=15,
-        )
-        ok = r.is_success
+        # Atomiskt (_justera_planbok, ✅104) — ersätter en PATCH beräknad ur
+        # den lokala saldon-cachen, som kan bli inaktuell mot andra samtidiga
+        # skrivningar (t.ex. agent.py) mot samma agents saldo.
+        ok = _justera_planbok(SB_KEY, name, saldo_delta=delta) is not None
     if not ok:
         print(f"  [VARNING] Saldo-uppdatering misslyckades för {name}", file=sys.stderr)
     saldon[name] = nytt_saldo
@@ -197,9 +194,7 @@ def betala_passiv_inkomst(saldon: dict):
             continue
         daglig = round(veckoinkomst / 7, 2)
         agent = row["agent"]
-        nuvarande = saldon.get(agent, 0)
-        nytt = round(nuvarande + daglig, 2)
-        patch_saldo(agent, nytt, saldon)
+        patch_saldo(agent, daglig, saldon)
         totalt += daglig
     # Spara sentinel så att re-run inte betalar dubbelt
     sb_post("mark_transaktioner", {
@@ -251,14 +246,12 @@ def stang_avgjorda_auktioner(saldon, agent_zon_antal):
             continue
 
         # Dra saldo från vinnaren
-        nytt_saldo = round(saldon[vinnare] - pris, 2)
-        patch_saldo(vinnare, nytt_saldo, saldon)
+        patch_saldo(vinnare, -pris, saldon)
 
         # Om privatförsäljning — betala säljaren
         saljare = aukt.get("saljare")
         if saljare and saljare in saldon:
-            ny_s = round(saldon[saljare] + pris, 2)
-            patch_saldo(saljare, ny_s, saldon)
+            patch_saldo(saljare, pris, saldon)
             # Ta bort gamla ägarposten
             httpx.delete(
                 f"{SB_URL}/rest/v1/mark_agare?zon_id=eq.{zon_id}&agent=eq.{urllib.parse.quote(saljare)}",
@@ -601,10 +594,8 @@ def stang_avgjorda_vara_auktioner(saldon: dict, lager: dict):
         lager.setdefault(vinnare, {})[vara] = ny_buyer_antal
 
         # Flytta krediter
-        nytt_vinnare_saldo = round(saldon.get(vinnare, 0) - pris, 2)
-        nytt_saljare_saldo = round(saldon.get(saljare, 0) + pris, 2)
-        patch_saldo(vinnare, nytt_vinnare_saldo, saldon)
-        patch_saldo(saljare, nytt_saljare_saldo, saldon)
+        patch_saldo(vinnare, -pris, saldon)
+        patch_saldo(saljare, pris, saldon)
 
         sb_patch(f"mark_vara_auktioner?id=eq.{aukt['id']}", {"status": "avgjord"})
 
@@ -969,15 +960,12 @@ def fyll_kop_ordrar(lager: dict, saldon: dict):
         lager.setdefault(kop_agent, {})[vara] = ny_buyer_antal
 
         # Betala säljaren
-        nytt_saljare_saldo = round(saldon.get(saljare, 0) + total_pris, 2)
-        patch_saldo(saljare, nytt_saljare_saldo, saldon)
+        patch_saldo(saljare, total_pris, saldon)
 
         # Återbetala skillnaden (reserverat − faktisk kostnad) till köparen
         aterbet = reserverat - int(total_pris)
         if aterbet > 0 and kop_agent.startswith("Besökare-"):
-            kop_saldo = saldon.get(kop_agent, 0)
-            ny_kop_saldo = round(kop_saldo + aterbet, 2)
-            patch_saldo(kop_agent, ny_kop_saldo, saldon)
+            patch_saldo(kop_agent, aterbet, saldon)
 
         # Stäng ordern
         sb_patch(
