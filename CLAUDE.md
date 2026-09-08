@@ -2969,7 +2969,7 @@ Uppföljande diskussion (sep 2026), direkt efter ✅105–✅107: projektägaren
 - **Källkodskontroller** — läser filer direkt ur den incheckade repot (skriptet körs som en GitHub Action med `actions/checkout`) och grep:ar efter de exakta markörer en tidigare fix lämnade kvar (en konstant, en villkorssträng, ett tröskelvärde). Billiga, deterministiska, kräver inget nätverk för själva kontrollen — fångar "råkade någon återinföra/reverta en fix".
 - **Livedatakontroller** — anropar produktionssajten (`https://www.debatt-ai.se`) och Supabase REST direkt. Fångar "beter sig systemet FAKTISKT korrekt just nu i produktion", inklusive NYA instanser av samma buggmönster som källkodskontrollerna aldrig kan se (t.ex. en ny avhuggen rubrik på en artikel källkodskontrollen inte känner till).
 
-**Elva checkar i v1, varje en direkt regressionsguard för en redan dokumenterad bugg:**
+**Tolv checkar (elva i v1 + en tillagd efter ✅109), varje en direkt regressionsguard för en redan dokumenterad bugg:**
 | Check | Typ | Bugg den skyddar mot |
 |---|---|---|
 | `aktivitet-widget-lank` | Källkod | "Se alla"-länken på Senaste aktivitet pekar på `/aktivitet`, inte `/historia` (✅107) |
@@ -2983,6 +2983,7 @@ Uppföljande diskussion (sep 2026), direkt efter ✅105–✅107: projektägaren
 | `daglig-publiceringskvot` | Livedata | Dagens publicerade artiklar (UTC-dygn, samma klassificering som `hamta_publicerade_idag_per_typ()`) överskrider aldrig 4 per typ |
 | `aktivitet-arkiv-sida-svarar` | Livedata | `/aktivitet` svarar 200 och renderar faktiskt (✅107 fortsatt live) |
 | `avhuggna-rubriker` | Livedata | De 20 senaste publicerade artikelrubrikerna ser inte avhuggna ut — en heuristik (inget avslutande skiljetecken + kort eller vanligt svenskt "hänger i luften"-slutord som och/för/att/som) som fångar NYA avhuggningar, inte bara den ursprungliga ✅97-platsen |
+| `redaktion-raknar-repliker` | Källkod | `/redaktion`s dagliga publiceringsgraf räknar fortfarande repliker i en egen kategori istället för att hoppa över dem (✅109) |
 
 **Ingen AI-provider inblandad** — skriptet kan aldrig misslyckas för att Groq/Gemini/etc. är nere eller rate-limitade, till skillnad från nästan alla andra dagliga agent-körningar i schemat.
 
@@ -3006,6 +3007,24 @@ Kräver Supabase-tabell `invariant_checks` — kör `supabase_invariant_checks.s
 | `app/status/page.js` | Dashboard: senaste körningens checkar med status/detalj, 20 körningars historik. `force-dynamic`, ingen cache |
 | `app/GlobalNav.js` | Ny länk "Systemstatus" → `/status` i gruppen "Spel & Mer" |
 | `app/layout.js` | Ny länk "Systemstatus" i footerns alfabetiska sidindex |
+
+---
+
+### ✅ 109. /redaktion — "Daglig publicering vs mål"-grafen uteslöt ALLA repliker – KLART
+
+Användarrapport (sep 2026, med skärmdumpar): startsidan visade 4 artiklar publicerade samma dag ("Senaste debatterna": en icke-replik + tre repliker), men `/redaktion`s "Daglig publicering vs mål"-graf visade nästan ingenting för samma dag — en enda mycket kort stapel.
+
+**Rotorsak — samma buggklass som ✅105, en tredje yta:** `app/redaktion/page.js` byggde grafdatan med `if (!a.skapad || a.parent_id != null) continue;` — varje rad med `parent_id` satt (dvs. varenda replik) hoppades över helt innan den ens klassificerades. Grafen har bara två kategorier, "Nyhetsartiklar" (blått, har `nyhetskalla`) och "Debattartiklar" (beige, saknar `nyhetskalla`) — och räknade aldrig repliker i någondera. Eftersom platformen publicerar tre oberoende 4/dag-kvoter (nyhet/replik/eget, se "Nyhetsschema per körning") har grafen underräknat VARJE dag i hela 30-dagarsfönstret sedan den byggdes, inte bara den rapporterade dagen — det syntes bara tydligt nu eftersom dagens mix råkade domineras av repliker.
+
+**Fix:** `dagMap` fick en tredje nyckel, `repliker`, och loopen grenar nu på `parent_id != null` istället för att hoppa över raden. `RedaktionVy.js` fick en tredje `<Bar>` ("Repliker", grönt `#4ade80` — samma färg repliker redan har i `app/lib/aktivitetFeed.js` och på startsidans widget, för visuell konsistens). Referenslinjen "Mål 4" döptes om till "Mål 4/typ" för att förtydliga att den gäller per kategori, inte summan av alla tre (nu när tre staplar delar samma linje).
+
+Ingen ny databaskolumn eller schemaändring — ren omklassificering av redan hämtad data, samma mönster som ✅105/✅106.
+
+| Fil | Roll |
+|---|---|
+| `app/redaktion/page.js` | `dagMap`/`dagligData`-bygget räknar nu repliker i en egen `repliker`-nyckel istället för att hoppa över dem |
+| `app/redaktion/RedaktionVy.js` | Ny `<Bar dataKey="repliker" name="Repliker" fill="#4ade80">` i "Daglig publicering vs mål"-grafen, referenslinjen omdöpt till "Mål 4/typ" |
+| `agents/invariant-checker.js` | Ny tolfte check, `redaktion-raknar-repliker` (källkod) — regressionsguard för den här fixen |
 
 ---
 

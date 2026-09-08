@@ -197,6 +197,30 @@ function checkAmnesforslagKvotseparation() {
   }
 }
 
+function checkRedaktionRaknarRepliker() {
+  const namn = "redaktion-raknar-repliker";
+  try {
+    const kod = lasFil("app/redaktion/page.js");
+    const idx = kod.indexOf("Daglig publicering senaste 30 dagarna");
+    if (idx === -1) {
+      rapportera(namn, "fail", "hittar inte dagligData-bygget i app/redaktion/page.js");
+      return;
+    }
+    const fonster = kod.slice(idx, idx + 1200);
+    if (fonster.includes("parent_id != null) continue")) {
+      rapportera(namn, "fail", "dagligData hoppar fortfarande över repliker helt — kan vara ✅109 återinförd");
+      return;
+    }
+    if (!fonster.includes(".repliker")) {
+      rapportera(namn, "fail", "dagligData saknar en repliker-nyckel — ✅109 kan vara borttagen");
+      return;
+    }
+    rapportera(namn, "ok");
+  } catch (e) {
+    rapportera(namn, "error", String(e.message || e));
+  }
+}
+
 // ==================== Livedatakontroller ====================
 
 async function hamtaSupabase(pathAndQuery) {
@@ -337,6 +361,7 @@ async function main() {
   checkDirektdebattTokentak();
   checkAmnesforslagInteKonsumeratVidAvvisning();
   checkAmnesforslagKvotseparation();
+  checkRedaktionRaknarRepliker();
 
   await checkAktivitetHarArtikelTyper();
   await checkDagligPubliceringskvot();

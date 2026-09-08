@@ -52,18 +52,26 @@ export default async function RedaktionPage() {
   const { rows, totalCount, artRows } = data;
 
   // Daglig publicering senaste 30 dagarna
+  //
+  // Tre kategorier, inte två — repliker uteslöts tidigare helt (parent_id
+  // != null → continue), vilket gjorde att grafen kunde visa "1 publicerad
+  // idag" trots att t.ex. 3 repliker + 1 egen artikel faktiskt publicerats
+  // (användarrapport, sep 2026: /redaktion visade en nästan tom stapel för
+  // en dag där startsidans "Senaste debatterna" tydligt visade 4 artiklar).
+  // Samma klass av "repliker osynliga" som ✅105, fast på en tredje yta.
   const dagMap = {};
   for (let i = 29; i >= 0; i--) {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - i);
     const key = d.toISOString().slice(0, 10);
-    dagMap[key] = { dag: key.slice(5), nyheter: 0, debatt: 0 };
+    dagMap[key] = { dag: key.slice(5), nyheter: 0, debatt: 0, repliker: 0 };
   }
   for (const a of artRows) {
-    if (!a.skapad || a.parent_id != null) continue;
+    if (!a.skapad) continue;
     const key = a.skapad.slice(0, 10);
     if (!dagMap[key]) continue;
-    if (a.nyhetskalla) dagMap[key].nyheter++;
+    if (a.parent_id != null) dagMap[key].repliker++;
+    else if (a.nyhetskalla) dagMap[key].nyheter++;
     else dagMap[key].debatt++;
   }
   const dagligData = Object.values(dagMap);

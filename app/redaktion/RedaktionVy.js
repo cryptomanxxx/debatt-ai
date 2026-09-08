@@ -180,9 +180,10 @@ export default function RedaktionVy({ total, snittPoang, beslutData, kriterieDat
                 iconSize={10}
                 formatter={(v) => <span style={{ color: C.text, fontSize: 12 }}>{v}</span>}
               />
-              <ReferenceLine y={4} stroke="#60a5fa" strokeDasharray="4 2" ifOverflow="extendDomain" label={{ value: "Mål 4", fill: "#60a5fa", fontSize: 10, position: "right" }} />
+              <ReferenceLine y={4} stroke="#60a5fa" strokeDasharray="4 2" ifOverflow="extendDomain" label={{ value: "Mål 4/typ", fill: "#60a5fa", fontSize: 10, position: "right" }} />
               <Bar dataKey="nyheter" name="Nyhetsartiklar" fill="#60a5fa" radius={[3, 3, 0, 0]} />
               <Bar dataKey="debatt" name="Debattartiklar" fill="#e8d5a3" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="repliker" name="Repliker" fill="#4ade80" radius={[3, 3, 0, 0]} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
