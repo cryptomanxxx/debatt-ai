@@ -218,8 +218,20 @@ function checkRedaktionRaknarRepliker() {
     // regression den finns till för att fånga. Letar nu specifikt efter
     // själva ökningsuttrycket, ihopkopplat med parent_id-villkoret som styr
     // det — inte bara att fältnamnet förekommer någonstans i fönstret.
-    if (!fonster.includes("parent_id != null) dagMap[key].repliker++")) {
-      rapportera(namn, "fail", "dagMap[key].repliker++ hittas inte kopplat till parent_id-villkoret — repliker kanske inte längre räknas (✅109)");
+    const marker = "parent_id != null) dagMap[key].repliker++";
+    // Codex-fynd (PR #1433-granskning): ett `.includes()`-test på rå
+    // filtext matchar lika gärna en UTKOMMENTERAD rad (t.ex.
+    // `// if (a.parent_id != null) dagMap[key].repliker++;`) — koden vore
+    // då i praktiken avstängd men checken hade ändå rapporterat OK. Kräver
+    // nu att åtminstone en rad som innehåller markören inte är en
+    // kommentarsrad (radens text före markören saknar "//").
+    const harAktivMarkor = fonster.split("\n").some(rad => {
+      const idxMarkor = rad.indexOf(marker);
+      if (idxMarkor === -1) return false;
+      return !rad.slice(0, idxMarkor).includes("//");
+    });
+    if (!harAktivMarkor) {
+      rapportera(namn, "fail", "dagMap[key].repliker++ hittas inte som aktiv (okommenterad) kod kopplad till parent_id-villkoret — repliker kanske inte längre räknas (✅109)");
       return;
     }
     rapportera(namn, "ok");
