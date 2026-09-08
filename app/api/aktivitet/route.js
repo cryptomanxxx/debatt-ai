@@ -580,7 +580,28 @@ async function byggFeed() {
     });
   });
 
-  return feed.sort((a, b) => new Date(b.skapad) - new Date(a.skapad)).slice(0, 10);
+  // Feeden hämtar från ~30 olika Supabase-tabeller och tar ett rent globalt
+  // topp-10 sorterat på tidsstämpel — inga garanterade platser per typ. Ju
+  // fler aktivitetstyper som lagts till över tid (14 separata PR:ar mot den
+  // här filen: bilder, feedback, nyhetsanalyser, vetenskapliga upptäckter,
+  // Fråga AI-agenterna m.fl.), desto lättare trängs publicerade artiklar/
+  // repliker (som bara sker ~16–19 ggr/dag) ut helt av mer högfrekventa
+  // händelser (börsaffärer 14 ggr/dag, dagliga lobbying/koalition/ekonomi/
+  // parlament/mark/handel/rykte/feedback-körningar m.fl.) — särskilt när
+  // flera av de dussintals dagliga cron-jobben klungar ihop sig mitt på
+  // dagen (användarrapport, sep 2026: "det gjorde dom innan men nu ser jag
+  // inte dom där längre"). Reserverar därför minst ARTIKEL_MIN_SLOTS platser
+  // åt de senaste artiklarna/replikerna — resten fylls precis som förut av
+  // det mest aktuella oavsett typ.
+  const ARTIKEL_TYPER = new Set(["artikel-ai", "artikel-human", "replik"]);
+  const ARTIKEL_MIN_SLOTS = 3;
+  const sorterad = feed.sort((a, b) => new Date(b.skapad) - new Date(a.skapad));
+  const garanterade = sorterad.filter(f => ARTIKEL_TYPER.has(f.typ)).slice(0, ARTIKEL_MIN_SLOTS);
+  const garanteradeSet = new Set(garanterade);
+  const resten = sorterad.filter(f => !garanteradeSet.has(f));
+  return [...garanterade, ...resten]
+    .slice(0, Math.max(10, garanterade.length))
+    .sort((a, b) => new Date(b.skapad) - new Date(a.skapad));
 }
 
 
