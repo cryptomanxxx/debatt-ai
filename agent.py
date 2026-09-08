@@ -591,11 +591,27 @@ def main():
         # fönstret redan pekar ut rätt typ. Utanför alla fönster härleds
         # målet istället ur dagens faktiska kvotläge — samma prioritetsordning
         # (nyhet före eget) som catch-up-logiken ovan använder.
+        #
+        # Codex-fynd, PR #1414-granskning: den föregående versionen kollade
+        # bara `idag_publicerat["nyhet"] < 4` för att välja kraver_kalla=False
+        # (mål: eget) — men kollade aldrig om EGET:s egen kvot faktiskt hade
+        # plats kvar. Om både nyhet OCH eget redan var fyllda (4/4 vardera)
+        # och bara replik hade kvot kvar, valde koden ändå kraver_kalla=False
+        # och kunde plocka upp ett källlöst förslag som — om slumpen vid
+        # rad ~401 råkade välja "ny artikel" istället för replik — publicerats
+        # som en 5:e eget-klassad artikel samma dag. Nu kollas båda kvoterna
+        # explicit; är båda redan fyllda hämtas inget ämnesförslag alls
+        # (kraver_kalla=None hoppar över anropet) — förslaget lämnas orört i
+        # kön tills en riktig nyhets- eller eget-kvot faktiskt har plats.
         if force_nyhet or force_eget:
             kraver_kalla = not force_eget
+        elif idag_publicerat["nyhet"] < 4:
+            kraver_kalla = True
+        elif idag_publicerat["eget"] < 4:
+            kraver_kalla = False
         else:
-            kraver_kalla = idag_publicerat["nyhet"] < 4
-        if sb_key:
+            kraver_kalla = None
+        if sb_key and kraver_kalla is not None:
             forslag = hamta_amnesforslag(sb_key, kraver_kalla=kraver_kalla)
             if forslag:
                 forslag_amne = forslag["amne"]
