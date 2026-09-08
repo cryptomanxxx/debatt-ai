@@ -3072,6 +3072,12 @@ Ingen ny databaskolumn eller schemaändring — ren omklassificering av redan h�
 | `app/redaktion/RedaktionVy.js` | Ny `<Bar dataKey="repliker" name="Repliker" fill="#4ade80">` i "Daglig publicering vs mål"-grafen, referenslinjen omdöpt till "Mål 4/typ" |
 | `agents/invariant-checker.js` | Ny tolfte check, `redaktion-raknar-repliker` (källkod) — regressionsguard för den här fixen |
 
+**Codex-fynd (PR #1430-granskning, efter merge): `redaktion-raknar-repliker` verifierade bara att fältnamnet fanns, inte att det faktiskt räknas upp.** Den ursprungliga checken sökte efter den lösa substrängen `.repliker` i fönstret — men objektinitieraren (`repliker: 0`) och den faktiska uppräkningsraden (`dagMap[key].repliker++`) ligger båda i samma 1200-teckensfönster, så en regression som tar bort SJÄLVA räkningen men råkar lämna kvar en referens till fältnamnet (t.ex. en kommentar som nämner `dagMap[key].repliker` utan att någon kod faktiskt kör den raden) hade kunnat glida igenom obemärkt — exakt den typ av "checken låtsas skydda men gör det inte" som hela poängen med invariant-checkaren är att undvika. Fixat: söker nu efter den EXAKTA, ihopkopplade koden `parent_id != null) dagMap[key].repliker++` — villkoret och ökningsuttrycket tillsammans, inte bara fältnamnet isolerat. Verifierat mot både den riktiga (korrekta) filen och en simulerad regression (uppräkningsraden ersatt med den gamla `continue`-buggen, fältnamnet kvar i initieraren) — nya checken ger rätt utfall i båda fallen.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | `redaktion-raknar-repliker` sökningsvillkor skärpt till att matcha villkor+ökning ihopkopplat, inte bara fältnamnet |
+
 ---
 
 ## Den autonoma debatten – slutvisionen

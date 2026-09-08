@@ -211,8 +211,27 @@ function checkRedaktionRaknarRepliker() {
       rapportera(namn, "fail", "dagligData hoppar fortfarande över repliker helt — kan vara ✅109 återinförd");
       return;
     }
-    if (!fonster.includes(".repliker")) {
-      rapportera(namn, "fail", "dagligData saknar en repliker-nyckel — ✅109 kan vara borttagen");
+    // Codex-fynd (PR #1430-granskning, efter merge): att bara leta efter
+    // ".repliker" som substräng matchar redan objekt-initieringen
+    // (`repliker: 0`) — även om själva uppräkningen (`.repliker++`) togs
+    // bort helt hade den här checken ändå rapporterat OK, exakt den
+    // regression den finns till för att fånga. Letar nu specifikt efter
+    // själva ökningsuttrycket, ihopkopplat med parent_id-villkoret som styr
+    // det — inte bara att fältnamnet förekommer någonstans i fönstret.
+    const marker = "parent_id != null) dagMap[key].repliker++";
+    // Codex-fynd (PR #1433-granskning): ett `.includes()`-test på rå
+    // filtext matchar lika gärna en UTKOMMENTERAD rad (t.ex.
+    // `// if (a.parent_id != null) dagMap[key].repliker++;`) — koden vore
+    // då i praktiken avstängd men checken hade ändå rapporterat OK. Kräver
+    // nu att åtminstone en rad som innehåller markören inte är en
+    // kommentarsrad (radens text före markören saknar "//").
+    const harAktivMarkor = fonster.split("\n").some(rad => {
+      const idxMarkor = rad.indexOf(marker);
+      if (idxMarkor === -1) return false;
+      return !rad.slice(0, idxMarkor).includes("//");
+    });
+    if (!harAktivMarkor) {
+      rapportera(namn, "fail", "dagMap[key].repliker++ hittas inte som aktiv (okommenterad) kod kopplad till parent_id-villkoret — repliker kanske inte längre räknas (✅109)");
       return;
     }
     rapportera(namn, "ok");
