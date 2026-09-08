@@ -244,7 +244,20 @@ async function handlePost(request) {
   // Johan i AgentOverlay/StudioOverlay (se CLAUDE.md ✅93) och behöver därför betydligt
   // mer substans än Direktdebattens 2–3-meningarsregel. Egen prompt + högre tak nedan.
   const erNyhetsanalys = typ === "nyhetsanalys";
-  const maxTokensForRequest = erNyhetsanalys ? 700 : 250;
+  // Debatt-taket höjt 250→500 (användarrapport, sep 2026, CLAUDE.md ✅101): samma
+  // klass av bugg som redan fixad för generera_rubrik() i artikel.py (✅97) —
+  // "openai/gpt-oss-120b" är en reasoning-modell som spenderar en del av
+  // max_tokens-budgeten på interna resonemangstokens INNAN den börjar skriva det
+  // synliga svaret, utan att något reasoning_effort-styrande fält sätts här. Vid
+  // 250 kunde reasoning-overheaden ensam äta hela budgeten, vilket klippte det
+  // synliga 2–3-meningarssvaret mitt i en mening (bekräftat: en sparad debatt där
+  // 5 av 6 repliker var avhuggna). Till skillnad från Python-sidans fix (som läser
+  // providerns egna finish_reason) kan denna edge-route inte inspektera
+  // finish_reason INNAN strömmen redan pipats vidare till klienten (`new
+  // Response(groqRes.body, ...)` nedan) — arTroligenAvbruten()-omförsöket i
+  // app/chatt/page.js är fortsatt den enda skyddslinjen mot en enskild avhuggen
+  // ström, men ett högre tak minskar hur OFTA det över huvud taget inträffar.
+  const maxTokensForRequest = erNyhetsanalys ? 700 : 500;
 
   // typ="nyhetsanalys" (från /nyhetskallor) är ett fristående enskilt agentsvar på en
   // vald nyhet, inte en flertursdebatt — den delar INTE Direktdebattens kvot (5
