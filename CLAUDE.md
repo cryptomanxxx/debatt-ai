@@ -2750,10 +2750,12 @@ Användarrapport (sep 2026): en hel svensk kalenderdag (2026-09-07) publicerades
 
 **Fix v2 (den faktiska separationen):** `hamta_amnesforslag(sb_key, kraver_kalla)` filtrerar nu på PostgREST-nivå efter om förslaget har en källa eller inte — `kraver_kalla=True` returnerar bara källbackade förslag (blir "nyhet"), `kraver_kalla=False` bara källlösa (blir "eget"), `kraver_kalla=None` inget filter. `agent.py` anropar den med `kraver_kalla=not force_eget`: nyhets-eligible fönster (allt utom eget) får bara källbackade förslag, eget-fönstret får bara källlösa. Ett förslag av "fel" typ för det aktuella fönstret rörs inte alls (varken hämtat eller markerat) — det väntar tyst på att rätt fönstertyp kommer runt, vilket ger den önskade "spara till rätt dags rätt kvot"-effekten korrekt i BÅDA riktningarna, inte bara en.
 
+**Codex-fynd (PR #1413-granskning): `not force_eget` var fel signal för manuella körningar utanför alla fönster.** En `workflow_dispatch`-körning som inte träffar något av de tre tidsfönstren men fortfarande har en outnyttjad kvot ($ar_manuell_korning \land nagon\_kvot\_kvar$, rad ~389) tillåts fortsätta med `force_nyhet = force_eget = False`. `not force_eget` är då alltid `True` oavsett vilken kvot som faktiskt är eftersatt — en manuell körning avsedd att fylla en eftersatt EGET-kvot tvingades ändå leta efter enbart källbackade förslag, vilket i värsta fall kunde trycka in ytterligare en "nyhet"-klassad artikel även om nyhetskvoten redan var full den dagen. Fixat: `kraver_kalla` härleds nu bara ur `not force_eget` när körningen faktiskt befinner sig i ett riktigt fönster (`force_nyhet` eller `force_eget` satt — fönstret pekar redan ut rätt typ där). Utanför alla fönster (bara den manuella undantagsvägen) härleds målet istället ur dagens faktiska kvotläge: `kraver_kalla = idag_publicerat["nyhet"] < 4` — samma prioritetsordning (nyhet före eget) som catch-up-logikens `prio`-dict redan använder.
+
 | Fil | Roll |
 |---|---|
 | `supabase_utils.py` → `hamta_amnesforslag()` | Nytt `kraver_kalla`-argument — PostgREST-filtrerar förslag efter `kalla_namn`/`kalla_url`-närvaro |
-| `agent.py` | Anropar `hamta_amnesforslag(sb_key, kraver_kalla=not force_eget)` — källbackade förslag bara i nyhets-eligible fönster, källlösa bara i eget-fönstret |
+| `agent.py` | Anropar `hamta_amnesforslag(sb_key, kraver_kalla=...)` — `not force_eget` i ett riktigt fönster (force_nyhet/force_eget satt), annars härlett ur `idag_publicerat["nyhet"] < 4` för den manuella fallback-vägen utanför alla fönster |
 
 ---
 
