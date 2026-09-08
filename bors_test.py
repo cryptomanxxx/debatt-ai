@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 import httpx
 
 from agenter import AGENTER
-from supabase_utils import SB_URL, spara_civilisations_minne
+from supabase_utils import SB_URL, spara_civilisations_minne, _justera_planbok
 
 # ─── Konstanter ───────────────────────────────────────────────────────────────
 
@@ -365,44 +365,22 @@ def execute_trade(sb_key: str, kop_order: dict, salj_order: dict,
         print(f"  [execute_trade] affar-exception: {e}")
         return False
 
-    # 2. Dra saldo från köparen (handel + faktisk avgift)
+    # 2. Dra saldo från köparen (handel + faktisk avgift) — atomiskt (_justera_planbok, ✅104)
     try:
-        kop_saldo = kop_saldo_pre  # redan hämtat ovan
-        nytt_kop_saldo = max(0.0, round(kop_saldo - total_kr - avgift_betald, 2))
-        kop_enc = urllib.parse.quote(kop_agent)
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{kop_enc}",
-            headers=h_min,
-            json={"saldo": nytt_kop_saldo, "uppdaterad": "now()"},
-            timeout=8,
-        )
+        _justera_planbok(sb_key, kop_agent, saldo_delta=-(total_kr + avgift_betald))
     except Exception as e:
         print(f"  [execute_trade] saldo kop: {e}")
 
     # 3. Addera saldo till säljaren (full handelsvolym — avgiften bärs av köparen)
     try:
-        salj_saldo = hamta_saldo(sb_key, salj_agent)
-        nytt_salj_saldo = round(salj_saldo + total_kr, 2)
-        salj_enc = urllib.parse.quote(salj_agent)
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{salj_enc}",
-            headers=h_min,
-            json={"saldo": nytt_salj_saldo, "uppdaterad": "now()"},
-            timeout=8,
-        )
+        _justera_planbok(sb_key, salj_agent, saldo_delta=total_kr)
     except Exception as e:
         print(f"  [execute_trade] saldo salj: {e}")
 
     # 3b. Kreditera faktisk avgift till Börskassan
     if avgift_betald > 0:
         try:
-            bk_saldo = hamta_saldo(sb_key, "Börskassan")
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan",
-                headers=h_min,
-                json={"saldo": round(bk_saldo + avgift_betald, 2), "uppdaterad": "now()"},
-                timeout=8,
-            )
+            _justera_planbok(sb_key, "Börskassan", saldo_delta=avgift_betald)
         except Exception as e:
             print(f"  [execute_trade] avgift borskassan: {e}")
 
@@ -889,24 +867,8 @@ def betala_ut_staking(
             # Fallback: gammal formel (används om pool_namnare saknas)
             yield_sek = round((total_antal ** STAKING_ALPHA) * rad_andel * pris * float(stake["apy"]) * dagar / 365, 2)
 
-        # Kreditera yield till agentens saldo
-        agent_enc = urllib.parse.quote(stake["agent"])
-        r_saldo = httpx.get(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}&select=saldo",
-            headers=_h(sb_key), timeout=8,
-        )
-        saldo_ok = False
-        if r_saldo.is_success and r_saldo.json():
-            gammalt_saldo = float(r_saldo.json()[0]["saldo"])
-            nytt_saldo = round(gammalt_saldo + yield_sek, 2)
-            h_min = {**_h(sb_key), "Prefer": "return=minimal"}
-            r_patch = httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
-                headers=h_min,
-                json={"saldo": nytt_saldo, "uppdaterad": "now()"},
-                timeout=8,
-            )
-            saldo_ok = r_patch.is_success
+        # Kreditera yield till agentens saldo — atomiskt (_justera_planbok, ✅104)
+        saldo_ok = _justera_planbok(sb_key, stake["agent"], saldo_delta=yield_sek) is not None
 
         if not saldo_ok:
             print(f"  [betala_ut_staking] saldo-uppdatering misslyckades för {stake['agent']} — hoppar över utbetalning")
@@ -1459,22 +1421,10 @@ def kör_liquidity_mining(sb_key: str) -> None:
 
     for agent, pairs in agent_pairs.items():
         total = round(LIKVIDITET_BELOPP * len(pairs), 2)
-        agent_enc = urllib.parse.quote(agent)
 
-        r_sal = httpx.get(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}&select=saldo",
-            headers=_h(sb_key), timeout=8,
-        )
-        if not r_sal.is_success or not r_sal.json():
+        # Atomiskt (_justera_planbok, ✅104) — ingen mellanliggande GET behövs
+        if _justera_planbok(sb_key, agent, saldo_delta=total) is None:
             continue
-
-        nytt_saldo = round(float(r_sal.json()[0]["saldo"]) + total, 2)
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
-            headers=h_min,
-            json={"saldo": nytt_saldo, "uppdaterad": "now()"},
-            timeout=8,
-        )
 
         for symbol, spread_pct in pairs:
             try:
@@ -1570,8 +1520,7 @@ def stang_short(sb_key: str, short: dict, anledning: str = "frivillig") -> None:
     saldo_delta   = round(collateral_kr - aterköps_kr, 2)
     status        = "likviderad" if anledning == "likvidation" else "stangd"
 
-    h_min     = {**_h(sb_key), "Prefer": "return=minimal"}
-    agent_enc = urllib.parse.quote(short["agent"])
+    h_min = {**_h(sb_key), "Prefer": "return=minimal"}
 
     r = httpx.post(
         f"{SB_URL}/rest/v1/rpc/close_short_rpc",
@@ -1596,13 +1545,9 @@ def stang_short(sb_key: str, short: dict, anledning: str = "frivillig") -> None:
         )
         if not r_upd.is_success:
             return
-        saldo = hamta_saldo(sb_key, short["agent"])
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
-            headers=h_min,
-            json={"saldo": max(0.0, round(saldo + saldo_delta, 2)), "uppdaterad": "now()"},
-            timeout=8,
-        )
+        # Atomiskt (_justera_planbok, ✅104) — saldo_delta är redan ett rent
+        # relativt delta, ingen GET av det aktuella saldot behövs
+        _justera_planbok(sb_key, short["agent"], saldo_delta=saldo_delta)
     elif not r.is_success:
         print(f"  SHORT STÄNGNING MISSLYCKAD (rpc): {short['agent']} {short['symbol']} — {r.status_code}")
         return
@@ -1643,24 +1588,12 @@ def kör_shorts(sb_key: str, alla_symboler: list[str]) -> None:
         avgift = round(float(s["collateral_kr"]) * SHORT_DAGLIG_AVGIFT / 100, 2)
         if avgift <= 0:
             continue
-        agent_enc = urllib.parse.quote(s["agent"])
-        saldo = hamta_saldo(sb_key, s["agent"])
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{agent_enc}",
-            headers=h_min,
-            json={"saldo": max(0.0, round(saldo - avgift, 2)), "uppdaterad": "now()"},
-            timeout=8,
-        )
+        # Atomiskt (_justera_planbok, ✅104)
+        _justera_planbok(sb_key, s["agent"], saldo_delta=-avgift)
         total_avgifter += avgift
 
     if total_avgifter > 0:
-        bk_saldo = hamta_saldo(sb_key, "Börskassan")
-        httpx.patch(
-            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan",
-            headers=h_min,
-            json={"saldo": round(bk_saldo + total_avgifter, 2), "uppdaterad": "now()"},
-            timeout=8,
-        )
+        _justera_planbok(sb_key, "Börskassan", saldo_delta=total_avgifter)
 
     # ── 2 & 3. Likvidering och take-profit ───────────────────────────────────
     for s in öppna:

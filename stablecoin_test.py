@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 import httpx
 
 from agenter import AGENTER
-from supabase_utils import SB_URL, spara_civilisations_minne
+from supabase_utils import SB_URL, spara_civilisations_minne, _justera_planbok
 
 # ─── Konstanter ───────────────────────────────────────────────────────────────
 
@@ -56,13 +56,11 @@ def hamta_saldo(sb_key: str, agent: str) -> float:
     return 0.0
 
 
-def uppdatera_saldo(sb_key: str, agent: str, nytt_saldo: float) -> None:
-    try:
-        h_min = {**_h(sb_key), "Prefer": "return=minimal"}
-        url = f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(agent)}"
-        httpx.patch(url, headers=h_min, json={"saldo": round(nytt_saldo, 2), "uppdaterad": "now()"}, timeout=8)
-    except Exception as e:
-        print(f"  [uppdatera_saldo] {agent}: {e}")
+def justera_saldo(sb_key: str, agent: str, delta: float) -> None:
+    """Atomisk saldo-justering (_justera_planbok, ✅104) — ersätter den tidigare
+    uppdatera_saldo() som PATCHade ett absolut tal beräknat ur ett tidigare
+    (potentiellt inaktuellt) läst saldo."""
+    _justera_planbok(sb_key, agent, saldo_delta=delta)
 
 
 def hamta_vault(sb_key: str, agent: str) -> dict | None:
@@ -212,7 +210,7 @@ def mint_runda(sb_key: str) -> None:
             continue
 
         # Lås collateral och utfärda STAB
-        uppdatera_saldo(sb_key, agent, saldo - COLLATERAL_SEK)
+        justera_saldo(sb_key, agent, -COLLATERAL_SEK)
         uppdatera_stab_innehav(sb_key, agent, STAB_PER_VAULT)
         upsert_vault(sb_key, agent, COLLATERAL_SEK, STAB_PER_VAULT)
 
@@ -236,9 +234,8 @@ def redeem_runda(sb_key: str) -> None:
         if stab_innehav < stab_utfardat * 0.9:
             continue  # Agent har inte tillräckligt STAB för att lösa in hela vault
 
-        # Frigör collateral
-        saldo = hamta_saldo(sb_key, agent)
-        uppdatera_saldo(sb_key, agent, saldo + collateral)
+        # Frigör collateral — atomiskt (_justera_planbok, ✅104)
+        justera_saldo(sb_key, agent, collateral)
 
         # Bränn STAB
         uppdatera_stab_innehav(sb_key, agent, -stab_utfardat)
@@ -285,8 +282,8 @@ def likvidations_runda(sb_key: str) -> None:
         straff_belopp = round(collateral * LIKVIDATIONS_STRAFF, 2)
         frigord_collateral = collateral - straff_belopp
 
-        saldo = hamta_saldo(sb_key, agent)
-        uppdatera_saldo(sb_key, agent, saldo + frigord_collateral)
+        # Atomiskt (_justera_planbok, ✅104)
+        justera_saldo(sb_key, agent, frigord_collateral)
 
         # Bränn STAB
         uppdatera_stab_innehav(sb_key, agent, -stab_utfardat)

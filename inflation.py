@@ -15,6 +15,8 @@ Obs: Markinkomst genereras via varuauktioner (mark_test.py) — ingen fast vecko
 import os, sys, httpx, math, urllib.parse
 from datetime import datetime, timezone
 
+from supabase_utils import _justera_planbok
+
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 
@@ -153,10 +155,8 @@ def main():
             if skatt < 1:
                 continue
             nytt_saldo = int(float(row["saldo"])) - skatt
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{row['agent']}",
-                headers=h, json={"saldo": nytt_saldo, "uppdaterad": "now()"}, timeout=8,
-            )
+            # Atomiskt (_justera_planbok, ✅104)
+            _justera_planbok(sb_key, row["agent"], saldo_delta=-skatt)
             total_skatt += skatt
             print(f"  {row['agent']}: -{skatt} kr skatt (saldo {row['saldo']} → {nytt_saldo} kr)")
             httpx.post(
@@ -166,16 +166,8 @@ def main():
                 timeout=6,
             )
         if total_skatt > 0:
-            sk_res = httpx.get(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa&select=saldo",
-                headers={**h, "Prefer": ""}, timeout=6,
-            )
-            if sk_res.is_success and sk_res.json():
-                sk_saldo = int(sk_res.json()[0].get("saldo") or 0)
-                httpx.patch(
-                    f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa",
-                    headers=h, json={"saldo": sk_saldo + total_skatt, "uppdaterad": "now()"}, timeout=8,
-                )
+            # Atomiskt (_justera_planbok, ✅104) — ingen mellanliggande GET behövs
+            _justera_planbok(sb_key, "Statskassa", saldo_delta=total_skatt)
             httpx.post(
                 f"{SB_URL}/rest/v1/civilisations_minne",
                 headers=h,
@@ -282,12 +274,8 @@ def main():
                     print(f"  {parti['namn']}: +{belopp} kr ({andel*100:.1f}% andel)")
 
                 if utdelat > 0:
-                    httpx.patch(
-                        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa",
-                        headers=h,
-                        json={"saldo": sk_saldo_nu - utdelat, "uppdaterad": "now()"},
-                        timeout=8,
-                    )
+                    # Atomiskt (_justera_planbok, ✅104)
+                    _justera_planbok(sb_key, "Statskassa", saldo_delta=-utdelat)
                     print(f"  ✓ Totalt {utdelat} kr partistöd fördelat bland {len(partier)} partier.")
                 else:
                     print("  Ingen utdelning — alla andelar för små.")
@@ -345,16 +333,9 @@ def main():
         for lan in lan_res.json():
             ranta = math.ceil(lan["saldo_kvar"] * lan["rantefot"])
             ny_skuld = lan["saldo_kvar"] + ranta
-            saldo_res = httpx.get(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{lan['agent']}&select=saldo",
-                headers={**h, "Prefer": ""}, timeout=6,
-            )
-            if saldo_res.is_success and saldo_res.json():
-                gammalt_saldo = saldo_res.json()[0]["saldo"]
-                httpx.patch(
-                    f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{lan['agent']}",
-                    headers=h, json={"saldo": max(0, gammalt_saldo - ranta), "uppdaterad": "now()"}, timeout=8,
-                )
+            # Atomiskt (_justera_planbok, ✅104) — ingen GET av saldot behövs
+            # längre, golv_noll=True (default) matchar det tidigare max(0, ...)
+            _justera_planbok(sb_key, lan["agent"], saldo_delta=-ranta)
             httpx.patch(
                 f"{SB_URL}/rest/v1/agent_lan?id=eq.{lan['id']}",
                 headers=h, json={"saldo_kvar": ny_skuld, "senast_uppdaterad": "now()"}, timeout=8,
@@ -378,12 +359,8 @@ def main():
             ranta = math.floor(float(row["saldo"]) * SPARRANTA)
             if ranta < 1:
                 continue
-            httpx.patch(
-                f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{row['agent']}",
-                headers=h,
-                json={"saldo": round(float(row["saldo"]) + ranta, 2), "uppdaterad": "now()"},
-                timeout=8,
-            )
+            # Atomiskt (_justera_planbok, ✅104)
+            _justera_planbok(sb_key, row["agent"], saldo_delta=ranta)
             total_utbetalt += ranta
             print(f"  {row['agent']}: +{ranta} kr sparränta (saldo {row['saldo']} kr)")
         if total_utbetalt > 0:
@@ -460,17 +437,10 @@ def main():
                 per_agent = math.floor(statskassa_balans / len(agenter))
                 if per_agent >= 1:
                     for row in agenter:
-                        httpx.patch(
-                            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{row['agent']}",
-                            headers=h,
-                            json={"saldo": round(float(row["saldo"]) + per_agent, 2), "uppdaterad": "now()"},
-                            timeout=8,
-                        )
+                        # Atomiskt (_justera_planbok, ✅104)
+                        _justera_planbok(sb_key, row["agent"], saldo_delta=per_agent)
                     aterstaende = statskassa_balans - (per_agent * len(agenter))
-                    httpx.patch(
-                        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.Statskassa",
-                        headers=h, json={"saldo": aterstaende, "uppdaterad": "now()"}, timeout=8,
-                    )
+                    _justera_planbok(sb_key, "Statskassa", saldo_delta=-(per_agent * len(agenter)))
                     httpx.post(
                         f"{SB_URL}/rest/v1/civilisations_minne",
                         headers=h,
@@ -519,23 +489,11 @@ def main():
                 per_mm = math.floor(bk_balans / len(MARKET_MAKERS))
                 if per_mm >= 1:
                     for mm in MARKET_MAKERS:
-                        mm_saldo = float(httpx.get(
-                            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(mm)}&select=saldo",
-                            headers={**h, "Prefer": ""}, timeout=8,
-                        ).json()[0].get("saldo", 0))
-                        httpx.patch(
-                            f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.{urllib.parse.quote(mm)}",
-                            headers=h,
-                            json={"saldo": round(mm_saldo + per_mm, 2), "uppdaterad": "now()"},
-                            timeout=8,
-                        )
+                        # Atomiskt (_justera_planbok, ✅104) — ingen GET av
+                        # market makerns saldo behövs längre
+                        _justera_planbok(sb_key, mm, saldo_delta=per_mm)
                     aterstaende_bk = bk_balans - per_mm * len(MARKET_MAKERS)
-                    httpx.patch(
-                        f"{SB_URL}/rest/v1/agent_planbocker?agent=eq.B%C3%B6rskassan",
-                        headers=h,
-                        json={"saldo": round(aterstaende_bk, 2), "uppdaterad": "now()"},
-                        timeout=8,
-                    )
+                    _justera_planbok(sb_key, "Börskassan", saldo_delta=-(per_mm * len(MARKET_MAKERS)))
                     print(f"  ✓ {bk_balans} kr omfördelade: {per_mm} kr × {len(MARKET_MAKERS)} market makers")
                 else:
                     print(f"  Börskassan ({bk_balans} kr) räcker inte till minst 1 kr/market maker — väntar.")

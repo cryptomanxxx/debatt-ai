@@ -23,7 +23,7 @@ from datetime import datetime, timezone, timedelta
 
 import httpx
 
-from supabase_utils import generera_domstolsdom_bild, _llm_spel
+from supabase_utils import generera_domstolsdom_bild, _llm_spel, _justera_planbok
 
 # ---------------------------------------------------------------------------
 # Konstanter
@@ -526,35 +526,31 @@ def hall_forhandling(arende: dict) -> dict:
 
 def verkstall_straff(h: dict, dom_id: int, svarande: str, belopp: int) -> bool:
     """Dra böter från agentens saldo och logga som skandal."""
-    # Hämta nuvarande saldo
+    # Hämta nuvarande saldo — informativt för loggtexten, själva skrivningen
+    # nedan är atomisk och beror inte på detta värde
     planbok = sb_get(h, f"agent_planbocker?agent=eq.{svarande}&select=saldo")
     if not planbok:
         print(f"  [FEL] Kunde inte hämta saldo för {svarande}")
         return False
 
     nuvarande_saldo = planbok[0].get("saldo", 0)
-    nytt_saldo = max(0, nuvarande_saldo - belopp)
 
-    # Uppdatera saldo
-    ok = sb_patch(
-        h,
-        f"agent_planbocker?agent=eq.{svarande}",
-        {"saldo": nytt_saldo, "uppdaterad": datetime.now(timezone.utc).isoformat()},
-    )
-    if not ok:
+    # Atomiskt (_justera_planbok, ✅104) — golvar vid 0 som default, matchar
+    # den tidigare max(0, ...)-semantiken
+    result = _justera_planbok(h.get("apikey"), svarande, saldo_delta=-belopp)
+    if result is None:
         print(f"  [FEL] Kunde inte uppdatera saldo för {svarande}")
         return False
+    nytt_saldo = result["saldo"]
 
     faktisk_bot = nuvarande_saldo - nytt_saldo
     print(f"  → Böter verkställda: {svarande} -{faktisk_bot} kr (saldo: {nuvarande_saldo} → {nytt_saldo} kr)")
 
     # Böterna går till statskassan för veckovis omfördelning som grundinkomst
-    statskassa = sb_get(h, "agent_planbocker?agent=eq.Statskassa&select=saldo")
-    if statskassa:
-        nytt_statskassa = (statskassa[0].get("saldo") or 0) + faktisk_bot
-        sb_patch(h, "agent_planbocker?agent=eq.Statskassa",
-                 {"saldo": nytt_statskassa, "uppdaterad": datetime.now(timezone.utc).isoformat()})
-        print(f"  → Statskassan: +{faktisk_bot} kr (totalt: {nytt_statskassa} kr)")
+    # — atomiskt (_justera_planbok, ✅104)
+    statskassa_result = _justera_planbok(h.get("apikey"), "Statskassa", saldo_delta=faktisk_bot)
+    if statskassa_result:
+        print(f"  → Statskassan: +{faktisk_bot} kr (totalt: {statskassa_result['saldo']} kr)")
 
     # Markera domen som verkställd
     sb_patch(h, f"domstol_domar?id=eq.{dom_id}", {"verkstalldes": True})
