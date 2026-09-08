@@ -1,0 +1,22 @@
+name: Invariant Checker
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"  # var 3:e timme
+  workflow_dispatch:
+
+jobs:
+  invariant-checker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Kör invariant-checkar
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node agents/invariant-checker.js
