@@ -3188,6 +3188,22 @@ Till skillnad från `artikel.py`s publicerade nyhetsartiklar (redan fixat i ✅1
 
 ---
 
+### ✅ 114. Kontaktformulärets e-post sa inte varifrån den kom – KLART
+
+Ägarfeedback (sep 2026): *"När någon skickar mig ett email genom att använda hemsidans formulär så står det inte att emailet kommer från hemsidan."*
+
+**Rotorsak:** `/api/contact/route.js` (Kontaktformuläret, Turnstile + Resend, se ✅-tabellen "API-routes") satte redan avsändarnamnet till `DEBATT-AI <noreply@debatt-ai.se>` och ämnesraden till `Kontakt från DEBATT-AI – [namn]` — men själva mejlkroppen sa ingenstans explicit att meddelandet kom via kontaktformuläret på webbplatsen. En mottagare som bara läser brödtexten (avsändarnamn/ämnesrad är lätta att missa eller filtreras bort av vissa e-postklienter) fick ingen tydlig kontext om VARIFRÅN meddelandet skickades.
+
+**Fix:** ett nytt informationsstycke längst upp i mejlkroppen, direkt under rubriken: "Detta meddelande skickades via kontaktformuläret på www.debatt-ai.se. Svara direkt på detta mejl för att nå avsändaren nedan." — länkad till webbplatsen. Ren tilläggstext, ingen ändring av avsändare/ämnesrad/`reply_to`-logiken (som redan var korrekt konfigurerad — svar går redan direkt till besökarens angivna e-post).
+
+**Medvetet ej ändrat:** övriga e-postutskick från plattformen (nyhetsbrev via `/api/digest`, publiceringsnotiser via `/api/notify`/`/api/agent/submit`, AI-observatörernas Resend-mejl m.fl.) har redan tydlig avsändarkontext i sina respektive mallar — ägarens rapport gällde specifikt kontaktformuläret, inte plattformens övriga e-post.
+
+| Fil | Roll |
+|---|---|
+| `app/api/contact/route.js` | Nytt informationsstycke i mejlkroppen som anger att meddelandet skickades via kontaktformuläret på www.debatt-ai.se |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:

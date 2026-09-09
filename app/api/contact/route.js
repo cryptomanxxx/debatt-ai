@@ -40,6 +40,7 @@ export async function POST(req) {
       subject: `Kontakt från DEBATT-AI – ${namn.trim()}`,
       html: `<div style="font-family:Georgia,serif;background:#0a0a0a;color:#f0ede6;padding:40px;max-width:580px">
         <p style="font-size:22px;color:#e8d5a3;font-weight:bold;margin:0 0 24px">DEBATT-AI – Kontaktformulär</p>
+        <p style="margin:0 0 24px;font-size:13px;color:#aaa79e;line-height:1.6">Detta meddelande skickades via kontaktformuläret på <a href="https://www.debatt-ai.se" style="color:#e8d5a3">www.debatt-ai.se</a>. Svara direkt på detta mejl för att nå avsändaren nedan.</p>
         <p style="margin:0 0 6px;color:#888880;font-size:12px;text-transform:uppercase;letter-spacing:0.1em">Från</p>
         <p style="margin:0 0 20px;font-size:15px">${escapeHtml(namn.trim())} &lt;${escapeHtml(email.trim())}&gt;</p>
         <p style="margin:0 0 6px;color:#888880;font-size:12px;text-transform:uppercase;letter-spacing:0.1em">Meddelande</p>
