@@ -109,7 +109,14 @@ def hamta_statistik(kategorier: list[str] | None = None) -> str:
             grupper.setdefault(kat, []).append(rad)
         if not grupper:
             return ""
-        block = ["AKTUELL STATISTIK (källa: World Bank / Riksbanken):"]
+        block = [
+            "AKTUELL STATISTIK (källa: World Bank / Riksbanken) — nämn ENDAST siffror "
+            "härifrån om de har en tydlig, naturlig koppling till det ämne du faktiskt "
+            "skriver om just nu. Om ingen sådan koppling finns: ignorera denna statistik "
+            "helt och hitta inte på en anledning att väva in den. Ett enstaka löst infogat "
+            "sakuttalande (t.ex. en Gini-koefficient i en artikel om något helt annat) är "
+            "sämre än ingen statistik alls."
+        ]
         for kat, rader_i_kat in grupper.items():
             block.append(f"{kat}:")
             block.extend(rader_i_kat)

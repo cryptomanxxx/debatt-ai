@@ -969,8 +969,14 @@ def main():
             "ungdomsarbetslöshet", "sysselsättning", "co2", "förnybar", "skogtäckning",
             "gini", "utbildning", "hälsa", "livsvängd",
         ]
-        all_text = (amne + " " + artikel).lower()
-        hints = [k for k in ALL_VIZ_NYCKELORD if k in all_text]
+        # Matchar bara mot den färdiga rubriken (amne) — inte hela artikeltexten.
+        # En enda incidentell nämning av t.ex. "hälsa" eller "export" någonstans i
+        # en 400-ordsartikel om ett helt annat ämne räknades tidigare som en
+        # "träff" och kunde ge en helt orelaterad graf bifogad (t.ex. en BNP-graf
+        # på en artikel som bara nämner ekonomi i förbigående). Rubriken (satt av
+        # generera_rubrik() strax ovan, för alla tre skrivgrenar) är den faktiska,
+        # curated ämnestexten — betydligt mer precis än fri body-text.
+        hints = [k for k in ALL_VIZ_NYCKELORD if k in amne.lower()]
         if hints:
             viz = hamta_senaste_visualisering(sb_key, hints)
             if viz:
