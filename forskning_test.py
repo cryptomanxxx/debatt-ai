@@ -151,6 +151,7 @@ ARXIV_DISCIPLIN = {
     "arXiv: Ekonomi":             ["ekonomi"],
     "arXiv: Computers & Society": ["statsvetenskap", "sociologi", "AI-etik"],
     "arXiv: Robotik":             ["kryptovetenskap", "AI-etik"],
+    "arXiv: Språkteknologi":      ["AI-etik", "kryptovetenskap"],
 }
 ARXIV_SANNOLIKHET = 0.4
 

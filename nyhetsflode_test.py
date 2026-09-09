@@ -23,6 +23,7 @@ import json
 import os
 import re
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -115,23 +116,42 @@ def _oversatt_batch(objekt: list[dict]) -> list[dict]:
 def oversatt_nya_rader(rader: list[dict], kanda_urls: set[str]) -> None:
     """Muterar `rader` på plats — översätter bara de rader vars URL inte redan
     finns i nyhetsflode. Körs batchvis (OVERSATT_BATCH åt gången) för att hålla
-    varje LLM-anrop och prompt rimligt stor."""
+    varje LLM-anrop och prompt rimligt stor.
+
+    Loggar progress per batch (ägarfeedback, sep 2026) — tidigare syntes bara
+    en enda rad innan hela loopen, ingen indikation i GitHub Actions-loggen
+    på hur långt en körning med många batchar faktiskt kommit eller om en
+    enskild batch misslyckades/fail-open föll tillbaka på originaltexten."""
     nya = [r for r in rader if r["url"] not in kanda_urls]
     if not nya:
         print("Inga nya rader att översätta.")
         return
-    print(f"{len(nya)}/{len(rader)} rader är nya — kör språkdetektion/översättning på dem.")
+    total_batchar = (len(nya) + OVERSATT_BATCH - 1) // OVERSATT_BATCH
+    print(f"{len(nya)}/{len(rader)} rader är nya — kör språkdetektion/översättning på dem ({total_batchar} batchar).")
 
-    for i in range(0, len(nya), OVERSATT_BATCH):
+    klara = 0
+    andrade_totalt = 0
+    for batch_nr, i in enumerate(range(0, len(nya), OVERSATT_BATCH), start=1):
         chunk = nya[i:i + OVERSATT_BATCH]
         objekt = [{"i": j, "rubrik": r["rubrik"], "beskrivning": r["beskrivning"] or ""} for j, r in enumerate(chunk)]
+        t0 = time.monotonic()
         oversatta = _oversatt_batch(objekt)
+        elapsed = time.monotonic() - t0
+        klara += len(chunk)
         if len(oversatta) != len(chunk):
+            print(f"  Batch {batch_nr}/{total_batchar}: LLM-svar ogiltigt — {len(chunk)} rader lämnade oöversatta ({elapsed:.1f}s) — {klara}/{len(nya)} rader genomgångna")
             continue
+        andrade = 0
         for j, o in enumerate(oversatta):
             if o.get("rubrik"):
+                if o["rubrik"] != chunk[j]["rubrik"]:
+                    andrade += 1
                 chunk[j]["rubrik"] = o["rubrik"]
             chunk[j]["beskrivning"] = o.get("beskrivning")
+        andrade_totalt += andrade
+        print(f"  Batch {batch_nr}/{total_batchar}: {andrade}/{len(chunk)} rader översatta ({elapsed:.1f}s) — {klara}/{len(nya)} rader genomgångna")
+
+    print(f"Översättning klar: {andrade_totalt}/{len(nya)} rader ändrades totalt (resten var redan svenska eller fail-open oförändrade).")
 
 
 def main():
