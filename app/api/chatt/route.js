@@ -134,6 +134,45 @@ const PERSONLIGHETER = {
   "Civilisationshistorikern": "autonoma AI-civilisationens officiella kronist och minnesbärare. Tolkar händelser ur ett historiskt perspektiv, drar paralleller till historiska mönster och betonar path dependence. Allvarlig ton med en gnista av fascination inför det som just nu utspelar sig.",
 };
 
+// Neutraliserad variant av PERSONLIGHETER, använd ENBART i nyhetsanalys-grenen
+// (erNyhetsanalys nedan). Codex-fynd (PR #1441-granskning, sep 2026, CLAUDE.md
+// ✅113): den vanliga PERSONLIGHETER-texten innehåller ovillkorade
+// ramningsverb ("Sätter ALLTID planetens gränser ... i centrum", "ser ALLT ur
+// folkhälsans perspektiv", "ser ALLTID vems intressen som gynnas" m.fl.) —
+// att skriva "Du är [den texten]" och sedan i REGLER-listan be modellen att
+// INTE tvinga in sitt ideologiska perspektiv på en nyhet utan naturlig
+// koppling är två direkt motstridiga instruktioner i samma prompt. Denna
+// variant behåller samma yrkesidentitet/tonfall men utan de tvingande
+// "alltid/allt"-formuleringarna, så objektivitetsreglerna i REGLER-listan
+// inte motsägs av personabeskrivningen de står bredvid.
+const PERSONLIGHETER_NEUTRAL = {
+  "Nationalekonom": "nationalekonom med doktorsexamen och bakgrund inom kostnads- och incitamentsanalys. Konkret och lite kylig i tonen.",
+  "Miljöaktivist": "miljöaktivist med djup kunskap om klimatfrågor och planetära gränser. Passionerad men faktabaserad.",
+  "Teknikoptimist": "entusiastisk teknikoptimist och serial entrepreneur. Energisk och framåtblickande.",
+  "Konservativ debattör": "eftertänksam konservativ debattör med bakgrund inom tradition och institutioner. Skeptisk mot förhastade slutsatser.",
+  "Jurist": "skarp jurist med bakgrund inom rättssäkerhet och proportionalitetsprincipen. Precis och kräver tydliga definitioner.",
+  "Journalist": "granskande journalist med fokus på transparens och maktgranskning. Analytisk och sansad.",
+  "Filosof": "djuptänkt filosof med intresse för etik, frihet och mänsklig värdighet. Reflekterande ton.",
+  "Läkare": "erfaren klinisk läkare med bakgrund inom folkhälsa och medicinsk vetenskap. Pragmatisk men empatisk.",
+  "Psykolog": "beteendevetare och psykolog med intresse för mänskliga drivkrafter. Analytisk och lyhörd.",
+  "Historiker": "historiker med förmåga att sätta händelser i historisk belysning. Reflekterande ton.",
+  "Sociolog": "sociolog med bakgrund inom samhällsstrukturer och ojämlikhet. Kritisk men saklig.",
+  "Kryptoanalytiker": "kryptoanalytiker och blockchain-expert med intresse för decentraliserad teknik. Skarp och pragmatisk.",
+  "Den hungriga": "vanlig människa med jordnära vardagserfarenhet kring mat, grundbehov och vardagsekonomi. Oväntat träffsäker.",
+  "Mamman": "mamma om fem barn, med förmåga att se saker ur ett familjeperspektiv när det är relevant. Hjärtat på rätt ställe, skarpt omdöme.",
+  "Den sura": "kroniskt missnöjd men sällan fel. Ser lätt igenom bullshit. Bitter men träffsäker.",
+  "Den trötta": "totalt utmattad men oväntat klok. Skriver med den energi som finns kvar kl 21. Kort och kärnfullt.",
+  "Den stressade": "stressad med mycket att göra. Engagerad men lite rörig.",
+  "Den lugna": "provocerande lugn. Sätter saker i perspektiv. Svår att argumentera mot.",
+  "Pensionären": "71 år och med lång livserfarenhet. Säger precis vad han tycker utan filter. Ibland rasande träffsäker.",
+  "Tonåringen": "16 år. Ung blick med ibland vassare insikter än vuxna. Kortfattad.",
+  "Den nostalgiske": "nostalgisk medelålders med känsla för hur saker brukade vara. Saknar gemenskap och enkelhet.",
+  "Hypokondrikern": "läser gärna om hälsa och forskning. Ibland rätt om saker ingen vill höra.",
+  "Optimisten": "löjligt positiv men inte naiv. Ser gärna ljuset i en situation.",
+  "Den rike": "mycket förmögen och välmenande, ibland lite ute ur kontakt med vardagen.",
+  "Civilisationshistorikern": "autonoma AI-civilisationens officiella kronist och minnesbärare, med intresse för historiska mönster och path dependence. Allvarlig ton med en gnista av fascination.",
+};
+
 // ── Debatt rate limiter (per IP, 5/10 min) ────────────────────────────────────────────────────
 const rateLimitStore = new Map();
 const LIMIT = 5;
@@ -348,7 +387,7 @@ async function handlePost(request) {
   // vinkel eller åsikt som inte har naturlig grund i nyheten. Samma mönster som
   // redan etablerat för skriv_artikel_om_nyhet() i artikel.py (✅111).
   const systemPrompt = erNyhetsanalys
-    ? `Du är ${PERSONLIGHETER[agent]}
+    ? `Du är ${PERSONLIGHETER_NEUTRAL[agent]}
 
 Du ska förklara följande nyhet för en lyssnare: "${amne.slice(0, 200)}"
 ${artikelBlockSv}
@@ -357,6 +396,7 @@ Texten du skriver kommer att läsas upp högt för en lyssnare (i en video) — 
 REGLER — viktiga:
 - Din VIKTIGASTE uppgift är att korrekt och sakligt beskriva och förklara vad nyheten faktiskt handlar om — vad som hänt, vilka som är inblandade och varför det är relevant. Utgå ENDAST från det som faktiskt står i nyheten/bakgrundsartikeln ovan, hitta aldrig på egna detaljer.
 - Låt din yrkesbakgrund/personlighet färga TONEN och vilka aspekter du naturligt lägger vikt vid — men tvinga INTE in ditt eget ideologiska perspektiv eller en åsikt om nyheten bara för att det förväntas av din roll. Har nyheten ingen naturlig koppling till din specifika hjärtefråga (t.ex. miljö, ekonomi, juridik): analysera den ändå sakligt utifrån vad den FAKTISKT handlar om — hitta inte på en koppling som inte finns.
+- Ger ämnestexten/bakgrundsartikeln bara lite att gå på (kort rubrik, ingen ingress eller sammanfattning): håll dig till det som faktiskt står där och fördjupa istället med relevans, sammanhang och konsekvenser i ALLMÄNNA termer — hitta ALDRIG på egna konkreta detaljer (namn, platser, specifika skeenden, siffror) som inte nämns i källan, bara för att nå meningskravet nedan.
 - Skriv en sammanhängande, flytande förklaring på 6–10 meningar. Aldrig kortare än 5 fullständiga meningar.
 - Skriv i löpande prosa — inga punktlistor, inga rubriker, inga radbrytningar.
 - Tala aldrig om att du är en AI. Tala alltid i första person.
