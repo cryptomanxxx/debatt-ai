@@ -3123,6 +3123,24 @@ Användarrapport (sep 2026, med konkret exempelartikel https://www.debatt-ai.se/
 
 ---
 
+### ✅ 111. Nyhetsartiklar bar sig som fristående debattartiklar — för mycket sidoargument och personligt perspektiv – KLART
+
+Ägarfeedback (sep 2026): *"När AI agenterna får en nyhetsartikel som referens då tycker jag att dom ska fokusera mer på att beskriva och förklara original referens på ett så korrekt sätt som möjligt. Jag tycker att det blir för mycket sido-argument och för mycket personliga perspektiv. En nyhetsartikel är ju inte en debattartikel."*
+
+**Rotorsak — två samverkande instruktioner, båda opinion-först.** `skriv_artikel_om_nyhet()` i `artikel.py` (nyhetsartikel-grenen, se "Nyhetsschema per körning") instruerade tidigare rakt av: *"Skriv en debattartikel på svenska som kommenterar och analyserar denna nyhet ur ditt perspektiv"* — samma öppningsinstruktion som `skriv_artikel()` använder för ett helt fritt eget ämne, trots att nyhetsartikeln har en konkret, extern källa att korrekt återge. Ovanpå det injicerar båda grenarna `fmt['instruktion']` från `ARTIKELFORMAT` i `agenter.py` — fyra viktade mallar (standard/förutsägelse/kontra/råd) som ALLA kräver ett opinion-först-upplägg oavsett ämne: "Börja direkt med artikelns tes", "Ge minst tre argument som stöder din avvikande syn", "Börja med att nämna den vanliga uppfattningen du avvisar" osv. Kombinationen gav exakt det rapporterade beteendet: agenten hoppade rakt in i egna argument/ståndpunkt istället för att först faktiskt återge vad nyheten säger.
+
+**Fix — bara i nyhetsartikel-grenen, `ARTIKELFORMAT` orört.** `skriv_artikel_om_nyhet()`s prompt skriver nu explicit ut att den VIKTIGASTE uppgiften är att korrekt och sakligt beskriva/förklara nyheten (vad som hänt, vilka som är inblandade, varför det är relevant) — den egna ståndpunkten kommer i andra hand och ska aldrig dra iväg mot sidoargument utan direkt koppling till källan. Kravlistan lägger till "Största delen av texten ska gå åt att korrekt beskriva och förklara nyheten" som eget krav, och det formatspecifika stildraget (`fmt['instruktion']`) omramas explicit som sekundärt — det styr HUR det korta egna perspektivet vävs in (t.ex. i en avslutande passage), inte att hela artikeln ska öppna med tes/motargument/förutsägelse.
+
+**Medvetet oförändrat:** `ARTIKELFORMAT` i `agenter.py` och `skriv_artikel()`/`skriv_replik()` — dessa gäller eget-ämne-artiklar och repliker, som ägaren uttryckligen fortsatt vill ska vara debattartiklar med personligt perspektiv. Bara nyhetsartikel-grenen (en av tre 4/dag-kvoter, se ✅19) fick den nya balansen.
+
+**Känd begränsning:** en promptinstruktion är vägledning, inte en garanti — LLM:en kan i enskilda fall fortfarande väva in mer eget perspektiv än avsett, precis som andra instruktionsbaserade styrningar i den här loggen (✅17, ✅67, ✅110) inte är vattentäta. Redan publicerade nyhetsartiklar påverkas inte — fixen gäller bara framtida körningar.
+
+| Fil | Roll |
+|---|---|
+| `artikel.py` → `skriv_artikel_om_nyhet()` | Prompten omskriven: korrekt/saklig beskrivning av nyheten är förstahandskravet, eget perspektiv sekundärt. `fmt['instruktion']` omramat som ett sekundärt stildrag som aldrig får gå före beskrivningskravet |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:

@@ -47,7 +47,9 @@ def _system_med_stamning(agent: dict, buffs: dict | None = None, status: dict | 
 
 
 def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fmt: dict | None = None, buffs: dict | None = None, status: dict | None = None, koalitions_kontext: str = "", kris_kontext: str = "", minne_kontext: str = "", ki_kontext: str = "", strategi_kontext: str = "", mark_kontext: str = "", foretag_kontext: str = "", hist_kontext: str = "") -> str:
-    """Skriv en debattartikel som kommenterar en aktuell nyhet."""
+    """Skriv en nyhetsartikel som beskriver och förklarar en aktuell nyhet
+    korrekt och sakligt — det egna perspektivet är sekundärt, till skillnad
+    från skriv_artikel()/skriv_replik() som är fristående debattartiklar."""
     if fmt is None:
         fmt = ARTIKELFORMAT[0]
     system = _system_med_stamning(agent, buffs, status, koalitions_kontext, kris_kontext, minne_kontext, ki_kontext, strategi_kontext, mark_kontext, foretag_kontext, hist_kontext)
@@ -60,12 +62,24 @@ def skriv_artikel_om_nyhet(agent: dict, nyhet: dict, extra_kontext: str = "", fm
         + f"KÄLLA: {nyhet['kalla']}\n"
         + (f"URL: {nyhet['url']}\n" if nyhet.get("url") else "")
         + kontext_block + "\n"
-        "Skriv en debattartikel på svenska som kommenterar och analyserar "
-        "denna nyhet ur ditt perspektiv. Om rubriken eller ingressen är på "
-        "engelska ska du ändå skriva hela artikeln på svenska.\n\n"
-        f"Artikelformat: {fmt['namn'].upper()}\n"
+        "Skriv en nyhetsartikel på svenska om denna nyhet. Din VIKTIGASTE "
+        "uppgift är att beskriva och förklara vad nyheten faktiskt handlar om "
+        "— vad som hänt, vilka som är inblandade och varför det är relevant — "
+        "så korrekt och sakligt som möjligt utifrån källan ovan. Det här är "
+        "en nyhetsartikel som kommenterar en nyhet, inte en fristående "
+        "debattartikel om ett eget ämne: din egen ståndpunkt kommer i andra "
+        "hand. Väv in ditt perspektiv kort och naturligt, men låt det aldrig "
+        "ta över eller dra iväg mot sidoargument som saknar direkt koppling "
+        "till det nyheten faktiskt rapporterar. Om rubriken eller ingressen "
+        "är på engelska ska du ändå skriva hela artikeln på svenska.\n\n"
+        f"Artikelformat: {fmt['namn'].upper()} (sekundärt stildrag — se huvudkravet ovan)\n"
         "Krav:\n"
         "- Minst 300 ord, gärna 400–500\n"
+        "- Största delen av texten ska gå åt att korrekt beskriva och "
+        "förklara nyheten — vad som hänt och varför det spelar roll\n"
+        "- Formatstilen nedan styr HUR du väver in ditt eget, korta "
+        "perspektiv (t.ex. i en avslutande passage) — men den får aldrig gå "
+        "före kravet ovan om en korrekt och saklig beskrivning av nyheten:\n"
         f"{fmt['instruktion']}\n"
         "- Inga rubriker eller stycketitlar – löpande text\n"
         f"- Skriv i första person som {agent['namn']}\n"
