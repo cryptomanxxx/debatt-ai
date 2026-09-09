@@ -473,6 +473,28 @@ async function main() {
   if (antalFail > 0 || antalError > 0 || !sparningLyckades) {
     process.exitCode = 1;
   }
+
+  // Skriver en läsbar sammanfattning av vad som gick fel till
+  // GITHUB_OUTPUT, så att workflowens felmejl-steg kan citera EXAKT vilka
+  // checkar som floppade och varför — istället för GitHub:s generiska
+  // "Run failed"-notis (se ✅108-uppföljningen: "mejlet är inte speciellt
+  // specifikt varför"). Body skrivs bara när det faktiskt finns problem;
+  // ett tomt/no-op-fall skickar aldrig mejl (se invariant-check.yml).
+  if (process.env.GITHUB_OUTPUT) {
+    const problemRader = resultat
+      .filter(r => r.status !== "ok")
+      .map(r => `${r.status === "fail" ? "❌" : "⚠️"} ${r.namn}: ${r.detalj || "(inget detaljmeddelande)"}`);
+    if (!sparningLyckades) {
+      problemRader.push("⚠️ sparning-till-supabase: misslyckades — se körningens fullständiga loggar på GitHub");
+    }
+    if (problemRader.length > 0) {
+      const delim = `EOF_${Date.now()}`;
+      fs.appendFileSync(
+        process.env.GITHUB_OUTPUT,
+        `sammanfattning<<${delim}\n${problemRader.join("\n")}\n${delim}\n`
+      );
+    }
+  }
 }
 
 main();
