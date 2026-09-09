@@ -3151,6 +3151,23 @@ Användarrapport (sep 2026, med konkret exempelartikel https://www.debatt-ai.se/
 
 ---
 
+### ✅ 112. Bättre översättningslogg + Reddit 429-omförsöket skippat — mindre tid slösad i nyhetsflode_test.py – KLART
+
+Ägarfeedback (sep 2026), två separata punkter om samma workflow (`nyhetsflode-test.yml` → `nyhetsflode_test.py`):
+
+**1. Översättningsloggen visade ingen progress.** `oversatt_nya_rader()` (✅93) skrev bara EN rad ("X/Y rader är nya...") innan hela batch-loopen körde — GitHub Actions-loggen gav ingen indikation på hur långt en körning med flera batchar (`OVERSATT_BATCH = 20`) faktiskt hade kommit, eller om en enskild batch fail-open föll tillbaka på originaltexten (`_oversatt_batch()` returnerar objekten oförändrade vid ett ogiltigt/felformat LLM-svar). Fixat: loopen skriver nu en rad per batch — batchnummer/totalt, hur många rader i just den batchen som FAKTISKT ändrades (skiljer "redan svenska"/fail-open-passthrough från genuin översättning genom att jämföra `o["rubrik"]` mot originalet innan det skrivs över), tid batchen tog, och en löpande "X/Y rader genomgångna"-räknare. En sista sammanfattningsrad ("Översättning klar: X/Y rader ändrades totalt") avslutar sektionen.
+
+**2. Reddit-gruppernas 429-omförsök väntade i onödan.** `_hamta_flode()` (✅93) väntar vid ett 429-svar enligt `Retry-After`-headern eller en standard på 5s (cappat vid 20s) innan den försöker EN gång till — designat för att inte tappa en källa helt vid en enstaka tillfällig rate-limit-träff. Ägarens bedömning: en fast 5–20s-väntan hjälper inte mot Reddits FAKTISKA rate-limit-fönster (betydligt längre i praktiken), och kostar bara extra körtid över potentiellt alla 19 Reddit-gruppanrop (`REDDIT_GRUPPER`) om flera träffar 429 samtidigt — värsta fall (`20s × 19`) hade kunnat lägga över 6 extra minuter på en körning som annars tar sekunder. Fixat: Reddit-källor (alla `REDDIT_GRUPPER`-etiketter börjar på `"Reddit-grupp:"`, vilket matchar samma `kalla.startswith("Reddit")`-villkor som redan används för den fasta inter-request-pausen på rad ~712) ger nu upp direkt vid 429 utan att vänta och försöka igen — gruppen markeras som misslyckad för just den körningen (samma `rss_stats`-diagnostik som redan finns för andra fel) och täcks naturligt in av nästa av de 6 dagliga `nyhetsflode-test.yml`-körningarna. Icke-Reddit-källors befintliga omförsöksbeteende är oförändrat — den fasta 5s-standarden är fortfarande rimlig för källor med kortare, mer normala rate-limit-fönster.
+
+**Medvetet ej ändrat:** den fasta 1,2s inter-request-pausen mellan varje Reddit-gruppanrop (rad ~712, förhindrar att burst-anropen i sig triggar 429 i första hand) rördes inte — ägarens kritik gällde specifikt EFTER-429-omförsöket, inte den förebyggande pausen. Icke-Reddit-källors 429-hantering rördes inte alls.
+
+| Fil | Roll |
+|---|---|
+| `nyhetsflode_test.py` → `oversatt_nya_rader()` | Per-batch progressloggning: batchnummer/totalt, antal genuint ändrade rader, tid, löpande genomgången-räknare, avslutande sammanfattning |
+| `nyheter.py` → `_hamta_flode()` | 429-omförsöket (väntan + andra GET) hoppas nu över för Reddit-källor — ger upp direkt istället för att vänta 5–20s per gruppanrop |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:

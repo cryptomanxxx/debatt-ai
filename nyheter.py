@@ -249,9 +249,18 @@ def _hamta_flode(url: str, kalla: str):
     """GET med ett enda omförsök vid 429 — väntar enligt Retry-After-headern
     (eller en rimlig standard om den saknas/inte är numerisk). Utan detta
     tappar en enskild, tillfällig rate-limit-träff källan helt för hela
-    körningen istället för att bara vänta ut den."""
+    körningen istället för att bara vänta ut den.
+
+    Reddit undantaget (ägarfeedback, sep 2026): en fast 5s-standardväntan
+    hjälper inte mot Reddits faktiska rate-limit-fönster (betydligt längre
+    än 5–20s i praktiken) — den bara förlängde körningen i onödan över upp
+    till 19 Reddit-gruppanrop utan att märkbart minska antalet 429:or.
+    Reddit-källor (alla `REDDIT_GRUPPER`-etiketter börjar på "Reddit") ger
+    därför upp direkt vid 429 istället för att vänta och försöka igen —
+    gruppen markeras som misslyckad för den här körningen och täcks in av
+    nästa av de 6 dagliga körningarna. Icke-Reddit-källor är oförändrade."""
     res = httpx.get(url, timeout=15, follow_redirects=True, headers={"User-Agent": _ANVANDARAGENT})
-    if res.status_code == 429:
+    if res.status_code == 429 and not kalla.startswith("Reddit"):
         try:
             vantetid = min(int(res.headers.get("retry-after", 5)), 20)
         except (TypeError, ValueError):
