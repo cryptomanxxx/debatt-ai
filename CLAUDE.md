@@ -3060,6 +3060,20 @@ Kräver Supabase-tabell `invariant_checks` — kör `supabase_invariant_checks.s
 | `app/GlobalNav.js` | Ny länk "Systemstatus" → `/status` i gruppen "Spel & Mer" |
 | `app/layout.js` | Ny länk "Systemstatus" i footerns alfabetiska sidindex |
 
+**Uppföljning — specifikt felmejl + en egen övervakningsrutin (sep 2026).** Ägarfeedback: GitHub:s standardnotis vid en misslyckad `invariant-check.yml`-körning säger bara "Run failed" — ingen antydan om VILKEN check som floppade eller varför, och ägaren fick manuellt klistra in det i en Claude Code-session för att få hjälp.
+
+**Specifikt felmejl:** `main()` i `agents/invariant-checker.js` skriver nu — bara när minst en check inte är `ok`, eller om själva sparningen till Supabase misslyckades — en rad per problem (`❌ check-namn: detalj` / `⚠️ check-namn: detalj`) till `GITHUB_OUTPUT` (multiline-syntax, `sammanfattning<<EOF_...`). Ett nytt steg i `invariant-check.yml`, `if: failure() && steps.run.outputs.sammanfattning != ''`, citerar den sammanfattningen rakt av i ett eget Resend-mejl (samma `noreply@debatt-ai.se`/mottagaradress-mönster som `economy-observer.yml` redan använder) — ämnesraden räknar antalet `❌`-rader, brödtexten listar varje floppad check med dess faktiska detaljmeddelande i en `<pre>`, HTML-sanerat via jq:s `@html`-filter (skyddar mot att en detaljtext med `<`/`&`/`"` bryter mejlets HTML). Saknas `RESEND_API_KEY` hoppas steget bara över — GitHub:s generiska notis går fortfarande ut som vanligt, ingen regression. Verifierat isolerat: extraherad summeringslogik körd mot en syntetisk fail+error-batch gav korrekt `GITHUB_OUTPUT`-block, och samma jq/HTML-escape-uttryck testat mot en sträng med `<`/`&`/`"` gav ett giltigt JSON-payload med rätt eskaperad HTML.
+
+**Övervakningsrutin — så att Claude själv får veta, inte bara ägaren.** En Routine (`create_trigger`, namn "Invariant-checker hälsokontroll", cron `15 */3 * * *` — 15 minuter efter varje `invariant-check.yml`-körning för att ge Node-skriptet + Supabase-skrivningen tid att bli klar) fyrar in i den här sessionen var 3:e timme och hämtar `https://www.debatt-ai.se/status` (publik SSR-sida, inget API-nyckel-behov). Ser den "Alla checkar gröna" gör den ingenting — inget meddelande till ägaren, en tyst noop. Ser den istället "X av Y checkar visar problem" (eller om sidan inte svarar) läser den vilka checkar som är röda med sina detaljtexter direkt på sidan, slår upp check-namnet i den här ✅108-tabellen för att hitta vilken tidigare bugg/fil den skyddar, undersöker rotorsaken i koden och antingen (a) fixar en tydlig, redan dokumenterad regression själv — commit/push/PR på sessionsbranchen, väntar på "merga" precis som alla andra fixar i den här loggen — eller (b) rapporterar en konkret diagnos till ägaren om orsaken är oklar eller kräver ett beslut. Ingen ny kod krävdes för själva bevakningen — bara Routine-konfigurationen, eftersom `/status` redan var byggd för att svara på exakt den frågan.
+
+**Varför `/status`-sidan och inte Supabase REST direkt:** `invariant_checks` har publik SELECT via RLS, men att fråga tabellen direkt hade krävt att routine-prompten bar med sig `SUPABASE_ANON_KEY` — en extra hemlighet att hålla reda på i en fri-text-prompt. `/status` är redan en SSR-rendrerad sammanfattning av exakt samma data (byggd i ✅108 självt), och kräver ingen autentisering — ett enkelt textscan efter "Alla checkar gröna" räcker.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | `main()` skriver en sammanfattning av alla icke-OK-checkar (+ ev. misslyckad Supabase-sparning) till `GITHUB_OUTPUT`, bara när det finns något att rapportera |
+| `.github/workflows/invariant-check.yml` | Nytt steg "Skicka detaljerad felmejl" — Resend-mejl med exakt vilka checkar som floppade, körs bara vid `failure()` med en icke-tom sammanfattning |
+| (Routine, ingen fil) | "Invariant-checker hälsokontroll" — cron `15 */3 * * *`, fyrar in i sessionen, kollar `/status`, tyst noop vid grönt, annars undersöker/fixar/rapporterar |
+
 ---
 
 ### ✅ 109. /redaktion — "Daglig publicering vs mål"-grafen uteslöt ALLA repliker – KLART

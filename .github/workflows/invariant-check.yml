@@ -16,7 +16,46 @@ jobs:
           node-version: "24"
 
       - name: Kör invariant-checkar
+        id: run
         env:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node agents/invariant-checker.js
+
+      # ✅108-uppföljning: GitHub:s egen felnotis vid en misslyckad
+      # schemalagd körning säger bara "Run failed" — ingen antydan om VILKEN
+      # check som floppade eller varför. invariant-checker.js skriver nu en
+      # sammanfattning (namn + detaljmeddelande per icke-OK check) till
+      # GITHUB_OUTPUT när något är fel; det här steget citerar den
+      # sammanfattningen rakt av i ett eget, mer specifikt mejl. Körs bara
+      # om körningen ovan faktiskt floppade OCH gav en sammanfattning att
+      # skicka — en tom sammanfattning (borde aldrig hända om steget ovan
+      # misslyckades) skickar inget mejl.
+      - name: Skicka detaljerad felmejl
+        if: failure() && steps.run.outputs.sammanfattning != ''
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SAMMANFATTNING: ${{ steps.run.outputs.sammanfattning }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$RESEND_API_KEY" ]; then
+            echo "RESEND_API_KEY saknas — hoppar över detaljmejlet (GitHub:s egen notis går ut som vanligt)"
+            exit 0
+          fi
+          FAIL_COUNT=$(printf '%s\n' "$SAMMANFATTNING" | grep -c '^❌' || true)
+          PAYLOAD=$(jq -n \
+            --arg from "noreply@debatt-ai.se" \
+            --arg to "neonhawk194@gmail.com" \
+            --arg subject "🚨 Invariant Checker: ${FAIL_COUNT} check(ar) floppade" \
+            --arg body "$SAMMANFATTNING" \
+            --arg runurl "$RUN_URL" \
+            '{
+              from: $from,
+              to: [$to],
+              subject: $subject,
+              html: ("<p>Invariant-checkaren hittade problem vid senaste körningen:</p><pre style=\"white-space:pre-wrap;font-family:monospace;background:#111;color:#eee;padding:12px;border-radius:6px\">" + ($body | @html) + "</pre><p><a href=\"" + ($runurl|@html) + "\">Se full körningslogg på GitHub →</a></p><p><a href=\"https://www.debatt-ai.se/status\">Se /status →</a></p>")
+            }')
+          curl -s -X POST https://api.resend.com/emails \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
