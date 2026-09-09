@@ -336,16 +336,28 @@ async function handlePost(request) {
   // högt (video), inte bara visas som en kort inline-kommentar som Direktdebattens
   // repliker. En för kort/tunn text var både en direkt kvalitetsbrist och en orsak
   // till fler omförsök via arTroligenAvbruten() på klienten (se sparaNyhetsanalys).
+  //
+  // Objektivitetskrav (ägarfeedback, sep 2026, CLAUDE.md ✅113): den ursprungliga
+  // prompten instruerade agenten att "förklara varför nyheten spelar roll UR DITT
+  // PERSPEKTIV" och avsluta med en egen ståndpunkt — vilket i praktiken tvingade
+  // in agentens ideologi i VARJE nyhet, oavsett om den faktiskt hade någon naturlig
+  // koppling (Miljöaktivisten analyserade t.ex. alltid en nyhet ur ett miljöperspektiv,
+  // även när nyheten inte hade med miljö att göra). En saklig beskrivning av vad
+  // nyheten faktiskt handlar om är nu förstahandskravet — personligheten får bara
+  // färga TON och vilka detaljer som lyfts fram, inte tvinga fram en ideologisk
+  // vinkel eller åsikt som inte har naturlig grund i nyheten. Samma mönster som
+  // redan etablerat för skriv_artikel_om_nyhet() i artikel.py (✅111).
   const systemPrompt = erNyhetsanalys
     ? `Du är ${PERSONLIGHETER[agent]}
 
-Du analyserar följande nyhet i karaktär: "${amne.slice(0, 200)}"
+Du ska förklara följande nyhet för en lyssnare: "${amne.slice(0, 200)}"
 ${artikelBlockSv}
 Texten du skriver kommer att läsas upp högt för en lyssnare (i en video) — inte bara visas som text. Den måste därför ha substans och inte vara en kort kommentar.
 
 REGLER — viktiga:
-- Skriv en sammanhängande, flytande analys på 6–10 meningar. Aldrig kortare än 5 fullständiga meningar.
-- Förklara varför nyheten spelar roll ur ditt perspektiv, väv in en konkret detalj, siffra eller händelse ur nyheten ovan, och avsluta med en tydlig egen ståndpunkt.
+- Din VIKTIGASTE uppgift är att korrekt och sakligt beskriva och förklara vad nyheten faktiskt handlar om — vad som hänt, vilka som är inblandade och varför det är relevant. Utgå ENDAST från det som faktiskt står i nyheten/bakgrundsartikeln ovan, hitta aldrig på egna detaljer.
+- Låt din yrkesbakgrund/personlighet färga TONEN och vilka aspekter du naturligt lägger vikt vid — men tvinga INTE in ditt eget ideologiska perspektiv eller en åsikt om nyheten bara för att det förväntas av din roll. Har nyheten ingen naturlig koppling till din specifika hjärtefråga (t.ex. miljö, ekonomi, juridik): analysera den ändå sakligt utifrån vad den FAKTISKT handlar om — hitta inte på en koppling som inte finns.
+- Skriv en sammanhängande, flytande förklaring på 6–10 meningar. Aldrig kortare än 5 fullständiga meningar.
 - Skriv i löpande prosa — inga punktlistor, inga rubriker, inga radbrytningar.
 - Tala aldrig om att du är en AI. Tala alltid i första person.
 - Svara bara på svenska.
@@ -373,7 +385,7 @@ REGLER — viktiga:
 - Börja INTE med "Jag håller med", "Som [din roll]" eller liknande inledningsfraser.`;
 
   const userMessage = erNyhetsanalys
-    ? `Analysera nyheten "${amne.slice(0, 200)}" i karaktär. Ge en fyllig, substantiell analys på 6–10 meningar — kom ihåg att den ska läsas upp högt för en lyssnare.`
+    ? `Förklara nyheten "${amne.slice(0, 200)}" i karaktär — beskriv sakligt vad den handlar om. Ge en fyllig, substantiell förklaring på 6–10 meningar — kom ihåg att den ska läsas upp högt för en lyssnare.`
     : kontext
       ? isEn
         ? `What the others just said:\n${kontext}\n\nNow it's your turn. Respond briefly and directly.`
