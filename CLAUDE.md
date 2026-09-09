@@ -3168,6 +3168,26 @@ Användarrapport (sep 2026, med konkret exempelartikel https://www.debatt-ai.se/
 
 ---
 
+### ✅ 113. Nyhetsanalyser tvingade fram agentens ideologi på varje nyhet — objektivitet nu förstahandskrav – KLART
+
+Ägarfeedback (sep 2026): *"Vi behöver nog begränsa AI agenternas personligheter i Nyhetsanalyser också. Miljöaktivisten analysera alltid en nyhet utifrån ett miljö perspektiv. Jag tycker inte att detta är lämpligt. AI agenterna behöver beskriva en nyhetsartikel på ett objekt[ivt] och neutralt sett."*
+
+**Rotorsak — samma buggklass som ✅111, en andra yta.** Nyhetsanalys-funktionen (`typ="nyhetsanalys"` i `app/api/chatt/route.js`, används av "🔎 Analysera i Nyhetsanalysen" på `/nyhetskallor`, `/universitet` och `/fraga-anna-och-peter`, se ✅93) hade en egen systemprompt-gren, separat från både Direktdebattens repliker och `artikel.py`s publicerade nyhetsartiklar. Den instruerade agenten att *"Förklara varför nyheten spelar roll UR DITT PERSPEKTIV ... och avsluta med en tydlig egen ståndpunkt"* — ett opinion-först-krav som tvingade in agentens ideologiska hjärtefråga i VARJE nyhet, oavsett om nyheten faktiskt hade någon naturlig koppling till den. En Miljöaktivist som analyserade en nyhet om, säg, en fotbollsmatch eller en skattereform fick alltså ändå leta upp en miljövinkel att avsluta med, eftersom prompten krävde en ståndpunkt "ur ditt perspektiv" — exakt det ägaren beskrev och bedömde som olämpligt.
+
+Till skillnad från `artikel.py`s publicerade nyhetsartiklar (redan fixat i ✅111) hade Nyhetsanalys-funktionen aldrig fått motsvarande objektivitetskrav — de två funktionerna delar bakgrund/källa-koncept (`nyhetskalla` respektive `artikelBlockSv`) men har helt separata prompt-byggen (Python vs. denna JS-route), så ✅111s fix täckte aldrig hit.
+
+**Fix:** systemPrompt för `erNyhetsanalys` omskriven enligt samma mönster som ✅111 — saklig, korrekt beskrivning av vad nyheten faktiskt handlar om är nu det VIKTIGASTE kravet, listat först. Personligheten får fortsatt färga TONEN och vilka aspekter agenten naturligt lyfter fram, men en ny explicit instruktion förbjuder att tvinga in ett ideologiskt perspektiv eller en åsikt när nyheten saknar naturlig koppling till agentens hjärtefråga — agenten ska då analysera sakligt utifrån vad nyheten faktiskt handlar om, inte hitta på en koppling som inte finns. Kravet att "avsluta med en tydlig egen ståndpunkt" togs bort helt. `userMessage` uppdaterad i samma anda ("Förklara nyheten ... — beskriv sakligt vad den handlar om" istället för "Analysera nyheten ... i karaktär").
+
+**Medvetet oförändrat:** Direktdebattens (`typ` ej `"nyhetsanalys"`) systemPrompt-gren rördes inte — där är personlighetsdriven debatt och tydlig ståndpunkt själva poängen (flera agenter ska aktivt vara oense med varandra), och ägaren har inte bett om någon ändring där. `PERSONLIGHETER`-dicten (agentens grundläggande röst/ton) rördes inte heller — bara HUR den personligheten får styra innehållet i en nyhetsanalys.
+
+**Känd begränsning:** en promptinstruktion är vägledning, inte en garanti — LLM:en kan i enskilda fall fortfarande väva in mer ideologisk vinkel än avsett, precis som andra instruktionsbaserade styrningar i den här loggen (✅17, ✅67, ✅110, ✅111) inte är vattentäta. Redan sparade `nyhetsanalys`-rader (i `/nyhetsanalyser`-arkivet och Senaste aktivitet) påverkas inte — fixen gäller bara framtida analyser.
+
+| Fil | Roll |
+|---|---|
+| `app/api/chatt/route.js` | `erNyhetsanalys`-systemprompten omskriven: saklig beskrivning av nyheten först, personlighet färgar bara ton/fokus — inte en tvingad ideologisk vinkel eller avslutande egen ståndpunkt. `userMessage` uppdaterad i samma anda |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
