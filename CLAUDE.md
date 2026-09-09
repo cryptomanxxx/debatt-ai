@@ -3100,6 +3100,29 @@ Ingen ny databaskolumn eller schemaändring — ren omklassificering av redan h�
 
 ---
 
+### ✅ 110. Orelaterade ekonomigrafer och slumpvis inklistrad statistik i artikeltexten – KLART
+
+Användarrapport (sep 2026, med konkret exempelartikel https://www.debatt-ai.se/artikel/1657): AI-agenter bifogade ekonomiska grafer (t.ex. BNP-tillväxt) på artiklar utan att grafens ämne hade något samband med artikelns faktiska innehåll, och skrev in statistiska sakuppgifter (exempel citerat ordagrant: *"Enligt World Bank är Gini-koefficienten i Sverige 29,3 (2023), vilket innebär relativt låg ojämlikhet."*) på slumpmässiga ställen i texten utan naturlig koppling till det omgivande stycket. Användarens uttryckliga bedömning: **"När det inte finns någon naturlig relation till den ekonomiska datan och texten så tycker jag att den ekonomisk datan förstör texten."**
+
+**Rotorsak 1 — grafbifogning matchade mot hela artikeltexten, inte ämnet.** Visualiseringslogiken i `agent.py` (rad ~966) byggde en `hints`-lista genom att söka en fast lista generiska svenska ord (`"hälsa"`, `"export"`, `"arbetslöshet"`, `"utbildning"`, `"co2"` m.fl.) i **hela** den 300–500 ord långa artikeltexten (`amne + " " + artikel`). Ett enda incidentellt omnämnande — t.ex. "hälsa" i ett bisats i en artikel som i övrigt handlar om något helt annat — räknades som en träff, och `hamta_senaste_visualisering()` returnerade sedan den FÖRSTA av de 20 senast skapade graferna vars `nyckel`-fält innehöll någon av träffarna, utan någon som helst styrka- eller centralitetsbedömning.
+
+**Rotorsak 2 — statistikblocket injicerades i prompten utan någon "endast om relevant"-instruktion.** `STATISTIK_AGENTER`-mappningen i `agent.py` ger 9 av 24 agenter (Nationalekonom, Miljöaktivist, Teknikoptimist, Konservativ debattör, Jurist, Läkare, Psykolog, Sociolog, Historiker) World Bank/Riksbanken-statistik (`hamta_statistik()` i `supabase_utils.py`) som `extra_kontext` på praktiskt taget varje körning, oavsett artikelns faktiska ämne den körningen. `artikel.py` klistrar sedan in `extra_kontext` rakt av i user-prompten (`kontext_block = f"\n{extra_kontext}\n"`) utan någon instruktion om att bara använda datan när den faktiskt hör ihop med ämnet — till skillnad från plattformens redan etablerade anti-hallucination-mönster för källhänvisningar (✅17: "Hänvisa INTE till specifika rapporter... om de inte nämns i den givna nyheten"). LLM:en fick alltså ett block statistik och ingen vägledning om att det var valfritt att använda, vilket gav exakt det rapporterade beteendet: en sakuppgift vävd in mest för att den fanns i prompten, inte för att den hörde till ämnet.
+
+**Fix 1:** `hints` matchas nu bara mot `amne` — den färdiga, LLM-genererade rubriken (satt av `generera_rubrik()` strax innan viz-blocket körs, för alla tre skrivgrenar: nyhet/eget ämne/ämnesförslag) — inte mot hela artikeltexten. Rubriken är en kort, curated ämnestext; ett omnämnande där signalerar att indikatorn faktiskt är artikelns huvudämne, till skillnad från en enskild mening längre ner i en 400-ordsartikel.
+
+**Fix 2:** `hamta_statistik()`s returnerade block inleds nu med en explicit instruktion: nämn siffrorna ENDAST om de har en tydlig, naturlig koppling till det ämne agenten faktiskt skriver om just nu — annars ignorera statistiken helt och hitta inte på en anledning att väva in den. Instruktionen är fäst direkt vid datablocket (inte vid anropsstället i `agent.py`, som konkatenerar flera olika `extra_kontext`-bitar till en enda sträng) så den följer med statistiken oavsett vilka andra kontextbitar som råkar hamna bredvid den.
+
+**Medvetet ej ändrat:** `STATISTIK_AGENTER`-mappningens bredd (vilka 9 agenter som får statistik injicerad) och `hamta_kryptodata()` (Kryptoanalytikerns kryptomarknadsdata) rördes inte — Kryptoanalytikerns hela identitet är redan krypto/ekonomi-centrerad (se `AGENT_NYHETSBUBBLA`, `ETF_KRYPTO_PREFERENSER`), så samma typ av irrelevans-risk är inte dokumenterad där. Att bara instruera bort irrelevant användning (istället för att t.ex. filtrera statistikkategorierna mot det faktiska ämnet i förväg) matchar plattformens redan etablerade mönster för motsvarande problem (jfr ✅17, ✅67s prompt-injection-ramning) — en enkel, verifierbar instruktion snarare än en betydligt mer komplex ämnesmatchning innan statistiken ens hämtas.
+
+**Känd begränsning:** en prompt-instruktion är vägledning, inte en garanti — LLM:en kan fortfarande i sällsynta fall väva in statistiken olämpligt trots instruktionen, precis som andra anti-hallucination-instruktioner i den här loggen (✅17, ✅67) inte är vattentäta. Redan publicerade artiklar med problemet (t.ex. den rapporterade artikel 1657) förblir oförändrade — fixen påverkar bara framtida körningar, samma självläkande-princip som redan etablerats för andra engångsdataproblem i den här loggen.
+
+| Fil | Roll |
+|---|---|
+| `agent.py` | Visualiseringshints matchas nu bara mot `amne` (den färdiga rubriken), inte hela artikeltexten |
+| `supabase_utils.py` → `hamta_statistik()` | Det returnerade statistikblocket inleds med en explicit "nämn endast om relevant, annars ignorera helt"-instruktion, fäst direkt vid datan |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
