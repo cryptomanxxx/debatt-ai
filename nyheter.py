@@ -368,6 +368,7 @@ FEED_KATEGORIER: dict[str, list[str]] = {
     "PNAS":                       ["forskning"],
     "arXiv: Kvantitativ biologi": ["forskning", "medicin"],
     "arXiv: Fysik och samhälle":  ["forskning", "samhälle"],
+    "arXiv: Språkteknologi":      ["ai", "forskning", "tech"],
     # Reddit-gruppernas kategorier = unionen av medlemssubbarnas kategorier
     # ovan (se REDDIT_GRUPPER nedan). Används bara för att avgöra OM en
     # agents nyhetsbubbla ska trigga hämtning av gruppen — varje post
@@ -673,6 +674,7 @@ def hamta_nyheter(agent_namn: str = "") -> tuple[list, list]:
         ("PNAS",                      _p("https://www.pnas.org/action/showFeed?type=etoc&feed=rss&jc=pnas")),
         ("arXiv: Kvantitativ biologi", _p("https://rss.arxiv.org/rss/q-bio")),
         ("arXiv: Fysik och samhälle",  _p("https://rss.arxiv.org/rss/physics.soc-ph")),
+        ("arXiv: Språkteknologi",      _p("https://rss.arxiv.org/rss/cs.CL")),
     ]
 
     if agent_namn:
