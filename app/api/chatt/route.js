@@ -476,6 +476,22 @@ REGLER — viktiga:
           max_tokens: maxTokensForRequest,
           temperature: 0.88,
           stream: true,
+          // Ägarrapport (sep 2026, CLAUDE.md ✅115): höjningen av max_tokens i ✅101
+          // (250→500) räckte inte — en sparad debatt visade repliker avhuggna ännu
+          // hårdare (mitt i enstaka ord) OCH en replik med bokstavligt läckt
+          // resonemangstext ("perspective:* How does fear,") rakt i den synliga
+          // texten. reasoning_effort:"low" minskar hur mycket av max_tokens-
+          // budgeten "openai/gpt-oss-120b" (en reasoning-modell) spenderar på
+          // dolda resonemangstokens innan den börjar skriva det synliga svaret —
+          // adresserar roten till trunkeringen. reasoning_format:"hidden" ser
+          // dessutom till att eventuell kvarvarande resonemangstext ALDRIG strömmas
+          // som en del av content-fältet, oavsett — adresserar läckaget. Kunde inte
+          // empiriskt verifieras mot skarpt Groq-API i den här miljön (ingen
+          // GROQ_API_KEY/nätverksåtkomst) — bygger på Groqs dokumenterade
+          // gpt-oss-parametrar, samma familj av fix som redan gjord Python-sidan
+          // (`hamta_kort_fns_med_trunkering()`, ✅97).
+          reasoning_effort: "low",
+          reasoning_format: "hidden",
         }),
       });
       clearTimeout(groqTimeout);
