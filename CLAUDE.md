@@ -3231,6 +3231,16 @@ Användarrapport (sep 2026, skärmdump av en sparad `/chatt/[id]`-debatt): 5 av 
 |---|---|
 | `agents/invariant-checker.js` | `checkDirektdebattReasoningEffort()`s regex bytt från en global `.test(kod)`-sökning till en rad-förankrad matchning som inte kan luras av kommentarstext med samma citattecken-mönster |
 
+**Codex-fynd (PR #1445-granskning, efter merge): den rad-förankrade regexen kunde fortfarande luras — av en flerradig blockkommentar.** Fixen ovan löste problemet med kommentarer på SAMMA rad som texten den matchade mot — men en `/* ... */`-kommentar vars avgränsare (`/*` och `*/`) står på EGNA rader, med de två payload-raderna oförändrade emellan, kringgår den fortfarande: varje innesluten rad börjar (efter whitespace-trim) fortfarande bokstavligen med `reasoning_effort:`/`reasoning_format:`, exakt det radförankringen letar efter — regexen har ingen uppfattning om kommentarsblocksgränser, bara om enskilda rader. En sådan bortkommenterad payload hade alltså fortsatt rapporterats "ok" trots att inget av fälten faktiskt skickas till Groq — precis den regression checken finns till för att upptäcka.
+
+Fixat genom att strippa ALLA JS-kommentarer (`//`-radkommentarer OCH flerradiga `/* ... */`-block, oavsett var avgränsarna står) ur källkoden INNAN radmatchningen körs, via en ny delad `taBortJsKommentarer()`-hjälpfunktion. En bortkommenterad rad — oavsett kommentarform — kan då aldrig matcha regexen längre, eftersom den inte längre finns kvar i den textsträng som faktiskt genomsöks. Verifierat med fyra syntetiska scenarier extraherade direkt ur den redigerade filens egen `taBortJsKommentarer()`-implementation (inte en separat kopia): (1) den riktiga, oförändrade filen ger fortsatt `true`/`true`; (2) Codex konkreta scenario — payload-raderna omslutna av en `/*`/`*/`-kommentar med avgränsarna på egna rader — ger nu korrekt `false`/`false`; (3) `//`-kommenterade payload-rader ger `false`/`false`; (4) payload-raderna helt borttagna med bara de förklarande kommentarerna kvar (det ursprungliga #1444-scenariot) ger fortsatt korrekt `false`/`false`.
+
+**Känd begränsning:** `taBortJsKommentarer()` är en enkel regexbaserad stripper, inte en riktig JS-parser — den är inte garanterat korrekt mot t.ex. `/* */`-liknande sekvenser inuti strängliteraler eller reguljära uttryck. Tillräckligt robust för denna källkodskontrolls smala syfte (en känd, kontrollerad fil), men inte en generell kommentarsparser.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | Ny `taBortJsKommentarer()`-hjälpfunktion — strippar `//`- och flerradiga `/* ... */`-kommentarer ur källkoden innan `checkDirektdebattReasoningEffort()`s rad-förankrade regex körs, oavsett var kommentarsavgränsarna står |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
