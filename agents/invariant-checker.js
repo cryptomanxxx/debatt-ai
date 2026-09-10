@@ -169,8 +169,15 @@ function checkDirektdebattReasoningEffort() {
   const namn = "direktdebatt-reasoning-effort";
   try {
     const kod = lasFil("app/api/chatt/route.js");
-    const harEffort = /reasoning_effort:\s*"low"/.test(kod);
-    const harFormat = /reasoning_format:\s*"hidden"/.test(kod);
+    // Rad-förankrad (^...$ på en enskild, trimmad rad) — matchar bara den
+    // FAKTISKA egenskapstilldelningen i payload-objektet, aldrig en
+    // kommentarsrad. Codex-fynd (PR #1444-granskning): en ren `.test(kod)`
+    // mot hela filen matchade även de förklarande kommentarerna ovanför
+    // payloaden (som av misstag innehöll exakt samma citattecken-mönster),
+    // så checken skulle fortsatt rapportera "ok" även om själva
+    // payload-raderna togs bort så länge kommentaren fanns kvar.
+    const harEffort = /^\s*reasoning_effort:\s*"low",?\s*$/m.test(kod);
+    const harFormat = /^\s*reasoning_format:\s*"hidden",?\s*$/m.test(kod);
     if (!harEffort || !harFormat) {
       rapportera(namn, "fail", `saknar ${!harEffort ? "reasoning_effort:\"low\"" : ""}${!harEffort && !harFormat ? " och " : ""}${!harFormat ? "reasoning_format:\"hidden\"" : ""} i Groq-anropet i app/api/chatt/route.js — risk för avhuggna/läckande repliker igen (✅115)`);
       return;
