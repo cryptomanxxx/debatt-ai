@@ -159,6 +159,28 @@ function checkDirektdebattTokentak() {
   }
 }
 
+function checkDirektdebattReasoningEffort() {
+  // Regressionsguard för ✅115: höjt max_tokens (✅101) räckte inte — en
+  // sparad debatt visade repliker avhuggna mitt i enstaka ord OCH en replik
+  // med bokstavligt läckt resonemangstext ("perspective:* How does fear,")
+  // rakt i den synliga texten. reasoning_effort:"low" + reasoning_format:
+  // "hidden" i Groq-anropet är roten av den fixen — säkerställ att de finns
+  // kvar i samma payload som skickar max_tokens.
+  const namn = "direktdebatt-reasoning-effort";
+  try {
+    const kod = lasFil("app/api/chatt/route.js");
+    const harEffort = /reasoning_effort:\s*"low"/.test(kod);
+    const harFormat = /reasoning_format:\s*"hidden"/.test(kod);
+    if (!harEffort || !harFormat) {
+      rapportera(namn, "fail", `saknar ${!harEffort ? "reasoning_effort:\"low\"" : ""}${!harEffort && !harFormat ? " och " : ""}${!harFormat ? "reasoning_format:\"hidden\"" : ""} i Groq-anropet i app/api/chatt/route.js — risk för avhuggna/läckande repliker igen (✅115)`);
+      return;
+    }
+    rapportera(namn, "ok");
+  } catch (e) {
+    rapportera(namn, "error", String(e.message || e));
+  }
+}
+
 function checkAmnesforslagInteKonsumeratVidAvvisning() {
   const namn = "amnesforslag-inte-konsumerat-vid-avvisning";
   try {
@@ -414,6 +436,7 @@ async function main() {
   checkSenasteDebatternaFilter();
   checkRubrikTrunkeringsskydd();
   checkDirektdebattTokentak();
+  checkDirektdebattReasoningEffort();
   checkAmnesforslagInteKonsumeratVidAvvisning();
   checkAmnesforslagKvotseparation();
   checkRedaktionRaknarRepliker();

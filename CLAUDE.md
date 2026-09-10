@@ -3208,6 +3208,25 @@ Till skillnad från `artikel.py`s publicerade nyhetsartiklar (redan fixat i ✅1
 
 ---
 
+### ✅ 115. Direktdebatt-repliker fortfarande avhuggna — ✅101s tak räckte inte, resonemangstext läckte in i svaret – KLART
+
+Användarrapport (sep 2026, skärmdump av en sparad `/chatt/[id]`-debatt): 5 av 6 repliker synligt avhuggna mitt i enstaka ord — "När vi drar in tolkh", "Att begränsa rätten till to", "Att subventionera tolkar på ob", "Att begränsa r" — värre än det ursprungliga ✅101-fyndet (som visade avhuggning mellan hela ord, inte mitt i dem). En av replikerna ("perspective:* How does fear,") visade dessutom något nytt: bokstavligt läckt engelsk resonemangstext, inte bara en avkapad svensk mening.
+
+**Rotorsak — ✅101s fix adresserade symptomet (för snålt tak), inte roten (varför taket äts upp).** `maxTokensForRequest` höjdes 250→500 i ✅101, men Groq-anropet till `openai/gpt-oss-120b` (en reasoning-modell) satte fortfarande inget `reasoning_effort`-fält — modellen kan alltså spendera en OBEGRÄNSAD, oförutsägbar andel av `max_tokens`-budgeten på dolda resonemangstokens innan den ens börjar skriva den synliga svenska repliken. Ett högre tak minskar bara FREKVENSEN av att budgeten tar slut mitt i, det tar inte bort orsaken. `"perspective:* How does fear,"`-läckaget pekar dessutom på en andra, separat brist: utan ett `reasoning_format`-fält kan modellens interna resonemangstext strömmas rakt in i samma `content`-fält som den synliga repliken, istället för att hållas separat eller dold — vilket förklarar varför en replik kunde innehålla obegriplig engelsk metatext mitt i en svensk debatt.
+
+**Fix:** Groq-anropet i `app/api/chatt/route.js` (delat mellan Direktdebattens repliker och nyhetsanalys-grenen — enda Groq-anropsstället i filen) fick två nya fält: `reasoning_effort: "low"` (minskar hur mycket av `max_tokens`-budgeten som går åt till dolt resonemang innan det synliga svaret börjar — adresserar trunkeringens rotorsak) och `reasoning_format: "hidden"` (garanterar att eventuell resonemangstext aldrig strömmas som en del av `content`, oavsett — adresserar läckaget). Samma familj av fix som redan gjord på Python-sidan för `generera_rubrik()` (✅97, `hamta_kort_fns_med_trunkering()`s `finish_reason`-läsning), fast här via Groqs egna reasoning-styrande parametrar snarare än en efterhandskontroll — eftersom Groqs råa stream i den här routen pipas direkt till klienten (`new Response(groqRes.body, ...)`) och `finish_reason` därför inte går att inspektera innan strömmen redan levererats (se ✅101s förklaring av samma begränsning).
+
+**Känd begränsning:** kunde inte empiriskt verifieras mot skarpt Groq-API i den här miljön (ingen `GROQ_API_KEY`/nätverksåtkomst tillgänglig) — fixen bygger på Groqs dokumenterade parametrar för `openai/gpt-oss-*`-modeller, inte en live-testad körning. `maxTokensForRequest` (500/700) lämnades oförändrat som ett fortsatt säkerhetsnät, inte höjt ytterligare — `reasoning_effort` bör minska hur mycket av budgeten som äts av resonemang, vilket gör en ytterligare höjning mindre nödvändig än innan.
+
+**Ej åtgärdat här (medvetet avgränsat scope):** samma reasoning-modell (`openai/gpt-oss-120b`) används på dussintals andra ställen i Python-kodbasen (`agent.py`, `supabase_utils.py`, `forskning_test.py`, m.fl. — se grep-träffar i "Viktiga filer") utan `reasoning_effort` satt. De flesta av dessa har redan ✅97s `finish_reason`-baserade skydd (`hamta_kort_fns_med_trunkering()`) som fångar avhuggning i efterhand, men ingen av dem har den förebyggande `reasoning_effort`-åtgärden. Denna fix är scopad till den rapporterade buggen (Direktdebatt/nyhetsanalys, som saknar `finish_reason`-skydd helt eftersom svaret strömmas direkt) — en bredare `reasoning_effort`-utrullning över hela `ai_klient.py` är en separat avvägning som inte görs ensidigt här.
+
+| Fil | Roll |
+|---|---|
+| `app/api/chatt/route.js` | Groq-anropets payload fick `reasoning_effort: "low"` (minskar dold resonemangstokenförbrukning) och `reasoning_format: "hidden"` (förhindrar att resonemangstext läcker in i det synliga `content`-fältet) |
+| `agents/invariant-checker.js` | Ny check, `direktdebatt-reasoning-effort` (källkod) — regressionsguard som verifierar att båda fälten finns kvar i Groq-anropet |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
