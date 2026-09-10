@@ -3225,6 +3225,12 @@ Användarrapport (sep 2026, skärmdump av en sparad `/chatt/[id]`-debatt): 5 av 
 | `app/api/chatt/route.js` | Groq-anropets payload fick `reasoning_effort: "low"` (minskar dold resonemangstokenförbrukning) och `reasoning_format: "hidden"` (förhindrar att resonemangstext läcker in i det synliga `content`-fältet) |
 | `agents/invariant-checker.js` | Ny check, `direktdebatt-reasoning-effort` (källkod) — regressionsguard som verifierar att båda fälten finns kvar i Groq-anropet |
 
+**Codex-fynd (PR #1444-granskning): checken kunde luras av sina egna förklarande kommentarer.** `checkDirektdebattReasoningEffort()`s ursprungliga `.test(kod)` matchade mot HELA filens råtext — inklusive de förklarande kommentarsraderna direkt ovanför payload-objektet, som av misstag råkade innehålla exakt samma citattecken-mönster (`reasoning_effort:"low"`, `reasoning_format:"hidden"`, utan mellanslag efter kolon, precis som regexen förväntade). Hade någon tagit bort de faktiska payload-raderna men lämnat kommentarerna kvar (eller bara skrivit om koden så att fälten flyttades men kommentaren blev kvar) hade checken ändå rapporterat "ok" — precis den typ av "checken låtsas skydda men gör det inte" som hela poängen med invariant-checkaren (✅108) är att undvika. Fixat: regexen är nu rad-förankrad (`^\s*reasoning_effort:\s*"low",?\s*$` med `m`-flaggan) — matchar bara en rad som (efter inledande whitespace) BÖRJAR med den faktiska nyckeln, vilket en kommentarsrad (som börjar med `//`) aldrig gör, oavsett vad den sedan innehåller längre in på raden. Verifierat med ett syntetiskt test: samma fil med bara de två payload-raderna borttagna (kommentarerna kvar) ger nu korrekt `false`/`false` istället för det tidigare `true`/`true`.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | `checkDirektdebattReasoningEffort()`s regex bytt från en global `.test(kod)`-sökning till en rad-förankrad matchning som inte kan luras av kommentarstext med samma citattecken-mönster |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
