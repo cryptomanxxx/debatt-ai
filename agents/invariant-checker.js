@@ -159,6 +159,13 @@ function checkDirektdebattTokentak() {
   }
 }
 
+function taBortJsKommentarer(kod) {
+  // Enkel, inte fullt korrekt mot strängar/regex-literaler — tillräckligt för
+  // denna källkodskontrolls syfte (förhindra att en kommentar maskerar eller
+  // simulerar en payload-egenskap, se checkDirektdebattReasoningEffort()).
+  return kod.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+}
+
 function checkDirektdebattReasoningEffort() {
   // Regressionsguard för ✅115: höjt max_tokens (✅101) räckte inte — en
   // sparad debatt visade repliker avhuggna mitt i enstaka ord OCH en replik
@@ -169,15 +176,22 @@ function checkDirektdebattReasoningEffort() {
   const namn = "direktdebatt-reasoning-effort";
   try {
     const kod = lasFil("app/api/chatt/route.js");
-    // Rad-förankrad (^...$ på en enskild, trimmad rad) — matchar bara den
-    // FAKTISKA egenskapstilldelningen i payload-objektet, aldrig en
-    // kommentarsrad. Codex-fynd (PR #1444-granskning): en ren `.test(kod)`
-    // mot hela filen matchade även de förklarande kommentarerna ovanför
-    // payloaden (som av misstag innehöll exakt samma citattecken-mönster),
-    // så checken skulle fortsatt rapportera "ok" även om själva
-    // payload-raderna togs bort så länge kommentaren fanns kvar.
-    const harEffort = /^\s*reasoning_effort:\s*"low",?\s*$/m.test(kod);
-    const harFormat = /^\s*reasoning_format:\s*"hidden",?\s*$/m.test(kod);
+    // Kommentarer (både // och flerradiga /* ... */) tas bort INNAN
+    // rad-matchningen. Codex-fynd (PR #1444-granskning): en ren `.test(kod)`
+    // mot hela filen matchade förklarande kommentarer ovanför payloaden (som
+    // av misstag innehöll samma citattecken-mönster) — fixat med en
+    // rad-förankrad regex (^...$ på en enskild, trimmad rad). Codex-fynd
+    // (PR #1445-granskning): den rad-förankrade regexen kunde fortfarande
+    // luras av en FLERRADIG /* ... */-kommentar vars `/*`/`*/`-avgränsare
+    // stod på egna rader — varje inneslutna rad börjar då fortfarande (efter
+    // trim) med egenskapsnamnet, vilket den rena radförankringen inte kunde
+    // skilja från en riktig, aktiv payload-rad. Att strippa alla
+    // JS-kommentarer FÖRST eliminerar hela den felklassen — en kommenterad
+    // (eller bortkommenterad) rad kan aldrig matcha regexen längre, oavsett
+    // kommentarform.
+    const kodUtanKommentarer = taBortJsKommentarer(kod);
+    const harEffort = /^\s*reasoning_effort:\s*"low",?\s*$/m.test(kodUtanKommentarer);
+    const harFormat = /^\s*reasoning_format:\s*"hidden",?\s*$/m.test(kodUtanKommentarer);
     if (!harEffort || !harFormat) {
       rapportera(namn, "fail", `saknar ${!harEffort ? "reasoning_effort:\"low\"" : ""}${!harEffort && !harFormat ? " och " : ""}${!harFormat ? "reasoning_format:\"hidden\"" : ""} i Groq-anropet i app/api/chatt/route.js — risk för avhuggna/läckande repliker igen (✅115)`);
       return;
