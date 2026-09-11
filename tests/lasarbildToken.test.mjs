@@ -10,7 +10,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { valjHmacSecret, delningsToken, tokenMatchar } from "../app/lib/lasarbildToken.mjs";
+import { valjHmacSecret, hamtaHmacSecret, delningsToken, tokenMatchar } from "../app/lib/lasarbildToken.mjs";
 
 // ── valjHmacSecret: anon-nyckeln är aldrig en giltig källa ─────────────
 
@@ -87,4 +87,52 @@ test("tokenMatchar: hex-jämförelsen är case-insensitive", () => {
   const filnamn = "44444444-4444-4444-4444-444444444444.png";
   const token = delningsToken(filnamn, secret);
   assert.equal(tokenMatchar(filnamn, token.toUpperCase(), secret), true);
+});
+
+// ── hamtaHmacSecret: läser miljön färskt, faller aldrig tillbaka på anon ─
+//
+// Till skillnad från testerna ovan (som anropar de rena funktionerna med
+// explicita indata) muterar de här process.env — de enda i filen som gör
+// det. Ursprungsvärdena sparas och återställs alltid i en finally, så en
+// mutation här aldrig läcker till andra tester i samma körning (`node
+// --test tests/*.test.mjs` kan köra flera testfiler i samma process).
+
+test("hamtaHmacSecret: läser SUPABASE_SERVICE_ROLE_KEY vid varje anrop, inte cachat vid modulladdning", () => {
+  const sparadService = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const sparadAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  try {
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    assert.equal(hamtaHmacSecret(), "");
+
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "hemlig-service-role-nyckel";
+    assert.equal(hamtaHmacSecret(), "hemlig-service-role-nyckel");
+
+    // En förändring av nyckeln vid körningstid (t.ex. secret roteras)
+    // ska omedelbart återspeglas — ingen modulnivå-cache.
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "en-annan-nyckel";
+    assert.equal(hamtaHmacSecret(), "en-annan-nyckel");
+  } finally {
+    if (sparadService === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = sparadService;
+    if (sparadAnon === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    else process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = sparadAnon;
+  }
+});
+
+test("hamtaHmacSecret: fail closed — faller ALDRIG tillbaka på NEXT_PUBLIC_SUPABASE_ANON_KEY", () => {
+  const sparadService = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const sparadAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  try {
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "publik-anon-nyckel";
+
+    // Service-role saknas men anon-nyckeln finns satt — resultatet ska
+    // fortfarande vara tomt, aldrig anon-nyckeln.
+    assert.equal(hamtaHmacSecret(), "");
+  } finally {
+    if (sparadService === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = sparadService;
+    if (sparadAnon === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    else process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = sparadAnon;
+  }
 });

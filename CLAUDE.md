@@ -3316,6 +3316,16 @@ Implementerat genom att bryta ut logiken till `app/lib/lasarbildToken.mjs` (`.mj
 | `app/api/skicka-in/bild/route.js` | Importerar från `lasarbildToken.mjs` istället för att definiera HMAC-logiken inline. Lokala `skapaDelningsToken()`/`verifieraToken()`-wrappers binder in filens `HMAC_SECRET` |
 | `tests/lasarbildToken.test.mjs` | Nytt regressionstest, 8 fall — täcker anon-uteslutning, fail-closed, korrekt validering, anon-förfalskning, malformerade tokens |
 
+**Codex-fynd (uppföljande kommentar på PR #1451 — beskrev återigen en föreslagen ändring, inget faktiskt landat i repot; samma icke-existerande "commit + PR"-mönster som ovan, verifierat på nytt mot `git log --all` och en PR-titelsökning): testa `hamtaHmacSecret()`s miljöläsning direkt.** De befintliga 8 testerna täckte bara de rena funktionerna (`valjHmacSecret()`, `tokenMatchar()`, `delningsToken()`) med explicita indata — själva `hamtaHmacSecret()`-wrappern som faktiskt läser `process.env.SUPABASE_SERVICE_ROLE_KEY` hade inget eget test, bara indirekt täckning via att `route.js` anropar den vid modulladdning.
+
+Två nya tester tillagda i `tests/lasarbildToken.test.mjs`: (1) `hamtaHmacSecret()` läser miljön FÄRSKT vid varje anrop — ingen nyckel satt ger `""`, en satt nyckel returneras, och en ändrad nyckel (secret-rotation vid körningstid) återspeglas omedelbart utan cache; (2) fail-closed-garantin gäller även den riktiga miljö-wrappern, inte bara de rena funktionerna — saknas `SUPABASE_SERVICE_ROLE_KEY` men `NEXT_PUBLIC_SUPABASE_ANON_KEY` råkar vara satt (t.ex. i en trasig deploy-konfiguration) ska resultatet fortfarande vara tomt, aldrig anon-nyckeln. Båda testerna är de enda i filen som muterar `process.env` — ursprungsvärdena sparas och återställs alltid i en `finally`, så en mutation aldrig läcker till andra tester i samma körning (`node --test tests/*.test.mjs` kan köra flera testfiler i samma process). Verifierat: `node --test tests/*.test.mjs` — 41/41 gröna (39 tidigare + 2 nya; filens egna 10 tester körda isolerat gav samma resultat).
+
+**Ett medvetet stopp här.** Det här är nu fjärde uppföljningskommentaren i samma kedja (#1449→#1450, #1450→#1451, och nu på #1451 självt) — samtliga med samma "påstår en committad ändring + skapad PR som aldrig existerar"-mönster. De två första hittade genuina problem (anon-nyckel-fallback, otestbar logik); den här testar i praktiken bara att en 4-radig wrapper-funktion delegerar korrekt till en redan fullt testad ren funktion. Projektägaren beslutade explicit (sep 2026) att implementera denna sista omgång men sätta en gräns: framtida Codex-kommentarer på den här filen som är rena testtäckningsförslag (inte nya bugg-/säkerhetsfynd) besvaras med en kort kommentar på PR:en om att förslaget redan är indirekt täckt, snarare än att trigga ännu en implementerings-PR — annars finns ingen naturlig slutpunkt, eftersom varje ny testfil i sig kan generera nästa förslag om att testa den.
+
+| Fil | Roll (tillägg, uppföljande kommentar på #1451) |
+|---|---|
+| `tests/lasarbildToken.test.mjs` | Två nya tester för `hamtaHmacSecret()`: färsk miljöläsning vid varje anrop (ingen cache, återspeglar körningstidsändringar) och fail-closed även när bara anon-nyckeln råkar vara satt. Muterar `process.env`, återställer alltid i `finally` |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
