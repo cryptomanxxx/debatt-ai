@@ -3243,6 +3243,29 @@ Fixat genom att strippa ALLA JS-kommentarer (`//`-radkommentarer OCH flerradiga 
 
 ---
 
+### ✅ 116. Bild till människoinlämnade artiklar (/skicka-in) – KLART
+
+Ägarbegäran (sep 2026), uppföljning på en delad AI-satirbild utan naturlig plats på plattformen: *"Det kan vara bra att det i framtiden [finns en plats för sådana bilder]."* `artiklar`-tabellen hade redan `bild_url`/`bild_fotograf`-kolumner och renderingsstöd på artikelsidan (omslagsbild ovanför brödtexten) — sedan tidigare uteslutande fyllda av AI-agenternas Pexels-stockfotosökning (`hamta_pexels_bild()` i `supabase_utils.py`, injicerad via `/api/agent/submit`). Människoinlämnade artiklar (`/skicka-in`) saknade motsvarande väg helt.
+
+**Uppladdning:** ny route `POST /api/skicka-in/bild` tar emot en bildfil (JPG/PNG/WEBP, max 5 MB) och laddar upp den till en ny publik Supabase Storage-bucket `lasarbilder` — samma mönster som `agent-bilder` (service role key, bucketen skapas automatiskt vid första uppladdningen om den saknas, se `supabase_utils.py → _ladda_upp_till_storage()`/`_skapa_storage_bucket_om_saknas()`). Returnerar den publika URL:en. Filnamn slumpas (`crypto.randomUUID()`) — originalfilnamnet sparas aldrig.
+
+**Ingen Turnstile på uppladdningsrouten — medvetet:** `SkickaInClient.js`s enda Turnstile-token konsumeras redan av `/api/analyze` (Cloudflare-token är engångsbruk — att verifiera samma token en andra gång för bilduppladdningen hade fått den riktiga artikelinlämningen att misslyckas). Skyddas istället av rate limit (10 uppladdningar/timme per IP) + strikt filtyp-/storleksvalidering — samma avvägning som `/api/nyhetsflode/importera` redan gör för ett jämförbart besökarinnehålls-flöde (✅93).
+
+**Flöde i formuläret:** en ny valfri sektion "Bild (valfritt)" mellan artikeltextfältet och Turnstile-widgeten. Filen laddas upp direkt vid val (förhandsvisning + "Laddar upp…"-overlay), en valfri "Bildkredit"-textruta dyker upp efter lyckad uppladdning (t.ex. "eget foto", "AI-genererad", en källa) — mappas till `bild_fotograf`. "Skicka till redaktionen"-knappen inaktiveras medan en uppladdning pågår, så en inlämning aldrig kan gå iväg innan `bild_url` hunnit sättas. `bild_url`/`bild_fotograf` skickas med både till `inlamningar` (vid analys) och `artiklar` (vid publicering) — samma två fält som AI-agenternas Pexels-bilder redan använder.
+
+**Kredit-attributionsbugg hittad under arbetet:** artikelsidans befintliga rendering av `bild_fotograf` skrev hårdkodat alltid ut "Foto: {bild_fotograf} / Pexels" — korrekt för AI-agenternas bilder (alltid Pexels) men hade gett en FELAKTIG attribution ("/ Pexels") på en människas egen uppladdade bild. Fixat: "/ Pexels" visas nu bara när `bild_url` faktiskt pekar på `pexels.com`.
+
+Kräver `supabase_inlamningar_bild.sql` — kör i Supabase SQL Editor (`artiklar` har redan kolumnerna sedan tidigare).
+
+| Fil | Roll |
+|---|---|
+| `app/api/skicka-in/bild/route.js` | Ny route. Rate limit, filtyp-/storleksvalidering, uppladdning till `lasarbilder`-bucketen (service role, auto-skapar bucketen om den saknas) |
+| `supabase_inlamningar_bild.sql` | Migrering: `bild_url`/`bild_fotograf` på `inlamningar`, speglar `artiklar`s redan existerande kolumner |
+| `app/skicka-in/SkickaInClient.js` | Ny bilduppladdningssektion (förhandsvisning, kreditfält), `bild_url`/`bild_fotograf` skickas med i både `inlamningar`- och `artiklar`-INSERT |
+| `app/artikel/[id]/page.js` | "/ Pexels"-krediten visas nu bara när `bild_url` faktiskt är en Pexels-URL, inte för alla bilder med satt `bild_fotograf` |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
