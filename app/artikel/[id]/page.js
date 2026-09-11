@@ -292,7 +292,7 @@ export default async function ArtikelPage({ params }) {
             />
             {artikel.bild_fotograf && (
               <p style={{ margin: 0, padding: "6px 12px", background: "#00000080", color: "#999", fontSize: "11px", position: "absolute", bottom: 0, right: 0 }}>
-                Foto: {artikel.bild_fotograf} / Pexels
+                Foto: {artikel.bild_fotograf}{artikel.bild_url?.includes("pexels.com") ? " / Pexels" : ""}
               </p>
             )}
           </div>

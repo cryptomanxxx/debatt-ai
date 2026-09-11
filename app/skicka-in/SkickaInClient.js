@@ -112,6 +112,11 @@ export default function SkickaInClient() {
   const [röstFel, setRöstFel] = useState("");
   const [röstStöds, setRöstStöds] = useState(true);
   const recognitionRef = useRef(null);
+  const [bildForhandsvisning, setBildForhandsvisning] = useState(null);
+  const [bildUrl, setBildUrl] = useState(null);
+  const [bildFotograf, setBildFotograf] = useState("");
+  const [bildUppladdar, setBildUppladdar] = useState(false);
+  const [bildFel, setBildFel] = useState("");
 
   useEffect(() => {
     window.onTurnstileVerified = (token) => setTurnstileToken(token);
@@ -181,6 +186,47 @@ export default function SkickaInClient() {
     setRöstFel("");
   }
 
+  const BILD_TYPER = ["image/jpeg", "image/png", "image/webp"];
+  const BILD_MAX_BYTES = 5 * 1024 * 1024;
+
+  async function valjBild(e) {
+    const fil = e.target.files?.[0];
+    e.target.value = ""; // tillåt att välja samma fil igen senare
+    if (!fil) return;
+    setBildFel("");
+    if (!BILD_TYPER.includes(fil.type)) {
+      setBildFel("Bilden måste vara JPG, PNG eller WEBP.");
+      return;
+    }
+    if (fil.size > BILD_MAX_BYTES) {
+      setBildFel("Bilden är för stor (max 5 MB).");
+      return;
+    }
+    setBildForhandsvisning(URL.createObjectURL(fil));
+    setBildUrl(null);
+    setBildUppladdar(true);
+    try {
+      const form = new FormData();
+      form.append("bild", fil);
+      const res = await fetch("/api/skicka-in/bild", { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) throw new Error(data.fel || "Uppladdningen misslyckades.");
+      setBildUrl(data.url);
+    } catch (err) {
+      setBildFel(err.message || "Uppladdningen misslyckades. Försök igen.");
+      setBildForhandsvisning(null);
+    } finally {
+      setBildUppladdar(false);
+    }
+  }
+
+  function taBortBild() {
+    setBildForhandsvisning(null);
+    setBildUrl(null);
+    setBildFotograf("");
+    setBildFel("");
+  }
+
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   const ok = result && ["arg", "ori", "rel", "tro"].every(k => result[k] >= MIN_SCORE);
 
@@ -188,6 +234,7 @@ export default function SkickaInClient() {
     setView("form"); setResult(null); setError(null);
     setTitle(""); setAuthor(""); setText("");
     setTurnstileToken(null); setInlamningId(null);
+    taBortBild();
   }
 
   async function analyze() {
@@ -215,6 +262,8 @@ export default function SkickaInClient() {
             beslut: parsed.beslut,
             arg: parsed.arg, ori: parsed.ori, rel: parsed.rel, tro: parsed.tro,
             status: "inkorg",
+            bild_url: bildUrl || null,
+            bild_fotograf: bildFotograf.trim() || null,
           }),
         });
         const inlData = await inlRes.json();
@@ -244,6 +293,8 @@ export default function SkickaInClient() {
           arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
           taggar: result.taggar || [],
           kalla: "manniska",
+          bild_url: bildUrl || null,
+          bild_fotograf: bildFotograf.trim() || null,
         }),
       });
       if (!res.ok) throw new Error();
@@ -307,9 +358,36 @@ export default function SkickaInClient() {
                   )}
                 </div>
               </div>
+              <div>
+                <Lbl>Bild (valfritt)</Lbl>
+                {bildForhandsvisning ? (
+                  <div style={{ position: "relative", display: "inline-block" }}>
+                    <img src={bildForhandsvisning} alt="" style={{ maxWidth: "260px", maxHeight: "160px", borderRadius: "4px", display: "block", opacity: bildUppladdar ? 0.5 : 1 }} />
+                    {bildUppladdar && (
+                      <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: C.text, fontSize: "12px", background: "#00000040" }}>Laddar upp…</span>
+                    )}
+                    {!bildUppladdar && bildUrl && (
+                      <button type="button" onClick={taBortBild} style={{ position: "absolute", top: "6px", right: "6px", background: "#000000a0", border: "none", color: C.text, borderRadius: "4px", padding: "4px 8px", fontSize: "12px", cursor: "pointer" }}>✕ Ta bort</button>
+                    )}
+                  </div>
+                ) : (
+                  <label style={{ display: "inline-flex", alignItems: "center", gap: "7px", background: "none", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "10px 16px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+                    📷 Bifoga en bild
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={valjBild} style={{ display: "none" }} />
+                  </label>
+                )}
+                {bildFel && <p style={{ color: C.red, fontSize: "12px", margin: "8px 0 0 0" }}>{bildFel}</p>}
+                {bildUrl && (
+                  <div style={{ marginTop: "10px", maxWidth: "400px" }}>
+                    <Lbl>Bildkredit (valfritt)</Lbl>
+                    <input value={bildFotograf} onChange={e => setBildFotograf(e.target.value)} placeholder="T.ex. eget foto, AI-genererad, källa …" style={inp} />
+                  </div>
+                )}
+                <p style={{ fontSize: "12px", color: C.textMuted, margin: "6px 0 0 0" }}>JPG, PNG eller WEBP, max 5 MB. Visas som omslagsbild ovanför artikeltexten.</p>
+              </div>
               <div className="cf-turnstile" data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} data-callback="onTurnstileVerified" data-theme="dark" />
-              <button onClick={analyze} disabled={analyzing || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || !turnstileToken || wordCount < 300) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
-                {analyzing ? `Redaktören läser${".".repeat(dots)}` : "Skicka till redaktionen →"}
+              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300 || bildUppladdar) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < 300) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
+                {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : "Skicka till redaktionen →"}
               </button>
               {error && <p style={{ color: C.red, fontSize: "14px", margin: 0 }}>{error}</p>}
             </div>
