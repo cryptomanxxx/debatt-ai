@@ -16,6 +16,12 @@ SkickaInClient.js → valjBild()/taBortBild(), men det här skriptet är den
 garanterade backstopen för allt UI-lagret inte hann fånga) är föräldralös
 och städas bort efter MAX_AGE_HOURS.
 
+Kräver SUPABASE_SERVICE_ROLE_KEY explicit (ingen tyst fallback till anon-
+nyckeln) — både referens-läsningarna och Storage-listningen/raderingen
+använder den, så att RLS aldrig kan dölja en faktiskt refererad rad och få
+en använd bild att felaktigt bedömas föräldralös. Referens-läsningarna
+paginerar hela inlamningar/artiklar (inget fast limit) av samma skäl.
+
 Körs via GitHub Actions, se .github/workflows/cleanup-lasarbilder.yml.
 """
 import os
@@ -33,25 +39,35 @@ FILNAMN_RE = re.compile(r"/lasarbilder/([0-9a-f-]{36}\.(?:jpg|png|webp))", re.IG
 
 def hamta_anvanda_filnamn(h_read):
     """Filnamn som förekommer i bild_url på inlamningar eller artiklar — dessa
-    får aldrig raderas oavsett ålder."""
+    får aldrig raderas oavsett ålder. Paginerar hela tabellen (inget fast
+    limit) så en tabell med fler än en sida rader aldrig ger falska
+    "föräldralös"-träffar för rader som bara inte fick plats i första sidan."""
     anvanda = set()
+    page = 1000
     for tabell in ("inlamningar", "artiklar"):
-        try:
-            r = httpx.get(
-                f"{SB_URL}/rest/v1/{tabell}?select=bild_url&bild_url=not.is.null&limit=10000",
-                headers=h_read, timeout=30,
-            )
-            r.raise_for_status()
-            for rad in r.json():
+        offset = 0
+        while True:
+            try:
+                r = httpx.get(
+                    f"{SB_URL}/rest/v1/{tabell}?select=bild_url&bild_url=not.is.null"
+                    f"&limit={page}&offset={offset}",
+                    headers=h_read, timeout=30,
+                )
+                r.raise_for_status()
+                sida = r.json()
+            except Exception as e:
+                # Fail-safe: om en tabell inte går att läsa, avbryt hellre hela
+                # körningen än att riskera att radera bilder som faktiskt används
+                # (okänt = skyddat, inte "inte hittat = ta bort").
+                print(f"FEL: kunde inte läsa {tabell} (offset {offset}): {e}", file=sys.stderr)
+                sys.exit(1)
+            for rad in sida:
                 m = FILNAMN_RE.search(rad.get("bild_url") or "")
                 if m:
                     anvanda.add(m.group(1).lower())
-        except Exception as e:
-            # Fail-safe: om en tabell inte går att läsa, avbryt hellre hela
-            # körningen än att riskera att radera bilder som faktiskt används
-            # (okänt = skyddat, inte "inte hittat = ta bort").
-            print(f"FEL: kunde inte läsa {tabell}: {e}", file=sys.stderr)
-            sys.exit(1)
+            if len(sida) < page:
+                break
+            offset += page
     return anvanda
 
 
@@ -82,19 +98,22 @@ def lista_bucket_objekt(h_write):
 
 
 def main():
-    sb_key = os.environ.get("SUPABASE_ANON_KEY", "").strip()
-    svc_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip() or sb_key
-    if not sb_key:
-        print("FEL: SUPABASE_ANON_KEY saknas.", file=sys.stderr)
+    # Kräver service role explicit (ingen tyst fallback till anon-nyckeln,
+    # till skillnad från de flesta andra skripten i den här kodbasen) — det
+    # här är den enda platsen där en RLS-begränsad läsning skulle kunna få
+    # en FAKTISKT refererad bild att se föräldralös ut och raderas. Hellre
+    # att körningen avbryts helt än att den städar med ofullständig insyn.
+    svc_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    if not svc_key:
+        print("FEL: SUPABASE_SERVICE_ROLE_KEY saknas — avbryter.", file=sys.stderr)
         sys.exit(1)
 
-    h_read = {"apikey": sb_key, "Authorization": f"Bearer {sb_key}"}
-    h_write = {"apikey": svc_key, "Authorization": f"Bearer {svc_key}", "Content-Type": "application/json"}
+    h = {"apikey": svc_key, "Authorization": f"Bearer {svc_key}", "Content-Type": "application/json"}
 
-    anvanda = hamta_anvanda_filnamn(h_read)
+    anvanda = hamta_anvanda_filnamn(h)
     print(f"📎 {len(anvanda)} bilder är refererade i inlamningar/artiklar")
 
-    objekt = lista_bucket_objekt(h_write)
+    objekt = lista_bucket_objekt(h)
     print(f"🗂️  {len(objekt)} objekt i {BUCKET}-bucketen")
     if not objekt:
         print("Inget att rensa.")
@@ -130,7 +149,7 @@ def main():
         # cleanup_bilder.py använder för agent-bilder-bucketens bulk-delete.
         dr = httpx.request(
             "DELETE", f"{SB_URL}/storage/v1/object/{BUCKET}",
-            headers=h_write, json={"prefixes": batch}, timeout=30,
+            headers=h, json={"prefixes": batch}, timeout=30,
         )
         if dr.is_success:
             raderade += len(batch)

@@ -114,6 +114,7 @@ export default function SkickaInClient() {
   const recognitionRef = useRef(null);
   const [bildForhandsvisning, setBildForhandsvisning] = useState(null);
   const [bildUrl, setBildUrl] = useState(null);
+  const [bildToken, setBildToken] = useState(null);
   const [bildFotograf, setBildFotograf] = useState("");
   const [bildUppladdar, setBildUppladdar] = useState(false);
   const [bildFel, setBildFel] = useState("");
@@ -193,13 +194,15 @@ export default function SkickaInClient() {
   // bucketen igen. Fire-and-forget: klientens UI ska aldrig vänta på eller
   // blockeras av det här anropet, och ett misslyckande här är ofarligt —
   // cleanup_lasarbilder.py städar periodiskt bort allt som blir kvar
-  // föräldralöst (aldrig kopplat till en inlämning).
-  function raderaUppladdadBild(url) {
-    if (!url) return;
+  // föräldralöst (aldrig kopplat till en inlämning). Kräver raderingstoken
+  // som fick tillbaka från POST-svaret — bara URL:en räcker inte längre
+  // (se motivering i route.js).
+  function raderaUppladdadBild(url, token) {
+    if (!url || !token) return;
     fetch("/api/skicka-in/bild", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, token }),
     }).catch(() => {});
   }
 
@@ -220,8 +223,10 @@ export default function SkickaInClient() {
     // föräldralös i Storage — ta bort den direkt istället för att bara
     // förlita sig på cleanup_lasarbilder.py.
     const tidigareUrl = bildUrl;
+    const tidigareToken = bildToken;
     setBildForhandsvisning(URL.createObjectURL(fil));
     setBildUrl(null);
+    setBildToken(null);
     setBildUppladdar(true);
     try {
       const form = new FormData();
@@ -230,7 +235,8 @@ export default function SkickaInClient() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.url) throw new Error(data.fel || "Uppladdningen misslyckades.");
       setBildUrl(data.url);
-      raderaUppladdadBild(tidigareUrl);
+      setBildToken(data.token || null);
+      raderaUppladdadBild(tidigareUrl, tidigareToken);
     } catch (err) {
       setBildFel(err.message || "Uppladdningen misslyckades. Försök igen.");
       setBildForhandsvisning(null);
@@ -247,6 +253,7 @@ export default function SkickaInClient() {
   function nollstallBildState() {
     setBildForhandsvisning(null);
     setBildUrl(null);
+    setBildToken(null);
     setBildFotograf("");
     setBildFel("");
   }
@@ -256,8 +263,9 @@ export default function SkickaInClient() {
   // inlamningar-/artiklar-rad här. Tar bort den faktiskt ur Storage.
   function taBortBild() {
     const urlAttRadera = bildUrl;
+    const tokenAttRadera = bildToken;
     nollstallBildState();
-    raderaUppladdadBild(urlAttRadera);
+    raderaUppladdadBild(urlAttRadera, tokenAttRadera);
   }
 
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
