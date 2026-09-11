@@ -233,9 +233,14 @@ export default function SkickaInClient() {
       form.append("bild", fil);
       const res = await fetch("/api/skicka-in/bild", { method: "POST", body: form });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.url) throw new Error(data.fel || "Uppladdningen misslyckades.");
+      // Kräv BÅDE url och token — ett svar med bara url (t.ex. om servern
+      // någon gång skulle sluta returnera token) hade lämnat oss utan sätt
+      // att radera bilden igen, och ett token utan url är meningslöst.
+      if (!res.ok || !data.url || !data.token) {
+        throw new Error(data.fel || "Uppladdningen misslyckades.");
+      }
       setBildUrl(data.url);
-      setBildToken(data.token || null);
+      setBildToken(data.token);
       raderaUppladdadBild(tidigareUrl, tidigareToken);
     } catch (err) {
       setBildFel(err.message || "Uppladdningen misslyckades. Försök igen.");

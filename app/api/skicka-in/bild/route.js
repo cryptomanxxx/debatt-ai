@@ -26,9 +26,12 @@
 // Storage-URL är per definition delad (den visas i artikeltexten, kan synas
 // i referrer-headers, skärmdumpar m.m.), så att låta den fungera som egen
 // behörighet hade gjort vem som helst som ser bilden till en potentiell
-// raderare. Token = HMAC-SHA256(filnamn) nyckad med SB_WRITE_KEY (en
-// server-only-hemlighet som aldrig når klienten — HMAC-utdata läcker den
-// inte) och jämförs tidskonstant (timingSafeEqual).
+// raderare. Token = HMAC-SHA256(filnamn) nyckad med SUPABASE_SERVICE_ROLE_KEY
+// (HMAC_SECRET nedan) — MEDVETET aldrig anon-nyckeln, som är synlig för
+// klienten och därför skulle göra token förfalskningsbart om den användes
+// (se HMAC_SECRET-kommentaren nedan) — och jämförs tidskonstant
+// (timingSafeEqual). Saknas den privata nyckeln svarar både POST och DELETE
+// 503 istället för att falla tillbaka på ett svagare skydd.
 // Kompletteras av cleanup_lasarbilder.py (körs periodiskt via GitHub Actions)
 // som städar bort bilder ingen någonsin kopplade till en inlämning alls —
 // t.ex. om besökaren stänger fliken direkt efter uppladdning utan att
@@ -40,6 +43,17 @@ import { logFel, getIp } from "../../../lib/logFel";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_ANON_KEY;
+
+// Nyckel för raderingstoken — MEDVETET utan fallback till anon-nyckeln.
+// NEXT_PUBLIC_SUPABASE_ANON_KEY är per definition synlig för klienten (den
+// bäddas in i webbläsarbunten), så om den någonsin använts som HMAC-nyckel
+// hade vem som helst kunnat räkna ut ett giltigt raderingstoken för valfritt
+// filnamn själva — HMAC-SHA256(filnamn, anon-nyckel) kräver bara att man
+// känner till nyckeln, och den nyckeln är redan offentlig. Bara den privata
+// SUPABASE_SERVICE_ROLE_KEY (server-only, aldrig skickad till klienten) får
+// nyckla token. Saknas den misslyckas uppladdning/radering hellre helt
+// (503, se nedan) än att tyst falla tillbaka på en osäker nyckel.
+const HMAC_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 const BUCKET = "lasarbilder";
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -82,15 +96,17 @@ function filSignaturMatchar(bytes, contentType) {
   return false;
 }
 
-// Raderingstoken = HMAC-SHA256(filnamn) nyckad med SB_WRITE_KEY. Genereras
-// vid uppladdning och skickas tillbaka i POST-svaret; DELETE kräver att
-// klienten skickar tillbaka exakt detta token — inte bara URL:en (se
-// filhuvudkommentaren ovan för motivering).
+// Raderingstoken = HMAC-SHA256(filnamn) nyckad med HMAC_SECRET (den privata
+// SUPABASE_SERVICE_ROLE_KEY, aldrig anon-nyckeln). Genereras vid uppladdning
+// och skickas tillbaka i POST-svaret; DELETE kräver att klienten skickar
+// tillbaka exakt detta token — inte bara URL:en (se filhuvudkommentaren ovan
+// för motivering).
 function delningsToken(filnamn) {
-  return createHmac("sha256", SB_WRITE_KEY).update(filnamn).digest("hex");
+  return createHmac("sha256", HMAC_SECRET).update(filnamn).digest("hex");
 }
 
 function tokenMatchar(filnamn, token) {
+  if (!HMAC_SECRET) return false;
   if (typeof token !== "string" || !/^[0-9a-f]{64}$/i.test(token)) return false;
   const forvantad = delningsToken(filnamn);
   return timingSafeEqual(Buffer.from(token.toLowerCase(), "hex"), Buffer.from(forvantad, "hex"));
@@ -125,6 +141,21 @@ async function laddaUpp(bytes, contentType, filnamn) {
 
 export async function POST(req) {
   const ip = getIp(req);
+  if (!HMAC_SECRET) {
+    // Utan en privat servernyckel kan vi inte utfärda ett meningsfullt
+    // raderingstoken (se HMAC_SECRET-kommentaren ovan) — fail closed hellre
+    // än att generera ett token som skulle behöva nyckla på anon-nyckeln.
+    logFel({
+      kalla: "skicka-in/bild",
+      feltyp: "saknad_service_role_key",
+      meddelande: "SUPABASE_SERVICE_ROLE_KEY saknas — kan inte utfärda raderingstoken",
+      ip,
+    });
+    return Response.json(
+      { fel: "Bilduppladdning är tillfälligt otillgänglig." },
+      { status: 503 }
+    );
+  }
   const rl = checkRateLimit(req, "skicka-in-bild", 10, 60 * 60 * 1000);
   if (!rl.ok) {
     return Response.json(
@@ -186,6 +217,21 @@ export async function POST(req) {
 }
 
 export async function DELETE(req) {
+  if (!HMAC_SECRET) {
+    // Samma fail-closed-princip som POST: utan den privata nyckeln kan inget
+    // token någonsin verifieras korrekt, så vi vägrar radera överhuvudtaget
+    // istället för att falla tillbaka på ett svagare (eller inget) skydd.
+    logFel({
+      kalla: "skicka-in/bild",
+      feltyp: "saknad_service_role_key",
+      meddelande: "SUPABASE_SERVICE_ROLE_KEY saknas — kan inte verifiera raderingstoken",
+      ip: getIp(req),
+    });
+    return Response.json(
+      { fel: "Bildradering är tillfälligt otillgänglig." },
+      { status: 503 }
+    );
+  }
   const rl = checkRateLimit(req, "skicka-in-bild-delete", 20, 60 * 60 * 1000);
   if (!rl.ok) {
     return Response.json(
