@@ -284,11 +284,11 @@ export default async function ArtikelPage({ params }) {
 
         {/* Omslagsbild */}
         {artikel.bild_url && (
-          <div style={{ marginBottom: "36px", borderRadius: "6px", overflow: "hidden", position: "relative" }}>
+          <div style={{ marginBottom: "36px", borderRadius: "6px", overflow: "hidden", position: "relative", background: C.surface }}>
             <img
               src={artikel.bild_url}
               alt={artikel.rubrik}
-              style={{ width: "100%", maxHeight: "380px", objectFit: "cover", display: "block" }}
+              style={{ width: "100%", maxHeight: "600px", objectFit: "contain", display: "block", margin: "0 auto" }}
             />
             {artikel.bild_fotograf && (
               <p style={{ margin: 0, padding: "6px 12px", background: "#00000080", color: "#999", fontSize: "11px", position: "absolute", bottom: 0, right: 0 }}>
