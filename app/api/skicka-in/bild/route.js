@@ -13,7 +13,21 @@
 // verifiera samma token två gånger hade fått den andra verifieringen att
 // misslyckas). Skyddas istället av rate limit + strikt filvalidering, samma
 // avvägning som /api/nyhetsflode/importera redan gör för ett jämförbart
-// besökarinnehålls-flöde.
+// besökarinnehålls-flöde. checkRateLimit() är in-memory per serverless-
+// instans (se lib/kanalRateLimit.js) — samma dokumenterade begränsning som
+// alla andra rate-limiterade routes i den här kodbasen, inte unikt för
+// denna. En riktig delad/durabel rate limiter är en separat, större
+// avvägning som inte görs ensidigt bara för den här endpointen.
+//
+// DELETE /api/skicka-in/bild {url} — tar bort en uppladdad men aldrig
+// kopplad bild igen (klickad "✕ Ta bort" innan artikeln skickats in, eller
+// en bild som ersätts med en ny). Filnamnet i URL:en är ett slumpat UUID —
+// att känna till det exakta filnamnet fungerar som behörighet, samma modell
+// som att en publik Storage-URL i sig är obevakad men opraktisk att gissa.
+// Kompletteras av cleanup_lasarbilder.py (körs periodiskt via GitHub Actions)
+// som städar bort bilder ingen någonsin kopplade till en inlämning alls —
+// t.ex. om besökaren stänger fliken direkt efter uppladdning utan att
+// klicka "✕ Ta bort".
 import { checkRateLimit } from "../../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../../lib/logFel";
 
@@ -28,6 +42,39 @@ const TILLATNA_TYPER = {
   "image/png": "png",
   "image/webp": "webp",
 };
+
+// UUID (från crypto.randomUUID()) + en av de tre tillåtna filändelserna —
+// exakt det format den här routen själv genererar vid uppladdning. Används
+// både för att validera DELETE-anrop (skydd mot path traversal/godtyckliga
+// Storage-nycklar) och kan återanvändas av framtida verktyg som behöver
+// känna igen ett giltigt lasarbilder-filnamn.
+const FILNAMN_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$/i;
+
+// Kontrollerar filens FAKTISKA innehåll (magic bytes) mot det Content-Type
+// klienten påstod — multipart-headern är obekräftad metadata och kan sättas
+// till vad som helst av en anropare som pratar direkt mot API:et förbi
+// webbläsarens filväljare. En godtycklig binärfil (eller HTML/JS) omdöpt/
+// deklarerad som en bild hade annars lagrats och serverats publikt under en
+// image/*-etikett. Kollar bara de första byten (headers), inte hela filens
+// giltighet — tillräckligt för att stoppa enkel typ-spoofing, inte en
+// fullständig bildvalidering.
+function filSignaturMatchar(bytes, contentType) {
+  if (contentType === "image/jpeg") {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (contentType === "image/png") {
+    const sig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    return bytes.length >= sig.length && sig.every((b, i) => bytes[i] === b);
+  }
+  if (contentType === "image/webp") {
+    return (
+      bytes.length >= 12 &&
+      bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && // "RIFF"
+      bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50 // "WEBP"
+    );
+  }
+  return false;
+}
 
 async function skapaBucketOmSaknas() {
   try {
@@ -87,6 +134,9 @@ export async function POST(req) {
   }
 
   const bytes = Buffer.from(await fil.arrayBuffer());
+  if (!filSignaturMatchar(bytes, fil.type)) {
+    return Response.json({ fel: "Filen verkar inte vara en giltig bild." }, { status: 400 });
+  }
   const filnamn = `${crypto.randomUUID()}.${ext}`;
 
   let res = await laddaUpp(bytes, fil.type, filnamn);
@@ -110,4 +160,51 @@ export async function POST(req) {
   }
 
   return Response.json({ url: `${SB_URL}/storage/v1/object/public/${BUCKET}/${filnamn}` });
+}
+
+export async function DELETE(req) {
+  const rl = checkRateLimit(req, "skicka-in-bild-delete", 20, 60 * 60 * 1000);
+  if (!rl.ok) {
+    return Response.json(
+      { fel: "För många förfrågningar — försök igen om en stund." },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
+    );
+  }
+
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ fel: "Ogiltig förfrågan." }, { status: 400 });
+  }
+
+  const url = typeof body?.url === "string" ? body.url : "";
+  const prefix = `${SB_URL}/storage/v1/object/public/${BUCKET}/`;
+  if (!url.startsWith(prefix)) {
+    return Response.json({ fel: "Ogiltig bild-URL." }, { status: 400 });
+  }
+  const filnamn = url.slice(prefix.length);
+  if (!FILNAMN_RE.test(filnamn)) {
+    return Response.json({ fel: "Ogiltigt filnamn." }, { status: 400 });
+  }
+
+  try {
+    const res = await fetch(`${SB_URL}/storage/v1/object/${BUCKET}/${filnamn}`, {
+      method: "DELETE",
+      headers: { apikey: SB_WRITE_KEY, Authorization: `Bearer ${SB_WRITE_KEY}` },
+    });
+    if (!res.ok) {
+      logFel({
+        kalla: "skicka-in/bild",
+        feltyp: "supabase_delete_fail",
+        meddelande: `HTTP ${res.status}`,
+        ip: getIp(req),
+      });
+    }
+  } catch {}
+
+  // Alltid ok mot klienten — det är ett best-effort-städanrop (klienten har
+  // redan tagit bort bilden ur sin egen UI oavsett), och cleanup_lasarbilder.py
+  // städar upp allt som faktiskt blir kvar föräldralöst i bucketen.
+  return Response.json({ ok: true });
 }

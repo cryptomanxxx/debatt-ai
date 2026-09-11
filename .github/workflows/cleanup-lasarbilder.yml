@@ -1,0 +1,26 @@
+name: Cleanup föräldralösa läsarbilder
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # Dagligen 05:00 svensk tid (03:00 UTC)
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Installera beroenden
+        run: pip install httpx
+
+      - name: Rensa föräldralösa bilder
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PYTHONUNBUFFERED: "1"
+        run: python -u cleanup_lasarbilder.py
