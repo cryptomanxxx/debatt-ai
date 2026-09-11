@@ -3304,6 +3304,18 @@ Fixat genom att separera de två nycklarnas syften helt: en ny `HMAC_SECRET = pr
 | `app/api/skicka-in/bild/route.js` | Ny `HMAC_SECRET` (bara `SUPABASE_SERVICE_ROLE_KEY`, inget anon-fallback) — separerad från `SB_WRITE_KEY` som fortsatt styr Storage-API-anropen. `delningsToken()`/`tokenMatchar()` nycklar nu bara med `HMAC_SECRET`. Både `POST` och `DELETE` svarar 503 direkt om `HMAC_SECRET` saknas |
 | `app/skicka-in/SkickaInClient.js` | `valjBild()` kräver nu både `data.url` och `data.token` i POST-svaret innan uppladdningen accepteras |
 
+**Codex-fynd (uppföljande kommentar på PR #1450 — beskrev en föreslagen ändring, inget faktiskt landat i repot): bryt ut HMAC-nyckelval/tokengenerering/verifiering till en testbar modul.** Kommentaren påstod att ändringen redan var committad (`a33a7d9`) och en uppföljande PR skapad — verifierat mot både `git log` och GitHub-sökning att varken commiten eller PR:en existerade; `chatgpt-codex-connector[bot]` saknar push-behörighet i det här repot och kan bara lämna kommentarer/förslag, inte landa kod (samma mönster som tidigare Codex-fynd i den här loggen — förslaget måste implementeras separat). Själva förslaget var dock giltigt: `delningsToken()`/`tokenMatchar()`/nyckelvalet levde bara inline i `route.js`, oåtkomligt för ett fristående test utan att mocka hela Next.js-routen.
+
+Implementerat genom att bryta ut logiken till `app/lib/lasarbildToken.mjs` (`.mjs`, inte `.js` — låter Nodes testrunner importera den direkt med native ESM utan `createRequire`-omvägen `tests/metrics.test.mjs` annars hade behövt). `valjHmacSecret({serviceRoleKey, anonKey})` är en ren funktion som tar emot kandidaterna som explicita argument istället för att läsa `process.env` direkt — gör uteslutningen av anon-nyckeln verifierbar i test utan att mutera globalt miljötillstånd mellan testfall. `hamtaHmacSecret()` är den tunna wrappern som faktiskt läser `process.env` vid anropstillfället, använd av `route.js` (`const HMAC_SECRET = hamtaHmacSecret()`, oförändrat beteende — beräknas fortfarande en gång vid modulladdning). `route.js` behåller två lokala engelsöversatta wrappers (`skapaDelningsToken()`/`verifieraToken()`) som binder in filens `HMAC_SECRET`, så anropsställena inte behövde ändras till att skicka med nyckeln varje gång.
+
+`tests/lasarbildToken.test.mjs` (8 tester, samma `node --test tests/*.test.mjs`-mönster som `tests/metrics.test.mjs`): väljer aldrig anon-nyckeln (med eller utan service-role-nyckel satt), `tokenMatchar()` fail-closed när secret saknas oavsett hur giltigt tokenet ser ut, korrekt nyckel+token matchar, olika filnamn ger olika token, ett token beräknat med anon-nyckeln matchar aldrig mot service-role-nyckeln (den konkreta förfalsknings-attacken P4/uppföljningen ovan skyddar mot), malformade tokens (fel längd, icke-hex, null/undefined/tal) avvisas, och hex-jämförelsen är case-insensitive. Verifierat: `node --test tests/*.test.mjs` — 39/39 gröna (31 befintliga i `metrics.test.mjs` + 8 nya).
+
+| Fil | Roll (tillägg, uppföljande kommentar på #1450) |
+|---|---|
+| `app/lib/lasarbildToken.mjs` | Ny modul: `valjHmacSecret()` (ren funktion, ingen `process.env`-läsning), `hamtaHmacSecret()`, `delningsToken()`, `tokenMatchar()` — bruten ut ur `route.js` för att göra HMAC-logiken testbar isolerat |
+| `app/api/skicka-in/bild/route.js` | Importerar från `lasarbildToken.mjs` istället för att definiera HMAC-logiken inline. Lokala `skapaDelningsToken()`/`verifieraToken()`-wrappers binder in filens `HMAC_SECRET` |
+| `tests/lasarbildToken.test.mjs` | Nytt regressionstest, 8 fall — täcker anon-uteslutning, fail-closed, korrekt validering, anon-förfalskning, malformerade tokens |
+
 ---
 
 ## Den autonoma debatten – slutvisionen

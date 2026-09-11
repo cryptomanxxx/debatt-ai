@@ -36,9 +36,9 @@
 // som städar bort bilder ingen någonsin kopplade till en inlämning alls —
 // t.ex. om besökaren stänger fliken direkt efter uppladdning utan att
 // klicka "✕ Ta bort".
-import { createHmac, timingSafeEqual } from "crypto";
 import { checkRateLimit } from "../../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../../lib/logFel";
+import { hamtaHmacSecret, delningsToken, tokenMatchar } from "../../../lib/lasarbildToken.mjs";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -53,7 +53,7 @@ const SB_WRITE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SB_ANON_KEY;
 // SUPABASE_SERVICE_ROLE_KEY (server-only, aldrig skickad till klienten) får
 // nyckla token. Saknas den misslyckas uppladdning/radering hellre helt
 // (503, se nedan) än att tyst falla tillbaka på en osäker nyckel.
-const HMAC_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const HMAC_SECRET = hamtaHmacSecret();
 
 const BUCKET = "lasarbilder";
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -100,16 +100,16 @@ function filSignaturMatchar(bytes, contentType) {
 // SUPABASE_SERVICE_ROLE_KEY, aldrig anon-nyckeln). Genereras vid uppladdning
 // och skickas tillbaka i POST-svaret; DELETE kräver att klienten skickar
 // tillbaka exakt detta token — inte bara URL:en (se filhuvudkommentaren ovan
-// för motivering).
-function delningsToken(filnamn) {
-  return createHmac("sha256", HMAC_SECRET).update(filnamn).digest("hex");
+// för motivering). Själva nyckelvalet + HMAC-logiken ligger i
+// lib/lasarbildToken.mjs (utbruten dit för att göra den testbar isolerat,
+// se tests/lasarbildToken.test.mjs) — de här är bara tunna wrappers som
+// alltid binder in den här filens HMAC_SECRET.
+function skapaDelningsToken(filnamn) {
+  return delningsToken(filnamn, HMAC_SECRET);
 }
 
-function tokenMatchar(filnamn, token) {
-  if (!HMAC_SECRET) return false;
-  if (typeof token !== "string" || !/^[0-9a-f]{64}$/i.test(token)) return false;
-  const forvantad = delningsToken(filnamn);
-  return timingSafeEqual(Buffer.from(token.toLowerCase(), "hex"), Buffer.from(forvantad, "hex"));
+function verifieraToken(filnamn, token) {
+  return tokenMatchar(filnamn, token, HMAC_SECRET);
 }
 
 async function skapaBucketOmSaknas() {
@@ -212,7 +212,7 @@ export async function POST(req) {
 
   return Response.json({
     url: `${SB_URL}/storage/v1/object/public/${BUCKET}/${filnamn}`,
-    token: delningsToken(filnamn),
+    token: skapaDelningsToken(filnamn),
   });
 }
 
@@ -256,7 +256,7 @@ export async function DELETE(req) {
   if (!FILNAMN_RE.test(filnamn)) {
     return Response.json({ fel: "Ogiltigt filnamn." }, { status: 400 });
   }
-  if (!tokenMatchar(filnamn, body?.token)) {
+  if (!verifieraToken(filnamn, body?.token)) {
     return Response.json({ fel: "Ogiltig raderingstoken." }, { status: 403 });
   }
 
