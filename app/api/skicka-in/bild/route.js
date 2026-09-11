@@ -19,15 +19,21 @@
 // denna. En riktig delad/durabel rate limiter är en separat, större
 // avvägning som inte görs ensidigt bara för den här endpointen.
 //
-// DELETE /api/skicka-in/bild {url} — tar bort en uppladdad men aldrig
+// DELETE /api/skicka-in/bild {url, token} — tar bort en uppladdad men aldrig
 // kopplad bild igen (klickad "✕ Ta bort" innan artikeln skickats in, eller
-// en bild som ersätts med en ny). Filnamnet i URL:en är ett slumpat UUID —
-// att känna till det exakta filnamnet fungerar som behörighet, samma modell
-// som att en publik Storage-URL i sig är obevakad men opraktisk att gissa.
+// en bild som ersätts med en ny). Kräver ett HMAC-baserat raderingstoken som
+// POST-svaret gav tillbaka vid uppladdningen — INTE bara URL:en. En publik
+// Storage-URL är per definition delad (den visas i artikeltexten, kan synas
+// i referrer-headers, skärmdumpar m.m.), så att låta den fungera som egen
+// behörighet hade gjort vem som helst som ser bilden till en potentiell
+// raderare. Token = HMAC-SHA256(filnamn) nyckad med SB_WRITE_KEY (en
+// server-only-hemlighet som aldrig når klienten — HMAC-utdata läcker den
+// inte) och jämförs tidskonstant (timingSafeEqual).
 // Kompletteras av cleanup_lasarbilder.py (körs periodiskt via GitHub Actions)
 // som städar bort bilder ingen någonsin kopplade till en inlämning alls —
 // t.ex. om besökaren stänger fliken direkt efter uppladdning utan att
 // klicka "✕ Ta bort".
+import { createHmac, timingSafeEqual } from "crypto";
 import { checkRateLimit } from "../../../lib/kanalRateLimit";
 import { logFel, getIp } from "../../../lib/logFel";
 
@@ -74,6 +80,20 @@ function filSignaturMatchar(bytes, contentType) {
     );
   }
   return false;
+}
+
+// Raderingstoken = HMAC-SHA256(filnamn) nyckad med SB_WRITE_KEY. Genereras
+// vid uppladdning och skickas tillbaka i POST-svaret; DELETE kräver att
+// klienten skickar tillbaka exakt detta token — inte bara URL:en (se
+// filhuvudkommentaren ovan för motivering).
+function delningsToken(filnamn) {
+  return createHmac("sha256", SB_WRITE_KEY).update(filnamn).digest("hex");
+}
+
+function tokenMatchar(filnamn, token) {
+  if (typeof token !== "string" || !/^[0-9a-f]{64}$/i.test(token)) return false;
+  const forvantad = delningsToken(filnamn);
+  return timingSafeEqual(Buffer.from(token.toLowerCase(), "hex"), Buffer.from(forvantad, "hex"));
 }
 
 async function skapaBucketOmSaknas() {
@@ -159,7 +179,10 @@ export async function POST(req) {
     return Response.json({ fel: "Uppladdningen misslyckades." }, { status: 500 });
   }
 
-  return Response.json({ url: `${SB_URL}/storage/v1/object/public/${BUCKET}/${filnamn}` });
+  return Response.json({
+    url: `${SB_URL}/storage/v1/object/public/${BUCKET}/${filnamn}`,
+    token: delningsToken(filnamn),
+  });
 }
 
 export async function DELETE(req) {
@@ -186,6 +209,9 @@ export async function DELETE(req) {
   const filnamn = url.slice(prefix.length);
   if (!FILNAMN_RE.test(filnamn)) {
     return Response.json({ fel: "Ogiltigt filnamn." }, { status: 400 });
+  }
+  if (!tokenMatchar(filnamn, body?.token)) {
+    return Response.json({ fel: "Ogiltig raderingstoken." }, { status: 403 });
   }
 
   try {
