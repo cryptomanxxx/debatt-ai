@@ -189,6 +189,20 @@ export default function SkickaInClient() {
   const BILD_TYPER = ["image/jpeg", "image/png", "image/webp"];
   const BILD_MAX_BYTES = 5 * 1024 * 1024;
 
+  // Best-effort städanrop — tar bort en uppladdad bild ur lasarbilder-
+  // bucketen igen. Fire-and-forget: klientens UI ska aldrig vänta på eller
+  // blockeras av det här anropet, och ett misslyckande här är ofarligt —
+  // cleanup_lasarbilder.py städar periodiskt bort allt som blir kvar
+  // föräldralöst (aldrig kopplat till en inlämning).
+  function raderaUppladdadBild(url) {
+    if (!url) return;
+    fetch("/api/skicka-in/bild", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }).catch(() => {});
+  }
+
   async function valjBild(e) {
     const fil = e.target.files?.[0];
     e.target.value = ""; // tillåt att välja samma fil igen senare
@@ -202,6 +216,10 @@ export default function SkickaInClient() {
       setBildFel("Bilden är för stor (max 5 MB).");
       return;
     }
+    // En redan uppladdad bild som ersätts med en ny annars blir permanent
+    // föräldralös i Storage — ta bort den direkt istället för att bara
+    // förlita sig på cleanup_lasarbilder.py.
+    const tidigareUrl = bildUrl;
     setBildForhandsvisning(URL.createObjectURL(fil));
     setBildUrl(null);
     setBildUppladdar(true);
@@ -212,6 +230,7 @@ export default function SkickaInClient() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.url) throw new Error(data.fel || "Uppladdningen misslyckades.");
       setBildUrl(data.url);
+      raderaUppladdadBild(tidigareUrl);
     } catch (err) {
       setBildFel(err.message || "Uppladdningen misslyckades. Försök igen.");
       setBildForhandsvisning(null);
@@ -220,11 +239,25 @@ export default function SkickaInClient() {
     }
   }
 
-  function taBortBild() {
+  // Klientstate-nollställning UTAN att radera i Storage — används av reset()
+  // efter en lyckad publicering (bilden är då redan kopplad till artikeln,
+  // radering hade förstört den publicerade bilden) eller vid "revidera och
+  // skicka in igen" (bilden är redan sparad på den befintliga inlamningar-
+  // raden). Skiljer sig medvetet från taBortBild() nedan.
+  function nollstallBildState() {
     setBildForhandsvisning(null);
     setBildUrl(null);
     setBildFotograf("");
     setBildFel("");
+  }
+
+  // Den explicita "✕ Ta bort"-knappen — bara synlig innan artikeln skickats
+  // in (view === "form"), så bilden kan aldrig redan vara kopplad till en
+  // inlamningar-/artiklar-rad här. Tar bort den faktiskt ur Storage.
+  function taBortBild() {
+    const urlAttRadera = bildUrl;
+    nollstallBildState();
+    raderaUppladdadBild(urlAttRadera);
   }
 
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
@@ -234,7 +267,10 @@ export default function SkickaInClient() {
     setView("form"); setResult(null); setError(null);
     setTitle(""); setAuthor(""); setText("");
     setTurnstileToken(null); setInlamningId(null);
-    taBortBild();
+    // nollstallBildState() — INTE taBortBild(): vid det här laget är bilden
+    // redan kopplad till en inlamningar-rad (eller publicerad artikel), en
+    // Storage-radering hade förstört den kopplingen.
+    nollstallBildState();
   }
 
   async function analyze() {
