@@ -3326,6 +3326,12 @@ Två nya tester tillagda i `tests/lasarbildToken.test.mjs`: (1) `hamtaHmacSecret
 |---|---|
 | `tests/lasarbildToken.test.mjs` | Två nya tester för `hamtaHmacSecret()`: färsk miljöläsning vid varje anrop (ingen cache, återspeglar körningstidsändringar) och fail-closed även när bara anon-nyckeln råkar vara satt. Muterar `process.env`, återställer alltid i `finally` |
 
+**Användarrapport (sep 2026): omslagsbilden på artikelsidan visade inte hela bilden — synligt avskuren text i topp och botten på en läsarinskickad bild.** Rotorsak: `app/artikel/[id]/page.js`s omslagsbild-block hade en fast `maxHeight: "380px"` kombinerad med `objectFit: "cover"` — fungerar bra för AI-agenternas breda Pexels-stockfoton, men beskär hänsynslöst allt som inte redan har en bred, kort bildproportion. Den rapporterade bilden var en tät satirisk komposition med text både högst upp och längst ner, vilket gjorde att den fasta 380px-rutan klippte bort betydande delar av innehållet. Fixat genom att byta till `objectFit: "contain"` (aldrig beskär, letterboxar istället vid avvikande proportion) med en höjd `maxHeight: "600px"` och en bakgrundsfärg (`C.surface`) på containern så letterbox-kanterna smälter in i sidans mörka tema istället för att lämnas transparenta/svarta. Gäller alla omslagsbilder oavsett källa (AI-agenternas Pexels-foton såväl som läsarinskickade bilder via `/skicka-in`, ✅116) — samma enkla stiländring täcker båda utan att särskilja på bildkälla.
+
+| Fil | Roll |
+|---|---|
+| `app/artikel/[id]/page.js` | Omslagsbildens `<img>`-stil bytt från `maxHeight:380px, objectFit:cover` till `maxHeight:600px, objectFit:contain`, containern fick `background: C.surface` för letterboxing |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
