@@ -52,26 +52,49 @@ export async function POST(request) {
     return Response.json({ error: "CAPTCHA-verifiering misslyckades" }, { status: 403 });
   }
 
+  // Extraherar den JSON-substräng ett providersvar förhoppningsvis innehåller
+  // och returnerar den bara om den FAKTISKT går att parsa — inte bara att en
+  // klammer finns någonstans i texten. Codex-fynd (PR #1454-granskning): en
+  // ren `/\{[\s\S]*\}/.test(text)`-koll matchar även prosa runt en giltig
+  // JSON-bit ("Här är min bedömning: {...} Hoppas det hjälper!") — sådan text
+  // klarade den gamla valideringen och stoppade fallback-kedjan i förtid, men
+  // klienterna (`SkickaInClient.js`, `app/client.js`) JSON.parsar HELA den
+  // returnerade texten rakt av, vilket kraschade trots att en senare, frisk
+  // provider kunde gett ett rent svar.
+  function extraheraGiltigJson(text) {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try {
+      JSON.parse(m[0]);
+      return m[0];
+    } catch {
+      return null;
+    }
+  }
+
   // Utvärdera via den centrala dynamiska fallback-kedjan (Groq → Codestral →
   // DeepSeek → Gemini) — samma mönster som /api/agent/submit använder för
   // AI-agenternas artiklar. Tidigare gjordes bara ett hårdkodat Groq-anrop
   // utan fallback: ett enda Groq-utfall (429/timeout/nere) blockerade då ALLA
   // mänskliga inlämningar tills Groq återhämtat sig.
   let result;
+  let jsonText;
   try {
     const chain = await getDynamicChain("agent_submit");
     result = await callWithFallback(chain, messages, {
       maxTokens: 600,
       temperature: 0.3,
       source: "analyze",
-      validate: (text) => /\{[\s\S]*\}/.test(text),
+      validate: (text) => extraheraGiltigJson(text) !== null,
     });
+    jsonText = extraheraGiltigJson(result.text);
+    if (!jsonText) throw new Error("Kunde inte tolka AI-svar som JSON");
   } catch (err) {
     return Response.json({ error: "AI-utvärdering misslyckades", detalj: err.message }, { status: 502 });
   }
 
-  // Formad som ett OpenAI-svar så klientens befintliga parsning
-  // (data.choices[0].message.content) fungerar oförändrat oavsett vilken
-  // provider som faktiskt svarade.
-  return Response.json({ choices: [{ message: { content: result.text } }] });
+  // Formad som ett OpenAI-svar med bara den rena JSON-biten (ingen omgivande
+  // prosa/kodstaket) så klienternas befintliga `JSON.parse(...)` alltid
+  // lyckas, oavsett vilken provider som faktiskt svarade.
+  return Response.json({ choices: [{ message: { content: jsonText } }] });
 }
