@@ -1,8 +1,8 @@
 import { checkRateLimit } from "../../lib/kanalRateLimit";
+import { getDynamicChain, callWithFallback } from "../../lib/aiRouter";
 
 const MAX_MESSAGES = 4;
-const MAX_TOTAL_CHARS = 12_000; // tak för total promptlängd för att skydda Groq rate-limit
-const GROQ_TIMEOUT_MS = 20_000;
+const MAX_TOTAL_CHARS = 12_000; // tak för total promptlängd för att skydda providerns rate-limit
 
 export async function POST(request) {
   // IP-rate-limit utöver Turnstile — 5 anrop/timme per IP
@@ -52,28 +52,49 @@ export async function POST(request) {
     return Response.json({ error: "CAPTCHA-verifiering misslyckades" }, { status: 403 });
   }
 
-  // Call Groq
-  let res;
+  // Extraherar den JSON-substräng ett providersvar förhoppningsvis innehåller
+  // och returnerar den bara om den FAKTISKT går att parsa — inte bara att en
+  // klammer finns någonstans i texten. Codex-fynd (PR #1454-granskning): en
+  // ren `/\{[\s\S]*\}/.test(text)`-koll matchar även prosa runt en giltig
+  // JSON-bit ("Här är min bedömning: {...} Hoppas det hjälper!") — sådan text
+  // klarade den gamla valideringen och stoppade fallback-kedjan i förtid, men
+  // klienterna (`SkickaInClient.js`, `app/client.js`) JSON.parsar HELA den
+  // returnerade texten rakt av, vilket kraschade trots att en senare, frisk
+  // provider kunde gett ett rent svar.
+  function extraheraGiltigJson(text) {
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try {
+      JSON.parse(m[0]);
+      return m[0];
+    } catch {
+      return null;
+    }
+  }
+
+  // Utvärdera via den centrala dynamiska fallback-kedjan (Groq → Codestral →
+  // DeepSeek → Gemini) — samma mönster som /api/agent/submit använder för
+  // AI-agenternas artiklar. Tidigare gjordes bara ett hårdkodat Groq-anrop
+  // utan fallback: ett enda Groq-utfall (429/timeout/nere) blockerade då ALLA
+  // mänskliga inlämningar tills Groq återhämtat sig.
+  let result;
+  let jsonText;
   try {
-    res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-oss-120b",
-        messages,
-        max_tokens: 600,
-      }),
-      signal: AbortSignal.timeout(GROQ_TIMEOUT_MS),
+    const chain = await getDynamicChain("agent_submit");
+    result = await callWithFallback(chain, messages, {
+      maxTokens: 600,
+      temperature: 0.3,
+      source: "analyze",
+      validate: (text) => extraheraGiltigJson(text) !== null,
     });
-  } catch {
-    return Response.json({ error: "AI-tjänsten svarar inte" }, { status: 502 });
+    jsonText = extraheraGiltigJson(result.text);
+    if (!jsonText) throw new Error("Kunde inte tolka AI-svar som JSON");
+  } catch (err) {
+    return Response.json({ error: "AI-utvärdering misslyckades", detalj: err.message }, { status: 502 });
   }
-  if (!res.ok) {
-    return Response.json({ error: "AI-utvärdering misslyckades" }, { status: 502 });
-  }
-  const data = await res.json();
-  return Response.json(data);
+
+  // Formad som ett OpenAI-svar med bara den rena JSON-biten (ingen omgivande
+  // prosa/kodstaket) så klienternas befintliga `JSON.parse(...)` alltid
+  // lyckas, oavsett vilken provider som faktiskt svarade.
+  return Response.json({ choices: [{ message: { content: jsonText } }] });
 }

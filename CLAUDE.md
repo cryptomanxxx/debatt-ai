@@ -3334,6 +3334,32 @@ Två nya tester tillagda i `tests/lasarbildToken.test.mjs`: (1) `hamtaHmacSecret
 
 ---
 
+### ✅ 117. Mänskliga inlämningar hade ingen AI-fallback — "Analysen misslyckades" vid minsta Groq-turbulens – KLART
+
+Användarrapport (sep 2026, skärmdump av `/skicka-in`): "Analysen misslyckades. Försök igen." vid inskick av en färdig artikel, trots giltig text/CAPTCHA/uppladdad bild.
+
+**Rotorsak:** `app/api/analyze/route.js` (körs av `SkickaInClient.js → analyze()` när en besökare klickar "Skicka till redaktionen") gjorde ett hårdkodat, direkt `fetch()` mot Groqs API — inget fallback till någon annan provider, till skillnad från praktiskt taget alla andra AI-anropande JS-routes i kodbasen (`/api/chatt`, `/api/civilisation`, `/api/beslut`, och avgörande: `/api/agent/submit`, som gör EXAKT samma sorts artikelbedömning för AI-agenternas inlämningar men redan går via den centrala dynamiska fallback-kedjan, `getDynamicChain("agent_submit")` + `callWithFallback()` i `app/lib/aiRouter.js`). Detta bröt mot plattformens egen dokumenterade regel (se tabellen "Fallback-kedjor per kontext": *"Artikelbedömning (JS): Groq → Codestral → DeepSeek"*) — regeln fanns nedskriven men var aldrig implementerad för just den här routen.
+
+Konsekvensen vid ett Groq-utfall (429 rate-limit, timeout, tillfälligt nere): `route.js` returnerade sin egen felform `{error: "AI-utvärdering misslyckades"}` — INTE ett OpenAI-format-svar. Klienten (`SkickaInClient.js`) läser blint `data.choices?.[0]?.message?.content` utan att först kolla `res.ok`, fick tillbaka `""`, och `JSON.parse("".trim())` kastade ett `SyntaxError` som fångades av den yttre catch-blocket och visades som det generiska "Analysen misslyckades. Försök igen." — utan någon antydan om att problemet var providerrelaterat, och utan någon retry mot en annan leverantör. Ett enda Groq-hack blockerade alltså **alla** mänskliga artikelinlämningar tills Groq återhämtat sig, medan AI-agenternas inlämningar (via `/api/agent/submit`) klarade sig obehindrat tack vare sin redan befintliga fallback-kedja.
+
+**Fix:** `route.js` migrerad till samma mönster som `/api/agent/submit`: `getDynamicChain("agent_submit")` + `callWithFallback(chain, messages, {maxTokens: 600, temperature: 0.3, source: "analyze", validate: text => /\{[\s\S]*\}/.test(text)})` — provar Groq → Codestral → DeepSeek → Gemini (eller Supabase `provider_config`s aktuella rankade ordning) i tur och ordning, hoppar vidare vid 429/timeout/tomt eller icke-JSON-svar. Svaret formas tillbaka till `{choices: [{message: {content: text}}]}` innan det returneras — exakt det format klienten redan förväntar sig — så `SkickaInClient.js` krävde ingen ändring alls.
+
+**Medvetet oförändrat:** klientens generiska catch-all-felmeddelande rördes inte — med fyra providers i kedjan istället för en är sannolikheten att ALLA fyra faller samtidigt mycket låg, vilket gör den återstående felytan tillräckligt sällsynt för att inte motivera en separat UI-ändring i denna fix.
+
+| Fil | Roll |
+|---|---|
+| `app/api/analyze/route.js` | Hårdkodat Groq-only-anrop ersatt med `getDynamicChain("agent_submit")` + `callWithFallback()` — samma fallback-kedja som `/api/agent/submit` redan använder för AI-agenternas artikelbedömning. Svaret återformas till OpenAI-svarsform så klienten inte behöver ändras |
+
+**Codex-fynd (PR #1454-granskning): `validate`-predikatet accepterade ett providersvar som bara RÅKADE innehålla en klammer, inte ett som faktiskt gick att tolka som JSON.** Den ursprungliga `validate: (text) => /\{[\s\S]*\}/.test(text)` matchar även prosa omkring en giltig JSON-bit ("Här är min bedömning: {...} Hoppas det hjälper!") eller till och med en trasig klammer-sekvens som inte alls är giltig JSON. Ett sådant svar klarade valideringen och fick `callWithFallback()` att stanna på just den providern istället för att gå vidare i kedjan — men båda klienterna som konsumerar `/api/analyze` (`app/skicka-in/SkickaInClient.js` OCH en likadan inline-variant i `app/client.js`, en tidigare okänd andra konsument av samma endpoint) kör `JSON.parse()` på HELA den returnerade texten rakt av, utan att först städa bort omgivande prosa. Resultatet: "Analysen misslyckades" hade kunnat kvarstå även efter fallback-fixen ovan, om en mellanliggande provider i kedjan råkade svara med text som innehöll en klammer men inte var ren JSON — trots att en senare, frisk provider hade kunnat ge ett rent svar.
+
+Fixat med en ny `extraheraGiltigJson()`-hjälpfunktion: extraherar samma `/\{[\s\S]*\}/`-substräng som förut, men försöker sedan faktiskt `JSON.parse()` den innan den godkänns — bara ett verifierat parsbart resultat räknas som giltigt, annars returneras `null` och `callWithFallback()` går vidare till nästa provider. Svaret som skickas till klienten är nu den redan extraherade och verifierade JSON-substrängen (`jsonText`), inte providerns råa svarstext — vilket gör klienternas enkla `JSON.parse(raw.replace(/\`\`\`json|\`\`\`/g, "").trim())` robust mot omgivande prosa oavsett vilken provider som till slut svarade. Verifierat isolerat mot fem representativa fall (ren JSON, prosa-omsluten giltig JSON, markdown-inramad JSON, prosa med en trasig klammer, ingen klammer alls) — samtliga gav förväntat utfall.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/api/analyze/route.js` | Ny `extraheraGiltigJson()` — extraherar OCH verifierar att JSON-substrängen faktiskt är parsbar innan den godkänns av `validate` eller skickas till klienten |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
