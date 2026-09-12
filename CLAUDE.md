@@ -3334,6 +3334,24 @@ Två nya tester tillagda i `tests/lasarbildToken.test.mjs`: (1) `hamtaHmacSecret
 
 ---
 
+### ✅ 117. Mänskliga inlämningar hade ingen AI-fallback — "Analysen misslyckades" vid minsta Groq-turbulens – KLART
+
+Användarrapport (sep 2026, skärmdump av `/skicka-in`): "Analysen misslyckades. Försök igen." vid inskick av en färdig artikel, trots giltig text/CAPTCHA/uppladdad bild.
+
+**Rotorsak:** `app/api/analyze/route.js` (körs av `SkickaInClient.js → analyze()` när en besökare klickar "Skicka till redaktionen") gjorde ett hårdkodat, direkt `fetch()` mot Groqs API — inget fallback till någon annan provider, till skillnad från praktiskt taget alla andra AI-anropande JS-routes i kodbasen (`/api/chatt`, `/api/civilisation`, `/api/beslut`, och avgörande: `/api/agent/submit`, som gör EXAKT samma sorts artikelbedömning för AI-agenternas inlämningar men redan går via den centrala dynamiska fallback-kedjan, `getDynamicChain("agent_submit")` + `callWithFallback()` i `app/lib/aiRouter.js`). Detta bröt mot plattformens egen dokumenterade regel (se tabellen "Fallback-kedjor per kontext": *"Artikelbedömning (JS): Groq → Codestral → DeepSeek"*) — regeln fanns nedskriven men var aldrig implementerad för just den här routen.
+
+Konsekvensen vid ett Groq-utfall (429 rate-limit, timeout, tillfälligt nere): `route.js` returnerade sin egen felform `{error: "AI-utvärdering misslyckades"}` — INTE ett OpenAI-format-svar. Klienten (`SkickaInClient.js`) läser blint `data.choices?.[0]?.message?.content` utan att först kolla `res.ok`, fick tillbaka `""`, och `JSON.parse("".trim())` kastade ett `SyntaxError` som fångades av den yttre catch-blocket och visades som det generiska "Analysen misslyckades. Försök igen." — utan någon antydan om att problemet var providerrelaterat, och utan någon retry mot en annan leverantör. Ett enda Groq-hack blockerade alltså **alla** mänskliga artikelinlämningar tills Groq återhämtat sig, medan AI-agenternas inlämningar (via `/api/agent/submit`) klarade sig obehindrat tack vare sin redan befintliga fallback-kedja.
+
+**Fix:** `route.js` migrerad till samma mönster som `/api/agent/submit`: `getDynamicChain("agent_submit")` + `callWithFallback(chain, messages, {maxTokens: 600, temperature: 0.3, source: "analyze", validate: text => /\{[\s\S]*\}/.test(text)})` — provar Groq → Codestral → DeepSeek → Gemini (eller Supabase `provider_config`s aktuella rankade ordning) i tur och ordning, hoppar vidare vid 429/timeout/tomt eller icke-JSON-svar. Svaret formas tillbaka till `{choices: [{message: {content: text}}]}` innan det returneras — exakt det format klienten redan förväntar sig — så `SkickaInClient.js` krävde ingen ändring alls.
+
+**Medvetet oförändrat:** klientens generiska catch-all-felmeddelande rördes inte — med fyra providers i kedjan istället för en är sannolikheten att ALLA fyra faller samtidigt mycket låg, vilket gör den återstående felytan tillräckligt sällsynt för att inte motivera en separat UI-ändring i denna fix.
+
+| Fil | Roll |
+|---|---|
+| `app/api/analyze/route.js` | Hårdkodat Groq-only-anrop ersatt med `getDynamicChain("agent_submit")` + `callWithFallback()` — samma fallback-kedja som `/api/agent/submit` redan använder för AI-agenternas artikelbedömning. Svaret återformas till OpenAI-svarsform så klienten inte behöver ändras |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
