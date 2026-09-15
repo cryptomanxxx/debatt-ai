@@ -1,0 +1,55 @@
+name: Vercel Deployment Prune
+
+# Vercel Hobby raderar aldrig gamla deployments automatiskt — Deployment
+# Storage är kumulativ lagring av ALLA sparade deployments (se CLAUDE.md
+# ✅94/✅119), så backloggen växer tills något aktivt städar den. Detta
+# kompletterar Vercels egen "Deployment Retention Policy"-inställning
+# (Team Settings → Build and Deployment), som styr NYA deployments men
+# inte nödvändigtvis städar bort en redan ackumulerad backlogg omedelbart.
+#
+# Manuell körning (workflow_dispatch) defaultar till dry_run=true — kör
+# den manuellt minst en gång och läs loggen innan du litar på att den
+# schemalagda körningen (som alltid raderar på riktigt) gör rätt sak.
+
+on:
+  schedule:
+    - cron: "30 3 * * *"  # Dagligen 05:30 svensk tid (03:30 UTC)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Logga bara vad som SKULLE raderas, radera inget på riktigt"
+        required: false
+        default: "true"
+      retention_days:
+        description: "Radera deployments äldre än så här många dagar"
+        required: false
+        default: "14"
+      keep_latest:
+        description: "Rör aldrig de N senaste deployments oavsett ålder"
+        required: false
+        default: "20"
+
+concurrency:
+  group: vercel-deployment-prune
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Radera gamla Vercel-deployments
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_NAME: debatt-ai
+          RETENTION_DAYS: ${{ github.event.inputs.retention_days || '14' }}
+          KEEP_LATEST: ${{ github.event.inputs.keep_latest || '20' }}
+          # Schemalagda körningar raderar alltid på riktigt. Manuella
+          # körningar defaultar till dry_run=true om inget annat anges.
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.dry_run || 'true') || 'false' }}
+        run: bash scripts/vercel-prune-deployments.sh
