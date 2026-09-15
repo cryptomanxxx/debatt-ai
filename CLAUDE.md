@@ -3424,6 +3424,12 @@ Uppföljning på ✅94: den fixen stoppade NYA deployments från att bli uppblå
 
 **Verifiering:** kunde inte köras mot ett skarpt Vercel-API i den här sessionen, men den exakta buggen reproducerades isolerat med syntetisk data (100 fejkade deployment-objekt, ~173 KB som en enda JSON-sträng) — gav ordagrant samma felmeddelande (`/usr/bin/jq: Argument list too long`) som produktionsloggen. Den nya filbaserade sammanslagningen verifierades korrekt slå ihop både en enda sida (100 st) och flera sidor (100 + 50 = 150 st) utan fel, och den efterföljande `keep_latest`/`retention_days`-filtreringslogiken verifierades ge korrekt antal kandidater mot både en avlägsen cutoff (0 kandidater, alla för nya) och en snäv 1-timmes-cutoff (130 kandidater = 150 − 20 behållna) på samma sammanslagna data.
 
+**Codex-fynd (PR #1459-granskning): skriptet avslutades alltid med exit 0, även om samtliga raderingsförsök misslyckades.** Raderingsloopen ökade bara en `FAILED`-räknare per misslyckat DELETE-anrop, men skriptets sista kommando var alltid en `echo` — så en körning där t.ex. `VERCEL_TOKEN` saknar delete-behörighet (fullt möjligt vid ett förbisett scope-val när secreten skapas) hade fått VARJE raderingsförsök att misslyckas med 403, ändå rapporterats grön i GitHub Actions, och backloggen hade förblivit helt ostädad utan något synligt larm.
+
+**Fix:** raderingsutfallet delas nu upp i tre kategorier istället för två. **Skyddade** (`PROTECTED`) — Vercel avvisar radering av en deployment med en aktiv domän-alias (t.ex. produktionsdeploymenten); identifieras genom att felsvarets kropp innehåller ordet "alias" (case-insensitive), oavsett exakt HTTP-statuskod, eftersom den exakta koden aldrig verifierats live i den här miljön — detta räknas som FÖRVÄNTAT och stoppar aldrig körningen. **Misslyckade** (`FAILED`) — allt annat (fel/utgången token, saknad behörighet, nätverksfel, 5xx m.m.) räknas som OVÄNTAT. Skriptet fortsätter processa resten av kandidaterna oavsett (samma beteende som innan — ett enskilt fel avbryter aldrig loopen), men avslutar nu med `exit 1` i slutet om `FAILED > 0`, så en trasig token eller ett bortglömt behörighetsscope syns direkt som en röd körning i Actions istället för att tystas bort.
+
+**Verifiering:** klassificeringslogiken (alias-svar → skyddad, allt annat inklusive ett generiskt "forbidden"-svar, ett tomt/nätverksfel-svar och ett 5xx-svar → misslyckad) testades isolerat mot fyra representativa svarskroppar — alla gav förväntat utfall.
+
 ---
 
 ## Den autonoma debatten – slutvisionen

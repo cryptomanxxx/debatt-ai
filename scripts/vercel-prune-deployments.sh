@@ -16,11 +16,20 @@
 # använder id:t direkt; osatt faller det tillbaka på att slå upp id:t från
 # VERCEL_PROJECT_NAME, som förut).
 #
-# Vercel avvisar redan (409/403) ett raderingsförsök mot en deployment som
-# har en aktiv domän-alias — dvs. den nuvarande produktionsdeploymenten kan
-# i praktiken inte raderas av misstag av det här skriptet ens om den råkar
-# hamna utanför KEEP_LATEST-golvet. Ett sådant fel loggas och skriptet
-# fortsätter med nästa deployment istället för att avbryta hela körningen.
+# Vercel avvisar redan ett raderingsförsök mot en deployment som har en
+# aktiv domän-alias — dvs. den nuvarande produktionsdeploymenten kan i
+# praktiken inte raderas av misstag av det här skriptet ens om den råkar
+# hamna utanför KEEP_LATEST-golvet. Ett sådant svar (identifierat på att
+# felsvaret nämner "alias") räknas som FÖRVÄNTAT och loggas separat —
+# skriptet fortsätter med nästa deployment istället för att avbryta hela
+# körningen, och det räknas inte som ett jobb-misslyckande.
+#
+# ALLA ANDRA raderingsfel (fel/utgången token, saknad delete-behörighet,
+# nätverksfel, 5xx m.m.) räknas däremot som OVÄNTADE och gör att skriptet
+# avslutas med exit 1 efter att ha försökt radera resten av kandidaterna —
+# annars hade t.ex. en token utan delete-behörighet kunnat låta EVERY
+# raderingsförsök misslyckas i tysthet, medan den schemalagda körningen
+# ändå rapporterades grön i GitHub Actions, med backloggen fortsatt ostädad.
 
 set -uo pipefail
 
@@ -139,7 +148,9 @@ if [[ "$DELETE_COUNT" -eq 0 ]]; then
 fi
 
 DELETED=0
+PROTECTED=0
 FAILED=0
+DEL_RESP_FILE="${TMP_DIR}/delete_resp.json"
 while IFS= read -r dep; do
   ID=$(echo "$dep" | jq -r '.uid // .id')
   URL_HOST=$(echo "$dep" | jq -r '.url // "okänd"')
@@ -154,16 +165,29 @@ while IFS= read -r dep; do
   DEL_URL="https://api.vercel.com/v13/deployments/${ID}"
   [[ -n "$DEL_QS" ]] && DEL_URL="${DEL_URL}?${DEL_QS}"
 
-  HTTP_CODE=$(curl -sS -o /tmp/vercel_delete_resp.json -w "%{http_code}" -X DELETE \
+  HTTP_CODE=$(curl -sS -o "$DEL_RESP_FILE" -w "%{http_code}" -X DELETE \
     -H "Authorization: Bearer ${VERCEL_TOKEN}" "$DEL_URL")
 
   if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "204" ]]; then
     echo "Raderad: ${ID} (${URL_HOST})"
     DELETED=$((DELETED + 1))
   else
-    echo "Kunde INTE radera ${ID} (${URL_HOST}): HTTP ${HTTP_CODE} — $(cat /tmp/vercel_delete_resp.json 2>/dev/null)"
-    FAILED=$((FAILED + 1))
+    RESP_BODY=$(cat "$DEL_RESP_FILE" 2>/dev/null)
+    if grep -qi "alias" <<<"$RESP_BODY"; then
+      # Förväntat: Vercel skyddar en deployment med en aktiv domän-alias
+      # (t.ex. den nuvarande produktionsdeploymenten) mot radering.
+      echo "Skyddad (aktiv alias), hoppar över: ${ID} (${URL_HOST}): HTTP ${HTTP_CODE} — ${RESP_BODY}"
+      PROTECTED=$((PROTECTED + 1))
+    else
+      echo "Kunde INTE radera ${ID} (${URL_HOST}): HTTP ${HTTP_CODE} — ${RESP_BODY}"
+      FAILED=$((FAILED + 1))
+    fi
   fi
 done < <(jq -c '.[]' "$TO_DELETE_FILE")
 
-echo "Klart. Raderade: ${DELETED} | Misslyckade: ${FAILED} | (dry_run=${DRY_RUN})"
+echo "Klart. Raderade: ${DELETED} | Skyddade (alias): ${PROTECTED} | Misslyckade: ${FAILED} | (dry_run=${DRY_RUN})"
+
+if [[ "$FAILED" -gt 0 ]]; then
+  echo "Minst en radering misslyckades av oväntad anledning (inte alias-skydd) — avslutar med fel så körningen syns röd i Actions."
+  exit 1
+fi
