@@ -206,8 +206,12 @@ def hamta_kort_fns_med_trunkering(payload: dict, system: str, prompt: str, max_t
     DeepSeek är OpenAI-kompatibla och exponerar finish_reason via redan hämtade
     httpx.Response-objekt — inga ändringar av deras delade funktioner krävs.
     Cloudflare/Gemini-wrapperna returnerar bara text (oförändrade signaturer här
-    med, används på fler ställen) — mojligen_trunkerad är alltid False för dem,
-    samma "vet inte"-fallback som innan denna funktion fanns.
+    med, används på fler ställen) — mojligen_trunkerad är alltid False för dem.
+    Gemini (✅118) hoppar numera själv till nästa modell/kastar undantag internt
+    vid finishReason == "MAX_TOKENS" (och sätter thinkingBudget: 0 för att
+    förebygga problemet i första hand), så en text som faktiskt returneras
+    härifrån är redan känd att inte vara trunkerad av Gemini — Cloudflare saknar
+    fortsatt motsvarande signal, "vet inte"-fallback kvarstår bara för den.
     """
     def _oai(post_fn):
         val = post_fn().json()["choices"][0]
@@ -297,15 +301,33 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
     payload = {
         "contents": [{"role": "user", "parts": [{"text": user_message}]}],
         "systemInstruction": {"parts": [{"text": system_prompt}]},
-        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8},
+        # thinkingBudget: 0 stänger av Geminis interna "thinking"-läge — påslaget som
+        # DEFAULT på gemini-3.5-flash/-lite. Utan detta äts maxOutputTokens-budgeten
+        # av dolda resonemangstokens innan det synliga svaret ens börjar skrivas —
+        # exakt samma buggklass som redan identifierad och fixad för Groqs
+        # reasoning-modell (✅97/✅115), men aldrig tidigare adresserad för
+        # Gemini-fallbacken. Upptäckt (CLAUDE.md ✅118) efter att Direktdebattens
+        # repliker fortsatte vara avhuggna EFTER ✅115s Groq-specifika fix — Gemini
+        # är den vanligast använda reserv-providern i flera JS-fallbackkedjor och
+        # hade samma latenta problem, aldrig testat i produktion förrän nu.
+        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8, "thinkingConfig": {"thinkingBudget": 0}},
     }
     last_err = ""
     for model in models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         r = httpx.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=timeout)
         if r.is_success:
-            text = r.json().get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-            if text:
+            data = r.json()
+            candidate = data.get("candidates", [{}])[0]
+            text = candidate.get("content", {}).get("parts", [{}])[0].get("text", "")
+            # finishReason "MAX_TOKENS" betyder svaret klipptes av innan det var
+            # klart trots thinkingBudget:0 (t.ex. ett ovanligt långt svar mot en
+            # snäv max_tokens) — en avhuggen text är sämre än inget svar alls,
+            # eftersom anropande kod annars kunde acceptera den rakt av. Prova
+            # nästa modell/provider istället av samma skäl som OpenAI-kompatibla
+            # providrar redan hoppar vidare vid finish_reason == "length"
+            # (hamta_kort_fns_med_trunkering()).
+            if text and candidate.get("finishReason") != "MAX_TOKENS":
                 return text
         last_err = f"{model}:{r.status_code} "
         if r.status_code in (400, 403) or "API_KEY" in r.text:
