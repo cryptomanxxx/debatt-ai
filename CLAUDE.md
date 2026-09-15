@@ -3409,9 +3409,11 @@ Uppföljning på ✅94: den fixen stoppade NYA deployments från att bli uppblå
 
 **Kräver två nya GitHub Actions-secrets:** `VERCEL_TOKEN` (ett Vercel-API-token med rättighet att lista/radera deployments för projektet) och valfri `VERCEL_TEAM_ID` (bara om projektet ligger under ett Vercel-team snarare än ett personligt scope — `cryptomanxxx`s "Hobby"-team i skärmdumpen kan vara endera). Utan `VERCEL_TOKEN` felar workflowen tydligt (`: "${VERCEL_TOKEN:?...}"`) istället för att tyst hoppa över körningen.
 
+**Valfri `VERCEL_PROJECT_ID`-secret (tillagd efter första versionen):** skriptet slog ursprungligen alltid upp projekt-id via `GET /v9/projects/{namn}` (ett anrop som aldrig testades live i den här miljön, se "Ärlighet om verifiering" ovan). Ägaren kunde läsa av det faktiska projekt-id:t direkt i Vercels dashboard (Project Settings → General → Project ID, `prj_...`) och bad om att få sätta det explicit. Satt en `VERCEL_PROJECT_ID`-secret hoppar skriptet över namn-uppslaget helt och använder id:t direkt — tar bort en tidigare overifierad risk (att namn-uppslaget faktiskt fungerar som förväntat) utan att kräva den. Osatt faller skriptet tillbaka på det ursprungliga namnbaserade uppslaget, oförändrat.
+
 | Fil | Roll |
 |---|---|
-| `scripts/vercel-prune-deployments.sh` | Slår upp projekt-id via Vercels Projects-API, paginerar igenom alla deployments, filtrerar fram raderingskandidater (bortom `KEEP_LATEST`, äldre än `RETENTION_DAYS`), raderar via DELETE-anrop (eller loggar i dry-run-läge). Fortsätter vid enskilda raderingsfel (t.ex. aktiv domän-alias) istället för att avbryta hela körningen |
+| `scripts/vercel-prune-deployments.sh` | Slår upp projekt-id via Vercels Projects-API (eller använder `VERCEL_PROJECT_ID` direkt om satt), paginerar igenom alla deployments, filtrerar fram raderingskandidater (bortom `KEEP_LATEST`, äldre än `RETENTION_DAYS`), raderar via DELETE-anrop (eller loggar i dry-run-läge). Fortsätter vid enskilda raderingsfel (t.ex. aktiv domän-alias) istället för att avbryta hela körningen |
 | `.github/workflows/vercel-deployment-prune.yml` | Kör skriptet dagligen 05:30 svensk tid (alltid på riktigt) + manuell `workflow_dispatch` (dry-run som default, med justerbara `retention_days`/`keep_latest`-inputs) |
 
 ---
