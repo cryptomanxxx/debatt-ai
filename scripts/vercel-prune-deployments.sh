@@ -24,6 +24,9 @@
 
 set -uo pipefail
 
+TMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TMP_DIR"' EXIT
+
 : "${VERCEL_TOKEN:?VERCEL_TOKEN måste vara satt}"
 PROJECT_NAME="${VERCEL_PROJECT_NAME:-debatt-ai}"
 PROJECT_ID_OVERRIDE="${VERCEL_PROJECT_ID:-}"
@@ -74,7 +77,18 @@ fi
 CUTOFF_MS=$(( $(date -u +%s) * 1000 - RETENTION_DAYS * 86400 * 1000 ))
 
 echo "Hämtar deployments..."
-ALL_DEPLOYMENTS="[]"
+# Ackumuleras via filer, inte som en shell-variabel skickad genom --argjson —
+# jq körs som en extern process (execve), och Linux begränsar en ENSKILD
+# argv-sträng till ~128 KB (MAX_ARG_STRLEN). Vercels deployment-objekt är
+# ordrika (aliaser, builds, git-metadata) — redan 100 st i en sida kan
+# överstiga den gränsen och ge "Argument list too long", vilket tidigare
+# tystade bort hela sidans innehåll (ALL_DEPLOYMENTS blev tom sträng) och
+# gjorde att skriptet felaktigt rapporterade "Inget att radera" istället för
+# att faktiskt misslyckas synligt. Filargument till jq är bara korta
+# sökvägar — själva JSON-innehållet läses via fil-I/O, aldrig via argv, så
+# gränsen kan aldrig träffas oavsett hur många deployments som ackumuleras.
+ALL_FILE="${TMP_DIR}/all.json"
+echo "[]" > "$ALL_FILE"
 UNTIL=""
 PAGE_NUM=0
 while true; do
@@ -95,23 +109,28 @@ while true; do
     break
   fi
 
-  ALL_DEPLOYMENTS=$(jq -c -n --argjson a "$ALL_DEPLOYMENTS" --argjson b "$DEPLOYMENTS" '$a + $b')
+  PAGE_FILE="${TMP_DIR}/page_${PAGE_NUM}.json"
+  printf '%s' "$DEPLOYMENTS" > "$PAGE_FILE"
+  jq -s 'add' "$ALL_FILE" "$PAGE_FILE" > "${ALL_FILE}.new"
+  mv "${ALL_FILE}.new" "$ALL_FILE"
+
   UNTIL=$(echo "$PAGE" | jq -r '.pagination.next // empty')
   if [[ -z "$UNTIL" || "$UNTIL" == "null" ]]; then
     break
   fi
 done
 
-TOTAL=$(echo "$ALL_DEPLOYMENTS" | jq 'length')
+TOTAL=$(jq 'length' "$ALL_FILE")
 echo "Totalt hämtade deployments: ${TOTAL}"
 
-TO_DELETE=$(echo "$ALL_DEPLOYMENTS" | jq -c --argjson keep "$KEEP_LATEST" --argjson cutoff "$CUTOFF_MS" '
+TO_DELETE_FILE="${TMP_DIR}/to_delete.json"
+jq -c --argjson keep "$KEEP_LATEST" --argjson cutoff "$CUTOFF_MS" '
   sort_by(-.createdAt)
   | .[$keep:]
   | map(select(.createdAt < $cutoff))
-')
+' "$ALL_FILE" > "$TO_DELETE_FILE"
 
-DELETE_COUNT=$(echo "$TO_DELETE" | jq 'length')
+DELETE_COUNT=$(jq 'length' "$TO_DELETE_FILE")
 echo "Kandidater för radering (äldre än ${RETENTION_DAYS}d, bortom de ${KEEP_LATEST} senaste): ${DELETE_COUNT}"
 
 if [[ "$DELETE_COUNT" -eq 0 ]]; then
@@ -145,6 +164,6 @@ while IFS= read -r dep; do
     echo "Kunde INTE radera ${ID} (${URL_HOST}): HTTP ${HTTP_CODE} — $(cat /tmp/vercel_delete_resp.json 2>/dev/null)"
     FAILED=$((FAILED + 1))
   fi
-done < <(echo "$TO_DELETE" | jq -c '.[]')
+done < <(jq -c '.[]' "$TO_DELETE_FILE")
 
 echo "Klart. Raderade: ${DELETED} | Misslyckade: ${FAILED} | (dry_run=${DRY_RUN})"
