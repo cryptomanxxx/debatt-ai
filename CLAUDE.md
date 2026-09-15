@@ -3393,6 +3393,29 @@ Givet osäkerheten byggdes en graceful degradation istället för att gissa rät
 
 ---
 
+### ✅ 119. Automatiserad radering av gamla Vercel-deployments (Deployment Storage-tak) – KLART
+
+Uppföljning på ✅94: den fixen stoppade NYA deployments från att bli uppblåsta (podd-avatarerna flyttade till Supabase Storage, `public/` halverades), men Vercels **Deployment Storage** är kumulativ lagring av ALLA sparade deployments — inte bara den senaste. Ägaren visade en skärmdump (sep 2026) där grafen fortfarande låg på 48,62 GB / 10 GB trots ✅94: gamla deployments från INNAN fixen (skapade när `public/` var ~92 MB) ligger kvar tills de raderas, och plattformen deployar dessutom på varenda merge till `main` (se git-arbetsflödet i CLAUDE.md), så backloggen fortsätter växa även efter fixen — bara långsammare per deployment.
+
+**Ett separat, redan pågående problem upptäcktes samtidigt:** ägaren hade satt Vercels egen "Deployment Retention Policy" (Team Settings → Build and Deployment) till ett annat värde tidigare, men den visade sig ha återgått till standardvärdet 30 dagar. Ingen av mina verktyg i den här sessionen har åtkomst till Vercels dashboard/inställningshistorik — jag kunde varken bekräfta orsaken (osparad ändring, en Hobby-planbegränsning på retentionslängden, eller ett dashboard-fel) eller åtgärda inställningen själv. Rekommenderat till ägaren: sätt om värdet, bekräfta att "Apply this policy to all existing projects" är ikryssad, klicka **Save**, och ladda om sidan för att verifiera att det faktiskt sparades — och kontakta Vercels support om det fortsätter återgå efter en bekräftad sparning.
+
+**Lösning här — en egen GitHub Action, oberoende av Vercels dashboard-inställning:** en schemalagd workflow som anropar Vercels REST API direkt och raderar gamla deployments proaktivt, snarare än att förlita sig på att dashboard-inställningen faktiskt håller sig kvar.
+
+**Policy:** rör ALDRIG de `KEEP_LATEST` (default 20) senaste deployments oavsett ålder — ett säkerhetsgolv mot att av misstag radera ett nyligt rollback-mål. Bland resten raderas allt äldre än `RETENTION_DAYS` (default 14) dagar. Om båda gränserna skulle träffa fel deployment (t.ex. den nuvarande produktionsdeploymenten hamnar utanför golvet av någon anledning) avvisar Vercel själv ett raderingsförsök mot en deployment med en aktiv domän-alias (409/403) — skriptet loggar det felet och fortsätter med nästa deployment istället för att avbryta hela körningen.
+
+**Säkerhetsdesign givet att jag inte kunde testa mot ett skarpt Vercel-API i den här sandboxen** (ingen nätverksåtkomst till `api.vercel.com`, och inget `VERCEL_TOKEN` att testa med även om det funnits): manuell körning (`workflow_dispatch`) defaultar till `dry_run=true` — loggar bara vad som SKULLE raderas utan att faktiskt anropa DELETE-endpointen. Den schemalagda körningen (dagligen 05:30 svensk tid) raderar alltid på riktigt, eftersom en cron-trigger inte har några inputs att styra ett dry-run-läge med. Rekommendation till ägaren: kör workflowen manuellt minst en gång (default dry-run) och läs igenom loggen — vilka deployments den tänker radera, att projekt-id:t slogs upp korrekt — innan den schemalagda körningen hinner göra det på riktigt.
+
+**Verifierat isolerat (ingen live-Vercel-åtkomst):** `bash -n` mot skriptet (syntax OK) samt jq-filtreringslogiken (`sort_by(-.createdAt) | .[$keep:] | map(select(.createdAt < $cutoff))`) körd mot syntetisk data — 30 simulerade deployments med 1 dags mellanrum, blandad ordning: bekräftat att exakt index 20–29 (de 10 äldsta, alla >14 dagar gamla och bortom top-20-golvet) flaggas för radering, och att en lista med färre deployments än `KEEP_LATEST` aldrig ger några raderingskandidater. Själva HTTP-anropen mot Vercels API (fältnamn som `uid`/`createdAt`, endpointerna `v9/projects/{namn}`, `v6/deployments`, `v13/deployments/{id}`) bygger på Vercels dokumenterade API-form, inte en live-testad körning — samma typ av epistemisk ödmjukhet som redan tillämpats för Geminis `thinkingConfig` i ✅118.
+
+**Kräver två nya GitHub Actions-secrets:** `VERCEL_TOKEN` (ett Vercel-API-token med rättighet att lista/radera deployments för projektet) och valfri `VERCEL_TEAM_ID` (bara om projektet ligger under ett Vercel-team snarare än ett personligt scope — `cryptomanxxx`s "Hobby"-team i skärmdumpen kan vara endera). Utan `VERCEL_TOKEN` felar workflowen tydligt (`: "${VERCEL_TOKEN:?...}"`) istället för att tyst hoppa över körningen.
+
+| Fil | Roll |
+|---|---|
+| `scripts/vercel-prune-deployments.sh` | Slår upp projekt-id via Vercels Projects-API, paginerar igenom alla deployments, filtrerar fram raderingskandidater (bortom `KEEP_LATEST`, äldre än `RETENTION_DAYS`), raderar via DELETE-anrop (eller loggar i dry-run-läge). Fortsätter vid enskilda raderingsfel (t.ex. aktiv domän-alias) istället för att avbryta hela körningen |
+| `.github/workflows/vercel-deployment-prune.yml` | Kör skriptet dagligen 05:30 svensk tid (alltid på riktigt) + manuell `workflow_dispatch` (dry-run som default, med justerbara `retention_days`/`keep_latest`-inputs) |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
