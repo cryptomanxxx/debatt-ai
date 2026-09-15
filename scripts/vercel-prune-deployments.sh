@@ -10,7 +10,11 @@
 #
 # Körs av .github/workflows/vercel-deployment-prune.yml. Kräver VERCEL_TOKEN
 # (secret) + valfri VERCEL_TEAM_ID (secret, bara om projektet ligger under
-# ett Vercel-team snarare än ett personligt scope).
+# ett Vercel-team snarare än ett personligt scope) + valfri VERCEL_PROJECT_ID
+# (secret — projektets id, t.ex. "prj_..." från Vercels Project Settings →
+# General. Satt hoppar skriptet över namn-uppslaget mot Vercels API och
+# använder id:t direkt; osatt faller det tillbaka på att slå upp id:t från
+# VERCEL_PROJECT_NAME, som förut).
 #
 # Vercel avvisar redan (409/403) ett raderingsförsök mot en deployment som
 # har en aktiv domän-alias — dvs. den nuvarande produktionsdeploymenten kan
@@ -22,6 +26,7 @@ set -uo pipefail
 
 : "${VERCEL_TOKEN:?VERCEL_TOKEN måste vara satt}"
 PROJECT_NAME="${VERCEL_PROJECT_NAME:-debatt-ai}"
+PROJECT_ID_OVERRIDE="${VERCEL_PROJECT_ID:-}"
 TEAM_ID="${VERCEL_TEAM_ID:-}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
 KEEP_LATEST="${KEEP_LATEST:-20}"
@@ -49,16 +54,22 @@ qs_join() {
 echo "== Vercel deployment prune =="
 echo "Projekt: ${PROJECT_NAME} | retention: ${RETENTION_DAYS}d | keep_latest: ${KEEP_LATEST} | dry_run: ${DRY_RUN}"
 
-PROJECT_URL="https://api.vercel.com/v9/projects/${PROJECT_NAME}$( [[ -n "$TEAM_QS" ]] && echo "?${TEAM_QS}" )"
-PROJECT_JSON=$(api "$PROJECT_URL")
-PROJECT_ID=$(echo "$PROJECT_JSON" | jq -r '.id // empty')
+if [[ -n "$PROJECT_ID_OVERRIDE" ]]; then
+  # VERCEL_PROJECT_ID satt — använd den direkt, hoppa över namn-uppslaget.
+  PROJECT_ID="$PROJECT_ID_OVERRIDE"
+  echo "Projekt-id (från VERCEL_PROJECT_ID): ${PROJECT_ID}"
+else
+  PROJECT_URL="https://api.vercel.com/v9/projects/${PROJECT_NAME}$( [[ -n "$TEAM_QS" ]] && echo "?${TEAM_QS}" )"
+  PROJECT_JSON=$(api "$PROJECT_URL")
+  PROJECT_ID=$(echo "$PROJECT_JSON" | jq -r '.id // empty')
 
-if [[ -z "$PROJECT_ID" ]]; then
-  echo "Kunde inte slå upp projekt '${PROJECT_NAME}'. Svar från Vercel:"
-  echo "$PROJECT_JSON"
-  exit 1
+  if [[ -z "$PROJECT_ID" ]]; then
+    echo "Kunde inte slå upp projekt '${PROJECT_NAME}'. Svar från Vercel:"
+    echo "$PROJECT_JSON"
+    exit 1
+  fi
+  echo "Projekt-id: ${PROJECT_ID}"
 fi
-echo "Projekt-id: ${PROJECT_ID}"
 
 CUTOFF_MS=$(( $(date -u +%s) * 1000 - RETENTION_DAYS * 86400 * 1000 ))
 
