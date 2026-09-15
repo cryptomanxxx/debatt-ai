@@ -211,12 +211,30 @@ export async function callProvider(name, messages, opts = {}) {
     body = geminiBody(messages, opts);
   }
 
-  const res = await fetch(url, {
+  let res = await fetch(url, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeout),
   });
+
+  // Codex-fynd (PR #1455-granskning): thinkingConfig.thinkingBudget:0 (satt av
+  // geminiBody() ovan, ✅118) stöds eventuellt inte av gemini-3.5-familjen —
+  // ett sådant fält kan ge HTTP 400, vilket annars slår ut hela Gemini-reserven
+  // i alla kedjor som går via denna router. Kunde inte verifieras mot skarpt
+  // API i den här sandboxen. Degradera gracefully: vid 400 på en Gemini-
+  // begäran, prova samma anrop en gång till utan thinkingConfig innan felet
+  // accepteras.
+  if (res.status === 400 && cfg.shape === "gemini") {
+    const fallbackBody = JSON.parse(JSON.stringify(body));
+    delete fallbackBody.generationConfig?.thinkingConfig;
+    res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(fallbackBody),
+      signal: AbortSignal.timeout(timeout),
+    });
+  }
 
   const latency = Date.now() - t0;
 
