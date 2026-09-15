@@ -298,24 +298,36 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
     # är GA sedan 19 maj 2026, gemini-3.5-flash-lite är modellen Googles eget
     # API-felmeddelande pekade ut som direkt ersättare.
     models = ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
-    payload = {
-        "contents": [{"role": "user", "parts": [{"text": user_message}]}],
-        "systemInstruction": {"parts": [{"text": system_prompt}]},
-        # thinkingBudget: 0 stänger av Geminis interna "thinking"-läge — påslaget som
-        # DEFAULT på gemini-3.5-flash/-lite. Utan detta äts maxOutputTokens-budgeten
-        # av dolda resonemangstokens innan det synliga svaret ens börjar skrivas —
-        # exakt samma buggklass som redan identifierad och fixad för Groqs
-        # reasoning-modell (✅97/✅115), men aldrig tidigare adresserad för
-        # Gemini-fallbacken. Upptäckt (CLAUDE.md ✅118) efter att Direktdebattens
-        # repliker fortsatte vara avhuggna EFTER ✅115s Groq-specifika fix — Gemini
-        # är den vanligast använda reserv-providern i flera JS-fallbackkedjor och
-        # hade samma latenta problem, aldrig testat i produktion förrän nu.
-        "generationConfig": {"maxOutputTokens": max_tokens, "temperature": 0.8, "thinkingConfig": {"thinkingBudget": 0}},
-    }
+
+    def _payload(med_thinking: bool) -> dict:
+        generation_config = {"maxOutputTokens": max_tokens, "temperature": 0.8}
+        if med_thinking:
+            # thinkingBudget: 0 stänger av Geminis interna "thinking"-läge — påslaget
+            # som DEFAULT på gemini-3.5-flash/-lite. Utan detta äts maxOutputTokens-
+            # budgeten av dolda resonemangstokens innan det synliga svaret ens börjar
+            # skrivas — exakt samma buggklass som redan identifierad och fixad för
+            # Groqs reasoning-modell (✅97/✅115), men aldrig tidigare adresserad för
+            # Gemini-fallbacken (CLAUDE.md ✅118).
+            generation_config["thinkingConfig"] = {"thinkingBudget": 0}
+        return {
+            "contents": [{"role": "user", "parts": [{"text": user_message}]}],
+            "systemInstruction": {"parts": [{"text": system_prompt}]},
+            "generationConfig": generation_config,
+        }
+
     last_err = ""
     for model in models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-        r = httpx.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=timeout)
+        r = httpx.post(url, json=_payload(True), headers={"Content-Type": "application/json"}, timeout=timeout)
+        if r.status_code == 400:
+            # Codex-fynd (PR #1455-granskning): thinkingBudget:0 stöds eventuellt
+            # inte av gemini-3.5-familjen (som kan kräva en enum-baserad
+            # thinkingLevel istället för en rå tokenbudget) — utan denna reträtt
+            # hade en sådan 400 permanent markerat Gemini som nere för hela
+            # körningen (se _nere.add nedan), trots att problemet bara var
+            # thinkingConfig-fältet. Kunde inte verifieras mot skarpt API i den
+            # här sandboxen — degradera gracefully istället för att anta.
+            r = httpx.post(url, json=_payload(False), headers={"Content-Type": "application/json"}, timeout=timeout)
         if r.is_success:
             data = r.json()
             candidate = data.get("candidates", [{}])[0]

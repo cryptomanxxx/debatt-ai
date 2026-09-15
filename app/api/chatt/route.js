@@ -571,29 +571,40 @@ REGLER — viktiga:
   // ── Gemini (sista utväg — 99% rate-limitad, prövas bara när allt annat misslyckats) ─────────────
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey) {
-    const geminiPayload = JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: userMessage }] }],
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      // thinkingConfig.thinkingBudget:0 stänger av Geminis interna "thinking"-läge
-      // — påslaget som DEFAULT på gemini-3.5-flash/-lite. Utan detta äts
-      // maxOutputTokens-budgeten av dolda resonemangstokens innan det synliga
-      // svaret ens börjar skrivas — samma buggklass som Groqs reasoning-modell
-      // (redan fixad ovan via reasoning_effort/reasoning_format, ✅115), men
-      // aldrig tidigare adresserad för Gemini-fallbacken. Detta var sannolikt en
-      // stor bidragande orsak till att avhuggna repliker fortsatte förekomma
-      // EFTER ✅115 landade: Gemini nås vid varje omförsök där Codestral saknar
-      // API-nyckel eller misslyckas, och led av exakt samma dolda budgetproblem
-      // (CLAUDE.md ✅118).
-      generationConfig: { maxOutputTokens: maxTokensForRequest, temperature: 0.88, thinkingConfig: { thinkingBudget: 0 } },
-    });
+    // thinkingConfig.thinkingBudget:0 stänger av Geminis interna "thinking"-läge
+    // — påslaget som DEFAULT på gemini-3.5-flash/-lite. Utan detta äts
+    // maxOutputTokens-budgeten av dolda resonemangstokens innan det synliga
+    // svaret ens börjar skrivas — samma buggklass som Groqs reasoning-modell
+    // (redan fixad ovan via reasoning_effort/reasoning_format, ✅115), men
+    // aldrig tidigare adresserad för Gemini-fallbacken (CLAUDE.md ✅118).
+    //
+    // Codex-fynd (PR #1455-granskning): thinkingBudget:0 stöds eventuellt
+    // inte av gemini-3.5-familjen (som kan kräva en enum-baserad
+    // thinkingLevel istället för en rå tokenbudget) — ett sådant fält skulle
+    // ge HTTP 400 och slå ut HELA Gemini-reserven, värre än den ursprungliga
+    // trunkeringsrisken. Kunde inte verifieras mot skarpt API i den här
+    // sandboxen. Byggd för att vara säker oavsett: körs alltid FÖRST med
+    // thinkingConfig, men om just DEN begäran ger 400 görs samma modell om
+    // en gång UTAN fältet innan den ges upp — degraderar gracefully istället
+    // för att anta att fältet stöds.
+    const buildGeminiBody = (medThinking) => {
+      const generationConfig = { maxOutputTokens: maxTokensForRequest, temperature: 0.88 };
+      if (medThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+      return JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: userMessage }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig,
+      });
+    };
     // gemini-2.0-*/gemini-1.5-flash stängdes ner av Google 1 jun 2026
     for (const model of ["gemini-3.5-flash", "gemini-3.5-flash-lite"]) {
       const gemT0 = Date.now();
       try {
-        const r = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`,
-          { method: "POST", headers: { "Content-Type": "application/json" }, body: geminiPayload, signal: AbortSignal.timeout(12000) }
-        );
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`;
+        let r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: buildGeminiBody(true), signal: AbortSignal.timeout(12000) });
+        if (r.status === 400) {
+          r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: buildGeminiBody(false), signal: AbortSignal.timeout(12000) });
+        }
         if (r.ok) {
           const data = await r.json().catch(() => null);
           const candidate = data?.candidates?.[0];

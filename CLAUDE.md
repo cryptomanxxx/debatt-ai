@@ -3381,6 +3381,16 @@ Ny användarrapport (sep 2026, skärmdump av en sparad `/chatt/[id]`-debatt date
 | `app/api/chatt/route.js` | Gemini-payloaden fick `thinkingConfig: {thinkingBudget: 0}`. Codestral- och Gemini-fallbackgrenarna kollar nu `finish_reason`/`finishReason` och `continue`:ar till nästa provider/modell vid trunkering istället för att returnera texten |
 | `app/chatt/page.js` | `streamSvar()` fångar `finish_reason` ur Groqs SSE-ström och returnerar den som `finishReason`. Retry-villkoret i debattloopen inkluderar nu `finishReason === "length"` som en auktoritativ signal utöver `klar` och `arTroligenAvbruten()` |
 
+**Codex-fynd (PR #1455-granskning): `thinkingBudget: 0` kan vara fel API-fält för hela gemini-3.5-familjen, vilket i så fall slår ut hela Gemini-reserven istället för att bara fixa trunkeringen.** Codex flaggade att Gemini 3.x eventuellt kräver en enum-baserad `thinkingLevel` istället för en rå `thinkingConfig.thinkingBudget`-tokenbudget — om så är fallet ger fältet HTTP 400 på varje anrop, vilket hade tagit bort Gemini som fallback helt i `/api/analyze`, `/api/beslut`, `/api/civilisation`, summeringar och observatörsjobben, samt Python-sidans artikelskrivning. Kunde INTE verifieras mot skarpt Gemini-API i den här sandboxen (ingen nätverksåtkomst till Google från miljön) — varken för att bekräfta eller avfärda Codex påstående.
+
+Givet osäkerheten byggdes en graceful degradation istället för att gissa rätt fältnamn: alla tre Gemini-anropsställen (`ai_klient.py → gemini_post()`, `app/lib/aiRouter.js → callProvider()`, `app/api/chatt/route.js`s Gemini-gren) försöker nu FÖRST med `thinkingConfig` inkluderat, men om just DEN begäran ger HTTP 400 görs samma modell om EN gång utan fältet innan felet accepteras eller nästa modell/provider provas. Om Codex har rätt (fältet ogiltigt) fortsätter Gemini fungera som innan denna PR — bara utan skydd mot dolt resonemang-trunkering, den ursprungliga bristen. Om Codex har fel (fältet är giltigt) fungerar den avsedda fixen som planerat, med en försumbar extra request bara i det ovanliga fallet att en 400 faktiskt inträffar. Ingen sida av utfallet kan bli sämre än läget innan ✅118 — det är den bärande avvägningen i denna fix.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `ai_klient.py` → `gemini_post()` | Ny `_payload(med_thinking)`-hjälpfunktion. Vid HTTP 400 görs samma modell om en gång utan `thinkingConfig` innan `_nere.add("gemini")` och break |
+| `app/lib/aiRouter.js` → `callProvider()` | Vid HTTP 400 på en Gemini-begäran görs samma anrop om en gång med `thinkingConfig` borttaget ur payloaden innan felet propageras |
+| `app/api/chatt/route.js` | Ny `buildGeminiBody(medThinking)`-hjälpfunktion. Vid HTTP 400 görs samma modell om en gång utan `thinkingConfig` innan `break`-villkoret (400/403) utvärderas |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
