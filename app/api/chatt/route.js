@@ -541,8 +541,16 @@ REGLER — viktiga:
       });
       if (r.ok) {
         const data = await r.json();
-        const text = data.choices?.[0]?.message?.content?.trim();
-        if (text) {
+        const choice = data.choices?.[0];
+        const text = choice?.message?.content?.trim();
+        // finish_reason "length" betyder svaret klipptes av innan det var klart —
+        // en avhuggen text är sämre än inget svar alls (den klarar inte
+        // arTroligenAvbruten()-heuristiken på klienten ändå, men skickar man den
+        // ändå slösas den bort som "det enda omförsöket" utan att faktiskt ge en
+        // hel replik). Behandla som misslyckat och prova nästa provider istället
+        // — samma mönster som redan finns för Groq/Mistral/DeepSeek på
+        // Python-sidan (ai_klient.py → hamta_kort_fns_med_trunkering(), ✅97).
+        if (text && choice?.finish_reason !== "length") {
           logAiCall({ provider: name, model, source: "chatt", status: "ok", latency_ms: Date.now() - t0 });
           const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
           const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
@@ -550,6 +558,10 @@ REGLER — viktiga:
             new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": name } }),
             { nyhetId: nyhetIdSafe, agent, requestId: requestIdSafe }
           );
+        }
+        if (text) {
+          logAiCall({ provider: name, model, source: "chatt", status: "truncated", latency_ms: Date.now() - t0 });
+          continue;
         }
       }
       logAiCall({ provider: name, model, source: "chatt", status: r.status === 429 ? "rate_limited" : "error", latency_ms: Date.now() - t0 });
@@ -562,7 +574,17 @@ REGLER — viktiga:
     const geminiPayload = JSON.stringify({
       contents: [{ role: "user", parts: [{ text: userMessage }] }],
       systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: { maxOutputTokens: maxTokensForRequest, temperature: 0.88 },
+      // thinkingConfig.thinkingBudget:0 stänger av Geminis interna "thinking"-läge
+      // — påslaget som DEFAULT på gemini-3.5-flash/-lite. Utan detta äts
+      // maxOutputTokens-budgeten av dolda resonemangstokens innan det synliga
+      // svaret ens börjar skrivas — samma buggklass som Groqs reasoning-modell
+      // (redan fixad ovan via reasoning_effort/reasoning_format, ✅115), men
+      // aldrig tidigare adresserad för Gemini-fallbacken. Detta var sannolikt en
+      // stor bidragande orsak till att avhuggna repliker fortsatte förekomma
+      // EFTER ✅115 landade: Gemini nås vid varje omförsök där Codestral saknar
+      // API-nyckel eller misslyckas, och led av exakt samma dolda budgetproblem
+      // (CLAUDE.md ✅118).
+      generationConfig: { maxOutputTokens: maxTokensForRequest, temperature: 0.88, thinkingConfig: { thinkingBudget: 0 } },
     });
     // gemini-2.0-*/gemini-1.5-flash stängdes ner av Google 1 jun 2026
     for (const model of ["gemini-3.5-flash", "gemini-3.5-flash-lite"]) {
@@ -574,8 +596,13 @@ REGLER — viktiga:
         );
         if (r.ok) {
           const data = await r.json().catch(() => null);
-          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? "";
-          if (text) {
+          const candidate = data?.candidates?.[0];
+          const text = candidate?.content?.parts?.[0]?.text?.trim() ?? "";
+          // finishReason "MAX_TOKENS" betyder svaret klipptes av trots
+          // thinkingBudget:0 (t.ex. ett ovanligt långt svar) — sämre än inget
+          // svar alls, prova nästa Gemini-modell istället av samma skäl som
+          // Codestral-fallbacken ovan.
+          if (text && candidate?.finishReason !== "MAX_TOKENS") {
             ps.gemini = { remaining: null, limit: 15, resetAt: null, ts: Date.now(), status: "ok" };
             logAiCall({ provider: "gemini", model, source: "chatt", status: "ok", latency_ms: Date.now() - gemT0, input_tokens: data?.usageMetadata?.promptTokenCount, output_tokens: data?.usageMetadata?.candidatesTokenCount });
             const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
@@ -584,6 +611,10 @@ REGLER — viktiga:
               new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": "gemini" } }),
               { nyhetId: nyhetIdSafe, agent, requestId: requestIdSafe }
             );
+          }
+          if (text) {
+            logAiCall({ provider: "gemini", model, source: "chatt", status: "truncated", latency_ms: Date.now() - gemT0 });
+            continue;
           }
         }
         const status = r.status === 429 ? "rate_limited" : "error";

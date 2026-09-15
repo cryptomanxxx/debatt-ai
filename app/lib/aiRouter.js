@@ -155,6 +155,14 @@ function geminiBody(messages, opts) {
     generationConfig: {
       maxOutputTokens: opts.maxTokens ?? 800,
       temperature:     opts.temperature ?? 0.7,
+      // thinkingBudget: 0 stänger av Geminis interna "thinking"-läge — påslaget
+      // som DEFAULT på gemini-3.5-flash/-lite. Utan detta äts maxOutputTokens-
+      // budgeten av dolda resonemangstokens innan det synliga svaret ens börjar
+      // skrivas — samma buggklass som Groqs reasoning-modell (redan adresserad
+      // för /api/chatt via reasoning_effort/reasoning_format), men aldrig
+      // tidigare adresserad här trots att Gemini är reservprovider i praktiskt
+      // taget alla kedjor som går via denna centrala router (CLAUDE.md ✅118).
+      thinkingConfig: { thinkingBudget: 0 },
     },
   };
   if (sys) body.systemInstruction = { parts: [{ text: sys.content }] };
@@ -165,6 +173,17 @@ function extractText(json, shape) {
   if (shape === "openai") return json.choices?.[0]?.message?.content?.trim() ?? null;
   if (shape === "gemini") return json.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ?? null;
   return null;
+}
+
+// Providerns egen signal att svaret klipptes av innan det var klart — betydligt
+// pålitligare än att gissa utifrån textform (jfr Python-sidans
+// hamta_kort_fns_med_trunkering(), ✅97). En avhuggen text är sämre än inget
+// svar alls: den ser giltig ut men saknar sitt slut, så callWithFallback() ska
+// hoppa vidare till nästa provider i kedjan istället för att acceptera den.
+function isTruncated(json, shape) {
+  if (shape === "openai") return json.choices?.[0]?.finish_reason === "length";
+  if (shape === "gemini") return json.candidates?.[0]?.finishReason === "MAX_TOKENS";
+  return false;
 }
 
 export async function callProvider(name, messages, opts = {}) {
@@ -218,6 +237,11 @@ export async function callProvider(name, messages, opts = {}) {
   if (!text) {
     log({ provider: name, model: cfg.model, source: opts.source ?? "aiRouter", status: "empty", latency_ms: latency });
     throw new Error(`${name}: tomt svar`);
+  }
+
+  if (isTruncated(json, cfg.shape)) {
+    log({ provider: name, model: cfg.model, source: opts.source ?? "aiRouter", status: "truncated", latency_ms: latency });
+    throw new Error(`${name}: avhugget svar (finish_reason/finishReason=length)`);
   }
 
   log({

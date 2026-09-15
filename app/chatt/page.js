@@ -215,7 +215,7 @@ async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfa
   onProvider?.(res.headers.get("X-Provider") ?? "groq");
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let text = "", buffer = "";
+  let text = "", buffer = "", finishReason = null;
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -226,10 +226,17 @@ async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfa
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const raw = line.slice(6).trim();
-        if (raw === "[DONE]") return { text, klar: true };
+        if (raw === "[DONE]") return { text, klar: true, finishReason };
         try {
-          const token = JSON.parse(raw).choices?.[0]?.delta?.content ?? "";
+          const choice = JSON.parse(raw).choices?.[0];
+          const token = choice?.delta?.content ?? "";
           if (token) { text += token; onToken(text); }
+          // Groqs egen ström (server.js pipar den rakt igenom, oinspekterad) bär
+          // med sig finish_reason i sin sista chunk innan [DONE] — en betydligt
+          // pålitligare trunkeringssignal än arTroligenAvbruten()s textheuristik.
+          // Servern kan inte inspektera detta (strömmen redan pipats vidare vid
+          // det laget), men klienten som redan läser hela strömmen kan.
+          if (choice?.finish_reason) finishReason = choice.finish_reason;
         } catch { /* ignore */ }
       }
     }
@@ -237,7 +244,7 @@ async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfa
   // Strömmen tog slut utan "data: [DONE]" — anslutningen dog, det var inte en
   // ren avslutning. klar: false är den auktoritativa signalen på det, mer
   // tillförlitlig än att gissa utifrån hur texten råkar sluta (Codex P2, PR #1286).
-  return { text, klar: false };
+  return { text, klar: false, finishReason };
 }
 
 async function fetchSummering(amne, inlagg) {
@@ -545,6 +552,7 @@ export default function ChattPage() {
       try {
         let text = null;
         let klar = false;
+        let finishReason = null;
         // En leverantörsström som stängs utan "data: [DONE]" (avbruten anslutning,
         // inte ett fel som kastas) lämnar text tom — eller värre, ett kort
         // mitt-i-meningen-avhugget fragment — utan att streamSvar() kastar. klar
@@ -557,7 +565,15 @@ export default function ChattPage() {
         // om av servern. Ett enda tyst omförsök här räcker för de flesta transienta
         // avbrott. Riktiga fel (429/502/abort, som KASTAS av streamSvar) hanteras
         // oförändrat i catch nedan — de görs inte om här.
-        for (let forsok = 0; forsok < 2 && (!klar || arTroligenAvbruten(text)) && !stoppRef.current; forsok++) {
+        //
+        // finishReason === "length" (CLAUDE.md ✅118) är en tredje, ännu mer
+        // pålitlig signal: Groqs egen ström bär med sig finish_reason i sista
+        // chunken innan [DONE] — en ström som avslutas RENT (klar:true) men med
+        // finish_reason "length" betyder att Groq själv klippte svaret vid
+        // max_tokens, inte att anslutningen dog. arTroligenAvbruten() fångar
+        // oftast samma fall via textform, men inte garanterat (t.ex. om det
+        // avhuggna svaret råkar sluta med skiljetecken ändå).
+        for (let forsok = 0; forsok < 2 && (!klar || finishReason === "length" || arTroligenAvbruten(text)) && !stoppRef.current; forsok++) {
           if (forsok > 0) {
             setStreaming(null);
             await new Promise(r => setTimeout(r, 400));
@@ -585,6 +601,7 @@ export default function ChattPage() {
           });
           text = resultat.text;
           klar = resultat.klar;
+          finishReason = resultat.finishReason;
         }
         if (stoppRef.current) break;
         if (!text) {
