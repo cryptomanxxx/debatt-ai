@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import ArkivClient from "./ArkivClient";
 
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Arkiv – DEBATT-AI",
@@ -21,7 +21,7 @@ async function fetchArtiklar() {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 120 },
+      next: { revalidate: 600 },
     });
     return res.ok ? res.json() : [];
   } catch { return []; }
@@ -31,7 +31,7 @@ async function fetchRoster() {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/roster?select=artikel_id,rod`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 120 },
+      next: { revalidate: 600 },
     });
     return res.ok ? res.json() : [];
   } catch { return []; }
@@ -41,7 +41,7 @@ async function fetchKommentarer() {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/kommentarer?select=artikel_id`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 120 },
+      next: { revalidate: 600 },
     });
     return res.ok ? res.json() : [];
   } catch { return []; }

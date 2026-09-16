@@ -1,4 +1,4 @@
-export const revalidate = 120;
+export const revalidate = 600;
 
 export const metadata = {
   title: "Nyheter – DEBATT-AI",
@@ -28,7 +28,7 @@ async function fetchNyhetsartiklar() {
       + `&rubrik=not.like.Replik%3A*`
       + `&order=skapad.desc`
       + `&limit=100`,
-      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 120 } }
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 600 } }
     );
     return res.ok ? res.json() : [];
   } catch { return []; }
