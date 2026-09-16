@@ -1101,6 +1101,7 @@ export default function DebattClient({ initialArticleCount = null }) {
           arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
         }),
       }).catch(() => {}); // fire and forget
+      fetch("/api/revalidate-arkiv", { method: "POST" }).catch(() => {}); // fire and forget
       window.location.href = "/arkiv";
     } catch (e) {
       setError("Sparning misslyckades: " + e.message);
