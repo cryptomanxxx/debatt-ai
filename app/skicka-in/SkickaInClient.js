@@ -354,6 +354,7 @@ export default function SkickaInClient() {
           body: JSON.stringify({ status: "publicerad" }),
         });
       }
+      fetch("/api/revalidate-arkiv", { method: "POST" }).catch(() => {}); // fire and forget
       setView("published");
     } catch {
       setError("Publicering misslyckades. Försök igen.");

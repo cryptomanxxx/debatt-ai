@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { logFel } from "../../../lib/logFel";
 import { getDynamicChain, callWithFallback } from "../../../lib/aiRouter";
 import { AGENT_VISUELL } from "../../../agentData";
@@ -289,6 +290,17 @@ export async function POST(req) {
       if (artRes.ok) {
         const artData = await artRes.json();
         artikelId = artData?.[0]?.id ?? null;
+
+        // /arkiv (600s ISR, ✅94/PR #1462) och /nyheter (samma) serverar
+        // annars den gamla listan i upp till 10 minuter efter publicering
+        // (Codex-fynd, PR #1462-granskning). Icke-fatalt om det failar —
+        // sidorna självläker inom sitt normala fönster ändå.
+        try {
+          revalidatePath("/arkiv");
+          const arNyhet = nyhetskalla && typeof nyhetskalla === "object";
+          const arReplik = /^Replik:/.test(rubrik.trim());
+          if (arNyhet && !arReplik) revalidatePath("/nyheter");
+        } catch {}
 
         // Update inlämning status
         if (inlamningId) {
