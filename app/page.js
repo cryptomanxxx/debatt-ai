@@ -1,6 +1,6 @@
 import DebattClient from "./client";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -9,7 +9,7 @@ async function fetchArticleCount() {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id`, {
       headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
-      cache: "no-store",
+      next: { revalidate: 60 },
     });
     if (!res.ok) return null;
     const data = await res.json();
