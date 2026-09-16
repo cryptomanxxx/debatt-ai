@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import ArkivClient from "./ArkivClient";
 
 export const revalidate = 120;
@@ -73,7 +74,9 @@ export default async function ArkivPage() {
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
 
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px" }}>
-        <ArkivClient artiklar={artiklar} voteCounts={voteCounts} commentCounts={commentCounts} />
+        <Suspense fallback={null}>
+          <ArkivClient artiklar={artiklar} voteCounts={voteCounts} commentCounts={commentCounts} />
+        </Suspense>
       </main>
     </div>
   );
