@@ -410,6 +410,7 @@ ${artikelBlockEn}
 RULES — important:
 - Answer with EXACTLY 2–3 sentences. Never more.
 - Be sharp and take a clear position. No filler.${rebutPreviousEn}${groundInArticleEn}
+- Stick strictly to the topic above, whether or not you recognize the specific work, person or name in it. Never invent facts about something you don't actually know — reason about the topic based only on what the topic text itself states (e.g. its genre or theme, if implied by the title). NEVER drift to a different topic just because it happens to fit your professional role or personality better.
 - Never say you are an AI. Always speak in first person.
 - Reply only in English.
 - Do NOT start with "I agree", "As [your role]" or similar opening phrases.`
@@ -420,6 +421,7 @@ ${artikelBlockSv}
 REGLER — viktiga:
 - Svara med EXAKT 2–3 meningar. Aldrig mer.
 - Var skarp och ta tydlig ställning. Ingen fluff.${bemotForegaendeSv}${forankraArtikelnSv}
+- Utgå strikt från ämnet ovan, oavsett om du känner igen det specifika verket, personen eller namnet i det. Hitta ALDRIG på fakta om något du inte faktiskt känner till — resonera kring ämnet enbart utifrån det som ämnestexten själv anger (t.ex. genre eller tema, om det framgår av titeln). Byt ALDRIG till ett annat ämne bara för att det råkar passa din yrkesroll eller personlighet bättre.
 - Tala aldrig om att du är en AI. Tala alltid i första person.
 - Svara bara på svenska.
 - Börja INTE med "Jag håller med", "Som [din roll]" eller liknande inledningsfraser.`;
