@@ -31,9 +31,15 @@ function linkifyKalla(paragraphs, kalla) {
       const slut = start + m[0].length;
       const noder = paragraphs.map((pp, j) => {
         if (j !== i) return pp;
+        // Källnamnet kan dela stycke med en mänskligt formaterad citatlänk (t.ex.
+        // en "Källor"-lista där källnamnet också nämns i prosan) — kör därför
+        // linkifyRawAnchors på texten FÖRE och EFTER källnamnsmatchningen också,
+        // inte bara på stycken linkifyKalla lämnar orörda (Codex-fynd,
+        // PR #1463-granskning: den ursprungliga versionen hoppade helt över
+        // raw-anchor-parsning för hela det källnamnsmatchade stycket).
         return (
           <Fragment key={`kalla-${j}`}>
-            {pp.slice(0, start)}
+            {linkifyRawAnchors(pp.slice(0, start), `kalla-${j}-pre`)}
             <a
               href={kalla.url}
               target="_blank"
@@ -42,7 +48,7 @@ function linkifyKalla(paragraphs, kalla) {
             >
               {pp.slice(start, slut)}
             </a>
-            {pp.slice(slut)}
+            {linkifyRawAnchors(pp.slice(slut), `kalla-${j}-post`)}
           </Fragment>
         );
       });
@@ -65,9 +71,17 @@ function linkifyKalla(paragraphs, kalla) {
 // via en falsk länk, t.ex. i en egenhändigt formaterad "Källor"-lista).
 const SAFE_URL_RE = /^https?:\/\//i;
 const RAW_ANCHOR_RE = /<a\s+href=(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a>/gi;
+// Snabb förkontroll innan den kostsammare loopen körs — måste vara lika
+// tolerant mot skiftläge och whitespace som RAW_ANCHOR_RE självt (case-
+// insensitive, godtyckligt whitespace mellan "<a" och "href"), annars
+// missas giltiga former som <A href="..."> eller <a\thref="..."> som
+// regexen faktiskt skulle ha matchat (Codex-fynd, PR #1463-granskning:
+// den ursprungliga .includes("<a ") var skiftlägeskänslig och krävde
+// exakt ett mellanslag).
+const HAS_ANCHOR_RE = /<a\s/i;
 
 function linkifyRawAnchors(text, keyPrefix) {
-  if (typeof text !== "string" || !text.includes("<a ")) return text;
+  if (typeof text !== "string" || !HAS_ANCHOR_RE.test(text)) return text;
   const nodes = [];
   let lastIndex = 0;
   let key = 0;
@@ -106,12 +120,14 @@ export default function ArgumentRoster({ artikelId, artikelText, kalla }) {
     () => linkifyKalla(paragraphs, kalla),
     [artikelText, kalla?.namn, kalla?.url]
   );
-  // linkifyKalla lämnar redan sitt matchade stycke som ett färdigt Fragment —
-  // rör inte det stycket igen. Övriga stycken är fortfarande råa strängar,
-  // vilka nu även genomsöks efter mänskligt formaterade citatlänkar.
+  // linkifyKalla har redan kört linkifyRawAnchors på sitt matchade styckes
+  // pre-/post-delar internt (se ovan) — här körs den bara på råa strängar.
+  // linkifyRawAnchors no-opar tyst på ett redan färdigt Fragment (typeof
+  // text !== "string"), så samma anrop kan köras uniformt över alla stycken
+  // utan att särbehandla matchIndex.
   const finalParagraphs = useMemo(
-    () => renderedParagraphs.map((p, i) => (i === matchIndex ? p : linkifyRawAnchors(p, `p-${i}`))),
-    [renderedParagraphs, matchIndex]
+    () => renderedParagraphs.map((p, i) => linkifyRawAnchors(p, `p-${i}`)),
+    [renderedParagraphs]
   );
   const [votes, setVotes] = useState({});
   const [voted, setVoted] = useState({});
