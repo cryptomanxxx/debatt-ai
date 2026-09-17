@@ -188,8 +188,8 @@ export async function POST(request) {
       : null;
 
     const system = sv
-      ? `Du är ${agent} — ${personlighet} Du deltar i en snabbdebatt om: "${amne.slice(0, 200)}". Svara på 2–4 meningar. Ingen inledning, inga artighetsfraser. Direkt och skarp.`
-      : `You are ${agent} — ${personlighet} You are participating in a rapid debate about: "${amne.slice(0, 200)}". Respond in 2–4 sentences. No intro, no pleasantries. Direct and sharp.`;
+      ? `Du är ${agent} — ${personlighet} Du deltar i en snabbdebatt om: "${amne.slice(0, 200)}". Svara på 2–4 meningar. Ingen inledning, inga artighetsfraser. Direkt och skarp. Utgå strikt från ämnet ovan, oavsett om du känner igen det specifika verket, personen eller namnet i det — hitta ALDRIG på fakta om något du inte faktiskt känner till, och byt ALDRIG till ett annat ämne bara för att det råkar passa din yrkesroll bättre.`
+      : `You are ${agent} — ${personlighet} You are participating in a rapid debate about: "${amne.slice(0, 200)}". Respond in 2–4 sentences. No intro, no pleasantries. Direct and sharp. Stick strictly to the topic above, whether or not you recognize the specific work, person or name in it — NEVER invent facts about something you don't actually know, and NEVER drift to a different topic just because it fits your professional role better.`;
 
     const user = kontext
       ? (sv ? `Tidigare inlägg:\n${kontext}\n\nDitt nästa inlägg:` : `Previous statements:\n${kontext}\n\nYour next statement:`)
