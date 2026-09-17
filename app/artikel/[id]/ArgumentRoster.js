@@ -52,11 +52,66 @@ function linkifyKalla(paragraphs, kalla) {
   return { noder: paragraphs, matchIndex: -1 };
 }
 
+// Säker matchning av MÄNNISKO-skrivna citatlänkar i brödtexten — parsar ALDRIG
+// texten som HTML (ingen dangerouslySetInnerHTML, texten skickas aldrig till
+// DOM:en som markup). Extraherar bara href och länktext ur ett textmönster som
+// RÅKAR se ut som en ankartagg, och bygger ett eget riktigt React-element av de
+// extraherade värdena — alla andra attribut i det matchade mönstret (t.ex. ett
+// insmugglat onclick=...) kastas bort helt, eftersom det nya elementet bara får
+// href/target/rel/style, aldrig de matchade attributen rakt av. href godkänns
+// bara om den börjar med http:// eller https:// — javascript:/data:/vbscript:
+// m.fl. avvisas och lämnas kvar som overksam, synlig text istället för att bli
+// klickbara (skydd mot att en mänsklig inlämning smugglar in en XSS-nyttolast
+// via en falsk länk, t.ex. i en egenhändigt formaterad "Källor"-lista).
+const SAFE_URL_RE = /^https?:\/\//i;
+const RAW_ANCHOR_RE = /<a\s+href=(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a>/gi;
+
+function linkifyRawAnchors(text, keyPrefix) {
+  if (typeof text !== "string" || !text.includes("<a ")) return text;
+  const nodes = [];
+  let lastIndex = 0;
+  let key = 0;
+  let m;
+  RAW_ANCHOR_RE.lastIndex = 0;
+  while ((m = RAW_ANCHOR_RE.exec(text)) !== null) {
+    const href = (m[1] ?? m[2] ?? "").trim();
+    const linkText = m[3];
+    if (m.index > lastIndex) nodes.push(text.slice(lastIndex, m.index));
+    if (SAFE_URL_RE.test(href)) {
+      nodes.push(
+        <a
+          key={`${keyPrefix}-raw-${key++}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: "#38bdf8", textDecoration: "underline", textDecorationColor: "#38bdf850" }}
+        >
+          {linkText}
+        </a>
+      );
+    } else {
+      // Osäkert URL-schema — lämna kvar exakt den ursprungliga texten, overksam.
+      nodes.push(m[0]);
+    }
+    lastIndex = RAW_ANCHOR_RE.lastIndex;
+  }
+  if (lastIndex === 0) return text; // inget giltigt ankarmönster hittades trots "<a "-träffen
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return <Fragment key={keyPrefix}>{nodes}</Fragment>;
+}
+
 export default function ArgumentRoster({ artikelId, artikelText, kalla }) {
   const paragraphs = (artikelText || "").split("\n\n").filter(Boolean);
   const { noder: renderedParagraphs, matchIndex } = useMemo(
     () => linkifyKalla(paragraphs, kalla),
     [artikelText, kalla?.namn, kalla?.url]
+  );
+  // linkifyKalla lämnar redan sitt matchade stycke som ett färdigt Fragment —
+  // rör inte det stycket igen. Övriga stycken är fortfarande råa strängar,
+  // vilka nu även genomsöks efter mänskligt formaterade citatlänkar.
+  const finalParagraphs = useMemo(
+    () => renderedParagraphs.map((p, i) => (i === matchIndex ? p : linkifyRawAnchors(p, `p-${i}`))),
+    [renderedParagraphs, matchIndex]
   );
   const [votes, setVotes] = useState({});
   const [voted, setVoted] = useState({});
@@ -123,7 +178,7 @@ export default function ArgumentRoster({ artikelId, artikelText, kalla }) {
             onMouseEnter={() => setHovered(i)}
             onMouseLeave={() => setHovered(null)}
           >
-            <p style={{ fontSize: "18px", lineHeight: 2, color: "#f0ede6", margin: 0, paddingRight: "48px" }}>{renderedParagraphs[i]}</p>
+            <p style={{ fontSize: "18px", lineHeight: 2, color: "#f0ede6", margin: 0, paddingRight: "48px" }}>{finalParagraphs[i]}</p>
             <button
               onClick={() => vote(i)}
               title={isVoted ? "Röstad" : "Lyft fram detta argument"}
