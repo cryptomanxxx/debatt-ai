@@ -10,6 +10,20 @@ name: Vercel Deployment Prune
 # Manuell körning (workflow_dispatch) defaultar till dry_run=true — kör
 # den manuellt minst en gång och läs loggen innan du litar på att den
 # schemalagda körningen (som alltid raderar på riktigt) gör rätt sak.
+#
+# retention_days=1 / keep_latest=10 (sänkt från 14/20, CLAUDE.md ✅120):
+# de ursprungliga 14/20-defaultsen gav ZERO raderingskandidater i
+# praktiken, dagligen, i flera veckor — inte för att skriptet var
+# trasigt, utan för att projektets faktiska deployment-takt (alla
+# GitHub Actions-bottar som committar direkt till main dagligen + varje
+# PR-merge, se CLAUDE.md GitHub Actions-schemat) är ~15–20 deployments/
+# dygn. Vid den takten hinner backloggen aldrig bli 14 dagar gammal
+# medan den samtidigt ligger bortom de 20 senaste — så INGET raderades
+# någonsin, och Deployment Storage växte obehindrat tills 47 st ackumu-
+# lerade deployments motsvarade 48,36 GB (~950 MB/deployment i snitt,
+# rimligt givet hur många separata serverless-API-routes appen har).
+# 1/10 gör att den dagliga cronen faktiskt hinner ikapp gårdagens
+# överskott varje körning istället för att vänta veckor.
 
 on:
   schedule:
@@ -23,11 +37,11 @@ on:
       retention_days:
         description: "Radera deployments äldre än så här många dagar"
         required: false
-        default: "14"
+        default: "1"
       keep_latest:
         description: "Rör aldrig de N senaste deployments oavsett ålder"
         required: false
-        default: "20"
+        default: "10"
 
 concurrency:
   group: vercel-deployment-prune
@@ -48,8 +62,8 @@ jobs:
           VERCEL_TEAM_ID: ${{ secrets.VERCEL_TEAM_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_PROJECT_NAME: debatt-ai
-          RETENTION_DAYS: ${{ github.event.inputs.retention_days || '14' }}
-          KEEP_LATEST: ${{ github.event.inputs.keep_latest || '20' }}
+          RETENTION_DAYS: ${{ github.event.inputs.retention_days || '1' }}
+          KEEP_LATEST: ${{ github.event.inputs.keep_latest || '10' }}
           # Schemalagda körningar raderar alltid på riktigt. Manuella
           # körningar defaultar till dry_run=true om inget annat anges.
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.dry_run || 'true') || 'false' }}

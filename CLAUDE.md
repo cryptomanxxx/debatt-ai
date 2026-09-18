@@ -3432,6 +3432,32 @@ Uppföljning på ✅94: den fixen stoppade NYA deployments från att bli uppblå
 
 ---
 
+### ✅ 120. Deployment Storage tillbaka på 48 GB dagar efter att den bekräftats nära noll — pruning-skriptets defaults för slappa för projektets faktiska deploy-takt – KLART
+
+Ägarfråga (sep 2026, med skärmdumpar av Vercels Usage-sida: Deployment Storage 48,36 GB / 10 GB, samt Deployment Retention Policy-sidan som redan visade alla fyra kategorier sparade på "1 week"): *"Är inte det här konstigt? Nu deployment storage tillbaka igen. För ett par dagar sen var det noll."* — trots att ✅119s dagliga schemalagda pruning-körning rapporterades grön varje dag.
+
+**Diagnos, i tre steg, alla körda live mot produktions-API:et:**
+1. Den senaste FAKTISKA schemalagda körningen (18 sep, retention_days=14/keep_latest=20 — de ursprungliga defaultsen) loggade `Sida 1: 49 deployments` → `Kandidater för radering: 0` → `Inget att radera.` Skriptet fungerade felfritt, det fanns bara inget att göra under de villkoren.
+2. En manuell `workflow_dispatch`-dry-run med betydligt hårdare parametrar (retention_days=2, keep_latest=10) gav bara 6 kandidater av 52 totala deployments — alltså var ~46 av de 52 antingen bland de 10 senaste (alltid skyddade) eller yngre än 2 dagar.
+3. En manuell riktig körning (dry_run=false, retention_days=0, keep_latest=5) raderade **47 av 52 deployments** (0 skyddade, 0 misslyckade — produktionsdeploymenten låg redan bland de 5 senaste och rördes aldrig).
+
+**Rotorsak:** skriptet var aldrig trasigt — dess ursprungliga defaults (retention_days=14, keep_latest=20, satta i ✅119) var bara feldimensionerade för projektets FAKTISKA deploy-takt. Varje kodpush till `main` (mänskliga PR-merges OCH de många GitHub Actions-bottar som committar direkt till main dagligen — `daily-vision.yml`, `daily-strategy.yml`, `economy-observer.yml`, `ai-performance-observer.yml`, m.fl., se GitHub Actions-schemat ovan) triggar en egen Vercel-deployment. Den observerade takten (47 raderade, varav de flesta yngre än 2 dagar) motsvarar grovt **15–20 deployments/dygn** — vid den takten hinner "bortom de 20 senaste OCH äldre än 14 dagar"-villkoret aldrig bli sant förrän flera veckors backlogg redan hunnit ackumuleras, och under tiden växer Deployment Storage helt obehindrat.
+
+**47 raderade deployments ≈ hela de 48,36 GB som synts på Usage-sidan** — ett snitt på **~950 MB–1 GB per deployment**, ovanligt stort, sannolikt en direkt konsekvens av hur många separata serverless-funktioner den här appen bygger (se den mycket långa API-routes-tabellen ovan — varje `/api/*`-route blir en egen Lambda-bundle, och Next.js kan duplicera node_modules-beroenden mellan dem).
+
+**Åtgärdat i två steg:**
+1. **Omedelbar sanering** — en manuellt triggad riktig körning (retention_days=0, keep_latest=5) körd direkt mot produktions-API:et, raderade de 47 överblivna deployments. Bara de 5 senaste (inkl. den aktiva produktionsdeploymenten) finns kvar. Ingen kodändring krävdes för detta steg — bara att köra den redan befintliga workflowen med tillfälligt hårdare `workflow_dispatch`-inputs.
+2. **Permanent fix** — den dagliga schemalagda körningens defaults sänkta från retention_days=14/keep_latest=20 till **retention_days=1/keep_latest=10**, i både `workflow_dispatch`-inputens defaultvärden, den schemalagda körningens `env`-fallback-literaler, och skriptets egna interna `${VAR:-...}`-fallbacks (för konsekvens om skriptet någonsin körs utanför den här workflowen). Vid den observerade takten (~15–20/dygn) hinner den dagliga cronen nu faktiskt ikapp föregående dags överskott varje körning, istället för att vänta veckor på att villkoret ens blir sant en gång.
+
+**Känd begränsning:** `keep_latest=10` skyddar bara ett smalt rullande fönster (ungefär ett halvt dygns deployments vid nuvarande takt) mot radering oavsett ålder — tillräckligt för en typisk samma-dag-rollback, men en incident som kräver att rulla tillbaka längre än så skulle behöva en manuell `workflow_dispatch`-körning med ett högre `keep_latest`-värde innan den önskade äldre deploymenten hinner städas bort av nästa dagliga cron. Ingen ändring gjordes av Vercels egen "Deployment Retention Policy"-inställning (redan satt till "1 week" av ägaren) — den styr bara NYA deployments framåt, inte den här skript-baserade aktiva städningen av redan existerande backlogg.
+
+| Fil | Roll |
+|---|---|
+| `.github/workflows/vercel-deployment-prune.yml` | `workflow_dispatch`-defaults och schemats `env`-fallback sänkta från retention_days=14/keep_latest=20 till 1/10, med förklarande kommentar om varför |
+| `scripts/vercel-prune-deployments.sh` | Interna `${RETENTION_DAYS:-...}`/`${KEEP_LATEST:-...}`-fallbacks sänkta till samma 1/10, för konsekvens |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
