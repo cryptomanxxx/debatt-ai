@@ -3765,6 +3765,39 @@ Användarrapport (sep 2026): *"Jag gick in på admin panelen nu och försökte t
 
 ---
 
+### ✅ 125. Saknade filter-taggar för nyhetsartiklar och för AI/människa – KLART
+
+Användarrapport (sep 2026, med tre skärmdumpar av `/nyheter` och `/arkiv`): *"Nyhetsartiklar saknar alla ämnes taggar som man kan klicka på för att sortera. Hela nyhetsartikel taggen för att sortera artiklarna efter nyheter verkar också saknas (debattartiklar och filmrecensioner har taggar som man kan klicka på att sortera). Alla tre verkar saknar taggar (för att sortera listan) för människor och AI agenter."*
+
+**Tre separata brister, verifierade en och en mot koden:**
+
+1. **`/nyheter` hade ingen interaktivitet alls.** Sidan var en ren SSR-sida (`export default async function NyheterPage`) utan client-komponent — ämnestaggarna som visades per artikelkort (`artikel.taggar.slice(0,3)`) var vanliga `<span>`, aldrig klickbara. Till skillnad från `/arkiv` (som redan har en fullständig `ArkivClient.js` med klickbara taggfilter) saknade `/nyheter` hela filtreringslagret.
+2. **`/arkiv` saknade en "Nyhetsartiklar"-filterpill.** Filterraden hade redan "🎬 Filmrecensioner" och "💬 Debattartiklar" (se ✅123) men ingen motsvarande "📰 Nyhetsartiklar"-toggle för att isolera genuina nyhetsartiklar (`nyhetskalla` satt, `typ !== "replik"`, ingen filmrecension).
+3. **Ingen av sidorna hade ett AI/Människa-filter.** `KallaBadge` visar redan "AI" respektive "MÄNNISKA" som en ren etikett per kort på `/arkiv`, men det gick inte att klicka för att filtrera listan efter författartyp — och `/nyheter` visade bara en AI-badge (ingen MÄNNISKA-badge alls) utan någon filtrering.
+
+**Fix — `/arkiv` (`ArkivClient.js`):**
+- Ny `filterNyhet`-state (boolean) + "📰 Nyhetsartiklar"-togglepill, matchning `!a.filmrecension && a.nyhetskalla && a.nyhetskalla?.typ !== "replik"` — samma villkor som redan används för rubrikfärg på flera ställen i denna logg (✅105/✅123).
+- Ny `filterKalla`-state (`null | "ai" | "manniska"`) + "🤖 AI"/"✍️ Människa"-togglepills (ömsesidigt uteslutande, eftersom `kalla` bara har två värden).
+- Stödjer `?nyhet=1` och `?kalla=ai`/`?kalla=manniska` som URL-parametrar, samma mönster som `?film=1`/`?debatt=1` (✅123).
+- `filtered`-logiken, `isFiltering`, tomt-resultat-texten och "Rensa filter"-knappen utökade med de två nya filtren.
+
+**Fix — `/nyheter` (ombyggd till page.js + NyheterClient.js):**
+- `page.js` gjordes tunn (bara datahämtning + tomt-state) och delegerar all rendering till en ny `NyheterClient.js` — samma page/client-split som `/arkiv` redan använder.
+- `NyheterClient.js` innehåller filtreringslogiken: klickbara ämnestaggar (topp-20 efter frekvens, samma mönster som `ArkivClient.js`s `topTags`) i både filterraden och per artikelkort, samt "🤖 AI"/"✍️ Människa"-filterpills. Ingen Filmrecensioner/Debattartiklar/Nyhetsartiklar-toggle behövs här — sidans egen SSR-fråga (`nyhetskalla=not.is.null&rubrik=not.like.Replik%3A*`) är redan avgränsad till enbart genuina nyhetsartiklar.
+- `grupperaEfterNyhet()`/`GrupperadNyhetsKort`/`ArtikelKort` flyttades oförändrade in i klientkomponenten, filtreringen sker på den platta listan innan gruppering — en grupp med flera agenter som kommenterat samma nyhet kan alltså krympa till en enda artikel (och renderas då som `ArtikelKort`) om bara en av dem matchar filtret.
+- Ny `KallaBadge`-komponent (AI/MÄNNISKA) visas nu på varje kort — tidigare visades bara en AI-badge, ingen MÄNNISKA-badge alls.
+- Taggarna renderas som syskon till (inte nästlade inuti) kortets `<a href=...>`-länk, för att undvika ogiltig nästlad interaktiv HTML (`<button>` inuti `<a>`) — samma försiktighet som redan tillämpats på andra ställen i denna logg för liknande klickbara element inuti länkade kort.
+
+Ingen ny Supabase-migrering eller serverkod — ren klientsidesfiltrering av redan hämtad data, samma mönster som `/arkiv` redan etablerat.
+
+| Fil | Roll |
+|---|---|
+| `app/arkiv/ArkivClient.js` | Ny `filterNyhet`- och `filterKalla`-state, tre nya filterpills ("📰 Nyhetsartiklar", "🤖 AI", "✍️ Människa"), URL-param-stöd (`?nyhet=1`, `?kalla=`), utökad `filtered`/`isFiltering`/tomt-resultat-logik |
+| `app/nyheter/page.js` | Gjord tunn — bara datahämtning, delegerar rendering till `NyheterClient` |
+| `app/nyheter/NyheterClient.js` | Ny klientkomponent. Klickbara ämnestaggar (topp-20, filterrad + per kort), "🤖 AI"/"✍️ Människa"-filterpills, `KallaBadge` (AI/MÄNNISKA) på varje kort. Innehåller den flyttade `grupperaEfterNyhet()`/`GrupperadNyhetsKort`/`ArtikelKort`-logiken |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
