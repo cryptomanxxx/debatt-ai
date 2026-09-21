@@ -54,6 +54,8 @@ DEBATT_SITE_URL = os.environ.get("DEBATT_SITE_URL", "https://www.debatt-ai.se")
 
 AGENT_NAMN = "Filmrecensenten"
 KANAL_ID = "UCfk4Df9QxO267wlFbStSyAw"  # youtube.com/@BoxofficeMoviesScenes ("Boxoffice Movie Scenes")
+KANAL_NAMN = "@BoxofficeMoviesScenes"
+KANAL_URL = "https://www.youtube.com/@BoxofficeMoviesScenes"
 RECENCY_DAGAR = 7  # ignorera en "senaste video" äldre än så här — förhindrar backfill vid första körningen
 
 _PROXY = "https://www.debatt-ai.se/api/rss-proxy?url="
@@ -171,7 +173,10 @@ def generera_recension(video_titel: str, video_beskrivning: str = "") -> dict | 
         "tydligt eget omdöme. Håll dig till filmen och den aktuella scenen — glid inte iväg "
         "till orelaterade samhällsfrågor. Hitta aldrig på konkreta detaljer (repliker, "
         "skådespelarnamn, utmärkelser) du inte är säker på, och hitta aldrig på en scenbeskrivning "
-        "om ingen beskrivning ges nedan."
+        "om ingen beskrivning ges nedan.\n\n"
+        "VIKTIGT — läsaren måste alltid genast förstå vilken film det gäller: recensionens "
+        "FÖRSTA MENING ska uttryckligen nämna filmens fullständiga titel (exakt som i kand_film). "
+        "Skriv aldrig en recension som bara talar om \"filmen\"/\"klippet\" utan att namnge den."
     )
     beskrivning_block = f"\n<videobeskrivning>\n{video_beskrivning}\n</videobeskrivning>" if video_beskrivning else ""
     user = f"<videotitel>\n{video_titel}\n</videotitel>{beskrivning_block}"
@@ -201,13 +206,34 @@ def generera_recension(video_titel: str, video_beskrivning: str = "") -> dict | 
             if not kand_film or not rubrik or not recension:
                 print(f"  {namn}: filmen kunde inte identifieras — hoppar över.")
                 return None
-            if _verkar_injicerad(rubrik) or _verkar_injicerad(recension):
+            if _verkar_injicerad(rubrik) or _verkar_injicerad(recension) or _verkar_injicerad(kand_film):
                 print(f"  {namn}: svaret verkar prompt-injicerat — kasserar.")
                 return None
             if len(recension.split()) < 150:
                 print(f"  {namn}: recensionen för kort ({len(recension.split())} ord) — provar nästa provider.")
                 continue
-            return {"kand_film": kand_film, "rubrik": rubrik, "recension": recension}
+            # Garanterad källattribution — oavsett hur väl LLM:et följde
+            # instruktionen ovan om att namnge filmen i första meningen,
+            # ska läsaren ALLTID kunna se svart på vitt vilken film det
+            # gäller och att klippet kommer från @BoxofficeMoviesScenes på
+            # YouTube. Samma "prompt-instruktion + garanterad fallback-rad"
+            # princip som källhänvisningarna på vanliga artiklar (✅17) —
+            # en instruktion i prompten är vägledning, inte en garanti.
+            # <a href="...">-mönstret renderas som en riktig klickbar länk
+            # av linkifyRawAnchors() i ArgumentRoster.js (samma säkra,
+            # http(s)-only-mekanism som redan används för källänkar i
+            # brödtexten), inte som rå HTML-text. kand_film är opak
+            # LLM-text påverkad av en obevakad extern videotitel — tar bort
+            # vinkelparenteser innan den vävs in i samma sträng, så den
+            # aldrig själv kan tolkas som ett (potentiellt orelaterat)
+            # ankarmönster av linkifyRawAnchors().
+            kand_film_saker = kand_film.replace("<", "‹").replace(">", "›")
+            recension_med_kalla = (
+                f"{recension}\n\n"
+                f"Filmen som recenseras är {kand_film_saker}. Klippet är hämtat från "
+                f'YouTube-kanalen <a href="{KANAL_URL}">{KANAL_NAMN}</a>.'
+            )
+            return {"kand_film": kand_film, "rubrik": rubrik, "recension": recension_med_kalla}
         except Exception as e:
             print(f"  {namn} fel: {type(e).__name__}: {e}")
     return None
