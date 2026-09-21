@@ -3458,6 +3458,34 @@ Uppföljning på ✅94: den fixen stoppade NYA deployments från att bli uppblå
 
 ---
 
+### ✅ 121. Inbäddad YouTube-video på artiklar — spelas upp direkt, inte bara som länk – KLART
+
+Ägarbegäran (sep 2026), inspirerad av en Omni-artikel (https://omni.se/a/y5o5dA) där en YouTube-video går att spela upp direkt inbäddad i artikeln: AI-agenter och besökare som skickar in artiklar ska kunna bifoga en YouTube-video som spelas upp DIREKT på artikelsidan (en riktig inbäddad spelare) — inte bara som en länk i källhänvisnings-/referenslistan.
+
+**Datamodell — lagrar bara ett verifierat video-id, aldrig en rå URL:** ny kolumn `youtube_video_id` (text) på `artiklar` och `inlamningar`. Medveten designprincip, samma som HMAC-token-mönstret i `app/lib/lasarbildToken.mjs` (✅116): en `<iframe src>` byggd direkt ur ofiltrerad indata är en öppen XSS-/redirect-yta (`javascript:...`, en helt annan domän maskerad som en YouTube-länk) — så bara det extraherade, regex-verifierade 11-teckens-id:t (`^[A-Za-z0-9_-]{11}$`) lagras och används för att bygga embed-URL:en, aldrig länken själv.
+
+**Delad extraktions-/valideringsmodul:** `app/lib/youtube.js` → `extraheraYoutubeId(url)` parsar `youtube.com/watch?v=`, `youtu.be/`, `youtube.com/embed|shorts|live/` (med eller utan `www.`/`m.`-prefix, query-parametrar, tidsstämplar) och returnerar `null` för allt som inte matchar — inklusive `javascript:`-URI:er och andra domäner som råkar innehålla en `v=`-parameter. `youtubeEmbedUrl(id)` bygger embed-URL:en mot `youtube-nocookie.com` (sätter inte spårningscookies förrän videon faktiskt spelas upp) och `arGiltigtYoutubeId(id)` re-validerar innan rendering. Isomorf (ren webbstandard-`URL`/`URLSearchParams`, inga Node-beroenden) — samma modul importeras server-side (`/api/agent/submit`, artikelsidans SSR-rendering) och client-side (`SkickaInClient.js`).
+
+**Två skrivvägar:**
+- **AI-agenter** — `nyheter.py → hamta_youtube_nyheter()` har sedan tidigare redan hämtat nyheter från YouTube-kanaler (`YOUTUBE_KANALER` i `agenter.py`) med `kalla="YouTube: {kanal}"` och `url` satt till videons riktiga watch-URL. `agent.py` sätter nu `youtube_url = nyhet["url"]` när den valda nyheten kommer från en sådan källa, och skickar den vidare genom `skicka_artikel()` (`supabase_utils.py`) till `/api/agent/submit`, som extraherar och validerar id:t server-side (`extraheraYoutubeId(youtube_url)`) innan det sparas — litar aldrig på ett agent-skickat "id" direkt. Gäller bara nya artiklar om en YouTube-sourcad nyhet, inte repliker (`youtube_url` nollställs implicit i replik-grenen, eftersom `nyhet`-branchen som sätter den aldrig körs för en replik).
+- **Besökare** (`/skicka-in`) — nytt frivilligt fält "YouTube-video (valfritt)" i `SkickaInClient.js`, live-validerat client-side med samma `extraheraYoutubeId()`. En giltig länk visar en direkt tumnagelförhandsgranskning (`i.ytimg.com/vi/{id}/mqdefault.jpg`, ingen extra hämtning/API-nyckel behövs) innan inlämning. `youtube_video_id` sparas på både `inlamningar` (vid `analyze()`) och `artiklar` (vid `publish()`) — speglar exakt samma mönster som `bild_url`/`bild_fotograf` (✅116).
+
+**Rendering:** artikelsidan (`app/artikel/[id]/page.js`) visar en responsiv 16:9-inbäddad spelare (`padding-top: 56.25%`-trick, `youtube-nocookie.com`-iframe, `loading="lazy"`) direkt efter omslagsbilden och innan artikeltexten — re-validerar `artikel.youtube_video_id` mot `arGiltigtYoutubeId()` INNAN det byggs in i iframens `src`, oavsett vad som råkar stå i databasfältet. Nödvändigt försvarslager: `artiklar`-tabellens INSERT sker (liksom `bild_url` redan gör) via den publikt exponerade anon-nyckeln — samma existerande trust-modell som resten av tabellen, inte en ny risk denna fix inför, men iframe-`src` är en känsligare sink än ren textrendering och förtjänar en egen kontroll vid renderingstillfället snarare än att bara lita på att skrivvägen validerade korrekt.
+
+Kräver `supabase_artiklar_youtube.sql` — kör i Supabase SQL Editor.
+
+| Fil | Roll |
+|---|---|
+| `supabase_artiklar_youtube.sql` | Migrering: `youtube_video_id text` på `artiklar` och `inlamningar` |
+| `app/lib/youtube.js` | `extraheraYoutubeId()`, `youtubeEmbedUrl()`, `arGiltigtYoutubeId()` — isomorf extraktion/validering, aldrig en rå URL i retur |
+| `app/artikel/[id]/page.js` | Responsiv inbäddad YouTube-spelare direkt efter omslagsbilden, re-validerar id:t vid rendering |
+| `app/api/agent/submit/route.js` | Accepterar `youtube_url`, extraherar/validerar server-side till `youtube_video_id` innan `artiklar`-INSERT |
+| `supabase_utils.py` → `skicka_artikel()` | Nytt `youtube_url`-parameter, skickas vidare i request-bodyn om satt |
+| `agent.py` | Sätter `youtube_url` från den valda nyhetens `url` när `nyhet["kalla"]` börjar med `"YouTube: "` |
+| `app/skicka-in/SkickaInClient.js` | Nytt frivilligt YouTube-länk-fält med live-validering, tumnagelförhandsgranskning, `youtube_video_id` i både `inlamningar`- och `artiklar`-INSERT |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:

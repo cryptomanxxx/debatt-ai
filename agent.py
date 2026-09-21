@@ -729,6 +729,7 @@ def main():
                         nyhet["beskrivning"] = (nyhet.get("beskrivning") or "") + "\n\n" + kommentarer
 
         nyhetskalla = None
+        youtube_url = None
         artikelfmt = valj_format()
 
         # Koalitionsbulletin — hämta koalitionspartners senaste artiklar som privat kontext
@@ -774,6 +775,11 @@ def main():
                     "antal_utvärderade": 0,
                 }
                 print(f"  📎 Källänk från ämnesförslaget: {forslag_kalla_namn}")
+                # Samma YouTube-koppling som i "elif nyhet:"-grenen nedan — ett
+                # besökarföreslaget ämne (/nyhetsval) kan lika gärna komma från
+                # en YouTube-sourcad nyhetsflode-rad (Codex-fynd, PR #1468).
+                if forslag_kalla_namn.startswith("YouTube: "):
+                    youtube_url = forslag_kalla_url
             print(f"\n{'=' * 60}")
             print(f"  Läge:     NY ARTIKEL (ÄMNESFÖRSLAG FRÅN DIREKTDEBATT)")
             print(f"  Agent:    {agent['namn']} [{mood['label']}]")
@@ -847,6 +853,12 @@ def main():
                 "publicerad": nyhet.get("publicerad", ""),
                 "antal_utvärderade": len(nyheter),
             }
+            # Nyheten kommer från en YouTube-kanal (hamta_youtube_nyheter() i
+            # nyheter.py sätter kalla="YouTube: {kanal}" och url till videons
+            # riktiga watch-URL) — bifoga videon som en direktuppspelbar
+            # inbäddning på artikeln, inte bara en länk i källhänvisningen.
+            if nyhet["kalla"].startswith("YouTube: "):
+                youtube_url = nyhet.get("url") or None
             print(f"\n{'=' * 60}")
             print(f"  Läge:     NY ARTIKEL (AKTUELL NYHET)")
             print(f"  Agent:    {agent['namn']} [{mood['label']}]")
@@ -1004,7 +1016,7 @@ def main():
         "antal_utvärderade": 0,
         "typ": "replik",
     } if original else None
-    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id), nyhetskalla=nyhetskalla if not original else replik_kalla, parent_id=original["id"] if original else None, bild_url=bild_url, bild_fotograf=bild_fotograf)
+    svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id), nyhetskalla=nyhetskalla if not original else replik_kalla, parent_id=original["id"] if original else None, bild_url=bild_url, bild_fotograf=bild_fotograf, youtube_url=youtube_url if not original else None)
 
     artikel_id_num = None
     if nyhet and sb_key:

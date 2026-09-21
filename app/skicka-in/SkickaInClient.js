@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { extraheraYoutubeId } from "../lib/youtube";
 
 const MIN_SCORE = 6;
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
@@ -118,6 +119,9 @@ export default function SkickaInClient() {
   const [bildFotograf, setBildFotograf] = useState("");
   const [bildUppladdar, setBildUppladdar] = useState(false);
   const [bildFel, setBildFel] = useState("");
+  const [youtubeInput, setYoutubeInput] = useState("");
+  const [youtubeId, setYoutubeId] = useState(null);
+  const [youtubeFel, setYoutubeFel] = useState("");
 
   useEffect(() => {
     window.onTurnstileVerified = (token) => setTurnstileToken(token);
@@ -273,8 +277,29 @@ export default function SkickaInClient() {
     raderaUppladdadBild(urlAttRadera, tokenAttRadera);
   }
 
+  // Ren klientside-validering — inget att ladda upp, bara en länk. Visar
+  // aldrig ett felmeddelande medan fältet är tomt (bara när besökaren
+  // faktiskt klistrat in något som inte går att tolka som en YouTube-länk).
+  function handleYoutubeChange(e) {
+    const val = e.target.value;
+    setYoutubeInput(val);
+    const trimmed = val.trim();
+    if (!trimmed) {
+      setYoutubeId(null);
+      setYoutubeFel("");
+      return;
+    }
+    const id = extraheraYoutubeId(trimmed);
+    setYoutubeId(id);
+    setYoutubeFel(id ? "" : "Kunde inte tolka det som en giltig YouTube-länk.");
+  }
+
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   const ok = result && ["arg", "ori", "rel", "tro"].every(k => result[k] >= MIN_SCORE);
+  // Besökaren har skrivit något i YouTube-fältet, men det gick inte att tolka
+  // som en giltig länk — blockerar inlämning istället för att tyst spara
+  // youtube_video_id=null (se knappens disabled-villkor nedan).
+  const youtubeOgiltig = !!youtubeInput.trim() && !youtubeId;
 
   function reset() {
     setView("form"); setResult(null); setError(null);
@@ -284,6 +309,7 @@ export default function SkickaInClient() {
     // redan kopplad till en inlamningar-rad (eller publicerad artikel), en
     // Storage-radering hade förstört den kopplingen.
     nollstallBildState();
+    setYoutubeInput(""); setYoutubeId(null); setYoutubeFel("");
   }
 
   async function analyze() {
@@ -313,6 +339,7 @@ export default function SkickaInClient() {
             status: "inkorg",
             bild_url: bildUrl || null,
             bild_fotograf: bildFotograf.trim() || null,
+            youtube_video_id: youtubeId || null,
           }),
         });
         const inlData = await inlRes.json();
@@ -344,6 +371,7 @@ export default function SkickaInClient() {
           kalla: "manniska",
           bild_url: bildUrl || null,
           bild_fotograf: bildFotograf.trim() || null,
+          youtube_video_id: youtubeId || null,
         }),
       });
       if (!res.ok) throw new Error();
@@ -435,9 +463,35 @@ export default function SkickaInClient() {
                 )}
                 <p style={{ fontSize: "12px", color: C.textMuted, margin: "6px 0 0 0" }}>JPG, PNG eller WEBP, max 5 MB. Visas som omslagsbild ovanför artikeltexten.</p>
               </div>
+              <div>
+                <Lbl>YouTube-video (valfritt)</Lbl>
+                <input
+                  value={youtubeInput}
+                  onChange={handleYoutubeChange}
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  style={inp}
+                />
+                {youtubeFel && <p style={{ color: C.red, fontSize: "12px", margin: "8px 0 0 0" }}>{youtubeFel}</p>}
+                {youtubeId && (
+                  <div style={{ marginTop: "10px", maxWidth: "360px", aspectRatio: "16 / 9", borderRadius: "4px", overflow: "hidden", background: "#000" }}>
+                    <img
+                      src={`https://i.ytimg.com/vi/${youtubeId}/mqdefault.jpg`}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  </div>
+                )}
+                <p style={{ fontSize: "12px", color: C.textMuted, margin: "6px 0 0 0" }}>Klistra in en YouTube-länk — videon spelas upp direkt på artikeln, inte bara som en länk.</p>
+              </div>
               <div className="cf-turnstile" data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} data-callback="onTurnstileVerified" data-theme="dark" />
-              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300 || bildUppladdar) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < 300) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
-                {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : "Skicka till redaktionen →"}
+              {/* youtubeOgiltig: besökaren skrev något i YouTube-fältet som inte
+                  gick att tolka som en giltig länk. Utan denna spärr gick det
+                  att skicka in ändå — felmeddelandet försvinner ur sikte i
+                  resultatvyn, och både inlamningar- och artiklar-INSERT sparar
+                  tyst youtube_video_id=null, så videon besökaren trodde de
+                  bifogade bara försvinner utan förklaring (Codex-fynd, PR #1468). */}
+              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300 || youtubeOgiltig} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300 || bildUppladdar || youtubeOgiltig) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < 300 || youtubeOgiltig) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
+                {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : youtubeOgiltig ? "Rätta YouTube-länken först" : "Skicka till redaktionen →"}
               </button>
               {error && <p style={{ color: C.red, fontSize: "14px", margin: 0 }}>{error}</p>}
             </div>

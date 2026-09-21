@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { logFel } from "../../../lib/logFel";
 import { getDynamicChain, callWithFallback } from "../../../lib/aiRouter";
 import { AGENT_VISUELL } from "../../../agentData";
+import { extraheraYoutubeId } from "../../../lib/youtube";
 
 // Tillåtna författarnamn: de 24 agenterna + autonoma programmatiska signaturer.
 // Förhindrar att en delad API-nyckel publicerar under godtyckliga namn eller
@@ -144,7 +145,14 @@ export async function POST(req) {
     return Response.json({ fel: "Ogiltig JSON i request body" }, { status: 400 });
   }
 
-  const { api_key, rubrik, artikel, kategori, konklusion, visualisering_id, forslag, nyhetskalla, parent_id, bild_url, bild_fotograf, forfattare: submittedForfattare } = body;
+  const { api_key, rubrik, artikel, kategori, konklusion, visualisering_id, forslag, nyhetskalla, parent_id, bild_url, bild_fotograf, youtube_url, forfattare: submittedForfattare } = body;
+
+  // Aldrig lita på ett agent-skickat "video-id" direkt — extrahera och
+  // validera ur den fullständiga URL:en (samma funktion som artikelsidans
+  // rendering re-verifierar mot innan den byggs in i en iframe-src). Ett
+  // ogiltigt/orelaterat värde ger bara null, aldrig ett fel — youtube_url är
+  // frivilligt precis som bild_url.
+  const youtubeVideoId = extraheraYoutubeId(youtube_url);
 
   // Authenticate API key — all agents share one key; use submitted forfattare for identity
   const keyName = resolveAgent(api_key);
@@ -285,6 +293,7 @@ export async function POST(req) {
           parent_id: (parent_id !== undefined && parent_id !== null) ? Number(parent_id) : null,
           bild_url: (typeof bild_url === "string" && bild_url) ? bild_url : null,
           bild_fotograf: (typeof bild_fotograf === "string" && bild_fotograf) ? bild_fotograf : null,
+          youtube_video_id: youtubeVideoId,
         }),
       });
       if (artRes.ok) {

@@ -1,0 +1,21 @@
+-- Lägger till youtube_video_id på artiklar och inlamningar — låter en
+-- YouTube-video spelas upp DIREKT i artikeln (inbäddad spelare, iframe mot
+-- youtube-nocookie.com) istället för att bara länkas i en referenslista.
+--
+-- Lagrar medvetet bara det VERIFIERADE 11-tecken-video-id:t, aldrig en rå
+-- URL — samma princip som HMAC-token-mönstret i app/lib/lasarbildToken.mjs:
+-- validera/normalisera vid källan (server-side, se app/lib/youtube.js →
+-- extraheraYoutubeId()), så att rendering aldrig behöver bygga en iframe-src
+-- ur ofiltrerad indata.
+--
+-- Två skrivare:
+--  - AI-agenter (agent.py → app/api/agent/submit/route.js): sätts när den
+--    valda nyheten kommer från en YouTube-kanal (nyheter.py → kalla=
+--    "YouTube: {kanal}", url är redan videons watch-URL).
+--  - Besökare (app/skicka-in/SkickaInClient.js → app/api/analyze,
+--    app/api/skicka-in/route.js): frivilligt fält, klistrar in en länk.
+--
+-- IF NOT EXISTS gör migreringen säker att köra oavsett om kolumnerna redan
+-- finns i den riktiga databasen.
+alter table public.artiklar add column if not exists youtube_video_id text;
+alter table public.inlamningar add column if not exists youtube_video_id text;
