@@ -3486,6 +3486,25 @@ Kräver `supabase_artiklar_youtube.sql` — kör i Supabase SQL Editor.
 
 ---
 
+### ✅ 122. Importera en YouTube-video på /nyhetskallor – KLART
+
+Ägarbegäran (sep 2026), direkt uppföljning på ✅121: *"På den här sidan skulle vi nästan ha en importera YouTube video funktion efter importera nyhetskälla funktionen — https://www.debatt-ai.se/nyhetskallor"*. `/nyhetskallor` hade redan "IMPORTERA EN NYHETSARTIKEL" (besökare klistrar in en artikellänk som saknas i de ~44 automatiskt bevakade källorna, se ✅93) men ingen motsvarande väg för en YouTube-video.
+
+**Ny import-yta, samma mönster som artikelimporten — men skriver in i det redan befintliga YouTube-spåret.** `nyheter.py → hamta_youtube_nyheter()` hämtar redan videor från bevakade kanaler (`YOUTUBE_KANALER`) med `kalla` formaterat `f"YouTube: {kanal_namn}"` och `url` satt till videons watch-URL (`https://www.youtube.com/watch?v={video_id}`). Den nya importfunktionen skriver in en ny `nyhetsflode`-rad med EXAKT samma `kalla`-prefix (`"YouTube: {kanal} (besökarimport)"`, suffixet följer samma anti-spoofing-princip som artikelimportens `" (besökarimport)"`, se ✅93) — vilket betyder att en importerad video automatiskt flödar genom den redan existerande pipelinen utan någon ny Python-kod: besökaren klickar "🔎 Analysera i Nyhetsanalysen" på raden → en `nyhetsanalys`-rad skapas → på `/nyhetsanalyser` kan analysen föreslås som artikelämne (`POST /api/nyhetsval`) → `kalla_namn`/`kalla_url` sparas rakt av från nyhetsflode-radens `kalla`/`url` in i `amnesforslag` → `agent.py`s `forslag_amne`-gren läser `forslag_kalla_namn.startswith("YouTube: ")` (satt i ✅121 för just detta syfte, ursprungligen ett Codex-fynd på PR #1468) och sätter `youtube_url = forslag_kalla_url` → den färdiga artikeln får videon inbäddad direkt (✅121s spelare), inte bara länkad i källhänvisningen. Ingen ny `nyhetsflode`-kolumn eller migrering behövdes — video-id:t härleds vid behov direkt ur den redan sparade `url`-kolumnen via `extraheraYoutubeId()`.
+
+**Server-side validering och metadatahämtning, ingen klient-tillit.** `POST /api/nyhetsflode/importera-youtube` (rate limit 10/timme per IP, egen bucket skild från artikelimportens) extraherar och validerar video-id:t via `app/lib/youtube.js → extraheraYoutubeId()` — samma modul ✅121s artikel-embedding redan använder, litar aldrig på en rå klient-inskickad URL. Titel och kanalnamn hämtas via YouTubes publika oEmbed-endpoint (`https://www.youtube.com/oembed?url=...&format=json`, ingen API-nyckel krävs) — målhosten är fast (`youtube.com`) och aldrig besökarstyrd, så inget SSRF-skydd av samma typ som artikelimportens `hamtaArtikelInnehall()` behövs. En video som inte kan hittas (privat, borttagen, åldersbegränsad — oEmbed svarar då inte OK) ger ett tydligt 422-fel istället för ett kryptiskt serverfel. URL:en normaliseras alltid till den kanoniska watch-formen oavsett hur besökaren klistrade in länken (`youtu.be/...`, `shorts/...`, `embed/...` m.fl.) — ger en entydig `unique(url)`-dedup, och matchar exakt det format `nyheter.py` själv skriver.
+
+**Visuell förstärkning i listan — gäller retroaktivt ALLA YouTube-källor, inte bara nya importer.** `NyhetsRad` visar nu en klickbar tumnagel (▶-overlay, `i.ytimg.com/vi/{id}/mqdefault.jpg`) för varje rad vars `kalla` börjar med `"YouTube: "`, oavsett om raden kommer från den automatiska 6x/dag-hämtningen eller den nya importfunktionen — video-id:t härleds live ur `n.url` via samma `extraheraYoutubeId()`, ingen ny databaskolumn krävdes. Importformuläret (`ImporteraYoutubeForm`, positionerat direkt efter `ImporteraForm`) ger samma sortens live client-side-förhandsgranskning som artikelimportens motpart saknar men `/skicka-in`s YouTube-fält redan har (✅121) — en ogiltig länk flaggas och blockerar knappen innan servern ens anropas, medan en giltig länk visar tumnageln direkt.
+
+**Medvetet ej ändrat:** ingen ny `youtube_video_id`-kolumn på `nyhetsflode` — den skulle bara duplicera information som redan går att härleda deterministiskt ur `kalla`/`url` vid rendering, samma minimalism-princip som redan tillämpats flera gånger i den här loggen. `nyhetsanalys`/`amnesforslag`/`agent.py`s pipeline rördes inte alls — hela poängen med att återanvända `"YouTube: "`-prefixet är att den redan fungerar oförändrad.
+
+| Fil | Roll |
+|---|---|
+| `app/api/nyhetsflode/importera-youtube/route.js` | Ny route. Rate limit, `extraheraYoutubeId()`-validering, normaliserad watch-URL, oEmbed-hämtning av titel/kanalnamn, service-role-INSERT med `kalla="YouTube: {kanal} (besökarimport)"`, `unique(url)`-dubblettshantering |
+| `app/nyhetskallor/NyhetskallorClient.js` | Ny `ImporteraYoutubeForm`-komponent (live förhandsgranskning via tumnagel, positionerad direkt efter `ImporteraForm`). `NyhetsRad` visar en klickbar tumnagel för alla rader med `kalla` som börjar `"YouTube: "` (både automatiska och importerade). Introtexten uppdaterad |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
