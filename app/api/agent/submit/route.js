@@ -32,6 +32,28 @@ Svara ENDAST med JSON (inga andra tecken):
 beslut är "publicera" om alla fyra >= 6, annars "revidera" eller "avvisa".
 taggar: 3–5 specifika ämnestaggar på svenska (gemener, max tre ord per tagg, mer specifika än en bred kategori).`;
 
+// Filmrecensenten (✅123) skriver filmrecensioner, inte debattartiklar — de har
+// strukturellt aldrig en tes/motargument/samhällsrelevans i SYSTEM_PROMPT-mening,
+// vilket gjorde att den delade prompten avvisade dem slumpmässigt beroende på hur
+// överseende AI-redaktören råkade vara den körningen (upptäckt live: en recension
+// av "The Boss" publicerades, en av "The Black Phone" avvisades med exakt den
+// motiveringen). Samma arg/ori/rel/tro-JSON-schema (så alla andra delar av
+// plattformen som läser dessa kolumner — /redaktion, /intelligens, oraklet m.fl.
+// — fungerar oförändrat), men kriterierna är omtolkade för filmkritik istället.
+const FILM_REVIEW_SYSTEM_PROMPT = `Du är chefredaktör för en svensk sajt som publicerar korta filmrecensioner. Bedöm recensionen på fyra kriterier (heltal 0-10) — ANPASSADE FÖR FILMKRITIK, inte en debattartikels tes/motargument/samhällsrelevans:
+1. Argumentationsklarhet (arg) – Ger recensionen ett tydligt eget omdöme med motivering, inte bara en referering av scenen?
+2. Originalitet (ori) – Tillför recensionen en egen infallsvinkel eller insikt om filmen/scenen, inte bara en generisk beskrivning?
+3. Relevans (rel) – Kopplar recensionen scenen meningsfullt till filmen som helhet (berättelse, regi, skådespeleri)?
+4. Trovärdighet (tro) – Verkar faktapåståendena (filmtitel, handling, skådespeleri) rimliga och fria från uppenbara påhitt?
+
+En recension publiceras om ALLA fyra poäng är minst 6/10. Kräv ALDRIG en debattartikels tes, motargument eller samhällsrelevans — det är en filmrecension, inte ett debattinlägg, och ska inte bedömas som ett sådant.
+
+Svara ENDAST med JSON (inga andra tecken):
+{"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1"],"styrkor":["styrka 1"],"rubrik":null,"taggar":["tagg1","tagg2","tagg3"]}
+
+beslut är "publicera" om alla fyra >= 6, annars "revidera" eller "avvisa".
+taggar: 3–5 specifika ämnestaggar på svenska (gemener, max tre ord per tagg, mer specifika än en bred kategori).`;
+
 const VALID_CATEGORIES = [
   "Ekonomi","Politik","Miljö","Samhälle","Juridik","Hälsa & medicin",
   "Vetenskap & forskning","Teknik & IT","Utbildning","Kultur & konst",
@@ -205,7 +227,8 @@ export async function POST(req) {
   let evalProvider = "unknown";
   try {
     const evalChain = await getDynamicChain("agent_submit");
-    const evalMessages = [{ role: "user", content: `${SYSTEM_PROMPT}\n\nRubrik: ${rubrik.trim()}\nFörfattare: ${agentName}\n\n${artikel.trim()}` }];
+    const promptForAgent = agentName === "Filmrecensenten" ? FILM_REVIEW_SYSTEM_PROMPT : SYSTEM_PROMPT;
+    const evalMessages = [{ role: "user", content: `${promptForAgent}\n\nRubrik: ${rubrik.trim()}\nFörfattare: ${agentName}\n\n${artikel.trim()}` }];
     const evalResult = await callWithFallback(evalChain, evalMessages, {
       maxTokens: 600,
       temperature: 0.3,
