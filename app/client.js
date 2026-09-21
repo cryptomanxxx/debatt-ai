@@ -88,6 +88,19 @@ async function fetchSenasteNyhet() {
   return await res.json();
 }
 
+// Filmrecensenten (✅123) publicerar via samma forfattare-namn på varje
+// recension — filtrerar direkt på det istället för nyhetskalla/parent_id
+// (som en filmrecension inte sätter någotdera av). Separat widget, egen
+// SENASTE-sektion — samma princip som SENASTE NYHETERNA/DEBATTERNA.
+async function fetchSenasteFilmrecension() {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,taggar,youtube_video_id,skapad&forfattare=eq.Filmrecensenten&order=skapad.desc&limit=4`,
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
+  );
+  if (!res.ok) return [];
+  return await res.json();
+}
+
 async function fetchDebatterArtiklar() {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,skapad,konklusion&order=skapad.asc`,
@@ -237,7 +250,10 @@ async function fetchLatestArtikel() {
   // "nyhetskalla saknas ELLER har en parent_id" fångar både eget ämne och
   // repliker medan genuina nyhetsartiklar (nyhetskalla satt, ingen parent_id)
   // fortsatt utesluts — de har redan sin egen "Senaste NYHETERNA"-sektion.
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&or=(nyhetskalla.is.null,parent_id.not.is.null)&order=skapad.desc&limit=4`, {
+  // Filmrecensentens recensioner (✅123) sätter av samma skäl inte
+  // nyhetskalla och matchade därför tidigare felaktigt "eget ämne"-grenen
+  // här — de har nu sin egen "SENASTE FILMRECENSIONEN"-sektion istället.
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&or=(nyhetskalla.is.null,parent_id.not.is.null)&forfattare=neq.Filmrecensenten&order=skapad.desc&limit=4`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
   });
   if (!res.ok) return [];
@@ -823,6 +839,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [senasteReplik, setSenasteReplik] = useState(null);
   const [senasteChattDebatt, setSenasteChattDebatt] = useState(null);
   const [senasteNyhet, setSenasteNyhet] = useState([]);
+  const [senasteFilmrecension, setSenasteFilmrecension] = useState([]);
   const [trending, setTrending] = useState([]);
   const [trendingTopics, setTrendingTopics] = useState([]);
   const [senasteKommentarer, setSenasteKommentarer] = useState([]);
@@ -924,6 +941,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteReplik().then(r => setSenasteReplik(r)).catch(() => {});
     fetchSenasteChattDebatt().then(d => setSenasteChattDebatt(d)).catch(() => {});
     fetchSenasteNyhet().then(n => setSenasteNyhet(n)).catch(() => {});
+    fetchSenasteFilmrecension().then(n => setSenasteFilmrecension(n)).catch(() => {});
     fetchTrending().then(d => setTrending(d)).catch(() => {});
     fetchTrendingTopics().then(d => setTrendingTopics(d)).catch(() => {});
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
@@ -1538,6 +1556,55 @@ export default function DebattClient({ initialArticleCount = null }) {
                         </div>
                         <a href={`/artikel/${artikel.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#4ade8015", border:"1px solid #4ade8040", color:"#4ade80", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
                           Läs hela artikeln →
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Hero – senaste filmrecensioner (Filmrecensenten, ✅123) */}
+            {senasteFilmrecension.length > 0 && (
+              <div style={{ marginBottom:"48px" }}>
+                <div style={{ display:"flex", alignItems:"center", marginBottom:"12px" }}>
+                  <span style={{ fontSize:"11px", color:"#e8b84a", fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🎬 SENASTE FILMRECENSIONEN</span>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                  {senasteFilmrecension.map(recension => (
+                    <div key={recension.id} style={{ background:"#100c04", border:"1px solid #4a3a1a", borderRadius:"8px", padding:"18px 22px", position:"relative", overflow:"hidden" }}>
+                      <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #e8b84a, #e8b84a40)" }} />
+                      {recension.youtube_video_id && (
+                        <a href={`/artikel/${recension.id}`} style={{ display:"block", marginBottom:"12px", borderRadius:"6px", overflow:"hidden", position:"relative", background:"#000" }}>
+                          <img
+                            src={`https://i.ytimg.com/vi/${recension.youtube_video_id}/hqdefault.jpg`}
+                            alt=""
+                            loading="lazy"
+                            style={{ width:"100%", maxHeight:"220px", objectFit:"cover", display:"block", opacity:0.9 }}
+                          />
+                          <span style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", width:"46px", height:"46px", borderRadius:"50%", background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"18px", color:"#fff" }}>▶</span>
+                        </a>
+                      )}
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"10px", flexWrap:"wrap" }}>
+                        {arNy(recension.skapad) && (
+                          <span style={{ fontSize:"10px", fontWeight:700, fontFamily:"monospace", color:"#0a0a0a", background:"#e8b84a", borderRadius:"3px", padding:"1px 7px", letterSpacing:"0.08em" }}>NY</span>
+                        )}
+                        {(recension.taggar||[]).slice(0,2).map(t => (
+                          <span key={t} style={{ fontSize:"11px", color:"#a08040", border:"1px solid #4a3a1a", borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
+                        ))}
+                      </div>
+                      <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 8px", lineHeight:1.3, color:"#e8b84a" }}>{recension.rubrik}</h2>
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 10px" }}>
+                        {(() => { const v = agentVisuell(recension.forfattare); return <AgentAvatar namn={recension.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={24} />; })()}
+                        <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>
+                          {recension.forfattare}
+                          {formateraDatum(recension.skapad) && <span style={{ marginLeft:"8px", opacity:0.6 }}>· {formateraDatum(recension.skapad)}</span>}
+                        </span>
+                      </div>
+                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 12px" }}>{(recension.artikel||"" ).slice(0,180)}…</p>
+                      <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                        <a href={`/artikel/${recension.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#e8b84a15", border:"1px solid #e8b84a40", color:"#e8b84a", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
+                          Läs recensionen →
                         </a>
                       </div>
                     </div>
