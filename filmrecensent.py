@@ -172,29 +172,53 @@ def uppladdningsplaylist_id() -> str:
 MAX_PENDING_FORSOK = 3
 
 
+class _TransientFel(Exception):
+    """Signalerar ett TILLFÄLLIGT fel (nätverksfel, timeout, icke-2xx
+    HTTP-svar) vid en Supabase- eller YouTube-läsning — skiljs medvetet
+    från ett bekräftat "finns inte/går inte att använda"-utfall (som
+    returneras som None/tomt state) så att anroparen kan behandla de två
+    fallen olika: en transient miss ska leda till en retry, inte till att
+    riktigt pending-tillstånd övergavs eller skrevs över (Codex-fynd på
+    PR #1481: utan denna distinktion kunde hamta_state()/
+    _hamta_video_metadata() göra en tillfällig hicka omöjlig att skilja
+    från "inget pågår"/"videon är borta", vilket i värsta fall permanent
+    tappade bort en kandidat som bara väntade på ett nytt försök)."""
+
+
 def hamta_state() -> dict:
     """Hämtar hela filmrecensent_state-raden: cursorn (next_page_token)
     OCH ett ev. pending-tillstånd (en funnen men ännu inte slutgiltigt
-    hanterad kandidatvideo, se hamta_video_kandidat()). Fail-safe: en
-    misslyckad läsning ger ett tomt state, samma som "börja om, inget
-    pågår"."""
+    hanterad kandidatvideo, se hamta_video_kandidat()).
+
+    Kastar _TransientFel vid en misslyckad läsning (nätverksfel, icke-200
+    HTTP-svar) — en genuint tom rad (tabellen har ingen 'current'-rad än,
+    t.ex. allra första körningen) returneras däremot som ett tomt state,
+    inte som ett fel. Anroparen MÅSTE hantera _TransientFel explicit
+    (aldrig låta den bubbla upp och tolkas som "inget pågår") — annars
+    kunde en transient läsmiss se ut precis som ett genuint tomt state,
+    vilket lät hamta_video_kandidat() börja bläddra från sida 1 och skriva
+    över ett RIKTIGT pending-tillstånd som bara råkade misslyckas att
+    läsas just den körningen (Codex-fynd)."""
     try:
         res = httpx.get(
             f"{SB_URL}/rest/v1/filmrecensent_state?id=eq.current&select=next_page_token,pending_video_id,pending_next_token,pending_forsok",
             headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"},
             timeout=10,
         )
-        if res.status_code == 200 and res.json():
-            rad = res.json()[0]
-            return {
-                "next_page_token": rad.get("next_page_token"),
-                "pending_video_id": rad.get("pending_video_id"),
-                "pending_next_token": rad.get("pending_next_token"),
-                "pending_forsok": rad.get("pending_forsok") or 0,
-            }
-    except Exception:
-        pass
-    return {"next_page_token": None, "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0}
+    except Exception as e:
+        raise _TransientFel(str(e)) from e
+    if res.status_code != 200:
+        raise _TransientFel(f"HTTP {res.status_code}")
+    rader = res.json()
+    if not rader:
+        return {"next_page_token": None, "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0}
+    rad = rader[0]
+    return {
+        "next_page_token": rad.get("next_page_token"),
+        "pending_video_id": rad.get("pending_video_id"),
+        "pending_next_token": rad.get("pending_next_token"),
+        "pending_forsok": rad.get("pending_forsok") or 0,
+    }
 
 
 def _upsert_state(falt: dict) -> bool:
@@ -234,8 +258,17 @@ def _finalisera_pending(video_id: str) -> None:
     pending-fälten. No-op om video_id inte matchar det pending state
     faktiskt håller — bör aldrig hända (bara en kandidat kan vara pending
     åt gången), men skyddar mot att avancera fel cursor om state hunnit
-    ändras oväntat."""
-    state = hamta_state()
+    ändras oväntat.
+
+    Om state inte går att läsa (_TransientFel) görs INGET — hellre att
+    nästa körning fortsätter se videon som pending (och i värsta fall
+    råkar räkna upp pending_forsok en gång extra) än att gissa och
+    riskera att avancera fel cursor utan att ha kunnat verifiera matchen."""
+    try:
+        state = hamta_state()
+    except _TransientFel as e:
+        print(f"  ⚠ Kunde inte läsa filmrecensent_state för att slutföra pending: {e} — lämnar state orört.")
+        return
     if state["pending_video_id"] != video_id:
         return
     _upsert_state({
@@ -284,38 +317,46 @@ def _hamta_video_metadata(video_id: str) -> dict | None:
     tidigare körning — bara video_id sparas mellan körningar, inte hela
     metadatan, så en retry gör om ett enda videos.list-anrop (försumbar
     kvotkostnad). Kollar samma inbäddningsbarhet/geoblockering som
-    _hamta_videodetaljer() innan kandidaten returneras igen. Returnerar
-    None om videon inte längre går att hämta (borttagen/privat sedan den
-    hittades) eller inte längre går att bädda in."""
+    _hamta_videodetaljer() innan kandidaten returneras igen.
+
+    Returnerar None om videon BEKRÄFTAT inte längre går att använda —
+    borttagen/privat (200-svar med tomt items eller "Private/Deleted
+    video"-titel) eller inte längre inbäddningsbar/geoblockerad. Kastar
+    däremot _TransientFel vid ett nätverksfel eller ett icke-2xx HTTP-svar
+    (403/429/5xx m.m.) — en TILLFÄLLIG API-hicka ska ge anroparen chans att
+    försöka igen (MAX_PENDING_FORSOK-mekanismen), inte behandlas identiskt
+    med en bekräftat borttagen video och permanent överges (Codex-fynd:
+    utan denna distinktion defeatade exakt de felfall den nya
+    retry-logiken skulle skydda mot — en 429/timeout — hela mekanismen)."""
     try:
         params = {"part": "snippet,status,contentDetails", "id": video_id, "key": YOUTUBE_API_KEY}
         res = httpx.get(f"{YOUTUBE_DATA_API}/videos", params=params, timeout=15)
-        if res.status_code != 200:
-            return None
-        items = res.json().get("items", [])
-        if not items:
-            return None
-        item = items[0]
-        snippet = item.get("snippet", {})
-        titel = (snippet.get("title") or "").strip()
-        if not titel or titel in ("Private video", "Deleted video"):
-            return None
-        embeddable = item.get("status", {}).get("embeddable", True)
-        region = item.get("contentDetails", {}).get("regionRestriction", {}) or {}
-        blockerad = SVERIGE in (region.get("blocked") or []) or (
-            "allowed" in region and SVERIGE not in (region.get("allowed") or [])
-        )
-        if not embeddable or blockerad:
-            return None
-        beskrivning = (snippet.get("description") or "").strip()[:1500]
-        return {
-            "video_id": video_id,
-            "titel": titel,
-            "beskrivning": beskrivning,
-            "url": f"https://www.youtube.com/watch?v={video_id}",
-        }
-    except Exception:
+    except Exception as e:
+        raise _TransientFel(str(e)) from e
+    if res.status_code != 200:
+        raise _TransientFel(f"HTTP {res.status_code}")
+    items = res.json().get("items", [])
+    if not items:
+        return None  # bekräftat: videon finns inte längre (giltigt 200-svar, tomt)
+    item = items[0]
+    snippet = item.get("snippet", {})
+    titel = (snippet.get("title") or "").strip()
+    if not titel or titel in ("Private video", "Deleted video"):
         return None
+    embeddable = item.get("status", {}).get("embeddable", True)
+    region = item.get("contentDetails", {}).get("regionRestriction", {}) or {}
+    blockerad = SVERIGE in (region.get("blocked") or []) or (
+        "allowed" in region and SVERIGE not in (region.get("allowed") or [])
+    )
+    if not embeddable or blockerad:
+        return None
+    beskrivning = (snippet.get("description") or "").strip()[:1500]
+    return {
+        "video_id": video_id,
+        "titel": titel,
+        "beskrivning": beskrivning,
+        "url": f"https://www.youtube.com/watch?v={video_id}",
+    }
 
 
 def hamta_video_kandidat() -> dict | None:
@@ -342,10 +383,16 @@ def hamta_video_kandidat() -> dict | None:
     att bädda in (se _hamta_videodetaljer() — hoppar över videor med
     inbäddning avstängd eller geoblockerade i Sverige).
 
-    Returnerar None vid API-fel, tom katalog, eller om ingen ny video
+    Returnerar None vid API-fel, tom katalog, en misslyckad
+    filmrecensent_state-läsning (_TransientFel — avbryter hela körningen
+    utan att röra databasen, se hamta_state()), eller om ingen ny video
     hittas inom sidtaket den här körningen (mycket osannolikt så länge
     katalogen inte redan är nästan helt genomgången)."""
-    state = hamta_state()
+    try:
+        state = hamta_state()
+    except _TransientFel as e:
+        print(f"  ✗ Kunde inte läsa filmrecensent_state: {e} — hoppar över körningen för säkerhets skull.")
+        return None
     token = state["next_page_token"]
 
     if state["pending_video_id"]:
@@ -356,7 +403,17 @@ def hamta_video_kandidat() -> dict | None:
         elif pending_forsok >= MAX_PENDING_FORSOK:
             print(f"  Ger upp på pending video {pending_id} efter {pending_forsok} försök — hoppar vidare.")
         else:
-            kandidat = _hamta_video_metadata(pending_id)
+            try:
+                kandidat = _hamta_video_metadata(pending_id)
+            except _TransientFel as e:
+                # Tillfälligt fel (nätverk/rate limit) — SKILT från en
+                # bekräftad borttagning: räkna upp försöket och avbryt
+                # HELA körningen (ingen ny kandidat hämtas heller) så
+                # nästa körning kan retrya samma pending-video, istället
+                # för att permanent ge upp på den (Codex-fynd).
+                print(f"  Tillfälligt fel vid hämtning av pending video {pending_id}: {e} — försöker igen nästa körning.")
+                _upsert_state({"pending_forsok": pending_forsok + 1})
+                return None
             if kandidat:
                 # Räknar upp försöket nu, INNAN utfallet av den här
                 # körningen är känt — en kandidat vars körning kraschar
@@ -365,7 +422,7 @@ def hamta_video_kandidat() -> dict | None:
                 # blockera kön för evigt trots gränsen ovan.
                 _upsert_state({"pending_forsok": pending_forsok + 1})
                 return kandidat
-            print(f"  Pending video {pending_id} kunde inte hämtas längre (borttagen/privat?) — hoppar vidare.")
+            print(f"  Pending video {pending_id} inte längre tillgänglig (borttagen/privat/ej inbäddningsbar) — hoppar vidare.")
         token = state["pending_next_token"]
         _upsert_state({
             "next_page_token": token,
@@ -469,13 +526,36 @@ def _forcera_stycken(text: str, antal_stycken: int = 3) -> str:
     Skyddar kända förkortningar (_FORKORTNINGAR) innan meningsdelningen —
     annars hade regexen (?<=[.!?])\\s+ felaktigt splittrat mitt i t.ex.
     "... regissören, m.fl. skådespelare ...", vilket ger en trasig
-    styckesbrytning mitt i en mening istället för mellan meningar."""
+    styckesbrytning mitt i en mening istället för mellan meningar.
+
+    Skyddet gäller bara när förkortningen följs av en GEMEN bokstav —
+    det är den starkaste tillgängliga signalen (utan en riktig NLP-
+    meningssegmenterare) på att förkortningen fortsätter samma mening
+    istället för att avsluta den. En förkortning som legitimt AVSLUTAR en
+    mening ("... A är bra etc. B är bättre.") följs nästan alltid av en
+    VERSAL — den lämnas då medvetet oskyddad så att regexen fortfarande
+    kan känna igen den som ett meningsslut (Codex-fynd: det ovillkorade
+    skyddet dolde annars ALLA förkortningars punkter, även legitima
+    meningsslut, vilket kunde slå ihop två meningar till en och — vid
+    exakt gränsfallet antal_stycken*2 meningar — felaktigt trigga
+    no-op-fallbacken nedan. Ingen perfekt lösning: en förkortning omedelbart
+    följd av ett versalt egennamn, t.ex. "Dr. Smith", missbedöms fortfarande
+    som ett meningsslut — samma typ av approximation som redan används på
+    flera andra ställen i kodbasen, se CLAUDE.md)."""
     if "\n\n" in text:
         return text
     skyddad = text
     for f in _FORKORTNINGAR:
+        # (?i:...) skopar case-insensitivity till BARA förkortningen —
+        # ett globalt IGNORECASE-flagg (den ursprungliga varianten) hade
+        # gjort lookahead-klassen [a-zåäö] okänslig för versaler också,
+        # vilket tyst omintetgjorde hela poängen med att kräva en gemen
+        # bokstav (verifierat: matchade felaktigt "etc. B" trots versalt
+        # B). Kräver Python 3.11+ (repo kör 3.11/3.12, se .github/workflows).
         skyddad = re.sub(
-            re.escape(f), f[:-1] + _FORKORTNING_PLACEHOLDER, skyddad, flags=re.IGNORECASE
+            rf"(?i:{re.escape(f)})(?=\s+[a-zåäö])",
+            f[:-1] + _FORKORTNING_PLACEHOLDER,
+            skyddad,
         )
     meningar = [
         m.strip().replace(_FORKORTNING_PLACEHOLDER, ".")
