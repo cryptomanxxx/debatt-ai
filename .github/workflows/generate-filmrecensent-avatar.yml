@@ -2,6 +2,17 @@ name: Generera Filmrecensent-avatar (engångskörning)
 
 on:
   workflow_dispatch:
+  # workflow_dispatch kräver att filen redan ligger på default-branchen för att
+  # bli anropsbar via API/UI — den gör den inte förrän PR:en mergats. En
+  # push-trigger scopad till just den här branchen låter oss köra workflowen
+  # direkt utan att behöva merga till main först. Committen som pushar
+  # resultatet märks [skip ci] för att inte trigga sig själv i en loop.
+  push:
+    branches:
+      - claude/hmac-auth-vulnerability-e7ed2m
+    paths:
+      - '.github/workflows/generate-filmrecensent-avatar.yml'
+      - 'scripts/generate-filmrecensent-avatar.js'
 
 permissions:
   contents: write
@@ -30,5 +41,5 @@ jobs:
             echo "Ingen ändring att committa."
             exit 0
           fi
-          git commit -m "Lägg till AI-genererad avatar för Filmrecensenten"
+          git commit -m "Lägg till AI-genererad avatar för Filmrecensenten [skip ci]"
           git push
