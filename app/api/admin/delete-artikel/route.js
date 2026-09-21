@@ -11,7 +11,15 @@ export async function POST(req) {
   if (!pw || pw !== SECRET) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   if (!id) return NextResponse.json({ ok: false, error: "id krävs" }, { status: 400 });
 
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Ingen anon-nyckel-fallback: artiklar kräver service role för DELETE
+  // (RLS-härdning). Om anon-nyckeln hade fått köra vidare hade PostgREST
+  // kunnat svara 2xx med noll ändrade rader (RLS avslår tyst) — routen
+  // hade då rapporterat ok:true trots att INGET raderats, exakt den
+  // silent-failure-bugg denna route finns till för att fixa (Codex-fynd).
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) {
+    return NextResponse.json({ ok: false, error: "Service role-nyckel saknas" }, { status: 503 });
+  }
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?id=eq.${id}`, {
     method: "DELETE",
     headers: {

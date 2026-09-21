@@ -3596,6 +3596,18 @@ Fixat med en ny delad hjälpfunktion, `taBortAnkartaggar()` (`app/lib/htmlText.j
 | `app/lib/htmlText.js` | Ny modul: `taBortAnkartaggar()` — ersätter en rå `<a href="...">text</a>`-ankartagg med bara sin synliga länktext |
 | `app/artikel/[id]/page.js` | `LyssnaKnapp`s `text`-prop körs genom `taBortAnkartaggar()` innan den skickas till TTS |
 
+**Codex-fynd (PR #1481-granskning): fyra separata fynd till, alla i `filmrecensent.py` utom det sista.**
+- **Avataren fortfarande onödigt stor** — `public/avatarer/filmrecensenten.png` var 1254×1254px (2,16 MB) trots att den bara renderas i små storlekar (24px i navigering, ~96px i homepage-widgeten). Skalad ned till 256×256 (~104 KB, `Image.LANCZOS`) — matchar exakt konventionen för de 24 debattagenternas avatarer.
+- **`spara_cursor()` kollade aldrig skrivningens HTTP-status** — en misslyckad `httpx.post()` (t.ex. saknad `SUPABASE_SERVICE_ROLE_KEY`, eller att `filmrecensent_state_v2.sql`-migreringen inte hunnit köras) sågs tyst som lyckad, vilket lät samma katalogsidor skannas om i all oändlighet utan något synligt fel. Funktionen döptes om till `_upsert_state()` och kollar nu explicit `res.status_code` — loggar och returnerar `False` vid ett icke-2xx-svar.
+- **Cursorn avancerades innan kandidaten faktiskt bearbetats klart** — `spara_cursor(nasta_token)` kördes så fort en kandidatvideo HITTATS, inte när den faktiskt publicerats. En transient miss mellan de två stegen (LLM-genereringen fallerar, `/api/agent/submit`-anropet timeoutar, AI-redaktören avvisar tillfälligt) gjorde att cursorn redan hunnit gå förbi videon — permanent hoppad över, utan att någon recension någonsin publicerats. Fixat med ett "pending"-tillstånd: `hamta_video_kandidat()` sparar nu `pending_video_id`/`pending_next_token` istället för att direkt avancera `next_page_token`; cursorn flyttas bara vid ett terminalt utfall — lyckad publicering (`_finalisera_pending()`, nu inkopplad i `main()` direkt efter en bekräftad publicering) eller `MAX_PENDING_FORSOK` (3) misslyckade återförsök i rad, samma bounded-retry-princip som `MAX_FORSLAG_FORSOK` i `agent.py` (✅98). En pending-kandidat vars metadata (titel/beskrivning/inbäddningsbarhet) hämtas på nytt vid varje återförsök via `_hamta_video_metadata()`, så en video som blivit privat/borttagen mellan försöken korrekt hoppas över.
+- **Avhuggen mening vid en förkortning i `_forcera_stycken()`** — regexen `(?<=[.!?])\s+` kunde felaktigt tolka punkten i en förkortning (t.ex. "m.fl.", "Dr.") mitt i en mening som ett meningsslut, vilket gav en trasig styckesbrytning. En liten lista kända förkortningar (`_FORKORTNINGAR`) skyddas nu med en placeholder-punkt innan splitningen och återställs efteråt.
+- **`app/api/admin/delete-artikel/route.js`s anon-nyckel-fallback** (den enda icke-filmrecensent-fixen i denna PR) — se ✅124s Codex-fynd nedan.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `filmrecensent.py` | `hamta_cursor()`/`spara_cursor()` ersatta av `hamta_state()`/`_upsert_state()` (statuskontrollerad). Nytt pending-tillstånd (`pending_video_id`/`pending_next_token`/`pending_forsok`, `MAX_PENDING_FORSOK=3`) med `_finalisera_pending()` inkopplad i `main()`. Ny `_hamta_video_metadata()` för att hämta en pending-kandidats metadata på nytt vid retry. `_forcera_stycken()` skyddar nu `_FORKORTNINGAR` innan meningsdelning |
+| `supabase_filmrecensent_state_v2.sql` | Migrering: `pending_video_id text`, `pending_next_token text`, `pending_forsok integer not null default 0` på `filmrecensent_state` |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
@@ -3610,6 +3622,12 @@ Användarrapport (sep 2026): *"Jag gick in på admin panelen nu och försökte t
 |---|---|
 | `app/api/admin/delete-artikel/route.js` | Ny route. Admin-lösenordskoll + DELETE mot `artiklar` med service role |
 | `app/admin/client.js` → `deleteArtikelById()` | Anropar `/api/admin/delete-artikel` istället för Supabase REST direkt med anon-nyckeln |
+
+**Codex-fynd (PR #1481-granskning): routen hade själv kvar exakt den fallback som orsakade den ursprungliga buggen.** `const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;` — i en driftsättning som saknar `SUPABASE_SERVICE_ROLE_KEY` (t.ex. en förhandsgranskningsmiljö) hade DELETE:n körts med anon-nyckeln, RLS hade tyst avvisat den (PostgREST svarar ändå 2xx, noll rader ändrade), och routen hade rapporterat `ok:true` trots att inget raderats — samma silent-failure-mönster som denna route byggdes för att fixa, bara flyttat till en annan miljökonfiguration. Fixat genom att ta bort anon-fallbacken helt: saknas `SUPABASE_SERVICE_ROLE_KEY` svarar routen nu direkt 503 ("Service role-nyckel saknas") istället för att försöka DELETE:a med en nyckel som saknar rättighet.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/api/admin/delete-artikel/route.js` | Anon-nyckel-fallback borttagen. Svarar 503 direkt om `SUPABASE_SERVICE_ROLE_KEY` saknas, istället för att falla tillbaka på anon |
 
 ---
 

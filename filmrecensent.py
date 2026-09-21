@@ -164,43 +164,84 @@ def uppladdningsplaylist_id() -> str:
     return KANAL_ID  # bör aldrig hända för ett riktigt YouTube-kanal-ID
 
 
-def hamta_cursor() -> str | None:
-    """Hämtar den sparade next_page_token från förra körningen — var i
-    kanalens hela uppladdningskatalog Filmrecensenten senast befann sig.
-    None om ingen cursor finns (första körningen, eller precis efter att
-    en hel katalog-genomgång slutförts och startats om från början).
-    Fail-safe: en misslyckad läsning ger None, samma som "börja om"."""
+# Max antal gånger en funnen kandidat (pending_video_id) försöks innan
+# den ges upp och cursorn avancerar förbi den — samma värde/princip som
+# agent.py:s MAX_FORSLAG_FORSOK (✅98): förhindrar att en ihållande
+# rejekterad eller trasig video blockerar hela katalogbläddringen i all
+# oändlighet.
+MAX_PENDING_FORSOK = 3
+
+
+def hamta_state() -> dict:
+    """Hämtar hela filmrecensent_state-raden: cursorn (next_page_token)
+    OCH ett ev. pending-tillstånd (en funnen men ännu inte slutgiltigt
+    hanterad kandidatvideo, se hamta_video_kandidat()). Fail-safe: en
+    misslyckad läsning ger ett tomt state, samma som "börja om, inget
+    pågår"."""
     try:
         res = httpx.get(
-            f"{SB_URL}/rest/v1/filmrecensent_state?id=eq.current&select=next_page_token",
+            f"{SB_URL}/rest/v1/filmrecensent_state?id=eq.current&select=next_page_token,pending_video_id,pending_next_token,pending_forsok",
             headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"},
             timeout=10,
         )
         if res.status_code == 200 and res.json():
-            return res.json()[0].get("next_page_token") or None
+            rad = res.json()[0]
+            return {
+                "next_page_token": rad.get("next_page_token"),
+                "pending_video_id": rad.get("pending_video_id"),
+                "pending_next_token": rad.get("pending_next_token"),
+                "pending_forsok": rad.get("pending_forsok") or 0,
+            }
     except Exception:
         pass
-    return None
+    return {"next_page_token": None, "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0}
 
 
-def spara_cursor(token: str | None) -> None:
-    """Sparar var i katalogen nästa körning ska fortsätta. token=None
-    betyder att hela katalogen just genomgåtts — nästa körning börjar om
-    från kanalens senaste video igen. Fail-safe: en misslyckad skrivning
-    (t.ex. saknad SUPABASE_SERVICE_ROLE_KEY, se SB_WRITE_KEY) gör bara att
-    nästa körning börjar om från början istället för att krascha."""
+def _upsert_state(falt: dict) -> bool:
+    """Upsertar de angivna fälten i filmrecensent_state — PostgREST:s
+    per-kolumn ON CONFLICT-uppdatering lämnar övriga kolumner orörda, så
+    ett anrop kan sätta t.ex. bara pending_forsok utan att nollställa
+    next_page_token. Returnerar True vid en bekräftat lyckad skrivning
+    (HTTP 2xx), annars False — en misslyckad skrivning (t.ex. saknad
+    SUPABASE_SERVICE_ROLE_KEY, se SB_WRITE_KEY, eller att tabellen saknar
+    de nya pending-kolumnerna innan migreringen körts) LOGGAS nu explicit
+    istället för att tyst behandlas som lyckad (Codex-fynd, PR #1470-
+    granskning: utan statuskontroll kunde en trasig skrivning se ut som en
+    lyckad cursor-sparning, vilket lät samma sidor skannas om i all
+    oändlighet utan något synligt fel)."""
     try:
-        httpx.post(
+        res = httpx.post(
             f"{SB_URL}/rest/v1/filmrecensent_state",
             headers={
                 "apikey": SB_WRITE_KEY, "Authorization": f"Bearer {SB_WRITE_KEY}",
                 "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates",
             },
-            json={"id": "current", "next_page_token": token, "uppdaterad": datetime.now(timezone.utc).isoformat()},
+            json={"id": "current", "uppdaterad": datetime.now(timezone.utc).isoformat(), **falt},
             timeout=10,
         )
+        if res.status_code not in (200, 201, 204):
+            print(f"  ⚠ Kunde inte spara filmrecensent_state: HTTP {res.status_code} {res.text[:200]}")
+            return False
+        return True
     except Exception as e:
-        print(f"  ⚠ Kunde inte spara cursor: {type(e).__name__}: {e}")
+        print(f"  ⚠ Kunde inte spara filmrecensent_state: {type(e).__name__}: {e}")
+        return False
+
+
+def _finalisera_pending(video_id: str) -> None:
+    """Avslutar en lyckat publicerad pending-kandidat: avancerar
+    next_page_token till den sparade pending_next_token och nollställer
+    pending-fälten. No-op om video_id inte matchar det pending state
+    faktiskt håller — bör aldrig hända (bara en kandidat kan vara pending
+    åt gången), men skyddar mot att avancera fel cursor om state hunnit
+    ändras oväntat."""
+    state = hamta_state()
+    if state["pending_video_id"] != video_id:
+        return
+    _upsert_state({
+        "next_page_token": state["pending_next_token"],
+        "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0,
+    })
 
 
 SVERIGE = "SE"
@@ -238,6 +279,45 @@ def _hamta_videodetaljer(video_ids: list[str]) -> dict:
         return {}
 
 
+def _hamta_video_metadata(video_id: str) -> dict | None:
+    """Hämtar titel/beskrivning på nytt för en pending-kandidat från en
+    tidigare körning — bara video_id sparas mellan körningar, inte hela
+    metadatan, så en retry gör om ett enda videos.list-anrop (försumbar
+    kvotkostnad). Kollar samma inbäddningsbarhet/geoblockering som
+    _hamta_videodetaljer() innan kandidaten returneras igen. Returnerar
+    None om videon inte längre går att hämta (borttagen/privat sedan den
+    hittades) eller inte längre går att bädda in."""
+    try:
+        params = {"part": "snippet,status,contentDetails", "id": video_id, "key": YOUTUBE_API_KEY}
+        res = httpx.get(f"{YOUTUBE_DATA_API}/videos", params=params, timeout=15)
+        if res.status_code != 200:
+            return None
+        items = res.json().get("items", [])
+        if not items:
+            return None
+        item = items[0]
+        snippet = item.get("snippet", {})
+        titel = (snippet.get("title") or "").strip()
+        if not titel or titel in ("Private video", "Deleted video"):
+            return None
+        embeddable = item.get("status", {}).get("embeddable", True)
+        region = item.get("contentDetails", {}).get("regionRestriction", {}) or {}
+        blockerad = SVERIGE in (region.get("blocked") or []) or (
+            "allowed" in region and SVERIGE not in (region.get("allowed") or [])
+        )
+        if not embeddable or blockerad:
+            return None
+        beskrivning = (snippet.get("description") or "").strip()[:1500]
+        return {
+            "video_id": video_id,
+            "titel": titel,
+            "beskrivning": beskrivning,
+            "url": f"https://www.youtube.com/watch?v={video_id}",
+        }
+    except Exception:
+        return None
+
+
 def hamta_video_kandidat() -> dict | None:
     """Bläddrar genom HELA kanalens uppladdningskatalog (via YouTube Data
     API v3 — kräver YOUTUBE_API_KEY) istället för att bara känna till den
@@ -245,20 +325,54 @@ def hamta_video_kandidat() -> dict | None:
     körning fortsätta där den förra slutade, så katalogen (~9000+ videor)
     gås igenom gradvis över tid — inte bara nya klipp någonsin recenseras.
 
+    En funnen kandidat sparas som "pending" (video_id + var bläddringen
+    ska fortsätta EFTER den) — cursorn (next_page_token) avancerar INTE
+    förrän kandidaten når ett slutgiltigt utfall: publicerad (main() anropar
+    _finalisera_pending()), eller MAX_PENDING_FORSOK misslyckade försök.
+    En avbruten körning (t.ex. om LLM-genereringen eller publiceringen
+    misslyckas eller AI-redaktören avvisar texten) retryas därför av nästa
+    körning istället för att permanent hoppa över videon och resten av dess
+    sida (Codex-fynd, PR #1470-granskning: utan detta kunde en enda
+    transient publiceringsmiss skjuta upp en giltig video i upp till ~46
+    dagar, tills hela katalogen bläddrats igenom igen).
+
     Bläddrar framåt (max MAX_SIDOR_PER_KORNING sidor á 50 videor) tills en
     video hittas som INTE redan recenserats (redan_recenserad(), som är
     fail-säkert mot dubbletter — se dess docstring) OCH som faktiskt går
     att bädda in (se _hamta_videodetaljer() — hoppar över videor med
-    inbäddning avstängd eller geoblockerade i Sverige). Sparar var
-    bläddringen slutade så nästa körning kan fortsätta därifrån ELLER —
-    om hela katalogen just gåtts igenom (inget nextPageToken kvar) —
-    börjar om från kanalens senaste video igen (wrap-around).
+    inbäddning avstängd eller geoblockerade i Sverige).
 
     Returnerar None vid API-fel, tom katalog, eller om ingen ny video
     hittas inom sidtaket den här körningen (mycket osannolikt så länge
     katalogen inte redan är nästan helt genomgången)."""
+    state = hamta_state()
+    token = state["next_page_token"]
+
+    if state["pending_video_id"]:
+        pending_id = state["pending_video_id"]
+        pending_forsok = state["pending_forsok"]
+        if redan_recenserad(pending_id):
+            pass  # publicerad i en tidigare, delvis lyckad körning — hoppa vidare
+        elif pending_forsok >= MAX_PENDING_FORSOK:
+            print(f"  Ger upp på pending video {pending_id} efter {pending_forsok} försök — hoppar vidare.")
+        else:
+            kandidat = _hamta_video_metadata(pending_id)
+            if kandidat:
+                # Räknar upp försöket nu, INNAN utfallet av den här
+                # körningen är känt — en kandidat vars körning kraschar
+                # helt (utan att ens nå publicera()) förbrukar ändå ett
+                # försök, annars kunde en genomgående trasig video
+                # blockera kön för evigt trots gränsen ovan.
+                _upsert_state({"pending_forsok": pending_forsok + 1})
+                return kandidat
+            print(f"  Pending video {pending_id} kunde inte hämtas längre (borttagen/privat?) — hoppar vidare.")
+        token = state["pending_next_token"]
+        _upsert_state({
+            "next_page_token": token,
+            "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0,
+        })
+
     playlist_id = uppladdningsplaylist_id()
-    token = hamta_cursor()
     try:
         for _ in range(MAX_SIDOR_PER_KORNING):
             params = {"part": "snippet", "playlistId": playlist_id, "maxResults": 50, "key": YOUTUBE_API_KEY}
@@ -305,23 +419,39 @@ def hamta_video_kandidat() -> dict | None:
                 }
                 break
             if kandidat:
-                # Sparar cursorn för nästa körning EFTER att kandidaten
-                # hittats (inte innan) — så en avbruten körning (t.ex. om
-                # LLM-anropet eller publiceringen misslyckas senare) inte
-                # tappar bort videor mellan den gamla och den nya cursorn.
-                spara_cursor(nasta_token)
+                _upsert_state({
+                    "pending_video_id": kandidat["video_id"],
+                    "pending_next_token": nasta_token,
+                    "pending_forsok": 1,
+                })
                 return kandidat
             if not nasta_token:
                 print("  Hela kanalens katalog genomgången — börjar om från början nästa körning.")
-                spara_cursor(None)
+                _upsert_state({"next_page_token": None})
                 return None
             token = nasta_token
         print(f"  Hittade ingen ny video inom {MAX_SIDOR_PER_KORNING} sidor — sparar cursor och provar vidare nästa körning.")
-        spara_cursor(token)
+        _upsert_state({"next_page_token": token})
         return None
     except Exception as e:
         print(f"  ✗ YouTube Data API-fel: {type(e).__name__}: {e}")
         return None
+
+
+# Vanliga svenska/engelska förkortningar vars punkt annars felaktigt skulle
+# tolkas som ett meningsslut av _forcera_stycken()s regex — en förkortning
+# mitt i en mening (t.ex. "Han spelade rollen, t.ex. i uppföljaren...")
+# skulle annars splittras mitt i meningen, vilket kan ge ett stycke som
+# börjar med gemen bokstav eller en udda styckesgräns (Codex-fynd: samma
+# ordklass av "regex kan inte skilja förkortning från meningsslut"-problem
+# som redan adresserats på andra ställen i kodbasen, t.ex. avhuggna
+# rubriker ✅97/✅108). Punkten i varje förkortning ersätts med en
+# placeholder innan splitningen och återställs efteråt.
+_FORKORTNINGAR = [
+    "t.ex.", "m.fl.", "dvs.", "bl.a.", "o.s.v.", "osv.", "d.v.s.", "e.g.",
+    "i.e.", "etc.", "Dr.", "Mr.", "Mrs.", "Ms.", "jr.", "sr.", "vs.",
+]
+_FORKORTNING_PLACEHOLDER = "\u0000"
 
 
 def _forcera_stycken(text: str, antal_stycken: int = 3) -> str:
@@ -334,10 +464,24 @@ def _forcera_stycken(text: str, antal_stycken: int = 3) -> str:
     kodgaranterad fallback"-princip som källattributionen ovan). Delar in
     meningarna i ~antal_stycken ungefär jämnstora grupper. No-op om texten
     redan har en styckesbrytning, eller har för få meningar för att
-    meningsfullt delas upp."""
+    meningsfullt delas upp.
+
+    Skyddar kända förkortningar (_FORKORTNINGAR) innan meningsdelningen —
+    annars hade regexen (?<=[.!?])\\s+ felaktigt splittrat mitt i t.ex.
+    "... regissören, m.fl. skådespelare ...", vilket ger en trasig
+    styckesbrytning mitt i en mening istället för mellan meningar."""
     if "\n\n" in text:
         return text
-    meningar = [m.strip() for m in re.split(r"(?<=[.!?])\s+", text) if m.strip()]
+    skyddad = text
+    for f in _FORKORTNINGAR:
+        skyddad = re.sub(
+            re.escape(f), f[:-1] + _FORKORTNING_PLACEHOLDER, skyddad, flags=re.IGNORECASE
+        )
+    meningar = [
+        m.strip().replace(_FORKORTNING_PLACEHOLDER, ".")
+        for m in re.split(r"(?<=[.!?])\s+", skyddad)
+        if m.strip()
+    ]
     if len(meningar) < antal_stycken * 2:
         return text
     n = len(meningar)
@@ -520,6 +664,13 @@ def main():
 
     svar = publicera(resultat["rubrik"], resultat["recension"], video["url"])
     if svar and svar.get("publicerad"):
+        if YOUTUBE_API_KEY:
+            # Avancerar cursorn förbi den nu publicerade kandidaten och
+            # nollställer pending-fälten — utan detta hade nästa körning
+            # sett videon som fortfarande pending och räknat upp
+            # pending_forsok i onödan (och i värsta fall gett upp på en
+            # video som redan publicerats framgångsrikt).
+            _finalisera_pending(video["video_id"])
         print(f"\n✓ Recension publicerad: {DEBATT_SITE_URL}{svar.get('artikel_url', '')}")
     elif svar:
         print(f"\n✗ Inte publicerad (beslut: {svar.get('beslut')}) — {svar.get('motivering')}")
