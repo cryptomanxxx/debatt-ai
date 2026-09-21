@@ -3581,6 +3581,12 @@ Fixat med ett nytt, batchat kontrollsteg: `_hamta_videodetaljer()` hämtar `stat
 | `app/client.js` | Ny "🎬 SENASTE FILMRECENSIONEN"-sektion mellan "SENASTE DEBATTERNA" och "Senaste kommentarerna", med YouTube-tumnagel |
 | `app/agentData.js` → `AGENT_VISUELL.Filmrecensenten` | Egen visuell identitet (🎬-ikon, guld/amber-ton) |
 
+**Namn och tumnagelstorlek justerade efter ägarfeedback (sep 2026):** *"1. Senaste filmrecensionerna (plural) istället för senaste filmrecensionen. 2. Jag tycker att det tar för mycket plats på hemsidan framsida att visa bilden från videon på varje filmrecension."* Sektionsrubriken bytt till "🎬 SENASTE FILMRECENSIONERNA" — matchar pluralformen som redan används i "SENASTE NYHETERNA"/"SENASTE DEBATTERNA". Varje kort omformat till en kompakt klickbar rad (hela kortet är nu en `<a>`, ingen separat "Läs recensionen"-knapp) med en liten 96×54px tumnagel (`mqdefault.jpg` istället för `hqdefault.jpg`) bredvid rubrik/författare istället för en 220px hög bild ovanför texten — samma innehåll, en bråkdel av höjden per kort. Brödtextutdraget togs bort helt (rubrik + författare räcker för en kompakt startsideslista, fulltexten finns redan på artikelsidan en klick bort).
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/client.js` | "SENASTE FILMRECENSIONEN" → "SENASTE FILMRECENSIONERNA". Kortlayouten omgjord till en kompakt klickbar rad med liten sidotumnagel istället för en stor bild ovanpå texten |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
