@@ -1,0 +1,34 @@
+name: Generera Filmrecensent-avatar (engångskörning)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generera:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Generera avatar via Pollinations
+        run: node scripts/generate-filmrecensent-avatar.js
+
+      - name: Committa avataren
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/avatarer/filmrecensenten.png
+          if git diff --cached --quiet; then
+            echo "Ingen ändring att committa."
+            exit 0
+          fi
+          git commit -m "Lägg till AI-genererad avatar för Filmrecensenten"
+          git push
