@@ -272,6 +272,33 @@ def hamta_video_kandidat() -> dict | None:
         return None
 
 
+def _forcera_stycken(text: str, antal_stycken: int = 3) -> str:
+    """Fallback om LLM:et, trots instruktionen i systemprompten, ändå
+    skriver recensionen som en enda sammanhängande textmassa —
+    ArgumentRoster.js (artikelsidans brödtextkomponent) delar upp texten i
+    lässtycken genom att splitta på "\\n\\n"; utan minst en sådan
+    styckesbrytning renderas hela recensionen som ETT enda jättestycke,
+    vilket rapporterats som svårläst (samma "prompt-instruktion +
+    kodgaranterad fallback"-princip som källattributionen ovan). Delar in
+    meningarna i ~antal_stycken ungefär jämnstora grupper. No-op om texten
+    redan har en styckesbrytning, eller har för få meningar för att
+    meningsfullt delas upp."""
+    if "\n\n" in text:
+        return text
+    meningar = [m.strip() for m in re.split(r"(?<=[.!?])\s+", text) if m.strip()]
+    if len(meningar) < antal_stycken * 2:
+        return text
+    n = len(meningar)
+    bas, rest = divmod(n, antal_stycken)
+    stycken = []
+    i = 0
+    for k in range(antal_stycken):
+        storlek = bas + (1 if k < rest else 0)
+        stycken.append(" ".join(meningar[i:i + storlek]))
+        i += storlek
+    return "\n\n".join(stycken)
+
+
 def generera_recension(video_titel: str, video_beskrivning: str = "") -> dict | None:
     """LLM identifierar filmen och skriver en kort recension. Returnerar
     {"kand_film", "rubrik", "recension"} eller None om filmen inte kunde
@@ -298,7 +325,8 @@ def generera_recension(video_titel: str, video_beskrivning: str = "") -> dict | 
         "Svara ENDAST med JSON, inga andra tecken:\n"
         '{"kand_film": "Filmens titel (år)" — eller tom sträng om du inte med rimlig säkerhet '
         'kan identifiera vilken film klippet kommer från, "rubrik": "en kort, läsvärd svensk '
-        'rubrik för recensionen", "recension": "200–280 ord löpande svensk text"}\n\n'
+        'rubrik för recensionen", "recension": "200–280 ord löpande svensk text, uppdelad i '
+        'flera stycken enligt instruktionen nedan"}\n\n'
         "Om kand_film är tom sträng, lämna rubrik och recension tomma också — gissa aldrig på "
         "en film du är osäker på.\n"
         "Skriv recensionen i löpande prosa (inga punktlistor). Utgå från den specifika scenen "
@@ -310,7 +338,12 @@ def generera_recension(video_titel: str, video_beskrivning: str = "") -> dict | 
         "om ingen beskrivning ges nedan.\n\n"
         "VIKTIGT — läsaren måste alltid genast förstå vilken film det gäller: recensionens "
         "FÖRSTA MENING ska uttryckligen nämna filmens fullständiga titel (exakt som i kand_film). "
-        "Skriv aldrig en recension som bara talar om \"filmen\"/\"klippet\" utan att namnge den."
+        "Skriv aldrig en recension som bara talar om \"filmen\"/\"klippet\" utan att namnge den.\n\n"
+        "VIKTIGT — dela ALLTID upp recensionen i minst 3 separata stycken, med EXAKT en tom rad "
+        "(två radbrytningar i följd, \\n\\n) mellan varje stycke — ett nytt stycke per tankegång "
+        "(t.ex. presentation av scenen, koppling till filmen som helhet, ditt eget omdöme). Skriv "
+        "ALDRIG hela recensionen som en enda sammanhängande textmassa utan styckesindelning — det "
+        "gör texten svårläst för besökaren."
     )
     beskrivning_block = f"\n<videobeskrivning>\n{video_beskrivning}\n</videobeskrivning>" if video_beskrivning else ""
     user = f"<videotitel>\n{video_titel}\n</videotitel>{beskrivning_block}"
@@ -346,6 +379,7 @@ def generera_recension(video_titel: str, video_beskrivning: str = "") -> dict | 
             if len(recension.split()) < 150:
                 print(f"  {namn}: recensionen för kort ({len(recension.split())} ord) — provar nästa provider.")
                 continue
+            recension = _forcera_stycken(recension)
             # Garanterad källattribution — oavsett hur väl LLM:et följde
             # instruktionen ovan om att namnge filmen i första meningen,
             # ska läsaren ALLTID kunna se svart på vitt vilken film det
