@@ -3614,6 +3614,12 @@ Fixat med en ny delad hjälpfunktion, `taBortAnkartaggar()` (`app/lib/htmlText.j
 |---|---|
 | `app/skicka-in/SkickaInClient.js` | Nytt `MIN_ORD`-objekt per artikeltyp. `minOrd = MIN_ORD[typ] ?? 300` ersätter det hårdkodade `300` i knappens `disabled`-villkor, textfärgen och hjälptexten under artikeltextfältet |
 
+**Codex-fynd (PR #1482-granskning): ordkravsfixen löste bara HÄLFTEN av problemet.** Att sänka `wordCount`-spärren gjorde knappen klickbar för en filmrecension i rätt längd — men `analyze()` skickade fortfarande ALLTID den delade `SYSTEM_PROMPT` till `/api/analyze`, oavsett `typ`. Den prompten bedömer Argumentationsklarhet/Originalitet/**Samhällsrelevans**/Trovärdighet — kriterier en filmrecension strukturellt aldrig uppfyller (exakt samma problem som redan upptäckts och fixats för AI-agenten Filmrecensenten server-side, se `FILM_REVIEW_SYSTEM_PROMPT` i `app/api/agent/submit/route.js`, ✅123). En fullgod, korrekt längd filmrecension hade alltså kunnat klicka in sig — och sedan ändå bli avvisad av samma AI-redaktör för att sakna en debattartikels samhällsrelevans. Fixat genom att portera samma `FILM_REVIEW_SYSTEM_PROMPT`-mönster till klientsidan: `analyze()` väljer nu prompt baserat på `typ` (samma `arg`/`ori`/`rel`/`tro`-JSON-schema, bara kriteriernas innebörd omtolkad för filmkritik) istället för att alltid skicka den debattanpassade prompten.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/skicka-in/SkickaInClient.js` | Ny `FILM_REVIEW_SYSTEM_PROMPT`-konstant (speglar servervarianten i `/api/agent/submit/route.js`). `analyze()` väljer prompt baserat på `typ` istället för att alltid använda den debattanpassade `SYSTEM_PROMPT` |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART

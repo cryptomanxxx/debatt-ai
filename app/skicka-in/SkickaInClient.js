@@ -34,6 +34,29 @@ Svara ENDAST med JSON (inga andra tecken):
 beslut är "publicera" om alla fyra >= ${MIN_SCORE}, annars "revidera" eller "avvisa".
 taggar: 3–5 specifika ämnestaggar på svenska (gemener, max tre ord per tagg, mer specifika än en bred kategori).`;
 
+// Speglar FILM_REVIEW_SYSTEM_PROMPT i app/api/agent/submit/route.js (✅123) —
+// en filmrecension har strukturellt aldrig en tes/motargument/samhällsrelevans
+// i SYSTEM_PROMPT-mening. Utan denna hade sänkningen av ordkravet ovan bara
+// löst HÄLFTEN av problemet: knappen blir klickbar, men en fullgod
+// filmrecension skulle ändå kunna avvisas av samma AI-redaktör för att sakna
+// debattkriterier den aldrig var tänkt att uppfylla (Codex-fynd, PR #1482-
+// granskning). Samma arg/ori/rel/tro-JSON-schema som SYSTEM_PROMPT, så
+// /redaktion, /intelligens m.fl. som läser dessa kolumner fungerar oförändrat
+// — bara kriteriernas INNEBÖRD är omtolkad för filmkritik.
+const FILM_REVIEW_SYSTEM_PROMPT = `Du är chefredaktör för en svensk sajt som publicerar korta filmrecensioner. Bedöm recensionen på fyra kriterier (heltal 0-10) — ANPASSADE FÖR FILMKRITIK, inte en debattartikels tes/motargument/samhällsrelevans:
+1. Argumentationsklarhet (arg) – Ger recensionen ett tydligt eget omdöme med motivering, inte bara en referering av handlingen?
+2. Originalitet (ori) – Tillför recensionen en egen infallsvinkel eller insikt om filmen, inte bara en generisk beskrivning?
+3. Relevans (rel) – Kopplar recensionen sina iakttagelser meningsfullt till filmen som helhet (berättelse, regi, skådespeleri)?
+4. Trovärdighet (tro) – Verkar faktapåståendena (filmtitel, handling, skådespeleri) rimliga och fria från uppenbara påhitt?
+
+En recension publiceras om ALLA fyra poäng är minst ${MIN_SCORE}/10. Kräv ALDRIG en debattartikels tes, motargument eller samhällsrelevans — det är en filmrecension, inte ett debattinlägg, och ska inte bedömas som ett sådant.
+
+Svara ENDAST med JSON (inga andra tecken):
+{"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1","förslag 2"],"styrkor":["styrka 1"],"rubrik":null,"taggar":["tagg1","tagg2","tagg3"]}
+
+beslut är "publicera" om alla fyra >= ${MIN_SCORE}, annars "revidera" eller "avvisa".
+taggar: 3–5 specifika ämnestaggar på svenska (gemener, max tre ord per tagg, mer specifika än en bred kategori).`;
+
 function sbHeaders() {
   return {
     "apikey": SB_KEY,
@@ -350,11 +373,12 @@ export default function SkickaInClient() {
     if (!turnstileToken) { setError("Vänligen slutför CAPTCHA-kontrollen nedan."); return; }
     setAnalyzing(true); setError(null);
     try {
+      const promptForTyp = typ === "filmrecension" ? FILM_REVIEW_SYSTEM_PROMPT : SYSTEM_PROMPT;
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [{ role: "user", content: `${SYSTEM_PROMPT}\n\nRubrik: ${title}\nFörfattare: ${author}\n\n${text}` }],
+          messages: [{ role: "user", content: `${promptForTyp}\n\nRubrik: ${title}\nFörfattare: ${author}\n\n${text}` }],
           turnstileToken,
         }),
       });
