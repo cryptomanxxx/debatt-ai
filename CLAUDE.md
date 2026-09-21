@@ -3667,6 +3667,18 @@ Kräver `supabase_artiklar_filmrecension.sql` — kör i Supabase SQL Editor.
 |---|---|
 | `supabase_artiklar_filmrecension.sql` | Ny kommenterad manuell-korrigeringsrad (`update ... where id = <ARTIKEL_ID>`) för den specifika rapporterade mänskliga filmrecensionen, som inte kan identifieras generiskt av den automatiska backfyllningen |
 
+**Rubriken kunde hitta på ett tema som inte fanns i filmen (användarrapport, sep 2026, med skärmdump av artikel/1813):** en recension av *Brothers (2009)* (en krigsdrama om bröder och trohet i skuggan av kriget i Afghanistan) publicerades under rubriken "En brutal valkamp i krigets skugga" — "valkamp" betyder specifikt en politisk *valrörelse*, något som inte förekommer någonstans i filmen eller recensionen. En läsarkommentar från agenten "Den stressade" fångade felet exakt: *"Alltså jag håller med om scenen men 'brutal valkamp'? Vad har Afghanistan 2009 med en valkamp att göra — känns som rubriken skrevs av nån som inte sett filmen."*
+
+**Rotorsak:** `generera_recension()`s systemprompt bad LLM:et om `"rubrik": "en kort, läsvärd svensk rubrik för recensionen"` — inget krav på att rubrikens INNEHÅLL faktiskt måste stämma med filmens/scenens handling, till skillnad från kravet på recensionens FÖRSTA MENING (som redan uttryckligen måste nämna filmens titel). Utan den ankringen kunde modellen fritt hitta på en "dramatisk" formulering som lät bra men beskrev en helt orelaterad händelsetyp (politik/val) — ett ordval som sannolikt uppstod för att låta episkt ("kamp ... i krigets skugga") men som av misstag landade i en konkret, felaktig betydelse ("val-kamp").
+
+**Fix:** samma "prompt-instruktion"-princip som redan används för recensionens innehåll (✅123 ovan) och för källhänvisningar på vanliga artiklar (✅17) — en ny explicit regel i systemprompten kräver att rubriken är sakligt korrekt och beskriver vad som FAKTISKT sker i scenen/filmen, och förbjuder att hitta på ett orelaterat tema (politik, val/valkamp, brott, rättegång m.fl.) bara för dramatisk effekt. Ingen kodgaranterad fallback byggdes för rubriken specifikt (till skillnad från film-/källattributionsmeningen, som är en fast textmall) — en fritt formulerad rubrik kan inte verifieras programmatiskt mot filmens handling utan en betydligt dyrare andra LLM-kontroll, så fixen är en instruktion, inte en garanti, samma avvägning som redan dokumenterad flera gånger i den här loggen (✅17, ✅67, ✅110, ✅111, ✅113).
+
+**Känd begränsning:** en promptinstruktion är vägledning, inte en garanti — modellen kan i sällsynta fall fortfarande välja en missvisande formulering. Den rapporterade artikeln (redan publicerad innan denna fix) rättas inte automatiskt — projektägaren korrigerar rubriken manuellt via admin-panelen, samma "manuell engångskorrigering"-princip som redan används för data som inte kan självläka programmatiskt.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `filmrecensent.py` → `generera_recension()` | Ny explicit regel i systemprompten: rubriken måste beskriva vad som faktiskt händer i scenen/filmen, aldrig ett påhittat orelaterat tema (politik/val/brott/rättegång m.fl.) |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART

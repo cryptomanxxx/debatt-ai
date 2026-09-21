@@ -613,8 +613,8 @@ def generera_recension(video_titel: str, video_beskrivning: str = "") -> dict | 
         "Svara ENDAST med JSON, inga andra tecken:\n"
         '{"kand_film": "Filmens titel (år)" — eller tom sträng om du inte med rimlig säkerhet '
         'kan identifiera vilken film klippet kommer från, "rubrik": "en kort, läsvärd svensk '
-        'rubrik för recensionen", "recension": "200–280 ord löpande svensk text, uppdelad i '
-        'flera stycken enligt instruktionen nedan"}\n\n'
+        'rubrik för recensionen — se VIKTIGT-regeln om rubriken nedan", "recension": "200–280 '
+        'ord löpande svensk text, uppdelad i flera stycken enligt instruktionen nedan"}\n\n'
         "Om kand_film är tom sträng, lämna rubrik och recension tomma också — gissa aldrig på "
         "en film du är osäker på.\n"
         "Skriv recensionen i löpande prosa (inga punktlistor). Utgå från den specifika scenen "
@@ -627,6 +627,11 @@ def generera_recension(video_titel: str, video_beskrivning: str = "") -> dict | 
         "VIKTIGT — läsaren måste alltid genast förstå vilken film det gäller: recensionens "
         "FÖRSTA MENING ska uttryckligen nämna filmens fullständiga titel (exakt som i kand_film). "
         "Skriv aldrig en recension som bara talar om \"filmen\"/\"klippet\" utan att namnge den.\n\n"
+        "VIKTIGT — rubriken måste vara sakligt korrekt och beskriva vad som FAKTISKT sker i "
+        "scenen/filmen. Hitta ALDRIG på ett orelaterat tema (t.ex. politik, val/valkamp, brott, "
+        "rättegång) bara för att det låter dramatiskt — varje ord i rubriken ska gå att känna "
+        "igen i den faktiska handling du beskriver i recensionen. En kort, säljande formulering "
+        "är bra, men aldrig på bekostnad av att den beskriver något som inte händer i filmen.\n\n"
         "VIKTIGT — dela ALLTID upp recensionen i minst 3 separata stycken, med EXAKT en tom rad "
         "(två radbrytningar i följd, \\n\\n) mellan varje stycke — ett nytt stycke per tankegång "
         "(t.ex. presentation av scenen, koppling till filmen som helhet, ditt eget omdöme). Skriv "
