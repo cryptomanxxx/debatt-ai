@@ -3679,6 +3679,18 @@ Kräver `supabase_artiklar_filmrecension.sql` — kör i Supabase SQL Editor.
 |---|---|
 | `filmrecensent.py` → `generera_recension()` | Ny explicit regel i systemprompten: rubriken måste beskriva vad som faktiskt händer i scenen/filmen, aldrig ett påhittat orelaterat tema (politik/val/brott/rättegång m.fl.) |
 
+**En andra, separat rubrikbugg — mistranslation, inte ett påhittat tema (användarrapport, sep 2026, med skärmdump av artikel/1822):** en recension av *The Big Chill* (1983) publicerades under rubriken "Oväntad förförelse på begravningsvakten". Verifierat direkt mot GitHub Actions-loggen (körning [35656768934](https://github.com/cryptomanxxx/debatt-ai/actions/runs/35656768934), på huvudgrenens merge-commit av ovanstående fix) att artikeln publicerades EFTER fixen ovan — den ursprungliga rubrikfixen räckte alltså inte, för att detta är en annan buggklass.
+
+**Rotorsak:** ovanstående fix skyddar bara mot att rubriken hittar på ett HELT ORELATERAT tema (t.ex. politik) — men här var temat korrekt (en flört vid en väns bortgångna vaka i *The Big Chill*), problemet var ett felaktigt ordval: källvideons titel säger "FUNERAL WAKE", vars korrekta svenska motsvarighet är "sorgevaka"/"minnesstund" — modellen skrev istället "begravningsvakt", ett ord som betyder en VAKTPOST vid en begravning (bevakning), inte en minnesstund/vaka. Ett klassiskt falskt vän-fel vid EN→SV-översättning ("wake" ≈ "vaka", inte "vakt").
+
+**Fix:** en ny, separat prompt-regel (samma "instruktion, inte garanti"-princip som ovan och som redan dokumenterad flera gånger i denna logg) kräver att rubriken bara använder genuina, korrekta svenska ord — och nämner explicit detta konkreta fall (funeral wake → sorgevaka/minnesstund, aldrig "begravningsvakt") som exempel på ett falskt vän-fel att undvika, med en generell instruktion att välja en enklare, otvetydig formulering vid osäkerhet om ett ords betydelse.
+
+**Känd begränsning:** samma som ovan — en instruktion är vägledning, inte en garanti, och kan bara konkret varna för det EXAKTA fallet som redan observerats, inte förutse alla möjliga framtida falska vänner. Den rapporterade artikeln rättas inte automatiskt.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `filmrecensent.py` → `generera_recension()` | Ny separat regel: rubriken får bara innehålla genuina, korrekta svenska ord — nämner explicit "funeral wake → sorgevaka/minnesstund, aldrig begravningsvakt" som exempel på ett EN→SV falskt vän-fel |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
