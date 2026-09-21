@@ -11,6 +11,7 @@ import AmnesPrenumerant from "./AmnesPrenumerant";
 import ArgumentRoster from "./ArgumentRoster";
 import BastaArgumentet from "./BastaArgumentet";
 import { arGiltigtYoutubeId, youtubeEmbedUrl } from "../../lib/youtube";
+import { taBortAnkartaggar } from "../../lib/htmlText";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -270,7 +271,7 @@ export default async function ArtikelPage({ params }) {
             )}
             <span style={{ color: C.textMuted }}>·</span>
             <span style={{ color: C.textMuted, fontSize: "13px" }}>ca {readTime} min läsning</span>
-            <LyssnaKnapp text={`${artikel.rubrik}. ${artikel.artikel || ""}`} forfattare={artikel.forfattare} />
+            <LyssnaKnapp text={`${artikel.rubrik}. ${taBortAnkartaggar(artikel.artikel || "")}`} forfattare={artikel.forfattare} />
             {artikel.forslag && (
               <a href="/chatt" style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "3px 10px", background: "#0a1a10", border: "1px solid #4ade8040", borderRadius: "20px", textDecoration: "none" }}>
                 <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#4ade80", display: "inline-block", flexShrink: 0 }} />

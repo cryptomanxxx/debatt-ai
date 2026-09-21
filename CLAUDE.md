@@ -3587,6 +3587,15 @@ Fixat med ett nytt, batchat kontrollsteg: `_hamta_videodetaljer()` hämtar `stat
 |---|---|
 | `app/client.js` | "SENASTE FILMRECENSIONEN" → "SENASTE FILMRECENSIONERNA". Kortlayouten omgjord till en kompakt klickbar rad med liten sidotumnagel istället för en stor bild ovanpå texten |
 
+**Codex-fynd (PR #1470-granskning, sent inkommen efter merge): den kodgaranterade käll­attributionens `<a href="...">`-tagg lästes upp bokstavligt av "🎧 Lyssna"-knappen.** Attributionsmeningen i slutet av varje recension (se ovan, "Garanterad film- och källattribution i brödtexten") innehåller medvetet en RÅ `<a href="...">@BoxofficeMoviesScenes</a>`-ankartagg — `ArgumentRoster.js → linkifyRawAnchors()` parsar det mönstret säkert till en riktig klickbar länk för LÄSARE, aldrig som `dangerouslySetInnerHTML`. Men artikelsidans "🎧 Lyssna"-knapp (`LyssnaKnapp`) skickar `${artikel.rubrik}. ${artikel.artikel}` rakt in i `responsiveVoice.speak()` utan någon HTML-tolkning — den bokstavliga ankartaggen (vinkelparenteser, `href=`, citattecken) hade därför lästs upp som syntax istället för prosa i slutet av varenda Filmrecensenten-recension.
+
+Fixat med en ny delad hjälpfunktion, `taBortAnkartaggar()` (`app/lib/htmlText.js`) — samma regexmönster som `ArgumentRoster.js`s redan existerande `RAW_ANCHOR_RE`, men här ersätter den varje `<a href="...">text</a>`-förekomst med bara den synliga länktexten. Används ENDAST vid `LyssnaKnapp`-anropet i `app/artikel/[id]/page.js` — den lagrade `artikel.artikel`-kolumnen och dess rendering via `ArgumentRoster.js` (klickbar länk för läsare) rörs inte alls, bara texten som skickas till text-till-tal. Verifierat isolerat mot fem representativa fall (attributionsmeningen, text utan länk, flera länkar i samma text, tom sträng, `null`) — samtliga gav förväntat utfall.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/lib/htmlText.js` | Ny modul: `taBortAnkartaggar()` — ersätter en rå `<a href="...">text</a>`-ankartagg med bara sin synliga länktext |
+| `app/artikel/[id]/page.js` | `LyssnaKnapp`s `text`-prop körs genom `taBortAnkartaggar()` innan den skickas till TTS |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
