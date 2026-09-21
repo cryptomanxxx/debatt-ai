@@ -1572,8 +1572,9 @@ export default function DebattClient({ initialArticleCount = null }) {
             {/* Hero – senaste filmrecensioner (Filmrecensenten, ✅123) */}
             {senasteFilmrecension.length > 0 && (
               <div style={{ marginBottom:"48px" }}>
-                <div style={{ display:"flex", alignItems:"center", marginBottom:"12px" }}>
+                <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:"12px" }}>
                   <span style={{ fontSize:"11px", color:"#e8b84a", fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🎬 SENASTE FILMRECENSIONERNA</span>
+                  <a href="/arkiv?film=1" style={{ fontSize:"11px", color:"#e8b84a", textDecoration:"none", fontFamily:"monospace", letterSpacing:"0.06em" }}>Se alla →</a>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                   {senasteFilmrecension.map(recension => (
