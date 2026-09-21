@@ -205,20 +205,26 @@ def hamta_state() -> dict:
             headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"},
             timeout=10,
         )
+        if res.status_code != 200:
+            raise _TransientFel(f"HTTP {res.status_code}")
+        rader = res.json()
+        if not rader:
+            return {"next_page_token": None, "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0}
+        rad = rader[0]
+        return {
+            "next_page_token": rad.get("next_page_token"),
+            "pending_video_id": rad.get("pending_video_id"),
+            "pending_next_token": rad.get("pending_next_token"),
+            "pending_forsok": rad.get("pending_forsok") or 0,
+        }
+    except _TransientFel:
+        raise
     except Exception as e:
+        # Täcker även ett malformat/icke-JSON 200-svar (res.json() kastar)
+        # och en oväntad svarsform (rader[0]/rad.get() kastar) — Codex-fynd,
+        # PR #1484-granskning: dessa låg tidigare UTANFÖR try-blocket och
+        # kraschade hela körningen istället för att behandlas som transienta.
         raise _TransientFel(str(e)) from e
-    if res.status_code != 200:
-        raise _TransientFel(f"HTTP {res.status_code}")
-    rader = res.json()
-    if not rader:
-        return {"next_page_token": None, "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0}
-    rad = rader[0]
-    return {
-        "next_page_token": rad.get("next_page_token"),
-        "pending_video_id": rad.get("pending_video_id"),
-        "pending_next_token": rad.get("pending_next_token"),
-        "pending_forsok": rad.get("pending_forsok") or 0,
-    }
 
 
 def _upsert_state(falt: dict) -> bool:
@@ -331,32 +337,38 @@ def _hamta_video_metadata(video_id: str) -> dict | None:
     try:
         params = {"part": "snippet,status,contentDetails", "id": video_id, "key": YOUTUBE_API_KEY}
         res = httpx.get(f"{YOUTUBE_DATA_API}/videos", params=params, timeout=15)
+        if res.status_code != 200:
+            raise _TransientFel(f"HTTP {res.status_code}")
+        items = res.json().get("items", [])
+        if not items:
+            return None  # bekräftat: videon finns inte längre (giltigt 200-svar, tomt)
+        item = items[0]
+        snippet = item.get("snippet", {})
+        titel = (snippet.get("title") or "").strip()
+        if not titel or titel in ("Private video", "Deleted video"):
+            return None
+        embeddable = item.get("status", {}).get("embeddable", True)
+        region = item.get("contentDetails", {}).get("regionRestriction", {}) or {}
+        blockerad = SVERIGE in (region.get("blocked") or []) or (
+            "allowed" in region and SVERIGE not in (region.get("allowed") or [])
+        )
+        if not embeddable or blockerad:
+            return None
+        beskrivning = (snippet.get("description") or "").strip()[:1500]
+        return {
+            "video_id": video_id,
+            "titel": titel,
+            "beskrivning": beskrivning,
+            "url": f"https://www.youtube.com/watch?v={video_id}",
+        }
+    except _TransientFel:
+        raise
     except Exception as e:
+        # Samma fix som hamta_state() (Codex-fynd, PR #1484-granskning):
+        # ett malformat/icke-JSON 200-svar eller en oväntad svarsform
+        # (items[0]/.get()-anrop) kraschade tidigare hela körningen
+        # istället för att korrekt behandlas som en transient miss.
         raise _TransientFel(str(e)) from e
-    if res.status_code != 200:
-        raise _TransientFel(f"HTTP {res.status_code}")
-    items = res.json().get("items", [])
-    if not items:
-        return None  # bekräftat: videon finns inte längre (giltigt 200-svar, tomt)
-    item = items[0]
-    snippet = item.get("snippet", {})
-    titel = (snippet.get("title") or "").strip()
-    if not titel or titel in ("Private video", "Deleted video"):
-        return None
-    embeddable = item.get("status", {}).get("embeddable", True)
-    region = item.get("contentDetails", {}).get("regionRestriction", {}) or {}
-    blockerad = SVERIGE in (region.get("blocked") or []) or (
-        "allowed" in region and SVERIGE not in (region.get("allowed") or [])
-    )
-    if not embeddable or blockerad:
-        return None
-    beskrivning = (snippet.get("description") or "").strip()[:1500]
-    return {
-        "video_id": video_id,
-        "titel": titel,
-        "beskrivning": beskrivning,
-        "url": f"https://www.youtube.com/watch?v={video_id}",
-    }
 
 
 def hamta_video_kandidat() -> dict | None:

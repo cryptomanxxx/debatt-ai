@@ -398,6 +398,7 @@ export default function SkickaInClient() {
             bild_url: bildUrl || null,
             bild_fotograf: bildFotograf.trim() || null,
             youtube_video_id: youtubeId || null,
+            filmrecension: typ === "filmrecension",
           }),
         });
         const inlData = await inlRes.json();
@@ -430,6 +431,7 @@ export default function SkickaInClient() {
           bild_url: bildUrl || null,
           bild_fotograf: bildFotograf.trim() || null,
           youtube_video_id: youtubeId || null,
+          filmrecension: typ === "filmrecension",
           nyhetskalla: (typ === "nyhetsartikel" && kallaNamn.trim() && kallaUrl.trim())
             ? { namn: kallaNamn.trim(), url: kallaUrl.trim(), publicerad: null, antal_utvärderade: 0 }
             : null,
