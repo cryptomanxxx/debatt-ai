@@ -775,6 +775,11 @@ def main():
                     "antal_utvärderade": 0,
                 }
                 print(f"  📎 Källänk från ämnesförslaget: {forslag_kalla_namn}")
+                # Samma YouTube-koppling som i "elif nyhet:"-grenen nedan — ett
+                # besökarföreslaget ämne (/nyhetsval) kan lika gärna komma från
+                # en YouTube-sourcad nyhetsflode-rad (Codex-fynd, PR #1468).
+                if forslag_kalla_namn.startswith("YouTube: "):
+                    youtube_url = forslag_kalla_url
             print(f"\n{'=' * 60}")
             print(f"  Läge:     NY ARTIKEL (ÄMNESFÖRSLAG FRÅN DIREKTDEBATT)")
             print(f"  Agent:    {agent['namn']} [{mood['label']}]")

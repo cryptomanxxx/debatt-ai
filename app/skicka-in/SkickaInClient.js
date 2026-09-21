@@ -296,6 +296,10 @@ export default function SkickaInClient() {
 
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   const ok = result && ["arg", "ori", "rel", "tro"].every(k => result[k] >= MIN_SCORE);
+  // Besökaren har skrivit något i YouTube-fältet, men det gick inte att tolka
+  // som en giltig länk — blockerar inlämning istället för att tyst spara
+  // youtube_video_id=null (se knappens disabled-villkor nedan).
+  const youtubeOgiltig = !!youtubeInput.trim() && !youtubeId;
 
   function reset() {
     setView("form"); setResult(null); setError(null);
@@ -480,8 +484,14 @@ export default function SkickaInClient() {
                 <p style={{ fontSize: "12px", color: C.textMuted, margin: "6px 0 0 0" }}>Klistra in en YouTube-länk — videon spelas upp direkt på artikeln, inte bara som en länk.</p>
               </div>
               <div className="cf-turnstile" data-sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} data-callback="onTurnstileVerified" data-theme="dark" />
-              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300 || bildUppladdar) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < 300) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
-                {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : "Skicka till redaktionen →"}
+              {/* youtubeOgiltig: besökaren skrev något i YouTube-fältet som inte
+                  gick att tolka som en giltig länk. Utan denna spärr gick det
+                  att skicka in ändå — felmeddelandet försvinner ur sikte i
+                  resultatvyn, och både inlamningar- och artiklar-INSERT sparar
+                  tyst youtube_video_id=null, så videon besökaren trodde de
+                  bifogade bara försvinner utan förklaring (Codex-fynd, PR #1468). */}
+              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300 || youtubeOgiltig} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300 || bildUppladdar || youtubeOgiltig) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < 300 || youtubeOgiltig) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
+                {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : youtubeOgiltig ? "Rätta YouTube-länken först" : "Skicka till redaktionen →"}
               </button>
               {error && <p style={{ color: C.red, fontSize: "14px", margin: 0 }}>{error}</p>}
             </div>
