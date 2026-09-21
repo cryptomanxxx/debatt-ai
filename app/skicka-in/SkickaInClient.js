@@ -3,6 +3,14 @@ import { useState, useEffect, useRef } from "react";
 import { extraheraYoutubeId } from "../lib/youtube";
 
 const MIN_SCORE = 6;
+// Minsta ordantal för att "Skicka till redaktionen"-knappen ska aktiveras.
+// Filmrecensioner är medvetet ett kort format — Filmrecensenten (AI-agenten,
+// ✅123) skriver själv 200–280 ords recensioner via samma AI-redaktör som
+// bedömer människors inlämningar här — så samma 300-ordskrav som gäller för
+// en fullängds debatt-/nyhetsartikel blockerade omöjligen en människas
+// filmrecension i den etablerade längden (användarrapport, sep 2026: knappen
+// var "blockerad" vid manuell inlämning av en filmrecension).
+const MIN_ORD = { debattartikel: 300, nyhetsartikel: 300, filmrecension: 150 };
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -19,6 +27,29 @@ const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm ar
 4. Trovärdighet – Är faktapåståendena rimliga och välgrundade?
 
 En artikel kan publiceras om ALLA fyra poäng är minst ${MIN_SCORE}/10.
+
+Svara ENDAST med JSON (inga andra tecken):
+{"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1","förslag 2"],"styrkor":["styrka 1"],"rubrik":null,"taggar":["tagg1","tagg2","tagg3"]}
+
+beslut är "publicera" om alla fyra >= ${MIN_SCORE}, annars "revidera" eller "avvisa".
+taggar: 3–5 specifika ämnestaggar på svenska (gemener, max tre ord per tagg, mer specifika än en bred kategori).`;
+
+// Speglar FILM_REVIEW_SYSTEM_PROMPT i app/api/agent/submit/route.js (✅123) —
+// en filmrecension har strukturellt aldrig en tes/motargument/samhällsrelevans
+// i SYSTEM_PROMPT-mening. Utan denna hade sänkningen av ordkravet ovan bara
+// löst HÄLFTEN av problemet: knappen blir klickbar, men en fullgod
+// filmrecension skulle ändå kunna avvisas av samma AI-redaktör för att sakna
+// debattkriterier den aldrig var tänkt att uppfylla (Codex-fynd, PR #1482-
+// granskning). Samma arg/ori/rel/tro-JSON-schema som SYSTEM_PROMPT, så
+// /redaktion, /intelligens m.fl. som läser dessa kolumner fungerar oförändrat
+// — bara kriteriernas INNEBÖRD är omtolkad för filmkritik.
+const FILM_REVIEW_SYSTEM_PROMPT = `Du är chefredaktör för en svensk sajt som publicerar korta filmrecensioner. Bedöm recensionen på fyra kriterier (heltal 0-10) — ANPASSADE FÖR FILMKRITIK, inte en debattartikels tes/motargument/samhällsrelevans:
+1. Argumentationsklarhet (arg) – Ger recensionen ett tydligt eget omdöme med motivering, inte bara en referering av handlingen?
+2. Originalitet (ori) – Tillför recensionen en egen infallsvinkel eller insikt om filmen, inte bara en generisk beskrivning?
+3. Relevans (rel) – Kopplar recensionen sina iakttagelser meningsfullt till filmen som helhet (berättelse, regi, skådespeleri)?
+4. Trovärdighet (tro) – Verkar faktapåståendena (filmtitel, handling, skådespeleri) rimliga och fria från uppenbara påhitt?
+
+En recension publiceras om ALLA fyra poäng är minst ${MIN_SCORE}/10. Kräv ALDRIG en debattartikels tes, motargument eller samhällsrelevans — det är en filmrecension, inte ett debattinlägg, och ska inte bedömas som ett sådant.
 
 Svara ENDAST med JSON (inga andra tecken):
 {"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1","förslag 2"],"styrkor":["styrka 1"],"rubrik":null,"taggar":["tagg1","tagg2","tagg3"]}
@@ -315,6 +346,7 @@ export default function SkickaInClient() {
   }
 
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  const minOrd = MIN_ORD[typ] ?? 300;
   const ok = result && ["arg", "ori", "rel", "tro"].every(k => result[k] >= MIN_SCORE);
   // Besökaren har skrivit något i YouTube-fältet, men det gick inte att tolka
   // som en giltig länk — blockerar inlämning istället för att tyst spara
@@ -341,11 +373,12 @@ export default function SkickaInClient() {
     if (!turnstileToken) { setError("Vänligen slutför CAPTCHA-kontrollen nedan."); return; }
     setAnalyzing(true); setError(null);
     try {
+      const promptForTyp = typ === "filmrecension" ? FILM_REVIEW_SYSTEM_PROMPT : SYSTEM_PROMPT;
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [{ role: "user", content: `${SYSTEM_PROMPT}\n\nRubrik: ${title}\nFörfattare: ${author}\n\n${text}` }],
+          messages: [{ role: "user", content: `${promptForTyp}\n\nRubrik: ${title}\nFörfattare: ${author}\n\n${text}` }],
           turnstileToken,
         }),
       });
@@ -463,8 +496,8 @@ export default function SkickaInClient() {
                 <Lbl>Artikeltext</Lbl>
                 <textarea value={text} onChange={e => setText(e.target.value)} rows={16} style={{ ...inp, resize: "vertical", lineHeight: 1.8 }} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginTop: "6px" }}>
-                  <p style={{ fontSize: "12px", color: wordCount < 300 ? C.red : C.green, margin: 0, fontFamily: "monospace" }}>
-                    {wordCount} ord {wordCount < 300 ? "– minst 300 ord krävs" : "✓"}
+                  <p style={{ fontSize: "12px", color: wordCount < minOrd ? C.red : C.green, margin: 0, fontFamily: "monospace" }}>
+                    {wordCount} ord {wordCount < minOrd ? `– minst ${minOrd} ord krävs` : "✓"}
                   </p>
                   {röstStöds && (
                     <button
@@ -534,7 +567,7 @@ export default function SkickaInClient() {
                   kallaOgiltig: samma princip för typ="nyhetsartikel" — utan
                   namn+URL blir nyhetskalla null och artikeln ser ut som en
                   vanlig debattartikel trots det valda läget. */}
-              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300 || youtubeOgiltig || kallaOgiltig} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300 || bildUppladdar || youtubeOgiltig || kallaOgiltig) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < 300 || youtubeOgiltig || kallaOgiltig) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
+              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < minOrd || youtubeOgiltig || kallaOgiltig} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < minOrd || bildUppladdar || youtubeOgiltig || kallaOgiltig) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < minOrd || youtubeOgiltig || kallaOgiltig) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
                 {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : youtubeOgiltig ? "Rätta YouTube-länken först" : kallaOgiltig ? "Ange källa för nyhetsartikeln först" : "Skicka till redaktionen →"}
               </button>
               {error && <p style={{ color: C.red, fontSize: "14px", margin: 0 }}>{error}</p>}
