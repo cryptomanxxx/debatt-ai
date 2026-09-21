@@ -30,5 +30,11 @@ jobs:
           GROQ_API_KEY_3:    ${{ secrets.GROQ_API_KEY_3 }}
           DEEPSEEK_API_KEY:  ${{ secrets.DEEPSEEK_API_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DEBATT_API_KEY:    ${{ secrets.DEBATT_API_KEY }}
+          # Krävs för att bläddra kanalens HELA uppladdningskatalog
+          # (~9000+ videor) istället för bara den senaste videon — se
+          # filmrecensent.py. Saknas secreten faller skriptet tillbaka på
+          # det gamla RSS-baserade "bara senaste videon"-beteendet.
+          YOUTUBE_API_KEY:   ${{ secrets.YOUTUBE_API_KEY }}
         run: python3 filmrecensent.py

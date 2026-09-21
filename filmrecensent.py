@@ -3,7 +3,10 @@
 filmrecensent.py — Filmrecensenten: en dedikerad AI-filmkritiker som
 bevakar YouTube-kanalen @BoxofficeMoviesScenes ("Boxoffice Movie Scenes",
 kanal-id UCfk4Df9QxO267wlFbStSyAw) och publicerar en kort recension varje
-gång kanalen laddar upp en ny video.
+körning, hämtad ur kanalens HELA uppladdningskatalog (~9000+ videor) —
+inte bara den allra senaste videon. En äldre film är inte sämre för att
+den är äldre (ägarbeslut, sep 2026): syftet är att gradvis arbeta sig
+igenom hela katalogen över tid, inte bara reagera på nya uppladdningar.
 
 Precis som Civilisationshistorikern (agents/civilisations-historiker.js,
 ✅80) är Filmrecensenten INTE en av de 24 debattagenterna och deltar inte
@@ -12,14 +15,17 @@ publicering via /api/agent/submit på en egen cron, samma etablerade
 mönster som kanal_debatt.py/forskning_test.py.
 
 Flöde per körning:
-  1. Hämta kanalens ALLRA senaste video via YouTube RSS, via
-     /api/rss-proxy (samma mönster som nyheter.py → hamta_youtube_
-     nyheter() — kringgår GitHub Actions IP-block mot YouTube).
-  2. Avbryt utan publicering om videon redan recenserats (dedup mot
-     artiklar.youtube_video_id) eller är äldre än RECENCY_DAGAR — bara
-     den senaste videon kollas varje körning, ingen backfill av kanalens
-     historik.
-  3. LLM identifierar vilken film klippet är hämtat ur och skriver en
+  1. Om YOUTUBE_API_KEY finns: bläddra genom kanalens uppladdnings-
+     playlist via YouTube Data API v3, med en cursor sparad i Supabase
+     (filmrecensent_state) som låter varje körning fortsätta där förra
+     slutade — hela katalogen gås därmed igenom stegvis över tid, med
+     wrap-around till början när slutet nås. Den FÖRSTA videon på
+     bläddringsvägen som inte redan har en publicerad recension
+     (dedup mot artiklar.youtube_video_id) väljs.
+     Saknas YOUTUBE_API_KEY: faller tillbaka på det gamla beteendet —
+     bara kanalens allra senaste video via YouTube RSS (/api/rss-proxy,
+     samma mönster som nyheter.py → hamta_youtube_nyheter()).
+  2. LLM identifierar vilken film klippet är hämtat ur och skriver en
      kort recension (200–280 ord) via den centrala fallback-kedjan för
      artikelskrivning (ai_klient.hamta_artikel_fns, _ARTIKEL_CHAIN =
      Groq → DeepSeek) — aldrig en hårdkodad providerklient. Videotiteln
@@ -27,11 +33,12 @@ Flöde per körning:
      text (samma anti-injektionsprincip som generera_ki_fran_nyheter(),
      ✅67): ramas in som exempeldata i prompten, filtreras genom
      _verkar_injicerad() innan den accepteras.
-  4. Publicera via /api/agent/submit med youtube_url satt — videon bäddas
+  3. Publicera via /api/agent/submit med youtube_url satt — videon bäddas
      då in direkt i artikeln (✅121/✅122), inte bara länkas.
 
 Körs manuellt:
   GROQ_API_KEY=xxx SUPABASE_ANON_KEY=xxx DEBATT_API_KEY=xxx \
+  YOUTUBE_API_KEY=xxx SUPABASE_SERVICE_ROLE_KEY=xxx \
   python3 filmrecensent.py
 """
 import os
@@ -40,7 +47,7 @@ import sys
 import json
 import urllib.parse
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import httpx
 
@@ -49,14 +56,24 @@ from supabase_utils import _verkar_injicerad
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+# Krävs för att skriva filmrecensent_state (RLS: publik SELECT, skrivning
+# kräver service role, samma mönster som nyhetsflode/nyhetsanalys m.fl.
+# sedan RLS-härdningen). Faller tillbaka på anon-nyckeln om secreten
+# saknas — RLS avvisar då bara skrivningen tyst, cursorn avancerar inte
+# och nästa körning börjar om från kanalens senaste video, aldrig ett
+# hårt fel.
+SB_WRITE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or SB_KEY
 DEBATT_API_KEY = os.environ.get("DEBATT_API_KEY", "")
 DEBATT_SITE_URL = os.environ.get("DEBATT_SITE_URL", "https://www.debatt-ai.se")
+YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 
 AGENT_NAMN = "Filmrecensenten"
 KANAL_ID = "UCfk4Df9QxO267wlFbStSyAw"  # youtube.com/@BoxofficeMoviesScenes ("Boxoffice Movie Scenes")
 KANAL_NAMN = "@BoxofficeMoviesScenes"
 KANAL_URL = "https://www.youtube.com/@BoxofficeMoviesScenes"
-RECENCY_DAGAR = 7  # ignorera en "senaste video" äldre än så här — förhindrar backfill vid första körningen
+
+YOUTUBE_DATA_API = "https://www.googleapis.com/youtube/v3"
+MAX_SIDOR_PER_KORNING = 5  # tak på antal playlistItems-sidor (50 videor/sida) en körning bläddrar innan den ger upp
 
 _PROXY = "https://www.debatt-ai.se/api/rss-proxy?url="
 _ANVANDARAGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -68,8 +85,10 @@ def _p(url: str) -> str:
 
 
 def hamta_senaste_video() -> dict | None:
-    """Hämtar kanalens allra senaste video. Returnerar None vid RSS-fel, tomt
-    flöde, eller om videon är äldre än RECENCY_DAGAR."""
+    """Fallback när YOUTUBE_API_KEY saknas: hämtar bara kanalens allra
+    senaste video via RSS (som inte exponerar mer än de ~15 senaste
+    uppladdningarna — hela katalogen kräver YouTube Data API, se
+    hamta_video_kandidat()). Returnerar None vid RSS-fel eller tomt flöde."""
     ns = {
         "atom": "http://www.w3.org/2005/Atom",
         "yt": "http://www.youtube.com/xml/schemas/2015",
@@ -88,20 +107,10 @@ def hamta_senaste_video() -> dict | None:
             return None
         video_id_el = entry.find("yt:videoId", ns)
         title_el = entry.find("atom:title", ns)
-        published_el = entry.find("atom:published", ns)
         if video_id_el is None or not video_id_el.text or title_el is None or not title_el.text:
             return None
         video_id = video_id_el.text.strip()
         titel = title_el.text.strip()
-        publicerad = published_el.text.strip() if published_el is not None and published_el.text else ""
-        if publicerad:
-            try:
-                pub_dt = datetime.strptime(publicerad[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                if pub_dt < datetime.now(timezone.utc) - timedelta(days=RECENCY_DAGAR):
-                    print(f"  Senaste video är äldre än {RECENCY_DAGAR} dagar — hoppar över.")
-                    return None
-            except Exception:
-                pass
         # Videons egen beskrivning (media:group/media:description) — samma fält
         # nyheter.py → hamta_youtube_nyheter() redan använder som scenkontext.
         # Utan den har LLM:en bara en kort titel att gå på (Codex-fynd, PR
@@ -125,17 +134,142 @@ def hamta_senaste_video() -> dict | None:
 
 
 def redan_recenserad(video_id: str) -> bool:
-    """Dedup: kollar om videon redan har en publicerad recension. Fail-open
-    (hellre en sällsynt dubblett vid ett DB-fel än att aldrig publicera)."""
+    """Dedup: kollar om videon redan har en publicerad recension. Fail-SÄKERT
+    mot dubbletter (ägarprioritet, sep 2026: "det viktigaste är att det inte
+    blir några dubbletter på hemsidan") — ett misslyckat DB-anrop tolkas som
+    "kanske redan recenserad" och videon hoppas över, hellre än att anta att
+    den är oanvänd och riskera en publicerad dubblett. Kostar i värsta fall
+    en enstaka missad recension per körning, aldrig en dubblett."""
     try:
         res = httpx.get(
             f"{SB_URL}/rest/v1/artiklar?youtube_video_id=eq.{video_id}&select=id&limit=1",
             headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"},
             timeout=10,
         )
-        return res.status_code == 200 and len(res.json()) > 0
+        if res.status_code != 200:
+            return True
+        return len(res.json()) > 0
     except Exception:
-        return False
+        return True
+
+
+def uppladdningsplaylist_id() -> str:
+    """Härleder kanalens uppladdningsplaylist-ID direkt ur kanal-ID:t —
+    YouTubes egen dokumenterade konvention: en kanals huvuduppladdnings-
+    playlist har alltid samma ID som kanalen, bara med 'UC'-prefixet bytt
+    mot 'UU'. Sparar ett extra channels.list-API-anrop (och den kvoten)
+    jämfört med att slå upp den via API:et vid varje körning."""
+    if KANAL_ID.startswith("UC"):
+        return "UU" + KANAL_ID[2:]
+    return KANAL_ID  # bör aldrig hända för ett riktigt YouTube-kanal-ID
+
+
+def hamta_cursor() -> str | None:
+    """Hämtar den sparade next_page_token från förra körningen — var i
+    kanalens hela uppladdningskatalog Filmrecensenten senast befann sig.
+    None om ingen cursor finns (första körningen, eller precis efter att
+    en hel katalog-genomgång slutförts och startats om från början).
+    Fail-safe: en misslyckad läsning ger None, samma som "börja om"."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/filmrecensent_state?id=eq.current&select=next_page_token",
+            headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"},
+            timeout=10,
+        )
+        if res.status_code == 200 and res.json():
+            return res.json()[0].get("next_page_token") or None
+    except Exception:
+        pass
+    return None
+
+
+def spara_cursor(token: str | None) -> None:
+    """Sparar var i katalogen nästa körning ska fortsätta. token=None
+    betyder att hela katalogen just genomgåtts — nästa körning börjar om
+    från kanalens senaste video igen. Fail-safe: en misslyckad skrivning
+    (t.ex. saknad SUPABASE_SERVICE_ROLE_KEY, se SB_WRITE_KEY) gör bara att
+    nästa körning börjar om från början istället för att krascha."""
+    try:
+        httpx.post(
+            f"{SB_URL}/rest/v1/filmrecensent_state",
+            headers={
+                "apikey": SB_WRITE_KEY, "Authorization": f"Bearer {SB_WRITE_KEY}",
+                "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates",
+            },
+            json={"id": "current", "next_page_token": token, "uppdaterad": datetime.now(timezone.utc).isoformat()},
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"  ⚠ Kunde inte spara cursor: {type(e).__name__}: {e}")
+
+
+def hamta_video_kandidat() -> dict | None:
+    """Bläddrar genom HELA kanalens uppladdningskatalog (via YouTube Data
+    API v3 — kräver YOUTUBE_API_KEY) istället för att bara känna till den
+    allra senaste videon. En sparad cursor (filmrecensent_state) låter varje
+    körning fortsätta där den förra slutade, så katalogen (~9000+ videor)
+    gås igenom gradvis över tid — inte bara nya klipp någonsin recenseras.
+
+    Bläddrar framåt (max MAX_SIDOR_PER_KORNING sidor á 50 videor) tills en
+    video hittas som INTE redan recenserats (redan_recenserad(), som är
+    fail-säkert mot dubbletter — se dess docstring). Sparar var
+    bläddringen slutade så nästa körning kan fortsätta därifrån ELLER —
+    om hela katalogen just gåtts igenom (inget nextPageToken kvar) —
+    börjar om från kanalens senaste video igen (wrap-around).
+
+    Returnerar None vid API-fel, tom katalog, eller om ingen ny video
+    hittas inom sidtaket den här körningen (mycket osannolikt så länge
+    katalogen inte redan är nästan helt genomgången)."""
+    playlist_id = uppladdningsplaylist_id()
+    token = hamta_cursor()
+    try:
+        for _ in range(MAX_SIDOR_PER_KORNING):
+            params = {"part": "snippet", "playlistId": playlist_id, "maxResults": 50, "key": YOUTUBE_API_KEY}
+            if token:
+                params["pageToken"] = token
+            res = httpx.get(f"{YOUTUBE_DATA_API}/playlistItems", params=params, timeout=15)
+            if res.status_code != 200:
+                print(f"  ✗ YouTube Data API HTTP {res.status_code}: {res.text[:300]}")
+                return None
+            data = res.json()
+            items = data.get("items", [])
+            nasta_token = data.get("nextPageToken")
+            kandidat = None
+            for item in items:
+                snippet = item.get("snippet", {})
+                resource = snippet.get("resourceId", {})
+                video_id = resource.get("videoId")
+                titel = (snippet.get("title") or "").strip()
+                if not video_id or not titel or titel in ("Private video", "Deleted video"):
+                    continue
+                if redan_recenserad(video_id):
+                    continue
+                beskrivning = (snippet.get("description") or "").strip()[:1500]
+                kandidat = {
+                    "video_id": video_id,
+                    "titel": titel,
+                    "beskrivning": beskrivning,
+                    "url": f"https://www.youtube.com/watch?v={video_id}",
+                }
+                break
+            if kandidat:
+                # Sparar cursorn för nästa körning EFTER att kandidaten
+                # hittats (inte innan) — så en avbruten körning (t.ex. om
+                # LLM-anropet eller publiceringen misslyckas senare) inte
+                # tappar bort videor mellan den gamla och den nya cursorn.
+                spara_cursor(nasta_token)
+                return kandidat
+            if not nasta_token:
+                print("  Hela kanalens katalog genomgången — börjar om från början nästa körning.")
+                spara_cursor(None)
+                return None
+            token = nasta_token
+        print(f"  Hittade ingen ny video inom {MAX_SIDOR_PER_KORNING} sidor — sparar cursor och provar vidare nästa körning.")
+        spara_cursor(token)
+        return None
+    except Exception as e:
+        print(f"  ✗ YouTube Data API-fel: {type(e).__name__}: {e}")
+        return None
 
 
 def generera_recension(video_titel: str, video_beskrivning: str = "") -> dict | None:
@@ -271,16 +405,23 @@ def main():
         print("SUPABASE_ANON_KEY saknas — avbryter.")
         sys.exit(1)
 
-    video = hamta_senaste_video()
+    if YOUTUBE_API_KEY:
+        video = hamta_video_kandidat()
+        # hamta_video_kandidat() har redan dedup-filtrerat kandidaten mot
+        # redan_recenserad() innan den returneras — ingen andra kontroll
+        # behövs här.
+    else:
+        print("  YOUTUBE_API_KEY saknas — faller tillbaka på RSS (bara kanalens allra senaste video).")
+        video = hamta_senaste_video()
+        if video and redan_recenserad(video["video_id"]):
+            print("Redan recenserad — avslutar.")
+            return
+
     if not video:
         print("Ingen ny video att recensera — avslutar.")
         return
 
-    print(f"Senaste video: \"{video['titel']}\" ({video['url']})")
-
-    if redan_recenserad(video["video_id"]):
-        print("Redan recenserad — avslutar.")
-        return
+    print(f"Vald video: \"{video['titel']}\" ({video['url']})")
 
     print("Genererar recension…")
     resultat = generera_recension(video["titel"], video.get("beskrivning", ""))
