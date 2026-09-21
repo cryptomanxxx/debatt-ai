@@ -1462,8 +1462,9 @@ export default function DebattClient({ initialArticleCount = null }) {
             {/* Hero – senaste nyheter */}
             {senasteNyhet.length > 0 && (
               <div style={{ marginBottom:"24px" }}>
-                <div style={{ display:"flex", alignItems:"center", marginBottom:"12px" }}>
+                <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:"12px" }}>
                   <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE NYHETERNA</span>
+                  <a href="/nyheter" style={{ fontSize:"11px", color:"#38bdf8", textDecoration:"none", fontFamily:"monospace", letterSpacing:"0.06em" }}>Se alla →</a>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                   {senasteNyhet.map(nyhet => (
@@ -1508,8 +1509,9 @@ export default function DebattClient({ initialArticleCount = null }) {
             {/* Hero – senaste debatter */}
             {heroArtikel.length > 0 && (
               <div style={{ marginBottom:"48px" }}>
-                <div style={{ display:"flex", alignItems:"center", marginBottom:"12px" }}>
+                <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:"12px" }}>
                   <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔥 SENASTE DEBATTERNA</span>
+                  <a href="/arkiv?debatt=1" style={{ fontSize:"11px", color:"#4ade80", textDecoration:"none", fontFamily:"monospace", letterSpacing:"0.06em" }}>Se alla →</a>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                   {heroArtikel.map(artikel => (

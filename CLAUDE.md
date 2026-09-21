@@ -3716,6 +3716,19 @@ Kräver `supabase_artiklar_filmrecension.sql` — kör i Supabase SQL Editor.
 | `app/arkiv/ArkivClient.js` | Ny `filterFilm`-state, läser `?film=1` från URL:en. Ny "🎬 Filmrecensioner"-togglepill bredvid taggfiltret. `filtered`-logiken och tomt-resultat-hanteringen (`Rensa filter`) utökade med filmfiltret |
 | `app/client.js` | Ny "Se alla →"-länk (till `/arkiv?film=1`) i "🎬 SENASTE FILMRECENSIONERNA"-widgetens rubrikrad |
 
+**Samma sak för SENASTE NYHETERNA och SENASTE DEBATTERNA-widgetarna (ägarbegäran, sep 2026):** *"Samma sak för SENASTE NYHETERNA widgeten och SENASTE DEBATTERNA widgeten."*
+
+**SENASTE NYHETERNA:** hade redan en exakt matchande dedikerad sida — `/nyheter` (✅18) använder ordagrant samma filter som widgetens egen `fetchSenasteNyhet()` (`nyhetskalla=not.is.null&rubrik=not.like.Replik%3A*`). Ingen ny sida eller nytt filter behövdes — bara en "Se alla →"-länk (blå `#38bdf8`, matchar widgetens och `/nyheter`s färgtema) i widgetens rubrikrad, pekar direkt på `/nyheter`.
+
+**SENASTE DEBATTERNA:** saknade en motsvarande dedikerad sida — widgeten visar en blandning av eget-ämne-artiklar och repliker (`fetchLatestArtikel()`s filter, se ✅105/✅123: `or=(nyhetskalla.is.null,parent_id.not.is.null)` + `filmrecension=eq.false`), och ingen sida visade exakt den delmängden. Samma mönster som filmrecensionsfiltret ovan: en fjärde filterdimension, `filterDebatt` (boolean) i `ArkivClient.js`, som en togglebar "💬 Debattartiklar"-pill (grön `#4ade80`) — `matchDebatt` speglar EXAKT `fetchLatestArtikel()`s logik (`filmrecension !== true && (!nyhetskalla || parent_id != null)`), så samma artiklar som skulle synts på widgeten (om den inte var begränsad till 4) visas i arkivet. Stödjer `?debatt=1` som URL-parameter — widgetens nya "Se alla →"-länk (grön, matchar widgetens rubrikfärg för debattartiklar) pekar på `/arkiv?debatt=1`.
+
+**Verifiering:** `node --check` på båda ändrade filerna — syntaktiskt korrekt.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/client.js` | Ny "Se alla →"-länk (till `/nyheter`) i "🔥 SENASTE NYHETERNA"-widgetens rubrikrad. Ny "Se alla →"-länk (till `/arkiv?debatt=1`) i "🔥 SENASTE DEBATTERNA"-widgetens rubrikrad |
+| `app/arkiv/ArkivClient.js` | Ny `filterDebatt`-state, läser `?debatt=1` från URL:en. Ny "💬 Debattartiklar"-togglepill, `matchDebatt` speglar exakt `fetchLatestArtikel()`s eget-ämne/replik-filter. `filtered`-logiken och tomt-resultat-hanteringen utökade |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
