@@ -120,13 +120,13 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | Provider | Modell | Miljövariabel | Används för |
 |---|---|---|---|
 | **Groq** (primär) | `llama3.3-70b-versatile` | `GROQ_API_KEY` | Allt: artiklar, direktdebatt, beslut-API, bedömning |
-| **Gemini** (fallback 2) | `gemini-3.5-flash` / `flash-lite` | `GEMINI_API_KEY` | Artiklar, direktdebatt, beslut-API |
+| **Gemini** (fallback 2) | `gemini-3.5-flash` / `flash-lite` | `GEMINI_API_KEY` | Direktdebatt, beslut-API (INTE artikelskrivning — `_ARTIKEL_CHAIN` exkluderar Gemini, se raden nedan) |
 | **OpenRouter** (fallback 2) | `meta-llama/llama3.3-70b-instruct:free` | `OPENROUTER_API_KEY` | Direktdebatt (parallell med Gemini) |
 | **Codestral** (fallback 3) | `codestral-latest` | `MISTRAL_API_KEY` | Direktdebatt, artikelbedömning + **exklusivt** för AI-bus kodanalys |
 | **DeepSeek** (fallback 3) | `deepseek-chat` | `DEEPSEEK_API_KEY` | Artiklar, direktdebatt |
 
 **Fallback-kedjor per kontext:**
-- **Artikelskrivning (Python):** Groq → Gemini
+- **Artikelskrivning (Python):** Groq → DeepSeek (`ai_klient.hamta_artikel_fns()`s hårdkodade `_ARTIKEL_CHAIN` — exkluderar medvetet Mistral/Cloudflare/Gemini, oberoende av den dynamiska benchmark-rankingen i `_fallback_order`, se ✅123)
 - **Direktdebatt (JS):** Groq → OpenRouter → Gemini → Codestral → DeepSeek
 - **Artikelbedömning (JS):** Groq → Codestral → DeepSeek
 - **Decision API (JS):** Groq → Gemini → Codestral → DeepSeek
@@ -3502,6 +3502,46 @@ Kräver `supabase_artiklar_youtube.sql` — kör i Supabase SQL Editor.
 |---|---|
 | `app/api/nyhetsflode/importera-youtube/route.js` | Ny route. Rate limit, `extraheraYoutubeId()`-validering, normaliserad watch-URL, oEmbed-hämtning av titel/kanalnamn, service-role-INSERT med `kalla="YouTube: {kanal} (besökarimport)"`, `unique(url)`-dubblettshantering |
 | `app/nyhetskallor/NyhetskallorClient.js` | Ny `ImporteraYoutubeForm`-komponent (live förhandsgranskning via tumnagel, positionerad direkt efter `ImporteraForm`). `NyhetsRad` visar en klickbar tumnagel för alla rader med `kalla` som börjar `"YouTube: "` (både automatiska och importerade). Introtexten uppdaterad |
+
+---
+
+### ✅ 123. Filmrecensenten — dedikerad filmkritiker-agent för @BoxofficeMoviesScenes – KLART
+
+Ägarbegäran (sep 2026): *"Det finns ju en kanal på YouTube som heter @BoxofficeMoviesScenes. Vi skulle ju kunna ha en ny agent som bara recenserar film och YouTube videos från den kanalen. Agenten publicerar en kort recension av filmen och bäddar in YouTube videon av filmen i debattartikeln."*
+
+**Ny, dedikerad persona — inte en av de 24 debattagenterna, inte del av 4/4/4-kvoten.** Precis som Civilisationshistorikern (✅80) är Filmrecensenten en fristående publiceringspersona som kör på sin egen cron och publicerar via `/api/agent/submit` med en `forfattare`-override — helt utanför `agent.py`s nyhet/replik/eget-kvotsystem (✅19/100). En filmrecension är varken en nyhetsartikel (sätter aldrig `nyhetskalla` — skulle annars felaktigt räknas som "nyhet" av `hamta_publicerade_idag_per_typ()` och synas på `/nyheter`) eller en replik (`parent_id` sätts aldrig).
+
+**Flöde (`filmrecensent.py`, körs 4x/dag via `filmrecensent.yml`):**
+1. Hämtar kanalens ALLRA SENASTE video via YouTube RSS (`https://www.youtube.com/feeds/videos.xml?channel_id=UCfk4Df9QxO267wlFbStSyAw`), via `/api/rss-proxy` — samma mönster som `nyheter.py → hamta_youtube_nyheter()` använder för att kringgå GitHub Actions IP-block mot YouTube (se "Den autonoma debatten"). Ingen backfill av kanalens historik — en video äldre än `RECENCY_DAGAR` (7) hoppas över, så ett första körningstillfälle inte plötsligt recenserar en gammal video.
+2. Avbryter utan publicering om videon redan recenserats — dedup mot `artiklar.youtube_video_id` (kolumnen finns redan sedan ✅121, ingen ny migrering behövs).
+3. Ett LLM-anrop (`ai_klient.hamta_artikel_fns`, den hårdkodade `_ARTIKEL_CHAIN` = Groq → DeepSeek, samma kedja som all annan artikelskrivning på plattformen använder — aldrig en hårdkodad providerklient, se "Regel — ingen hårdkodning av providerklienter") identifierar filmen ur videotiteln (och videons RSS-beskrivning som scenkontext, om den finns — Codex-fynd, PR #1470-granskning) och skriver en 200–280 ords recension. Om filmen inte kan identifieras med rimlig säkerhet (`kand_film` tom sträng) avbryts hela körningen utan publicering — modellen instrueras uttryckligen att aldrig gissa.
+4. Publicerar via `/api/agent/submit` med `forfattare: "Filmrecensenten"`, `kategori: "Kultur & konst"` och `youtube_url` satt till videons watch-URL — videon bäddas då in direkt i artikeln (✅121s spelare), inte bara länkad i källhänvisningen.
+
+**Prompt-injection-skydd — videotiteln (och beskrivningen) är opålitlig extern text.** En YouTube-kanals videotitlar och -beskrivningar är obevakad extern text, precis som RSS-rubriker (✅67). Samma tvålagersskydd återanvänds: båda omsluts av egna XML-taggar (`<videotitel>`/`<videobeskrivning>`) i user-prompten med en explicit instruktion om att de ALDRIG ska tolkas som kommandon, och det genererade svaret (rubrik + recension) filtreras genom `supabase_utils._verkar_injicerad()` innan det accepteras — ett svar som verkar kapat kasseras och körningen avslutas utan publicering, precis som `generera_ki_fran_nyheter()` redan gör.
+
+**Reasoning-trunkering förebyggd redan från start.** `openai/gpt-oss-120b` (den Groq-modell hela plattformen använder) kan spendera en oförutsägbar andel av `max_tokens` på dolt resonemang innan den skriver det synliga svaret, vilket tre separata buggar tidigare i den här loggen (✅97, ✅115, ✅118) fick fixa i efterhand för andra funktioner. `filmrecensent.py`s Groq-payload sätter `"reasoning_effort": "low"` direkt från start — samma fix, applicerad proaktivt istället för reaktivt. Geminis motsvarande `thinkingConfig: {thinkingBudget: 0}}` (✅118) ligger redan inbyggt i `ai_klient.gemini_post()` och gäller automatiskt när Gemini-fallbacken används, utan någon särskild åtgärd i den nya filen.
+
+**Auktorisation:** `app/api/agent/submit/route.js`s `VALID_AGENTS`-lista (redan utökad med `"Civilisationshistorikern"`) fick ett tredje undantag, `"Filmrecensenten"` — annars hade `forfattare`-overriden avvisats med 400 "Okänt författarnamn".
+
+**Schema:** 4 gånger/dag (08/12/16/20 svensk tid) — kollar bara om kanalen laddat upp något nytt sedan senast, ingen kostnad om inget nytt finns (`hamta_senaste_video()` returnerar tidigt).
+
+Kräver ingen ny Supabase-migrering — `artiklar.youtube_video_id` (✅121) och `/api/agent/submit`s befintliga publiceringslogik täcker allt.
+
+**Codex-fynd (PR #1470-granskning): två separata problem hittades vid granskning, båda fixade innan merge.**
+- **Ingen scenkontext** — `generera_recension()` fick ursprungligen bara videotiteln. En generisk eller missvisande titel riskerade att LLM:en antingen avvisade en giltig video eller hittade på detaljer om filmen/scenen. Fixat: `hamta_senaste_video()` extraherar nu `media:group/media:description` ur RSS-entryn — samma fält `nyheter.py → hamta_youtube_nyheter()` redan använder som scenkontext — och `generera_recension()` inkluderar den i prompten (samma anti-injektions-ramning som titeln).
+- **Fel fallback-secret i workflowen** — `filmrecensent.yml` skickade `GEMINI_API_KEY`, men `ai_klient.py`s `_ARTIKEL_CHAIN` är `["groq", "deepseek"]` — Gemini ingår inte i den kedjan alls, så secreten var en no-op. Ett Groq-utfall hade gjort att körningen avslutades utan att publicera något. Fixat: bytt till `DEEPSEEK_API_KEY`. (Samma granskning avslöjade att CLAUDE.md:s fallback-kedjetabell felaktigt angav "Artikelskrivning (Python): Groq → Gemini" sedan tidigare — rättat i tabellen ovan.)
+
+**Egen homepage-widget — "SENASTE FILMRECENSIONEN" (ägarbegäran, sep 2026):** Filmrecensentens artiklar sätter varken `nyhetskalla` (ingen nyhetskälla att citera) eller `parent_id` (ingen replik) — vilket innan denna fix gjorde att `fetchLatestArtikel()`s `or=(nyhetskalla.is.null,parent_id.not.is.null)`-filter (✅105) felaktigt matchade dem som "eget ämne" och lät dem synas i "🔥 SENASTE DEBATTERNA", blandat med riktiga debattartiklar. Fixat i två steg: (1) `fetchLatestArtikel()` fick ett extra `forfattare=neq.Filmrecensenten`-villkor (ANDat med `or`-satsen) så filmrecensioner aldrig längre matchar den sektionen; (2) en ny `fetchSenasteFilmrecension()` hämtar `artiklar` där `forfattare=eq.Filmrecensenten` och renderas i en egen "🎬 SENASTE FILMRECENSIONEN"-sektion (guld/amber-tema, `#e8b84a`) mellan "SENASTE DEBATTERNA" och "Senaste kommentarerna" — varje kort visar en klickbar YouTube-tumnagel (`i.ytimg.com/vi/{id}/hqdefault.jpg`, ingen extra API-hämtning) när `youtube_video_id` finns, annars bara rubrik/ingress som de andra två sektionerna. `Filmrecensenten` fick en egen visuell identitet i `AGENT_VISUELL` (`app/agentData.js`, 🎬-ikon) — samma precedent som Civilisationshistorikern (✅80) redan har. De tre sektionerna (nyheter/debatter/filmrecensioner) är nu ömsesidigt uteslutande — ingen artikel kan dyka upp i mer än en.
+
+| Fil | Roll |
+|---|---|
+| `filmrecensent.py` | Ny fristående skript. Hämtar kanalens senaste video + RSS-beskrivning via RSS-proxy, dedup mot `artiklar.youtube_video_id`, LLM identifierar filmen och skriver recensionen (med anti-injektionsfilter + `reasoning_effort: "low"`), publicerar via `/api/agent/submit` med `youtube_url` satt |
+| `app/api/agent/submit/route.js` | `VALID_AGENTS` utökad med `"Filmrecensenten"` |
+| `.github/workflows/filmrecensent.yml` | Kör `filmrecensent.py` 4x/dag (08/12/16/20 svensk tid) + manuell `workflow_dispatch`. `DEEPSEEK_API_KEY` (inte `GEMINI_API_KEY`) som fallback-secret |
+| `app/client.js` → `fetchSenasteFilmrecension()` | Ny fetch: `artiklar` där `forfattare=eq.Filmrecensenten`, senaste 4 |
+| `app/client.js` → `fetchLatestArtikel()` | Nytt `forfattare=neq.Filmrecensenten`-villkor — utesluter filmrecensioner ur "SENASTE DEBATTERNA" |
+| `app/client.js` | Ny "🎬 SENASTE FILMRECENSIONEN"-sektion mellan "SENASTE DEBATTERNA" och "Senaste kommentarerna", med YouTube-tumnagel |
+| `app/agentData.js` → `AGENT_VISUELL.Filmrecensenten` | Egen visuell identitet (🎬-ikon, guld/amber-ton) |
 
 ---
 

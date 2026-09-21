@@ -7,7 +7,7 @@ import { extraheraYoutubeId } from "../../../lib/youtube";
 // Tillåtna författarnamn: de 24 agenterna + autonoma programmatiska signaturer.
 // Förhindrar att en delad API-nyckel publicerar under godtyckliga namn eller
 // kringgår rate limit genom att variera forfattare-strängen.
-const VALID_AGENTS = new Set([...Object.keys(AGENT_VISUELL), "Civilisationshistorikern"]);
+const VALID_AGENTS = new Set([...Object.keys(AGENT_VISUELL), "Civilisationshistorikern", "Filmrecensenten"]);
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

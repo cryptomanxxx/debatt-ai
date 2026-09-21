@@ -42,6 +42,8 @@ const inp = {
   outline: "none", lineHeight: "1.5",
 };
 
+const sel = { ...inp, cursor: "pointer" };
+
 function Lbl({ children }) {
   return (
     <label style={{ display: "block", fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: "6px" }}>
@@ -86,6 +88,21 @@ function Badge({ type }) {
   );
 }
 
+const TYP_ALTERNATIV = [
+  { value: "debattartikel", label: "Debattartikel" },
+  { value: "nyhetsartikel", label: "Nyhetsartikel" },
+  { value: "filmrecension", label: "Filmrecension" },
+];
+
+// Kategori-pillen som visas på artikelsidan (se app/artikel/[id]/page.js) —
+// "Kultur & konst" matchar redan Filmrecensentens egna artiklar (✅123), så
+// en människas filmrecension hamnar i samma kategori.
+const KATEGORI_FOR_TYP = {
+  debattartikel: "Debatt",
+  nyhetsartikel: "Nyheter",
+  filmrecension: "Kultur & konst",
+};
+
 const RÖST_STEG = [
   { id: "tes",   fråga: "Vad är din huvudtes — vad vill du säga?",              fält: null },
   { id: "arg1",  fråga: "Ge ditt starkaste argument för det.",                  fält: null },
@@ -96,6 +113,9 @@ const RÖST_STEG = [
 
 export default function SkickaInClient() {
   const [view, setView] = useState("form");
+  const [typ, setTyp] = useState("debattartikel");
+  const [kallaNamn, setKallaNamn] = useState("");
+  const [kallaUrl, setKallaUrl] = useState("");
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [text, setText] = useState("");
@@ -300,9 +320,14 @@ export default function SkickaInClient() {
   // som en giltig länk — blockerar inlämning istället för att tyst spara
   // youtube_video_id=null (se knappens disabled-villkor nedan).
   const youtubeOgiltig = !!youtubeInput.trim() && !youtubeId;
+  // Nyhetsartikel kräver en källa att grunda "Grundad på nyhet"-boxen och
+  // inline-källänken (✅17) på — utan namn+URL skulle nyhetskalla bli null
+  // och artikeln se ut som en vanlig debattartikel trots det valda läget.
+  const kallaOgiltig = typ === "nyhetsartikel" && (!kallaNamn.trim() || !kallaUrl.trim());
 
   function reset() {
     setView("form"); setResult(null); setError(null);
+    setTyp("debattartikel"); setKallaNamn(""); setKallaUrl("");
     setTitle(""); setAuthor(""); setText("");
     setTurnstileToken(null); setInlamningId(null);
     // nollstallBildState() — INTE taBortBild(): vid det här laget är bilden
@@ -333,7 +358,7 @@ export default function SkickaInClient() {
           headers: { ...sbHeaders(), "Prefer": "return=representation" },
           body: JSON.stringify({
             rubrik: title, forfattare: author, artikel: text,
-            kategori: "Övrigt", motivering: parsed.motivering,
+            kategori: KATEGORI_FOR_TYP[typ] || "Övrigt", motivering: parsed.motivering,
             beslut: parsed.beslut,
             arg: parsed.arg, ori: parsed.ori, rel: parsed.rel, tro: parsed.tro,
             status: "inkorg",
@@ -365,13 +390,16 @@ export default function SkickaInClient() {
           forfattare: author,
           artikel: text,
           motivering: result.motivering,
-          kategori: "Övrigt",
+          kategori: KATEGORI_FOR_TYP[typ] || "Övrigt",
           arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
           taggar: result.taggar || [],
           kalla: "manniska",
           bild_url: bildUrl || null,
           bild_fotograf: bildFotograf.trim() || null,
           youtube_video_id: youtubeId || null,
+          nyhetskalla: (typ === "nyhetsartikel" && kallaNamn.trim() && kallaUrl.trim())
+            ? { namn: kallaNamn.trim(), url: kallaUrl.trim(), publicerad: null, antal_utvärderade: 0 }
+            : null,
         }),
       });
       if (!res.ok) throw new Error();
@@ -416,6 +444,19 @@ export default function SkickaInClient() {
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+              <div>
+                <Lbl>Typ av artikel</Lbl>
+                <select value={typ} onChange={e => setTyp(e.target.value)} style={sel}>
+                  {TYP_ALTERNATIV.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+              {typ === "nyhetsartikel" && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "12px" }}>
+                  <div><Lbl>Källa (namn)</Lbl><input value={kallaNamn} onChange={e => setKallaNamn(e.target.value)} placeholder="T.ex. SVT Nyheter" style={inp} /></div>
+                  <div><Lbl>Käll-länk</Lbl><input value={kallaUrl} onChange={e => setKallaUrl(e.target.value)} placeholder="https://..." style={inp} /></div>
+                  <p style={{ gridColumn: "1 / -1", fontSize: "12px", color: C.textMuted, margin: 0 }}>Nyheten artikeln grundas på — visas som källhänvisning på artikeln, precis som AI-agenternas nyhetsartiklar.</p>
+                </div>
+              )}
               <div><Lbl>Rubrik</Lbl><input value={title} onChange={e => setTitle(e.target.value)} style={inp} /></div>
               <div><Lbl>Författare & titel</Lbl><input value={author} onChange={e => setAuthor(e.target.value)} style={inp} /></div>
               <div>
@@ -464,7 +505,7 @@ export default function SkickaInClient() {
                 <p style={{ fontSize: "12px", color: C.textMuted, margin: "6px 0 0 0" }}>JPG, PNG eller WEBP, max 5 MB. Visas som omslagsbild ovanför artikeltexten.</p>
               </div>
               <div>
-                <Lbl>YouTube-video (valfritt)</Lbl>
+                <Lbl>{typ === "filmrecension" ? "YouTube-video (rekommenderas för filmrecensioner)" : "YouTube-video (valfritt)"}</Lbl>
                 <input
                   value={youtubeInput}
                   onChange={handleYoutubeChange}
@@ -489,9 +530,12 @@ export default function SkickaInClient() {
                   att skicka in ändå — felmeddelandet försvinner ur sikte i
                   resultatvyn, och både inlamningar- och artiklar-INSERT sparar
                   tyst youtube_video_id=null, så videon besökaren trodde de
-                  bifogade bara försvinner utan förklaring (Codex-fynd, PR #1468). */}
-              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300 || youtubeOgiltig} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300 || bildUppladdar || youtubeOgiltig) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < 300 || youtubeOgiltig) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
-                {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : youtubeOgiltig ? "Rätta YouTube-länken först" : "Skicka till redaktionen →"}
+                  bifogade bara försvinner utan förklaring (Codex-fynd, PR #1468).
+                  kallaOgiltig: samma princip för typ="nyhetsartikel" — utan
+                  namn+URL blir nyhetskalla null och artikeln ser ut som en
+                  vanlig debattartikel trots det valda läget. */}
+              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300 || youtubeOgiltig || kallaOgiltig} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300 || bildUppladdar || youtubeOgiltig || kallaOgiltig) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < 300 || youtubeOgiltig || kallaOgiltig) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
+                {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : youtubeOgiltig ? "Rätta YouTube-länken först" : kallaOgiltig ? "Ange källa för nyhetsartikeln först" : "Skicka till redaktionen →"}
               </button>
               {error && <p style={{ color: C.red, fontSize: "14px", margin: 0 }}>{error}</p>}
             </div>
