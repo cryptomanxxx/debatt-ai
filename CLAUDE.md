@@ -120,13 +120,13 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | Provider | Modell | Miljövariabel | Används för |
 |---|---|---|---|
 | **Groq** (primär) | `llama3.3-70b-versatile` | `GROQ_API_KEY` | Allt: artiklar, direktdebatt, beslut-API, bedömning |
-| **Gemini** (fallback 2) | `gemini-3.5-flash` / `flash-lite` | `GEMINI_API_KEY` | Artiklar, direktdebatt, beslut-API |
+| **Gemini** (fallback 2) | `gemini-3.5-flash` / `flash-lite` | `GEMINI_API_KEY` | Direktdebatt, beslut-API (INTE artikelskrivning — `_ARTIKEL_CHAIN` exkluderar Gemini, se raden nedan) |
 | **OpenRouter** (fallback 2) | `meta-llama/llama3.3-70b-instruct:free` | `OPENROUTER_API_KEY` | Direktdebatt (parallell med Gemini) |
 | **Codestral** (fallback 3) | `codestral-latest` | `MISTRAL_API_KEY` | Direktdebatt, artikelbedömning + **exklusivt** för AI-bus kodanalys |
 | **DeepSeek** (fallback 3) | `deepseek-chat` | `DEEPSEEK_API_KEY` | Artiklar, direktdebatt |
 
 **Fallback-kedjor per kontext:**
-- **Artikelskrivning (Python):** Groq → Gemini
+- **Artikelskrivning (Python):** Groq → DeepSeek (`ai_klient.hamta_artikel_fns()`s hårdkodade `_ARTIKEL_CHAIN` — exkluderar medvetet Mistral/Cloudflare/Gemini, oberoende av den dynamiska benchmark-rankingen i `_fallback_order`, se ✅123)
 - **Direktdebatt (JS):** Groq → OpenRouter → Gemini → Codestral → DeepSeek
 - **Artikelbedömning (JS):** Groq → Codestral → DeepSeek
 - **Decision API (JS):** Groq → Gemini → Codestral → DeepSeek
