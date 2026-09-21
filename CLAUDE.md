@@ -3691,6 +3691,20 @@ Kräver `supabase_artiklar_filmrecension.sql` — kör i Supabase SQL Editor.
 |---|---|
 | `filmrecensent.py` → `generera_recension()` | Ny separat regel: rubriken får bara innehålla genuina, korrekta svenska ord — nämner explicit "funeral wake → sorgevaka/minnesstund, aldrig begravningsvakt" som exempel på ett EN→SV falskt vän-fel |
 
+**Filmrecensioners rubrikfärg inkonsekvent — orange bara i startsidans widget, grön (som vanliga debattartiklar) på arkivet och artikelsidan (användarrapport, sep 2026, med två skärmdumpar):** *"I arkivet syns film recensioner så här (i grönt som debattartiklar) men på hemsidans framsida i orange. Det är bättre att film recensionen alltid är orange."*
+
+**Rotorsak:** plattformens etablerade färgkonvention för artikelrubriker är blå (`#38bdf8`) för nyhetsartiklar, grön (`#4ade80`) för debattartiklar/repliker och guld/orange (`#e8b84a`) för filmrecensioner — men den tredje grenen fanns bara implementerad i startsidans dedikerade "🎬 SENASTE FILMRECENSIONERNA"-widget (`app/client.js`). Övriga ställen som redan renderade samma `nyhetskalla`-baserade tvåvägs-ternary (`a.nyhetskalla ? blå : grön`) fick aldrig en tredje gren för `filmrecension` när fältet infördes (se ovan i denna sektion) — de fortsatte att falla igenom till "grön" för varje filmrecension, eftersom `filmrecension` aldrig kontrollerades. Drabbade: `/arkiv` (`ArkivClient.js`), **artikelsidans egen `<h1>`-rubrik** (`app/artikel/[id]/page.js` — den mest synliga platsen av alla, exakt den sida användaren skärmdumpat rubriker från tidigare i denna logg) och startsidans "VECKANS MEST LÄSTA"-widget i `app/client.js`, som dessutom hade en separat databug: dess `fetchTrending()`-query saknade `filmrecension` i sin explicita `select=`-lista (PostgREST returnerar bara kolumner som uttryckligen efterfrågas i en icke-`select=*`-fråga), så fältet var `undefined` client-side även om artikeln hade `filmrecension=true` i databasen — ternaryn hade fortsatt gett fel färg där även efter en render-fix utan denna kompletterande data-fix.
+
+**Fix:** samma tredje gren (`a.filmrecension ? guld : (nyhetskalla ? blå : grön)`) tillagd på alla tre ställen: `ArkivClient.js` (ny `C.filmrecension = "#e8b84a"`-konstant + uppdaterad `<h2>`-ternary — `app/arkiv/page.js`s hämtning använder redan `select=*`, ingen datafix behövdes där), `app/artikel/[id]/page.js` (ny `C.filmrecension`-konstant + uppdaterad `<h1>`-ternary — hämtningen använder redan `select=*`), och `app/client.js`s trending-widget (`filmrecension` tillagd i `fetchTrending()`s `select=`-lista + uppdaterad render-ternary, samma inline-hex `#e8b84a` som redan används i filmrecensionswidgeten, ingen ny `C`-nyckel eftersom filens `C`-objekt inte har någon för de andra två färgerna heller på just detta ställe).
+
+**Verifiering:** `node --check` kört mot alla tre ändrade filer — syntaktiskt korrekt. Ingen live-sajt-åtkomst i den här miljön (se tidigare noteringar i denna logg om sandboxens nätverksbegränsningar), så den visuella effekten kunde inte skärmdumpas, men logiken speglar exakt det redan etablerade, fungerande mönstret i startsidans filmrecensionswidget.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/arkiv/ArkivClient.js` | Ny `C.filmrecension = "#e8b84a"`. Artikelkortens `<h2>`-rubrikfärg kollar nu `a.filmrecension` först, innan `nyhetskalla`-ternaryn |
+| `app/artikel/[id]/page.js` | Ny `C.filmrecension = "#e8b84a"`. Artikelns egen `<h1>`-rubrikfärg kollar nu `artikel.filmrecension` först, innan `nyhetskalla`-ternaryn |
+| `app/client.js` | `fetchTrending()`s `select=`-lista utökad med `filmrecension` (saknades helt — fältet var annars `undefined` client-side). "VECKANS MEST LÄSTA"-widgetens rubrikfärg kollar nu `a.filmrecension` först |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
