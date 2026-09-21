@@ -203,6 +203,41 @@ def spara_cursor(token: str | None) -> None:
         print(f"  ⚠ Kunde inte spara cursor: {type(e).__name__}: {e}")
 
 
+SVERIGE = "SE"
+
+
+def _hamta_videodetaljer(video_ids: list[str]) -> dict:
+    """Hämtar embeddable-status och landsrestriktioner för upp till 50
+    video-ID:n i ETT anrop (kostar 1 extra kvotenhet per sida) — undviker
+    att välja en video som visar "Videon är inte tillgänglig" i artikelns
+    inbäddade spelare (användarrapport, sep 2026, artikel/1812: en giltig
+    recension publicerades men klippet visade sig vara geoblockerat i
+    Sverige — licensierat filmstudiomaterial har ofta landsrestriktioner
+    som varierar per klipp). Returnerar {} vid API-fel — fail-open, hellre
+    en sällsynt geoblockerad video än att aldrig hitta en kandidat."""
+    if not video_ids:
+        return {}
+    try:
+        params = {"part": "status,contentDetails", "id": ",".join(video_ids), "key": YOUTUBE_API_KEY}
+        res = httpx.get(f"{YOUTUBE_DATA_API}/videos", params=params, timeout=15)
+        if res.status_code != 200:
+            return {}
+        detaljer = {}
+        for item in res.json().get("items", []):
+            vid = item.get("id")
+            if not vid:
+                continue
+            embeddable = item.get("status", {}).get("embeddable", True)
+            region = item.get("contentDetails", {}).get("regionRestriction", {}) or {}
+            blockerad = SVERIGE in (region.get("blocked") or []) or (
+                "allowed" in region and SVERIGE not in (region.get("allowed") or [])
+            )
+            detaljer[vid] = {"embeddable": embeddable, "blockerad_i_sverige": blockerad}
+        return detaljer
+    except Exception:
+        return {}
+
+
 def hamta_video_kandidat() -> dict | None:
     """Bläddrar genom HELA kanalens uppladdningskatalog (via YouTube Data
     API v3 — kräver YOUTUBE_API_KEY) istället för att bara känna till den
@@ -212,7 +247,9 @@ def hamta_video_kandidat() -> dict | None:
 
     Bläddrar framåt (max MAX_SIDOR_PER_KORNING sidor á 50 videor) tills en
     video hittas som INTE redan recenserats (redan_recenserad(), som är
-    fail-säkert mot dubbletter — se dess docstring). Sparar var
+    fail-säkert mot dubbletter — se dess docstring) OCH som faktiskt går
+    att bädda in (se _hamta_videodetaljer() — hoppar över videor med
+    inbäddning avstängd eller geoblockerade i Sverige). Sparar var
     bläddringen slutade så nästa körning kan fortsätta därifrån ELLER —
     om hela katalogen just gåtts igenom (inget nextPageToken kvar) —
     börjar om från kanalens senaste video igen (wrap-around).
@@ -234,6 +271,12 @@ def hamta_video_kandidat() -> dict | None:
             data = res.json()
             items = data.get("items", [])
             nasta_token = data.get("nextPageToken")
+            video_ids_pa_sidan = [
+                it.get("snippet", {}).get("resourceId", {}).get("videoId")
+                for it in items
+                if it.get("snippet", {}).get("resourceId", {}).get("videoId")
+            ]
+            videodetaljer = _hamta_videodetaljer(video_ids_pa_sidan)
             kandidat = None
             for item in items:
                 snippet = item.get("snippet", {})
@@ -243,6 +286,15 @@ def hamta_video_kandidat() -> dict | None:
                 if not video_id or not titel or titel in ("Private video", "Deleted video"):
                     continue
                 if redan_recenserad(video_id):
+                    continue
+                # Hoppa över videor med inbäddning avstängd eller som är
+                # geoblockerade i Sverige — annars publiceras en giltig
+                # recension med en trasig "Videon är inte tillgänglig"-
+                # spelare (se _hamta_videodetaljer()). Okänd video (saknas
+                # i videodetaljer, t.ex. om detaljanropet misslyckades)
+                # behandlas fail-open som embeddable/oblockerad.
+                detalj = videodetaljer.get(video_id, {})
+                if not detalj.get("embeddable", True) or detalj.get("blockerad_i_sverige", False):
                     continue
                 beskrivning = (snippet.get("description") or "").strip()[:1500]
                 kandidat = {
