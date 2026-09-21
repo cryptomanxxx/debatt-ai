@@ -3,6 +3,14 @@ import { useState, useEffect, useRef } from "react";
 import { extraheraYoutubeId } from "../lib/youtube";
 
 const MIN_SCORE = 6;
+// Minsta ordantal för att "Skicka till redaktionen"-knappen ska aktiveras.
+// Filmrecensioner är medvetet ett kort format — Filmrecensenten (AI-agenten,
+// ✅123) skriver själv 200–280 ords recensioner via samma AI-redaktör som
+// bedömer människors inlämningar här — så samma 300-ordskrav som gäller för
+// en fullängds debatt-/nyhetsartikel blockerade omöjligen en människas
+// filmrecension i den etablerade längden (användarrapport, sep 2026: knappen
+// var "blockerad" vid manuell inlämning av en filmrecension).
+const MIN_ORD = { debattartikel: 300, nyhetsartikel: 300, filmrecension: 150 };
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -315,6 +323,7 @@ export default function SkickaInClient() {
   }
 
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  const minOrd = MIN_ORD[typ] ?? 300;
   const ok = result && ["arg", "ori", "rel", "tro"].every(k => result[k] >= MIN_SCORE);
   // Besökaren har skrivit något i YouTube-fältet, men det gick inte att tolka
   // som en giltig länk — blockerar inlämning istället för att tyst spara
@@ -463,8 +472,8 @@ export default function SkickaInClient() {
                 <Lbl>Artikeltext</Lbl>
                 <textarea value={text} onChange={e => setText(e.target.value)} rows={16} style={{ ...inp, resize: "vertical", lineHeight: 1.8 }} />
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginTop: "6px" }}>
-                  <p style={{ fontSize: "12px", color: wordCount < 300 ? C.red : C.green, margin: 0, fontFamily: "monospace" }}>
-                    {wordCount} ord {wordCount < 300 ? "– minst 300 ord krävs" : "✓"}
+                  <p style={{ fontSize: "12px", color: wordCount < minOrd ? C.red : C.green, margin: 0, fontFamily: "monospace" }}>
+                    {wordCount} ord {wordCount < minOrd ? `– minst ${minOrd} ord krävs` : "✓"}
                   </p>
                   {röstStöds && (
                     <button
@@ -534,7 +543,7 @@ export default function SkickaInClient() {
                   kallaOgiltig: samma princip för typ="nyhetsartikel" — utan
                   namn+URL blir nyhetskalla null och artikeln ser ut som en
                   vanlig debattartikel trots det valda läget. */}
-              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < 300 || youtubeOgiltig || kallaOgiltig} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < 300 || bildUppladdar || youtubeOgiltig || kallaOgiltig) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < 300 || youtubeOgiltig || kallaOgiltig) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
+              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < minOrd || youtubeOgiltig || kallaOgiltig} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < minOrd || bildUppladdar || youtubeOgiltig || kallaOgiltig) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < minOrd || youtubeOgiltig || kallaOgiltig) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
                 {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : youtubeOgiltig ? "Rätta YouTube-länken först" : kallaOgiltig ? "Ange källa för nyhetsartikeln först" : "Skicka till redaktionen →"}
               </button>
               {error && <p style={{ color: C.red, fontSize: "14px", margin: 0 }}>{error}</p>}

@@ -3608,6 +3608,12 @@ Fixat med en ny delad hjälpfunktion, `taBortAnkartaggar()` (`app/lib/htmlText.j
 | `filmrecensent.py` | `hamta_cursor()`/`spara_cursor()` ersatta av `hamta_state()`/`_upsert_state()` (statuskontrollerad). Nytt pending-tillstånd (`pending_video_id`/`pending_next_token`/`pending_forsok`, `MAX_PENDING_FORSOK=3`) med `_finalisera_pending()` inkopplad i `main()`. Ny `_hamta_video_metadata()` för att hämta en pending-kandidats metadata på nytt vid retry. `_forcera_stycken()` skyddar nu `_FORKORTNINGAR` innan meningsdelning |
 | `supabase_filmrecensent_state_v2.sql` | Migrering: `pending_video_id text`, `pending_next_token text`, `pending_forsok integer not null default 0` på `filmrecensent_state` |
 
+**Manuell filmrecensionsinlämning blockerad av ett generiskt 300-ordskrav (användarrapport, sep 2026):** `/skicka-in`s "Skicka till redaktionen"-knapp hade `disabled={... || wordCount < 300 || ...}` — ett hårdkodat ordminimum satt för fullängds debatt-/nyhetsartiklar, men gällde blint för ALLA artikeltyper inklusive den nya "Filmrecension"-väljaren (`1bd5908`). Filmrecensenten (AI-agenten) skriver själv 200–280 ords recensioner via samma AI-redaktör som bedömer människors inlämningar (se ✅123 ovan) — en människa som skrev en filmrecension i den etablerade längden fick alltså aldrig en aktiv knapp, oavsett hur bra recensionen var. Fixat genom att göra minimikravet typberoende: `MIN_ORD = { debattartikel: 300, nyhetsartikel: 300, filmrecension: 150 }` — 150 ger komfortabel marginal under det etablerade 200–280-ordsintervallet utan att öppna för alltför korta recensioner. Ingen serverkontroll berörs — ordkravet var (och är fortsatt) uteslutande en klientsidesspärr, `/api/analyze` har aldrig haft något eget ordkrav.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/skicka-in/SkickaInClient.js` | Nytt `MIN_ORD`-objekt per artikeltyp. `minOrd = MIN_ORD[typ] ?? 300` ersätter det hårdkodade `300` i knappens `disabled`-villkor, textfärgen och hjälptexten under artikeltextfältet |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
