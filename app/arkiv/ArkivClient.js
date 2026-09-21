@@ -58,12 +58,14 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
   const searchParams = useSearchParams();
   const [filterTag, setFilterTag] = useState(null);
+  const [filterFilm, setFilterFilm] = useState(false);
   const [sokning, setSokning] = useState("");
   const [agentSymboler, setAgentSymboler] = useState({});
 
   useEffect(() => {
     const q = searchParams.get("q") || "";
     if (q) setSokning(q);
+    if (searchParams.get("film") === "1") setFilterFilm(true);
   }, [searchParams]);
 
   useEffect(() => {
@@ -90,17 +92,18 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
   const term = sokning.trim().toLowerCase();
   const filtered = artiklar.filter(a => {
     const matchTag = !filterTag || (a.taggar || []).includes(filterTag);
-    if (!term) return matchTag;
+    const matchFilm = !filterFilm || a.filmrecension === true;
+    if (!term) return matchTag && matchFilm;
     const matchSearch = (
       (a.rubrik || "").toLowerCase().includes(term) ||
       (a.forfattare || "").toLowerCase().includes(term) ||
       (a.artikel || "").toLowerCase().includes(term) ||
       (a.taggar || []).some(t => t.toLowerCase().includes(term))
     );
-    return matchTag && matchSearch;
+    return matchTag && matchFilm && matchSearch;
   });
 
-  const isFiltering = !!filterTag || !!term;
+  const isFiltering = !!filterTag || !!term || filterFilm;
 
   return (
     <div>
@@ -143,6 +146,9 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
             <button onClick={() => setFilterTag(null)} style={{ background: !filterTag ? C.accent : "transparent", color: !filterTag ? "#0a0a0a" : C.textMuted, border: `1px solid ${!filterTag ? C.accent : C.border}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
               Alla
             </button>
+            <button onClick={() => setFilterFilm(f => !f)} style={{ background: filterFilm ? C.filmrecension : "transparent", color: filterFilm ? "#0a0a0a" : C.filmrecension, border: `1px solid ${C.filmrecension}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+              🎬 Filmrecensioner
+            </button>
             {topTags.map(t => (
               <button key={t} onClick={() => setFilterTag(filterTag === t ? null : t)} style={{ background: filterTag === t ? C.accent : "transparent", color: filterTag === t ? "#0a0a0a" : C.textMuted, border: `1px solid ${filterTag === t ? C.accent : C.border}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
                 #{t}
@@ -155,8 +161,8 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
       {filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "80px 0", color: C.textMuted }}>
           <p style={{ fontSize: "40px", margin: "0 0 16px 0" }}>🔍</p>
-          <p style={{ fontSize: "16px" }}>Inga artiklar matchar "{sokning || filterTag}".</p>
-          <button onClick={() => { setSokning(""); setFilterTag(null); }} style={{ marginTop: "12px", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "8px 16px", fontSize: "14px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+          <p style={{ fontSize: "16px" }}>Inga artiklar matchar "{sokning || filterTag || "🎬 Filmrecensioner"}".</p>
+          <button onClick={() => { setSokning(""); setFilterTag(null); setFilterFilm(false); }} style={{ marginTop: "12px", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "8px 16px", fontSize: "14px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
             Rensa filter
           </button>
         </div>

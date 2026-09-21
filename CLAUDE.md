@@ -3705,6 +3705,17 @@ Kräver `supabase_artiklar_filmrecension.sql` — kör i Supabase SQL Editor.
 | `app/artikel/[id]/page.js` | Ny `C.filmrecension = "#e8b84a"`. Artikelns egen `<h1>`-rubrikfärg kollar nu `artikel.filmrecension` först, innan `nyhetskalla`-ternaryn |
 | `app/client.js` | `fetchTrending()`s `select=`-lista utökad med `filmrecension` (saknades helt — fältet var annars `undefined` client-side). "VECKANS MEST LÄSTA"-widgetens rubrikfärg kollar nu `a.filmrecension` först |
 
+**"Se alla filmrecensioner"-knapp på startsidans widget (ägarbegäran, sep 2026):** *"Skulle man kunna ha en knapp på SENASTE FILMRECENSIONERNA widgeten se alla FILMRECENSIONER"*. Widgeten visade bara de senaste fyra recensionerna utan någon väg vidare till hela arkivet — samma "Se alla →"-mönster som redan finns på andra startsidewidgetar (t.ex. "Senaste agentkonversationer" → `/konversationer`) saknades här.
+
+**Fix — ingen ny sida, ett filter på den befintliga `/arkiv`:** `/arkiv` (`ArkivClient.js`) hade redan `filmrecension`-fältet tillgängligt (`select=*`) och en egen guld/orange-färg för filmrecensionsrubriker (se ovan i denna sektion) men ingen väg att filtrera FRAM bara filmrecensioner — bara det generella tagg-/fritextfiltret. Lade till en tredje filterdimension, `filterFilm` (boolean), som en egen togglebar "🎬 Filmrecensioner"-pill bredvid tagg-pillsen, oberoende av `filterTag`/fritextsökningen (alla tre kombineras med AND). Stödjer även `?film=1` som URL-parameter (samma mönster som `?q=` redan använder för fritextsökning) — startsidans nya "Se alla →"-länk på filmrecensionswidgeten (`app/client.js`) pekar på `/arkiv?film=1`, vilket öppnar arkivet med filtret redan aktiverat.
+
+**Verifiering:** `node --check` på båda ändrade filerna — syntaktiskt korrekt. Ingen live-sajt-åtkomst i den här miljön.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/arkiv/ArkivClient.js` | Ny `filterFilm`-state, läser `?film=1` från URL:en. Ny "🎬 Filmrecensioner"-togglepill bredvid taggfiltret. `filtered`-logiken och tomt-resultat-hanteringen (`Rensa filter`) utökade med filmfiltret |
+| `app/client.js` | Ny "Se alla →"-länk (till `/arkiv?film=1`) i "🎬 SENASTE FILMRECENSIONERNA"-widgetens rubrikrad |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
