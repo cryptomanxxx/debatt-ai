@@ -88,13 +88,15 @@ async function fetchSenasteNyhet() {
   return await res.json();
 }
 
-// Filmrecensenten (✅123) publicerar via samma forfattare-namn på varje
-// recension — filtrerar direkt på det istället för nyhetskalla/parent_id
-// (som en filmrecension inte sätter någotdera av). Separat widget, egen
-// SENASTE-sektion — samma princip som SENASTE NYHETERNA/DEBATTERNA.
+// Filtrerar på det dedikerade filmrecension-fältet (✅123, uppföljning) —
+// inte på forfattare="Filmrecensenten", som bara identifierar AI-agentens
+// egna recensioner. Sedan besökare kan skicka in filmrecensioner manuellt
+// via /skicka-in under sitt eget namn (✅123-uppföljning, PR #1482) räcker
+// forfattare inte längre som signal. Separat widget, egen SENASTE-sektion
+// — samma princip som SENASTE NYHETERNA/DEBATTERNA.
 async function fetchSenasteFilmrecension() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,taggar,youtube_video_id,skapad&forfattare=eq.Filmrecensenten&order=skapad.desc&limit=4`,
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,taggar,youtube_video_id,skapad&filmrecension=eq.true&order=skapad.desc&limit=4`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
   if (!res.ok) return [];
@@ -250,10 +252,13 @@ async function fetchLatestArtikel() {
   // "nyhetskalla saknas ELLER har en parent_id" fångar både eget ämne och
   // repliker medan genuina nyhetsartiklar (nyhetskalla satt, ingen parent_id)
   // fortsatt utesluts — de har redan sin egen "Senaste NYHETERNA"-sektion.
-  // Filmrecensentens recensioner (✅123) sätter av samma skäl inte
-  // nyhetskalla och matchade därför tidigare felaktigt "eget ämne"-grenen
-  // här — de har nu sin egen "SENASTE FILMRECENSIONEN"-sektion istället.
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&or=(nyhetskalla.is.null,parent_id.not.is.null)&forfattare=neq.Filmrecensenten&order=skapad.desc&limit=4`, {
+  // Filmrecensioner (✅123) sätter av samma skäl inte nyhetskalla och
+  // matchade därför tidigare felaktigt "eget ämne"-grenen här — de har nu
+  // sin egen "SENASTE FILMRECENSIONERNA"-sektion istället. Filtrerar på
+  // det dedikerade filmrecension-fältet, inte forfattare — en manuellt
+  // inskickad filmrecension (✅123-uppföljning) har inte forfattare=
+  // "Filmrecensenten" men ska ändå uteslutas härifrån.
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&or=(nyhetskalla.is.null,parent_id.not.is.null)&filmrecension=eq.false&order=skapad.desc&limit=4`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
   });
   if (!res.ok) return [];

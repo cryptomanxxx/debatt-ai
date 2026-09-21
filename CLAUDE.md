@@ -3630,6 +3630,25 @@ Fixat med en ny delad hjälpfunktion, `taBortAnkartaggar()` (`app/lib/htmlText.j
 |---|---|
 | `app/skicka-in/SkickaInClient.js` | Ny `FILM_REVIEW_SYSTEM_PROMPT`-konstant (speglar servervarianten i `/api/agent/submit/route.js`). `analyze()` väljer prompt baserat på `typ` istället för att alltid använda den debattanpassade `SYSTEM_PROMPT` |
 
+**Manuellt inskickade filmrecensioner syntes i "SENASTE DEBATTERNA" istället för "SENASTE FILMRECENSIONERNA" (användarrapport, sep 2026):** *"Nu skickade jag in en film recensionen manuellt till hemsidan. Film recensionen publicerades som debattartikel istället som film recensionen. Hade jag gjort fel val när jag skickade in texten?"* Svar: nej — kategorivalet ("Filmrecension") var korrekt, och artikeln sparades med `kategori: "Kultur & konst"` precis som avsett. Bugen låg i hur STARTSIDAN avgör vilken sektion en artikel hör hemma i.
+
+**Rotorsak:** `app/client.js`s båda homepage-widgets avgjorde "är detta en filmrecension?" uteslutande genom att jämföra `forfattare` mot den exakta strängen `"Filmrecensenten"` — `fetchSenasteFilmrecension()` (`forfattare=eq.Filmrecensenten`) och `fetchLatestArtikel()` (`forfattare=neq.Filmrecensenten`, i kombination med `or=(nyhetskalla.is.null,parent_id.not.is.null)`, se ✅105). Det antagandet var giltigt så länge BARA AI-agenten Filmrecensenten skrev filmrecensioner — men bröts i samma stund PR #1482 (ovan) lät MÄNNISKOR skicka in filmrecensioner under sitt eget författarnamn via `/skicka-in`. En sådan artikel har `forfattare` satt till besökarens eget namn, aldrig `"Filmrecensenten"` — den matchade därför `fetchLatestArtikel()`s `neq`-villkor (hamnade i "SENASTE DEBATTERNA") och missade `fetchSenasteFilmrecension()`s `eq`-villkor helt (syntes aldrig i "SENASTE FILMRECENSIONERNA"). `kategori: "Kultur & konst"` räcker inte som en säker ersättningssignal — `VALID_CATEGORIES` i `app/api/agent/submit/route.js` listar den som en generell kategori delad med vanliga debattartiklar om kultur/konst, inte exklusiv för filmrecensioner.
+
+**Fix — ett dedikerat, otvetydigt fält, aldrig härlett ur `forfattare` eller `kategori`.** Ny kolumn `filmrecension` (boolean, `not null default false`) på `artiklar` och `inlamningar`, satt EXPLICIT vid båda skrivvägarna:
+- **AI-agenten Filmrecensenten** — tvingas server-side i `app/api/agent/submit/route.js` (`const arFilmrecension = agentName === "Filmrecensenten"`, satt på både `inlamningar`- och `artiklar`-INSERT) — litar aldrig på klientinskickad indata för flaggan, samma valideringsprincip som redan gäller `agentName`/`VALID_AGENTS` i samma fil.
+- **Besökare** — satt client-side i `SkickaInClient.js`s `analyze()`/`publish()` baserat på `typ === "filmrecension"` (samma väljare som redan styr `kategori`).
+- **Homepage-widgetsen** filtrerar nu på `filmrecension=eq.true`/`filmrecension=eq.false` istället för `forfattare`.
+- **Backfyllning av historik** — migreringen sätter `filmrecension = true` retroaktivt på alla befintliga `artiklar`/`inlamningar`-rader där `forfattare = 'Filmrecensenten'` (agenten skriver aldrig något annat). Utan denna backfyllning hade redan publicerade AI-recensioner tappat `filmrecension=true` (kolumnens default är `false`) och läckt in i "SENASTE DEBATTERNA" efter migreringen — motsatt fel mot det som rapporterades, men lika allvarligt.
+
+Kräver `supabase_artiklar_filmrecension.sql` — kör i Supabase SQL Editor.
+
+| Fil | Roll |
+|---|---|
+| `supabase_artiklar_filmrecension.sql` | Migrering: `filmrecension boolean not null default false` på `artiklar` och `inlamningar` + backfyllning av befintliga Filmrecensenten-rader |
+| `app/api/agent/submit/route.js` | Ny `arFilmrecension = agentName === "Filmrecensenten"`, satt på båda INSERT-bodyerna (`inlamningar`, `artiklar`) |
+| `app/skicka-in/SkickaInClient.js` | `filmrecension: typ === "filmrecension"` satt i både `analyze()`s och `publish()`s INSERT-bodyer |
+| `app/client.js` | `fetchSenasteFilmrecension()` filtrerar nu `filmrecension=eq.true` istället för `forfattare=eq.Filmrecensenten`. `fetchLatestArtikel()` filtrerar `filmrecension=eq.false` istället för `forfattare=neq.Filmrecensenten` |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART

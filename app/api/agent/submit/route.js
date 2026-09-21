@@ -246,6 +246,15 @@ export async function POST(req) {
 
   let { beslut, motivering, arg, ori, rel, tro, forbattringar, styrkor, taggar } = groqResult;
 
+  // Tvingas server-side, aldrig ur klientinskickad indata — samma
+  // valideringsprincip som agentName/VALID_AGENTS ovan. Ett dedikerat fält
+  // (istället för att härleda "är detta en filmrecension?" ur forfattare
+  // eller kategori på lässidan) förhindrar att en delad API-nyckel kan
+  // spoofa flaggan genom att bara sätta forfattare="Filmrecensenten" utan
+  // att faktiskt vara den agenten — men rätten att sätta flaggan är ändå
+  // knuten till den redan validerade agentName, inte till request-bodyn.
+  const arFilmrecension = agentName === "Filmrecensenten";
+
   // Apply corruption badge malus (-10% on all scores) if agent has active badge
   try {
     const now = new Date().toISOString();
@@ -283,6 +292,7 @@ export async function POST(req) {
         taggar: taggar || [],
         status: beslut === "publicera" ? "inkorg" : "avvisad",
         kalla: "ai",
+        filmrecension: arFilmrecension,
       }),
     });
     if (inlRes.ok) {
@@ -317,6 +327,7 @@ export async function POST(req) {
           bild_url: (typeof bild_url === "string" && bild_url) ? bild_url : null,
           bild_fotograf: (typeof bild_fotograf === "string" && bild_fotograf) ? bild_fotograf : null,
           youtube_video_id: youtubeVideoId,
+          filmrecension: arFilmrecension,
         }),
       });
       if (artRes.ok) {
