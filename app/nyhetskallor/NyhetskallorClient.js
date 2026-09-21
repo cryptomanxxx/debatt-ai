@@ -4,6 +4,7 @@ import NyhetsTicker from "./NyhetsTicker";
 import NastaHamtningRaknare from "./NastaHamtningRaknare";
 import { analyseraMedAgent } from "./agentAnalys";
 import AgentAnalysPanel from "./AgentAnalysPanel";
+import { extraheraYoutubeId } from "../lib/youtube";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -115,10 +116,102 @@ function ImporteraForm({ onImporterad }) {
   );
 }
 
+// Besökare klistrar in en länk till en YouTube-video. Video-id:t
+// extraheras/valideras auktoritativt SERVER-SIDE (samma app/lib/youtube.js
+// som ✅121s artikel-embedding använder) — klientens egen extrahering här
+// är bara en live förhandsgranskning (tumnagel + "ogiltig länk"-varning),
+// aldrig den faktiska källan till sanning. Se
+// app/api/nyhetsflode/importera-youtube/route.js.
+function ImporteraYoutubeForm({ onImporterad }) {
+  const [url, setUrl] = useState("");
+  const [status, setStatus] = useState(null); // null | "laddar" | "ok" | "dubblett" | "fel"
+  const [felText, setFelText] = useState("");
+
+  const trimmedUrl = url.trim();
+  const previewId = trimmedUrl ? extraheraYoutubeId(trimmedUrl) : null;
+  const ogiltigLank = !!trimmedUrl && !previewId;
+
+  async function importera(e) {
+    e.preventDefault();
+    if (!trimmedUrl || ogiltigLank || status === "laddar") return;
+    setStatus("laddar");
+    setFelText("");
+    try {
+      const res = await fetch("/api/nyhetsflode/importera-youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmedUrl }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStatus("fel");
+        setFelText(data.fel || "Kunde inte importera videon.");
+        return;
+      }
+      onImporterad(data.rad, !!data.redanImporterad);
+      setStatus(data.redanImporterad ? "dubblett" : "ok");
+      setUrl("");
+    } catch {
+      setStatus("fel");
+      setFelText("Nätverksfel — försök igen.");
+    }
+  }
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "16px 18px", marginBottom: "24px" }}>
+      <div style={{ fontSize: "11px", letterSpacing: "0.1em", fontFamily: "monospace", color: C.textMuted, marginBottom: "10px" }}>
+        IMPORTERA EN YOUTUBE-VIDEO
+      </div>
+      <form onSubmit={importera} style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+        {previewId && (
+          <img
+            src={`https://i.ytimg.com/vi/${previewId}/mqdefault.jpg`}
+            alt=""
+            width={80}
+            height={45}
+            style={{ borderRadius: "4px", objectFit: "cover", flexShrink: 0, display: "block" }}
+          />
+        )}
+        <input
+          type="text"
+          value={url}
+          onChange={e => { setUrl(e.target.value); if (status && status !== "laddar") setStatus(null); }}
+          placeholder="https://www.youtube.com/watch?v=..."
+          style={{ flex: 1, minWidth: "220px", padding: "10px 12px", background: C.bg, border: `1px solid ${ogiltigLank ? "#f8717150" : C.border}`, borderRadius: "6px", color: C.text, fontSize: "13px", fontFamily: "monospace", outline: "none" }}
+        />
+        <button
+          type="submit"
+          disabled={!trimmedUrl || ogiltigLank || status === "laddar"}
+          style={{ padding: "10px 18px", borderRadius: "6px", fontSize: "13px", fontFamily: "Georgia, serif", border: `1px solid ${LANK}50`, background: "transparent", color: !trimmedUrl || ogiltigLank || status === "laddar" ? C.textMuted : LANK, cursor: !trimmedUrl || ogiltigLank || status === "laddar" ? "default" : "pointer" }}
+        >
+          {status === "laddar" ? "Hämtar…" : "Importera →"}
+        </button>
+      </form>
+      {ogiltigLank && (
+        <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#f87171", fontFamily: "monospace" }}>Kunde inte tolka länken som en YouTube-video.</p>
+      )}
+      {status === "ok" && (
+        <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#4ade80", fontFamily: "monospace" }}>✓ Importerad — visas överst i listan nedan.</p>
+      )}
+      {status === "dubblett" && (
+        <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#fbbf24", fontFamily: "monospace" }}>Videon fanns redan i nyhetsflödet.</p>
+      )}
+      {status === "fel" && (
+        <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#f87171", fontFamily: "monospace" }}>{felText}</p>
+      )}
+    </div>
+  );
+}
+
 function NyhetsRad({ n, analysProps }) {
   const [expanderad, setExpanderad] = useState(false);
   const kortText = (n.beskrivning || "").length > 220;
   const visadText = expanderad || !kortText ? n.beskrivning : n.beskrivning.slice(0, 220) + "…";
+  // Gäller både automatiskt hämtade YouTube-nyheter (nyheter.py →
+  // hamta_youtube_nyheter(), kalla="YouTube: {kanal}") och videor
+  // importerade via "IMPORTERA EN YOUTUBE-VIDEO" nedan — inget nytt
+  // DB-fält behövs, video-id:t härleds direkt ur den redan sparade url:en.
+  const ytId = n.kalla && n.kalla.startsWith("YouTube: ") ? extraheraYoutubeId(n.url) : null;
 
   return (
     <div style={{ padding: "16px 20px", background: C.surface, border: `1px solid ${C.border}`, borderRadius: "8px", marginBottom: "10px" }}>
@@ -129,6 +222,12 @@ function NyhetsRad({ n, analysProps }) {
           <span key={k} style={{ fontSize: "10px", color: C.textMuted, border: `1px solid ${C.border}`, borderRadius: "20px", padding: "1px 8px", fontFamily: "monospace" }}>{k}</span>
         ))}
       </div>
+      {ytId && (
+        <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ display: "block", marginBottom: "10px", position: "relative", maxWidth: "320px" }}>
+          <img src={`https://i.ytimg.com/vi/${ytId}/mqdefault.jpg`} alt="" style={{ width: "100%", display: "block", borderRadius: "6px" }} />
+          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", textShadow: "0 0 8px rgba(0,0,0,0.7)" }}>▶</span>
+        </a>
+      )}
       <a href={n.url} target="_blank" rel="noopener noreferrer" style={{ display: "block", fontSize: "16px", color: LANK, lineHeight: 1.4, fontFamily: "Georgia, serif", textDecoration: "none", marginBottom: n.beskrivning ? "6px" : "10px" }}>
         {n.rubrik}
       </a>
@@ -312,11 +411,12 @@ export default function NyhetskallorClient({ nyheter: initialNyheter, pageSize =
             Klicka <em>"🔎 Analysera i Nyhetsanalysen"</em> under en nyhet för att låta en eller flera agenter reagera direkt, i realtid — samma knapp finns på <a href="/universitet" style={{ color: LANK }}>AI-Universitetet</a> för vetenskapliga nyheter. Analysen sparas i Nyhetsanalysen och syns på <a href="/nyhetsanalyser" style={{ color: LANK }}>/nyhetsanalyser</a> — därifrån kan en agentanalys i sin tur föreslås som artikelämne, ett steg som medvetet ligger efter analysen snarare än här: en obehandlad RSS-rubrik är sämre underlag för en hel debattartikel än en agents egen analys av den.
           </p>
           <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: 0 }}>
-            Saknas en nyhet i flödet? Klistra in länken i formuläret nedan så hämtar vi den och lägger till den.
+            Saknas en nyhet i flödet? Klistra in länken i formuläret nedan så hämtar vi den och lägger till den. Du kan även importera en YouTube-video separat — videon får en egen rad i flödet, och spelas upp direkt i artikeln (inte bara länkas) om en agent skriver om den.
           </p>
         </div>
 
         <ImporteraForm onImporterad={nyhetImporterad} />
+        <ImporteraYoutubeForm onImporterad={nyhetImporterad} />
 
         <div style={{ marginBottom: "20px" }}>
           <input
