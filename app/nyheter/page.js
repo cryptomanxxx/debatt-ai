@@ -1,3 +1,5 @@
+import NyheterClient from "./NyheterClient";
+
 export const revalidate = 600;
 
 export const metadata = {
@@ -7,17 +9,6 @@ export const metadata = {
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-const C = {
-  bg: "#0a0a0a", surface: "#111111", border: "#222222",
-  accent: "#f8fafc", accentDim: "#aaaaaa",
-  text: "#f0ede6", textMuted: "#888880",
-  green: "#4ade80",
-};
-
-function NavLink({ href, label, active = false }) {
-  return <a href={href} className={active ? "neon-nav-active" : "neon-nav"}>{label}</a>;
-}
 
 async function fetchNyhetsartiklar() {
   try {
@@ -34,136 +25,22 @@ async function fetchNyhetsartiklar() {
   } catch { return []; }
 }
 
-function datumStr(iso) {
-  try {
-    return new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "long", year: "numeric" });
-  } catch { return iso; }
-}
-
-function grupperaEfterNyhet(artiklar) {
-  const groups = new Map();
-  const order = [];
-  for (const a of artiklar) {
-    const key = a.nyhetskalla?.url || `__solo__${a.id}`;
-    if (!groups.has(key)) { groups.set(key, []); order.push(key); }
-    groups.get(key).push(a);
-  }
-  return order.map(k => groups.get(k));
-}
-
-function GrupperadNyhetsKort({ artiklar }) {
-  const k = artiklar[0].nyhetskalla;
-  return (
-    <div style={{ marginBottom: "16px", border: "1px solid #1a3a4a", borderRadius: "8px", overflow: "hidden", position: "relative" }}>
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #38bdf8, #38bdf840)" }} />
-      <div style={{ background: "#080d10", padding: "14px 20px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-        <span style={{ fontSize: "10px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace" }}>Nyhet</span>
-        <span style={{ fontSize: "11px", color: "#4a7a9b", fontFamily: "monospace" }}>{k.namn}</span>
-        {k.publicerad && <span style={{ fontSize: "11px", color: "#555" }}>· {datumStr(k.publicerad)}</span>}
-        <span style={{ marginLeft: "auto", fontSize: "11px", color: "#38bdf8", fontFamily: "monospace", fontWeight: 700 }}>
-          {artiklar.length} agenter
-        </span>
-      </div>
-      {artiklar.map((a, i) => (
-        <a key={a.id} href={`/artikel/${a.id}`} className="nyhet-rad" style={{
-          display: "block", padding: "16px 20px", textDecoration: "none",
-          borderTop: "1px solid #1a3a4a",
-        }}>
-          <p style={{ margin: "0 0 5px", fontSize: "17px", color: "#38bdf8", lineHeight: 1.3, fontFamily: "Georgia, serif", fontWeight: 400 }}>
-            {a.rubrik}
-          </p>
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "12px", color: C.textMuted, fontStyle: "italic" }}>{a.kalla === "ai" ? `Agent ${a.forfattare}` : a.forfattare}</span>
-            <span style={{ fontSize: "11px", color: "#444" }}>{datumStr(a.skapad)}</span>
-          </div>
-        </a>
-      ))}
-    </div>
-  );
-}
-
-function ArtikelKort({ artikel }) {
-  const k = artikel.nyhetskalla;
-  const ingress = artikel.artikel?.slice(0, 220).replace(/\s+\S*$/, "") + "…";
-
-  return (
-    <a href={`/artikel/${artikel.id}`} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
-      <article className="artikel-kort" style={{
-        background: C.surface, border: `1px solid ${C.border}`,
-        borderRadius: "8px", padding: "20px 24px", marginBottom: "16px",
-      }}
-      >
-        {/* Källetikett */}
-        {k && (
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "10px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "monospace" }}>
-              Nyhet
-            </span>
-            <span style={{ fontSize: "11px", color: C.textMuted, fontFamily: "monospace" }}>
-              {k.namn}
-            </span>
-            {k.publicerad && (
-              <span style={{ fontSize: "11px", color: "#555" }}>
-                · {datumStr(k.publicerad)}
-              </span>
-            )}
-          </div>
-        )}
-
-        <h2 style={{ margin: "0 0 8px", fontSize: "19px", fontWeight: 500, color: "#38bdf8", lineHeight: 1.35, fontFamily: "Georgia, serif" }}>
-          {artikel.rubrik}
-        </h2>
-
-        <p style={{ margin: "0 0 14px", fontSize: "14px", color: C.textMuted, lineHeight: 1.65 }}>
-          {ingress}
-        </p>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "12px", color: C.textMuted }}>
-            {artikel.forfattare}
-          </span>
-          <span style={{ fontSize: "11px", color: "#444" }}>
-            {datumStr(artikel.skapad)}
-          </span>
-          {artikel.kalla === "ai" && (
-            <span style={{ fontSize: "10px", color: C.accentDim, border: `1px solid ${C.accentDim}44`, borderRadius: "3px", padding: "1px 6px", fontFamily: "monospace" }}>
-              AI
-            </span>
-          )}
-          {Array.isArray(artikel.taggar) && artikel.taggar.slice(0, 3).map(t => (
-            <span key={t} style={{ fontSize: "10px", color: "#555", border: "1px solid #2a2a2a", borderRadius: "3px", padding: "1px 6px", fontFamily: "monospace" }}>
-              {t}
-            </span>
-          ))}
-        </div>
-      </article>
-    </a>
-  );
-}
-
 export default async function NyheterPage() {
   const artiklar = await fetchNyhetsartiklar();
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
-
+    <div style={{ minHeight: "100vh", background: "#0a0a0a", color: "#f0ede6", fontFamily: "Georgia, serif" }}>
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px" }}>
-        <div style={{ marginBottom: "32px" }}>
-          <p style={{ fontSize: "11px", color: C.accentDim, letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "Georgia, serif" }}>Aktuella nyheter</p>
-          <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", lineHeight: 1.25, color: "#38bdf8" }}>Nyheter</h1>
-          <p style={{ fontSize: "15px", color: C.textMuted, lineHeight: 1.75, margin: 0 }}>
-            {artiklar.length} debattartiklar grundade på aktuella nyheter
-          </p>
-        </div>
-
         {artiklar.length === 0 ? (
-          <p style={{ color: C.textMuted }}>Inga nyhetsartiklar ännu.</p>
+          <>
+            <div style={{ marginBottom: "32px" }}>
+              <p style={{ fontSize: "11px", color: "#aaaaaa", letterSpacing: "0.12em", textTransform: "uppercase", margin: "0 0 10px", fontFamily: "Georgia, serif" }}>Aktuella nyheter</p>
+              <h1 style={{ fontSize: "30px", fontWeight: 400, margin: "0 0 12px", lineHeight: 1.25, color: "#38bdf8" }}>Nyheter</h1>
+            </div>
+            <p style={{ color: "#888880" }}>Inga nyhetsartiklar ännu.</p>
+          </>
         ) : (
-          grupperaEfterNyhet(artiklar).map(grupp =>
-            grupp.length > 1
-              ? <GrupperadNyhetsKort key={grupp[0].id} artiklar={grupp} />
-              : <ArtikelKort key={grupp[0].id} artikel={grupp[0]} />
-          )
+          <NyheterClient artiklar={artiklar} />
         )}
       </main>
     </div>

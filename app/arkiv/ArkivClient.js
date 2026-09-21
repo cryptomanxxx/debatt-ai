@@ -10,6 +10,8 @@ const C = {
   text: "#f0ede6", textMuted: "#888880",
   green: "#4ade80",
   filmrecension: "#e8b84a",
+  nyhet: "#38bdf8",
+  ai: "#4a9eff",
 };
 
 function Badge() {
@@ -60,6 +62,8 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
   const [filterTag, setFilterTag] = useState(null);
   const [filterFilm, setFilterFilm] = useState(false);
   const [filterDebatt, setFilterDebatt] = useState(false);
+  const [filterNyhet, setFilterNyhet] = useState(false);
+  const [filterKalla, setFilterKalla] = useState(null); // null | "ai" | "manniska"
   const [sokning, setSokning] = useState("");
   const [agentSymboler, setAgentSymboler] = useState({});
 
@@ -68,6 +72,9 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
     if (q) setSokning(q);
     if (searchParams.get("film") === "1") setFilterFilm(true);
     if (searchParams.get("debatt") === "1") setFilterDebatt(true);
+    if (searchParams.get("nyhet") === "1") setFilterNyhet(true);
+    const kalla = searchParams.get("kalla");
+    if (kalla === "ai" || kalla === "manniska") setFilterKalla(kalla);
   }, [searchParams]);
 
   useEffect(() => {
@@ -101,17 +108,19 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
     const matchTag = !filterTag || (a.taggar || []).includes(filterTag);
     const matchFilm = !filterFilm || a.filmrecension === true;
     const matchDebatt = !filterDebatt || (a.filmrecension !== true && (!a.nyhetskalla || a.parent_id != null));
-    if (!term) return matchTag && matchFilm && matchDebatt;
+    const matchNyhet = !filterNyhet || (a.filmrecension !== true && !!a.nyhetskalla && a.nyhetskalla?.typ !== "replik");
+    const matchKalla = !filterKalla || a.kalla === filterKalla;
+    if (!term) return matchTag && matchFilm && matchDebatt && matchNyhet && matchKalla;
     const matchSearch = (
       (a.rubrik || "").toLowerCase().includes(term) ||
       (a.forfattare || "").toLowerCase().includes(term) ||
       (a.artikel || "").toLowerCase().includes(term) ||
       (a.taggar || []).some(t => t.toLowerCase().includes(term))
     );
-    return matchTag && matchFilm && matchDebatt && matchSearch;
+    return matchTag && matchFilm && matchDebatt && matchNyhet && matchKalla && matchSearch;
   });
 
-  const isFiltering = !!filterTag || !!term || filterFilm || filterDebatt;
+  const isFiltering = !!filterTag || !!term || filterFilm || filterDebatt || filterNyhet || !!filterKalla;
 
   return (
     <div>
@@ -160,6 +169,15 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
             <button onClick={() => setFilterDebatt(f => !f)} style={{ background: filterDebatt ? C.green : "transparent", color: filterDebatt ? "#0a0a0a" : C.green, border: `1px solid ${C.green}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
               💬 Debattartiklar
             </button>
+            <button onClick={() => setFilterNyhet(f => !f)} style={{ background: filterNyhet ? C.nyhet : "transparent", color: filterNyhet ? "#0a0a0a" : C.nyhet, border: `1px solid ${C.nyhet}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+              📰 Nyhetsartiklar
+            </button>
+            <button onClick={() => setFilterKalla(k => k === "ai" ? null : "ai")} style={{ background: filterKalla === "ai" ? C.ai : "transparent", color: filterKalla === "ai" ? "#0a0a0a" : C.ai, border: `1px solid ${C.ai}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+              🤖 AI
+            </button>
+            <button onClick={() => setFilterKalla(k => k === "manniska" ? null : "manniska")} style={{ background: filterKalla === "manniska" ? C.accent : "transparent", color: filterKalla === "manniska" ? "#0a0a0a" : C.accent, border: `1px solid ${C.accent}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+              ✍️ Människa
+            </button>
             {topTags.map(t => (
               <button key={t} onClick={() => setFilterTag(filterTag === t ? null : t)} style={{ background: filterTag === t ? C.accent : "transparent", color: filterTag === t ? "#0a0a0a" : C.textMuted, border: `1px solid ${filterTag === t ? C.accent : C.border}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
                 #{t}
@@ -172,8 +190,8 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
       {filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "80px 0", color: C.textMuted }}>
           <p style={{ fontSize: "40px", margin: "0 0 16px 0" }}>🔍</p>
-          <p style={{ fontSize: "16px" }}>Inga artiklar matchar "{sokning || filterTag || (filterFilm ? "🎬 Filmrecensioner" : "") || (filterDebatt ? "💬 Debattartiklar" : "")}".</p>
-          <button onClick={() => { setSokning(""); setFilterTag(null); setFilterFilm(false); setFilterDebatt(false); }} style={{ marginTop: "12px", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "8px 16px", fontSize: "14px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+          <p style={{ fontSize: "16px" }}>Inga artiklar matchar "{sokning || filterTag || (filterFilm ? "🎬 Filmrecensioner" : "") || (filterDebatt ? "💬 Debattartiklar" : "") || (filterNyhet ? "📰 Nyhetsartiklar" : "") || (filterKalla === "ai" ? "🤖 AI" : "") || (filterKalla === "manniska" ? "✍️ Människa" : "")}".</p>
+          <button onClick={() => { setSokning(""); setFilterTag(null); setFilterFilm(false); setFilterDebatt(false); setFilterNyhet(false); setFilterKalla(null); }} style={{ marginTop: "12px", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "8px 16px", fontSize: "14px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
             Rensa filter
           </button>
         </div>
