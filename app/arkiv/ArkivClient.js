@@ -198,7 +198,7 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
                 <span style={{ fontSize: "13px", color: C.textMuted }}>{a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE") : ""}</span>
               </div>
             </div>
-            <h2 style={{ fontSize: "19px", fontWeight: 500, margin: "0 0 6px 0", lineHeight: 1.35, color: a.filmrecension ? C.filmrecension : (a.nyhetskalla ? "#38bdf8" : "#4ade80") }}>
+            <h2 style={{ fontSize: "19px", fontWeight: 500, margin: "0 0 6px 0", lineHeight: 1.35, color: a.filmrecension ? C.filmrecension : (a.nyhetskalla && a.nyhetskalla?.typ !== "replik" ? "#38bdf8" : "#4ade80") }}>
               {term ? highlight(a.rubrik, term) : a.rubrik}
             </h2>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "0 0 12px 0" }}>
