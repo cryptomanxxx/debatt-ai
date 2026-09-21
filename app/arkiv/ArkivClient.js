@@ -59,6 +59,7 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
   const searchParams = useSearchParams();
   const [filterTag, setFilterTag] = useState(null);
   const [filterFilm, setFilterFilm] = useState(false);
+  const [filterDebatt, setFilterDebatt] = useState(false);
   const [sokning, setSokning] = useState("");
   const [agentSymboler, setAgentSymboler] = useState({});
 
@@ -66,6 +67,7 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
     const q = searchParams.get("q") || "";
     if (q) setSokning(q);
     if (searchParams.get("film") === "1") setFilterFilm(true);
+    if (searchParams.get("debatt") === "1") setFilterDebatt(true);
   }, [searchParams]);
 
   useEffect(() => {
@@ -89,21 +91,27 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
   artiklar.forEach(a => (a.taggar || []).forEach(t => { freq[t] = (freq[t] || 0) + 1; }));
   const topTags = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([t]) => t);
 
+  // matchDebatt speglar exakt samma filter som startsidans "SENASTE
+  // DEBATTERNA"-widget (fetchLatestArtikel() i app/client.js, ✅105/✅123):
+  // eget ämne (ingen nyhetskalla) eller replik (har parent_id, oavsett
+  // nyhetskalla — repliker sätter alltid nyhetskalla till en pekare mot
+  // originalartikeln) — men aldrig en filmrecension.
   const term = sokning.trim().toLowerCase();
   const filtered = artiklar.filter(a => {
     const matchTag = !filterTag || (a.taggar || []).includes(filterTag);
     const matchFilm = !filterFilm || a.filmrecension === true;
-    if (!term) return matchTag && matchFilm;
+    const matchDebatt = !filterDebatt || (a.filmrecension !== true && (!a.nyhetskalla || a.parent_id != null));
+    if (!term) return matchTag && matchFilm && matchDebatt;
     const matchSearch = (
       (a.rubrik || "").toLowerCase().includes(term) ||
       (a.forfattare || "").toLowerCase().includes(term) ||
       (a.artikel || "").toLowerCase().includes(term) ||
       (a.taggar || []).some(t => t.toLowerCase().includes(term))
     );
-    return matchTag && matchFilm && matchSearch;
+    return matchTag && matchFilm && matchDebatt && matchSearch;
   });
 
-  const isFiltering = !!filterTag || !!term || filterFilm;
+  const isFiltering = !!filterTag || !!term || filterFilm || filterDebatt;
 
   return (
     <div>
@@ -149,6 +157,9 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
             <button onClick={() => setFilterFilm(f => !f)} style={{ background: filterFilm ? C.filmrecension : "transparent", color: filterFilm ? "#0a0a0a" : C.filmrecension, border: `1px solid ${C.filmrecension}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
               🎬 Filmrecensioner
             </button>
+            <button onClick={() => setFilterDebatt(f => !f)} style={{ background: filterDebatt ? C.green : "transparent", color: filterDebatt ? "#0a0a0a" : C.green, border: `1px solid ${C.green}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+              💬 Debattartiklar
+            </button>
             {topTags.map(t => (
               <button key={t} onClick={() => setFilterTag(filterTag === t ? null : t)} style={{ background: filterTag === t ? C.accent : "transparent", color: filterTag === t ? "#0a0a0a" : C.textMuted, border: `1px solid ${filterTag === t ? C.accent : C.border}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
                 #{t}
@@ -161,8 +172,8 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
       {filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "80px 0", color: C.textMuted }}>
           <p style={{ fontSize: "40px", margin: "0 0 16px 0" }}>🔍</p>
-          <p style={{ fontSize: "16px" }}>Inga artiklar matchar "{sokning || filterTag || "🎬 Filmrecensioner"}".</p>
-          <button onClick={() => { setSokning(""); setFilterTag(null); setFilterFilm(false); }} style={{ marginTop: "12px", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "8px 16px", fontSize: "14px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+          <p style={{ fontSize: "16px" }}>Inga artiklar matchar "{sokning || filterTag || (filterFilm ? "🎬 Filmrecensioner" : "") || (filterDebatt ? "💬 Debattartiklar" : "")}".</p>
+          <button onClick={() => { setSokning(""); setFilterTag(null); setFilterFilm(false); setFilterDebatt(false); }} style={{ marginTop: "12px", background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, borderRadius: "4px", padding: "8px 16px", fontSize: "14px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
             Rensa filter
           </button>
         </div>
