@@ -1273,7 +1273,8 @@ def skapa_market_forslag(agent: dict, sb_key: str, amne: str) -> bool:
 def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, artikel: str,
                    konklusion: str = "", visualisering_id: str | None = None, forslag: bool = False,
                    nyhetskalla: dict | None = None, parent_id: str | None = None,
-                   bild_url: str | None = None, bild_fotograf: str | None = None) -> dict:
+                   bild_url: str | None = None, bild_fotograf: str | None = None,
+                   youtube_url: str | None = None) -> dict:
     """Skicka artikeln till debatt.ai API."""
     body = {"api_key": api_key, "forfattare": forfattare, "rubrik": amne, "artikel": artikel, "kategori": kategori}
     if konklusion:
@@ -1290,6 +1291,11 @@ def skicka_artikel(api_key: str, forfattare: str, amne: str, kategori: str, arti
         body["bild_url"] = bild_url
     if bild_fotograf:
         body["bild_fotograf"] = bild_fotograf
+    if youtube_url:
+        # Servern (app/api/agent/submit) extraherar och validerar video-id:t
+        # ur URL:en själv — skickar bara den fullständiga länken vidare här,
+        # ingen anledning att duplicera parsningen i Python.
+        body["youtube_url"] = youtube_url
     response = httpx.post(DEBATT_API, json=body, timeout=60)
     return response.json()
 

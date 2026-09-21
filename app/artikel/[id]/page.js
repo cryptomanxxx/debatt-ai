@@ -10,6 +10,7 @@ import { agentVisuell } from "../../agentData";
 import AmnesPrenumerant from "./AmnesPrenumerant";
 import ArgumentRoster from "./ArgumentRoster";
 import BastaArgumentet from "./BastaArgumentet";
+import { arGiltigtYoutubeId, youtubeEmbedUrl } from "../../lib/youtube";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -295,6 +296,27 @@ export default async function ArtikelPage({ params }) {
                 Foto: {artikel.bild_fotograf}{artikel.bild_url?.includes("pexels.com") ? " / Pexels" : ""}
               </p>
             )}
+          </div>
+        )}
+
+        {/* YouTube-video — spelas upp direkt i artikeln, inte bara som länk.
+            Re-validerar id:t här på nytt (aldrig lita på att DB-fältet redan
+            är rent) innan det stoppas in i en iframe-src — youtube_video_id
+            skrivs via ett publikt anon-nyckel-INSERT (samma trust-modell som
+            resten av artiklar-tabellen), så en direkt Supabase-attack förbi
+            klientkoden kan i teorin ha satt vad som helst i fältet. */}
+        {arGiltigtYoutubeId(artikel.youtube_video_id) && (
+          <div style={{ marginBottom: "36px" }}>
+            <div style={{ position: "relative", paddingTop: "56.25%", borderRadius: "6px", overflow: "hidden", background: "#000" }}>
+              <iframe
+                src={youtubeEmbedUrl(artikel.youtube_video_id)}
+                title="Bifogad YouTube-video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                loading="lazy"
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
+              />
+            </div>
           </div>
         )}
 
