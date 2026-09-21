@@ -3729,6 +3729,19 @@ Kräver `supabase_artiklar_filmrecension.sql` — kör i Supabase SQL Editor.
 | `app/client.js` | Ny "Se alla →"-länk (till `/nyheter`) i "🔥 SENASTE NYHETERNA"-widgetens rubrikrad. Ny "Se alla →"-länk (till `/arkiv?debatt=1`) i "🔥 SENASTE DEBATTERNA"-widgetens rubrikrad |
 | `app/arkiv/ArkivClient.js` | Ny `filterDebatt`-state, läser `?debatt=1` från URL:en. Ny "💬 Debattartiklar"-togglepill, `matchDebatt` speglar exakt `fetchLatestArtikel()`s eget-ämne/replik-filter. `filtered`-logiken och tomt-resultat-hanteringen utökade |
 
+**Repliker visades i blått (nyhetsfärg) i det nya "💬 Debattartiklar"-filtret — samma bugg på två ställen (användarrapport, sep 2026, med skärmdump av `/arkiv?debatt=1`):** *"Skiljer verkligen filtret på debattartiklar och nyhetsartiklar? Färgerna på rubrikerna är ju olika."* Skärmdumpen visade en artikel med grön rubrik ("Om fem år är kritiken på nätet tystad") direkt följd av två repliker med BLÅ rubrik ("Replik: Jensen Huang har rätt om en sak...") — trots att alla tre korrekt matchade det nya debattfiltret.
+
+**Rotorsak:** repliker sätter alltid `nyhetskalla` (till en pekare tillbaka mot originalartikeln, `replik_kalla`, se ✅17/✅105) — `ArkivClient.js`s och `app/client.js`s "VECKANS MEST LÄSTA"-widgets rubrikfärgs-ternary kollade bara `a.nyhetskalla ? blå : grön`, dvs. ren TRUTHINESS, utan att skilja en genuin nyhetskälla från en replik-pekare. Artikelsidans egen `<h1>`-rubrik (`app/artikel/[id]/page.js`) hade redan rätt logik sedan tidigare (`nyhetskalla && nyhetskalla?.typ !== "replik" ? blå : grön`) — de två andra ställena fick aldrig samma skydd, ett läge som fanns redan innan den här sessionens filmrecensions-färgfixar (✅123 ovan) och som bara blev synligt nu när debattfiltret för första gången samlade repliker och eget-ämne-artiklar i SAMMA lista där skillnaden syns sida vid sida.
+
+**Fix:** samma `nyhetskalla?.typ !== "replik"`-villkor som artikelsidan redan använder, tillagt på båda de andra två ställena. Ingen filtreringslogik ändrades — `matchDebatt`/`fetchLatestArtikel()` inkluderade redan replikerna korrekt, det var uteslutande en rubrikfärgsbugg.
+
+**Om "MÄNNISKA"-taggen (samma rapport):** *"Det verkar också saknas en tag för publicerade av människa."* `KallaBadge`-komponenten i `ArkivClient.js` renderar redan korrekt "MÄNNISKA" för `kalla === "manniska"` (samma fält och värde som `/skicka-in` sätter vid publicering, se ✅116/✅123) — ingen kod ändrad här. Den skärmdumpade vyn råkade bara inte innehålla någon människopublicerad artikel bland de senaste träffarna; plattformen publicerar i praktiken nästan uteslutande AI-genererat innehåll (16–19 AI-artiklar/dag mot enstaka manuella inskick, se "Nyhetsschema per körning"), så badgen syns sällan i ett litet urval snarare än att den saknas i koden.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/arkiv/ArkivClient.js` | Artikelkortens `<h2>`-rubrikfärg kollar nu `a.nyhetskalla?.typ !== "replik"` — samma villkor som artikelsidan redan hade — så repliker renderas grönt (debatt), inte blått (nyhet) |
+| `app/client.js` | "VECKANS MEST LÄSTA"-widgetens rubrikfärg fick samma `nyhetskalla?.typ !== "replik"`-villkor |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
