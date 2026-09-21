@@ -70,9 +70,11 @@ async function deleteInlamning(id) {
 }
 
 async function deleteArtikelById(id) {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?id=eq.${id}`, {
-    method: "DELETE",
-    headers: sbHeaders(),
+  // Routed through server-side API so SUPABASE_SERVICE_ROLE_KEY is used — anon key lacks DELETE on artiklar
+  const res = await fetch("/api/admin/delete-artikel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pw: getStoredPw(), id }),
   });
   if (!res.ok) throw new Error(await res.text());
 }

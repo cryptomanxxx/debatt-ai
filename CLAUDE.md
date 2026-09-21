@@ -3583,6 +3583,21 @@ Fixat med ett nytt, batchat kontrollsteg: `_hamta_videodetaljer()` hämtar `stat
 
 ---
 
+### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
+
+Användarrapport (sep 2026): *"Jag gick in på admin panelen nu och försökte ta bort (delete) / Episkt förföljelseklipp som visar filmens tekniska briljans / från hemsidan men det funkade inte."* (en Filmrecensenten-artikel, artikel/1812).
+
+**Rotorsak:** `deleteArtikelById()` i `app/admin/client.js` skickade `DELETE` direkt mot Supabase REST med den publika anon-nyckeln (`sbHeaders()`) — ingen server-side route, ingen admin-lösenordsspärr. Sedan RLS-härdningsgenomgången (se avsnittet ovan) kräver `artiklar` service role för skrivning; anon-nyckeln har ingen DELETE-policy. PostgREST/Postgres svarar dock med en **lyckad** HTTP-status och noll ändrade rader när RLS blockerar en skrivning — inget kastat fel. `handleDeleteArtikel()` såg alltså `res.ok === true`, tog bort raden optimistiskt ur den lokala listan (`setArtiklar(prev => prev.filter(...))`) — artikeln såg borttagen ut i admin-panelen men fanns kvar oförändrad i databasen och på den publika sajten. Exakt samma bugklass som redan fixades för `updateArtikel()` (routad via `/api/admin/update-artikel` med service role) under RLS-härdningen — bara `delete`-vägen missades vid det tillfället.
+
+**Fix:** ny route `app/api/admin/delete-artikel/route.js`, exakt samma mönster som `update-artikel/route.js` (kollar `pw === ADMIN_SECRET`, DELETEar sedan med `SUPABASE_SERVICE_ROLE_KEY`). `deleteArtikelById()` i `client.js` anropar nu den routen istället för att gå direkt mot Supabase.
+
+| Fil | Roll |
+|---|---|
+| `app/api/admin/delete-artikel/route.js` | Ny route. Admin-lösenordskoll + DELETE mot `artiklar` med service role |
+| `app/admin/client.js` → `deleteArtikelById()` | Anropar `/api/admin/delete-artikel` istället för Supabase REST direkt med anon-nyckeln |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
