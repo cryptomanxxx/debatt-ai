@@ -119,6 +119,7 @@ async function publishToArtiklar(row) {
       kategori: row.kategori, motivering: row.motivering,
       arg: row.arg, ori: row.ori, rel: row.rel, tro: row.tro,
       kalla: row.kalla || "manniska",
+      filmrecension: row.filmrecension === true,
     }),
   });
   if (!res.ok) throw new Error(await res.text());

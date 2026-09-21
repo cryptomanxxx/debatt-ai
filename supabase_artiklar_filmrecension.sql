@@ -33,3 +33,16 @@ alter table public.inlamningar add column if not exists filmrecension boolean no
 
 update public.artiklar set filmrecension = true where forfattare = 'Filmrecensenten' and filmrecension = false;
 update public.inlamningar set filmrecension = true where forfattare = 'Filmrecensenten' and filmrecension = false;
+
+-- Känd begränsning (Codex-fynd, PR #1484-granskning): denna backfyllning
+-- täcker bara AI-agentens recensioner. Den ursprungliga rapporterade
+-- MÄNSKLIGA filmrecensionen (som motiverade hela denna fix) kan INTE
+-- identifieras generiskt i efterhand — dess kategori ("Kultur & konst")
+-- delas med vanliga debattartiklar, så en heuristisk backfyllning riskerar
+-- att felmärka en genuin debattartikel om kultur som filmrecension.
+-- Kör raden nedan manuellt i Supabase SQL Editor med den specifika
+-- artikelns id (synligt i admin-panelen eller i artikelns URL,
+-- /artikel/<id>) för att korrigera just den redan publicerade artikeln:
+--
+-- update public.artiklar set filmrecension = true where id = <ARTIKEL_ID>;
+-- update public.inlamningar set filmrecension = true where id = <INLAMNING_ID>; -- om känd

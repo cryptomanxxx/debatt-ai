@@ -3655,6 +3655,18 @@ Kräver `supabase_artiklar_filmrecension.sql` — kör i Supabase SQL Editor.
 | `app/skicka-in/SkickaInClient.js` | `filmrecension: typ === "filmrecension"` satt i både `analyze()`s och `publish()`s INSERT-bodyer |
 | `app/client.js` | `fetchSenasteFilmrecension()` filtrerar nu `filmrecension=eq.true` istället för `forfattare=eq.Filmrecensenten`. `fetchLatestArtikel()` filtrerar `filmrecension=eq.false` istället för `forfattare=neq.Filmrecensenten` |
 
+**Codex-fynd (PR #1484-granskning): admin-panelens manuella publiceringsflöde kopierade inte flaggan.** När en inlämning inte kan självpubliceras (poäng under gränsen) och en admin senare godkänner och publicerar den manuellt från admin-panelens inkorg, kopierar `app/admin/client.js → publishToArtiklar()` bara ett urval fält (`rubrik`/`forfattare`/`artikel`/`kategori`/`motivering`/`arg`/`ori`/`rel`/`tro`/`kalla`) från `inlamningar`-raden till den nya `artiklar`-raden — `filmrecension` saknades i den listan. En manuellt admin-godkänd filmrecension hade alltså fått databasens `false`-default trots att `inlamningar`-raden redan korrekt hade `filmrecension=true` (satt av `SkickaInClient.js`s `analyze()`, se ovan) — samma bugg som denna PR fixar, fast via en annan skrivväg. Fixat: `filmrecension: row.filmrecension === true` tillagt i POST-bodyn (samma mönster som övriga kopierade fält). `inlamningar`-hämtningen använder redan `select=*`, så `row.filmrecension` är alltid tillgängligt.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/admin/client.js` → `publishToArtiklar()` | Kopierar nu `filmrecension` från `inlamningar`-raden till den nya `artiklar`-raden vid manuell admin-publicering |
+
+**Codex-fynd (PR #1484-granskning): den ursprungliga backfyllningen kunde bara täcka AI-agentens recensioner, inte den specifika rapporterade mänskliga.** Migreringens `update ... where forfattare = 'Filmrecensenten'` sätter korrekt `filmrecension=true` retroaktivt på AI-agentens redan publicerade recensioner (se ovan) — men den MÄNSKLIGA filmrecensionen som ursprungligen rapporterade buggen ligger kvar med `filmrecension=false` (kolumnens default) efter migreringen, eftersom dess `kategori` ("Kultur & konst") delas med vanliga debattartiklar och `forfattare` är besökarens eget namn, inte "Filmrecensenten". En generisk backfyllning kan alltså inte identifiera den specifika raden utan risk att felmärka en genuin debattartikel om kultur som filmrecension. **Kräver manuell åtgärd:** migreringsfilen innehåller nu en färdig, kommenterad `update ... where id = <ARTIKEL_ID>`-rad att köra i Supabase SQL Editor så fort artikelns id är känt (synligt i admin-panelen eller i artikelns URL, `/artikel/<id>`) — samma "manuell engångskorrigering"-princip som redan används på flera andra ställen i den här loggen för data som inte kan självläka programmatiskt (jfr ✅93 "Kvarvarande skräprader").
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `supabase_artiklar_filmrecension.sql` | Ny kommenterad manuell-korrigeringsrad (`update ... where id = <ARTIKEL_ID>`) för den specifika rapporterade mänskliga filmrecensionen, som inte kan identifieras generiskt av den automatiska backfyllningen |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
