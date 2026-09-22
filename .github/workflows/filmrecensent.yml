@@ -39,11 +39,20 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DEBATT_API_KEY:    ${{ secrets.DEBATT_API_KEY }}
           # Krävs för att bläddra kanalens HELA uppladdningskatalog
-          # (~9000+ videor) istället för bara den senaste videon — se
+          # (~9000+ videor) istället för bara de senaste videorna — se
           # filmrecensent.py. Saknas secreten faller skriptet tillbaka på
-          # det gamla RSS-baserade "bara senaste videon"-beteendet.
+          # det gamla RSS-baserade beteendet (skannar de ~15 senast
+          # uppladdade videorna i flödet, hoppar över redan recenserade —
+          # se hamta_senaste_video(), Codex-fynd PR #1501-granskning: annars
+          # hade bara pass 1 av dagens 4 gjort något, resten sett samma
+          # (redan recenserade) video och no-opat).
           YOUTUBE_API_KEY:   ${{ secrets.YOUTUBE_API_KEY }}
         run: |
+          # OBS: pending_forsok/MAX_PENDING_FORSOK-retryn (filmrecensent.py)
+          # räknas EN gång per KÖRNING (dag), inte en gång per pass nedan —
+          # se AKTUELL_KORNING_ID/pending_run_id (Codex-fynd, PR #1501-
+          # granskning). En kort transient leverantörsstörning under dessa
+          # 4 pass kan därför aldrig ensam förbruka hela retry-budgeten.
           set +e
           FAILED=0
           for i in $(seq 1 4); do

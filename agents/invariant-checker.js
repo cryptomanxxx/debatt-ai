@@ -294,7 +294,13 @@ function checkRedaktionRaknarFilmrecensioner() {
     // ursprungsbugg (✅127) återuppstår, trots att den här checken fortsatt
     // rapporterar "ok". Samma klass av fynd som redan fixats för
     // checkRedaktionRaknarRepliker() (PR #1430/#1433).
-    const selectMatch = kod.match(/rest\/v1\/artiklar\?select=([^&]*)/);
+    // Codex-fynd (PR #1501-granskning): matchades tidigare mot RÅ källkod —
+    // en utkommenterad gammal query-URL (t.ex. under en pågående ändring av
+    // select=-listan) hade fortfarande kunnat matcha och ge "ok" trots att
+    // den AKTIVA queryn saknar filmrecension. Samma taBortJsKommentarer()
+    // som redan används av checkDirektdebattReasoningEffort() tar bort den
+    // risken helt.
+    const selectMatch = taBortJsKommentarer(kod).match(/rest\/v1\/artiklar\?select=([^&]*)/);
     if (!selectMatch || !selectMatch[1].split(",").includes("filmrecension")) {
       rapportera(namn, "fail", "artiklar-queryns select= i page.js saknar filmrecension — a.filmrecension blir alltid undefined (✅127)");
       return;
