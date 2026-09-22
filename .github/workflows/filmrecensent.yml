@@ -8,7 +8,7 @@ on:
     # är redan tidpunktsagnostisk och säkert återanropningsbar i en tät
     # sekventiell loop — den fortsätter alltid där föregående pass sparade
     # cursorn.
-    - cron: '0 6 * * *'  # 08:00 svensk tid (sommartid) — 4 pass i samma körning
+    - cron: '0 10 * * *'  # 12:00 svensk tid (sommartid, ✅129) — 4 pass i samma körning
   workflow_dispatch:
 
 permissions:

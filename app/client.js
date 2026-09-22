@@ -487,14 +487,20 @@ function isEligible(r) {
 // Filmrecensioner en enda GitHub Actions-körning per typ (som internt loopar
 // 4 publiceringspass) istället för 4 separata körningar — schemat nedan
 // visar bara den enda avfyrningstidpunkten per typ, inte varje internt pass.
+// ✅129: Nyhetsartiklar/Debattartiklar/Repliker/Filmrecensioner flyttade till
+// 09:00/10:00/11:00/12:00 svensk tid (tätt packade istället för utspridda
+// 07/08/15/19) — listan MÅSTE hållas i strikt stigande tidsordning, annars
+// bryts useNastaKorning()s findIndex-baserade "nästa händelse"-logik.
 const ALLA_KÖRNINGAR = [
   { h: 5,  m: 30, namn: "Riksdagsval",     farg: "#e8d5a3", ikon: "🗳️" },
   { h: 6,  m: 30, namn: "Krisevents",      farg: "#f87171", ikon: "🌍" },
-  { h: 7,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
-  { h: 8,  m: 0,  namn: "Filmrecensioner", farg: "#e8b84a", ikon: "🎬" },
+  { h: 9,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
+  { h: 10, m: 0,  namn: "Debattartiklar",  farg: "#e879f9", ikon: "📝" },
   { h: 10, m: 30, namn: "Intern börs",     farg: "#e8d5a3", ikon: "📈" },
+  { h: 11, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
   { h: 11, m: 0,  namn: "Butiken",         farg: "#f59e0b", ikon: "🛍" },
   { h: 11, m: 30, namn: "Andrahandsmkn",   farg: "#e879f9", ikon: "🔨" },
+  { h: 12, m: 0,  namn: "Filmrecensioner", farg: "#e8b84a", ikon: "🎬" },
   { h: 12, m: 0,  namn: "Parlamentet",     farg: "#a78bfa", ikon: "🏛" },
   { h: 12, m: 30, namn: "Lobbying",        farg: "#f87171", ikon: "💰" },
   { h: 13, m: 0,  namn: "Koalitioner",     farg: "#34d399", ikon: "🤝" },
@@ -502,9 +508,7 @@ const ALLA_KÖRNINGAR = [
   { h: 13, m: 45, namn: "Ryktesspridning", farg: "#fb923c", ikon: "📢" },
   { h: 14, m: 0,  namn: "Konversationer",  farg: "#a78bfa", ikon: "🤖" },
   { h: 14, m: 30, namn: "Domstolen",       farg: "#e8d5a3", ikon: "⚖️" },
-  { h: 15, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
   { h: 18, m: 15, namn: "Intern börs",     farg: "#e8d5a3", ikon: "📈" },
-  { h: 19, m: 0,  namn: "Debattartiklar",  farg: "#e879f9", ikon: "📝" },
 ];
 
 function svTidSek() {

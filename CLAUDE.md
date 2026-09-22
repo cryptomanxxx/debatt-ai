@@ -3911,6 +3911,33 @@ Fixat genom att lägga till en tredje kontroll först i funktionen: en regex (`/
 
 ---
 
+### ✅ 129. Fönstren omschemalagda till 09:00/10:00/11:00/12:00 svensk tid — och varför fönstren själva var tvungna att smalna av – KLART
+
+Ägarbegäran (sep 2026), direkt uppföljning på ✅128: *"Kan ordning vara så här: 09:00📰Nyhetsartiklar / 10:00📝Debattartiklar / 11:00💬Repliker / 12:00🎬Filmrecensioner / Allt annat"* — flytta de fyra kärninnehållstyperna från sina tidigare utspridda klockslag (07:00/19:00/15:00/08:00) till fyra tätt packade timmar på förmiddagen, i den ordningen.
+
+**Ren tidsflytt, inte en omstrukturering av visningslogiken.** Övervägde att bokstavligen gruppera de fyra typerna som ett eget block följt av "Allt annat" i `DagensSchema`-widgeten — men widgetens `useNastaKorning()`-hook förutsätter att `ALLA_KÖRNINGAR` är strikt kronologiskt sorterad (`findIndex(k => k.h*3600+k.m*60 > nowSec)`), och en bokstavlig gruppering hade krävt en omskrivning av den logiken. Tolkade "Allt annat" som "resten av schemat fortsätter som vanligt" snarare än ett krav på att visuellt separera blocket — de fyra nya tiderna (09–12) hamnar naturligt kronologiskt FÖRE nästan alla andra dagliga körningar (Intern börs 10:30, Butiken 11:00, Parlamentet 12:00 m.fl. börjar först 10:30), så en ren tidsflytt ger i praktiken nästan exakt den grupperade känslan ägaren efterfrågade, utan att röra widgetens arkitektur.
+
+**Rotorsak till varför en ren tidsbyte i workflow-YAML:erna inte var tillräckligt.** `agent.py`s `force_nyhet`/`force_replik`/`force_eget`-flaggor (kvotfönstren, ✅19/100) var innan denna fix definierade som BREDA 4-timmarsspann (`utc_hour in (5,6,7,8)` för nyhet, `(13,14,15,16)` för replik, `(17,18,19,20)` för eget) — rimligt så länge de tre typerna låg utspridda över dygnet med gott om marginal mellan sig. Att bara flytta de faktiska cron-tiderna till tre PÅ VARANDRA FÖLJANDE UTC-timmar (7/8/9) utan att samtidigt smalna av spannen hade skapat en genuin överlappsbugg: den gamla nyhet-rangen (5,6,7,8) hade fortsatt inkludera timme 8 — nu debattartiklarnas (eget) egen timme — vilket hade gett `force_nyhet=True` OCH `force_eget=True` SAMTIDIGT för en och samma körning (bekräftat att koden på flera ställen, t.ex. `if force_nyhet or force_eget:` i ✅100s kvotseparationslogik, behandlar dessa som oberoende booleaner, inte en ömsesidigt uteslutande if/elif-kedja — en sådan dubbel-sanning hade gett odefinierat/felaktigt beteende i den logiken).
+
+**Fix:** de tre fönstren smalnades av till exakta enkeltimmesjämförelser (`utc_hour == 7`/`== 8`/`== 9`) istället för breda intervall. Säkert att göra utan att förlora robusthet, eftersom AGENT_CRON-vägen (den normala, icke-försenade triggern) redan slår upp en EXAKT cron-sträng mot en EXAKT timme i `_CRON_TILL_TIMME`-dicten — spannets bredd spelade aldrig någon roll där. De enda två scenarier där det breda spannet tidigare gav extra marginal — manuell `workflow_dispatch` och en kraftigt försenad "stale" cron som korsat midnatt — kringgår redan `sys.exit(0)`-spärren helt via `ar_manuell_korning`/`nagon_kvot_kvar`-grinden (✅98/100), så en smalare räckvidd där kostar ingen faktisk robusthet: en sådan körning publicerar fortfarande fritt utifrån dagens kvotläge, den tvingar bara inte längre en SPECIFIK typ om den råkar landa utanför de tre exakta timmarna.
+
+**Filmrecensenten** (`filmrecensent.py`/`filmrecensent.yml`) är helt fristående från `agent.py`s fönster-/kvotsystem (dokumenterat sedan ✅123/128 — dess egen cursor/pending-state-maskin är tidpunktsagnostisk) — dess flytt till 12:00 krävde bara en cron-ändring i `filmrecensent.yml`, ingen `agent.py`-logik berörs.
+
+**Nya UTC-motsvarigheter (CEST, UTC+2):** 09:00→07 UTC (nyhet), 10:00→08 UTC (eget/debatt), 11:00→09 UTC (replik), 12:00→10 UTC (film).
+
+**`DagensSchema`-widgeten** (`app/client.js`) fick sina fyra `ALLA_KÖRNINGAR`-poster flyttade till de nya klockslagen och hela arrayen omsorterad i strikt stigande tidsordning (två exakta tidskrockar uppstår nu, 11:00 Repliker/Butiken och 12:00 Filmrecensioner/Parlamentet — ofarligt, `useNastaKorning()`s `>`-jämförelse och renderingens `past`/`isNext`-logik hanterar likvärdiga tidsstämplar korrekt oavsett array-ordning mellan de två). Antal poster (17) och grid-layouten (`repeat(9, auto)`) är oförändrade — bara tiderna flyttade, inga rader lades till eller togs bort.
+
+**Ej ändrat:** catch-up-mekanismen (`utc_hour == 21`, `brist`/`prio`-baserat typval) är helt oberoende av de tre primära fönstrens specifika klockslag och påverkas inte. `hamta_publicerade_idag_per_typ()`, `agent.yml`s `concurrency`-grupp och ✅128s per-cron `PASS=4`-loopning är strukturellt oförändrade — bara vilka exakta cron-strängar som mappas till 4 pass uppdaterades.
+
+| Fil | Roll |
+|---|---|
+| `.github/workflows/agent.yml` | De tre primära cron-raderna ändrade `"0 5/13/17 * * *"` → `"0 7/8/9 * * *"` (09:00/10:00/11:00 svensk tid för nyhet/eget/replik). `PASS=4`-case-satsen matchar nu de nya cron-strängarna. Kommentarer uppdaterade |
+| `.github/workflows/filmrecensent.yml` | Cron ändrad `'0 6 * * *'` (08:00) → `'0 10 * * *'` (12:00 svensk tid) |
+| `agent.py` | `_CRON_TILL_TIMME`s tre primära entries uppdaterade till de nya cron-strängarna/timmarna (7/8/9). `force_nyhet`/`force_replik`/`force_eget` smalnade av från breda 4-timmarsspann till exakta enkeltimmesjämförelser — förhindrar att de tre flaggorna kan bli sanna samtidigt nu när deras timmar ligger direkt intill varandra |
+| `app/client.js` | `ALLA_KÖRNINGAR`s fyra poster (Nyhetsartiklar/Debattartiklar/Repliker/Filmrecensioner) flyttade till 09:00/10:00/11:00/12:00, hela arrayen omsorterad kronologiskt för att bevara `useNastaKorning()`s korrekthet |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
