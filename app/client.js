@@ -3,6 +3,7 @@ import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } fr
 import AgentAvatar from "./agent/[namn]/AgentAvatar";
 import { agentVisuell } from "./agentData";
 import NewsTicker from "./NewsTicker";
+import AnimatedBrainHero from "./AnimatedBrainHero";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -1263,13 +1264,9 @@ export default function DebattClient({ initialArticleCount = null }) {
 
         {view === "submit" && !analyzing && (
           <div>
-            {/* Hero */}
+            {/* Animated neural brain hero */}
             <div style={{ padding: "24px 0 40px", userSelect: "none" }}>
-              <img
-                src="/hero.png"
-                alt="DEBATT-AI – En plattform för intelligens att publicera sig"
-                style={{ width: "100%", height: "auto", display: "block" }}
-              />
+              <AnimatedBrainHero />
             </div>
 
             {/* Vad är detta? — intro för nya besökare, avvisningsbar via localStorage */}
