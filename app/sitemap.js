@@ -27,7 +27,6 @@ export default async function sitemap() {
   const staticPages = [
     { url: BASE,                        lastModified: now, changeFrequency: "daily",   priority: 1.0 },
     { url: `${BASE}/arkiv`,             lastModified: now, changeFrequency: "daily",   priority: 0.9 },
-    { url: `${BASE}/nyheter`,           lastModified: now, changeFrequency: "daily",   priority: 0.9 },
     { url: `${BASE}/chatt`,             lastModified: now, changeFrequency: "daily",   priority: 0.8 },
     { url: `${BASE}/chatt/historik`,    lastModified: now, changeFrequency: "daily",   priority: 0.7 },
     { url: `${BASE}/opinion`,           lastModified: now, changeFrequency: "daily",   priority: 0.8 },

@@ -157,34 +157,33 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
           )}
         </div>
 
-        {/* Taggfilter */}
-        {topTags.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-            <button onClick={() => setFilterTag(null)} style={{ background: !filterTag ? C.accent : "transparent", color: !filterTag ? "#0a0a0a" : C.textMuted, border: `1px solid ${!filterTag ? C.accent : C.border}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
-              Alla
+        {/* Filterrad — alltid synlig oavsett om taggar finns (filmrecension-/debatt-/nyhets-/kalla-filtren
+            är oberoende av taggmolnet; bara tagg-pillsen längst ned är villkorade på topTags.length > 0). */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+          <button onClick={() => setFilterTag(null)} style={{ background: !filterTag ? C.accent : "transparent", color: !filterTag ? "#0a0a0a" : C.textMuted, border: `1px solid ${!filterTag ? C.accent : C.border}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+            Alla
+          </button>
+          <button onClick={() => setFilterFilm(f => !f)} style={{ background: filterFilm ? C.filmrecension : "transparent", color: filterFilm ? "#0a0a0a" : C.filmrecension, border: `1px solid ${C.filmrecension}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+            🎬 Filmrecensioner
+          </button>
+          <button onClick={() => setFilterDebatt(f => !f)} style={{ background: filterDebatt ? C.green : "transparent", color: filterDebatt ? "#0a0a0a" : C.green, border: `1px solid ${C.green}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+            💬 Debattartiklar
+          </button>
+          <button onClick={() => setFilterNyhet(f => !f)} style={{ background: filterNyhet ? C.nyhet : "transparent", color: filterNyhet ? "#0a0a0a" : C.nyhet, border: `1px solid ${C.nyhet}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+            📰 Nyhetsartiklar
+          </button>
+          <button onClick={() => setFilterKalla(k => k === "ai" ? null : "ai")} style={{ background: filterKalla === "ai" ? C.ai : "transparent", color: filterKalla === "ai" ? "#0a0a0a" : C.ai, border: `1px solid ${C.ai}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+            🤖 AI
+          </button>
+          <button onClick={() => setFilterKalla(k => k === "manniska" ? null : "manniska")} style={{ background: filterKalla === "manniska" ? C.accent : "transparent", color: filterKalla === "manniska" ? "#0a0a0a" : C.accent, border: `1px solid ${C.accent}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+            ✍️ Människa
+          </button>
+          {topTags.map(t => (
+            <button key={t} onClick={() => setFilterTag(filterTag === t ? null : t)} style={{ background: filterTag === t ? C.accent : "transparent", color: filterTag === t ? "#0a0a0a" : C.textMuted, border: `1px solid ${filterTag === t ? C.accent : C.border}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
+              #{t}
             </button>
-            <button onClick={() => setFilterFilm(f => !f)} style={{ background: filterFilm ? C.filmrecension : "transparent", color: filterFilm ? "#0a0a0a" : C.filmrecension, border: `1px solid ${C.filmrecension}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
-              🎬 Filmrecensioner
-            </button>
-            <button onClick={() => setFilterDebatt(f => !f)} style={{ background: filterDebatt ? C.green : "transparent", color: filterDebatt ? "#0a0a0a" : C.green, border: `1px solid ${C.green}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
-              💬 Debattartiklar
-            </button>
-            <button onClick={() => setFilterNyhet(f => !f)} style={{ background: filterNyhet ? C.nyhet : "transparent", color: filterNyhet ? "#0a0a0a" : C.nyhet, border: `1px solid ${C.nyhet}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
-              📰 Nyhetsartiklar
-            </button>
-            <button onClick={() => setFilterKalla(k => k === "ai" ? null : "ai")} style={{ background: filterKalla === "ai" ? C.ai : "transparent", color: filterKalla === "ai" ? "#0a0a0a" : C.ai, border: `1px solid ${C.ai}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
-              🤖 AI
-            </button>
-            <button onClick={() => setFilterKalla(k => k === "manniska" ? null : "manniska")} style={{ background: filterKalla === "manniska" ? C.accent : "transparent", color: filterKalla === "manniska" ? "#0a0a0a" : C.accent, border: `1px solid ${C.accent}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
-              ✍️ Människa
-            </button>
-            {topTags.map(t => (
-              <button key={t} onClick={() => setFilterTag(filterTag === t ? null : t)} style={{ background: filterTag === t ? C.accent : "transparent", color: filterTag === t ? "#0a0a0a" : C.textMuted, border: `1px solid ${filterTag === t ? C.accent : C.border}`, borderRadius: "20px", padding: "6px 14px", fontSize: "13px", cursor: "pointer", fontFamily: "Georgia, serif" }}>
-                #{t}
-              </button>
-            ))}
-          </div>
-        )}
+          ))}
+        </div>
       </div>
 
       {filtered.length === 0 ? (
