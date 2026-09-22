@@ -3868,6 +3868,14 @@ Användarrapport (sep 2026): *"På sidan: https://www.debatt-ai.se/redaktion så
 | `app/redaktion/RedaktionVy.js` | Ny `<Bar dataKey="film" name="Filmrecensioner" fill="#e8b84a">` i "Daglig publicering vs mål"-grafen |
 | `agents/invariant-checker.js` | Ny check, `redaktion-raknar-filmrecensioner` (källkod) — regressionsguard för denna fix, kollar både datalager (`page.js`) och rendering (`RedaktionVy.js`) |
 
+**Codex-fynd (PR #1496/#1497-granskning): checken verifierade klassificeringen och grafstapeln men aldrig själva datakällan.** `redaktion-raknar-filmrecensioner` kollade att `dagMap[key].film++` finns kopplat till `a.filmrecension`-villkoret och att `RedaktionVy.js` har en `<Bar dataKey="film">` — men aldrig att Supabase-queryns `select=`-parameter i `page.js` faktiskt hämtar kolumnen `filmrecension`. En framtida ändring som tyst tog bort `filmrecension` ur `select=` (utan att röra klassificeringskoden eller graf-JSX:en) hade gjort `a.filmrecension` permanent `undefined` — exakt originalbuggen (✅127) återuppstår — samtidigt som checken ändå rapporterat "ok", eftersom de två andra villkoren fortfarande stämmer. Samma klass av fynd som redan fixats för `redaktion-raknar-repliker` (PR #1430/#1433).
+
+Fixat genom att lägga till en tredje kontroll först i funktionen: en regex (`/rest\/v1\/artiklar\?select=([^&]*)/`) extraherar `select=`-listan ur `page.js`s hela källkod och verifierar att `filmrecension` finns med bland de kommaseparerade fälten — misslyckas den kontrollen rapporteras `fail` direkt, innan de två redan existerande kontrollerna ens körs. Verifierat isolerat: regexen matchar korrekt `skapad,nyhetskalla,parent_id,filmrecension` mot den riktiga filen (`includes filmrecension: true`) och ger korrekt `false` mot en simulerad regression där `,filmrecension` tagits bort ur samma sträng.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | `checkRedaktionRaknarFilmrecensioner()` kollar nu även att `select=`-parametern i `app/redaktion/page.js`s Supabase-query innehåller `filmrecension`, inte bara klassificeringsgrenen och grafstapeln |
+
 ---
 
 ## Den autonoma debatten – slutvisionen

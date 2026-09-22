@@ -287,6 +287,18 @@ function checkRedaktionRaknarFilmrecensioner() {
   const namn = "redaktion-raknar-filmrecensioner";
   try {
     const kod = lasFil("app/redaktion/page.js");
+    // Codex-fynd (PR #1496/#1497-granskning): denna check verifierade tidigare
+    // bara klassificeringsgrenen och grafstapeln — inte att Supabase-queryns
+    // select= faktiskt hämtar filmrecension. Skulle en framtida ändring tyst ta
+    // bort fältet ur select= blir a.filmrecension alltid undefined och samma
+    // ursprungsbugg (✅127) återuppstår, trots att den här checken fortsatt
+    // rapporterar "ok". Samma klass av fynd som redan fixats för
+    // checkRedaktionRaknarRepliker() (PR #1430/#1433).
+    const selectMatch = kod.match(/rest\/v1\/artiklar\?select=([^&]*)/);
+    if (!selectMatch || !selectMatch[1].split(",").includes("filmrecension")) {
+      rapportera(namn, "fail", "artiklar-queryns select= i page.js saknar filmrecension — a.filmrecension blir alltid undefined (✅127)");
+      return;
+    }
     const idx = kod.indexOf("Daglig publicering senaste 30 dagarna");
     if (idx === -1) {
       rapportera(namn, "fail", "hittar inte dagligData-bygget i app/redaktion/page.js");
