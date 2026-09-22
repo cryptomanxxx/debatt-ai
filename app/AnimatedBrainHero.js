@@ -18,35 +18,19 @@ export default function AnimatedBrainHero() {
     let nodes = [];
     let edges = [];
     let pulses = [];
-    let pointer = { x: 0.5, y: 0.5, active: false };
+    let pointer = { x: 0.5, y: 0.5 };
+    let realPointerActive = false;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    // Pre-rendered glow sprites replace per-shape ctx.shadowBlur. A native
-    // shadow blur forces the browser to rasterize a blur pass for every node
-    // on every frame (the dominant cost of this animation — measured at
-    // ~6% extra main-thread time on desktop and ~16% on mobile vs. an
-    // otherwise-identical static frame). A radial gradient baked once into a
-    // tiny offscreen canvas and composited with drawImage() gives the same
-    // soft-glow look via a cheap bitmap blit instead.
-    function makeGlowSprite(rgb) {
-      const size = 64;
-      const c = document.createElement("canvas");
-      c.width = size;
-      c.height = size;
-      const g = c.getContext("2d");
-      const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-      grad.addColorStop(0, `rgba(${rgb},0.9)`);
-      grad.addColorStop(0.4, `rgba(${rgb},0.35)`);
-      grad.addColorStop(1, `rgba(${rgb},0)`);
-      g.fillStyle = grad;
-      g.beginPath();
-      g.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
-      g.fill();
-      return c;
-    }
-    const neuronGlow = makeGlowSprite("104,188,255");
-    const hoverGlow = makeGlowSprite("195,142,255");
-    const pulseGlow = makeGlowSprite("232,121,249");
+    // A gentle automatic sweep drives the hover-glow/parallax effect by
+    // default, so the animation looks alive without requiring the visitor
+    // to move their mouse over it (most homepage visits never do, and touch
+    // devices have no hover state at all). A real pointer, when present,
+    // takes over from this.
+    const autoFocus = (time) => ({
+      x: 0.5 + 0.30 * Math.sin(time * 0.00015),
+      y: 0.46 + 0.20 * Math.sin(time * 0.000105 + 1.7),
+    });
 
     // Two overlapping ellipses + a narrower lower section create a recognizable
     // brain silhouette without shipping a heavy 3D model.
@@ -116,10 +100,10 @@ export default function AnimatedBrainHero() {
       resizeTimer = setTimeout(resize, 150);
     }
 
-    const pos = (n, time) => {
+    const pos = (n, time, focus) => {
       const breathe = reduced ? 0 : Math.sin(time * 0.00045 + n.phase) * 0.0025;
-      const px = pointer.active ? (pointer.x - 0.5) * (0.018 + n.z * 0.012) : 0;
-      const py = pointer.active ? (pointer.y - 0.5) * (0.010 + n.z * 0.008) : 0;
+      const px = (focus.x - 0.5) * (0.018 + n.z * 0.012);
+      const py = (focus.y - 0.5) * (0.010 + n.z * 0.008);
       return {
         x: (n.x + breathe + px) * width,
         y: (n.y + breathe * 0.5 + py) * height,
@@ -128,6 +112,8 @@ export default function AnimatedBrainHero() {
 
     function draw(time = 0) {
       ctx.clearRect(0, 0, width, height);
+
+      const focus = realPointerActive ? pointer : autoFocus(time);
 
       const halo = ctx.createRadialGradient(width * 0.52, height * 0.45, 0, width * 0.52, height * 0.45, width * 0.48);
       halo.addColorStop(0, "rgba(58, 110, 255, 0.12)");
@@ -138,8 +124,8 @@ export default function AnimatedBrainHero() {
 
       ctx.lineWidth = 0.7;
       for (const [a, b] of edges) {
-        const pa = pos(nodes[a], time);
-        const pb = pos(nodes[b], time);
+        const pa = pos(nodes[a], time, focus);
+        const pb = pos(nodes[b], time, focus);
         const shimmer = reduced ? 0.18 : 0.14 + 0.08 * Math.sin(time * 0.001 + nodes[a].phase);
         ctx.strokeStyle = `rgba(83, 151, 255, ${shimmer})`;
         ctx.beginPath();
@@ -149,28 +135,22 @@ export default function AnimatedBrainHero() {
       }
 
       for (const n of nodes) {
-        const p = pos(n, time);
-        let proximity = 0;
-        if (pointer.active) {
-          const mx = pointer.x * width;
-          const my = pointer.y * height;
-          proximity = Math.max(0, 1 - Math.hypot(p.x - mx, p.y - my) / 150);
-        }
+        const p = pos(n, time, focus);
+        const fx = focus.x * width;
+        const fy = focus.y * height;
+        const proximity = Math.max(0, 1 - Math.hypot(p.x - fx, p.y - fy) / 150);
         const flicker = reduced ? 0.55 : 0.42 + 0.22 * Math.sin(time * 0.0015 + n.phase);
         const radius = 1 + n.z * 1.4 + proximity * 2.2;
-        const active = proximity > 0.25;
-        const glowAlpha = active ? 0.65 + proximity * 0.3 : flicker;
-        const glowSize = (radius * 2 + 6) * (active ? 3.4 : 2.6);
-        ctx.globalAlpha = Math.min(1, glowAlpha);
-        ctx.drawImage(active ? hoverGlow : neuronGlow, p.x - glowSize / 2, p.y - glowSize / 2, glowSize, glowSize);
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = active
+        ctx.shadowBlur = 7 + proximity * 16;
+        ctx.shadowColor = proximity > 0.25 ? "#a879ff" : "#48a8ff";
+        ctx.fillStyle = proximity > 0.25
           ? `rgba(195, 142, 255, ${0.65 + proximity * 0.3})`
           : `rgba(104, 188, 255, ${flicker})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.shadowBlur = 0;
 
       if (!reduced && edges.length) {
         for (const pulse of pulses) {
@@ -181,16 +161,18 @@ export default function AnimatedBrainHero() {
             pulse.speed = 0.002 + Math.random() * 0.004;
           }
           const [ai, bi] = edges[pulse.edge];
-          const a = pos(nodes[ai], time);
-          const b = pos(nodes[bi], time);
+          const a = pos(nodes[ai], time, focus);
+          const b = pos(nodes[bi], time, focus);
           const x = a.x + (b.x - a.x) * pulse.t;
           const y = a.y + (b.y - a.y) * pulse.t;
-          ctx.drawImage(pulseGlow, x - 11, y - 11, 22, 22);
+          ctx.shadowBlur = 16;
+          ctx.shadowColor = "#d8b4fe";
           ctx.fillStyle = "rgba(232, 121, 249, 0.95)";
           ctx.beginPath();
           ctx.arc(x, y, 2.1, 0, Math.PI * 2);
           ctx.fill();
         }
+        ctx.shadowBlur = 0;
       }
 
       if (!reduced) raf = requestAnimationFrame(draw);
@@ -201,10 +183,10 @@ export default function AnimatedBrainHero() {
       pointer = {
         x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
         y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
-        active: true,
       };
+      realPointerActive = true;
     };
-    const onLeave = () => { pointer.active = false; };
+    const onLeave = () => { realPointerActive = false; };
 
     // Pause the rAF loop while the tab is backgrounded — most browsers already
     // throttle rAF when hidden, but this makes it explicit and immediate
@@ -239,7 +221,7 @@ export default function AnimatedBrainHero() {
       <canvas ref={canvasRef} className="brainCanvas" aria-hidden="true" />
       <div className="brainVignette" aria-hidden="true" />
       <div className="brainCopy">
-        <div className="brainEyebrow">MÄNNISKA × AI × BÄTTRE SAMTAL</div>
+        <div className="brainEyebrow">MÄNNISKA × AI = BÄTTRE SAMTAL</div>
         <h1>DEBATT<span>-AI</span></h1>
         <p className="brainLead">En plattform för intelligens att publicera sig</p>
         <p className="brainText">
