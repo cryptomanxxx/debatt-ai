@@ -95,16 +95,48 @@ export default function AnimatedBrainHero() {
         speed: 0.002 + Math.random() * 0.004,
       }));
 
-      // A handful of one-time lightning bolts, timed to flash while the
-      // entrance burst is still forming — never recurs afterward. Skipped
+      // Chain-lightning: walks the ACTUAL edge graph node1 -> node2 -> node3,
+      // never a straight line laid over unconnected nodes. Each hop grows
+      // at its own random speed (irregular, not a uniform sweep), one after
+      // the other, then the whole chain holds briefly and fades. One-time,
+      // timed to fire while the entrance burst is still forming — skipped
       // for prefers-reduced-motion, same as the rest of the entrance.
-      lightnings = !reduced && nodes.length
-        ? Array.from({ length: mobile ? 4 : 7 }, () => ({
-            ai: Math.floor(Math.random() * nodes.length),
-            bi: Math.floor(Math.random() * nodes.length),
-            time: 250 + Math.random() * (ENTRANCE_MS + 500),
-            dur: 160 + Math.random() * 140,
-          }))
+      const adjacency = Array.from({ length: nodes.length }, () => []);
+      for (const [i, j] of edges) {
+        adjacency[i].push(j);
+        adjacency[j].push(i);
+      }
+      function randomChain(maxHops) {
+        const start = Math.floor(Math.random() * nodes.length);
+        const path = [start];
+        const visited = new Set(path);
+        for (let h = 0; h < maxHops; h++) {
+          const options = adjacency[path[path.length - 1]].filter((n) => !visited.has(n));
+          if (!options.length) break;
+          const next = options[Math.floor(Math.random() * options.length)];
+          path.push(next);
+          visited.add(next);
+        }
+        return path;
+      }
+      lightnings = !reduced && edges.length
+        ? Array.from({ length: mobile ? 4 : 7 }, () => {
+            const path = randomChain(2 + Math.floor(Math.random() * 3));
+            const segTimes = [];
+            let cursor = 0;
+            for (let s = 0; s < path.length - 1; s++) {
+              const dur = 50 + Math.random() * 90;
+              segTimes.push({ start: cursor, end: cursor + dur });
+              cursor += dur;
+            }
+            return {
+              path,
+              segTimes,
+              time: 250 + Math.random() * (ENTRANCE_MS + 500),
+              holdMs: 90 + Math.random() * 80,
+              fadeMs: 180 + Math.random() * 120,
+            };
+          }).filter((L) => L.path.length >= 2)
         : [];
     }
 
@@ -255,12 +287,25 @@ export default function AnimatedBrainHero() {
 
       if (!reduced) {
         for (const L of lightnings) {
-          if (elapsed < L.time || elapsed > L.time + L.dur) continue;
-          const lt = (elapsed - L.time) / L.dur;
-          const alpha = Math.sin(Math.min(1, lt) * Math.PI);
-          const p1 = pos(nodes[L.ai], time, focus, nodeEase(nodes[L.ai], elapsed));
-          const p2 = pos(nodes[L.bi], time, focus, nodeEase(nodes[L.bi], elapsed));
-          drawLightning(p1, p2, alpha);
+          const t = elapsed - L.time;
+          const totalGrow = L.segTimes[L.segTimes.length - 1].end;
+          const deadAt = totalGrow + L.holdMs + L.fadeMs;
+          if (t < 0 || t > deadAt) continue;
+          const alpha = t <= totalGrow + L.holdMs
+            ? 1
+            : Math.max(0, 1 - (t - totalGrow - L.holdMs) / L.fadeMs);
+          for (let s = 0; s < L.segTimes.length; s++) {
+            const { start, end } = L.segTimes[s];
+            if (t < start) break; // later hops always come after earlier ones
+            const segT = Math.min(1, (t - start) / (end - start));
+            const ni = L.path[s];
+            const nj = L.path[s + 1];
+            const pi = pos(nodes[ni], time, focus, nodeEase(nodes[ni], elapsed));
+            const pj = pos(nodes[nj], time, focus, nodeEase(nodes[nj], elapsed));
+            const ex = pi.x + (pj.x - pi.x) * segT;
+            const ey = pi.y + (pj.y - pi.y) * segT;
+            drawLightning(pi, { x: ex, y: ey }, alpha);
+          }
         }
       }
 
