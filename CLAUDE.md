@@ -3798,6 +3798,33 @@ Ingen ny Supabase-migrering eller serverkod — ren klientsidesfiltrering av red
 
 ---
 
+### ✅ 126. /nyheter fortsatte se annorlunda ut trots ✅125 — retirerad till en ren redirect till /arkiv?nyhet=1 – KLART
+
+Uppföljande användarrapport (sep 2026), direkt efter ✅125 gått live i produktion: *"När man klickar på se alla i senaste Nyheterna, senaste Debatterna och Senaste film recensionerna widgetarna på hemsidans framsida så ser nyhetssidan fortfarande annorlunda ut en sidan för Debattartiklar och Senaste film recensionerna. Det står publicerade artiklar på två sidor och Nyheter på en. Nyhetssidan ser annorlunda ut. Varför?"*
+
+**Rotorsak:** ✅125 gav `/nyheter` sin egen taggfiltrering (en ny `NyheterClient.js`) — men det var fortfarande en helt SEPARAT komponent från `ArkivClient.js`, bara med liknande funktionalitet byggd parallellt. Två oberoende implementationer av "samma" filtreringskoncept garanterar ingen visuell identitet, bara en ytlig likhet — exakt det mönster den här kodbasen redan bitits av flera gånger (se t.ex. `app/nyhetskallor/agentAnalys.js`, som bröts ut just för att förhindra att `/nyhetskallor` och `/universitet` gled isär). `/arkiv?debatt=1` och `/arkiv?film=1` (✅123) är däremot bokstavligen SAMMA sida med olika förvalda filter — de kan aldrig se olika ut eftersom det är exakt samma komponent. `/nyheter` hade ingen sådan garanti.
+
+**Fix — retirera `/nyheter`s egen design helt, istället för att försöka matcha den mot `/arkiv`.** Samma etablerade mönster som redan finns i kodbasen för att pensionera en sida till förmån för en enhetlig destination: `app/marknad/page.js` gör exakt detta (`redirect("/mark?tab=marknaden")`). `app/nyheter/page.js` skrevs om till en ren tvåradig `redirect("/arkiv?nyhet=1")`, och den nyss byggda `app/nyheter/NyheterClient.js` (från ✅125) togs bort som nu död kod. Detta garanterar permanent pixel-för-pixel visuell identitet med `/arkiv?debatt=1` och `/arkiv?film=1` — det finns inte längre två implementationer som kan glida isär, för det finns bara en.
+
+**Sex korsreferensfiler pekade fortfarande på `/nyheter` istället för direkt på `/arkiv?nyhet=1`** — fungerar fortfarande korrekt via redirecten, men uppdaterades ändå för en direkt, icke-studsande navigering: `app/client.js` (huvudnavlänken + "🔥 SENASTE NYHETERNA"-widgetens "Se alla →"), `app/GlobalNav.js`, `app/layout.js` (footernav), `app/vecka/page.js` ("Nyheter →"), samt `app/om/page.js`s "Nyheter-sida"-avsnitt (bytte även den beskrivande prosan från "Sidan Nyheter samlar..." till "Filtret 📰 Nyhetsartiklar i arkivet samlar...").
+
+**`app/api/agent/submit/route.js`s villkorade `revalidatePath("/nyheter")`-anrop togs bort** — meningslöst nu när `/nyheter` är en ren redirect utan egen cachead listvy; `revalidatePath("/arkiv")` (som redan körs på raden ovanför) täcker allt som faktiskt spelar roll.
+
+**Medvetet oförändrat:** `agents/qa-observer.js`s sidlista behåller `/nyheter` — Playwrights `page.goto()` följer redirects transparent, så veckans visuella QA-skärmdump av `/nyheter` fångar nu korrekt den enhetliga `/arkiv?nyhet=1`-vyn utan att skriptet behöver ändras.
+
+| Fil | Roll |
+|---|---|
+| `app/nyheter/page.js` | Omskriven till en ren `redirect("/arkiv?nyhet=1")` — samma etablerade mönster som `app/marknad/page.js` |
+| `app/nyheter/NyheterClient.js` | Borttagen (död kod sedan `page.js` inte längre renderar den) |
+| `app/om/page.js` | "Nyheter-sida"-avsnittets båda länkar och beskrivande prosa pekar nu på `/arkiv?nyhet=1` |
+| `app/client.js` | Huvudnavlänken och "🔥 SENASTE NYHETERNA"-widgetens "Se alla →"-länk pekar nu direkt på `/arkiv?nyhet=1` |
+| `app/GlobalNav.js` | Toppnivålänken "Nyheter" pekar nu direkt på `/arkiv?nyhet=1` |
+| `app/layout.js` | Footernavets "Nyheter"-länk pekar nu direkt på `/arkiv?nyhet=1` |
+| `app/vecka/page.js` | "Nyheter →"-länken pekar nu direkt på `/arkiv?nyhet=1` |
+| `app/api/agent/submit/route.js` | Det nu meningslösa villkorade `revalidatePath("/nyheter")`-anropet (och dess `arNyhet`/`arReplik`-hjälpvariabler) borttaget — `revalidatePath("/arkiv")` räcker |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
