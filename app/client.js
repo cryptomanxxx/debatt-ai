@@ -96,7 +96,7 @@ async function fetchSenasteNyhet() {
 // — samma princip som SENASTE NYHETERNA/DEBATTERNA.
 async function fetchSenasteFilmrecension() {
   const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,taggar,youtube_video_id,skapad&filmrecension=eq.true&order=skapad.desc&limit=4`,
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla,taggar,arg,ori,rel,tro,skapad&filmrecension=eq.true&order=skapad.desc&limit=4`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
   if (!res.ok) return [];
@@ -1580,35 +1580,54 @@ export default function DebattClient({ initialArticleCount = null }) {
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                   {senasteFilmrecension.map(recension => (
-                    <a key={recension.id} href={`/artikel/${recension.id}`} style={{ display:"flex", gap:"14px", background:"#100c04", border:"1px solid #4a3a1a", borderRadius:"8px", padding:"14px 18px", position:"relative", overflow:"hidden", textDecoration:"none" }}>
+                    <div key={recension.id} style={{ background:"#100c04", border:"1px solid #4a3a1a", borderRadius:"8px", padding:"20px 24px", position:"relative", overflow:"hidden" }}>
                       <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #e8b84a, #e8b84a40)" }} />
-                      {recension.youtube_video_id && (
-                        <div style={{ flexShrink:0, width:"96px", height:"54px", borderRadius:"6px", overflow:"hidden", position:"relative", background:"#000" }}>
-                          <img
-                            src={`https://i.ytimg.com/vi/${recension.youtube_video_id}/mqdefault.jpg`}
-                            alt=""
-                            loading="lazy"
-                            style={{ width:"100%", height:"100%", objectFit:"cover", display:"block", opacity:0.9 }}
-                          />
-                          <span style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%)", width:"22px", height:"22px", borderRadius:"50%", background:"rgba(0,0,0,0.6)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"10px", color:"#fff" }}>▶</span>
-                        </div>
-                      )}
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px", flexWrap:"wrap" }}>
-                          {arNy(recension.skapad) && (
-                            <span style={{ fontSize:"10px", fontWeight:700, fontFamily:"monospace", color:"#0a0a0a", background:"#e8b84a", borderRadius:"3px", padding:"1px 7px", letterSpacing:"0.08em" }}>NY</span>
-                          )}
-                          {(recension.taggar||[]).slice(0,2).map(t => (
-                            <span key={t} style={{ fontSize:"11px", color:"#a08040", border:"1px solid #4a3a1a", borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
-                          ))}
-                        </div>
-                        <h2 style={{ fontSize:"16px", fontWeight:500, margin:"0 0 4px", lineHeight:1.3, color:"#e8b84a" }}>{recension.rubrik}</h2>
-                        <span style={{ color:C.textMuted, fontSize:"12px", fontStyle:"italic" }}>
-                          {recension.forfattare}
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px", flexWrap:"wrap" }}>
+                        {arNy(recension.skapad) && (
+                          <span style={{ fontSize:"10px", fontWeight:700, fontFamily:"monospace", color:"#0a0a0a", background:"#e8b84a", borderRadius:"3px", padding:"1px 7px", letterSpacing:"0.08em" }}>NY</span>
+                        )}
+                        {recension.kalla === "ai" && (
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
+                            <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#4a9eff", display:"inline-block" }} />
+                            <span style={{ color:"#4a9eff", fontSize:"11px", fontWeight:700, fontFamily:"monospace" }}>AI</span>
+                          </span>
+                        )}
+                        {recension.kalla === "manniska" && (
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#0a0a05", border:"1px solid #e8b84a40", borderRadius:"20px" }}>
+                            <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#e8b84a", display:"inline-block" }} />
+                            <span style={{ color:"#e8b84a", fontSize:"11px", fontWeight:700, fontFamily:"monospace" }}>MÄNNISKA</span>
+                          </span>
+                        )}
+                        {(recension.taggar||[]).slice(0,3).map(t => (
+                          <span key={t} style={{ fontSize:"11px", color:"#a08040", border:"1px solid #4a3a1a", borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
+                        ))}
+                      </div>
+                      <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 8px", lineHeight:1.3, color:"#e8b84a" }}>{recension.rubrik}</h2>
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 10px" }}>
+                        {recension.kalla === "ai" && (() => { const v = agentVisuell(recension.forfattare); return <AgentAvatar namn={recension.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={24} />; })()}
+                        <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>
+                          {recension.kalla === "ai" ? `Agent ${recension.forfattare}` : recension.forfattare}
                           {formateraDatum(recension.skapad) && <span style={{ marginLeft:"8px", opacity:0.6 }}>· {formateraDatum(recension.skapad)}</span>}
                         </span>
                       </div>
-                    </a>
+                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 14px" }}>{(recension.artikel||"").slice(0,180)}…</p>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
+                        <div style={{ display:"flex", gap:"12px" }}>
+                          {[["Arg",recension.arg],["Ori",recension.ori],["Rel",recension.rel],["Tro",recension.tro]].map(([lbl,val]) => {
+                            const color = val >= 8 ? C.green : val >= 6 ? C.yellow : C.red;
+                            return (
+                              <div key={lbl} style={{ textAlign:"center" }}>
+                                <div style={{ fontSize:"11px", color:C.textMuted, marginBottom:"3px" }}>{lbl}</div>
+                                <div style={{ fontSize:"13px", fontWeight:700, color, fontFamily:"monospace" }}>{val}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <a href={`/artikel/${recension.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#e8b84a15", border:"1px solid #e8b84a40", color:"#e8b84a", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
+                          Läs hela artikeln →
+                        </a>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
