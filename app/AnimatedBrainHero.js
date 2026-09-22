@@ -18,6 +18,7 @@ export default function AnimatedBrainHero() {
     let nodes = [];
     let edges = [];
     let pulses = [];
+    let lightnings = [];
     let pointer = { x: 0.5, y: 0.5 };
     let realPointerActive = false;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -93,6 +94,18 @@ export default function AnimatedBrainHero() {
         t: Math.random(),
         speed: 0.002 + Math.random() * 0.004,
       }));
+
+      // A handful of one-time lightning bolts, timed to flash while the
+      // entrance burst is still forming — never recurs afterward. Skipped
+      // for prefers-reduced-motion, same as the rest of the entrance.
+      lightnings = !reduced && nodes.length
+        ? Array.from({ length: mobile ? 4 : 7 }, () => ({
+            ai: Math.floor(Math.random() * nodes.length),
+            bi: Math.floor(Math.random() * nodes.length),
+            time: 250 + Math.random() * (ENTRANCE_MS + 500),
+            dur: 160 + Math.random() * 140,
+          }))
+        : [];
     }
 
     function resize() {
@@ -131,7 +144,45 @@ export default function AnimatedBrainHero() {
       };
     };
 
-    const SHOCKWAVE_MS = 900;
+    const SHOCKWAVE_MS = 1000;
+
+    // Sweeps blue -> purple -> pink as the shockwave ring expands, matching
+    // the node/pulse palette already used elsewhere in this component.
+    function ringColor(t) {
+      const stops = [[72, 168, 255], [168, 124, 255], [232, 121, 249]];
+      const seg = Math.min(0.999, Math.max(0, t)) * (stops.length - 1);
+      const i = Math.floor(seg);
+      const f = seg - i;
+      const c0 = stops[i];
+      const c1 = stops[Math.min(i + 1, stops.length - 1)];
+      return c0.map((v, idx) => Math.round(v + (c1[idx] - v) * f));
+    }
+
+    // A brief jagged spark between two nodes — regenerated fresh on every
+    // frame it's visible (only a handful of ms), which is exactly what
+    // makes it read as flickering electricity rather than a static line.
+    function drawLightning(p1, p2, alpha) {
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+      const segments = 6;
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      for (let i = 1; i < segments; i++) {
+        const t = i / segments;
+        const offset = (Math.random() - 0.5) * len * 0.16 * Math.sin(t * Math.PI);
+        ctx.lineTo(p1.x + dx * t + nx * offset, p1.y + dy * t + ny * offset);
+      }
+      ctx.lineTo(p2.x, p2.y);
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = "#bcdcff";
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
 
     function draw(time = 0) {
       const elapsed = performance.now() - mountTime;
@@ -146,16 +197,27 @@ export default function AnimatedBrainHero() {
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, width, height);
 
-      // A single expanding ring of light from the center, synced with the
-      // node burst below — a one-time "the brain is switching on" flourish.
-      if (!reduced && elapsed < SHOCKWAVE_MS) {
-        const t = elapsed / SHOCKWAVE_MS;
-        const eased = 1 - Math.pow(1 - t, 2);
-        ctx.strokeStyle = `rgba(159, 140, 255, ${(1 - t) * 0.55})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(width * 0.52, height * 0.45, eased * width * 0.55, 0, Math.PI * 2);
-        ctx.stroke();
+      // The brain "switching on": a brief full-canvas color flash, then two
+      // staggered expanding rings sweeping blue -> purple -> pink, synced
+      // with the node burst below — all one-time, never recurs.
+      if (!reduced && elapsed < 260) {
+        const flashAlpha = Math.sin(Math.min(1, elapsed / 260) * Math.PI) * 0.3;
+        ctx.fillStyle = `rgba(180, 160, 255, ${flashAlpha})`;
+        ctx.fillRect(0, 0, width, height);
+      }
+      if (!reduced) {
+        for (const [delay, boldness] of [[0, 1], [180, 0.55]]) {
+          const localElapsed = elapsed - delay;
+          if (localElapsed < 0 || localElapsed > SHOCKWAVE_MS) continue;
+          const t = localElapsed / SHOCKWAVE_MS;
+          const eased = 1 - Math.pow(1 - t, 2);
+          const [r, g, b] = ringColor(t);
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${(1 - t) * 0.65 * boldness})`;
+          ctx.lineWidth = 1.5 + 2 * boldness;
+          ctx.beginPath();
+          ctx.arc(width * 0.52, height * 0.45, eased * width * 0.58, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
 
       ctx.lineWidth = 0.7;
@@ -190,6 +252,17 @@ export default function AnimatedBrainHero() {
         ctx.fill();
       }
       ctx.shadowBlur = 0;
+
+      if (!reduced) {
+        for (const L of lightnings) {
+          if (elapsed < L.time || elapsed > L.time + L.dur) continue;
+          const lt = (elapsed - L.time) / L.dur;
+          const alpha = Math.sin(Math.min(1, lt) * Math.PI);
+          const p1 = pos(nodes[L.ai], time, focus, nodeEase(nodes[L.ai], elapsed));
+          const p2 = pos(nodes[L.bi], time, focus, nodeEase(nodes[L.bi], elapsed));
+          drawLightning(p1, p2, alpha);
+        }
+      }
 
       if (!reduced && edges.length && elapsed > ENTRANCE_MS * 0.5) {
         for (const pulse of pulses) {
