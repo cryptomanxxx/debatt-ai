@@ -209,8 +209,10 @@ export default function AnimatedBrainHero() {
       }
       ctx.lineTo(p2.x, p2.y);
       ctx.shadowBlur = 16;
-      ctx.shadowColor = "#bcdcff";
-      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      // Violet-toned rather than generic blue-white — matches the hover-glow
+      // purple (#a879ff) and pulse magenta already used elsewhere here.
+      ctx.shadowColor = "#c084fc";
+      ctx.strokeStyle = `rgba(233, 213, 255, ${alpha})`;
       ctx.lineWidth = 1.6;
       ctx.stroke();
       ctx.shadowBlur = 0;
