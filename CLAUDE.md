@@ -3969,9 +3969,15 @@ Fixat med en ny `pending_run_id`-kolumn (`supabase_filmrecensent_state_v3.sql`) 
 | Fil | Roll |
 |---|---|
 | `agents/invariant-checker.js` | `checkRedaktionRaknarFilmrecensioner()`s `selectMatch` matchas nu mot `taBortJsKommentarer(kod)` istället för rå källkod |
-| `filmrecensent.py` | Ny `AKTUELL_KORNING_ID`-konstant (`GITHUB_RUN_ID`). `hamta_state()`/`_upsert_state()`-anropen och `hamta_video_kandidat()`s pending-gren utökade med `pending_run_id` — räknar `pending_forsok` en gång per körning/dag, inte per internt pass. `hamta_senaste_video()` skannar nu alla RSS-poster (inte bara den senaste) och dedupar internt; `main()`s redundanta efterkontroll borttagen |
+| `filmrecensent.py` | Ny `AKTUELL_KORNING_ID`-konstant (`GITHUB_RUN_ID`+`GITHUB_RUN_ATTEMPT`, se Codex-fyndet nedan). `hamta_state()`/`_upsert_state()`-anropen och `hamta_video_kandidat()`s pending-gren utökade med `pending_run_id` — räknar `pending_forsok` en gång per körning/dag, inte per internt pass. `hamta_senaste_video()` skannar nu alla RSS-poster (inte bara den senaste) och dedupar internt; `main()`s redundanta efterkontroll borttagen |
 | `supabase_filmrecensent_state_v3.sql` | Migrering: `pending_run_id text`-kolumn på `filmrecensent_state` |
 | `.github/workflows/filmrecensent.yml` | Uppdaterade kommentarer som förklarar per-körning-retryn och RSS-fallbackens nya alla-poster-skanning |
+
+**Codex-fynd (PR #1502-granskning, efter merge): `AKTUELL_KORNING_ID` byggd på bara `GITHUB_RUN_ID` missade manuella återkörningar.** `GITHUB_RUN_ID` är OFÖRÄNDRAT vid en manuell "Re-run jobs" i GitHub Actions-UI:t — bara `GITHUB_RUN_ATTEMPT` räknas upp (1 → 2 → ...). En pending-kandidat som misslyckades under det ursprungliga försöket (t.ex. Groq/DeepSeek nere) hade alltså setts som "redan försökt i den här körningen" av VARJE pass i en manuell återkörning, och väntat till nästa dags schemalagda körning istället för att faktiskt retrya i den nya, manuellt startade återkörningen — precis den typen av transient hicka mekanismen finns till för att överleva. Fixat: `AKTUELL_KORNING_ID` bygger nu på `{GITHUB_RUN_ID}-{GITHUB_RUN_ATTEMPT}` istället för bara `GITHUB_RUN_ID` — en manuell återkörning får därmed ett nytt, distinkt id och kan retrya normalt. Tom sträng (spärren avstängd) om `GITHUB_RUN_ID` saknas, oförändrat.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `filmrecensent.py` | `AKTUELL_KORNING_ID` bygger nu på `GITHUB_RUN_ID`+`GITHUB_RUN_ATTEMPT` istället för bara `GITHUB_RUN_ID` |
 
 ---
 

@@ -191,21 +191,35 @@ def uppladdningsplaylist_id() -> str:
 # oändlighet.
 MAX_PENDING_FORSOK = 3
 
-# GitHub Actions sätter GITHUB_RUN_ID automatiskt i miljön för alla steg i
-# en körning — inget behöver deklareras i workflow-filens env:-block.
-# Används av hamta_video_kandidat() för att räkna pending_forsok EN gång
-# per KÖRNING (dag), inte en gång per INTERNT PASS (Codex-fynd, PR #1501-
-# granskning): sedan ✅128/✅129 körs alla 4 dagliga pass i EN körning med
-# bara 60s mellanrum, istället för utspridda över ~12 timmar som förut.
+# GitHub Actions sätter GITHUB_RUN_ID/GITHUB_RUN_ATTEMPT automatiskt i miljön
+# för alla steg i en körning — inget behöver deklareras i workflow-filens
+# env:-block. Används av hamta_video_kandidat() för att räkna pending_forsok
+# EN gång per KÖRNING (dag), inte en gång per INTERNT PASS (Codex-fynd, PR
+# #1501-granskning): sedan ✅128/✅129 körs alla 4 dagliga pass i EN körning
+# med bara 60s mellanrum, istället för utspridda över ~12 timmar som förut.
 # Utan detta skydd kunde en enda transient leverantörsstörning (Groq/
 # DeepSeek nere några minuter) räkna upp forsok på VARJE av de 4 passen och
 # permanent hoppa över en helt giltig video inom loppet av ~3 minuter —
 # tidigare krävdes att samma störning höll i sig över flera SKILDA
-# 4-timmarskontroller för att nå samma gräns. Tomt/None om skriptet körs
-# utanför GitHub Actions (lokal testning) — då tillämpas aldrig
-# samma-körning-spärren (se villkoret i hamta_video_kandidat(), som kräver
-# ett icke-tomt pending_run_id att jämföra mot).
-AKTUELL_KORNING_ID = os.environ.get("GITHUB_RUN_ID", "")
+# 4-timmarskontroller för att nå samma gräns.
+#
+# GITHUB_RUN_ATTEMPT ingår i identifieraren (Codex-fynd, PR #1502-
+# granskning): GITHUB_RUN_ID är OFÖRÄNDRAT vid en manuell "Re-run jobs" i
+# Actions-UI:t — bara GITHUB_RUN_ATTEMPT räknas upp (1 → 2 → ...). Utan
+# attemptnumret hade en sparad pending-kandidat som misslyckades under det
+# FÖRSTA försöket sett en manuell återkörning som "redan försökt i den här
+# körningen" och väntat till nästa DAGENS schemalagda körning istället för
+# att faktiskt retrya i den nya, manuellt startade återkörningen — precis
+# den typen av transient hicka pending_run_id-mekanismen finns till för att
+# överleva.
+#
+# Tomt/None om GITHUB_RUN_ID saknas (lokal testning, utanför GitHub
+# Actions) — då tillämpas aldrig samma-körning-spärren (se villkoret i
+# hamta_video_kandidat(), som kräver ett icke-tomt pending_run_id att
+# jämföra mot).
+_GH_RUN_ID = os.environ.get("GITHUB_RUN_ID", "")
+_GH_RUN_ATTEMPT = os.environ.get("GITHUB_RUN_ATTEMPT", "")
+AKTUELL_KORNING_ID = f"{_GH_RUN_ID}-{_GH_RUN_ATTEMPT}" if _GH_RUN_ID else ""
 
 
 class _TransientFel(Exception):
