@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 
 export default function NyheterPage() {
-  redirect("/arkiv?nyhet=1");
+  permanentRedirect("/arkiv?nyhet=1");
 }

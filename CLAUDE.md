@@ -3823,6 +3823,21 @@ Uppföljande användarrapport (sep 2026), direkt efter ✅125 gått live i produ
 | `app/vecka/page.js` | "Nyheter →"-länken pekar nu direkt på `/arkiv?nyhet=1` |
 | `app/api/agent/submit/route.js` | Det nu meningslösa villkorade `revalidatePath("/nyheter")`-anropet (och dess `arNyhet`/`arReplik`-hjälpvariabler) borttaget — `revalidatePath("/arkiv")` räcker |
 
+**Codex-fynd (PR #1487–#1492-granskning): sex separata fynd, verifierade en och en mot den mergade koden.**
+
+- **Temporär redirect på en permanent pensionering.** `app/nyheter/page.js` använde `redirect()` (307, "flytta tillfälligt") trots att `/nyheter` är permanent avvecklad till förmån för `/arkiv?nyhet=1` — sökmotorer bör istället få en 308 så länkvärde/indexering flyttas över permanent. Fixat: bytt till `permanentRedirect()` från `next/navigation`, samma modul, bara rätt semantik.
+- **`app/sitemap.js` listade fortfarande `/nyheter`** som en egen daglig, hög-prioriterad sitemap-URL trots att den nu bara är en redirect utan eget innehåll — en sitemap ska peka på kanoniska, indexerbara sidor, aldrig en redirect-käll-URL. Fixat: raden borttagen helt (målet, `/arkiv`, fanns redan listat separat — `/arkiv?nyhet=1` är ett klientfilter på samma sida, inte en egen kanonisk URL värd en egen sitemap-post).
+- **Hydrerings-tidszonsfyndet i `NyheterClient.js` är moot.** Filen togs bort i samma PR som skapade redirecten (död kod sedan `page.js` slutade rendera den) — fyndet gällde en fil som inte längre existerar. Ingen åtgärd.
+- **`app/client.js`s gamla 100-radersgräns på `/nyheter`s "Se alla"-mål är superseded.** Länken pekar numera på `/arkiv?nyhet=1` istället för den gamla `/nyheter?limit=100`-frågan — men samma typ av gräns finns kvar ett steg längre in: `app/arkiv/page.js → fetchArtiklar()` gör en helt opaginerad `select=*&order=skapad.desc`-fråga utan `limit`, vilket i praktiken cappas av PostgREST/Supabase-projektets `db-max-rows`-inställning (Supabase-standard 1000 rader). Vid ~19 artiklar/dag (se "Nyhetsschema per körning") räcker det till dryga 50 dagars täckning innan äldre träffar (av vilken kategori som helst — nyhet/debatt/film/tagg) blir onåbara via `/arkiv`s klientsidesfiltrering. **Medvetet inte åtgärdat här** — detta är en redan existerande, arkitektonisk begränsning hos HELA `/arkiv`-sidan (fanns långt innan ✅123–✅126s filmrecensions-/debatt-/nyhetsfilter lades till ovanpå den), inte en regression introducerad av dessa PR:ar. En riktig fix (server-side cursor-paginering, "Ladda fler"-mönster likt `/nyhetskallor`s datumbaserade paginering, ✅93) är en betydligt större ombyggnad av `/arkiv`s hela SSR+klient-arkitektur än vad de nya filtren själva motiverar — proportionerlig avvägning, samma princip som redan tillämpas flera gånger tidigare i denna logg.
+- **Samma opaginerade-cap-risk gäller identiskt `matchFilm`/`matchDebatt`/`matchNyhet`** (klientsidesfilter ovanpå samma redan capade lista) — ingen separat bugg, bara ytterligare en instans av föregående punkt.
+- **Filterraden (🎬/💬/📰/🤖/✍️ + "Alla") var villkorad på `topTags.length > 0`.** Om ingen artikel i den laddade listan har taggar (osannolikt i praktiken — AI-redaktören genererar 3–5 taggar per artikel, ✅4 — men inte omöjligt för t.ex. äldre eller manuellt inskickade rader) försvann HELA filterraden, inklusive de fem tagg-oberoende filtren. Fixat: filterraden renderas nu alltid; bara den avslutande `topTags.map(...)`-listan med tagg-pills är i sig ofarlig att rendera tom (ingen egen villkorsgrening behövs, en tom array ger bara inga extra knappar).
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/nyheter/page.js` | `redirect()` → `permanentRedirect()` |
+| `app/sitemap.js` | `/nyheter`-raden borttagen helt |
+| `app/arkiv/ArkivClient.js` | `{topTags.length > 0 && (...)}`-gaten borttagen — filterraden (Alla/🎬/💬/📰/🤖/✍️ + tagg-pills) renderas nu alltid |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
