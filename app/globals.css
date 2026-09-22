@@ -1,3 +1,19 @@
+/* The homepage hero (AnimatedBrainHero) breaks out of its container to span
+   most of the viewport via a `width:100vw` + negative-margin technique.
+   100vw includes the vertical scrollbar's width in most browsers, which
+   would otherwise introduce a few pixels of unwanted horizontal overflow.
+   `clip` (not `hidden`) deliberately: per the CSS Overflow spec, setting
+   overflow-x to anything but visible/clip forces overflow-y's *computed*
+   value from visible to auto, turning <body> into its own scroll
+   container — which then breaks position:sticky elements whose nearest
+   scrolling ancestor becomes <body> instead of the viewport (the
+   site-wide sticky nav in GlobalNav.js, the homepage's own sticky header,
+   and the sticky sidebars on /butik and /markets). `clip` still visually
+   clips the horizontal overflow but doesn't trigger that promotion. */
+html, body {
+  overflow-x: clip;
+}
+
 @keyframes neonPulse {
   0%, 100% {
     text-shadow:
@@ -22,11 +38,13 @@
 }
 
 .neon-logo {
-  /* Static fallback matching the animation's 0%/100% keyframe. Some
-     browsers/devices don't run the animation (accessibility "reduce
-     motion" settings, or a GPU that silently drops very large text-shadow
-     blur radii) — without this, the logo shows no glow at all instead of
-     just not pulsing. */
+  /* Base value matching the animation's 0%/100% keyframe. While the
+     animation is running, its computed text-shadow replaces this rather
+     than layering over it — so this only actually paints (a) briefly
+     before the animation attaches, or (b) whenever the animation isn't
+     running at all, which is exactly the case just below for
+     prefers-reduced-motion. Without it, that case would render with no
+     glow at all instead of a static one. */
   text-shadow:
     0 0 4px #fff,
     0 0 10px #fff,
@@ -36,6 +54,16 @@
     0 0 120px #c026d3,
     0 0 160px #c026d3;
   animation: neonPulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* prefers-reduced-motion only makes this media feature available to
+     query — browsers don't auto-disable a declared animation just because
+     it matches. Without this explicit override the logo keeps pulsing for
+     users who asked their OS/browser to reduce motion. */
+  .neon-logo {
+    animation: none;
+  }
 }
 
 @keyframes neonHero {
