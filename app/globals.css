@@ -1,10 +1,17 @@
 /* The homepage hero (AnimatedBrainHero) breaks out of its container to span
    most of the viewport via a `width:100vw` + negative-margin technique.
    100vw includes the vertical scrollbar's width in most browsers, which
-   would otherwise introduce a few pixels of unwanted horizontal overflow —
-   this keeps that contained without affecting normal vertical scrolling. */
+   would otherwise introduce a few pixels of unwanted horizontal overflow.
+   `clip` (not `hidden`) deliberately: per the CSS Overflow spec, setting
+   overflow-x to anything but visible/clip forces overflow-y's *computed*
+   value from visible to auto, turning <body> into its own scroll
+   container — which then breaks position:sticky elements whose nearest
+   scrolling ancestor becomes <body> instead of the viewport (the
+   site-wide sticky nav in GlobalNav.js, the homepage's own sticky header,
+   and the sticky sidebars on /butik and /markets). `clip` still visually
+   clips the horizontal overflow but doesn't trigger that promotion. */
 html, body {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 @keyframes neonPulse {
