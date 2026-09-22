@@ -218,8 +218,19 @@ export default function AnimatedBrainHero() {
       ctx.shadowBlur = 0;
     }
 
+    // Pulses advance by pulse.speed once per rendered frame, which used to
+    // mean the signals crawled along edges twice as fast on a 120Hz display
+    // and slowed down whenever frames dropped. dtScale normalizes that to a
+    // 60fps baseline using the real inter-frame delta, clamped so a long
+    // pause (tab backgrounded, hero scrolled offscreen) can't make a pulse
+    // visibly teleport on the next frame.
+    let lastFrameTime = null;
+
     function draw(time = 0) {
       const elapsed = performance.now() - mountTime;
+      const dtMs = time && lastFrameTime != null ? Math.max(0, time - lastFrameTime) : 16.6667;
+      if (time) lastFrameTime = time;
+      const dtScale = Math.min(4, dtMs / 16.6667);
       ctx.clearRect(0, 0, width, height);
 
       const focus = realPointerActive ? pointer : autoFocus(time);
@@ -313,7 +324,7 @@ export default function AnimatedBrainHero() {
 
       if (!reduced && edges.length && elapsed > ENTRANCE_MS * 0.5) {
         for (const pulse of pulses) {
-          pulse.t += pulse.speed;
+          pulse.t += pulse.speed * dtScale;
           if (pulse.t > 1) {
             pulse.t = 0;
             pulse.edge = Math.floor(Math.random() * edges.length);
@@ -334,7 +345,8 @@ export default function AnimatedBrainHero() {
         ctx.shadowBlur = 0;
       }
 
-      if (!reduced) raf = requestAnimationFrame(draw);
+      if (shouldRun()) raf = requestAnimationFrame(draw);
+      else raf = 0;
     }
 
     const onMove = (event) => {
@@ -347,16 +359,40 @@ export default function AnimatedBrainHero() {
     };
     const onLeave = () => { realPointerActive = false; };
 
+    // The loop only runs while the tab is visible AND the hero is actually
+    // in the viewport — without the latter, scrolling past it on a long
+    // page still redraws hundreds of nodes/edges at full frame rate for no
+    // visible output. isIntersecting starts true (the hero is normally
+    // above the fold) so nothing pauses before the observer's first
+    // callback fires.
+    let isIntersecting = true;
+    function shouldRun() {
+      return !reduced && !document.hidden && isIntersecting;
+    }
+    function startLoop() {
+      if (!shouldRun() || raf) return;
+      lastFrameTime = null; // avoid a stale/huge dt on the first resumed frame
+      raf = requestAnimationFrame(draw);
+    }
+    function stopLoop() {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+
     // Pause the rAF loop while the tab is backgrounded — most browsers already
     // throttle rAF when hidden, but this makes it explicit and immediate
     // rather than relying on that heuristic alone.
     const onVisibility = () => {
-      if (document.hidden) {
-        cancelAnimationFrame(raf);
-      } else if (!reduced) {
-        raf = requestAnimationFrame(draw);
-      }
+      if (document.hidden) stopLoop();
+      else startLoop();
     };
+
+    const observer = new IntersectionObserver(([entry]) => {
+      isIntersecting = entry.isIntersecting;
+      if (isIntersecting) startLoop();
+      else stopLoop();
+    });
+    observer.observe(canvas);
 
     resize();
     window.addEventListener("resize", scheduleResize);
@@ -368,6 +404,7 @@ export default function AnimatedBrainHero() {
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(resizeTimer);
+      observer.disconnect();
       window.removeEventListener("resize", scheduleResize);
       document.removeEventListener("visibilitychange", onVisibility);
       canvas.removeEventListener("pointermove", onMove);
