@@ -430,7 +430,7 @@ export default function AnimatedBrainHero() {
       </div>
       <div className="brainStatus" aria-hidden="true"><i /> NEURAL NETWORK ONLINE</div>
       <style>{`
-        .brainHero{position:relative;height:clamp(430px,62vw,650px);overflow:hidden;border:1px solid #20263a;border-radius:14px;background:radial-gradient(circle at 55% 45%,#0b1230 0%,#070a16 40%,#03050b 78%);isolation:isolate}
+        .brainHero{position:relative;height:clamp(430px,62vw,650px);overflow:hidden;border-radius:14px;background:radial-gradient(circle at 55% 45%,#0b1230 0%,#070a16 40%,#03050b 78%);isolation:isolate}
         .brainCanvas{position:absolute;inset:0;width:100%;height:100%;z-index:1}
         .brainVignette{position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(90deg,rgba(3,5,11,.94) 0%,rgba(3,5,11,.64) 31%,rgba(3,5,11,.08) 58%,rgba(3,5,11,.22) 100%),linear-gradient(0deg,rgba(3,5,11,.58),transparent 35%)}
         .brainCopy{position:absolute;z-index:3;left:clamp(22px,5vw,64px);top:50%;transform:translateY(-50%);max-width:510px;text-shadow:0 2px 18px #03050b}
