@@ -491,9 +491,18 @@ function isEligible(r) {
 // 09:00/10:00/11:00/12:00 svensk tid (tätt packade istället för utspridda
 // 07/08/15/19) — listan MÅSTE hållas i strikt stigande tidsordning, annars
 // bryts useNastaKorning()s findIndex-baserade "nästa händelse"-logik.
+// ✅130: Nyhetsflöde/Nyhetsanalys saknades helt — precis som "Intern börs"
+// (14 ggr/dag, ✅93) representeras de här av EN sampeltidpunkt snarare än
+// alla 6 dagliga körningar, samma etablerade sampling-princip som redan
+// gäller för högfrekventa jobb i den här listan. Nyhetsanalys har ingen egen
+// fast crontid — den triggas primärt av workflow_run direkt efter att
+// Nyhetsflöde blivit klar (se ✅93 "Triggerkedja, inte bara schema"), så
+// 08:05 är en ungefärlig "strax efter"-tidpunkt, inte en riktig cron.
 const ALLA_KÖRNINGAR = [
   { h: 5,  m: 30, namn: "Riksdagsval",     farg: "#e8d5a3", ikon: "🗳️" },
   { h: 6,  m: 30, namn: "Krisevents",      farg: "#f87171", ikon: "🌍" },
+  { h: 8,  m: 0,  namn: "Nyhetsflöde",     farg: "#38bdf8", ikon: "📡" },
+  { h: 8,  m: 5,  namn: "Nyhetsanalys",    farg: "#38bdf8", ikon: "🔎" },
   { h: 9,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
   { h: 10, m: 0,  namn: "Debattartiklar",  farg: "#e879f9", ikon: "📝" },
   { h: 10, m: 30, namn: "Intern börs",     farg: "#e8d5a3", ikon: "📈" },
@@ -566,12 +575,12 @@ function DagensSchema({ nextIdx }) {
   }, []);
   const gridStyle = isMobile
     ? { display: "grid", gridTemplateColumns: "1fr", gap: "3px" }
-    : { display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "repeat(9, auto)", gridAutoFlow: "column", gap: "3px 10px" };
+    : { display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "repeat(10, auto)", gridAutoFlow: "column", gap: "3px 10px" };
   return (
     <div style={{ marginBottom: "24px", background: "#0a0a0f", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
         <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Dagens schema</span>
-        <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>17 körningar · svensk tid</span>
+        <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>19 körningar · svensk tid</span>
       </div>
       <div style={gridStyle}>
         {ALLA_KÖRNINGAR.map((k, i) => {

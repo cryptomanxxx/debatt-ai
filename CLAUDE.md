@@ -3938,6 +3938,20 @@ Fixat genom att lägga till en tredje kontroll först i funktionen: en regex (`/
 
 ---
 
+### ✅ 130. Nyhetsflöde och Nyhetsanalys saknades i "Dagens schema" – KLART
+
+Användarrapport (sep 2026): *"Nyhetsanalys verkas saknas i Dagens schema"*.
+
+**Rotorsak:** `ALLA_KÖRNINGAR` (`app/client.js`, ✅128/✅129) listar en handfull av plattformens ~50 dagliga GitHub Actions-jobb som en kuraterad, inte uttömmande, sammanfattning — `Intern börs` (`bors-test.yml`, faktiskt 14 körningar/dag, se schematabellen) representeras redan bara av 2 sampeltidpunkter (10:30 och 18:15), inte alla 14. `nyhetsflode-test.yml` (6 ggr/dag, ✅93) och `nyhetsanalys-auto.yml` (i praktiken samma kadens, `workflow_run`-triggat direkt efter Nyhetsflöde plus ett opålitligt `*/20`-schema som bonus) hade aldrig fått en egen post alls — inte ens en enda sampeltidpunkt, till skillnad från alla andra jobb i listan.
+
+**Fix:** två nya poster tillagda, samma sampling-princip som redan etablerad för Intern börs — en tidpunkt var, inte alla sex. `Nyhetsflöde` på 08:00 (en av de sex faktiska cron-tiderna 04/08/12/16/20/00). `Nyhetsanalys` på 08:05 — en ungefärlig "strax efter"-tidpunkt snarare än en riktig cron, eftersom Nyhetsanalys saknar ett eget fast klockslag (den triggas primärt av `workflow_run` när Nyhetsflöde blir klar). Båda placerade i strikt kronologisk ordning mellan Krisevents (06:30) och Nyhetsartiklar (09:00) — nödvändigt för att inte bryta `useNastaKorning()`s `findIndex`-baserade "nästa händelse"-logik (se ✅129). Header-etiketten ("17 körningar" → "19 körningar") och grid-layouten (`repeat(9, auto)` → `repeat(10, auto)`, ⌈19÷2⌉=10) uppdaterade i samma veva.
+
+| Fil | Roll |
+|---|---|
+| `app/client.js` | Två nya poster i `ALLA_KÖRNINGAR`: `Nyhetsflöde` (08:00) och `Nyhetsanalys` (08:05, ungefärlig eftersom källan saknar en fast crontid). Header-etikett och `gridTemplateRows` uppdaterade till 19/10 |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
