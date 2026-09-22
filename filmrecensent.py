@@ -85,10 +85,24 @@ def _p(url: str) -> str:
 
 
 def hamta_senaste_video() -> dict | None:
-    """Fallback när YOUTUBE_API_KEY saknas: hämtar bara kanalens allra
-    senaste video via RSS (som inte exponerar mer än de ~15 senaste
-    uppladdningarna — hela katalogen kräver YouTube Data API, se
-    hamta_video_kandidat()). Returnerar None vid RSS-fel eller tomt flöde."""
+    """Fallback när YOUTUBE_API_KEY saknas: hämtar via RSS (som inte
+    exponerar mer än de ~15 senaste uppladdningarna — hela katalogen kräver
+    YouTube Data API, se hamta_video_kandidat()) och returnerar den FÖRSTA
+    (senaste) posten som INTE redan recenserats.
+
+    Går igenom alla poster i flödet, inte bara den allra senaste (Codex-
+    fynd, PR #1501-granskning): sedan ✅128/✅129 körs 4 pass i samma
+    dagliga körning istället för 4 separata körningar utspridda över
+    dagen. Om funktionen bara returnerade den enda senaste posten hade pass
+    1 recenserat den och pass 2–4 (samma körning) alltid sett den som redan
+    recenserad och avslutat som no-op — tre fjärdedelar av dagens pass hade
+    varit bortkastade även om flödet innehöll flera ännu ej recenserade
+    äldre poster. Att en video uppladdad SENARE samma dag inte upptäcks
+    förrän nästa dags körning är en oundviklig konsekvens av att gå från
+    4 separata dagliga körningar till 1 (medvetet begärt av ägaren, se
+    ✅128) — den här fixen adresserar bara att BEFINTLIGA pass inom en
+    körning faktiskt gör något meningsfullt, inte upptäcktsfördröjningen
+    för nya uppladdningar i sig."""
     ns = {
         "atom": "http://www.w3.org/2005/Atom",
         "yt": "http://www.youtube.com/xml/schemas/2015",
@@ -101,33 +115,39 @@ def hamta_senaste_video() -> dict | None:
             print(f"  ✗ RSS HTTP {res.status_code}")
             return None
         root = ET.fromstring(res.text)
-        entry = root.find("atom:entry", ns)
-        if entry is None:
+        entries = root.findall("atom:entry", ns)
+        if not entries:
             print("  Inga videor i flödet.")
             return None
-        video_id_el = entry.find("yt:videoId", ns)
-        title_el = entry.find("atom:title", ns)
-        if video_id_el is None or not video_id_el.text or title_el is None or not title_el.text:
-            return None
-        video_id = video_id_el.text.strip()
-        titel = title_el.text.strip()
-        # Videons egen beskrivning (media:group/media:description) — samma fält
-        # nyheter.py → hamta_youtube_nyheter() redan använder som scenkontext.
-        # Utan den har LLM:en bara en kort titel att gå på (Codex-fynd, PR
-        # #1470-granskning), vilket riskerar att den antingen missar en giltig
-        # video eller hittar på detaljer om filmen/scenen den inte kan veta.
-        beskrivning = ""
-        media_group = entry.find("media:group", ns)
-        if media_group is not None:
-            desc_el = media_group.find("media:description", ns)
-            if desc_el is not None and desc_el.text:
-                beskrivning = desc_el.text.strip()[:1500]
-        return {
-            "video_id": video_id,
-            "titel": titel,
-            "beskrivning": beskrivning,
-            "url": f"https://www.youtube.com/watch?v={video_id}",
-        }
+        for entry in entries:
+            video_id_el = entry.find("yt:videoId", ns)
+            title_el = entry.find("atom:title", ns)
+            if video_id_el is None or not video_id_el.text or title_el is None or not title_el.text:
+                continue
+            video_id = video_id_el.text.strip()
+            if redan_recenserad(video_id):
+                continue
+            titel = title_el.text.strip()
+            # Videons egen beskrivning (media:group/media:description) — samma
+            # fält nyheter.py → hamta_youtube_nyheter() redan använder som
+            # scenkontext. Utan den har LLM:en bara en kort titel att gå på
+            # (Codex-fynd, PR #1470-granskning), vilket riskerar att den
+            # antingen missar en giltig video eller hittar på detaljer om
+            # filmen/scenen den inte kan veta.
+            beskrivning = ""
+            media_group = entry.find("media:group", ns)
+            if media_group is not None:
+                desc_el = media_group.find("media:description", ns)
+                if desc_el is not None and desc_el.text:
+                    beskrivning = desc_el.text.strip()[:1500]
+            return {
+                "video_id": video_id,
+                "titel": titel,
+                "beskrivning": beskrivning,
+                "url": f"https://www.youtube.com/watch?v={video_id}",
+            }
+        print("  Alla videor i flödet redan recenserade.")
+        return None
     except Exception as e:
         print(f"  ✗ RSS-fel: {type(e).__name__}: {e}")
         return None
@@ -171,6 +191,22 @@ def uppladdningsplaylist_id() -> str:
 # oändlighet.
 MAX_PENDING_FORSOK = 3
 
+# GitHub Actions sätter GITHUB_RUN_ID automatiskt i miljön för alla steg i
+# en körning — inget behöver deklareras i workflow-filens env:-block.
+# Används av hamta_video_kandidat() för att räkna pending_forsok EN gång
+# per KÖRNING (dag), inte en gång per INTERNT PASS (Codex-fynd, PR #1501-
+# granskning): sedan ✅128/✅129 körs alla 4 dagliga pass i EN körning med
+# bara 60s mellanrum, istället för utspridda över ~12 timmar som förut.
+# Utan detta skydd kunde en enda transient leverantörsstörning (Groq/
+# DeepSeek nere några minuter) räkna upp forsok på VARJE av de 4 passen och
+# permanent hoppa över en helt giltig video inom loppet av ~3 minuter —
+# tidigare krävdes att samma störning höll i sig över flera SKILDA
+# 4-timmarskontroller för att nå samma gräns. Tomt/None om skriptet körs
+# utanför GitHub Actions (lokal testning) — då tillämpas aldrig
+# samma-körning-spärren (se villkoret i hamta_video_kandidat(), som kräver
+# ett icke-tomt pending_run_id att jämföra mot).
+AKTUELL_KORNING_ID = os.environ.get("GITHUB_RUN_ID", "")
+
 
 class _TransientFel(Exception):
     """Signalerar ett TILLFÄLLIGT fel (nätverksfel, timeout, icke-2xx
@@ -201,7 +237,7 @@ def hamta_state() -> dict:
     läsas just den körningen (Codex-fynd)."""
     try:
         res = httpx.get(
-            f"{SB_URL}/rest/v1/filmrecensent_state?id=eq.current&select=next_page_token,pending_video_id,pending_next_token,pending_forsok",
+            f"{SB_URL}/rest/v1/filmrecensent_state?id=eq.current&select=next_page_token,pending_video_id,pending_next_token,pending_forsok,pending_run_id",
             headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"},
             timeout=10,
         )
@@ -209,13 +245,19 @@ def hamta_state() -> dict:
             raise _TransientFel(f"HTTP {res.status_code}")
         rader = res.json()
         if not rader:
-            return {"next_page_token": None, "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0}
+            return {"next_page_token": None, "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0, "pending_run_id": None}
         rad = rader[0]
         return {
             "next_page_token": rad.get("next_page_token"),
             "pending_video_id": rad.get("pending_video_id"),
             "pending_next_token": rad.get("pending_next_token"),
             "pending_forsok": rad.get("pending_forsok") or 0,
+            # Vilken GITHUB_RUN_ID som senast räknade upp pending_forsok — se
+            # AKTUELL_KORNING_ID/hamta_video_kandidat() (Codex-fynd, PR #1501-
+            # granskning). Saknas kolumnen (migreringen inte körd än) faller
+            # PostgREST bara tillbaka på att fältet inte finns i svaret →
+            # .get() ger None, samma fail-safe-default som övriga fält.
+            "pending_run_id": rad.get("pending_run_id"),
         }
     except _TransientFel:
         raise
@@ -280,6 +322,7 @@ def _finalisera_pending(video_id: str) -> None:
     _upsert_state({
         "next_page_token": state["pending_next_token"],
         "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0,
+        "pending_run_id": None,
     })
 
 
@@ -410,10 +453,23 @@ def hamta_video_kandidat() -> dict | None:
     if state["pending_video_id"]:
         pending_id = state["pending_video_id"]
         pending_forsok = state["pending_forsok"]
+        pending_run_id = state["pending_run_id"]
         if redan_recenserad(pending_id):
             pass  # publicerad i en tidigare, delvis lyckad körning — hoppa vidare
         elif pending_forsok >= MAX_PENDING_FORSOK:
             print(f"  Ger upp på pending video {pending_id} efter {pending_forsok} försök — hoppar vidare.")
+        elif AKTUELL_KORNING_ID and pending_run_id == AKTUELL_KORNING_ID:
+            # Redan försökt (och misslyckats) en gång i DEN HÄR körningen —
+            # ett tidigare av dagens 4 interna pass, se AKTUELL_KORNING_ID.
+            # Försök inte igen förrän nästa körning/dag (Codex-fynd, PR
+            # #1501-granskning): utan detta skydd räknade VARJE pass i
+            # samma körning upp pending_forsok separat, vilket kunde nå
+            # MAX_PENDING_FORSOK inom loppet av ~3 minuter under en kort
+            # transient leverantörsstörning — tidigare (4 separata
+            # körningar utspridda över ~12 timmar) krävdes att störningen
+            # höll i sig över flera SKILDA kontroller för samma utfall.
+            print(f"  Pending video {pending_id} redan försökt i den här körningen — väntar till nästa körning.")
+            return None
         else:
             try:
                 kandidat = _hamta_video_metadata(pending_id)
@@ -424,21 +480,25 @@ def hamta_video_kandidat() -> dict | None:
                 # nästa körning kan retrya samma pending-video, istället
                 # för att permanent ge upp på den (Codex-fynd).
                 print(f"  Tillfälligt fel vid hämtning av pending video {pending_id}: {e} — försöker igen nästa körning.")
-                _upsert_state({"pending_forsok": pending_forsok + 1})
+                _upsert_state({"pending_forsok": pending_forsok + 1, "pending_run_id": AKTUELL_KORNING_ID or None})
                 return None
             if kandidat:
                 # Räknar upp försöket nu, INNAN utfallet av den här
                 # körningen är känt — en kandidat vars körning kraschar
                 # helt (utan att ens nå publicera()) förbrukar ändå ett
                 # försök, annars kunde en genomgående trasig video
-                # blockera kön för evigt trots gränsen ovan.
-                _upsert_state({"pending_forsok": pending_forsok + 1})
+                # blockera kön för evigt trots gränsen ovan. pending_run_id
+                # sätts samtidigt så att resten av DAGENS pass (om detta
+                # misslyckas) inte räknar upp ytterligare gånger, se grenen
+                # ovan.
+                _upsert_state({"pending_forsok": pending_forsok + 1, "pending_run_id": AKTUELL_KORNING_ID or None})
                 return kandidat
             print(f"  Pending video {pending_id} inte längre tillgänglig (borttagen/privat/ej inbäddningsbar) — hoppar vidare.")
         token = state["pending_next_token"]
         _upsert_state({
             "next_page_token": token,
             "pending_video_id": None, "pending_next_token": None, "pending_forsok": 0,
+            "pending_run_id": None,
         })
 
     playlist_id = uppladdningsplaylist_id()
@@ -492,6 +552,7 @@ def hamta_video_kandidat() -> dict | None:
                     "pending_video_id": kandidat["video_id"],
                     "pending_next_token": nasta_token,
                     "pending_forsok": 1,
+                    "pending_run_id": AKTUELL_KORNING_ID or None,
                 })
                 return kandidat
             if not nasta_token:
@@ -744,11 +805,11 @@ def main():
         # redan_recenserad() innan den returneras — ingen andra kontroll
         # behövs här.
     else:
-        print("  YOUTUBE_API_KEY saknas — faller tillbaka på RSS (bara kanalens allra senaste video).")
+        print("  YOUTUBE_API_KEY saknas — faller tillbaka på RSS (de ~15 senaste uppladdningarna).")
         video = hamta_senaste_video()
-        if video and redan_recenserad(video["video_id"]):
-            print("Redan recenserad — avslutar.")
-            return
+        # hamta_senaste_video() har redan dedup-filtrerat kandidaten mot
+        # redan_recenserad() innan den returneras — ingen andra kontroll
+        # behövs här (samma mönster som Data-API-grenen ovan).
 
     if not video:
         print("Ingen ny video att recensera — avslutar.")
