@@ -183,7 +183,7 @@ export default function GlobalNav() {
       zIndex: 100,
     }}>
       <div ref={navRef} style={{ display: "flex", alignItems: "center" }}>
-        <a href="/" style={{
+        <a href="/" className="neon-logo" style={{
           fontFamily: "Times New Roman, serif",
           fontSize: "20px",
           fontWeight: 700,
