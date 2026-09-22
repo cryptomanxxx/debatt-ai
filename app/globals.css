@@ -1,3 +1,12 @@
+/* The homepage hero (AnimatedBrainHero) breaks out of its container to span
+   most of the viewport via a `width:100vw` + negative-margin technique.
+   100vw includes the vertical scrollbar's width in most browsers, which
+   would otherwise introduce a few pixels of unwanted horizontal overflow —
+   this keeps that contained without affecting normal vertical scrolling. */
+html, body {
+  overflow-x: hidden;
+}
+
 @keyframes neonPulse {
   0%, 100% {
     text-shadow:

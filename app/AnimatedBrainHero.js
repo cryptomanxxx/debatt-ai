@@ -19,6 +19,7 @@ export default function AnimatedBrainHero() {
     let edges = [];
     let pulses = [];
     let lightnings = [];
+    let bgStars = [];
     let pointer = { x: 0.5, y: 0.5 };
     let realPointerActive = false;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -67,12 +68,24 @@ export default function AnimatedBrainHero() {
         const x = 0.12 + Math.random() * 0.76;
         const y = 0.07 + Math.random() * 0.82;
         if (!insideBrain(x, y)) continue;
+        // Night-sky brightness distribution: most nodes are small faint
+        // background stars, a minority are noticeably brighter "feature"
+        // stars, and a rare few are large hero stars — mirrors how a real
+        // starfield reads (a handful of bright points among many faint
+        // ones), rather than every node being the same uniform size.
+        const starRoll = Math.random();
+        const starClass = starRoll > 0.97 ? 2 : starRoll > 0.82 ? 1 : 0;
         nodes.push({
           x, y,
           z: Math.random(),
           phase: Math.random() * Math.PI * 2,
           glow: Math.random(),
           entranceDelay: Math.random() * 500,
+          starClass,
+          // A minority of nodes read as warm gold/copper stardust instead
+          // of the usual blue/purple — breaks up the otherwise uniformly
+          // cool palette the way real starfields mix warm and cool stars.
+          warm: Math.random() < 0.16,
         });
       }
 
@@ -138,6 +151,21 @@ export default function AnimatedBrainHero() {
             };
           }).filter((L) => L.path.length >= 2)
         : [];
+
+      // A distant backdrop layer, independent of the brain's own node graph
+      // and spread across the WHOLE canvas rather than clipped to
+      // insideBrain() — gives a sense of depth behind the network, like a
+      // night sky the brain floats in front of. Deliberately cheap (no
+      // shadowBlur) since there can be quite a few of them.
+      const bgCount = mobile ? 20 : 40;
+      bgStars = Array.from({ length: bgCount }, () => ({
+        x: Math.random(),
+        y: Math.random(),
+        r: 0.4 + Math.random() * 0.9,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.0006 + Math.random() * 0.0009,
+        warm: Math.random() < 0.25,
+      }));
     }
 
     function resize() {
@@ -233,6 +261,18 @@ export default function AnimatedBrainHero() {
       const dtScale = Math.min(4, dtMs / 16.6667);
       ctx.clearRect(0, 0, width, height);
 
+      // Distant backdrop stars, drawn first so everything else — the halo,
+      // the brain network — sits visually in front of them.
+      for (const s of bgStars) {
+        const twinkle = reduced ? 0.5 : 0.35 + 0.35 * Math.sin(time * s.speed + s.phase);
+        ctx.fillStyle = s.warm
+          ? `rgba(255, 214, 170, ${twinkle * 0.55})`
+          : `rgba(180, 200, 255, ${twinkle * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(s.x * width, s.y * height, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       const focus = realPointerActive ? pointer : autoFocus(time);
 
       const halo = ctx.createRadialGradient(width * 0.52, height * 0.45, 0, width * 0.52, height * 0.45, width * 0.48);
@@ -279,6 +319,12 @@ export default function AnimatedBrainHero() {
         ctx.stroke();
       }
 
+      // Size/glow multipliers per star class (background / feature / hero) —
+      // most nodes stay at the original scale, a minority read as brighter
+      // feature stars, and a rare few stand out as prominent hero stars.
+      const STAR_SCALE = [1, 1.9, 3.4];
+      const STAR_GLOW = [0, 6, 14];
+
       for (const n of nodes) {
         const ease = nodeEase(n, elapsed);
         const p = pos(n, time, focus, ease);
@@ -286,12 +332,21 @@ export default function AnimatedBrainHero() {
         const fy = focus.y * height;
         const proximity = Math.max(0, 1 - Math.hypot(p.x - fx, p.y - fy) / 150);
         const flicker = (reduced ? 0.55 : 0.42 + 0.22 * Math.sin(time * 0.0015 + n.phase)) * ease;
-        const radius = (1 + n.z * 1.4 + proximity * 2.2) * (0.4 + ease * 0.6);
-        ctx.shadowBlur = 7 + proximity * 16;
-        ctx.shadowColor = proximity > 0.25 ? "#a879ff" : "#48a8ff";
-        ctx.fillStyle = proximity > 0.25
-          ? `rgba(195, 142, 255, ${(0.65 + proximity * 0.3) * ease})`
-          : `rgba(104, 188, 255, ${flicker})`;
+        const scale = STAR_SCALE[n.starClass];
+        const radius = (1 + n.z * 1.4 + proximity * 2.2) * (0.4 + ease * 0.6) * scale;
+        ctx.shadowBlur = 7 + proximity * 16 + STAR_GLOW[n.starClass];
+        if (proximity > 0.25) {
+          ctx.shadowColor = "#a879ff";
+          ctx.fillStyle = `rgba(195, 142, 255, ${(0.65 + proximity * 0.3) * ease})`;
+        } else if (n.warm) {
+          // Warm gold/copper stardust mixed into the otherwise cool blue/
+          // purple palette, the way a real night sky mixes star colors.
+          ctx.shadowColor = "#ffb454";
+          ctx.fillStyle = `rgba(255, 200, 140, ${flicker})`;
+        } else {
+          ctx.shadowColor = "#48a8ff";
+          ctx.fillStyle = `rgba(104, 188, 255, ${flicker})`;
+        }
         ctx.beginPath();
         ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
         ctx.fill();
@@ -413,6 +468,14 @@ export default function AnimatedBrainHero() {
   }, []);
 
   return (
+    // Breaks the hero out of the page's own 800px reading-column width so it
+    // can visually span most of the viewport, then re-caps it at a wider
+    // max-width (rather than a raw 100vw) so it doesn't sprawl edge-to-edge
+    // on ultra-wide monitors. Works regardless of how deeply nested this
+    // component is, as long every ancestor up to <body> stays horizontally
+    // centered (margin:auto, no asymmetric offsets) — true here.
+    <div className="brainBleed">
+    <div className="brainBleedInner">
     <section className="brainHero" aria-label="DEBATT-AI">
       <canvas ref={canvasRef} className="brainCanvas" aria-hidden="true" />
       <div className="brainVignette" aria-hidden="true" />
@@ -430,6 +493,8 @@ export default function AnimatedBrainHero() {
       </div>
       <div className="brainStatus" aria-hidden="true"><i /> NEURAL NETWORK ONLINE</div>
       <style>{`
+        .brainBleed{width:100vw;position:relative;left:50%;right:50%;margin-left:-50vw;margin-right:-50vw}
+        .brainBleedInner{max-width:1600px;margin:0 auto;padding:0 clamp(16px,3vw,40px)}
         .brainHero{position:relative;height:clamp(430px,62vw,650px);overflow:hidden;border-radius:14px;background:radial-gradient(circle at 55% 45%,#0b1230 0%,#070a16 40%,#03050b 78%);isolation:isolate}
         .brainCanvas{position:absolute;inset:0;width:100%;height:100%;z-index:1}
         .brainVignette{position:absolute;inset:0;z-index:2;pointer-events:none;background:linear-gradient(90deg,rgba(3,5,11,.94) 0%,rgba(3,5,11,.64) 31%,rgba(3,5,11,.08) 58%,rgba(3,5,11,.22) 100%),linear-gradient(0deg,rgba(3,5,11,.58),transparent 35%)}
@@ -458,5 +523,7 @@ export default function AnimatedBrainHero() {
         @media(prefers-reduced-motion:reduce){.brainStatus i,.brainActions a{animation:none;transition:none}}
       `}</style>
     </section>
+    </div>
+    </div>
   );
 }
