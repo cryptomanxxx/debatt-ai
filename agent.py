@@ -290,9 +290,9 @@ def main():
     # Civilisationsdigest hämtas en gång — återanvänds i alla artikelgrenar
     civ_digest = hamta_civilisations_digest(sb_key) if sb_key else ""
 
-    # 05:00–08:00 UTC (07:00–10:00 svensk tid) → garanterad nyhetsartikel (4 st/dag)
-    # 13:00–16:00 UTC (15:00–18:00 svensk tid) → garanterad replik (4 st/dag)
-    # 17:00–20:00 UTC (19:00–22:00 svensk tid) → garanterad eget ämne (4 st/dag)
+    # 07:00 UTC (09:00 svensk tid) → garanterad nyhetsartikel (4 st/dag)
+    # 08:00 UTC (10:00 svensk tid) → garanterad eget ämne / debattartikel (4 st/dag)
+    # 09:00 UTC (11:00 svensk tid) → garanterad replik (4 st/dag)
     #
     # GitHub Actions garanterar INTE exakt en trigger per deklarerad cron-rad —
     # schemaläggaren kan både hoppa över och (mindre vanligt men bekräftat
@@ -329,15 +329,24 @@ def main():
     # datum. Faller tillbaka på den gamla timheuristiken om tidsstämpeln
     # saknas eller inte går att tolka (t.ex. API-anropet misslyckades).
     # Sedan ✅128 (CLAUDE.md) finns bara EN cron per fönster (agent.yml loopar
-    # 4 publiceringspass internt istället för att ha 4 separata cron-rader) —
-    # dict:en trimmad till de cron-strängar som faktiskt kan förekomma.
-    # Fönsterintervallen nedan (utc_hour in (5,6,7,8) m.fl.) lämnas oförändrade
-    # — de gäller fortfarande vid manuell workflow_dispatch/stale-cron-fallback,
-    # där utc_hour kommer från väggklockan, inte från denna dict.
+    # 4 publiceringspass internt istället för att ha 4 separata cron-rader).
+    #
+    # ✅129: de tre primära fönstren flyttade till 09:00/10:00/11:00 svensk tid
+    # (07/08/09 UTC) — tätt packade i tre på varandra följande UTC-timmar,
+    # istället för tidigare utspridda 07/15/19 svensk tid. Fönsterintervallen
+    # nedan är därför medvetet SMALARE än innan (exakt en UTC-timme per typ,
+    # inte ett brett 4-timmarsspann) — annars hade t.ex. den gamla nyhet-
+    # rangen (5,6,7,8) fortsatt inkludera timme 8 (nu eget-fönstret) och gett
+    # force_nyhet=True samtidigt som force_eget=True för samma körning. Det
+    # smalare fönstret gäller bara AGENT_CRON-vägen (en exakt dict-slagning,
+    # oberoende av spannets bredd); vid manuell workflow_dispatch eller en
+    # stale cron kringgås fönsterkravet ändå helt av
+    # ar_manuell_korning/nagon_kvot_kvar-grinden längre ner — den smalare
+    # rangen kostar alltså ingen robusthet där.
     _CRON_TILL_TIMME = {
-        "0 5 * * *": 5,
-        "0 13 * * *": 13,
-        "0 17 * * *": 17,
+        "0 7 * * *": 7,
+        "0 8 * * *": 8,
+        "0 9 * * *": 9,
         "30 21 * * *": 21, "40 21 * * *": 21, "50 21 * * *": 21,
     }
     _utc_now = datetime.now(timezone.utc)
@@ -354,9 +363,9 @@ def main():
         _cron_stale = _utc_now.hour < _cron_hour
     utc_hour = _cron_hour if (_cron_hour is not None and not _cron_stale) else _utc_now.hour
     idag_publicerat = hamta_publicerade_idag_per_typ(sb_key) if sb_key else {"nyhet": 0, "replik": 0, "eget": 0}
-    force_nyhet  = utc_hour in (5, 6, 7, 8)   and idag_publicerat["nyhet"]  < 4
-    force_replik = utc_hour in (13, 14, 15, 16) and idag_publicerat["replik"] < 4
-    force_eget   = utc_hour in (17, 18, 19, 20) and idag_publicerat["eget"]   < 4
+    force_nyhet  = utc_hour == 7 and idag_publicerat["nyhet"]  < 4
+    force_replik = utc_hour == 9 and idag_publicerat["replik"] < 4
+    force_eget   = utc_hour == 8 and idag_publicerat["eget"]   < 4
 
     # 21:xx UTC (23:xx svensk tid) → catch-up-fönster. De tre fönstren ovan
     # garanterar bara att en typ INTE skjuts över 4 — de gör inget om ett
