@@ -29,7 +29,7 @@ async function getData() {
       { headers: h, next: { revalidate: 1800 } }
     ),
     fetch(
-      `${SB_URL}/rest/v1/artiklar?select=skapad,nyhetskalla,parent_id&kalla=eq.ai&order=skapad.desc&limit=1500`,
+      `${SB_URL}/rest/v1/artiklar?select=skapad,nyhetskalla,parent_id,filmrecension&kalla=eq.ai&order=skapad.desc&limit=1500`,
       { headers: h, next: { revalidate: 1800 } }
     ),
   ]);
@@ -53,24 +53,27 @@ export default async function RedaktionPage() {
 
   // Daglig publicering senaste 30 dagarna
   //
-  // Tre kategorier, inte två — repliker uteslöts tidigare helt (parent_id
-  // != null → continue), vilket gjorde att grafen kunde visa "1 publicerad
-  // idag" trots att t.ex. 3 repliker + 1 egen artikel faktiskt publicerats
-  // (användarrapport, sep 2026: /redaktion visade en nästan tom stapel för
-  // en dag där startsidans "Senaste debatterna" tydligt visade 4 artiklar).
-  // Samma klass av "repliker osynliga" som ✅105, fast på en tredje yta.
+  // Fyra kategorier — repliker uteslöts tidigare helt (parent_id != null →
+  // continue, ✅109), och senare hamnade filmrecensioner osynligt i
+  // "Debattartiklar"-bucketen eftersom `filmrecension` varken hämtades
+  // eller kollades (Filmrecensenten sätter aldrig nyhetskalla/parent_id,
+  // se ✅123 — utan en egen gren föll den raden bara igenom till `else`).
+  // Samma klass av "en artikeltyp osynlig i grafen" som ✅105/✅109, fast
+  // på en fjärde yta. `filmrecension` kollas FÖRST — den är den enda
+  // otvetydiga signalen (aldrig härledd ur forfattare/kategori, ✅123).
   const dagMap = {};
   for (let i = 29; i >= 0; i--) {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - i);
     const key = d.toISOString().slice(0, 10);
-    dagMap[key] = { dag: key.slice(5), nyheter: 0, debatt: 0, repliker: 0 };
+    dagMap[key] = { dag: key.slice(5), nyheter: 0, debatt: 0, repliker: 0, film: 0 };
   }
   for (const a of artRows) {
     if (!a.skapad) continue;
     const key = a.skapad.slice(0, 10);
     if (!dagMap[key]) continue;
-    if (a.parent_id != null) dagMap[key].repliker++;
+    if (a.filmrecension) dagMap[key].film++;
+    else if (a.parent_id != null) dagMap[key].repliker++;
     else if (a.nyhetskalla) dagMap[key].nyheter++;
     else dagMap[key].debatt++;
   }

@@ -283,6 +283,43 @@ function checkRedaktionRaknarRepliker() {
   }
 }
 
+function checkRedaktionRaknarFilmrecensioner() {
+  const namn = "redaktion-raknar-filmrecensioner";
+  try {
+    const kod = lasFil("app/redaktion/page.js");
+    const idx = kod.indexOf("Daglig publicering senaste 30 dagarna");
+    if (idx === -1) {
+      rapportera(namn, "fail", "hittar inte dagligData-bygget i app/redaktion/page.js");
+      return;
+    }
+    const fonster = kod.slice(idx, idx + 1200);
+    // Samma mönster som checkRedaktionRaknarRepliker() (✅109, Codex-fynd på
+    // PR #1430/#1433): matcha det ihopkopplade villkoret+ökningen, inte bara
+    // fältnamnet isolerat, och kräv att åtminstone en förekomst inte är
+    // utkommenterad. Filmrecensioner (✅123/✅127) föll tidigare igenom till
+    // "Debattartiklar" eftersom `filmrecension` varken hämtades eller
+    // kollades — exakt samma buggklass som repliker-fyndet, en fjärde yta.
+    const marker = "a.filmrecension) dagMap[key].film++";
+    const harAktivMarkor = fonster.split("\n").some(rad => {
+      const idxMarkor = rad.indexOf(marker);
+      if (idxMarkor === -1) return false;
+      return !rad.slice(0, idxMarkor).includes("//");
+    });
+    if (!harAktivMarkor) {
+      rapportera(namn, "fail", "dagMap[key].film++ hittas inte som aktiv (okommenterad) kod kopplad till filmrecension-villkoret — filmrecensioner kanske inte längre räknas i /redaktion (✅127)");
+      return;
+    }
+    const vyKod = lasFil("app/redaktion/RedaktionVy.js");
+    if (!vyKod.includes('dataKey="film"')) {
+      rapportera(namn, "fail", "RedaktionVy.js saknar en <Bar dataKey=\"film\"> — filmrecensioner räknas men visas inte i grafen (✅127)");
+      return;
+    }
+    rapportera(namn, "ok");
+  } catch (e) {
+    rapportera(namn, "error", String(e.message || e));
+  }
+}
+
 // ==================== Livedatakontroller ====================
 
 async function hamtaSupabase(pathAndQuery) {
@@ -461,6 +498,7 @@ async function main() {
   checkAmnesforslagInteKonsumeratVidAvvisning();
   checkAmnesforslagKvotseparation();
   checkRedaktionRaknarRepliker();
+  checkRedaktionRaknarFilmrecensioner();
 
   await checkAktivitetHarArtikelTyper();
   await checkDagligPubliceringskvot();

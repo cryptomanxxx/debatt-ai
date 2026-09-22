@@ -184,6 +184,7 @@ export default function RedaktionVy({ total, snittPoang, beslutData, kriterieDat
               <Bar dataKey="nyheter" name="Nyhetsartiklar" fill="#60a5fa" radius={[3, 3, 0, 0]} />
               <Bar dataKey="debatt" name="Debattartiklar" fill="#e8d5a3" radius={[3, 3, 0, 0]} />
               <Bar dataKey="repliker" name="Repliker" fill="#4ade80" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="film" name="Filmrecensioner" fill="#e8b84a" radius={[3, 3, 0, 0]} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
