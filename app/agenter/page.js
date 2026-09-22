@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AGENT_VISUELL, agentVisuell } from "../agentData";
 import AgentAvatar from "../agent/[namn]/AgentAvatar";
 import AgentOverlay from "../nyhetskallor/AgentOverlay";
-import { StarField } from "../client";
+import { StarField } from "../StarField";
 
 const C = {
   // A dark radial gradient (matching the homepage hero's own tones) instead
