@@ -4,6 +4,7 @@ import AgentAvatar from "./agent/[namn]/AgentAvatar";
 import { agentVisuell } from "./agentData";
 import NewsTicker from "./NewsTicker";
 import AnimatedBrainHero from "./AnimatedBrainHero";
+import { StarField } from "./StarField";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -609,12 +610,6 @@ function DagensSchema({ nextIdx }) {
     </div>
   );
 }
-
-// ── Starfield ─────────────────────────────────────────────────────────────────
-// Moved to its own module (app/StarField.js) so pages that only need this
-// decorative background don't have to pull in this entire file's client
-// bundle. Re-exported here so this file's own usage below is unchanged.
-export { StarField } from "./StarField";
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 const DRIFT_LEVELS = [
