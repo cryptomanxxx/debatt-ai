@@ -483,13 +483,15 @@ function isEligible(r) {
   return r && r.arg >= MIN_SCORE && r.ori >= MIN_SCORE && r.rel >= MIN_SCORE && r.tro >= MIN_SCORE;
 }
 
+// Sedan ✅128 (CLAUDE.md) kör Nyhetsartiklar/Repliker/Debattartiklar/
+// Filmrecensioner en enda GitHub Actions-körning per typ (som internt loopar
+// 4 publiceringspass) istället för 4 separata körningar — schemat nedan
+// visar bara den enda avfyrningstidpunkten per typ, inte varje internt pass.
 const ALLA_KÖRNINGAR = [
   { h: 5,  m: 30, namn: "Riksdagsval",     farg: "#e8d5a3", ikon: "🗳️" },
   { h: 6,  m: 30, namn: "Krisevents",      farg: "#f87171", ikon: "🌍" },
   { h: 7,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
-  { h: 8,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
-  { h: 9,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
-  { h: 10, m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
+  { h: 8,  m: 0,  namn: "Filmrecensioner", farg: "#e8b84a", ikon: "🎬" },
   { h: 10, m: 30, namn: "Intern börs",     farg: "#e8d5a3", ikon: "📈" },
   { h: 11, m: 0,  namn: "Butiken",         farg: "#f59e0b", ikon: "🛍" },
   { h: 11, m: 30, namn: "Andrahandsmkn",   farg: "#e879f9", ikon: "🔨" },
@@ -501,14 +503,8 @@ const ALLA_KÖRNINGAR = [
   { h: 14, m: 0,  namn: "Konversationer",  farg: "#a78bfa", ikon: "🤖" },
   { h: 14, m: 30, namn: "Domstolen",       farg: "#e8d5a3", ikon: "⚖️" },
   { h: 15, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
-  { h: 16, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
-  { h: 17, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
-  { h: 18, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
   { h: 18, m: 15, namn: "Intern börs",     farg: "#e8d5a3", ikon: "📈" },
   { h: 19, m: 0,  namn: "Debattartiklar",  farg: "#e879f9", ikon: "📝" },
-  { h: 20, m: 0,  namn: "Debattartiklar",  farg: "#e879f9", ikon: "📝" },
-  { h: 21, m: 0,  namn: "Debattartiklar",  farg: "#e879f9", ikon: "📝" },
-  { h: 22, m: 0,  namn: "Debattartiklar",  farg: "#e879f9", ikon: "📝" },
 ];
 
 function svTidSek() {
@@ -566,12 +562,12 @@ function DagensSchema({ nextIdx }) {
   }, []);
   const gridStyle = isMobile
     ? { display: "grid", gridTemplateColumns: "1fr", gap: "3px" }
-    : { display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "repeat(13, auto)", gridAutoFlow: "column", gap: "3px 10px" };
+    : { display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "repeat(9, auto)", gridAutoFlow: "column", gap: "3px 10px" };
   return (
     <div style={{ marginBottom: "24px", background: "#0a0a0f", border: "1px solid #1a1a1a", borderRadius: "8px", padding: "16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
         <span style={{ fontSize: "10px", color: "#555", fontFamily: "monospace", letterSpacing: "0.12em", textTransform: "uppercase" }}>Dagens schema</span>
-        <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>25 körningar · svensk tid</span>
+        <span style={{ fontSize: "10px", color: "#333", fontFamily: "monospace" }}>17 körningar · svensk tid</span>
       </div>
       <div style={gridStyle}>
         {ALLA_KÖRNINGAR.map((k, i) => {

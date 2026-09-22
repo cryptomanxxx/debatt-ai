@@ -328,10 +328,16 @@ def main():
     # länge jobbet sedan köade) ger ett exakt datum att jämföra mot väggklockans
     # datum. Faller tillbaka på den gamla timheuristiken om tidsstämpeln
     # saknas eller inte går att tolka (t.ex. API-anropet misslyckades).
+    # Sedan ✅128 (CLAUDE.md) finns bara EN cron per fönster (agent.yml loopar
+    # 4 publiceringspass internt istället för att ha 4 separata cron-rader) —
+    # dict:en trimmad till de cron-strängar som faktiskt kan förekomma.
+    # Fönsterintervallen nedan (utc_hour in (5,6,7,8) m.fl.) lämnas oförändrade
+    # — de gäller fortfarande vid manuell workflow_dispatch/stale-cron-fallback,
+    # där utc_hour kommer från väggklockan, inte från denna dict.
     _CRON_TILL_TIMME = {
-        "0 5 * * *": 5, "0 6 * * *": 6, "0 7 * * *": 7, "0 8 * * *": 8,
-        "0 13 * * *": 13, "0 14 * * *": 14, "0 15 * * *": 15, "0 16 * * *": 16,
-        "0 17 * * *": 17, "0 18 * * *": 18, "0 19 * * *": 19, "0 20 * * *": 20,
+        "0 5 * * *": 5,
+        "0 13 * * *": 13,
+        "0 17 * * *": 17,
         "30 21 * * *": 21, "40 21 * * *": 21, "50 21 * * *": 21,
     }
     _utc_now = datetime.now(timezone.utc)

@@ -2,7 +2,13 @@ name: Filmrecensenten
 
 on:
   schedule:
-    - cron: '0 6,10,14,18 * * *'  # 08/12/16/20 svensk tid (sommartid) — kollar kanalens senaste video 4x/dag
+    # EN trigger istället för 4 separata (se ✅128 i CLAUDE.md) — "Kör
+    # Filmrecensenten"-steget nedan loopar 4 pass internt i samma körning.
+    # filmrecensent.py:s cursor/pending-state (filmrecensent_state-tabellen)
+    # är redan tidpunktsagnostisk och säkert återanropningsbar i en tät
+    # sekventiell loop — den fortsätter alltid där föregående pass sparade
+    # cursorn.
+    - cron: '0 6 * * *'  # 08:00 svensk tid (sommartid) — 4 pass i samma körning
   workflow_dispatch:
 
 permissions:
@@ -11,7 +17,7 @@ permissions:
 jobs:
   recension:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v7
@@ -37,4 +43,19 @@ jobs:
           # filmrecensent.py. Saknas secreten faller skriptet tillbaka på
           # det gamla RSS-baserade "bara senaste videon"-beteendet.
           YOUTUBE_API_KEY:   ${{ secrets.YOUTUBE_API_KEY }}
-        run: python3 filmrecensent.py
+        run: |
+          set +e
+          FAILED=0
+          for i in $(seq 1 4); do
+            echo "=== Filmrecension $i/4 ==="
+            python3 filmrecensent.py
+            ec=$?
+            if [ $ec -ne 0 ]; then
+              echo "::warning::Pass $i/4 misslyckades (exit $ec) — fortsätter med nästa pass."
+              FAILED=1
+            fi
+            if [ "$i" -lt 4 ]; then
+              sleep 60
+            fi
+          done
+          exit $FAILED
