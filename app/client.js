@@ -611,7 +611,9 @@ function DagensSchema({ nextIdx }) {
 }
 
 // ── Starfield ─────────────────────────────────────────────────────────────────
-function StarField() {
+// Exported so other pages (e.g. /agenter) can reuse the same circuit-board
+// motif for a consistent background instead of a flat color.
+export function StarField() {
   const stars = useMemo(() => {
     const s = [];
     for (let i = 0; i < 100; i++) {
@@ -1183,10 +1185,16 @@ export default function DebattClient({ initialArticleCount = null }) {
   }
 
   const ok = isEligible(result);
+  // The hero's own canvas network already provides plenty of visual
+  // interest — layering the global circuit-board background behind it too
+  // reads as an unintentional "frame" of pink traces around the hero card
+  // (its dark lines are visible outside the card's own boundary against the
+  // page background). Hide it specifically while the hero is showing.
+  const heroVisible = view === "submit" && !analyzing;
 
   return (
     <>
-    <StarField />
+    {!heroVisible && <StarField />}
     <div style={{ minHeight: "100vh", background: "transparent", color: C.text, fontFamily: "Georgia, serif", position: "relative", zIndex: 1 }}>
 
       {/* Header */}
