@@ -3742,6 +3742,18 @@ Kräver `supabase_artiklar_filmrecension.sql` — kör i Supabase SQL Editor.
 | `app/arkiv/ArkivClient.js` | Artikelkortens `<h2>`-rubrikfärg kollar nu `a.nyhetskalla?.typ !== "replik"` — samma villkor som artikelsidan redan hade — så repliker renderas grönt (debatt), inte blått (nyhet) |
 | `app/client.js` | "VECKANS MEST LÄSTA"-widgetens rubrikfärg fick samma `nyhetskalla?.typ !== "replik"`-villkor |
 
+**SENASTE FILMRECENSIONERNA-widgeten fortsatt strukturellt olik trots gemensam "Se alla"-länk till samma /arkiv-sida (uppföljande användarrapport, sep 2026):** *"varför ser SENASTE FILMRECENSIONERNA widgeten Fortfarande annorlunda ut från SENASTE DEBATTERNA widgeten SENASTE NYHETERNA widgeten på hemsidans startsida"* — trots att alla tre widgetar nu länkade till samma visuellt enhetliga `/arkiv`-sida (se ✅126), var själva widget-korten på startsidan fortsatt strukturellt olika: filmwidgeten behöll sitt kompakta enradsformat (liten 96×54px YouTube-tumnagel, ingen avatar, inget textutdrag, inga Arg/Ori/Rel/Tro-poäng) — designat medvetet tidigare i just denna sektion (se "Namn och tumnagelstorlek justerade efter ägarfeedback" ovan) som en reaktion på ett ännu tidigare klagomål om att den ursprungliga, fullständiga videokortsdesignen tog för mycket plats på startsidan.
+
+Ett första försök att lösa tvetydigheten (fråga användaren om de ville ha full kortstruktur eller behålla det kompakta läget) gav ett obestämt svar. Den avgörande uppföljningen klargjorde det exakta kravet: *"Problemet var att den bilden på förhandsgranskade videon tog för mycket plats. Jag vill inte att bilden på den förhandsgranskade videon ska synas i wirgeten men jag vill att dom 3 wirgetarna ska se likadana ut."* — dvs. det var uteslutande videotumnagelbilden som var problemet, inte den fullständiga kortstrukturen i sig.
+
+**Fix:** filmwidgetens kort mirrorar nu exakt debattkortets struktur (NY-badge, AI/MÄNNISKA-badge, upp till 3 taggar, avatar+författare+datum-rad, 180-teckens textutdrag, Arg/Ori/Rel/Tro-poängrad, explicit "Läs hela artikeln →"-knapp) i sitt befintliga guld/orange-tema (`#e8b84a` accent, `#100c04` bakgrund, `#4a3a1a` kant) — helt utan någon videobild eller play-knapp-overlay. `fetchSenasteFilmrecension()`s Supabase-fråga utökades med `kalla,arg,ori,rel,tro` (behövs för de nya badgarna/poängraden) och `youtube_video_id` togs bort ur `select=`-listan (inte längre använt av widgeten — artikelsidan har fortsatt sin egen inbäddade spelare, se ✅121, oberoende av denna homepage-widget).
+
+**Verifiering:** manuell diff-granskning av JSX-blocket mot det redan fungerande debattkortet (`node --check` är dokumenterat opålitligt för denna JSX-innehållande `.js`-fil i den här kodbasen) samt bekräftat att inga kvarvarande referenser till `youtube_video_id` finns kvar i filen. Ingen live-sajt-åtkomst i den här miljön för visuell verifiering.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/client.js` | `fetchSenasteFilmrecension()`s `select=` utökad med `kalla,arg,ori,rel,tro`, `youtube_video_id` borttaget. "Hero – senaste filmrecensioner"-blocket omskrivet till att mirrora debattkortets fullständiga struktur (badges, taggar, avatar, utdrag, poängrad, knapp) i guldtemat, utan videotumnagel |
+
 ---
 
 ### ✅ 124. Admin-panelens "Ta bort artikel" gjorde ingenting — DELETE gick via anon-nyckeln, RLS blockerade den tyst – KLART
