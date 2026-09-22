@@ -3852,6 +3852,24 @@ Uppföljande användarrapport (sep 2026), direkt efter ✅125 gått live i produ
 
 ---
 
+### ✅ 127. /redaktion — filmrecensioner osynliga i "Daglig publicering vs mål" – KLART
+
+Användarrapport (sep 2026): *"På sidan: https://www.debatt-ai.se/redaktion så saknas filmrecensioner nu"*.
+
+**Rotorsak — samma buggklass som ✅109, en fjärde yta.** `/redaktion`s dagliga publiceringsgraf (`app/redaktion/page.js`) klassificerar varje `artiklar`-rad i en av flera kategorier via en `if/else`-kedja baserad på `nyhetskalla` och `parent_id`. När `filmrecension` (✅123) infördes som en tredje, otvetydig artikeltyp fick den aldrig en egen gren — kolumnen hämtades inte ens i Supabase-queryn (`select=skapad,nyhetskalla,parent_id`, utan `filmrecension`). Filmrecensenten sätter varken `nyhetskalla` eller `parent_id` (dokumenterat i ✅121/✅123), så varje filmrecension föll igenom hela kedjan och landade i den generiska `else`-grenen — "Debattartiklar". Raden var alltså aldrig borttagen eller dold ur datasetet (`/api/agent/submit/route.js` sätter redan `kalla:"ai"` och `filmrecension:true` korrekt på Filmrecensentens artiklar, se ✅123), bara osynligt sammanslagen med en orelaterad kategori — exakt vad ✅105/✅106/✅107/✅109 redan dokumenterat flera gånger som samma återkommande mönster: en ny innehållstyp läggs till i datamodellen, men en befintlig klassificerings-`if/else`-kedja på en annan yta får aldrig en ny gren.
+
+**Fix:** `filmrecension` läggs till i Supabase-queryns `select=`, och `dagMap`-loopen kollar `a.filmrecension` FÖRST (innan `parent_id`/`nyhetskalla`) — den enda otvetydiga signalen, aldrig härledd ur `forfattare`/`kategori` (✅123). En fjärde kategori, `film`, läggs till i dagbucket-initieraren. `RedaktionVy.js` fick en fjärde `<Bar dataKey="film" name="Filmrecensioner" fill="#e8b84a">` (samma guld/orange som all annan filmrecensions-UI på plattformen) i "Daglig publicering vs mål"-grafen.
+
+**Regressionsguard:** ny invariant-checker-check `redaktion-raknar-filmrecensioner`, samma mönster som `redaktion-raknar-repliker` (✅109, härdad mot Codex-fynd på PR #1430/#1433 — matchar det ihopkopplade villkoret+ökningen, kräver en aktiv/okommenterad förekomst). Kontrollerar även att `RedaktionVy.js` faktiskt har en `<Bar dataKey="film">` — annars kunde datalagret räkna filmrecensioner korrekt utan att grafen någonsin visar dem.
+
+| Fil | Roll |
+|---|---|
+| `app/redaktion/page.js` | `filmrecension` tillagd i `artiklar`-queryns `select=`. `dagMap`-klassificeringen kollar `filmrecension` FÖRST, ny `film`-kategori i dagbucket-initieraren |
+| `app/redaktion/RedaktionVy.js` | Ny `<Bar dataKey="film" name="Filmrecensioner" fill="#e8b84a">` i "Daglig publicering vs mål"-grafen |
+| `agents/invariant-checker.js` | Ny check, `redaktion-raknar-filmrecensioner` (källkod) — regressionsguard för denna fix, kollar både datalager (`page.js`) och rendering (`RedaktionVy.js`) |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
