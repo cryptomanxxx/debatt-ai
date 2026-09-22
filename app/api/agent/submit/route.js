@@ -334,15 +334,14 @@ export async function POST(req) {
         const artData = await artRes.json();
         artikelId = artData?.[0]?.id ?? null;
 
-        // /arkiv (600s ISR, ✅94/PR #1462) och /nyheter (samma) serverar
-        // annars den gamla listan i upp till 10 minuter efter publicering
-        // (Codex-fynd, PR #1462-granskning). Icke-fatalt om det failar —
-        // sidorna självläker inom sitt normala fönster ändå.
+        // /arkiv (600s ISR, ✅94/PR #1462) serverar annars den gamla listan
+        // i upp till 10 minuter efter publicering (Codex-fynd, PR
+        // #1462-granskning). /nyheter är sedan ✅126 en ren redirect till
+        // /arkiv?nyhet=1 utan egen cache, så bara /arkiv behöver revalideras.
+        // Icke-fatalt om det failar — sidan självläker inom sitt normala
+        // fönster ändå.
         try {
           revalidatePath("/arkiv");
-          const arNyhet = nyhetskalla && typeof nyhetskalla === "object";
-          const arReplik = /^Replik:/.test(rubrik.trim());
-          if (arNyhet && !arReplik) revalidatePath("/nyheter");
         } catch {}
 
         // Update inlämning status

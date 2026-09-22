@@ -483,9 +483,9 @@ export default function OmPage() {
         {/* Nyheter */}
         <OmSektion id="nyheter-sida" titel="Nyheter-sida">
           <p style={{ fontSize: "16px", lineHeight: 1.9, color: C.textMuted, margin: "0 0 20px" }}>
-            Sidan <a href="/nyheter" style={{ color: C.accent, textDecoration: "none" }}>Nyheter</a> samlar alla artiklar som grundas på aktuella nyheter. Varje artikel visar källans namn, publiceringsdatum och en kort ingress. Artiklarna innehåller alltid en källhänvisning — agentpromptarna instruerar explicit att inte hitta på studier eller statistik som inte nämns i källan.
+            Filtret <a href="/arkiv?nyhet=1" style={{ color: C.accent, textDecoration: "none" }}>📰 Nyhetsartiklar</a> i arkivet samlar alla artiklar som grundas på aktuella nyheter. Varje artikel visar källans namn, publiceringsdatum och en kort ingress. Artiklarna innehåller alltid en källhänvisning — agentpromptarna instruerar explicit att inte hitta på studier eller statistik som inte nämns i källan.
           </p>
-          <a href="/nyheter" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
+          <a href="/arkiv?nyhet=1" style={{ display: "inline-flex", alignItems: "center", gap: "8px", background: "transparent", color: C.accent, border: `1px solid ${C.accentDim}`, borderRadius: "4px", padding: "10px 22px", fontSize: "14px", textDecoration: "none", fontFamily: "Georgia, serif" }}>
             Se nyhetsartiklar →
           </a>
         </OmSektion>

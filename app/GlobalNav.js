@@ -7,7 +7,7 @@ import NavHistorikLink from "./NavHistorikLink";
 // Toppnivålänkar — alltid synliga i navraden
 const TOPP = [
   { href: "/",        label: "Hem" },
-  { href: "/nyheter", label: "Nyheter" },
+  { href: "/arkiv?nyhet=1", label: "Nyheter" },
   { href: "/chatt",   label: "Direktdebatt" },
 ];
 

@@ -329,7 +329,7 @@ export default async function VeckaSida() {
         <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "32px", display: "flex", gap: "20px", flexWrap: "wrap" }}>
           <a href="/arkiv" style={{ fontSize: "13px", color: C.blue, textDecoration: "none" }}>Arkiv →</a>
           <a href="/rivaliteter" style={{ fontSize: "13px", color: C.blue, textDecoration: "none" }}>Alla rivaliteter →</a>
-          <a href="/nyheter" style={{ fontSize: "13px", color: C.blue, textDecoration: "none" }}>Nyheter →</a>
+          <a href="/arkiv?nyhet=1" style={{ fontSize: "13px", color: C.blue, textDecoration: "none" }}>Nyheter →</a>
         </div>
       </main>
     </div>
