@@ -32,6 +32,22 @@ export default function AnimatedBrainHero() {
       y: 0.46 + 0.20 * Math.sin(time * 0.000105 + 1.7),
     });
 
+    // One-time entrance: nodes burst outward from the center into their
+    // resting brain-shaped positions, staggered per node, fading in as they
+    // go. A one-time cost only (finishes within ~2s of mount and never
+    // recurs), so it can afford to be much more dramatic than anything in
+    // the steady-state loop. Skipped entirely for prefers-reduced-motion —
+    // nodeEase() then always returns 1, so the first (and only) draw() call
+    // renders the final resting state immediately, no motion at all.
+    const ENTRANCE_MS = reduced ? 0 : 1400;
+    const mountTime = performance.now();
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+    function nodeEase(n, elapsed) {
+      if (!ENTRANCE_MS) return 1;
+      const t = Math.max(0, Math.min(1, (elapsed - n.entranceDelay) / ENTRANCE_MS));
+      return easeOutCubic(t);
+    }
+
     // Two overlapping ellipses + a narrower lower section create a recognizable
     // brain silhouette without shipping a heavy 3D model.
     const insideBrain = (x, y) => {
@@ -55,6 +71,7 @@ export default function AnimatedBrainHero() {
           z: Math.random(),
           phase: Math.random() * Math.PI * 2,
           glow: Math.random(),
+          entranceDelay: Math.random() * 500,
         });
       }
 
@@ -100,17 +117,24 @@ export default function AnimatedBrainHero() {
       resizeTimer = setTimeout(resize, 150);
     }
 
-    const pos = (n, time, focus) => {
+    const pos = (n, time, focus, ease) => {
       const breathe = reduced ? 0 : Math.sin(time * 0.00045 + n.phase) * 0.0025;
       const px = (focus.x - 0.5) * (0.018 + n.z * 0.012);
       const py = (focus.y - 0.5) * (0.010 + n.z * 0.008);
+      // Entrance: node flies outward from the exact center (0.5,0.5) to its
+      // resting (n.x,n.y) position as ease goes 0 -> 1.
+      const ex = 0.5 + (n.x - 0.5) * ease;
+      const ey = 0.5 + (n.y - 0.5) * ease;
       return {
-        x: (n.x + breathe + px) * width,
-        y: (n.y + breathe * 0.5 + py) * height,
+        x: (ex + breathe + px) * width,
+        y: (ey + breathe * 0.5 + py) * height,
       };
     };
 
+    const SHOCKWAVE_MS = 900;
+
     function draw(time = 0) {
+      const elapsed = performance.now() - mountTime;
       ctx.clearRect(0, 0, width, height);
 
       const focus = realPointerActive ? pointer : autoFocus(time);
@@ -122,11 +146,25 @@ export default function AnimatedBrainHero() {
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, width, height);
 
+      // A single expanding ring of light from the center, synced with the
+      // node burst below — a one-time "the brain is switching on" flourish.
+      if (!reduced && elapsed < SHOCKWAVE_MS) {
+        const t = elapsed / SHOCKWAVE_MS;
+        const eased = 1 - Math.pow(1 - t, 2);
+        ctx.strokeStyle = `rgba(159, 140, 255, ${(1 - t) * 0.55})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(width * 0.52, height * 0.45, eased * width * 0.55, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
       ctx.lineWidth = 0.7;
       for (const [a, b] of edges) {
-        const pa = pos(nodes[a], time, focus);
-        const pb = pos(nodes[b], time, focus);
-        const shimmer = reduced ? 0.18 : 0.14 + 0.08 * Math.sin(time * 0.001 + nodes[a].phase);
+        const ea = nodeEase(nodes[a], elapsed);
+        const eb = nodeEase(nodes[b], elapsed);
+        const pa = pos(nodes[a], time, focus, ea);
+        const pb = pos(nodes[b], time, focus, eb);
+        const shimmer = (reduced ? 0.18 : 0.14 + 0.08 * Math.sin(time * 0.001 + nodes[a].phase)) * Math.min(ea, eb);
         ctx.strokeStyle = `rgba(83, 151, 255, ${shimmer})`;
         ctx.beginPath();
         ctx.moveTo(pa.x, pa.y);
@@ -135,16 +173,17 @@ export default function AnimatedBrainHero() {
       }
 
       for (const n of nodes) {
-        const p = pos(n, time, focus);
+        const ease = nodeEase(n, elapsed);
+        const p = pos(n, time, focus, ease);
         const fx = focus.x * width;
         const fy = focus.y * height;
         const proximity = Math.max(0, 1 - Math.hypot(p.x - fx, p.y - fy) / 150);
-        const flicker = reduced ? 0.55 : 0.42 + 0.22 * Math.sin(time * 0.0015 + n.phase);
-        const radius = 1 + n.z * 1.4 + proximity * 2.2;
+        const flicker = (reduced ? 0.55 : 0.42 + 0.22 * Math.sin(time * 0.0015 + n.phase)) * ease;
+        const radius = (1 + n.z * 1.4 + proximity * 2.2) * (0.4 + ease * 0.6);
         ctx.shadowBlur = 7 + proximity * 16;
         ctx.shadowColor = proximity > 0.25 ? "#a879ff" : "#48a8ff";
         ctx.fillStyle = proximity > 0.25
-          ? `rgba(195, 142, 255, ${0.65 + proximity * 0.3})`
+          ? `rgba(195, 142, 255, ${(0.65 + proximity * 0.3) * ease})`
           : `rgba(104, 188, 255, ${flicker})`;
         ctx.beginPath();
         ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
@@ -152,7 +191,7 @@ export default function AnimatedBrainHero() {
       }
       ctx.shadowBlur = 0;
 
-      if (!reduced && edges.length) {
+      if (!reduced && edges.length && elapsed > ENTRANCE_MS * 0.5) {
         for (const pulse of pulses) {
           pulse.t += pulse.speed;
           if (pulse.t > 1) {
@@ -161,8 +200,8 @@ export default function AnimatedBrainHero() {
             pulse.speed = 0.002 + Math.random() * 0.004;
           }
           const [ai, bi] = edges[pulse.edge];
-          const a = pos(nodes[ai], time, focus);
-          const b = pos(nodes[bi], time, focus);
+          const a = pos(nodes[ai], time, focus, nodeEase(nodes[ai], elapsed));
+          const b = pos(nodes[bi], time, focus, nodeEase(nodes[bi], elapsed));
           const x = a.x + (b.x - a.x) * pulse.t;
           const y = a.y + (b.y - a.y) * pulse.t;
           ctx.shadowBlur = 16;
