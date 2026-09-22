@@ -121,7 +121,7 @@ export default function AnimatedBrainHero() {
       }
       lightnings = !reduced && edges.length
         ? Array.from({ length: mobile ? 4 : 7 }, () => {
-            const path = randomChain(5 + Math.floor(Math.random() * 6));
+            const path = randomChain(8 + Math.floor(Math.random() * 7));
             const segTimes = [];
             let cursor = 0;
             for (let s = 0; s < path.length - 1; s++) {
