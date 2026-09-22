@@ -22,6 +22,19 @@
 }
 
 .neon-logo {
+  /* Static fallback matching the animation's 0%/100% keyframe. Some
+     browsers/devices don't run the animation (accessibility "reduce
+     motion" settings, or a GPU that silently drops very large text-shadow
+     blur radii) — without this, the logo shows no glow at all instead of
+     just not pulsing. */
+  text-shadow:
+    0 0 4px #fff,
+    0 0 10px #fff,
+    0 0 20px #e879f9,
+    0 0 40px #e879f9,
+    0 0 80px #e879f9,
+    0 0 120px #c026d3,
+    0 0 160px #c026d3;
   animation: neonPulse 2.4s ease-in-out infinite;
 }
 
