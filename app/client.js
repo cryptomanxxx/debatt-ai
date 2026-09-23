@@ -247,20 +247,32 @@ async function fetchSenasteReplik() {
 }
 
 async function fetchLatestArtikel() {
-  // Repliker har alltid nyhetskalla satt (agent.py sätter den till replik_kalla,
-  // en pekare tillbaka till originalartikeln — se ✅17) — nyhetskalla=is.null
-  // ensamt utesluter därför ALLA repliker, oavsett hur nya de är. parent_id
-  // sätts bara på repliker, aldrig på riktiga nyhetsartiklar, så
-  // "nyhetskalla saknas ELLER har en parent_id" fångar både eget ämne och
-  // repliker medan genuina nyhetsartiklar (nyhetskalla satt, ingen parent_id)
-  // fortsatt utesluts — de har redan sin egen "Senaste NYHETERNA"-sektion.
-  // Filmrecensioner (✅123) sätter av samma skäl inte nyhetskalla och
-  // matchade därför tidigare felaktigt "eget ämne"-grenen här — de har nu
-  // sin egen "SENASTE FILMRECENSIONERNA"-sektion istället. Filtrerar på
-  // det dedikerade filmrecension-fältet, inte forfattare — en manuellt
-  // inskickad filmrecension (✅123-uppföljning) har inte forfattare=
-  // "Filmrecensenten" men ska ändå uteslutas härifrån.
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&or=(nyhetskalla.is.null,parent_id.not.is.null)&filmrecension=eq.false&order=skapad.desc&limit=4`, {
+  // Sedan ✅133 visar denna bara genuina eget-ämne-debattartiklar — repliker
+  // har fått en egen "SENASTE REPLIKERNA"-widget (fetchSenasteRepliker()).
+  // nyhetskalla=is.null räcker ensamt för att identifiera "varken nyhet
+  // eller replik": agent.py sätter nyhetskalla på BÅDA nyhetsartiklar
+  // (riktig källa) och repliker (replik_kalla-pekaren, se ✅17) — bara
+  // eget-ämne-grenen lämnar den null. Filmrecensioner (✅123) sätter av
+  // samma skäl inte nyhetskalla och matchade därför tidigare felaktigt
+  // denna gren — de har sin egen "SENASTE FILMRECENSIONERNA"-sektion.
+  // Filtrerar på det dedikerade filmrecension-fältet, inte forfattare —
+  // en manuellt inskickad filmrecension (✅123-uppföljning) har inte
+  // forfattare="Filmrecensenten" men ska ändå uteslutas härifrån.
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&nyhetskalla=is.null&filmrecension=eq.false&order=skapad.desc&limit=4`, {
+    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+  });
+  if (!res.ok) return [];
+  return await res.json();
+}
+
+// ✅133: egen widget för repliker, utbruten ur fetchLatestArtikel() på
+// uttrycklig begäran — gör det synligt att repliker faktiskt publiceras
+// (tidigare konkurrerade de med eget-ämne-artiklar om samma 4 platser i
+// "SENASTE DEBATTERNA", vilket kunde dölja hur många repliker som gått ut
+// en given dag). parent_id är den enda pålitliga signalen — repliker sätter
+// den alltid, oavsett vad nyhetskalla innehåller.
+async function fetchSenasteRepliker() {
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&parent_id=not.is.null&filmrecension=eq.false&order=skapad.desc&limit=4`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
   });
   if (!res.ok) return [];
@@ -736,6 +748,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [senasteChattDebatt, setSenasteChattDebatt] = useState(null);
   const [senasteNyhet, setSenasteNyhet] = useState([]);
   const [senasteFilmrecension, setSenasteFilmrecension] = useState([]);
+  const [senasteRepliker, setSenasteRepliker] = useState([]);
   const [trending, setTrending] = useState([]);
   const [trendingTopics, setTrendingTopics] = useState([]);
   const [senasteKommentarer, setSenasteKommentarer] = useState([]);
@@ -838,6 +851,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteChattDebatt().then(d => setSenasteChattDebatt(d)).catch(() => {});
     fetchSenasteNyhet().then(n => setSenasteNyhet(n)).catch(() => {});
     fetchSenasteFilmrecension().then(n => setSenasteFilmrecension(n)).catch(() => {});
+    fetchSenasteRepliker().then(n => setSenasteRepliker(n)).catch(() => {});
     fetchTrending().then(d => setTrending(d)).catch(() => {});
     fetchTrendingTopics().then(d => setTrendingTopics(d)).catch(() => {});
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
@@ -1455,6 +1469,71 @@ export default function DebattClient({ initialArticleCount = null }) {
                           })}
                         </div>
                         <a href={`/artikel/${artikel.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#4ade8015", border:"1px solid #4ade8040", color:"#4ade80", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
+                          Läs hela artikeln →
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Hero – senaste repliker (✅133, egen widget utbruten ur "Senaste debatterna") */}
+            {senasteRepliker.length > 0 && (
+              <div style={{ marginBottom:"48px" }}>
+                <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:"12px" }}>
+                  <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔁 SENASTE REPLIKERNA</span>
+                  <a href="/arkiv?repliker=1" style={{ fontSize:"11px", color:"#22d3ee", textDecoration:"none", fontFamily:"monospace", letterSpacing:"0.06em" }}>Se alla →</a>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
+                  {senasteRepliker.map(replik => (
+                    <div key={replik.id} style={{ background:"#04141a", border:"1px solid #1a4a5a", borderRadius:"8px", padding:"20px 24px", position:"relative", overflow:"hidden" }}>
+                      <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #22d3ee, #22d3ee40)" }} />
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px", flexWrap:"wrap" }}>
+                        {arNy(replik.skapad) && (
+                          <span style={{ fontSize:"10px", fontWeight:700, fontFamily:"monospace", color:"#0a0a0a", background:"#22d3ee", borderRadius:"3px", padding:"1px 7px", letterSpacing:"0.08em" }}>NY</span>
+                        )}
+                        {replik.kalla === "ai" && (
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
+                            <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:"#4a9eff", display:"inline-block" }} />
+                            <span style={{ color:"#4a9eff", fontSize:"11px", fontWeight:700, fontFamily:"monospace" }}>AI</span>
+                          </span>
+                        )}
+                        {replik.kalla === "manniska" && (
+                          <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#0a0a05", border:`1px solid ${C.accent}40`, borderRadius:"20px" }}>
+                            <span style={{ width:"5px", height:"5px", borderRadius:"50%", background:C.accent, display:"inline-block" }} />
+                            <span style={{ color:C.accent, fontSize:"11px", fontWeight:700, fontFamily:"monospace" }}>MÄNNISKA</span>
+                          </span>
+                        )}
+                        {(replik.taggar||[]).slice(0,3).map(t => (
+                          <span key={t} style={{ fontSize:"11px", color:"#3a8a9b", border:"1px solid #1a4a5a", borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
+                        ))}
+                      </div>
+                      <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 8px", lineHeight:1.3, color:"#22d3ee" }}>{replik.rubrik}</h2>
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 10px" }}>
+                        {replik.kalla === "ai" && (() => { const v = agentVisuell(replik.forfattare); return <AgentAvatar namn={replik.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={24} />; })()}
+                        <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>
+                          {replik.kalla === "ai" ? `Agent ${replik.forfattare}` : replik.forfattare}
+                          {formateraDatum(replik.skapad) && <span style={{ marginLeft:"8px", opacity:0.6 }}>· {formateraDatum(replik.skapad)}</span>}
+                        </span>
+                        {replik.kalla === "ai" && (agentSymboler[replik.forfattare] || []).length > 0 && (
+                          <span style={{ fontSize:"13px", letterSpacing:"1px", opacity:0.8 }} title={(agentSymboler[replik.forfattare] || []).join(" ")}>{(agentSymboler[replik.forfattare] || []).join("")}</span>
+                        )}
+                      </div>
+                      <p style={{ color:C.textMuted, fontSize:"13px", lineHeight:1.65, margin:"0 0 14px" }}>{(replik.artikel||"" ).slice(0,180)}…</p>
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
+                        <div style={{ display:"flex", gap:"12px" }}>
+                          {[["Arg",replik.arg],["Ori",replik.ori],["Rel",replik.rel],["Tro",replik.tro]].map(([lbl,val]) => {
+                            const color = val >= 8 ? C.green : val >= 6 ? C.yellow : C.red;
+                            return (
+                              <div key={lbl} style={{ textAlign:"center" }}>
+                                <div style={{ fontSize:"11px", color:C.textMuted, marginBottom:"3px" }}>{lbl}</div>
+                                <div style={{ fontSize:"13px", fontWeight:700, color, fontFamily:"monospace" }}>{val}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <a href={`/artikel/${replik.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#22d3ee15", border:"1px solid #22d3ee40", color:"#22d3ee", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
                           Läs hela artikeln →
                         </a>
                       </div>
