@@ -12,7 +12,7 @@ const C = {
   filmrecension: "#e8b84a",
   nyhet: "#38bdf8",
   ai: "#4a9eff",
-  replik: "#22d3ee",
+  replik: "#a78bfa",
 };
 
 function Badge() {

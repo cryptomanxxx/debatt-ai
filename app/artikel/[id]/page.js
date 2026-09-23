@@ -143,7 +143,7 @@ const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
   accent: "#f8fafc", accentDim: "#aaaaaa",
   text: "#f0ede6", textMuted: "#888880",
-  green: "#4ade80", blue: "#4a9eff", filmrecension: "#e8b84a", replik: "#22d3ee",
+  green: "#4ade80", blue: "#4a9eff", filmrecension: "#e8b84a", replik: "#a78bfa",
 };
 
 export default async function ArtikelPage({ params }) {

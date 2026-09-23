@@ -4090,6 +4090,18 @@ Fixat genom att lägga till två ytterligare villkor: `fetchSenasteRepliker().th
 |---|---|
 | `agents/invariant-checker.js` | `checkSenasteReplikerWidget()` kräver nu även att fetchen är kopplad till `setSenasteRepliker` och att widgeten renderar villkorat på `senasteRepliker.length > 0`, inte bara att koden existerar någonstans i filen |
 
+**Uppföljning — cyan för nära blått i praktiken (ägarfeedback med skärmdump av mobilsajten, sep 2026):** *"Jag tycker fortfarande färgen på nyhetsartiklarna och replikerna ser för lika ut."* Föregående fix (ovan) löste KLASSIFICERINGEN — vilken artikel som får replik-färgen — men aldrig FÄRGVALET i sig: cyan (`#22d3ee`, ~187° nyans) och blått (`#38bdf8`, ~199° nyans) ligger bara ~12° isär på färghjulet, vilket gör dem svåra att skilja åt i liten storlek (rubriktext, badges) på en mobilskärm, trots att de är tekniskt distinkta hex-värden.
+
+**Fix:** repliker fick en violett kulör (`#a78bfa`, ~255° nyans) istället för cyan — ligger tydligt avskild från både blått (nyhet, ~199°), grönt (debattartikel, ~141°) och guld (filmrecension, ~43°) i färgrymden, så alla fyra artikeltypsfärger nu är sinsemellan urskiljbara även vid liten textstorlek. Bytt på samtliga ställen där replikfärgen definieras eller hårdkodas: `C.replik` i både `ArkivClient.js` och `app/artikel/[id]/page.js`, samt de 6 raderna (8 färgförekomster, inklusive alpha-varianterna `#22d3ee40`/`#22d3ee15`) i `app/client.js` som styr "🔁 SENASTE REPLIKERNA"-widgetens NY-badge, topplinje-gradient, rubrikfärg och "Läs hela artikeln →"-knapp, samt "VECKANS MEST LÄSTA"-widgetens rubrikfärgs-ternary. Ingen ändring av `parent_id`-klassificeringslogiken i sig — bara vilken hex-kod den cyan-grenen numera pekar på.
+
+**Medvetet oberört:** `#22d3ee` (samma hex, ren kulörkoincidens) används sedan tidigare även för Markartans "kust"-zontyp (✅75, `kust | #22d3ee`) — en helt orelaterad funktion (SVG-hexagonkartan på `/mark`) som inte delar någon kod med artikelrubriksfärgerna och därför inte berörs av eller behöver synkroniseras med denna fix.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/arkiv/ArkivClient.js` | `C.replik` bytt från `#22d3ee` till `#a78bfa` |
+| `app/artikel/[id]/page.js` | `C.replik` bytt från `#22d3ee` till `#a78bfa` |
+| `app/client.js` | Samtliga 8 förekomster av `#22d3ee` (inkl. alpha-varianterna `#22d3ee40`/`#22d3ee15`) i "🔁 SENASTE REPLIKERNA"-widgeten och "VECKANS MEST LÄSTA"-widgetens rubrikfärgs-ternary bytta till `#a78bfa`/`#a78bfa40`/`#a78bfa15` |
+
 ---
 
 ## Den autonoma debatten – slutvisionen

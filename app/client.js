@@ -1352,7 +1352,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                     <a key={a.id} href={`/artikel/${a.id}`} className="debatt-rad" style={{ display:"flex", alignItems:"center", gap:"14px", padding:"14px 18px", background:C.surface, textDecoration:"none" }}>
                       <span style={{ fontSize:"18px", fontWeight:700, color:"#333", fontFamily:"monospace", flexShrink:0, width:"20px", textAlign:"right" }}>{i + 1}</span>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <p style={{ margin:"0 0 3px", fontSize:"15px", color:a.filmrecension ? "#e8b84a" : (a.parent_id != null ? "#22d3ee" : (a.nyhetskalla ? "#38bdf8" : "#4ade80")), lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                        <p style={{ margin:"0 0 3px", fontSize:"15px", color:a.filmrecension ? "#e8b84a" : (a.parent_id != null ? "#a78bfa" : (a.nyhetskalla ? "#38bdf8" : "#4ade80")), lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                           {a.rubrik}
                         </p>
                         <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>
@@ -1483,15 +1483,15 @@ export default function DebattClient({ initialArticleCount = null }) {
               <div style={{ marginBottom:"48px" }}>
                 <div style={{ display:"flex", alignItems:"baseline", justifyContent:"space-between", marginBottom:"12px" }}>
                   <span style={{ fontSize:"11px", color:C.red, fontWeight:700, letterSpacing:"0.1em", fontFamily:"monospace" }}>🔁 SENASTE REPLIKERNA</span>
-                  <a href="/arkiv?repliker=1" style={{ fontSize:"11px", color:"#22d3ee", textDecoration:"none", fontFamily:"monospace", letterSpacing:"0.06em" }}>Se alla →</a>
+                  <a href="/arkiv?repliker=1" style={{ fontSize:"11px", color:"#a78bfa", textDecoration:"none", fontFamily:"monospace", letterSpacing:"0.06em" }}>Se alla →</a>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                   {senasteRepliker.map(replik => (
                     <div key={replik.id} style={{ background:"#04141a", border:"1px solid #1a4a5a", borderRadius:"8px", padding:"20px 24px", position:"relative", overflow:"hidden" }}>
-                      <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #22d3ee, #22d3ee40)" }} />
+                      <div style={{ position:"absolute", top:0, left:0, right:0, height:"3px", background:"linear-gradient(90deg, #a78bfa, #a78bfa40)" }} />
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"12px", flexWrap:"wrap" }}>
                         {arNy(replik.skapad) && (
-                          <span style={{ fontSize:"10px", fontWeight:700, fontFamily:"monospace", color:"#0a0a0a", background:"#22d3ee", borderRadius:"3px", padding:"1px 7px", letterSpacing:"0.08em" }}>NY</span>
+                          <span style={{ fontSize:"10px", fontWeight:700, fontFamily:"monospace", color:"#0a0a0a", background:"#a78bfa", borderRadius:"3px", padding:"1px 7px", letterSpacing:"0.08em" }}>NY</span>
                         )}
                         {replik.kalla === "ai" && (
                           <span style={{ display:"inline-flex", alignItems:"center", gap:"5px", padding:"2px 8px", background:"#050a1a", border:"1px solid #4a9eff40", borderRadius:"20px" }}>
@@ -1509,7 +1509,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                           <span key={t} style={{ fontSize:"11px", color:"#3a8a9b", border:"1px solid #1a4a5a", borderRadius:"20px", padding:"2px 8px" }}>#{t}</span>
                         ))}
                       </div>
-                      <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 8px", lineHeight:1.3, color:"#22d3ee" }}>{replik.rubrik}</h2>
+                      <h2 style={{ fontSize:"19px", fontWeight:500, margin:"0 0 8px", lineHeight:1.3, color:"#a78bfa" }}>{replik.rubrik}</h2>
                       <div style={{ display:"flex", alignItems:"center", gap:"8px", margin:"0 0 10px" }}>
                         {replik.kalla === "ai" && (() => { const v = agentVisuell(replik.forfattare); return <AgentAvatar namn={replik.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={24} />; })()}
                         <span style={{ color:C.textMuted, fontSize:"13px", fontStyle:"italic" }}>
@@ -1533,7 +1533,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                             );
                           })}
                         </div>
-                        <a href={`/artikel/${replik.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#22d3ee15", border:"1px solid #22d3ee40", color:"#22d3ee", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
+                        <a href={`/artikel/${replik.id}`} style={{ display:"inline-flex", alignItems:"center", gap:"8px", background:"#a78bfa15", border:"1px solid #a78bfa40", color:"#a78bfa", borderRadius:"4px", padding:"7px 14px", fontSize:"13px", fontWeight:600, textDecoration:"none", fontFamily:"Georgia, serif" }}>
                           Läs hela artikeln →
                         </a>
                       </div>
