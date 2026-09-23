@@ -4286,6 +4286,22 @@ Lägg bara till `insert`/`update`/`delete` i anon-raden om en motsvarande RLS-po
 
 ---
 
+### ✅ 135. /qant — experimenthistoriken sorterades efter timestamp, inte forskningssekvens – KLART
+
+Användarrapport (sep 2026), direkt uppföljning på ✅134: *"Experimenthistoriken sorteras efter timestamp, vilket gör att Exp005 visas före Exp004. På bilden står ordningen #3 Exp3, #4 Exp5, #5 Exp4. Det är kronologiskt efter filernas timestamps men intuitivt fel när experimentnumren representerar forskningssekvensen. Jag tycker dashboarden bör sortera Exp001 → Exp002 → ... → Exp009 efter experimentnummer. Tidsstämpeln kan fortfarande visas bredvid."*
+
+**Rotorsak:** `sorteradeExp` sorterade uteslutande på `timestamp_utc`-strängen ur den publika JSON:en. I den faktiska datan har `exp004_depth_topology` ett SENARE `timestamp_utc` än `exp005_auto_topology_search` — troligen en artefakt av hur forskningsrepot loggade/backfyllde de två experimenten (exp005 delar dessutom exakt timestamp med exp003), inte ett fel i sig i den datan. En ren timestamp-sortering är alltså i produktion, inte bara i teorin, ur synk med den logiska forskningssekvensen (Exp001, Exp002, ... Exp009) som experimentens egna `expNNN_...`-id redan otvetydigt uttrycker.
+
+**Fix:** ny `experimentNummer(id)`-hjälpfunktion (samma regex-mönster som den redan befintliga `naturligtNamn()`, `/^exp0*(\d+)_/i`) extraherar det numeriska experimentnumret. `sorteradeExp`s komparator sorterar nu primärt på detta nummer stigande — timestamp används bara som fallback för ett id som inte matchar `expNNN_...`-mönstret (t.ex. ett hypotetiskt framtida experiment med ett annat namnschema), så robustheten mot ett oväntat framtida ID-format bevaras. Ingen ändring av vad som visas per rad — `fmtDatum(exp.timestamp_utc)` fortsätter visas bredvid varje experiment i både stapeldiagrammet och de expanderbara korten, precis som användaren efterfrågade.
+
+**Verifierat:** `npx next build` kördes framgångsrikt, `/qant` byggdes statiskt utan fel.
+
+| Fil | Roll |
+|---|---|
+| `app/qant/QantVy.js` | Ny `experimentNummer(id)`-hjälpfunktion. `sorteradeExp`s sorteringskomparator bytt från ren `timestamp_utc`-strängjämförelse till primärt experimentnummer (stigande), med timestamp som fallback för icke-matchande id:n |
+
+---
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt
