@@ -405,6 +405,14 @@ async function checkDagligPubliceringskvot() {
   }
 }
 
+// Returnerar true bara när ett genuint, åtgärdbart underskott upptäcktes —
+// main() använder returvärdet för att avgöra om invariant-check.yml ska
+// TRIGGA agent.yml direkt (✅131) istället för att bara passivt rapportera
+// och vänta på att någon läser /status eller på att catch-up-fönstret
+// (21:30-21:50 UTC) råkar hinna före midnatt. Ett fel (catch-blocket) eller
+// att vi är utanför kontrollfönstret returnerar medvetet false — osäker
+// data är inte samma sak som ett bekräftat underskott, och ska aldrig
+// trigga en extra GitHub Actions-körning.
 async function checkPubliceringstaktUnderskott() {
   const namn = "publiceringstakt-underskott";
   try {
@@ -420,7 +428,7 @@ async function checkPubliceringstaktUnderskott() {
     const utcTimme = new Date().getUTCHours();
     if (utcTimme < 12 || utcTimme >= 21) {
       rapportera(namn, "ok", `utanför kontrollfönstret (12–20 UTC), aktuell UTC-timme ${utcTimme}`);
-      return;
+      return false;
     }
     const idagUtc = new Date();
     idagUtc.setUTCHours(0, 0, 0, 0);
@@ -443,14 +451,16 @@ async function checkPubliceringstaktUnderskott() {
         "fail",
         `Fortfarande 0 publicerade artiklar av typ: ${noll.join(", ")} trots att dagens tre primära ` +
         `agent.yml-crons (07/08/09 UTC) borde ha kört för länge sedan — tyder på att en eller flera ` +
-        `av dem har fördröjts kraftigt eller inte kört alls. Catch-up (21:30–21:50 UTC) kan fortfarande ` +
-        `åtgärda det innan dygnet är slut.`
+        `av dem har fördröjts kraftigt eller inte kört alls. Triggar agent.yml direkt (4 pass) som ` +
+        `ombudspublicering istället för att bara vänta på catch-up (21:30–21:50 UTC).`
       );
-      return;
+      return true;
     }
     rapportera(namn, "ok", `nyhet=${nyhet} replik=${replik} eget=${eget}`);
+    return false;
   } catch (e) {
     rapportera(namn, "error", String(e.message || e));
+    return false;
   }
 }
 
@@ -569,7 +579,7 @@ async function main() {
 
   await checkAktivitetHarArtikelTyper();
   await checkDagligPubliceringskvot();
-  await checkPubliceringstaktUnderskott();
+  const underskottUpptackt = await checkPubliceringstaktUnderskott();
   await checkAktivitetArkivSidaSvarar();
   await checkAvhuggnaRubriker();
 
@@ -644,6 +654,12 @@ async function main() {
         `sammanfattning<<${delim}\n${problemRader.join("\n")}\n${delim}\n`
       );
     }
+    // Separat, snävt scopad output (✅131) — bara publiceringstakt-
+    // underskott-checken sätter true, aldrig något annat fail/error. Låter
+    // invariant-check.yml trigga agent.yml som ombudspublicering utan att
+    // riskera att en helt orelaterad regression (t.ex. en trasig länk på
+    // /aktivitet) av misstag också startar en publiceringskörning.
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, `behover_ombudspublicering=${underskottUpptackt}\n`);
   }
 }
 

@@ -8,6 +8,12 @@ on:
 jobs:
   invariant-checker:
     runs-on: ubuntu-latest
+    # actions:write krävs av "Trigga ombudspublicering" nedan (✅131) — den
+    # avfyrar agent.yml via workflow_dispatch med GITHUB_TOKEN, vilket kräver
+    # skrivrättighet på actions. contents:read räcker för checkout.
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v7
 
@@ -21,6 +27,32 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node agents/invariant-checker.js
+
+      # ✅131: användaren påpekade korrekt att bara DETEKTERA ett
+      # publiceringsunderskott inte räcker — om GitHubs schemaläggare redan
+      # missköter de tre primära crons i agent.yml (se PR #1513s ✅130-
+      # utredning), finns ingen garanti att catch-up-crons (21:30–21:50 UTC,
+      # samma opålitliga schemaläggare) kör i tid heller. Så fort
+      # invariant-checker.js bekräftar ett underskott (behover_ombudspublicering,
+      # satt EXKLUSIVT av checkPubliceringstaktUnderskott — aldrig av någon
+      # annan check) triggas agent.yml direkt med 4 pass, samma täckning som
+      # ett riktigt fönster. En bekräftad underskott-check rapporterar alltid
+      # "fail" (main() sätter då process.exitCode=1), så failure() är den
+      # exakta — inte bara tillräckliga — villkoret, samma mönster som
+      # felmejl-steget nedan redan använder.
+      #
+      # Säkert mot dubbeltriggning: invariant-check.yml kör var 3:e timme
+      # (12/15/18 UTC ligger alla inom kontrollfönstret), så flera körningar
+      # kan i teorin se samma underskott och trigga flera gånger — men
+      # agent.py läser dagens kvot fräscht vid varje pass och avslutar
+      # omedelbart (sys.exit(0)) om allt redan är 4/4/4, så en redundant
+      # ombudspublicering är en billig no-op, inte en dubbelpublicering.
+      - name: Trigga ombudspublicering
+        if: failure() && steps.run.outputs.behover_ombudspublicering == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run agent.yml --repo "${{ github.repository }}" --ref main -f pass=4
 
       # ✅108-uppföljning: GitHub:s egen felnotis vid en misslyckad
       # schemalagd körning säger bara "Run failed" — ingen antydan om VILKEN
