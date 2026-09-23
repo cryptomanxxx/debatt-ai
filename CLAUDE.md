@@ -4058,6 +4058,18 @@ Kräver ingen ny Supabase-migrering. `agent.yml`s `PASS`-beräkning (case-satsen
 | `app/arkiv/ArkivClient.js` | Artikelkortens `<h2>`-rubrikfärg tregrenad på samma sätt, använder befintlig `C.replik` |
 | `app/client.js` | "VECKANS MEST LÄSTA"-widgetens rubrikfärg tregrenad på samma sätt |
 
+**Codex-fynd (PR #1519-granskning, efter merge): den ursprungliga ✅105-invarianten blev tyst falsk-positiv efter ✅133.** `checkSenasteDebatternaFilter()` i `agents/invariant-checker.js` (byggd för ✅105) krävde att `fetchLatestArtikel()`s fönster innehöll `parent_id.not.is.null` — men ✅133 tog uttryckligen bort just den klausulen (repliker flyttades till sin egen `fetchSenasteRepliker()`). Utan en fix hade varenda schemalagd `invariant-check.yml`-körning (var 3:e timme) rapporterat en falsk regression och skickat ett detaljerat felmejl, trots att båda widgetarna fungerade korrekt.
+
+Fixat genom att uppdatera checken till sin nya, omvända betydelse (skydda mot att repliker SMYGER TILLBAKA i `fetchLatestArtikel()`, inte mot att de saknas där) och lägga till en ny systerkontroll, `checkSenasteReplikerWidget()`, som täcker den ursprungliga ✅105-oron (repliker osynliga någonstans på startsidan) via den nya dedikerade widgeten istället.
+
+**Egen bugg upptäckt under verifiering av fixen:** de första implementationerna av båda de nya/uppdaterade checkarna hade var sin variant av samma "för brett/för smalt sökfönster"-fälla som redan dokumenterats flera gånger i den här loggen för invariant-checkern (✅115, ✅119, ✅127): `checkSenasteDebatternaFilter()`s 2000-teckensfönster läckte in i den direkt intilliggande `fetchSenasteRepliker()`s egen kropp (bara ~30 rader bort i filen) och gav en falsk "repliker återinförda"-flagga på redan korrekt kod, eftersom fönstret då även innehöll SYSKONFUNKTIONENS `parent_id=not.is.null`. `checkSenasteReplikerWidget()` anropade i sin tur `indexOf("fetchSenasteRepliker")`, som hittade en textreferens i en KOMMENTAR i `fetchLatestArtikel()` ("... (fetchSenasteRepliker())...") innan den faktiska funktionsdeklarationen — ett fönster räknat därifrån missade helt den riktiga koden längre ner. Båda upptäcktes genom att köra checkarna mot den riktiga filen INNAN de skickades — ingen av dem gav `"ok"` på korrekt kod vid första försöket.
+
+Fixat med en delad hjälpfunktion, `funktionsFonster(kod, funktionsnamn, maxLen)`: ankrar på den FAKTISKA funktionsdeklarationen (`(async )?function <namn>(`, aldrig ett löst textomnämnande) och begränsar fönstret till innan nästa funktionsdeklaration börjar (eller `maxLen`, beroende på vilket som kommer först) — kan inte längre läcka in i en angränsande funktions kropp. Verifierat mot både den riktiga filen (båda checkarna ger nu `"ok"`) och fyra simulerade regressioner (repliker återinförda i `fetchLatestArtikel()`, `fetchSenasteRepliker()` helt borttagen, "Se alla"-länken borttagen, `parent_id`-filtret borttaget ur replikfrågan) — samtliga ger korrekt `"fail"`.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | Ny delad `funktionsFonster()`-hjälpfunktion (ankrar på faktisk funktionsdeklaration, kapar fönstret vid nästa funktion). `checkSenasteDebatternaFilter()` omvänd till att skydda mot att repliker återinförs i `fetchLatestArtikel()`. Ny `checkSenasteReplikerWidget()` — regressionsguard för `fetchSenasteRepliker()` och dess "Se alla"-länk |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
