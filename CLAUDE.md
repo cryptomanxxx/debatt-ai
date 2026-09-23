@@ -4031,6 +4031,27 @@ Kräver ingen ny Supabase-migrering. `agent.yml`s `PASS`-beräkning (case-satsen
 
 ---
 
+### ✅ 133. "Senaste repliker" — egen fjärde startsideswidget, utbruten ur "Senaste debatterna" – KLART
+
+Ägarbegäran (sep 2026), efter en fråga om varför tre startsidewidgetar ("Senaste nyheterna"/"Senaste debatterna"/"Senaste filmrecensionerna") ska täcka fyra publiceringstyper (nyhetsartiklar/debattartiklar/repliker/filmrecensioner): *"Det bästa är nog en egen fjärde widget för repliker. Det känns mer komplett. Då blir det lättare att se att 4 repliker faktiskt har publicerats per dag."*
+
+**Innan denna fix:** "Senaste debatterna" (`fetchLatestArtikel()`) visade eget-ämne-debattartiklar OCH repliker tillsammans, konkurrerande om samma 4 platser (✅105) — precis den crowding-risk som redan flaggats och åtgärdats för andra widgetar flera gånger i den här loggen (✅106, ✅109, ✅127). En dag med många repliker kunde tränga undan färska eget-ämne-artiklar i den listan, eller tvärtom, och det gick inte att se på startsidan hur många av dagens 4 repliker som faktiskt publicerats.
+
+**Fix:** `fetchLatestArtikel()` filtrerar nu bara `nyhetskalla is null` (utan `parent_id`-villkoret) — vilket räcker ensamt för att identifiera genuina eget-ämne-artiklar, eftersom `agent.py` sätter `nyhetskalla` på BÅDA nyhetsartiklar och repliker (den senare till `replik_kalla`-pekaren, ✅17), bara eget-ämne-grenen lämnar fältet null. Ny `fetchSenasteRepliker()` hämtar repliker separat (`parent_id is not null`, den enda pålitliga signalen oavsett vad `nyhetskalla` innehåller). Ny widget "🔁 SENASTE REPLIKERNA" (cyan `#22d3ee`, distinkt från nyhet=blå/debatt=grön/film=guld) infogad mellan "Senaste debatterna" och "Senaste filmrecensionerna" — samma kortstruktur (NY-badge, AI/MÄNNISKA-badge, taggar, avatar+datum, textutdrag, Arg/Ori/Rel/Tro-poängrad, "Läs hela artikeln →") som de tre andra widgetarna.
+
+**`/arkiv` fick motsvarande uppdelning för konsekvens** (samma princip som redan etablerad när nyhet/debatt/film fick egna filter, ✅123/125/126): `matchDebatt` (💬-pillen) betyder nu bara eget-ämne (`!a.nyhetskalla`, utan `parent_id`-villkoret), och en ny `matchReplik`/"🔁 Repliker"-pill (samma cyan) täcker repliker separat. Stödjer `?repliker=1` som URL-parameter, konsekvent med `?nyhet=1`/`?debatt=1`/`?film=1`. "Se alla →"-länken på den nya widgeten pekar på `/arkiv?repliker=1`.
+
+**Medvetet oförändrat:** den befintliga korta "X svarar Y"-enradsbannern (`fetchSenasteReplik()`/`senasteReplik`, visar bara den ALLRA senaste repliken) är en separat, mindre UI-komponent med ett annat syfte (snabb notis om senaste aktivitet) — rörs inte och kan samexistera med den nya 4-korts-widgeten.
+
+| Fil | Roll |
+|---|---|
+| `app/client.js` → `fetchLatestArtikel()` | Filtrerar nu bara `nyhetskalla is null` — repliker (som alltid har `nyhetskalla` satt) ingår inte längre |
+| `app/client.js` → `fetchSenasteRepliker()` | Ny funktion. Hämtar repliker (`parent_id is not null`, `filmrecension=false`), senaste 4 |
+| `app/client.js` | Ny "🔁 SENASTE REPLIKERNA"-widget (cyan `#22d3ee`) mellan "Senaste debatterna" och "Senaste filmrecensionerna", länkad till `/arkiv?repliker=1` |
+| `app/arkiv/ArkivClient.js` | `matchDebatt` smalnat av till bara eget-ämne. Ny `filterReplik`-state, "🔁 Repliker"-filterpill (samma cyan), `?repliker=1`-URL-stöd, `isFiltering`/tomt-resultat/"Rensa filter" utökade |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
