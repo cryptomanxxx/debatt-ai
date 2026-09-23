@@ -4070,6 +4070,18 @@ Fixat med en delad hjälpfunktion, `funktionsFonster(kod, funktionsnamn, maxLen)
 |---|---|
 | `agents/invariant-checker.js` | Ny delad `funktionsFonster()`-hjälpfunktion (ankrar på faktisk funktionsdeklaration, kapar fönstret vid nästa funktion). `checkSenasteDebatternaFilter()` omvänd till att skydda mot att repliker återinförs i `fetchLatestArtikel()`. Ny `checkSenasteReplikerWidget()` — regressionsguard för `fetchSenasteRepliker()` och dess "Se alla"-länk |
 
+**Codex-fynd (PR #1520-granskning): rubrikfärgens tregrenade ternary använde fel autoritativ signal för replik.** Den ternary jag skrev (`!nyhetskalla ? grön : (typ !== "replik" ? blå : cyan)`) klassificerar en replik via `nyhetskalla?.typ === "replik"` — men `/api/agent/submit` (`route.js` rad 170/325–326) tar emot `nyhetskalla` och `parent_id` som HELT OBEROENDE fält utan någon koppling dem emellan: en extern API-nyckelinnehavare (eller en framtida persona) kan alltså skicka in en artikel med `parent_id` satt men `nyhetskalla` null, eller med `nyhetskalla` satt till något annat än `{typ:"replik"}`. `/arkiv`s egen `matchReplik`/`matchDebatt`-filterlogik (✅133) använder redan `a.parent_id != null` som den enda autoritativa signalen för "är det en replik" — men rubrikfärgen använde en annan, svagare signal, vilket kunde ge en filtrerat-in replik (via `matchReplik`) fel rubrikfärg (grön eller blå istället för cyan) om `nyhetskalla` avvek från det normala mönstret.
+
+Fixat genom att byta alla tre ternaryer till att avgöra replik-status via `parent_id != null` FÖRST (samma precedens som filterlogiken), med `nyhetskalla`/`!nyhetskalla` bara kvar för att skilja nyhet från eget ämne DÄREFTER: `filmrecension ? guld : (parent_id != null ? cyan : (nyhetskalla ? blå : grön))`. `app/client.js`s "VECKANS MEST LÄSTA"-widget (`fetchTrending()`) saknade dessutom `parent_id` i sin explicita `select=`-lista — samma PostgREST-fälla som redan dokumenterad för `filmrecension`-fältet i ✅127 (en icke-`select=*`-fråga returnerar bara uttryckligen begärda kolumner) — lades till där.
+
+Verifierat isolerat mot sex fall: de fyra normala (nyhet/eget/replik/film, där `agent.py`s egen skrivväg redan håller `nyhetskalla`/`parent_id` konsekventa) och de två divergenta Codex pekade på (replik med `nyhetskalla=null`, replik med `nyhetskalla.typ !== "replik"`) — samtliga ger nu korrekt färg.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/artikel/[id]/page.js` | `<h1>`-ternaryn avgör nu replik via `parent_id != null` istället för `nyhetskalla?.typ` |
+| `app/arkiv/ArkivClient.js` | Artikelkortens `<h2>`-ternary samma fix |
+| `app/client.js` | "VECKANS MEST LÄSTA"-widgetens ternary samma fix. `fetchTrending()`s `select=`-lista utökad med `parent_id` |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
