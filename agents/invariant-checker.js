@@ -153,6 +153,21 @@ function checkSenasteReplikerWidget() {
       rapportera(namn, "fail", "fetchSenasteRepliker filtrerar inte längre på parent_id — visar kanske inte längre bara repliker");
       return;
     }
+    // Funktionsdefinitionen och "Se alla"-länken kan finnas kvar oanvänd
+    // död kod om själva anropet/render-kopplingen tas bort — kollar därför
+    // explicit att fetchen faktiskt är inkopplad till state och att widgeten
+    // faktiskt renderar villkorat på det statet (Codex-fynd, PR #1521-
+    // granskning: en bar sträng-/funktionskontroll hade gett "ok" även om
+    // fetchSenasteRepliker().then(...)-anropet och den villkorade JSX-blocket
+    // tagits bort, eftersom fonster/href-koll ovan inte kräver att de körs).
+    if (!kod.includes("fetchSenasteRepliker().then(") || !kod.includes("setSenasteRepliker")) {
+      rapportera(namn, "fail", "fetchSenasteRepliker() anropas inte längre och kopplas till state — widgeten kan visa tom data trots att funktionen finns kvar");
+      return;
+    }
+    if (!kod.includes("senasteRepliker.length > 0")) {
+      rapportera(namn, "fail", "widgeten renderar inte längre villkorat på senasteRepliker — kan vara borttagen ur JSX trots att fetchen fortfarande körs");
+      return;
+    }
     if (!kod.includes('href="/arkiv?repliker=1"')) {
       rapportera(namn, "fail", "'Se alla'-länken för Senaste repliker-widgeten saknas (?repliker=1)");
       return;

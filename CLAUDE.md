@@ -4082,6 +4082,14 @@ Verifierat isolerat mot sex fall: de fyra normala (nyhet/eget/replik/film, där 
 | `app/arkiv/ArkivClient.js` | Artikelkortens `<h2>`-ternary samma fix |
 | `app/client.js` | "VECKANS MEST LÄSTA"-widgetens ternary samma fix. `fetchTrending()`s `select=`-lista utökad med `parent_id` |
 
+**Codex-fynd (PR #1521-granskning, P2): `checkSenasteReplikerWidget()` verifierade bara att koden FANNS, inte att den var INKOPPLAD.** Checken kollade bara att `fetchSenasteRepliker()`-funktionen och `href="/arkiv?repliker=1"`-strängen förekom någonstans i filen — ingen av kontrollerna kräver att fetchen faktiskt anropas och kopplas till state, eller att widgeten faktiskt renderar villkorat på det statet. En regression som tog bort `fetchSenasteRepliker().then(n => setSenasteRepliker(n))`-anropet (eller `senasteRepliker.length > 0`-render-gaten) men lämnade funktionsdefinitionen/länken kvar som död kod hade fått checken att rapportera `"ok"` trots att widgeten aldrig visar något — exakt den typ av "checken låtsas skydda men gör det inte" som redan flera gånger dokumenterats för den här filen (✅109, ✅115, ✅127).
+
+Fixat genom att lägga till två ytterligare villkor: `fetchSenasteRepliker().then(` OCH `setSenasteRepliker` måste båda finnas (bekräftar att fetchen faktiskt anropas och kopplas till state), samt `senasteRepliker.length > 0` (bekräftar att widgeten faktiskt renderar villkorat på det statet). Verifierat mot den riktiga filen (`"ok"`) och mot exakt det scenario Codex beskrev (`.then(...)`-anropet borttaget, funktionen/JSX kvar som död kod) samt en separat simulerad borttagning av render-gaten — båda ger nu korrekt `"fail"`.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | `checkSenasteReplikerWidget()` kräver nu även att fetchen är kopplad till `setSenasteRepliker` och att widgeten renderar villkorat på `senasteRepliker.length > 0`, inte bara att koden existerar någonstans i filen |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
