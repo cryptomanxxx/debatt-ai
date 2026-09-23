@@ -4277,12 +4277,38 @@ Lägg bara till `insert`/`update`/`delete` i anon-raden om en motsvarande RLS-po
 
 **Verifierat:** `npx next build` kördes framgångsrikt mot hela plattformen — `/qant` byggdes statiskt med en riktig fetch mot den publika GitHub-URL:en och renderade korrekt (bekräftar både att URL:en är nåbar från produktionsmiljön och att JSON-formen matchar sidans förväntningar), ingen build-varning eller -fel.
 
+**Codex-fynd (PR #1523-granskning, efter merge): statisk ISR riskerade att fälla hela plattformens build vid en transient GitHub-störning.** `hamtaDashboard()` fångade alla felvägar (nätverksfel, icke-2xx, malformad JSON) och returnerade `null`, vilket lät sidan rendera "framgångsrikt" med fallback-vyn. Eftersom `/qant` ursprungligen var statiskt förhandsrenderad (`export const revalidate = 1800`, `next build` markerade den `○ Static`) betydde det att en enda misslyckad bakgrundsrevalidering blev den nya cachade sidan för HELA 30-minutersfönstret, för ALLA besökare — istället för att Next.js ISR:s vanliga "behåll senaste fungerande sida vid ett revalideringsfel"-beteende fick kicka in.
+
+Den bokstavliga fixen (låt `hamtaDashboard()` kasta fel istället för att svälja dem) hade adresserat just det symptomet — men eftersom sidan pre-renderas vid `next build`, hade ett kastat fel UNDER en Vercel-deploys build-steg (t.ex. en transient GitHub-hicka i exakt det ögonblicket) sannolikt fällt HELA produktionsbuilden för hela debatt-ai, inte bara den här enskilda lågtrafikerade sidan — ett väsentligt värre fel-läge än det ursprungliga.
+
+**Fix, efter avstämning med projektägaren:** `page.js` bytt från statisk ISR (`export const revalidate = 1800`) till `export const dynamic = "force-dynamic"` — sidan pre-renderas aldrig längre vid build, vilket eliminerar build-fällningsrisken helt. Fetchens egna `next: { revalidate: 1800 }`-option (Data Cache, oberoende av routens statiska/dynamiska status) fortsätter cacha själva GitHub-anropet i upp till 1800s, så vanlig trafik fortfarande inte hamrar på GitHub raw vid varje sidvisning. `hamtaDashboard()`s catch-till-null-mönster lämnades oförändrat — i en dynamisk route finns ingen felaktigt cachad HTML att bevara: en genuint misslyckad request drabbar bara den enskilda besökaren som råkar träffa felet just då, och nästa request (även millisekunder senare) gör ett helt nytt, oberoende försök. Ingen `error.js`-gräns behövdes eftersom `QantVy`s redan befintliga "data kunde inte hämtas"-fallback räcker för det smalare felfönstret.
+
+**Verifierat:** `npx next build` bekräftade att `/qant` nu listas som `ƒ` (Dynamic) istället för `○` (Static), utan `Revalidate`/`Expire`-kolumner.
+
 | Fil | Roll |
 |---|---|
-| `app/qant/page.js` | SSR. Hämtar `research-dashboard.json` från `raw.githubusercontent.com` med 1800s ISR-revalidering, minimal formvalidering, fail-open till `null` vid fel |
-| `app/qant/QantVy.js` | Klientkomponent. Statuspills, disclaimer-banner (verbatim ur JSON), forskningsloop-pilkedja, experimenthistorik (Recharts BarChart + expanderbara kort), accuracy-vs-parametrar (Recharts ScatterChart + tabell), allt schema-tolerant via generisk `extraArkFalt`/`Object.entries`-rendering av okända fält |
+| `app/qant/page.js` | Dynamiskt renderad (`export const dynamic = "force-dynamic"`), inte statisk ISR — pre-renderas aldrig vid build. Hämtar `research-dashboard.json` från `raw.githubusercontent.com` med 1800s Data Cache-revalidering, minimal formvalidering, fail-open till `null` vid fel |
+| `app/qant/QantVy.js` | Klientkomponent. Statuspills, disclaimer-banner (verbatim ur JSON), forskningsloop-pilkedja, experimenthistorik (Recharts BarChart + expanderbara kort, sorterad efter experimentnummer — se ✅135), accuracy-vs-parametrar (Recharts ScatterChart + tabell), allt schema-tolerant via generisk `extraArkFalt`/`Object.entries`-rendering av okända fält |
 | `app/GlobalNav.js` | Ny länk "Q.ANT Research Lab 🔬" i "Socialt"-gruppen, direkt efter "Intelligens" |
 | `app/layout.js` | Ny footerlänk "Q.ANT Research Lab" i det alfabetiska sidindexet |
+
+---
+
+### ✅ 135. /qant — experimenthistoriken sorterades efter timestamp, inte forskningssekvens – KLART
+
+Användarrapport (sep 2026), direkt uppföljning på ✅134: *"Experimenthistoriken sorteras efter timestamp, vilket gör att Exp005 visas före Exp004. På bilden står ordningen #3 Exp3, #4 Exp5, #5 Exp4. Det är kronologiskt efter filernas timestamps men intuitivt fel när experimentnumren representerar forskningssekvensen. Jag tycker dashboarden bör sortera Exp001 → Exp002 → ... → Exp009 efter experimentnummer. Tidsstämpeln kan fortfarande visas bredvid."*
+
+**Rotorsak:** `sorteradeExp` sorterade uteslutande på `timestamp_utc`-strängen ur den publika JSON:en. I den faktiska datan har `exp004_depth_topology` ett SENARE `timestamp_utc` än `exp005_auto_topology_search` — troligen en artefakt av hur forskningsrepot loggade/backfyllde de två experimenten (exp005 delar dessutom exakt timestamp med exp003), inte ett fel i sig i den datan. En ren timestamp-sortering är alltså i produktion, inte bara i teorin, ur synk med den logiska forskningssekvensen (Exp001, Exp002, ... Exp009) som experimentens egna `expNNN_...`-id redan otvetydigt uttrycker.
+
+**Fix:** ny `experimentNummer(id)`-hjälpfunktion (samma regex-mönster som den redan befintliga `naturligtNamn()`, `/^exp0*(\d+)_/i`) extraherar det numeriska experimentnumret. `sorteradeExp`s komparator sorterar nu primärt på detta nummer stigande — timestamp används bara som fallback för ett id som inte matchar `expNNN_...`-mönstret (t.ex. ett hypotetiskt framtida experiment med ett annat namnschema), så robustheten mot ett oväntat framtida ID-format bevaras. Ingen ändring av vad som visas per rad — `fmtDatum(exp.timestamp_utc)` fortsätter visas bredvid varje experiment i både stapeldiagrammet och de expanderbara korten, precis som användaren efterfrågade.
+
+**Verifierat:** `npx next build` kördes framgångsrikt, `/qant` byggdes utan fel (sidan var vid detta tillfälle fortfarande statisk — se ✅134s Codex-fynd-tillägg för när den senare gjordes dynamisk, av ett helt annat, orelaterat skäl).
+
+**Codex-fynd (PR #1524-granskning): ingressen påstod fortfarande "kronologisk ordning" trots att sorteringen nu är experimentsekvens.** Just för den datan denna fix riktar sig mot (exp004/exp005 vars timestamps divergerar från sekvensen) blev texten "i kronologisk ordning" bokstavligen felaktig — listan visar inte längre kronologisk ordning, bara sekvensordning (som råkar sammanfalla med kronologi för alla experiment utom just detta par). Fixat: texten omformulerad till "i forskningssekvensens ordning (Exp001 → Exp002 → …)".
+
+| Fil | Roll |
+|---|---|
+| `app/qant/QantVy.js` | Ny `experimentNummer(id)`-hjälpfunktion. `sorteradeExp`s sorteringskomparator bytt från ren `timestamp_utc`-strängjämförelse till primärt experimentnummer (stigande), med timestamp som fallback för icke-matchande id:n. Ingresstexten uppdaterad till att beskriva forskningssekvens istället för kronologisk ordning |
 
 ---
 

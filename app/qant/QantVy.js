@@ -56,6 +56,18 @@ function naturligtNamn(id) {
   return `Exp ${nr} — ${namn.charAt(0).toUpperCase()}${namn.slice(1)}`;
 }
 
+// Experimentnummer ur samma "expNNN_..."-mönster som naturligtNamn() — den
+// autentiska forskningssekvensen, inte filens timestamp. Två experiment kan
+// råka få timestamps i "fel" ordning (t.ex. loggade/backfyllda tillsammans),
+// vilket gjorde att Exp005 visades före Exp004 innan denna fix (CLAUDE.md ✅135).
+// Returnerar null för ett id som inte matchar mönstret — då faller sorteringen
+// tillbaka på timestamp för just det experimentet.
+function experimentNummer(id) {
+  if (!id) return null;
+  const m = /^exp0*(\d+)_/i.exec(id);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 // Deterministisk färg ur en godtycklig sträng (dataset, arkitekturnamn) —
 // nya datasetnamn i framtiden får automatiskt en stabil, distinkt färg utan
 // att en hårdkodad färgkarta behöver underhållas.
@@ -119,9 +131,17 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
   const forskningsloop = Array.isArray(data.research_loop) ? data.research_loop : [];
   const provenance = data.provenance || {};
 
-  const sorteradeExp = [...experiments].sort((a, b) =>
-    (a.timestamp_utc || "").localeCompare(b.timestamp_utc || "")
-  );
+  // Sorterar efter forskningssekvensens experimentnummer (Exp001 → Exp002 → …),
+  // inte filens timestamp — de två kan divergera (se experimentNummer() ovan).
+  // Faller tillbaka på timestamp bara om ett id inte matchar expNNN_-mönstret.
+  const sorteradeExp = [...experiments].sort((a, b) => {
+    const na = experimentNummer(a.id);
+    const nb = experimentNummer(b.id);
+    if (na !== null && nb !== null) return na - nb;
+    if (na !== null) return -1;
+    if (nb !== null) return 1;
+    return (a.timestamp_utc || "").localeCompare(b.timestamp_utc || "");
+  });
 
   const tidslinjeData = sorteradeExp.map((e, i) => ({
     id: e.id,
@@ -218,7 +238,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
       <div style={SEKTION}>
         <h2 style={RUBRIK}>Experimenthistorik</h2>
         <p style={INGRESS}>
-          Antal arkitekturer på Paretofronten per experiment, i kronologisk ordning. Klicka ett experiment
+          Antal arkitekturer på Paretofronten per experiment, i forskningssekvensens ordning (Exp001 → Exp002 → …). Klicka ett experiment
           för att se dataset, konfiguration och vilka arkitekturer som låg på fronten.
         </p>
         {tidslinjeData.length === 0 ? (
