@@ -2,6 +2,7 @@ export const revalidate = 600;
 
 import fs from "fs";
 import path from "path";
+import Image from "next/image";
 import HjarnanVy from "./HjarnanVy";
 import { AGENT_VISUELL } from "../agentData";
 
@@ -436,9 +437,19 @@ export default async function HjarnanPage() {
 
   return (
     <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "40px 16px 80px", background: "#050505", minHeight: "100vh" }}>
-      {/* Hero */}
-      <div style={{ marginBottom: "32px", borderRadius: "12px", overflow: "hidden" }}>
-        <img src="/hero-hjarnan.png" alt="Civilisationens hjärna" style={{ width: "100%", height: "auto", display: "block" }} />
+      {/* Hero — next/image serves optimized, viewport-sized variants (avif/webp)
+          instead of the full 2.3MB source PNG on every visit, and `priority`
+          preloads it since it's the page's above-the-fold LCP element. */}
+      <div style={{ marginBottom: "32px", borderRadius: "12px", overflow: "hidden", position: "relative" }}>
+        <Image
+          src="/hero-hjarnan.png"
+          alt="Civilisationens hjärna"
+          width={1536}
+          height={1024}
+          sizes="(max-width: 1100px) 100vw, 1100px"
+          priority
+          style={{ width: "100%", height: "auto", display: "block" }}
+        />
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
