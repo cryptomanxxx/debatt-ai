@@ -95,6 +95,7 @@ export default function RootLayout({ children }) {
               <a href="/pis" className="neon-nav">Policy Impact Simulator</a>
               <a href="/partier" className="neon-nav">Politiska partier</a>
               <a href="/qa-tidslinje" className="neon-nav">QA-tidslinje</a>
+              <a href="/qant" className="neon-nav">Q.ANT Research Lab 🔬</a>
               <a href="/redaktion" className="neon-nav">Redaktionen</a>
               <a href="/val" className="neon-nav">Riksdagsval</a>
               <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
