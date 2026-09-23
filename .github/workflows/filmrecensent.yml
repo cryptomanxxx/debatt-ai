@@ -9,7 +9,25 @@ on:
     # sekventiell loop — den fortsätter alltid där föregående pass sparade
     # cursorn.
     - cron: '0 10 * * *'  # 12:00 svensk tid (sommartid, ✅129) — 4 pass i samma körning
-  workflow_dispatch:
+  workflow_dispatch:      # Manuellt, eller automatisk ombudspublicering från
+    # invariant-checker.js (✅131) när dagens filmrecension fortfarande
+    # ligger på 0 långt efter det schemalagda fönstret.
+
+# Serialiserar körningar istället för att låta dem köra parallellt — samma
+# mönster och motivering som agent.yml:s debatt-agent-publish-grupp. Utan
+# detta kunde en ombudsdispatch starta SAMTIDIGT som en bara försenad
+# (inte faktiskt misslyckad) ordinarie körning, vilket gör
+# filmrecensent.py:s dagliga kvotkontroll (hamta_publicerade_idag(),
+# se ✅132) opålitlig — båda processerna kunde då läsa samma
+# "0 publicerade idag"-läge innan någon hunnit publicera och tillsammans
+# ändå producera fler recensioner än dagens mål. queue: max krävs utöver
+# cancel-in-progress: false — annars behåller GitHub bara en enda väntande
+# körning per grupp och tappar tyst en tredje trigger (Codex-fynd, PR #1515-
+# granskning).
+concurrency:
+  group: filmrecensent-publish
+  cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read

@@ -153,6 +153,66 @@ def hamta_senaste_video() -> dict | None:
         return None
 
 
+# Antal recensioner som ska publiceras per dag — matchar filmrecensent.yml:s
+# 4 interna pass per körning (✅128). Används av hamta_publicerade_idag() för
+# att göra en ombudspublicering (invariant-checker.js, ✅131) IDEMPOTENT:
+# utan denna kontroll hade en ombudsdispatch som råkar starta medan den
+# ordinarie, bara FÖRSENADE (inte faktiskt misslyckade) körningen fortfarande
+# pågår eller väntar kunnat lägga till upp till 4 EXTRA recensioner ovanpå
+# de 4 den ordinarie körningen ändå levererar — 8 samma dag istället för 4,
+# och ännu fler om flera 3-timmars invariant-checkar hinner dispatcha innan
+# den första ombudskörningen ens publicerat något (Codex-fynd, PR #1515-
+# granskning).
+MALSATT_ANTAL_PER_DAG = 4
+
+
+def hamta_publicerade_idag() -> int:
+    """Räknar dagens (UTC) redan publicerade filmrecensioner. Anropas i
+    main() innan varje enskild recension — så snart dagens mål är nått
+    (oavsett OM det uppnåddes av den vanliga schemalagda körningen, en
+    tidigare ombudsdispatch, eller båda tillsammans) blir varje ytterligare
+    pass, i vilken körning det än råkar hamna, en billig no-op istället för
+    en extra publicerad recension.
+
+    Fail-open: returnerar 0 vid fel — precis som
+    supabase_utils.hamta_publicerade_idag_per_typ() blockerar detta aldrig
+    den vanliga dagliga publiceringen på grund av ett infrastrukturproblem.
+    Kvarstående (accepterad) race: två processer som läser samma
+    "3 av 4"-läge nästan samtidigt kan båda besluta sig för att publicera,
+    vilket i sällsynta fall kan ge en enstaka extra recension — samma
+    tolerans som redan gäller för agent.py:s motsvarande 4+4+4-kvot.
+
+    kalla=eq.ai är obligatoriskt (Codex-fynd, PR #1516-granskning): utan
+    filtret räknas ÄVEN besökarinskickade filmrecensioner (satta via
+    /skicka-in, kalla="manniska", se ✅116/✅123) in i dagens "redan
+    publicerat"-läge. Fyra mänskliga recensioner samma dag hade då fått
+    denna funktion att rapportera kvoten fylld trots att Filmrecensenten
+    själv aldrig publicerat något — vilket gjorde varje ombudsdispatch
+    till en permanent, tyst no-op. Samma filter som redan används i
+    checkPubliceringstaktUnderskott()/checkDagligPubliceringskvot()
+    (invariant-checker.js) och hamta_publicerade_idag_per_typ()
+    (supabase_utils.py)."""
+    idag_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00+00:00")
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={
+                "select": "id",
+                "kalla": "eq.ai",
+                "filmrecension": "eq.true",
+                "skapad": f"gte.{idag_utc}",
+                "limit": "50",
+            },
+            headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"},
+            timeout=15,
+        )
+        if res.status_code != 200:
+            return 0
+        return len(res.json())
+    except Exception:
+        return 0
+
+
 def redan_recenserad(video_id: str) -> bool:
     """Dedup: kollar om videon redan har en publicerad recension. Fail-SÄKERT
     mot dubbletter (ägarprioritet, sep 2026: "det viktigaste är att det inte
@@ -812,6 +872,14 @@ def main():
     if not SB_KEY:
         print("SUPABASE_ANON_KEY saknas — avbryter.")
         sys.exit(1)
+
+    antal_idag = hamta_publicerade_idag()
+    if antal_idag >= MALSATT_ANTAL_PER_DAG:
+        print(
+            f"Redan {antal_idag}/{MALSATT_ANTAL_PER_DAG} filmrecensioner publicerade idag — "
+            "avslutar utan att publicera fler (gör en ev. ombudspublicering idempotent, se ✅131)."
+        )
+        return
 
     if YOUTUBE_API_KEY:
         video = hamta_video_kandidat()

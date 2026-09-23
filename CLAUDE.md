@@ -3981,6 +3981,56 @@ Fixat med en ny `pending_run_id`-kolumn (`supabase_filmrecensent_state_v3.sql`) 
 
 ---
 
+### ✅ 132. Precisionsstyrd ombudspublicering — explicit typval istället för generiska 4-pass-körningar – KLART
+
+Ägarfeedback (sep 2026), direkt uppföljning på ✅131s under-delivery-detektering och ombudsdispatch: *"Sedan blir ju frågan. Om nu dagens github körningen va 5 timmar och 32 minuter för sent. Vårat github Action skript verkar ju bero på vad klockan är för att bestämma om det blir en nyhetsartikel eller debattartikel. Blir inte det ett problem när github är så opålitlig? Kan man inte ha ett valmöjligheter i github action workflow scriptet för debattagenten om man vill ha en nyhetsartikel, debattartikel, replik eller filmrecension och hur många. Då får ju under-delivery-checken mer precision när den triggar debattagenten igen."*
+
+**Problemet:** ✅131s ombudsdispatch skickade bara `pass=4` till `agent.yml` utan att ange VILKEN typ som saknades — `agent.py`s egen typavvägning utanför ett riktigt cron-fönster är semi-slumpmässig (myntkast mellan replik/ny artikel, sedan nyhet/eget-val baserat på ämnesförslagens källa, se ✅100), så en generisk 4-pass-ombudskörning hade ingen garanti att faktiskt träffa den specifika typ som saknades — bara en chans.
+
+**Fix — ett explicit typval, inte fler pass:**
+- `agent.yml` fick ett nytt `workflow_dispatch.inputs.typ` (`type: choice`, alternativ `auto`/`nyhet`/`eget`/`replik`, default `auto`) — sätts som `AGENT_FORCE_TYP`-miljövariabel.
+- `agent.py` läser `AGENT_FORCE_TYP` direkt efter att `idag_publicerat` hämtats, och sätter `force_nyhet`/`force_replik`/`force_eget` baserat på den EXPLICIT begärda typen (villkorat på att den typens egen dagskvot fortfarande har plats, 4/4) — kringgår helt både cron/fönster-logiken och den vanliga slumpmässiga avvägningen. `auto` (default vid en vanlig manuell testkörning) behåller allt oförändrat.
+- `checkPubliceringstaktUnderskott()` i `agents/invariant-checker.js` returnerar nu en LISTA av saknade typer (`nyhet`/`replik`/`eget`/`film`) istället för en bar boolean — `main()` skriver den som `underskott_typer` (kommaseparerad) till `GITHUB_OUTPUT`.
+- `invariant-check.yml`s "Trigga ombudspublicering"-steg loopar över listan och dispatchar en SEPARAT, typforcerad körning per saknad typ: `gh workflow run agent.yml ... -f typ=X` för nyhet/replik/eget, `gh workflow run filmrecensent.yml` (ingen typ-parameter — filmrecensent.yml är en helt separat workflow med egen cursor-baserad logik, oberoende av agent.py:s 4+4+4-system) för film.
+
+**Filmrecension miscounted som "eget" — samma buggklass som ✅127, en femte yta.** Under arbetet upptäcktes att BÅDA `checkDagligPubliceringskvot()` och `checkPubliceringstaktUnderskott()` i `invariant-checker.js` hade exakt samma klassificeringsbugg som redan hittats och fixats för `/redaktion` (✅127): en filmrecension sätter varken `nyhetskalla` eller `parent_id`, så den räknades tyst in i "eget" — vilket både kunde dölja ett genuint filmrecensions-underskott och felaktigt rapportera en frisk "eget"-siffra som i själva verket bara bestod av filmrecensioner. Fixat med en delad `klassificeraArtiklar()`-hjälpfunktion (kollar `filmrecension` FÖRST, sedan `parent_id`, sedan `nyhetskalla` — samma precedens i båda checkarna).
+
+Kräver ingen ny Supabase-migrering. `agent.yml`s `PASS`-beräkning (case-satsen för `AGENT_DISPATCH_PASS`, ✅131) är oförändrad — `typ`-inputen lever helt parallellt med `pass`-inputen.
+
+| Fil | Roll |
+|---|---|
+| `.github/workflows/agent.yml` | Nytt `workflow_dispatch.inputs.typ` (choice: auto/nyhet/eget/replik) → `AGENT_FORCE_TYP`-env |
+| `agent.py` | Läser `AGENT_FORCE_TYP` direkt efter `idag_publicerat`, sätter `force_nyhet`/`force_replik`/`force_eget` explicit (kvotvillkorat) istället för fönster-/slumplogiken när satt |
+| `agents/invariant-checker.js` | Ny delad `klassificeraArtiklar()` (film → replik → nyhet-precedens). `checkPubliceringstaktUnderskott()` returnerar nu en array av saknade typer istället för en boolean |
+| `.github/workflows/invariant-check.yml` | "Trigga ombudspublicering"-steget loopar över `underskott_typer` och dispatchar en typforcerad `agent.yml`-körning per saknad nyhet/replik/eget-typ, eller `filmrecensent.yml` för film |
+
+**Codex-fynd (PR #1515-granskning, tre separata fynd): den nya precisionsdispatchen hade själv tre luckor, alla i samspelet mellan komponenter som byggdes i samma PR.**
+
+1. **`hamta_publicerade_idag_per_typ()` i `supabase_utils.py` — samma filmrecension-i-eget-bugg som ovan, fast i den funktion `agent.py` FAKTISKT använder för att BESLUTA vad som ska publiceras, inte bara i JS-övervakningen.** En dag med 4 filmrecensioner men 0 egna debattartiklar gav `idag_publicerat["eget"] == 4` — vilket fick en `AGENT_FORCE_TYP=eget`-ombudsdispatch att felaktigt tro att egen-kvoten redan var fylld och avstå från att skriva något, precis det underskott dispatchen skulle åtgärda. Fixat: samma `film`-först-precedens som `klassificeraArtiklar()` i JS — filmrecensioner räknas nu bort innan `eget` beräknas. Ingen `film`-nyckel lades till i den returnerade dicten (skulle annars påverka `nagon_kvot_kvar = any(v < 4 for v in idag_publicerat.values())` längre ner, som aldrig ska bry sig om filmkvoten — den hör inte till agent.py:s system alls).
+2. **En redan uppfylld forcerad typ bara loggade och föll igenom** till catch-up-blocket eller `ar_manuell_korning`/`nagon_kvot_kvar`-grinden — som, eftersom `AGENT_FORCE_TYP` alltid sätts via `workflow_dispatch`, skulle ha släppt igenom körningen så fort NÅGON ANNAN typ hade kvot kvar och låtit den vanliga semi-slumpmässiga logiken publicera en helt annan typ än den explicit begärda — eller i värsta fall en femte artikel av den redan mättade typen. Fixat: branchen anropar nu `sys.exit(0)` direkt — en redan uppfylld forcerad typ är en ren no-op, aldrig en generell "skriv vad som helst"-signal.
+3. **Filmrecensionens ombudsdispatch saknade ett dagligt kvotskydd helt.** Till skillnad från `agent.yml` (som har både en `concurrency`-grupp OCH en per-typ kvotkontroll som gör en redundant ombudsdispatch till en billig no-op) hade `filmrecensent.yml` varken någotdera — en ombudsdispatch som startar medan den ordinarie, bara FÖRSENADE (inte faktiskt misslyckade) körningen fortfarande pågår kunde ge upp till 8 recensioner samma dag istället för 4, och ännu fler om flera 3-timmars invariant-checkar hann dispatcha innan den första hunnit publicera något. Fixat i två lager: en ny `hamta_publicerade_idag()`-funktion i `filmrecensent.py` räknar dagens redan publicerade filmrecensioner och gör `main()` till en no-op så fort `MALSATT_ANTAL_PER_DAG` (4) är nått — oavsett vilken körning som råkar exekvera passet; samt en ny `concurrency`-grupp (`filmrecensent-publish`, `cancel-in-progress: false`, `queue: max`) på `filmrecensent.yml`, samma mönster och motivering som `agent.yml`s `debatt-agent-publish`-grupp, som serialiserar överlappande körningar så att kvotkontrollen inte kan läsas race:at av två samtidiga processer.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `supabase_utils.py` | `hamta_publicerade_idag_per_typ()` räknar nu bort `filmrecension`-rader innan `eget` beräknas (samma precedens som `klassificeraArtiklar()` i JS) |
+| `agent.py` | Den redan-uppfylld-forcerad-typ-branchen anropar nu `sys.exit(0)` istället för att bara logga och falla igenom till catch-up/manuell-dispatch-grinden |
+| `filmrecensent.py` | Ny `hamta_publicerade_idag()` + `MALSATT_ANTAL_PER_DAG = 4` — `main()` avslutar som no-op så fort dagens mål är nått, oavsett vilken körning som exekverar |
+| `.github/workflows/filmrecensent.yml` | Ny `concurrency`-grupp (`filmrecensent-publish`) — serialiserar överlappande körningar, samma mönster som `agent.yml` |
+
+**Codex-fynd (efterföljande granskning, en av två giltig — den andra reviewade en redan förbigången äldre commit): `checkPubliceringstaktUnderskott()` upptäckte bara ett RENT nollskede, aldrig ett DELVIS underskott.** Villkoren (`if (nyhet === 0) noll.push(...)` osv.) matchade exakt datumet den ursprungliga funktionen skrevs — men blev aldrig uppdaterade när funktionen bytte från en boolean till en lista av saknade typer (samma PR som ovan). Konkret exempel: nyhet=2, replik=4, eget=4, film=4 — nyheten saknar fortfarande 2 av sina 4 artiklar (en av dagens fyra pass misslyckades utan att de tre andra gjorde det), men `nyhet === 0` är falskt, `underskott`-listan blir tom, och ingen ombudsdispatch triggas alls. Detta motsäger direkt både `agent.py`s egen `AGENT_FORCE_TYP`-gren (`idag_publicerat["nyhet"] < 4`, redan skriven mot samma "under 4"-tröskel) och `filmrecensent.py`s `hamta_publicerade_idag() >= MALSATT_ANTAL_PER_DAG`-koll — bara JS-sidans DETEKTERING hade den snävare, felaktiga tröskeln. Fixat genom att byta samtliga fyra villkor till `< 4` (döpte om `noll` → `underskott` för att matcha den nya semantiken: "under dagens mål", inte "exakt noll"). `checkDagligPubliceringskvot()` har en helt annan, redan korrekt tröskel (`> 4`, ett ÖVERSKOTTS-larm) — ingen parallell bugg där, olika syfte.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | `checkPubliceringstaktUnderskott()`s fyra villkor bytta från `=== 0` till `< 4` — ett delvis underskott (t.ex. nyhet=2 av 4) upptäcks nu, inte bara ett rent nollskede. Variabeln `noll` döpt till `underskott` |
+
+**Codex-fynd (PR #1516-granskning): `filmrecensent.py`s egen dagliga kvotkoll (`hamta_publicerade_idag()`, tillagd i denna serie ovan) räknade in BESÖKARINSKICKADE filmrecensioner, inte bara Filmrecensentens egna.** Frågan filtrerade bara på `filmrecension=eq.true` — utan `kalla=eq.ai` räknades även manuellt inskickade recensioner via `/skicka-in` (som sedan ✅116/✅123 också sätter `filmrecension: true`, men med `kalla: "manniska"`) in i "redan publicerat idag"-summan. Fyra besökarrecensioner samma dag hade gjort funktionen tro att dagens mål redan var nått, trots att Filmrecensenten själv aldrig publicerat något — vilket permanent tystade varje ombudsdispatch (`filmrecensent.yml`) till en no-op utan att någonsin faktiskt åtgärda underskottet `checkPubliceringstaktUnderskott()` (ovan) upptäckt. Fixat genom att lägga till samma `kalla=eq.ai`-filter som redan används på alla andra ställen i kodbasen för exakt detta syfte (`hamta_publicerade_idag_per_typ()` i `supabase_utils.py`, båda kvotcheckarna i `invariant-checker.js`).
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `filmrecensent.py` | `hamta_publicerade_idag()`s Supabase-fråga fick `kalla: "eq.ai"` — räknar bara Filmrecensentens egna publiceringar, inte besökarinskickade filmrecensioner |
+
+---
+
 ## Den autonoma debatten – slutvisionen
 
 Det långsiktiga målet är en självgående debattloop:
