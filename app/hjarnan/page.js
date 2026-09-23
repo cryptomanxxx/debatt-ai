@@ -436,6 +436,11 @@ export default async function HjarnanPage() {
 
   return (
     <main style={{ maxWidth: "1100px", margin: "0 auto", padding: "40px 16px 80px", background: "#050505", minHeight: "100vh" }}>
+      {/* Hero */}
+      <div style={{ marginBottom: "32px", borderRadius: "12px", overflow: "hidden" }}>
+        <img src="/hero-hjarnan.png" alt="Civilisationens hjärna" style={{ width: "100%", height: "auto", display: "block" }} />
+      </div>
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
         <a href="/historia" style={{ fontSize: "11px", color: "#555", fontFamily: "monospace", textDecoration: "none" }}>← Historia</a>
         <a href="/civilisation" style={{ fontSize: "11px", color: "#38bdf8", fontFamily: "monospace", textDecoration: "none" }}>Fråga hjärnan →</a>
