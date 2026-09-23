@@ -39,6 +39,16 @@ on:
         description: "Antal publiceringspass (1-4). Lämna som 1 för en vanlig manuell testkörning — invariant-checkerns automatiska ombudspublicering skickar alltid 4 för att ge samma täckning som ett riktigt fönster."
         required: false
         default: "1"
+      typ:
+        description: "Tvinga en specifik artikeltyp för samtliga pass i den här körningen — kringgår helt både fönster-/cron-logiken och den normala slumpmässiga nyhet/replik/eget-avvägningen (se ✅132). 'eget' = egen debattartikel. 'auto' (default) behåller befintligt beteende oförändrat. Filmrecensioner hanteras aldrig här — de är en helt separat workflow (filmrecensent.yml, cursor-baserad, inget typval behövs)."
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - nyhet
+          - eget
+          - replik
 
 # Serialiserar körningar istället för att låta dem köra parallellt — utan
 # detta kan två överlappande triggers (t.ex. en kraftigt försenad cron plus
@@ -133,6 +143,11 @@ jobs:
           # schemalagd körning, se ✅131). Bara relevant i case-satsens
           # fallback-gren nedan — de tre primära crons ignorerar den helt.
           AGENT_DISPATCH_PASS: ${{ github.event.inputs.pass }}
+          # Tvingad artikeltyp (tom sträng vid en schemalagd körning eller om
+          # inte satt vid manuell dispatch, se ✅132). Läses direkt av
+          # agent.py — kringgår helt fönster-/cron-logiken för den här
+          # körningen när satt till nyhet/eget/replik.
+          AGENT_FORCE_TYP: ${{ github.event.inputs.typ }}
         run: |
           # De tre primära fönster-crons (nyhet/replik/eget) loopar alltid 4
           # publiceringspass i samma körning — se ✅128 i CLAUDE.md. Catch-up-

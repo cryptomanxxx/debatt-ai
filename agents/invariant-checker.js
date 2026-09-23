@@ -375,6 +375,24 @@ async function checkAktivitetHarArtikelTyper() {
   }
 }
 
+// Delad klassificeringslogik för ✅130/✅131/✅132 — matchar exakt
+// hamta_publicerade_idag_per_typ() i supabase_utils.py, MED filmrecension
+// särskiljd (✅132-fynd: den ursprungliga versionen av båda checkarna nedan
+// hade samma bugg som redan hittades och fixades för /redaktion, ✅127 —
+// en filmrecension sätter varken nyhetskalla eller parent_id och räknades
+// därför tyst in i "eget"-hinken, vilket både kunde dölja ett genuint
+// filmrecensions-underskott OCH felaktigt rapportera "eget" som friskt).
+function klassificeraArtiklar(rader) {
+  let replik = 0, nyhet = 0, film = 0;
+  for (const a of rader) {
+    if (a.filmrecension) film++;
+    else if (a.parent_id) replik++;
+    else if (a.nyhetskalla) nyhet++;
+  }
+  const eget = rader.length - nyhet - replik - film;
+  return { nyhet, replik, eget, film };
+}
+
 async function checkDagligPubliceringskvot() {
   const namn = "daglig-publiceringskvot";
   try {
@@ -383,84 +401,80 @@ async function checkDagligPubliceringskvot() {
     const idagUtc = new Date();
     idagUtc.setUTCHours(0, 0, 0, 0);
     const rader = await hamtaSupabase(
-      `artiklar?select=nyhetskalla,parent_id&kalla=eq.ai&skapad=gte.${idagUtc.toISOString()}&limit=200`
+      `artiklar?select=nyhetskalla,parent_id,filmrecension&kalla=eq.ai&skapad=gte.${idagUtc.toISOString()}&limit=200`
     );
-    let replik = 0, nyhet = 0;
-    for (const a of rader) {
-      if (a.parent_id) replik++;
-      else if (a.nyhetskalla) nyhet++;
-    }
-    const eget = rader.length - nyhet - replik;
+    const { nyhet, replik, eget, film } = klassificeraArtiklar(rader);
     const overskridna = [];
     if (nyhet > 4) overskridna.push(`nyhet=${nyhet}`);
     if (replik > 4) overskridna.push(`replik=${replik}`);
     if (eget > 4) overskridna.push(`eget=${eget}`);
+    if (film > 4) overskridna.push(`film=${film}`);
     if (overskridna.length > 0) {
-      rapportera(namn, "fail", `4/4/4-kvoten överskriden idag: ${overskridna.join(", ")}`);
+      rapportera(namn, "fail", `4/4/4/4-kvoten överskriden idag: ${overskridna.join(", ")}`);
       return;
     }
-    rapportera(namn, "ok", `nyhet=${nyhet} replik=${replik} eget=${eget}`);
+    rapportera(namn, "ok", `nyhet=${nyhet} replik=${replik} eget=${eget} film=${film}`);
   } catch (e) {
     rapportera(namn, "error", String(e.message || e));
   }
 }
 
-// Returnerar true bara när ett genuint, åtgärdbart underskott upptäcktes —
-// main() använder returvärdet för att avgöra om invariant-check.yml ska
-// TRIGGA agent.yml direkt (✅131) istället för att bara passivt rapportera
-// och vänta på att någon läser /status eller på att catch-up-fönstret
-// (21:30-21:50 UTC) råkar hinna före midnatt. Ett fel (catch-blocket) eller
-// att vi är utanför kontrollfönstret returnerar medvetet false — osäker
-// data är inte samma sak som ett bekräftat underskott, och ska aldrig
-// trigga en extra GitHub Actions-körning.
+// Returnerar en lista av typer som saknas (tom lista = allt friskt) — ALDRIG
+// en bar boolean, sedan ✅132: main() använder listan för att trigga EXAKT
+// rätt ombudspublicering per saknad typ (agent.yml med typ=X för nyhet/
+// replik/eget, filmrecensent.yml för film) istället för en enda generisk
+// 4-pass-körning som bara semi-slumpmässigt kanske råkar täcka det som
+// faktiskt saknas. Ett fel (catch-blocket) eller att vi är utanför
+// kontrollfönstret returnerar medvetet [] — osäker data är inte samma sak
+// som ett bekräftat underskott, och ska aldrig trigga en extra
+// GitHub Actions-körning.
 async function checkPubliceringstaktUnderskott() {
   const namn = "publiceringstakt-underskott";
   try {
-    // agent.yml:s tre primära crons (07/08/09 UTC = nyhet/eget/replik) har
-    // vid 12 UTC haft minst 3h marginal utöver sin egen schemalagda tid —
-    // gott om utrymme för den redan dokumenterade "vanliga" GitHub Actions-
-    // förseningen (~90 min observerat historiskt). Stannar kontrollen INNAN
-    // catch-up-fönstret (21:30-21:50 UTC) hinner ha åtgärdat ett eventuellt
-    // underskott, så en redan självläkt dag aldrig flaggas i efterhand.
-    // Denna check kan alltså bara upptäcka ett underskott UNDER dagen,
-    // aldrig bekräfta att catch-up faktiskt löste det — det gör nästa dags
-    // körning av samma check, som då ser en frisk 0:a igen.
+    // agent.yml:s tre primära crons (07/08/09 UTC = nyhet/eget/replik) och
+    // filmrecensent.yml:s cron (10:00 UTC) har vid 12 UTC alla haft minst
+    // 2-3h marginal utöver sin egen schemalagda tid — gott om utrymme för
+    // den redan dokumenterade "vanliga" GitHub Actions-förseningen (~90 min
+    // observerat historiskt). Stannar kontrollen INNAN catch-up-fönstret
+    // (21:30-21:50 UTC, gäller bara agent.yml — filmrecensent.yml har ingen
+    // egen catch-up) hinner ha åtgärdat ett eventuellt underskott, så en
+    // redan självläkt dag aldrig flaggas i efterhand. Denna check kan alltså
+    // bara upptäcka ett underskott UNDER dagen, aldrig bekräfta att
+    // catch-up faktiskt löste det — det gör nästa dags körning av samma
+    // check, som då ser en frisk 0:a igen.
     const utcTimme = new Date().getUTCHours();
     if (utcTimme < 12 || utcTimme >= 21) {
       rapportera(namn, "ok", `utanför kontrollfönstret (12–20 UTC), aktuell UTC-timme ${utcTimme}`);
-      return false;
+      return [];
     }
     const idagUtc = new Date();
     idagUtc.setUTCHours(0, 0, 0, 0);
     const rader = await hamtaSupabase(
-      `artiklar?select=nyhetskalla,parent_id&kalla=eq.ai&skapad=gte.${idagUtc.toISOString()}&limit=200`
+      `artiklar?select=nyhetskalla,parent_id,filmrecension&kalla=eq.ai&skapad=gte.${idagUtc.toISOString()}&limit=200`
     );
-    let replik = 0, nyhet = 0;
-    for (const a of rader) {
-      if (a.parent_id) replik++;
-      else if (a.nyhetskalla) nyhet++;
-    }
-    const eget = rader.length - nyhet - replik;
+    const { nyhet, replik, eget, film } = klassificeraArtiklar(rader);
     const noll = [];
     if (nyhet === 0) noll.push("nyhet");
     if (replik === 0) noll.push("replik");
     if (eget === 0) noll.push("eget");
+    if (film === 0) noll.push("film");
     if (noll.length > 0) {
       rapportera(
         namn,
         "fail",
-        `Fortfarande 0 publicerade artiklar av typ: ${noll.join(", ")} trots att dagens tre primära ` +
-        `agent.yml-crons (07/08/09 UTC) borde ha kört för länge sedan — tyder på att en eller flera ` +
-        `av dem har fördröjts kraftigt eller inte kört alls. Triggar agent.yml direkt (4 pass) som ` +
-        `ombudspublicering istället för att bara vänta på catch-up (21:30–21:50 UTC).`
+        `Fortfarande 0 publicerade artiklar av typ: ${noll.join(", ")} trots att dagens primära ` +
+        `crons (agent.yml 07/08/09 UTC, filmrecensent.yml 10:00 UTC) borde ha kört för länge sedan — ` +
+        `tyder på att en eller flera av dem har fördröjts kraftigt eller inte kört alls. Triggar en ` +
+        `precis ombudspublicering per saknad typ istället för att bara vänta på catch-up (endast för ` +
+        `nyhet/replik/eget, 21:30–21:50 UTC — filmrecensent.yml har ingen egen catch-up).`
       );
-      return true;
+      return noll;
     }
-    rapportera(namn, "ok", `nyhet=${nyhet} replik=${replik} eget=${eget}`);
-    return false;
+    rapportera(namn, "ok", `nyhet=${nyhet} replik=${replik} eget=${eget} film=${film}`);
+    return [];
   } catch (e) {
     rapportera(namn, "error", String(e.message || e));
-    return false;
+    return [];
   }
 }
 
@@ -579,7 +593,7 @@ async function main() {
 
   await checkAktivitetHarArtikelTyper();
   await checkDagligPubliceringskvot();
-  const underskottUpptackt = await checkPubliceringstaktUnderskott();
+  const underskottTyper = await checkPubliceringstaktUnderskott();
   await checkAktivitetArkivSidaSvarar();
   await checkAvhuggnaRubriker();
 
@@ -654,12 +668,16 @@ async function main() {
         `sammanfattning<<${delim}\n${problemRader.join("\n")}\n${delim}\n`
       );
     }
-    // Separat, snävt scopad output (✅131) — bara publiceringstakt-
-    // underskott-checken sätter true, aldrig något annat fail/error. Låter
-    // invariant-check.yml trigga agent.yml som ombudspublicering utan att
-    // riskera att en helt orelaterad regression (t.ex. en trasig länk på
-    // /aktivitet) av misstag också startar en publiceringskörning.
-    fs.appendFileSync(process.env.GITHUB_OUTPUT, `behover_ombudspublicering=${underskottUpptackt}\n`);
+    // Separat, snävt scopad output (✅131, precis-typad sedan ✅132) — bara
+    // publiceringstakt-underskott-checken sätter det här, aldrig något annat
+    // fail/error, så en helt orelaterad regression (t.ex. en trasig länk på
+    // /aktivitet) kan aldrig av misstag också trigga en publiceringskörning.
+    // Komma-separerad lista av EXAKT vilka typer som saknas (t.ex.
+    // "nyhet,film") — låter invariant-check.yml dispatcha precis rätt
+    // workflow(ar) med rätt typ-val istället för en enda generisk 4-pass-
+    // körning som bara semi-slumpmässigt kanske råkar täcka det som
+    // faktiskt saknas. Tom sträng när inget underskott upptäcktes.
+    fs.appendFileSync(process.env.GITHUB_OUTPUT, `underskott_typer=${underskottTyper.join(",")}\n`);
   }
 }
 
