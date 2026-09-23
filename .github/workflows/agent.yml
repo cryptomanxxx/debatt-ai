@@ -29,7 +29,16 @@ on:
     - cron: "30 21 * * *"  # 23:30 svensk tid — catch-up 1/3
     - cron: "40 21 * * *"  # 23:40 svensk tid — catch-up 2/3
     - cron: "50 21 * * *"  # 23:50 svensk tid — catch-up 3/3
-  workflow_dispatch:       # Kan också köras manuellt från GitHub
+  workflow_dispatch:       # Kan också köras manuellt från GitHub — eller
+    # automatiskt av invariant-checker.js (se ✅131) som ombudspublicering
+    # när en dags 4+4+4-kvot fortfarande har en typ på 0 långt efter att
+    # dess primära fönster borde ha kört (t.ex. dagens gav bara 2/4
+    # nyhetsartiklar efter en kraftigt försenad cron).
+    inputs:
+      pass:
+        description: "Antal publiceringspass (1-4). Lämna som 1 för en vanlig manuell testkörning — invariant-checkerns automatiska ombudspublicering skickar alltid 4 för att ge samma täckning som ett riktigt fönster."
+        required: false
+        default: "1"
 
 # Serialiserar körningar istället för att låta dem köra parallellt — utan
 # detta kan två överlappande triggers (t.ex. en kraftigt försenad cron plus
@@ -120,19 +129,37 @@ jobs:
           # "Hämta körningens skapelsetid" ovan). Tom sträng om API-anropet
           # misslyckades.
           AGENT_RUN_CREATED_AT: ${{ steps.run_meta.outputs.created_at }}
+          # Antal pass begärt via workflow_dispatch (tom sträng vid en
+          # schemalagd körning, se ✅131). Bara relevant i case-satsens
+          # fallback-gren nedan — de tre primära crons ignorerar den helt.
+          AGENT_DISPATCH_PASS: ${{ github.event.inputs.pass }}
         run: |
-          # De tre primära fönster-crons (nyhet/replik/eget) loopar 4
+          # De tre primära fönster-crons (nyhet/replik/eget) loopar alltid 4
           # publiceringspass i samma körning — se ✅128 i CLAUDE.md. Catch-up-
-          # crons och workflow_dispatch förblir 1 pass: att loopa catch-up 4x
-          # hade fyrdubblat dess kompensationskapacitet (från max 3 till max
-          # 12 återhämtade artiklar/dag) och underminerat själva poängen med
-          # att ha tre separata, oberoende catch-up-tillfällen.
+          # crons förblir 1 pass: att loopa catch-up 4x hade fyrdubblat dess
+          # kompensationskapacitet (från max 3 till max 12 återhämtade
+          # artiklar/dag) och underminerat själva poängen med att ha tre
+          # separata, oberoende catch-up-tillfällen.
+          #
+          # workflow_dispatch (manuell ELLER invariant-checkerns automatiska
+          # ombudspublicering, ✅131) läser istället AGENT_DISPATCH_PASS —
+          # default 1 för en vanlig manuell testkörning, men invariant-
+          # checkern skickar alltid 4 för att en ombudspublicering ska ha
+          # samma chans att täcka ett flertypsunderskott som ett riktigt
+          # fönster. Klampad till [1,4] mot en tom/felaktig/orimlig indata
+          # (t.ex. någon som råkar skriva "999" i GitHub-UI:t) — aldrig fler
+          # pass än ett riktigt fönster redan kör.
           case "$AGENT_CRON" in
             "0 7 * * *"|"0 8 * * *"|"0 9 * * *")
               PASS=4
               ;;
             *)
-              PASS=1
+              PASS="${AGENT_DISPATCH_PASS:-1}"
+              case "$PASS" in
+                ''|*[!0-9]*) PASS=1 ;;
+              esac
+              if [ "$PASS" -lt 1 ]; then PASS=1; fi
+              if [ "$PASS" -gt 4 ]; then PASS=4; fi
               ;;
           esac
           # set +e: ett misslyckat pass ska inte hindra resten av passen i
