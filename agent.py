@@ -363,9 +363,27 @@ def main():
         _cron_stale = _utc_now.hour < _cron_hour
     utc_hour = _cron_hour if (_cron_hour is not None and not _cron_stale) else _utc_now.hour
     idag_publicerat = hamta_publicerade_idag_per_typ(sb_key) if sb_key else {"nyhet": 0, "replik": 0, "eget": 0}
-    force_nyhet  = utc_hour == 7 and idag_publicerat["nyhet"]  < 4
-    force_replik = utc_hour == 9 and idag_publicerat["replik"] < 4
-    force_eget   = utc_hour == 8 and idag_publicerat["eget"]   < 4
+
+    # ✅132: explicit typ-override via workflow_dispatch (AGENT_FORCE_TYP,
+    # satt av agent.yml från github.event.inputs.typ). Kringgår helt
+    # cron/fönster-logiken nedan OCH den normala slumpmässiga nyhet/replik/
+    # eget-avvägningen längre ner i filen — utan den skrev en ombudspubli-
+    # cering (invariant-checker.js, ✅131) bara N SEMI-SLUMPMÄSSIGA pass, med
+    # ingen garanti att de faktiskt träffade den specifika typ som saknades.
+    # Respekterar fortfarande den typens egen dagskvot (4/4/4) — en begäran
+    # om en redan fylld typ ger inget forcerat val, precis som en vanlig
+    # extra körning.
+    _forced_typ = os.environ.get("AGENT_FORCE_TYP", "").strip().lower()
+    if _forced_typ in ("nyhet", "replik", "eget"):
+        force_nyhet  = _forced_typ == "nyhet"  and idag_publicerat["nyhet"]  < 4
+        force_replik = _forced_typ == "replik" and idag_publicerat["replik"] < 4
+        force_eget   = _forced_typ == "eget"   and idag_publicerat["eget"]   < 4
+        if not (force_nyhet or force_replik or force_eget):
+            print(f"AGENT_FORCE_TYP='{_forced_typ}' begärdes, men den typen har redan nått dagens kvot (4/4) — inget forcerat.")
+    else:
+        force_nyhet  = utc_hour == 7 and idag_publicerat["nyhet"]  < 4
+        force_replik = utc_hour == 9 and idag_publicerat["replik"] < 4
+        force_eget   = utc_hour == 8 and idag_publicerat["eget"]   < 4
 
     # 21:xx UTC (23:xx svensk tid) → catch-up-fönster. De tre fönstren ovan
     # garanterar bara att en typ INTE skjuts över 4 — de gör inget om ett

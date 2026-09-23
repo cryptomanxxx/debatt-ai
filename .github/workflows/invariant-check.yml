@@ -30,29 +30,54 @@ jobs:
 
       # ✅131: användaren påpekade korrekt att bara DETEKTERA ett
       # publiceringsunderskott inte räcker — om GitHubs schemaläggare redan
-      # missköter de tre primära crons i agent.yml (se PR #1513s ✅130-
-      # utredning), finns ingen garanti att catch-up-crons (21:30–21:50 UTC,
-      # samma opålitliga schemaläggare) kör i tid heller. Så fort
-      # invariant-checker.js bekräftar ett underskott (behover_ombudspublicering,
-      # satt EXKLUSIVT av checkPubliceringstaktUnderskott — aldrig av någon
-      # annan check) triggas agent.yml direkt med 4 pass, samma täckning som
-      # ett riktigt fönster. En bekräftad underskott-check rapporterar alltid
-      # "fail" (main() sätter då process.exitCode=1), så failure() är den
-      # exakta — inte bara tillräckliga — villkoret, samma mönster som
-      # felmejl-steget nedan redan använder.
+      # missköter de primära crons i agent.yml/filmrecensent.yml (se PR
+      # #1513s ✅130-utredning), finns ingen garanti att agent.yml:s egen
+      # catch-up (21:30–21:50 UTC, samma opålitliga schemaläggare) kör i tid
+      # heller. Så fort invariant-checker.js bekräftar ett underskott
+      # (underskott_typer, satt EXKLUSIVT av checkPubliceringstaktUnderskott
+      # — aldrig av någon annan check) triggas rätt workflow direkt.
+      #
+      # ✅132: användaren påpekade vidare att en enda generisk "pass=4"-
+      # dispatch till agent.yml inte räcker för PRECISION — agent.py:s egna
+      # nyhet/replik/eget-val är annars semi-slumpmässigt (myntkast/vikter,
+      # se agent.py) utanför ett riktigt fönster, med ingen garanti att just
+      # den saknade typen faktiskt skrivs under de 4 passen. underskott_typer
+      # är en komma-separerad lista av EXAKT vilka typer som saknas
+      # (nyhet/replik/eget/film) — loopen nedan dispatchar en separat, typ-
+      # forcerad körning PER saknad typ istället: agent.yml med typ=X för
+      # nyhet/replik/eget (kringgår helt fönster-/slumplogiken, se
+      # AGENT_FORCE_TYP i agent.py), filmrecensent.yml (ingen typ-parameter
+      # behövs — helt separat workflow med egen cursor-baserad logik,
+      # oberoende av agent.py:s 4+4+4-kvotsystem).
+      #
+      # En bekräftad underskott-check rapporterar alltid "fail" (main()
+      # sätter då process.exitCode=1), så failure() är den exakta — inte
+      # bara tillräckliga — villkoret, samma mönster som felmejl-steget
+      # nedan redan använder.
       #
       # Säkert mot dubbeltriggning: invariant-check.yml kör var 3:e timme
       # (12/15/18 UTC ligger alla inom kontrollfönstret), så flera körningar
       # kan i teorin se samma underskott och trigga flera gånger — men
-      # agent.py läser dagens kvot fräscht vid varje pass och avslutar
-      # omedelbart (sys.exit(0)) om allt redan är 4/4/4, så en redundant
-      # ombudspublicering är en billig no-op, inte en dubbelpublicering.
+      # agent.py/filmrecensent.py läser dagens läge fräscht vid varje pass
+      # och avslutar/no-opar omedelbart om allt redan är i mål, så en
+      # redundant ombudspublicering är en billig no-op, inte en
+      # dubbelpublicering.
       - name: Trigga ombudspublicering
-        if: failure() && steps.run.outputs.behover_ombudspublicering == 'true'
+        if: failure() && steps.run.outputs.underskott_typer != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UNDERSKOTT_TYPER: ${{ steps.run.outputs.underskott_typer }}
         run: |
-          gh workflow run agent.yml --repo "${{ github.repository }}" --ref main -f pass=4
+          IFS=',' read -ra TYPER <<< "$UNDERSKOTT_TYPER"
+          for t in "${TYPER[@]}"; do
+            if [ "$t" = "film" ]; then
+              echo "=== Ombudspublicering: film (filmrecensent.yml) ==="
+              gh workflow run filmrecensent.yml --repo "${{ github.repository }}" --ref main
+            else
+              echo "=== Ombudspublicering: $t (agent.yml, typ=$t) ==="
+              gh workflow run agent.yml --repo "${{ github.repository }}" --ref main -f pass=4 -f "typ=$t"
+            fi
+          done
 
       # ✅108-uppföljning: GitHub:s egen felnotis vid en misslyckad
       # schemalagd körning säger bara "Run failed" — ingen antydan om VILKEN
