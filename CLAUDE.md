@@ -4017,6 +4017,12 @@ Kräver ingen ny Supabase-migrering. `agent.yml`s `PASS`-beräkning (case-satsen
 | `filmrecensent.py` | Ny `hamta_publicerade_idag()` + `MALSATT_ANTAL_PER_DAG = 4` — `main()` avslutar som no-op så fort dagens mål är nått, oavsett vilken körning som exekverar |
 | `.github/workflows/filmrecensent.yml` | Ny `concurrency`-grupp (`filmrecensent-publish`) — serialiserar överlappande körningar, samma mönster som `agent.yml` |
 
+**Codex-fynd (efterföljande granskning, en av två giltig — den andra reviewade en redan förbigången äldre commit): `checkPubliceringstaktUnderskott()` upptäckte bara ett RENT nollskede, aldrig ett DELVIS underskott.** Villkoren (`if (nyhet === 0) noll.push(...)` osv.) matchade exakt datumet den ursprungliga funktionen skrevs — men blev aldrig uppdaterade när funktionen bytte från en boolean till en lista av saknade typer (samma PR som ovan). Konkret exempel: nyhet=2, replik=4, eget=4, film=4 — nyheten saknar fortfarande 2 av sina 4 artiklar (en av dagens fyra pass misslyckades utan att de tre andra gjorde det), men `nyhet === 0` är falskt, `underskott`-listan blir tom, och ingen ombudsdispatch triggas alls. Detta motsäger direkt både `agent.py`s egen `AGENT_FORCE_TYP`-gren (`idag_publicerat["nyhet"] < 4`, redan skriven mot samma "under 4"-tröskel) och `filmrecensent.py`s `hamta_publicerade_idag() >= MALSATT_ANTAL_PER_DAG`-koll — bara JS-sidans DETEKTERING hade den snävare, felaktiga tröskeln. Fixat genom att byta samtliga fyra villkor till `< 4` (döpte om `noll` → `underskott` för att matcha den nya semantiken: "under dagens mål", inte "exakt noll"). `checkDagligPubliceringskvot()` har en helt annan, redan korrekt tröskel (`> 4`, ett ÖVERSKOTTS-larm) — ingen parallell bugg där, olika syfte.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | `checkPubliceringstaktUnderskott()`s fyra villkor bytta från `=== 0` till `< 4` — ett delvis underskott (t.ex. nyhet=2 av 4) upptäcks nu, inte bara ett rent nollskede. Variabeln `noll` döpt till `underskott` |
+
 ---
 
 ## Den autonoma debatten – slutvisionen

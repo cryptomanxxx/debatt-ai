@@ -453,22 +453,32 @@ async function checkPubliceringstaktUnderskott() {
       `artiklar?select=nyhetskalla,parent_id,filmrecension&kalla=eq.ai&skapad=gte.${idagUtc.toISOString()}&limit=200`
     );
     const { nyhet, replik, eget, film } = klassificeraArtiklar(rader);
-    const noll = [];
-    if (nyhet === 0) noll.push("nyhet");
-    if (replik === 0) noll.push("replik");
-    if (eget === 0) noll.push("eget");
-    if (film === 0) noll.push("film");
-    if (noll.length > 0) {
+    // < 4 (inte === 0) — ett DELVIS underskott (t.ex. nyhet=2 medan
+    // replik/eget/film redan nått 4) är lika åtgärdbart som ett rent 0-läge:
+    // agent.py:s AGENT_FORCE_TYP-gren och filmrecensent.py:s
+    // hamta_publicerade_idag()-koll är båda redan skrivna mot samma "< 4"-
+    // tröskel (se ✅132), så en ombudsdispatch toppar upp exakt mellanskillnaden
+    // istället för att duplicera redan publicerat innehåll. Ett rent
+    // nollskede räknades tidigare in (Codex-fynd, PR #1516-granskning): med
+    // bara "=== 0" hade t.ex. nyhet=2/replik=4/eget=4/film=4 aldrig flaggats,
+    // trots att nyhet fortfarande saknade 2 av sina 4 artiklar.
+    const underskott = [];
+    if (nyhet < 4) underskott.push("nyhet");
+    if (replik < 4) underskott.push("replik");
+    if (eget < 4) underskott.push("eget");
+    if (film < 4) underskott.push("film");
+    if (underskott.length > 0) {
       rapportera(
         namn,
         "fail",
-        `Fortfarande 0 publicerade artiklar av typ: ${noll.join(", ")} trots att dagens primära ` +
-        `crons (agent.yml 07/08/09 UTC, filmrecensent.yml 10:00 UTC) borde ha kört för länge sedan — ` +
-        `tyder på att en eller flera av dem har fördröjts kraftigt eller inte kört alls. Triggar en ` +
-        `precis ombudspublicering per saknad typ istället för att bara vänta på catch-up (endast för ` +
+        `Under dagens mål (4/typ) för: ${underskott.join(", ")} (nyhet=${nyhet} replik=${replik} ` +
+        `eget=${eget} film=${film}) trots att dagens primära crons (agent.yml 07/08/09 UTC, ` +
+        `filmrecensent.yml 10:00 UTC) borde ha kört för länge sedan — tyder på att en eller flera av ` +
+        `dem har fördröjts kraftigt, kört bara delvis, eller inte kört alls. Triggar en precis ` +
+        `ombudspublicering per underskjuten typ istället för att bara vänta på catch-up (endast för ` +
         `nyhet/replik/eget, 21:30–21:50 UTC — filmrecensent.yml har ingen egen catch-up).`
       );
-      return noll;
+      return underskott;
     }
     rapportera(namn, "ok", `nyhet=${nyhet} replik=${replik} eget=${eget} film=${film}`);
     return [];
