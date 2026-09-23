@@ -83,6 +83,7 @@ const GRUPPER = [
       { href: "/visdomsspelet", label: "Visdomsspelet" },
       { href: "/orakel",        label: "Oraklet 🔮" },
       { href: "/intelligens",   label: "Intelligens" },
+      { href: "/qant",          label: "Q.ANT Research Lab 🔬" },
       { href: "/hjarnan",       label: "Hjärnan" },
       { href: "/narrativ",      label: "Narrativ" },
       { href: "/ai-bilder",     label: "AI-Bilder" },

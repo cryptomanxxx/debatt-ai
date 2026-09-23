@@ -4257,6 +4257,33 @@ grant select, insert, update, delete on <tabell> to service_role;  -- alltid, oa
 ```
 Lägg bara till `insert`/`update`/`delete` i anon-raden om en motsvarande RLS-policy faktiskt tillåter det för anon (matcha aldrig blint Supabase egen boilerplate, som ger anon full CRUD som standardexempel) — annars, som med resten av plattformens tabeller, `select`-bara för anon och `service role kräver skrivning`.
 
+### ✅ 134. Q.ANT Research Lab (/qant) — extern forskningsdashboard, publik JSON som enda datakälla – KLART
+
+Ägarbegäran (sep 2026): en ny sida som visar status för ett fristående forskningsprojekt, "Q.ANT Research Lab" (`https://github.com/cryptomanxxx/debatt-ai-qant-research-lab`), som experimenterar med neurala arkitekturer på Q.ANT Native Computing Toolkit. Explicit arkitekturgräns: *"Webbplatsen ska inte behöva förstå eller läsa de interna forskningsmapparna såsom research_queue/jobs, proposals, analyses eller råa experimentfiler."* Flödet är `Q.ANT experiments → results → public/research-dashboard.json → Debatt-AI` — forskningsrepot regenererar självt den publika JSON:en varje gång ett nytt experiment landar, och Debatt-AI läser bara den filen.
+
+**Första plattformssida som hämtar data från ett externt repo istället för Supabase.** `/qant` fetchar `research-dashboard.json` direkt från `raw.githubusercontent.com/cryptomanxxx/debatt-ai-qant-research-lab/main/public/research-dashboard.json` server-side (`next: { revalidate: 1800 }`, samma ISR-mönster som resten av plattformen). Ingen ny Supabase-tabell, ingen skrivväg — sidan är read-only mot en extern källa den inte äger.
+
+**Verifierat innan bygget (per ägarens uttryckliga instruktion om att inspektera först):** klonade forskningsrepot och läste `public/research-dashboard.json` direkt — bekräftade att Exp009 (Fashion-MNIST, `exp009_cross_dataset_validation`) redan fanns med i den publika filen, samt läste `scripts/build_research_dashboard.py` för att förstå att `featured_comparison`-blocket alltid pekar på det SENASTE experimentet med en fullständig arkitektursammanfattning — det är alltså ett levande, självuppdaterande snapshot, inte permanent bundet till ett specifikt experiment-id.
+
+**Datadriven rendering — inga hårdkodade experiment-id:n:** `experiments[]`, `featured_comparison.architectures[]` och `research_loop[]` itereras rakt av från JSON:en. `naturligtNamn()` härleder ett läsbart namn ur ett godtyckligt `expNNN_beskrivning`-id via regex (`/^exp0*(\d+)_(.+)$/`) — fungerar identiskt för exp010, exp099 osv. utan kodändring. `fargForNamn()` ger varje dataset/arkitektur en deterministisk hash-baserad HSL-färg istället för en hårdkodad färgkarta, så ett helt nytt datasetnamn (t.ex. CIFAR-10 i ett framtida experiment) automatiskt får en stabil, distinkt färg.
+
+**Vetenskaplig disclaimer — visas verbatim, aldrig omskriven:** `project.backend_disclaimer` (ur JSON:en) renderas ordagrant i en egen, visuellt framträdande varningsbanner direkt under sidhuvudet — plattformens egen text lägger bara till en "⚠️ Vetenskaplig disclaimer"-etikett runt den. Ingen av sidans egna rubriker/beskrivningar nämner latency, throughput, energiförbrukning eller fotonisk prestanda — all text refererar bara till "accuracy", "parametrar" och "Paretofronten", i linje med att nuvarande resultat kommer från Q.ANT CPU-backend, inte fotonikhårdvara.
+
+**Schema-tolerant för framtida fält (fotonikhårdvara senare):** arkitekturjämförelsens tabell och scatterplot itererar över en känd fältmängd (`architecture`/`parameters`/`mean_accuracy`/`std_accuracy`/`pareto`) men beräknar dessutom `extraArkFalt` — unionen av alla NYCKLAR utöver de kända som förekommer på någon arkitektur — och renderar dem som egna kolumner/chips generiskt. Samma mönster på experimentens `configuration`-objekt. Den dagen forskningsrepot lägger till `latency_ms`/`throughput`/`energy_efficiency` på en arkitektur dyker de upp på sidan automatiskt, utan att `/qant` behöver skrivas om — exakt kravet i ägarbegäran.
+
+**Sidinnehåll:** statuspills (genomförda experiment, senaste experiment, aktuell backend, andel på Paretofronten), aktuell forskningsriktning, forskningsloopen som en pilkedja byggd generiskt ur `research_loop[]` (Results → AI Researcher → Falsifiable Hypothesis → Human Approval → Guarded Q.ANT Experiment → New Results), experimenthistorik (stapeldiagram över antal Paretofront-arkitekturer per experiment kronologiskt + expanderbara kort med dataset/konfiguration/Paretofront-namn per experiment — samma collapsible-kort-mönster som KI-biblioteket på `/intelligens`), och en Recharts `ScatterChart` för accuracy kontra parameterantal (gröna punkter = Paretofronten) plus en fullständig jämförelsetabell, båda titlade dynamiskt efter `featured_comparison.experiment_id`/`dataset` istället för ett hårdkodat experimentnamn.
+
+**Fail-open:** `page.js`s `hamtaDashboard()` fångar nätverksfel och validerar minimalt att svaret faktiskt är ett objekt med en `experiments`-array innan det skickas vidare — annars (nätverksfel, GitHub nere, trasig fil) renderar `QantVy` en tydlig "data kunde inte hämtas"-vy med en direktlänk till JSON-filen, istället för att krascha.
+
+**Verifierat:** `npx next build` kördes framgångsrikt mot hela plattformen — `/qant` byggdes statiskt med en riktig fetch mot den publika GitHub-URL:en och renderade korrekt (bekräftar både att URL:en är nåbar från produktionsmiljön och att JSON-formen matchar sidans förväntningar), ingen build-varning eller -fel.
+
+| Fil | Roll |
+|---|---|
+| `app/qant/page.js` | SSR. Hämtar `research-dashboard.json` från `raw.githubusercontent.com` med 1800s ISR-revalidering, minimal formvalidering, fail-open till `null` vid fel |
+| `app/qant/QantVy.js` | Klientkomponent. Statuspills, disclaimer-banner (verbatim ur JSON), forskningsloop-pilkedja, experimenthistorik (Recharts BarChart + expanderbara kort), accuracy-vs-parametrar (Recharts ScatterChart + tabell), allt schema-tolerant via generisk `extraArkFalt`/`Object.entries`-rendering av okända fält |
+| `app/GlobalNav.js` | Ny länk "Q.ANT Research Lab 🔬" i "Socialt"-gruppen, direkt efter "Intelligens" |
+| `app/layout.js` | Ny footerlänk "Q.ANT Research Lab" i det alfabetiska sidindexet |
+
 ---
 
 ## Kontext om projektet
