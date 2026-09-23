@@ -180,13 +180,25 @@ def hamta_publicerade_idag() -> int:
     Kvarstående (accepterad) race: två processer som läser samma
     "3 av 4"-läge nästan samtidigt kan båda besluta sig för att publicera,
     vilket i sällsynta fall kan ge en enstaka extra recension — samma
-    tolerans som redan gäller för agent.py:s motsvarande 4+4+4-kvot."""
+    tolerans som redan gäller för agent.py:s motsvarande 4+4+4-kvot.
+
+    kalla=eq.ai är obligatoriskt (Codex-fynd, PR #1516-granskning): utan
+    filtret räknas ÄVEN besökarinskickade filmrecensioner (satta via
+    /skicka-in, kalla="manniska", se ✅116/✅123) in i dagens "redan
+    publicerat"-läge. Fyra mänskliga recensioner samma dag hade då fått
+    denna funktion att rapportera kvoten fylld trots att Filmrecensenten
+    själv aldrig publicerat något — vilket gjorde varje ombudsdispatch
+    till en permanent, tyst no-op. Samma filter som redan används i
+    checkPubliceringstaktUnderskott()/checkDagligPubliceringskvot()
+    (invariant-checker.js) och hamta_publicerade_idag_per_typ()
+    (supabase_utils.py)."""
     idag_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00+00:00")
     try:
         res = httpx.get(
             f"{SB_URL}/rest/v1/artiklar",
             params={
                 "select": "id",
+                "kalla": "eq.ai",
                 "filmrecension": "eq.true",
                 "skapad": f"gte.{idag_utc}",
                 "limit": "50",

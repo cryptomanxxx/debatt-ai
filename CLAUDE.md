@@ -4023,6 +4023,12 @@ Kräver ingen ny Supabase-migrering. `agent.yml`s `PASS`-beräkning (case-satsen
 |---|---|
 | `agents/invariant-checker.js` | `checkPubliceringstaktUnderskott()`s fyra villkor bytta från `=== 0` till `< 4` — ett delvis underskott (t.ex. nyhet=2 av 4) upptäcks nu, inte bara ett rent nollskede. Variabeln `noll` döpt till `underskott` |
 
+**Codex-fynd (PR #1516-granskning): `filmrecensent.py`s egen dagliga kvotkoll (`hamta_publicerade_idag()`, tillagd i denna serie ovan) räknade in BESÖKARINSKICKADE filmrecensioner, inte bara Filmrecensentens egna.** Frågan filtrerade bara på `filmrecension=eq.true` — utan `kalla=eq.ai` räknades även manuellt inskickade recensioner via `/skicka-in` (som sedan ✅116/✅123 också sätter `filmrecension: true`, men med `kalla: "manniska"`) in i "redan publicerat idag"-summan. Fyra besökarrecensioner samma dag hade gjort funktionen tro att dagens mål redan var nått, trots att Filmrecensenten själv aldrig publicerat något — vilket permanent tystade varje ombudsdispatch (`filmrecensent.yml`) till en no-op utan att någonsin faktiskt åtgärda underskottet `checkPubliceringstaktUnderskott()` (ovan) upptäckt. Fixat genom att lägga till samma `kalla=eq.ai`-filter som redan används på alla andra ställen i kodbasen för exakt detta syfte (`hamta_publicerade_idag_per_typ()` i `supabase_utils.py`, båda kvotcheckarna i `invariant-checker.js`).
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `filmrecensent.py` | `hamta_publicerade_idag()`s Supabase-fråga fick `kalla: "eq.ai"` — räknar bara Filmrecensentens egna publiceringar, inte besökarinskickade filmrecensioner |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
