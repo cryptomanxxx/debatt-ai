@@ -405,6 +405,55 @@ async function checkDagligPubliceringskvot() {
   }
 }
 
+async function checkPubliceringstaktUnderskott() {
+  const namn = "publiceringstakt-underskott";
+  try {
+    // agent.yml:s tre primära crons (07/08/09 UTC = nyhet/eget/replik) har
+    // vid 12 UTC haft minst 3h marginal utöver sin egen schemalagda tid —
+    // gott om utrymme för den redan dokumenterade "vanliga" GitHub Actions-
+    // förseningen (~90 min observerat historiskt). Stannar kontrollen INNAN
+    // catch-up-fönstret (21:30-21:50 UTC) hinner ha åtgärdat ett eventuellt
+    // underskott, så en redan självläkt dag aldrig flaggas i efterhand.
+    // Denna check kan alltså bara upptäcka ett underskott UNDER dagen,
+    // aldrig bekräfta att catch-up faktiskt löste det — det gör nästa dags
+    // körning av samma check, som då ser en frisk 0:a igen.
+    const utcTimme = new Date().getUTCHours();
+    if (utcTimme < 12 || utcTimme >= 21) {
+      rapportera(namn, "ok", `utanför kontrollfönstret (12–20 UTC), aktuell UTC-timme ${utcTimme}`);
+      return;
+    }
+    const idagUtc = new Date();
+    idagUtc.setUTCHours(0, 0, 0, 0);
+    const rader = await hamtaSupabase(
+      `artiklar?select=nyhetskalla,parent_id&kalla=eq.ai&skapad=gte.${idagUtc.toISOString()}&limit=200`
+    );
+    let replik = 0, nyhet = 0;
+    for (const a of rader) {
+      if (a.parent_id) replik++;
+      else if (a.nyhetskalla) nyhet++;
+    }
+    const eget = rader.length - nyhet - replik;
+    const noll = [];
+    if (nyhet === 0) noll.push("nyhet");
+    if (replik === 0) noll.push("replik");
+    if (eget === 0) noll.push("eget");
+    if (noll.length > 0) {
+      rapportera(
+        namn,
+        "fail",
+        `Fortfarande 0 publicerade artiklar av typ: ${noll.join(", ")} trots att dagens tre primära ` +
+        `agent.yml-crons (07/08/09 UTC) borde ha kört för länge sedan — tyder på att en eller flera ` +
+        `av dem har fördröjts kraftigt eller inte kört alls. Catch-up (21:30–21:50 UTC) kan fortfarande ` +
+        `åtgärda det innan dygnet är slut.`
+      );
+      return;
+    }
+    rapportera(namn, "ok", `nyhet=${nyhet} replik=${replik} eget=${eget}`);
+  } catch (e) {
+    rapportera(namn, "error", String(e.message || e));
+  }
+}
+
 async function checkAktivitetArkivSidaSvarar() {
   const namn = "aktivitet-arkiv-sida-svarar";
   try {
@@ -520,6 +569,7 @@ async function main() {
 
   await checkAktivitetHarArtikelTyper();
   await checkDagligPubliceringskvot();
+  await checkPubliceringstaktUnderskott();
   await checkAktivitetArkivSidaSvarar();
   await checkAvhuggnaRubriker();
 
