@@ -4058,6 +4058,38 @@ Kräver ingen ny Supabase-migrering. `agent.yml`s `PASS`-beräkning (case-satsen
 | `app/arkiv/ArkivClient.js` | Artikelkortens `<h2>`-rubrikfärg tregrenad på samma sätt, använder befintlig `C.replik` |
 | `app/client.js` | "VECKANS MEST LÄSTA"-widgetens rubrikfärg tregrenad på samma sätt |
 
+**Codex-fynd (PR #1519-granskning, efter merge): den ursprungliga ✅105-invarianten blev tyst falsk-positiv efter ✅133.** `checkSenasteDebatternaFilter()` i `agents/invariant-checker.js` (byggd för ✅105) krävde att `fetchLatestArtikel()`s fönster innehöll `parent_id.not.is.null` — men ✅133 tog uttryckligen bort just den klausulen (repliker flyttades till sin egen `fetchSenasteRepliker()`). Utan en fix hade varenda schemalagd `invariant-check.yml`-körning (var 3:e timme) rapporterat en falsk regression och skickat ett detaljerat felmejl, trots att båda widgetarna fungerade korrekt.
+
+Fixat genom att uppdatera checken till sin nya, omvända betydelse (skydda mot att repliker SMYGER TILLBAKA i `fetchLatestArtikel()`, inte mot att de saknas där) och lägga till en ny systerkontroll, `checkSenasteReplikerWidget()`, som täcker den ursprungliga ✅105-oron (repliker osynliga någonstans på startsidan) via den nya dedikerade widgeten istället.
+
+**Egen bugg upptäckt under verifiering av fixen:** de första implementationerna av båda de nya/uppdaterade checkarna hade var sin variant av samma "för brett/för smalt sökfönster"-fälla som redan dokumenterats flera gånger i den här loggen för invariant-checkern (✅115, ✅119, ✅127): `checkSenasteDebatternaFilter()`s 2000-teckensfönster läckte in i den direkt intilliggande `fetchSenasteRepliker()`s egen kropp (bara ~30 rader bort i filen) och gav en falsk "repliker återinförda"-flagga på redan korrekt kod, eftersom fönstret då även innehöll SYSKONFUNKTIONENS `parent_id=not.is.null`. `checkSenasteReplikerWidget()` anropade i sin tur `indexOf("fetchSenasteRepliker")`, som hittade en textreferens i en KOMMENTAR i `fetchLatestArtikel()` ("... (fetchSenasteRepliker())...") innan den faktiska funktionsdeklarationen — ett fönster räknat därifrån missade helt den riktiga koden längre ner. Båda upptäcktes genom att köra checkarna mot den riktiga filen INNAN de skickades — ingen av dem gav `"ok"` på korrekt kod vid första försöket.
+
+Fixat med en delad hjälpfunktion, `funktionsFonster(kod, funktionsnamn, maxLen)`: ankrar på den FAKTISKA funktionsdeklarationen (`(async )?function <namn>(`, aldrig ett löst textomnämnande) och begränsar fönstret till innan nästa funktionsdeklaration börjar (eller `maxLen`, beroende på vilket som kommer först) — kan inte längre läcka in i en angränsande funktions kropp. Verifierat mot både den riktiga filen (båda checkarna ger nu `"ok"`) och fyra simulerade regressioner (repliker återinförda i `fetchLatestArtikel()`, `fetchSenasteRepliker()` helt borttagen, "Se alla"-länken borttagen, `parent_id`-filtret borttaget ur replikfrågan) — samtliga ger korrekt `"fail"`.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | Ny delad `funktionsFonster()`-hjälpfunktion (ankrar på faktisk funktionsdeklaration, kapar fönstret vid nästa funktion). `checkSenasteDebatternaFilter()` omvänd till att skydda mot att repliker återinförs i `fetchLatestArtikel()`. Ny `checkSenasteReplikerWidget()` — regressionsguard för `fetchSenasteRepliker()` och dess "Se alla"-länk |
+
+**Codex-fynd (PR #1520-granskning): rubrikfärgens tregrenade ternary använde fel autoritativ signal för replik.** Den ternary jag skrev (`!nyhetskalla ? grön : (typ !== "replik" ? blå : cyan)`) klassificerar en replik via `nyhetskalla?.typ === "replik"` — men `/api/agent/submit` (`route.js` rad 170/325–326) tar emot `nyhetskalla` och `parent_id` som HELT OBEROENDE fält utan någon koppling dem emellan: en extern API-nyckelinnehavare (eller en framtida persona) kan alltså skicka in en artikel med `parent_id` satt men `nyhetskalla` null, eller med `nyhetskalla` satt till något annat än `{typ:"replik"}`. `/arkiv`s egen `matchReplik`/`matchDebatt`-filterlogik (✅133) använder redan `a.parent_id != null` som den enda autoritativa signalen för "är det en replik" — men rubrikfärgen använde en annan, svagare signal, vilket kunde ge en filtrerat-in replik (via `matchReplik`) fel rubrikfärg (grön eller blå istället för cyan) om `nyhetskalla` avvek från det normala mönstret.
+
+Fixat genom att byta alla tre ternaryer till att avgöra replik-status via `parent_id != null` FÖRST (samma precedens som filterlogiken), med `nyhetskalla`/`!nyhetskalla` bara kvar för att skilja nyhet från eget ämne DÄREFTER: `filmrecension ? guld : (parent_id != null ? cyan : (nyhetskalla ? blå : grön))`. `app/client.js`s "VECKANS MEST LÄSTA"-widget (`fetchTrending()`) saknade dessutom `parent_id` i sin explicita `select=`-lista — samma PostgREST-fälla som redan dokumenterad för `filmrecension`-fältet i ✅127 (en icke-`select=*`-fråga returnerar bara uttryckligen begärda kolumner) — lades till där.
+
+Verifierat isolerat mot sex fall: de fyra normala (nyhet/eget/replik/film, där `agent.py`s egen skrivväg redan håller `nyhetskalla`/`parent_id` konsekventa) och de två divergenta Codex pekade på (replik med `nyhetskalla=null`, replik med `nyhetskalla.typ !== "replik"`) — samtliga ger nu korrekt färg.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/artikel/[id]/page.js` | `<h1>`-ternaryn avgör nu replik via `parent_id != null` istället för `nyhetskalla?.typ` |
+| `app/arkiv/ArkivClient.js` | Artikelkortens `<h2>`-ternary samma fix |
+| `app/client.js` | "VECKANS MEST LÄSTA"-widgetens ternary samma fix. `fetchTrending()`s `select=`-lista utökad med `parent_id` |
+
+**Codex-fynd (PR #1521-granskning, P2): `checkSenasteReplikerWidget()` verifierade bara att koden FANNS, inte att den var INKOPPLAD.** Checken kollade bara att `fetchSenasteRepliker()`-funktionen och `href="/arkiv?repliker=1"`-strängen förekom någonstans i filen — ingen av kontrollerna kräver att fetchen faktiskt anropas och kopplas till state, eller att widgeten faktiskt renderar villkorat på det statet. En regression som tog bort `fetchSenasteRepliker().then(n => setSenasteRepliker(n))`-anropet (eller `senasteRepliker.length > 0`-render-gaten) men lämnade funktionsdefinitionen/länken kvar som död kod hade fått checken att rapportera `"ok"` trots att widgeten aldrig visar något — exakt den typ av "checken låtsas skydda men gör det inte" som redan flera gånger dokumenterats för den här filen (✅109, ✅115, ✅127).
+
+Fixat genom att lägga till två ytterligare villkor: `fetchSenasteRepliker().then(` OCH `setSenasteRepliker` måste båda finnas (bekräftar att fetchen faktiskt anropas och kopplas till state), samt `senasteRepliker.length > 0` (bekräftar att widgeten faktiskt renderar villkorat på det statet). Verifierat mot den riktiga filen (`"ok"`) och mot exakt det scenario Codex beskrev (`.then(...)`-anropet borttaget, funktionen/JSX kvar som död kod) samt en separat simulerad borttagning av render-gaten — båda ger nu korrekt `"fail"`.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `agents/invariant-checker.js` | `checkSenasteReplikerWidget()` kräver nu även att fetchen är kopplad till `setSenasteRepliker` och att widgeten renderar villkorat på `senasteRepliker.length > 0`, inte bara att koden existerar någonstans i filen |
+
 ---
 
 ## Den autonoma debatten – slutvisionen

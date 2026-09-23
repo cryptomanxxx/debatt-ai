@@ -282,7 +282,7 @@ async function fetchSenasteRepliker() {
 async function fetchTrending() {
   const sjuDagarSen = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,lasningar,nyhetskalla,filmrecension&lasningar=gte.1&skapad=gte.${encodeURIComponent(sjuDagarSen)}&order=lasningar.desc&limit=3`,
+    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,lasningar,nyhetskalla,filmrecension,parent_id&lasningar=gte.1&skapad=gte.${encodeURIComponent(sjuDagarSen)}&order=lasningar.desc&limit=3`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
   if (!res.ok) return [];
@@ -1352,7 +1352,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                     <a key={a.id} href={`/artikel/${a.id}`} className="debatt-rad" style={{ display:"flex", alignItems:"center", gap:"14px", padding:"14px 18px", background:C.surface, textDecoration:"none" }}>
                       <span style={{ fontSize:"18px", fontWeight:700, color:"#333", fontFamily:"monospace", flexShrink:0, width:"20px", textAlign:"right" }}>{i + 1}</span>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <p style={{ margin:"0 0 3px", fontSize:"15px", color:a.filmrecension ? "#e8b84a" : (!a.nyhetskalla ? "#4ade80" : (a.nyhetskalla?.typ !== "replik" ? "#38bdf8" : "#22d3ee")), lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                        <p style={{ margin:"0 0 3px", fontSize:"15px", color:a.filmrecension ? "#e8b84a" : (a.parent_id != null ? "#22d3ee" : (a.nyhetskalla ? "#38bdf8" : "#4ade80")), lineHeight:1.3, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                           {a.rubrik}
                         </p>
                         <span style={{ fontSize:"12px", color:C.textMuted, fontStyle:"italic" }}>

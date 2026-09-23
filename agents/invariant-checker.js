@@ -4,7 +4,7 @@
  *
  * En samling konkreta, verifierbara påståenden om hur plattformen SKA
  * bete sig — varje check är en tidigare hittad och fixad bugg (✅97, ✅98,
- * ✅100, ✅101, ✅105, ✅106, ✅107) omvandlad till ett permanent
+ * ✅100, ✅101, ✅105, ✅106, ✅107, ✅133) omvandlad till ett permanent
  * regressionsskydd. Två typer av checkar:
  *
  * - Källkodskontroller: läser filer direkt ur den incheckade repot (grep
@@ -43,6 +43,23 @@ if (!SB_KEY) { console.error("SUPABASE_ANON_KEY saknas — avbryter"); process.e
 
 function lasFil(relPath) {
   return fs.readFileSync(path.join(REPO_ROOT, relPath), "utf8");
+}
+
+// Hittar den FAKTISKA funktionsdeklarationen (inte ett textomnämnande i en
+// annan funktions kommentar, t.ex. "(fetchX())" i ett förklarande stycke) och
+// begränsar fönstret till innan nästa funktion börjar — annars kan ett för
+// brett fönster läcka in i en angränsande funktions kod och ge falska
+// positiva/negativa (upptäckt när checkSenasteReplikerWidget()/
+// checkSenasteDebatternaFilter() byggdes för ✅133: den förstnämnda hittade
+// en kommentarsreferens istället för deklarationen, den sistnämnda läckte in
+// i sibling-funktionens kropp).
+function funktionsFonster(kod, funktionsnamn, maxLen = 1500) {
+  const deklIdx = kod.search(new RegExp(`(^|\\n)\\s*(async\\s+)?function\\s+${funktionsnamn}\\s*\\(`));
+  if (deklIdx === -1) return null;
+  const startIdx = kod.indexOf(funktionsnamn, deklIdx);
+  const nastaFn = kod.slice(startIdx + funktionsnamn.length).search(/\n\s*(async\s+)?function\s+\w+\s*\(/);
+  const slut = nastaFn === -1 ? startIdx + maxLen : Math.min(startIdx + funktionsnamn.length + nastaFn, startIdx + maxLen);
+  return kod.slice(startIdx, slut);
 }
 
 const resultat = [];
@@ -93,18 +110,66 @@ function checkAktivitetReserveradePlatser() {
   }
 }
 
+// Sedan ✅133 är repliker utbrutna ur "Senaste debatterna" till en egen
+// widget ("Senaste repliker", fetchSenasteRepliker()) — så checken nedan
+// är omvänd mot sin ursprungliga (✅105) betydelse: den skyddar nu mot att
+// repliker återigen blandas in i fetchLatestArtikel(), inte mot att de
+// saknas där. checkSenasteReplikerWidget() nedan täcker den ursprungliga
+// ✅105-oron (att repliker inte syns någonstans alls på startsidan) genom
+// att verifiera den nya dedikerade widgeten istället.
 function checkSenasteDebatternaFilter() {
   const namn = "senaste-debatterna-filter";
   try {
     const kod = lasFil("app/client.js");
-    const idx = kod.indexOf("fetchLatestArtikel");
-    if (idx === -1) {
+    const fonster = funktionsFonster(kod, "fetchLatestArtikel", 2000);
+    if (fonster === null) {
       rapportera(namn, "fail", "hittar inte fetchLatestArtikel i app/client.js");
       return;
     }
-    const fonster = kod.slice(idx, idx + 2000);
-    if (!fonster.includes("parent_id.not.is.null")) {
-      rapportera(namn, "fail", "fetchLatestArtikel filtrerar inte längre in repliker (✅105 återinförd?)");
+    if (!fonster.includes("nyhetskalla=is.null")) {
+      rapportera(namn, "fail", "fetchLatestArtikel saknar nyhetskalla=is.null-filtret — identifierar inte längre eget-ämne-artiklar korrekt (✅133 ändrad?)");
+      return;
+    }
+    if (fonster.includes("parent_id.not.is.null") || fonster.includes("parent_id=not.is.null")) {
+      rapportera(namn, "fail", "fetchLatestArtikel filtrerar återigen in repliker — de ska bara synas i egen widget sedan ✅133");
+      return;
+    }
+    rapportera(namn, "ok");
+  } catch (e) {
+    rapportera(namn, "error", String(e.message || e));
+  }
+}
+
+function checkSenasteReplikerWidget() {
+  const namn = "senaste-repliker-widget";
+  try {
+    const kod = lasFil("app/client.js");
+    const fonster = funktionsFonster(kod, "fetchSenasteRepliker", 1000);
+    if (fonster === null) {
+      rapportera(namn, "fail", "hittar inte fetchSenasteRepliker i app/client.js — repliker kan ha tappat sin enda väg till synlighet på startsidan (✅133 borttagen?)");
+      return;
+    }
+    if (!fonster.includes("parent_id=not.is.null")) {
+      rapportera(namn, "fail", "fetchSenasteRepliker filtrerar inte längre på parent_id — visar kanske inte längre bara repliker");
+      return;
+    }
+    // Funktionsdefinitionen och "Se alla"-länken kan finnas kvar oanvänd
+    // död kod om själva anropet/render-kopplingen tas bort — kollar därför
+    // explicit att fetchen faktiskt är inkopplad till state och att widgeten
+    // faktiskt renderar villkorat på det statet (Codex-fynd, PR #1521-
+    // granskning: en bar sträng-/funktionskontroll hade gett "ok" även om
+    // fetchSenasteRepliker().then(...)-anropet och den villkorade JSX-blocket
+    // tagits bort, eftersom fonster/href-koll ovan inte kräver att de körs).
+    if (!kod.includes("fetchSenasteRepliker().then(") || !kod.includes("setSenasteRepliker")) {
+      rapportera(namn, "fail", "fetchSenasteRepliker() anropas inte längre och kopplas till state — widgeten kan visa tom data trots att funktionen finns kvar");
+      return;
+    }
+    if (!kod.includes("senasteRepliker.length > 0")) {
+      rapportera(namn, "fail", "widgeten renderar inte längre villkorat på senasteRepliker — kan vara borttagen ur JSX trots att fetchen fortfarande körs");
+      return;
+    }
+    if (!kod.includes('href="/arkiv?repliker=1"')) {
+      rapportera(namn, "fail", "'Se alla'-länken för Senaste repliker-widgeten saknas (?repliker=1)");
       return;
     }
     rapportera(namn, "ok");
@@ -593,6 +658,7 @@ async function main() {
   checkAktivitetWidgetLank();
   checkAktivitetReserveradePlatser();
   checkSenasteDebatternaFilter();
+  checkSenasteReplikerWidget();
   checkRubrikTrunkeringsskydd();
   checkDirektdebattTokentak();
   checkDirektdebattReasoningEffort();
