@@ -4050,6 +4050,14 @@ Kräver ingen ny Supabase-migrering. `agent.yml`s `PASS`-beräkning (case-satsen
 | `app/client.js` | Ny "🔁 SENASTE REPLIKERNA"-widget (cyan `#22d3ee`) mellan "Senaste debatterna" och "Senaste filmrecensionerna", länkad till `/arkiv?repliker=1` |
 | `app/arkiv/ArkivClient.js` | `matchDebatt` smalnat av till bara eget-ämne. Ny `filterReplik`-state, "🔁 Repliker"-filterpill (samma cyan), `?repliker=1`-URL-stöd, `isFiltering`/tomt-resultat/"Rensa filter" utökade |
 
+**Uppföljning — replikrubriker delade fortfarande grönt med debattartiklar överallt utom i den nya widgeten (ägarfråga, sep 2026):** widgeten och `/arkiv`-filtret fick sin egna cyan `#22d3ee` — men själva RUBRIKFÄRGEN på artikelsidan (`<h1>`), `/arkiv`s kort och startsidans "VECKANS MEST LÄSTA"-widget avgjordes fortfarande av den äldre tvåvägs-ternaryn `nyhetskalla?.typ !== "replik" ? blå : grön`, som slår ihop repliker och eget-ämne-debattartiklar till samma gröna färg — repliker hade alltså fortfarande ingen egen rubrikfärg, bara en egen widget/filter. Fixat genom att göra ternaryn tregrenad på alla tre ställen: `!nyhetskalla ? grön (debattartikel) : (typ !== "replik" ? blå (nyhet) : cyan (replik))` — `filmrecension`-kollen (redan först i kedjan) oförändrad. `app/artikel/[id]/page.js`s `C`-objekt fick en ny `replik: "#22d3ee"`-nyckel (speglar `C.replik` som redan fanns i `ArkivClient.js` sedan ✅133); `app/client.js`s trending-widget använder samma hex-literal som `filmrecension`-fallet redan gjorde där.
+
+| Fil | Roll (tillägg) |
+|---|---|
+| `app/artikel/[id]/page.js` | Ny `C.replik = "#22d3ee"`. `<h1>`-rubrikfärgen tregrenad: eget-ämne=grön, nyhet=blå, replik=cyan |
+| `app/arkiv/ArkivClient.js` | Artikelkortens `<h2>`-rubrikfärg tregrenad på samma sätt, använder befintlig `C.replik` |
+| `app/client.js` | "VECKANS MEST LÄSTA"-widgetens rubrikfärg tregrenad på samma sätt |
+
 ---
 
 ## Den autonoma debatten – slutvisionen
