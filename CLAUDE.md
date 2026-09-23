@@ -4302,11 +4302,13 @@ Användarrapport (sep 2026), direkt uppföljning på ✅134: *"Experimenthistori
 
 **Fix:** ny `experimentNummer(id)`-hjälpfunktion (samma regex-mönster som den redan befintliga `naturligtNamn()`, `/^exp0*(\d+)_/i`) extraherar det numeriska experimentnumret. `sorteradeExp`s komparator sorterar nu primärt på detta nummer stigande — timestamp används bara som fallback för ett id som inte matchar `expNNN_...`-mönstret (t.ex. ett hypotetiskt framtida experiment med ett annat namnschema), så robustheten mot ett oväntat framtida ID-format bevaras. Ingen ändring av vad som visas per rad — `fmtDatum(exp.timestamp_utc)` fortsätter visas bredvid varje experiment i både stapeldiagrammet och de expanderbara korten, precis som användaren efterfrågade.
 
-**Verifierat:** `npx next build` kördes framgångsrikt, `/qant` byggdes statiskt utan fel.
+**Verifierat:** `npx next build` kördes framgångsrikt, `/qant` byggdes utan fel (sidan var vid detta tillfälle fortfarande statisk — se ✅134s Codex-fynd-tillägg för när den senare gjordes dynamisk, av ett helt annat, orelaterat skäl).
+
+**Codex-fynd (PR #1524-granskning): ingressen påstod fortfarande "kronologisk ordning" trots att sorteringen nu är experimentsekvens.** Just för den datan denna fix riktar sig mot (exp004/exp005 vars timestamps divergerar från sekvensen) blev texten "i kronologisk ordning" bokstavligen felaktig — listan visar inte längre kronologisk ordning, bara sekvensordning (som råkar sammanfalla med kronologi för alla experiment utom just detta par). Fixat: texten omformulerad till "i forskningssekvensens ordning (Exp001 → Exp002 → …)".
 
 | Fil | Roll |
 |---|---|
-| `app/qant/QantVy.js` | Ny `experimentNummer(id)`-hjälpfunktion. `sorteradeExp`s sorteringskomparator bytt från ren `timestamp_utc`-strängjämförelse till primärt experimentnummer (stigande), med timestamp som fallback för icke-matchande id:n |
+| `app/qant/QantVy.js` | Ny `experimentNummer(id)`-hjälpfunktion. `sorteradeExp`s sorteringskomparator bytt från ren `timestamp_utc`-strängjämförelse till primärt experimentnummer (stigande), med timestamp som fallback för icke-matchande id:n. Ingresstexten uppdaterad till att beskriva forskningssekvens istället för kronologisk ordning |
 
 ---
 

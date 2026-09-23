@@ -238,7 +238,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
       <div style={SEKTION}>
         <h2 style={RUBRIK}>Experimenthistorik</h2>
         <p style={INGRESS}>
-          Antal arkitekturer på Paretofronten per experiment, i kronologisk ordning. Klicka ett experiment
+          Antal arkitekturer på Paretofronten per experiment, i forskningssekvensens ordning (Exp001 → Exp002 → …). Klicka ett experiment
           för att se dataset, konfiguration och vilka arkitekturer som låg på fronten.
         </p>
         {tidslinjeData.length === 0 ? (
