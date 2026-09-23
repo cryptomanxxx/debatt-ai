@@ -183,7 +183,7 @@ def hamta_publicerade_idag_per_typ(sb_key: str) -> dict:
         r = httpx.get(
             f"{SB_URL}/rest/v1/artiklar",
             params={
-                "select": "nyhetskalla,parent_id",
+                "select": "nyhetskalla,parent_id,filmrecension",
                 "kalla": "eq.ai",
                 "skapad": f"gte.{idag_utc}",
                 "limit": "200",
@@ -194,13 +194,28 @@ def hamta_publicerade_idag_per_typ(sb_key: str) -> dict:
         if r.status_code != 200:
             return {"nyhet": 0, "replik": 0, "eget": 0}
         rader = r.json()
+        # Filmrecensioner (Filmrecensenten, ✅123) sätter varken nyhetskalla
+        # eller parent_id — de ingår inte i agent.py:s 4/4/4-kvot alls (egen
+        # helt separat workflow, filmrecensent.yml). Måste kontrolleras FÖRST
+        # (samma precedens som klassificeraArtiklar() i invariant-checker.js),
+        # annars räknas varje filmrecension tyst in i "eget" — exakt samma
+        # buggklass som redan hittades och fixades för /redaktion (✅127) och
+        # invariant-checker.js (✅132), nu i den funktion agent.py FAKTISKT
+        # använder för att avgöra vad som ska publiceras (Codex-fynd, PR
+        # #1515-granskning: en dag med 4 filmrecensioner men 0 egna
+        # debattartiklar fick annars idag_publicerat["eget"] == 4, vilket fick
+        # både den vanliga fönsterlogiken och en AGENT_FORCE_TYP=eget-
+        # ombudsdispatch (✅132) att felaktigt tro att egen-kvoten redan var
+        # fylld och avstå från att skriva något.
+        #
         # parent_id är den entydiga signalen för en replik — repliker får ETT
         # eget nyhetskalla-objekt (typ: "replik", för att kunna länka till
         # originalartikeln, se skicka_artikel() i agent.py) som annars felaktigt
         # skulle räkna varje replik som en nyhetsartikel (Codex P2, PR #1272).
-        replik = sum(1 for a in rader if a.get("parent_id"))
-        nyhet = sum(1 for a in rader if a.get("nyhetskalla") and not a.get("parent_id"))
-        eget = len(rader) - nyhet - replik
+        film = sum(1 for a in rader if a.get("filmrecension"))
+        replik = sum(1 for a in rader if not a.get("filmrecension") and a.get("parent_id"))
+        nyhet = sum(1 for a in rader if not a.get("filmrecension") and a.get("nyhetskalla") and not a.get("parent_id"))
+        eget = len(rader) - nyhet - replik - film
         return {"nyhet": nyhet, "replik": replik, "eget": eget}
     except Exception:
         return {"nyhet": 0, "replik": 0, "eget": 0}

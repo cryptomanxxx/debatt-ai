@@ -379,7 +379,19 @@ def main():
         force_replik = _forced_typ == "replik" and idag_publicerat["replik"] < 4
         force_eget   = _forced_typ == "eget"   and idag_publicerat["eget"]   < 4
         if not (force_nyhet or force_replik or force_eget):
-            print(f"AGENT_FORCE_TYP='{_forced_typ}' begärdes, men den typen har redan nått dagens kvot (4/4) — inget forcerat.")
+            # Avslutar direkt istället för att bara logga och falla igenom
+            # (Codex-fynd, PR #1515-granskning): utan detta hade körningen
+            # fortsatt ner till catch-up-blocket (om utc_hour==21) eller
+            # ar_manuell_korning/nagon_kvot_kvar-grinden nedan — vilken,
+            # eftersom AGENT_FORCE_TYP alltid sätts via workflow_dispatch,
+            # skulle ha släppt igenom körningen så fort NÅGON ANNAN typ hade
+            # kvot kvar och låtit den vanliga semi-slumpmässiga logiken
+            # publicera en HELT ANNAN typ än den ombudspubliceringen
+            # explicit bad om — eller i värsta fall en femte artikel av den
+            # redan mättade typen. En redan uppfylld forcerad typ ska vara
+            # en ren no-op, inte en generell "skriv vad som helst"-signal.
+            print(f"AGENT_FORCE_TYP='{_forced_typ}' begärdes, men den typen har redan nått dagens kvot (4/4) — avslutar utan att publicera något.")
+            sys.exit(0)
     else:
         force_nyhet  = utc_hour == 7 and idag_publicerat["nyhet"]  < 4
         force_replik = utc_hour == 9 and idag_publicerat["replik"] < 4
