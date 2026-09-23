@@ -1,6 +1,14 @@
 import QantVy from "./QantVy";
 
-export const revalidate = 1800;
+// Dynamisk, inte statisk ISR (se CLAUDE.md ✅134, Codex-fynd på PR #1523):
+// sidan pre-renderas ALDRIG vid `next build` — den risken (en transient
+// GitHub-störning under en Vercel-deploy fäller hela plattformens build)
+// väger tyngre än den marginella prestandavinsten av statisk generering
+// för en lågtrafikerad sekundärsida. Fetchens egna `next: { revalidate }`
+// nedan cachar ändå det underliggande GitHub-anropet i upp till 1800s per
+// request-cykel — bara den enskilda besökaren som råkar träffa ett genuint
+// nätverksfel ser fallback-vyn, inte alla besökare under hela fönstret.
+export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Q.ANT Research Lab – DEBATT-AI",

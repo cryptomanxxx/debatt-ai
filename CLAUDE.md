@@ -4277,10 +4277,18 @@ Lägg bara till `insert`/`update`/`delete` i anon-raden om en motsvarande RLS-po
 
 **Verifierat:** `npx next build` kördes framgångsrikt mot hela plattformen — `/qant` byggdes statiskt med en riktig fetch mot den publika GitHub-URL:en och renderade korrekt (bekräftar både att URL:en är nåbar från produktionsmiljön och att JSON-formen matchar sidans förväntningar), ingen build-varning eller -fel.
 
+**Codex-fynd (PR #1523-granskning, efter merge): statisk ISR riskerade att fälla hela plattformens build vid en transient GitHub-störning.** `hamtaDashboard()` fångade alla felvägar (nätverksfel, icke-2xx, malformad JSON) och returnerade `null`, vilket lät sidan rendera "framgångsrikt" med fallback-vyn. Eftersom `/qant` ursprungligen var statiskt förhandsrenderad (`export const revalidate = 1800`, `next build` markerade den `○ Static`) betydde det att en enda misslyckad bakgrundsrevalidering blev den nya cachade sidan för HELA 30-minutersfönstret, för ALLA besökare — istället för att Next.js ISR:s vanliga "behåll senaste fungerande sida vid ett revalideringsfel"-beteende fick kicka in.
+
+Den bokstavliga fixen (låt `hamtaDashboard()` kasta fel istället för att svälja dem) hade adresserat just det symptomet — men eftersom sidan pre-renderas vid `next build`, hade ett kastat fel UNDER en Vercel-deploys build-steg (t.ex. en transient GitHub-hicka i exakt det ögonblicket) sannolikt fällt HELA produktionsbuilden för hela debatt-ai, inte bara den här enskilda lågtrafikerade sidan — ett väsentligt värre fel-läge än det ursprungliga.
+
+**Fix, efter avstämning med projektägaren:** `page.js` bytt från statisk ISR (`export const revalidate = 1800`) till `export const dynamic = "force-dynamic"` — sidan pre-renderas aldrig längre vid build, vilket eliminerar build-fällningsrisken helt. Fetchens egna `next: { revalidate: 1800 }`-option (Data Cache, oberoende av routens statiska/dynamiska status) fortsätter cacha själva GitHub-anropet i upp till 1800s, så vanlig trafik fortfarande inte hamrar på GitHub raw vid varje sidvisning. `hamtaDashboard()`s catch-till-null-mönster lämnades oförändrat — i en dynamisk route finns ingen felaktigt cachad HTML att bevara: en genuint misslyckad request drabbar bara den enskilda besökaren som råkar träffa felet just då, och nästa request (även millisekunder senare) gör ett helt nytt, oberoende försök. Ingen `error.js`-gräns behövdes eftersom `QantVy`s redan befintliga "data kunde inte hämtas"-fallback räcker för det smalare felfönstret.
+
+**Verifierat:** `npx next build` bekräftade att `/qant` nu listas som `ƒ` (Dynamic) istället för `○` (Static), utan `Revalidate`/`Expire`-kolumner.
+
 | Fil | Roll |
 |---|---|
-| `app/qant/page.js` | SSR. Hämtar `research-dashboard.json` från `raw.githubusercontent.com` med 1800s ISR-revalidering, minimal formvalidering, fail-open till `null` vid fel |
-| `app/qant/QantVy.js` | Klientkomponent. Statuspills, disclaimer-banner (verbatim ur JSON), forskningsloop-pilkedja, experimenthistorik (Recharts BarChart + expanderbara kort), accuracy-vs-parametrar (Recharts ScatterChart + tabell), allt schema-tolerant via generisk `extraArkFalt`/`Object.entries`-rendering av okända fält |
+| `app/qant/page.js` | Dynamiskt renderad (`export const dynamic = "force-dynamic"`), inte statisk ISR — pre-renderas aldrig vid build. Hämtar `research-dashboard.json` från `raw.githubusercontent.com` med 1800s Data Cache-revalidering, minimal formvalidering, fail-open till `null` vid fel |
+| `app/qant/QantVy.js` | Klientkomponent. Statuspills, disclaimer-banner (verbatim ur JSON), forskningsloop-pilkedja, experimenthistorik (Recharts BarChart + expanderbara kort, sorterad efter experimentnummer — se ✅135), accuracy-vs-parametrar (Recharts ScatterChart + tabell), allt schema-tolerant via generisk `extraArkFalt`/`Object.entries`-rendering av okända fält |
 | `app/GlobalNav.js` | Ny länk "Q.ANT Research Lab 🔬" i "Socialt"-gruppen, direkt efter "Intelligens" |
 | `app/layout.js` | Ny footerlänk "Q.ANT Research Lab" i det alfabetiska sidindexet |
 
