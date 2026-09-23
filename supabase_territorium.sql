@@ -94,3 +94,26 @@ FROM new_event,
   (3, 3, 'Gruvindustrin',   'gruva',    2),
   (4, 3, 'Sydkusten',       'kust',     1)
 ) AS d(c, r, n, t, p);
+
+-- Data API-grants (Supabase-krav från 30 okt 2026 — se CLAUDE.md): nya
+-- tabeller i public-schemat behöver explicita GRANT-satser för att vara
+-- nåbara via Data API (PostgREST/supabase-js) efter det datumet, annars
+-- "permission denied" trots korrekta RLS-policies — Supabase slutar
+-- auto-bevilja grundrättigheter på nya tabeller från och med då. GRANT
+-- och RLS är två separata lager: GRANT avgör om ett anrop överhuvudtaget
+-- tillåts nå tabellen, RLS-policies avgör sedan vilka RADER som är
+-- synliga/skrivbara. anon beviljas här exakt de operationer som
+-- tabellens egna RLS-policies redan tillåter (ingen ändring av
+-- säkerhetsmodellen — bara att göra det GRANT auto-gav tidigare
+-- explicit) — service_role beviljas alltid full CRUD, eftersom BYPASSRLS
+-- bara kringgår radpolicies, inte detta grundläggande GRANT-lager.
+-- Ingen grant till authenticated: plattformen har ingen Supabase Auth /
+-- inloggade användare, så rollen är aldrig i bruk här.
+grant select on territorium_events to anon;
+grant select, insert, update, delete on territorium_events to service_role;
+grant select on territorium_hexagoner to anon;
+grant select, insert, update, delete on territorium_hexagoner to service_role;
+grant select, insert, update on territorium_agare to anon;
+grant select, insert, update, delete on territorium_agare to service_role;
+grant select, insert on territorium_drag to anon;
+grant select, insert, update, delete on territorium_drag to service_role;

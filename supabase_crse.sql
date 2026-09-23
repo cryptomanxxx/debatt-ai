@@ -51,3 +51,24 @@ ALTER TABLE corruption_badges ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "anon_select_corruption_badges" ON corruption_badges FOR SELECT TO anon USING (true);
 CREATE POLICY "anon_insert_corruption_badges" ON corruption_badges FOR INSERT TO anon WITH CHECK (true);
 CREATE POLICY "anon_update_corruption_badges" ON corruption_badges FOR UPDATE TO anon USING (true);
+
+-- Data API-grants (Supabase-krav från 30 okt 2026 — se CLAUDE.md): nya
+-- tabeller i public-schemat behöver explicita GRANT-satser för att vara
+-- nåbara via Data API (PostgREST/supabase-js) efter det datumet, annars
+-- "permission denied" trots korrekta RLS-policies — Supabase slutar
+-- auto-bevilja grundrättigheter på nya tabeller från och med då. GRANT
+-- och RLS är två separata lager: GRANT avgör om ett anrop överhuvudtaget
+-- tillåts nå tabellen, RLS-policies avgör sedan vilka RADER som är
+-- synliga/skrivbara. anon beviljas här exakt de operationer som
+-- tabellens egna RLS-policies redan tillåter (ingen ändring av
+-- säkerhetsmodellen — bara att göra det GRANT auto-gav tidigare
+-- explicit) — service_role beviljas alltid full CRUD, eftersom BYPASSRLS
+-- bara kringgår radpolicies, inte detta grundläggande GRANT-lager.
+-- Ingen grant till authenticated: plattformen har ingen Supabase Auth /
+-- inloggade användare, så rollen är aldrig i bruk här.
+grant select, insert on bribe_offers to anon;
+grant select, insert, update, delete on bribe_offers to service_role;
+grant select, insert, update on bribe_scores to anon;
+grant select, insert, update, delete on bribe_scores to service_role;
+grant select, insert, update on corruption_badges to anon;
+grant select, insert, update, delete on corruption_badges to service_role;

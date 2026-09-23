@@ -95,3 +95,24 @@ INSERT INTO mark_zoner (namn, typ, hex_col, hex_row, veckoinkomst, koppris, besk
 ('Vattenverket',        'kust',     1, 6, 165, 1250, 'Kommunalt vattenreningsverk, naturmonopol'),
 ('Söderskogen',         'skog',     2, 6,  50,  500, 'Lövskog i söder, populärt strövområde'),
 ('Bioenergiverket',     'energi',   3, 6, 155, 1100, 'Biogasproduktion från jordbruksrester');
+
+-- Data API-grants (Supabase-krav från 30 okt 2026 — se CLAUDE.md): nya
+-- tabeller i public-schemat behöver explicita GRANT-satser för att vara
+-- nåbara via Data API (PostgREST/supabase-js) efter det datumet, annars
+-- "permission denied" trots korrekta RLS-policies — Supabase slutar
+-- auto-bevilja grundrättigheter på nya tabeller från och med då. GRANT
+-- och RLS är två separata lager: GRANT avgör om ett anrop överhuvudtaget
+-- tillåts nå tabellen, RLS-policies avgör sedan vilka RADER som är
+-- synliga/skrivbara. anon beviljas här exakt de operationer som
+-- tabellens egna RLS-policies redan tillåter (ingen ändring av
+-- säkerhetsmodellen — bara att göra det GRANT auto-gav tidigare
+-- explicit) — service_role beviljas alltid full CRUD, eftersom BYPASSRLS
+-- bara kringgår radpolicies, inte detta grundläggande GRANT-lager.
+-- Ingen grant till authenticated: plattformen har ingen Supabase Auth /
+-- inloggade användare, så rollen är aldrig i bruk här.
+grant select, insert, update on mark_zoner to anon;
+grant select, insert, update, delete on mark_zoner to service_role;
+grant select, insert, update, delete on mark_agare to anon;
+grant select, insert, update, delete on mark_agare to service_role;
+grant select, insert on mark_transaktioner to anon;
+grant select, insert, update, delete on mark_transaktioner to service_role;
