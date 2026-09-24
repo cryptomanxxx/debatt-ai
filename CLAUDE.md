@@ -4386,6 +4386,25 @@ Referens [2] låg i en HELT SEPARAT paragraf som `linkifyKalla()` aldrig rörde 
 
 ---
 
+### ✅ 139. /qant — Codex-fynd på PR #1527 efter merge: tooltip-lucka och mobil radbrytning för icke-Pareto-experiment – KLART
+
+Uppföljande användarrapport (sep 2026), med skärmdump av produktionssidan direkt efter att ✅138 gått live: stapeldiagrammet saknade korrekt en stapel för Exp012 (`pareto_applicable:false`), men raden och den expanderade panelen under diagrammet visade fortfarande den GAMLA texten ("0 på fronten" / "Ingen Paretofront registrerad för det här experimentet.") istället för den nya `altSammanfattning()`-texten. En bifogad, extern "ChatGPT"-analys av samma skärmdump drog slutsatsen att detta var en "ren frontend-bugg" i radrenderingen.
+
+**Verifiering innan fix (den externa analysen behandlades som obekräftad hypotes, inte fakta — samma princip som redan etablerad för liknande pastade rapporter i denna logg, ✅136/✅137):** hämtade den LIVE `research-dashboard.json` direkt (samma URL `/qant` själv fetchar) och bekräftade att Exp012 redan hade `pareto_applicable:false`, `result_count:9`, `summary_count:3`, `experiment_type:"training_method"`, `completed:true` — den publika datan var alltså redan fullständigt uppdaterad, inte en ännu ej ombyggd v1-kopia. Läste därefter om HELA den redan sammanslagna koden i `app/qant/QantVy.js` och bekräftade att `paretoApplicable = exp.pareto_applicable !== false` beräknas identiskt (samma fält, samma objekt) i BÅDE stapeldiagrammets `tidslinjeData`-mappning OCH radens/panelens egen `sorteradeExp.map()`-loop — ingen kodmässig avvikelse mellan de två renderingsvägarna kunde hittas. Slutsats: den rapporterade skillnaden (diagram rätt, rad fel, trots identisk data och identisk kodlogik) är strukturellt oförenlig med en genuin kodbugg i just den logiken — betydligt mer sannolikt är en tillfällig cachningsartefakt (`next: { revalidate: 1800 }`-datacachen på GitHub-fetchen i `app/qant/page.js`, eller att skärmdumpen togs innan den nya deploy:en hunnit propagera fullt ut) som självläker inom cachefönstret. Ingen kodändring gjordes för detta specifika, oreproducerbara symptom.
+
+**Två separata, verifierbara fynd däremot** — postade av `@chatgpt-codex-connector[bot]`s automatiska granskning av PR #1527, levererad som en sen webhook-notis EFTER att PR:en redan mergats (samma bot som redan flaggat flera giltiga fynd tidigare i denna logg):
+
+- **Tooltip-lucka:** Recharts `<Tooltip>` filtrerar som standard (`filterNull`, default `true`) bort payload-poster vars värde är `null` INNAN den egna `formatter`-funktionen anropas. Eftersom `paretoDisplayValue` medvetet sätts till `null` för ett `pareto_applicable:false`-experiment (för att lämna en tom lucka i stapeln, se ✅138) filtrerades just den datapunkten bort ur tooltip-payloaden — hovring över luckan visade alltså ingen tooltip alls istället för den avsedda `altSammanfattning()`-texten. Fixat: `filterNull={false}` på `<Tooltip>`, så formatter-funktionen (som redan korrekt grenar på `p.paretoApplicable`) faktiskt får köra för den datapunkten.
+- **Mobil radbrytning:** radens högra infogrupp (datum + Pareto-badge/altSammanfattning + expanderpil) hade `flexShrink: 0` och ingen radbrytning, medan det omslutande kortet har `overflow: "hidden"`. En lång `altSammanfattning`-sträng (t.ex. "9 körningar · Träningsmetod · Genomförd" för Exp012) kunde därför klippas av på smala skärmar istället för att radbrytas. Fixat: knappraden och dess högra infogrupp tillåts nu radbryta (`flexWrap: "wrap"`) — infogruppen hamnar på en egen rad under titel/dataset-badgen när utrymmet inte räcker, istället för att klippas.
+
+**Verifierat:** `npx next build` — `/qant` byggdes utan fel, fortsatt `ƒ` (Dynamic). `node --test tests/*.test.mjs` — samtliga 70 tester (oförändrade) passerar.
+
+| Fil | Roll |
+|---|---|
+| `app/qant/QantVy.js` | `<Tooltip filterNull={false}>` på stapeldiagrammet — förhindrar att en `null`-värderad (icke-Pareto-tillämplig) datapunkt filtreras bort ur tooltip-payloaden innan formatter-funktionen körs. Radens knapp och dess högra infogrupp fick `flexWrap: "wrap"` istället för en tvingad, icke-krympande enkelrad — en lång `altSammanfattning`-text radbryts nu på smala skärmar istället för att klippas av kortets `overflow: hidden` |
+
+---
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

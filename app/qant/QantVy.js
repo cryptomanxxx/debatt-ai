@@ -311,6 +311,11 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
               <YAxis allowDecimals={false} tick={{ fill: C.faint, fontSize: 11 }} tickLine={false} />
               <Tooltip
                 {...TOOLTIP_STYLE}
+                // Recharts filtrerar bort payload-poster med värde null som default
+                // (filterNull) — utan detta hade en icke-Pareto-tillämplig lucka i
+                // stapeln aldrig nått formatter-funktionen nedan, och hovring över
+                // luckan visat en tom tooltip istället för altSammanfattning.
+                filterNull={false}
                 formatter={(_v, _n, props) => {
                   const p = props.payload;
                   if (p.paretoApplicable) return [`${p.paretoCount} arkitekturer`, p.fulltNamn];
@@ -341,8 +346,9 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
                   onClick={() => setOppetExp(oppen ? null : exp.id)}
                   style={{
                     width: "100%", padding: "12px 16px", background: "transparent", border: "none",
-                    cursor: "pointer", textAlign: "left", display: "flex", justifyContent: "space-between",
-                    alignItems: "center", gap: "10px", color: "inherit",
+                    cursor: "pointer", textAlign: "left", display: "flex", flexWrap: "wrap",
+                    justifyContent: "space-between", alignItems: "center", gap: "10px",
+                    rowGap: "6px", color: "inherit",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
@@ -354,10 +360,14 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
                       {exp.dataset || "okänt dataset"}
                     </span>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
-                    <span style={{ fontSize: "12px", color: C.faint }}>{fmtDatum(exp.timestamp_utc)}</span>
+                  {/* Ingen flexShrink/nowrap här — en lång altSammanfattning (t.ex.
+                      "9 körningar · Träningsmetod · Genomförd" för Exp012) ska kunna
+                      radbrytas till en egen rad på smala skärmar istället för att
+                      klippas av korthets overflow:hidden (Codex-fynd, PR #1527). */}
+                  <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", gap: "8px 12px" }}>
+                    <span style={{ fontSize: "12px", color: C.faint, whiteSpace: "nowrap" }}>{fmtDatum(exp.timestamp_utc)}</span>
                     {paretoApplicable ? (
-                      <span style={{ fontSize: "12px", color: paretoFront.length ? C.pareto : C.faint }}>{paretoFront.length} på fronten</span>
+                      <span style={{ fontSize: "12px", color: paretoFront.length ? C.pareto : C.faint, whiteSpace: "nowrap" }}>{paretoFront.length} på fronten</span>
                     ) : (
                       <span style={{ fontSize: "12px", color: C.faint }}>{altSammanfattning(exp)}</span>
                     )}
