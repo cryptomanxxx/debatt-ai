@@ -4363,6 +4363,29 @@ Referens [2] låg i en HELT SEPARAT paragraf som `linkifyKalla()` aldrig rörde 
 
 ---
 
+### ✅ 138. /qant — Experimenthistorik uppgraderad till forskningsrepots v2-schema, Pareto-info bara när tillämpligt – KLART
+
+Ägarbegäran (sep 2026), relaterad via en pastad text från "ChatGPT" om en ändring i det externa forskningsrepot `debatt-ai-qant-research-lab` (commit `39bed07`): dashboard-generatorn där gick från schema v1 till v2 och varje experiment får nu fem nya fält — `experiment_type` (t.ex. `"architecture_search"`, `"validation"`, `"baseline"`, `"training_method"`, framtida `"diagnostic"`), `completed` (bool), `result_count`, `summary_count` och `pareto_applicable` (bool). Exp012 exemplifierades: `experiment_type: "training_method"`, `completed: true`, `result_count: 9`, `summary_count: 3`, `pareto_applicable: false` — ett experiment som körts 9 gånger men aldrig haft en meningsfull Paretofront att jämföra arkitekturer mot, vilket innan denna fix hade visats som "0 på fronten" och kunnat misstolkas som att experimentet saknade resultat.
+
+**Uppgiften gällde uteslutande `/qant`s konsumtion av dessa fält** — inte forskningsrepot självt (utanför den här sessionens GitHub-scope), och den pastade texten noterade uttryckligen att den publika `research-dashboard.json` (filen `/qant` hämtar server-side, se ✅134) ännu inte byggts om för att publicera de nya fälten ("Dashboard-JSON behöver också byggas om en gång ... det kan vi göra via Build Public Research Dashboard") — ett separat manuellt steg utanför denna sessions kontroll. Koden måste alltså fungera identiskt med dagens live-data (v1-format, inga av de nya fälten satta) tills den ombyggnaden görs, i linje med filens redan etablerade schema-toleranta designfilosofi (✅134).
+
+**Fix — `app/qant/QantVy.js`:**
+- `pareto_applicable` läses per experiment med `e.pareto_applicable !== false` — saknas fältet helt (v1-format) antas det vara `true`, vilket bevarar exakt det tidigare beteendet för äldre/redan publicerade experiment.
+- Ny `EXPERIMENT_TYP_SV`-översättningskarta (arkitektursökning/validering/baslinje/träningsmetod/diagnostik) med fallback till den redan befintliga `humaniseraNyckel()` för ett okänt framtida `experiment_type`-värde — samma "känt fält + generisk fallback"-princip som `KANDA_ARK_FALT`/`KANDA_CFG_FALT` redan använder för arkitektur-/konfigurationsobjekt.
+- `completed` humaniseras till svenska ("Genomförd"/"Pågående") via `genomfordLabel()` — plattformens UI är genomgående på svenska, den pastade textens engelska "Completed" var bara illustrativ.
+- Ny `altSammanfattning(exp)` bygger en kompakt "9 körningar · Träningsmetod · Genomförd"-sträng av bara de fält som faktiskt finns (fail-open till "Pareto-analys ej tillämplig" om samtliga v2-fält skulle saknas trots ett explicit `pareto_applicable:false`).
+- **Stapeldiagrammet** ("Experimenthistorik") plottar nu `paretoDisplayValue` (=`paretoCount` om tillämpligt, annars `null`) istället för `paretoCount` direkt — ett `pareto_applicable:false`-experiment lämnar en tom lucka i diagrammet istället för en missvisande 0-hög stapel. Tooltipen visar `altSammanfattning()` för sådana experiment istället för "N arkitekturer".
+- **Varje experiments kollapsade radsammanfattning** ("N på fronten") är nu villkorad på `pareto_applicable` — annars visas `altSammanfattning()`.
+- **Den expanderade detaljvyn** fick en ny chip-rad (körningar/sammanfattningar/typ/status) som visas för alla experiment där något av v2-fälten finns, oavsett `pareto_applicable`. Paretofront-listan/dess "Ingen Paretofront registrerad"-fallback visas bara när `pareto_applicable !== false`; annars en förklarande text om att Pareto-analys inte är tillämplig för experimenttypen.
+
+**Verifierat:** `npx next build` — `/qant` byggdes utan fel eller varningar. `node --test tests/*.test.mjs` — samtliga 70 tester (oförändrade, ingen ny testfil för denna rent visuella/UI-nära ändring) passerar.
+
+| Fil | Roll |
+|---|---|
+| `app/qant/QantVy.js` | Läser och renderar de fem nya v2-experimentfälten (`experiment_type`, `completed`, `result_count`, `summary_count`, `pareto_applicable`) med fail-open-fallback till v1-beteende när de saknas. Ny `EXPERIMENT_TYP_SV`/`humaniseraExperimentTyp()`, `genomfordLabel()`, `altSammanfattning()`. Stapeldiagrammet och per-experiment-raderna (kollapsad + expanderad) gatear all Pareto-relaterad rendering på `pareto_applicable !== false` |
+
+---
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt
