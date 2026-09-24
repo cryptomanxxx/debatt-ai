@@ -4335,6 +4335,32 @@ Användarrapport (sep 2026), med en extern ChatGPT-analys av repot bifogad: en p
 
 ---
 
+### ✅ 137. Samma artikel, kvarstående trasig referens — källnamnet splittrade en helt korrekt formaterad ankartagg – KLART
+
+Uppföljande användarrapport (sep 2026), med en ny skärmdump av samma artikel EFTER att ✅136 gått live i produktion: *"Nu är kodändringen live på hemsidan men resultatet är samma"*. Skärmdumpen visade referens [1] fortfarande som rå text — bokstavligen `<a href="https://www.anthropic.com/news/claude-discovers-novel-enzyme-system" target="_blank" rel="noopener noreferrer">Anthropic – Claude discovers a novel enzyme system with CRISPR-like repeats</a>` — medan referens [2] (en annan källa i samma "Källor"-lista) korrekt visades som en klickbar länk.
+
+**Verifiering:** livesajten och Supabase-databasen förblev onåbara från den här sessionen (samma nätverksbegränsning som i ✅136), så diagnosen byggde uteslutande på att läsa den ändrade koden och tolka skärmdumpens exakta textinnehåll rad för rad. Till skillnad från ✅136:s fall är referens [1]:s tagg redan HELT KORREKT formaterad — href är första attributet, dubbla citattecken, standardattribut — så ✅136:s fix (attributordning/whitespace/citattecken-tolerans) hade aldrig kunnat lösa detta. Det här är en genuint annan, tidigare oupptäckt bugg.
+
+**Rotorsak:** `linkifyKalla()` (den funktion som länkar den FÖRSTA förekomsten av `nyhetskalla.namn` till `nyhetskalla.url` i brödtexten, se ✅17) sökte efter källnamnet i HELA paragraf-STRÄNGEN innan den kände igen några ankartaggar alls. Den här artikelns källa heter uppenbarligen "Anthropic" — och "Anthropic" råkar vara det FÖRSTA ORDET i referens [1]:s egen, redan korrekt formaterade citatlänks synliga länktext ("Anthropic – Claude discovers..."). `linkifyKalla()` hittade alltså sin källnamnsträff MITT INUTI den råa ankartaggens egen inre text, och skar paragrafen i två delar exakt vid den träffpunkten:
+- **Före träffen:** `"[1] <a href=\"...\" target=\"_blank\" rel=\"noopener noreferrer\">"` — en öppningstagg UTAN sin matchande `</a>` — ett ofullständigt mönster som `linkifyRawAnchors()` aldrig kunde känna igen som en komplett länk, så det visades som rå, synlig text.
+- **Efter träffen:** `" – Claude discovers a novel enzyme system with CRISPR-like repeats</a>"` — en föräldralös `</a>` utan sin öppningstagg, likaledes ointelligibel för parsern, visades också som rå text.
+
+Referens [2] låg i en HELT SEPARAT paragraf som `linkifyKalla()` aldrig rörde (källnamnsträffen hittades redan i paragrafen med referens [1]) — den paragrafen gick oförändrad genom den vanliga `linkifyRawAnchors()`-vägen och blev därför en korrekt, ren länk. Det förklarar exakt varför de två referenserna i samma "Källor"-lista betedde sig helt olika trots identisk formattering.
+
+**Fix — sök källnamnet bara i redan avgränsade textsegment, aldrig i en redan igenkänd länks egen text:** hela renderingskedjan byggdes om kring en gemensam token-pipeline istället för strängbaserad slice-manipulation. `parseRawAnchors()` körs nu FÖRST på varje stycke (ger en lista av `{type:"text"}`/`{type:"link"}`/`{type:"unsafe-anchor"}`-tokens) — och en ny, delad, testad funktion `insertNamedLink(tokens, namn, href)` i `app/lib/rawAnchors.mjs` söker källnamnet ENDAST bland `type:"text"`-tokens, och splittrar i så fall bara DEN texttokenets innehåll (kringliggande tokens, inklusive redan igenkända råa länkar, lämnas helt orörda). Hittas källnamnet bara inuti en redan igenkänd länks egen synliga text (som i den rapporterade buggen) rapporteras korrekt `found: false` — den råa taggen förblir en enda intakt länk, och den befintliga "Läs källan: ..."-fallbackraden (för `matchIndex === -1`) täcker in citeringen istället. Ingen `dangerouslySetInnerHTML` införd — samma säkra, manuella React-elementkonstruktion som innan, bara en korrekt avgränsad sökning.
+
+`ArgumentRoster.js`s `linkifyKalla()`/`linkifyRawAnchors()` slogs ihop till en enda `byggParagrafer()`-funktion plus en delad `renderTokens()`-hjälpare — eliminerar den tidigare tvåpass-designen (`linkifyKalla` byggde delvis JSX själv med interna pre-/post-`linkifyRawAnchors()`-patchar för just det här scenariot, ett lapp-på-lapp-mönster som aldrig kunde täcka fallet där matchen låg INUTI själva den skyddade taggen).
+
+**Regressionstester:** 7 nya test i `tests/rawAnchors.test.mjs` för `insertNamedLink()`, inklusive en direkt reproduktion av artikel 1849:s exakta trasiga citat (källnamnet som första ord i en redan komplett ankartaggs länktext) — verifierar att taggen nu förblir en HEL, oskadd länk och att sökningen istället (korrekt) rapporterar `found: false`. Samtliga 67 tester i `tests/`-katalogen passerar. `npx next build` verifierat framgångsrikt.
+
+| Fil | Roll |
+|---|---|
+| `app/lib/rawAnchors.mjs` | Ny `insertNamedLink(tokens, namn, href)` — söker och splittrar bara i `type:"text"`-tokens, rör aldrig en redan igenkänd länks egen text |
+| `app/artikel/[id]/ArgumentRoster.js` | `linkifyKalla()`/`linkifyRawAnchors()` ersatta av en enda token-baserad `byggParagrafer()` + delad `renderTokens()` — `parseRawAnchors()` körs FÖRST på varje stycke, källnamnssökningen sker via `insertNamedLink()` på de resulterande tokens, aldrig på rå paragraf-sträng |
+| `tests/rawAnchors.test.mjs` | 7 nya test för `insertNamedLink()`, inklusive en exakt reproduktion av artikel 1849:s trasiga citat |
+
+---
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

@@ -88,3 +88,53 @@ export function taBortAnkartaggar(text) {
   if (!tokens) return text;
   return tokens.map((t) => (t.type === "text" ? t.value : t.text)).join("");
 }
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Söker `namn` (helt ord, skiftlägesokänsligt) i en tokenlista från
+ * parseRawAnchors() (eller motsvarande `[{type:"text", value}]`-fallback)
+ * — ENDAST i "text"-tokens, ALDRIG inuti en redan igenkänd länks (type
+ * "link"/"unsafe-anchor") egen synliga text.
+ *
+ * Detta är avsiktligt: om en källas namn råkar förekomma INUTI en redan
+ * inbäddad rå ankartaggs egen länktext (t.ex. en "Källor"-lista där citatets
+ * EGEN synliga text börjar med källnamnet — "Anthropic – Claude discovers
+ * ..." när källan heter "Anthropic") och man naivt letar efter namnet i hela
+ * paragraf-STRÄNGEN innan man känner igen ankartaggar, splittras den råa
+ * taggens markup mitt itu vid träffpunkten. Ena halvan (öppningstaggen utan
+ * sin matchande </a>) blir då ett ofullständigt ankarmönster som aldrig kan
+ * kännas igen och visas som rå, synlig text (den rapporterade buggen på
+ * artikel 1849, ✅137). Genom att bara söka i redan avgränsade text-tokens
+ * kan en sådan kollision aldrig uppstå — hela den råa ankartaggens token
+ * lämnas helt orörd, oavsett vad dess synliga text råkar innehålla.
+ *
+ * Hittas en träff ersätts den delen av det text-tokenet med en ny
+ * { type: "link", href, text }-token (kringliggande tokens oförändrade och i
+ * ursprunglig ordning), och `{ tokens: <ny lista>, found: true }` returneras.
+ * Ingen träff → `{ tokens: <samma lista, oförändrad>, found: false }`.
+ */
+export function insertNamedLink(tokens, namn, href) {
+  const n = (namn || "").trim();
+  if (!n || !href || !Array.isArray(tokens)) return { tokens, found: false };
+  const re = new RegExp(`\\b(${escapeRegExp(n)})\\b`, "i");
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i].type !== "text") continue;
+    const val = tokens[i].value;
+    const m = val.match(re);
+    if (!m) continue;
+    const start = m.index;
+    const slut = start + m[0].length;
+    const nya = [
+      ...tokens.slice(0, i),
+      ...(start > 0 ? [{ type: "text", value: val.slice(0, start) }] : []),
+      { type: "link", href, text: val.slice(start, slut) },
+      ...(slut < val.length ? [{ type: "text", value: val.slice(slut) }] : []),
+      ...tokens.slice(i + 1),
+    ];
+    return { tokens: nya, found: true };
+  }
+  return { tokens, found: false };
+}
