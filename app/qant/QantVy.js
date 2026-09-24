@@ -290,8 +290,10 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
         </p>
         <div style={{ background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px 16px", color: C.dim, fontSize: "13px", lineHeight: 1.65 }}>
           <strong style={{ color: C.warnText }}>Viktig begränsning:</strong> de nuvarande experimenten använder Q.ANT:s
-          CPU-backend. Resultaten gäller därför arkitektur, kompatibilitet och numeriskt beteende — inte verklig fotonisk
-          latency, energiförbrukning eller throughput. Sådana slutsatser kräver senare experiment på faktisk Q.ANT-hårdvara.
+          CPU-backend, som är en mjukvarubackend för utveckling utan den fotoniska processorn. Själva beräkningarna körs
+          på CPU-resurser i GitHub Actions — Q.ANT tillhandahåller alltså inte compute för dessa experiment. Resultaten
+          gäller därför arkitektur, kompatibilitet och numeriskt beteende — inte verklig fotonisk latency,
+          energiförbrukning eller throughput. Sådana slutsatser kräver senare experiment på faktisk Q.ANT-hårdvara.
         </div>
       </div>
 
