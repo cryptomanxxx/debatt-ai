@@ -6,8 +6,9 @@ import QantVy from "./QantVy";
 // väger tyngre än den marginella prestandavinsten av statisk generering
 // för en lågtrafikerad sekundärsida. Fetchens egna `next: { revalidate }`
 // nedan cachar ändå det underliggande GitHub-anropet i upp till 1800s per
-// request-cykel — bara den enskilda besökaren som råkar träffa ett genuint
-// nätverksfel ser fallback-vyn, inte alla besökare under hela fönstret.
+// request-cykel. Forskningsdashboarden är liten och uppdateras efter varje
+// experiment, så sidan hämtar den färska versionen i stället för att kunna
+// visa en gammal Paretofront i upp till 30 minuter.
 export const dynamic = "force-dynamic";
 
 export const metadata = {
@@ -28,8 +29,9 @@ async function hamtaDashboard() {
   try {
     const res = await fetch(DASHBOARD_URL, {
       // GitHub raw-innehåll skickar inte alltid tillförlitliga cache-headers,
-      // så vi styr färskheten själva via Next.js ISR istället.
-      next: { revalidate: 1800 },
+      // och forskningsresultat ska synas direkt efter publicering, så vi undviker
+      // Next.js datacache för just detta lilla JSON-anrop.
+      cache: "no-store",
       headers: { Accept: "application/json" },
     });
     if (!res.ok) return null;
