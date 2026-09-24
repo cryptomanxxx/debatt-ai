@@ -155,7 +155,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
   if (!data) {
     return (
       <main style={{ minHeight: "100vh", background: C.bg, color: "#fff", padding: "24px", maxWidth: "1100px", margin: "0 auto" }}>
-        <h1 style={{ fontSize: "28px", fontWeight: 700, marginBottom: "12px" }}>🔬 Q.ANT Research Lab</h1>
+        <h1 style={{ fontSize: "28px", fontWeight: 700, marginBottom: "12px" }}>🔬 Debatt-AI Q.ANT Research Lab</h1>
         <div style={{ ...SEKTION, textAlign: "center", color: C.faint }}>
           <p style={{ marginBottom: "12px" }}>Forskningsdatan kunde inte hämtas just nu.</p>
           <p style={{ fontSize: "13px" }}>
@@ -223,7 +223,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
     <main style={{ minHeight: "100vh", background: C.bg, color: "#fff", padding: "24px", maxWidth: "1100px", margin: "0 auto" }}>
       <div style={{ marginBottom: "24px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "8px" }}>
-          <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>🔬 {project.name || "Q.ANT Research Lab"}</h1>
+          <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>🔬 {project.name || "Debatt-AI Q.ANT Research Lab"}</h1>
           <a href={repoUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: "12px", color: C.accent, fontFamily: "monospace", textDecoration: "none", whiteSpace: "nowrap" }}>
             📂 Forskningsrepo →
           </a>
@@ -267,6 +267,44 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
           <div style={{ fontSize: "15px", color: C.text, lineHeight: 1.6 }}>{status.current_research_direction}</div>
         </div>
       )}
+
+      {/* Varför forskningen spelar roll */}
+      <div style={SEKTION}>
+        <h2 style={RUBRIK}>Vem kan ha nytta av forskningen?</h2>
+        <p style={{ ...INGRESS, marginBottom: "12px" }}>
+          Debatt-AI Q.ANT Research Lab undersöker inte bara om dagens neurala nätverk kan köras på alternativ
+          beräkningshårdvara. Den mer grundläggande frågan är vilka AI-arkitekturer som bör byggas när själva
+          beräkningen fungerar annorlunda än på traditionella GPU:er.
+        </p>
+        <p style={{ color: C.dim, fontSize: "14px", lineHeight: 1.7, marginBottom: "12px" }}>
+          Forskningen kan vara relevant för <strong style={{ color: C.text }}>Q.ANT och utvecklare av fotoniska acceleratorer</strong>,
+          forskare inom <strong style={{ color: C.text }}>photonic computing och hardware-aware AI</strong>, samt projekt inom
+          <strong style={{ color: C.text }}> EuroHPC och europeisk AI-infrastruktur</strong> som behöver avgöra vilka idéer som
+          är värda att skala till betydligt dyrare beräkningsresurser.
+        </p>
+        <p style={{ color: C.dim, fontSize: "14px", lineHeight: 1.7, marginBottom: "12px" }}>
+          Projektet är samtidigt ett experiment i <strong style={{ color: C.text }}>AI-driven forskning</strong>: en AI-forskare
+          analyserar resultaten, formulerar falsifierbara hypoteser och föreslår nästa experiment. En människa godkänner
+          experimentet innan den reproducerbara körningen utförs och resultaten versionshanteras och publiceras öppet.
+          Det gör det möjligt för andra att reproducera resultaten, kritisera metodiken och bygga vidare på arbetet.
+        </p>
+        <div style={{ background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px 16px", color: C.dim, fontSize: "13px", lineHeight: 1.65 }}>
+          <strong style={{ color: C.warnText }}>Viktig begränsning:</strong> de nuvarande experimenten använder Q.ANT:s
+          CPU-backend. Resultaten gäller därför arkitektur, kompatibilitet och numeriskt beteende — inte verklig fotonisk
+          latency, energiförbrukning eller throughput. Sådana slutsatser kräver senare experiment på faktisk Q.ANT-hårdvara.
+        </div>
+      </div>
+
+      <div style={SEKTION}>
+        <div style={{ fontSize: "12px", color: C.faint, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
+          Aktuell forskningsfråga
+        </div>
+        <div style={{ fontSize: "15px", color: C.text, lineHeight: 1.7 }}>
+          De senaste experimenten indikerar att fler Fourier-komponenter kan ge större ackumulerade skillnader mellan
+          referensberäkningen och Q.ANT-backenden. Forskningen undersöker nu om arkitekturen kan modifieras så att denna
+          felackumulering begränsas utan att den extra representationskapaciteten går förlorad.
+        </div>
+      </div>
 
       {/* Forskningsloopen */}
       {forskningsloop.length > 0 && (
