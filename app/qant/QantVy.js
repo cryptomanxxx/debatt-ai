@@ -151,6 +151,8 @@ function StatPill({ label, v, sub }) {
 
 export default function QantVy({ data, repoUrl, dashboardUrl }) {
   const [oppetExp, setOppetExp] = useState(null);
+  const [visadeExperiment, setVisadeExperiment] = useState(10);
+  const [visaHelaHistoriken, setVisaHelaHistoriken] = useState(false);
 
   if (!data) {
     return (
@@ -190,12 +192,19 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
     return (a.timestamp_utc || "").localeCompare(b.timestamp_utc || "");
   });
 
-  const tidslinjeData = sorteradeExp.map((e, i) => {
+  // Listan visar de senaste experimenten först och laddar äldre i steg om 10.
+  // Historikgrafen begränsas separat till de 20 senaste för att förbli läsbar
+  // även när forskningslabbet har hundratals experiment.
+  const senasteForst = [...sorteradeExp].reverse();
+  const synligaExperiment = senasteForst.slice(0, visadeExperiment);
+  const historikExp = visaHelaHistoriken ? sorteradeExp : sorteradeExp.slice(-20);
+
+  const tidslinjeData = historikExp.map((e) => {
     const paretoApplicable = e.pareto_applicable !== false;
     const paretoCount = Array.isArray(e.pareto_front) ? e.pareto_front.length : 0;
     return {
       id: e.id,
-      namn: `#${i + 1}`,
+      namn: `#${experimentNummer(e.id) ?? "?"}`,
       fulltNamn: naturligtNamn(e.id),
       dataset: e.dataset,
       paretoApplicable,
@@ -344,6 +353,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
         {tidslinjeData.length === 0 ? (
           <div style={TOM}>Inga experiment publicerade ännu.</div>
         ) : (
+          <>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={tidslinjeData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
@@ -370,10 +380,21 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          {sorteradeExp.length > 20 && (
+            <div style={{ textAlign: "center", marginTop: "10px" }}>
+              <button
+                onClick={() => setVisaHelaHistoriken(v => !v)}
+                style={{ background: "#0d1117", color: C.accent, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "8px 14px", cursor: "pointer", fontSize: "12px" }}
+              >
+                {visaHelaHistoriken ? "Visa senaste 20" : `Visa hela historiken (${sorteradeExp.length})`}
+              </button>
+            </div>
+          )}
+          </>
         )}
 
         <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "8px" }}>
-          {sorteradeExp.map((exp, i) => {
+          {synligaExperiment.map((exp, i) => {
             const oppen = oppetExp === exp.id;
             const paretoApplicable = exp.pareto_applicable !== false;
             const paretoFront = Array.isArray(exp.pareto_front) ? exp.pareto_front : [];
@@ -392,7 +413,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-                    <span style={{ fontSize: "11px", color: C.faint, fontFamily: "monospace", flexShrink: 0 }}>#{i + 1}</span>
+                    <span style={{ fontSize: "11px", color: C.faint, fontFamily: "monospace", flexShrink: 0 }}>#{experimentNummer(exp.id) ?? (sorteradeExp.length - i)}</span>
                     <span style={{ fontWeight: 600, fontSize: "14px", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {naturligtNamn(exp.id)}
                     </span>
@@ -489,6 +510,14 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
               </div>
             );
           })}
+          {visadeExperiment < senasteForst.length && (
+            <button
+              onClick={() => setVisadeExperiment(v => Math.min(v + 10, senasteForst.length))}
+              style={{ marginTop: "4px", width: "100%", padding: "11px 16px", background: "#0d1117", color: C.accent, border: `1px solid ${C.border}`, borderRadius: "10px", cursor: "pointer", fontSize: "13px", fontWeight: 600 }}
+            >
+              Visa 10 äldre experiment ({senasteForst.length - visadeExperiment} kvar)
+            </button>
+          )}
         </div>
       </div>
 
