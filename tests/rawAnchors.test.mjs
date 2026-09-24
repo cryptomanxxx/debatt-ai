@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseRawAnchors, taBortAnkartaggar } from "../app/lib/rawAnchors.mjs";
+import { parseRawAnchors, taBortAnkartaggar, insertNamedLink } from "../app/lib/rawAnchors.mjs";
 
 // Regressionstest för artikel 1849 (sep 2026): en referenslänk visades inte
 // korrekt. Grundorsaken var att den ursprungliga regexen krävde att href var
@@ -25,6 +25,33 @@ test("standardfallet — href först, dubbla citattecken", () => {
 test("attributordning — href kommer EFTER target/rel (den rapporterade buggen)", () => {
   const [l] = lankTokens('<a target="_blank" rel="noopener" href="https://example.com/b">Källan</a>');
   assert.deepEqual(l, { type: "link", href: "https://example.com/b", text: "Källan" });
+});
+
+// Codex-fynd (PR #1525-granskning): en tidigare version sökte "href=" fritt
+// i hela attributsträngen (\bhref\s*=), vilket kunde matcha "href=" INUTI
+// ett annat attributs citerade VÄRDE, eller ett attribut vars namn bara
+// RÅKAR sluta på "href" (data-href). Genom att tokenisera ETT HELT attribut
+// i taget (namn + eventuellt citerat värde) kan ingendera längre hända.
+
+test("href-attributet väljs korrekt även om ett annat attributs VÄRDE innehåller texten 'href='", () => {
+  const [l] = lankTokens(
+    '<a title="href=https://fel.example" href="https://ratt.example">Källan</a>'
+  );
+  assert.equal(l.href, "https://ratt.example");
+});
+
+test("ett attribut vars namn bara slutar på 'href' (data-href) blir aldrig länkens URL", () => {
+  const tokens = parseRawAnchors('<a data-href="https://example.com">Klicka</a>');
+  // Ingen giltig href hittades (bara det olikartade attributnamnet
+  // "data-href") — taggen ska INTE bli klickbar.
+  assert.equal(tokens.some((t) => t.type === "link"), false);
+  const unsafe = tokens.find((t) => t.type === "unsafe-anchor");
+  assert.ok(unsafe);
+});
+
+test("xlink:href (ett annat attributnamn som råkar sluta på 'href') blir inte heller länkens URL", () => {
+  const tokens = parseRawAnchors('<a xlink:href="https://example.com">Klicka</a>');
+  assert.equal(tokens.some((t) => t.type === "link"), false);
 });
 
 test("whitespace runt likhetstecknet", () => {
@@ -145,4 +172,95 @@ test("taBortAnkartaggar — text utan ankartagg är oförändrad", () => {
 test("taBortAnkartaggar — icke-sträng skickas tillbaka orörd", () => {
   assert.equal(taBortAnkartaggar(null), null);
   assert.equal(taBortAnkartaggar(42), 42);
+});
+
+// insertNamedLink — regressionstest för den FAKTISKA buggen på artikel 1849
+// (sep 2026, bekräftad via en skärmdump av den publicerade artikeln): en
+// källhänvisning i en "Källor"-lista visades som RÅ, synlig text — inklusive
+// bokstavligen "<a href=...>" och en föräldralös "</a>" — istället för att
+// bli en klickbar länk. Den attributordning-toleranta fixen ovan (PR #1525)
+// löste INTE detta, eftersom det är en helt annan bugg: källans namn
+// ("Anthropic") råkade vara det FÖRSTA ordet i citatets EGEN synliga
+// länktext ("Anthropic – Claude discovers..."). Den gamla linkifyKalla()
+// letade efter källnamnet i HELA paragraf-strängen INNAN den kände igen
+// ankartaggar, hittade "Anthropic" mitt inuti citatets egen <a>...</a>, och
+// klippte paragrafen vid den träffpunkten — vilket splittrade den råa
+// ankartaggens markup i två ofullständiga halvor (en öppningstagg utan sin
+// </a>, och en </a> utan sin öppningstagg), ingendera igenkännbar.
+// insertNamedLink() söker nu bara i redan avgränsade text-tokens, ALDRIG
+// inuti en redan igenkänd länks egen text — vilket förhindrar just detta.
+
+test("insertNamedLink — hittar namnet i ett rent textstycke", () => {
+  const tokens = [{ type: "text", value: "Enligt Aftonbladet är läget allvarligt." }];
+  const { tokens: nya, found } = insertNamedLink(tokens, "Aftonbladet", "https://aftonbladet.se");
+  assert.equal(found, true);
+  assert.deepEqual(nya, [
+    { type: "text", value: "Enligt " },
+    { type: "link", href: "https://aftonbladet.se", text: "Aftonbladet" },
+    { type: "text", value: " är läget allvarligt." },
+  ]);
+});
+
+test("insertNamedLink — rör ALDRIG en redan igenkänd länks egen text, även om namnet står där", () => {
+  // Detta är den EXAKTA formen på artikel 1849:s trasiga citat — källnamnet
+  // "Anthropic" är det första ordet i citatets EGEN synliga länktext.
+  const paragraf =
+    '[1] <a href="https://www.anthropic.com/news/claude-discovers-novel-enzyme-system" target="_blank" rel="noopener noreferrer">Anthropic – Claude discovers a novel enzyme system with CRISPR-like repeats</a>';
+  const tokens = parseRawAnchors(paragraf);
+  // Grundläggande förutsättning: taggen känns igen som EN komplett länk.
+  assert.equal(tokens.length, 2);
+  assert.equal(tokens[1].type, "link");
+  assert.equal(tokens[1].href, "https://www.anthropic.com/news/claude-discovers-novel-enzyme-system");
+
+  const { tokens: nya, found } = insertNamedLink(
+    tokens,
+    "Anthropic",
+    "https://www.anthropic.com/news/claude-discovers-novel-enzyme-system"
+  );
+  // "Anthropic" finns bara inuti länk-tokenets egen text — ingen träff ska
+  // rapporteras, och tokenlistan ska vara HELT oförändrad (samma referens
+  // eller åtminstone identiskt innehåll — taggen får aldrig splittras).
+  assert.equal(found, false);
+  assert.deepEqual(nya, tokens);
+  assert.equal(nya[1].type, "link"); // fortfarande EN hel länk, inte itusplittrad
+});
+
+test("insertNamedLink — hittar namnet i ett SENARE textstycke när det bara förekommer inuti en tidigare länk", () => {
+  const tokens = [
+    { type: "link", href: "https://x.se/a", text: "Anthropic gjorde ett fynd" },
+    { type: "text", value: " Läs mer hos Anthropic här." },
+  ];
+  const { tokens: nya, found } = insertNamedLink(tokens, "Anthropic", "https://anthropic.com");
+  assert.equal(found, true);
+  // Den första länk-tokenet ska vara helt orört.
+  assert.deepEqual(nya[0], tokens[0]);
+  // Träffen ska ligga i det EFTERFÖLJANDE textstycket.
+  assert.deepEqual(nya.slice(1), [
+    { type: "text", value: " Läs mer hos " },
+    { type: "link", href: "https://anthropic.com", text: "Anthropic" },
+    { type: "text", value: " här." },
+  ]);
+});
+
+test("insertNamedLink — ingen träff alls (varken i text eller länk) ger tokenlistan oförändrad", () => {
+  const tokens = [{ type: "text", value: "Helt orelaterad text." }];
+  const { tokens: nya, found } = insertNamedLink(tokens, "SVT Nyheter", "https://svt.se");
+  assert.equal(found, false);
+  assert.equal(nya, tokens);
+});
+
+test("insertNamedLink — saknat namn eller href ger found:false utan att kasta", () => {
+  const tokens = [{ type: "text", value: "Text." }];
+  assert.equal(insertNamedLink(tokens, "", "https://x.se").found, false);
+  assert.equal(insertNamedLink(tokens, "X", "").found, false);
+  assert.equal(insertNamedLink(tokens, null, "https://x.se").found, false);
+});
+
+test("insertNamedLink — matchar bara hela ord, inte en substräng inuti ett annat ord", () => {
+  // Den ENDA förekomsten av "Nyheter" i den här texten sitter ihopskriven
+  // med "24" utan mellanslag — ingen ordgräns mellan "r" och "2", så
+  // \bNyheter\b ska INTE matcha där.
+  const tokens = [{ type: "text", value: "Vi läser Nyheter24 varje dag." }];
+  const { found } = insertNamedLink(tokens, "Nyheter", "https://svt.se/nyheter");
+  assert.equal(found, false);
 });
