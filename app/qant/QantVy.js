@@ -367,7 +367,14 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
                   <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", gap: "8px 12px" }}>
                     <span style={{ fontSize: "12px", color: C.faint, whiteSpace: "nowrap" }}>{fmtDatum(exp.timestamp_utc)}</span>
                     {paretoApplicable ? (
-                      <span style={{ fontSize: "12px", color: paretoFront.length ? C.pareto : C.faint, whiteSpace: "nowrap" }}>{paretoFront.length} på fronten</span>
+                      <>
+                        {typeof exp.result_count === "number" && (
+                          <span style={{ fontSize: "12px", color: C.faint, whiteSpace: "nowrap" }}>{exp.result_count} körningar</span>
+                        )}
+                        <span style={{ fontSize: "12px", color: paretoFront.length ? C.pareto : C.faint, whiteSpace: "nowrap" }}>{paretoFront.length} på fronten</span>
+                        {typLabel && <span style={{ fontSize: "12px", color: C.faint, whiteSpace: "nowrap" }}>{typLabel}</span>}
+                        {cl && <span style={{ fontSize: "12px", color: C.faint, whiteSpace: "nowrap" }}>{cl}</span>}
+                      </>
                     ) : (
                       <span style={{ fontSize: "12px", color: C.faint }}>{altSammanfattning(exp)}</span>
                     )}
