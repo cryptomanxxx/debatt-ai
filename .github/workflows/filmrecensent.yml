@@ -8,7 +8,14 @@ on:
     # är redan tidpunktsagnostisk och säkert återanropningsbar i en tät
     # sekventiell loop — den fortsätter alltid där föregående pass sparade
     # cursorn.
-    - cron: '0 10 * * *'  # 12:00 svensk tid (sommartid, ✅129) — 4 pass i samma körning
+    - cron: '0 10 * * *'  # 12:00 svensk tid (sommartid, ✅129) — primär körning, 4 pass
+    # Tre sena catch-up-körningar ger Filmrecensenten samma redundans som
+    # agent.yml. filmrecensent.py kontrollerar MALSATT_ANTAL_PER_DAG=4 före
+    # varje pass, så när dagens fyra redan finns blir dessa billiga no-ops.
+    # Om primärkörningen däremot försenats/misslyckats toppar de upp till 4.
+    - cron: '30 21 * * *'  # 23:30 svensk sommartid — catch-up 1/3
+    - cron: '40 21 * * *'  # 23:40 svensk sommartid — catch-up 2/3
+    - cron: '50 21 * * *'  # 23:50 svensk sommartid — catch-up 3/3
   workflow_dispatch:      # Manuellt, eller automatisk ombudspublicering från
     # invariant-checker.js (✅131) när dagens filmrecension fortfarande
     # ligger på 0 långt efter det schemalagda fönstret.
