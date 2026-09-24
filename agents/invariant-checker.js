@@ -540,8 +540,9 @@ async function checkPubliceringstaktUnderskott() {
         `eget=${eget} film=${film}) trots att dagens primära crons (agent.yml 07/08/09 UTC, ` +
         `filmrecensent.yml 10:00 UTC) borde ha kört för länge sedan — tyder på att en eller flera av ` +
         `dem har fördröjts kraftigt, kört bara delvis, eller inte kört alls. Triggar en precis ` +
-        `ombudspublicering per underskjuten typ istället för att bara vänta på catch-up (endast för ` +
-        `nyhet/replik/eget, 21:30–21:50 UTC — filmrecensent.yml har ingen egen catch-up).`
+        `ombudspublicering per underskjuten typ direkt. Som extra redundans har både agent.yml och ` +
+        `filmrecensent.yml egna sena catch-up-körningar 21:30–21:50 UTC; de dagliga kvotkontrollerna ` +
+        `gör redan uppnådda mål till no-op och toppar annars upp mot 4.`
       );
       return underskott;
     }
