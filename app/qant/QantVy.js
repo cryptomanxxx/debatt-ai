@@ -92,6 +92,53 @@ function fmtPct(frac, dec = 1) {
   return `${(frac * 100).toFixed(dec)}%`;
 }
 
+// Schema v2 (forskningsrepo-commit 39bed07) lägger till fem fält per
+// experiment: experiment_type, completed, result_count, summary_count och
+// pareto_applicable. Innan dess (och tills den publika research-dashboard.json
+// byggts om på nytt, vilket är ett separat manuellt steg i forskningsrepot)
+// saknar alla experiment dessa fält helt — så varje läsning nedan måste
+// fungera lika bra utan dem. pareto_applicable === false betyder att
+// experimentet av sin natur (t.ex. en ren träningsmetod- eller
+// valideringskörning) aldrig haft en meningsfull Paretofront att jämföra
+// arkitekturer mot — "0 på fronten" hade då kunnat misstolkas som att
+// experimentet saknade resultat, trots att det kan ha körts flera gånger.
+// Saknas fältet helt (v1-format) antas pareto_applicable vara true — det
+// bevarar exakt det redan etablerade beteendet för äldre experiment.
+const EXPERIMENT_TYP_SV = {
+  architecture_search: "Arkitektursökning",
+  validation: "Validering",
+  baseline: "Baslinje",
+  training_method: "Träningsmetod",
+  diagnostic: "Diagnostik",
+};
+
+function humaniseraExperimentTyp(typ) {
+  if (!typ) return null;
+  return EXPERIMENT_TYP_SV[typ] || humaniseraNyckel(String(typ));
+}
+
+function genomfordLabel(completed) {
+  if (completed === true) return "Genomförd";
+  if (completed === false) return "Pågående";
+  return null;
+}
+
+// Kompakt "9 körningar · Träningsmetod · Genomförd"-sammanfattning för ett
+// experiment där Pareto-information inte är tillämplig. Bygger bara av de
+// fält som faktiskt finns — ett experiment som saknar samtliga v2-fält (en
+// pareto_applicable:false-rad utan övrig kontext, osannolikt men inte
+// omöjligt under en pågående schemamigrering) faller tillbaka på en generisk
+// text istället för en tom sträng.
+function altSammanfattning(exp) {
+  const delar = [];
+  if (typeof exp.result_count === "number") delar.push(`${exp.result_count} körningar`);
+  const typLabel = humaniseraExperimentTyp(exp.experiment_type);
+  if (typLabel) delar.push(typLabel);
+  const cl = genomfordLabel(exp.completed);
+  if (cl) delar.push(cl);
+  return delar.length ? delar.join(" · ") : "Pareto-analys ej tillämplig";
+}
+
 function StatPill({ label, v, sub }) {
   return (
     <div style={{ background: "#0d1117", borderRadius: "12px", padding: "16px", border: `1px solid ${C.border}` }}>
@@ -143,13 +190,25 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
     return (a.timestamp_utc || "").localeCompare(b.timestamp_utc || "");
   });
 
-  const tidslinjeData = sorteradeExp.map((e, i) => ({
-    id: e.id,
-    namn: `#${i + 1}`,
-    fulltNamn: naturligtNamn(e.id),
-    dataset: e.dataset,
-    paretoCount: Array.isArray(e.pareto_front) ? e.pareto_front.length : 0,
-  }));
+  const tidslinjeData = sorteradeExp.map((e, i) => {
+    const paretoApplicable = e.pareto_applicable !== false;
+    const paretoCount = Array.isArray(e.pareto_front) ? e.pareto_front.length : 0;
+    return {
+      id: e.id,
+      namn: `#${i + 1}`,
+      fulltNamn: naturligtNamn(e.id),
+      dataset: e.dataset,
+      paretoApplicable,
+      paretoCount,
+      // Bar-diagrammet plottar bara den här — null ger en tom lucka i
+      // stapeln istället för en missvisande 0-hög stapel för ett experiment
+      // vars Pareto-analys inte är tillämplig (t.ex. Exp012, en ren
+      // träningsmetod-körning med 9 genomförda körningar men ingen
+      // Paretofront att jämföra mot).
+      paretoDisplayValue: paretoApplicable ? paretoCount : null,
+      altSammanfattning: paretoApplicable ? null : altSammanfattning(e),
+    };
+  });
 
   const antalParetoArk = arkitekturer.filter(a => a.pareto).length;
   const extraArkFalt = [...new Set(arkitekturer.flatMap(a => Object.keys(a).filter(k => !KANDA_ARK_FALT.has(k))))];
@@ -238,8 +297,9 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
       <div style={SEKTION}>
         <h2 style={RUBRIK}>Experimenthistorik</h2>
         <p style={INGRESS}>
-          Antal arkitekturer på Paretofronten per experiment, i forskningssekvensens ordning (Exp001 → Exp002 → …). Klicka ett experiment
-          för att se dataset, konfiguration och vilka arkitekturer som låg på fronten.
+          Antal arkitekturer på Paretofronten per experiment, i forskningssekvensens ordning (Exp001 → Exp002 → …). Stapeln saknas för
+          experiment där Pareto-analys inte är tillämplig (t.ex. rena tränings- eller valideringskörningar) — hovra eller klicka på
+          experimentet för en sammanfattning istället.
         </p>
         {tidslinjeData.length === 0 ? (
           <div style={TOM}>Inga experiment publicerade ännu.</div>
@@ -251,10 +311,14 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
               <YAxis allowDecimals={false} tick={{ fill: C.faint, fontSize: 11 }} tickLine={false} />
               <Tooltip
                 {...TOOLTIP_STYLE}
-                formatter={(v, _n, props) => [`${v} arkitekturer`, props.payload.fulltNamn]}
+                formatter={(_v, _n, props) => {
+                  const p = props.payload;
+                  if (p.paretoApplicable) return [`${p.paretoCount} arkitekturer`, p.fulltNamn];
+                  return [p.altSammanfattning, p.fulltNamn];
+                }}
                 labelFormatter={() => ""}
               />
-              <Bar dataKey="paretoCount" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="paretoDisplayValue" radius={[4, 4, 0, 0]}>
                 {tidslinjeData.map(d => (
                   <Cell key={d.id} fill={fargForNamn(d.dataset)} />
                 ))}
@@ -266,8 +330,11 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
         <div style={{ marginTop: "20px", display: "flex", flexDirection: "column", gap: "8px" }}>
           {sorteradeExp.map((exp, i) => {
             const oppen = oppetExp === exp.id;
+            const paretoApplicable = exp.pareto_applicable !== false;
             const paretoFront = Array.isArray(exp.pareto_front) ? exp.pareto_front : [];
             const cfg = exp.configuration || {};
+            const typLabel = humaniseraExperimentTyp(exp.experiment_type);
+            const cl = genomfordLabel(exp.completed);
             return (
               <div key={exp.id || i} style={{ background: "#0d1117", borderRadius: "10px", border: `1px solid ${C.border}`, overflow: "hidden" }}>
                 <button
@@ -289,7 +356,11 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
                     <span style={{ fontSize: "12px", color: C.faint }}>{fmtDatum(exp.timestamp_utc)}</span>
-                    <span style={{ fontSize: "12px", color: paretoFront.length ? C.pareto : C.faint }}>{paretoFront.length} på fronten</span>
+                    {paretoApplicable ? (
+                      <span style={{ fontSize: "12px", color: paretoFront.length ? C.pareto : C.faint }}>{paretoFront.length} på fronten</span>
+                    ) : (
+                      <span style={{ fontSize: "12px", color: C.faint }}>{altSammanfattning(exp)}</span>
+                    )}
                     <span style={{ color: C.faint, fontSize: "11px" }}>{oppen ? "▲" : "▼"}</span>
                   </div>
                 </button>
@@ -298,6 +369,30 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
                     {exp.backend && (
                       <div style={{ marginBottom: "8px" }}>
                         Backend: <code style={{ color: C.text }}>{exp.backend}</code>
+                      </div>
+                    )}
+                    {(typeof exp.result_count === "number" || typeof exp.summary_count === "number" || cl) && (
+                      <div style={{ marginBottom: "8px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                        {typeof exp.result_count === "number" && (
+                          <span style={{ background: "#1f2937", borderRadius: "6px", padding: "3px 8px", fontSize: "12px", color: C.text }}>
+                            {exp.result_count} körningar
+                          </span>
+                        )}
+                        {typeof exp.summary_count === "number" && (
+                          <span style={{ background: "#1f2937", borderRadius: "6px", padding: "3px 8px", fontSize: "12px", color: C.text }}>
+                            {exp.summary_count} sammanfattningar
+                          </span>
+                        )}
+                        {typLabel && (
+                          <span style={{ background: "#1f2937", borderRadius: "6px", padding: "3px 8px", fontSize: "12px", color: C.accent }}>
+                            {typLabel}
+                          </span>
+                        )}
+                        {cl && (
+                          <span style={{ background: "#1f2937", borderRadius: "6px", padding: "3px 8px", fontSize: "12px", color: cl === "Genomförd" ? C.pareto : C.warnText }}>
+                            {cl}
+                          </span>
+                        )}
                       </div>
                     )}
                     {Object.keys(cfg).length > 0 && (
@@ -312,19 +407,25 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
                         </div>
                       </div>
                     )}
-                    {paretoFront.length > 0 ? (
-                      <div>
-                        <div style={{ fontSize: "11px", color: C.faint, marginBottom: "4px" }}>Arkitekturer på Paretofronten</div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
-                          {paretoFront.map(namn => (
-                            <span key={namn} style={{ background: "#052e1f", border: `1px solid ${C.pareto}55`, color: C.pareto, borderRadius: "6px", padding: "3px 8px", fontSize: "12px", fontFamily: "monospace" }}>
-                              {namn}
-                            </span>
-                          ))}
+                    {paretoApplicable ? (
+                      paretoFront.length > 0 ? (
+                        <div>
+                          <div style={{ fontSize: "11px", color: C.faint, marginBottom: "4px" }}>Arkitekturer på Paretofronten</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                            {paretoFront.map(namn => (
+                              <span key={namn} style={{ background: "#052e1f", border: `1px solid ${C.pareto}55`, color: C.pareto, borderRadius: "6px", padding: "3px 8px", fontSize: "12px", fontFamily: "monospace" }}>
+                                {namn}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div style={{ fontSize: "12px", color: C.faint }}>Ingen Paretofront registrerad för det här experimentet.</div>
+                      )
                     ) : (
-                      <div style={{ fontSize: "12px", color: C.faint }}>Ingen Paretofront registrerad för det här experimentet.</div>
+                      <div style={{ fontSize: "12px", color: C.faint }}>
+                        Pareto-analys är inte tillämplig för den här experimenttypen{typLabel ? ` (${typLabel})` : ""} — se sammanfattningen ovan istället.
+                      </div>
                     )}
                   </div>
                 )}
