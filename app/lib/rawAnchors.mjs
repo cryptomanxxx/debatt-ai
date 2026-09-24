@@ -32,11 +32,41 @@ const HAS_ANCHOR_RE = /<a\s/i;
 // synliga länktexten.
 const ANCHOR_TAG_RE = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
 
-// Extraherar href-värdet ur en attributsträng — tolerant mot attributordning
-// (den kan stå var som helst bland andra attribut), whitespace runt "="
-// (href = "...", href="...", href ="..."), och citattecken (dubbla, enkla,
-// eller helt utan citattecken).
-const HREF_ATTR_RE = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i;
+// Tokeniserar EN attribut-token i taggens attributsträng: ett attributnamn
+// följt av ett valfritt =värde (citerat med " eller ', eller ociterat fram
+// till nästa whitespace/'>'). Grupp 1 = attributnamnet, grupp 2/3/4 =
+// värdet (dubbla citattecken/enkla citattecken/ociterat).
+//
+// Används för att hitta href SOM ETT EGET, NAMNGIVET ATTRIBUT — inte som en
+// lös delsträng "href=" var som helst i attributsträngen. En tidigare
+// version sökte "href=" fritt i hela strängen (\bhref\s*=), vilket felaktigt
+// kunde matcha "href=" INUTI ett annat attributs citerade värde (t.ex.
+// title="href=https://fel.example" href="https://ratt.example" hade gett
+// fel URL) eller ett attribut med ett liknande men annat namn (t.ex.
+// data-href="..." hade blivit klickbart trots att det inte har någon
+// href alls) — eftersom \b bara kräver en ordgräns, inte att "href" är
+// hela attributnamnet (Codex-fynd, PR #1525-granskning). Genom att
+// tokenisera ETT HELT attribut i taget (namn + eventuellt VÄRDE, där ett
+// citerat värde konsumeras i sin helhet innan nästa attribut söks) kan
+// "href=" aldrig hittas inuti ett annat attributs citerade innehåll, och
+// ett namn som bara RÅKAR sluta på "href" (data-href, xlink:href) matchar
+// aldrig eftersom hela attributnamnet ("data-href") jämförs, inte bara en
+// delsträng av det.
+const ATTR_TOKEN_RE = /([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*(?:=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+
+function extraheraHref(attrs) {
+  ATTR_TOKEN_RE.lastIndex = 0;
+  let m;
+  while ((m = ATTR_TOKEN_RE.exec(attrs)) !== null) {
+    if (m[1].toLowerCase() === "href") return (m[2] ?? m[3] ?? m[4] ?? "").trim();
+    // Skydd mot en oändlig loop vid en nolllängdsmatchning — attributnamnets
+    // teckenklass kräver minst ett tecken, så detta bör aldrig inträffa i
+    // praktiken, men en trasig indata (t.ex. bara skräptecken) ska aldrig
+    // kunna hänga skriptet.
+    if (m.index === ATTR_TOKEN_RE.lastIndex) ATTR_TOKEN_RE.lastIndex++;
+  }
+  return "";
+}
 
 // Bara http(s)-länkar blir klickbara — javascript:/data:/vbscript: m.fl.
 // avvisas och lämnas kvar som overksam, synlig text (skydd mot att en
@@ -68,8 +98,7 @@ export function parseRawAnchors(text) {
     if (m.index > lastIndex) tokens.push({ type: "text", value: text.slice(lastIndex, m.index) });
     const attrs = m[1] || "";
     const linkText = m[2];
-    const hrefMatch = attrs.match(HREF_ATTR_RE);
-    const href = hrefMatch ? (hrefMatch[1] ?? hrefMatch[2] ?? hrefMatch[3] ?? "").trim() : "";
+    const href = extraheraHref(attrs);
     if (href && SAFE_URL_RE.test(href)) {
       tokens.push({ type: "link", href, text: linkText });
     } else {

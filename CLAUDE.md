@@ -4326,12 +4326,14 @@ Användarrapport (sep 2026), med en extern ChatGPT-analys av repot bifogad: en p
 
 **Känd begränsning:** den exakta orsaken till felet på artikel 1849 specifikt kunde inte bekräftas empiriskt (ingen nätverksåtkomst till livesajten/databasen i den här sessionen) — fixen adresserar den mest konkreta, kodbekräftade bristen (attributordning/whitespace/citattecken) som ensam förklarar den beskrivna symptombilden, snarare än en verifierad reproduktion. Redan publicerad artikeltext med en tagg som fortfarande inte matchar (t.ex. en href med ett `>`-tecken inuti ett citerat attributvärde) rättas inte retroaktivt — samma självläkande-princip som redan etablerad för liknande engångsdataproblem i den här loggen.
 
+**Codex-fynd (PR #1525-granskning): href-sökningen kunde träffa fel attribut.** Den ursprungliga `HREF_ATTR_RE = /\bhref\s*=\s*.../i` sökte "href=" fritt i HELA attributsträngen, inte bara som ett eget attributnamn — `\b` kräver bara en ordgräns, inte att "href" är HELA attributnamnet. Två konkreta konsekvenser: (1) `<a title="href=https://fel.example" href="https://ratt.example">` kunde plocka upp "href=" INUTI `title`-attributets citerade VÄRDE och peka länken fel; (2) `<a data-href="https://example.com">` (ett attribut vars namn bara RÅKAR sluta på "href") kunde felaktigt göras klickbart trots att taggen saknar en riktig `href` helt. Fixat genom att ersätta friträffs-sökningen med en riktig attribut-tokenisering (`ATTR_TOKEN_RE`): ett attribut konsumeras i sin helhet (namn + eventuellt citerat värde) innan nästa söks, så "href=" inuti ett annat attributs citerade innehåll kan aldrig plockas upp separat, och bara ett attribut vars NAMN är exakt "href" (skiftlägesokänsligt) godkänns. 3 nya test i `tests/rawAnchors.test.mjs` (70 totalt) — täcker båda de konkreta scenarierna plus `xlink:href` som ett tredje exempel på ett namn som bara delvis liknar "href".
+
 | Fil | Roll |
 |---|---|
-| `app/lib/rawAnchors.mjs` | Ny delad modul. `parseRawAnchors(text)` — attributordning-/whitespace-/citattecken-tolerant ankartaggsmatchning, returnerar rena data-tokens (aldrig HTML/JSX). `taBortAnkartaggar(text)` |
+| `app/lib/rawAnchors.mjs` | Ny delad modul. `parseRawAnchors(text)` — attributordning-/whitespace-/citattecken-tolerant ankartaggsmatchning, returnerar rena data-tokens (aldrig HTML/JSX). `taBortAnkartaggar(text)`. `extraheraHref()`/`ATTR_TOKEN_RE` tokeniserar attribut ett i taget istället för en fri "href="-substrängssökning (Codex-fynd) |
 | `app/artikel/[id]/ArgumentRoster.js` | `linkifyRawAnchors()` delegerar mönstermatchningen till `parseRawAnchors()`, bygger bara React-JSX av tokens själv — samma säkra konstruktionsprincip, ingen `dangerouslySetInnerHTML` |
 | `app/lib/htmlText.js` | `taBortAnkartaggar()` delegerar nu till den delade modulen istället för en egen dubblerad regex |
-| `tests/rawAnchors.test.mjs` | Nytt regressionstest, 22 fall — attributordning, whitespace, citattecken, versaler, flera länkar/stycken, osäkra scheman |
+| `tests/rawAnchors.test.mjs` | Regressionstest, 25 fall totalt — attributordning, whitespace, citattecken, versaler, flera länkar/stycken, osäkra scheman, felplacerad "href="-text i ett annat attributs värde, `data-href`/`xlink:href` |
 
 ---
 

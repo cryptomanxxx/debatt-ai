@@ -27,6 +27,33 @@ test("attributordning — href kommer EFTER target/rel (den rapporterade buggen)
   assert.deepEqual(l, { type: "link", href: "https://example.com/b", text: "Källan" });
 });
 
+// Codex-fynd (PR #1525-granskning): en tidigare version sökte "href=" fritt
+// i hela attributsträngen (\bhref\s*=), vilket kunde matcha "href=" INUTI
+// ett annat attributs citerade VÄRDE, eller ett attribut vars namn bara
+// RÅKAR sluta på "href" (data-href). Genom att tokenisera ETT HELT attribut
+// i taget (namn + eventuellt citerat värde) kan ingendera längre hända.
+
+test("href-attributet väljs korrekt även om ett annat attributs VÄRDE innehåller texten 'href='", () => {
+  const [l] = lankTokens(
+    '<a title="href=https://fel.example" href="https://ratt.example">Källan</a>'
+  );
+  assert.equal(l.href, "https://ratt.example");
+});
+
+test("ett attribut vars namn bara slutar på 'href' (data-href) blir aldrig länkens URL", () => {
+  const tokens = parseRawAnchors('<a data-href="https://example.com">Klicka</a>');
+  // Ingen giltig href hittades (bara det olikartade attributnamnet
+  // "data-href") — taggen ska INTE bli klickbar.
+  assert.equal(tokens.some((t) => t.type === "link"), false);
+  const unsafe = tokens.find((t) => t.type === "unsafe-anchor");
+  assert.ok(unsafe);
+});
+
+test("xlink:href (ett annat attributnamn som råkar sluta på 'href') blir inte heller länkens URL", () => {
+  const tokens = parseRawAnchors('<a xlink:href="https://example.com">Klicka</a>');
+  assert.equal(tokens.some((t) => t.type === "link"), false);
+});
+
 test("whitespace runt likhetstecknet", () => {
   const [l1] = lankTokens('<a href = "https://example.com/c">A</a>');
   assert.equal(l1.href, "https://example.com/c");
