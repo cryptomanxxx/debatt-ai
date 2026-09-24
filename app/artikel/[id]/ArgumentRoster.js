@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useMemo, Fragment } from "react";
+import { parseRawAnchors } from "../../lib/rawAnchors.mjs";
 
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -69,48 +70,32 @@ function linkifyKalla(paragraphs, kalla) {
 // m.fl. avvisas och lämnas kvar som overksam, synlig text istället för att bli
 // klickbara (skydd mot att en mänsklig inlämning smugglar in en XSS-nyttolast
 // via en falsk länk, t.ex. i en egenhändigt formaterad "Källor"-lista).
-const SAFE_URL_RE = /^https?:\/\//i;
-const RAW_ANCHOR_RE = /<a\s+href=(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a>/gi;
-// Snabb förkontroll innan den kostsammare loopen körs — måste vara lika
-// tolerant mot skiftläge och whitespace som RAW_ANCHOR_RE självt (case-
-// insensitive, godtyckligt whitespace mellan "<a" och "href"), annars
-// missas giltiga former som <A href="..."> eller <a\thref="..."> som
-// regexen faktiskt skulle ha matchat (Codex-fynd, PR #1463-granskning:
-// den ursprungliga .includes("<a ") var skiftlägeskänslig och krävde
-// exakt ett mellanslag).
-const HAS_ANCHOR_RE = /<a\s/i;
-
+//
+// Själva mönstermatchningen (attributordning, whitespace, citattecken,
+// URL-säkerhet) ligger i den delade, testade app/lib/rawAnchors.mjs — den
+// här funktionen bygger bara React-JSX av de tokens den ger tillbaka.
 function linkifyRawAnchors(text, keyPrefix) {
-  if (typeof text !== "string" || !HAS_ANCHOR_RE.test(text)) return text;
-  const nodes = [];
-  let lastIndex = 0;
-  let key = 0;
-  let m;
-  RAW_ANCHOR_RE.lastIndex = 0;
-  while ((m = RAW_ANCHOR_RE.exec(text)) !== null) {
-    const href = (m[1] ?? m[2] ?? "").trim();
-    const linkText = m[3];
-    if (m.index > lastIndex) nodes.push(text.slice(lastIndex, m.index));
-    if (SAFE_URL_RE.test(href)) {
-      nodes.push(
+  const tokens = parseRawAnchors(text);
+  if (!tokens) return text;
+  const nodes = tokens.map((t, i) => {
+    if (t.type === "text") return t.value;
+    if (t.type === "link") {
+      return (
         <a
-          key={`${keyPrefix}-raw-${key++}`}
-          href={href}
+          key={`${keyPrefix}-raw-${i}`}
+          href={t.href}
           target="_blank"
           rel="noopener noreferrer"
           style={{ color: "#38bdf8", textDecoration: "underline", textDecorationColor: "#38bdf850" }}
         >
-          {linkText}
+          {t.text}
         </a>
       );
-    } else {
-      // Osäkert URL-schema — lämna kvar exakt den ursprungliga texten, overksam.
-      nodes.push(m[0]);
     }
-    lastIndex = RAW_ANCHOR_RE.lastIndex;
-  }
-  if (lastIndex === 0) return text; // inget giltigt ankarmönster hittades trots "<a "-träffen
-  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+    // unsafe-anchor — osäkert eller saknat URL-schema, lämna kvar exakt den
+    // ursprungliga texten, overksam.
+    return t.raw;
+  });
   return <Fragment key={keyPrefix}>{nodes}</Fragment>;
 }
 

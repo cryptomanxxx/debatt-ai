@@ -4312,6 +4312,29 @@ Användarrapport (sep 2026), direkt uppföljning på ✅134: *"Experimenthistori
 
 ---
 
+### ✅ 136. Referenslänkar i artikeltext visades ibland som rå text — länkparsern krävde att href var FÖRSTA attributet – KLART
+
+Användarrapport (sep 2026), med en extern ChatGPT-analys av repot bifogad: en publicerad artikel (https://www.debatt-ai.se/artikel/1849) visade en av sina referenslänkar felaktigt. Den bifogade analysen pekade ut `app/artikel/[id]/ArgumentRoster.js`s regex-baserade länkigenkänning som trolig orsak och avrådde uttryckligen från `dangerouslySetInnerHTML` som lösning ("då öppnas en onödig XSS-yta när användare och AI-agenter kan skapa artikeltext") — en instruktion som följdes strikt: hela fixen bygger vidare på den redan etablerade principen att bara extrahera URL/länktext ur mönstret och konstruera React-elementet själv.
+
+**Verifiering innan fix (den externa analysen behandlades som obekräftad, inte som sanning):** den bifogade analysens kärnpåstående — att en regex vid namn `RAW_ANCHOR_RE` fanns i filen och kunde vara skör — bekräftades genom att läsa filens faktiska innehåll. Livesajten och Supabase-databasen kunde däremot inte nås från den här miljön (utgående nätverkstrafik till `debatt-ai.se` blockeras av sandboxens proxy-policy) — den exakta felformen i artikel 1849 kunde alltså inte verifieras direkt. Kodgranskningen visade dock en genuin, konkret brist som ensam förklarar exakt den rapporterade symptombilden.
+
+**Rotorsak:** `RAW_ANCHOR_RE = /<a\s+href=(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a>/gi` krävde att `href` var det FÖRSTA (och bokstavligen enda namngivna) attributet direkt efter `<a `. En ankartagg med attributen i en annan ordning — t.ex. `<a target="_blank" href="...">` eller `<a rel="noopener" href="...">`, ett fullt rimligt mönster för både mänskligt formaterade "Källor"-listor och LLM-genererad text — matchade aldrig regexen, och taggen visades då som rå, synlig text istället för att bli en klickbar länk. Whitespace runt `=` (`href = "..."`) och en href helt utan citattecken (`href=https://...`) hade samma effekt. Samma regex fanns dessutom DUPLICERAD i `app/lib/htmlText.js` (för att strippa ankartaggar inför text-till-tal, se ✅123) — en risk för att de två kopiorna skulle glida isär vid en framtida fix, exakt det mönster som redan flera gånger dokumenterats i den här loggen (✅93s `agentAnalys.js`-utbrytning).
+
+**Fix — en delad, testbar parser, ingen `dangerouslySetInnerHTML`:** ny modul `app/lib/rawAnchors.mjs` (`.mjs`, samma mönster som `app/lib/lasarbildToken.mjs`, ✅116 — importerbar direkt av Nodes testrunner utan JSX/bundler-omväg). `parseRawAnchors(text)` matchar nu HELA `<a ...>...</a>`-elementet (`<a\b([^>]*)>([\s\S]*?)<\/a>`) oavsett attributordning, och letar sedan efter `href` NÅGONSTANS i attributsträngen via en egen regex (`\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))`) — tolerant mot attributordning, whitespace runt `=`, och citattecken (dubbla/enkla/inga alls). Funktionen returnerar rena data-tokens (`{type:"text"}` / `{type:"link", href, text}` / `{type:"unsafe-anchor", text, raw}` för ett osäkert eller saknat URL-schema) — aldrig HTML eller JSX. `ArgumentRoster.js`s `linkifyRawAnchors()` bygger nu React-`<a>`-element manuellt av dessa tokens, exakt samma säkra konstruktionsprincip som innan (href/target/rel/style sätts explicit, aldrig de matchade attributen rakt av; bara `http(s)://`-scheman blir klickbara). `app/lib/htmlText.js`s `taBortAnkartaggar()` delegerar nu till samma delade modul istället för att ha en egen kopia av regexen.
+
+**Regressionstester:** `tests/rawAnchors.test.mjs` (22 nya test, `node --test tests/*.test.mjs`) — täcker exakt de variationsklasser som orsakade buggen: attributordning (href efter target/rel — den rapporterade buggen), whitespace runt `=`, enkla/dubbla/inga citattecken, versaler, radbrytning mellan attribut, www vs. icke-www, flera länkar i samma stycke med blandad formatering, flera källreferenser i olika stycken, osäkra URL-scheman, en ankartagg utan href, samt att vanlig text utan ankartaggar lämnas helt oförändrad. Samtliga 61 tester i `tests/`-katalogen passerar. `npx next build` verifierat framgångsrikt.
+
+**Känd begränsning:** den exakta orsaken till felet på artikel 1849 specifikt kunde inte bekräftas empiriskt (ingen nätverksåtkomst till livesajten/databasen i den här sessionen) — fixen adresserar den mest konkreta, kodbekräftade bristen (attributordning/whitespace/citattecken) som ensam förklarar den beskrivna symptombilden, snarare än en verifierad reproduktion. Redan publicerad artikeltext med en tagg som fortfarande inte matchar (t.ex. en href med ett `>`-tecken inuti ett citerat attributvärde) rättas inte retroaktivt — samma självläkande-princip som redan etablerad för liknande engångsdataproblem i den här loggen.
+
+| Fil | Roll |
+|---|---|
+| `app/lib/rawAnchors.mjs` | Ny delad modul. `parseRawAnchors(text)` — attributordning-/whitespace-/citattecken-tolerant ankartaggsmatchning, returnerar rena data-tokens (aldrig HTML/JSX). `taBortAnkartaggar(text)` |
+| `app/artikel/[id]/ArgumentRoster.js` | `linkifyRawAnchors()` delegerar mönstermatchningen till `parseRawAnchors()`, bygger bara React-JSX av tokens själv — samma säkra konstruktionsprincip, ingen `dangerouslySetInnerHTML` |
+| `app/lib/htmlText.js` | `taBortAnkartaggar()` delegerar nu till den delade modulen istället för en egen dubblerad regex |
+| `tests/rawAnchors.test.mjs` | Nytt regressionstest, 22 fall — attributordning, whitespace, citattecken, versaler, flera länkar/stycken, osäkra scheman |
+
+---
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

@@ -6,9 +6,9 @@
 // <a href="...">-tagg (t.ex. Filmrecensentens kodgaranterade käll­attribution,
 // se ✅123) skulle annars läsas upp som syntax istället för prosa
 // (Codex-fynd, PR #1470-granskning). Behåller bara länkens synliga text.
-const RAW_ANCHOR_RE = /<a\s+href=(?:"[^"]*"|'[^']*')[^>]*>([\s\S]*?)<\/a>/gi;
-
-export function taBortAnkartaggar(text) {
-  if (typeof text !== "string" || !text) return text;
-  return text.replace(RAW_ANCHOR_RE, "$1");
-}
+//
+// Delegerar till den delade, testade parsern i app/lib/rawAnchors.mjs — de
+// två filerna hade tidigare varsin egen kopia av samma regex, vilket är
+// exakt det duplikationsmönster som redan flera gånger visat sig glida isär
+// på andra ställen i den här kodbasen (se ✅93s agentAnalys.js-utbrytning).
+export { taBortAnkartaggar } from "./rawAnchors.mjs";
