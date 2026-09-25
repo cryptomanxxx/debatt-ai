@@ -306,14 +306,37 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
         </div>
       </div>
 
+      <div style={{ ...SEKTION, border: `1px solid ${C.accentDim}`, background: "linear-gradient(135deg, #071521 0%, #111827 100%)" }}>
+        <div style={{ fontSize: "12px", color: C.accent, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
+          Forskningsmål
+        </div>
+        <h2 style={{ ...RUBRIK, fontSize: "22px", marginBottom: "10px" }}>Debatt-AI Photonic Neural Network v1</h2>
+        <p style={{ color: C.text, fontSize: "15px", lineHeight: 1.7, marginBottom: "12px" }}>
+          Målet för Debatt-AI Q.ANT Research Lab är att utveckla en egen neural nätverksarkitektur byggd kring
+          Q.ANT Native Computing Toolkits fotoniskt orienterade, icke-linjära matematiska byggblock — inte bara att
+          köra färdiga exempelmodeller.
+        </p>
+        <p style={{ color: C.dim, fontSize: "14px", lineHeight: 1.7, margin: 0 }}>
+          Den första målmodellen kallas <strong style={{ color: C.text }}>Debatt-AI Photonic Neural Network v1</strong>.
+          Den ska växa fram ur reproducerbara experiment där arkitektur, numerisk kompatibilitet och praktisk
+          problemlösningsförmåga utvärderas steg för steg. När en lovande modell finns är den långsiktiga planen att
+          validera den på faktisk Q.ANT-fotonikhårdvara och då mäta verklig latency, throughput och energianvändning.
+        </p>
+      </div>
+
       <div style={SEKTION}>
         <div style={{ fontSize: "12px", color: C.faint, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
-          Aktuell forskningsfråga
+          Övergripande forskningsfråga
         </div>
-        <div style={{ fontSize: "15px", color: C.text, lineHeight: 1.7 }}>
-          De senaste experimenten indikerar att fler Fourier-komponenter kan ge större ackumulerade skillnader mellan
-          referensberäkningen och Q.ANT-backenden. Forskningen undersöker nu om arkitekturen kan modifieras så att denna
-          felackumulering begränsas utan att den extra representationskapaciteten går förlorad.
+        <div style={{ fontSize: "17px", color: C.text, lineHeight: 1.7, fontWeight: 600, marginBottom: "12px" }}>
+          Kan en AI-forskare autonomt upptäcka neurala arkitekturer som är särskilt väl anpassade till Q.ANT:s
+          fotoniska native computing — och kan dessa arkitekturer sedan lösa verkliga problem effektivt?
+        </div>
+        <div style={{ fontSize: "14px", color: C.dim, lineHeight: 1.7 }}>
+          De nuvarande experimenten kartlägger designreglerna bakom sådana modeller: bland annat hur ackumuleringsbredd,
+          hierarkisk struktur och downstream-känslighet påverkar överensstämmelsen mellan referensberäkningen och
+          Q.ANT-backenden. Nästa fas är att använda dessa resultat för att gå från diagnostiska experiment till en
+          egen Q.ANT-native modell och testa den på praktiska uppgifter.
         </div>
       </div>
 
