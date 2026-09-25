@@ -152,6 +152,7 @@ function StatPill({ label, v, sub }) {
 export default function QantVy({ data, repoUrl, dashboardUrl }) {
   const [oppetExp, setOppetExp] = useState(null);
   const [visadeExperiment, setVisadeExperiment] = useState(10);
+  const [visadePnnExperiment, setVisadePnnExperiment] = useState(10);
   const [visaHelaHistoriken, setVisaHelaHistoriken] = useState(false);
   const [aktivForskningsflik, setAktivForskningsflik] = useState("pnn-v1");
 
@@ -182,6 +183,8 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
   const provenance = data.provenance || {};
   const pnn = data.pnn_v1 || {};
   const pnnExperiments = Array.isArray(pnn.experiments) ? pnn.experiments : [];
+  const pnnSenasteForst = [...pnnExperiments].reverse();
+  const synligaPnnExperiment = pnnSenasteForst.slice(0, visadePnnExperiment);
 
   // Sorterar efter forskningssekvensens experimentnummer (Exp001 → Exp002 → …),
   // inte filens timestamp — de två kan divergera (se experimentNummer() ovan).
@@ -464,7 +467,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
             </p>
           </div>
 
-          {pnnExperiments.length === 0 ? <div style={TOM}>Inga PNN-v1-resultat publicerade ännu.</div> : pnnExperiments.map((exp) => (
+          {pnnExperiments.length === 0 ? <div style={TOM}>Inga PNN-v1-resultat publicerade ännu.</div> : synligaPnnExperiment.map((exp) => (
             <div key={exp.id} style={SEKTION}>
               <h2 style={RUBRIK}>{exp.id} — {exp.dataset || "benchmark"}</h2>
               <p style={INGRESS}>
@@ -489,6 +492,16 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
               </div>
             </div>
           ))}
+          {visadePnnExperiment < pnnExperiments.length && (
+            <div style={{ textAlign: "center", margin: "8px 0 24px" }}>
+              <button
+                onClick={() => setVisadePnnExperiment(v => v + 10)}
+                style={{ background: "#0d1117", color: C.accent, border: `1px solid ${C.border}`, borderRadius: "8px", padding: "10px 16px", cursor: "pointer", fontSize: "13px" }}
+              >
+                Visa 10 äldre PNN-v1-experiment ({pnnExperiments.length - visadePnnExperiment} kvar)
+              </button>
+            </div>
+          )}
         </>
       )}
 
