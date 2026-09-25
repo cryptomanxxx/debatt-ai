@@ -180,6 +180,8 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
   const arkitekturer = Array.isArray(featured.architectures) ? featured.architectures : [];
   const forskningsloop = Array.isArray(data.research_loop) ? data.research_loop : [];
   const provenance = data.provenance || {};
+  const pnn = data.pnn_v1 || {};
+  const pnnExperiments = Array.isArray(pnn.experiments) ? pnn.experiments : [];
 
   // Sorterar efter forskningssekvensens experimentnummer (Exp001 → Exp002 → …),
   // inte filens timestamp — de två kan divergera (se experimentNummer() ovan).
@@ -359,22 +361,45 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
       </div>
 
       {aktivForskningsflik === "pnn-v1" && (
-        <div style={{ ...SEKTION, border: `1px solid ${C.accentDim}` }}>
-          <div style={{ fontSize: "12px", color: C.accent, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
-            Development phase
+        <>
+          <div style={{ ...SEKTION, border: `1px solid ${C.accentDim}` }}>
+            <div style={{ fontSize: "12px", color: C.accent, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Development phase</div>
+            <h2 style={{ ...RUBRIK, fontSize: "20px", marginBottom: "10px" }}>{pnn.name || "Debatt-AI Photonic Neural Network v1"}</h2>
+            <p style={{ color: C.text, fontSize: "15px", lineHeight: 1.7, marginBottom: "14px" }}>
+              {pnn.description || "Utveckling av en kompakt Q.ANT-native neural nätverksarkitektur."}
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
+              <StatPill label="Genomförda PNN-experiment" v={pnn.completed_experiments ?? pnnExperiments.length} />
+              <StatPill label="Senaste PNN-experiment" v={pnn.latest_completed_experiment || "–"} />
+              <StatPill label="Första benchmark" v={pnnExperiments[0]?.dataset || "–"} />
+            </div>
           </div>
-          <h2 style={{ ...RUBRIK, fontSize: "20px", marginBottom: "10px" }}>Debatt-AI Photonic Neural Network v1</h2>
-          <p style={{ color: C.text, fontSize: "15px", lineHeight: 1.7, marginBottom: "10px" }}>
-            Här kommer utvecklingen av vår egen Q.ANT-native neurala nätverksarkitektur att följas experiment för experiment.
-            Den nya serien startar med <strong>PNN-v1 Proposal001 ↔ PNN-v1 Exp001</strong> och använder resultaten från
-            Toolkit-forskningen som grund.
-          </p>
-          <p style={{ color: C.dim, fontSize: "14px", lineHeight: 1.7, margin: 0 }}>
-            När de första PNN-v1-experimenten finns publiceras modellcentrerade grafer här: utveckling över experiment,
-            jämförelser mot konventionella baselines samt relevanta mått för Q.ANT-kompatibilitet. Inga resultat visas
-            innan experimenten faktiskt har genomförts.
-          </p>
-        </div>
+          {pnnExperiments.length === 0 ? <div style={TOM}>Inga PNN-v1-resultat publicerade ännu.</div> : pnnExperiments.map((exp) => (
+            <div key={exp.id} style={SEKTION}>
+              <h2 style={RUBRIK}>{exp.id} — {exp.dataset || "benchmark"}</h2>
+              <p style={INGRESS}>
+                Backend: <code>{exp.backend || "–"}</code>{typeof exp.success_criteria_met === "boolean" ? ` · Förregistrerat kriterium: ${exp.success_criteria_met ? "uppfyllt" : "inte uppfyllt"}` : ""}
+              </p>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <thead><tr style={{ borderBottom: `1px solid ${C.border}`, color: C.faint, textAlign: "left" }}>
+                    <th style={{ padding: "8px" }}>Arkitektur / variant</th><th style={{ padding: "8px" }}>Parametrar</th><th style={{ padding: "8px" }}>Reference accuracy</th><th style={{ padding: "8px" }}>Q.ANT accuracy</th><th style={{ padding: "8px" }}>Q.ANT std.avv</th><th style={{ padding: "8px" }}>Logit MAE</th>
+                  </tr></thead>
+                  <tbody>{(exp.architectures || []).map(a => (
+                    <tr key={a.architecture} style={{ borderBottom: `1px solid ${C.border}` }}>
+                      <td style={{ padding: "8px", color: C.text, fontFamily: "monospace" }}>{a.architecture}</td>
+                      <td style={{ padding: "8px", color: C.dim }}>{typeof a.parameters === "number" ? a.parameters.toLocaleString("sv-SE") : "–"}</td>
+                      <td style={{ padding: "8px", color: C.text }}>{typeof a.mean_reference_accuracy === "number" ? fmtPct(a.mean_reference_accuracy, 2) : "–"}</td>
+                      <td style={{ padding: "8px", color: C.accent }}>{typeof a.mean_qant_accuracy === "number" ? fmtPct(a.mean_qant_accuracy, 2) : "–"}</td>
+                      <td style={{ padding: "8px", color: C.faint }}>{typeof a.std_qant_accuracy === "number" ? `± ${(a.std_qant_accuracy * 100).toFixed(2)}` : "–"}</td>
+                      <td style={{ padding: "8px", color: C.faint }}>{typeof a.mean_absolute_logit_error === "number" ? a.mean_absolute_logit_error.toFixed(4) : "–"}</td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </>
       )}
 
       {aktivForskningsflik === "toolkit" && (
