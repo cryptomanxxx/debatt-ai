@@ -335,6 +335,32 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
         </div>
       </div>
 
+      {/* Forskningsloopen */}
+      {forskningsloop.length > 0 && (
+        <div style={SEKTION}>
+          <h2 style={RUBRIK}>Forskningsloopen</h2>
+          <p style={INGRESS}>
+            Varje ny idé testas som en falsifierbar hypotes innan den får köra ett skarpt experiment —
+            en människa godkänner alltid steget mellan hypotes och körning.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" }}>
+            {forskningsloop.map((steg, i) => (
+              <span key={`${steg}-${i}`} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{
+                  background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "999px",
+                  padding: "8px 14px", fontSize: "13px", color: C.text, whiteSpace: "nowrap",
+                }}>
+                  {String(steg).charAt(0).toUpperCase() + String(steg).slice(1)}
+                </span>
+                {i < forskningsloop.length - 1 && <span style={{ color: C.faint }}>→</span>}
+              </span>
+            ))}
+            <span style={{ color: C.faint, fontSize: "12px" }}>↻</span>
+          </div>
+        </div>
+      )}
+
+
       {/* Forskningsspår */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px", marginBottom: "24px" }}>
         <button
@@ -405,31 +431,6 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
 
       {aktivForskningsflik === "toolkit" && (
         <>
-      {/* Forskningsloopen */}
-      {forskningsloop.length > 0 && (
-        <div style={SEKTION}>
-          <h2 style={RUBRIK}>Forskningsloopen</h2>
-          <p style={INGRESS}>
-            Varje ny idé testas som en falsifierbar hypotes innan den får köra ett skarpt experiment —
-            en människa godkänner alltid steget mellan hypotes och körning.
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px" }}>
-            {forskningsloop.map((steg, i) => (
-              <span key={`${steg}-${i}`} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{
-                  background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "999px",
-                  padding: "8px 14px", fontSize: "13px", color: C.text, whiteSpace: "nowrap",
-                }}>
-                  {String(steg).charAt(0).toUpperCase() + String(steg).slice(1)}
-                </span>
-                {i < forskningsloop.length - 1 && <span style={{ color: C.faint }}>→</span>}
-              </span>
-            ))}
-            <span style={{ color: C.faint, fontSize: "12px" }}>↻</span>
-          </div>
-        </div>
-      )}
-
       {/* Experimenthistorik / tidslinje */}
       <div style={SEKTION}>
         <h2 style={RUBRIK}>Experimenthistorik</h2>
