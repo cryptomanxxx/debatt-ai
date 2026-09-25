@@ -263,13 +263,15 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
         </div>
       )}
 
-      {/* Status */}
+      {/* Övergripande status. Compute och Q.ANT-backend hålls isär:
+          GitHub Actions tillhandahåller CPU-resurserna medan Q.ANT:s
+          software/simulation backend är exekveringslagret för Q.ANT-operationerna. */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px", marginBottom: "24px" }}>
-        <StatPill label="Genomförda experiment" v={status.completed_experiments ?? experiments.length} />
-        <StatPill label="Genomförda PNN-v1-experiment" v={pnn.completed_experiments ?? pnnExperiments.length} />
-        <StatPill label="Senaste experiment" v={naturligtNamn(status.latest_completed_experiment)} />
-        <StatPill label="Aktuell backend" v={<code style={{ fontFamily: "monospace" }}>{project.current_backend || "–"}</code>} />
-        <StatPill label="Arkitekturer på Paretofronten" v={`${antalParetoArk} / ${arkitekturer.length}`} sub={featured.dataset ? `i ${featured.dataset}` : null} />
+        <StatPill label="Toolkit-experiment" v={status.completed_experiments ?? experiments.length} />
+        <StatPill label="PNN-v1-experiment" v={pnn.completed_experiments ?? pnnExperiments.length} />
+        <StatPill label="Senaste PNN-v1-experiment" v={pnn.latest_completed_experiment || "–"} />
+        <StatPill label="Compute-plattform" v="GitHub Actions" sub="GitHub-hosted CPU runner" />
+        <StatPill label="Q.ANT-exekvering" v="Software simulation" sub="Q.ANT CPU backend" />
       </div>
 
       <div style={{ ...SEKTION, border: `1px solid ${C.accentDim}`, background: "linear-gradient(135deg, #071521 0%, #111827 100%)" }}>
