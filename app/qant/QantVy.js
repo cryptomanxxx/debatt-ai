@@ -268,35 +268,6 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
         <StatPill label="Arkitekturer på Paretofronten" v={`${antalParetoArk} / ${arkitekturer.length}`} sub={featured.dataset ? `i ${featured.dataset}` : null} />
       </div>
 
-      {/* Varför forskningen spelar roll */}
-      <div style={SEKTION}>
-        <h2 style={RUBRIK}>Vem kan ha nytta av forskningen?</h2>
-        <p style={{ ...INGRESS, marginBottom: "12px" }}>
-          Debatt-AI Q.ANT Research Lab undersöker inte bara om dagens neurala nätverk kan köras på alternativ
-          beräkningshårdvara. Den mer grundläggande frågan är vilka AI-arkitekturer som bör byggas när själva
-          beräkningen fungerar annorlunda än på traditionella GPU:er.
-        </p>
-        <p style={{ color: C.dim, fontSize: "14px", lineHeight: 1.7, marginBottom: "12px" }}>
-          Forskningen kan vara relevant för <strong style={{ color: C.text }}>Q.ANT och utvecklare av fotoniska acceleratorer</strong>,
-          forskare inom <strong style={{ color: C.text }}>photonic computing och hardware-aware AI</strong>, samt projekt inom
-          <strong style={{ color: C.text }}> EuroHPC och europeisk AI-infrastruktur</strong> som behöver avgöra vilka idéer som
-          är värda att skala till betydligt dyrare beräkningsresurser.
-        </p>
-        <p style={{ color: C.dim, fontSize: "14px", lineHeight: 1.7, marginBottom: "12px" }}>
-          Projektet är samtidigt ett experiment i <strong style={{ color: C.text }}>AI-driven forskning</strong>: en AI-forskare
-          analyserar resultaten, formulerar falsifierbara hypoteser och föreslår nästa experiment. En människa godkänner
-          experimentet innan den reproducerbara körningen utförs och resultaten versionshanteras och publiceras öppet.
-          Det gör det möjligt för andra att reproducera resultaten, kritisera metodiken och bygga vidare på arbetet.
-        </p>
-        <div style={{ background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px 16px", color: C.dim, fontSize: "13px", lineHeight: 1.65 }}>
-          <strong style={{ color: C.warnText }}>Viktig begränsning:</strong> de nuvarande experimenten använder Q.ANT:s
-          CPU-backend, som är en mjukvarubackend för utveckling utan den fotoniska processorn. Själva beräkningarna körs
-          på CPU-resurser i GitHub Actions — Q.ANT tillhandahåller alltså inte compute för dessa experiment. Resultaten
-          gäller därför arkitektur, kompatibilitet och numeriskt beteende — inte verklig fotonisk latency,
-          energiförbrukning eller throughput. Sådana slutsatser kräver senare experiment på faktisk Q.ANT-hårdvara.
-        </div>
-      </div>
-
       <div style={{ ...SEKTION, border: `1px solid ${C.accentDim}`, background: "linear-gradient(135deg, #071521 0%, #111827 100%)" }}>
         <div style={{ fontSize: "12px", color: C.accent, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
           Forskningsmål
@@ -328,6 +299,35 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
           hierarkisk struktur och downstream-känslighet påverkar överensstämmelsen mellan referensberäkningen och
           Q.ANT-backenden. Nästa fas är att använda dessa resultat för att gå från diagnostiska experiment till en
           egen Q.ANT-native modell och testa den på praktiska uppgifter.
+        </div>
+      </div>
+
+      {/* Varför forskningen spelar roll */}
+      <div style={SEKTION}>
+        <h2 style={RUBRIK}>Vem kan ha nytta av forskningen?</h2>
+        <p style={{ ...INGRESS, marginBottom: "12px" }}>
+          Debatt-AI Q.ANT Research Lab undersöker inte bara om dagens neurala nätverk kan köras på alternativ
+          beräkningshårdvara. Den mer grundläggande frågan är vilka AI-arkitekturer som bör byggas när själva
+          beräkningen fungerar annorlunda än på traditionella GPU:er.
+        </p>
+        <p style={{ color: C.dim, fontSize: "14px", lineHeight: 1.7, marginBottom: "12px" }}>
+          Forskningen kan vara relevant för <strong style={{ color: C.text }}>Q.ANT och utvecklare av fotoniska acceleratorer</strong>,
+          forskare inom <strong style={{ color: C.text }}>photonic computing och hardware-aware AI</strong>, samt projekt inom
+          <strong style={{ color: C.text }}> EuroHPC och europeisk AI-infrastruktur</strong> som behöver avgöra vilka idéer som
+          är värda att skala till betydligt dyrare beräkningsresurser.
+        </p>
+        <p style={{ color: C.dim, fontSize: "14px", lineHeight: 1.7, marginBottom: "12px" }}>
+          Projektet är samtidigt ett experiment i <strong style={{ color: C.text }}>AI-driven forskning</strong>: en AI-forskare
+          analyserar resultaten, formulerar falsifierbara hypoteser och föreslår nästa experiment. En människa godkänner
+          experimentet innan den reproducerbara körningen utförs och resultaten versionshanteras och publiceras öppet.
+          Det gör det möjligt för andra att reproducera resultaten, kritisera metodiken och bygga vidare på arbetet.
+        </p>
+        <div style={{ background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "10px", padding: "14px 16px", color: C.dim, fontSize: "13px", lineHeight: 1.65 }}>
+          <strong style={{ color: C.warnText }}>Viktig begränsning:</strong> de nuvarande experimenten använder Q.ANT:s
+          CPU-backend, som är en mjukvarubackend för utveckling utan den fotoniska processorn. Själva beräkningarna körs
+          på CPU-resurser i GitHub Actions — Q.ANT tillhandahåller alltså inte compute för dessa experiment. Resultaten
+          gäller därför arkitektur, kompatibilitet och numeriskt beteende — inte verklig fotonisk latency,
+          energiförbrukning eller throughput. Sådana slutsatser kräver senare experiment på faktisk Q.ANT-hårdvara.
         </div>
       </div>
 
