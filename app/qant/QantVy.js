@@ -403,6 +403,67 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
               <StatPill label="Första benchmark" v={pnnExperiments[0]?.dataset || "–"} />
             </div>
           </div>
+          <div style={SEKTION}>
+            <div style={{ fontSize: "12px", color: C.accent, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Teknisk modellbeskrivning</div>
+            <h2 style={RUBRIK}>PNN-v1 Alpha1 — nuvarande arkitektur</h2>
+            <p style={INGRESS}>
+              Den första PNN-v1-arkitekturen är ett kompakt, hierarkiskt Fourier/KAN-baserat nätverk byggt för att kunna
+              evalueras med Q.ANT Native Computing Toolkits <code style={{ color: C.accent }}>calc_kan_layer_fprop</code>.
+              Den nuvarande benchmarken är ECG200, där varje tidsserie innehåller 96 datapunkter och ska klassificeras i två klasser.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginBottom: "18px" }}>
+              <StatPill label="Input" v="96" sub="datapunkter per tidsserie" />
+              <StatPill label="Segmentering" v="12 × 8" sub="12 lokala fönster" />
+              <StatPill label="Latent representation" v="48" sub="12 × 4 features" />
+              <StatPill label="Output" v="2" sub="klasser" />
+              <StatPill label="Parametrar" v="3 890" sub="PNN-v1 Alpha1" />
+            </div>
+            <div style={{ background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "12px", padding: "18px", marginBottom: "16px" }}>
+              <div style={{ fontSize: "12px", color: C.faint, marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Arkitekturflöde</div>
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px", fontFamily: "monospace", fontSize: "13px" }}>
+                {[
+                  ["96 input", "ECG-tidsserie"],
+                  ["12 × (8 → 4)", "Q.ANT Fourier/KAN-block"],
+                  ["48 features", "sammanfogad representation"],
+                  ["48 → 2", "Q.ANT Fourier/KAN-head"],
+                  ["2 klasser", "klassificering"],
+                ].map(([titel, sub], i, arr) => (
+                  <span key={titel} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ border: `1px solid ${C.accentDim}`, background: "#083344", borderRadius: "9px", padding: "9px 11px", color: C.text }}>
+                      <strong>{titel}</strong><span style={{ display: "block", color: C.faint, fontSize: "10px", marginTop: "3px" }}>{sub}</span>
+                    </span>
+                    {i < arr.length - 1 && <span style={{ color: C.accent }}>→</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <tbody>
+                  {[
+                    ["Modelltyp", "Hierarkiskt Q.ANT-native Fourier/KAN-nätverk"],
+                    ["Lokala block", "12 block, vart och ett 8 → 4"],
+                    ["Frekvenser", "k = [1, 2, 3, 4]"],
+                    ["Output-head", "48 → 2 Fourier/KAN-block"],
+                    ["Träning", "Exakt torch.cos-referens"],
+                    ["Q.ANT-evaluering", "calc_kan_layer_fprop + add_bias_fprop"],
+                    ["Q.ANT-backend", "Software simulation / CPU backend"],
+                    ["Första benchmark", "ECG200 — 100 train / 100 test"],
+                  ].map(([k, v]) => (
+                    <tr key={k} style={{ borderBottom: `1px solid ${C.border}` }}>
+                      <td style={{ padding: "8px 10px", color: C.faint, whiteSpace: "nowrap" }}>{k}</td>
+                      <td style={{ padding: "8px 10px", color: C.text }}>{v}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ color: C.faint, fontSize: "12px", lineHeight: 1.6, marginTop: "14px", marginBottom: 0 }}>
+              Alpha1 är den första forskningsversionen, inte en låst slutarkitektur. Kommande PNN-v1-experiment får ändra
+              arkitekturen när resultaten ger stöd för det, medan varje version och resultat bevaras reproducerbart i forskningsrepot.
+            </p>
+          </div>
+
           {pnnExperiments.length === 0 ? <div style={TOM}>Inga PNN-v1-resultat publicerade ännu.</div> : pnnExperiments.map((exp) => (
             <div key={exp.id} style={SEKTION}>
               <h2 style={RUBRIK}>{exp.id} — {exp.dataset || "benchmark"}</h2>
