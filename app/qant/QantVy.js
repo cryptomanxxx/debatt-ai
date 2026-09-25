@@ -153,6 +153,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
   const [oppetExp, setOppetExp] = useState(null);
   const [visadeExperiment, setVisadeExperiment] = useState(10);
   const [visaHelaHistoriken, setVisaHelaHistoriken] = useState(false);
+  const [aktivForskningsflik, setAktivForskningsflik] = useState("toolkit");
 
   if (!data) {
     return (
@@ -331,6 +332,53 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
         </div>
       </div>
 
+      {/* Forskningsspår */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px", marginBottom: "24px" }}>
+        <button
+          onClick={() => setAktivForskningsflik("toolkit")}
+          style={{
+            padding: "14px 12px", borderRadius: "12px", cursor: "pointer", fontWeight: 700, fontSize: "14px",
+            border: `1px solid ${aktivForskningsflik === "toolkit" ? C.accent : C.border}`,
+            background: aktivForskningsflik === "toolkit" ? "#083344" : "#0d1117",
+            color: aktivForskningsflik === "toolkit" ? C.accent : C.dim,
+          }}
+        >
+          🧪 Q.ANT Toolkit Research
+        </button>
+        <button
+          onClick={() => setAktivForskningsflik("pnn-v1")}
+          style={{
+            padding: "14px 12px", borderRadius: "12px", cursor: "pointer", fontWeight: 700, fontSize: "14px",
+            border: `1px solid ${aktivForskningsflik === "pnn-v1" ? C.accent : C.border}`,
+            background: aktivForskningsflik === "pnn-v1" ? "#083344" : "#0d1117",
+            color: aktivForskningsflik === "pnn-v1" ? C.accent : C.dim,
+          }}
+        >
+          🧠 Photonic Neural Network v1
+        </button>
+      </div>
+
+      {aktivForskningsflik === "pnn-v1" && (
+        <div style={{ ...SEKTION, border: `1px solid ${C.accentDim}` }}>
+          <div style={{ fontSize: "12px", color: C.accent, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
+            Development phase
+          </div>
+          <h2 style={{ ...RUBRIK, fontSize: "20px", marginBottom: "10px" }}>Debatt-AI Photonic Neural Network v1</h2>
+          <p style={{ color: C.text, fontSize: "15px", lineHeight: 1.7, marginBottom: "10px" }}>
+            Här kommer utvecklingen av vår egen Q.ANT-native neurala nätverksarkitektur att följas experiment för experiment.
+            Den nya serien startar med <strong>PNN-v1 Proposal001 ↔ PNN-v1 Exp001</strong> och använder resultaten från
+            Toolkit-forskningen som grund.
+          </p>
+          <p style={{ color: C.dim, fontSize: "14px", lineHeight: 1.7, margin: 0 }}>
+            När de första PNN-v1-experimenten finns publiceras modellcentrerade grafer här: utveckling över experiment,
+            jämförelser mot konventionella baselines samt relevanta mått för Q.ANT-kompatibilitet. Inga resultat visas
+            innan experimenten faktiskt har genomförts.
+          </p>
+        </div>
+      )}
+
+      {aktivForskningsflik === "toolkit" && (
+        <>
       {/* Forskningsloopen */}
       {forskningsloop.length > 0 && (
         <div style={SEKTION}>
@@ -644,6 +692,9 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
           </>
         )}
       </div>
+
+        </>
+      )}
 
       {/* Provenance */}
       <div style={{ fontSize: "12px", color: C.faint, textAlign: "center", lineHeight: 1.7, padding: "8px 0 24px" }}>
