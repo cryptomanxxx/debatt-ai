@@ -153,7 +153,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
   const [oppetExp, setOppetExp] = useState(null);
   const [visadeExperiment, setVisadeExperiment] = useState(10);
   const [visaHelaHistoriken, setVisaHelaHistoriken] = useState(false);
-  const [aktivForskningsflik, setAktivForskningsflik] = useState("toolkit");
+  const [aktivForskningsflik, setAktivForskningsflik] = useState("pnn-v1");
 
   if (!data) {
     return (
@@ -266,6 +266,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
       {/* Status */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px", marginBottom: "24px" }}>
         <StatPill label="Genomförda experiment" v={status.completed_experiments ?? experiments.length} />
+        <StatPill label="Genomförda PNN-v1-experiment" v={pnn.completed_experiments ?? pnnExperiments.length} />
         <StatPill label="Senaste experiment" v={naturligtNamn(status.latest_completed_experiment)} />
         <StatPill label="Aktuell backend" v={<code style={{ fontFamily: "monospace" }}>{project.current_backend || "–"}</code>} />
         <StatPill label="Arkitekturer på Paretofronten" v={`${antalParetoArk} / ${arkitekturer.length}`} sub={featured.dataset ? `i ${featured.dataset}` : null} />
