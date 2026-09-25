@@ -268,15 +268,6 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
         <StatPill label="Arkitekturer på Paretofronten" v={`${antalParetoArk} / ${arkitekturer.length}`} sub={featured.dataset ? `i ${featured.dataset}` : null} />
       </div>
 
-      {status.current_research_direction && (
-        <div style={{ ...SEKTION, marginBottom: "24px" }}>
-          <div style={{ fontSize: "12px", color: C.faint, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>
-            Aktuell forskningsriktning
-          </div>
-          <div style={{ fontSize: "15px", color: C.text, lineHeight: 1.6 }}>{status.current_research_direction}</div>
-        </div>
-      )}
-
       {/* Varför forskningen spelar roll */}
       <div style={SEKTION}>
         <h2 style={RUBRIK}>Vem kan ha nytta av forskningen?</h2>
