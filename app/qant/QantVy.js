@@ -277,6 +277,35 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
         <StatPill label="Q.ANT-exekvering" v="Software simulation" sub="Q.ANT CPU backend" />
       </div>
 
+      {pnn.active_model && (
+        <div style={{ ...SEKTION, border: `1px solid ${C.pareto}66`, background: "linear-gradient(135deg, #052e1f 0%, #111827 100%)" }}>
+          <div style={{ fontSize: "12px", color: C.pareto, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
+            Aktiv PNN-v1-modell
+          </div>
+          <h2 style={{ ...RUBRIK, fontSize: "24px", marginBottom: "8px" }}>{pnn.active_model.name}</h2>
+          <div style={{ color: C.text, fontFamily: "monospace", fontSize: "13px", lineHeight: 1.7, marginBottom: "12px", overflowWrap: "anywhere" }}>
+            {pnn.active_model.architecture}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {Array.isArray(pnn.active_model.frequencies) && (
+              <span style={{ background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "999px", padding: "5px 10px", color: C.dim, fontSize: "12px" }}>
+                k=[{pnn.active_model.frequencies.join(",")}]
+              </span>
+            )}
+            {typeof pnn.active_model.ecg200_parameter_count === "number" && (
+              <span style={{ background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "999px", padding: "5px 10px", color: C.dim, fontSize: "12px" }}>
+                {pnn.active_model.ecg200_parameter_count.toLocaleString("sv-SE")} parametrar på ECG200
+              </span>
+            )}
+            {pnn.active_model.promoted_by && (
+              <span style={{ background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "999px", padding: "5px 10px", color: C.pareto, fontSize: "12px" }}>
+                Promoverad av {pnn.active_model.promoted_by}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div style={{ ...SEKTION, border: `1px solid ${C.accentDim}`, background: "linear-gradient(135deg, #071521 0%, #111827 100%)" }}>
         <div style={{ fontSize: "12px", color: C.accent, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
           Forskningsmål
