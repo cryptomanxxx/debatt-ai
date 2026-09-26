@@ -480,7 +480,7 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
           </div>
 
           {pnnExperiments.length > 0 && (() => {
-            const confirmations = pnnSenasteForst.filter(exp => /(?:w8|w10|w12)/i.test(exp.id || "") && typeof exp.success_criteria_met === "boolean").slice(0, 3);
+            const confirmations = pnnExperiments.filter(exp => /w(?:8|10|12).*100epoch/i.test(exp.id || "") && typeof exp.success_criteria_met === "boolean").slice(-3).reverse();
             if (!confirmations.length) return null;
             return (
               <div style={SEKTION}>
