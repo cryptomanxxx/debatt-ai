@@ -435,49 +435,57 @@ export default function QantVy({ data, repoUrl, dashboardUrl }) {
               <StatPill label="Första benchmark" v={pnnExperiments[0]?.dataset || "–"} />
             </div>
           </div>
-          <div style={SEKTION}>
-            <div style={{ fontSize: "12px", color: C.accent, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Teknisk modellbeskrivning</div>
-            <h2 style={RUBRIK}>PNN-v1 {pnn.active_model?.name || "aktiv modell"} — nuvarande arkitektur</h2>
-            <p style={INGRESS}>
-              Den aktiva PNN-v1-modellen är ett kompakt, hierarkiskt Fourier/KAN-baserat nätverk som evalueras med
-              Q.ANT Native Computing Toolkit. Arkitekturdata nedan hämtas från den aktiva modell som publiceras i forskningsdatan,
-              så beskrivningen följer modellutvecklingen i stället för att vara låst till Alpha1.
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginBottom: "18px" }}>
-              <StatPill label="Input" v="96" sub="datapunkter per ECG200-tidsserie" />
-              <StatPill label="Output" v="2" sub="klasser" />
-              <StatPill label="Parametrar" v={typeof pnn.active_model?.ecg200_parameter_count === "number" ? pnn.active_model.ecg200_parameter_count.toLocaleString("sv-SE") : "–"} sub={pnn.active_model?.name || "aktiv PNN-v1-modell"} />
-            </div>
-            {pnn.active_model?.architecture && (
-              <div style={{ background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "12px", padding: "18px", marginBottom: "16px" }}>
-                <div style={{ fontSize: "12px", color: C.faint, marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Arkitekturflöde</div>
-                <code style={{ color: C.text, fontSize: "13px", lineHeight: 1.7, overflowWrap: "anywhere" }}>{pnn.active_model.architecture}</code>
+          {pnn.active_model ? (
+            <div style={SEKTION}>
+              <div style={{ fontSize: "12px", color: C.accent, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Teknisk modellbeskrivning</div>
+              <h2 style={RUBRIK}>PNN-v1 {pnn.active_model?.name || "aktiv modell"} — nuvarande arkitektur</h2>
+              <p style={INGRESS}>
+                Den aktiva PNN-v1-modellen är ett kompakt, hierarkiskt Fourier/KAN-baserat nätverk som evalueras med
+                Q.ANT Native Computing Toolkit. Arkitekturdata nedan hämtas från den aktiva modell som publiceras i forskningsdatan,
+                så beskrivningen följer modellutvecklingen i stället för att vara låst till Alpha1.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px", marginBottom: "18px" }}>
+                <StatPill label="Input" v="96" sub="datapunkter per ECG200-tidsserie" />
+                <StatPill label="Output" v="2" sub="klasser" />
+                <StatPill label="Parametrar" v={typeof pnn.active_model?.ecg200_parameter_count === "number" ? pnn.active_model.ecg200_parameter_count.toLocaleString("sv-SE") : "–"} sub={pnn.active_model?.name || "aktiv PNN-v1-modell"} />
               </div>
-            )}
-            <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                <tbody>
-                  {[
-                    ["Modell", pnn.active_model?.name || "–"],
-                    ["Modelltyp", "Hierarkiskt Q.ANT-native Fourier/KAN-nätverk"],
-                    ["Frekvenser", Array.isArray(pnn.active_model?.frequencies) ? `k = [${pnn.active_model.frequencies.join(", ")}]` : "–"],
-                    ["Q.ANT-backend", "Software simulation / CPU backend"],
-                    ["Benchmark", "ECG200 — 100 train / 100 test"],
-                    ["Promoverad av", pnn.active_model?.promoted_by || "–"],
-                  ].map(([k, v]) => (
-                    <tr key={k} style={{ borderBottom: `1px solid ${C.border}` }}>
-                      <td style={{ padding: "8px 10px", color: C.faint, whiteSpace: "nowrap" }}>{k}</td>
-                      <td style={{ padding: "8px 10px", color: C.text }}>{v}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              {pnn.active_model?.architecture && (
+                <div style={{ background: "#0d1117", border: `1px solid ${C.border}`, borderRadius: "12px", padding: "18px", marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: C.faint, marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Arkitekturflöde</div>
+                  <code style={{ color: C.text, fontSize: "13px", lineHeight: 1.7, overflowWrap: "anywhere" }}>{pnn.active_model.architecture}</code>
+                </div>
+              )}
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                  <tbody>
+                    {[
+                      ["Modell", pnn.active_model?.name || "–"],
+                      ["Modelltyp", "Hierarkiskt Q.ANT-native Fourier/KAN-nätverk"],
+                      ["Frekvenser", Array.isArray(pnn.active_model?.frequencies) ? `k = [${pnn.active_model.frequencies.join(", ")}]` : "–"],
+                      ["Q.ANT-backend", "Software simulation / CPU backend"],
+                      ["Benchmark", "ECG200 — 100 train / 100 test"],
+                      ["Promoverad av", pnn.active_model?.promoted_by || "–"],
+                    ].map(([k, v]) => (
+                      <tr key={k} style={{ borderBottom: `1px solid ${C.border}` }}>
+                        <td style={{ padding: "8px 10px", color: C.faint, whiteSpace: "nowrap" }}>{k}</td>
+                        <td style={{ padding: "8px 10px", color: C.text }}>{v}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p style={{ color: C.faint, fontSize: "12px", lineHeight: 1.6, marginTop: "14px", marginBottom: 0 }}>
+                Den aktiva modellen är inte en låst slutarkitektur. Nya reproducerbara PNN-v1-experiment kan ge stöd för framtida
+                modellversioner, medan tidigare arkitekturer och resultat bevaras i forskningsrepot.
+              </p>
             </div>
-            <p style={{ color: C.faint, fontSize: "12px", lineHeight: 1.6, marginTop: "14px", marginBottom: 0 }}>
-              Den aktiva modellen är inte en låst slutarkitektur. Nya reproducerbara PNN-v1-experiment kan ge stöd för framtida
-              modellversioner, medan tidigare arkitekturer och resultat bevaras i forskningsrepot.
-            </p>
-          </div>
+          ) : (
+            <div style={SEKTION}>
+              <div style={{ fontSize: "12px", color: C.accent, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Teknisk modellbeskrivning</div>
+              <h2 style={RUBRIK}>PNN-v1 — ingen aktiv modell publicerad</h2>
+              <p style={INGRESS}>Aktuell forskningsdata innehåller ingen publicerad aktiv PNN-v1-modell. Modellarkitektur och modellstatistik visas när active_model finns i forskningsdatan.</p>
+            </div>
+          )}
 
           {pnnExperiments.length > 0 && (() => {
             const confirmations = pnnExperiments.filter(exp => /w(?:8|10|12).*100epoch/i.test(exp.id || "") && typeof exp.success_criteria_met === "boolean").slice(-3).reverse();
