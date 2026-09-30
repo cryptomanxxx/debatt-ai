@@ -341,7 +341,13 @@ export async function POST(req) {
         // Icke-fatalt om det failar — sidan självläker inom sitt normala
         // fönster ändå.
         try {
+          revalidatePath("/");
           revalidatePath("/arkiv");
+          if (artikelId) revalidatePath(`/artikel/${artikelId}`);
+          const parentId = Number(parent_id);
+          if (parent_id !== undefined && parent_id !== null && Number.isFinite(parentId)) {
+            revalidatePath(`/artikel/${parentId}`);
+          }
         } catch {}
 
         // Update inlämning status
