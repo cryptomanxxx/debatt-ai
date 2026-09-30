@@ -1,7 +1,7 @@
 import DebattClient from "./client";
 
 const CACHE_SECONDS = 60;
-export const revalidate = CACHE_SECONDS;
+export const revalidate = 60;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
