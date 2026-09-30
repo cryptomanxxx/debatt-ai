@@ -12,6 +12,7 @@ export async function POST(req) {
   if (!ok) return Response.json({ ok: false }, { status: 429, headers: { "Retry-After": String(retryAfter) } });
 
   try {
+    revalidatePath("/");
     revalidatePath("/arkiv");
   } catch {
     // Non-fatal — /arkiv självläker inom sitt normala 600s-fönster ändå
