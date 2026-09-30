@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSelectedLayoutSegments } from "next/navigation";
 import NavArkivLink from "./NavArkivLink";
 import NavHistorikLink from "./NavHistorikLink";
 
@@ -112,6 +112,7 @@ const GRUPPER = [
 
 export default function GlobalNav() {
   const pathname = usePathname();
+  const segments = useSelectedLayoutSegments();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [openGrupp, setOpenGrupp] = useState(null);
@@ -130,8 +131,10 @@ export default function GlobalNav() {
     return () => document.removeEventListener("click", stang);
   }, [openGrupp]);
 
-  // Startsidan har sin egen header-nav med hamburger-meny och SPA-navigering
-  if (pathname === "/") return null;
+  // Startsidan har sin egen header-nav med hamburger-meny och SPA-navigering.
+  // useSelectedLayoutSegments() är robustare här än att enbart lita på pathname:
+  // root-routen har inga segment, även när den visas med query-parametrar.
+  if (segments.length === 0 || !pathname || pathname === "/") return null;
 
   function isActive(href) {
     if (href.startsWith("/?")) return false;
