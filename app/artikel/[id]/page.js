@@ -15,9 +15,9 @@ import { taBortAnkartaggar } from "../../lib/htmlText";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const CACHE_SECONDS = 60;
+const CACHE_SECONDS = 86400;
 
-export const revalidate = 60;
+export const revalidate = 86400;
 
 async function getArtikelCount() {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id&limit=1`, {
