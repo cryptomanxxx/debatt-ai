@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SECRET = process.env.ADMIN_SECRET || process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
@@ -27,5 +28,12 @@ export async function POST(req) {
     const err = await res.text();
     return NextResponse.json({ ok: false, error: err }, { status: res.status });
   }
+
+  try {
+    revalidatePath("/");
+    revalidatePath("/arkiv");
+    revalidatePath(`/artikel/${id}`);
+  } catch {}
+
   return NextResponse.json({ ok: true });
 }
