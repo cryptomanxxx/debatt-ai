@@ -42,7 +42,9 @@ async function getArtikel(id) {
     },
     next: { revalidate: CACHE_SECONDS },
   });
-  if (!res.ok) return null;
+  if (!res.ok) {
+    throw new Error(`Supabase article fetch failed with status ${res.status}`);
+  }
   const data = await res.json();
   return data?.[0] || null;
 }
