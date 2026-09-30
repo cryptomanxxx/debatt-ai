@@ -15,15 +15,23 @@ import { taBortAnkartaggar } from "../../lib/htmlText";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const CACHE_SECONDS = 60;
+
+export const revalidate = CACHE_SECONDS;
 
 async function getArtikelCount() {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id`, {
-    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
-    cache: "no-store",
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id&limit=1`, {
+    headers: {
+      "apikey": SB_KEY,
+      "Authorization": `Bearer ${SB_KEY}`,
+      "Prefer": "count=exact",
+    },
+    next: { revalidate: CACHE_SECONDS },
   });
   if (!res.ok) return null;
-  const data = await res.json();
-  return Array.isArray(data) ? data.length : null;
+  const contentRange = res.headers.get("content-range");
+  const total = contentRange?.split("/")[1];
+  return total && total !== "*" ? Number(total) : null;
 }
 
 async function getArtikel(id) {
@@ -32,7 +40,7 @@ async function getArtikel(id) {
       "apikey": SB_KEY,
       "Authorization": `Bearer ${SB_KEY}`,
     },
-    cache: "no-store",
+    next: { revalidate: CACHE_SECONDS },
   });
   if (!res.ok) return null;
   const data = await res.json();
@@ -43,7 +51,7 @@ async function getReplikMedKonklusion(rubrik) {
   // Find a reply to this article that has a AI conclusion
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?rubrik=like.Replik%3A*&select=id,rubrik,konklusion&order=skapad.desc&limit=30`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }, cache: "no-store" }
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }, next: { revalidate: CACHE_SECONDS } }
   );
   if (!res.ok) return null;
   const data = await res.json();
@@ -55,7 +63,7 @@ async function getVisualisering(id) {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/visualiseringar?id=eq.${id}&select=*`, {
       headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
-      cache: "no-store",
+      next: { revalidate: CACHE_SECONDS },
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -72,7 +80,7 @@ async function getRelateradeArtiklar(id, taggar, parentId) {
   const excludeParam = exclude ? `&id=not.in.(${exclude})` : `&id=neq.${id}`;
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,skapad,taggar${excludeParam}&order=skapad.desc&limit=30`,
-    { headers, cache: "no-store" }
+    { headers, next: { revalidate: CACHE_SECONDS } }
   );
   if (!res.ok) return [];
   const pool = await res.json();
@@ -88,7 +96,7 @@ async function getRelateradeArtiklar(id, taggar, parentId) {
 async function getRepliker(artikelId) {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?parent_id=eq.${artikelId}&select=id,rubrik,forfattare,kalla,skapad&order=skapad.asc`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }, cache: "no-store" }
+    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` }, next: { revalidate: CACHE_SECONDS } }
   );
   if (!res.ok) return [];
   return res.json();
@@ -102,7 +110,7 @@ async function getAncestors(parentId) {
   for (let i = 0; i < 8 && cursorId; i++) {
     const res = await fetch(
       `${SB_URL}/rest/v1/artiklar?id=eq.${cursorId}&select=id,rubrik,forfattare,kalla,skapad,parent_id`,
-      { headers, cache: "no-store" }
+      { headers, next: { revalidate: CACHE_SECONDS } }
     );
     if (!res.ok) break;
     const data = await res.json();
@@ -157,7 +165,7 @@ export default async function ArtikelPage({ params }) {
     getRepliker(id),
     getAncestors(artikel.parent_id),
     artikel.kalla === "ai"
-      ? fetch(`${SB_URL}/rest/v1/agent_symboler?agent=eq.${encodeURIComponent(artikel.forfattare)}&select=vara_id,pris_betalt&order=pris_betalt.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" }).then(r => r.ok ? r.json() : [])
+      ? fetch(`${SB_URL}/rest/v1/agent_symboler?agent=eq.${encodeURIComponent(artikel.forfattare)}&select=vara_id,pris_betalt&order=pris_betalt.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: CACHE_SECONDS } }).then(r => r.ok ? r.json() : [])
       : Promise.resolve([]),
   ]);
 
@@ -165,7 +173,7 @@ export default async function ArtikelPage({ params }) {
   let forfattareSymboler = [];
   if (forfattareSymbolerRes.length > 0) {
     const varaIds = forfattareSymbolerRes.map(s => s.vara_id).join(",");
-    const iconRes = await fetch(`${SB_URL}/rest/v1/butik_varor?id=in.(${varaIds})&select=id,ikon`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" });
+    const iconRes = await fetch(`${SB_URL}/rest/v1/butik_varor?id=in.(${varaIds})&select=id,ikon`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: CACHE_SECONDS } });
     if (iconRes.ok) {
       const varor = await iconRes.json();
       const ikonMap = Object.fromEntries(varor.map(v => [v.id, v.ikon]));
