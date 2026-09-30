@@ -1,19 +1,25 @@
 import DebattClient from "./client";
 
-export const dynamic = "force-dynamic";
+const CACHE_SECONDS = 60;
+export const revalidate = 60;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 async function fetchArticleCount() {
   try {
-    const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id`, {
-      headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
-      cache: "no-store",
+    const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id&limit=1`, {
+      headers: {
+        "apikey": SB_KEY,
+        "Authorization": `Bearer ${SB_KEY}`,
+        "Prefer": "count=exact",
+      },
+      next: { revalidate: CACHE_SECONDS },
     });
     if (!res.ok) return null;
-    const data = await res.json();
-    return data.length;
+    const contentRange = res.headers.get("content-range");
+    const total = contentRange?.split("/")[1];
+    return total && total !== "*" ? Number(total) : null;
   } catch { return null; }
 }
 
