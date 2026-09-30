@@ -1,4 +1,4 @@
-export const revalidate = 600;
+export const revalidate = 1800;
 
 import fs from "fs";
 import path from "path";
@@ -58,7 +58,7 @@ async function getData() {
     hedgeInvRaw: [], universitetRaw: [],
   };
   const h = { apikey: key, Authorization: `Bearer ${key}` };
-  const opts = { next: { revalidate: 600 } };
+  const opts = { next: { revalidate: 1800 } };
 
   const results = await Promise.allSettled([
     fetch(`${SB_URL}/rest/v1/agent_relationer?select=agent_a,agent_b,typ,styrka,beskrivning&order=styrka.desc`, { headers: h, ...opts }),
