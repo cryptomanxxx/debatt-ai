@@ -334,12 +334,10 @@ export async function POST(req) {
         const artData = await artRes.json();
         artikelId = artData?.[0]?.id ?? null;
 
-        // /arkiv (600s ISR, ✅94/PR #1462) serverar annars den gamla listan
-        // i upp till 10 minuter efter publicering (Codex-fynd, PR
-        // #1462-granskning). /nyheter är sedan ✅126 en ren redirect till
-        // /arkiv?nyhet=1 utan egen cache, så bara /arkiv behöver revalideras.
-        // Icke-fatalt om det failar — sidan självläker inom sitt normala
-        // fönster ändå.
+        // Invalidera bara de ytor som faktiskt ändrats. Startsidan och
+        // artikelsidorna har lång fallback-cache för att hålla nere ISR Writes,
+        // så publicering måste göra dem färska on-demand. /nyheter är en redirect
+        // till /arkiv?nyhet=1 och behöver ingen separat invalidation.
         try {
           revalidatePath("/");
           revalidatePath("/arkiv");
