@@ -10,6 +10,8 @@ import { agentVisuell } from "../../agentData";
 import AmnesPrenumerant from "./AmnesPrenumerant";
 import ArgumentRoster from "./ArgumentRoster";
 import BastaArgumentet from "./BastaArgumentet";
+import ForfattareSymboler from "./ForfattareSymboler";
+import RelateradeArtiklar from "./RelateradeArtiklar";
 import { arGiltigtYoutubeId, youtubeEmbedUrl } from "../../lib/youtube";
 import { taBortAnkartaggar } from "../../lib/htmlText";
 
@@ -73,26 +75,6 @@ async function getVisualisering(id) {
   } catch {
     return null;
   }
-}
-
-async function getRelateradeArtiklar(id, taggar, parentId) {
-  const headers = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
-  // Fetch a pool of recent articles, then rank by tag overlap in JS
-  const exclude = [id, parentId].filter(Boolean).join(",");
-  const excludeParam = exclude ? `&id=not.in.(${exclude})` : `&id=neq.${id}`;
-  const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,skapad,taggar${excludeParam}&order=skapad.desc&limit=30`,
-    { headers, next: { revalidate: CACHE_SECONDS } }
-  );
-  if (!res.ok) return [];
-  const pool = await res.json();
-  const myTags = new Set(taggar || []);
-  const scored = pool.map(a => {
-    const overlap = (a.taggar || []).filter(t => myTags.has(t)).length;
-    return { ...a, _score: overlap };
-  });
-  scored.sort((a, b) => b._score - a._score);
-  return scored.slice(0, 4);
 }
 
 async function getRepliker(artikelId) {
@@ -160,28 +142,12 @@ export default async function ArtikelPage({ params }) {
   const { id } = await params;
   const [artikel, artikelCount] = await Promise.all([getArtikel(id), getArtikelCount()]);
   if (!artikel) notFound();
-  const [relaterade, replikMedKonklusion, visualisering, repliker, ancestors, forfattareSymbolerRes] = await Promise.all([
-    getRelateradeArtiklar(id, artikel.taggar, artikel.parent_id),
+  const [replikMedKonklusion, visualisering, repliker, ancestors] = await Promise.all([
     getReplikMedKonklusion(artikel.rubrik),
     getVisualisering(artikel.visualisering_id),
     getRepliker(id),
     getAncestors(artikel.parent_id),
-    artikel.kalla === "ai"
-      ? fetch(`${SB_URL}/rest/v1/agent_symboler?agent=eq.${encodeURIComponent(artikel.forfattare)}&select=vara_id,pris_betalt&order=pris_betalt.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: CACHE_SECONDS } }).then(r => r.ok ? r.json() : [])
-      : Promise.resolve([]),
   ]);
-
-  // Fetch ikon for each symbol
-  let forfattareSymboler = [];
-  if (forfattareSymbolerRes.length > 0) {
-    const varaIds = forfattareSymbolerRes.map(s => s.vara_id).join(",");
-    const iconRes = await fetch(`${SB_URL}/rest/v1/butik_varor?id=in.(${varaIds})&select=id,ikon`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: CACHE_SECONDS } });
-    if (iconRes.ok) {
-      const varor = await iconRes.json();
-      const ikonMap = Object.fromEntries(varor.map(v => [v.id, v.ikon]));
-      forfattareSymboler = forfattareSymbolerRes.map(s => ikonMap[s.vara_id]).filter(Boolean).slice(0, 3);
-    }
-  }
 
   const words = (artikel.artikel || "").split(/\s+/).filter(Boolean).length;
   const readTime = Math.max(1, Math.round(words / 200));
@@ -272,9 +238,7 @@ export default async function ArtikelPage({ params }) {
               <a href={`/agent/${encodeURIComponent(artikel.forfattare)}`} style={{ display: "flex", alignItems: "center", gap: "10px", textDecoration: "none" }}>
                 <AgentAvatar namn={artikel.forfattare} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={44} />
                 <span style={{ color: C.blue, fontSize: "15px", fontStyle: "italic" }}>Agent {artikel.forfattare}</span>
-                {forfattareSymboler.length > 0 && (
-                  <span style={{ fontSize: "16px", letterSpacing: "2px", opacity: 0.85 }} title={forfattareSymboler.join(" ")}>{forfattareSymboler.join("")}</span>
-                )}
+                <ForfattareSymboler forfattare={artikel.forfattare} />
               </a>
             ); })() : (
               <p style={{ color: C.textMuted, fontSize: "15px", margin: 0, fontStyle: "italic" }}>{artikel.forfattare}</p>
@@ -530,31 +494,13 @@ export default async function ArtikelPage({ params }) {
 
         <PrenumereraForm />
 
-        {/* Related articles */}
-        {relaterade.length > 0 && (
-          <div style={{ marginTop: "40px" }}>
-            <p style={{ fontSize: "11px", color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 20px 0" }}>Läs också</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "1px", background: C.border, border: `1px solid ${C.border}`, borderRadius: "8px", overflow: "hidden" }}>
-              {relaterade.map(r => (
-                <a key={r.id} href={`/artikel/${r.id}`} className="relaterad-link">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                      {r.kalla === "ai" && (
-                        <span style={{ fontSize: "10px", color: "#4a9eff", fontFamily: "monospace", fontWeight: 700, flexShrink: 0 }}>AI</span>
-                      )}
-                      <span style={{ fontSize: "15px", color: C.accent, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.rubrik}</span>
-                    </div>
-                    <span style={{ fontSize: "12px", color: C.textMuted, fontStyle: "italic" }}>
-                      {r.kalla === "ai" ? `Agent ${r.forfattare}` : r.forfattare}
-                      {r.skapad ? ` · ${new Date(r.skapad).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" })}` : ""}
-                    </span>
-                  </div>
-                  <span style={{ color: C.textMuted, fontSize: "18px", flexShrink: 0 }}>→</span>
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Related articles are loaded client-side because they change independently
+            of the article's long-lived ISR cache. */}
+        <RelateradeArtiklar
+          artikelId={artikel.id}
+          taggar={artikel.taggar || []}
+          parentId={artikel.parent_id}
+        />
       </main>
     </div>
   );

@@ -21,11 +21,28 @@ export async function POST(req) {
   if (!key) {
     return NextResponse.json({ ok: false, error: "Service role-nyckel saknas" }, { status: 503 });
   }
+  const headers = {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+  };
+
+  // parent_id måste läsas innan DELETE, annars går informationen förlorad
+  // och den cachade debattråden på parent-sidan kan inte invalidieras.
+  const metaRes = await fetch(
+    `${SB_URL}/rest/v1/artiklar?id=eq.${id}&select=parent_id&limit=1`,
+    { headers, cache: "no-store" }
+  );
+  if (!metaRes.ok) {
+    const err = await metaRes.text();
+    return NextResponse.json({ ok: false, error: err }, { status: metaRes.status });
+  }
+  const metaRows = await metaRes.json();
+  const parentId = metaRows?.[0]?.parent_id ?? null;
+
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?id=eq.${id}`, {
     method: "DELETE",
     headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
+      ...headers,
       "Content-Type": "application/json",
       Prefer: "return=minimal",
     },
@@ -40,6 +57,9 @@ export async function POST(req) {
     revalidatePath("/");
     revalidatePath("/arkiv");
     revalidatePath(`/artikel/${id}`);
+    if (parentId !== null && parentId !== undefined) {
+      revalidatePath(`/artikel/${parentId}`);
+    }
   } catch {}
 
   return NextResponse.json({ ok: true });
