@@ -297,3 +297,11 @@ test("insertNamedLink hittar källnamn med icke-latinska Unicode-tecken", () => 
   assert.equal(result.tokens[1].type, "link");
   assert.equal(result.tokens[1].text, "日本語");
 });
+
+
+test("insertNamedLink delar inte ord vid Unicode combining marks", () => {
+  const tokens = [{ type: "text", value: "अनुच्छेद är inte samma källnamn." }];
+  const result = insertNamedLink(tokens, "अन", "https://example.com/source");
+  assert.equal(result.found, false);
+  assert.deepEqual(result.tokens, tokens);
+});
