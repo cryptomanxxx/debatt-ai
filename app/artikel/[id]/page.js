@@ -307,7 +307,7 @@ export default async function ArtikelPage({ params }) {
         />
 
         {/* Nyhetskälla */}
-        {artikel.nyhetskalla && (() => {
+        {artikel.nyhetskalla?.namn && (() => {
           const k = artikel.nyhetskalla;
           const erReplik = k.typ === "replik";
           let pubStr = "";
