@@ -145,8 +145,6 @@ const RÖST_STEG = [
 export default function SkickaInClient() {
   const [view, setView] = useState("form");
   const [typ, setTyp] = useState("debattartikel");
-  const [kallaNamn, setKallaNamn] = useState("");
-  const [kallaUrl, setKallaUrl] = useState("");
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [text, setText] = useState("");
@@ -352,14 +350,9 @@ export default function SkickaInClient() {
   // som en giltig länk — blockerar inlämning istället för att tyst spara
   // youtube_video_id=null (se knappens disabled-villkor nedan).
   const youtubeOgiltig = !!youtubeInput.trim() && !youtubeId;
-  // Nyhetsartikel kräver en källa att grunda "Grundad på nyhet"-boxen och
-  // inline-källänken (✅17) på — utan namn+URL skulle nyhetskalla bli null
-  // och artikeln se ut som en vanlig debattartikel trots det valda läget.
-  const kallaOgiltig = typ === "nyhetsartikel" && (!kallaNamn.trim() || !kallaUrl.trim());
-
   function reset() {
     setView("form"); setResult(null); setError(null);
-    setTyp("debattartikel"); setKallaNamn(""); setKallaUrl("");
+    setTyp("debattartikel");
     setTitle(""); setAuthor(""); setText("");
     setTurnstileToken(null); setInlamningId(null);
     // nollstallBildState() — INTE taBortBild(): vid det här laget är bilden
@@ -432,8 +425,11 @@ export default function SkickaInClient() {
           bild_fotograf: bildFotograf.trim() || null,
           youtube_video_id: youtubeId || null,
           filmrecension: typ === "filmrecension",
-          nyhetskalla: (typ === "nyhetsartikel" && kallaNamn.trim() && kallaUrl.trim())
-            ? { namn: kallaNamn.trim(), url: kallaUrl.trim(), publicerad: null, antal_utvärderade: 0 }
+          // Manuella nyhetsartiklar använder referenslistan i artikeltexten.
+          // Behåll en liten typmarkör så befintliga nyhetsfilter fortfarande
+          // känner igen artikeln utan att kräva en påhittad ensam källa.
+          nyhetskalla: typ === "nyhetsartikel"
+            ? { typ: "manuell", namn: null, url: null, publicerad: null, antal_utvärderade: 0 }
             : null,
         }),
       });
@@ -486,11 +482,9 @@ export default function SkickaInClient() {
                 </select>
               </div>
               {typ === "nyhetsartikel" && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "12px" }}>
-                  <div><Lbl>Källa (namn)</Lbl><input value={kallaNamn} onChange={e => setKallaNamn(e.target.value)} placeholder="T.ex. SVT Nyheter" style={inp} /></div>
-                  <div><Lbl>Käll-länk</Lbl><input value={kallaUrl} onChange={e => setKallaUrl(e.target.value)} placeholder="https://..." style={inp} /></div>
-                  <p style={{ gridColumn: "1 / -1", fontSize: "12px", color: C.textMuted, margin: 0 }}>Nyheten artikeln grundas på — visas som källhänvisning på artikeln, precis som AI-agenternas nyhetsartiklar.</p>
-                </div>
+                <p style={{ fontSize: "12px", color: C.textMuted, margin: 0, lineHeight: 1.6 }}>
+                  Lägg källor och referenser direkt i artikeltexten. Du kan ange hur många klickbara referenser som behövs med HTML-länkar.
+                </p>
               )}
               <div><Lbl>Rubrik</Lbl><input value={title} onChange={e => setTitle(e.target.value)} style={inp} /></div>
               <div><Lbl>Författare & titel</Lbl><input value={author} onChange={e => setAuthor(e.target.value)} style={inp} /></div>
@@ -565,12 +559,9 @@ export default function SkickaInClient() {
                   att skicka in ändå — felmeddelandet försvinner ur sikte i
                   resultatvyn, och både inlamningar- och artiklar-INSERT sparar
                   tyst youtube_video_id=null, så videon besökaren trodde de
-                  bifogade bara försvinner utan förklaring (Codex-fynd, PR #1468).
-                  kallaOgiltig: samma princip för typ="nyhetsartikel" — utan
-                  namn+URL blir nyhetskalla null och artikeln ser ut som en
-                  vanlig debattartikel trots det valda läget. */}
-              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < minOrd || youtubeOgiltig || kallaOgiltig} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < minOrd || bildUppladdar || youtubeOgiltig || kallaOgiltig) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < minOrd || youtubeOgiltig || kallaOgiltig) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
-                {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : youtubeOgiltig ? "Rätta YouTube-länken först" : kallaOgiltig ? "Ange källa för nyhetsartikeln först" : "Skicka till redaktionen →"}
+                  bifogade bara försvinner utan förklaring (Codex-fynd, PR #1468). */}
+              <button onClick={analyze} disabled={analyzing || bildUppladdar || !text.trim() || !title.trim() || !turnstileToken || wordCount < minOrd || youtubeOgiltig} style={{ background: analyzing ? `${C.accent}20` : (!turnstileToken || wordCount < minOrd || bildUppladdar || youtubeOgiltig) ? `${C.accent}40` : C.accent, color: analyzing ? C.accentDim : "#0a0a0a", border: "none", borderRadius: "4px", padding: "15px 32px", fontSize: "14px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: (analyzing || bildUppladdar || !turnstileToken || wordCount < minOrd || youtubeOgiltig) ? "default" : "pointer", fontFamily: "Georgia, serif", alignSelf: "flex-start" }}>
+                {analyzing ? `Redaktören läser${".".repeat(dots)}` : bildUppladdar ? "Bild laddas upp…" : youtubeOgiltig ? "Rätta YouTube-länken först" : "Skicka till redaktionen →"}
               </button>
               {error && <p style={{ color: C.red, fontSize: "14px", margin: 0 }}>{error}</p>}
             </div>
