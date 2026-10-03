@@ -147,7 +147,13 @@ function escapeRegExp(s) {
  */
 export function insertNamedLink(tokens, namn, href) {
   const n = (namn || "").trim();
-  if (!n || !href || !Array.isArray(tokens)) return { tokens, found: false };
+  // Ett källnamn måste innehålla minst en bokstav eller siffra. Äldre
+  // manuella nyhetsartiklar kunde använda "." som obligatorisk placeholder;
+  // att autolänka den strängen kunde då träffa versionspunkter som i
+  // "GLM-5.3" och skapa en meningslös länk mitt i modellnamnet.
+  if (!n || !/[\\p{L}\\p{N}]/u.test(n) || !href || !Array.isArray(tokens)) {
+    return { tokens, found: false };
+  }
   const re = new RegExp(`\\b(${escapeRegExp(n)})\\b`, "i");
   for (let i = 0; i < tokens.length; i++) {
     if (tokens[i].type !== "text") continue;

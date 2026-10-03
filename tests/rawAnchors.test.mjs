@@ -264,3 +264,19 @@ test("insertNamedLink — matchar bara hela ord, inte en substräng inuti ett an
   const { found } = insertNamedLink(tokens, "Nyheter", "https://svt.se/nyheter");
   assert.equal(found, false);
 });
+
+
+test("insertNamedLink ignores punctuation-only placeholder sources", () => {
+  const tokens = [{ type: "text", value: "En frontiermodell som GLM-5.3 är särskilt intressant." }];
+  const result = insertNamedLink(tokens, ".", "https://example.com");
+  assert.equal(result.found, false);
+  assert.deepEqual(result.tokens, tokens);
+});
+
+test("insertNamedLink still links meaningful source names", () => {
+  const tokens = [{ type: "text", value: "Anthropic publicerade resultatet." }];
+  const result = insertNamedLink(tokens, "Anthropic", "https://anthropic.com");
+  assert.equal(result.found, true);
+  assert.equal(result.tokens[0].type, "link");
+  assert.equal(result.tokens[0].text, "Anthropic");
+});
