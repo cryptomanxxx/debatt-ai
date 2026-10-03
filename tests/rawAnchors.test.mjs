@@ -280,3 +280,28 @@ test("insertNamedLink still links meaningful source names", () => {
   assert.equal(result.tokens[0].type, "link");
   assert.equal(result.tokens[0].text, "Anthropic");
 });
+
+
+test("insertNamedLink hittar källnamn med svenska Unicode-bokstäver", () => {
+  const tokens = [{ type: "text", value: "Örebro publicerade rapporten." }];
+  const result = insertNamedLink(tokens, "Örebro", "https://example.com/orebro");
+  assert.equal(result.found, true);
+  assert.equal(result.tokens[0].type, "link");
+  assert.equal(result.tokens[0].text, "Örebro");
+});
+
+test("insertNamedLink hittar källnamn med icke-latinska Unicode-tecken", () => {
+  const tokens = [{ type: "text", value: "Källan 日本語 publicerade rapporten." }];
+  const result = insertNamedLink(tokens, "日本語", "https://example.com/jp");
+  assert.equal(result.found, true);
+  assert.equal(result.tokens[1].type, "link");
+  assert.equal(result.tokens[1].text, "日本語");
+});
+
+
+test("insertNamedLink delar inte ord vid Unicode combining marks", () => {
+  const tokens = [{ type: "text", value: "अनुच्छेद är inte samma källnamn." }];
+  const result = insertNamedLink(tokens, "अन", "https://example.com/source");
+  assert.equal(result.found, false);
+  assert.deepEqual(result.tokens, tokens);
+});
