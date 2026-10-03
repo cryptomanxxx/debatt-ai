@@ -1381,7 +1381,7 @@ export default function DebattClient({ initialArticleCount = null }) {
                         {arNy(nyhet.skapad) && (
                           <span style={{ fontSize:"10px", fontWeight:700, fontFamily:"monospace", color:"#0a0a0a", background:"#38bdf8", borderRadius:"3px", padding:"1px 7px", letterSpacing:"0.08em" }}>NY</span>
                         )}
-                        {nyhet.nyhetskalla?.namn && (
+                        {nyhet.nyhetskalla?.namn && /[\p{L}\p{N}]/u.test(nyhet.nyhetskalla.namn) && (
                           <span style={{ fontSize:"11px", color:"#4a7a9b", fontFamily:"monospace", background:"#0a1a2a", border:"1px solid #1a3a5a", borderRadius:"3px", padding:"1px 8px" }}>
                             {nyhet.nyhetskalla.namn}
                           </span>
