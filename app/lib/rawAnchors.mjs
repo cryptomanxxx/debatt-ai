@@ -154,7 +154,7 @@ export function insertNamedLink(tokens, namn, href) {
   if (!n || !/[\p{L}\p{N}]/u.test(n) || !href || !Array.isArray(tokens)) {
     return { tokens, found: false };
   }
-  const re = new RegExp(`(?<![\\p{L}\\p{N}_])(${escapeRegExp(n)})(?![\\p{L}\\p{N}_])`, "iu");
+  const re = new RegExp(`(?<![\\p{L}\\p{N}\\p{M}_])(${escapeRegExp(n)})(?![\\p{L}\\p{N}\\p{M}_])`, "iu");
   for (let i = 0; i < tokens.length; i++) {
     if (tokens[i].type !== "text") continue;
     const val = tokens[i].value;
