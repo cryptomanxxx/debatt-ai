@@ -300,7 +300,11 @@ export default async function ArtikelPage({ params }) {
           artikelId={artikel.id}
           artikelText={artikel.artikel}
           kalla={
-            artikel.nyhetskalla && artikel.nyhetskalla?.typ !== "replik" && artikel.nyhetskalla?.url
+            artikel.nyhetskalla &&
+            artikel.nyhetskalla?.typ !== "replik" &&
+            artikel.nyhetskalla?.url &&
+            artikel.nyhetskalla?.namn &&
+            /[\p{L}\p{N}]/u.test(artikel.nyhetskalla.namn)
               ? { namn: artikel.nyhetskalla.namn, url: artikel.nyhetskalla.url }
               : null
           }

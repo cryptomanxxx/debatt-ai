@@ -151,7 +151,7 @@ export function insertNamedLink(tokens, namn, href) {
   // manuella nyhetsartiklar kunde använda "." som obligatorisk placeholder;
   // att autolänka den strängen kunde då träffa versionspunkter som i
   // "GLM-5.3" och skapa en meningslös länk mitt i modellnamnet.
-  if (!n || !/[\\p{L}\\p{N}]/u.test(n) || !href || !Array.isArray(tokens)) {
+  if (!n || !/[\p{L}\p{N}]/u.test(n) || !href || !Array.isArray(tokens)) {
     return { tokens, found: false };
   }
   const re = new RegExp(`\\b(${escapeRegExp(n)})\\b`, "i");
