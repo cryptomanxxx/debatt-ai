@@ -205,6 +205,7 @@ def hamta_senaste_video(handle: str, kanal_id: str, innehallstyp: str = "riktig_
             return None
         root = ET.fromstring(res.text)
         entries = root.findall("atom:entry", ns)
+        avvisade = hamta_avvisade(handle) or set()
         if not entries:
             print(f"  {handle}: inga videor i flödet.")
             return None
@@ -217,6 +218,8 @@ def hamta_senaste_video(handle: str, kanal_id: str, innehallstyp: str = "riktig_
             titel = title_el.text.strip()
             if _hoppa_over_som_icke_film(innehallstyp, titel):
                 print(f"  {handle}: hoppar över icke-film-uppladdning \"{titel}\".")
+                continue
+            if video_id in avvisade:
                 continue
             if redan_recenserad(video_id):
                 continue
@@ -572,6 +575,63 @@ def _finalisera_pending(handle: str, video_id: str) -> None:
     })
 
 
+# Max antal avvisade video-ID:n som sparas per kanal — de äldsta faller
+# bort först. Gott om marginal för de små AI-kanalerna (18–38 videor).
+MAX_AVVISADE_PER_KANAL = 1000
+
+
+def _hamta_avvisade_lista(handle: str) -> list[str] | None:
+    """Hämtar kanalens bekräftat avvisade video-ID:n (se registrera_avvisad()).
+    Returnerar None vid ett läsfel (nätverk, icke-200, eller att kolumnen
+    saknas innan supabase_filmrecensent_state_v7.sql körts) — läses
+    medvetet i en EGEN fråga, skild från hamta_state(), så en saknad
+    kolumn aldrig fäller hela körningen. Anroparen behandlar None som en
+    tom mängd vid kandidatval (fail-open: värsta fallet är att en avvisad
+    video väljs igen och LLM-grinden avvisar den igen), men registrera_avvisad()
+    skriver aldrig över listan när den inte gick att läsa."""
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/filmrecensent_state",
+            params={"id": f"eq.{handle}", "select": "avvisade_video_ids"},
+            headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"},
+            timeout=10,
+        )
+        if res.status_code != 200:
+            return None
+        rader = res.json()
+        if not rader:
+            return []
+        return list(rader[0].get("avvisade_video_ids") or [])
+    except Exception:
+        return None
+
+
+def hamta_avvisade(handle: str) -> set[str] | None:
+    """Mängdvariant av _hamta_avvisade_lista() för snabb uteslutning vid
+    kandidatval. None vid läsfel, se ovan."""
+    lista = _hamta_avvisade_lista(handle)
+    return None if lista is None else set(lista)
+
+
+def registrera_avvisad(handle: str, video_id: str) -> None:
+    """Sparar ett bekräftat avvisat video-ID (LLM-grinden: ingen kort-/
+    konceptfilm) så att kandidatvalet aldrig väljer det igen (Codex-fynd,
+    PR #1545-granskning). Utan detta flyttade _finalisera_pending() bara
+    cursorn, och när den wrappade — för en kanal vars katalog ryms på en
+    enda sida redan nästa pass — valdes samma video igen och kunde blockera
+    resten av kanalen. Läs-modifiera-skriv är säkert här eftersom
+    filmrecensent.yml:s concurrency-grupp serialiserar körningarna."""
+    befintliga = _hamta_avvisade_lista(handle)
+    if befintliga is None:
+        print(f"  ⚠ {handle}: kunde inte läsa avvisade_video_ids — sparar inte {video_id} (kör supabase_filmrecensent_state_v7.sql om kolumnen saknas).")
+        return
+    if video_id in befintliga:
+        return
+    # Behåller insättningsordningen, så att de ÄLDSTA faller bort vid taket.
+    lista = befintliga + [video_id]
+    _upsert_state(handle, {"avvisade_video_ids": lista[-MAX_AVVISADE_PER_KANAL:]})
+
+
 SVERIGE = "SE"
 
 
@@ -697,6 +757,7 @@ def hamta_video_kandidat(handle: str, kanal_id: str, innehallstyp: str = "riktig
         print(f"  ✗ {handle}: kunde inte läsa filmrecensent_state: {e} — hoppar över körningen för säkerhets skull.")
         return None
     token = state["next_page_token"]
+    avvisade = hamta_avvisade(handle) or set()
 
     if state["pending_video_id"]:
         pending_id = state["pending_video_id"]
@@ -704,6 +765,8 @@ def hamta_video_kandidat(handle: str, kanal_id: str, innehallstyp: str = "riktig
         pending_run_id = state["pending_run_id"]
         if redan_recenserad(pending_id):
             pass  # publicerad i en tidigare, delvis lyckad körning — hoppa vidare
+        elif pending_id in avvisade:
+            print(f"  {handle}: pending video {pending_id} redan avvisad som icke-film — hoppar vidare.")
         elif pending_forsok >= MAX_PENDING_FORSOK:
             print(f"  {handle}: ger upp på pending video {pending_id} efter {pending_forsok} försök — hoppar vidare.")
         elif AKTUELL_KORNING_ID and pending_run_id == AKTUELL_KORNING_ID:
@@ -784,6 +847,8 @@ def hamta_video_kandidat(handle: str, kanal_id: str, innehallstyp: str = "riktig
                 # per icke-film-uppladdning (se _ICKE_FILM_TITELMARKORER).
                 if _hoppa_over_som_icke_film(innehallstyp, titel):
                     print(f"  {handle}: hoppar över icke-film-uppladdning \"{titel}\".")
+                    continue
+                if video_id in avvisade:
                     continue
                 if redan_recenserad(video_id):
                     continue
@@ -1270,7 +1335,11 @@ def main():
         # Bekräftat inte en kortfilm (Codex-fynd, PR #1544-granskning) —
         # avancera cursorn förbi videon direkt istället för att låta den
         # ligga kvar som pending och retryas MAX_PENDING_FORSOK gånger
-        # (ett "nej, inte en film" är inte ett transient fel).
+        # (ett "nej, inte en film" är inte ett transient fel). Videon
+        # registreras FÖRST som avvisad, så kandidatvalet aldrig väljer den
+        # igen när cursorn wrappar (Codex-fynd, PR #1545-granskning) — i
+        # både Data API- och RSS-läget.
+        registrera_avvisad(handle, video["video_id"])
         if YOUTUBE_API_KEY:
             _finalisera_pending(handle, video["video_id"])
         print("Videon är ingen kort-/konceptfilm — hoppar över utan publicering.")
