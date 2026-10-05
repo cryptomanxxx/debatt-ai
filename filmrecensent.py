@@ -123,6 +123,12 @@ KANALER = [
      "url": "https://www.youtube.com/@RescueMechAnimals"},
     {"handle": "@Meysamderees", "namn": "@Meysamderees",
      "url": "https://www.youtube.com/@Meysamderees"},
+    {"handle": "@Karloff_AI", "namn": "@Karloff_AI",
+     "url": "https://www.youtube.com/@Karloff_AI"},
+    {"handle": "@HistoryReforgedYT", "namn": "@HistoryReforgedYT",
+     "url": "https://www.youtube.com/@HistoryReforgedYT"},
+    {"handle": "@xyronth", "namn": "@xyronth",
+     "url": "https://www.youtube.com/@xyronth"},
 ]
 
 YOUTUBE_DATA_API = "https://www.googleapis.com/youtube/v3"

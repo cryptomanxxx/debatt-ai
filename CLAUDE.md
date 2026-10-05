@@ -3780,13 +3780,16 @@ Ett första försök att lösa tvetydigheten (fråga användaren om de ville ha 
 
 **Källattribution i den publicerade recensionen pekar nu på rätt kanal:** `generera_recension()` tar ett nytt `kanal`-argument och bygger den garanterade avslutningsmeningen ("Klippet är hämtat från YouTube-kanalen...") mot den faktiska kanal videon kom från den körningen — inte längre en hårdkodad `@BoxofficeMoviesScenes`-sträng.
 
-Kräver `supabase_filmrecensent_state_v4.sql` OCH `supabase_filmrecensent_state_v5.sql` — kör båda i Supabase SQL Editor, i ordning. Ingen ändring av `filmrecensent.yml` — `YOUTUBE_API_KEY`/`SUPABASE_SERVICE_ROLE_KEY` var redan konfigurerade secrets, kanalvalet och innehållsklassificeringen är internt i Python/Supabase.
+**Tre ytterligare AI-genererade kanaler (ägarbeslut, okt 2026):** `@Karloff_AI`, `@HistoryReforgedYT` och `@xyronth` lades till i `KANALER` och klassificeras som `ai_genererat` via `supabase_filmrecensent_state_v6.sql` — samma recensionsväg (`generera_recension_ai_genererat()`) som Cine Drop/Last Sumerian. Ägaren verifierade manuellt att alla tre handtagen finns på YouTube (sandboxen kunde inte nå YouTube). Övervägda men medvetet uteslutna: Curious Refuge (tutorials, inga filmer), Higgsfield AI (produktmarknadsföring) och DUST (mestadels människogjorda kortfilmer — en kanalbred `ai_genererat`-klassificering hade felmärkt dem). **Avvägning:** kanalvalet är `random.choice()` över alla sex kanaler, så `@BoxofficeMoviesScenes` (riktiga filmer) får nu bara ~1/6 av passen istället för ~1/3 — fortfarande samma dagliga kvot på 4 recensioner totalt.
+
+Kräver `supabase_filmrecensent_state_v4.sql`, `supabase_filmrecensent_state_v5.sql` OCH `supabase_filmrecensent_state_v6.sql` — kör dem i Supabase SQL Editor, i ordning. Ingen ändring av `filmrecensent.yml` — `YOUTUBE_API_KEY`/`SUPABASE_SERVICE_ROLE_KEY` var redan konfigurerade secrets, kanalvalet och innehållsklassificeringen är internt i Python/Supabase.
 
 | Fil | Roll (tillägg) |
 |---|---|
 | `filmrecensent.py` | `KANAL_ID`/`KANAL_NAMN`/`KANAL_URL` ersatta av `KANALER` (lista). Ny `resolv_kanal_id()` (Data API `forHandle` + sidscrapningsfallback). `hamta_state()`/`_upsert_state()`/`_finalisera_pending()`/`hamta_video_kandidat()`/`hamta_senaste_video()`/`uppladdningsplaylist_id()` parametriserade på `handle`/`kanal_id`. `hamta_state()` läser även `innehallstyp` (fail-safe default `"riktig_film"`). Ny `generera_recension_ai_genererat()` — recenserar videons eget koncept/premiss utan filmigenkänningskrav, egen garanterad transparenssats. `main()` väljer kanal via `random.choice(KANALER)`, slår upp/cachar kanal-ID, läser `innehallstyp` och grenar till rätt recensionsfunktion. `generera_recension()` tar `kanal` för källattributionen |
 | `supabase_filmrecensent_state_v4.sql` | Ny `kanal_id text`-kolumn. Döper om den befintliga `id='current'`-raden till `'@BoxofficeMoviesScenes'` och backfyller dess redan kända kanal-ID |
 | `supabase_filmrecensent_state_v5.sql` | Ny `innehallstyp text`-kolumn (CHECK: `riktig_film`/`ai_genererat`, default `riktig_film`). Sätter `@BoxofficeMoviesScenes` → `riktig_film`, `@RescueMechAnimals`/`@Meysamderees` → `ai_genererat` |
+| `supabase_filmrecensent_state_v6.sql` | Skapar kanalrader för `@Karloff_AI`, `@HistoryReforgedYT`, `@xyronth` med `innehallstyp = 'ai_genererat'` |
 
 ---
 
