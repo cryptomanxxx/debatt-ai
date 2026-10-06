@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 export const UPSTREAM = '66b680ce742e654cfe86da4f072a69061fe182b1';
+export const PROMPT_VERSION = 'consistent-coefficients-v1';
 export const LIMITATIONS = 'Syntetiskt metodtest med känd formelklass, inte en ny vetenskaplig upptäckt. Kontroll på ändligt många punkter är inget bevis för alla x. Ratfit returnerar en kontrollrapport, inte formelns koefficienter; modellens förslag kontrolleras separat.';
 
 function gcd(a, b) { a = a < 0n ? -a : a; while (b) [a, b] = [b, a % b]; return a; }
@@ -36,7 +37,7 @@ export function correctionPrompt(banked, proposal, checks) {
     ...modelPrompt(banked),
     { role: 'assistant', content: JSON.stringify(proposal) },
     { role: 'user', content: JSON.stringify({
-      instruction: 'Ditt förslag matchar inte alla givna punkter. Gör ett enda korrigeringsförsök utifrån exakt kontroll nedan. actual=null betyder division med noll. Kontrollera din nya formel mot alla sex givna punkter. Samma JSON-format gäller. Du har fortfarande inte fått facit eller undanhållna kontrollpunkter.',
+      instruction: 'Ditt förslag matchar inte alla givna punkter. Gör ett enda korrigeringsförsök utifrån exakt kontroll nedan. actual=null betyder division med noll. Bestäm och kontrollera den nya slutliga formeln mot alla sex givna punkter INNAN du skriver JSON. Ersätt coefficients med den slutliga formelns koefficienter i ordningen [a,b,c,d]; behåll inte gamla värden om formeln ändras. Det är coefficients som testas, inte formeln i reason. Skriv därefter en kort reason som beskriver just dessa koefficienter, utan mellanliggande försök. Samma JSON-format gäller. Du har fortfarande inte fått facit eller undanhållna kontrollpunkter.',
       visibleChecks: checks,
     }) },
   ];
@@ -60,7 +61,7 @@ export function makeCases(seed) {
 
 export function modelPrompt(banked) {
   return [
-    { role: 'system', content: 'Du är Professor Oraklet i Debatt-AI:s forskningslabb. Genomför ett syntetiskt metodtest. Sök en formel (a*x+b)/(c*x+d) från de givna exakta datapunkterna. Använd metoden bootloops_ratfit som efterföljande kontroll. Du har inte fått facit eller kontrollpunkterna. Svara ENDAST med JSON: {"method":"bootloops_ratfit","coefficients":["a","b","c","d"],"reason":"kort metodmotivering på svenska"}. Koefficienter ska vara heltal mellan -999 och 999, skrivna som strängar. Ange inga påståenden om testresultat eftersom testet ännu inte har körts.' },
+    { role: 'system', content: 'Du är Professor Oraklet i Debatt-AI:s forskningslabb. Genomför ett syntetiskt metodtest. Sök en formel (a*x+b)/(c*x+d) från de givna exakta datapunkterna. Använd metoden bootloops_ratfit som efterföljande kontroll. Du har inte fått facit eller kontrollpunkterna. Bestäm den slutliga formeln och kontrollera den mot de sex givna punkterna INNAN du skriver JSON. Svara ENDAST med JSON: {"method":"bootloops_ratfit","coefficients":["a","b","c","d"],"reason":"kort metodmotivering på svenska"}. coefficients ska innehålla den slutliga formelns koefficienter i exakt ordningen [a,b,c,d]. Det är dessa värden som testas; en annan formel i reason ändrar inte förslaget. Skriv därefter en kort reason som beskriver just den slutliga formeln, utan mellanliggande försök. Koefficienter ska vara heltal mellan -999 och 999, skrivna som strängar. Ange inga påståenden om testresultat eftersom testet ännu inte har körts.' },
     { role: 'user', content: JSON.stringify({ banked }) },
   ];
 }
@@ -130,9 +131,8 @@ export async function runExperiment(seed, propose, callTool, onCommit = () => {}
       sameModel: initial.provider === provider && initial.model === model,
       passed: bankedMatch && holdoutMatch });
   }
-  return { schemaVersion: 2, researcher: 'Professor Oraklet', title: 'Kan återkoppling hjälpa Oraklet återfinna ett dolt rationellt samband?',
+  return { schemaVersion: 2, promptVersion: PROMPT_VERSION, researcher: 'Professor Oraklet', title: 'Kan återkoppling hjälpa Oraklet återfinna ett dolt rationellt samband?',
     question: 'Förbättras modellens formelförslag efter högst ett korrigeringsförsök med exakt återkoppling från sex synliga punkter, mätt mot tre undanhållna kontrollpunkter?',
     method: 'Tre syntetiska fall. Första förslaget sparas och kontrolleras mot sex synliga punkter. Om någon missar ges exakt återkoppling och högst ett korrigeringsförsök. Det slutliga förslaget låses innan de tre undanhållna punkterna kontrolleras. Första och slutliga resultat redovisas separat. Ratfit körs på riktiga och avsiktligt felaktiga kontrollvärden. Modellens koefficienter testas separat med BigInt och exakt korsmultiplikation, utan Thiele-algoritmen.',
     seed: String(seed), status: results.every(r => r.passed) ? 'passed' : 'failed', limitations: LIMITATIONS + ' Tre fall räcker inte för att fastställa en generell förbättring. Eventuella modellbyten mellan försöken redovisas och kan påverka jämförelsen.', cases: results };
 }
-
