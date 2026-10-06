@@ -13,15 +13,15 @@ async function fetchData() {
   const [koalRes, posRes, planRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka,antal_utbyten&order=styrka.desc`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 300 },
+      next: { revalidate: 1800 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_positioner?select=agent,amne,position,styrka&order=styrka.desc`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 300 },
+      next: { revalidate: 1800 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_planbocker?select=agent,saldo&order=saldo.desc`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 300 },
+      next: { revalidate: 1800 },
     }),
   ]);
 

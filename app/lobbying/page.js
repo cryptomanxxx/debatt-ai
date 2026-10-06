@@ -22,9 +22,9 @@ async function getData() {
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
   const [logRes, planbokRes, forslagRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/lobbying_log?order=skapad.desc&limit=60&select=id,lagforslag_id,lobbying_agent,mal_agent,belopp,argument,resultat,rod_fore,rod_efter,skapad`, { headers: h, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/agent_planbocker?order=saldo.desc`, { headers: h, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel&limit=200`, { headers: h, next: { revalidate: 300 } }),
+    fetch(`${SB_URL}/rest/v1/lobbying_log?order=skapad.desc&limit=60&select=id,lagforslag_id,lobbying_agent,mal_agent,belopp,argument,resultat,rod_fore,rod_efter,skapad`, { headers: h, next: { revalidate: 1800 } }),
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?order=saldo.desc`, { headers: h, next: { revalidate: 1800 } }),
+    fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel&limit=200`, { headers: h, next: { revalidate: 1800 } }),
   ]);
 
   return {

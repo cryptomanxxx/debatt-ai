@@ -20,7 +20,7 @@ async function getDebatter() {
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,scores,skapad&scores=not.is.null&order=skapad.desc&limit=500`,
-      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 300 } }
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 1800 } }
     );
     if (!res.ok) return [];
     return await res.json();
@@ -31,7 +31,7 @@ async function getPrediktionsData() {
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,market_id,markets(utfall,status,kategori,titel,deadline)`,
-      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 300 } }
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 1800 } }
     );
     if (!res.ok) return [];
     return await res.json();
