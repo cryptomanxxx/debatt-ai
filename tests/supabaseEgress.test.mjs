@@ -54,6 +54,60 @@ async function loadRoute(builder) {
   return { get: context.get, advance: ms => { now += ms; }, config: () => cacheConfig };
 }
 
+async function loadFeed(fetch) {
+  const source = await readFile(new URL("../app/lib/aktivitetFeed.js", import.meta.url), "utf8");
+  const context = vm.createContext({ fetch, process: { env: {} } });
+  vm.runInContext(source.replace(/^export /gm, "") + "\n globalThis.build = hamtaAktivitetHandelser;", context);
+  return context.build;
+}
+
+test("a failed source cannot replace the cached feed, including sources with optional fallbacks", async () => {
+  for (const table of ["artiklar", "bribe_offers", "oraklet_lasningar"]) {
+    for (const failure of ["network", "http", "shape", "json"]) {
+      let failing = false, sourceCalls = 0;
+      const build = await loadFeed(async url => {
+        sourceCalls++;
+        const selected = failing && url.includes("/" + table + "?");
+        if (selected && failure === "network") throw new Error("offline");
+        return {
+          ok: !(selected && failure === "http"), status: selected ? 503 : 200,
+          json: async () => {
+            if (selected && failure === "json") throw new Error("invalid JSON");
+            if (selected && failure === "shape") return { message: "not rows" };
+            return url.includes("/artiklar?")
+              ? [{ id: 1, rubrik: "Test", forfattare: "AI", kalla: "ai", skapad: "2026-10-06T09:00:00Z" }]
+              : [];
+          },
+        };
+      });
+      const route = await loadRoute(options => {
+        assert.equal(options.requireComplete, true);
+        return build(options);
+      });
+      const first = await route.get();
+      assert.equal(first.body.length, 1);
+      route.advance(60000); failing = true;
+      const failed = await route.get();
+      assert.deepEqual(failed.body, first.body, table + "/" + failure);
+      assert.equal(failed.headers["Cache-Control"], "no-store");
+      failing = false;
+      await route.get();
+      assert.equal(sourceCalls, 90, "failed builds must retry without a fresh local cache");
+    }
+  }
+});
+
+test("empty successful sources are valid; archive callers retain partial-source tolerance", async () => {
+  const empty = await loadFeed(async () => ({ ok: true, json: async () => [] }));
+  assert.equal((await empty({ requireComplete: true })).length, 0);
+  const partial = await loadFeed(async url => {
+    if (url.includes("/bribe_offers?")) throw new Error("offline");
+    return { ok: true, json: async () => [] };
+  });
+  assert.equal((await partial()).length, 0);
+  await assert.rejects(partial({ requireComplete: true }), /inte hämtas komplett/);
+});
+
 test("100 concurrent activity requests share one build, preserve article slots, then refresh at 60s", async () => {
   let builds = 0, release;
   const rows = Array.from({ length: 12 }, (_, i) => ({

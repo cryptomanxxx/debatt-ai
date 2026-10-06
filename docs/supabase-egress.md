@@ -17,6 +17,11 @@ enskild fråga eller vilken klient som anropar den.
   pågående hämtning. Råa tabellsvar cachas inte separat. CDN-inställningen är
   kvar på 25 sekunder. Felvägen behåller senaste lokala svar men skickar
   no-store så att ett tillfälligt fel inte cachas av CDN.
+  Cachebygget kräver att alla källor lyckas med HTTP-svar och JSON-listor.
+  Nätverksfel, HTTP-fel, ogiltig JSON eller fel svarsform avbryter bygget,
+  även för källor som arkivet normalt tolererar fel från. Ett lyckat tomt
+  tabellsvar är giltigt. Cacheversionen har höjts så gamla partiella
+  cachevärden inte återanvänds. Arkivets befintliga feltolerans är kvar.
 - Startsidans artikelräknare hämtade ett id per artikel och använde
   arraylängden. Nu används HEAD, limit=1 och Prefer: count=exact: inga rader
   överförs och antalet begränsas inte av PostgRESTs radgräns.
@@ -44,7 +49,10 @@ node --test tests/supabaseEgress.test.mjs
 
 Testerna kör den faktiska aktivitetsrutten med Next-adaptrar injicerade:
 100 samtidiga anrop, TTL, artikelplatser och felåterhämtning. De verifierar
-även dold/synlig polling och HEAD-räkning. De mäter inte Vercels distribuerade
+även dold/synlig polling och HEAD-räkning.
+De kör också den riktiga källhämtaren med simulerade källfel och kontrollerar
+att tidigare feed bevaras och nästa försök hämtar igen.
+De mäter inte Vercels distribuerade
 cache eller skarp Supabase-trafik. JSX och route har syntaxkompilerats;
 ingen full Next-produktionsbuild kördes lokalt.
 

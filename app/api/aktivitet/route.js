@@ -26,7 +26,7 @@ let pendingFeed = null;
 let _cache = { data: null, ts: 0 };
 
 async function byggFeed() {
-  const sorterad = await hamtaAktivitetHandelser({ limit: 8 });
+  const sorterad = await hamtaAktivitetHandelser({ limit: 8, requireComplete: true });
 
   // Feeden hämtar från ~30 olika Supabase-tabeller och tar ett rent globalt
   // topp-10 sorterat på tidsstämpel — inga garanterade platser per typ. Ju
@@ -57,7 +57,7 @@ async function byggFeed() {
 // automatiskt i cache-funktionens hash.
 const hamtaDeladFeed = unstable_cache(
   byggFeed,
-  ["startsida-aktivitet-feed-v1"],
+  ["startsida-aktivitet-feed-v2"],
   { revalidate: 60 }
 );
 

@@ -112,41 +112,58 @@ export function paginateAktivitet(alla, cursorSkapad, cursorVidLista = []) {
   return { sida, nastaCursor, nastaVid };
 }
 
-export async function hamtaAktivitetHandelser({ limit = 8 } = {}) {
+export async function hamtaAktivitetHandelser({ limit = 8, requireComplete = false } = {}) {
   const h = { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
   const L = limit;
-  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang, nyhetsanalys, upptackter, fragaAnnaPeter, orakletLasningar] = await Promise.allSettled([
-    fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,skapad,lagforslag(titel)&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka,senast_aktiv&order=senast_aktiv.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/lobbying_log?select=lobbying_agent,mal_agent,resultat,belopp,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/bribe_offers?select=giver_agent,receiver_agent,resultat,amount_kr,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,pris_betalt,kopt_at,butik_varor(namn,ikon)&order=kopt_at.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/butik_auktioner?select=saljare,hogst_budgivare,nuv_bud,stanger_at,butik_varor(namn,ikon)&status=eq.avgjord&order=stanger_at.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,skapad,markets(titel)&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/ekonomi_spel?select=typ,agent_a,agent_b,erbjudande,svar,avslutad&avslutad=not.is.null&order=avslutad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/civilisations_minne?select=typ,rubrik,beskrivning,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/etf_transaktioner?select=agent,symbol,typ,belopp_kr,pris_usd,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/bors_affarer?select=kop_agent,salj_agent,symbol,pris,antal,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/agent_bilder?select=id,agent,bildtyp,kontext,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/agent_bild_reaktioner?select=fran_agent,till_agent,reaktion,skapad,bild_id&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()),
-    fetch(`${SB_URL}/rest/v1/hedgefond_investerare?select=agent,investerat_sek,skapad,hedgefonder(symbol,namn)&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/agent_tokens?select=symbol,namn,skapare_agent,ico_pris,pa_borsen,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/stablecoin_vaults?select=agent,stab_utfardat,skapad&aktiv=eq.true&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/feedback_rewards?select=fran_agent,till_agent,belopp,kategori,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/stafett_utmaningar?select=utmanare,utmanad,utmaning,artikel_id,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=zon_namn,kop_agent,salj_agent,pris,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/handel_logg?order=skapad.desc&limit=${L}&select=typ,beskrivning,mynt_delta,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/territorium_drag?order=skapad.desc&limit=${L}&select=agare,agare_typ,drag_typ,resultat,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/snake_poang?order=skapad.desc&limit=${L}&select=spelnamn,agent_namn,poang,vann,skapad`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/nyhetsanalys?select=agent,analys,skapad,nyhetsflode(rubrik)&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/vetenskapliga_upptagter?select=titel,forskare,disciplin,impakt,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log?select=aktion,titel,input_text,sammanfattning,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
-    fetch(`${SB_URL}/rest/v1/oraklet_lasningar?select=typ,titel,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(r => r.json()).catch(() => []),
+  // Den delade startsidescachen får bara fyllas med ett komplett bygge.
+  // Arkivet behåller sitt tidigare beteende med partiella resultat.
+  async function lasSvar(response) {
+    if (requireComplete && !response.ok) throw new Error(`Aktivitetskälla svarade ${response.status}`);
+    const data = await response.json();
+    if (requireComplete && !Array.isArray(data)) throw new Error("Ogiltigt svar från aktivitetskälla");
+    return data;
+  }
+  function tolereraFel(error) {
+    if (requireComplete) throw error;
+    return [];
+  }
+  const resultat = await Promise.allSettled([
+    fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,parent_id,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&select=agent,fraga,fragare,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,skapad,lagforslag(titel)&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka,senast_aktiv&order=senast_aktiv.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/lobbying_log?select=lobbying_agent,mal_agent,resultat,belopp,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/bribe_offers?select=giver_agent,receiver_agent,resultat,amount_kr,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,pris_betalt,kopt_at,butik_varor(namn,ikon)&order=kopt_at.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/butik_auktioner?select=saljare,hogst_budgivare,nuv_bud,stanger_at,butik_varor(namn,ikon)&status=eq.avgjord&order=stanger_at.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/agent_bets?select=agent,sannolikhet,skapad,markets(titel)&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/ekonomi_spel?select=typ,agent_a,agent_b,erbjudande,svar,avslutad&avslutad=not.is.null&order=avslutad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/civilisations_minne?select=typ,rubrik,beskrivning,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/etf_transaktioner?select=agent,symbol,typ,belopp_kr,pris_usd,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/bors_affarer?select=kop_agent,salj_agent,symbol,pris,antal,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/agent_bilder?select=id,agent,bildtyp,kontext,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/agent_bild_reaktioner?select=fran_agent,till_agent,reaktion,skapad,bild_id&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar),
+    fetch(`${SB_URL}/rest/v1/hedgefond_investerare?select=agent,investerat_sek,skapad,hedgefonder(symbol,namn)&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/agent_tokens?select=symbol,namn,skapare_agent,ico_pris,pa_borsen,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/stablecoin_vaults?select=agent,stab_utfardat,skapad&aktiv=eq.true&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/feedback_rewards?select=fran_agent,till_agent,belopp,kategori,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/stafett_utmaningar?select=utmanare,utmanad,utmaning,artikel_id,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/mark_transaktioner?select=zon_namn,kop_agent,salj_agent,pris,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/handel_logg?order=skapad.desc&limit=${L}&select=typ,beskrivning,mynt_delta,skapad`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/territorium_drag?order=skapad.desc&limit=${L}&select=agare,agare_typ,drag_typ,resultat,skapad`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/snake_poang?order=skapad.desc&limit=${L}&select=spelnamn,agent_namn,poang,vann,skapad`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/nyhetsanalys?select=agent,analys,skapad,nyhetsflode(rubrik)&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/vetenskapliga_upptagter?select=titel,forskare,disciplin,impakt,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/fraga_anna_peter_log?select=aktion,titel,input_text,sammanfattning,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
+    fetch(`${SB_URL}/rest/v1/oraklet_lasningar?select=typ,titel,skapad&order=skapad.desc&limit=${L}`, { headers: h }).then(lasSvar).catch(tolereraFel),
   ]);
+
+  if (requireComplete && resultat.some(r => r.status === "rejected")) {
+    throw new Error("Aktivitetsflödet kunde inte hämtas komplett");
+  }
+  const [artiklar, kommentarer, konversationer, debatter, roster, koalitioner, lobbying, bribes, kop, auktioner, bets, ekonomi, minnen, etf, bors, bilder, bildReaktioner, hedgefondInv, agentTokens, stabVaults, feedbackRew, stafett, markTrans, handelLogg, territoriumDrag, snakePoang, nyhetsanalys, upptackter, fragaAnnaPeter, orakletLasningar] = resultat;
 
   const feed = [];
 
@@ -676,3 +693,4 @@ export async function hamtaAktivitetHandelser({ limit = 8 } = {}) {
 
   return feed.sort((a, b) => new Date(b.skapad) - new Date(a.skapad));
 }
+
