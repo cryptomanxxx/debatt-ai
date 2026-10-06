@@ -139,7 +139,7 @@ test("activity failure retains last good feed, is not CDN cached, and next call 
 });
 
 test("article count uses HEAD and exact count beyond PostgREST row limit; never reads a response body", async () => {
-  const source = await readFile(new URL("../app/client.js", import.meta.url), "utf8");
+  const source = await readFile(new URL("../app/lib/startsidaData.js", import.meta.url), "utf8");
   const fn = source.slice(source.indexOf("async function sbCount()"), source.indexOf("async function fetchSenasteChattDebatt"));
   let total = "0-0/2033", calls = 0;
   const context = vm.createContext({
@@ -155,4 +155,35 @@ test("article count uses HEAD and exact count beyond PostgREST row limit; never 
   total = "*/0"; assert.equal(await context.count(), 0);
   total = "0-0/*"; await assert.rejects(context.count(), /Artikelantal saknas/);
   assert.equal(calls, 3);
+});
+
+test("startsida data bundles every widget and flags failed sources instead of caching them as empty", async () => {
+  const source = (await readFile(new URL("../app/lib/startsidaData.js", import.meta.url), "utf8"))
+    .replace("export async function hamtaStartsidaData", "async function hamtaStartsidaData")
+    .replace(/^const SB_(URL|KEY) = .*$/gm, "");
+  let failTable = null, calls = 0;
+  const context = vm.createContext({
+    SB_URL: "https://example.invalid", SB_KEY: "test", URLSearchParams, Date, Object, Promise,
+    fetch: async (url) => {
+      calls++;
+      const ok = !(failTable && url.includes(`/rest/v1/${failTable}?`));
+      return {
+        ok, status: ok ? 200 : 500,
+        headers: { get: () => "0-0/42" },
+        json: async () => (url.includes("roster?") ? [{ artikel_id: 1, rod: "ja" }, { artikel_id: 1, rod: "nej" }] : []),
+      };
+    },
+  });
+  vm.runInContext(source + "\nglobalThis.hamta = hamtaStartsidaData;", context);
+  const { data, ofullstandig } = await context.hamta();
+  assert.equal(ofullstandig, 0);
+  assert.equal(data.articleCount, 42);
+  assert.deepEqual(JSON.parse(JSON.stringify(data.roster)), { voteCounts: { 1: { ja: 1, nej: 1 } }, totalRoster: 2 });
+  assert.equal(Object.keys(data).length, 20);
+  const okCalls = calls;
+  failTable = "chatt_debatter";
+  const partial = await context.hamta();
+  assert.equal(partial.ofullstandig, 1);
+  assert.equal(partial.data.senasteChattDebatt, null);
+  assert.ok(okCalls > 0);
 });

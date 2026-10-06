@@ -63,56 +63,6 @@ async function sbSelect() {
   return res.json();
 }
 
-async function sbCount() {
-  // Hämta bara count-headern, inte ett id för varje artikel.
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id&limit=1`, {
-    method: "HEAD",
-    headers: {
-      "apikey": SB_KEY,
-      "Authorization": `Bearer ${SB_KEY}`,
-      "Prefer": "count=exact",
-    },
-  });
-  if (!res.ok) throw new Error("Artikelräknaren kunde inte hämtas");
-  const total = res.headers.get("content-range")?.split("/")[1];
-  if (!/^\d+$/.test(total || "")) throw new Error("Artikelantal saknas");
-  return Number(total);
-}
-
-async function fetchSenasteChattDebatt() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,summering,skapad&order=skapad.desc&limit=1`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data?.[0] || null;
-}
-
-async function fetchSenasteNyhet() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla,taggar,nyhetskalla,skapad&nyhetskalla=not.is.null&rubrik=not.like.Replik%3A*&order=skapad.desc&limit=4`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return [];
-  return await res.json();
-}
-
-// Filtrerar på det dedikerade filmrecension-fältet (✅123, uppföljning) —
-// inte på forfattare="Filmrecensenten", som bara identifierar AI-agentens
-// egna recensioner. Sedan besökare kan skicka in filmrecensioner manuellt
-// via /skicka-in under sitt eget namn (✅123-uppföljning, PR #1482) räcker
-// forfattare inte längre som signal. Separat widget, egen SENASTE-sektion
-// — samma princip som SENASTE NYHETERNA/DEBATTERNA.
-async function fetchSenasteFilmrecension() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,artikel,kalla,taggar,arg,ori,rel,tro,skapad&filmrecension=eq.true&order=skapad.desc&limit=4`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return [];
-  return await res.json();
-}
-
 async function fetchDebatterArtiklar() {
   const res = await fetch(
     `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,skapad,konklusion&order=skapad.asc`,
@@ -182,33 +132,6 @@ function grupperaDebatter(artiklar) {
     });
 }
 
-async function fetchAllaRoster() {
-  const res = await fetch(`${SB_URL}/rest/v1/roster?select=artikel_id,rod`, {
-    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
-  });
-  if (!res.ok) return [];
-  return res.json();
-}
-
-async function fetchAllaKommentarer() {
-  const res = await fetch(`${SB_URL}/rest/v1/kommentarer?select=artikel_id`, {
-    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
-  });
-  if (!res.ok) return [];
-  return res.json();
-}
-
-async function fetchCivilisationDrift() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/oligarki_historik?select=datum,oligarki_risk,gini,mobilitet&order=datum.desc&limit=2`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return null;
-  const rows = await res.json();
-  if (!Array.isArray(rows) || rows.length === 0) return null;
-  return rows;
-}
-
 async function fetchAktivitetsFeed() {
   // Feeden byggs server-side med 25s cache — se app/api/aktivitet/route.js.
   // Tidigare gjordes 26 Supabase-fetchar härifrån per besökare var 30:e sekund.
@@ -218,176 +141,12 @@ async function fetchAktivitetsFeed() {
   return Array.isArray(feed) ? feed : [];
 }
 
-async function fetchSenasteAgentKonversationer() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/agent_fragor?offentlig=eq.true&order=skapad.desc&limit=6&select=agent,fraga,svar,fragare,skapad`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return [];
-  return res.json();
-}
-
-async function fetchSenasteUtmaningar() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/agent_utmaningar?order=skapad.desc&limit=3&select=agent,tes,motargument,skapad`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return [];
-  return res.json();
-}
-
-async function fetchSenasteReplik() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?rubrik=like.Replik%3A*&order=skapad.desc&limit=1&select=id,rubrik,forfattare,skapad`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (!data?.[0]) return null;
-  const replik = data[0];
-  const originalRubrik = replik.rubrik.replace(/^(Replik: )+/, "");
-  const res2 = await fetch(
-    `${SB_URL}/rest/v1/artiklar?rubrik=eq.${encodeURIComponent(originalRubrik)}&select=forfattare&limit=1`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  const orig = res2.ok ? await res2.json() : [];
-  return { ...replik, originalForfattare: orig[0]?.forfattare || null };
-}
-
-async function fetchLatestArtikel() {
-  // Sedan ✅133 visar denna bara genuina eget-ämne-debattartiklar — repliker
-  // har fått en egen "SENASTE REPLIKERNA"-widget (fetchSenasteRepliker()).
-  // nyhetskalla=is.null räcker ensamt för att identifiera "varken nyhet
-  // eller replik": agent.py sätter nyhetskalla på BÅDA nyhetsartiklar
-  // (riktig källa) och repliker (replik_kalla-pekaren, se ✅17) — bara
-  // eget-ämne-grenen lämnar den null. Filmrecensioner (✅123) sätter av
-  // samma skäl inte nyhetskalla och matchade därför tidigare felaktigt
-  // denna gren — de har sin egen "SENASTE FILMRECENSIONERNA"-sektion.
-  // Filtrerar på det dedikerade filmrecension-fältet, inte forfattare —
-  // en manuellt inskickad filmrecension (✅123-uppföljning) har inte
-  // forfattare="Filmrecensenten" men ska ändå uteslutas härifrån.
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&nyhetskalla=is.null&filmrecension=eq.false&order=skapad.desc&limit=4`, {
-    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
-  });
-  if (!res.ok) return [];
-  return await res.json();
-}
-
-// ✅133: egen widget för repliker, utbruten ur fetchLatestArtikel() på
-// uttrycklig begäran — gör det synligt att repliker faktiskt publiceras
-// (tidigare konkurrerade de med eget-ämne-artiklar om samma 4 platser i
-// "SENASTE DEBATTERNA", vilket kunde dölja hur många repliker som gått ut
-// en given dag). parent_id är den enda pålitliga signalen — repliker sätter
-// den alltid, oavsett vad nyhetskalla innehåller.
-async function fetchSenasteRepliker() {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&parent_id=not.is.null&filmrecension=eq.false&order=skapad.desc&limit=4`, {
-    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
-  });
-  if (!res.ok) return [];
-  return await res.json();
-}
-
-async function fetchTrending() {
-  const sjuDagarSen = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kalla,lasningar,nyhetskalla,filmrecension,parent_id&lasningar=gte.1&skapad=gte.${encodeURIComponent(sjuDagarSen)}&order=lasningar.desc&limit=3`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return [];
-  return res.json();
-}
-
-async function fetchTrendingTopics() {
-  const sjuttioTvaTimmarSen = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
-  const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,taggar,lasningar&skapad=gte.${encodeURIComponent(sjuttioTvaTimmarSen)}&order=skapad.desc&limit=120`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return [];
-  const artiklar = await res.json();
-  if (!artiklar.length) return [];
-
-  // Fetch reply counts for these articles
-  const ids = artiklar.map(a => a.id).join(",");
-  const svarRes = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=parent_id&parent_id=in.(${ids})`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  const svarData = svarRes.ok ? await svarRes.json() : [];
-  const svarCount = {};
-  svarData.forEach(s => { svarCount[s.parent_id] = (svarCount[s.parent_id] || 0) + 1; });
-
-  // Aggregate by tag: score = lasningar + svar × 5
-  const tagMap = {};
-  for (const art of artiklar) {
-    const tags = Array.isArray(art.taggar) ? art.taggar : [];
-    const las = art.lasningar || 0;
-    const svar = svarCount[art.id] || 0;
-    for (const tag of tags) {
-      if (!tag) continue;
-      if (!tagMap[tag]) tagMap[tag] = { tag, antal: 0, score: 0, lasningar: 0, svar: 0 };
-      tagMap[tag].antal++;
-      tagMap[tag].lasningar += las;
-      tagMap[tag].svar += svar;
-      tagMap[tag].score += las + svar * 5;
-    }
-  }
-
-  return Object.values(tagMap)
-    .filter(t => t.antal >= 1)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 7);
-}
-
-async function fetchTopDebattrad() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,parent_id&order=skapad.desc&limit=100&parent_id=not.is.null`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return null;
-  const repliker = await res.json();
-  if (!repliker.length) return null;
-  const counts = {};
-  repliker.forEach(r => {
-    const root = r.parent_id;
-    counts[root] = (counts[root] || 0) + 1;
-  });
-  const topId = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
-  if (!topId) return null;
-  const res2 = await fetch(
-    `${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare&id=eq.${topId}`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res2.ok) return null;
-  const [art] = await res2.json();
-  if (!art) return null;
-  return { ...art, antalRepliker: counts[topId] };
-}
-
-async function fetchSenasteKommentarer() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/kommentarer?select=id,artikel_id,namn,text,skapad&publicerad=eq.true&order=skapad.desc&limit=5`,
-    { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
-  );
-  if (!res.ok) return [];
-  return res.json();
-}
-
 async function incrementVisitors() {
   await fetch(`${SB_URL}/rest/v1/rpc/increment_visitors`, {
     method: "POST",
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
     body: JSON.stringify({}),
   });
-}
-
-async function getVisitors() {
-  const res = await fetch(`${SB_URL}/rest/v1/besokare?select=antal`, {
-    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
-  });
-  if (!res.ok) return 0;
-  const data = await res.json();
-  return data?.[0]?.antal || 0;
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
@@ -833,38 +592,36 @@ export default function DebattClient({ initialArticleCount = null }) {
 
   // Load data on mount
   useEffect(() => {
-    sbCount().then(n => setArticleCount(n)).catch(() => {});
-    fetchLatestArtikel().then(a => setHeroArtikel(a)).catch(() => {});
     incrementVisitors().catch(() => {});
-    getVisitors().then(n => setVisitors(n)).catch(() => {});
-    fetchAllaRoster().then(data => {
-      const counts = {};
-      let total = 0;
-      data.forEach(r => {
-        if (!counts[r.artikel_id]) counts[r.artikel_id] = { ja: 0, nej: 0 };
-        if (r.rod === "ja") counts[r.artikel_id].ja++;
-        else counts[r.artikel_id].nej++;
-        total++;
-      });
-      setVoteCounts(counts);
-      setTotalRoster(total);
-    }).catch(() => {});
-    fetchAllaKommentarer().then(data => {
-      const counts = {};
-      data.forEach(r => { counts[r.artikel_id] = (counts[r.artikel_id] || 0) + 1; });
-      setCommentCounts(counts);
-      setTotalKommentarer(data.length);
-    }).catch(() => {});
-    fetchSenasteReplik().then(r => setSenasteReplik(r)).catch(() => {});
-    fetchSenasteChattDebatt().then(d => setSenasteChattDebatt(d)).catch(() => {});
-    fetchSenasteNyhet().then(n => setSenasteNyhet(n)).catch(() => {});
-    fetchSenasteFilmrecension().then(n => setSenasteFilmrecension(n)).catch(() => {});
-    fetchSenasteRepliker().then(n => setSenasteRepliker(n)).catch(() => {});
-    fetchTrending().then(d => setTrending(d)).catch(() => {});
-    fetchTrendingTopics().then(d => setTrendingTopics(d)).catch(() => {});
-    fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
-    fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
-    fetchCivilisationDrift().then(d => setCivilisationDrift(d)).catch(() => {});
+    // All widgetdata hämtas i ett cachat anrop (app/api/startsida/route.js).
+    // Ett fält som är null har misslyckats på servern: behåll standardvärdet.
+    fetch("/api/startsida")
+      .then(r => (r.ok ? r.json() : {}))
+      .then(d => {
+        if (!d) return;
+        const satt = (nyckel, setter) => { if (d[nyckel] != null) setter(d[nyckel]); };
+        satt("articleCount", setArticleCount);
+        satt("heroArtikel", setHeroArtikel);
+        satt("visitors", setVisitors);
+        if (d.roster) { setVoteCounts(d.roster.voteCounts); setTotalRoster(d.roster.totalRoster); }
+        if (d.kommentarer) { setCommentCounts(d.kommentarer.commentCounts); setTotalKommentarer(d.kommentarer.totalKommentarer); }
+        satt("senasteReplik", setSenasteReplik);
+        satt("senasteChattDebatt", setSenasteChattDebatt);
+        satt("senasteNyhet", setSenasteNyhet);
+        satt("senasteFilmrecension", setSenasteFilmrecension);
+        satt("senasteRepliker", setSenasteRepliker);
+        satt("trending", setTrending);
+        satt("trendingTopics", setTrendingTopics);
+        satt("senasteKommentarer", setSenasteKommentarer);
+        satt("topDebattrad", setTopDebattrad);
+        satt("civilisationDrift", setCivilisationDrift);
+        satt("agentKonversationer", setAgentKonversationer);
+        satt("dagbok", setDagbok);
+        satt("agentUtmaningar", setAgentUtmaningar);
+        satt("agentSymboler", setAgentSymboler);
+        satt("agentKoalitioner", setAgentKoalitioner);
+      })
+      .catch(() => {});
     const stopAktivitetPolling = startVisiblePolling({
       document,
       run: () => fetchAktivitetsFeed().then(d => {
@@ -880,25 +637,6 @@ export default function DebattClient({ initialArticleCount = null }) {
       }).catch(() => {}),
       intervalMs: 30000,
     });
-    fetchSenasteAgentKonversationer().then(d => setAgentKonversationer(d)).catch(() => {});
-    fetch(`${SB_URL}/rest/v1/agent_dagbok?select=id,agent,rubrik,reflektion,ar_replik,skapad&order=skapad.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
-      .then(r => r.ok ? r.json() : []).then(d => setDagbok(Array.isArray(d) ? d : [])).catch(() => {});
-    fetchSenasteUtmaningar().then(d => setAgentUtmaningar(d)).catch(() => {});
-    // Agent-symboler för att visa ikoner på artikelkort
-    fetch(`${SB_URL}/rest/v1/agent_symboler?select=agent,vara_id,pris_betalt&order=pris_betalt.desc`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
-      .then(r => r.json()).then(rows => {
-        if (!Array.isArray(rows)) return;
-        fetch(`${SB_URL}/rest/v1/butik_varor?select=id,ikon`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
-          .then(r2 => r2.json()).then(varor => {
-            const ikonMap = Object.fromEntries((varor || []).map(v => [v.id, v.ikon]));
-            const map = {};
-            for (const r of rows) {
-              if (!map[r.agent]) map[r.agent] = [];
-              if (map[r.agent].length < 3) map[r.agent].push(ikonMap[r.vara_id] || "");
-            }
-            setAgentSymboler(map);
-          }).catch(() => {});
-      }).catch(() => {});
     // Plattformsstämning
     fetch("/api/platform-stamning").then(r => r.json()).then(d => {
       if (d && d.sinnesstamning) {
@@ -912,9 +650,6 @@ export default function DebattClient({ initialArticleCount = null }) {
     // Kolla om besökaren redan röstat idag
     const stamningVotedTs = localStorage.getItem("platform_stamning_voted");
     if (stamningVotedTs && Date.now() - Number(stamningVotedTs) < 24 * 60 * 60 * 1000) setStamningVoted(true);
-    // Agent-koalitioner
-    fetch(`${SB_URL}/rest/v1/agent_koalitioner?select=agent_a,agent_b,styrka,antal_utbyten&order=styrka.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
-      .then(r => r.json()).then(d => setAgentKoalitioner(Array.isArray(d) ? d : [])).catch(() => {});
     // Opinion-widget: hämta röstdata och välj 3 slumpvisa frågor
     const WIDGET_FRAGOR = [
       { fraga: "Ska AI få fatta juridiska beslut?", kategori: "ai-tech" },
@@ -1911,7 +1646,6 @@ export default function DebattClient({ initialArticleCount = null }) {
                 {totalKommentarer !== null && <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: "monospace" }}><span style={{ color: C.text, fontWeight: 700 }}>{totalKommentarer}</span> kommentarer</span>}
               </div>
             )}
-
 
             <div style={{ background: "#0d0f0a", border: `1px solid ${C.green}30`, borderRadius: "8px", padding: "28px 32px", marginBottom: "40px" }}>
               <p style={{ fontSize: "11px", color: C.green, letterSpacing: "0.1em", textTransform: "uppercase", margin: "0 0 10px 0", fontWeight: 700 }}>Artikelinlämning</p>

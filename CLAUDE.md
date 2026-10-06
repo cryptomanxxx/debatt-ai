@@ -287,6 +287,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | POST | `/api/visit` | Spårar besökarsessioner med visitor_id till `visitor_sessions`-tabellen. |
 | POST | `/api/unsubscribe` | Avaktiverar nyhetsbrevsprenumerationer via avprenumerera-token. |
 | GET  | `/api/reports` | Listar de senaste 12 AI-bus-veckorapporterna från `ai-bus/reports/*.json`. |
+| GET  | `/api/startsida` | All widgetdata för startsidan i ett anrop. Cachar bara kompletta svar, 60 s server- och CDN-cache. |
 | GET  | `/api/nav-count` | Antal artiklar och direktdebatter för navigeringens räknare. HEAD + count=exact, 15 min server- och CDN-cache. |
 | POST | `/api/labb` | Labb-endpoint: genererar agentsvar via Groq med skjutreglage-justerad personlighet (aggressivitet, faktafokus, humor, optimism). |
 
@@ -4487,6 +4488,22 @@ Supabase-loggarna (okt 2026) visade att API Gateway stod för nästan all loggda
 | `app/api/nav-count/route.js` | Ny route. `HEAD` + `count=exact` mot `artiklar` och `chatt_debatter`. 15 min Data Cache + CDN-cache |
 | `app/useNavCount.js` | Ny delad klienthook, ett anrop per sidladdning |
 | `app/NavArkivLink.js`, `app/NavHistorikLink.js` | Använder hooken istället för direkta Supabase-anrop |
+
+### ✅142. Startsidans widgets hämtades direkt från Supabase i varje besökares webbläsare – KLART
+
+Supabase-loggarna per adress (okt 2026) visade att `/rest/v1/artiklar` stod för cirka 30 % av all API Gateway-trafik. Den största källan var startsidan. `app/client.js` gjorde cirka 18 ocachade Supabase-anrop direkt från webbläsaren vid varje besök, varav ungefär 10 mot `artiklar`: ett per widget, plus räknare, röster, kommentarer, symboler och koalitioner. Det gällde även sökmotorer som kör JavaScript.
+
+**Fix:** hämtningsfunktionerna är flyttade till `app/lib/startsidaData.js`. Där samlar `hamtaStartsidaData()` alla 20 widgetfält parallellt med `Promise.allSettled`. Den enda ändringen i funktionerna är att ett HTTP-fel nu kastar istället för att returnera en tom lista. Annars hade ett misslyckat anrop cachats som "inga data". Den nya `GET /api/startsida` cachar bara kompletta svar, i 60 sekunder i Next Data Cache och 60 sekunder i CDN. Om någon källa misslyckas skickas det som gick att hämta med `no-store`. Klienten gör ett enda anrop och behåller sitt standardvärde för fält som är `null`. Besöksräknarens `increment_visitors` körs fortfarande per besök, eftersom det är en skrivning.
+
+Widgetarna kan visa ny data upp till cirka 1–2 minuter sent. Invariant-checkerns kontroller `senaste-debatterna-filter` och `senaste-repliker-widget` läser nu hämtningen i `app/lib/startsidaData.js` och kopplingen till state i `app/client.js`.
+
+| Fil | Roll |
+|---|---|
+| `app/lib/startsidaData.js` | Ny modul. De flyttade hämtningsfunktionerna + `hamtaStartsidaData()` |
+| `app/api/startsida/route.js` | Ny route. Cachar bara kompletta svar, 60 s Data Cache + CDN |
+| `app/client.js` | Ett anrop mot `/api/startsida` istället för cirka 18 direkta Supabase-anrop |
+| `agents/invariant-checker.js` | Två kontroller pekar om till den nya filen |
+| `tests/supabaseEgress.test.mjs` | Nytt test för sammanställningen och felhanteringen |
 
 ## Kontext om projektet
 
