@@ -129,6 +129,8 @@ KANALER = [
      "url": "https://www.youtube.com/@HistoryReforgedYT"},
     {"handle": "@xyronth", "namn": "@xyronth",
      "url": "https://www.youtube.com/@xyronth"},
+    {"handle": "@MythReel-GK", "namn": "@MythReel-GK",
+     "url": "https://www.youtube.com/@MythReel-GK"},
 ]
 
 YOUTUBE_DATA_API = "https://www.googleapis.com/youtube/v3"
