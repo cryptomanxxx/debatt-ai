@@ -6,7 +6,8 @@
  * per cache-fönster på servern — 100 samtidiga besökare ger 26 queries
  * istället för 2 600.
  *
- * Cache: in-memory 25s per lambda + CDN s-maxage=25, stale-while-revalidate=30.
+ * Cache: färdig topp-10 i Next Data Cache (60s), lokal 60s-cache och CDN 25s.
+ * In-flight-anrop delas inom samma instans. Dolda browserflikar pollar inte.
  *
  * Själva händelsebygget (30 parallella Supabase-fetchar → enhetlig
  * {typ,ikon,text,href,skapad,farg}-lista) ligger i app/lib/aktivitetFeed.js
@@ -15,15 +16,17 @@
  */
 
 import { NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { hamtaAktivitetHandelser } from "../../lib/aktivitetFeed";
 
 export const dynamic = "force-dynamic";
 
-const CACHE_MS = 25_000;
+const CACHE_MS = 60_000;
+let pendingFeed = null;
 let _cache = { data: null, ts: 0 };
 
 async function byggFeed() {
-  const sorterad = await hamtaAktivitetHandelser({ limit: 8 });
+  const sorterad = await hamtaAktivitetHandelser({ limit: 8, requireComplete: true });
 
   // Feeden hämtar från ~30 olika Supabase-tabeller och tar ett rent globalt
   // topp-10 sorterat på tidsstämpel — inga garanterade platser per typ. Ju
@@ -48,17 +51,36 @@ async function byggFeed() {
     .sort((a, b) => new Date(b.skapad) - new Date(a.skapad));
 }
 
+// Cache endast den färdiga offentliga listan, inte de ~30 råa svaren.
+// Behåll force-dynamic för rutten; unstable_cache har en egen Data Cache.
+// Ny nyckel när bygglogiken ändras: closures i aktivitetFeed ingår inte
+// automatiskt i cache-funktionens hash.
+const hamtaDeladFeed = unstable_cache(
+  byggFeed,
+  ["startsida-aktivitet-feed-v2"],
+  { revalidate: 60 }
+);
+
 export async function GET() {
   const headers = { "Cache-Control": "public, max-age=0, s-maxage=25, stale-while-revalidate=30" };
   if (_cache.data && Date.now() - _cache.ts < CACHE_MS) {
     return NextResponse.json(_cache.data, { headers });
   }
   try {
-    const feed = await byggFeed();
-    _cache = { data: feed, ts: Date.now() };
+    if (!pendingFeed) {
+      pendingFeed = hamtaDeladFeed()
+        .then(feed => {
+          _cache = { data: feed, ts: Date.now() };
+          return feed;
+        })
+        .finally(() => { pendingFeed = null; });
+    }
+    const feed = await pendingFeed;
     return NextResponse.json(feed, { headers });
   } catch {
     // Fail-open: returnera senaste kända feed (eller tom) hellre än 500
-    return NextResponse.json(_cache.data || [], { headers });
+    return NextResponse.json(_cache.data || [], {
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 }
