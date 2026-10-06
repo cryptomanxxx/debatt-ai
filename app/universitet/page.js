@@ -70,8 +70,22 @@ async function getData() {
   }
 }
 
+async function getExperiments() {
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!key) return { experiment: [], labAvailable: false };
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/oraklet_experiment?order=skapad.desc&limit=10&select=id,titel,status,rapport,skapad`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, next: { revalidate: 900 }, signal: AbortSignal.timeout(10000) }
+    );
+    if (!res.ok) return { experiment: [], labAvailable: false };
+    const rows = await res.json();
+    return { experiment: Array.isArray(rows) ? rows : [], labAvailable: Array.isArray(rows) };
+  } catch { return { experiment: [], labAvailable: false }; }
+}
+
 export default async function UniversitetPage() {
-  const { fynd, nyheter, urval } = await getData();
+  const [{ fynd, nyheter, urval }, { experiment, labAvailable }] = await Promise.all([getData(), getExperiments()]);
 
   const discipliner = new Set(fynd.map(f => f.disciplin || "övrigt"));
   const genombrott = fynd.filter(f => f.impakt === "genombrottsfynd").length;
@@ -148,19 +162,7 @@ export default async function UniversitetPage() {
       </div>
 
       <div style={{ padding: "40px 24px" }}>
-        {fynd.length === 0 && nyheter.length === 0 && urval.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "80px 20px" }}>
-            <div style={{ fontSize: "40px", marginBottom: "16px", opacity: 0.3 }}>🎓</div>
-            <div style={{ fontSize: "14px", color: "#1e4a80", fontFamily: "monospace" }}>
-              Inga vetenskapliga upptäckter ännu.
-            </div>
-            <div style={{ fontSize: "11px", color: "#0d2040", fontFamily: "monospace", marginTop: "8px" }}>
-              Kör forskning_test.py för att generera de första fynden.
-            </div>
-          </div>
-        ) : (
-          <UniversitetVy fynd={fynd} nyheter={nyheter} urval={urval} />
-        )}
+        <UniversitetVy fynd={fynd} nyheter={nyheter} urval={urval} experiment={experiment} labAvailable={labAvailable} />
       </div>
 
       {/* Footer */}

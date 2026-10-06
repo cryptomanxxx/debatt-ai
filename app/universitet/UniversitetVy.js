@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import ForskningsListaVy from "./ForskningsListaVy";
 import VetenskapsFlodeVy from "./VetenskapsFlodeVy";
 import OrakletsLaslistaVy from "./OrakletsLaslistaVy";
+import OrakletsForskningslabbVy from "./OrakletsForskningslabbVy";
 import AgentOverlay from "../nyhetskallor/AgentOverlay";
 
 function TypTab({ label, count, active, onClick, farg }) {
@@ -37,9 +38,9 @@ function TypTab({ label, count, active, onClick, farg }) {
 // till 50 rader) bara för att nå vetenskapsnyheterna längst ner. En
 // typväxlare löser det genom att bara visa EN lista åt gången — inget
 // skrollberg att ta sig förbi för att nå den andra.
-export default function UniversitetVy({ fynd, nyheter, urval }) {
+export default function UniversitetVy({ fynd, nyheter, urval, experiment = [], labAvailable = false }) {
   const [typ, setTyp] = useState(
-    fynd.length > 0 ? "forskning" : nyheter.length > 0 ? "nyheter" : urval.length > 0 ? "urval" : "forskning"
+    fynd.length > 0 ? "forskning" : nyheter.length > 0 ? "nyheter" : urval.length > 0 ? "urval" : "labb"
   );
   // Professor Oraklet läser ett enskilt fynd/nyhet i taget — samma
   // AgentOverlay-mönster som "🎙️ Anna läser" m.fl. på /nyhetsanalyser, men
@@ -160,9 +161,18 @@ export default function UniversitetVy({ fynd, nyheter, urval }) {
           onClick={() => setTyp("urval")}
           farg="#dd6e5f"
         />
+        <TypTab
+          label="🧪 Oraklets forskningslabb"
+          count={experiment.length}
+          active={typ === "labb"}
+          onClick={() => setTyp("labb")}
+          farg="#67e8c2"
+        />
       </div>
 
-      {typ === "forskning"
+      {typ === "labb"
+        ? <OrakletsForskningslabbVy experiment={experiment} labAvailable={labAvailable} />
+        : typ === "forskning"
         ? <ForskningsListaVy fynd={fynd} onLasa={handleLasa} />
         : typ === "nyheter"
         ? <VetenskapsFlodeVy nyheter={nyheter} onLasa={handleLasa} />
