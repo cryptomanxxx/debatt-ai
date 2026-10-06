@@ -129,6 +129,8 @@ KANALER = [
      "url": "https://www.youtube.com/@HistoryReforgedYT"},
     {"handle": "@xyronth", "namn": "@xyronth",
      "url": "https://www.youtube.com/@xyronth"},
+    {"handle": "@MythReel-GK", "namn": "@MythReel-GK",
+     "url": "https://www.youtube.com/@MythReel-GK"},
 ]
 
 YOUTUBE_DATA_API = "https://www.googleapis.com/youtube/v3"
@@ -306,6 +308,43 @@ def hamta_publicerade_idag() -> int:
         return len(res.json())
     except Exception:
         return 0
+
+
+# Kanalen med riktiga filmer får garanterat en recension per dag
+# (ägarbeslut, okt 2026). Med sju kanaler och slumpmässigt kanalval hade
+# den annars bara fått ~1/7 av passen.
+GARANTERAD_KANAL = "@BoxofficeMoviesScenes"
+
+
+def garanterad_kanal_publicerad_idag() -> bool:
+    """True om dagens (UTC) recensioner redan innehåller en från
+    GARANTERAD_KANAL. Känns igen på kanalhandtaget i den kodgaranterade
+    källattributionen som varje recension avslutas med
+    (<a href="https://www.youtube.com/@BoxofficeMoviesScenes">...).
+
+    Fail-open åt "inte publicerad": ett fel ger bara ett extra försök med
+    kanalen, och main() faller ändå tillbaka på en annan kanal i samma pass
+    om försöket inte ger någon recension."""
+    idag_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00+00:00")
+    try:
+        res = httpx.get(
+            f"{SB_URL}/rest/v1/artiklar",
+            params={
+                "select": "id",
+                "kalla": "eq.ai",
+                "filmrecension": "eq.true",
+                "skapad": f"gte.{idag_utc}",
+                "artikel": f"ilike.*{GARANTERAD_KANAL}*",
+                "limit": "1",
+            },
+            headers={"apikey": SB_KEY, "Authorization": f"Bearer {SB_KEY}"},
+            timeout=15,
+        )
+        if res.status_code != 200:
+            return False
+        return len(res.json()) > 0
+    except Exception:
+        return False
 
 
 def redan_recenserad(video_id: str) -> bool:
@@ -1287,17 +1326,36 @@ def main():
         )
         return
 
-    # Slumpmässigt vald kanal denna körning — ger variation mellan
-    # kanalerna utan ett eget delat rotationsindex, se moduldocstringen.
-    kanal = random.choice(KANALER)
+    if garanterad_kanal_publicerad_idag():
+        kanal = random.choice(KANALER)
+        print(f"Vald kanal denna körning: {kanal['handle']}")
+        forsok_kanal(kanal)
+        return
+
+    # Ingen recension från den garanterade kanalen idag ännu — försök med
+    # den först. Ger den ingen recension (ingen ny video, oidentifierad
+    # film, avvisad av redaktören) används passet ändå: en slumpvis vald
+    # annan kanal får försöka i samma pass.
+    garanterad = next(k for k in KANALER if k["handle"] == GARANTERAD_KANAL)
+    print(f"Ingen recension från {GARANTERAD_KANAL} idag ännu — försöker med den först.")
+    if forsok_kanal(garanterad):
+        return
+    ovriga = [k for k in KANALER if k["handle"] != GARANTERAD_KANAL]
+    kanal = random.choice(ovriga)
+    print(f"\n{GARANTERAD_KANAL} gav ingen recension — provar {kanal['handle']} i samma pass.")
+    forsok_kanal(kanal)
+
+
+def forsok_kanal(kanal: dict) -> bool:
+    """Försöker hitta, recensera och publicera en video från kanalen.
+    True om en recension publicerades."""
     handle = kanal["handle"]
-    print(f"Vald kanal denna körning: {handle}")
 
     try:
         kanal_state = hamta_state(handle)
     except _TransientFel as e:
         print(f"  ✗ {handle}: kunde inte läsa filmrecensent_state: {e} — avslutar.")
-        return
+        return False
     kanal_id = kanal_state.get("kanal_id")
     # Avgör vilken av de två recensionsfunktionerna som ska användas för
     # den här kanalen — en kolumn i Supabase, inte hårdkodat i Python
@@ -1311,7 +1369,7 @@ def main():
         kanal_id = resolv_kanal_id(handle)
         if not kanal_id:
             print(f"  ✗ {handle}: kunde inte slå upp kanal-ID — avslutar utan att publicera.")
-            return
+            return False
         _upsert_state(handle, {"kanal_id": kanal_id})
 
     if YOUTUBE_API_KEY:
@@ -1328,7 +1386,7 @@ def main():
 
     if not video:
         print("Ingen ny video att recensera — avslutar.")
-        return
+        return False
 
     print(f"Vald video: \"{video['titel']}\" ({video['url']})")
 
@@ -1349,10 +1407,10 @@ def main():
         if YOUTUBE_API_KEY:
             _finalisera_pending(handle, video["video_id"])
         print("Videon är inget berättande verk — hoppar över utan publicering.")
-        return
+        return False
     if not resultat:
         print("Kunde inte generera en godtagbar recension — avslutar utan publicering.")
-        return
+        return False
 
     if "kand_film" in resultat:
         print(f"  Film: {resultat['kand_film']}")
@@ -1368,10 +1426,12 @@ def main():
             # video som redan publicerats framgångsrikt).
             _finalisera_pending(handle, video["video_id"])
         print(f"\n✓ Recension publicerad: {DEBATT_SITE_URL}{svar.get('artikel_url', '')}")
+        return True
     elif svar:
         print(f"\n✗ Inte publicerad (beslut: {svar.get('beslut')}) — {svar.get('motivering')}")
     else:
         print("\n✗ Publicering misslyckades helt.")
+    return False
 
 
 if __name__ == "__main__":
