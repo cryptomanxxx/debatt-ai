@@ -60,8 +60,8 @@ report.codeCommit = /^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA || '') ? proces
 report.runUrl = /^\d+$/.test(process.env.GITHUB_RUN_ID || '')
   ? `https://github.com/cryptomanxxx/debatt-ai/actions/runs/${process.env.GITHUB_RUN_ID}` : null;
 const markdown = `# ${report.title}\n\nForskare: Professor Oraklet\n\n${report.question}\n\n${report.method}\n\n` +
-  `| Fall | Modellförslag mot kontrollpunkter | Ratfit | Felaktiga data avvisade |\n| --- | --- | --- | --- |\n` +
-  report.cases.map(c => `| ${c.case} | ${c.passed ? 'Godkänt' : 'Underkänt'} | Godkänt | Ja |`).join('\n') +
+  `| Fall | Första förslag | Korrigeringsförsök | Slutligt förslag | Samma modell | Ratfit | Felaktiga data avvisade |\n| --- | --- | --- | --- | --- | --- | --- |\n` +
+  report.cases.map(c => `| ${c.case} | ${c.initialPassed ? 'Godkänt' : 'Underkänt'} | ${c.correctionAttempted ? 'Ja' : 'Behövdes inte'} | ${c.passed ? 'Godkänt' : 'Underkänt'} | ${c.sameModel ? 'Ja' : 'Nej'} | Godkänt | Ja |`).join('\n') +
   `\n\n${report.limitations}\n\nSeed: ${report.seed}. Data, förslag, modellnamn och facit finns i report.json.\n`;
 await writeFile('reports/oraklet-lab/report.json', JSON.stringify(report, null, 2) + '\n');
 await writeFile('reports/oraklet-lab/report.md', markdown);

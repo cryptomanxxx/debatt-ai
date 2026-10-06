@@ -10,6 +10,7 @@ export default function OrakletsForskningslabbVy({ experiment = [], labAvailable
       <div style={{ padding: '20px', border: `1px solid ${C.border}`, borderRadius: '10px', marginBottom: '24px' }}>
         <strong style={{ color: C.accent }}>Första experimentet: återfinna ett dolt rationellt samband</strong>
         <p>Oraklet får sex exakta datapunkter och söker en formel av typen (a·x+b)/(c·x+d). Tre andra punkter hålls undan tills förslaget är låst. BootLoops Ratfit kontrollerar sambandet och ska avvisa avsiktligt felaktiga data. Modellens formel kontrolleras dessutom separat med exakt heltalsräkning.</p>
+        <p>I nya körningar får ett felaktigt första förslag exakt återkoppling från de sex synliga punkterna och ett korrigeringsförsök. Första och slutliga resultat visas separat. De tre undanhållna punkterna avslöjas först efter det slutliga förslaget.</p>
         <p style={{ color: C.muted }}>Detta är ett syntetiskt metodtest med känt facit. Ett godkänt test är inte en ny vetenskaplig upptäckt.</p>
         <a href={WORKFLOW} style={{ color: C.accent }}>Öppna experimentets manuella körning i GitHub →</a>
       </div>
@@ -17,7 +18,7 @@ export default function OrakletsForskningslabbVy({ experiment = [], labAvailable
       {labAvailable && experiment.length === 0 && <p style={{ color: C.muted }}>Inga experimentrapporter har sparats ännu.</p>}
       {experiment.map(row => {
         const r = row.rapport;
-        if (r?.schemaVersion !== 1 || !Array.isArray(r.cases)) return null;
+        if (![1, 2].includes(r?.schemaVersion) || !Array.isArray(r.cases)) return null;
         return (
           <article key={row.id} style={{ border: `1px solid ${C.border}`, borderRadius: '10px', padding: '20px', marginBottom: '20px', overflowWrap: 'anywhere' }}>
             <p style={{ color: r.status === 'passed' ? C.accent : '#fbbf24', fontFamily: 'monospace' }}>
@@ -29,6 +30,25 @@ export default function OrakletsForskningslabbVy({ experiment = [], labAvailable
             {r.cases.map(c => (
               <details key={c.case} style={{ borderTop: `1px solid ${C.border}`, padding: '12px 0' }}>
                 <summary style={{ cursor: 'pointer' }}>Fall {c.case}: {c.passed ? 'godkänt modellförslag' : 'underkänt modellförslag'}</summary>
+                {r.schemaVersion === 2 && (
+                  <div>
+                    <p>Första förslag: {c.initialPassed ? 'godkänt' : 'underkänt'}. Slutligt förslag: {c.passed ? 'godkänt' : 'underkänt'}. Korrigeringsförsök: {c.correctionAttempted ? 'ja' : 'behövdes inte'}.</p>
+                    {!c.sameModel && <p style={{ color: '#fbbf24' }}>AI-modellen byttes mellan försöken; resultatet kan påverkas av både återkoppling och modellbyte.</p>}
+                    {c.attempts.map((a, index) => (
+                      <details key={index}>
+                        <summary>{index === 0 ? 'Första förslag' : 'Korrigerat förslag'}: {formula(a.proposal.coefficients)}</summary>
+                        <p>{a.proposal.reason}</p>
+                        <p>AI-modell: {a.provider} / {a.model}.</p>
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', textAlign: 'left' }}>
+                            <thead><tr><th>x</th><th>Givet värde</th><th>Förslagets värde</th><th>Matchar</th></tr></thead>
+                            <tbody>{a.visibleChecks.map(p => <tr key={p.x}><td>{p.x}</td><td>{p.expected}</td><td>{p.actual ?? 'Division med noll'}</td><td>{p.matched ? 'ja' : 'nej'}</td></tr>)}</tbody>
+                          </table>
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                )}
                 <p><strong>Oraklets förslag:</strong> {formula(c.proposal.coefficients)}</p>
                 <p>{c.proposal.reason}</p>
                 <p style={{ color: C.muted }}>AI-modell: {c.provider} / {c.model}. Metodmotiveringen är AI-genererad; resultaten nedan kommer från körda kontroller.</p>

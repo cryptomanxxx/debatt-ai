@@ -20,6 +20,28 @@ export function verifyFormula(coefficients, rows) {
   });
 }
 
+// Feedback uses only the six visible rows, never the fixture or holdout.
+export function checkVisiblePoints(coefficients, banked) {
+  const [a, b, c, d] = coefficients.map(BigInt);
+  return banked.map(([x, expected]) => {
+    const [xn, xd] = pair(x);
+    const denominator = c * xn + d * xd;
+    const actual = denominator === 0n ? null : fraction(a * xn + b * xd, denominator);
+    return { x, expected, actual, matched: verifyFormula(coefficients, [[x, expected]]) };
+  });
+}
+
+export function correctionPrompt(banked, proposal, checks) {
+  return [
+    ...modelPrompt(banked),
+    { role: 'assistant', content: JSON.stringify(proposal) },
+    { role: 'user', content: JSON.stringify({
+      instruction: 'Ditt förslag matchar inte alla givna punkter. Gör ett enda korrigeringsförsök utifrån exakt kontroll nedan. actual=null betyder division med noll. Kontrollera din nya formel mot alla sex givna punkter. Samma JSON-format gäller. Du har fortfarande inte fått facit eller undanhållna kontrollpunkter.',
+      visibleChecks: checks,
+    }) },
+  ];
+}
+
 export function makeCases(seed) {
   if (!/^[0-9]{1,9}$/.test(String(seed))) throw new Error('Seed ska vara 1–9 siffror');
   return [0, 1, 2].map(index => {
@@ -73,9 +95,21 @@ export async function runExperiment(seed, propose, callTool, onCommit = () => {}
   await onCommit(cases.map(c => ({ case: c.id, sha256: c.commitment })));
   const results = [];
   for (const fixture of cases) {
-    const ai = await propose(modelPrompt(fixture.input.banked));
-    const proposal = parseProposal(ai.text);
-    if (!proposal || typeof ai.provider !== 'string' || typeof ai.model !== 'string') throw new Error('Ogiltigt modellförslag');
+    // Store a parsed copy so the original attempt cannot be overwritten.
+    async function attempt(messages) {
+      const ai = await propose(messages);
+      const proposal = parseProposal(ai.text);
+      if (!proposal || typeof ai.provider !== 'string' || typeof ai.model !== 'string') throw new Error('Ogiltigt modellförslag');
+      return { proposal, provider: ai.provider, model: ai.model,
+        visibleChecks: checkVisiblePoints(proposal.coefficients, fixture.input.banked) };
+    }
+    const initial = await attempt(modelPrompt(fixture.input.banked));
+    const correctionAttempted = initial.visibleChecks.some(p => !p.matched);
+    // No tool invocation or holdout evaluation occurs before this final proposal.
+    const final = correctionAttempted
+      ? await attempt(correctionPrompt(fixture.input.banked, initial.proposal, initial.visibleChecks))
+      : initial;
+    const { proposal, provider, model } = final;
     const corrupted = structuredClone(fixture.input);
     const [n, d] = pair(corrupted.holdout[0][1]);
     corrupted.holdout[0][1] = fraction(n + d, d);
@@ -87,11 +121,18 @@ export async function runExperiment(seed, propose, callTool, onCommit = () => {}
     const bankedMatch = verifyFormula(proposal.coefficients, fixture.input.banked);
     const holdoutMatch = verifyFormula(proposal.coefficients, fixture.input.holdout);
     results.push({ case: fixture.id, commitment: fixture.commitment, data: fixture.input, truth: fixture.truth,
-      proposal, provider: ai.provider, model: ai.model, bankedMatch, holdoutMatch, ratfit, negativeControl,
+      proposal, provider, model, bankedMatch, holdoutMatch, ratfit, negativeControl,
+      correctionAttempted, attempts: correctionAttempted ? [initial, final] : [initial],
+      initialBankedMatch: initial.visibleChecks.every(p => p.matched),
+      initialHoldoutMatch: verifyFormula(initial.proposal.coefficients, fixture.input.holdout),
+      initialPassed: verifyFormula(initial.proposal.coefficients, fixture.input.banked)
+        && verifyFormula(initial.proposal.coefficients, fixture.input.holdout),
+      sameModel: initial.provider === provider && initial.model === model,
       passed: bankedMatch && holdoutMatch });
   }
-  return { schemaVersion: 1, researcher: 'Professor Oraklet', title: 'Kan Oraklet återfinna ett dolt rationellt samband?',
-    question: 'Kan en AI-modell föreslå rätt formel inom klassen (a*x+b)/(c*x+d) från sex exakta datapunkter, och klara tre undanhållna kontrollpunkter?',
-    method: 'Tre syntetiska fall. Förslagen låses före kontrollen. Ratfit körs på riktiga och avsiktligt felaktiga kontrollvärden. Modellens koefficienter testas separat med BigInt och exakt korsmultiplikation, utan Thiele-algoritmen.',
-    seed: String(seed), status: results.every(r => r.passed) ? 'passed' : 'failed', limitations: LIMITATIONS, cases: results };
+  return { schemaVersion: 2, researcher: 'Professor Oraklet', title: 'Kan återkoppling hjälpa Oraklet återfinna ett dolt rationellt samband?',
+    question: 'Förbättras modellens formelförslag efter högst ett korrigeringsförsök med exakt återkoppling från sex synliga punkter, mätt mot tre undanhållna kontrollpunkter?',
+    method: 'Tre syntetiska fall. Första förslaget sparas och kontrolleras mot sex synliga punkter. Om någon missar ges exakt återkoppling och högst ett korrigeringsförsök. Det slutliga förslaget låses innan de tre undanhållna punkterna kontrolleras. Första och slutliga resultat redovisas separat. Ratfit körs på riktiga och avsiktligt felaktiga kontrollvärden. Modellens koefficienter testas separat med BigInt och exakt korsmultiplikation, utan Thiele-algoritmen.',
+    seed: String(seed), status: results.every(r => r.passed) ? 'passed' : 'failed', limitations: LIMITATIONS + ' Tre fall räcker inte för att fastställa en generell förbättring. Eventuella modellbyten mellan försöken redovisas och kan påverka jämförelsen.', cases: results };
 }
+
