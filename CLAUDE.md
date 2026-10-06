@@ -287,6 +287,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | POST | `/api/visit` | Spårar besökarsessioner med visitor_id till `visitor_sessions`-tabellen. |
 | POST | `/api/unsubscribe` | Avaktiverar nyhetsbrevsprenumerationer via avprenumerera-token. |
 | GET  | `/api/reports` | Listar de senaste 12 AI-bus-veckorapporterna från `ai-bus/reports/*.json`. |
+| GET  | `/api/nav-count` | Antal artiklar och direktdebatter för navigeringens räknare. HEAD + count=exact, 15 min server- och CDN-cache. |
 | POST | `/api/labb` | Labb-endpoint: genererar agentsvar via Groq med skjutreglage-justerad personlighet (aggressivitet, faktafokus, humor, optimism). |
 
 ---
@@ -4472,6 +4473,20 @@ Vercel-mejl + skärmdump (okt 2026): ISR Writes 306 701 / 200 000 för senaste 3
 | `app/{ekonomi,lobbying,parlament,oligarki,historia,fraktioner,rivaliteter,leaderboard}/page.js` | Fetch-nivåns revalidate 120/180/300 → 1800 |
 
 **Codex-fynd (PR #1547-granskning): brödtextsökningen ändrade vad besökaren sökte på.** Två P2-fynd: (1) den första versionen körde bara Supabase-sökningen för termer på minst 3 tecken, så en sökning på "EU" eller "AI" tappade alla träffar som låg efter utdraget, något den gamla fulltextsökningen aldrig gjorde. Nu körs brödtextsökningen för alla icke-tomma termer. (2) Söktermen rensades från `*%,()\` innan den skickades, så "100%" sökte på "100" och "50,000" på "50000", men svaret räknades ändå som träffar för den ursprungliga termen. Nu escapas LIKE-metatecknen (`\`, `%`, `_`) med backslash istället för att tas bort. Kommatecken och parenteser behöver ingen behandling i ett vanligt kolumnfilter (bara inuti `or=()`). `*` blir `_` eftersom PostgREST alltid gör om `*` till `%` och saknar escape för det — kan ge en marginell överträff men tappar aldrig en riktig träff.
+
+### ✅ 141. Navigeringens räknare gick direkt mot Supabase vid varje sidvisning – KLART
+
+Supabase-loggarna (okt 2026) visade att API Gateway stod för nästan all loggdata: cirka 460 rader i timmen, även nattetid. `NavArkivLink`/`NavHistorikLink` finns i `GlobalNav` på alla sidor. Vid varje sidvisning hämtade besökarens webbläsare id:t för varje artikel och varje debatt direkt från Supabase och räknade arrayens längd. Det gav två ocachade anrop per sidvisning. Räkningen begränsades dessutom av PostgREST:s radgräns, 1000 rader.
+
+**Fix:** ny `GET /api/nav-count` räknar båda tabellerna på servern med `HEAD` + `Prefer: count=exact`, samma mönster som startsidans artikelräknare. Bara totalen läses ur `content-range`. Svaret cachas 15 minuter i Next Data Cache (`unstable_cache`) och CDN (`s-maxage=900`). Ett misslyckat anrop cachas aldrig. Båda länkarna delar hooken `app/useNavCount.js`, så det blir ett anrop per sidladdning, och det går mot vårt eget cachade API, inte mot Supabase.
+
+**Undersökt men inte åtgärdat: hoppa över Vercel-driftsättningar för commits som bara rör `ai-bus/`.** Enligt Vercels dokumentation sparas Data Cache och ISR-cache mellan driftsättningar, så färre driftsättningar ger sannolikt ingen märkbar minskning av Supabase-anropen. `/hjarnan` och `/api/reports` läser dessutom `ai-bus/`-filer från den driftsatta koden, och de skulle då visa inaktuellt innehåll fram till nästa kodändring. Förslaget kan ändå vara värt att ta upp för Deployment Storage (✅120), men det är en separat avvägning.
+
+| Fil | Roll |
+|---|---|
+| `app/api/nav-count/route.js` | Ny route. `HEAD` + `count=exact` mot `artiklar` och `chatt_debatter`. 15 min Data Cache + CDN-cache |
+| `app/useNavCount.js` | Ny delad klienthook, ett anrop per sidladdning |
+| `app/NavArkivLink.js`, `app/NavHistorikLink.js` | Använder hooken istället för direkta Supabase-anrop |
 
 ## Kontext om projektet
 
