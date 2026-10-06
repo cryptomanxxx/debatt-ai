@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeCases, runExperiment, modelPrompt, parseProposal, verifyFormula, validateTool, UPSTREAM } from '../agents/oraklet-lab-core.mjs';
+import { makeCases, runExperiment, modelPrompt, parseProposal, verifyFormula, validateTool, checkVisiblePoints, correctionPrompt, UPSTREAM } from '../agents/oraklet-lab-core.mjs';
 
 function response(accepted) {
   return { status: accepted ? 200 : 422, data: { provider: 'bootloops', mock: false,
@@ -70,4 +70,69 @@ test('mock, fel upstream, scope, räknare och missad negativ kontroll avvisas', 
   }
   await assert.rejects(runExperiment('99', async () => ({ text: proposal(['1','1','1','2']), provider: 'test', model: 'test' }),
     async () => response(true)), /Oväntad Ratfit/);
+});
+
+test('fall 2 korrigeras en gång med bara synliga punkter; första försöket bevaras', async () => {
+  const fixtures = makeCases('20261006');
+  let caseIndex = 0, modelCalls = 0, toolCalls = 0, correctionDone = false;
+  const wrong = ['2', '7', '9', '0'];
+  const report = await runExperiment('20261006', async messages => {
+    modelCalls++;
+    const fixture = fixtures[caseIndex];
+    if (caseIndex === 1 && messages.length === 2) {
+      return { text: proposal(wrong), provider: 'test', model: 'same' };
+    }
+    if (caseIndex === 1) {
+      assert.equal(toolCalls, 2, 'inga kontroller av fall 2 före slutligt förslag');
+      const checks = checkVisiblePoints(wrong, fixture.input.banked);
+      assert.deepEqual(messages, correctionPrompt(fixture.input.banked, JSON.parse(proposal(wrong)), checks));
+      assert.equal(checks.length, 6);
+      assert.deepEqual(checks.map(p => p.x), ['0', '1', '2', '3', '4', '5']);
+      assert.equal(checks[0].actual, null);
+      assert.equal(checks[1].actual, '1');
+      assert.deepEqual(Object.keys(JSON.parse(messages[3].content)), ['instruction', 'visibleChecks']);
+      assert.ok(!JSON.stringify(messages).includes('23/33'));
+      correctionDone = true;
+    }
+    return { text: proposal(fixture.truth), provider: 'test', model: 'same' };
+  }, async () => {
+    if (caseIndex === 1) assert.ok(correctionDone);
+    const positive = toolCalls++ % 2 === 0;
+    if (!positive) caseIndex++;
+    return response(positive);
+  });
+  assert.equal(modelCalls, 4);
+  assert.equal(toolCalls, 6);
+  assert.equal(report.schemaVersion, 2);
+  assert.equal(report.status, 'passed');
+  const repaired = report.cases[1];
+  assert.equal(repaired.initialPassed, false);
+  assert.equal(repaired.initialHoldoutMatch, false);
+  assert.equal(repaired.passed, true);
+  assert.equal(repaired.sameModel, true);
+  assert.equal(repaired.attempts.length, 2);
+  assert.deepEqual(repaired.attempts[0].proposal.coefficients, wrong);
+  assert.deepEqual(repaired.proposal.coefficients, fixtures[1].truth);
+  assert.ok(report.cases[0].initialPassed);
+  assert.equal(report.cases[0].attempts.length, 1);
+});
+
+test('fortsatt fel efter korrigering ger underkänt, högst sex modellförslag och redovisat modellbyte', async () => {
+  let models = 0, tools = 0;
+  const report = await runExperiment('99', async () => ({
+    text: proposal(['0', '0', '0', '1']), provider: 'test', model: models++ % 2 === 0 ? 'first' : 'second',
+  }), async () => response(tools++ % 2 === 0));
+  assert.equal(models, 6);
+  assert.equal(tools, 6);
+  assert.equal(report.status, 'failed');
+  assert.ok(report.cases.every(c => c.correctionAttempted && !c.sameModel && !c.initialPassed && !c.passed && c.attempts.length === 2));
+});
+
+test('ogiltigt korrigeringssvar får inte gå vidare till blind kontroll', async () => {
+  let models = 0, tools = 0;
+  await assert.rejects(runExperiment('99', async () => ({
+    text: models++ === 0 ? proposal(['0', '0', '0', '1']) : '{}', provider: 'test', model: 'test',
+  }), async () => { tools++; return response(true); }), /Ogiltigt modellförslag/);
+  assert.equal(models, 2);
+  assert.equal(tools, 0);
 });
