@@ -120,10 +120,11 @@ function checkAktivitetReserveradePlatser() {
 function checkSenasteDebatternaFilter() {
   const namn = "senaste-debatterna-filter";
   try {
-    const kod = lasFil("app/client.js");
+    // Hämtningen flyttades till servern i ✅142 (app/lib/startsidaData.js).
+    const kod = lasFil("app/lib/startsidaData.js");
     const fonster = funktionsFonster(kod, "fetchLatestArtikel", 2000);
     if (fonster === null) {
-      rapportera(namn, "fail", "hittar inte fetchLatestArtikel i app/client.js");
+      rapportera(namn, "fail", "hittar inte fetchLatestArtikel i app/lib/startsidaData.js");
       return;
     }
     if (!fonster.includes("nyhetskalla=is.null")) {
@@ -143,10 +144,13 @@ function checkSenasteDebatternaFilter() {
 function checkSenasteReplikerWidget() {
   const namn = "senaste-repliker-widget";
   try {
+    // Hämtningen ligger sedan ✅142 i app/lib/startsidaData.js, renderingen
+    // och state-kopplingen kvar i app/client.js.
+    const data = lasFil("app/lib/startsidaData.js");
     const kod = lasFil("app/client.js");
-    const fonster = funktionsFonster(kod, "fetchSenasteRepliker", 1000);
+    const fonster = funktionsFonster(data, "fetchSenasteRepliker", 1000);
     if (fonster === null) {
-      rapportera(namn, "fail", "hittar inte fetchSenasteRepliker i app/client.js — repliker kan ha tappat sin enda väg till synlighet på startsidan (✅133 borttagen?)");
+      rapportera(namn, "fail", "hittar inte fetchSenasteRepliker i app/lib/startsidaData.js — repliker kan ha tappat sin enda väg till synlighet på startsidan (✅133 borttagen?)");
       return;
     }
     if (!fonster.includes("parent_id=not.is.null")) {
@@ -160,8 +164,11 @@ function checkSenasteReplikerWidget() {
     // granskning: en bar sträng-/funktionskontroll hade gett "ok" även om
     // fetchSenasteRepliker().then(...)-anropet och den villkorade JSX-blocket
     // tagits bort, eftersom fonster/href-koll ovan inte kräver att de körs).
-    if (!kod.includes("fetchSenasteRepliker().then(") || !kod.includes("setSenasteRepliker")) {
-      rapportera(namn, "fail", "fetchSenasteRepliker() anropas inte längre och kopplas till state — widgeten kan visa tom data trots att funktionen finns kvar");
+    // Sedan ✅142 anropas den via hamtaStartsidaData() (fältet senasteRepliker)
+    // och klienten kopplar fältet till state via /api/startsida.
+    if (!/senasteRepliker:\s*fetchSenasteRepliker\b/.test(taBortJsKommentarer(data)) ||
+        !/satt\("senasteRepliker",\s*setSenasteRepliker\)/.test(taBortJsKommentarer(kod))) {
+      rapportera(namn, "fail", "fetchSenasteRepliker är inte längre inkopplad (hamtaStartsidaData → /api/startsida → setSenasteRepliker) — widgeten kan visa tom data trots att funktionen finns kvar");
       return;
     }
     if (!kod.includes("senasteRepliker.length > 0")) {
