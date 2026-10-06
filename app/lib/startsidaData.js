@@ -122,7 +122,8 @@ async function fetchSenasteReplik() {
     `${SB_URL}/rest/v1/artiklar?rubrik=eq.${encodeURIComponent(originalRubrik)}&select=forfattare&limit=1`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
-  const orig = res2.ok ? await res2.json() : [];
+  if (!res2.ok) throw new Error("Supabase " + res2.status);
+  const orig = await res2.json();
   return { ...replik, originalForfattare: orig[0]?.forfattare || null };
 }
 
@@ -185,7 +186,8 @@ async function fetchTrendingTopics() {
     `${SB_URL}/rest/v1/artiklar?select=parent_id&parent_id=in.(${ids})`,
     { headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` } }
   );
-  const svarData = svarRes.ok ? await svarRes.json() : [];
+  if (!svarRes.ok) throw new Error("Supabase " + svarRes.status);
+  const svarData = await svarRes.json();
   const svarCount = {};
   svarData.forEach(s => { svarCount[s.parent_id] = (svarCount[s.parent_id] || 0) + 1; });
 

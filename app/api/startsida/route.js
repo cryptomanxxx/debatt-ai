@@ -18,6 +18,11 @@ export const dynamic = "force-dynamic";
 
 const CACHE_SEKUNDER = 60;
 
+// Samtidiga anrop inom samma instans delar en pågående hämtning, så att en
+// kall cache inte ger ett helt nytt bygge (cirka 23 Supabase-anrop) per
+// anrop. Samma mönster som /api/aktivitet.
+let pagaende = null;
+
 class OfullstandigtSvar extends Error {
   constructor(data) {
     super("startsida: ofullständigt svar");
@@ -37,7 +42,8 @@ const hamtaKomplett = unstable_cache(
 
 export async function GET() {
   try {
-    const data = await hamtaKomplett();
+    if (!pagaende) pagaende = hamtaKomplett().finally(() => { pagaende = null; });
+    const data = await pagaende;
     return NextResponse.json(data, {
       headers: { "Cache-Control": `public, max-age=0, s-maxage=${CACHE_SEKUNDER}, stale-while-revalidate=120` },
     });
