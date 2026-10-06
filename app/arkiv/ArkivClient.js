@@ -57,6 +57,9 @@ function highlight(text, term) {
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Antal artikelkort som renderas innan "Visa fler" — hela listan (upp till
+// ~1000) behöver inte ritas på en gång.
+const SIDSTORLEK = 50;
 
 export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
   const searchParams = useSearchParams();
@@ -68,6 +71,12 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
   const [filterKalla, setFilterKalla] = useState(null); // null | "ai" | "manniska"
   const [sokning, setSokning] = useState("");
   const [agentSymboler, setAgentSymboler] = useState({});
+  const [visaAntal, setVisaAntal] = useState(SIDSTORLEK);
+  // Brödtexten skickas inte längre med i propsen (✅140, ISR-skrivningar) —
+  // fritextsökning i artikeltexten görs istället on-demand mot Supabase.
+  // Sparar vilken söksträng svaret gäller så ett inaktuellt svar aldrig
+  // blandas ihop med en nyare sökning.
+  const [textTraffar, setTextTraffar] = useState({ term: "", ids: null });
 
   useEffect(() => {
     const q = searchParams.get("q") || "";
@@ -97,6 +106,27 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
     }).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const t = sokning.trim().toLowerCase();
+    const rensad = t.replace(/[*%,()\\]/g, "");
+    if (rensad.length < 3) { setTextTraffar({ term: t, ids: null }); return; }
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(`${SB_URL}/rest/v1/artiklar?select=id&artikel=ilike.*${encodeURIComponent(rensad)}*&limit=5000`, {
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+        signal: ctrl.signal,
+      })
+        .then(r => (r.ok ? r.json() : []))
+        .then(rows => setTextTraffar({ term: t, ids: new Set((rows || []).map(r => r.id)) }))
+        .catch(() => {});
+    }, 300);
+    return () => { clearTimeout(timer); ctrl.abort(); };
+  }, [sokning]);
+
+  useEffect(() => {
+    setVisaAntal(SIDSTORLEK);
+  }, [sokning, filterTag, filterFilm, filterDebatt, filterReplik, filterNyhet, filterKalla]);
+
   const freq = {};
   artiklar.forEach(a => (a.taggar || []).forEach(t => { freq[t] = (freq[t] || 0) + 1; }));
   const topTags = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 20).map(([t]) => t);
@@ -119,7 +149,8 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
     const matchSearch = (
       (a.rubrik || "").toLowerCase().includes(term) ||
       (a.forfattare || "").toLowerCase().includes(term) ||
-      (a.artikel || "").toLowerCase().includes(term) ||
+      (a.utdrag || "").toLowerCase().includes(term) ||
+      (textTraffar.term === term && textTraffar.ids?.has(a.id)) ||
       (a.taggar || []).some(t => t.toLowerCase().includes(term))
     );
     return matchTag && matchFilm && matchDebatt && matchReplik && matchNyhet && matchKalla && matchSearch;
@@ -202,7 +233,7 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
             Rensa filter
           </button>
         </div>
-      ) : filtered.map((a, i) => {
+      ) : filtered.slice(0, visaAntal).map((a, i) => {
         const vc = voteCounts[a.id];
         const cc = commentCounts[a.id] || 0;
         const total = vc ? vc.ja + vc.nej : 0;
@@ -219,7 +250,7 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
                 <KallaBadge kalla={a.kalla} />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                {(() => { const min = Math.ceil((a.artikel || "").split(/\s+/).filter(Boolean).length / 200); return min > 0 ? <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace" }}>~{min} min</span> : null; })()}
+                {(() => { const min = Math.ceil((a.ordAntal || 0) / 200); return min > 0 ? <span style={{ fontSize: "12px", color: C.textMuted, fontFamily: "monospace" }}>~{min} min</span> : null; })()}
                 <span style={{ fontSize: "13px", color: C.textMuted }}>{a.skapad ? new Date(a.skapad).toLocaleDateString("sv-SE") : ""}</span>
               </div>
             </div>
@@ -235,7 +266,7 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
                 <span style={{ fontSize: "13px", letterSpacing: "1px", opacity: 0.8 }} title={(agentSymboler[a.forfattare] || []).join(" ")}>{(agentSymboler[a.forfattare] || []).join("")}</span>
               )}
             </div>
-            <p style={{ color: C.textMuted, fontSize: "14px", lineHeight: 1.65, margin: "0 0 16px 0" }}>{(a.artikel || "").slice(0, 220)}…</p>
+            <p style={{ color: C.textMuted, fontSize: "14px", lineHeight: 1.65, margin: "0 0 16px 0" }}>{a.utdrag || ""}…</p>
             {(a.taggar || []).length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "16px" }}>
                 {(a.taggar || []).map(t => (
@@ -257,6 +288,16 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
           </div>
         );
       })}
+      {filtered.length > visaAntal && (
+        <div style={{ textAlign: "center", margin: "8px 0 24px" }}>
+          <button
+            onClick={() => setVisaAntal(n => n + SIDSTORLEK)}
+            style={{ background: "transparent", color: C.accent, border: `1px solid ${C.border}`, borderRadius: "20px", padding: "8px 20px", fontSize: "14px", cursor: "pointer", fontFamily: "Georgia, serif" }}
+          >
+            Visa fler ({filtered.length - visaAntal} kvar) ↓
+          </button>
+        </div>
+      )}
     </div>
   );
 }

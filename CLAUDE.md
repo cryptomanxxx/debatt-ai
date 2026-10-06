@@ -397,7 +397,7 @@ Vilket publiceringsfönster som gäller härleds i första hand ur det triggande
 | `app/api/chatt/artikel-kontext/route.js` | Tunn wrapper (rate limit + JSON-svarsform) runt `app/lib/hamtaArtikelInnehall.js` — SSRF-skyddad hämtning av en besökarbifogad nyhetsartikel-URL (Node.js-runtime, `dns.lookup()`-baserad IP-validering). Extraherar titel/sammanfattning ur OG-metataggar med fallback till avskalad brödtext |
 | `app/chatt/page.js` | Direktdebatt-sidan (live-streaming, dela, ämnesförslag, konfidensindikator, valfri nyhetsartikel-URL som kontext) |
 | `app/artikel/[id]/page.js` | Artikelsida med debattråd-vy, källhänvisningar, intern länkning, relaterade artiklar, AI-slutsats |
-| `app/arkiv/ArkivClient.js` | Arkiv-klient med fritextsökning, taggfilter, highlight, URL-param `?q=` |
+| `app/arkiv/ArkivClient.js` | Arkiv-klient med fritextsökning (brödtext on-demand mot Supabase, ✅140), taggfilter, highlight, URL-param `?q=`, "Visa fler"-paginering |
 | `app/rivaliteter/page.js` | Agent-rivaliteter: rankad lista baserad på `parent_id`-kedjor |
 | `app/agentData.js` | Delad visuell data (gradient, ring, ikon, färg) för alla 24 agenter |
 | `app/NavArkivLink.js` | Klientkomponent — live artikelräknare i nav |
@@ -4446,6 +4446,23 @@ Uppföljande användarrapport (sep 2026), med skärmdump av produktionssidan dir
 | `app/qant/QantVy.js` | `<Tooltip filterNull={false}>` på stapeldiagrammet — förhindrar att en `null`-värderad (icke-Pareto-tillämplig) datapunkt filtreras bort ur tooltip-payloaden innan formatter-funktionen körs. Radens knapp och dess högra infogrupp fick `flexWrap: "wrap"` istället för en tvingad, icke-krympande enkelrad — en lång `altSammanfattning`-text radbryts nu på smala skärmar istället för att klippas av kortets `overflow: hidden` |
 
 ---
+
+### ✅ 140. ISR Write Units över Hobby-taket igen (306 701 / 200 000) — /arkiv skickade hela artikeltexten för ~1000 artiklar vid varje regenerering – KLART
+
+Vercel-mejl + skärmdump (okt 2026): ISR Writes 306 701 / 200 000 för senaste 30 dagarna, ~5–23k Write Units/dag, med varningen att projektet pausas automatiskt om gratisnivån överskrids. ✅94 hade redan höjt revalidate-tiderna på ~50 sidor, men det räckte inte.
+
+**Huvudmisstänkt — /arkiv.** Vercel räknar ISR-skrivningar i **8 KB-enheter**, inte per regenerering — sidans storlek spelar alltså lika stor roll som hur ofta den byggs om. `app/arkiv/page.js` hämtade `artiklar?select=*` (PostgREST-taket ~1000 rader) och skickade HELA listan, inklusive full brödtext, som props till `ArkivClient`. Det gav en RSC-payload på flera MB som lagrades som ISR-data vid varje regenerering — hundratals Write Units per gång. Och /arkiv regenereras ofta: tidsbaserat var 10:e minut (`revalidate = 600`) OCH on-demand via `revalidatePath("/arkiv")` vid varje publicerad artikel (~20/dag). Detta är en välgrundad hypotes från kodläsning, inte en per-route-mätning — Vercels "Open in Observability" → ISR visar per-route-fördelningen och bör användas för att bekräfta.
+
+**Fix:**
+- `app/arkiv/page.js` väljer bara de kolumner `ArkivClient` faktiskt använder, och skickar varje artikel genom `slimmaArtikel()`: brödtexten ersätts med `utdrag` (220 tecken) + `ordAntal` (för läsminuterna), `nyhetskalla` slimmas till `{typ}`. `revalidate` 600 → 3600 — sidan revalideras ändå on-demand vid varje publicering.
+- `ArkivClient.js`: fritextsökning i artikeltexten görs nu on-demand mot Supabase (`artiklar?select=id&artikel=ilike.*<term>*`, debounce 300 ms, ≥ 3 tecken, svaret knutet till söksträngen så ett inaktuellt svar aldrig blandas in) istället för mot den lokala fulltexten — samma sökfunktion, ingen fulltext i propsen. Rubrik/författare/taggar/utdrag söks fortsatt lokalt direkt. Listan renderar 50 kort åt gången med en "Visa fler"-knapp (återställs vid filterbyte).
+- Åtta sidor som ✅94 missade (de saknade en segment-export och styrdes bara av fetch-nivåns `next.revalidate`) höjda från 120/180/300 s till 1800 s: `/ekonomi`, `/lobbying`, `/parlament`, `/oligarki`, `/historia`, `/fraktioner`, `/rivaliteter`, `/leaderboard`. Datan på dem uppdateras av dagliga cron-jobb.
+
+| Fil | Roll |
+|---|---|
+| `app/arkiv/page.js` | Explicit kolumnlista, `slimmaArtikel()` (utdrag + ordantal istället för brödtext), revalidate 600 → 3600 |
+| `app/arkiv/ArkivClient.js` | Brödtextsökning on-demand mot Supabase, `utdrag`/`ordAntal` istället för `artikel`, "Visa fler"-paginering (50 åt gången) |
+| `app/{ekonomi,lobbying,parlament,oligarki,historia,fraktioner,rivaliteter,leaderboard}/page.js` | Fetch-nivåns revalidate 120/180/300 → 1800 |
 
 ## Kontext om projektet
 

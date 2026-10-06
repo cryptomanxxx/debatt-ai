@@ -30,7 +30,7 @@ async function fetchData() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!key) return null;
   const h = { apikey: key, Authorization: `Bearer ${key}` };
-  const r = (path) => fetch(`${SB_URL}/rest/v1/${path}`, { headers: h, next: { revalidate: 180 } });
+  const r = (path) => fetch(`${SB_URL}/rest/v1/${path}`, { headers: h, next: { revalidate: 1800 } });
 
   const [plRes, symRes, koalRes, lobbyRes, betsRes, histRes, portfRes, tillgRes] = await Promise.all([
     r("agent_planbocker?select=agent,saldo,saldo_spel&order=saldo.desc"),

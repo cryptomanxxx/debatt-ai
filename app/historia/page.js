@@ -27,11 +27,11 @@ async function getData() {
   const [mRes, rRes] = await Promise.all([
     fetch(
       `${SB_URL}/rest/v1/civilisations_minne?select=id,typ,rubrik,beskrivning,agenter,skapad&order=skapad.desc&limit=100`,
-      { headers: hdrs, next: { revalidate: 180 } }
+      { headers: hdrs, next: { revalidate: 1800 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/agent_relationer?typ=neq.neutral&order=styrka.desc&limit=40`,
-      { headers: hdrs, next: { revalidate: 180 } }
+      { headers: hdrs, next: { revalidate: 1800 } }
     ),
   ]);
   return {

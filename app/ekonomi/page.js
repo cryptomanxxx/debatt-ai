@@ -46,10 +46,10 @@ async function getData() {
   const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
 
   const [pRes, spelRes, transRes, giniRes] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/agent_planbocker?${EXKL_SYSTEM_QS}&order=saldo.desc`, { headers: hdrs, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/ekonomi_spel?order=skapad.desc&limit=300`, { headers: hdrs, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/agent_transaktioner?order=skapad.desc&limit=30&typ=neq.startkapital`, { headers: hdrs, next: { revalidate: 120 } }),
-    fetch(`${SB_URL}/rest/v1/oligarki_historik?select=skapad,gini&order=skapad.asc&limit=120`, { headers: hdrs, next: { revalidate: 120 } }),
+    fetch(`${SB_URL}/rest/v1/agent_planbocker?${EXKL_SYSTEM_QS}&order=saldo.desc`, { headers: hdrs, next: { revalidate: 1800 } }),
+    fetch(`${SB_URL}/rest/v1/ekonomi_spel?order=skapad.desc&limit=300`, { headers: hdrs, next: { revalidate: 1800 } }),
+    fetch(`${SB_URL}/rest/v1/agent_transaktioner?order=skapad.desc&limit=30&typ=neq.startkapital`, { headers: hdrs, next: { revalidate: 1800 } }),
+    fetch(`${SB_URL}/rest/v1/oligarki_historik?select=skapad,gini&order=skapad.asc&limit=120`, { headers: hdrs, next: { revalidate: 1800 } }),
   ]);
 
   return {

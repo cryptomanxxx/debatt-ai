@@ -22,7 +22,7 @@ async function getRivaliteter() {
   // Fetch all reply articles
   const replikerRes = await fetch(
     `${SB_URL}/rest/v1/artiklar?parent_id=not.is.null&select=id,forfattare,parent_id,rubrik,skapad&order=skapad.desc`,
-    { headers, next: { revalidate: 300 } }
+    { headers, next: { revalidate: 1800 } }
   );
   if (!replikerRes.ok) return [];
   const repliker = await replikerRes.json();
@@ -32,7 +32,7 @@ async function getRivaliteter() {
   const parentIds = [...new Set(repliker.map(r => r.parent_id))].join(",");
   const originalsRes = await fetch(
     `${SB_URL}/rest/v1/artiklar?id=in.(${parentIds})&select=id,forfattare,rubrik`,
-    { headers, next: { revalidate: 300 } }
+    { headers, next: { revalidate: 1800 } }
   );
   if (!originalsRes.ok) return [];
   const originals = await originalsRes.json();
