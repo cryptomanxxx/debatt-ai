@@ -5,6 +5,7 @@ import { agentVisuell } from "./agentData";
 import NewsTicker from "./NewsTicker";
 import AnimatedBrainHero from "./AnimatedBrainHero";
 import { StarField } from "./StarField";
+import { startVisiblePolling } from "./lib/visiblePolling.mjs";
 
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
@@ -63,12 +64,19 @@ async function sbSelect() {
 }
 
 async function sbCount() {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id`, {
-    headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
+  // Hämta bara count-headern, inte ett id för varje artikel.
+  const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id&limit=1`, {
+    method: "HEAD",
+    headers: {
+      "apikey": SB_KEY,
+      "Authorization": `Bearer ${SB_KEY}`,
+      "Prefer": "count=exact",
+    },
   });
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.length;
+  if (!res.ok) throw new Error("Artikelräknaren kunde inte hämtas");
+  const total = res.headers.get("content-range")?.split("/")[1];
+  if (!/^\d+$/.test(total || "")) throw new Error("Artikelantal saknas");
+  return Number(total);
 }
 
 async function fetchSenasteChattDebatt() {
@@ -857,12 +865,9 @@ export default function DebattClient({ initialArticleCount = null }) {
     fetchSenasteKommentarer().then(d => setSenasteKommentarer(d)).catch(() => {});
     fetchTopDebattrad().then(d => setTopDebattrad(d)).catch(() => {});
     fetchCivilisationDrift().then(d => setCivilisationDrift(d)).catch(() => {});
-    fetchAktivitetsFeed().then(d => {
-      setAktivitetsFeed(d);
-      if (d.length > 0) aktivitetLatestRef.current = d[0].skapad;
-    }).catch(() => {});
-    const aktivitetInterval = setInterval(() => {
-      fetchAktivitetsFeed().then(d => {
+    const stopAktivitetPolling = startVisiblePolling({
+      document,
+      run: () => fetchAktivitetsFeed().then(d => {
         if (!d.length) return;
         const prevLatest = aktivitetLatestRef.current;
         const nyaste = d[0].skapad;
@@ -872,8 +877,9 @@ export default function DebattClient({ initialArticleCount = null }) {
         }
         aktivitetLatestRef.current = nyaste;
         setAktivitetsFeed(d);
-      }).catch(() => {});
-    }, 30000);
+      }).catch(() => {}),
+      intervalMs: 30000,
+    });
     fetchSenasteAgentKonversationer().then(d => setAgentKonversationer(d)).catch(() => {});
     fetch(`${SB_URL}/rest/v1/agent_dagbok?select=id,agent,rubrik,reflektion,ar_replik,skapad&order=skapad.desc&limit=5`, { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } })
       .then(r => r.ok ? r.json() : []).then(d => setDagbok(Array.isArray(d) ? d : [])).catch(() => {});
@@ -939,7 +945,7 @@ export default function DebattClient({ initialArticleCount = null }) {
         setOpinionWidget(prev => ({ ...prev, rosterData: map }));
       })
       .catch(() => {});
-    return () => clearInterval(aktivitetInterval);
+    return stopAktivitetPolling;
   }, []);
 
   useEffect(() => {
