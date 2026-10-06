@@ -108,11 +108,17 @@ export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
 
   useEffect(() => {
     const t = sokning.trim().toLowerCase();
-    const rensad = t.replace(/[*%,()\\]/g, "");
-    if (rensad.length < 3) { setTextTraffar({ term: t, ids: null }); return; }
+    if (!t) { setTextTraffar({ term: t, ids: null }); return; }
+    // Escapa LIKE-metatecken istället för att ta bort dem, så söktermen
+    // betyder samma sak i databasen som lokalt ("100%" söker på "100%", inte
+    // "100"). \, % och _ escapas med backslash (Postgres LIKE-standard).
+    // PostgREST gör alltid om * till % och har ingen escape för det, så ett
+    // * i termen blir _ (exakt ett godtyckligt tecken) — kan överträffa
+    // marginellt, men tappar aldrig en riktig träff.
+    const monster = t.replace(/[\\%_]/g, c => "\\" + c).replace(/\*/g, "_");
     const ctrl = new AbortController();
     const timer = setTimeout(() => {
-      fetch(`${SB_URL}/rest/v1/artiklar?select=id&artikel=ilike.*${encodeURIComponent(rensad)}*&limit=5000`, {
+      fetch(`${SB_URL}/rest/v1/artiklar?select=id&artikel=ilike.*${encodeURIComponent(monster)}*&limit=5000`, {
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
         signal: ctrl.signal,
       })

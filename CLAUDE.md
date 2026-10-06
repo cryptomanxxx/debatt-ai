@@ -4455,7 +4455,7 @@ Vercel-mejl + skärmdump (okt 2026): ISR Writes 306 701 / 200 000 för senaste 3
 
 **Fix:**
 - `app/arkiv/page.js` väljer bara de kolumner `ArkivClient` faktiskt använder, och skickar varje artikel genom `slimmaArtikel()`: brödtexten ersätts med `utdrag` (220 tecken) + `ordAntal` (för läsminuterna), `nyhetskalla` slimmas till `{typ}`. `revalidate` 600 → 3600 — sidan revalideras ändå on-demand vid varje publicering.
-- `ArkivClient.js`: fritextsökning i artikeltexten görs nu on-demand mot Supabase (`artiklar?select=id&artikel=ilike.*<term>*`, debounce 300 ms, ≥ 3 tecken, svaret knutet till söksträngen så ett inaktuellt svar aldrig blandas in) istället för mot den lokala fulltexten — samma sökfunktion, ingen fulltext i propsen. Rubrik/författare/taggar/utdrag söks fortsatt lokalt direkt. Listan renderar 50 kort åt gången med en "Visa fler"-knapp (återställs vid filterbyte).
+- `ArkivClient.js`: fritextsökning i artikeltexten görs nu on-demand mot Supabase (`artiklar?select=id&artikel=ilike.*<term>*`, debounce 300 ms, svaret knutet till söksträngen så ett inaktuellt svar aldrig blandas in) istället för mot den lokala fulltexten — samma sökfunktion, ingen fulltext i propsen. Rubrik/författare/taggar/utdrag söks fortsatt lokalt direkt. Listan renderar 50 kort åt gången med en "Visa fler"-knapp (återställs vid filterbyte).
 - Åtta sidor som ✅94 missade (de saknade en segment-export och styrdes bara av fetch-nivåns `next.revalidate`) höjda från 120/180/300 s till 1800 s: `/ekonomi`, `/lobbying`, `/parlament`, `/oligarki`, `/historia`, `/fraktioner`, `/rivaliteter`, `/leaderboard`. Datan på dem uppdateras av dagliga cron-jobb.
 
 | Fil | Roll |
@@ -4463,6 +4463,8 @@ Vercel-mejl + skärmdump (okt 2026): ISR Writes 306 701 / 200 000 för senaste 3
 | `app/arkiv/page.js` | Explicit kolumnlista, `slimmaArtikel()` (utdrag + ordantal istället för brödtext), revalidate 600 → 3600 |
 | `app/arkiv/ArkivClient.js` | Brödtextsökning on-demand mot Supabase, `utdrag`/`ordAntal` istället för `artikel`, "Visa fler"-paginering (50 åt gången) |
 | `app/{ekonomi,lobbying,parlament,oligarki,historia,fraktioner,rivaliteter,leaderboard}/page.js` | Fetch-nivåns revalidate 120/180/300 → 1800 |
+
+**Codex-fynd (PR #1547-granskning): brödtextsökningen ändrade vad besökaren sökte på.** Två P2-fynd: (1) den första versionen körde bara Supabase-sökningen för termer på minst 3 tecken, så en sökning på "EU" eller "AI" tappade alla träffar som låg efter utdraget, något den gamla fulltextsökningen aldrig gjorde. Nu körs brödtextsökningen för alla icke-tomma termer. (2) Söktermen rensades från `*%,()\` innan den skickades, så "100%" sökte på "100" och "50,000" på "50000", men svaret räknades ändå som träffar för den ursprungliga termen. Nu escapas LIKE-metatecknen (`\`, `%`, `_`) med backslash istället för att tas bort. Kommatecken och parenteser behöver ingen behandling i ett vanligt kolumnfilter (bara inuti `or=()`). `*` blir `_` eftersom PostgREST alltid gör om `*` till `%` och saknar escape för det — kan ge en marginell överträff men tappar aldrig en riktig träff.
 
 ## Kontext om projektet
 
