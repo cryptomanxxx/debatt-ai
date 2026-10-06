@@ -37,8 +37,9 @@ async function rakna(tabell) {
 const hamtaAntal = unstable_cache(
   async () => {
     const [artiklar, debatter] = await Promise.all([rakna("artiklar"), rakna("chatt_debatter")]);
-    // Kasta vid fel så att ett misslyckat anrop aldrig cachas i 15 minuter.
-    if (artiklar === null && debatter === null) throw new Error("nav-count: inga svar");
+    // Kasta om någon räkning misslyckas, så att bara kompletta svar cachas.
+    // Annars försvinner en av räknarna i 15 minuter efter ett tillfälligt fel.
+    if (artiklar === null || debatter === null) throw new Error("nav-count: ofullständigt svar");
     return { artiklar, debatter };
   },
   ["nav-count-v1"],
