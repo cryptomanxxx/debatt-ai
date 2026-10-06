@@ -136,3 +136,17 @@ test('ogiltigt korrigeringssvar får inte gå vidare till blind kontroll', async
   assert.equal(models, 2);
   assert.equal(tools, 0);
 });
+
+test('rätt formel i motiveringen ersätter inte felaktiga JSON-koefficienter', async () => {
+  let calls = 0;
+  const report = await runExperiment('20261006', async () => ({
+    text: JSON.stringify({ method: 'bootloops_ratfit', coefficients: ['2', '7', '9', '0'],
+      reason: 'Slutlig formel: (2x+7)/(3x+9). Koefficienter a=2,b=7,c=3,d=9.' }),
+    provider: 'test', model: 'test',
+  }), async () => response(calls++ % 2 === 0));
+  assert.equal(report.promptVersion, 'consistent-coefficients-v1');
+  assert.equal(report.cases[1].passed, false);
+  assert.equal(report.cases[1].correctionAttempted, true);
+  assert.deepEqual(report.cases[1].proposal.coefficients, ['2', '7', '9', '0']);
+  assert.ok(verifyFormula(makeCases('20261006')[1].truth, report.cases[1].data.holdout));
+});
