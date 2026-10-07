@@ -124,6 +124,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | **OpenRouter** (fallback 2) | `meta-llama/llama3.3-70b-instruct:free` | `OPENROUTER_API_KEY` | Direktdebatt (parallell med Gemini) |
 | **Codestral** (fallback 3) | `codestral-latest` | `MISTRAL_API_KEY` | Direktdebatt, artikelbedömning + **exklusivt** för AI-bus kodanalys |
 | **DeepSeek** (fallback 3) | `deepseek-chat` | `DEEPSEEK_API_KEY` | Artiklar, direktdebatt |
+| **Cloudflare Workers AI** | `@cf/meta/llama-3.3-70b-instruct(-fp8-fast)` | `CF_ACCOUNT_ID` + `CF_API_TOKEN` | Python-skriptens dynamiska kedja (`hamta_kort_fns()`, satt i 35 workflows) och `/api/kanal/*` (3:e i den kedjan). Inte i `app/lib/aiRouter.js` eller artikelskrivningen |
 
 **Fallback-kedjor per kontext:**
 - **Artikelskrivning (Python):** Groq → DeepSeek (`ai_klient.hamta_artikel_fns()`s hårdkodade `_ARTIKEL_CHAIN` — exkluderar medvetet Mistral/Cloudflare/Gemini, oberoende av den dynamiska benchmark-rankingen i `_fallback_order`, se ✅123)
@@ -131,6 +132,8 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 - **Artikelbedömning (JS):** Groq → Codestral → DeepSeek
 - **Decision API (JS):** Groq → Gemini → Codestral → DeepSeek
 - **Kodanalys (Codestral-worker):** Codestral (exklusivt, ingen fallback)
+- **Korta anrop i Python-skript (`hamta_kort_fns()`):** dynamisk ordning ur `provider_config.ranked_order` (Groq/Mistral/DeepSeek/Cloudflare/Gemini, rankad dagligen av `provider_benchmark.py`)
+- **AI-TV-kanalen (`/api/kanal/*`):** Mistral → DeepSeek → Cloudflare → Groq
 
 **GitHub Models borttaget (30 aug 2026):** var tidigare sista-utväg-fallback i samtliga kedjor ovan (`GITHUB_TOKEN`, `Llama-3.3-70B-Instruct` via `models.inference.ai.azure.com`). Tjänsten stängde helt 30 juli 2026 — bekräftat via live 404/anslutningsfel i `/test-providers`. Borttaget ur `ai_klient.py`, `app/lib/aiRouter.js`, `provider_benchmark.py` och samtliga API-routes som hade en egen direktkopia av fallback-kedjan.
 
@@ -4566,6 +4569,22 @@ Följd av ✅144. `provider_benchmark.py` rankar providers främst på deras fak
 | `app/ai-statistik/page.js` | SSR med ISR (1800 s). Pagerad hämtning av `ai_log`, `aggregera()` räknar ihop allt på servern, `provider_config` för rankingen |
 | `app/ai-statistik/AiStatistikVy.js` | Klientkomponent: statusrutor, fallback-ordning, tre Recharts-grafer, två tabeller |
 | `app/GlobalNav.js`, `app/layout.js` | Länk "AI-statistik" (Spel & Mer-gruppen och footern, där den ligger i alfabetisk ordning efter AI-Parlamentet; AI-Straffspelet flyttades samtidigt till rätt plats) |
+
+### ✅147. SQL-migreringarna i en egen mapp, Cloudflare dokumenterad, footern omsorterad – KLART
+
+Ägarbegäran (okt 2026), tre delar:
+
+**1. Alla 180 `supabase_*.sql` flyttade till `supabase/`.** Inget skript eller workflow läser filerna via sökväg. De körs bara manuellt i Supabase SQL Editor, så flytten ändrar ingenting i drift. Filnamnen är oförändrade, så alla hänvisningar i den här filen och i kodkommentarer ("kör `supabase_x.sql`") gäller fortfarande, bara i mappen `supabase/`. Nya migreringar ska läggas i samma mapp.
+
+**2. Cloudflare används fortfarande — ingen kod borttagen.** Ägaren trodde att Cloudflare inte längre var i bruk, eftersom den saknades i provider-tabellen ovan. Kontrollen visade att Cloudflare Workers AI fortfarande ingår i Python-skriptens dynamiska kedja (`ai_klient.py → cloudflare_post()`, `_DEFAULT_ORDER`, `CF_ACCOUNT_ID`/`CF_API_TOKEN` i 35 workflows) och i AI-TV-kanalens routes (`app/api/kanal/expand`, `batch-expand`, `batch-rubriker`, trea i kedjan Mistral → DeepSeek → Cloudflare → Groq). Den saknas däremot i `app/lib/aiRouter.js`, alltså i Direktdebatt, Decision API, artikelbedömning m.fl., och i artikelskrivningen (`_ARTIKEL_CHAIN = ["groq", "deepseek"]`). Att `/ai-statistik` visar den som trea är därför korrekt. Det är den ordning `provider_benchmark.py` senast sparat i `provider_config`. Provider-tabellen och kedjelistan ovan är kompletterade. Om Cloudflare ska tas bort helt är det ett separat beslut: ta bort den ur `ai_klient.py`, `provider_benchmark.py`, kanalroutarna och workflows-secrets.
+
+**3. Footerns sidindex helt omsorterat.** Alla länkar i `app/layout.js` sorterade med svensk ordning (å, ä, ö efter z), skiftläge, mellanslag, bindestreck och emoji ignoreras. Förutom Hem, Civilisations-API och Snake låg bland annat AI-Universitetet, Förmögenheter, Handelsimperium, Territorium, Oraklet och Q.ANT Research Lab fel. RSS och Integritetspolicy ligger kvar sist som fasta tilläggslänkar.
+
+| Fil | Roll |
+|---|---|
+| `supabase/` | Ny mapp, alla 180 `supabase_*.sql` flyttade hit med `git mv` |
+| `app/layout.js` | Footerns sidindex omsorterat alfabetiskt |
+| `CLAUDE.md` | Cloudflare i provider-tabellen och kedjelistan |
 
 ## Kontext om projektet
 
