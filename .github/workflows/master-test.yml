@@ -67,4 +67,4 @@ jobs:
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
             ARGS="$ARGS --dry-run"
           fi
-          python -u master_test.py $ARGS
+          python -u python/master_test.py $ARGS

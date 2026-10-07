@@ -82,7 +82,7 @@ jobs:
           FAILED=0
           for i in $(seq 1 4); do
             echo "=== Filmrecension $i/4 ==="
-            python3 filmrecensent.py
+            python3 python/filmrecensent.py
             ec=$?
             if [ $ec -ne 0 ]; then
               echo "::warning::Pass $i/4 misslyckades (exit $ec) — fortsätter med nästa pass."

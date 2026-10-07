@@ -48,7 +48,7 @@ jobs:
           PYTHONUNBUFFERED: "1"
         run: |
           if [ -n "${{ github.event.inputs.agent }}" ]; then
-            python -u bild_test.py --agent "${{ github.event.inputs.agent }}"
+            python -u python/bild_test.py --agent "${{ github.event.inputs.agent }}"
           else
-            python -u bild_test.py
+            python -u python/bild_test.py
           fi

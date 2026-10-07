@@ -39,4 +39,4 @@ jobs:
           SAMBANOVA_API_KEY: ${{ secrets.SAMBANOVA_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AGENTER_SUBSET: ${{ github.event.inputs.agenter_subset }}
-        run: python civ_fraga_test.py
+        run: python python/civ_fraga_test.py

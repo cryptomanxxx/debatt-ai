@@ -29,6 +29,9 @@ import sys
 import os
 import time
 
+# Övriga skript ligger i samma mapp (python/) — oberoende av arbetskatalog.
+SKRIPTMAPP = os.path.dirname(os.path.abspath(__file__))
+
 
 STEG = [
     {
@@ -165,7 +168,7 @@ def main():
             continue
 
         # Bygg kommando
-        cmd = [sys.executable, "-u", steg["fil"]]
+        cmd = [sys.executable, "-u", os.path.join(SKRIPTMAPP, steg["fil"])]
         if sid == "konversationer":
             cmd += ["--antal", str(args.antal_konv)]
 

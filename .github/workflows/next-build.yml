@@ -1,0 +1,42 @@
+name: Next.js-bygge
+
+# Bygger appen på varje PR som rör den, så att ett trasigt bygge syns här
+# istället för först i Vercel-deployen efter merge (✅150).
+# Inga Supabase-hemligheter: sidorna som hämtar data vid bygget faller
+# tillbaka på sina felvyer, så bygget testar koden, inte datan.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "next.config.mjs"
+      - "package.json"
+      - ".github/workflows/next-build.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - "next.config.mjs"
+      - "package.json"
+      - ".github/workflows/next-build.yml"
+
+concurrency:
+  group: next-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  next-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Installera beroenden
+        # package-lock.json är gitignorerad, därav npm install och inte npm ci.
+        run: npm install --no-audit --no-fund
+      - name: Bygg
+        run: npx next build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"

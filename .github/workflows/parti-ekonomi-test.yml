@@ -34,4 +34,4 @@ jobs:
           GROQ_API_KEY_10: ${{ secrets.GROQ_API_KEY_10 }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PYTHONUNBUFFERED: "1"
-        run: python -u parti_ekonomi_test.py
+        run: python -u python/parti_ekonomi_test.py

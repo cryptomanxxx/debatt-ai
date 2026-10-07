@@ -4603,6 +4603,44 @@ Cloudflare tas inte bort ur kedjan (ägarbeslut: fler providers är bättre).
 | `app/ai-statistik/page.js` | Ny `dagligAnrop` (antal anrop per provider och dag) i `aggregera()` |
 | `app/ai-statistik/AiStatistikVy.js` | Ny graf "Anrop per provider och dag", nollrader för providers utan anrop, noter om vilka providers som saknas i linje- och latensgraferna |
 
+### ✅149. Python-skripten i en egen mapp (python/) – KLART
+
+Ägarbegäran (okt 2026), samma princip som SQL-migreringarna i ✅147: alla 59 Python-skript som låg i repots rot är flyttade till `python/` med `git mv`. Filnamnen är oförändrade, så alla hänvisningar i den här filen ("`agent.py`", "`supabase_utils.py → ...`") gäller fortfarande, bara i mappen `python/`. Nya skript ska läggas där. Undantag: `tests/test_berakningar.py` (ligger kvar i `tests/`) och verktyget `scripts/slice-world-map.py`.
+
+**Importerna fungerade utan ändring.** Skripten importerar varandra direkt (`from supabase_utils import ...`). När Python startar `python/X.py` läggs skriptets egen mapp först på `sys.path`, så syskonmodulerna hittas som förut. Arbetskatalogen är fortfarande repots rot, och inget skript läser filer relativt sin egen mapp.
+
+**Det som behövde ändras:**
+- 53 workflows: `python X.py` → `python python/X.py` (60 rader). Inline-skripten i `bootstrap-demokrati.yml` och `seed-partikassor.yml` importerar inga egna moduler och påverkas inte.
+- `python/master_test.py` startar övriga skript med `subprocess` och bygger nu sökvägen från sin egen mapp (`SKRIPTMAPP`), inte från arbetskatalogen.
+- `tests/conftest.py` (ny) lägger `python/` på `sys.path`, så att pytest hittar modulerna.
+- `agents/invariant-checker.js` läser `python/artikel.py` och `python/agent.py`, och `agents/codestral-worker.js` bevakar `python/nyheter.py` och `python/agenter.py`.
+
+`lint-provider-usage.yml` söker rekursivt och jämför bara filnamn, och `tests.yml` triggas på `**.py`. Båda fungerar oförändrat.
+
+**Verifierat:** `pytest tests/` 28/28, `node --test` 83/83, alla skript kompilerar (utom `auto_fix_test.py`, som är trasigt med avsikt), importerna fungerar från den nya mappen och invariant-checkerns källkodskontroller är gröna.
+
+| Fil | Roll |
+|---|---|
+| `python/` | Ny mapp, alla 59 Python-skript från roten |
+| 53 workflows | `python python/X.py` |
+| `python/master_test.py` | `SKRIPTMAPP` för underprocessernas sökväg |
+| `tests/conftest.py` | Lägger `python/` på `sys.path` |
+| `agents/invariant-checker.js`, `agents/codestral-worker.js` | Nya sökvägar |
+
+**Codex-fynd (PR #1564-granskning):** prompten i `agents/codestral-worker.js` listade Python-filerna med bara filnamn ("agent.py") som tillåtna värden i `file`-fältet. `writeSuggestions()` kopierar värdet rakt in i förslagets frontmatter och auto-implement-flödet använder det som sökväg, så ett förslag hade pekat på en fil som inte finns. Prompten listar nu hela sökvägarna (`python/agent.py` osv.).
+
+### ✅150. CI-kontroll som bygger Next.js-appen (next build) – KLART
+
+Ägarbegäran (okt 2026). CI körde bara pytest, node-tester och providerlintern, path-filtrerade på Python-filer och testfiler. Inget byggde appen, så en ändring i `app/` som bryter bygget märktes först när Vercel-deployen misslyckades efter merge.
+
+**Ny workflow `next-build.yml`:** körs på PR:er och push till `main` som rör `app/**`, `next.config.mjs`, `package.json` eller workflowen själv. Installerar med `npm install` (inte `npm ci`, eftersom `package-lock.json` är gitignorerad) och kör `npx next build`. Inga Supabase-hemligheter skickas med: sidorna som hämtar data vid bygget faller tillbaka på sina felvyer (✅134, ✅146), så kontrollen testar koden, inte datan. Verifierat lokalt utan miljövariabler, bygget går igenom. `concurrency` avbryter en äldre körning på samma branch när en ny push kommer.
+
+**Medvetet utanför:** `ai-bus/` (läses av `/hjarnan` och `/api/reports`) triggar inte bygget, eftersom botarna committar dit flera gånger om dagen och filerna läses vid körning, inte vid bygget.
+
+| Fil | Roll |
+|---|---|
+| `.github/workflows/next-build.yml` | Ny workflow. `npm install` + `next build` på PR:er och push till main som rör appen |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

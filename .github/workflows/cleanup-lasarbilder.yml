@@ -22,4 +22,4 @@ jobs:
         env:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PYTHONUNBUFFERED: "1"
-        run: python -u cleanup_lasarbilder.py
+        run: python -u python/cleanup_lasarbilder.py

@@ -59,7 +59,7 @@ jobs:
           ANTAL="${{ github.event.inputs.antal || '10' }}"
           AGENTER="${{ github.event.inputs.agenter || '' }}"
           if [ -n "$AGENTER" ]; then
-            python -u konversationer_bulk.py --antal "$ANTAL" --agenter "$AGENTER"
+            python -u python/konversationer_bulk.py --antal "$ANTAL" --agenter "$AGENTER"
           else
-            python -u konversationer_bulk.py --antal "$ANTAL"
+            python -u python/konversationer_bulk.py --antal "$ANTAL"
           fi

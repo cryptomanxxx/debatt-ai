@@ -188,7 +188,7 @@ function checkSenasteReplikerWidget() {
 function checkRubrikTrunkeringsskydd() {
   const namn = "rubrik-trunkeringsskydd";
   try {
-    const kod = lasFil("artikel.py");
+    const kod = lasFil("python/artikel.py");
     const idx = kod.indexOf("def generera_rubrik");
     if (idx === -1) {
       rapportera(namn, "fail", "hittar inte generera_rubrik i artikel.py");
@@ -277,7 +277,7 @@ function checkDirektdebattReasoningEffort() {
 function checkAmnesforslagInteKonsumeratVidAvvisning() {
   const namn = "amnesforslag-inte-konsumerat-vid-avvisning";
   try {
-    const kod = lasFil("agent.py");
+    const kod = lasFil("python/agent.py");
     const idxMarkera = kod.indexOf("markera_forslag_behandlat(sb_key, forslag_id)");
     if (idxMarkera === -1) {
       rapportera(namn, "fail", "hittar inget markera_forslag_behandlat(sb_key, forslag_id)-anrop i agent.py");
@@ -301,7 +301,7 @@ function checkAmnesforslagInteKonsumeratVidAvvisning() {
 function checkAmnesforslagKvotseparation() {
   const namn = "amnesforslag-kvotseparation";
   try {
-    const kod = lasFil("agent.py");
+    const kod = lasFil("python/agent.py");
     if (!kod.includes("kraver_kalla=kraver_kalla") || !kod.includes("kraver_kalla = not force_eget")) {
       rapportera(namn, "fail", "kraver_kalla-separationen mellan nyhets- och eget-kvoten (✅100) verkar saknas eller ha ändrats");
       return;
