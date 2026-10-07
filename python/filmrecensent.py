@@ -131,6 +131,8 @@ KANALER = [
      "url": "https://www.youtube.com/@xyronth"},
     {"handle": "@MythReel-GK", "namn": "@MythReel-GK",
      "url": "https://www.youtube.com/@MythReel-GK"},
+    {"handle": "@KaiDrakOfficial", "namn": "@KaiDrakOfficial",
+     "url": "https://www.youtube.com/@KaiDrakOfficial"},
 ]
 
 YOUTUBE_DATA_API = "https://www.googleapis.com/youtube/v3"
