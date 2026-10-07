@@ -4543,6 +4543,30 @@ Följd av ✅144. `provider_benchmark.py` rankar providers främst på deras fak
 | `ai_klient.py` | `_logga_ai_anrop()` buffrar rader (med `ts`). `_skicka_ai_log()` skickar en JSON-array och returnerar om det lyckades, `_lagg_tillbaka()` sparar en misslyckad omgång, `_toem_ai_log()` registrerad med `atexit` |
 | 10 workflows (se ovan) | `SUPABASE_SERVICE_ROLE_KEY` tillagd i env |
 
+### ✅146. AI-statistik (/ai-statistik) — publik sida över ai_log – KLART
+
+Ägarbegäran (okt 2026), direkt efter ✅145: en sida med statistik och grafer över `ai_log`. Sidan räknar på samma 7-dagarsfönster som `provider_benchmark.py → hamta_produktion_ok_rate_7d()`, så den visar exakt det underlag som styr fallback-rankingen.
+
+**Innehåll:**
+- statusrutor (antal anrop, andel lyckade, median-latens, antal 429, antal providers)
+- aktuell fallback-ordning ur `provider_config`
+- staplat stapeldiagram över anrop per dag fördelade på utfall
+- linjediagram över andel lyckade anrop per provider och dag (providers med minst 20 anrop under perioden; en dag med färre än 5 anrop för en provider blir en lucka)
+- liggande stapeldiagram över latens (p50/p90) för lyckade anrop
+- tabeller per provider och för de 15 mest aktiva källorna (`source`)
+
+**Liten sida trots mycket data:** raderna hämtas i sidor om 1000 (PostgREST-taket, max 50 sidor). Allt räknas ihop på servern och bara sammanställningen skickas till klienten, så ISR-skrivningen blir liten (jfr ✅140). `revalidate = 1800`. Vid en bakgrundsregenerering kastas ett hämtningsfel vidare, så att ISR behåller den senaste fungerande sidan istället för att cacha en felsida. Under `next build` visas felvyn istället, så att en tillfällig Supabase-störning inte fäller bygget (jfr ✅134).
+
+**Färger:** status (ok/429/timeout/fel) använder reserverade statusfärger med etikett. Providers har en fast färg per namn, validerad med dataviz-validatorn mot sajtens mörka bakgrund. Okända providers blir grå. Legendtext är neutral. `itemSorter: null` behövs eftersom Recharts 3 annars sorterar legenden alfabetiskt.
+
+**Observera:** Python-skripten loggar `mistral` och Vercel-routarna `codestral` för samma leverantör. Sidan visar dem som de står i tabellen, samma namn som benchmarken räknar med. Data före 7 oktober 2026 är ofullständig (se ✅145), vilket sidan själv nämner.
+
+| Fil | Roll |
+|---|---|
+| `app/ai-statistik/page.js` | SSR med ISR (1800 s). Pagerad hämtning av `ai_log`, `aggregera()` räknar ihop allt på servern, `provider_config` för rankingen |
+| `app/ai-statistik/AiStatistikVy.js` | Klientkomponent: statusrutor, fallback-ordning, tre Recharts-grafer, två tabeller |
+| `app/GlobalNav.js`, `app/layout.js` | Länk "AI-statistik" (Spel & Mer-gruppen och footern) |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

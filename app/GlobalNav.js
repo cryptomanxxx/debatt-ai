@@ -103,6 +103,7 @@ const GRUPPER = [
       { href: "/tidsserie",    label: "Tidsseriegraf" },
       { href: "/civilisation", label: "Civilisations-API" },
       { href: "/beslut",       label: "Decision API" },
+      { href: "/ai-statistik", label: "AI-statistik" },
       { href: "/status",       label: "Systemstatus" },
       { href: "/om",           label: "Om DEBATT-AI" },
       { href: "/?kontakt=1",   label: "Kontakt" },
