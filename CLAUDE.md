@@ -4532,14 +4532,16 @@ Följd av ✅144. `provider_benchmark.py` rankar providers främst på deras fak
 1. Nio workflows med AI-anrop saknade `SUPABASE_SERVICE_ROLE_KEY` och loggade aldrig (före ✅144 nekades deras skrivningar med 42501). Flera av dem gör många anrop per körning, till exempel Visdomsspelet.
 2. Varje rad skickades i en egen daemon-tråd. Trådar som inte hunnit skicka när ett skript avslutades dödades, så de sista anropen (oftast lyckade mot huvudprovidern) tappades.
 
-**Fix:** `_logga_ai_anrop()` i `ai_klient.py` lägger raderna i en buffert i minnet. Bufferten skickas som en JSON-array var 50:e rad och resten vid processens slut (`atexit`). Det blir ett loggat API-anrop per 50 AI-anrop istället för ett per anrop, och inga rader tappas vid normal avslutning. `ts` sätts vid själva AI-anropet, inte när raden skickas, så tidsfönstren i `provider_benchmark.py` stämmer. Schemat och alla läsare är oförändrade. `SUPABASE_SERVICE_ROLE_KEY` är tillagd i `bild-test.yml`, `cem-test.yml`, `civ-fraga-test.yml`, `kanal_debatt.yml`, `kollektiv-intelligens-test.yml`, `kollusion-experiment.yml`, `kris-test.yml`, `oligarki-snapshot.yml` och `rykte-test.yml`, så att alla skript räknas.
+**Fix:** `_logga_ai_anrop()` i `ai_klient.py` lägger raderna i en buffert i minnet. Bufferten skickas som en JSON-array var 50:e rad och resten vid processens slut (`atexit`). Det blir ett loggat API-anrop per 50 AI-anrop istället för ett per anrop, och inga rader tappas vid normal avslutning. `ts` sätts vid själva AI-anropet, inte när raden skickas, så tidsfönstren i `provider_benchmark.py` stämmer. Schemat och alla läsare är oförändrade. `SUPABASE_SERVICE_ROLE_KEY` är tillagd i `bild-test.yml`, `cem-test.yml`, `civ-fraga-test.yml`, `kanal_debatt.yml`, `kollektiv-intelligens-test.yml`, `kollusion-experiment.yml`, `kris-test.yml`, `oligarki-snapshot.yml`, `rykte-test.yml` och `val-test.yml`, så att alla skript räknas.
+
+**Codex-fynd (PR #1559-granskning):** (1) en misslyckad skrivning (icke-2xx eller nätverksfel) kastade hela omgången, alltså rader försvann just när Supabase krånglade, vilket snedvrider statistiken. Nu kollas svaret: en misslyckad omgång läggs tillbaka först i bufferten (max 1000 rader, äldst faller bort) och nästa försök görs först när ytterligare 50 rader samlats, så att inte varje AI-anrop väntar på en nere Supabase. Vid avslut görs ett nytt försök efter 1 s. (2) `val-test.yml` saknades i listan ovan och fick nyckeln.
 
 **Kvar som förut:** Vercel-routes (`app/lib/logAiCall.js`) loggar fortfarande ett anrop i taget, eftersom en serverlös funktion saknar en säker avslutningspunkt. Om ett skript dödas hårt (timeout, `os._exit`) tappas raderna som ännu inte skickats, högst 49. Reservproviders mäts oftast när huvudprovidern redan har problem, och den snedvridningen löses inte av mer komplett data.
 
 | Fil | Roll |
 |---|---|
-| `ai_klient.py` | `_logga_ai_anrop()` buffrar rader (med `ts`). `_skicka_ai_log()` skickar en JSON-array, `_toem_ai_log()` registrerad med `atexit` |
-| 9 workflows (se ovan) | `SUPABASE_SERVICE_ROLE_KEY` tillagd i env |
+| `ai_klient.py` | `_logga_ai_anrop()` buffrar rader (med `ts`). `_skicka_ai_log()` skickar en JSON-array och returnerar om det lyckades, `_lagg_tillbaka()` sparar en misslyckad omgång, `_toem_ai_log()` registrerad med `atexit` |
+| 10 workflows (se ovan) | `SUPABASE_SERVICE_ROLE_KEY` tillagd i env |
 
 ## Kontext om projektet
 
