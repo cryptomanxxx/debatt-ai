@@ -27,8 +27,8 @@ const ALWAYS_WATCH = [
   "app/api/agent/submit/route.js",
   "app/api/chatt/route.js",
   "app/api/beslut/route.js",
-  "nyheter.py",
-  "agenter.py",
+  "python/nyheter.py",
+  "python/agenter.py",
 ];
 
 async function main() {
@@ -474,7 +474,7 @@ Du får både källkod och runtime-statistik från produktionsmiljön.
 Använd runtime-datan för att prioritera verkliga problem framför hypotetiska.
 
 Projektets faktiska filer (ange ENBART dessa i "file"-fältet):
-Python: agent.py, agenter.py, ai_klient.py, artikel.py, nyheter.py, supabase_utils.py, kanal_debatt.py, backtest.py, backtest_fetch.py, data_agent.py
+Python (i mappen python/): agent.py, agenter.py, ai_klient.py, artikel.py, nyheter.py, supabase_utils.py, kanal_debatt.py, backtest.py, backtest_fetch.py, data_agent.py
 JS API-routes: app/api/agent/submit/route.js, app/api/chatt/route.js, app/api/beslut/route.js, app/api/agent-fraga/route.js, app/api/opinion-stats/route.js, app/api/youtube-transcript/route.js
 JS övrigt: app/admin/client.js, app/agentData.js, agents/codestral-worker.js
 

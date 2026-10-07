@@ -64,4 +64,4 @@ jobs:
           ANROP_PER_PROVIDER: ${{ inputs.anrop_per_provider || '10' }}
           SLEEP_MELLAN: ${{ inputs.sleep_mellan || '1' }}
           PYTHONUNBUFFERED: "1"
-        run: python -u provider_benchmark.py
+        run: python -u python/provider_benchmark.py

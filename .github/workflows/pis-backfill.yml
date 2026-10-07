@@ -81,4 +81,4 @@ jobs:
           MC_ITERATIONER: ${{ inputs.mc_iterationer }}
           MIN_ITERATIONER: ${{ inputs.min_iterationer }}
           PYTHONUNBUFFERED: "1"
-        run: python -u pis_backfill.py
+        run: python -u python/pis_backfill.py

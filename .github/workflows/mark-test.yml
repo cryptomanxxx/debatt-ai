@@ -47,11 +47,11 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PYTHONUNBUFFERED: "1"
-        run: python -u mark_test.py
+        run: python -u python/mark_test.py
 
       - name: Kör mark_andrahand_test
         env:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PYTHONUNBUFFERED: "1"
-        run: python -u mark_andrahand_test.py
+        run: python -u python/mark_andrahand_test.py

@@ -4603,6 +4603,30 @@ Cloudflare tas inte bort ur kedjan (ägarbeslut: fler providers är bättre).
 | `app/ai-statistik/page.js` | Ny `dagligAnrop` (antal anrop per provider och dag) i `aggregera()` |
 | `app/ai-statistik/AiStatistikVy.js` | Ny graf "Anrop per provider och dag", nollrader för providers utan anrop, noter om vilka providers som saknas i linje- och latensgraferna |
 
+### ✅149. Python-skripten i en egen mapp (python/) – KLART
+
+Ägarbegäran (okt 2026), samma princip som SQL-migreringarna i ✅147: alla 59 Python-skript som låg i repots rot är flyttade till `python/` med `git mv`. Filnamnen är oförändrade, så alla hänvisningar i den här filen ("`agent.py`", "`supabase_utils.py → ...`") gäller fortfarande, bara i mappen `python/`. Nya skript ska läggas där. Undantag: `tests/test_berakningar.py` (ligger kvar i `tests/`) och verktyget `scripts/slice-world-map.py`.
+
+**Importerna fungerade utan ändring.** Skripten importerar varandra direkt (`from supabase_utils import ...`). När Python startar `python/X.py` läggs skriptets egen mapp först på `sys.path`, så syskonmodulerna hittas som förut. Arbetskatalogen är fortfarande repots rot, och inget skript läser filer relativt sin egen mapp.
+
+**Det som behövde ändras:**
+- 53 workflows: `python X.py` → `python python/X.py` (60 rader). Inline-skripten i `bootstrap-demokrati.yml` och `seed-partikassor.yml` importerar inga egna moduler och påverkas inte.
+- `python/master_test.py` startar övriga skript med `subprocess` och bygger nu sökvägen från sin egen mapp (`SKRIPTMAPP`), inte från arbetskatalogen.
+- `tests/conftest.py` (ny) lägger `python/` på `sys.path`, så att pytest hittar modulerna.
+- `agents/invariant-checker.js` läser `python/artikel.py` och `python/agent.py`, och `agents/codestral-worker.js` bevakar `python/nyheter.py` och `python/agenter.py`.
+
+`lint-provider-usage.yml` söker rekursivt och jämför bara filnamn, och `tests.yml` triggas på `**.py`. Båda fungerar oförändrat.
+
+**Verifierat:** `pytest tests/` 28/28, `node --test` 83/83, alla skript kompilerar (utom `auto_fix_test.py`, som är trasigt med avsikt), importerna fungerar från den nya mappen och invariant-checkerns källkodskontroller är gröna.
+
+| Fil | Roll |
+|---|---|
+| `python/` | Ny mapp, alla 59 Python-skript från roten |
+| 53 workflows | `python python/X.py` |
+| `python/master_test.py` | `SKRIPTMAPP` för underprocessernas sökväg |
+| `tests/conftest.py` | Lägger `python/` på `sys.path` |
+| `agents/invariant-checker.js`, `agents/codestral-worker.js` | Nya sökvägar |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

@@ -185,7 +185,7 @@ jobs:
           FAILED=0
           for i in $(seq 1 "$PASS"); do
             echo "=== Publiceringspass $i/$PASS (AGENT_CRON='$AGENT_CRON') ==="
-            python -u agent.py
+            python -u python/agent.py
             ec=$?
             if [ $ec -ne 0 ]; then
               echo "::warning::Pass $i/$PASS misslyckades (exit $ec) — fortsätter med nästa pass."
