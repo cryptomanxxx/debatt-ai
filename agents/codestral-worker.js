@@ -474,7 +474,7 @@ Du får både källkod och runtime-statistik från produktionsmiljön.
 Använd runtime-datan för att prioritera verkliga problem framför hypotetiska.
 
 Projektets faktiska filer (ange ENBART dessa i "file"-fältet):
-Python (i mappen python/): agent.py, agenter.py, ai_klient.py, artikel.py, nyheter.py, supabase_utils.py, kanal_debatt.py, backtest.py, backtest_fetch.py, data_agent.py
+Python: python/agent.py, python/agenter.py, python/ai_klient.py, python/artikel.py, python/nyheter.py, python/supabase_utils.py, python/kanal_debatt.py, python/backtest.py, python/backtest_fetch.py, python/data_agent.py
 JS API-routes: app/api/agent/submit/route.js, app/api/chatt/route.js, app/api/beslut/route.js, app/api/agent-fraga/route.js, app/api/opinion-stats/route.js, app/api/youtube-transcript/route.js
 JS övrigt: app/admin/client.js, app/agentData.js, agents/codestral-worker.js
 

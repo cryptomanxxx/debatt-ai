@@ -4627,6 +4627,20 @@ Cloudflare tas inte bort ur kedjan (ägarbeslut: fler providers är bättre).
 | `tests/conftest.py` | Lägger `python/` på `sys.path` |
 | `agents/invariant-checker.js`, `agents/codestral-worker.js` | Nya sökvägar |
 
+**Codex-fynd (PR #1564-granskning):** prompten i `agents/codestral-worker.js` listade Python-filerna med bara filnamn ("agent.py") som tillåtna värden i `file`-fältet. `writeSuggestions()` kopierar värdet rakt in i förslagets frontmatter och auto-implement-flödet använder det som sökväg, så ett förslag hade pekat på en fil som inte finns. Prompten listar nu hela sökvägarna (`python/agent.py` osv.).
+
+### ✅150. CI-kontroll som bygger Next.js-appen (next build) – KLART
+
+Ägarbegäran (okt 2026). CI körde bara pytest, node-tester och providerlintern, path-filtrerade på Python-filer och testfiler. Inget byggde appen, så en ändring i `app/` som bryter bygget märktes först när Vercel-deployen misslyckades efter merge.
+
+**Ny workflow `next-build.yml`:** körs på PR:er och push till `main` som rör `app/**`, `next.config.mjs`, `package.json` eller workflowen själv. Installerar med `npm install` (inte `npm ci`, eftersom `package-lock.json` är gitignorerad) och kör `npx next build`. Inga Supabase-hemligheter skickas med: sidorna som hämtar data vid bygget faller tillbaka på sina felvyer (✅134, ✅146), så kontrollen testar koden, inte datan. Verifierat lokalt utan miljövariabler, bygget går igenom. `concurrency` avbryter en äldre körning på samma branch när en ny push kommer.
+
+**Medvetet utanför:** `ai-bus/` (läses av `/hjarnan` och `/api/reports`) triggar inte bygget, eftersom botarna committar dit flera gånger om dagen och filerna läses vid körning, inte vid bygget.
+
+| Fil | Roll |
+|---|---|
+| `.github/workflows/next-build.yml` | Ny workflow. `npm install` + `next build` på PR:er och push till main som rör appen |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt
