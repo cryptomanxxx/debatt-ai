@@ -48,9 +48,10 @@ export default function RootLayout({ children }) {
               <a href="/dynamik" className="neon-nav">Agentdynamik</a>
               <a href="/ai-bilder" className="neon-nav">AI-Bilder</a>
               <a href="/ekonomi" className="neon-nav">AI-Ekonomi</a>
-              <a href="/tpp" className="neon-nav">AI-Straffspelet</a>
               <a href="/lobbying" className="neon-nav">AI-Lobbying</a>
               <a href="/parlament" className="neon-nav">AI-Parlamentet</a>
+              <a href="/ai-statistik" className="neon-nav">AI-statistik</a>
+              <a href="/tpp" className="neon-nav">AI-Straffspelet</a>
               <a href="/arkiv" className="neon-nav">Arkiv</a>
               <a href="/butik" className="neon-nav">Butiken</a>
               <a href="/bank" className="neon-nav">Centralbanken</a>
@@ -103,7 +104,6 @@ export default function RootLayout({ children }) {
               <a href="/feedback" className="neon-nav">Socialt kapital</a>
               <a href="/stablecoin" className="neon-nav">Stablecoin STAB</a>
               <a href="/staten" className="neon-nav">Staten</a>
-              <a href="/ai-statistik" className="neon-nav">AI-statistik</a>
               <a href="/status" className="neon-nav">Systemstatus</a>
               <a href="/snake" className="neon-nav">Snake 🐍</a>
               <a href="/territorium" className="neon-nav">Territorium 🎮</a>

@@ -20,7 +20,7 @@ const STATUS = [
 // Validerad mot sajtens mörka bakgrund med dataviz-validatorn. Okända
 // providers blir grå.
 const PROVIDER_FARG = {
-  groq: "#3987e5", deepseek: "#d95926", mistral: "#199e70", codestral: "#c98500",
+  groq: "#3987e5", deepseek: "#d95926", mistral: "#199e70",
   cloudflare: "#d55181", gemini: "#008300", openrouter: "#9085e9",
 };
 const providerFarg = (p) => PROVIDER_FARG[p] || "#6b7280";
