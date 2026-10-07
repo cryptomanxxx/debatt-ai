@@ -45,6 +45,8 @@ jobs:
           GROQ_API_KEY_10: ${{ secrets.GROQ_API_KEY_10 }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # Krävs för att spara tidslinjesidornas skärmdumpar i Storage
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           BASE_URL: ${{ github.event.inputs.base_url || 'https://www.debatt-ai.se' }}
         run: node agents/qa-observer.js
 

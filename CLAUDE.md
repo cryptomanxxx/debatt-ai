@@ -4644,6 +4644,39 @@ Cloudflare tas inte bort ur kedjan (ägarbeslut: fler providers är bättre).
 |---|---|
 | `.github/workflows/next-build.yml` | Ny workflow. `npm install` + `next build` på PR:er och push till main som rör appen |
 
+### ✅151. qa_snapshots växte ~12 MB i veckan — skärmdumpar flyttade till Supabase Storage – KLART
+
+Ägarrapport (okt 2026): `qa_snapshots` var 238 MB av databasens 417 MB (taket är 500 MB). `screenshot_b64` stod för 228 MB: 719 rader, 707 med en base64-PNG på i snitt 330 kB.
+
+**Orsak:** `agents/qa-observer.js` sparade varje måndag en base64-skärmdump för alla ~38 granskade sidor, och inget rensade dem. Bilderna läses bara av `/qa-tidslinje` och `/api/qa-tidslinje-gif`, och bara för 6 sidor. Vision-analysen gör man på den lokala PNG-filen under körningen, så den behöver ingen sparad kopia. De övriga ~32 sidornas bilder lästes aldrig.
+
+**Fix:**
+- Listan med tidslinjesidor ligger nu i `app/qa-tidslinje/sidor.json`, och både sidan och observatören läser den.
+- Observatören tar en extra JPEG (kvalitet 80) bara för de sidorna och laddar upp den till Storage-bucketen `qa-screenshots` (`{vecka}/{sida}.jpg`, bucketen skapas automatiskt). Raden får bara URL:en i en ny kolumn, `screenshot_url`. `screenshot_b64` skrivs inte längre.
+- Retention: bilder äldre än 52 veckor raderas ur Storage och deras `screenshot_url` nollas. Det ger högst ungefär 30–80 MB.
+- `/qa-tidslinje` och GIF-routen läser `screenshot_url` först och faller tillbaka på `screenshot_b64` för äldre rader.
+- Sidan bäddar inte längre in nya bilder som base64 i ISR-svaret.
+- Upserten använder nu `on_conflict=vecka,sida_path`. Tidigare saknades det, så en omkörning samma vecka gav 409.
+
+**Befintlig data rörs inte automatiskt.** `supabase_qa_snapshots_cleanup_MANUELL.sql` innehåller tre steg som körs för hand i SQL Editor:
+1. En förhandsgranskning.
+2. En `UPDATE` som nollar `screenshot_b64` för sidor som inte finns på tidslinjen, vilket frigör ungefär 190 MB. Metadata och tidslinjebilderna behålls.
+3. `vacuum full qa_snapshots`, som körs ensam för att faktiskt ge tillbaka diskutrymmet.
+
+**Inte ändrat:** RLS-policyerna på `qa_snapshots` tillåter fortfarande anon att skriva (`INSERT`/`UPDATE`). Det är ett separat härdningssteg.
+
+Kräver att `supabase_qa_snapshots_v3.sql` (kolumnen `screenshot_url`) körs innan koden driftsätts. Kräver också secreten `SUPABASE_SERVICE_ROLE_KEY` i `qa-observer.yml`, som nu skickas med. Utan den sparas bara metadata.
+
+| Fil | Roll |
+|---|---|
+| `agents/qa-observer.js` | Sparar JPEG i Storage för tidslinjesidorna, aldrig base64 i raden. Ny retention (`rensaGamlaSkarmdumpar()`), `on_conflict` på upserten |
+| `app/qa-tidslinje/sidor.json` | Ny, delad lista med tidslinjesidor |
+| `app/qa-tidslinje/page.js`, `TidslinjeVy.js` | Läser `screenshot_url`, med base64 som fallback |
+| `app/api/qa-tidslinje-gif/route.js` | Hämtar bilder från Storage-URL eller base64 |
+| `supabase/supabase_qa_snapshots_v3.sql` | Ny kolumn `screenshot_url` |
+| `supabase/supabase_qa_snapshots_cleanup_MANUELL.sql` | Manuell, granskad engångsrensning av gamla base64-bilder |
+| `.github/workflows/qa-observer.yml` | `SUPABASE_SERVICE_ROLE_KEY` i env |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

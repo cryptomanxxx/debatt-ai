@@ -829,7 +829,7 @@ export default function OmPage() {
             {[
               ["Playwright", "Öppnar varje sida i en headless Chromium-browser, väntar på networkidle + 2s, tar en viewport-skärmdump och fångar konsolfel."],
               ["Vision-LLM", "Skärmdumpen skickas som base64 till Gemini 2.0 Flash. Modellen svarar med STATUS (OK/VARNING/FEL), ORSAK och DETALJ. Groq används som fallback om Gemini saknas eller är otillgänglig."],
-              ["Supabase-historik", "Varje körning sparar status, orsak och skärmdump (base64) per sida i tabellen qa_snapshots med ISO-vecka som nyckel (UNIQUE på vecka + sida). Diff mot föregående vecka visas i rapporten."],
+              ["Supabase-historik", "Varje körning sparar status och orsak per sida i tabellen qa_snapshots med ISO-vecka som nyckel (UNIQUE på vecka + sida). Skärmdumpar sparas i Supabase Storage för sidorna på QA-tidslinjen. Diff mot föregående vecka visas i rapporten."],
               ["Rapport", "Markdownfil sparas i ai-bus/discussions/ och committas till repot — synlig i Claude Code-sessioner och GitHub-historiken."],
               ["Schema", "Kör varje måndag 10:00 svensk tid via .github/workflows/qa-observer.yml. Kan triggas manuellt med valfri BASE_URL."],
             ].map(([titel, text]) => (
@@ -2737,7 +2737,7 @@ export default function OmPage() {
               ["25 sidor per vecka", "Varje måndag screenshottas alla kritiska sidor: startsidan, arkiv, parlament, ekonomi, börsen, oligarkirisk, m.fl."],
               ["Vision-LLM-analys", "Groq Llama 4 Scout / Gemini analyserar varje screenshot och rapporterar status OK/VARNING/FEL med orsak och antal konsol-fel."],
               ["Historisk jämförelse", "Bläddra bakåt i tid och se exakt hur sidan såg ut under en specifik vecka — useful för att spåra när ett UI-problem uppstod."],
-              ["Supabase-lagring", "Screenshots sparas som base64-PNG i qa_snapshots-tabellen, indexerade på (vecka, sida_path). Max ett snapshot per sida per vecka."],
+              ["Supabase-lagring", "Screenshots sparas som JPEG i Supabase Storage och länkas från qa_snapshots-tabellen (vecka, sida_path). Max ett snapshot per sida per vecka, äldre än ett år raderas."],
             ].map(([k, v]) => (
               <div key={k} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: "6px", padding: "16px" }}>
                 <p style={{ fontSize: "11px", color: C.green, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", margin: "0 0 6px", fontFamily: "monospace" }}>{k}</p>

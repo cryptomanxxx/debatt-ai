@@ -24,9 +24,9 @@ export async function GET(req) {
   const r = await fetch(
     `${SB_URL}/rest/v1/qa_snapshots` +
     `?sida_path=eq.${encodeURIComponent(path)}` +
-    `&screenshot_b64=not.is.null` +
+    `&or=(screenshot_url.not.is.null,screenshot_b64.not.is.null)` +
     `&order=vecka.asc` +
-    `&select=vecka,screenshot_b64,status`,
+    `&select=vecka,screenshot_url,screenshot_b64,status`,
     { headers: { apikey: key, Authorization: `Bearer ${key}` } }
   ).catch(() => null);
 
@@ -44,7 +44,16 @@ export async function GET(req) {
   const frames = [];
   for (const row of rows) {
     try {
-      const buf = Buffer.from(row.screenshot_b64, "base64");
+      // Nya rader har bilden i Supabase Storage, äldre som base64 i raden.
+      let buf;
+      if (row.screenshot_url) {
+        if (!row.screenshot_url.startsWith(`${SB_URL}/storage/v1/object/public/`)) continue;
+        const bildRes = await fetch(row.screenshot_url);
+        if (!bildRes.ok) continue;
+        buf = Buffer.from(await bildRes.arrayBuffer());
+      } else {
+        buf = Buffer.from(row.screenshot_b64, "base64");
+      }
       const rgba = await sharp(buf)
         .resize(GIF_WIDTH, GIF_HEIGHT, { fit: "cover", position: "top" })
         .ensureAlpha()

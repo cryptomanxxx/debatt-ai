@@ -10,12 +10,20 @@
  *   (Llama 4 Scout deprecerades 2026-06-25, Maverick stängdes 2026-03-09).
  *
  * Sparar resultat till Supabase (qa_snapshots) för veckovis jämförelse.
+ * Skärmdumpar sparas bara för sidorna på /qa-tidslinje (app/qa-tidslinje/
+ * sidor.json), som JPEG i Supabase Storage (bucket qa-screenshots), och
+ * raden får bara URL:en (screenshot_url). Tidigare sparades varje sidas
+ * skärmdump som base64 i screenshot_b64, vilket fick tabellen att växa
+ * med ~12 MB i veckan utan att de flesta bilderna någonsin lästes.
+ * Skärmdumpar äldre än SKARMDUMP_RETENTION_VECKOR raderas ur Storage.
  * Hämtar föregående veckas data och visar diff: "förra veckan OK → nu FEL".
  *
  * Kräver:
  *   GEMINI_API_KEY          — primär vision-provider (GitHub Secret)
  *   GROQ_API_KEY            — fallback vision-provider (GitHub Secret)
  *   SUPABASE_ANON_KEY       — valfritt, aktiverar historik (GitHub Secret)
+ *   SUPABASE_SERVICE_ROLE_KEY — valfritt, krävs för att spara skärmdumpar
+ *                             i Storage (utan den sparas bara metadata)
  *   BASE_URL                — valfritt, default https://www.debatt-ai.se
  *
  * Kör lokalt:
@@ -29,6 +37,17 @@ const crypto = require("crypto");
 const GROQ_KEY     = process.env.GROQ_API_KEY;
 const GEMINI_KEY   = process.env.GEMINI_API_KEY;
 const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const SB_WRITE_KEY = SB_SERVICE_KEY || SB_KEY;
+const SB_HOST      = "fmwxftnistkoqazfwnuj.supabase.co";
+const BUCKET       = "qa-screenshots";
+// Skärmdumpar äldre än så här raderas ur Storage (6 sidor × 52 veckor
+// × ~100–250 kB ≈ högst 30–80 MB). Rör bara screenshot_url, aldrig de
+// gamla base64-bilderna i screenshot_b64.
+const SKARMDUMP_RETENTION_VECKOR = 52;
+const TIDSLINJE_SIDOR = new Set(
+  require("../app/qa-tidslinje/sidor.json").map((s) => s.path)
+);
 const BASE_URL     = (process.env.BASE_URL || "https://www.debatt-ai.se").replace(/\/$/, "");
 const SUMMARY_FILE = process.env.GITHUB_STEP_SUMMARY;
 const DISCUSSIONS  = path.join(__dirname, "../ai-bus/discussions");
@@ -153,27 +172,118 @@ function httpsGet(host, urlPath, headers) {
   });
 }
 
+function httpsRaw(method, urlPath, headers, body) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      { hostname: SB_HOST, path: urlPath, method,
+        headers: { ...headers, ...(body ? { "Content-Length": body.length } : {}) } },
+      (res) => {
+        let buf = "";
+        res.on("data", (c) => (buf += c));
+        res.on("end", () => resolve({ status: res.statusCode, body: buf }));
+      }
+    );
+    req.on("error", reject);
+    req.setTimeout(60000, () => { req.destroy(new Error(`${method} timeout`)); });
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
 // ── Supabase helpers ────────────────────────────────────────────────────────────────────
 function sbHeaders() {
   return {
-    apikey: SB_KEY,
-    Authorization: `Bearer ${SB_KEY}`,
+    apikey: SB_WRITE_KEY,
+    Authorization: `Bearer ${SB_WRITE_KEY}`,
     "Content-Type": "application/json",
     Prefer: "resolution=merge-duplicates",
   };
 }
 
 async function sparaSnapshot(rad) {
-  if (!SB_KEY) return;
+  if (!SB_WRITE_KEY) return;
   try {
-    await httpsPost(
-      "fmwxftnistkoqazfwnuj.supabase.co",
-      "/rest/v1/qa_snapshots",
+    const res = await httpsPost(
+      SB_HOST,
+      "/rest/v1/qa_snapshots?on_conflict=vecka,sida_path",
       sbHeaders(),
       rad
     );
+    if (res.status >= 300) {
+      console.error(`  ⚠ Kunde inte spara snapshot: HTTP ${res.status} ${JSON.stringify(res.body).slice(0, 160)}`);
+    }
   } catch (e) {
     console.error(`  ⚠ Kunde inte spara snapshot till Supabase: ${e.message}`);
+  }
+}
+
+function storageHeaders(extra = {}) {
+  return { apikey: SB_SERVICE_KEY, Authorization: `Bearer ${SB_SERVICE_KEY}`, ...extra };
+}
+
+async function skapaBucket() {
+  const body = Buffer.from(JSON.stringify({ id: BUCKET, name: BUCKET, public: true }));
+  const res = await httpsRaw("POST", "/storage/v1/bucket",
+    storageHeaders({ "Content-Type": "application/json" }), body);
+  console.log(`  [storage] skapa bucket ${BUCKET}: HTTP ${res.status}`);
+}
+
+// Laddar upp en JPEG-skärmdump och returnerar dess publika URL, eller null.
+async function laddaUppSkarmdump(vecka, sidaPath, buf) {
+  if (!SB_SERVICE_KEY || !buf) return null;
+  const fil = `${vecka}/${sidaPath.replace(/\//g, "_") || "_"}.jpg`;
+  const ladda = () => httpsRaw("PUT", `/storage/v1/object/${BUCKET}/${fil}`,
+    storageHeaders({ "Content-Type": "image/jpeg", "x-upsert": "true" }), buf);
+  try {
+    let res = await ladda();
+    if (res.status === 400 || res.status === 404) {
+      await skapaBucket();
+      res = await ladda();
+    }
+    if (res.status >= 300) {
+      console.error(`  ⚠ Skärmdump-uppladdning misslyckades: HTTP ${res.status} ${res.body.slice(0, 160)}`);
+      return null;
+    }
+    // ?v= så att en omkörning samma vecka inte visar en cachad äldre bild
+    return `https://${SB_HOST}/storage/v1/object/public/${BUCKET}/${fil}?v=${Date.now()}`;
+  } catch (e) {
+    console.error(`  ⚠ Skärmdump-uppladdning fel: ${e.message}`);
+    return null;
+  }
+}
+
+// Raderar skärmdumpar äldre än SKARMDUMP_RETENTION_VECKOR ur Storage och
+// nollar deras screenshot_url. Metadata-raderna (status, orsak, detalj)
+// behålls, och screenshot_b64 rörs aldrig.
+async function rensaGamlaSkarmdumpar() {
+  if (!SB_SERVICE_KEY) return;
+  const gräns = isoVecka(new Date(Date.now() - SKARMDUMP_RETENTION_VECKOR * 7 * 86400000));
+  const rader = await httpsGet(SB_HOST,
+    `/rest/v1/qa_snapshots?screenshot_url=not.is.null&vecka=lt.${gräns}&select=id,screenshot_url&limit=500`,
+    storageHeaders());
+  if (!Array.isArray(rader) || rader.length === 0) return;
+  const prefix = `/storage/v1/object/public/${BUCKET}/`;
+  const filer = rader
+    .map((r) => r.screenshot_url.split("?")[0])
+    .filter((u) => u.includes(prefix))
+    .map((u) => u.slice(u.indexOf(prefix) + prefix.length));
+  try {
+    if (filer.length > 0) {
+      const res = await httpsRaw("DELETE", `/storage/v1/object/${BUCKET}`,
+        storageHeaders({ "Content-Type": "application/json" }),
+        Buffer.from(JSON.stringify({ prefixes: filer })));
+      if (res.status >= 300) {
+        console.error(`  ⚠ Kunde inte radera gamla skärmdumpar: HTTP ${res.status}`);
+        return;
+      }
+    }
+    const ids = rader.map((r) => r.id).join(",");
+    const res = await httpsRaw("PATCH", `/rest/v1/qa_snapshots?id=in.(${ids})`,
+      storageHeaders({ "Content-Type": "application/json", Prefer: "return=minimal" }),
+      Buffer.from(JSON.stringify({ screenshot_url: null })));
+    console.log(`  🧹 Raderade ${filer.length} skärmdumpar äldre än ${gräns} (HTTP ${res.status})`);
+  } catch (e) {
+    console.error(`  ⚠ Rensning av gamla skärmdumpar misslyckades: ${e.message}`);
   }
 }
 
@@ -182,7 +292,7 @@ async function hämtaFörraVeckan(vecka) {
   const prev = föregåendeVecka(vecka);
   try {
     const rows = await httpsGet(
-      "fmwxftnistkoqazfwnuj.supabase.co",
+      SB_HOST,
       `/rest/v1/qa_snapshots?vecka=eq.${prev}&select=sida_path,status,orsak,detalj`,
       { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
     );
@@ -358,8 +468,14 @@ async function kör() {
     }
 
     const skärmdumpPath = path.join(tmpDir, `${sida.path.replace(/\//g, "_") || "hem"}.png`);
+    let tidslinjeBild = null;
     try {
       await page.screenshot({ path: skärmdumpPath, fullPage: false });
+      // Sidorna på /qa-tidslinje får en sparad JPEG (mindre än PNG:en,
+      // som bara används för vision-analysen och sedan slängs)
+      if (TIDSLINJE_SIDOR.has(sida.path) && !laddningsfel) {
+        tidslinjeBild = await page.screenshot({ type: "jpeg", quality: 80, fullPage: false });
+      }
     } catch (e) {
       console.error(`  ⚠ Kunde inte ta skärmdump för ${sida.path}: ${e.message}`);
     }
@@ -400,7 +516,8 @@ async function kör() {
       ? `[h:${htmlHash}] ${analys.detalj.replace(/^\[h:[a-f0-9]{32}\] /, "")}`
       : analys.detalj;
 
-    sparaSnapshot({
+    const screenshotUrl = await laddaUppSkarmdump(vecka, sida.path, tidslinjeBild);
+    await sparaSnapshot({
       vecka,
       sida_path:          sida.path,
       sida_namn:          sida.namn,
@@ -409,13 +526,14 @@ async function kör() {
       detalj:             detaljMedHash,
       konsol_fel_antal:   konsolfEl.length,
       konsol_fel_exempel: konsolfEl.slice(0, 3),
-      screenshot_b64:     fs.existsSync(skärmdumpPath)
-                            ? fs.readFileSync(skärmdumpPath).toString("base64")
-                            : null,
+      // Bara när en ny bild faktiskt laddats upp, så att en misslyckad
+      // omkörning samma vecka inte nollar en redan sparad URL
+      ...(screenshotUrl ? { screenshot_url: screenshotUrl } : {}),
     });
   }
 
   await browser.close();
+  await rensaGamlaSkarmdumpar();
 
   // ── Hämta diff ────────────────────────────────────────────────────────────────────────────
   const diff     = byggDiff(resultat, förra);

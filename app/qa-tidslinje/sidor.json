@@ -1,0 +1,8 @@
+[
+  { "path": "/dynamik",  "namn": "Agentdynamik" },
+  { "path": "/oligarki", "namn": "Oligarkirisk" },
+  { "path": "/kompass",  "namn": "Ideologisk kompass" },
+  { "path": "/partier",  "namn": "Politiska partier" },
+  { "path": "/trust",    "namn": "Förtroendegraf" },
+  { "path": "/bors",     "namn": "Kryptobörsen" }
+]
