@@ -18,21 +18,24 @@ const STATUSAR = ["ok", "rate_limited", "timeout", "error"];
 
 // Samma 7-dagarsfönster som provider_benchmark.py → hamta_produktion_ok_rate_7d().
 // PostgREST begränsar svaret till 1000 rader, så raderna hämtas i sidor.
+// Sidorna följer id nedåt (keyset): rader som skrivs medan hämtningen pågår
+// får högre id och kan inte flytta sidgränserna, vilket offset hade gjort.
 async function hamtaRader(sedan) {
   const rader = [];
-  let avkortad = false;
+  let sistaId = null;
   for (let sida = 0; sida < MAX_SIDOR; sida++) {
-    const url = `${SB_URL}/rest/v1/ai_log?select=ts,provider,source,status,latency_ms`
-      + `&ts=gte.${encodeURIComponent(sedan)}&order=ts.desc,id.desc`
-      + `&limit=${SIDSTORLEK}&offset=${sida * SIDSTORLEK}`;
+    const url = `${SB_URL}/rest/v1/ai_log?select=id,ts,provider,source,status,latency_ms`
+      + `&ts=gte.${encodeURIComponent(sedan)}`
+      + (sistaId != null ? `&id=lt.${sistaId}` : "")
+      + `&order=id.desc&limit=${SIDSTORLEK}`;
     const res = await fetch(url, { headers: HEADERS, next: { revalidate: 1800 } });
     if (!res.ok) throw new Error(`ai_log ${res.status}`);
     const batch = await res.json();
     rader.push(...batch);
-    if (batch.length < SIDSTORLEK) return { rader, avkortad };
-    if (sida === MAX_SIDOR - 1) avkortad = true;
+    if (batch.length < SIDSTORLEK) return { rader, avkortad: false };
+    sistaId = batch[batch.length - 1].id;
   }
-  return { rader, avkortad };
+  return { rader, avkortad: true };
 }
 
 async function hamtaRanking() {
@@ -63,7 +66,16 @@ function percentil(sorterad, p) {
 
 function tomStatus() { return { ok: 0, rate_limited: 0, timeout: 0, error: 0 }; }
 
-function aggregera(rader) {
+// Alla dagar i fönstret, så att en dag helt utan anrop syns i graferna
+// istället för att axeln hoppar över den.
+function allaDagar(sedan) {
+  const dagar = new Set();
+  for (let t = new Date(sedan).getTime(); t <= Date.now(); t += 3600000) dagar.add(dagNyckel(new Date(t).toISOString()));
+  dagar.add(dagNyckel(new Date().toISOString()));
+  return dagar;
+}
+
+function aggregera(rader, sedan) {
   const provider = new Map();
   const kalla = new Map();
   const dagStatus = new Map();
@@ -116,8 +128,8 @@ function aggregera(rader) {
     return { namn, totalt, okAndel: totalt ? o.ok / totalt : null, huvudprovider: huvud ? huvud[0] : null };
   }).sort((a, b) => b.totalt - a.totalt).slice(0, 15);
 
-  const dagar = [...dagStatus.keys()].sort();
-  const daglig = dagar.map(d => ({ dag: d.slice(5), ...dagStatus.get(d) }));
+  const dagar = [...new Set([...allaDagar(sedan), ...dagStatus.keys()])].sort();
+  const daglig = dagar.map(d => ({ dag: d.slice(5), ...(dagStatus.get(d) || tomStatus()) }));
 
   const providerNamn = perProvider.map(p => p.namn);
   const dagligOk = dagar.map(d => {
@@ -145,7 +157,7 @@ export default async function AiStatistikPage() {
   let fel = null;
   try {
     const { rader, avkortad } = await hamtaRader(sedan);
-    data = { ...aggregera(rader), avkortad, dagar: DAGAR };
+    data = { ...aggregera(rader, sedan), avkortad, dagar: DAGAR };
   } catch (e) {
     // Vid en bakgrundsregenerering kastas felet vidare, så att ISR behåller den
     // senaste fungerande sidan istället för att cacha en felsida i 30 minuter.
