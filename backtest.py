@@ -195,9 +195,12 @@ def backtesta(data, btc_uptrend, exit_days, vol_threshold,
     }
 
 
-def spara(symbol, strategi, res, vol_threshold, lookback,
-          stoploss_pct, tc_pct, regime_filter) -> bool:
-    row = {
+SPARA_BATCH_STORLEK = 50
+
+
+def bygg_rad(symbol, strategi, res, vol_threshold, lookback,
+             stoploss_pct, tc_pct, regime_filter) -> dict:
+    return {
         "symbol":                  symbol,
         "strategi":                strategi,
         "period_start":            res["period_start"],
@@ -218,20 +221,37 @@ def spara(symbol, strategi, res, vol_threshold, lookback,
         "regim_filter":            regime_filter,
         "kord":                    datetime.now(timezone.utc).isoformat(),
     }
+
+
+def spara_batch(rader: list[dict]) -> int:
+    """Upsertar raderna i omgångar om SPARA_BATCH_STORLEK per anrop.
+
+    Tidigare gjordes ett POST-anrop per parameterkombination (216 per mynt),
+    vilket gav runt 1000 rader/dag i Supabase API Gateway-loggen. Alla rader
+    har samma nycklar, vilket PostgREST kräver för en array-upsert.
+    Returnerar antalet rader som inte gick att spara."""
     headers = {
         "apikey":        SB_WRITE_KEY,
         "Authorization": f"Bearer {SB_WRITE_KEY}",
         "Content-Type":  "application/json",
         "Prefer":        "resolution=merge-duplicates,return=minimal",
     }
-    r = httpx.post(
-        f"{SB_URL}/rest/v1/backtest_resultat?on_conflict=symbol,strategi",
-        json=row, headers=headers, timeout=15,
-    )
-    if r.status_code not in (200, 201, 204):
-        print(f"    ✗ Sparfel: {r.status_code} {r.text[:80]}", file=sys.stderr)
-        return False
-    return True
+    misslyckade = 0
+    for i in range(0, len(rader), SPARA_BATCH_STORLEK):
+        omgang = rader[i:i + SPARA_BATCH_STORLEK]
+        try:
+            r = httpx.post(
+                f"{SB_URL}/rest/v1/backtest_resultat?on_conflict=symbol,strategi",
+                json=omgang, headers=headers, timeout=30,
+            )
+        except httpx.HTTPError as e:
+            print(f"    ✗ Sparfel ({len(omgang)} rader): {e}", file=sys.stderr)
+            misslyckade += len(omgang)
+            continue
+        if r.status_code not in (200, 201, 204):
+            print(f"    ✗ Sparfel ({len(omgang)} rader): {r.status_code} {r.text[:80]}", file=sys.stderr)
+            misslyckade += len(omgang)
+    return misslyckade
 
 
 def main():
@@ -271,7 +291,7 @@ def main():
 
         basta_alpha    = float("-inf")
         basta_strategi = ""
-        sparade        = 0
+        rader          = []
 
         for exit_d, vol_t, lb, sl, tc, rf in PARAM_GRID:
             sid     = strategi_id(exit_d, vol_t, lb, sl, tc, rf)
@@ -279,10 +299,7 @@ def main():
             res     = backtesta(data, uptrend, exit_d, vol_t, lb, sl, tc, rf)
             if res is None:
                 continue
-            if spara(symbol, sid, res, vol_t, lb, sl, tc, rf):
-                sparade += 1
-            else:
-                sparfel_totalt += 1
+            rader.append(bygg_rad(symbol, sid, res, vol_t, lb, sl, tc, rf))
 
             tot   = res.get("total_avkastning") or 0
             bh    = res.get("buyhold_avkastning") or 0
@@ -291,6 +308,9 @@ def main():
                 basta_alpha    = alpha
                 basta_strategi = sid
 
+        misslyckade     = spara_batch(rader)
+        sparfel_totalt += misslyckade
+        sparade         = len(rader) - misslyckade
         print(f"  ✓ {sparade} sparade — "
               f"bästa alpha: {basta_strategi} ({basta_alpha:+.0f}pp vs B&H)")
 
