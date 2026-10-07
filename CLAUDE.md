@@ -4559,13 +4559,13 @@ Följd av ✅144. `provider_benchmark.py` rankar providers främst på deras fak
 
 **Färger:** status (ok/429/timeout/fel) använder reserverade statusfärger med etikett. Providers har en fast färg per namn, validerad med dataviz-validatorn mot sajtens mörka bakgrund. Okända providers blir grå. Legendtext är neutral. `itemSorter: null` behövs eftersom Recharts 3 annars sorterar legenden alfabetiskt.
 
-**Observera:** Python-skripten loggar `mistral` och Vercel-routarna `codestral` för samma leverantör. Sidan visar dem som de står i tabellen, samma namn som benchmarken räknar med. Data före 7 oktober 2026 är ofullständig (se ✅145), vilket sidan själv nämner.
+**Mistral under två namn:** Python-skripten loggar `mistral` och Vercel-routarna `codestral` för samma leverantör. Sidan slår ihop dem till `mistral` med samma alias som `provider_benchmark.py` (`_PROVIDER_ALIAS`), så att Mistral inte syns som två providers. Det som skrivs till `ai_log` är oförändrat, eftersom admin-panelen och `ai-performance-observer.js` läser namnet `codestral`. Data före 7 oktober 2026 är ofullständig (se ✅145), vilket sidan själv nämner.
 
 | Fil | Roll |
 |---|---|
 | `app/ai-statistik/page.js` | SSR med ISR (1800 s). Pagerad hämtning av `ai_log`, `aggregera()` räknar ihop allt på servern, `provider_config` för rankingen |
 | `app/ai-statistik/AiStatistikVy.js` | Klientkomponent: statusrutor, fallback-ordning, tre Recharts-grafer, två tabeller |
-| `app/GlobalNav.js`, `app/layout.js` | Länk "AI-statistik" (Spel & Mer-gruppen och footern) |
+| `app/GlobalNav.js`, `app/layout.js` | Länk "AI-statistik" (Spel & Mer-gruppen och footern, där den ligger i alfabetisk ordning efter AI-Parlamentet; AI-Straffspelet flyttades samtidigt till rätt plats) |
 
 ## Kontext om projektet
 

@@ -64,6 +64,13 @@ function percentil(sorterad, p) {
   return sorterad[i];
 }
 
+// Python-skripten loggar Mistral som "mistral", Vercel-routerna som "codestral".
+// Samma leverantör, så de räknas ihop, på samma sätt som provider_benchmark.py
+// (_PROVIDER_ALIAS). Det som skrivs till ai_log ändras inte, eftersom
+// admin-panelen och ai-performance-observer läser namnet "codestral".
+const PROVIDER_ALIAS = { codestral: "mistral", github: "github_models" };
+const normProvider = (p) => PROVIDER_ALIAS[p] || p || "okänd";
+
 function tomStatus() { return { ok: 0, rate_limited: 0, timeout: 0, error: 0 }; }
 
 // Alla dagar i fönstret, så att en dag helt utan anrop syns i graferna
@@ -84,7 +91,7 @@ function aggregera(rader, sedan) {
   const allaLatens = [];
 
   for (const r of rader) {
-    const p = r.provider || "okänd";
+    const p = normProvider(r.provider);
     const s = normStatus(r.status);
     const dag = dagNyckel(r.ts);
     total[s]++;
