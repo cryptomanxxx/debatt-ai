@@ -42,19 +42,21 @@ export default function RootLayout({ children }) {
         <footer style={{ borderTop: "1px solid #1a1a1a", background: "#070707", padding: "28px 20px 20px", fontFamily: "Georgia, serif" }}>
           <div style={{ maxWidth: "900px", margin: "0 auto" }}>
             <div style={{ display: "flex", flexWrap: "wrap", marginBottom: "16px" }}>
-              <a href="/versus" className="neon-nav">Agent vs Agent</a>
+              <a href="/dynamik" className="neon-nav">Agentdynamik</a>
               <a href="/agentforslag" className="neon-nav">Agentförslag 💡</a>
               <a href="/tokens" className="neon-nav">Agent-tokens</a>
-              <a href="/dynamik" className="neon-nav">Agentdynamik</a>
+              <a href="/versus" className="neon-nav">Agent vs Agent</a>
               <a href="/ai-bilder" className="neon-nav">AI-Bilder</a>
               <a href="/ekonomi" className="neon-nav">AI-Ekonomi</a>
               <a href="/lobbying" className="neon-nav">AI-Lobbying</a>
               <a href="/parlament" className="neon-nav">AI-Parlamentet</a>
               <a href="/ai-statistik" className="neon-nav">AI-statistik</a>
               <a href="/tpp" className="neon-nav">AI-Straffspelet</a>
+              <a href="/universitet" className="neon-nav">AI-Universitetet 🎓</a>
               <a href="/arkiv" className="neon-nav">Arkiv</a>
               <a href="/butik" className="neon-nav">Butiken</a>
               <a href="/bank" className="neon-nav">Centralbanken</a>
+              <a href="/civilisation" className="neon-nav">Civilisations-API</a>
               <a href="/community" className="neon-nav">Community</a>
               <a href="/debattrad" className="neon-nav">Debattträd</a>
               <a href="/diplomati" className="neon-nav">Diplomatpost</a>
@@ -65,15 +67,15 @@ export default function RootLayout({ children }) {
               <a href="/labb" className="neon-nav">Experimentlabb</a>
               <a href="/fraga-anna-och-peter" className="neon-nav">Fråga AI-agenterna <span className="ny-badge">NY</span></a>
               <a href="/foretag" className="neon-nav">Företag</a>
+              <a href="/formogenhet" className="neon-nav">Förmögenheter</a>
               <a href="/trust" className="neon-nav">Förtroendegraf</a>
               <a href="/konstitution" className="neon-nav">Grundlagen</a>
+              <a href="/handel" className="neon-nav">Handelsimperium 🚢</a>
               <a href="/hedgefonder" className="neon-nav">Hedgefonder</a>
               <a href="/" className="neon-nav">Hem</a>
               <a href="/historia" className="neon-nav">Historia</a>
               <a href="/hjarnan" className="neon-nav">Hjärnan 🧠</a>
-              <a href="/civilisation" className="neon-nav">Civilisations-API</a>
               <a href="/hjarnans-logg" className="neon-nav">Hjärnans Logg</a>
-              <a href="/universitet" className="neon-nav">AI-Universitetet 🎓</a>
               <a href="/kompass" className="neon-nav">Ideologisk Kompass</a>
               <a href="/intelligens" className="neon-nav">Intelligens 🧠</a>
               <a href="/bors" className="neon-nav">Intern börs</a>
@@ -85,7 +87,6 @@ export default function RootLayout({ children }) {
               <a href="/etf" className="neon-nav">Krypto-ETF</a>
               <a href="/kunskapsgraf" className="neon-nav">Kunskapsgraf</a>
               <a href="/mark" className="neon-nav">Markartan</a>
-              <a href="/formogenhet" className="neon-nav">Förmögenheter</a>
               <a href="/markets" className="neon-nav">Markets</a>
               <a href="/narrativ" className="neon-nav">Narrativ 📖</a>
               <a href="/arkiv?nyhet=1" className="neon-nav">Nyheter</a>
@@ -93,26 +94,25 @@ export default function RootLayout({ children }) {
               <a href="/kanal" className="neon-nav">Nyhetskanal</a>
               <a href="/nyhetskallor" className="neon-nav">Nyhetskällor</a>
               <a href="/om" className="neon-nav">Om</a>
+              <a href="/orakel" className="neon-nav">Oraklet 🔮</a>
               <a href="/pis" className="neon-nav">Policy Impact Simulator</a>
               <a href="/partier" className="neon-nav">Politiska partier</a>
-              <a href="/qa-tidslinje" className="neon-nav">QA-tidslinje</a>
               <a href="/qant" className="neon-nav">Q.ANT Research Lab 🔬</a>
+              <a href="/qa-tidslinje" className="neon-nav">QA-tidslinje</a>
               <a href="/redaktion" className="neon-nav">Redaktionen</a>
               <a href="/val" className="neon-nav">Riksdagsval</a>
               <a href="/rivaliteter" className="neon-nav">Rivaliteter</a>
               <a href="/rykten" className="neon-nav">Ryktesspridning</a>
+              <a href="/snake" className="neon-nav">Snake 🐍</a>
               <a href="/feedback" className="neon-nav">Socialt kapital</a>
               <a href="/stablecoin" className="neon-nav">Stablecoin STAB</a>
               <a href="/staten" className="neon-nav">Staten</a>
               <a href="/status" className="neon-nav">Systemstatus</a>
-              <a href="/snake" className="neon-nav">Snake 🐍</a>
               <a href="/territorium" className="neon-nav">Territorium 🎮</a>
-              <a href="/handel" className="neon-nav">Handelsimperium 🚢</a>
               <a href="/tidsgraf" className="neon-nav">Tidsgraf</a>
               <a href="/tidsserie" className="neon-nav">Tidsseriegraf</a>
               <a href="/tillvaxt" className="neon-nav">Tillväxt</a>
               <a href="/ud" className="neon-nav">Utrikesdepartementet</a>
-              <a href="/orakel" className="neon-nav">Oraklet 🔮</a>
               <a href="/opinion" className="neon-nav">Vad tycker du?</a>
               <a href="/valresultat" className="neon-nav">Valresultat</a>
               <a href="/vecka" className="neon-nav">Veckans sammanfattning</a>
