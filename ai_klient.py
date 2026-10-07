@@ -20,6 +20,8 @@ import httpx
 import os
 import time
 import threading
+import atexit
+from datetime import datetime, timezone
 
 # Providers som misslyckats permanent under denna körning (TPD, saknad nyckel, etc.)
 # Återställs automatiskt nästa gång agent.py startas (ny process = nytt minne).
@@ -95,35 +97,111 @@ def logga_429_passivt(provider: str) -> None:
     threading.Thread(target=_post, daemon=True).start()
 
 
-def _logga_ai_anrop(provider: str, source: str, status: str, latency_ms: int) -> None:
-    """Loggar ett AI-anrop till ai_log-tabellen i bakgrunden (fire-and-forget).
+_AI_LOG_BUFFERT: list[dict] = []
+_AI_LOG_LAS = threading.Lock()
+_AI_LOG_BATCH_STORLEK = 50
+# Tak för bufferten om Supabase är nere länge: äldst faller bort först.
+_AI_LOG_MAX_BUFFERT = 1000
+# Buffertstorlek som utlöser nästa skickning. Höjs med en omgång efter ett
+# misslyckande så att inte varje nytt AI-anrop väntar på en nere Supabase.
+_ai_log_nasta_skick = _AI_LOG_BATCH_STORLEK
 
-    ai_log saknar anon-skrivpolicy (RLS) — service role krävs för att skriva.
-    Utan SUPABASE_SERVICE_ROLE_KEY hoppas loggningen över helt. En anon-
-    fallback nekades alltid (42501) och gav bara en felrad i Supabase-loggen
-    per AI-anrop, cirka 230 per dygn från workflows utan secreten.
+
+def _skicka_ai_log(rader: list[dict]) -> bool:
+    """Skickar en lista ai_log-rader i ett enda anrop (JSON-array).
+
+    Ett anrop ger en rad i Supabase API Gateway-loggen oavsett hur många
+    ai_log-rader det innehåller. Alla rader har samma nycklar, vilket
+    PostgREST kräver för en array-insert. Returnerar True vid 2xx-svar.
     """
     sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-    if not sb_key:
+    if not sb_key or not rader:
+        return True
+    try:
+        res = httpx.post(
+            f"{_SB_URL}/rest/v1/ai_log",
+            headers={
+                "apikey": sb_key,
+                "Authorization": f"Bearer {sb_key}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+            json=rader,
+            timeout=10,
+        )
+        return 200 <= res.status_code < 300
+    except Exception:
+        return False
+
+
+def _lagg_tillbaka(rader: list[dict]) -> None:
+    """Lägger tillbaka en misslyckad omgång först i bufferten.
+
+    Annars försvinner rader just när Supabase eller nätverket krånglar, vilket
+    snedvrider statistiken. Nästa omgång (eller avslutet) försöker igen.
+    """
+    global _ai_log_nasta_skick
+    with _AI_LOG_LAS:
+        _AI_LOG_BUFFERT[:0] = rader
+        _ai_log_nasta_skick = len(_AI_LOG_BUFFERT) + _AI_LOG_BATCH_STORLEK
+        overskott = len(_AI_LOG_BUFFERT) - _AI_LOG_MAX_BUFFERT
+        if overskott > 0:
+            del _AI_LOG_BUFFERT[:overskott]
+
+
+def _toem_ai_log() -> None:
+    """Skickar allt som ligger i bufferten. Körs vid processens slut (atexit).
+
+    Ett misslyckat försök görs om en gång innan raderna ges upp.
+    Sover inte före första försöket och högst 1 s mellan försöken.
+    """
+    with _AI_LOG_LAS:
+        rader = _AI_LOG_BUFFERT[:]
+        _AI_LOG_BUFFERT.clear()
+    for _ in range(2):
+        if _skicka_ai_log(rader):
+            return
+        time.sleep(1)
+
+
+atexit.register(_toem_ai_log)
+
+
+def _logga_ai_anrop(provider: str, source: str, status: str, latency_ms: int) -> None:
+    """Lägger ett AI-anrop i bufferten för ai_log.
+
+    Raderna skickas i omgångar om _AI_LOG_BATCH_STORLEK och resten när
+    processen avslutas (atexit), istället för ett anrop per AI-anrop. Det ger
+    färre rader i Supabase-loggen och inga tappade rader när skriptet slutar
+    (de tidigare daemon-trådarna kunde dödas innan de hunnit skicka). ts sätts
+    här, vid anropet, så att tidsfönstren i provider_benchmark.py stämmer
+    även om raden skickas senare.
+
+    ai_log saknar anon-skrivpolicy (RLS) — service role krävs för att skriva.
+    Utan SUPABASE_SERVICE_ROLE_KEY hoppas loggningen över helt.
+    """
+    global _ai_log_nasta_skick
+    if not os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""):
         return
 
-    def _post():
-        try:
-            httpx.post(
-                f"{_SB_URL}/rest/v1/ai_log",
-                headers={
-                    "apikey": sb_key,
-                    "Authorization": f"Bearer {sb_key}",
-                    "Content-Type": "application/json",
-                    "Prefer": "return=minimal",
-                },
-                json={"provider": provider, "source": source, "status": status, "latency_ms": latency_ms},
-                timeout=5,
-            )
-        except Exception:
-            pass
-
-    threading.Thread(target=_post, daemon=True).start()
+    rad = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "provider": provider,
+        "source": source,
+        "status": status,
+        "latency_ms": latency_ms,
+    }
+    att_skicka = None
+    with _AI_LOG_LAS:
+        _AI_LOG_BUFFERT.append(rad)
+        if len(_AI_LOG_BUFFERT) >= _ai_log_nasta_skick:
+            att_skicka = _AI_LOG_BUFFERT[:]
+            _AI_LOG_BUFFERT.clear()
+    if att_skicka:
+        if _skicka_ai_log(att_skicka):
+            _ai_log_nasta_skick = _AI_LOG_BATCH_STORLEK
+        else:
+            _lagg_tillbaka(att_skicka)
 
 
 _SKIP_PHRASES = (
