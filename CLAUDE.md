@@ -4515,6 +4515,17 @@ Supabase-loggarna för ett dygn (okt 2026) visade cirka 930 anrop mot `/rest/v1/
 |---|---|
 | `backtest.py` | `bygg_rad()` + `spara_batch()` ersätter `spara()`. `main()` samlar rader per mynt och sparar dem i omgångar |
 
+### ✅144. 42501-fel i Supabase-loggen — ai_log-skrivningar med anon-nyckeln – KLART
+
+Supabase-loggarna (okt 2026) visade cirka 230 fel per dygn med status 42501 (Insufficient Privilege), alla med meddelandet `new row violates row-level security policy for table "ai_log"`. `ai_log` kräver service role för skrivning sedan RLS-härdningen (`supabase_ai_log_v2.sql`). `_logga_ai_anrop()` i `ai_klient.py` föll ändå tillbaka på anon-nyckeln när `SUPABASE_SERVICE_ROLE_KEY` saknades. Det gäller elva workflows, bland annat `kollektiv-intelligens-test.yml`, `rykte-test.yml`, `civ-fraga-test.yml`, `cem-test.yml`, `kris-test.yml` och `kanal_debatt.yml`. Varje AI-anrop i dem gav ett nekat POST och en felrad i loggen, utan att något sparades.
+
+**Fix:** `_logga_ai_anrop()` och `app/lib/logAiCall.js` loggar bara när service role-nyckeln finns, och hoppar annars över helt. Det är ingen förlust av data, för de anropen sparades aldrig. Vill man ha AI-statistik även från de workflows som saknar nyckeln lägger man till `SUPABASE_SERVICE_ROLE_KEY` i deras env. Det ger lika många API-anrop som förut, men lyckade istället för nekade.
+
+| Fil | Roll |
+|---|---|
+| `ai_klient.py` → `_logga_ai_anrop()` | Ingen anon-fallback, hoppar över loggningen utan service role-nyckel |
+| `app/lib/logAiCall.js` | Samma, och den nu oanvända `SB_KEY`-konstanten borttagen |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

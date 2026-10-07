@@ -99,11 +99,11 @@ def _logga_ai_anrop(provider: str, source: str, status: str, latency_ms: int) ->
     """Loggar ett AI-anrop till ai_log-tabellen i bakgrunden (fire-and-forget).
 
     ai_log saknar anon-skrivpolicy (RLS) — service role krävs för att skriva.
-    Fallback till anon-nyckeln bevaras för miljöer utan secreten; posten
-    misslyckas då tyst (redan fire-and-forget, ingen funktionell påverkan
-    utöver ett hål i loggen för den körningen).
+    Utan SUPABASE_SERVICE_ROLE_KEY hoppas loggningen över helt. En anon-
+    fallback nekades alltid (42501) och gav bara en felrad i Supabase-loggen
+    per AI-anrop, cirka 230 per dygn från workflows utan secreten.
     """
-    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY", "")
+    sb_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
     if not sb_key:
         return
 
