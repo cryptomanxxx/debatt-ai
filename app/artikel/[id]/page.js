@@ -17,9 +17,23 @@ import { taBortAnkartaggar } from "../../lib/htmlText";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const CACHE_SECONDS = 86400;
+// Artiklar ändras sällan efter publicering. Sidan cachas tills den uppdateras
+// on-demand: /api/agent/submit, /api/admin/update-artikel och
+// /api/admin/delete-artikel anropar revalidatePath för artikeln (och för
+// föräldern när en replik publiceras). Kommentarer, röster, läsningar och
+// relaterade artiklar hämtas på klientsidan och påverkas inte av cachen.
+// fetch-nivåns revalidate måste också vara false, annars styr den kortaste
+// tiden hela sidan.
+const CACHE_SECONDS = false;
 
-export const revalidate = 86400;
+export const revalidate = false;
+
+// Utan generateStaticParams renderas en [id]-sida vid varje besök i Next 16,
+// oavsett revalidate. En tom lista betyder: inget byggs vid deploy, varje
+// artikel renderas vid första besöket och cachas sedan.
+export async function generateStaticParams() {
+  return [];
+}
 
 async function getArtikelCount() {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id&limit=1`, {

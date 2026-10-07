@@ -4690,6 +4690,25 @@ Kräver att `supabase_qa_snapshots_v4.sql` körs i Supabase SQL Editor. `SUPABAS
 | `supabase/supabase_qa_snapshots_v4.sql` | Tar bort anon-skrivpolicyer, behåller publik läsning, grants: anon SELECT, service role allt |
 | `agents/qa-observer.js` | `SB_WRITE_KEY` = bara service role, ingen anon-fallback |
 
+### ✅153. Fluid Active CPU nära taket — artikelsidan renderades vid varje besök – KLART
+
+Vercel Usage (okt 2026) visade Fluid Active CPU 3h 30m av 4h. I Observability → Functions låg `/artikel/[id]` överst med 490 anrop och 53 s Active CPU på 12 timmar (~108 ms per rendering), följd av `/api/rss-proxy` (10 s) och `/icon` + `/apple-icon` (11,6 s tillsammans).
+
+**Orsak 1, artikelsidan:** `app/artikel/[id]/page.js` hade `revalidate = 86400`, men bygget listade den som `ƒ` (dynamisk). I Next 16 renderas en sida med en dynamisk parameter vid varje besök om den saknar `generateStaticParams`, oavsett `revalidate`. Samma sak gäller `/agent/[namn]`, `/agent/[namn]/historik` och `/visualiseringar/[id]`, men de låg lågt i listan och ändrades inte.
+
+**Orsak 2, ikonerna:** `app/icon.js` och `app/apple-icon.js` hade `runtime = "edge"` och ritades därför med `ImageResponse` vid varje anrop.
+
+**Fix:**
+- Ikonerna: edge-runtime borttagen. De byggs nu statiskt (`○`) och kostar ingen CPU.
+- Artikelsidan (ägarbeslut: cacha tills artikeln ändras): tom `generateStaticParams()`, `revalidate = false` och `next: { revalidate: false }` på sidans fetchar. Fetch-nivån måste också vara `false`, annars styr den kortaste tiden hela sidan. Bygget visar nu `●`. Varje artikel renderas vid första besöket och cachas sedan tills `revalidatePath` körs. Det sker redan i `/api/agent/submit` (ny artikel, och föräldern när en replik publiceras), `/api/admin/update-artikel` och `/api/admin/delete-artikel`. Kommentarer, röster, läsningar och relaterade artiklar hämtas på klientsidan och påverkas inte.
+
+**Avvägning:** varje cachad artikelrendering blir en ISR Write. Den sidan gav inga ISR Writes alls så länge den var dynamisk. Med cachning tills ändring renderas varje artikel i stället ungefär en gång, så antalet writes bör bli litet i förhållande till de renderingar som försvinner.
+
+| Fil | Roll |
+|---|---|
+| `app/icon.js`, `app/apple-icon.js` | `runtime = "edge"` borttagen, prerenderas vid bygget |
+| `app/artikel/[id]/page.js` | Tom `generateStaticParams()`, `revalidate = false` på sidan och dess fetchar |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt
