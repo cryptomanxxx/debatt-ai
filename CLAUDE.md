@@ -4586,6 +4586,23 @@ Följd av ✅144. `provider_benchmark.py` rankar providers främst på deras fak
 | `app/layout.js` | Footerns sidindex omsorterat alfabetiskt |
 | `CLAUDE.md` | Cloudflare i provider-tabellen och kedjelistan |
 
+### ✅148. /ai-statistik visade inte providers med få eller inga anrop – KLART
+
+Ägarfråga (okt 2026): Cloudflare står som trea i fallback-ordningen men syntes inte i graferna. Loggningen var korrekt: Cloudflare-anrop loggas till `ai_log` från både `ai_klient.py` och `/api/kanal/*`. Förklaringen är att en provider längre ned i kedjan bara anropas när alla ovanför misslyckas i samma anrop, så den får få eller inga anrop även när den fungerar. Linjegrafen visade bara providers med minst 20 anrop, latensgrafen bara providers med lyckade anrop, och tabellen bara providers som förekom i `ai_log`. En provider med få anrop försvann därför helt utan förklaring.
+
+**Fix:**
+- Ny graf "Anrop per provider och dag" (staplad, i fallback-kedjans ordning) visar volymen för varje provider som anropats, även med få anrop.
+- Tabellen "Per provider" tar med providers i fallback-kedjan som inte anropats alls, med noll.
+- Linje- och latensgraferna listar under grafen vilka providers som inte visas och hur många anrop de hade.
+- Fallback-sektionen förklarar att placeringen i kedjan inte säger hur mycket en provider används.
+
+Cloudflare tas inte bort ur kedjan (ägarbeslut: fler providers är bättre).
+
+| Fil | Roll |
+|---|---|
+| `app/ai-statistik/page.js` | Ny `dagligAnrop` (antal anrop per provider och dag) i `aggregera()` |
+| `app/ai-statistik/AiStatistikVy.js` | Ny graf "Anrop per provider och dag", nollrader för providers utan anrop, noter om vilka providers som saknas i linje- och latensgraferna |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

@@ -74,9 +74,29 @@ export default function AiStatistikVy({ data, fel, ranking }) {
     );
   }
 
-  const { totalt, total, okAndel, p50, perProvider, perKalla, daglig, dagligOk, avkortad, dagar } = data;
+  const { totalt, total, okAndel, p50, perProvider, perKalla, daglig, dagligOk, dagligAnrop = [], avkortad, dagar } = data;
+
+  // Providers i fallback-kedjan som inte gjort något anrop under perioden
+  // läggs till med noll, så att alla providers i kedjan syns i tabellen.
+  const rankade = ranking?.ranked_order || [];
+  const medAnrop = new Set(perProvider.map(p => p.namn));
+  const allaProviders = [
+    ...perProvider,
+    ...rankade.filter(p => !medAnrop.has(p)).map(namn => ({
+      namn, totalt: 0, ok: 0, rate_limited: 0, timeout: 0, error: 0, okAndel: null, p50: null, p90: null,
+    })),
+  ];
+  // Staplarnas ordning följer fallback-kedjan, övriga providers sist.
+  const ordnade = [
+    ...rankade.filter(p => medAnrop.has(p)),
+    ...perProvider.map(p => p.namn).filter(p => !rankade.includes(p)),
+  ];
+
   const linjeProviders = perProvider.filter(p => p.totalt >= 20).map(p => p.namn);
+  const ejILinje = allaProviders.filter(p => p.totalt < 20);
   const latensData = perProvider.filter(p => p.p50 != null).map(p => ({ namn: p.namn, p50: p.p50, p90: p.p90 }));
+  const ejILatens = allaProviders.filter(p => p.p50 == null);
+  const fattigaNamn = (lista) => lista.map(p => `${p.namn} (${tal(p.totalt)} anrop)`).join(", ");
 
   return (
     <main style={{ background: C.bg, minHeight: "100vh", padding: "40px 16px", color: C.text }}>
@@ -103,7 +123,11 @@ export default function AiStatistikVy({ data, fel, ranking }) {
         {ranking && (
           <section style={SEKTION}>
             <h2 style={RUBRIK}>Aktuell fallback-ordning</h2>
-            <p style={INGRESS}>Ordningen som Python-skripten och de flesta API-routes provar providers i, satt av den dagliga benchmarken.</p>
+            <p style={INGRESS}>
+              Ordningen som Python-skripten och de flesta API-routes provar providers i, satt av den dagliga benchmarken.
+              En provider längre ned anropas bara när alla ovanför den misslyckas i samma anrop, så den kan få få
+              eller inga anrop även när den fungerar. Placeringen säger alltså inget om hur mycket den används.
+            </p>
             <ol style={{ display: "flex", flexWrap: "wrap", gap: 8, listStyle: "none", padding: 0, margin: 0 }}>
               {ranking.ranked_order.map((p, i) => (
                 <li key={p} style={{ border: `1px solid ${C.border}`, borderRadius: 999, padding: "4px 12px", fontSize: 13 }}>
@@ -136,6 +160,30 @@ export default function AiStatistikVy({ data, fel, ranking }) {
         </section>
 
         <section style={SEKTION}>
+          <h2 style={RUBRIK}>Anrop per provider och dag</h2>
+          <p style={INGRESS}>
+            Hur många anrop varje provider tog emot per dag, i fallback-kedjans ordning. Providers med få anrop
+            blir tunna staplar; hovra för exakta tal eller se tabellen Per provider.
+          </p>
+          {ordnade.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={dagligAnrop} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+                <CartesianGrid stroke={C.grid} vertical={false} />
+                <XAxis dataKey="dag" tick={{ fill: C.faint, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: C.faint, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip {...TOOLTIP} cursor={{ fill: "#ffffff08" }} />
+                <Legend {...LEGEND} />
+                {ordnade.map((p, i) => (
+                  <Bar key={p} dataKey={p} name={p} stackId="p" fill={providerFarg(p)}
+                    stroke={C.panel} strokeWidth={1}
+                    radius={i === ordnade.length - 1 ? [4, 4, 0, 0] : 0} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <p style={{ color: C.faint }}>Inga anrop loggade ännu.</p>}
+        </section>
+
+        <section style={SEKTION}>
           <h2 style={RUBRIK}>Andel lyckade anrop per provider och dag</h2>
           <p style={INGRESS}>Providers med minst 20 anrop under perioden. En dag med färre än 5 anrop för en provider visas som en lucka.</p>
           {linjeProviders.length ? (
@@ -153,6 +201,9 @@ export default function AiStatistikVy({ data, fel, ranking }) {
               </LineChart>
             </ResponsiveContainer>
           ) : <p style={{ color: C.faint }}>För lite data ännu.</p>}
+          {ejILinje.length > 0 && (
+            <p style={{ color: C.faint, fontSize: 12, margin: "10px 0 0" }}>Visas inte (under 20 anrop): {fattigaNamn(ejILinje)}.</p>
+          )}
         </section>
 
         <section style={SEKTION}>
@@ -171,11 +222,14 @@ export default function AiStatistikVy({ data, fel, ranking }) {
               </BarChart>
             </ResponsiveContainer>
           ) : <p style={{ color: C.faint }}>Ingen latensdata ännu.</p>}
+          {ejILatens.length > 0 && (
+            <p style={{ color: C.faint, fontSize: 12, margin: "10px 0 0" }}>Inga lyckade anrop att mäta: {fattigaNamn(ejILatens)}.</p>
+          )}
         </section>
 
         <section style={SEKTION}>
           <h2 style={RUBRIK}>Per provider</h2>
-          <p style={INGRESS}>Alla utfall per provider under perioden.</p>
+          <p style={INGRESS}>Alla utfall per provider under perioden, inklusive providers i fallback-kedjan som inte anropats alls.</p>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead><tr>
@@ -184,7 +238,7 @@ export default function AiStatistikVy({ data, fel, ranking }) {
                 <th style={TH}>p50</th><th style={TH}>p90</th>
               </tr></thead>
               <tbody>
-                {perProvider.map(p => (
+                {allaProviders.map(p => (
                   <tr key={p.namn}>
                     <td style={TD}><ProviderNamn namn={p.namn} /></td>
                     <td style={TD}>{tal(p.totalt)}</td><td style={TD}>{pct(p.okAndel)}</td>

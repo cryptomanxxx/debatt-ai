@@ -149,12 +149,20 @@ function aggregera(rader, sedan) {
     return rad;
   });
 
+  // Antal anrop per provider och dag, så att även providers med få anrop
+  // (t.ex. de som ligger långt ned i fallback-kedjan) syns.
+  const dagligAnrop = dagar.map(d => {
+    const rad = { dag: d.slice(5) };
+    for (const p of providerNamn) rad[p] = dagProvider.get(`${d}|${p}`)?.totalt || 0;
+    return rad;
+  });
+
   const sorteradLatens = allaLatens.sort((a, b) => a - b);
   return {
     totalt: summa(total), total,
     okAndel: summa(total) ? total.ok / summa(total) : null,
     p50: percentil(sorteradLatens, 0.5),
-    perProvider, perKalla, daglig, dagligOk,
+    perProvider, perKalla, daglig, dagligOk, dagligAnrop,
   };
 }
 
