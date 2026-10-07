@@ -1,4 +1,5 @@
 import TidslinjeVy from "./TidslinjeVy";
+import SIDOR from "./sidor.json";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -9,14 +10,9 @@ export const metadata = {
   description: "Animerade veckobilder som visar hur AI-civilisationen förändras över tid.",
 };
 
-const SIDOR_ATT_VISA = [
-  { path: "/dynamik",  namn: "Agentdynamik"    },
-  { path: "/oligarki", namn: "Oligarkirisk"     },
-  { path: "/kompass",  namn: "Ideologisk kompass" },
-  { path: "/partier",  namn: "Politiska partier" },
-  { path: "/trust",    namn: "Förtroendegraf"   },
-  { path: "/bors",     namn: "Kryptobörsen"     },
-];
+// Delas med agents/qa-observer.js, som bara sparar skärmdumpar för de här
+// sidorna (övriga sidors skärmdumpar läses aldrig).
+const SIDOR_ATT_VISA = SIDOR;
 
 // Max antal veckor per sida som embeddas i den prerendrade sidan. Utan tak
 // växer varje base64-skärmdump (sparas varje måndag, aldrig rensad) sidans
@@ -26,6 +22,9 @@ const SIDOR_ATT_VISA = [
 // som redan hunnit ackumuleras, så en försiktig gräns garanterar att
 // nästa deploy faktiskt kommer under Vercels tak istället för att gissa
 // ett värde som råkar vara större än vad som redan finns.
+// Sedan skärmdumparna flyttades till Supabase Storage (screenshot_url)
+// bäddas bara äldre rader in som base64; nya rader länkas som vanliga
+// bild-URL:er och gör inte sidan större.
 const MAX_VECKOR_PER_SIDA = 6;
 
 // Hämtar en sidas snapshots med gränsen pålagd i själva Supabase-frågan
@@ -37,10 +36,10 @@ async function fetchSidaSnapshots(path, key) {
   const url =
     `${SB_URL}/rest/v1/qa_snapshots` +
     `?sida_path=eq.${encodeURIComponent(path)}` +
-    `&screenshot_b64=not.is.null` +
+    `&or=(screenshot_url.not.is.null,screenshot_b64.not.is.null)` +
     `&order=vecka.desc` +
     `&limit=${MAX_VECKOR_PER_SIDA}` +
-    `&select=vecka,sida_path,sida_namn,status,screenshot_b64`;
+    `&select=vecka,sida_path,sida_namn,status,screenshot_url,screenshot_b64`;
 
   const r = await fetch(url, {
     headers: {
@@ -57,7 +56,8 @@ async function fetchSidaSnapshots(path, key) {
   return rows.reverse().map(row => ({
     vecka:     row.vecka,
     status:    row.status,
-    bild:      row.screenshot_b64,
+    // Ny rad: URL till Storage. Äldre rad: base64 som data-URI.
+    bild:      row.screenshot_url || `data:image/png;base64,${row.screenshot_b64}`,
     sida_namn: row.sida_namn,
   }));
 }

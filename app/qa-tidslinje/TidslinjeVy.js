@@ -72,7 +72,7 @@ function SlideshowPanel({ frames, sida }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           key={frame.vecka}
-          src={`data:image/png;base64,${frame.bild}`}
+          src={frame.bild}
           alt={`${sida.namn} vecka ${frame.vecka}`}
           style={{
             width: "100%", height: "100%",
