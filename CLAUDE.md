@@ -4505,6 +4505,16 @@ Widgetarna kan visa ny data upp till cirka 1–2 minuter sent. Invariant-checker
 | `agents/invariant-checker.js` | Två kontroller pekar om till den nya filen |
 | `tests/supabaseEgress.test.mjs` | Nytt test för sammanställningen och felhanteringen |
 
+### ✅143. backtest.py gjorde ett Supabase-anrop per parameterkombination – KLART
+
+Supabase-loggarna för ett dygn (okt 2026) visade cirka 930 anrop mot `/rest/v1/backtest_resultat`. `backtest.py` testar 216 parameterkombinationer per mynt för 5 mynt och upsertade varje resultat med ett eget POST-anrop. Varje anrop blev en egen rad i API Gateway-loggen.
+
+**Fix:** `spara()` är uppdelad i `bygg_rad()`, som bygger raden, och `spara_batch()`, som upsertar en lista rader som JSON-array i omgångar om `SPARA_BATCH_STORLEK` (50). Samma `on_conflict=symbol,strategi` och `resolution=merge-duplicates` som förut. PostgREST kräver att alla objekt i en array-upsert har samma nycklar, vilket de har eftersom `bygg_rad()` alltid ger samma fält. `main()` samlar raderna per mynt och sparar dem efter loopen. Det blir 5 anrop per mynt istället för 216. En misslyckad omgång räknar alla dess rader som misslyckade, så `sys.exit(1)` vid sparfel fungerar som förut.
+
+| Fil | Roll |
+|---|---|
+| `backtest.py` | `bygg_rad()` + `spara_batch()` ersätter `spara()`. `main()` samlar rader per mynt och sparar dem i omgångar |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt
