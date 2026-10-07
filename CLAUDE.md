@@ -4526,6 +4526,21 @@ Supabase-loggarna (okt 2026) visade cirka 230 fel per dygn med status 42501 (Ins
 | `ai_klient.py` → `_logga_ai_anrop()` | Ingen anon-fallback, hoppar över loggningen utan service role-nyckel |
 | `app/lib/logAiCall.js` | Samma, och den nu oanvända `SB_KEY`-konstanten borttagen |
 
+### ✅145. ai_log räknade inte alla skript — skev provider-ranking – KLART
+
+Följd av ✅144. `provider_benchmark.py` rankar providers främst på deras faktiska ok-andel i `ai_log` senaste 7 dagarna (`hamta_produktion_ok_rate_7d()`). Statistiken var skev av två skäl, vilket sannolikt förklarar den ibland märkliga rankingen:
+1. Nio workflows med AI-anrop saknade `SUPABASE_SERVICE_ROLE_KEY` och loggade aldrig (före ✅144 nekades deras skrivningar med 42501). Flera av dem gör många anrop per körning, till exempel Visdomsspelet.
+2. Varje rad skickades i en egen daemon-tråd. Trådar som inte hunnit skicka när ett skript avslutades dödades, så de sista anropen (oftast lyckade mot huvudprovidern) tappades.
+
+**Fix:** `_logga_ai_anrop()` i `ai_klient.py` lägger raderna i en buffert i minnet. Bufferten skickas som en JSON-array var 50:e rad och resten vid processens slut (`atexit`). Det blir ett loggat API-anrop per 50 AI-anrop istället för ett per anrop, och inga rader tappas vid normal avslutning. `ts` sätts vid själva AI-anropet, inte när raden skickas, så tidsfönstren i `provider_benchmark.py` stämmer. Schemat och alla läsare är oförändrade. `SUPABASE_SERVICE_ROLE_KEY` är tillagd i `bild-test.yml`, `cem-test.yml`, `civ-fraga-test.yml`, `kanal_debatt.yml`, `kollektiv-intelligens-test.yml`, `kollusion-experiment.yml`, `kris-test.yml`, `oligarki-snapshot.yml` och `rykte-test.yml`, så att alla skript räknas.
+
+**Kvar som förut:** Vercel-routes (`app/lib/logAiCall.js`) loggar fortfarande ett anrop i taget, eftersom en serverlös funktion saknar en säker avslutningspunkt. Om ett skript dödas hårt (timeout, `os._exit`) tappas raderna som ännu inte skickats, högst 49. Reservproviders mäts oftast när huvudprovidern redan har problem, och den snedvridningen löses inte av mer komplett data.
+
+| Fil | Roll |
+|---|---|
+| `ai_klient.py` | `_logga_ai_anrop()` buffrar rader (med `ts`). `_skicka_ai_log()` skickar en JSON-array, `_toem_ai_log()` registrerad med `atexit` |
+| 9 workflows (se ovan) | `SUPABASE_SERVICE_ROLE_KEY` tillagd i env |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt
