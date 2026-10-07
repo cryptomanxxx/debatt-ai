@@ -21,9 +21,10 @@
  * Kräver:
  *   GEMINI_API_KEY          — primär vision-provider (GitHub Secret)
  *   GROQ_API_KEY            — fallback vision-provider (GitHub Secret)
- *   SUPABASE_ANON_KEY       — valfritt, aktiverar historik (GitHub Secret)
- *   SUPABASE_SERVICE_ROLE_KEY — valfritt, krävs för att spara skärmdumpar
- *                             i Storage (utan den sparas bara metadata)
+ *   SUPABASE_ANON_KEY       — valfritt, läser förra veckans resultat (diff)
+ *   SUPABASE_SERVICE_ROLE_KEY — valfritt, krävs för att spara resultat i
+ *                             qa_snapshots och skärmdumpar i Storage
+ *                             (tabellen kräver service role för skrivning)
  *   BASE_URL                — valfritt, default https://www.debatt-ai.se
  *
  * Kör lokalt:
@@ -38,7 +39,9 @@ const GROQ_KEY     = process.env.GROQ_API_KEY;
 const GEMINI_KEY   = process.env.GEMINI_API_KEY;
 const SB_KEY       = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const SB_WRITE_KEY = SB_SERVICE_KEY || SB_KEY;
+// qa_snapshots kräver service role för skrivning (supabase_qa_snapshots_v4.sql).
+// Ingen anon-fallback: den skulle bara ge nekade skrivningar.
+const SB_WRITE_KEY = SB_SERVICE_KEY;
 const SB_HOST      = "fmwxftnistkoqazfwnuj.supabase.co";
 const BUCKET       = "qa-screenshots";
 // Skärmdumpar äldre än så här raderas ur Storage (6 sidor × 52 veckor
@@ -591,7 +594,7 @@ ${diffRader}
 ${rader}
 ${diffSektion}
 ---
-**Sammanfattning:** ${antalOK} OK · ${antalVar} varningar · ${antalFel} fel · ${elapsed}s total${SB_KEY ? ` · Sparat till Supabase (qa_snapshots, vecka ${vecka})` : ""}
+**Sammanfattning:** ${antalOK} OK · ${antalVar} varningar · ${antalFel} fel · ${elapsed}s total${SB_WRITE_KEY ? ` · Sparat till Supabase (qa_snapshots, vecka ${vecka})` : ""}
 `;
 
   console.log("\n" + rapport);

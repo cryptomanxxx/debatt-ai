@@ -165,7 +165,7 @@ Plattformen använder flera AI-leverantörer i prioritetsordning. Om primären �
 | `ohlcv_cache` | Dagliga OHLCV-priser för kryptovalutor (BTC/ETH/SOL/XRP/BNB). Primary key: (symbol, datum). Fylls av `backtest_fetch.py` (veckovis bulk, GitHub Actions), `hedgefond_test.py → kop_etf_fond()` (dagligt enskilt pris, GitHub Actions) och `app/api/krypto-priser/route.js` (live Binance-cache, Vercel). RLS aktiverad med publik SELECT (ingen PII) — skrivning kräver service role. Kör `supabase_ohlcv.sql` + `supabase_ohlcv_v2.sql`. |
 | `krypto_historik` | Daglig snapshot av topp 50 kryptovalutor från CoinMarketCap. Kolumner: id, datum, symbol, namn, rank, pris_usd, marknadsvarde, volym_24h, forandring_1h/24h/7d, cirkulation, skapad. UNIQUE(datum, symbol). RLS aktiverad med publik SELECT (ingen PII, ingen läsare ännu) — skrivning kräver service role (`data_agent.py → spara_krypto_historik()`). Kör `supabase_krypto_historik.sql` + `supabase_krypto_historik_v2.sql`. |
 | `backtest_resultat` | Resultat från kryptostrategibacktest. Kolumner: id, symbol, namn, strategi, total_avkastning, sharpe, max_drawdown, antal_affarer, equity_kurva (jsonb), skapad. RLS aktiverad med publik SELECT (ingen PII) — skrivning kräver service role (`backtest.py`). Kör `supabase_backtest.sql` + `supabase_backtest_v2.sql`. |
-| `qa_snapshots` | Veckovis visuell QA-historik. Kolumner: id, vecka (ISO t.ex. "2026-W21"), sida_path, sida_namn, status (OK/VARNING/FEL), orsak, detalj, konsol_fel_antal, konsol_fel_exempel (text[]), screenshot_b64 (base64-PNG), skapad. UNIQUE(vecka, sida_path). Kör `supabase_qa_snapshots.sql` + `supabase_qa_snapshots_v2.sql`. |
+| `qa_snapshots` | Veckovis visuell QA-historik. Kolumner: id, vecka (ISO t.ex. "2026-W21"), sida_path, sida_namn, status (OK/VARNING/FEL), orsak, detalj, konsol_fel_antal, konsol_fel_exempel (text[]), screenshot_b64 (base64-PNG), skapad. UNIQUE(vecka, sida_path). Ny kolumn `screenshot_url` (✅151). RLS: publik SELECT, skrivning kräver service role (✅152). Kör `supabase_qa_snapshots.sql` + `_v2` + `_v3` + `_v4.sql`. |
 | `ai_log` | Logg över alla AI-provider-anrop från backend-routes (kanal, chatt m.fl.). Kolumner: id, ts, provider, model, source, status (ok/error/timeout/rate_limited), latency_ms, input_tokens, output_tokens. RLS aktiverad med publik SELECT (ingen PII) — skrivning kräver service role (`ai_klient.py → _logga_ai_anrop()`, `app/lib/logAiCall.js`). Används av `provider_benchmark.py → hamta_produktion_ok_rate_7d()` för att vikta providers mot passiva 429-loggar. Kör `supabase_ai_log.sql` + `supabase_ai_log_v2.sql`. |
 | `labb_log` | Logg över personlighetslabbets försök (`/labb`). Kolumner: id, amne, aggressivitet, faktafokus, humor, optimism, provider, skapad. RLS aktiverad med publik SELECT (ingen PII) — skrivning kräver service role (`app/api/labb/route.js → logLabb()`, fire-and-forget). Kör `supabase_labb_log.sql` + `supabase_labb_log_v2.sql`. |
 | `argument_roster` | Läsarröster på enskilda artikelstycken. Kolumner: id, artikel_id, stycke_index, stycke_text, roster (int, räknare), skapad. UNIQUE(artikel_id, stycke_index). RLS aktiverad med publik SELECT (ingen PII) — skrivning kräver service role (`app/api/argument-roster/route.js`). Kör `supabase_argument_roster.sql` + `supabase_argument_roster_v2.sql`. |
@@ -4663,7 +4663,7 @@ Cloudflare tas inte bort ur kedjan (ägarbeslut: fler providers är bättre).
 2. En `UPDATE` som nollar `screenshot_b64` för sidor som inte finns på tidslinjen, vilket frigör ungefär 190 MB. Metadata och tidslinjebilderna behålls.
 3. `vacuum full qa_snapshots`, som körs ensam för att faktiskt ge tillbaka diskutrymmet.
 
-**Inte ändrat:** RLS-policyerna på `qa_snapshots` tillåter fortfarande anon att skriva (`INSERT`/`UPDATE`). Det är ett separat härdningssteg.
+**RLS:** åtgärdat i ✅152.
 
 Kräver att `supabase_qa_snapshots_v3.sql` (kolumnen `screenshot_url`) körs innan koden driftsätts. Kräver också secreten `SUPABASE_SERVICE_ROLE_KEY` i `qa-observer.yml`, som nu skickas med. Utan den sparas bara metadata.
 
@@ -4676,6 +4676,19 @@ Kräver att `supabase_qa_snapshots_v3.sql` (kolumnen `screenshot_url`) körs inn
 | `supabase/supabase_qa_snapshots_v3.sql` | Ny kolumn `screenshot_url` |
 | `supabase/supabase_qa_snapshots_cleanup_MANUELL.sql` | Manuell, granskad engångsrensning av gamla base64-bilder |
 | `.github/workflows/qa-observer.yml` | `SUPABASE_SERVICE_ROLE_KEY` i env |
+
+### ✅152. RLS-härdning av qa_snapshots – KLART
+
+Uppföljning på ✅151. Policyerna "Service insert"/"Service update" i `supabase_qa_snapshots.sql` hade `WITH CHECK (true)`/`USING (true)`, så vem som helst med den publika anon-nyckeln kunde skriva och skriva över QA-historiken. Enda skrivaren är `agents/qa-observer.js`.
+
+**Fix:** `supabase_qa_snapshots_v4.sql` tar bort skrivpolicyerna (plus eventuella `pub ins/upd qa_snapshots` från den borttagna `supabase_rls_fix.sql`), behåller publik SELECT och drar tillbaka anon:s INSERT/UPDATE/DELETE-grants. `qa-observer.js` skriver nu bara med `SUPABASE_SERVICE_ROLE_KEY` (ingen anon-fallback, som annars bara gett nekade skrivningar). Utan nyckeln hoppas sparningen över. Läsarna (`/qa-tidslinje`, `/api/qa-tidslinje-gif`, observatörens diff mot förra veckan) använder anon-nyckeln och påverkas inte.
+
+Kräver att `supabase_qa_snapshots_v4.sql` körs i Supabase SQL Editor. `SUPABASE_SERVICE_ROLE_KEY` finns redan i `qa-observer.yml`.
+
+| Fil | Roll |
+|---|---|
+| `supabase/supabase_qa_snapshots_v4.sql` | Tar bort anon-skrivpolicyer, behåller publik läsning, grants: anon SELECT, service role allt |
+| `agents/qa-observer.js` | `SB_WRITE_KEY` = bara service role, ingen anon-fallback |
 
 ## Kontext om projektet
 
