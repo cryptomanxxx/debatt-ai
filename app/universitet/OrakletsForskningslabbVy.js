@@ -51,7 +51,8 @@ export default function OrakletsForskningslabbVy({ experiment = [], labAvailable
   return (
     <section style={{ color: C.text, lineHeight: 1.7 }}>
       <h2 style={{ fontFamily: 'Georgia, serif', marginTop: 0 }}>Oraklets forskningslabb</h2>
-      <p>Professor Oraklet föreslår matematiska samband. Beräkningsverktyg och en separat exakt kontroll prövar hans förslag. Här visas metod, data och resultat från genomförda experiment.</p>
+      <p>Forskningslabbet bygger på <a href="https://github.com/cryptomanxxx/debatt-ai-orchestrator" style={{ color: C.accent }}>debatt-ai-orchestrator på GitHub</a>, som kombinerar AI-modellorkestrering med Professor Oraklets automatiserade forskningsflöde. Orkestreringen väljer modell eller verktyg enligt konfiguration och regler. Oraklet föreslår och väljer experiment inom en fördefinierad katalog, varefter beräkningsverktyg och oberoende kontroller prövar modellens förslag. Här visas metod, data och resultat från genomförda experiment.</p>
+      <p>Målet är autonom vetenskaplig AI-forskning där systemet väljer en lämplig AI-modell, planerar och genomför experiment samt dokumenterar resultaten, medan människan bara behöver granska och godkänna experimenten. Dagens labb kör avgränsade metodtester; dagliga körningar inom katalogen sker automatiskt utan separat godkännande inför varje experiment.</p>
       <div style={{ padding: '20px', border: `1px solid ${C.border}`, borderRadius: '10px', marginBottom: '24px' }}>
         <strong style={{ color: C.accent }}>Ratfit-experiment: återfinna ett dolt rationellt samband</strong>
         <p>Oraklet får sex exakta datapunkter och söker en formel av typen (a·x+b)/(c·x+d). Tre andra punkter hålls undan tills förslaget är låst. BootLoops Ratfit kontrollerar sambandet och ska avvisa avsiktligt felaktiga data. Modellens formel kontrolleras dessutom separat med exakt heltalsräkning.</p>
