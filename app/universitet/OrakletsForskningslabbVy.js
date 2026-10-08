@@ -2,6 +2,43 @@ const C = { text: '#b8d8ff', muted: '#8aaac8', border: '#17395a', accent: '#67e8
 const WORKFLOW = 'https://github.com/cryptomanxxx/debatt-ai-orchestrator/actions/workflows/oraklet-lab.yml';
 const formula = coefficients => `(${coefficients[0]}·x + ${coefficients[1]}) / (${coefficients[2]}·x + ${coefficients[3]})`;
 
+// Reports share schemaVersion, but each tool has its own case payload.
+const isRatfitCase = c => c && Array.isArray(c.proposal?.coefficients)
+  && c.proposal.coefficients.length === 4 && Array.isArray(c.truth)
+  && c.truth.length === 4 && c.ratfit && Array.isArray(c.data?.banked)
+  && Array.isArray(c.data?.holdout)
+  && (!c.attempts || (Array.isArray(c.attempts) && c.attempts.every(a =>
+    Array.isArray(a?.proposal?.coefficients) && Array.isArray(a.visibleChecks))));
+const printable = value => typeof value === 'string' ? value : JSON.stringify(value, null, 2) ?? 'Ej angivet';
+
+function StructuredCase({ c, index }) {
+  if (!c || typeof c !== 'object' || Array.isArray(c)) {
+    return <p>Fall {index + 1}: rapportuppgifterna kan inte visas.</p>;
+  }
+  const h = c.hypothesisTest;
+  return (
+    <details style={{ borderTop: `1px solid ${C.border}`, padding: '12px 0' }}>
+      <summary style={{ cursor: 'pointer' }}>Fall {printable(c.case ?? index + 1)}: {c.passed === true ? 'godkänt modellförslag' : c.passed === false ? 'underkänt modellförslag' : 'inget modellresultat'}</summary>
+      <p style={{ color: C.muted }}>AI-modell: {printable(c.provider)} / {printable(c.model)}. Modellförslaget är separat från verktygets uppmätta resultat.</p>
+      {h && <p><strong>Uppmätt beslut:</strong> {printable(h.decision)}. Oberoende verifierat: {h.independentlyVerified === true ? 'ja' : 'ej angivet'}.</p>}
+      {[
+        ['Oraklets förslag (AI-genererat)', c.proposal],
+        ['Uppmätt resultat', h?.measured ?? c.evidence?.result],
+        ['Hypotes och beslutskriterium', h?.protocol],
+        ['Syntetiskt facit', c.truth],
+        ['Data', c.data],
+        ['Kontrollresultat', c.controlEvidence?.result],
+      ].filter(([, value]) => value != null).map(([label, value]) => (
+        <details key={label}>
+          <summary style={{ cursor: 'pointer' }}>{label}</summary>
+          <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', fontSize: '13px' }}>{printable(value)}</pre>
+        </details>
+      ))}
+      {c.commitment && <p style={{ color: C.muted, fontSize: '12px' }}>Datans fingeravtryck före förslaget: {printable(c.commitment)}</p>}
+    </details>
+  );
+}
+
 export default function OrakletsForskningslabbVy({ experiment = [], labAvailable = false }) {
   return (
     <section style={{ color: C.text, lineHeight: 1.7 }}>
@@ -16,7 +53,7 @@ export default function OrakletsForskningslabbVy({ experiment = [], labAvailable
       </div>
       {!labAvailable && <p style={{ color: C.muted }}>Experimentrapporter kan inte hämtas just nu. Labbet är förberett, men inga resultat kan visas här ännu.</p>}
       {labAvailable && experiment.length === 0 && <p style={{ color: C.muted }}>Inga experimentrapporter har sparats ännu.</p>}
-      {experiment.map(row => {
+      {experiment.filter(row => row && typeof row === 'object').map(row => {
         const r = row.rapport;
         if (![1, 2].includes(r?.schemaVersion) || !Array.isArray(r.cases)) return null;
         return (
@@ -29,14 +66,14 @@ export default function OrakletsForskningslabbVy({ experiment = [], labAvailable
             <p><strong>Metod:</strong> {r.method}</p>
             {r.plan?.reason && <p><strong>Oraklets experimentval (AI-genererat):</strong> {r.plan.reason}</p>}
             {r.executionStatus === 'error' && <p style={{ color: '#fbbf24' }}>Experimentet slutfördes inte. Rapporten ger inget resultat om modellens förmåga.</p>}
-            {r.cases.map(c => (
+            {r.cases.map((c, index) => !isRatfitCase(c) ? <StructuredCase key={index} c={c} index={index} /> : (
               <details key={c.case} style={{ borderTop: `1px solid ${C.border}`, padding: '12px 0' }}>
                 <summary style={{ cursor: 'pointer' }}>Fall {c.case}: {c.passed ? 'godkänt modellförslag' : 'underkänt modellförslag'}</summary>
                 {r.schemaVersion === 2 && (
                   <div>
                     <p>Första förslag: {c.initialPassed ? 'godkänt' : 'underkänt'}. Slutligt förslag: {c.passed ? 'godkänt' : 'underkänt'}. Korrigeringsförsök: {c.correctionAttempted ? 'ja' : 'nej'}.</p>
                     {!c.sameModel && <p style={{ color: '#fbbf24' }}>AI-modellen byttes mellan försöken; resultatet kan påverkas av både återkoppling och modellbyte.</p>}
-                    {c.attempts.map((a, index) => (
+                    {(c.attempts || []).map((a, index) => (
                       <details key={index}>
                         <summary>{index === 0 ? 'Första förslag' : 'Korrigerat förslag'}: {formula(a.proposal.coefficients)}</summary>
                         <p>{a.proposal.reason}</p>
