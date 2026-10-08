@@ -6,12 +6,14 @@ on:
     paths:
       - "**.py"
       - "app/lib/metrics.js"
+      - "app/universitet/OrakletsForskningslabbVy.js"
       - "tests/**"
       - ".github/workflows/tests.yml"
   pull_request:
     paths:
       - "**.py"
       - "app/lib/metrics.js"
+      - "app/universitet/OrakletsForskningslabbVy.js"
       - "tests/**"
       - ".github/workflows/tests.yml"
 
@@ -37,5 +39,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "20"
-      - name: Kör metrics-tester
+      - name: Installera JavaScript-beroenden
+        run: npm install --ignore-scripts
+      - name: Kör JavaScript-tester
         run: node --test tests/*.test.mjs
