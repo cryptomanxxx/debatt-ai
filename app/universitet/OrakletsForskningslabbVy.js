@@ -3,12 +3,20 @@ const WORKFLOW = 'https://github.com/cryptomanxxx/debatt-ai-orchestrator/actions
 const formula = coefficients => `(${coefficients[0]}·x + ${coefficients[1]}) / (${coefficients[2]}·x + ${coefficients[3]})`;
 
 // Reports share schemaVersion, but each tool has its own case payload.
-const isRatfitCase = c => c && Array.isArray(c.proposal?.coefficients)
-  && c.proposal.coefficients.length === 4 && Array.isArray(c.truth)
-  && c.truth.length === 4 && c.ratfit && Array.isArray(c.data?.banked)
-  && Array.isArray(c.data?.holdout)
-  && (!c.attempts || (Array.isArray(c.attempts) && c.attempts.every(a =>
-    Array.isArray(a?.proposal?.coefficients) && Array.isArray(a.visibleChecks))));
+const isDisplayValue = value => value == null || ['string', 'number', 'boolean'].includes(typeof value);
+const isCoefficients = values => Array.isArray(values) && values.length === 4 && values.every(isDisplayValue);
+const isProposal = proposal => proposal && isCoefficients(proposal.coefficients) && isDisplayValue(proposal.reason);
+const isDataRows = rows => Array.isArray(rows) && rows.every(row =>
+  Array.isArray(row) && row.length === 2 && row.every(isDisplayValue));
+const isRatfitCase = c => c && isProposal(c.proposal) && isCoefficients(c.truth)
+  && c.ratfit && isDisplayValue(c.ratfit.checked)
+  && [c.case, c.provider, c.model, c.commitment].every(isDisplayValue)
+  && isDataRows(c.data?.banked) && isDataRows(c.data?.holdout)
+  && (c.attempts == null || (Array.isArray(c.attempts) && c.attempts.every(a =>
+    a && isProposal(a.proposal) && [a.provider, a.model].every(isDisplayValue)
+    && Array.isArray(a.visibleChecks) && a.visibleChecks.every(p =>
+      p && typeof p === 'object' && !Array.isArray(p)
+      && [p.x, p.expected, p.actual].every(isDisplayValue)))));
 const printable = value => typeof value === 'string' ? value : JSON.stringify(value, null, 2) ?? 'Ej angivet';
 
 function StructuredCase({ c, index }) {
