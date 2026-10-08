@@ -46,3 +46,21 @@ test('partial and malformed cases do not crash the lab', () => {
   assert.match(render([null, {}, { proposal: {}, truth: {} }]), /rapportuppgifterna kan inte visas/);
   assert.doesNotThrow(() => render([]));
 });
+
+test('malformed nested Ratfit data and directly rendered fields use the safe view', () => {
+  const valid = { case: 1, passed: true, proposal: { coefficients: [1, 2, 3, 4] },
+    truth: [1, 2, 3, 4], ratfit: { checked: 9 }, data: { banked: [[1, '3/7']], holdout: [] } };
+  for (const change of [
+    { data: { banked: [null], holdout: [] } },
+    { data: { banked: [[1, { value: 2 }]], holdout: [] } },
+    { proposal: { coefficients: [1, 2, 3, 4], reason: {} } },
+    { ratfit: { checked: {} } },
+    { provider: {} },
+    { attempts: [{ proposal: valid.proposal, visibleChecks: [null] }] },
+    { attempts: [{ proposal: valid.proposal, visibleChecks: [{ x: 1, expected: {} }] }] },
+  ]) {
+    const html = render([{ ...valid, ...change }]);
+    assert.match(html, /Oraklets förslag \(AI-genererat\)/);
+    assert.doesNotMatch(html, /Ratfit: 9 kontrollpunkter/);
+  }
+});
