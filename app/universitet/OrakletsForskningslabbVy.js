@@ -56,7 +56,7 @@ export default function OrakletsForskningslabbVy({ experiment = [], labAvailable
       <aside aria-label="Vetenskaplig litteratur och källor" style={{ padding: '20px', border: `1px solid ${C.border}`, borderRadius: '10px', marginBottom: '24px' }}>
         <h3 style={{ color: C.accent, marginTop: 0 }}>Vetenskaplig litteratur och källor</h3>
         <p>Professor Oraklets forskningsflöde använder bland annat <a href="https://www.semanticscholar.org/?utm_source=api" style={{ color: C.accent }}>Semantic Scholar</a> för att söka vetenskapliga artiklar och hämta metadata och tillgängliga abstrakt via deras API. Detta ger litteraturunderlag för forskningsplaneringen och kopplar arbetet till tidigare forskning.</p>
-        <p style={{ color: C.muted, marginBottom: 0 }}>Vi tackar Semantic Scholar vid Ai2 för tillgången till vetenskapliga litteraturdata. Läs mer: <a href="https://arxiv.org/abs/2301.10140" style={{ color: C.accent }}>The Semantic Scholar Open Data Platform</a> (Kinney med flera, 2023).</p>
+        <p style={{ color: C.muted, marginBottom: 0 }}>Vi tackar Semantic Scholar vid Allen Institute for Artificial Intelligence (Ai2) för tillgången till vetenskapliga litteraturdata. Läs mer: <a href="https://arxiv.org/abs/2301.10140" style={{ color: C.accent }}>The Semantic Scholar Open Data Platform</a> (Kinney med flera, 2023).</p>
       </aside>
       <div style={{ padding: '20px', border: `1px solid ${C.border}`, borderRadius: '10px', marginBottom: '24px' }}>
         <strong style={{ color: C.accent }}>Ratfit-experiment: återfinna ett dolt rationellt samband</strong>
