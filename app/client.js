@@ -14,47 +14,7 @@ const MIN_SCORE = 6;
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm artikeln på fyra kriterier (heltal 0-10):
-1. Argumentationsklarhet – Är argumenten tydliga och logiskt uppbyggda?
-2. Originalitet – Tillför artikeln något nytt till debatten?
-3. Samhällsrelevans – Är ämnet viktigt och aktuellt?
-4. Trovärdighet – Är faktapåståendena rimliga och välgrundade?
-
-En artikel kan publiceras om ALLA fyra poäng är minst ${MIN_SCORE}/10.
-
-Svara ENDAST med JSON (inga andra tecken):
-{"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1","förslag 2"],"styrkor":["styrka 1"],"rubrik":null,"taggar":["tagg1","tagg2","tagg3"]}
-
-beslut är "publicera" om alla fyra >= ${MIN_SCORE}, annars "revidera" eller "avvisa".
-taggar: 3–5 specifika ämnestaggar på svenska (gemener, max tre ord per tagg, mer specifika än en bred kategori).`;
-
 // ── Supabase REST helpers ─────────────────────────────────────────────────────
-function sbHeaders() {
-  return {
-    "apikey": SB_KEY,
-    "Authorization": `Bearer ${SB_KEY}`,
-    "Content-Type": "application/json",
-    "Prefer": "return=minimal",
-  };
-}
-
-async function sbInsert(row) {
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar`, {
-    method: "POST",
-    headers: sbHeaders(),
-    body: JSON.stringify(row),
-  });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-async function sbInsertInlamning(row) {
-  await fetch(`${SB_URL}/rest/v1/inlamningar`, {
-    method: "POST",
-    headers: sbHeaders(),
-    body: JSON.stringify(row),
-  });
-}
-
 async function sbSelect() {
   const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=*&order=skapad.desc`, {
     headers: { "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` },
@@ -502,6 +462,7 @@ export default function DebattClient({ initialArticleCount = null }) {
   const [turnstileToken, setTurnstileToken] = useState(null);
   const [visitors, setVisitors] = useState(null);
   const [inlamningId, setInlamningId] = useState(null);
+  const [publiceringsToken, setPubliceringsToken] = useState(null);
   const [heroArtikel, setHeroArtikel] = useState([]);
   // null = okänt (före hydration), false = visa intro, true = användaren har stängt den
   const [introDold, setIntroDold] = useState(null);
@@ -698,41 +659,25 @@ export default function DebattClient({ initialArticleCount = null }) {
     return () => clearInterval(iv);
   }, [analyzing]);
 
+  // Samma serverflöde som /skicka-in: bedömning + sparning i /api/skicka-in,
+  // publicering i /api/skicka-in/publicera (kräver token och sparade poäng).
   async function analyze() {
     if (!turnstileToken) { setError("Vänligen slutför CAPTCHA-kontrollen nedan."); return; }
     setAnalyzing(true); setError(null);
     try {
-      const res = await fetch("/api/analyze", {
+      const res = await fetch("/api/skicka-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [{ role: "user", content: `${SYSTEM_PROMPT}\n\nRubrik: ${title}\nFörfattare: ${author}\n\n${text}` }],
-          turnstileToken,
-        }),
+        body: JSON.stringify({ typ: "debattartikel", rubrik: title, forfattare: author, artikel: text, turnstileToken }),
       });
-      const data = await res.json();
-      const raw = data.choices?.[0]?.message?.content || "";
-      const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-      // Save to inlamningar regardless of decision
-      try {
-        const inlRes = await fetch(`${SB_URL}/rest/v1/inlamningar`, {
-          method: "POST",
-          headers: { ...sbHeaders(), "Prefer": "return=representation" },
-          body: JSON.stringify({
-            rubrik: title, forfattare: author, artikel: text,
-            kategori: "Övrigt", motivering: parsed.motivering,
-            beslut: parsed.beslut,
-            arg: parsed.arg, ori: parsed.ori, rel: parsed.rel, tro: parsed.tro,
-            status: "inkorg",
-          }),
-        });
-        const inlData = await inlRes.json();
-        if (inlData?.[0]?.id) setInlamningId(inlData[0].id);
-      } catch {}
-      setResult(parsed);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.resultat) throw new Error(data.error || "");
+      setResult(data.resultat);
+      setInlamningId(data.inlamning_id);
+      setPubliceringsToken(data.token);
       setView("result");
-    } catch {
-      setError("Analysen misslyckades. Försök igen.");
+    } catch (e) {
+      setError(e.message ? `Analysen misslyckades: ${e.message}` : "Analysen misslyckades. Försök igen.");
     } finally {
       setAnalyzing(false);
     }
@@ -741,25 +686,19 @@ export default function DebattClient({ initialArticleCount = null }) {
   async function publish() {
     setSaving(true); setError(null);
     try {
-      await sbInsert({
-        rubrik: title,
-        forfattare: author,
-        artikel: text,
-        motivering: result.motivering,
-        kategori: "Övrigt",
-        arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
-        kalla: "manniska",
-        taggar: result.taggar || [],
+      const res = await fetch("/api/skicka-in/publicera", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inlamning_id: inlamningId,
+          token: publiceringsToken,
+          rubrik_forslag: result.rubrik || null,
+          // Rubrikförslaget används bara om besökaren valt det ("Använd rubriken").
+          anvand_forslag: !!result.rubrik && title === result.rubrik,
+        }),
       });
-      // Update inlamning status to publicerad
-      if (inlamningId) {
-        fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${inlamningId}`, {
-          method: "PATCH",
-          headers: sbHeaders(),
-          body: JSON.stringify({ status: "publicerad" }),
-        }).catch(() => {});
-      }
-      // Send email notification
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       fetch("/api/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -770,7 +709,6 @@ export default function DebattClient({ initialArticleCount = null }) {
           arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
         }),
       }).catch(() => {}); // fire and forget
-      fetch("/api/revalidate-arkiv", { method: "POST" }).catch(() => {}); // fire and forget
       window.location.href = "/arkiv";
     } catch (e) {
       setError("Sparning misslyckades: " + e.message);
@@ -783,6 +721,7 @@ export default function DebattClient({ initialArticleCount = null }) {
     setTitle(""); setAuthor(""); setText("");
     window.history.pushState(null, "", "/");
     setInlamningId(null);
+    setPubliceringsToken(null);
     setTurnstileToken(null);
     if (window.turnstile) window.turnstile.reset();
   }

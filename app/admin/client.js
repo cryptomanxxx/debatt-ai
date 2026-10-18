@@ -34,13 +34,22 @@ function sbHeaders() {
 const INL_PAGE = 50;
 const ART_PAGE = 50;
 
-async function fetchInlamningar(offset = 0) {
-  const res = await fetch(`${SB_URL}/rest/v1/inlamningar?select=*&order=skapad.desc&limit=${INL_PAGE}&offset=${offset}`, {
-    headers: { ...sbHeaders(), "Prefer": "count=exact" },
+// Inlämningar nås bara via /api/admin/inlamningar (lösenord kontrolleras på
+// servern, databasen nås med service role). Anon-nyckeln har ingen åtkomst.
+async function inlamningApi(action, extra = {}) {
+  const res = await fetch("/api/admin/inlamningar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ pw: getStoredPw(), action, ...extra }),
   });
-  if (!res.ok) throw new Error(await res.text());
-  const total = parseInt(res.headers.get("content-range")?.split("/")[1] ?? "0", 10);
-  return { rows: await res.json(), total };
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+async function fetchInlamningar(offset = 0) {
+  const { rows, total } = await inlamningApi("lista", { offset });
+  return { rows, total };
 }
 
 async function fetchArtiklar(offset = 0) {
@@ -53,20 +62,11 @@ async function fetchArtiklar(offset = 0) {
 }
 
 async function updateStatus(id, status) {
-  const res = await fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${id}`, {
-    method: "PATCH",
-    headers: { ...sbHeaders(), "Prefer": "return=minimal" },
-    body: JSON.stringify({ status }),
-  });
-  if (!res.ok) throw new Error(await res.text());
+  await inlamningApi("status", { id, status });
 }
 
 async function deleteInlamning(id) {
-  const res = await fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${id}`, {
-    method: "DELETE",
-    headers: sbHeaders(),
-  });
-  if (!res.ok) throw new Error(await res.text());
+  await inlamningApi("radera", { id });
 }
 
 async function deleteArtikelById(id) {
@@ -106,23 +106,8 @@ async function updateArtikel(id, changes) {
 }
 
 async function publishToArtiklar(row) {
-  const check = await fetch(`${SB_URL}/rest/v1/artiklar?rubrik=eq.${encodeURIComponent(row.rubrik)}&select=id`, {
-    headers: sbHeaders(),
-  });
-  const existing = await check.json();
-  if (existing.length > 0) throw new Error("Artikeln finns redan publicerad i arkivet.");
-  const res = await fetch(`${SB_URL}/rest/v1/artiklar`, {
-    method: "POST",
-    headers: { ...sbHeaders(), "Prefer": "return=minimal" },
-    body: JSON.stringify({
-      rubrik: row.rubrik, forfattare: row.forfattare, artikel: row.artikel,
-      kategori: row.kategori, motivering: row.motivering,
-      arg: row.arg, ori: row.ori, rel: row.rel, tro: row.tro,
-      kalla: row.kalla || "manniska",
-      filmrecension: row.filmrecension === true,
-    }),
-  });
-  if (!res.ok) throw new Error(await res.text());
+  // Servern kollar dubblettrubrik, skapar artikeln och sätter status "publicerad".
+  await inlamningApi("publicera", { id: row.id });
 }
 
 function EquityKurva({ best, sym }) {
@@ -2985,7 +2970,6 @@ export default function AdminClient() {
     setActionLoading(row.id);
     try {
       await publishToArtiklar(row);
-      await updateStatus(row.id, "publicerad");
       setInlamningar(prev => prev.map(a => a.id === row.id ? {...a, status:"publicerad"} : a));
     } catch (e) { setError("Fel vid publicering: " + e.message); }
     setActionLoading(null);

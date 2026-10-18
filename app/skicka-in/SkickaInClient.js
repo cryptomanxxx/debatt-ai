@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { extraheraYoutubeId } from "../lib/youtube";
 
+// Måste matcha MIN_SCORE/MIN_ORD i app/lib/inlamning.mjs (servern avgör).
 const MIN_SCORE = 6;
 // Minsta ordantal för att "Skicka till redaktionen"-knappen ska aktiveras.
 // Filmrecensioner är medvetet ett kort format — Filmrecensenten (AI-agenten,
@@ -11,60 +12,12 @@ const MIN_SCORE = 6;
 // filmrecension i den etablerade längden (användarrapport, sep 2026: knappen
 // var "blockerad" vid manuell inlämning av en filmrecension).
 const MIN_ORD = { debattartikel: 300, nyhetsartikel: 300, filmrecension: 150 };
-const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
-const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const C = {
   bg: "#0a0a0a", surface: "#111111", border: "#222222",
   text: "#f0ede6", textMuted: "#888880", accentDim: "#aaaaaa",
   green: "#4ade80", red: "#f87171", yellow: "#facc15", accent: "#e879f9",
 };
-
-const SYSTEM_PROMPT = `Du är chefredaktör för en svensk debattajts. Bedöm artikeln på fyra kriterier (heltal 0-10):
-1. Argumentationsklarhet – Är argumenten tydliga och logiskt uppbyggda?
-2. Originalitet – Tillför artikeln något nytt till debatten?
-3. Samhällsrelevans – Är ämnet viktigt och aktuellt?
-4. Trovärdighet – Är faktapåståendena rimliga och välgrundade?
-
-En artikel kan publiceras om ALLA fyra poäng är minst ${MIN_SCORE}/10.
-
-Svara ENDAST med JSON (inga andra tecken):
-{"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1","förslag 2"],"styrkor":["styrka 1"],"rubrik":null,"taggar":["tagg1","tagg2","tagg3"]}
-
-beslut är "publicera" om alla fyra >= ${MIN_SCORE}, annars "revidera" eller "avvisa".
-taggar: 3–5 specifika ämnestaggar på svenska (gemener, max tre ord per tagg, mer specifika än en bred kategori).`;
-
-// Speglar FILM_REVIEW_SYSTEM_PROMPT i app/api/agent/submit/route.js (✅123) —
-// en filmrecension har strukturellt aldrig en tes/motargument/samhällsrelevans
-// i SYSTEM_PROMPT-mening. Utan denna hade sänkningen av ordkravet ovan bara
-// löst HÄLFTEN av problemet: knappen blir klickbar, men en fullgod
-// filmrecension skulle ändå kunna avvisas av samma AI-redaktör för att sakna
-// debattkriterier den aldrig var tänkt att uppfylla (Codex-fynd, PR #1482-
-// granskning). Samma arg/ori/rel/tro-JSON-schema som SYSTEM_PROMPT, så
-// /redaktion, /intelligens m.fl. som läser dessa kolumner fungerar oförändrat
-// — bara kriteriernas INNEBÖRD är omtolkad för filmkritik.
-const FILM_REVIEW_SYSTEM_PROMPT = `Du är chefredaktör för en svensk sajt som publicerar korta filmrecensioner. Bedöm recensionen på fyra kriterier (heltal 0-10) — ANPASSADE FÖR FILMKRITIK, inte en debattartikels tes/motargument/samhällsrelevans:
-1. Argumentationsklarhet (arg) – Ger recensionen ett tydligt eget omdöme med motivering, inte bara en referering av handlingen?
-2. Originalitet (ori) – Tillför recensionen en egen infallsvinkel eller insikt om filmen, inte bara en generisk beskrivning?
-3. Relevans (rel) – Kopplar recensionen sina iakttagelser meningsfullt till filmen som helhet (berättelse, regi, skådespeleri)?
-4. Trovärdighet (tro) – Verkar faktapåståendena (filmtitel, handling, skådespeleri) rimliga och fria från uppenbara påhitt?
-
-En recension publiceras om ALLA fyra poäng är minst ${MIN_SCORE}/10. Kräv ALDRIG en debattartikels tes, motargument eller samhällsrelevans — det är en filmrecension, inte ett debattinlägg, och ska inte bedömas som ett sådant.
-
-Svara ENDAST med JSON (inga andra tecken):
-{"beslut":"publicera","motivering":"kort motivering","arg":8,"ori":7,"rel":9,"tro":8,"forbattringar":["förslag 1","förslag 2"],"styrkor":["styrka 1"],"rubrik":null,"taggar":["tagg1","tagg2","tagg3"]}
-
-beslut är "publicera" om alla fyra >= ${MIN_SCORE}, annars "revidera" eller "avvisa".
-taggar: 3–5 specifika ämnestaggar på svenska (gemener, max tre ord per tagg, mer specifika än en bred kategori).`;
-
-function sbHeaders() {
-  return {
-    "apikey": SB_KEY,
-    "Authorization": `Bearer ${SB_KEY}`,
-    "Content-Type": "application/json",
-    "Prefer": "return=minimal",
-  };
-}
 
 const inp = {
   background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px",
@@ -125,15 +78,6 @@ const TYP_ALTERNATIV = [
   { value: "filmrecension", label: "Filmrecension" },
 ];
 
-// Kategori-pillen som visas på artikelsidan (se app/artikel/[id]/page.js) —
-// "Kultur & konst" matchar redan Filmrecensentens egna artiklar (✅123), så
-// en människas filmrecension hamnar i samma kategori.
-const KATEGORI_FOR_TYP = {
-  debattartikel: "Debatt",
-  nyhetsartikel: "Nyheter",
-  filmrecension: "Kultur & konst",
-};
-
 const RÖST_STEG = [
   { id: "tes",   fråga: "Vad är din huvudtes — vad vill du säga?",              fält: null },
   { id: "arg1",  fråga: "Ge ditt starkaste argument för det.",                  fält: null },
@@ -155,6 +99,7 @@ export default function SkickaInClient() {
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [inlamningId, setInlamningId] = useState(null);
+  const [publiceringsToken, setPubliceringsToken] = useState(null);
   const [röstView, setRöstView] = useState(false);
   const [röstSteg, setRöstSteg] = useState(0);
   const [röstLyssnar, setRöstLyssnar] = useState(false);
@@ -354,7 +299,7 @@ export default function SkickaInClient() {
     setView("form"); setResult(null); setError(null);
     setTyp("debattartikel");
     setTitle(""); setAuthor(""); setText("");
-    setTurnstileToken(null); setInlamningId(null);
+    setTurnstileToken(null); setInlamningId(null); setPubliceringsToken(null);
     // nollstallBildState() — INTE taBortBild(): vid det här laget är bilden
     // redan kopplad till en inlamningar-rad (eller publicerad artikel), en
     // Storage-radering hade förstört den kopplingen.
@@ -362,45 +307,33 @@ export default function SkickaInClient() {
     setYoutubeInput(""); setYoutubeId(null); setYoutubeFel("");
   }
 
+  // Bedömning och sparning sker på servern (/api/skicka-in): prompten byggs
+  // där och inlämningen sparas med service role. Publicering (/api/skicka-in/
+  // publicera) kräver token från bedömningen och utgår från de sparade
+  // poängen, så klienten kan inte publicera något AI-redaktören inte godkänt.
   async function analyze() {
     if (!turnstileToken) { setError("Vänligen slutför CAPTCHA-kontrollen nedan."); return; }
     setAnalyzing(true); setError(null);
     try {
-      const promptForTyp = typ === "filmrecension" ? FILM_REVIEW_SYSTEM_PROMPT : SYSTEM_PROMPT;
-      const res = await fetch("/api/analyze", {
+      const res = await fetch("/api/skicka-in", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [{ role: "user", content: `${promptForTyp}\n\nRubrik: ${title}\nFörfattare: ${author}\n\n${text}` }],
+          typ, rubrik: title, forfattare: author, artikel: text,
+          bild_url: bildUrl || null,
+          bild_fotograf: bildFotograf.trim() || null,
+          youtube_video_id: youtubeId || null,
           turnstileToken,
         }),
       });
-      const data = await res.json();
-      const raw = data.choices?.[0]?.message?.content || "";
-      const parsed = JSON.parse(raw.replace(/```json|```/g, "").trim());
-      try {
-        const inlRes = await fetch(`${SB_URL}/rest/v1/inlamningar`, {
-          method: "POST",
-          headers: { ...sbHeaders(), "Prefer": "return=representation" },
-          body: JSON.stringify({
-            rubrik: title, forfattare: author, artikel: text,
-            kategori: KATEGORI_FOR_TYP[typ] || "Övrigt", motivering: parsed.motivering,
-            beslut: parsed.beslut,
-            arg: parsed.arg, ori: parsed.ori, rel: parsed.rel, tro: parsed.tro,
-            status: "inkorg",
-            bild_url: bildUrl || null,
-            bild_fotograf: bildFotograf.trim() || null,
-            youtube_video_id: youtubeId || null,
-            filmrecension: typ === "filmrecension",
-          }),
-        });
-        const inlData = await inlRes.json();
-        if (inlData?.[0]?.id) setInlamningId(inlData[0].id);
-      } catch {}
-      setResult(parsed);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.resultat) throw new Error(data.error || "");
+      setResult(data.resultat);
+      setInlamningId(data.inlamning_id);
+      setPubliceringsToken(data.token);
       setView("result");
-    } catch {
-      setError("Analysen misslyckades. Försök igen.");
+    } catch (e) {
+      setError(e.message ? `Analysen misslyckades: ${e.message}` : "Analysen misslyckades. Försök igen.");
     } finally {
       setAnalyzing(false);
     }
@@ -409,39 +342,18 @@ export default function SkickaInClient() {
   async function publish() {
     setSaving(true); setError(null);
     try {
-      const res = await fetch(`${SB_URL}/rest/v1/artiklar`, {
+      const res = await fetch("/api/skicka-in/publicera", {
         method: "POST",
-        headers: { ...sbHeaders(), "Prefer": "return=representation" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          rubrik: result.rubrik || title,
-          forfattare: author,
-          artikel: text,
-          motivering: result.motivering,
-          kategori: KATEGORI_FOR_TYP[typ] || "Övrigt",
-          arg: result.arg, ori: result.ori, rel: result.rel, tro: result.tro,
-          taggar: result.taggar || [],
-          kalla: "manniska",
-          bild_url: bildUrl || null,
-          bild_fotograf: bildFotograf.trim() || null,
-          youtube_video_id: youtubeId || null,
-          filmrecension: typ === "filmrecension",
-          // Manuella nyhetsartiklar använder referenslistan i artikeltexten.
-          // Behåll en liten typmarkör så befintliga nyhetsfilter fortfarande
-          // känner igen artikeln utan att kräva en påhittad ensam källa.
-          nyhetskalla: typ === "nyhetsartikel"
-            ? { typ: "manuell", namn: null, url: null, publicerad: null, antal_utvärderade: 0 }
-            : null,
+          inlamning_id: inlamningId,
+          token: publiceringsToken,
+          rubrik_forslag: result.rubrik || null,
+          // Samma som tidigare: AI-redaktörens rubrikförslag används om det finns.
+          anvand_forslag: !!result.rubrik,
         }),
       });
       if (!res.ok) throw new Error();
-      if (inlamningId) {
-        await fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${inlamningId}`, {
-          method: "PATCH",
-          headers: sbHeaders(),
-          body: JSON.stringify({ status: "publicerad" }),
-        });
-      }
-      fetch("/api/revalidate-arkiv", { method: "POST" }).catch(() => {}); // fire and forget
       setView("published");
     } catch {
       setError("Publicering misslyckades. Försök igen.");
