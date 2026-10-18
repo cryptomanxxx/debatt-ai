@@ -86,12 +86,22 @@ export async function publiceraInlamning(key, inl, { rubrik, franStatus } = {}) 
   if (((await lasRes.json()) || []).length === 0) return { konflikt: true };
 
   // Statusen är redan bytt. Misslyckas artikeln (fel svar eller nätverksfel)
-  // återställs den, annars kan inlämningen aldrig publiceras igen.
-  const aterstall = () => fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${inl.id}`, {
-    method: "PATCH",
-    headers: headers(key),
-    body: JSON.stringify({ status: inl.status }),
-  }).catch(() => {});
+  // återställs den, annars kan inlämningen aldrig publiceras igen. Svaret
+  // kontrolleras och anropet görs om. Lyckas inget av försöken loggas det;
+  // admin kan då sätta tillbaka status "inkorg" i adminpanelen.
+  const aterstall = async () => {
+    for (let forsok = 0; forsok < 3; forsok++) {
+      try {
+        const res = await fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${inl.id}`, {
+          method: "PATCH",
+          headers: headers(key),
+          body: JSON.stringify({ status: inl.status }),
+        });
+        if (res.ok) return;
+      } catch {}
+    }
+    console.error(`Kunde inte återställa status för inlämning ${inl.id} efter misslyckad publicering`);
+  };
 
   let artRes;
   try {
