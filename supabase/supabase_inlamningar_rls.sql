@@ -48,7 +48,9 @@ end $$;
 drop policy if exists "Publik läsning artiklar" on artiklar;
 create policy "Publik läsning artiklar" on artiklar for select using (true);
 
-revoke insert, update, delete on artiklar from anon, authenticated;
+-- Allt utom läsning dras in (även TRUNCATE/TRIGGER/REFERENCES, som tabellen
+-- hade fått automatiskt). TRUNCATE omfattas inte av RLS.
+revoke all on artiklar from anon, authenticated;
 grant select on artiklar to anon;
 grant select, insert, update, delete on artiklar to service_role;
 
