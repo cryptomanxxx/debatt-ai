@@ -9,7 +9,7 @@
 // (app/api/agent/submit/route.js).
 //
 // Ingen Turnstile-verifiering här: SkickaInClient.js's enda Turnstile-token
-// konsumeras redan av /api/analyze (Cloudflare-token är engångsbruk — att
+// konsumeras redan av /api/skicka-in (Cloudflare-token är engångsbruk — att
 // verifiera samma token två gånger hade fått den andra verifieringen att
 // misslyckas). Skyddas istället av rate limit + strikt filvalidering, samma
 // avvägning som /api/nyhetsflode/importera redan gör för ett jämförbart

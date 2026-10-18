@@ -62,10 +62,12 @@ const VALID_CATEGORIES = [
   "Biologi & natur","Övrigt",
 ];
 
+// Skrivningar till inlamningar/artiklar kräver service role (anon-nyckeln är
+// publik och har inte längre skrivrätt där).
 function sbHeaders() {
   return {
-    apikey: SB_KEY,
-    Authorization: `Bearer ${SB_KEY}`,
+    apikey: SB_SERVICE_KEY,
+    Authorization: `Bearer ${SB_SERVICE_KEY}`,
     "Content-Type": "application/json",
   };
 }

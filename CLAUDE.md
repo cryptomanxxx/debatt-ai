@@ -4709,6 +4709,40 @@ Vercel Usage (okt 2026) visade Fluid Active CPU 3h 30m av 4h. I Observability �
 | `app/icon.js`, `app/apple-icon.js` | `runtime = "edge"` borttagen, prerenderas vid bygget |
 | `app/artikel/[id]/page.js` | Tom `generateStaticParams()`, `revalidate = false` på sidan och dess fetchar |
 
+### ✅154. Opublicerade inlämningar var läsbara med anon-nyckeln — inlämning och publicering flyttade till servern – KLART
+
+Säkerhetsgranskning (okt 2026). Anon-nyckeln är publik, den syns i klientens JS. Ändå gick allt mot `inlamningar` och människors publicering direkt från webbläsaren med den:
+- Adminpanelen läste, ändrade och raderade `inlamningar` med anon-nyckeln. Lösenordet kontrollerades bara i webbläsaren, så vem som helst kunde läsa alla opublicerade texter och författarnamn, och ändra eller radera dem.
+- `/skicka-in` och startsidans formulär byggde AI-redaktörens prompt i webbläsaren och skrev sedan själva till `artiklar` med anon. Den som anropade Supabase direkt kunde publicera en artikel med påhittade poäng, utan att AI-redaktören bedömt den.
+- `/api/agent/submit` skrev också till `inlamningar`/`artiklar` med anon-nyckeln.
+
+Det gick inte att testa live från sessionen (sandboxen når inte Supabase), men koden visar att åtkomsten måste ha funnits, annars hade flödena inte fungerat.
+
+**Fix:**
+- `POST /api/skicka-in`: tar emot strukturerade fält (typ, rubrik, författare, text, bild, YouTube) och kollar Turnstile. Prompten byggs på servern (`app/lib/inlamning.mjs`). AI-redaktören bedömer via fallback-kedjan. Poängen klampas till heltal 0–10 och beslutet följer alltid poängen. Inlämningen sparas med service role. Svaret innehåller bedömningen, id och en publiceringstoken: en HMAC över id och AI-rubrikförslaget, nycklad med service role-nyckeln, samma princip som läsarbildernas raderingstoken (✅116). Bild-URL och YouTube-id släpps bara igenom i exakt den form plattformens egna flöden skapar. Ersätter `/api/analyze`, som tagits bort.
+- `POST /api/skicka-in/publicera`: kräver token. Läser inlämningen på servern och publicerar bara om status är `inkorg` och de sparade poängen når 6. Klienten kan bara välja mellan sin egen rubrik och AI-förslaget. Statusen byts villkorat (`status=eq.inkorg`) innan artikeln skapas, så samma inlämning aldrig kan publiceras två gånger. Misslyckas artikeln återställs statusen.
+- `POST /api/admin/inlamningar` (lista/status/radera/publicera): lösenordet kontrolleras på servern och allt går med service role. Admin-publicering kopierar nu även bild, YouTube och taggar.
+- `/api/agent/submit` skriver med service role.
+- `/redaktion` läser med service role. Människors namn på opublicerade inlämningar räknas ihop till "Människor", så sidan visar bara statistik.
+
+**Codex-fynd (PR #1574-granskning):**
+- **P1:** om själva artikel-anropet kastade (nätverksfel) efter att statusen bytts till `publicerad` återställdes den inte. Inlämningen kunde då aldrig publiceras igen. Nu återställs statusen även vid ett kastat fel.
+- **P2:** `agents/codestral-worker.js` läste `inlamningar` med anon-nyckeln och skulle ha rapporterat noll inlämningar efter migreringen. Den läsningen går nu med service role, och `codestral-analysis.yml` skickar med `SUPABASE_SERVICE_ROLE_KEY`.
+
+`supabase_inlamningar_rls.sql` slår på RLS på `inlamningar` utan anon-policies och tar bort anon:s skrivrätt på `artiklar` (publik läsning kvar). **Kör den först när koden är driftsatt**, annars slutar inlämning och inkorgen fungera tills deployen är klar. Ingen data raderas.
+
+| Fil | Roll |
+|---|---|
+| `app/lib/inlamning.mjs` | Prompter, validering, poängtolkning, publiceringstoken, artikelrad ur sparad inlämning |
+| `app/lib/inlamningDb.js` | Service role-anrop mot `inlamningar`, villkorad publicering |
+| `app/api/skicka-in/route.js` | Bedömning och sparning |
+| `app/api/skicka-in/publicera/route.js` | Publicering med token och sparade poäng |
+| `app/api/admin/inlamningar/route.js` | Adminpanelens inkorg |
+| `app/skicka-in/SkickaInClient.js`, `app/client.js`, `app/admin/client.js` | Anropar routarna, inga direkta Supabase-skrivningar |
+| `app/api/agent/submit/route.js`, `app/redaktion/page.js` | Service role |
+| `supabase/supabase_inlamningar_rls.sql` | RLS och grants |
+| `tests/inlamning.test.mjs` | Validering, klampning, token, artikelrad |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

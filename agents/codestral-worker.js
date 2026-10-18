@@ -16,6 +16,8 @@ const { execSync } = require("child_process");
 const MISTRAL_API_KEY  = process.env.MISTRAL_API_KEY;
 const SUPABASE_URL     = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SUPABASE_KEY     = process.env.SUPABASE_ANON_KEY;
+// inlamningar är bara läsbar med service role (opublicerade texter).
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SUGGESTIONS_DIR  = path.join(__dirname, "../ai-bus/suggestions");
 const REPORTS_DIR      = path.join(__dirname, "../ai-bus/reports");
 const DAYS_BACK        = parseInt(process.env.DAYS_BACK || "7", 10);
@@ -152,10 +154,13 @@ async function fetchRuntimeData() {
   const since = new Date(Date.now() - DAYS_BACK * 86400_000).toISOString();
   const h  = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
   const SB = SUPABASE_URL;
+  const hService = SUPABASE_SERVICE_KEY
+    ? { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` }
+    : h;
 
-  async function sb(path) {
+  async function sb(path, headers = h) {
     try {
-      const r = await fetch(`${SB}/rest/v1/${path}`, { headers: h });
+      const r = await fetch(`${SB}/rest/v1/${path}`, { headers });
       return r.ok ? r.json() : [];
     } catch { return []; }
   }
@@ -175,7 +180,7 @@ async function fetchRuntimeData() {
     sb(`beslut_log?select=ip&skapad=gte.${since}&limit=1000`),
     sb(`agent_fragor?select=id,offentlig&skapad=gte.${since}&limit=500`),
     sb(`amnesforslag?select=id,behandlad&skapad=gte.${since}&limit=200`),
-    sb(`inlamningar?select=status&skapad=gte.${since}&limit=300`),
+    sb(`inlamningar?select=status&skapad=gte.${since}&limit=300`, hService),
     sb(`nyhetslog?select=antal&skapad=gte.${since}&limit=300`),
   ]);
 

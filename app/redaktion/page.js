@@ -1,4 +1,5 @@
 import RedaktionVy from "./RedaktionVy";
+import { AGENT_VISUELL } from "../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -11,7 +12,9 @@ export const metadata = {
 
 
 async function getData() {
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // inlamningar innehåller opublicerade texter och nås bara med service role.
+  // Sidan visar bara sammanställd statistik, aldrig enskilda inlämningar.
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) return null;
   const h = { apikey: key, Authorization: `Bearer ${key}` };
 
@@ -25,7 +28,7 @@ async function getData() {
   // Fetch newest rows for accurate recent stats and weekly trend
   const [res, artRes] = await Promise.all([
     fetch(
-      `${SB_URL}/rest/v1/inlamningar?select=beslut,arg,ori,rel,tro,forfattare,status,skapad&order=skapad.desc&limit=3000`,
+      `${SB_URL}/rest/v1/inlamningar?select=beslut,arg,ori,rel,tro,forfattare,kalla,status,skapad&order=skapad.desc&limit=3000`,
       { headers: h, next: { revalidate: 1800 } }
     ),
     fetch(
@@ -134,7 +137,10 @@ export default async function RedaktionPage() {
   // Per-agent statistik (topp 24 efter antal inlämningar)
   const agentMap = {};
   for (const r of rows) {
-    const a = r.forfattare || "Okänd";
+    // Människors namn på opublicerade inlämningar visas inte — de räknas ihop.
+    // Äldre rader saknar kalla, så kända agentnamn räknas också som AI.
+    const arAi = r.kalla === "ai" || Object.hasOwn(AGENT_VISUELL, r.forfattare || "");
+    const a = arAi ? (r.forfattare || "Okänd") : "Människor";
     if (!agentMap[a]) agentMap[a] = { agent: a, publicerade: 0, reviderade: 0, avvisade: 0 };
     const b = (r.beslut || "").toLowerCase();
     if (b === "publicera") agentMap[a].publicerade++;
