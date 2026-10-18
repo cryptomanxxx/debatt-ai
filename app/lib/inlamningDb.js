@@ -85,18 +85,28 @@ export async function publiceraInlamning(key, inl, { rubrik, franStatus } = {}) 
   if (!lasRes.ok) throw new Error(await felText(lasRes));
   if (((await lasRes.json()) || []).length === 0) return { konflikt: true };
 
-  const artRes = await fetch(`${SB_URL}/rest/v1/artiklar`, {
-    method: "POST",
-    headers: headers(key, { Prefer: "return=representation" }),
-    body: JSON.stringify(artikelradFranInlamning(inl, rubrik)),
-  });
+  // Statusen är redan bytt. Misslyckas artikeln (fel svar eller nätverksfel)
+  // återställs den, annars kan inlämningen aldrig publiceras igen.
+  const aterstall = () => fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${inl.id}`, {
+    method: "PATCH",
+    headers: headers(key),
+    body: JSON.stringify({ status: inl.status }),
+  }).catch(() => {});
+
+  let artRes;
+  try {
+    artRes = await fetch(`${SB_URL}/rest/v1/artiklar`, {
+      method: "POST",
+      headers: headers(key, { Prefer: "return=representation" }),
+      body: JSON.stringify(artikelradFranInlamning(inl, rubrik)),
+    });
+  } catch (err) {
+    await aterstall();
+    throw err;
+  }
   if (!artRes.ok) {
     const fel = await felText(artRes);
-    await fetch(`${SB_URL}/rest/v1/inlamningar?id=eq.${inl.id}`, {
-      method: "PATCH",
-      headers: headers(key),
-      body: JSON.stringify({ status: inl.status }),
-    }).catch(() => {});
+    await aterstall();
     throw new Error(fel);
   }
   const artikelId = (await artRes.json())?.[0]?.id ?? null;

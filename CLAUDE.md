@@ -4725,6 +4725,10 @@ Det gick inte att testa live från sessionen (sandboxen når inte Supabase), men
 - `/api/agent/submit` skriver med service role.
 - `/redaktion` läser med service role. Människors namn på opublicerade inlämningar räknas ihop till "Människor", så sidan visar bara statistik.
 
+**Codex-fynd (PR #1574-granskning):**
+- **P1:** om själva artikel-anropet kastade (nätverksfel) efter att statusen bytts till `publicerad` återställdes den inte. Inlämningen kunde då aldrig publiceras igen. Nu återställs statusen även vid ett kastat fel.
+- **P2:** `agents/codestral-worker.js` läste `inlamningar` med anon-nyckeln och skulle ha rapporterat noll inlämningar efter migreringen. Den läsningen går nu med service role, och `codestral-analysis.yml` skickar med `SUPABASE_SERVICE_ROLE_KEY`.
+
 `supabase_inlamningar_rls.sql` slår på RLS på `inlamningar` utan anon-policies och tar bort anon:s skrivrätt på `artiklar` (publik läsning kvar). **Kör den först när koden är driftsatt**, annars slutar inlämning och inkorgen fungera tills deployen är klar. Ingen data raderas.
 
 | Fil | Roll |
