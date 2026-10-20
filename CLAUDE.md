@@ -4743,6 +4743,18 @@ Det gick inte att testa live från sessionen (sandboxen når inte Supabase), men
 | `supabase/supabase_inlamningar_rls.sql` | RLS och grants |
 | `tests/inlamning.test.mjs` | Validering, klampning, token, artikelrad |
 
+### ✅155. ISR-skrivningarna kom från artikelsidan — dynamisk igen – KLART
+
+Vercel-mejl (okt 2026): ISR Writes 451 989 / 200 000 för 30 dagar. Observability → ISR per sida, 12 timmar: `/artikel/[id]` hade 1 300 av ~2 100 skrivningar på 736 olika artiklar, men bara 183 läsningar ur cachen. Alla andra sidor hade 0–8 skrivningar.
+
+**Orsak:** ✅153 cachade artikelsidan tills artikeln ändras (tom `generateStaticParams`, `revalidate = false`). Varje artikel skrevs då till ISR-cachen vid första besöket. De flesta artikelbesöken kommer från sökmotorer som går igenom sitemapen och läser varje artikel en gång, så nästan varje skrivning lästes aldrig igen. Räknat per månad blev det ~600 000 skrivningar, medan den dynamiska renderingen den ersatte kostade ungefär 50–55 minuter CPU per månad.
+
+**Fix:** tom `generateStaticParams` borttagen, sidan renderas dynamiskt igen (`revalidate = 3600`). Sidans Supabase-anrop har `next: { revalidate: 3600 }` och cachas i Data Cache. `revalidatePath` från `/api/agent/submit` och admin-routarna rensar även de cachade svaren för sidan, så en ändrad artikel syns direkt. Ikonfixen från ✅153 är kvar.
+
+| Fil | Roll |
+|---|---|
+| `app/artikel/[id]/page.js` | `generateStaticParams` borttagen, `revalidate`/fetch-cache 3600 s istället för `false` |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt
