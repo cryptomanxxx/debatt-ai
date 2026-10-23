@@ -72,7 +72,7 @@
   </div>
   <header>
     <a class="brand" href="https://www.debatt-ai.se/" target="_blank" rel="noopener noreferrer" aria-label="Besök Debatt-AI"><div class="mark" aria-hidden="true">✳</div><div><div class="brand-name">DEBATT<span>-AI</span></div><div class="brand-sub">AI-UNIVERSITETET <strong>✦ 3D</strong></div></div></a>
-    <div class="top-right"><a class="header-link" href="https://www.debatt-ai.se/universitet" target="_blank" rel="noopener noreferrer">AI-universitetet ↗</a><a class="header-link" href="https://www.debatt-ai.se/" target="_blank" rel="noopener noreferrer">Debatt-AI ↗</a><a class="header-link version-link" href="../v12/">← Version 12</a><span class="tag">● VERSION 13 · PRESENTATION</span><button id="reset" class="icon-button" title="Återställ vy" aria-label="Återställ vy">↺</button></div>
+    <div class="top-right"><a class="header-link" href="https://www.debatt-ai.se/universitet" target="_blank" rel="noopener noreferrer">AI-universitetet ↗</a><a class="header-link" href="https://www.debatt-ai.se/" target="_blank" rel="noopener noreferrer">Debatt-AI ↗</a><a id="previous-version" class="header-link version-link" href="../v12/" hidden>← Version 12</a><span class="tag">● VERSION 13 · PRESENTATION</span><button id="reset" class="icon-button" title="Återställ vy" aria-label="Återställ vy">↺</button></div>
   </header>
   <section class="hero" aria-label="Introduktion"><div class="eyebrow">VERSION 13 · PRESENTATIONSLÄGE</div><h1>Kunskap<br/>utan <em>gränser.</em></h1><p>Från Debatt-AI:s AI-universitet ser du stadens ljus långt där nere, blinkande stjärnor, nebulosor och roterande galaxer. Välkommen in.</p></section>
   <button id="exit-presentation" type="button" class="presentation-close" hidden>← Tillbaka till salen</button>
@@ -122,6 +122,11 @@
       closed:['oraklet-m0-closed.png','oraklet-m1-closed.png','oraklet-m2-closed.png','oraklet-m3-closed.png']
     };
     let fallbackFramesReady=false,eyeState='open',mouthIndex=0,avatarSpeaking=false,mouthTimer=null;
+    // Earlier versions remain available in the private lab, but v12 is not
+    // deployed at /ai-universitet-3d/v12/ on the public Debatt-AI website.
+    if(location.hostname==='professor-oraklet-vr-lab.rarecod10.chatgpt.site'){
+      document.getElementById('previous-version').hidden=false;
+    }
     let professor3D=null,currentTopic='universe';
     document.body.dataset.camera='overview';
     function drawAvatar(){
@@ -331,6 +336,20 @@
         const distance=Math.max(10,(lectureScreen.width+2)/(2*tanHalfFov*camera.aspect),(lectureScreen.height+2)/(2*tanHalfFov));
         return {position:new THREE.Vector3(lectureScreen.x,lectureScreen.y+.6,lectureScreen.z+distance),target:new THREE.Vector3(lectureScreen.x,lectureScreen.y,lectureScreen.z)};
       }
+      function refitPresentationOnResize(){
+        if(!isPresenting)return;
+        const closeup=screenCloseup();
+        if(travel){
+          // A device rotation during the fly-in must also update its endpoint.
+          travel.end.copy(closeup.position);
+          travel.endTarget.copy(closeup.target);
+        }else{
+          // Otherwise immediately restore a fully visible screen; controls
+          // are disabled during this mode, so the visitor cannot self-correct.
+          camera.position.copy(closeup.position);
+          controls.target.copy(closeup.target);
+        }
+      }
       function enterPresentation(){
         if(isPresenting)return;
         returnView={position:camera.position.clone(),target:controls.target.clone(),mode:document.body.dataset.camera||'overview'};
@@ -390,7 +409,7 @@
         controls.update();keepCameraInside();renderer.render(scene,camera);
       }
       animate();
-      addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7))});
+      addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));refitPresentationOnResize()});
       const loading=document.getElementById('loading');loading.classList.add('done');setTimeout(()=>loading.remove(),550);
     }catch(error){
       console.warn('3D unavailable; showing 2D preview instead',error);
