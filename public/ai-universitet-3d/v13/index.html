@@ -31,6 +31,7 @@
     .welcome-card p{font-size:13px;line-height:1.57;margin:11px 0 14px;color:#d5e2df;min-height:42px}
     .topic-buttons{display:flex;flex-wrap:wrap;gap:7px}.topic{border:1px solid rgba(111,195,255,.28);color:#deebff;background:rgba(97,169,247,.07);padding:8px 10px;font-size:11px;border-radius:9px}.topic.active{background:rgba(85,234,251,.14);border-color:var(--mint);color:var(--mint)}
     .speak-button{width:100%;margin-top:10px;padding:10px 12px;text-align:center;border:1px solid rgba(255,77,218,.65);border-radius:10px;background:rgba(255,77,218,.11);color:#ffd5f7;font-size:12px;font-weight:700}.speak-button:hover{background:rgba(255,77,218,.22)}.speak-button.speaking{border-color:var(--mint);color:var(--mint);background:rgba(85,234,251,.12)}.audio-note{display:block;margin-top:7px;text-align:center;font-size:10px;color:#bdcee4;line-height:1.4}.audio-note.error{color:#ffbfb1}
+    .language-button{width:100%;margin-top:8px;padding:10px 12px;text-align:center;border:1px solid rgba(130,169,255,.64);border-radius:10px;background:rgba(96,123,255,.14);color:#e3e9ff;font-size:12px;font-weight:750}.language-button:hover{background:rgba(120,151,255,.23)}.language-button[aria-pressed="true"]{border-color:var(--mint);background:rgba(85,234,251,.1);color:#d4faff}
     .presentation-cta{width:100%;margin-top:10px;padding:10px 12px;border:1px solid rgba(85,234,251,.55);border-radius:10px;background:rgba(85,234,251,.12);color:#d1faff;font-size:12px;font-weight:750}.presentation-cta:hover{background:rgba(85,234,251,.22)}.presentation-cta[hidden],.presentation-close[hidden]{display:none}
     .presentation-close{position:fixed;z-index:22;left:clamp(15px,4vw,56px);top:calc(20px + env(safe-area-inset-top));padding:12px 17px;border:1px solid rgba(85,234,251,.7);border-radius:12px;background:rgba(6,16,43,.93);backdrop-filter:blur(18px);color:#effbff;box-shadow:0 0 25px rgba(85,234,251,.22);font-size:12px;font-weight:800}
     body.presentation-mode header,body.presentation-mode .hero,body.presentation-mode .mobile-hint,body.presentation-mode .side-controls,body.presentation-mode .bottom-bar{opacity:0;visibility:hidden;pointer-events:none}
@@ -97,6 +98,7 @@
       </div>
       <button id="speak" class="speak-button" type="button">▶ Låt Oraklet tala</button>
       <small id="audio-note" class="audio-note" aria-live="polite">Svensk AI-röst · förinspelad demo</small>
+      <button id="english-toggle" class="language-button" type="button" lang="en" aria-pressed="false">🌐 Listen to Professor Oraklet in English</button>
       <button id="presentation-cta" class="presentation-cta" type="button">▣ Se presentationen i närbild</button>
       <div class="ecosystem-links"><a href="https://www.debatt-ai.se/universitet" target="_blank" rel="noopener noreferrer">🎓 AI-universitetet ↗</a><a href="https://www.debatt-ai.se/" target="_blank" rel="noopener noreferrer">Debatt-AI ↗</a></div>
     </section>
@@ -127,7 +129,41 @@
     if(location.hostname==='professor-oraklet-vr-lab.rarecod10.chatgpt.site'){
       document.getElementById('previous-version').hidden=false;
     }
-    let professor3D=null,currentTopic='universe';
+    let professor3D=null,currentTopic='universe',currentLanguage='sv',refreshBoard=null;
+    const translations={
+      sv:{
+        play:'▶ Låt Oraklet tala',stop:'■ Stoppa Oraklet',switchTo:'🌐 Listen to Professor Oraklet in English',
+        ready:'Svensk AI-röst · förinspelad demo',starting:'Startar ljuduppspelning …',playing:'Oraklet talar · ljudet spelas upp',
+        error:'Kunde inte ladda ljudet. Kontrollera din anslutning.',playError:'Ljudet kunde inte startas. Tryck igen eller kontrollera volymen.',
+        closeup:'▣ Se presentationen i närbild',back:'← Tillbaka till salen',demo:'DEMO · EJ LIVE-AI',
+        eyebrow:'VERSION 13 · PRESENTATIONSLÄGE',hero:'Kunskap<br/>utan <em>gränser.</em>',
+        heroInfo:'Från Debatt-AI:s AI-universitet ser du stadens ljus långt där nere, blinkande stjärnor, nebulosor och roterande galaxer. Välkommen in.',
+        hint:'Dra med fingret för att se dig omkring · Nyp för att zooma',
+        help:'Dra för att rotera vyn<br/>Scrolla eller nyp för att zooma<br/>Tryck på skärmen för närbild',
+        views:{overview:'Överblick',front:'Föreläsning',side:'Sidovy mot stjärnorna',oraklet:'Möt 3D-Oraklet',science:'Vetenskapsobjekt',architecture:'Arkitektur',panorama:'Panoramautsikt'},
+        topics:{
+          universe:{title:'Universums gåtor',sub:'Kosmologi · Rumtid · Galaxer',color:'#a1eadc',button:'✦ Universum',dialogue:'Universum är vårt största laboratorium. Här kan vi utforska galaxer, svarta hål och rumtid tillsammans.'},
+          atom:{title:'Atomernas värld',sub:'Kvantfysik · Materia · Energi',color:'#efcb91',button:'◎ Atomer',dialogue:'All materia är uppbyggd av atomer. Vårt svävande objekt är en konstnärlig illustration, inte en fysikalisk simulering.'},
+          ai:{title:'Artificiell intelligens',sub:'Neurala nätverk · AI-agenter · Forskning',color:'#87baff',button:'⌘ Artificiell intelligens',dialogue:'AI kan bli en vetenskaplig samarbetspartner. I framtiden vill vi låta Oraklet undervisa och svara på frågor här.'}
+        }
+      },
+      en:{
+        play:'▶ Let Oraklet speak',stop:'■ Stop Oraklet',switchTo:'🇸🇪 Lyssna på Professor Oraklet på svenska',
+        ready:'English synthetic voice · prerecorded demo',starting:'Starting English narration …',playing:'Oraklet is speaking · English audio playing',
+        error:'Could not load the audio. Check your connection.',playError:'Audio could not start. Try again or check your volume.',
+        closeup:'▣ View the presentation up close',back:'← Back to the auditorium',demo:'DEMO · NOT LIVE AI',
+        eyebrow:'VERSION 13 · PRESENTATION MODE',hero:'Knowledge<br/>without <em>borders.</em>',
+        heroInfo:'From Debatt-AI’s AI University, look out over the city lights, twinkling stars, nebulae and rotating galaxies. Welcome inside.',
+        hint:'Drag to look around · Pinch to zoom',
+        help:'Drag to rotate the view<br/>Scroll or pinch to zoom<br/>Tap the lecture screen for a close-up',
+        views:{overview:'Overview',front:'Lecture',side:'Side view of the stars',oraklet:'Meet 3D Oraklet',science:'Science exhibit',architecture:'Architecture',panorama:'Panoramic view'},
+        topics:{
+          universe:{title:'Mysteries of the Universe',sub:'Cosmology · Spacetime · Galaxies',color:'#a1eadc',button:'✦ Universe',dialogue:'The universe is our largest laboratory. Together, we can explore galaxies, black holes and the fabric of spacetime.'},
+          atom:{title:'The World of Atoms',sub:'Quantum physics · Matter · Energy',color:'#efcb91',button:'◎ Atoms',dialogue:'All matter is made of atoms. Our glowing exhibit is an artistic illustration, not a physically accurate simulation.'},
+          ai:{title:'Artificial Intelligence',sub:'Neural networks · AI agents · Research',color:'#87baff',button:'⌘ Artificial intelligence',dialogue:'AI can become a partner in scientific discovery. Our vision is to make research and knowledge accessible to everyone.'}
+        }
+      }
+    };
     document.body.dataset.camera='overview';
     function drawAvatar(){
       if(professor3D)professor3D.updateFace(eyeState,mouthIndex);
@@ -158,46 +194,90 @@
       },220);
     }
     const talkButton=document.getElementById('speak');
+    const languageButton=document.getElementById('english-toggle');
     const lectureAudio=document.getElementById('lecture-audio');
     const lessonVideo=document.getElementById('lesson-video');
     const audioNote=document.getElementById('audio-note');
-    const clips={universe:'assets/audio/universe.mp3',atom:'assets/audio/atom.mp3',ai:'assets/audio/ai.mp3'};
-    const films={universe:'assets/videos/universe.mp4',atom:'assets/videos/atom.mp4',ai:'assets/videos/ai.mp4'};
+    const clips={
+      sv:{universe:'assets/audio/universe.mp3',atom:'assets/audio/atom.mp3',ai:'assets/audio/ai.mp3'},
+      en:{universe:'assets/audio/en/universe.mp3',atom:'assets/audio/en/atom.mp3',ai:'assets/audio/en/ai.mp3'}
+    };
+    const films={
+      sv:{universe:'assets/videos/universe.mp4',atom:'assets/videos/atom.mp4',ai:'assets/videos/ai.mp4'},
+      en:{universe:'assets/videos/en/universe.mp4',atom:'assets/videos/en/atom.mp4',ai:'assets/videos/en/ai.mp4'}
+    };
+    const currentCopy=()=>translations[currentLanguage];
     let videoScreen=null;
     function projectVideo(value){if(videoScreen)videoScreen.visible=value}
     function stopVideo(){lessonVideo.pause();lessonVideo.currentTime=0;projectVideo(false)}
-    function endTalking(){setTalking(false);talkButton.classList.remove('speaking');talkButton.textContent='▶ Låt Oraklet tala'}
+    function endTalking(){setTalking(false);talkButton.classList.remove('speaking');talkButton.textContent=currentCopy().play}
     function stopAudio(){lectureAudio.pause();lectureAudio.currentTime=0;stopVideo();endTalking()}
     function selectTopicAudio(name){
-      if(!clips[name])return;
+      if(!clips[currentLanguage][name])return;
       stopAudio();currentTopic=name;
-      lectureAudio.src=clips[name];lectureAudio.load();
-      lessonVideo.src=films[name];lessonVideo.load();
-      audioNote.textContent='Svensk AI-röst · förinspelad demo';audioNote.classList.remove('error');
+      lectureAudio.src=clips[currentLanguage][name];lectureAudio.load();
+      lessonVideo.src=films[currentLanguage][name];lessonVideo.load();
+      audioNote.textContent=currentCopy().ready;audioNote.classList.remove('error');
+    }
+    function applyLanguageUI(){
+      const copy=currentCopy(),topic=copy.topics[currentTopic];
+      document.documentElement.lang=currentLanguage;
+      document.getElementById('dialogue').textContent=topic.dialogue;
+      document.querySelectorAll('.topic').forEach(button=>{
+        button.textContent=copy.topics[button.dataset.topic].button;
+        button.classList.toggle('active',button.dataset.topic===currentTopic);
+      });
+      talkButton.textContent=avatarSpeaking?copy.stop:copy.play;
+      languageButton.textContent=copy.switchTo;
+      languageButton.lang=currentLanguage==='sv'?'en':'sv';
+      languageButton.setAttribute('aria-pressed',String(currentLanguage==='en'));
+      document.getElementById('presentation-cta').textContent=copy.closeup;
+      document.getElementById('exit-presentation').textContent=copy.back;
+      document.querySelector('.beta').textContent=copy.demo;
+      document.querySelector('.eyebrow').textContent=copy.eyebrow;
+      // These are fixed, authored UI fragments, never user-provided HTML.
+      document.querySelector('.hero h1').innerHTML=copy.hero;
+      document.querySelector('.hero p').textContent=copy.heroInfo;
+      document.querySelector('.mobile-hint').textContent=copy.hint;
+      document.querySelector('.help').innerHTML=copy.help;
+      document.querySelectorAll('.view-button').forEach(button=>{
+        button.lastChild.textContent=' '+copy.views[button.dataset.view];
+      });
     }
     lectureAudio.addEventListener('playing',()=>{
-      setTalking(true);talkButton.classList.add('speaking');talkButton.textContent='■ Stoppa Oraklet';
-      audioNote.textContent='Oraklet talar · ljudet spelas upp';audioNote.classList.remove('error');
+      setTalking(true);talkButton.classList.add('speaking');talkButton.textContent=currentCopy().stop;
+      audioNote.textContent=currentCopy().playing;audioNote.classList.remove('error');
       projectVideo(lessonVideo.readyState>=2);
     });
-    lectureAudio.addEventListener('ended',()=>{stopVideo();endTalking();audioNote.textContent='Svensk AI-röst · förinspelad demo'});
+    lectureAudio.addEventListener('ended',()=>{stopVideo();endTalking();audioNote.textContent=currentCopy().ready});
     lectureAudio.addEventListener('error',()=>{
-      stopVideo();endTalking();audioNote.textContent='Kunde inte ladda ljudet. Kontrollera din anslutning.';audioNote.classList.add('error');
+      stopVideo();endTalking();audioNote.textContent=currentCopy().error;audioNote.classList.add('error');
     });
     lessonVideo.addEventListener('loadeddata',()=>{if(avatarSpeaking)projectVideo(true)});
     lessonVideo.addEventListener('error',()=>{projectVideo(false);console.warn('Lektionsvideo kunde inte laddas')});
-    talkButton.addEventListener('click',()=>{
-      if(!lectureAudio.paused){stopAudio();return}
+    function startLecture(){
       if(!lectureAudio.src)selectTopicAudio(currentTopic);
-      audioNote.textContent='Startar ljuduppspelning …';audioNote.classList.remove('error');
+      audioNote.textContent=currentCopy().starting;audioNote.classList.remove('error');
       const start=lectureAudio.play();
       // Muted inline video may autoplay on mobile. Audio remains the timing source.
       const filmStart=lessonVideo.play();
       if(filmStart)filmStart.catch(error=>{projectVideo(false);console.warn('Videouppspelning saknar stöd',error)});
       if(start)start.catch(error=>{
-        stopVideo();endTalking();audioNote.textContent='Ljudet kunde inte startas. Tryck igen eller kontrollera volymen.';
+        stopVideo();endTalking();audioNote.textContent=currentCopy().playError;
         audioNote.classList.add('error');console.warn('Audio playback failed',error);
       });
+    }
+    talkButton.addEventListener('click',()=>{
+      if(!lectureAudio.paused){stopAudio();return}
+      startLecture();
+    });
+    languageButton.addEventListener('click',()=>{
+      currentLanguage=currentLanguage==='sv'?'en':'sv';
+      selectTopicAudio(currentTopic);
+      applyLanguageUI();
+      if(refreshBoard)refreshBoard();
+      // The language switch itself is a user gesture, enabling audio on mobile.
+      startLecture();
     });
     try {
       const container=document.getElementById('world');
@@ -311,12 +391,8 @@
       professor3D=createProfessorOraklet(scene);drawAvatar();
       // Small information pylons beside the stage.
       for(const side of [-1,1]){box(1.25,3.5,1.15,side*10.2,1.9,-12.4,materials.dark);box(1.4,.15,1.25,side*10.2,3.73,-12.4,materials.gold);sphere(.42,side*10.2,4.23,-12.4,materials.mint)}
-      const topics={
-        universe:{title:'Universums gåtor',sub:'Kosmologi · Rumtid · Galaxer',color:'#a1eadc',dialogue:'Universum är vårt största laboratorium. Här kan vi utforska galaxer, svarta hål och rumtid tillsammans.'},
-        atom:{title:'Atomernas värld',sub:'Kvantfysik · Materia · Energi',color:'#efcb91',dialogue:'All materia är uppbyggd av atomer. Vårt svävande objekt är en konstnärlig illustration, inte en fysikalisk simulering.'},
-        ai:{title:'Artificiell intelligens',sub:'Neurala nätverk · AI-agenter · Forskning',color:'#87baff',dialogue:'AI kan bli en vetenskaplig samarbetspartner. I framtiden vill vi låta Oraklet undervisa och svara på frågor här.'}
-      };
-      function setTopic(name){const t=topics[name];if(!t)return;selectTopicAudio(name);boardText(t.title,t.sub,t.color);document.getElementById('dialogue').textContent=t.dialogue;document.querySelectorAll('.topic').forEach(b=>b.classList.toggle('active',b.dataset.topic===name));core.material.color.set(t.color);core.material.emissive.set(t.color);}
+      refreshBoard=()=>{const t=currentCopy().topics[currentTopic];boardText(t.title,t.sub,t.color);core.material.color.set(t.color);core.material.emissive.set(t.color)};
+      function setTopic(name){if(!currentCopy().topics[name])return;selectTopicAudio(name);applyLanguageUI();refreshBoard();}
       document.querySelectorAll('.topic').forEach(b=>b.addEventListener('click',()=>setTopic(b.dataset.topic)));setTopic('universe');
       // Wide, elevated rear-of-room shot: show the full lecture hall and cosmic horizon.
       const views={overview:{pos:[0,18.6,22],target:[-6,10.2,-15]},front:{pos:[0,8,12],target:[0,7,-13]},side:{pos:[-29,4.5,8],target:[-2,12.4,-15]},oraklet:{pos:[6.65,4.5,0],target:[6.65,3.65,-10.6]},science:{pos:[-11.5,8,1],target:[-12.9,7.4,-14.2]},architecture:{pos:[0,18,12],target:[-12,20,-13]},panorama:{pos:[2,13,9],target:[-62,21,-72]}};
@@ -416,9 +492,8 @@
       document.getElementById('presentation-cta').hidden=true;
       document.getElementById('exit-presentation').hidden=true;
       document.getElementById('loading').remove();document.getElementById('world').style.display='none';document.getElementById('fallback').classList.add('show');
-      enableFallbackAvatar();selectTopicAudio('universe');
-      const examples={universe:'Universum är vårt största laboratorium. Här kan vi utforska galaxer, svarta hål och rumtid tillsammans.',atom:'All materia är uppbyggd av atomer. Vårt svävande objekt är en konstnärlig illustration, inte en fysikalisk simulering.',ai:'AI kan bli en vetenskaplig samarbetspartner. I framtiden vill vi låta Oraklet undervisa och svara på frågor här.'};
-      document.querySelectorAll('.topic').forEach(b=>b.addEventListener('click',()=>{selectTopicAudio(b.dataset.topic);document.querySelectorAll('.topic').forEach(x=>x.classList.toggle('active',x===b));document.getElementById('dialogue').textContent=examples[b.dataset.topic]}));
+      enableFallbackAvatar();selectTopicAudio('universe');applyLanguageUI();
+      document.querySelectorAll('.topic').forEach(b=>b.addEventListener('click',()=>{selectTopicAudio(b.dataset.topic);applyLanguageUI()}));
       document.querySelectorAll('.view-button').forEach(b=>b.addEventListener('click',()=>{document.body.dataset.camera=b.dataset.view;document.querySelectorAll('.view-button').forEach(x=>x.classList.toggle('active',x===b));document.getElementById('fallback').style.filter=b.dataset.view==='science'?'saturate(1.35) brightness(1.12)':b.dataset.view==='architecture'?'hue-rotate(18deg)':'none'}));
       document.getElementById('reset').addEventListener('click',()=>{document.body.dataset.camera='overview';document.getElementById('fallback').style.filter='none';document.querySelector('[data-view="overview"]').click()});
     }
