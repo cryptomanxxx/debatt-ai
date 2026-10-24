@@ -23,7 +23,7 @@
     .hero{position:fixed;z-index:4;left:clamp(18px,4vw,56px);top:26%;width:min(375px,40vw);pointer-events:none;text-shadow:0 2px 24px rgba(3,11,17,.8);transition:opacity .3s ease,transform .3s ease,visibility .3s ease}
     .eyebrow{font-size:11px;letter-spacing:.24em;color:var(--mint);font-weight:750;text-transform:uppercase}.hero h1{font-family:Georgia,'Times New Roman',serif;font-weight:normal;font-size:clamp(42px,5.6vw,82px);letter-spacing:-.04em;line-height:.98;margin:18px 0 17px}.hero h1 em{color:#f1a8ec;font-style:italic;text-shadow:0 0 22px rgba(255,77,218,.40)}.hero p{max-width:325px;font-size:14px;line-height:1.7;color:#d2dff3;margin:0}
     body:not([data-camera="overview"]) .hero,body:not([data-camera="overview"]) .mobile-hint{opacity:0;visibility:hidden;transform:translateX(-18px)}
-    .side-controls{position:fixed;z-index:7;right:clamp(14px,2.4vw,32px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px}
+    .side-controls{position:fixed;z-index:7;right:clamp(14px,2.4vw,32px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px}.view-options{display:flex;flex-direction:column;gap:8px}
     .view-button{display:flex;gap:10px;align-items:center;justify-content:flex-start;padding:12px 14px;min-width:154px;color:#d8eaff;background:rgba(6,15,39,.82);border:1px solid var(--border);border-radius:12px;backdrop-filter:blur(12px);font-size:12px;font-weight:650}.view-button span{font-size:17px}.view-button.active{color:#071528;background:var(--mint);border-color:var(--mint);box-shadow:0 0 18px rgba(85,234,251,.4)}
     .bottom-bar{z-index:6;position:fixed;bottom:clamp(18px,3vw,30px);left:clamp(18px,4vw,56px);right:clamp(18px,4vw,56px);display:flex;align-items:end;justify-content:space-between;gap:14px;pointer-events:none}
     .welcome-card{pointer-events:auto;width:min(392px,100%);background:var(--panel);border:1px solid var(--border);box-shadow:0 16px 60px rgba(0,0,0,.45),0 0 30px rgba(25,104,189,.1);backdrop-filter:blur(18px);padding:17px 18px 16px;border-radius:17px}
@@ -44,6 +44,42 @@
     @media(max-width:820px){header{padding:14px 16px}.mark{width:37px;height:37px}.brand-name{font-size:12px}.brand-sub{font-size:9px}.tag{font-size:9px;padding:8px}.header-link{padding:8px;font-size:10px}.hero{top:20%;left:20px;width:min(290px,62vw)}.hero h1{font-size:clamp(37px,7vw,55px)}.hero p{font-size:12px;max-width:245px}.side-controls{right:12px;top:37%;transform:none}.view-button{min-width:auto;padding:10px 12px;font-size:0}.view-button span{font-size:19px}.bottom-bar{bottom:calc(13px + env(safe-area-inset-bottom));left:13px;right:13px}.welcome-card{width:min(380px,100%)}.help{display:none}.mobile-hint{display:block;position:absolute;left:20px;top:calc(20% + 222px);font-size:10px;color:#d7e2db;opacity:.8;text-shadow:0 2px 12px #061622}}
     @media(max-width:520px){.hero{top:17%;width:260px}.hero h1{font-size:43px;margin:11px 0}.hero p{max-width:240px}.mobile-hint{top:calc(17% + 193px)}.welcome-card{padding:13px 14px}.welcome-card p{font-size:12px;margin:9px 0 11px;min-height:37px}.topic{font-size:10px;padding:8px}.top-right .tag,.top-right .header-link:not(.version-link){display:none}.side-controls{top:33%}.fallback-professor{right:13%;top:40%;width:38vw}}
     @media(max-height:590px){.hero{top:18%}.hero h1{font-size:36px}.hero p{display:none}.mobile-hint{display:none}.bottom-bar{bottom:9px}.welcome-card p{min-height:0}.side-controls{top:27%}}
+    /* Touch devices get small launchers by default; expanded controls are
+       opt-in so neither camera menu nor lecture card obscures the scene. */
+    .touch-toggle{display:none}
+    @media (pointer:coarse), (max-width:820px){
+      .touch-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#e0faff;background:rgba(6,20,44,.9);border:1px solid rgba(85,234,251,.62);border-radius:12px;padding:12px 15px;font-size:13px;font-weight:800;backdrop-filter:blur(16px);box-shadow:0 4px 22px rgba(0,0,0,.35)}
+      .touch-toggle[aria-expanded="true"]{background:rgba(14,48,72,.95);border-color:var(--mint)}
+      .touch-toggle[aria-expanded="true"] span{transform:rotate(180deg)}
+      .side-controls{top:calc(75px + env(safe-area-inset-top));right:12px;transform:none;display:flex;flex-direction:column;align-items:stretch;gap:7px;width:min(208px,calc(100vw - 24px));z-index:12}
+      .side-controls .view-options{display:none;flex-direction:column;gap:6px;max-height:calc(100dvh - 180px);overflow-y:auto;overscroll-behavior:contain}
+      .side-controls[data-open="true"] .view-options{display:flex}
+      .side-controls .view-button{display:flex;width:100%;min-width:0;padding:10px 12px;font-size:12px;line-height:1.35;gap:9px;text-align:left}
+      .side-controls .view-button span{font-size:17px;flex:0 0 19px}
+      .side-controls[data-open="false"]{width:auto}
+      #views-toggle{min-width:102px;align-self:flex-end}
+      .bottom-bar{bottom:calc(10px + env(safe-area-inset-bottom));left:12px;right:auto;max-width:calc(100vw - 24px);gap:0}
+      .welcome-card{width:min(360px,calc(100vw - 24px));padding:0;border:0;background:transparent;box-shadow:none;backdrop-filter:none}
+      .welcome-card[data-open="false"]{width:min(255px,calc(100vw - 24px))}
+      .welcome-card .lecture-details{display:none}
+      .welcome-card[data-open="true"]{padding:12px;border:1px solid var(--border);background:rgba(7,16,38,.96);box-shadow:0 16px 60px rgba(0,0,0,.6);backdrop-filter:blur(18px);max-height:calc(82dvh - env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
+      .welcome-card[data-open="true"] .lecture-details{display:block}
+      #lecture-toggle{width:100%;text-align:left}
+      .welcome-card[data-open="true"] #lecture-toggle{margin-bottom:12px}
+      .welcome-card .card-top{flex-wrap:wrap}
+      .welcome-card .ecosystem-links{flex-wrap:wrap}
+      .help,.mobile-hint{display:none}
+      .hero{top:19%;max-width:calc(100vw - 118px)}
+      .hero h1{font-size:clamp(34px,5vw,57px)}
+    }
+    @media (max-width:520px){
+      .brand-sub{font-size:8px}
+      .hero{top:16%;left:17px;max-width:calc(100vw - 98px)}
+      .hero h1{font-size:clamp(33px,9vw,43px);margin:11px 0}
+      .hero p{font-size:12px;line-height:1.45}
+      .side-controls{top:calc(70px + env(safe-area-inset-top));right:10px}
+      .welcome-card[data-open="true"]{max-height:calc(75dvh - env(safe-area-inset-bottom))}
+    }
     @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
   </style>
   <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
@@ -78,17 +114,22 @@
   <section class="hero" aria-label="Introduktion"><div class="eyebrow">VERSION 13 · PRESENTATIONSLÄGE</div><h1>Kunskap<br/>utan <em>gränser.</em></h1><p>Från Debatt-AI:s AI-universitet ser du stadens ljus långt där nere, blinkande stjärnor, nebulosor och roterande galaxer. Välkommen in.</p></section>
   <button id="exit-presentation" type="button" class="presentation-close" hidden>← Tillbaka till salen</button>
   <div class="mobile-hint">Dra med fingret för att se dig omkring · Nyp för att zooma</div>
-  <nav class="side-controls" aria-label="Kameravinklar">
-    <button class="view-button active" data-view="overview"><span>◈</span> Överblick</button>
-    <button class="view-button" data-view="front"><span>◉</span> Föreläsning</button>
-    <button class="view-button" data-view="side"><span>◩</span> Sidovy mot stjärnorna</button>
-    <button class="view-button" data-view="oraklet"><span>♙</span> Möt 3D-Oraklet</button>
-    <button class="view-button" data-view="science"><span>✧</span> Vetenskapsobjekt</button>
-    <button class="view-button" data-view="architecture"><span>▥</span> Arkitektur</button>
-    <button class="view-button" data-view="panorama"><span>✧</span> Panoramautsikt</button>
+  <nav class="side-controls" aria-label="Kameravinklar" data-open="false">
+    <button id="views-toggle" class="touch-toggle" type="button" aria-expanded="false" aria-controls="view-options">◈ Välj vy <span aria-hidden="true">▾</span></button>
+    <div class="view-options" id="view-options">
+      <button class="view-button active" data-view="overview"><span>◈</span> Överblick</button>
+      <button class="view-button" data-view="front"><span>◉</span> Föreläsning</button>
+      <button class="view-button" data-view="side"><span>◩</span> Sidovy mot stjärnorna</button>
+      <button class="view-button" data-view="oraklet"><span>♙</span> Möt 3D-Oraklet</button>
+      <button class="view-button" data-view="science"><span>✧</span> Vetenskapsobjekt</button>
+      <button class="view-button" data-view="architecture"><span>▥</span> Arkitektur</button>
+      <button class="view-button" data-view="panorama"><span>✧</span> Panoramautsikt</button>
+    </div>
   </nav>
   <div class="bottom-bar">
-    <section class="welcome-card" aria-label="Professor Oraklets föreläsning">
+    <section class="welcome-card" aria-label="Professor Oraklets föreläsning" data-open="false">
+      <button id="lecture-toggle" class="touch-toggle" type="button" aria-expanded="false" aria-controls="lecture-details">🎓 Oraklets föreläsning <span aria-hidden="true">▾</span></button>
+      <div id="lecture-details" class="lecture-details">
       <div class="card-top"><div class="oracle-name"><span class="status-dot"></span> PROFESSOR ORAKLET</div><span class="beta">DEMO · EJ LIVE-AI</span></div>
       <p id="dialogue" aria-live="polite">Välkommen, forskare! Välj ett ämne så börjar vår virtuella föreläsning.</p>
       <div class="topic-buttons" role="group" aria-label="Välj forskningsämne">
@@ -101,6 +142,7 @@
       <button id="english-toggle" class="language-button" type="button" lang="en" aria-pressed="false">🌐 Listen to Professor Oraklet in English</button>
       <button id="presentation-cta" class="presentation-cta" type="button">▣ Se presentationen i närbild</button>
       <div class="ecosystem-links"><a href="https://www.debatt-ai.se/universitet" target="_blank" rel="noopener noreferrer">🎓 AI-universitetet ↗</a><a href="https://www.debatt-ai.se/" target="_blank" rel="noopener noreferrer">Debatt-AI ↗</a></div>
+      </div>
     </section>
     <div class="help">Dra för att rotera vyn<br/>Scrolla eller nyp för att zooma<br/>Tryck på skärmen för närbild</div>
   </div>
@@ -195,6 +237,20 @@
     }
     const talkButton=document.getElementById('speak');
     const languageButton=document.getElementById('english-toggle');
+    const lecturePanel=document.querySelector('.welcome-card');
+    const lectureToggle=document.getElementById('lecture-toggle');
+    const cameraMenu=document.querySelector('.side-controls');
+    const viewsToggle=document.getElementById('views-toggle');
+    function setLectureOpen(open){lecturePanel.dataset.open=String(open);lectureToggle.setAttribute('aria-expanded',String(open));}
+    function setViewsOpen(open){cameraMenu.dataset.open=String(open);viewsToggle.setAttribute('aria-expanded',String(open));}
+    lectureToggle.addEventListener('click',()=>{setLectureOpen(lecturePanel.dataset.open!=='true');setViewsOpen(false)});
+    viewsToggle.addEventListener('click',()=>{setViewsOpen(cameraMenu.dataset.open!=='true');setLectureOpen(false)});
+    document.querySelectorAll('.view-button').forEach(button=>button.addEventListener('click',()=>setViewsOpen(false)));
+    document.addEventListener('pointerdown',event=>{
+      if(event.target instanceof Element && !event.target.closest('.welcome-card,.side-controls')){
+        setLectureOpen(false);setViewsOpen(false);
+      }
+    });
     const lectureAudio=document.getElementById('lecture-audio');
     const lessonVideo=document.getElementById('lesson-video');
     const audioNote=document.getElementById('audio-note');
@@ -231,6 +287,8 @@
       languageButton.textContent=copy.switchTo;
       languageButton.lang=currentLanguage==='sv'?'en':'sv';
       languageButton.setAttribute('aria-pressed',String(currentLanguage==='en'));
+      lectureToggle.firstChild.textContent=currentLanguage==='sv'?'🎓 Oraklets föreläsning ':"🎓 Oraklet's lecture ";
+      viewsToggle.firstChild.textContent=currentLanguage==='sv'?'◈ Välj vy ':'◈ Choose view ';
       document.getElementById('presentation-cta').textContent=copy.closeup;
       document.getElementById('exit-presentation').textContent=copy.back;
       document.querySelector('.beta').textContent=copy.demo;
@@ -270,6 +328,7 @@
     talkButton.addEventListener('click',()=>{
       if(!lectureAudio.paused){stopAudio();return}
       startLecture();
+      setLectureOpen(false);
     });
     languageButton.addEventListener('click',()=>{
       currentLanguage=currentLanguage==='sv'?'en':'sv';
@@ -278,6 +337,7 @@
       if(refreshBoard)refreshBoard();
       // The language switch itself is a user gesture, enabling audio on mobile.
       startLecture();
+      setLectureOpen(false);
     });
     try {
       const container=document.getElementById('world');
@@ -449,7 +509,7 @@
         }
         returnView=null;presentationCTA.focus();
       }
-      presentationCTA.addEventListener('click',enterPresentation);
+      presentationCTA.addEventListener('click',()=>{setLectureOpen(false);enterPresentation()});
       presentationClose.addEventListener('click',exitPresentation);
       addEventListener('keydown',event=>{if(event.key==='Escape'&&isPresenting)exitPresentation()});
       renderer.domElement.addEventListener('pointerdown',event=>{
