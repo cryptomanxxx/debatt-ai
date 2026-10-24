@@ -886,6 +886,34 @@ export default function DebattClient({ initialArticleCount = null }) {
               </div>
             )}
 
+            {/* Public 3D university announcement; independent of the dismissible introduction above. */}
+            <section aria-labelledby="ai-universitet-3d-nyhet" style={{
+              marginBottom: "24px",
+              padding: "22px 24px",
+              borderRadius: "12px",
+              border: "1px solid #67e8f955",
+              background: "radial-gradient(ellipse at 95% 0%, #3b1c7340, transparent 55%), linear-gradient(145deg, #071c2c, #0b101b 72%)",
+              boxShadow: "0 0 24px #38bdf811",
+            }}>
+              <div style={{ color: "#67e8f9", fontSize: "10px", fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.16em", marginBottom: "10px" }}>
+                ✦ NYHET · DEBATT-AI:S AI-UNIVERSITET I 3D
+              </div>
+              <h2 id="ai-universitet-3d-nyhet" style={{ margin: "0 0 12px", fontSize: "clamp(20px, 3vw, 27px)", color: "#e6f7ff", fontFamily: "Georgia, serif", lineHeight: 1.25 }}>
+                Besök Professor Oraklet och lyssna på en föreläsning i Debatt-AI:s AI-universitet i 3D
+              </h2>
+              <p style={{ color: "#a7c6df", fontSize: "14px", lineHeight: 1.7, margin: "0 0 18px", maxWidth: "740px" }}>
+                Kliv in i en futuristisk föreläsningssal högt över stadens skyskrapor, med stjärnhimlen som fond. Välj en föreläsning om universum, atomer eller AI – på svenska eller engelska.
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center" }}>
+                <a href="/ai-universitet-3d/v13/index.html" target="_blank" rel="noopener noreferrer" style={{
+                  display: "inline-block", padding: "11px 17px", borderRadius: "8px", color: "#041422", background: "#67e8f9", fontSize: "13px", fontWeight: 700, textDecoration: "none",
+                }}>🚀 Besök 3D-universitetet ↗</a>
+                <a href="/universitet" style={{ fontSize: "13px", color: "#93c5fd", textDecoration: "none" }}>
+                  Läs mer om AI-universitetet →
+                </a>
+              </div>
+            </section>
+
             <CivilisationDriftWidget data={civilisationDrift} />
 
             {nastaKorning.timeLeft && (
