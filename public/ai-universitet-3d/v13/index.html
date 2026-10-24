@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#09131c" />
+  <meta name="description" content="Version 13 av Debatt-AI:s AI-universitet i 3D: ett presentationsläge där besökaren kan zooma in på professor Oraklets föreläsning och återvända till salen." />
+  <title>Debatt-AI:s AI-universitet 3D — Version 13: Presentationsläge</title>
+  <style>
+    :root { color-scheme: dark; --bg:#060b1c; --panel:rgba(7,16,38,.87); --border:rgba(91,209,255,.28); --cream:#f1f5ff; --muted:#b7c8dd; --mint:#55eafb; --gold:#e5bc7f; --pink:#ff4dda; }
+    *{box-sizing:border-box} html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--cream)}
+    button{font:inherit;cursor:pointer} button:focus-visible{outline:2px solid var(--mint);outline-offset:3px} canvas{display:block;touch-action:none}
+    #world{position:fixed;inset:0} #world:after{content:"";pointer-events:none;position:absolute;inset:0;background:linear-gradient(90deg,rgba(4,8,25,.27),transparent 28%),linear-gradient(0deg,rgba(3,7,23,.30),transparent 40%)}
+    #world canvas{width:100%;height:100%}
+    #fallback{position:fixed;inset:0;display:none;align-items:stretch;justify-content:center;overflow:hidden;background:radial-gradient(ellipse at 60% 42%,#21444b 0%,#0a1c2a 60%,#06121b 100%)}#fallback svg{width:100%;height:100%;object-fit:cover;opacity:.92}#fallback.show{display:flex}
+    header{position:fixed;top:0;left:0;right:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px clamp(18px,3vw,42px);background:linear-gradient(180deg,rgba(3,14,22,.88),rgba(3,14,22,0))}
+    .brand{display:flex;align-items:center;gap:12px;min-width:0;text-decoration:none;color:inherit}.mark{width:42px;height:42px;border:1px solid rgba(255,77,218,.66);border-radius:12px;display:grid;place-items:center;color:var(--pink);font-size:26px;background:rgba(32,9,46,.78);box-shadow:0 0 20px rgba(255,77,218,.25),inset 0 0 15px rgba(255,77,218,.13)}
+    .brand-name{font-size:15px;letter-spacing:.19em;font-weight:850;line-height:1.25;color:#fff;text-shadow:0 0 14px rgba(255,77,218,.54)}.brand-name span{color:var(--pink)}.brand-sub{font-size:9px;letter-spacing:.15em;color:#95dff0;margin-top:5px}.brand-sub strong{font-weight:700;color:#f7aef2}
+    .top-right{display:flex;align-items:center;gap:9px}.tag{font-size:10px;letter-spacing:.12em;color:var(--mint);padding:10px 12px;border:1px solid rgba(85,234,251,.32);background:rgba(8,25,51,.68);border-radius:999px;white-space:nowrap}
+    .header-link{font-size:11px;font-weight:750;text-decoration:none;color:#b9edff;padding:9px 12px;border:1px solid rgba(90,193,246,.25);border-radius:10px;background:rgba(6,20,46,.66);white-space:nowrap}.header-link:hover,.header-link:focus-visible{color:#fff;border-color:var(--pink);box-shadow:0 0 20px rgba(255,77,218,.25)}
+    .version-link{border-color:rgba(255,77,218,.55);color:#ffc1f0;box-shadow:0 0 14px rgba(255,77,218,.15)}
+    .icon-button{width:38px;height:38px;border-radius:12px;border:1px solid var(--border);background:rgba(5,22,33,.72);color:var(--cream);font-size:19px}
+    .hero{position:fixed;z-index:4;left:clamp(18px,4vw,56px);top:26%;width:min(375px,40vw);pointer-events:none;text-shadow:0 2px 24px rgba(3,11,17,.8);transition:opacity .3s ease,transform .3s ease,visibility .3s ease}
+    .eyebrow{font-size:11px;letter-spacing:.24em;color:var(--mint);font-weight:750;text-transform:uppercase}.hero h1{font-family:Georgia,'Times New Roman',serif;font-weight:normal;font-size:clamp(42px,5.6vw,82px);letter-spacing:-.04em;line-height:.98;margin:18px 0 17px}.hero h1 em{color:#f1a8ec;font-style:italic;text-shadow:0 0 22px rgba(255,77,218,.40)}.hero p{max-width:325px;font-size:14px;line-height:1.7;color:#d2dff3;margin:0}
+    body:not([data-camera="overview"]) .hero,body:not([data-camera="overview"]) .mobile-hint{opacity:0;visibility:hidden;transform:translateX(-18px)}
+    .side-controls{position:fixed;z-index:7;right:clamp(14px,2.4vw,32px);top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:8px}
+    .view-button{display:flex;gap:10px;align-items:center;justify-content:flex-start;padding:12px 14px;min-width:154px;color:#d8eaff;background:rgba(6,15,39,.82);border:1px solid var(--border);border-radius:12px;backdrop-filter:blur(12px);font-size:12px;font-weight:650}.view-button span{font-size:17px}.view-button.active{color:#071528;background:var(--mint);border-color:var(--mint);box-shadow:0 0 18px rgba(85,234,251,.4)}
+    .bottom-bar{z-index:6;position:fixed;bottom:clamp(18px,3vw,30px);left:clamp(18px,4vw,56px);right:clamp(18px,4vw,56px);display:flex;align-items:end;justify-content:space-between;gap:14px;pointer-events:none}
+    .welcome-card{pointer-events:auto;width:min(392px,100%);background:var(--panel);border:1px solid var(--border);box-shadow:0 16px 60px rgba(0,0,0,.45),0 0 30px rgba(25,104,189,.1);backdrop-filter:blur(18px);padding:17px 18px 16px;border-radius:17px}
+    .card-top{display:flex;align-items:center;justify-content:space-between;gap:9px}.oracle-name{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:800;letter-spacing:.05em}.status-dot{display:inline-block;width:7px;height:7px;background:var(--mint);border-radius:50%;box-shadow:0 0 10px var(--mint)}.beta{font-size:10px;color:#c6b38e;letter-spacing:.11em}
+    .welcome-card p{font-size:13px;line-height:1.57;margin:11px 0 14px;color:#d5e2df;min-height:42px}
+    .topic-buttons{display:flex;flex-wrap:wrap;gap:7px}.topic{border:1px solid rgba(111,195,255,.28);color:#deebff;background:rgba(97,169,247,.07);padding:8px 10px;font-size:11px;border-radius:9px}.topic.active{background:rgba(85,234,251,.14);border-color:var(--mint);color:var(--mint)}
+    .speak-button{width:100%;margin-top:10px;padding:10px 12px;text-align:center;border:1px solid rgba(255,77,218,.65);border-radius:10px;background:rgba(255,77,218,.11);color:#ffd5f7;font-size:12px;font-weight:700}.speak-button:hover{background:rgba(255,77,218,.22)}.speak-button.speaking{border-color:var(--mint);color:var(--mint);background:rgba(85,234,251,.12)}.audio-note{display:block;margin-top:7px;text-align:center;font-size:10px;color:#bdcee4;line-height:1.4}.audio-note.error{color:#ffbfb1}
+    .language-button{width:100%;margin-top:8px;padding:10px 12px;text-align:center;border:1px solid rgba(130,169,255,.64);border-radius:10px;background:rgba(96,123,255,.14);color:#e3e9ff;font-size:12px;font-weight:750}.language-button:hover{background:rgba(120,151,255,.23)}.language-button[aria-pressed="true"]{border-color:var(--mint);background:rgba(85,234,251,.1);color:#d4faff}
+    .presentation-cta{width:100%;margin-top:10px;padding:10px 12px;border:1px solid rgba(85,234,251,.55);border-radius:10px;background:rgba(85,234,251,.12);color:#d1faff;font-size:12px;font-weight:750}.presentation-cta:hover{background:rgba(85,234,251,.22)}.presentation-cta[hidden],.presentation-close[hidden]{display:none}
+    .presentation-close{position:fixed;z-index:22;left:clamp(15px,4vw,56px);top:calc(20px + env(safe-area-inset-top));padding:12px 17px;border:1px solid rgba(85,234,251,.7);border-radius:12px;background:rgba(6,16,43,.93);backdrop-filter:blur(18px);color:#effbff;box-shadow:0 0 25px rgba(85,234,251,.22);font-size:12px;font-weight:800}
+    body.presentation-mode header,body.presentation-mode .hero,body.presentation-mode .mobile-hint,body.presentation-mode .side-controls,body.presentation-mode .bottom-bar{opacity:0;visibility:hidden;pointer-events:none}
+    .ecosystem-links{display:flex;justify-content:center;gap:13px;margin-top:10px;border-top:1px solid rgba(116,195,255,.16);padding-top:10px}.ecosystem-links a{font-size:11px;color:#9de7ff;text-decoration:none}.ecosystem-links a:hover,.ecosystem-links a:focus-visible{color:#ffb1ed;text-decoration:underline}
+    .fallback-professor{position:absolute;z-index:1;right:19%;top:30%;width:min(25vw,310px);aspect-ratio:1024/936;border:6px solid #b89b73;border-radius:4px;background:#101e27;box-shadow:0 0 0 7px #0d2832,0 15px 70px rgba(0,0,0,.5);transform:perspective(850px) rotateY(-9deg)}.fallback-professor img{display:block;width:100%;height:100%;object-fit:cover}
+    #lesson-video{position:fixed;left:-200vw;top:-200vh;width:2px;height:2px;pointer-events:none;opacity:0}
+    .help{pointer-events:none;background:rgba(9,25,35,.6);border:1px solid var(--border);border-radius:13px;padding:13px 16px;color:#d6e0dd;font-size:11px;line-height:1.6;backdrop-filter:blur(10px)}
+    .mobile-hint{display:none} #loading{z-index:15;position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;background:#07141e;transition:opacity .5s ease}#loading.done{opacity:0;pointer-events:none}.loader-ring{width:46px;height:46px;border:2px solid rgba(145,241,212,.15);border-top-color:var(--mint);border-radius:50%;animation:spin 1.1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}#loading strong{font-family:Georgia,serif;font-size:20px;font-weight:normal}#loading small{color:#91abb2}
+    #error{position:fixed;z-index:20;inset:18px;display:none;align-items:center;justify-content:center;text-align:center;padding:22px;background:#091a26;color:#f4eada;line-height:1.6}
+    @media(max-width:820px){header{padding:14px 16px}.mark{width:37px;height:37px}.brand-name{font-size:12px}.brand-sub{font-size:9px}.tag{font-size:9px;padding:8px}.header-link{padding:8px;font-size:10px}.hero{top:20%;left:20px;width:min(290px,62vw)}.hero h1{font-size:clamp(37px,7vw,55px)}.hero p{font-size:12px;max-width:245px}.side-controls{right:12px;top:37%;transform:none}.view-button{min-width:auto;padding:10px 12px;font-size:0}.view-button span{font-size:19px}.bottom-bar{bottom:calc(13px + env(safe-area-inset-bottom));left:13px;right:13px}.welcome-card{width:min(380px,100%)}.help{display:none}.mobile-hint{display:block;position:absolute;left:20px;top:calc(20% + 222px);font-size:10px;color:#d7e2db;opacity:.8;text-shadow:0 2px 12px #061622}}
+    @media(max-width:520px){.hero{top:17%;width:260px}.hero h1{font-size:43px;margin:11px 0}.hero p{max-width:240px}.mobile-hint{top:calc(17% + 193px)}.welcome-card{padding:13px 14px}.welcome-card p{font-size:12px;margin:9px 0 11px;min-height:37px}.topic{font-size:10px;padding:8px}.top-right .tag,.top-right .header-link:not(.version-link){display:none}.side-controls{top:33%}.fallback-professor{right:13%;top:40%;width:38vw}}
+    @media(max-height:590px){.hero{top:18%}.hero h1{font-size:36px}.hero p{display:none}.mobile-hint{display:none}.bottom-bar{bottom:9px}.welcome-card p{min-height:0}.side-controls{top:27%}}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+  </style>
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
+</head>
+<body>
+  <div id="world" aria-label="Interaktiv tredimensionell föreläsningssal"></div>
+  <div id="fallback" aria-label="Illustrerad vy av föreläsningssalen när 3D-grafik inte stöds">
+    <svg viewBox="0 0 1400 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs><linearGradient id="wallG" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#251442"/><stop offset="1" stop-color="#12365c"/></linearGradient><linearGradient id="floorG" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#284269"/><stop offset="1" stop-color="#09152c"/></linearGradient><radialGradient id="glowG"><stop stop-color="#a5f9df" stop-opacity=".8"/><stop offset="1" stop-color="#63d6cf" stop-opacity="0"/></radialGradient><radialGradient id="nebulaG"><stop stop-color="#a94ad9" stop-opacity=".43"/><stop offset="1" stop-color="#1f0e40" stop-opacity="0"/></radialGradient><pattern id="windowsG" width="22" height="27" patternUnits="userSpaceOnUse"><rect x="5" y="6" width="6" height="10" fill="#6ddfff" opacity=".62"/><rect x="14" y="9" width="3" height="7" fill="#fa7de8" opacity=".52"/></pattern></defs>
+      <path d="M0 0H1400V900H0Z" fill="#070b22"/><path d="M0 0H1400V520L1060 430H340L0 520Z" fill="url(#wallG)" opacity=".24"/>
+      <ellipse cx="980" cy="190" rx="400" ry="220" fill="url(#nebulaG)"/><ellipse cx="220" cy="280" rx="380" ry="250" fill="url(#nebulaG)"/>
+      <g fill="#dce9ff" opacity=".8"><circle cx="80" cy="109" r="2"/><circle cx="122" cy="205" r="1.6"/><circle cx="234" cy="77" r="2.4"/><circle cx="320" cy="165" r="1"/><circle cx="450" cy="62" r="1.4"/><circle cx="980" cy="87" r="1.7"/><circle cx="1099" cy="211" r="2"/><circle cx="1219" cy="94" r="1.5"/><circle cx="1355" cy="156" r="2.4"/><circle cx="1255" cy="320" r="1.3"/><circle cx="64" cy="304" r="1.5"/></g>
+      <circle cx="1209" cy="134" r="37" fill="#738ae0" opacity=".84"/><ellipse cx="1209" cy="134" rx="71" ry="17" transform="rotate(-21 1209 134)" fill="none" stroke="#e5abf4" stroke-width="3" opacity=".72"/>
+      <g fill="#0c1535" stroke="#4064ad" stroke-width="3"><rect x="0" y="224" width="88" height="300"/><rect x="102" y="171" width="90" height="325"/><rect x="206" y="260" width="81" height="248"/><rect x="299" y="145" width="62" height="275"/><rect x="1040" y="181" width="68" height="326"/><rect x="1119" y="262" width="96" height="247"/><rect x="1237" y="164" width="86" height="331"/><rect x="1340" y="231" width="60" height="278"/></g>
+      <g fill="url(#windowsG)" opacity=".78"><rect x="5" y="230" width="78" height="288"/><rect x="107" y="175" width="80" height="320"/><rect x="212" y="265" width="70" height="230"/><rect x="303" y="151" width="54" height="269"/><rect x="1044" y="186" width="60" height="320"/><rect x="1124" y="266" width="85" height="240"/><rect x="1242" y="170" width="77" height="326"/><rect x="1344" y="235" width="55" height="270"/></g>
+      <path d="M340 430H1060L1400 900H0Z" fill="url(#floorG)"/><path d="M340 430 0 900M1060 430 1400 900" stroke="#dfbc81" stroke-width="5" opacity=".58"/>
+      <path d="M355 160H1045V425H355Z" fill="#081b2a" stroke="#d1b47f" stroke-width="6"/><path d="M370 174H1030V410H370Z" fill="#102e3a"/>
+      <g stroke="#a5e8d6" fill="none"><ellipse cx="720" cy="297" rx="94" ry="33" transform="rotate(37 720 297)" stroke-width="4"/><ellipse cx="720" cy="297" rx="94" ry="33" transform="rotate(-37 720 297)" stroke-width="4"/><circle cx="720" cy="297" r="74" stroke-width="2" opacity=".5"/></g>
+      <circle cx="720" cy="297" r="105" fill="url(#glowG)"/><circle cx="720" cy="297" r="17" fill="#c2fff0"/>
+      <g fill="#d8ece5" font-family="Georgia,serif" text-anchor="middle"><text x="700" y="210" font-size="23">PROFESSOR ORAKLET</text><text x="700" y="375" font-size="14" letter-spacing="5">SCIENCE · DISCOVERY · AI</text></g>
+      <g fill="none" stroke="#69dbfa" stroke-width="8" opacity=".72"><path d="M0 0 340 430M1400 0 1060 430"/><path d="M0 180 340 450M1400 180 1060 450"/></g>
+      <g fill="#183b44" stroke="#91aca7" stroke-width="2"><path d="M0 540 290 486 460 560 120 695Z"/><path d="M940 560 1110 486 1400 540 1280 695Z"/><path d="M0 710 360 580 555 710 250 900H0Z"/><path d="M845 710 1040 580 1400 710V900H1150Z"/></g>
+      <g fill="#c1a375" opacity=".85"><path d="M0 550 290 494 290 504 0 563Z"/><path d="M1110 494 1400 550V563L1110 504Z"/><path d="M0 733 360 594 360 606 0 747Z"/><path d="M1040 594 1400 733V747L1040 606Z"/></g>
+      <path d="M570 900 675 430H725L830 900" fill="#102938" opacity=".45"/><path d="M0 900H1400" stroke="#d9bf8b" stroke-width="6"/>
+    </svg>
+    <div class="fallback-professor"><img id="fallback-oraklet" src="assets/oraklet/oraklet.png" alt="Professor Oraklet med animerade ögon och mun" /></div>
+  </div>
+  <header>
+    <a class="brand" href="https://www.debatt-ai.se/" target="_blank" rel="noopener noreferrer" aria-label="Besök Debatt-AI"><div class="mark" aria-hidden="true">✳</div><div><div class="brand-name">DEBATT<span>-AI</span></div><div class="brand-sub">AI-UNIVERSITETET <strong>✦ 3D</strong></div></div></a>
+    <div class="top-right"><a class="header-link" href="https://www.debatt-ai.se/universitet" target="_blank" rel="noopener noreferrer">AI-universitetet ↗</a><a class="header-link" href="https://www.debatt-ai.se/" target="_blank" rel="noopener noreferrer">Debatt-AI ↗</a><a id="previous-version" class="header-link version-link" href="../v12/" hidden>← Version 12</a><span class="tag">● VERSION 13 · PRESENTATION</span><button id="reset" class="icon-button" title="Återställ vy" aria-label="Återställ vy">↺</button></div>
+  </header>
+  <section class="hero" aria-label="Introduktion"><div class="eyebrow">VERSION 13 · PRESENTATIONSLÄGE</div><h1>Kunskap<br/>utan <em>gränser.</em></h1><p>Från Debatt-AI:s AI-universitet ser du stadens ljus långt där nere, blinkande stjärnor, nebulosor och roterande galaxer. Välkommen in.</p></section>
+  <button id="exit-presentation" type="button" class="presentation-close" hidden>← Tillbaka till salen</button>
+  <div class="mobile-hint">Dra med fingret för att se dig omkring · Nyp för att zooma</div>
+  <nav class="side-controls" aria-label="Kameravinklar">
+    <button class="view-button active" data-view="overview"><span>◈</span> Överblick</button>
+    <button class="view-button" data-view="front"><span>◉</span> Föreläsning</button>
+    <button class="view-button" data-view="side"><span>◩</span> Sidovy mot stjärnorna</button>
+    <button class="view-button" data-view="oraklet"><span>♙</span> Möt 3D-Oraklet</button>
+    <button class="view-button" data-view="science"><span>✧</span> Vetenskapsobjekt</button>
+    <button class="view-button" data-view="architecture"><span>▥</span> Arkitektur</button>
+    <button class="view-button" data-view="panorama"><span>✧</span> Panoramautsikt</button>
+  </nav>
+  <div class="bottom-bar">
+    <section class="welcome-card" aria-label="Professor Oraklets föreläsning">
+      <div class="card-top"><div class="oracle-name"><span class="status-dot"></span> PROFESSOR ORAKLET</div><span class="beta">DEMO · EJ LIVE-AI</span></div>
+      <p id="dialogue" aria-live="polite">Välkommen, forskare! Välj ett ämne så börjar vår virtuella föreläsning.</p>
+      <div class="topic-buttons" role="group" aria-label="Välj forskningsämne">
+        <button class="topic active" data-topic="universe">✦ Universum</button>
+        <button class="topic" data-topic="atom">◎ Atomer</button>
+        <button class="topic" data-topic="ai">⌘ Artificiell intelligens</button>
+      </div>
+      <button id="speak" class="speak-button" type="button">▶ Låt Oraklet tala</button>
+      <small id="audio-note" class="audio-note" aria-live="polite">Svensk AI-röst · förinspelad demo</small>
+      <button id="english-toggle" class="language-button" type="button" lang="en" aria-pressed="false">🌐 Listen to Professor Oraklet in English</button>
+      <button id="presentation-cta" class="presentation-cta" type="button">▣ Se presentationen i närbild</button>
+      <div class="ecosystem-links"><a href="https://www.debatt-ai.se/universitet" target="_blank" rel="noopener noreferrer">🎓 AI-universitetet ↗</a><a href="https://www.debatt-ai.se/" target="_blank" rel="noopener noreferrer">Debatt-AI ↗</a></div>
+    </section>
+    <div class="help">Dra för att rotera vyn<br/>Scrolla eller nyp för att zooma<br/>Tryck på skärmen för närbild</div>
+  </div>
+  <div id="loading" role="status"><div class="loader-ring"></div><strong>Universitetet tar form</strong><small>Bygger den virtuella miljön …</small></div>
+  <div id="error" role="alert">3D-miljön kunde inte laddas i den här webbläsaren. Prova en uppdaterad Chrome- eller Samsung Internet-webbläsare.</div>
+  <audio id="lecture-audio" preload="auto" playsinline></audio>
+  <video id="lesson-video" muted playsinline webkit-playsinline preload="auto" loop aria-hidden="true"></video>
+  <script type="module">
+    import * as THREE from 'three';
+    import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+    import {createProfessorOraklet} from './oraklet-3d.js';
+    import {createAudience} from './audience-3d.js';
+    import {createCosmicCity} from './cosmic-city.js';
+    import {createObservatory} from './observatory-3d.js';
+    // In fallback mode, reuse the twelve exact images from Debatt-AI.
+    // In WebGL mode, the professor's eyes and mouth are real animated 3D geometry.
+    const avatarBase='assets/oraklet/';
+    const avatarFrames={
+      open:['oraklet.png','oraklet-small.png','oraklet-medium.png','oraklet-large.png'],
+      half:['oraklet-m0-half.png','oraklet-m1-half.png','oraklet-m2-half.png','oraklet-m3-half.png'],
+      closed:['oraklet-m0-closed.png','oraklet-m1-closed.png','oraklet-m2-closed.png','oraklet-m3-closed.png']
+    };
+    let fallbackFramesReady=false,eyeState='open',mouthIndex=0,avatarSpeaking=false,mouthTimer=null;
+    // Earlier versions remain available in the private lab, but v12 is not
+    // deployed at /ai-universitet-3d/v12/ on the public Debatt-AI website.
+    if(location.hostname==='professor-oraklet-vr-lab.rarecod10.chatgpt.site'){
+      document.getElementById('previous-version').hidden=false;
+    }
+    let professor3D=null,currentTopic='universe',currentLanguage='sv',refreshBoard=null;
+    const translations={
+      sv:{
+        play:'▶ Låt Oraklet tala',stop:'■ Stoppa Oraklet',switchTo:'🌐 Listen to Professor Oraklet in English',
+        ready:'Svensk AI-röst · förinspelad demo',starting:'Startar ljuduppspelning …',playing:'Oraklet talar · ljudet spelas upp',
+        error:'Kunde inte ladda ljudet. Kontrollera din anslutning.',playError:'Ljudet kunde inte startas. Tryck igen eller kontrollera volymen.',
+        closeup:'▣ Se presentationen i närbild',back:'← Tillbaka till salen',demo:'DEMO · EJ LIVE-AI',
+        eyebrow:'VERSION 13 · PRESENTATIONSLÄGE',hero:'Kunskap<br/>utan <em>gränser.</em>',
+        heroInfo:'Från Debatt-AI:s AI-universitet ser du stadens ljus långt där nere, blinkande stjärnor, nebulosor och roterande galaxer. Välkommen in.',
+        hint:'Dra med fingret för att se dig omkring · Nyp för att zooma',
+        help:'Dra för att rotera vyn<br/>Scrolla eller nyp för att zooma<br/>Tryck på skärmen för närbild',
+        views:{overview:'Överblick',front:'Föreläsning',side:'Sidovy mot stjärnorna',oraklet:'Möt 3D-Oraklet',science:'Vetenskapsobjekt',architecture:'Arkitektur',panorama:'Panoramautsikt'},
+        topics:{
+          universe:{title:'Universums gåtor',sub:'Kosmologi · Rumtid · Galaxer',color:'#a1eadc',button:'✦ Universum',dialogue:'Universum är vårt största laboratorium. Här kan vi utforska galaxer, svarta hål och rumtid tillsammans.'},
+          atom:{title:'Atomernas värld',sub:'Kvantfysik · Materia · Energi',color:'#efcb91',button:'◎ Atomer',dialogue:'All materia är uppbyggd av atomer. Vårt svävande objekt är en konstnärlig illustration, inte en fysikalisk simulering.'},
+          ai:{title:'Artificiell intelligens',sub:'Neurala nätverk · AI-agenter · Forskning',color:'#87baff',button:'⌘ Artificiell intelligens',dialogue:'AI kan bli en vetenskaplig samarbetspartner. I framtiden vill vi låta Oraklet undervisa och svara på frågor här.'}
+        }
+      },
+      en:{
+        play:'▶ Let Oraklet speak',stop:'■ Stop Oraklet',switchTo:'🇸🇪 Lyssna på Professor Oraklet på svenska',
+        ready:'English synthetic voice · prerecorded demo',starting:'Starting English narration …',playing:'Oraklet is speaking · English audio playing',
+        error:'Could not load the audio. Check your connection.',playError:'Audio could not start. Try again or check your volume.',
+        closeup:'▣ View the presentation up close',back:'← Back to the auditorium',demo:'DEMO · NOT LIVE AI',
+        eyebrow:'VERSION 13 · PRESENTATION MODE',hero:'Knowledge<br/>without <em>borders.</em>',
+        heroInfo:'From Debatt-AI’s AI University, look out over the city lights, twinkling stars, nebulae and rotating galaxies. Welcome inside.',
+        hint:'Drag to look around · Pinch to zoom',
+        help:'Drag to rotate the view<br/>Scroll or pinch to zoom<br/>Tap the lecture screen for a close-up',
+        views:{overview:'Overview',front:'Lecture',side:'Side view of the stars',oraklet:'Meet 3D Oraklet',science:'Science exhibit',architecture:'Architecture',panorama:'Panoramic view'},
+        topics:{
+          universe:{title:'Mysteries of the Universe',sub:'Cosmology · Spacetime · Galaxies',color:'#a1eadc',button:'✦ Universe',dialogue:'The universe is our largest laboratory. Together, we can explore galaxies, black holes and the fabric of spacetime.'},
+          atom:{title:'The World of Atoms',sub:'Quantum physics · Matter · Energy',color:'#efcb91',button:'◎ Atoms',dialogue:'All matter is made of atoms. Our glowing exhibit is an artistic illustration, not a physically accurate simulation.'},
+          ai:{title:'Artificial Intelligence',sub:'Neural networks · AI agents · Research',color:'#87baff',button:'⌘ Artificial intelligence',dialogue:'AI can become a partner in scientific discovery. Our vision is to make research and knowledge accessible to everyone.'}
+        }
+      }
+    };
+    document.body.dataset.camera='overview';
+    function drawAvatar(){
+      if(professor3D)professor3D.updateFace(eyeState,mouthIndex);
+      if(fallbackFramesReady)document.getElementById('fallback-oraklet').src=avatarBase+avatarFrames[eyeState][mouthIndex];
+    }
+    function enableFallbackAvatar(){
+      const preload=Object.values(avatarFrames).flat().map(name=>new Promise((resolve,reject)=>{
+        const img=new Image();img.onload=resolve;img.onerror=()=>reject(new Error(name));img.src=avatarBase+name;
+      }));
+      Promise.all(preload).then(()=>{fallbackFramesReady=true;drawAvatar()}).catch(error=>console.warn('Porträttets animationsbilder kunde inte laddas:',error));
+    }
+    function blink(){
+      eyeState='half';drawAvatar();setTimeout(()=>{
+        eyeState='closed';drawAvatar();setTimeout(()=>{
+          eyeState='half';drawAvatar();setTimeout(()=>{eyeState='open';drawAvatar();setTimeout(blink,3000+Math.random()*4000)},80);
+        },120);
+      },80);
+    }
+    setTimeout(blink,1000+Math.random()*2000);
+    function setTalking(value){
+      avatarSpeaking=value;clearInterval(mouthTimer);mouthTimer=null;
+      talkButton.setAttribute('aria-pressed',String(value));
+      if(!value){mouthIndex=0;drawAvatar();return}
+      mouthTimer=setInterval(()=>{
+        // Weighted random walk: small mouth changes are most likely, as in Debatt-AI.
+        const candidates=[];for(let next=0;next<4;next++)if(next!==mouthIndex){const distance=Math.abs(next-mouthIndex);for(let w=0;w<(distance===1?5:distance===2?2:1);w++)candidates.push(next)}
+        mouthIndex=candidates[Math.floor(Math.random()*candidates.length)];drawAvatar();
+      },220);
+    }
+    const talkButton=document.getElementById('speak');
+    const languageButton=document.getElementById('english-toggle');
+    const lectureAudio=document.getElementById('lecture-audio');
+    const lessonVideo=document.getElementById('lesson-video');
+    const audioNote=document.getElementById('audio-note');
+    const clips={
+      sv:{universe:'assets/audio/universe.mp3',atom:'assets/audio/atom.mp3',ai:'assets/audio/ai.mp3'},
+      en:{universe:'assets/audio/en/universe.mp3',atom:'assets/audio/en/atom.mp3',ai:'assets/audio/en/ai.mp3'}
+    };
+    const films={
+      sv:{universe:'assets/videos/universe.mp4',atom:'assets/videos/atom.mp4',ai:'assets/videos/ai.mp4'},
+      en:{universe:'assets/videos/en/universe.mp4',atom:'assets/videos/en/atom.mp4',ai:'assets/videos/en/ai.mp4'}
+    };
+    const currentCopy=()=>translations[currentLanguage];
+    let videoScreen=null;
+    function projectVideo(value){if(videoScreen)videoScreen.visible=value}
+    function stopVideo(){lessonVideo.pause();lessonVideo.currentTime=0;projectVideo(false)}
+    function endTalking(){setTalking(false);talkButton.classList.remove('speaking');talkButton.textContent=currentCopy().play}
+    function stopAudio(){lectureAudio.pause();lectureAudio.currentTime=0;stopVideo();endTalking()}
+    function selectTopicAudio(name){
+      if(!clips[currentLanguage][name])return;
+      stopAudio();currentTopic=name;
+      lectureAudio.src=clips[currentLanguage][name];lectureAudio.load();
+      lessonVideo.src=films[currentLanguage][name];lessonVideo.load();
+      audioNote.textContent=currentCopy().ready;audioNote.classList.remove('error');
+    }
+    function applyLanguageUI(){
+      const copy=currentCopy(),topic=copy.topics[currentTopic];
+      document.documentElement.lang=currentLanguage;
+      document.getElementById('dialogue').textContent=topic.dialogue;
+      document.querySelectorAll('.topic').forEach(button=>{
+        button.textContent=copy.topics[button.dataset.topic].button;
+        button.classList.toggle('active',button.dataset.topic===currentTopic);
+      });
+      talkButton.textContent=avatarSpeaking?copy.stop:copy.play;
+      languageButton.textContent=copy.switchTo;
+      languageButton.lang=currentLanguage==='sv'?'en':'sv';
+      languageButton.setAttribute('aria-pressed',String(currentLanguage==='en'));
+      document.getElementById('presentation-cta').textContent=copy.closeup;
+      document.getElementById('exit-presentation').textContent=copy.back;
+      document.querySelector('.beta').textContent=copy.demo;
+      document.querySelector('.eyebrow').textContent=copy.eyebrow;
+      // These are fixed, authored UI fragments, never user-provided HTML.
+      document.querySelector('.hero h1').innerHTML=copy.hero;
+      document.querySelector('.hero p').textContent=copy.heroInfo;
+      document.querySelector('.mobile-hint').textContent=copy.hint;
+      document.querySelector('.help').innerHTML=copy.help;
+      document.querySelectorAll('.view-button').forEach(button=>{
+        button.lastChild.textContent=' '+copy.views[button.dataset.view];
+      });
+    }
+    lectureAudio.addEventListener('playing',()=>{
+      setTalking(true);talkButton.classList.add('speaking');talkButton.textContent=currentCopy().stop;
+      audioNote.textContent=currentCopy().playing;audioNote.classList.remove('error');
+      projectVideo(lessonVideo.readyState>=2);
+    });
+    lectureAudio.addEventListener('ended',()=>{stopVideo();endTalking();audioNote.textContent=currentCopy().ready});
+    lectureAudio.addEventListener('error',()=>{
+      stopVideo();endTalking();audioNote.textContent=currentCopy().error;audioNote.classList.add('error');
+    });
+    lessonVideo.addEventListener('loadeddata',()=>{if(avatarSpeaking)projectVideo(true)});
+    lessonVideo.addEventListener('error',()=>{projectVideo(false);console.warn('Lektionsvideo kunde inte laddas')});
+    function startLecture(){
+      if(!lectureAudio.src)selectTopicAudio(currentTopic);
+      audioNote.textContent=currentCopy().starting;audioNote.classList.remove('error');
+      const start=lectureAudio.play();
+      // Muted inline video may autoplay on mobile. Audio remains the timing source.
+      const filmStart=lessonVideo.play();
+      if(filmStart)filmStart.catch(error=>{projectVideo(false);console.warn('Videouppspelning saknar stöd',error)});
+      if(start)start.catch(error=>{
+        stopVideo();endTalking();audioNote.textContent=currentCopy().playError;
+        audioNote.classList.add('error');console.warn('Audio playback failed',error);
+      });
+    }
+    talkButton.addEventListener('click',()=>{
+      if(!lectureAudio.paused){stopAudio();return}
+      startLecture();
+    });
+    languageButton.addEventListener('click',()=>{
+      currentLanguage=currentLanguage==='sv'?'en':'sv';
+      selectTopicAudio(currentTopic);
+      applyLanguageUI();
+      if(refreshBoard)refreshBoard();
+      // The language switch itself is a user gesture, enabling audio on mobile.
+      startLecture();
+    });
+    try {
+      const container=document.getElementById('world');
+      const scene=new THREE.Scene();
+      const cosmicCity=createCosmicCity(scene);
+      const camera=new THREE.PerspectiveCamera(64,innerWidth/innerHeight,.1,550);
+      camera.position.set(0,18.6,22);
+      const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+      renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.5;container.appendChild(renderer.domElement);
+      const controls=new OrbitControls(camera,renderer.domElement);controls.enableDamping=true;controls.dampingFactor=.07;controls.minDistance=5;controls.maxDistance=125;controls.maxPolarAngle=Math.PI*.73;controls.target.set(-6,10.2,-15);controls.enablePan=false;
+      const mat=(color,metalness=0,roughness=.7,emissive=null,intensity=0)=>new THREE.MeshStandardMaterial({color,metalness,roughness,emissive:emissive??0x000000,emissiveIntensity:intensity});
+      const materials={floor:mat(0x202c46,.38,.62),wall:mat(0x0f1d38,.18,.79),stone:mat(0x3c4e68,.2,.84),dark:mat(0x0b1835,.4,.5),gold:mat(0xba9869,.67,.34),wood:mat(0x584d62,.13,.79),seat:mat(0x263e65,.26,.75),mint:mat(0x55dbed,.38,.3,0x20cbf5,.72),sky:mat(0x233653,.3,.4)};
+      const neonCyan=new THREE.MeshBasicMaterial({color:0x42efff,toneMapped:false});
+      const neonPink=new THREE.MeshBasicMaterial({color:0xff48db,toneMapped:false});
+      const neonBlue=new THREE.MeshBasicMaterial({color:0x477fff,toneMapped:false});
+      function box(w,h,d,x,y,z,m,parent=scene){const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);mesh.position.set(x,y,z);parent.add(mesh);return mesh}
+      function sphere(r,x,y,z,m,parent=scene,segments=24){const mesh=new THREE.Mesh(new THREE.SphereGeometry(r,segments,16),m);mesh.position.set(x,y,z);parent.add(mesh);return mesh}
+      function cylinder(r1,r2,h,x,y,z,m,parent=scene,sides=24){const mesh=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,sides),m);mesh.position.set(x,y,z);parent.add(mesh);return mesh}
+      function line(points,color,opacity=.8){const geometry=new THREE.BufferGeometry().setFromPoints(points.map(p=>new THREE.Vector3(...p)));const material=new THREE.LineBasicMaterial({color,transparent:true,opacity});const mesh=new THREE.Line(geometry,material);scene.add(mesh);return mesh}
+      const ambient=new THREE.HemisphereLight(0xbacbff,0x15112f,2.2);scene.add(ambient);
+      const key=new THREE.DirectionalLight(0xffd6e9,3);key.position.set(-9,21,14);scene.add(key);
+      const blue=new THREE.PointLight(0x36c9ff,55,35,2);blue.position.set(0,10,-9);scene.add(blue);
+      // Full-height curved window frames, without grey rendered panes, make
+      // the skyline feel outdoor-open while the camera remains indoors.
+      const observatory=createObservatory(scene,{
+        floor:materials.floor,stone:materials.stone,dark:materials.dark,
+        neonCyan,neonPink,neonBlue
+      });
+      // Raised semicircular presentation platform.
+      box(18,.52,8.3,0,.33,-11.3,materials.stone);
+      box(18,.12,.25,0,.67,-7.2,materials.gold);
+      box(17.9,.055,.11,0,.78,-7.08,neonPink);
+      for(const side of [-1,1])box(.065,.055,8.2,side*8.87,.64,-11.30,neonCyan);
+      cylinder(1.4,1.7,.6,0,.9,-12.2,materials.dark);cylinder(1.17,1.17,.08,0,1.25,-12.2,materials.gold);
+      box(5.4,2.7,.4,0,2.3,-16.55,materials.dark);box(5.7,.12,.65,0,4.0,-16.47,materials.gold);
+      for(let side of [-1,1]){box(.26,6,.26,side*10,7,-17.85,materials.gold);box(5.5,.14,.3,side*8.1,10.2,-17.9,materials.gold)}
+      // Rows of ergonomic lecture seats in amphitheatre layout.
+      for(let row=0;row<5;row++){
+        const z=-2.9+row*4.5, rise=row*.24;
+        for(let side of [-1,1]){
+          box(11.2,.16,3.7,side*6.1,rise+.04,z,materials.stone);
+          for(let col=0;col<4;col++){
+            let x=side*(2.45+col*2.58),yy=rise+.52;
+            box(1.82,.22,1.2,x,yy,z+.3,materials.wood);
+            box(1.8,1.45,.24,x,yy+.75,z+1.02,materials.seat);
+            box(2.12,.17,.22,x,yy+.43,z-.23,materials.gold);
+            box(.15,.7,.17,x-.84,yy+.33,z+.13,materials.dark);box(.15,.7,.17,x+.84,yy+.33,z+.13,materials.dark);
+          }
+        }
+      }
+      for(let row=0;row<5;row++){const z=-1.75+row*4.5;box(2.15,.018,2.9,0,row*.24+.12,z,mat(0x93ac9d,.1,.8))}
+      // Glowing guide lines define the central walkway without extra lights.
+      for(let row=0;row<5;row++)for(const side of [-1,1]){
+        box(.055,.025,3.5,side*1.06,row*.24+.18,-2.9+row*4.5,side<0?neonBlue:neonCyan);
+      }
+      const audience=createAudience(scene);
+      // Architectural feature lights and rings.
+      for(let i=0;i<4;i++){const z=[-12,-3,6,15][i],ring=new THREE.Mesh(new THREE.TorusGeometry(3.35,.07,10,72),i%2?neonBlue:neonCyan);ring.rotation.x=Math.PI/2;ring.position.set(0,20.7,z);scene.add(ring);sphere(.17,0,20.5,z,i%2?neonPink:neonCyan)}
+      for(let i=0;i<8;i++){const z=-14+i*4.25;line([[-16,1.4,z],[-16,2.3,z]],0xcba876,.8);line([[16,1.4,z],[16,2.3,z]],0xcba876,.8)}
+      // A roughly 23% larger lecture screen, extending primarily downward to
+      // preserve the unobstructed rotating galaxy high above the display.
+      // All slide, frame, sign and video surfaces share one physical layout.
+      const lectureScreen={x:-.7,y:7.28,z:-17.77,width:15.6,height:8.55};
+      const screenTop=lectureScreen.y+lectureScreen.height/2;
+      const screenBottom=lectureScreen.y-lectureScreen.height/2;
+      const boardCanvas=document.createElement('canvas');boardCanvas.width=1024;boardCanvas.height=560;
+      const ctx=boardCanvas.getContext('2d');const boardTex=new THREE.CanvasTexture(boardCanvas);boardTex.colorSpace=THREE.SRGBColorSpace;
+      const boardMat=new THREE.MeshBasicMaterial({map:boardTex,transparent:true,opacity:.95,side:THREE.DoubleSide});
+      const board=box(lectureScreen.width,lectureScreen.height,.06,lectureScreen.x,lectureScreen.y,lectureScreen.z,boardMat);
+      box(lectureScreen.width+.45,.2,.32,lectureScreen.x,screenTop+.095,-17.75,materials.gold);
+      box(lectureScreen.width+.45,.2,.32,lectureScreen.x,screenBottom-.095,-17.75,materials.gold);
+      box(lectureScreen.width+.45,.062,.10,lectureScreen.x,screenTop+.175,-17.53,neonCyan);
+      box(lectureScreen.width+.45,.062,.10,lectureScreen.x,screenBottom-.165,-17.53,neonPink);
+      for(const side of [-1,1])box(.09,lectureScreen.height+.2,.10,lectureScreen.x+side*(lectureScreen.width/2+.2),lectureScreen.y,-17.53,side<0?neonPink:neonCyan);
+      // Branded neon sign above, never in front of, the teaching screen.
+      box(lectureScreen.width+.35,.93,.16,lectureScreen.x,screenTop+.965,-17.75,materials.dark);
+      const signCanvas=document.createElement('canvas');signCanvas.width=1024;signCanvas.height=96;
+      const signContext=signCanvas.getContext('2d');
+      signContext.fillStyle='#090e2c';signContext.fillRect(0,0,1024,96);
+      signContext.strokeStyle='#ff4dda';signContext.lineWidth=4;signContext.strokeRect(3,3,1018,90);
+      signContext.shadowColor='#ff4dda';signContext.shadowBlur=20;signContext.font='800 48px system-ui';signContext.fillStyle='#ffa4ee';signContext.fillText('DEBATT-AI',31,65);
+      signContext.shadowColor='#42efff';signContext.shadowBlur=16;signContext.font='700 37px system-ui';signContext.fillStyle='#a6f6ff';signContext.fillText('✦  AI-UNIVERSITETET · 3D',393,64);
+      const signTexture=new THREE.CanvasTexture(signCanvas);signTexture.colorSpace=THREE.SRGBColorSpace;
+      const sign=new THREE.Mesh(new THREE.PlaneGeometry(lectureScreen.width+.15,.83),new THREE.MeshBasicMaterial({map:signTexture,toneMapped:false,side:THREE.DoubleSide}));
+      sign.position.set(lectureScreen.x,screenTop+.965,-17.53);scene.add(sign);
+      // A real muted H.264 MP4 plays on the auditorium screen during speech.
+      // The original lecture slide remains visible whenever the video is stopped.
+      const filmTexture=new THREE.VideoTexture(lessonVideo);
+      filmTexture.colorSpace=THREE.SRGBColorSpace;
+      filmTexture.minFilter=THREE.LinearFilter;filmTexture.magFilter=THREE.LinearFilter;
+      const filmMat=new THREE.MeshBasicMaterial({map:filmTexture,side:THREE.DoubleSide,toneMapped:false});
+      videoScreen=new THREE.Mesh(new THREE.PlaneGeometry(lectureScreen.width-.15,lectureScreen.height),filmMat);
+      videoScreen.position.set(lectureScreen.x,lectureScreen.y,-17.59);videoScreen.visible=false;scene.add(videoScreen);
+      function boardText(title,sub,color){
+        ctx.fillStyle='#071b29';ctx.fillRect(0,0,1024,560);
+        const gr=ctx.createRadialGradient(512,285,40,512,285,450);gr.addColorStop(0,color+'33');gr.addColorStop(1,'#071b2900');ctx.fillStyle=gr;ctx.fillRect(0,0,1024,560);
+        ctx.strokeStyle='#5d8d9a33';ctx.lineWidth=1;for(let x=0;x<1024;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,560);ctx.stroke()}for(let y=0;y<560;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(1024,y);ctx.stroke()}
+        ctx.fillStyle='#9de7d5';ctx.font='bold 21px system-ui';ctx.letterSpacing='5px';ctx.fillText('PROFESSOR ORAKLET / LAB 01',66,69);
+        ctx.fillStyle='#f2ecd9';ctx.font='55px Georgia';ctx.letterSpacing='0px';ctx.fillText(title,66,166);
+        ctx.font='25px system-ui';ctx.fillStyle='#b9d2d1';ctx.fillText(sub,68,219);
+        ctx.strokeStyle=color;ctx.lineWidth=3;ctx.beginPath();ctx.arc(750,312,126,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.ellipse(750,312,165,67,Math.PI/4,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.ellipse(750,312,165,67,-Math.PI/4,0,Math.PI*2);ctx.stroke();
+        ctx.fillStyle=color;ctx.beginPath();ctx.arc(750,312,18,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.arc(915,312,9,0,Math.PI*2);ctx.fill();boardTex.needsUpdate=true;
+      }
+      // Move the orrery beside the *left* edge of the screen so it no longer
+      // obscures either the lecture slide or the playing educational video.
+      const installation=new THREE.Group();installation.position.set(-12.9,7.4,-14.2);scene.add(installation);
+      const core=sphere(.76,0,0,0,new THREE.MeshStandardMaterial({color:0xc6fff1,emissive:0x31b9ab,emissiveIntensity:2,roughness:.16,metalness:.32}),installation,32);
+      const orbits=[];for(let i=0;i<4;i++){const m=new THREE.Mesh(new THREE.TorusGeometry(3.0,.028,8,96),new THREE.MeshBasicMaterial({color:i%2?0xe9c58d:0x8ff5da,transparent:true,opacity:.82}));m.rotation.set(i*.68,.35+i*.7,i*.42);installation.add(m);orbits.push(m);let electron=sphere(.16,3,0,0,materials.mint,m,12)}
+      for(let i=0;i<22;i++){let a=i*Math.PI*2/22,r=3.8+i%3*.36;sphere(.032,Math.cos(a)*r,Math.sin(a*2)*1.6,Math.sin(a)*r,new THREE.MeshBasicMaterial({color:0x99d9cc}),installation,8)}
+      // Oraklet stands physically on stage as a three-dimensional character.
+      professor3D=createProfessorOraklet(scene);drawAvatar();
+      // Small information pylons beside the stage.
+      for(const side of [-1,1]){box(1.25,3.5,1.15,side*10.2,1.9,-12.4,materials.dark);box(1.4,.15,1.25,side*10.2,3.73,-12.4,materials.gold);sphere(.42,side*10.2,4.23,-12.4,materials.mint)}
+      refreshBoard=()=>{const t=currentCopy().topics[currentTopic];boardText(t.title,t.sub,t.color);core.material.color.set(t.color);core.material.emissive.set(t.color)};
+      function setTopic(name){if(!currentCopy().topics[name])return;selectTopicAudio(name);applyLanguageUI();refreshBoard();}
+      document.querySelectorAll('.topic').forEach(b=>b.addEventListener('click',()=>setTopic(b.dataset.topic)));setTopic('universe');
+      // Wide, elevated rear-of-room shot: show the full lecture hall and cosmic horizon.
+      const views={overview:{pos:[0,18.6,22],target:[-6,10.2,-15]},front:{pos:[0,8,12],target:[0,7,-13]},side:{pos:[-29,4.5,8],target:[-2,12.4,-15]},oraklet:{pos:[6.65,4.5,0],target:[6.65,3.65,-10.6]},science:{pos:[-11.5,8,1],target:[-12.9,7.4,-14.2]},architecture:{pos:[0,18,12],target:[-12,20,-13]},panorama:{pos:[2,13,9],target:[-62,21,-72]}};
+      let travel=null;function setView(name){let v=views[name];if(!v)return;document.body.dataset.camera=name;travel={start:camera.position.clone(),startTarget:controls.target.clone(),end:new THREE.Vector3(...v.pos),endTarget:new THREE.Vector3(...v.target),t:0};document.querySelectorAll('.view-button').forEach(b=>b.classList.toggle('active',b.dataset.view===name));}
+      document.querySelectorAll('.view-button').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
+      document.getElementById('reset').addEventListener('click',()=>setView('overview'));
+      // Presentation mode is a dedicated camera destination, preserving the
+      // visitor's exact previous position and look direction for the return.
+      const presentationCTA=document.getElementById('presentation-cta');
+      const presentationClose=document.getElementById('exit-presentation');
+      const screenRaycaster=new THREE.Raycaster();
+      const screenPointer=new THREE.Vector2();
+      let isPresenting=false,returnView=null,pointerStart=null;
+      function screenCloseup(){
+        // Fit the full physical screen inside both landscape and portrait views.
+        const tanHalfFov=Math.tan(THREE.MathUtils.degToRad(camera.fov/2));
+        const distance=Math.max(10,(lectureScreen.width+2)/(2*tanHalfFov*camera.aspect),(lectureScreen.height+2)/(2*tanHalfFov));
+        return {position:new THREE.Vector3(lectureScreen.x,lectureScreen.y+.6,lectureScreen.z+distance),target:new THREE.Vector3(lectureScreen.x,lectureScreen.y,lectureScreen.z)};
+      }
+      function refitPresentationOnResize(){
+        if(!isPresenting)return;
+        const closeup=screenCloseup();
+        if(travel){
+          // A device rotation during the fly-in must also update its endpoint.
+          travel.end.copy(closeup.position);
+          travel.endTarget.copy(closeup.target);
+        }else{
+          // Otherwise immediately restore a fully visible screen; controls
+          // are disabled during this mode, so the visitor cannot self-correct.
+          camera.position.copy(closeup.position);
+          controls.target.copy(closeup.target);
+        }
+      }
+      function enterPresentation(){
+        if(isPresenting)return;
+        returnView={position:camera.position.clone(),target:controls.target.clone(),mode:document.body.dataset.camera||'overview'};
+        isPresenting=true;
+        document.body.classList.add('presentation-mode');document.body.dataset.camera='presentation';
+        presentationClose.hidden=false;controls.enabled=false;
+        const closeup=screenCloseup();
+        travel={start:camera.position.clone(),startTarget:controls.target.clone(),end:closeup.position,endTarget:closeup.target,t:0};
+        document.querySelectorAll('.view-button').forEach(b=>b.classList.remove('active'));
+        presentationClose.focus();
+      }
+      function exitPresentation(){
+        if(!isPresenting)return;
+        isPresenting=false;
+        document.body.classList.remove('presentation-mode');presentationClose.hidden=true;
+        controls.enabled=true;
+        if(returnView){
+          document.body.dataset.camera=returnView.mode;
+          travel={start:camera.position.clone(),startTarget:controls.target.clone(),end:returnView.position,endTarget:returnView.target,t:0};
+          document.querySelectorAll('.view-button').forEach(b=>b.classList.toggle('active',b.dataset.view===returnView.mode));
+        }
+        returnView=null;presentationCTA.focus();
+      }
+      presentationCTA.addEventListener('click',enterPresentation);
+      presentationClose.addEventListener('click',exitPresentation);
+      addEventListener('keydown',event=>{if(event.key==='Escape'&&isPresenting)exitPresentation()});
+      renderer.domElement.addEventListener('pointerdown',event=>{
+        if(isPresenting)return;
+        pointerStart={x:event.clientX,y:event.clientY};travel=null;
+      });
+      renderer.domElement.addEventListener('pointercancel',()=>{pointerStart=null});
+      renderer.domElement.addEventListener('pointerup',event=>{
+        if(!pointerStart||isPresenting)return;
+        const start=pointerStart;pointerStart=null;
+        if(Math.hypot(event.clientX-start.x,event.clientY-start.y)>12)return;
+        const bounds=renderer.domElement.getBoundingClientRect();
+        screenPointer.set((event.clientX-bounds.left)/bounds.width*2-1,-(event.clientY-bounds.top)/bounds.height*2+1);
+        screenRaycaster.setFromCamera(screenPointer,camera);
+        if(screenRaycaster.intersectObjects([board,videoScreen,sign],false).length)enterPresentation();
+      });
+      // Keep the visitor physically inside the curved observation deck even
+      // when pinch-zooming or dragging on a mobile touchscreen.
+      function keepCameraInside(){
+        const dx=camera.position.x,dz=camera.position.z-observatory.centerZ;
+        const radius=Math.hypot(dx,dz),limit=observatory.radius-2;
+        if(radius>limit){camera.position.x=dx*limit/radius;camera.position.z=observatory.centerZ+dz*limit/radius;}
+        camera.position.z=Math.min(camera.position.z,observatory.centerZ-1.5);
+        camera.position.y=Math.max(1.5,Math.min(observatory.height-1.4,camera.position.y));
+      }
+      const clock=new THREE.Clock();let last=0;
+      function animate(){requestAnimationFrame(animate);const seconds=clock.getElapsedTime(),delta=Math.min(.05,seconds-last);last=seconds;
+        cosmicCity.animate(seconds);
+        installation.rotation.y+=delta*.12;core.position.y=Math.sin(seconds*.7)*.08;orbits.forEach((o,i)=>o.rotation.y+=delta*(.12+i*.04));
+        professor3D.animate(seconds,avatarSpeaking);
+        audience.animate(seconds);
+        if(travel){travel.t=Math.min(1,travel.t+delta*.9);const t=1-Math.pow(1-travel.t,3);camera.position.lerpVectors(travel.start,travel.end,t);controls.target.lerpVectors(travel.startTarget,travel.endTarget,t);if(travel.t>=1)travel=null;}
+        controls.update();keepCameraInside();renderer.render(scene,camera);
+      }
+      animate();
+      addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));refitPresentationOnResize()});
+      const loading=document.getElementById('loading');loading.classList.add('done');setTimeout(()=>loading.remove(),550);
+    }catch(error){
+      console.warn('3D unavailable; showing 2D preview instead',error);
+      document.getElementById('presentation-cta').hidden=true;
+      document.getElementById('exit-presentation').hidden=true;
+      document.getElementById('loading').remove();document.getElementById('world').style.display='none';document.getElementById('fallback').classList.add('show');
+      enableFallbackAvatar();selectTopicAudio('universe');applyLanguageUI();
+      document.querySelectorAll('.topic').forEach(b=>b.addEventListener('click',()=>{selectTopicAudio(b.dataset.topic);applyLanguageUI()}));
+      document.querySelectorAll('.view-button').forEach(b=>b.addEventListener('click',()=>{document.body.dataset.camera=b.dataset.view;document.querySelectorAll('.view-button').forEach(x=>x.classList.toggle('active',x===b));document.getElementById('fallback').style.filter=b.dataset.view==='science'?'saturate(1.35) brightness(1.12)':b.dataset.view==='architecture'?'hue-rotate(18deg)':'none'}));
+      document.getElementById('reset').addEventListener('click',()=>{document.body.dataset.camera='overview';document.getElementById('fallback').style.filter='none';document.querySelector('[data-view="overview"]').click()});
+    }
+  </script>
+</body>
+</html>

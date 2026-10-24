@@ -10,12 +10,14 @@ on:
     branches: [main]
     paths:
       - "app/**"
+      - "public/ai-universitet-3d/**"
       - "next.config.mjs"
       - "package.json"
       - ".github/workflows/next-build.yml"
   pull_request:
     paths:
       - "app/**"
+      - "public/ai-universitet-3d/**"
       - "next.config.mjs"
       - "package.json"
       - ".github/workflows/next-build.yml"
