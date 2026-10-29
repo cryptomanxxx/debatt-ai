@@ -67,3 +67,25 @@ uppspelat AI-tal: https://github.com/met4citizen/HeadAudio,
 revision `c6d8af35034068b1c98dcc0fa3ec9602d711e784`. MIT-licensen finns i
 `web/rufus/vendor/headaudio/LICENSE` samt vid de publika ljudmodulerna.
 Webbläsarens AudioWorklet och riktig Gemini-anslutning behöver testas på en enhet.
+
+## Gemini-tokenformat och felsökning
+
+REST-anropet använder `bidiGenerateContentSetup`, med `generationConfig` och
+servervald röst. SDK-fälten `liveConnectConstraints`/`config` får inte skickas
+direkt till REST-API:t. `fieldMask: "model,generationConfig"` låser modell,
+ljudsvar och röst; övriga fält kan sättas av klienten, inklusive uppdragsverktyg,
+systeminstruktioner och återanslutningens `sessionResumption.handle`.
+Ingen fallback till obegränsade token införs.
+
+Testfixturen `tests/fixtures/gemini-token-sdk-2.31.0.json` fångades genom
+`@google/genai@2.31.0` med falsk nyckel och mockad fetch. Den visar SDK:ns
+faktiska REST-serialisering, utan något anrop till Google. Fältmasken
+sätts separat till två toppnivåfält så att alla övriga klientfält förblir fria.
+Primärkällor:
+- https://github.com/googleapis/js-genai/blob/main/src/tokens.ts
+- https://github.com/googleapis/js-genai/blob/main/src/converters/_tokens_converters.ts
+- https://ai.google.dev/api/generate-content#AuthToken
+
+Vid ett avvisat Google-anrop loggas `island_gemini_token_rejected` med HTTP-status
+och fasta, tillåtna felkoder/orsakskoder. Samma säkra diagnos visas i svaret.
+Googles fria feltext, metadata, API-nycklar och samtal loggas aldrig här.

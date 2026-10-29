@@ -1,4 +1,5 @@
 import {ANIMAL_IDS,sessionPrompt} from './prompts.mjs';
+import {providerError} from './provider-error.mjs';
 export const MODEL='gemini-3.8-live';
 const TOKEN_MS=30*60*1000;
 export function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff','referrer-policy':'no-referrer'}})}
@@ -31,13 +32,23 @@ export async function createSession(request,env,{fetch:fetcher=globalThis.fetch,
   if(!verification.ok||verdict.success!==true||verdict.action!=='friends_island_voice'||verdict.hostname!==url.hostname)return reject('Verifieringen misslyckades. Försök igen.',403);
  }catch{return reject('Verifieringen är tillfälligt otillgänglig. Försök igen.',503)}
  const expiresAt=new Date(now+TOKEN_MS).toISOString();
- const payload={uses:1,expireTime:expiresAt,newSessionExpireTime:new Date(now+45000).toISOString(),liveConnectConstraints:{model:`models/${MODEL}`,config:{responseModalities:['AUDIO']}}};
+ const session=sessionPrompt(input);
+ // liveConnectConstraints/config are SDK names, not REST fields. Match the
+ // official SDK's serialized request; keep the generation config authoritative
+ // while leaving tools, system instructions and resumption configurable.
+ const payload={uses:1,expireTime:expiresAt,newSessionExpireTime:new Date(now+45000).toISOString(),
+  bidiGenerateContentSetup:{model:`models/${MODEL}`,generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:session.voice}}}}},
+  fieldMask:'model,generationConfig'};
  try{
   const upstream=await fetcher('https://generativelanguage.googleapis.com/v1beta/auth_tokens',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},body:JSON.stringify(payload),signal:AbortSignal.timeout(10000)});
   // Never relay provider messages, headers or keys. Fail closed rather than
   // retrying with weaker token constraints on a public site.
-  if(!upstream.ok)return reject(upstream.status===429?'Googles anropsgräns är nådd. Prova senare.':'Gemini kunde inte starta samtalet. Försök igen senare.',upstream.status===429?429:502);
+  if(!upstream.ok){
+   const failure=await providerError(upstream,input.language);
+   console.warn('island_gemini_token_rejected',JSON.stringify(failure.diagnostic));
+   return json(failure,upstream.status===429?429:502);
+  }
   const result=await upstream.json();if(typeof result?.name!=='string'||!result.name)return reject('Gemini skickade ett ofullständigt svar.',502);
-  return json({token:result.name,model:MODEL,...sessionPrompt(input),animal:input.animal,expiresAt,idleTimeoutSeconds:120});
+  return json({token:result.name,model:MODEL,...session,animal:input.animal,expiresAt,idleTimeoutSeconds:120});
  }catch{return reject('Det gick inte att kontakta Gemini. Försök igen.',502)}
 }
