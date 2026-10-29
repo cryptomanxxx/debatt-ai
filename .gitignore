@@ -2,3 +2,6 @@ __pycache__/
 .next/
 node_modules/
 package-lock.json
+
+# Reproducible isolated island build.
+!features/vannernas-o/package-lock.json

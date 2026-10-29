@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta name="referrer" content="same-origin">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#12192d">
+  <title>Vännernas ö – Debatt-AI Animal Zoo</title>
+  <meta name="description" content="En upptäcktsvärld med åtta 3D-vänner, egna hem och röstsamtal.">
+  <style>
+    :root{color-scheme:dark;--night:#11172b;--soft:#f8f4e8;--muted:#aeb8ca;--line:#ffffff21;--lime:#cdf77d;--accent:#f5ad66;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+    *{box-sizing:border-box}[hidden]{display:none!important}body{margin:0;min-height:100vh;color:var(--soft);background:radial-gradient(ellipse at 80% -15%,#3f4d7f88,transparent 45%),radial-gradient(ellipse at 2% 65%,#235c5880,transparent 45%),var(--night)}button,input{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.42}
+    .orb{position:fixed;border-radius:50%;background:#ffffff06;filter:blur(1px);pointer-events:none}.orb.one{width:36vw;height:36vw;right:-12vw;top:18vh;border:1px solid #ffffff14}.orb.two{width:20vw;height:20vw;left:-10vw;bottom:-10vw;border:1px solid #ffffff16}
+    .page{max-width:1140px;margin:auto;padding:25px 28px 56px;position:relative;z-index:1}.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:36px}.brand{font-size:15px;letter-spacing:.22em;font-weight:850;display:flex;align-items:center;gap:11px}.brand-mark{height:36px;width:36px;display:grid;place-items:center;border-radius:12px;background:var(--lime);color:#132129;font-size:20px;letter-spacing:normal}.pill{display:inline-flex;align-items:center;gap:8px;color:#d8e6db;border:1px solid #b4d98b55;background:#bbdeaf14;padding:9px 13px;border-radius:99px;font-size:12px;font-weight:750;letter-spacing:.045em}.dot{height:7px;width:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 9px #d3f58e}
+    .eyebrow{text-transform:uppercase;letter-spacing:.18em;color:#cdf77d;font-size:12px;font-weight:850;margin-bottom:14px}.heading{font-size:clamp(40px,6.5vw,80px);line-height:1;letter-spacing:-.06em;font-weight:860;margin:0 0 19px}.heading em{font-family:Georgia,serif;font-weight:400;color:#fbb77e}.intro{color:#bbc5d0;line-height:1.7;max-width:560px;margin:0 0 34px;font-size:15px}.layout{display:grid;grid-template-columns:340px minmax(0,1fr);gap:24px;align-items:start}.small-title{font-size:11px;color:#bec7d3;text-transform:uppercase;letter-spacing:.18em;font-weight:800;margin:0 0 14px}.tag{border:1px solid #ffffff1e;border-radius:7px;padding:7px 9px;color:#c3cbd4;font-size:11px}
+    .stage-card{border-radius:27px;overflow:hidden;border:1px solid #ffffff27;background:linear-gradient(145deg,#27364a,#171f33);box-shadow:0 24px 70px #070d1d70}.stage{height:390px;position:relative;display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse at 50% 65%,#78baa073,transparent 58%),linear-gradient(#314969,#1a3946 68%,#1f413e)}.stage.duck{background:radial-gradient(ellipse at 50% 76%,#8fcec487,transparent 56%),linear-gradient(#5b839b,#3d7180 68%,#2d6671)}
+    .controls{padding:22px 24px 24px}.statusline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px}.status{font-size:13px;color:#e0e5ea;display:flex;align-items:center;gap:8px}.status .dot{background:#f3bd77;box-shadow:none}.status.active .dot{background:var(--lime);box-shadow:0 0 10px #c9f77b}.timer{font-variant-numeric:tabular-nums;font-size:12px;color:#b7c4cb;border:1px solid #ffffff28;border-radius:99px;padding:6px 11px}.buttons{display:flex;flex-wrap:wrap;gap:10px}.primary{flex:1;min-width:185px;border:0;background:var(--lime);color:#182c31;border-radius:14px;padding:14px 18px;font-weight:800;display:flex;justify-content:center;align-items:center;gap:9px}.secondary{border:1px solid #ffffff3b;background:#ffffff0c;color:#fff;border-radius:14px;padding:13px 16px;font-weight:730}.danger{border-color:#feaa9880;color:#ffd8cd;background:#aa3d301c}.instructions{font-size:12px;color:#a2b1bc;margin:15px 0 0;line-height:1.6}.message{border-radius:12px;padding:12px 14px;margin:0 0 14px;background:#e7ad7130;color:#ffe7c9;font-size:12px;line-height:1.6}.message.hidden{display:none}.chat{margin-top:20px;background:#ffffff09;border:1px solid var(--line);padding:22px;border-radius:23px}.chat-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.chat-head h2{margin:0;font-size:16px}.chat-head span{font-size:11px;color:#98aab8}.chat-log{max-height:160px;min-height:70px;overflow:auto;display:grid;gap:8px;margin-bottom:13px}.chat-log p{margin:0;border-left:2px solid #ffffff2c;padding:5px 9px;color:#cad4da;font-size:12px;line-height:1.5}.chat-log p strong{color:#e9f2ee}.chat-form{display:flex;gap:8px}.chat-form input{flex:1;min-width:0;border:1px solid #ffffff2d;background:#0c1725a0;color:#fff;padding:12px 13px;border-radius:12px;outline:none}.chat-form input:focus{border-color:#cffa86}.chat-form button{border:0;background:#f5b37d;color:#242534;border-radius:12px;font-weight:800;padding:10px 18px}.stats{display:flex;gap:16px;flex-wrap:wrap;color:#a0afbf;font-size:11px;margin-top:16px}.stats b{color:#e7f0ec}.footer{margin:28px 0 0;text-align:center;font-size:11px;color:#7d8f9f}
+    @media(max-width:830px){.layout{grid-template-columns:1fr}.stage{height:330px}.page{padding:20px 18px 36px}.topbar{margin-bottom:28px}}
+    @media(max-width:530px){.topbar{margin-bottom:25px}.brand{letter-spacing:.1em;font-size:12px}.brand-mark{width:32px;height:32px}.pill{font-size:10px;padding:8px 10px}.heading{font-size:clamp(38px,11vw,58px)}.intro{font-size:13px;margin-bottom:25px}.layout{gap:15px}.stage-card{border-radius:22px}.stage{height:300px}.controls{padding:17px}.secondary{flex:1}.primary{width:100%}.chat{padding:17px}.chat-form button{padding:10px 13px}}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+    .mic-diagnostics{margin-top:15px;padding:15px;border:1px solid #a8d7e36b;border-radius:15px;background:#7cb8c214}.mic-diagnostics strong{display:block;font-size:13px;margin-bottom:9px}.mic-meter{height:9px;background:#101d2c;border:1px solid #ffffff32;border-radius:99px;overflow:hidden}.mic-meter-fill{width:0;height:100%;background:linear-gradient(90deg,#bfe979,#71d8cc);transition:width .13s}.mic-diagnostics .mic-detail{color:#b9c9d1;font-size:12px;margin:8px 0 12px;line-height:1.5}.mic-diagnostics button{padding:10px 14px;font-size:12px}.mic-diagnostics .mic-tip{color:#9aaec0;font-size:11px;line-height:1.6;margin:12px 0 0}
+    .speech-panel{padding:14px;margin:13px 0;border:1px solid #cdeebd60;background:#142d2bc7;border-radius:13px}.speech-panel .speech-label{color:#cffa86;font-size:12px;font-weight:750}.speech-panel p{font-size:16px;line-height:1.5;min-height:23px;margin:7px 0;color:#fff;overflow-wrap:anywhere}.speech-panel small{color:#b7c4cb;font-size:11px;line-height:1.5;display:block}.speech-diagnostics{margin-top:15px;border:1px solid #a8d7e36b;border-radius:15px;padding:15px;background:#7cb8c214}.speech-diagnostics .secondary{margin-top:4px}.speech-diagnostics .mic-tip{font-size:11px;color:#aabdc7;line-height:1.6}.speech-diagnostics strong{font-size:13px}
+
+    .layout>aside,.layout>section{min-width:0}
+    @media(max-width:830px){.layout{grid-template-columns:minmax(0,1fr)}}
+    .rufus-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;display:none}
+    .rufus-build-status{position:absolute;right:12px;top:14px;z-index:5;padding:7px 10px;border-radius:10px;background:#071b23dd;color:#e8f5ec;border:1px solid #b3e7ca77;font-size:11px;font-weight:700;pointer-events:none;max-width:58%;text-align:right}
+    @media(max-width:830px){}
+    @media(max-width:530px){}.stage.new-zoo[data-rufus-ready] .rufus-canvas{display:block}@media(max-width:830px){}
+.page{max-width:1460px;padding-top:22px}.topbar{margin-bottom:26px}.heading{font-size:clamp(36px,4.4vw,62px);line-height:1.03}.intro{max-width:680px;margin-bottom:25px}.layout{grid-template-columns:minmax(0,1fr) 280px;gap:24px}.layout>section{grid-column:1;grid-row:1}.layout>aside{grid-column:2;grid-row:1}.world-toolbar{display:flex;align-items:center;gap:16px;margin:0 0 14px}.world-toolbar>div{flex:1}.world-kicker{font-size:10px;letter-spacing:.16em;color:#c3daae;font-weight:800}.world-toolbar h2{font-size:24px;letter-spacing:-.035em;margin:6px 0}.world-toolbar p{color:#b5c6c2;line-height:1.5;font-size:13px;margin:0}#world-visited{font-size:11px;color:#d5e7bb;white-space:nowrap}.stage.new-zoo{height:clamp(460px,66vh,720px)!important;min-height:460px;background:#d8d8bb}.new-zoo .rufus-build-status{top:auto;bottom:14px;right:14px;max-width:70%;font-size:10px}#world-pins{position:absolute;inset:0;z-index:3;pointer-events:none}.world-pin{position:absolute;transform:translate(-50%,-100%);min-height:44px;border:1px solid #fff7;border-radius:14px;background:#fff5dfed;color:#273d32;padding:8px 11px;font-size:11px;box-shadow:0 5px 20px #263d3730;pointer-events:auto;white-space:nowrap;font-weight:800;backdrop-filter:blur(6px)}.world-pin span{font-size:19px;margin-right:5px}.world-pin:hover{background:#fffbe9;outline:2px solid #cce68d}.world-pin:focus-visible,.destination:focus-visible{outline:3px solid #ffe1a4;outline-offset:3px}.destination{display:flex;width:100%;align-items:center;gap:12px;background:#ffffff06;color:#edf1de;border:1px solid #ffffff17;border-radius:14px;padding:12px 14px;text-align:left;margin:0 0 8px;min-height:61px;transition:background .2s,border-color .2s}.destination:hover{background:#c9e69514;border-color:#c9e69566}.destination[aria-current="location"]{border-color:#c6e4a1;background:#c9e69518}.destination .destination-icon{font-size:25px}.destination b{display:block;font-size:13px}.destination small{display:block;font-size:11px;color:#aabdba;margin-top:3px}.destination .visited{margin-left:auto;color:#d3e5af;font-size:11px}#world-overview-note{padding:16px 21px;color:#c9d9c3;font-size:13px;line-height:1.7;background:#162d2d}body[data-world-mode="overview"] .controls,body[data-world-mode="overview"] .chat,body[data-world-mode="overview"] #character-name{display:none}body[data-world-mode="visit"] #world-overview-note{display:none}#world-map-fallback{position:absolute;z-index:3;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:32px;text-align:center;background:radial-gradient(ellipse,#bed0a1,#8fae8e);color:#243c31}#world-map-fallback p{font-size:13px;line-height:1.6}
+@media(max-width:1000px){.layout{grid-template-columns:minmax(0,1fr)}.layout>aside{grid-column:1;grid-row:1}.layout>section{grid-column:1;grid-row:2}#world-destinations{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.destination{margin:0;gap:8px;padding:10px}.destination small{font-size:10px}.destination .destination-icon{font-size:22px}.intro{margin-bottom:20px}.heading br{display:none}.topbar{margin-bottom:22px}.stage.new-zoo{height:60vh!important;min-height:440px}.world-toolbar h2{font-size:22px}}
+@media(max-width:600px){.page{padding:16px 12px 36px}.brand{font-size:10px}.pill{font-size:9px;padding:7px 9px}.eyebrow{font-size:9px}.heading{font-size:39px}.intro{font-size:12px;margin-bottom:20px}.world-toolbar{flex-wrap:wrap;gap:10px}.world-toolbar p{font-size:11px}.world-toolbar h2{font-size:20px}.world-toolbar .secondary{flex:0 0 auto;padding:10px;font-size:11px;min-height:44px}#world-visited{font-size:10px}#world-destinations{grid-template-columns:repeat(2,minmax(0,1fr))}.stage.new-zoo{height:58vh!important;min-height:390px}.world-pin{padding:7px 8px;font-size:9px;border-radius:10px}.world-pin span{font-size:16px;margin-right:2px}#world-overview-note{font-size:11px;padding:13px 16px}.world-kicker{font-size:9px}.rufus-build-status{max-width:65%}.heading em{display:block}}
+
+.debatt-home{color:inherit;text-decoration:none}.debatt-home:hover{text-decoration:underline}.footer a{color:#d2e6ae;text-underline-offset:4px}.world-view-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-basis:100%;font-size:11px;color:#c4d4ca}.world-toolbar{flex-wrap:wrap}.world-view-controls>span{color:#a5bcae}
+
+body[data-world-mode="info"] .controls,body[data-world-mode="info"] .chat,body[data-world-mode="info"] #character-name,body[data-world-mode="info"] #world-overview-note{display:none}.world-view-controls .secondary{min-height:44px;padding:8px 12px;font-size:11px;flex:0 0 auto}.world-info-panel,.world-quest{margin-top:18px;padding:20px;border:1px solid #c4df9b44;border-radius:18px;background:#18352d80;color:#e9efdd}.world-info-panel p,.world-quest p{font-size:13px;line-height:1.7;color:#c7d5cb}.world-info-panel h2,.world-quest h3{font-size:20px;margin:7px 0 12px}.world-link{display:inline-block;color:#d8ecad;font-weight:800;padding:12px 0}.quest-heading>span,#quest-progress{font-size:10px;letter-spacing:.1em;color:#c5dca4;font-weight:800}#quest-choices{display:flex;gap:8px;flex-wrap:wrap}.quest-reset{display:block;margin-top:16px;background:none;border:0;color:#a4b9ac;text-decoration:underline;font-size:11px;padding:8px 0}.world-view-controls{gap:9px}body[data-world-fullscreen="true"]{overflow:hidden}body[data-world-fullscreen="true"] #world-shell,#world-shell:fullscreen{position:fixed;inset:0;z-index:10000;background:#111d25;overflow:auto;padding:16px;max-width:none;width:100%;height:100dvh}body[data-world-fullscreen="true"] .stage.new-zoo,#world-shell:fullscreen .stage.new-zoo{height:64dvh!important;min-height:300px}body[data-world-fullscreen="true"] .world-toolbar h2{font-size:20px}body[data-world-fullscreen="true"] .world-toolbar p{font-size:11px}body[data-world-fullscreen="true"] .world-quest{margin-top:12px}@media(max-width:600px){.world-info-panel,.world-quest{padding:16px}.world-view-controls{gap:7px}body[data-world-fullscreen="true"] #world-shell{padding:10px}}
+
+
+body[data-world-mode="treasure"] .controls,body[data-world-mode="treasure"] .chat,body[data-world-mode="treasure"] #character-name,body[data-world-mode="treasure"] #world-overview-note{display:none}.treasure-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.treasure-panel .secondary{min-height:44px;padding:10px 15px}.treasure-panel input{background:#102b2a;border:1px solid #c4df9b88;color:#fff;border-radius:9px;padding:10px;font:inherit;min-height:44px}.treasure-panel input:focus-visible{outline:3px solid #ffdc85}.treasure-panel summary{cursor:pointer;padding:12px 0;color:#e8d49c;font-weight:750}.treasure-panel ol{list-style:none;padding:0;margin:0}.treasure-row{display:grid;grid-template-columns:1fr auto;gap:8px 14px;padding:14px 0;border-top:1px solid #c4df9b33}.treasure-row strong{align-self:center}.treasure-row small{grid-column:1;grid-row:2;color:#bacdbf}.treasure-row>button:first-of-type{grid-column:2;grid-row:1/3}.treasure-row p,.treasure-row form{grid-column:1/-1}.treasure-row p{margin:0}.treasure-row form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.treasure-row form input{width:64px;text-align:center}.treasure-row form span{font-size:12px;color:#f5ce9b}.treasure-row [hidden]{display:none!important}#treasure-slots{display:flex;gap:7px;margin:14px 0;flex-wrap:wrap}.treasure-slot{display:grid;place-items:center;width:38px;height:44px;background:#102b2a;border:1px solid #e3c47d77;color:#ffe4a7;border-radius:8px;font-size:22px;font-weight:800}#treasure-code-form{display:grid;gap:10px;margin-top:18px}#treasure-code{max-width:210px;letter-spacing:.17em}#treasure-reward{border:1px solid #e3c47d77;padding:16px;border-radius:12px;background:#e3c47d12}.world-toolbar>.world-view-controls{flex-basis:100%}
+
+.world-pin::after{content:"";position:absolute;left:50%;top:100%;height:var(--pin-link-length,0px);width:1px;background:#f9f0caad;transform-origin:top;transform:rotate(var(--pin-link-angle,0rad));pointer-events:none}.world-pin{z-index:1}
+#stage{scroll-margin-top:12px}
+.animation-tools{margin-top:18px;padding:12px;border:1px solid #ffffff25;border-radius:12px}.animation-tools summary{cursor:pointer;font-weight:700;padding:6px}
+.character-name{position:absolute;z-index:4;top:16px;left:16px;border-radius:12px;padding:8px 12px;font-size:12px;background:#102028bb;color:#fff;pointer-events:none}
+.header-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}#language-toggle{min-height:48px;border:2px solid #d3e9a3;color:#e8f7cd;font-weight:800}#language-toggle:disabled{opacity:.6}@media(max-width:600px){.topbar{flex-wrap:wrap;gap:16px}.header-actions{width:100%;justify-content:space-between}}
+.quests-section{margin-top:40px;padding-top:28px;border-top:2px solid #c5dfa466}#quests-heading{margin:0 0 22px;font-size:clamp(32px,4vw,44px);font-weight:850;line-height:1.15;letter-spacing:-.04em;color:#e4f5be}
+</style>
+</head>
+<body data-world-mode="overview">
+<div class="orb one"></div><div class="orb two"></div>
+<main class="page">
+  <header class="topbar"><div class="brand"><span class="brand-mark">✦</span> <a class="debatt-home" href="/" target="_blank" rel="noopener noreferrer">DEBATT-AI</a> <span style="opacity:.42">/</span> ANIMAL ZOO</div><div class="header-actions"><button id="language-toggle" class="secondary" type="button" lang="en">🌐 In English</button><span class="pill"><span class="dot"></span> DEBATT-AI</span></div></header>
+  <div class="eyebrow">En liten värld. Åtta stora personligheter.</div>
+  <h1 class="heading">Välkommen till <br><em>vännernas ö.</em></h1>
+  <p class="intro">En del av Debatt-AI – en plats för nyfikenhet, kunskap och samtal. Följ stigarna till en ny vän på ön.</p>
+  <div class="layout">
+    <aside>
+      <p class="small-title">Vart vill du gå?</p><nav id="world-destinations" aria-label="Vänner och platser på ön"></nav>
+    </aside>
+    <section id="world-shell" aria-label="Samtal med djur">
+      <div class="world-toolbar"><div><span class="world-kicker">DEBATT-AI · UPPTÄCKTSVÄRLD</span><h2 id="world-title">Vännernas ö</h2><p id="world-description">Tryck på en plats på ön för att hälsa på.</p></div><button type="button" id="world-back" class="secondary" hidden>← Hela ön</button><span id="world-visited">0 av 8 besökta</span><div class="world-view-controls"><span id="world-clock-status" title="Ljuset följer din lokala klocka">Din lokala tid</span><button class="secondary" id="world-fullscreen" type="button" aria-pressed="false">⛶ Helskärm</button></div></div><div class="stage-card">
+        <div id="stage" class="stage new-zoo" tabindex="-1" role="region" aria-label="Figuren och ön">
+          <div id="world-pins" aria-label="Platser på ön"></div><div id="world-map-fallback" hidden><b>Din webbläsare kunde inte starta 3D-världen.</b><p>Öppna sidan i Chrome på din surfplatta för att besöka ön.</p></div><div class="rufus-build-status" id="rufus-build-status" role="status">Vännernas ö · kontrollerar 3D…</div>
+          <div class="character-name" id="character-name">🦊 Rufus lyssnar gärna</div>
+
+
+        </div>
+        <div id="world-overview-note">✦ Åtta platser, åtta vänner. Välj på ön eller i listan för att börja utforska.</div><div class="controls">
+          <div class="statusline"><div class="status" id="status" role="status"><span class="dot"></span><span id="status-text">Kontrollerar AI-anslutningen…</span></div><span class="timer" id="timer">Samtal i din takt</span></div>
+          <div id="voice-verification" hidden><p id="verification-note">Verifiera att du är en människa innan du startar ett samtal.</p><div id="turnstile-widget"></div></div>
+          <div id="idle-warning" class="message" role="status" hidden><span>Är du kvar? Prata eller skriv snart, annars avslutas samtalet.</span> <button id="keep-conversation" class="secondary" type="button">Jag är kvar</button></div>
+          <div id="message" class="message hidden" role="alert"></div>
+          <div class="buttons"><button class="primary" id="start-stt" type="button">🎤 Tala → se text → få svar</button><button class="secondary" id="start-voice" type="button">🎙 Direkt röstsamtal</button><button class="secondary" id="start-text" type="button">⌨ Skriv ett meddelande</button><button class="secondary danger" id="end" type="button" hidden>■ Avsluta</button><button class="secondary" id="preview" type="button">▶ Demoröst</button></div>
+          <div id="speech-diagnostics" class="speech-diagnostics" hidden><strong id="speech-health">Tryck på Tala in och säg något på svenska.</strong><div class="speech-panel"><span class="speech-label">🎤 Det här uppfattade webbläsaren</span><p id="speech-transcript" aria-live="polite">Väntar på ditt tal…</p><small id="speech-note">När talet har blivit text skickas det till djuret, som svarar med röst.</small></div><button id="recognize-speech" class="secondary" type="button">🎙 Tala in</button><p class="mic-tip">Använder webbläsarens taligenkänning, om den stöds. På vissa enheter skickas ljudet till webbläsarleverantörens tjänst. Ingen separat API-nyckel behövs.</p></div>
+          <div id="mic-diagnostics" class="mic-diagnostics" hidden><strong id="mic-health">Startar mikrofonen…</strong><div class="mic-meter" aria-label="Mikrofonens ljudnivå"><div id="mic-meter-fill" class="mic-meter-fill"></div></div><p id="mic-detail" class="mic-detail">0 ljudpaket skickade.</p><div class="speech-panel"><span class="speech-label">🎤 Det här uppfattade Gemini Live</span><p id="live-transcript" aria-live="polite">Ingen transkription ännu…</p><small id="live-note">När Gemini känner igen tal ska texten visas här.</small></div><button id="finish-speech" class="secondary" type="button">✓ Jag har pratat klart</button><p class="mic-tip">När du trycker ”Jag har pratat klart” pausas mikrofonens ljudöverföring medan Gemini får avsluta turen. Om rutan förblir tom, testa ”Tala → se text → få svar” ovan vid nästa försök.</p></div>
+          <p class="instructions">Röstsamtalet kräver att du ger mikrofontillstånd. Använd gärna hörlurar. Djurens röster är AI-genererade. Vi sparar inga samtal här; Googles och webbläsarens tjänster kan behandla ljud och text. På Googles gratisnivå kan innehåll användas för att förbättra tjänsten. Dela inte personuppgifter.</p>
+        </div>
+      </div>
+      <section id="world-about-panel" class="world-info-panel" hidden><h2>Välkommen till Debatt-AI</h2><p>Vännernas ö är en del av Debatt-AI: en plats för att utforska idéer, lära sig och samtala med AI. Alla åtta vännerna är AI-figurer.</p><a class="world-link" href="/" target="_blank" rel="noopener noreferrer">Besök Debatt-AI ↗</a></section>
+      <section class="quests-section" aria-labelledby="quests-heading"><h2 id="quests-heading">Uppdrag</h2>
+      <section class="world-quest" aria-label="Ett gemensamt äventyr"><div class="quest-heading"><span>ETT LITET ÄVENTYR</span><h3>1. Ett vattenhjul åt Doris</h3></div><button type="button" class="secondary" id="quest-start">Starta äventyret</button><div id="quest-body" hidden><span id="quest-progress"></span><p id="quest-text"></p><p>Steget uppdateras automatiskt när vännen har gett sitt råd. Du kan också använda svarsknapparna.</p><div id="quest-choices"></div><p id="quest-feedback" role="status"></p><button type="button" class="secondary" id="quest-travel">Besök Roboten</button></div><button type="button" id="quest-reset" class="quest-reset" hidden>Avsluta / börja om</button></section>
+      <section class="world-quest treasure-panel" aria-label="Skattjakten"><span class="world-kicker">ÅTTA VÄNNER · ÅTTA HEMLIGHETER</span><h3>2. Öns hemliga skatt</h3><p>Prata en stund med varje vän. Lös deras räknegåtor och hitta de åtta siffrorna till skattkistan. Ordningen står i anteckningsboken.</p><div class="treasure-actions"><button type="button" class="secondary" id="treasure-start">Starta skattjakten</button><button type="button" class="secondary" id="treasure-chest-travel">🗝 Besök skattkistan</button><button type="button" class="quest-reset" id="treasure-reset" hidden>Börja om skattjakten</button></div><p id="treasure-note" role="status">Framstegen finns kvar medan den här fliken är öppen.</p><form id="treasure-code-form"><label for="treasure-code">Kistans åttasiffriga kod</label><div class="treasure-actions"><input id="treasure-code" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" aria-describedby="treasure-note" placeholder="Åtta siffror"><button id="treasure-unlock" class="secondary" type="submit">Öppna skattkistan ✨</button></div></form><div id="treasure-book" hidden><h3 id="treasure-progress">Ledtrådar: 0 av 8</h3><div id="treasure-slots" aria-label="Kodens åtta positioner"></div><details><summary>Öppna anteckningsboken</summary><ol id="treasure-clues"></ol></details><div id="treasure-reward" hidden><h3>✨ Öns upptäckarmedalj</h3><p>Kistan är öppen! Fortsätt gärna utforska ön och upptäcka vännernas hemligheter.</p></div></div></section>
+      </section>
+      <div class="chat"><div class="chat-head"><h2>💬 Samtalslogg</h2><span>Endast medan fliken är öppen</span></div><div id="chat-log" class="chat-log" aria-live="polite"><p>Besök en vän på ön och starta ett samtal. Prata eller skriv ett meddelande.</p></div><form class="chat-form" id="chat-form"><input id="chat-input" maxlength="300" placeholder="Skriv till Rufus…" autocomplete="off" aria-label="Meddelande till djuret" disabled><button type="submit" id="send" disabled>Skicka</button></form><div class="stats"><span>Turordningar: <b id="turns">0</b></span><span>Senaste svarstid: <b id="latency">–</b></span><span>Motor: <b>Gemini 3.8 Live</b></span></div></div>
+    </section>
+  </div>
+  <footer class="footer"><a href="/" target="_blank" rel="noopener noreferrer">Debatt-AI – besök huvudsidan ↗</a> · Vännernas ö · En upptäcktsvärld med AI-vänner</footer>
+</main>
+<!-- ISLAND_LANGUAGE -->
+<script>
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const animals = {rabbit:{name:'Kaninen',emoji:'🐰',sample:'Hej! Vad vill du prata om idag?'},panda:{name:'Pandan',emoji:'🐼',sample:'Hej! Så roligt att träffa dig.'},owl:{name:'Ugglan',emoji:'🦉',sample:'Hej! Ska vi upptäcka något nytt tillsammans?'},hedgehog:{name:'Igelkotten',emoji:'🦔',sample:'Hej! Vad har du gjort idag?'},robot:{name:'Roboten',emoji:'🤖',sample:'Hej! Jag är redo för ett spännande samtal.'},turtle:{name:'Sköldpaddan',emoji:'🐢',sample:'Hej! Vi tar det lugnt och pratar en stund.'},fox:{name:'Rufus',emoji:'🦊',sample:'Hej! Jag heter Rufus. Vill du höra en hemlighet om skogen?'},duck:{name:'Doris',emoji:'🦆',sample:'Kvack och välkommen! Jag heter Doris. Vad ska vi hitta på idag?'}};
+  let sessionAttempt=0,lastActivityAt=0,conversationStartedAt=0;
+  const IDLE_TIMEOUT_MS=120000,IDLE_WARNING_MS=90000;
+  let animal='fox',configured=false,connected=false,connecting=false,mode='voice';
+  let ws=null,mic=null,micCtx=null,outCtx=null,processor=null,micSource=null,mutedGain=null;
+  let micPackets=0,micAudiblePackets=0,micLevel=0,micPeak=0,lastPacketAt=0,voiceActiveAt=0,micDiagnosticTimer=null,micPaused=false;
+  let recognition=null,recognizing=false,recognizedThisTurn=false,transcriptionTimeout=null,pendingSpeechText='';
+  const language=()=>window.islandI18n?.language||'sv';
+  let sessionQuestStage=0,pendingQuestCall=null,questPlaybackReady=false;
+  const questAnimals={1:'robot',2:'duck',3:'owl',4:'robot'};
+  const questTool={functionDeclarations:[{name:'complete_waterwheel_step',description:'Queue completion of the CURRENT waterwheel quest step only after giving its advice and explaining the next visit aloud. Never use for treasure clues or unrelated chat.',parameters:{type:'OBJECT',properties:{stage:{type:'INTEGER',description:'Current stage, 1 to 4.'}},required:['stage']}}]};
+  let sources=[],nextPlay=0,playCount=0,expiresAt=0,clock=null,expiryTimer=null,lastInputAt=0,turns=0,reconnectTimer=null;
+  let outAnalyser=null,audioSegments=[],lipTimer=null,lipLevel=.16,audioChunks=0;
+  let failedStart=false,stopRequested=false,voiceSession=null,pendingUserTurn=false,receivedTurnResponse=false,pendingTreasureClue=false,automaticClueTurn=false;
+  const tabs='BroadcastChannel' in window?new BroadcastChannel('debatt-ai-friends-island'):null;
+  if(tabs)tabs.onmessage=e=>{if(e.data?.type==='new-session'&&(connected||connecting))end('Ett nytt samtal öppnades i en annan flik.')};
+  const short = (s,n=220)=>String(s||'').slice(0,n);
+  function status(label,active=false){$('status-text').textContent=label;$('status').classList.toggle('active',active)}
+  function showError(s){$('message').textContent=s;$('message').classList.remove('hidden')}
+  function clearError(){$('message').classList.add('hidden');$('message').textContent=''}
+  function updateControls(){
+    $('start-voice').hidden=connecting||connected;$('start-text').hidden=connecting||connected;$('start-stt').hidden=connecting||connected;$('end').hidden=!(connecting||connected);
+    $('chat-input').disabled=!connected;$('send').disabled=!connected;
+
+    window.dispatchEvent(new CustomEvent('zoo-session-state',{detail:{animal,connected,connecting}}));
+  }
+  function choose(id){if(connected||connecting||!animals[id])return;animal=id;const a=animals[id];$('character-name').textContent=a.emoji+' '+a.name+' lyssnar gärna';$('start-stt').textContent='🎤 Prata med '+a.name;$('chat-input').placeholder='Skriv till '+a.name+'…';clearError();}
+  function log(who,text){if(!text)return;const p=document.createElement('p');p.setAttribute('data-no-translate','true');const strong=document.createElement('strong');strong.textContent=who+': ';p.append(strong,document.createTextNode(short(text,600)));$('chat-log').append(p);while($('chat-log').children.length>12)$('chat-log').firstChild.remove();$('chat-log').scrollTop=$('chat-log').scrollHeight}
+  function resetLog(){$('chat-log').replaceChildren();turns=0;$('turns').textContent='0';$('latency').textContent='–'}
+  function sendTextMessage(text){if(!text||!connected||ws?.readyState!==WebSocket.OPEN)return false;noteActivity();lastInputAt=Date.now();pendingUserTurn=true;receivedTurnResponse=false;automaticClueTurn=false;ws.send(JSON.stringify({realtimeInput:{text}}));log('Du',text);return true}
+  function speechToTextAvailable(){return Boolean(window.SpeechRecognition||window.webkitSpeechRecognition)}
+  function updateSpeechTranscript(text,final=false){$('speech-transcript').setAttribute('data-no-translate',text?'true':'false');$('speech-transcript').textContent=short(text,500)||'Väntar på ditt tal…';$('speech-note').textContent=final?'Texten är skickad till '+animals[animal].name+'. Väntar på röstsvar…':'Taligenkänningen arbetar. Texten skickas när du gör paus.'}
+  function startRecognition(){
+    if((!connected&&!connecting)||mode!=='speech'||recognizing)return;noteActivity();
+    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SpeechRecognition){showError('Samsung Internet erbjuder ingen taligenkänning här. Du kan använda mikrofonen på Samsung-tangentbordet i textrutan i stället.');return}
+    recognition=new SpeechRecognition();recognition.lang=language()==='en'?'en-GB':'sv-SE';recognition.continuous=false;recognition.interimResults=true;recognition.maxAlternatives=1;
+    recognizedThisTurn=false;recognizing=true;$('speech-transcript').setAttribute('data-no-translate','false');$('recognize-speech').textContent='⏹ Avsluta inspelning';$('speech-health').textContent='🎙 Lyssnar – tala nu!';$('speech-transcript').textContent='Lyssnar…';$('speech-note').textContent='Du ser texten här när webbläsaren känner igen talet.';clearError();
+    recognition.onresult=e=>{let finalText='',interim='';for(const result of e.results){const snippet=result[0]?.transcript||'';if(result.isFinal)finalText+=snippet+' ';else interim+=snippet+' '}
+      const visible=(finalText+interim).trim();if(visible){noteActivity();$('speech-transcript').setAttribute('data-no-translate','true');$('speech-transcript').textContent=short(visible,500);}
+      if(finalText.trim()&&!recognizedThisTurn){recognizedThisTurn=true;const said=finalText.trim();updateSpeechTranscript(said,true);if(connecting){pendingSpeechText=said;$('speech-note').textContent='Ditt tal väntar tills anslutningen är klar.';$('speech-health').textContent='✓ Talet väntar – ansluter…';}else if(sendTextMessage(said))$('speech-health').textContent='✓ Tal blev text – väntar på '+animals[animal].name+'!';else showError('Kunde inte skicka den transkriberade texten.')}
+    };
+    recognition.onerror=e=>{const reasons={not_allowed:'Mikrofontillstånd saknas.', 'not-allowed':'Mikrofontillstånd saknas.', 'no-speech':'Inget tal uppfattades.', 'audio-capture':'Mikrofonen kunde inte användas.',network:'Taligenkänningen har nätverksproblem.', 'service-not-allowed':'Webbläsaren tillåter inte taligenkänning.'};$('speech-health').textContent='⚠️ '+(reasons[e.error]||'Taligenkänningen kunde inte startas.');if(e.error==='not-allowed')showError('Kontrollera mikrofonbehörigheten i Samsung Internet. Du kan också prova tangentbordets mikrofon.')};
+    recognition.onend=()=>{recognizing=false;recognition=null;$('recognize-speech').textContent='🎙 Tala in igen';if(!recognizedThisTurn&&$('speech-health').textContent.startsWith('🎙'))$('speech-health').textContent='Inget färdigt tal uppfattades. Försök igen.'};
+    try{recognition.start()}catch{$('speech-health').textContent='Taligenkänningen kunde inte startas i den här webbläsaren.';recognizing=false;recognition=null;$('recognize-speech').textContent='🎙 Försök igen'}
+  }
+  let verificationToken='',verificationWidget=null;
+  function resetVerification(){verificationToken='';if(verificationWidget!==null)window.turnstile?.reset(verificationWidget);}
+  async function check(){
+    try{
+      const r=await fetch('/api/vannernas-o/status',{cache:'no-store'});if(!r.ok)throw Error('Status saknas');const j=await r.json();configured=Boolean(j.ready);
+      status(configured?'Välj en vän och starta ett samtal':'Samtalen är inte tillgängliga just nu.');
+      if(!configured)return;
+      $('voice-verification').hidden=false;
+      await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.onload=resolve;script.onerror=reject;script.async=true;document.head.append(script)});
+      verificationWidget=window.turnstile.render('#turnstile-widget',{sitekey:j.turnstileSiteKey,action:'friends_island_voice',language:language(),callback:token=>{verificationToken=token},'expired-callback':()=>{verificationToken=''},'error-callback':()=>{verificationToken='';showError('Verifieringen misslyckades. Försök igen.')}});
+    }catch{configured=false;status('Kunde inte kontrollera servern');showError('Kontroll av AI-anslutningen misslyckades.')}
+  }
+  function b64(bytes){let s='';for(let i=0;i<bytes.length;i+=8192)s+=String.fromCharCode.apply(null,bytes.subarray(i,i+8192));return btoa(s)}
+  function fromBase64(s){const binary=atob(s),out=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)out[i]=binary.charCodeAt(i);return out}
+  function setMouth(level){const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;$('stage').style.setProperty('--mouth-open',String(reduced ? 0.16 : level))}
+  // Analyse the *played* Gemini PCM, not the microphone or merely queued audio chunks.
+  function updateLips(){
+    if(!outCtx||!outAnalyser)return;
+    const now=outCtx.currentTime;
+    audioSegments=audioSegments.filter(seg=>seg.end>now);
+    const playing=audioSegments.some(seg=>seg.start<=now&&now<seg.end);
+    const stage=$('stage');
+    stage.classList.toggle('is-speaking',playing);
+    stage.classList.toggle('is-listening',connected&&!playing);
+    stage.classList.toggle('is-thinking',connecting&&!playing);
+    let target=.16;
+    if(playing){
+      const wave=new Uint8Array(outAnalyser.fftSize);
+      outAnalyser.getByteTimeDomainData(wave);
+      let sum=0;
+      for(const v of wave){const sample=(v-128)/128;sum+=sample*sample}
+      const rms=Math.sqrt(sum/wave.length);
+      target=Math.min(1.35,Math.max(.16,rms*9));
+    }
+    lipLevel=lipLevel*.4+target*.6;
+    setMouth(lipLevel.toFixed(3));
+  }
+  function clearSound(){
+    for(const source of sources){try{source.stop()}catch{}}
+    pendingQuestCall=null;questPlaybackReady=false;
+    sources=[];audioSegments=[];playCount=0;nextPlay=0;lipLevel=.16;
+    $('stage').classList.remove('is-speaking','is-thinking');
+    $('stage').classList.toggle('is-listening',connected);
+    setMouth(.16);
+  }
+  function playAudio(raw){
+    if(!outCtx||!outAnalyser)return;
+    const bytes=fromBase64(raw);if(bytes.byteLength<2)return;
+    const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+    const audio=outCtx.createBuffer(1,Math.floor(bytes.byteLength/2),24000);
+    const arr=audio.getChannelData(0);
+    for(let i=0;i<arr.length;i++)arr[i]=view.getInt16(i*2,true)/32768;
+    const source=outCtx.createBufferSource();source.buffer=audio;source.connect(outAnalyser);
+    const when=Math.max(outCtx.currentTime+.025,nextPlay||0);
+    nextPlay=when+audio.duration;audioSegments.push({start:when,end:nextPlay});
+    playCount++;audioChunks++;sources.push(source);
+    source.onended=()=>{sources=sources.filter(s=>s!==source);playCount=Math.max(0,playCount-1);flushQuestStep()};
+    source.start(when);
+  }
+  function downsample(buffer,sampleRate){const ratio=sampleRate/16000;if(ratio<=0)return new Uint8Array();const count=Math.floor(buffer.length/ratio),bytes=new Uint8Array(count*2),view=new DataView(bytes.buffer);for(let i=0;i<count;i++){const start=Math.floor(i*ratio),end=Math.max(start+1,Math.floor((i+1)*ratio));let sum=0;for(let j=start;j<end&&j<buffer.length;j++)sum+=buffer[j];const val=Math.max(-1,Math.min(1,sum/(end-start)));view.setInt16(i*2,val<0?val*32768:val*32767,true)}return bytes}
+  function refreshMicDiagnostics(){
+    if(!connected||mode!=='voice')return;
+    const packets=micPackets;
+    $('mic-meter-fill').style.width=Math.min(100,Math.round(micLevel*600))+'%';
+    $('mic-detail').textContent=packets+' ljudpaket skickade · '+micAudiblePackets+' med mätbart ljud · högsta nivå '+Math.round(micPeak*1000)/10+' %.';
+    if(micPaused)$('mic-health').textContent='⏸ Mikrofonöverföringen pausad – väntar på svar';
+    else if(!packets&&Date.now()-voiceActiveAt>2500)$('mic-health').textContent='⚠️ Inga ljudpaket skickas från webbläsaren';
+    else if(packets&&Date.now()-lastPacketAt>1800)$('mic-health').textContent='⚠️ Mikrofonen har slutat skicka ljud';
+    else if(packets>35&&!micAudiblePackets)$('mic-health').textContent='⚠️ Ljudpaket skickas, men verkar vara tysta. Kontrollera mikrofonen.';
+    else if(packets)$('mic-health').textContent='🎙 Mikrofonen skickar ljud – tala nu!';
+    else $('mic-health').textContent='Startar ljudströmmen…';
+  }
+  async function beginMic(){
+    micPackets=0;micAudiblePackets=0;micLevel=0;micPeak=0;micPaused=false;lastPacketAt=0;voiceActiveAt=Date.now();
+    $('mic-diagnostics').hidden=false;refreshMicDiagnostics();
+    const track=mic.getAudioTracks()[0];
+    if(!track||track.readyState!=='live')throw Error('Mikrofonspåret är inte aktivt.');
+    track.onended=()=>{if(connected&&!stopRequested)end('Mikrofonen kopplades bort. Kontrollera behörigheten i Samsung Internet.')};
+    micSource=micCtx.createMediaStreamSource(mic);
+    processor=micCtx.createScriptProcessor(4096,1,1);
+    mutedGain=micCtx.createGain();
+    // Very low nonzero output keeps this legacy processor alive on some mobile browsers.
+    mutedGain.gain.value=0.00001;
+    processor.onaudioprocess=e=>{
+      const samples=e.inputBuffer.getChannelData(0);
+      let power=0,count=0;
+      for(let i=0;i<samples.length;i+=16){power+=samples[i]*samples[i];count++}
+      micLevel=Math.sqrt(power/Math.max(1,count));
+      micPeak=Math.max(micPeak,micLevel);
+      if(!connected||micPaused||!ws||ws.readyState!==WebSocket.OPEN||ws.bufferedAmount>256000)return;
+      const data=downsample(samples,micCtx.sampleRate);
+      if(!data.length)return;
+      ws.send(JSON.stringify({realtimeInput:{audio:{data:b64(data),mimeType:'audio/pcm;rate=16000'}}}));
+      micPackets++;if(micLevel>.001)micAudiblePackets++;lastPacketAt=Date.now();
+    };
+    micSource.connect(processor);processor.connect(mutedGain);mutedGain.connect(micCtx.destination);
+    micDiagnosticTimer=setInterval(refreshMicDiagnostics,250);
+  }
+  function acceptQuestTools(message){
+    const cancelled=message.toolCallCancellation?.ids||[];
+    if(pendingQuestCall&&cancelled.includes(pendingQuestCall.id)){pendingQuestCall=null;questPlaybackReady=false;}
+    if(!message.toolCall?.functionCalls)return;
+    const functionResponses=message.toolCall.functionCalls.map(call=>{
+      const valid=call.name==='complete_waterwheel_step'&&Number.isInteger(call.args?.stage)&&call.args.stage===sessionQuestStage&&questAnimals[sessionQuestStage]===animal&&window.zooAdventure?.stage?.()===sessionQuestStage&&!automaticClueTurn;
+      if(valid&&!pendingQuestCall){pendingQuestCall={id:call.id,animal,stage:sessionQuestStage};questPlaybackReady=false;}
+      return {id:call.id,name:call.name,response:{result:valid?'queued_until_spoken_response_finishes':'ignored_wrong_or_inactive_step',instruction:valid?'Explain the advice and next visit aloud now. The card updates after playback. Do not call again.':'Continue the conversation without advancing a quest.'}};
+    });
+    ws.send(JSON.stringify({toolResponse:{functionResponses}}));
+  }
+  function flushQuestStep(){
+    if(!pendingQuestCall||!questPlaybackReady||playCount>0||document.hidden||!connected)return;
+    const detail=pendingQuestCall;pendingQuestCall=null;questPlaybackReady=false;
+    window.dispatchEvent(new CustomEvent('zoo-quest-spoken',{detail}));
+  }
+  function requestTreasureClue(){if(!connected||!window.zooTreasure?.active?.())return false;pendingTreasureClue=true;return true}
+  function flushTreasureClue(){if(pendingTreasureClue&&!document.hidden&&connected&&!pendingUserTurn&&ws?.readyState===WebSocket.OPEN&&outCtx&&outCtx.currentTime>nextPlay+.35){pendingTreasureClue=false;automaticClueTurn=true;receivedTurnResponse=false;ws.send(JSON.stringify({realtimeInput:{text:language()==='en'?'Please tell me your own treasure chest riddle in English, without giving away the answer.':'Nu vill jag höra din ledtråd till skattkistan. Ställ din egen räknegåta, utan att säga svaret.'}}));}}
+  function noteActivity(){lastActivityAt=Date.now();$('idle-warning').hidden=true;}
+  function syncClock(){
+    if(!connected)return;
+    flushQuestStep();flushTreasureClue();
+    // Hearing the character is an active conversation too. Silence packets and
+    // automatic clock ticks do not count as visitor activity.
+    if(playCount>0)noteActivity();
+    const idle=Date.now()-lastActivityAt;
+    $('idle-warning').hidden=idle<IDLE_WARNING_MS;
+    const elapsed=Math.max(0,Math.floor((Date.now()-conversationStartedAt)/1000));
+    $('timer').textContent=String(Math.floor(elapsed/60)).padStart(2,'0')+':'+String(elapsed%60).padStart(2,'0');
+    if(idle>=IDLE_TIMEOUT_MS)end('Samtalet avslutades efter två minuters inaktivitet. Du kan starta igen när du vill.');
+  }
+  function scheduleEnd(){conversationStartedAt=Date.now();noteActivity();clock=setInterval(syncClock,500);syncClock();expiryTimer=setTimeout(()=>end('Anslutningens giltighet har gått ut. Starta ett nytt samtal.'),Math.max(0,expiresAt-Date.now()))}
+  $('keep-conversation').addEventListener('click',()=>{if(connected)noteActivity()});
+  $('chat-input').addEventListener('input',()=>{if(connected)noteActivity()});
+  async function begin(which){
+    if(connecting||connected)return;
+    if(!configured){showError('Samtalen är inte tillgängliga just nu.');return}
+    if(!verificationToken){showError('Verifiera att du är en människa innan du startar ett samtal.');$('voice-verification').scrollIntoView({block:'center',behavior:'smooth'});return}
+    if(!('WebSocket' in window)){showError('Webbläsaren saknar WebSocket-stöd.');return}
+    if(which==='voice'&&!navigator.mediaDevices?.getUserMedia){showError('Mikrofon stöds inte här. Välj Testa med text.');return}
+    if(which==='speech'&&!speechToTextAvailable()){showError('Den här versionen av Samsung Internet saknar taligenkänning. Du kan ändå använda tangentbordets mikrofon i textrutan i läget Testa med text.');return}
+    if(tabs)tabs.postMessage({type:'new-session'});
+    const attempt=++sessionAttempt;
+    sessionQuestStage=window.zooAdventure?.stage?.()||0;pendingQuestCall=null;questPlaybackReady=false;
+    connecting=true;stopRequested=false;failedStart=false;pendingUserTurn=false;receivedTurnResponse=false;pendingTreasureClue=false;automaticClueTurn=false;mode=which;pendingSpeechText='';clearError();updateControls();status('Öppnar samtal…');
+    try{
+      // Start within the original tap so mobile browsers retain microphone activation.
+      if(which==='speech'){$('speech-diagnostics').hidden=false;startRecognition();}
+      audioChunks=0;outCtx=new(window.AudioContext||window.webkitAudioContext)();await outCtx.resume();outAnalyser=outCtx.createAnalyser();outAnalyser.fftSize=256;outAnalyser.connect(outCtx.destination);lipTimer=setInterval(updateLips,40);
+      if(which==='voice'){mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});micCtx=new(window.AudioContext||window.webkitAudioContext)();await micCtx.resume()}
+      const turnstileToken=verificationToken;resetVerification();
+      const r=await fetch('/api/vannernas-o/session',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({animal,turnstileToken,language:language(),questStage:sessionQuestStage,treasureActive:window.zooTreasure?.active?.()||false}),cache:'no-store'});
+      const j=await r.json();if(attempt!==sessionAttempt||stopRequested)return;if(!r.ok)throw Error(j.error||'Gemini kunde inte öppna samtalet');
+      voiceSession=j;expiresAt=new Date(j.expiresAt).getTime();
+      const endpoint='wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token='+encodeURIComponent(j.token);
+      let resumeHandle='',resumeAttempts=0;
+      function connectSocket(resume=false){
+      if(resume){resumeAttempts++;connected=false;connecting=true;updateControls();status('Återansluter samtalet…');}
+      const socket=new WebSocket(endpoint);ws=socket;
+      if(resume)reconnectTimer=setTimeout(()=>{if(socket===ws&&connecting)end('Anslutningen kunde inte återupptas. Starta ett nytt samtal.')},10000);
+      socket.onopen=()=>{if(stopRequested||attempt!==sessionAttempt||socket!==ws)return;socket.send(JSON.stringify({setup:{model:'models/'+j.model,generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:j.voice}}}},systemInstruction:{parts:[{text:j.prompt}]},...(questAnimals[sessionQuestStage]===animal?{tools:[questTool]}:{}),sessionResumption:resume&&resumeHandle?{handle:resumeHandle}:{},contextWindowCompression:{slidingWindow:{}},inputAudioTranscription:{},outputAudioTranscription:{}}}))};
+      socket.onmessage=async e=>{if(attempt!==sessionAttempt||socket!==ws)return;try{const data=typeof e.data==='string'?e.data:await e.data.text();if(attempt!==sessionAttempt||socket!==ws)return;const m=JSON.parse(data);if(m.sessionResumptionUpdate?.resumable&&m.sessionResumptionUpdate.newHandle)resumeHandle=m.sessionResumptionUpdate.newHandle;acceptQuestTools(m);if(m.setupComplete){if(resume){clearTimeout(reconnectTimer);reconnectTimer=null;failedStart=false;connecting=false;connected=true;updateControls();if(pendingSpeechText){const said=pendingSpeechText;pendingSpeechText='';sendTextMessage(said)}status('Samtalet fortsätter',true);return;}connecting=false;connected=true;updateControls();resetLog();scheduleEnd();$('speech-diagnostics').hidden=which!=='speech';$('mic-diagnostics').hidden=which!=='voice';if(which==='speech'){if(pendingSpeechText){const said=pendingSpeechText;pendingSpeechText='';if(sendTextMessage(said)){$('speech-health').textContent='✓ Tal blev text – väntar på '+animals[animal].name+'!';updateSpeechTranscript(said,true);}}}else{$('speech-transcript').textContent='Väntar på ditt tal…';}$('live-transcript').setAttribute('data-no-translate','false');$('live-transcript').textContent='Ingen transkription ännu…';$('live-note').textContent='När Gemini känner igen tal ska texten visas här.';if(which==='voice'){try{await beginMic()}catch(err){end('Mikrofonen kunde inte startas: '+short(err.message,100));return}}status(which==='voice'?'Jag lyssnar – prata nu!':which==='speech'?(recognizing?'Jag lyssnar – prata nu!':recognizedThisTurn?'Tal skickat – väntar på svar…':'Tryck på ”Tala in igen” för att försöka igen.'):'Skriv din första fråga',true);return}const sc=m.serverContent;if(!sc)return;if(sc.interrupted){clearSound();pendingUserTurn=false;receivedTurnResponse=false;automaticClueTurn=false;}if(sc.interimInputTranscription?.text&&mode==='voice'){noteActivity();$('live-transcript').setAttribute('data-no-translate','true');$('live-transcript').textContent=short(sc.interimInputTranscription.text,500);$('live-note').textContent='Gemini håller på att tolka ditt tal…'}if(sc.inputTranscription?.text){if(!automaticClueTurn)noteActivity();if(!automaticClueTurn)pendingUserTurn=true;clearTimeout(transcriptionTimeout);transcriptionTimeout=null;lastInputAt=Date.now();if(mode==='voice'){$('live-transcript').setAttribute('data-no-translate','true');$('live-transcript').textContent=short(sc.inputTranscription.text,500);$('live-note').textContent='✓ Gemini uppfattade ditt tal.'}log('Du',sc.inputTranscription.text)}if(sc.outputTranscription?.text){noteActivity();receivedTurnResponse=true;log(animals[animal].name,sc.outputTranscription.text)}if(sc.modelTurn?.parts){for(const p of sc.modelTurn.parts){if(p.inlineData?.data){receivedTurnResponse=true;if(lastInputAt){$('latency').textContent=((Date.now()-lastInputAt)/1000).toFixed(1)+' s';lastInputAt=0}playAudio(p.inlineData.data)}}}if(sc.turnComplete){if(pendingQuestCall&&receivedTurnResponse&&!automaticClueTurn){questPlaybackReady=true;flushQuestStep();}else if(pendingQuestCall){pendingQuestCall=null;questPlaybackReady=false;}const countsForTreasure=pendingUserTurn&&receivedTurnResponse&&!automaticClueTurn;pendingUserTurn=false;receivedTurnResponse=false;automaticClueTurn=false;if(countsForTreasure)window.dispatchEvent(new CustomEvent('zoo-conversation-turn',{detail:{animal}}));turns++;$('turns').textContent=turns;if(micPaused){micPaused=false;$('finish-speech').textContent='✓ Jag har pratat klart';refreshMicDiagnostics()}}}catch(err){showError('Kunde inte bearbeta ett ljudsvar: '+short(err.message,90))}};
+      socket.onerror=()=>{if(socket===ws&&attempt===sessionAttempt&&!stopRequested){showError('Anslutningen till Gemini misslyckades. Försök igen.');failedStart=true}};
+      socket.onclose=()=>{if(socket!==ws||attempt!==sessionAttempt||stopRequested)return;if(resumeHandle&&resumeAttempts<2&&Date.now()<expiresAt-5000){connectSocket(true);return;}end(failedStart?'Anslutningen kunde inte startas.':'Gemini avslutade anslutningen.')};
+      }
+      connectSocket();
+    }catch(err){if(attempt!==sessionAttempt)return;end('Det gick inte att börja: '+short(err.message,180))}
+  }
+  function end(reason){sessionAttempt++;$('idle-warning').hidden=true;pendingSpeechText='';automaticClueTurn=false;pendingTreasureClue=false;pendingUserTurn=false;receivedTurnResponse=false;stopRequested=true;connecting=false;connected=false;clearInterval(clock);clearTimeout(expiryTimer);clearTimeout(reconnectTimer);reconnectTimer=null;clearInterval(micDiagnosticTimer);clearTimeout(transcriptionTimeout);clock=null;expiryTimer=null;micDiagnosticTimer=null;transcriptionTimeout=null;micPaused=false;if(recognition){recognition.onend=null;recognition.onerror=null;recognition.onresult=null;try{recognition.abort()}catch{}recognition=null}recognizing=false;$('recognize-speech').textContent='🎙 Tala in';$('finish-speech').textContent='✓ Jag har pratat klart';if(ws){try{ws.close()}catch{}ws=null}if(processor){processor.disconnect();processor.onaudioprocess=null;processor=null}if(micSource){micSource.disconnect();micSource=null}if(mutedGain){mutedGain.disconnect();mutedGain=null}if(mic){mic.getTracks().forEach(t=>{t.onended=null;t.stop()});mic=null}if(micCtx){micCtx.close().catch(()=>{});micCtx=null}clearSound();if(lipTimer){clearInterval(lipTimer);lipTimer=null}outAnalyser=null;if(outCtx){outCtx.close().catch(()=>{});outCtx=null}$('stage').classList.remove('is-listening','is-thinking');voiceSession=null;$('mic-diagnostics').hidden=true;$('speech-diagnostics').hidden=true;$('mic-meter-fill').style.width='0%';updateControls();status('Samtalet är avslutat');$('timer').textContent='Samtal i din takt';if(reason)showError(reason)}
+  $('start-stt').addEventListener('click',()=>begin('speech'));
+  $('start-voice').addEventListener('click',()=>begin('voice'));
+  $('start-text').addEventListener('click',()=>begin('text'));
+  $('recognize-speech').addEventListener('click',()=>{if(recognizing){try{recognition.stop()}catch{}return}startRecognition()});
+  $('finish-speech').addEventListener('click',()=>{if(!connected||mode!=='voice'||ws?.readyState!==WebSocket.OPEN)return;if(micPaused){micPaused=false;clearTimeout(transcriptionTimeout);transcriptionTimeout=null;$('finish-speech').textContent='✓ Jag har pratat klart';status('Mikrofonen öppen igen – tala nu!',true);refreshMicDiagnostics();return}micPaused=true;ws.send(JSON.stringify({realtimeInput:{audioStreamEnd:true}}));$('finish-speech').textContent='↻ Prata igen';status('Tal skickat – väntar på Gemini…',true);$('live-note').textContent='Väntar på transkription från Gemini…';refreshMicDiagnostics();clearTimeout(transcriptionTimeout);transcriptionTimeout=setTimeout(()=>{if(connected&&mode==='voice'&&micPaused&&$('live-transcript').textContent===(window.islandI18n?.translate('Ingen transkription ännu…')||'Ingen transkription ännu…'))$('live-note').textContent='⚠️ Ingen text från Gemini efter 7 sekunder. Testa tal-till-text-läget för att undersöka om Samsung hör dig.'},7000)});
+  $('end').addEventListener('click',()=>end('Du avslutade samtalet.'));
+  $('chat-form').addEventListener('submit',e=>{e.preventDefault();const text=$('chat-input').value.trim();if(sendTextMessage(text))$('chat-input').value=''});
+  $('preview').addEventListener('click',()=>{if(!('speechSynthesis' in window)){showError('Demorösten stöds inte i den här webbläsaren.');return}speechSynthesis.cancel();const say=new SpeechSynthesisUtterance(window.islandI18n?.translate(animals[animal].sample)||animals[animal].sample);say.lang=language()==='en'?'en-GB':'sv-SE';say.rate=animal==='duck'?1.12:.95;say.pitch=animal==='duck'?1.38:1.05;say.onstart=()=>$('stage').classList.add('is-previewing');say.onend=()=>$('stage').classList.remove('is-previewing');say.onerror=()=>$('stage').classList.remove('is-previewing');speechSynthesis.speak(say)});
+  window.addEventListener('pagehide',()=>{if(connected||connecting)end()});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden&&(connected||connecting))end('Samtalet avslutades när du lämnade fliken.')});
+  window.zooUI={requestTreasureClue,select:id=>choose(id),active:()=>connected||connecting,audio:()=>outCtx&&outAnalyser?{context:outCtx,node:outAnalyser,chunks:audioChunks}:null};
+  updateControls();choose('fox');check();
+})();
+</script>
+<!-- ISLAND_RENDERER -->
+</body>
+</html>
