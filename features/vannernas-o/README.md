@@ -23,7 +23,9 @@ Utvecklingsmenyn ”Animation och modellprov” finns inte i den publika kopian.
 
 Next.js-rutterna `/api/vannernas-o/status` och `/api/vannernas-o/session` använder:
 
-- `GEMINI_API_KEY`: endast servern. Måste ha tillgång till `gemini-3.8-live`
+- `DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY`: endast servern. Använd den separata
+  Google AI Studio-nyckeln med visningsnamnet ”Debatt-AI Animal Zoo”.
+  Ingen fallback till webbplatsens generella `GEMINI_API_KEY` görs. Måste ha tillgång till `gemini-3.8-live`
   och Googles `v1beta/auth_tokens`.
 - `TURNSTILE_SECRET_KEY` och `NEXT_PUBLIC_TURNSTILE_SITE_KEY`: webbplatsens
   befintliga Cloudflare Turnstile-nycklar. Tillåt produktionsdomänen och

@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createSession,getStatus,MODEL} from '../server/session.mjs';
 import {TREASURE_CLUES} from '../web/rufus/treasure-data.js';
-const env={GEMINI_API_KEY:'server-key-never-return',TURNSTILE_SECRET_KEY:'captcha-secret',NEXT_PUBLIC_TURNSTILE_SITE_KEY:'public-site'};
+const env={DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY:'server-key-never-return',TURNSTILE_SECRET_KEY:'captcha-secret',NEXT_PUBLIC_TURNSTILE_SITE_KEY:'public-site'};
 const request=(input={},headers={})=>new Request('https://debatt-ai.se/api/vannernas-o/session',{method:'POST',headers:{origin:'https://debatt-ai.se','content-type':'application/json',...headers},body:JSON.stringify({animal:'duck',turnstileToken:'single-use-proof',...input})});
 const response=data=>new Response(JSON.stringify(data));
 const valid={success:true,action:'friends_island_voice',hostname:'debatt-ai.se'};
@@ -17,16 +17,16 @@ test('missing configuration or verification fails closed; wrong hostname/action 
  assert.equal((await createSession(request({turnstileToken:''}),env)).status,403);
  for(const verdict of [{...valid,success:false},{...valid,hostname:'evil.test'},{...valid,action:'contact'}]){let calls=0;const result=await createSession(request(),env,{fetch:async()=>{calls++;return response(verdict)}});assert.equal(result.status,403);assert.equal(calls,1)}
  assert.equal((await createSession(request(),env,{fetch:async()=>{throw Error('secret')}})).status,503);
- const status=await getStatus(env).json();assert.equal(status.ready,true);assert.equal(status.turnstileSiteKey,'public-site');assert.ok(!JSON.stringify(status).includes(env.GEMINI_API_KEY));
+ const status=await getStatus(env).json();assert.equal(status.ready,true);assert.equal(status.turnstileSiteKey,'public-site');assert.ok(!JSON.stringify(status).includes(env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY));
 });
 test('all eight mint one-use constrained 30-minute tokens; each gets only its own clue and correct English quest prompt',async()=>{
  for(const [i,clue] of TREASURE_CLUES.entries()){
   let calls=0;const now=Date.now();const result=await createSession(request({animal:clue.id,treasureActive:true,language:'en',questStage:clue.id==='duck'?2:0}),env,{now,fetch:async(url,init)=>{
    calls++;const body=JSON.parse(init.body);
    if(url.includes('siteverify')){assert.equal(body.secret,env.TURNSTILE_SECRET_KEY);return response(valid)}
-   assert.equal(init.headers['x-goog-api-key'],env.GEMINI_API_KEY);assert.equal(body.uses,1);assert.equal(Date.parse(body.expireTime)-now,1800000);assert.equal(Date.parse(body.newSessionExpireTime)-now,45000);assert.equal(body.bidiGenerateContentSetup.model,'models/'+MODEL);assert.deepEqual(body.bidiGenerateContentSetup.generationConfig.responseModalities,['AUDIO']);assert.equal(body.bidiGenerateContentSetup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,clue.id==='duck'||clue.id==='rabbit'||clue.id==='owl'?'Leda':'Puck');assert.equal(body.fieldMask,'model,generationConfig');assert.equal(body.liveConnectConstraints,undefined);return response({name:'auth_tokens/test'})
+   assert.equal(init.headers['x-goog-api-key'],env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY);assert.equal(body.uses,1);assert.equal(Date.parse(body.expireTime)-now,1800000);assert.equal(Date.parse(body.newSessionExpireTime)-now,45000);assert.equal(body.bidiGenerateContentSetup.model,'models/'+MODEL);assert.deepEqual(body.bidiGenerateContentSetup.generationConfig.responseModalities,['AUDIO']);assert.equal(body.bidiGenerateContentSetup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName,clue.id==='duck'||clue.id==='rabbit'||clue.id==='owl'?'Leda':'Puck');assert.equal(body.fieldMask,'model,generationConfig');assert.equal(body.liveConnectConstraints,undefined);return response({name:'auth_tokens/test'})
   }});
-  assert.equal(result.status,200);assert.equal(calls,2);const body=await result.json();assert.equal(body.idleTimeoutSeconds,120);assert.equal(body.maxConcurrentSessions,undefined);assert.ok(body.prompt.includes(clue.riddle));assert.ok(body.prompt.includes('siffra '+(i+1)));assert.ok(body.prompt.includes('ONLY natural English'));for(const other of TREASURE_CLUES.filter(c=>c!==clue))assert.ok(!body.prompt.includes(other.riddle));assert.ok(!JSON.stringify(body).includes(env.GEMINI_API_KEY));if(clue.id==='duck')assert.ok(body.prompt.includes('complete_waterwheel_step med stage=2'));
+  assert.equal(result.status,200);assert.equal(calls,2);const body=await result.json();assert.equal(body.idleTimeoutSeconds,120);assert.equal(body.maxConcurrentSessions,undefined);assert.ok(body.prompt.includes(clue.riddle));assert.ok(body.prompt.includes('siffra '+(i+1)));assert.ok(body.prompt.includes('ONLY natural English'));for(const other of TREASURE_CLUES.filter(c=>c!==clue))assert.ok(!body.prompt.includes(other.riddle));assert.ok(!JSON.stringify(body).includes(env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY));if(clue.id==='duck')assert.ok(body.prompt.includes('complete_waterwheel_step med stage=2'));
  }
 });
 test('provider quota/network/invalid response are sanitized and never retried with weaker constraints',async()=>{
@@ -50,10 +50,26 @@ test('safe diagnostics distinguish key/access/parameters/quota and omit arbitrar
  const original=console.warn,logs=[];console.warn=(...args)=>logs.push(args.join(' '));
  try{
  for(const [httpStatus,code,reason,match] of [[400,'INVALID_ARGUMENT','API_KEY_INVALID','servernyckel'],[403,'PERMISSION_DENIED','API_KEY_HTTP_REFERRER_BLOCKED','nekade åtkomst'],[400,'INVALID_ARGUMENT',null,'samtalsinställningarna'],[429,'RESOURCE_EXHAUSTED',null,'anropsgräns'],[400,'FAILED_PRECONDITION',null,'projektvillkor']]){
-  let calls=0;const r=await createSession(request(),env,{fetch:async(url)=>{calls++;return url.includes('siteverify')?response(valid):new Response(JSON.stringify({error:{status:code,message:env.GEMINI_API_KEY,details:[{reason,metadata:{apiKey:env.GEMINI_API_KEY}}]}}),{status:httpStatus})}});
-  const data=await r.json();assert.equal(calls,2);assert.deepEqual(data.diagnostic,{httpStatus,code,reason});assert.ok(data.error.includes(match));assert.ok(!JSON.stringify(data).includes(env.GEMINI_API_KEY));
+  let calls=0;const r=await createSession(request(),env,{fetch:async(url)=>{calls++;return url.includes('siteverify')?response(valid):new Response(JSON.stringify({error:{status:code,message:env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY,details:[{reason,metadata:{apiKey:env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY}}]}}),{status:httpStatus})}});
+  const data=await r.json();assert.equal(calls,2);assert.deepEqual(data.diagnostic,{httpStatus,code,reason});assert.ok(data.error.includes(match));assert.ok(!JSON.stringify(data).includes(env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY));
  }
- const hostile=await createSession(request({language:'en'}),env,{fetch:async(url)=>url.includes('siteverify')?response(valid):new Response(JSON.stringify({error:{status:env.GEMINI_API_KEY,message:env.GEMINI_API_KEY,details:[{reason:env.GEMINI_API_KEY}]}}),{status:400})});
- const data=await hostile.json();assert.deepEqual(data.diagnostic,{httpStatus:400,code:null,reason:null});assert.ok(data.error.includes('Google rejected'));assert.ok(!JSON.stringify(data).includes(env.GEMINI_API_KEY));assert.ok(!logs.join('').includes(env.GEMINI_API_KEY));assert.equal(logs.length,6);
+ const hostile=await createSession(request({language:'en'}),env,{fetch:async(url)=>url.includes('siteverify')?response(valid):new Response(JSON.stringify({error:{status:env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY,message:env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY,details:[{reason:env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY}]}}),{status:400})});
+ const data=await hostile.json();assert.deepEqual(data.diagnostic,{httpStatus:400,code:null,reason:null});assert.ok(data.error.includes('Google rejected'));assert.ok(!JSON.stringify(data).includes(env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY));assert.ok(!logs.join('').includes(env.DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY));assert.equal(logs.length,6);
  }finally{console.warn=original}
+});
+
+test('Animal Zoo uses only its dedicated Gemini key, never the website-wide key',async()=>{
+ const {DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY,...verificationEnv}=env;
+ const genericOnly={...verificationEnv,GEMINI_API_KEY:'different-general-site-key'};
+ assert.equal((await getStatus(genericOnly).json()).ready,false);
+ let calls=0;
+ assert.equal((await createSession(request(),genericOnly,{fetch:async()=>{calls++;throw Error('must not call Google')}})).status,503);assert.equal(calls,0);
+ const both={...genericOnly,DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY};
+ assert.equal((await getStatus(both).json()).ready,true);
+ const result=await createSession(request(),both,{fetch:async(url,init)=>{
+  if(url.includes('siteverify'))return response(valid);
+  assert.equal(init.headers['x-goog-api-key'],DEBATT_AI_ANIMAL_ZOO_GEMINI_API_KEY);
+  assert.notEqual(init.headers['x-goog-api-key'],both.GEMINI_API_KEY);
+  return response({name:'auth_tokens/test'});
+ }});assert.equal(result.status,200);
 });
