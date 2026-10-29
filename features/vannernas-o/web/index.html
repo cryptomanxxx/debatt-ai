@@ -283,8 +283,18 @@ body[data-world-mode="treasure"] .controls,body[data-world-mode="treasure"] .cha
     try{
       // Start within the original tap so mobile browsers retain microphone activation.
       if(which==='speech'){$('speech-diagnostics').hidden=false;startRecognition();}
-      audioChunks=0;outCtx=new(window.AudioContext||window.webkitAudioContext)();await outCtx.resume();outAnalyser=outCtx.createAnalyser();outAnalyser.fftSize=256;outAnalyser.connect(outCtx.destination);lipTimer=setInterval(updateLips,40);
-      if(which==='voice'){mic=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});micCtx=new(window.AudioContext||window.webkitAudioContext)();await micCtx.resume()}
+      const cancelled=()=>attempt!==sessionAttempt||stopRequested;
+      // Keep local references across awaits; an old attempt must never attach
+      // resources to a newer conversation or continue after end() cleaned up.
+      audioChunks=0;const outputContext=new(window.AudioContext||window.webkitAudioContext)();outCtx=outputContext;
+      await outputContext.resume();if(cancelled())return;
+      outAnalyser=outputContext.createAnalyser();outAnalyser.fftSize=256;outAnalyser.connect(outputContext.destination);lipTimer=setInterval(updateLips,40);
+      if(which==='voice'){
+        const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});
+        if(cancelled()){stream.getTracks().forEach(track=>track.stop());return}
+        mic=stream;const microphoneContext=new(window.AudioContext||window.webkitAudioContext)();micCtx=microphoneContext;
+        await microphoneContext.resume();if(cancelled())return;
+      }
       const turnstileToken=verificationToken;resetVerification();
       const r=await fetch('/api/vannernas-o/session',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({animal,turnstileToken,language:language(),questStage:sessionQuestStage,treasureActive:window.zooTreasure?.active?.()||false}),cache:'no-store'});
       const j=await r.json();if(attempt!==sessionAttempt||stopRequested)return;if(!r.ok)throw Error(j.error||'Gemini kunde inte öppna samtalet');

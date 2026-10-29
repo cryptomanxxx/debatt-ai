@@ -77,3 +77,38 @@ await socket.message({serverContent:{modelTurn:{parts:[{inlineData:{data:Buffer.
 simulatedTime+=130000;idleTick();assert.equal(get('end').hidden,false,'never stop in the middle of played reply audio');played.at(-1).onended();
 simulatedTime+=90000;idleTick();assert.equal(get('idle-warning').hidden,false);simulatedTime+=30000;idleTick();assert.equal(get('end').hidden,true);assert.ok(get('message').textContent.includes('två minuters inaktivitet'));
 console.log('Actual idle controller: active chat past 3 minutes, elapsed timer, warning/keep button, recognised speech, reply playback, 2-minute silence stop and resumable connection without progress reset passed.');
+
+// Real startup race: permission may resolve after end(), even after another start.
+const originalAudioContext=win.AudioContext,originalClientFetch=context.fetch;
+const contexts=[];let minted=0;
+context.fetch=async(...args)=>{if(args[0]==='/api/vannernas-o/session')minted++;return originalClientFetch(...args)};
+const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no});return {promise,resolve,reject}};
+let pendingOutput=null,pendingMicResume=null;
+win.AudioContext=class{constructor(){const index=contexts.length;const own={...audio,closed:0,analysers:0,resume:()=>index===0&&pendingOutput?pendingOutput.promise:index===1&&pendingMicResume?pendingMicResume.promise:Promise.resolve(),close:async()=>{own.closed++},createAnalyser:()=>{own.analysers++;return audio.createAnalyser()}};contexts.push(own);return own}};
+const stream=()=>{const tracks=[{stopped:0,stop(){this.stopped++}},{stopped:0,stop(){this.stopped++}}];return {getTracks:()=>tracks}};
+let permission=deferred(),acquisitions=0;
+context.navigator.mediaDevices={getUserMedia:()=>{acquisitions++;return permission.promise}};
+const tick=()=>new Promise(setImmediate);
+
+// Cancellation during permission: stop every late track and never mint/connect.
+let priorStartupSocket=socket,lateStream=stream();
+let openingMic=get('start-voice').listeners.click();await tick();assert.equal(acquisitions,1);
+get('end').listeners.click();permission.resolve(lateStream);await openingMic;
+assert.ok(lateStream.getTracks().every(t=>t.stopped===1));assert.equal(contexts.length,1,'cancelled permission creates no microphone context');assert.equal(contexts[0].closed,1);assert.equal(minted,0);assert.equal(socket,priorStartupSocket);assert.equal(get('end').hidden,true);
+
+// Old permission resolves while a new text conversation is live: clean only old stream.
+contexts.length=0;permission=deferred();lateStream=stream();openingMic=get('start-voice').listeners.click();await tick();get('end').listeners.click();
+await get('start-text').listeners.click();socket.onopen();await socket.message({setupComplete:true});const newSocket=socket,newOutput=contexts.at(-1);
+permission.resolve(lateStream);await openingMic;assert.ok(lateStream.getTracks().every(t=>t.stopped===1));assert.equal(socket,newSocket);assert.equal(get('end').hidden,false);assert.equal(newOutput.closed,0);assert.equal(contexts.length,2);assert.equal(minted,1);get('end').listeners.click();assert.equal(newOutput.closed,1);
+
+// Cancellation during output resume must not acquire a mic or create an analyser.
+contexts.length=0;pendingOutput=deferred();const previousAcquisitions=acquisitions,previousMinted=minted;
+openingMic=get('start-voice').listeners.click();get('end').listeners.click();pendingOutput.resolve();await openingMic;pendingOutput=null;
+assert.equal(acquisitions,previousAcquisitions);assert.equal(minted,previousMinted);assert.equal(contexts[0].analysers,0);assert.equal(contexts[0].closed,1);
+
+// Cancellation during mic-context resume: end owns and closes the adopted resources.
+contexts.length=0;permission=deferred();pendingMicResume=deferred();lateStream=stream();openingMic=get('start-voice').listeners.click();await tick();permission.resolve(lateStream);await tick();assert.equal(contexts.length,2);
+get('end').listeners.click();pendingMicResume.resolve();await openingMic;pendingMicResume=null;
+assert.ok(lateStream.getTracks().every(t=>t.stopped===1));assert.ok(contexts.every(c=>c.closed===1));assert.equal(minted,previousMinted);assert.equal(get('end').hidden,true);
+win.AudioContext=originalAudioContext;context.fetch=originalClientFetch;
+console.log('Cancelled startup: late permission tracks stopped, newer conversation preserved, deferred output/mic resume cleaned, and no stale token/socket created.');
