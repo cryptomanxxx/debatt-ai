@@ -914,6 +914,26 @@ export default function DebattClient({ initialArticleCount = null }) {
               </div>
             </section>
 
+            <section aria-labelledby="vannernas-o-nyhet" style={{
+              marginBottom: "24px", padding: "22px 24px", borderRadius: "12px",
+              border: "1px solid #c9e69555",
+              background: "radial-gradient(ellipse at 95% 0%, #c58e3730, transparent 55%), linear-gradient(145deg, #102a24, #0b101b 72%)",
+              boxShadow: "0 0 24px #c9e69511",
+            }}>
+              <div style={{ color: "#c9e695", fontSize: "10px", fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.16em", marginBottom: "10px" }}>
+                ✦ NYHET · VÄNNERNAS Ö
+              </div>
+              <h2 id="vannernas-o-nyhet" style={{ margin: "0 0 12px", fontSize: "clamp(20px, 3vw, 27px)", color: "#f0f5e2", fontFamily: "Georgia, serif", lineHeight: 1.25 }}>
+                Åtta AI-vänner. En ö full av upptäckter.
+              </h2>
+              <p style={{ color: "#b8cec3", fontSize: "14px", lineHeight: 1.7, margin: "0 0 18px", maxWidth: "740px" }}>
+                Hälsa på Rufus, Doris och deras vänner i en levande 3D-värld. Prata med figurerna, hjälp till att bygga ett vattenhjul och följ ledtrådarna till öns hemliga skatt – på svenska eller engelska.
+              </p>
+              <a href="/vannernas-o" style={{ display: "inline-block", padding: "11px 17px", borderRadius: "8px", color: "#132b22", background: "#c9e695", fontSize: "13px", fontWeight: 700, textDecoration: "none" }}>
+                🏝 Besök Vännernas ö →
+              </a>
+            </section>
+
             <CivilisationDriftWidget data={civilisationDrift} />
 
             {nastaKorning.timeLeft && (

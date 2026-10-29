@@ -1,0 +1,20 @@
+name: Vännernas ö
+on:
+  pull_request:
+    paths: ['features/vannernas-o/**', 'public/vannernas-o/**', 'app/api/vannernas-o/**', 'app/vannernas-o/**', 'app/client.js', '.github/workflows/vannernas-o.yml']
+  push:
+    branches: [main]
+    paths: ['features/vannernas-o/**', 'public/vannernas-o/**', 'app/api/vannernas-o/**', 'app/vannernas-o/**', '.github/workflows/vannernas-o.yml']
+jobs:
+  island:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: npm ci --prefix features/vannernas-o
+      - run: npm run build --prefix features/vannernas-o
+      - run: git diff --exit-code -- public/vannernas-o/v1/index.html
+      - run: npm test --prefix features/vannernas-o

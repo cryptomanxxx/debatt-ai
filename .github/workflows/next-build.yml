@@ -11,6 +11,8 @@ on:
     paths:
       - "app/**"
       - "public/ai-universitet-3d/**"
+      - "public/vannernas-o/**"
+      - "features/vannernas-o/**"
       - "next.config.mjs"
       - "package.json"
       - ".github/workflows/next-build.yml"
@@ -18,6 +20,8 @@ on:
     paths:
       - "app/**"
       - "public/ai-universitet-3d/**"
+      - "public/vannernas-o/**"
+      - "features/vannernas-o/**"
       - "next.config.mjs"
       - "package.json"
       - ".github/workflows/next-build.yml"
