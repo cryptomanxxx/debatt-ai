@@ -1,0 +1,31 @@
+name: AI University 3D assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "public/ai-universitet-3d/**"
+      - "scripts/check-ai-universitet-3d.mjs"
+      - ".github/workflows/ai-universitet-3d.yml"
+  pull_request:
+    paths:
+      - "public/ai-universitet-3d/**"
+      - "scripts/check-ai-universitet-3d.mjs"
+      - ".github/workflows/ai-universitet-3d.yml"
+
+concurrency:
+  group: ai-universitet-3d-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-lecture-assets:
+    name: Verify 3D lectures and localized media
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: Verify 3D modules, both languages, and media assets
+        run: node scripts/check-ai-universitet-3d.mjs

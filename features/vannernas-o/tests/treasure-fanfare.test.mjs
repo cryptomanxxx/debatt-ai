@@ -1,0 +1,9 @@
+import assert from 'node:assert/strict';
+import {createTreasureFanfare} from '../web/rufus/treasure-fanfare.js';
+let contexts=0,started=[],stopped=0,closed=0,voices=[];
+const factory=()=>{contexts++;return{state:'running',currentTime:7,destination:{},resume:async()=>{},close:async()=>{closed++},createOscillator(){const voice={type:'',frequency:{setValueAtTime(){}},connect(){},disconnect(){},start:at=>started.push(at),stop:()=>stopped++};voices.push(voice);return voice},createGain:()=>({gain:{setValueAtTime(){},linearRampToValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}})}};
+const sound=createTreasureFanfare({contextFactory:factory});assert.equal(contexts,0,'no autoplay on page load');sound.prime();assert.equal(contexts,1);assert.equal(started.length,0,'arming on the unlock tap stays silent during travel');await sound.play();assert.equal(started.length,6);assert.ok(started.every(t=>t>7));await sound.play();assert.equal(started.length,6,'one fanfare per unlock');for(const voice of voices)voice.onended();assert.equal(closed,1,'audio context closes after the last note');
+voices=[];sound.prime();sound.stop();await sound.play();assert.equal(started.length,6,'cancelled arrival does not play');assert.equal(closed,2);
+let resume;const waiting=createTreasureFanfare({contextFactory:()=>({...factory(),resume:()=>new Promise(r=>resume=r)})});waiting.prime();const playing=waiting.play();waiting.stop();resume();await playing;assert.equal(started.length,6,'leaving the page while audio resumes cancels playback');
+const unsupported=createTreasureFanfare({contextFactory(){throw Error('no audio')}});unsupported.prime();await unsupported.play();
+console.log('Chest audio: silent priming, delayed fanfare, one-shot playback, context cleanup, cancellation and unsupported-browser fallback passed.');

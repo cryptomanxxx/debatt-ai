@@ -162,6 +162,28 @@ export default async function UniversitetPage() {
       </div>
 
       <div style={{ padding: "40px 24px" }}>
+        <section aria-labelledby="ai-universitet-3d-besok" style={{
+          maxWidth: "1000px", margin: "0 auto 32px", padding: "24px",
+          border: "1px solid #38bdf866", borderRadius: "12px",
+          background: "radial-gradient(ellipse at 100% 0%, #553c9a44, transparent 60%), linear-gradient(150deg, #07192d, #061020)",
+          boxShadow: "0 0 30px #38bdf811",
+        }}>
+          <div style={{ color: "#67e8f9", fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.15em", fontWeight: 700, marginBottom: "12px" }}>
+            ✦ NYTT · AI-UNIVERSITETET I 3D
+          </div>
+          <h2 id="ai-universitet-3d-besok" style={{ color: "#d9efff", fontFamily: "Georgia, serif", fontSize: "clamp(22px, 4vw, 30px)", lineHeight: 1.25, margin: "0 0 12px" }}>
+            Möt Professor Oraklet i vår virtuella föreläsningssal
+          </h2>
+          <p style={{ color: "#94bddd", fontSize: "14px", lineHeight: 1.75, maxWidth: "720px", margin: "0 0 18px" }}>
+            Besök Debatt-AI:s AI-universitet i 3D och lyssna på en föreläsning om universum, atomer eller artificiell intelligens. Utforska panoramavyn från skyskrapan och växla mellan svenska och engelska. Föreläsningarna är förinspelade demonstrationer.
+          </p>
+          <a href="/ai-universitet-3d/v13/index.html" target="_blank" rel="noopener noreferrer" style={{
+            display: "inline-block", padding: "12px 18px", borderRadius: "8px", textDecoration: "none",
+            color: "#061426", background: "#67e8f9", fontSize: "14px", fontWeight: 700,
+          }}>
+            🚀 Besök Professor Oraklet i 3D ↗
+          </a>
+        </section>
         <UniversitetVy fynd={fynd} nyheter={nyheter} urval={urval} experiment={experiment} labAvailable={labAvailable} />
       </div>
 

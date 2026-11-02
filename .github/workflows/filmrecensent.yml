@@ -8,7 +8,7 @@ on:
     # är redan tidpunktsagnostisk och säkert återanropningsbar i en tät
     # sekventiell loop — den fortsätter alltid där föregående pass sparade
     # cursorn.
-    # ✅155: samma två tidiga tider som agent.yml, så alla fyra artikeltyper
+    # ✅156: samma två tidiga tider som agent.yml, så alla fyra artikeltyper
     # publiceras ungefär samtidigt tidigt på dagen. Reservkörningen fyller
     # bara på om huvudkörningen gav färre än 4 (dagskvoten gör den annars
     # till en no-op).
@@ -65,7 +65,7 @@ jobs:
           GROQ_API_KEY_2:    ${{ secrets.GROQ_API_KEY_2 }}
           GROQ_API_KEY_3:    ${{ secrets.GROQ_API_KEY_3 }}
           DEEPSEEK_API_KEY:  ${{ secrets.DEEPSEEK_API_KEY }}
-          # Fler reserver i artikelkedjan (✅155) — utan dem stannade allt när
+          # Fler reserver i artikelkedjan (✅156) — utan dem stannade allt när
           # Groq nått dagsgränsen och DeepSeek saknade krediter.
           GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
           CF_ACCOUNT_ID:     ${{ secrets.CF_ACCOUNT_ID }}

@@ -344,7 +344,7 @@ def main():
     # ar_manuell_korning/nagon_kvot_kvar-grinden längre ner — den smalare
     # rangen kostar alltså ingen robusthet där.
     #
-    # ✅155: de tre per-typ-crons (07/08/09 UTC) är borttagna. agent.yml kör
+    # ✅156: de tre per-typ-crons (07/08/09 UTC) är borttagna. agent.yml kör
     # nu alla tre typerna i samma tidiga körning (03:17 och 05:17 UTC) och
     # sätter AGENT_FORCE_TYP per pass, så typen avgörs aldrig längre av
     # timmen. Bara catch-up-crons finns kvar här.
@@ -395,7 +395,7 @@ def main():
             print(f"AGENT_FORCE_TYP='{_forced_typ}' begärdes, men den typen har redan nått dagens kvot (4/4) — avslutar utan att publicera något.")
             sys.exit(0)
     else:
-        # Inga timbaserade fönster längre (✅155) — utan AGENT_FORCE_TYP
+        # Inga timbaserade fönster längre (✅156) — utan AGENT_FORCE_TYP
         # tvingas en typ bara av catch-up-blocket nedan. En manuell körning
         # utan typ går genom ar_manuell_korning/nagon_kvot_kvar-grinden.
         force_nyhet = force_replik = force_eget = False

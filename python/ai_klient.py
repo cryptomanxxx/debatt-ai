@@ -34,7 +34,7 @@ _groq_nere_keys: set[str] = set()
 
 _DEFAULT_ORDER = ["groq", "mistral", "deepseek", "cloudflare", "gemini"]
 
-# Kedja för artikelskrivning (✅155). Tidigare bara Groq → DeepSeek. När Groq nått
+# Kedja för artikelskrivning (✅156). Tidigare bara Groq → DeepSeek. När Groq nått
 # sin dagsgräns (TPD) och DeepSeek saknar krediter (402) misslyckades VARJE pass, så
 # 1 nov 2026 publicerades inga nyhets-, debatt- eller replikartiklar alls förrän
 # Groq-gränsen släppt. Gemini och Cloudflare (Llama 3.3 70B) skriver godtagbar

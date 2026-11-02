@@ -1,0 +1,20 @@
+{
+  "expireTime": "2026-10-29T16:30:00.000Z",
+  "newSessionExpireTime": "2026-10-29T16:00:45.000Z",
+  "uses": 1,
+  "bidiGenerateContentSetup": {
+    "model": "models/gemini-3.8-live",
+    "generationConfig": {
+      "responseModalities": [
+        "AUDIO"
+      ],
+      "speechConfig": {
+        "voiceConfig": {
+          "prebuiltVoiceConfig": {
+            "voiceName": "Leda"
+          }
+        }
+      }
+    }
+  }
+}

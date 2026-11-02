@@ -504,7 +504,7 @@ async function checkPubliceringstaktUnderskott() {
   const namn = "publiceringstakt-underskott";
   try {
     // agent.yml och filmrecensent.yml kör alla fyra typerna i samma tidiga
-    // körningar, 03:17 UTC och en reserv 05:17 UTC (✅155). Från 08 UTC har
+    // körningar, 03:17 UTC och en reserv 05:17 UTC (✅156). Från 08 UTC har
     // båda haft minst 3–5 timmar på sig. GitHub har dock fördröjt crons med
     // upp till 6–7 timmar, och då är det ombudspubliceringen härifrån (en
     // workflow_dispatch, som startar direkt) som fyller dagen. En typ som

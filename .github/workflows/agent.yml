@@ -2,7 +2,7 @@ name: Debatt-agent
 
 on:
   schedule:
-    # ✅155: alla tre typerna (nyhet, eget, replik) skrivs i SAMMA tidiga
+    # ✅156: alla tre typerna (nyhet, eget, replik) skrivs i SAMMA tidiga
     # körning, tillsammans med filmrecensionerna (filmrecensent.yml har samma
     # två tider). Varje körning loopar 4 rundor × nyhet/eget/replik med
     # AGENT_FORCE_TYP satt per pass, så typen aldrig beror på vilken timme
@@ -145,7 +145,7 @@ jobs:
           # körningen när satt till nyhet/eget/replik.
           AGENT_FORCE_TYP: ${{ github.event.inputs.typ }}
         run: |
-          # Tidiga crons (✅155): 4 rundor × nyhet/eget/replik, typen satt per
+          # Tidiga crons (✅156): 4 rundor × nyhet/eget/replik, typen satt per
           # pass via AGENT_FORCE_TYP. Rundorna växlar mellan typerna så att
           # alla tre får artiklar även om körningen avbryts halvvägs.
           #

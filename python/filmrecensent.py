@@ -70,7 +70,7 @@ Flöde per körning:
   2. LLM identifierar vilken film klippet är hämtat ur och skriver en
      kort recension (200–280 ord) via den centrala fallback-kedjan för
      artikelskrivning (ai_klient.hamta_artikel_fns, _ARTIKEL_CHAIN =
-     Groq → Gemini → Cloudflare → Mistral → DeepSeek, ✅155) — aldrig en
+     Groq → Gemini → Cloudflare → Mistral → DeepSeek, ✅156) — aldrig en
      hårdkodad providerklient. Videotiteln
      (och en ev. videobeskrivning som scenkontext) är opålitlig extern
      text (samma anti-injektionsprincip som generera_ki_fran_nyheter(),
