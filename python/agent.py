@@ -343,10 +343,12 @@ def main():
     # stale cron kringgås fönsterkravet ändå helt av
     # ar_manuell_korning/nagon_kvot_kvar-grinden längre ner — den smalare
     # rangen kostar alltså ingen robusthet där.
+    #
+    # ✅155: de tre per-typ-crons (07/08/09 UTC) är borttagna. agent.yml kör
+    # nu alla tre typerna i samma tidiga körning (03:17 och 05:17 UTC) och
+    # sätter AGENT_FORCE_TYP per pass, så typen avgörs aldrig längre av
+    # timmen. Bara catch-up-crons finns kvar här.
     _CRON_TILL_TIMME = {
-        "0 7 * * *": 7,
-        "0 8 * * *": 8,
-        "0 9 * * *": 9,
         "30 21 * * *": 21, "40 21 * * *": 21, "50 21 * * *": 21,
     }
     _utc_now = datetime.now(timezone.utc)
@@ -393,9 +395,10 @@ def main():
             print(f"AGENT_FORCE_TYP='{_forced_typ}' begärdes, men den typen har redan nått dagens kvot (4/4) — avslutar utan att publicera något.")
             sys.exit(0)
     else:
-        force_nyhet  = utc_hour == 7 and idag_publicerat["nyhet"]  < 4
-        force_replik = utc_hour == 9 and idag_publicerat["replik"] < 4
-        force_eget   = utc_hour == 8 and idag_publicerat["eget"]   < 4
+        # Inga timbaserade fönster längre (✅155) — utan AGENT_FORCE_TYP
+        # tvingas en typ bara av catch-up-blocket nedan. En manuell körning
+        # utan typ går genom ar_manuell_korning/nagon_kvot_kvar-grinden.
+        force_nyhet = force_replik = force_eget = False
 
     # 21:xx UTC (23:xx svensk tid) → catch-up-fönster. De tre fönstren ovan
     # garanterar bara att en typ INTE skjuts över 4 — de gör inget om ett
@@ -434,7 +437,7 @@ def main():
     if not (force_nyhet or force_replik or force_eget) and not (ar_manuell_korning and nagon_kvot_kvar):
         print(f"Ingen artikel skriven — körningen (UTC-timme {utc_hour}) matchar inget öppet publiceringsfönster.")
         print(f"Dagens läge hittills: {idag_publicerat['nyhet']} nyhet / {idag_publicerat['replik']} replik / {idag_publicerat['eget']} eget (mål: 4/4/4).")
-        print("(Extra körning utöver de 12 schemalagda, eller kvoten redan uppnådd — skrivs medvetet inte för att hålla 4+4+4 korrekt.)")
+        print("(Körning utan typ utanför catch-up, eller kvoten redan uppnådd — skrivs medvetet inte för att hålla 4+4+4 korrekt.)")
         sys.exit(0)
 
     original = None

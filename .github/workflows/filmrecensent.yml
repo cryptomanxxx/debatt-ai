@@ -8,7 +8,12 @@ on:
     # är redan tidpunktsagnostisk och säkert återanropningsbar i en tät
     # sekventiell loop — den fortsätter alltid där föregående pass sparade
     # cursorn.
-    - cron: '0 10 * * *'  # 12:00 svensk tid (sommartid, ✅129) — primär körning, 4 pass
+    # ✅155: samma två tidiga tider som agent.yml, så alla fyra artikeltyper
+    # publiceras ungefär samtidigt tidigt på dagen. Reservkörningen fyller
+    # bara på om huvudkörningen gav färre än 4 (dagskvoten gör den annars
+    # till en no-op).
+    - cron: '17 3 * * *'  # 04:17 svensk vintertid (05:17 sommartid) — huvudkörning, 4 pass
+    - cron: '17 5 * * *'  # 06:17 svensk vintertid (07:17 sommartid) — reserv, 4 pass
     # Tre sena catch-up-körningar ger Filmrecensenten samma redundans som
     # agent.yml. filmrecensent.py kontrollerar MALSATT_ANTAL_PER_DAG=4 före
     # varje pass, så när dagens fyra redan finns blir dessa billiga no-ops.
@@ -60,6 +65,12 @@ jobs:
           GROQ_API_KEY_2:    ${{ secrets.GROQ_API_KEY_2 }}
           GROQ_API_KEY_3:    ${{ secrets.GROQ_API_KEY_3 }}
           DEEPSEEK_API_KEY:  ${{ secrets.DEEPSEEK_API_KEY }}
+          # Fler reserver i artikelkedjan (✅155) — utan dem stannade allt när
+          # Groq nått dagsgränsen och DeepSeek saknade krediter.
+          GEMINI_API_KEY:    ${{ secrets.GEMINI_API_KEY }}
+          CF_ACCOUNT_ID:     ${{ secrets.CF_ACCOUNT_ID }}
+          CF_API_TOKEN:      ${{ secrets.CF_API_TOKEN }}
+          MISTRAL_API_KEY:   ${{ secrets.MISTRAL_API_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DEBATT_API_KEY:    ${{ secrets.DEBATT_API_KEY }}

@@ -34,10 +34,14 @@ _groq_nere_keys: set[str] = set()
 
 _DEFAULT_ORDER = ["groq", "mistral", "deepseek", "cloudflare", "gemini"]
 
-# Hårdkodad kedja för artikelskrivning — exkluderar Mistral/Codestral (kodmodell, sämre på
-# kreativ långform svenska) samt DeepSeek och Cloudflare (lägre kvalitet för långa texter).
+# Kedja för artikelskrivning (✅155). Tidigare bara Groq → DeepSeek. När Groq nått
+# sin dagsgräns (TPD) och DeepSeek saknar krediter (402) misslyckades VARJE pass, så
+# 1 nov 2026 publicerades inga nyhets-, debatt- eller replikartiklar alls förrän
+# Groq-gränsen släppt. Gemini och Cloudflare (Llama 3.3 70B) skriver godtagbar
+# svenska. Codestral är en kodmodell och ligger därför näst sist. AI-redaktören
+# bedömer ändå varje artikel, så en svagare text publiceras aldrig obedömd.
 # Oberoende av den dynamiska benchmark-rankingen i _fallback_order.
-_ARTIKEL_CHAIN = ["groq", "deepseek"]
+_ARTIKEL_CHAIN = ["groq", "gemini", "cloudflare", "mistral", "deepseek"]
 _SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 
 
@@ -442,6 +446,11 @@ def deepseek_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {**json_payload, "model": "deepseek-chat"}
     r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+    if r.status_code == 402:
+        # Slut på krediter — ändras inte under körningen, så hoppa över
+        # DeepSeek direkt i resten av anropen.
+        _nere.add("deepseek")
+        raise Exception("DeepSeek 402 Payment Required (slut på krediter)")
     if r.status_code == 429:
         logga_429_passivt("deepseek")
         _nere.add("deepseek")
