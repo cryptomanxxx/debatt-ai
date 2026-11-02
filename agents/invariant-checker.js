@@ -503,20 +503,17 @@ async function checkDagligPubliceringskvot() {
 async function checkPubliceringstaktUnderskott() {
   const namn = "publiceringstakt-underskott";
   try {
-    // agent.yml:s tre primära crons (07/08/09 UTC = nyhet/eget/replik) och
-    // filmrecensent.yml:s cron (10:00 UTC) har vid 12 UTC alla haft minst
-    // 2-3h marginal utöver sin egen schemalagda tid — gott om utrymme för
-    // den redan dokumenterade "vanliga" GitHub Actions-förseningen (~90 min
-    // observerat historiskt). Stannar kontrollen INNAN catch-up-fönstret
-    // (21:30-21:50 UTC, gäller bara agent.yml — filmrecensent.yml har ingen
-    // egen catch-up) hinner ha åtgärdat ett eventuellt underskott, så en
-    // redan självläkt dag aldrig flaggas i efterhand. Denna check kan alltså
-    // bara upptäcka ett underskott UNDER dagen, aldrig bekräfta att
-    // catch-up faktiskt löste det — det gör nästa dags körning av samma
-    // check, som då ser en frisk 0:a igen.
+    // agent.yml och filmrecensent.yml kör alla fyra typerna i samma tidiga
+    // körningar, 03:17 UTC och en reserv 05:17 UTC (✅156). Från 08 UTC har
+    // båda haft minst 3–5 timmar på sig. GitHub har dock fördröjt crons med
+    // upp till 6–7 timmar, och då är det ombudspubliceringen härifrån (en
+    // workflow_dispatch, som startar direkt) som fyller dagen. En typ som
+    // redan nått 4 är en no-op i både agent.py och filmrecensent.py, så en
+    // dispatch som hinner före en försenad cron gör den cronen ofarlig.
+    // Kontrollen stannar före catch-up-fönstret (21:30–21:50 UTC).
     const utcTimme = new Date().getUTCHours();
-    if (utcTimme < 12 || utcTimme >= 21) {
-      rapportera(namn, "ok", `utanför kontrollfönstret (12–20 UTC), aktuell UTC-timme ${utcTimme}`);
+    if (utcTimme < 8 || utcTimme >= 21) {
+      rapportera(namn, "ok", `utanför kontrollfönstret (08–20 UTC), aktuell UTC-timme ${utcTimme}`);
       return [];
     }
     const idagUtc = new Date();
@@ -544,8 +541,8 @@ async function checkPubliceringstaktUnderskott() {
         namn,
         "fail",
         `Under dagens mål (4/typ) för: ${underskott.join(", ")} (nyhet=${nyhet} replik=${replik} ` +
-        `eget=${eget} film=${film}) trots att dagens primära crons (agent.yml 07/08/09 UTC, ` +
-        `filmrecensent.yml 10:00 UTC) borde ha kört för länge sedan — tyder på att en eller flera av ` +
+        `eget=${eget} film=${film}) trots att dagens tidiga crons (agent.yml och ` +
+        `filmrecensent.yml, 03:17 och 05:17 UTC) borde ha kört för länge sedan — tyder på att en eller flera av ` +
         `dem har fördröjts kraftigt, kört bara delvis, eller inte kört alls. Triggar en precis ` +
         `ombudspublicering per underskjuten typ direkt. Som extra redundans har både agent.yml och ` +
         `filmrecensent.yml egna sena catch-up-körningar 21:30–21:50 UTC; de dagliga kvotkontrollerna ` +

@@ -240,17 +240,19 @@ function isEligible(r) {
 // Nyhetsflöde blivit klar (se ✅93 "Triggerkedja, inte bara schema"), så
 // 08:05 är en ungefärlig "strax efter"-tidpunkt, inte en riktig cron.
 const ALLA_KÖRNINGAR = [
+  // ✅156: alla fyra artikeltyper i samma tidiga körning (03:17 UTC = 04:17
+  // svensk vintertid), med en reserv två timmar senare.
+  { h: 4,  m: 17, namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
+  { h: 4,  m: 17, namn: "Debattartiklar",  farg: "#e879f9", ikon: "📝" },
+  { h: 4,  m: 17, namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
+  { h: 4,  m: 17, namn: "Filmrecensioner", farg: "#e8b84a", ikon: "🎬" },
   { h: 5,  m: 30, namn: "Riksdagsval",     farg: "#e8d5a3", ikon: "🗳️" },
   { h: 6,  m: 30, namn: "Krisevents",      farg: "#f87171", ikon: "🌍" },
   { h: 8,  m: 0,  namn: "Nyhetsflöde",     farg: "#38bdf8", ikon: "📡" },
   { h: 8,  m: 5,  namn: "Nyhetsanalys",    farg: "#38bdf8", ikon: "🔎" },
-  { h: 9,  m: 0,  namn: "Nyhetsartiklar",  farg: "#4a9eff", ikon: "📰" },
-  { h: 10, m: 0,  namn: "Debattartiklar",  farg: "#e879f9", ikon: "📝" },
   { h: 10, m: 30, namn: "Intern börs",     farg: "#e8d5a3", ikon: "📈" },
-  { h: 11, m: 0,  namn: "Repliker",        farg: "#4ade80", ikon: "💬" },
   { h: 11, m: 0,  namn: "Butiken",         farg: "#f59e0b", ikon: "🛍" },
   { h: 11, m: 30, namn: "Andrahandsmkn",   farg: "#e879f9", ikon: "🔨" },
-  { h: 12, m: 0,  namn: "Filmrecensioner", farg: "#e8b84a", ikon: "🎬" },
   { h: 12, m: 0,  namn: "Parlamentet",     farg: "#a78bfa", ikon: "🏛" },
   { h: 12, m: 30, namn: "Lobbying",        farg: "#f87171", ikon: "💰" },
   { h: 13, m: 0,  namn: "Koalitioner",     farg: "#34d399", ikon: "🤝" },

@@ -2,21 +2,17 @@ name: Debatt-agent
 
 on:
   schedule:
-    # Nyhetsartiklar, repliker och egna debattartiklar: EN trigger per typ
-    # (inte längre 4 separata triggers/typ, se ✅128 i CLAUDE.md). "Kör
-    # agent"-steget nedan loopar 4 publiceringspass internt inom samma
-    # körning för dessa tre crons — output förblir 4 artiklar/typ/dag, men
-    # beror inte längre på att GitHub Actions schemaläggare avfyrar 12
-    # separata cron-triggers pålitligt (dokumenterat opålitlig: kan både
-    # hoppa över OCH leverera extra triggers).
-    #
-    # ✅129: tiderna flyttade till 09:00/10:00/11:00 svensk tid (tätt packade,
-    # istället för tidigare 07:00/15:00/19:00) — se motsvarande kommentar i
-    # agent.py (_CRON_TILL_TIMME) för varför fönstren där smalnades av i
-    # samma veva.
-    - cron: "0 7 * * *"   # 09:00 svensk tid — nyhetsartiklar (4 pass)
-    - cron: "0 8 * * *"   # 10:00 svensk tid — egna debattartiklar (4 pass)
-    - cron: "0 9 * * *"   # 11:00 svensk tid — repliker (4 pass)
+    # ✅156: alla tre typerna (nyhet, eget, replik) skrivs i SAMMA tidiga
+    # körning, tillsammans med filmrecensionerna (filmrecensent.yml har samma
+    # två tider). Varje körning loopar 4 rundor × nyhet/eget/replik med
+    # AGENT_FORCE_TYP satt per pass, så typen aldrig beror på vilken timme
+    # körningen råkar starta. GitHub har i praktiken fördröjt dagtids-crons
+    # med 6–7 timmar (07:00 UTC-cronen startade 14:01 UTC 1 nov) — en tidig
+    # cron och en andra reservkörning två timmar senare ger marginal. En typ
+    # som redan nått 4/4 är en no-op, så den andra körningen fyller bara på
+    # det som saknas. Minuttalet :17 undviker köbildningen kring hela timmar.
+    - cron: "17 3 * * *"   # 04:17 svensk vintertid (05:17 sommartid) — huvudkörning
+    - cron: "17 5 * * *"   # 06:17 svensk vintertid (07:17 sommartid) — reserv
     # Catch-up: 23:30–23:50 svensk tid (21:30–21:50 UTC), tre försök — inget
     # eget fönster, men agent.py kollar dagens 4+4+4-kvot vid varje pass och
     # tvingar fram en artikel av vilken typ som helst som fortfarande ligger
@@ -149,24 +145,22 @@ jobs:
           # körningen när satt till nyhet/eget/replik.
           AGENT_FORCE_TYP: ${{ github.event.inputs.typ }}
         run: |
-          # De tre primära fönster-crons (nyhet/replik/eget) loopar alltid 4
-          # publiceringspass i samma körning — se ✅128 i CLAUDE.md. Catch-up-
-          # crons förblir 1 pass: att loopa catch-up 4x hade fyrdubblat dess
-          # kompensationskapacitet (från max 3 till max 12 återhämtade
-          # artiklar/dag) och underminerat själva poängen med att ha tre
-          # separata, oberoende catch-up-tillfällen.
+          # Tidiga crons (✅156): 4 rundor × nyhet/eget/replik, typen satt per
+          # pass via AGENT_FORCE_TYP. Rundorna växlar mellan typerna så att
+          # alla tre får artiklar även om körningen avbryts halvvägs.
           #
-          # workflow_dispatch (manuell ELLER invariant-checkerns automatiska
-          # ombudspublicering, ✅131) läser istället AGENT_DISPATCH_PASS —
-          # default 1 för en vanlig manuell testkörning, men invariant-
-          # checkern skickar alltid 4 för att en ombudspublicering ska ha
-          # samma chans att täcka ett flertypsunderskott som ett riktigt
-          # fönster. Klampad till [1,4] mot en tom/felaktig/orimlig indata
-          # (t.ex. någon som råkar skriva "999" i GitHub-UI:t) — aldrig fler
-          # pass än ett riktigt fönster redan kör.
+          # Catch-up-crons (21:30–21:50 UTC) förblir 1 pass utan typ — agent.py
+          # väljer själv den mest eftersatta typen.
+          #
+          # workflow_dispatch (manuell ELLER invariant-checkerns ombudspubli-
+          # cering, ✅131/✅132) läser AGENT_DISPATCH_PASS och AGENT_FORCE_TYP
+          # som förut. Antalet pass klampas till [1,4].
+          PASSLISTA=""
           case "$AGENT_CRON" in
-            "0 7 * * *"|"0 8 * * *"|"0 9 * * *")
-              PASS=4
+            "17 3 * * *"|"17 5 * * *")
+              for runda in 1 2 3 4; do
+                PASSLISTA="$PASSLISTA nyhet eget replik"
+              done
               ;;
             *)
               PASS="${AGENT_DISPATCH_PASS:-1}"
@@ -175,24 +169,34 @@ jobs:
               esac
               if [ "$PASS" -lt 1 ]; then PASS=1; fi
               if [ "$PASS" -gt 4 ]; then PASS=4; fi
+              for i in $(seq 1 "$PASS"); do
+                PASSLISTA="$PASSLISTA ${AGENT_FORCE_TYP:-auto}"
+              done
               ;;
           esac
-          # set +e: ett misslyckat pass ska inte hindra resten av passen i
-          # samma fönster från att försöka — annars hade en enda krasch i
-          # pass 1 tyst tystat pass 2–4 (bash -eo pipefail är GitHub Actions
-          # default för run:-block).
+          set -- $PASSLISTA
+          ANTAL=$#
+          # set +e: ett misslyckat pass ska inte hindra resten av passen från
+          # att försöka (bash -eo pipefail är GitHub Actions default).
           set +e
           FAILED=0
-          for i in $(seq 1 "$PASS"); do
-            echo "=== Publiceringspass $i/$PASS (AGENT_CRON='$AGENT_CRON') ==="
+          i=0
+          for typ in "$@"; do
+            i=$((i + 1))
+            if [ "$typ" = "auto" ]; then
+              export AGENT_FORCE_TYP=""
+            else
+              export AGENT_FORCE_TYP="$typ"
+            fi
+            echo "=== Publiceringspass $i/$ANTAL (typ=$typ, AGENT_CRON='$AGENT_CRON') ==="
             python -u python/agent.py
             ec=$?
             if [ $ec -ne 0 ]; then
-              echo "::warning::Pass $i/$PASS misslyckades (exit $ec) — fortsätter med nästa pass."
+              echo "::warning::Pass $i/$ANTAL ($typ) misslyckades (exit $ec) — fortsätter med nästa pass."
               FAILED=1
             fi
-            if [ "$i" -lt "$PASS" ]; then
-              sleep 60
+            if [ "$i" -lt "$ANTAL" ]; then
+              sleep 30
             fi
           done
           exit $FAILED
