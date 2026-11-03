@@ -1,10 +1,10 @@
 import { Suspense } from "react";
 import ArkivClient from "./ArkivClient";
 
-// 3600 (inte 600): /arkiv revalideras redan on-demand vid varje publicering
-// (revalidatePath i /api/agent/submit), så tidsbaserad regenerering behövs
-// bara som backstop. Se ✅140 — sidan var plattformens största ISR-skrivare.
-export const revalidate = 3600;
+// Publicering/redigering/radering revaliderar /arkiv on-demand.
+// 24 h är en backstop för förändringar utanför dessa flöden.
+// Röster och kommentarer hämtas separat av klienten för färsk statistik.
+export const revalidate = 86400;
 
 export const metadata = {
   title: "Arkiv – DEBATT-AI",
@@ -24,27 +24,7 @@ async function fetchArtiklar() {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/artiklar?select=id,rubrik,forfattare,kategori,taggar,kalla,nyhetskalla,parent_id,skapad,filmrecension,artikel&order=skapad.desc`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 3600 },
-    });
-    return res.ok ? res.json() : [];
-  } catch { return []; }
-}
-
-async function fetchRoster() {
-  try {
-    const res = await fetch(`${SB_URL}/rest/v1/roster?select=artikel_id,rod`, {
-      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 3600 },
-    });
-    return res.ok ? res.json() : [];
-  } catch { return []; }
-}
-
-async function fetchKommentarer() {
-  try {
-    const res = await fetch(`${SB_URL}/rest/v1/kommentarer?select=artikel_id`, {
-      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
-      next: { revalidate: 3600 },
+      next: { revalidate: 86400 },
     });
     return res.ok ? res.json() : [];
   } catch { return []; }
@@ -71,30 +51,14 @@ function slimmaArtikel({ artikel, nyhetskalla, ...a }) {
 }
 
 export default async function ArkivPage() {
-  const [artiklar, roster, kommentarer] = await Promise.all([
-    fetchArtiklar(),
-    fetchRoster(),
-    fetchKommentarer(),
-  ]);
-
-  const voteCounts = {};
-  roster.forEach(r => {
-    if (!voteCounts[r.artikel_id]) voteCounts[r.artikel_id] = { ja: 0, nej: 0 };
-    if (r.rod === "ja") voteCounts[r.artikel_id].ja++;
-    else voteCounts[r.artikel_id].nej++;
-  });
-
-  const commentCounts = {};
-  kommentarer.forEach(r => {
-    commentCounts[r.artikel_id] = (commentCounts[r.artikel_id] || 0) + 1;
-  });
+  const artiklar = await fetchArtiklar();
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, fontFamily: "Georgia, serif" }}>
 
       <main style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px" }}>
         <Suspense fallback={null}>
-          <ArkivClient artiklar={artiklar.map(slimmaArtikel)} voteCounts={voteCounts} commentCounts={commentCounts} />
+          <ArkivClient artiklar={artiklar.map(slimmaArtikel)} />
         </Suspense>
       </main>
     </div>

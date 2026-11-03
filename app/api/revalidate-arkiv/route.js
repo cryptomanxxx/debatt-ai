@@ -1,13 +1,21 @@
+import { timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { checkRateLimit } from "../../lib/kanalRateLimit";
 
-// Klientsidan publicerar direkt mot Supabase (anon-nyckel, se app/client.js
-// och app/skicka-in/SkickaInClient.js) — ingen server-route i den vägen kan
-// annars anropa Next.js egen revalidatePath(). Utan detta serverade /arkivs
-// 600s ISR-cache (✅94/PR #1462) den GAMLA artikellistan i upp till 10
-// minuter efter en lyckad publicering, även efter en manuell omladdning
-// (Codex-fynd, PR #1462-granskning).
+// Äldre extern revalideringsväg. Aktuella publiceringsrutter gör själva
+// revalidatePath("/arkiv"). Denna endpoint får inte kunna rensa ISR-cache
+// anonymt – det kan skapa onödiga regenereringar och Write Units.
+// Om externa arbetsflöden behöver den: konfigurera REVALIDATE_ARCHIVE_SECRET
+// och skicka Authorization: Bearer <secret>. Utan hemlighet är den stängd.
 export async function POST(req) {
+  const secret = process.env.REVALIDATE_ARCHIVE_SECRET;
+  const supplied = req.headers.get("authorization")?.replace(/^Bearer /i, "") || "";
+  const expected = Buffer.from(secret || "");
+  const received = Buffer.from(supplied);
+  if (!secret || expected.length !== received.length || !timingSafeEqual(expected, received)) {
+    return Response.json({ ok: false }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  }
+
   const { ok, retryAfter } = checkRateLimit(req, "revalidate-arkiv", 30, 10 * 60 * 1000);
   if (!ok) return Response.json({ ok: false }, { status: 429, headers: { "Retry-After": String(retryAfter) } });
 
@@ -15,7 +23,7 @@ export async function POST(req) {
     revalidatePath("/");
     revalidatePath("/arkiv");
   } catch {
-    // Non-fatal — /arkiv självläker inom sitt normala 600s-fönster ändå
+    // Non-fatal — /arkiv självläker inom 24 h vid oväntade fel
   }
   return Response.json({ ok: true });
 }
