@@ -14,17 +14,9 @@ export const metadata = {
 // sidorna (övriga sidors skärmdumpar läses aldrig).
 const SIDOR_ATT_VISA = SIDOR;
 
-// Max antal veckor per sida som embeddas i den prerendrade sidan. Utan tak
-// växer varje base64-skärmdump (sparas varje måndag, aldrig rensad) sidans
-// storlek obegränsat — orsakade en "Oversized Incremental Static
-// Regeneration"-deployfel på Vercel (19,75 MB, över gränsen) 20 jul 2026.
-// Satt lågt (6 veckor ≈ 1,5 månad) medvetet — okänt exakt hur många veckor
-// som redan hunnit ackumuleras, så en försiktig gräns garanterar att
-// nästa deploy faktiskt kommer under Vercels tak istället för att gissa
-// ett värde som råkar vara större än vad som redan finns.
-// Sedan skärmdumparna flyttades till Supabase Storage (screenshot_url)
-// bäddas bara äldre rader in som base64; nya rader länkas som vanliga
-// bild-URL:er och gör inte sidan större.
+// Behåll högst sex veckor per sida i tidslinjen. Äldre Base64-bilder
+// hämtas via en dynamisk bildrutt och får aldrig ingå i ISR/RSC-payloaden.
+// Nya bilder länkas direkt till Supabase Storage.
 const MAX_VECKOR_PER_SIDA = 6;
 
 // Hämtar en sidas snapshots med gränsen pålagd i själva Supabase-frågan
@@ -39,7 +31,7 @@ async function fetchSidaSnapshots(path, key) {
     `&or=(screenshot_url.not.is.null,screenshot_b64.not.is.null)` +
     `&order=vecka.desc` +
     `&limit=${MAX_VECKOR_PER_SIDA}` +
-    `&select=vecka,sida_path,sida_namn,status,screenshot_url,screenshot_b64`;
+    `&select=vecka,sida_path,sida_namn,status,screenshot_url`;
 
   const r = await fetch(url, {
     headers: {
@@ -56,8 +48,8 @@ async function fetchSidaSnapshots(path, key) {
   return rows.reverse().map(row => ({
     vecka:     row.vecka,
     status:    row.status,
-    // Ny rad: URL till Storage. Äldre rad: base64 som data-URI.
-    bild:      row.screenshot_url || `data:image/png;base64,${row.screenshot_b64}`,
+    // URL-strängar i RSC-data; inga Base64-bildbytes i ISR-cachen.
+    bild:      row.screenshot_url || `/api/qa-snapshot-image?path=${encodeURIComponent(path)}&vecka=${encodeURIComponent(row.vecka)}`,
     sida_namn: row.sida_namn,
   }));
 }
