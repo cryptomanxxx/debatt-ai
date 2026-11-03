@@ -57,9 +57,17 @@ function AgentChip({ vote, forslagId }) {
   const [visar, setVisar] = useState(false);
   const [motivering, setMotivering] = useState(null);
   const [laddar, setLaddar] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ left: 8, top: 8, below: true });
   const color = vote.rod === "ja" ? C.ja : vote.rod === "nej" ? C.nej : C.avstar;
 
-  async function visaMotivering() {
+  async function visaMotivering(event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const width = Math.min(320, window.innerWidth - 16);
+    setTooltipPos({
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      top: rect.top < 180 ? rect.bottom + 6 : rect.top - 6,
+      below: rect.top < 180,
+    });
     setVisar(true);
     const cacheKey = `${forslagId}:${vote.agent}`;
     if (motiveringsCache.has(cacheKey)) {
@@ -104,8 +112,10 @@ function AgentChip({ vote, forslagId }) {
       {vote.agent}
       {visar && (laddar || motivering) && (
         <span role="tooltip" style={{
-          position: "absolute", bottom: "calc(100% + 6px)", left: 0, zIndex: 10,
-          width: "min(320px, 75vw)", whiteSpace: "normal", overflowWrap: "anywhere",
+          position: "fixed", top: tooltipPos.top, left: tooltipPos.left, zIndex: 1000,
+          transform: tooltipPos.below ? "none" : "translateY(-100%)",
+          width: "min(320px, calc(100vw - 16px))", boxSizing: "border-box",
+          whiteSpace: "normal", overflowWrap: "anywhere",
           padding: "9px 11px", borderRadius: "6px", background: "#202028",
           border: "1px solid #444", color: "#e8e8e8", lineHeight: 1.5,
           boxShadow: "0 4px 16px #0009", pointerEvents: "none",
