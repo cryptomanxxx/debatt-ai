@@ -61,8 +61,39 @@ const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 // ~1000) behöver inte ritas på en gång.
 const SIDSTORLEK = 50;
 
-export default function ArkivClient({ artiklar, voteCounts, commentCounts }) {
+export default function ArkivClient({ artiklar }) {
   const searchParams = useSearchParams();
+  const [voteCounts, setVoteCounts] = useState({});
+  const [commentCounts, setCommentCounts] = useState({});
+
+  // Dessa siffror ändras oftare än artikelindexet. Hämta dem direkt från
+  // Supabase så 24 h ISR-backstop inte ger inaktuella röster/kommentarer.
+  useEffect(() => {
+    const controller = new AbortController();
+    const headers = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` };
+    Promise.all([
+      fetch(`${SB_URL}/rest/v1/roster?select=artikel_id,rod`, { headers, signal: controller.signal }),
+      fetch(`${SB_URL}/rest/v1/kommentarer?select=artikel_id`, { headers, signal: controller.signal }),
+    ]).then(async ([votesRes, commentsRes]) => {
+      if (!votesRes.ok || !commentsRes.ok) return;
+      const [votes, comments] = await Promise.all([votesRes.json(), commentsRes.json()]);
+      if (controller.signal.aborted) return;
+      const nextVotes = {};
+      for (const vote of votes) {
+        if (!nextVotes[vote.artikel_id]) nextVotes[vote.artikel_id] = { ja: 0, nej: 0 };
+        if (vote.rod === "ja") nextVotes[vote.artikel_id].ja++;
+        else if (vote.rod === "nej") nextVotes[vote.artikel_id].nej++;
+      }
+      const nextComments = {};
+      for (const comment of comments) {
+        nextComments[comment.artikel_id] = (nextComments[comment.artikel_id] || 0) + 1;
+      }
+      setVoteCounts(nextVotes);
+      setCommentCounts(nextComments);
+    }).catch(() => {});
+    return () => controller.abort();
+  }, []);
+
   const [filterTag, setFilterTag] = useState(null);
   const [filterFilm, setFilterFilm] = useState(false);
   const [filterDebatt, setFilterDebatt] = useState(false);
