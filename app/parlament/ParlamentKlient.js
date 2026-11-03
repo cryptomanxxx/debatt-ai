@@ -69,7 +69,7 @@ function AgentChip({ vote, forslagId }) {
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     if (!key) return;
     setLaddar(true);
-    const url = `${SB_URL}/rest/v1/agent_roster_lag?select=motivering&lagforslag_id=eq.${encodeURIComponent(forslagId)}&agent=eq.${encodeURIComponent(vote.agent)}&limit=1`;
+    const url = `${SB_URL}/rest/v1/agent_roster_lag?select=motivering&lagforslag_id=eq.${encodeURIComponent(forslagId)}&agent=eq.${encodeURIComponent(vote.agent)}&order=skapad.desc&limit=1`;
     const promise = fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
       .then(async response => {
         if (!response.ok) throw new Error("Supabase");
