@@ -20,3 +20,10 @@ test("parliament keeps vote summaries and loads motives on demand", () => {
   assert.match(client, /onFocus=\{visaMotivering\}/);
   assert.match(client, /select=motivering&lagforslag_id=eq/);
 });
+
+test("vote tooltip stays within narrow viewport", () => {
+  assert.match(client, /getBoundingClientRect\(\)/);
+  assert.match(client, /window\.innerWidth - width - 8/);
+  assert.match(client, /position: "fixed"/);
+  assert.match(client, /calc\(100vw - 16px\)/);
+});
