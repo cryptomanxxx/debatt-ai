@@ -48,24 +48,88 @@ function VoteBar({ votes }) {
   );
 }
 
-function AgentChips({ votes }) {
+// Hämta motiveringen först när någon öppnar ett agent-chip. Stora historiska
+// motiveringstexter ska inte följa med i sidans ISR/RSC-payload.
+const motiveringsCache = new Map();
+const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
+
+function AgentChip({ vote, forslagId }) {
+  const [visar, setVisar] = useState(false);
+  const [motivering, setMotivering] = useState(null);
+  const [laddar, setLaddar] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ left: 8, top: 8, below: true });
+  const color = vote.rod === "ja" ? C.ja : vote.rod === "nej" ? C.nej : C.avstar;
+
+  async function visaMotivering(event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const width = Math.min(320, window.innerWidth - 16);
+    setTooltipPos({
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      top: rect.top < 180 ? rect.bottom + 6 : rect.top - 6,
+      below: rect.top < 180,
+    });
+    setVisar(true);
+    const cacheKey = `${forslagId}:${vote.agent}`;
+    if (motiveringsCache.has(cacheKey)) {
+      setMotivering(await motiveringsCache.get(cacheKey));
+      return;
+    }
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!key) return;
+    setLaddar(true);
+    const url = `${SB_URL}/rest/v1/agent_roster_lag?select=motivering&lagforslag_id=eq.${encodeURIComponent(forslagId)}&agent=eq.${encodeURIComponent(vote.agent)}&order=skapad.desc&limit=1`;
+    const promise = fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
+      .then(async response => {
+        if (!response.ok) throw new Error("Supabase");
+        const rows = await response.json();
+        return rows?.[0]?.motivering || "";
+      });
+    motiveringsCache.set(cacheKey, promise);
+    try {
+      setMotivering(await promise);
+    } catch {
+      motiveringsCache.delete(cacheKey); // misslyckade anrop kan provas igen
+      setMotivering("Kunde inte hämta motiveringen.");
+    } finally {
+      setLaddar(false);
+    }
+  }
+
+  return (
+    <span
+      onMouseEnter={visaMotivering}
+      onMouseLeave={() => setVisar(false)}
+      onFocus={visaMotivering}
+      onBlur={() => setVisar(false)}
+      tabIndex={0}
+      style={{
+        position: "relative", display: "inline-flex", alignItems: "center", gap: "4px",
+        padding: "2px 8px", borderRadius: "10px", background: color + "18",
+        border: `1px solid ${color}35`, fontSize: "11px", color, cursor: "help",
+      }}
+    >
+      <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: color, flexShrink: 0 }} />
+      {vote.agent}
+      {visar && (laddar || motivering) && (
+        <span role="tooltip" style={{
+          position: "fixed", top: tooltipPos.top, left: tooltipPos.left, zIndex: 1000,
+          transform: tooltipPos.below ? "none" : "translateY(-100%)",
+          width: "min(320px, calc(100vw - 16px))", boxSizing: "border-box",
+          whiteSpace: "normal", overflowWrap: "anywhere",
+          padding: "9px 11px", borderRadius: "6px", background: "#202028",
+          border: "1px solid #444", color: "#e8e8e8", lineHeight: 1.5,
+          boxShadow: "0 4px 16px #0009", pointerEvents: "none",
+        }}>{laddar ? "Hämtar motivering…" : motivering}</span>
+      )}
+    </span>
+  );
+}
+
+function AgentChips({ votes, forslagId }) {
   if (votes.length === 0) return null;
   return (
     <div style={{ marginTop: "10px", display: "flex", flexWrap: "wrap", gap: "5px" }}>
-      {votes.map(v => {
-        const color = v.rod === "ja" ? C.ja : v.rod === "nej" ? C.nej : C.avstar;
-        return (
-          <span key={v.agent} title={v.motivering || ""} style={{
-            display: "inline-flex", alignItems: "center", gap: "4px",
-            padding: "2px 8px", borderRadius: "10px",
-            background: color + "18", border: `1px solid ${color}35`,
-            fontSize: "11px", color, cursor: v.motivering ? "help" : "default",
-          }}>
-            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: color, flexShrink: 0 }} />
-            {v.agent}
-          </span>
-        );
-      })}
+      {votes.map(v => <AgentChip key={v.agent} vote={v} forslagId={forslagId} />)}
     </div>
   );
 }
@@ -201,7 +265,7 @@ function ForslagCard({ f, votes }) {
       )}
 
       <VoteBar votes={votes} />
-      <AgentChips votes={votes} />
+      <AgentChips votes={votes} forslagId={f.id} />
       <Jamforelse forslag={f} votes={votes} />
     </div>
   );
