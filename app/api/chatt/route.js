@@ -468,11 +468,7 @@ REGLER — viktiga:
     const groqTimeout = setTimeout(() => groqAbort.abort(), 5000);
     const groqT0 = Date.now();
     try {
-      const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-        signal: groqAbort.signal,
-        body: JSON.stringify({
+      const groqBody = {
           model: "openai/gpt-oss-120b",
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userMessage }],
           max_tokens: maxTokensForRequest,
@@ -494,8 +490,21 @@ REGLER — viktiga:
           // (`hamta_kort_fns_med_trunkering()`, ✅97).
           reasoning_effort: "low",
           reasoning_format: "hidden",
-        }),
+        };
+      const groqFetch = (b) => fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+        signal: groqAbort.signal,
+        body: JSON.stringify(b),
       });
+      let groqRes = await groqFetch(groqBody);
+      // Groq dokumenterar att reasoning_format inte stöds för gpt-oss-modeller
+      // (där styrs det istället med include_reasoning). Om fältet ger 400 skulle
+      // VARJE Groq-anrop falla till reserverna — gör om utan fältet (✅157).
+      if (groqRes.status === 400) {
+        const { reasoning_format, ...utanFormat } = groqBody;
+        groqRes = await groqFetch({ ...utanFormat, include_reasoning: false });
+      }
       clearTimeout(groqTimeout);
 
       const rem = parseInt(groqRes.headers.get("x-ratelimit-remaining-requests") ?? "-1");
@@ -504,7 +513,7 @@ REGLER — viktiga:
         ps.groq = { remaining: rem >= 0 ? rem : ps.groq.remaining, limit: 30, resetAt: rst, ts: Date.now(), status: rem <= 5 ? "warn" : "ok" };
         logAiCall({ provider: "groq", model: "openai/gpt-oss-120b", source: "chatt", status: "ok", latency_ms: Date.now() - groqT0 });
         return withNyhetsanalysSave(
-          new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq" } }),
+          new Response(groqRes.body, { headers: { ...rlHeaders, "X-Provider": "groq", "X-Model": "openai/gpt-oss-120b" } }),
           { nyhetId: nyhetIdSafe, agent, requestId: requestIdSafe }
         );
       }
@@ -557,7 +566,7 @@ REGLER — viktiga:
           const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
           const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
           return withNyhetsanalysSave(
-            new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": name } }),
+            new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": name, "X-Model": model } }),
             { nyhetId: nyhetIdSafe, agent, requestId: requestIdSafe }
           );
         }
@@ -621,7 +630,7 @@ REGLER — viktiga:
             const chunk = JSON.stringify({ choices: [{ delta: { content: text } }] });
             const sseBody = `data: ${chunk}\n\ndata: [DONE]\n\n`;
             return withNyhetsanalysSave(
-              new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": "gemini" } }),
+              new Response(new TextEncoder().encode(sseBody), { headers: { ...rlHeaders, "X-Provider": "gemini", "X-Model": model } }),
               { nyhetId: nyhetIdSafe, agent, requestId: requestIdSafe }
             );
           }

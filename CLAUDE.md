@@ -4782,6 +4782,31 @@ Vercel-mejl (okt 2026): ISR Writes 451 989 / 200 000 för 30 dagar. Observabilit
 | `agents/invariant-checker.js` | Kontrollfönstret börjar 08 UTC |
 | `app/client.js` | "Dagens schema" visar alla fyra typerna 04:17 |
 
+### ✅157. Direktdebattens summering avklippt — och modellnamn visas nu per inlägg – KLART
+
+Ägarrapport (nov 2026, `/chatt/acbd56d0-…`): i en sparad debatt slutade "Redaktörens summering" mitt i en mening ("...för både Finland och allians"). Replikerna i samma debatt var hela. Ägaren bad också om att se vilken AI-modell som skrev varje svar, för att lättare felsöka.
+
+**Orsak:** `/api/chatt/summering` anropar den centrala routern (`app/lib/aiRouter.js`) med `maxTokens: 220`. Groqs `openai/gpt-oss-120b` är en reasoning-modell, och routern satte aldrig `reasoning_effort`, så dolt resonemang åt en del av budgeten. Det är samma buggklass som ✅97/✅115, men fixen i ✅115 gällde bara `/api/chatt`. Vilken provider som faktiskt gav den avklippta summeringen går inte att se i efterhand, eftersom den aldrig sparades.
+
+**Fix:**
+- `aiRouter.js → openAIBody()` skickar `reasoning_effort: "low"` till gpt-oss-modeller. Gäller alla routes som går via routern.
+- Summeringen: `maxTokens` 220 → 600 och en `validate` som avvisar en text som inte slutar med skiljetecken, så att nästa provider provas. Poängsättningens `maxTokens` 80 → 400.
+- `/api/chatt` skickar `X-Model` med varje svar. Varje inlägg sparar `provider`, `modell`, `forsok` och `avhugget` i `inlagg`-jsonb (ingen migrering). En ny `ModellEtikett` visar detta på `/chatt` och `/chatt/[id]`, rött om svaret ser avklippt ut.
+- Summeringens modell sparas i en ny kolumn `summering_modell` och visas under summeringen. `/chatt` sparar debatten utan den om migreringen inte körts.
+- `/api/chatt`: Groq dokumenterar att `reasoning_format` inte stöds för gpt-oss. Det har inte gått att verifiera härifrån. Ger fältet 400 görs anropet om utan det (med `include_reasoning: false`), så att Groq inte tyst hoppas över i varje tur.
+
+Kräver `supabase_chatt_summering_modell.sql` för att summeringens modell ska sparas.
+
+| Fil | Roll |
+|---|---|
+| `app/lib/aiRouter.js` | `reasoning_effort: "low"` för gpt-oss |
+| `app/api/chatt/summering/route.js` | Högre tokentak, validering av avslutad mening, returnerar `modell` |
+| `app/api/chatt/route.js` | `X-Model`-header, omförsök utan `reasoning_format` vid 400 |
+| `app/chatt/page.js` | Sparar provider/modell/försök/avklippt per inlägg och summeringens modell |
+| `app/chatt/ModellEtikett.js` | Ny etikett med modellnamn |
+| `app/chatt/[id]/page.js` | Visar modell per inlägg och för summeringen |
+| `supabase/supabase_chatt_summering_modell.sql` | Ny kolumn `summering_modell` |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

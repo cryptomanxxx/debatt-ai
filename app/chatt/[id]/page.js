@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import ModellEtikett from "../ModellEtikett";
 import ChattShareButtons from "./ChattShareButtons";
 import ChattLyssna from "./ChattLyssna";
 import { chattProviderLabel } from "../../lib/chattProvider";
@@ -111,7 +112,10 @@ export default async function ChattDebattPage({ params }) {
             const r = isFirst && isLast ? "8px" : isFirst ? "8px 8px 0 0" : isLast ? "0 0 8px 8px" : "0";
             return (
               <div key={i} style={{ padding: "16px 20px", background: C.surface, borderLeft: `3px solid ${farg}`, borderRadius: r }}>
-                <div style={{ fontSize: "11px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", marginBottom: "8px", fontWeight: 700 }}>{h.agent.toUpperCase()}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "11px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", fontWeight: 700 }}>{h.agent.toUpperCase()}</span>
+                  <ModellEtikett h={h} />
+                </div>
                 <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.75, color: C.text }}>{h.text}</p>
               </div>
             );
@@ -123,6 +127,7 @@ export default async function ChattDebattPage({ params }) {
           <div style={{ padding: "20px 24px", background: `${C.accent}08`, border: `1px solid ${C.accent}25`, borderRadius: "8px", marginBottom: "40px" }}>
             <p style={{ fontSize: "11px", color: C.accentDim, textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 10px 0", fontFamily: "monospace" }}>Redaktörens summering</p>
             <p style={{ fontSize: "15px", color: C.text, lineHeight: 1.75, margin: 0, fontStyle: "italic" }}>{debatt.summering}</p>
+            {debatt.summering_modell && <p style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace", margin: "10px 0 0 0" }}>Modell: {debatt.summering_modell}</p>}
           </div>
         )}
 
