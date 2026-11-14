@@ -1,4 +1,5 @@
 "use client";
+import ModellEtikett from "./ModellEtikett";
 import { useState, useRef, useEffect } from "react";
 import ChattShareButtons from "./[id]/ChattShareButtons";
 import ForsladsLadan from "../ForsladsLadan";
@@ -212,7 +213,9 @@ async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfa
     const body = await res.text().catch(() => "");
     throw Object.assign(new Error(`HTTP ${status}: ${body.slice(0, 120)}`), { status });
   }
-  onProvider?.(res.headers.get("X-Provider") ?? "groq");
+  const provider = res.headers.get("X-Provider") ?? "groq";
+  const modell = res.headers.get("X-Model") ?? null;
+  onProvider?.(provider);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let text = "", buffer = "", finishReason = null;
@@ -226,7 +229,7 @@ async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfa
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const raw = line.slice(6).trim();
-        if (raw === "[DONE]") return { text, klar: true, finishReason };
+        if (raw === "[DONE]") return { text, klar: true, finishReason, provider, modell };
         try {
           const choice = JSON.parse(raw).choices?.[0];
           const token = choice?.delta?.content ?? "";
@@ -244,7 +247,7 @@ async function streamSvar({ amne, historik, agent, artikelTitel, artikelSammanfa
   // Strömmen tog slut utan "data: [DONE]" — anslutningen dog, det var inte en
   // ren avslutning. klar: false är den auktoritativa signalen på det, mer
   // tillförlitlig än att gissa utifrån hur texten råkar sluta (Codex P2, PR #1286).
-  return { text, klar: false, finishReason };
+  return { text, klar: false, finishReason, provider, modell };
 }
 
 async function fetchSummering(amne, inlagg) {
@@ -254,10 +257,10 @@ async function fetchSummering(amne, inlagg) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ amne, inlagg }),
     });
-    if (!res.ok) return { summering: "", scores: null };
+    if (!res.ok) return { summering: "", scores: null, summeringModell: null };
     const data = await res.json();
-    return { summering: data.summering ?? "", scores: data.scores ?? null };
-  } catch { return { summering: "", scores: null }; }
+    return { summering: data.summering ?? "", scores: data.scores ?? null, summeringModell: data.modell ?? null };
+  } catch { return { summering: "", scores: null, summeringModell: null }; }
 }
 
 async function fetchAiAmne(agenter) {
@@ -297,20 +300,21 @@ function postDebatt(payload) {
   });
 }
 
-async function sparaDebatt({ amne, agenter, inlagg, summering, scores, provider, kalla, kallaUrl, kallaTitel }) {
+async function sparaDebatt({ amne, agenter, inlagg, summering, summeringModell, scores, provider, kalla, kallaUrl, kallaTitel }) {
   try {
     const bas = { amne, agenter, inlagg, summering, scores: scores ?? null, provider: provider ?? null, kalla: kalla ?? "inbyggt" };
     const harArtikel = kallaUrl != null || kallaTitel != null;
-    let res = await postDebatt(harArtikel ? { ...bas, kalla_url: kallaUrl ?? null, kalla_titel: kallaTitel ?? null } : bas);
-    if (!res.ok && harArtikel) {
-      // Om kalla_url/kalla_titel-kolumnerna inte finns än (t.ex. en deploy som
-      // landar innan supabase_chatt_kalla_url.sql körts) avvisar PostgREST HELA
-      // insert:en, inte bara de okända fälten — utan den här reserven skulle
-      // varenda debatt sluta osparad och odelbar under det fönstret. Försök
-      // igen utan artikelfälten så att debatten i alla fall sparas.
+    const artikelFalt = harArtikel ? { kalla_url: kallaUrl ?? null, kalla_titel: kallaTitel ?? null } : {};
+    const modellFalt = summeringModell ? { summering_modell: summeringModell } : {};
+    let res = await postDebatt({ ...bas, ...artikelFalt, ...modellFalt });
+    // Om en valfri kolumn (kalla_url/kalla_titel, summering_modell) inte finns än
+    // — t.ex. en deploy som landar innan migreringen körts — avvisar PostgREST HELA
+    // insert:en. Försök då igen utan de valfria fälten så att debatten ändå sparas.
+    if (!res.ok && (harArtikel || summeringModell)) {
       const body = await res.text().catch(() => "");
-      if (/kalla_url|kalla_titel|schema cache/i.test(body)) {
-        res = await postDebatt(bas);
+      if (/kalla_url|kalla_titel|summering_modell|schema cache/i.test(body)) {
+        res = await postDebatt({ ...bas, ...artikelFalt });
+        if (!res.ok && harArtikel) res = await postDebatt(bas);
       }
     }
     if (!res.ok) return null;
@@ -343,6 +347,7 @@ function Bubble({ h, isFirst, isLast, isStreaming }) {
         <AgentAvatar namn={h.agent} gradient={v.gradient} ring={v.ring} ikon={v.ikon} ikonFarg={v.ikonFarg} size={28} />
         <span style={{ fontSize: "11px", color: farg, fontFamily: "monospace", letterSpacing: "0.1em", fontWeight: 700 }}>{h.agent.toUpperCase()}</span>
         {!isStreaming && h.konfidensPoang != null && <KonfidensBar poang={h.konfidensPoang} farg={farg} />}
+        {!isStreaming && <ModellEtikett h={h} />}
       </div>
       <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.75, color: isStreaming ? `${C.text}bb` : C.text }}>
         {h.text}
@@ -381,6 +386,7 @@ export default function ChattPage() {
   const [tänkande, setTänkande] = useState("");
   const [streaming, setStreaming] = useState(null);
   const [summering, setSummering] = useState("");
+  const [summeringModell, setSummeringModell] = useState(null);
   const [debattScoreHistorik, setDebattScoreHistorik] = useState([]);
   const [debattId, setDebattId] = useState(null);
   const [föreslagStatus, setFöreslagStatus] = useState(null); // null | "loading" | "ok" | "fel"
@@ -479,8 +485,9 @@ export default function ChattPage() {
     setTänker(false);
     if (h.length >= 3) {
       setFas("summering");
-      const { summering: sum, scores } = await fetchSummering(valtAmne, h);
+      const { summering: sum, scores, summeringModell: sumModell } = await fetchSummering(valtAmne, h);
       setSummering(sum);
+      setSummeringModell(sumModell);
       // Bygger provider-strängen dynamiskt ur ALLA leverantörer som faktiskt svarat
       // under debatten (i en stabil, förutsägbar ordning) — inte bara groq/gemini.
       // Sedan hoppaOverGroq (se streamSvar-anropet nedan) kan Codestral numera svara
@@ -488,7 +495,7 @@ export default function ChattPage() {
       // sparas/visas som ren Groq-debatt (Codex P2, PR #1288).
       const ps = providersRef.current;
       const provider = PROVIDER_VISNINGSORDNING.filter(p => ps.has(p)).join("+") || null;
-      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, scores, provider, kalla: kallaAmne, kallaUrl: artikel?.url ?? null, kallaTitel: artikel?.titel ?? null });
+      const id = await sparaDebatt({ amne: valtAmne, agenter: valdaAgenter, inlagg: h, summering: sum, summeringModell: sumModell, scores, provider, kalla: kallaAmne, kallaUrl: artikel?.url ?? null, kallaTitel: artikel?.titel ?? null });
       setDebattId(id);
       setFelmeddelande(""); // debate saved — clear any mid-stream error
     }
@@ -534,6 +541,7 @@ export default function ChattPage() {
     setHistorik([]);
     setStreaming(null);
     setSummering("");
+    setSummeringModell(null);
     setDebattId(null);
     setFelmeddelande("");
     setUsedProviders(new Set());
@@ -553,6 +561,7 @@ export default function ChattPage() {
         let text = null;
         let klar = false;
         let finishReason = null;
+        let provider = null, modell = null, forsokAntal = 0;
         // En leverantörsström som stängs utan "data: [DONE]" (avbruten anslutning,
         // inte ett fel som kastas) lämnar text tom — eller värre, ett kort
         // mitt-i-meningen-avhugget fragment — utan att streamSvar() kastar. klar
@@ -602,6 +611,9 @@ export default function ChattPage() {
           text = resultat.text;
           klar = resultat.klar;
           finishReason = resultat.finishReason;
+          provider = resultat.provider;
+          modell = resultat.modell;
+          forsokAntal = forsok + 1;
         }
         if (stoppRef.current) break;
         if (!text) {
@@ -611,7 +623,11 @@ export default function ChattPage() {
         // Om texten fortfarande verkar avhuggen efter omförsöket används den ändå —
         // en kort replik är bättre för debatten än att avbryta den helt.
         setStreaming(null);
-        const inlagg = { agent, text: text.trim(), id: i, konfidensPoang: genereraKonfidensPoang(agent) };
+        // provider/modell/forsok/avhugget sparas per inlägg (inlagg är jsonb, ingen
+        // migrering) så att ett avklippt svar kan spåras till exakt vilken modell
+        // som gav det.
+        const avhugget = !klar || finishReason === "length" || arTroligenAvbruten(text);
+        const inlagg = { agent, text: text.trim(), id: i, konfidensPoang: genereraKonfidensPoang(agent), provider, modell, forsok: forsokAntal, ...(avhugget ? { avhugget: true } : {}) };
         h = [...h, inlagg];
         setHistorik([...h]);
       } catch (e) {
@@ -684,6 +700,7 @@ export default function ChattPage() {
     setHistorik([]);
     setStreaming(null);
     setSummering("");
+    setSummeringModell(null);
     setDebattId(null);
     setAmne(slumpaAmne());
     setKallaAmne("inbyggt");
@@ -963,6 +980,7 @@ export default function ChattPage() {
               <div style={{ padding: "20px 24px", background: `${C.accent}08`, border: `1px solid ${C.accent}25`, borderRadius: "8px", marginBottom: "24px" }}>
                 <p style={{ fontSize: "11px", color: C.accentDim, textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 10px 0", fontFamily: "monospace" }}>Redaktörens summering</p>
                 <p style={{ fontSize: "15px", color: C.text, lineHeight: 1.75, margin: 0, fontStyle: "italic" }}>{summering}</p>
+                {summeringModell && <p style={{ fontSize: "10px", color: C.textMuted, fontFamily: "monospace", margin: "10px 0 0 0" }}>Modell: {summeringModell}</p>}
               </div>
             )}
 

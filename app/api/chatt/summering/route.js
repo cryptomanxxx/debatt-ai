@@ -15,16 +15,19 @@ export async function POST(request) {
     callWithFallback(chain, [
       { role: "system", content: "Du är en neutral redaktör. Sammanfatta debatter kort och balanserat på svenska. Ta aldrig parti." },
       { role: "user", content: `Debatten handlade om: "${amne}"\n\n${debattText}\n\nSammanfatta debatten i exakt 2 meningar. Lyft fram de starkaste argumenten från alla sidor. Neutral ton. Inga värderingar.` },
-    ], { maxTokens: 220, temperature: 0.4, source: "chatt-summering" }),
+    ], { maxTokens: 600, temperature: 0.4, source: "chatt-summering",
+      // Avvisa en summering som slutar mitt i en mening och prova nästa provider.
+      validate: (t) => /[.!?…][”"')\]]*\s*$/.test(t.trim()) }),
 
     callWithFallback(chain, [
       { role: "system", content: "Du är en retorisk domare. Svara ENDAST med ett JSON-objekt. Inga förklaringar, ingen text utanför JSON." },
       { role: "user", content: `Debatten handlade om: "${amne}"\n\n${debattText}\n\nGe varje deltagare ett heltalspoäng 1-10 för retorisk förmåga (argumentstyrka, originalitet, övertygande förmåga).\n\nDeltagarna är: ${agenter.map((a, i) => `${i + 1}. ${a}`).join(", ")}\n\nSvara med EXAKT detta format (ersätt talen med dina betyg):\n{"${agenter.join('": X, "')}: X}` },
-    ], { maxTokens: 80, temperature: 0.1, json: true, source: "chatt-summering-scores" }),
+    ], { maxTokens: 400, temperature: 0.1, json: true, source: "chatt-summering-scores" }),
   ]);
 
   const summering = sumResult.status === "fulfilled" ? sumResult.value.text.trim() : "";
   const usedProvider = sumResult.status === "fulfilled" ? sumResult.value.provider : "none";
+  const modell = sumResult.status === "fulfilled" ? `${sumResult.value.provider} · ${sumResult.value.model}` : null;
 
   let scores = null;
   if (scoreResult.status === "fulfilled") {
@@ -42,7 +45,7 @@ export async function POST(request) {
     }
   }
 
-  return Response.json({ summering, scores }, {
+  return Response.json({ summering, scores, modell }, {
     headers: { "X-Provider": usedProvider },
   });
 }

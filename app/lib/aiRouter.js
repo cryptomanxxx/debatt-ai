@@ -141,6 +141,11 @@ function openAIBody(messages, model, opts) {
     max_tokens:  opts.maxTokens ?? 800,
     temperature: opts.temperature ?? 0.7,
     ...(opts.json ? { response_format: { type: "json_object" } } : {}),
+    // gpt-oss är en reasoning-modell: utan detta äter dolda resonemangstokens en
+    // oförutsägbar del av max_tokens innan det synliga svaret börjar, vilket gav
+    // avklippta svar (t.ex. direktdebattens summering, ✅157). Samma fix som
+    // /api/chatt redan har (✅115).
+    ...(model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
   };
 }
 
