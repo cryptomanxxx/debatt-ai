@@ -4810,6 +4810,8 @@ Kräver `supabase_chatt_summering_modell.sql` för att summeringens modell ska s
 | `app/chatt/[id]/page.js` | Visar modell per inlägg och för summeringen |
 | `supabase/supabase_chatt_summering_modell.sql` | Ny kolumn `summering_modell` |
 
+**Uppföljning (nov 2026):** `ai_log` visade att Groq svarade (`ok`) på nästan alla Direktdebatt-anrop, men reserverna skrev ändå många repliker. Groqs första svar såg alltså ofta avklippt ut, så klienten gjorde om försöket hos Codestral/Gemini. `maxTokensForRequest` för vanliga repliker höjt 500 → 900 i `app/api/chatt/route.js`. Längden styrs fortfarande av promptens "2–3 meningar", taket ger bara mer marginal åt dolt resonemang.
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt
