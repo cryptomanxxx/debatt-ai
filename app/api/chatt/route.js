@@ -296,7 +296,10 @@ async function handlePost(request) {
   // Response(groqRes.body, ...)` nedan) — arTroligenAvbruten()-omförsöket i
   // app/chatt/page.js är fortsatt den enda skyddslinjen mot en enskild avhuggen
   // ström, men ett högre tak minskar hur OFTA det över huvud taget inträffar.
-  const maxTokensForRequest = erNyhetsanalys ? 700 : 500;
+  // 500 → 900 (nov 2026): reserverna skrev fortfarande många repliker efter
+  // att Groqs första svar sett avklippt ut. Längden styrs av promptens
+  // "2–3 meningar", taket ger bara marginal åt dolt resonemang.
+  const maxTokensForRequest = erNyhetsanalys ? 700 : 900;
 
   // typ="nyhetsanalys" (från /nyhetskallor) är ett fristående enskilt agentsvar på en
   // vald nyhet, inte en flertursdebatt — den delar INTE Direktdebattens kvot (5
