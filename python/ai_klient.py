@@ -445,6 +445,7 @@ def deepseek_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
     url = "https://api.deepseek.com/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {**json_payload, "model": "deepseek-chat"}
+    payload.pop("reasoning_effort", None)  # bara för Groqs gpt-oss
     r = httpx.post(url, headers=headers, json=payload, timeout=timeout)
     if r.status_code == 402:
         # Slut på krediter — ändras inte under körningen, så hoppa över
@@ -472,6 +473,7 @@ def mistral_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
     url = "https://api.mistral.ai/v1/chat/completions"
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     payload = {**json_payload, "model": "codestral-latest"}
+    payload.pop("reasoning_effort", None)  # bara för Groqs gpt-oss
     last_r = None
     for attempt in range(3):
         r = httpx.post(url, headers=headers, json=payload, timeout=timeout)

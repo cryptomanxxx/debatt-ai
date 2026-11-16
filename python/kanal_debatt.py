@@ -10,7 +10,7 @@ import os, json, random, re, time
 import xml.etree.ElementTree as ET
 import httpx
 
-from ai_klient import hamta_kort_fns
+from ai_klient import hamta_kort_fns_med_trunkering
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
 SB_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
@@ -40,8 +40,22 @@ AGENTER = {
 }
 
 
-def llm(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
-    """Provar alla providers i dynamisk rankad ordning (se ai_klient.py)."""
+MODELL_PER_PROVIDER = {
+    "groq": GROQ_MODEL, "mistral": "codestral-latest", "deepseek": "deepseek-chat",
+    "cloudflare": "llama-3.3-70b", "gemini": "gemini-3.5-flash",
+}
+
+
+def _ser_avklippt_ut(text: str) -> bool:
+    return not re.search(r"[.!?…][”\"')\]]*\s*$", text.strip())
+
+
+def llm_med_info(system_prompt: str, user_message: str, max_tokens: int = 400,
+                 kraver_hel_mening: bool = True) -> dict:
+    """Provar providers i rankad ordning. Ett svar som providern rapporterar som
+    avklippt (finish_reason == "length") eller som slutar mitt i en mening hoppas
+    över till nästa provider. Hittas inget helt svar används det bästa som fanns.
+    Returnerar {text, provider, modell, forsok, avhugget}."""
     payload = {
         "model": GROQ_MODEL,
         "messages": [
@@ -50,15 +64,34 @@ def llm(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
         ],
         "max_tokens": max_tokens,
         "temperature": 0.85,
+        # gpt-oss lägger annars en del av max_tokens på dolt resonemang (✅157)
+        "reasoning_effort": "low",
     }
-    for _name, fn in hamta_kort_fns(payload, system_prompt, user_message, max_tokens, source="kanal_debatt"):
+    reserv = None
+    forsok = 0
+    for namn, fn in hamta_kort_fns_med_trunkering(payload, system_prompt, user_message, max_tokens, source="kanal_debatt"):
+        forsok += 1
         try:
-            result = fn()
-            if result:
-                return result
+            text, trunkerad = fn()
         except Exception as e:
-            print(f"  {_name} fel: {e}")
-    return ""
+            print(f"  {namn} fel: {e}")
+            continue
+        if not text:
+            continue
+        provider = namn.lower()
+        info = {"text": text, "provider": provider,
+                "modell": MODELL_PER_PROVIDER.get(provider, provider), "forsok": forsok}
+        if trunkerad or (kraver_hel_mening and _ser_avklippt_ut(text)):
+            print(f"  {namn}: svaret ser avklippt ut — provar nästa")
+            if reserv is None:
+                reserv = {**info, "avhugget": True}
+            continue
+        return info
+    return reserv or {"text": "", "provider": None, "modell": None, "forsok": forsok}
+
+
+def llm(system_prompt: str, user_message: str, max_tokens: int = 400) -> str:
+    return llm_med_info(system_prompt, user_message, max_tokens, kraver_hel_mening=False)["text"]
 
 
 def hamta_nyheter() -> list[dict]:
@@ -100,7 +133,7 @@ def valj_nyhet(nyheter: list[dict]) -> dict:
     return random.choice(nyheter)
 
 
-def generera_inlagg(agent: str, amne: str, historik: list[dict]) -> str:
+def generera_inlagg(agent: str, amne: str, historik: list[dict]) -> dict:
     system = (
         f"{AGENTER[agent]}\n"
         "Du deltar i en TV-debatt om en specifik nyhet. Håll inlägget till 2–3 meningar. "
@@ -113,19 +146,20 @@ def generera_inlagg(agent: str, amne: str, historik: list[dict]) -> str:
             f"{h['agent']}: {h['text']}" for h in historik[-4:]
         )
     user = f"Ämne: {amne}{historik_text}\n\nDitt inlägg:"
-    return llm(system, user, max_tokens=200)
+    return llm_med_info(system, user, max_tokens=900)
 
 
-def generera_summering(amne: str, inlagg: list[dict]) -> str:
+def generera_summering(amne: str, inlagg: list[dict]) -> dict:
     historia = "\n".join(f"{i['agent']}: {i['text']}" for i in inlagg)
-    return llm(
+    return llm_med_info(
         "Du sammanfattar TV-debatter neutralt.",
         f"Sammanfatta debatten om '{amne}' i 1–2 meningar.\n\n{historia}",
-        max_tokens=150,
+        max_tokens=600,
     )
 
 
-def spara_debatt(amne: str, agenter: list[str], inlagg: list[dict], summering: str) -> str | None:
+def spara_debatt(amne: str, agenter: list[str], inlagg: list[dict], summering: str,
+                 summering_modell: str | None = None) -> str | None:
     headers = {
         "apikey": SB_KEY,
         "Authorization": f"Bearer {SB_KEY}",
@@ -139,6 +173,8 @@ def spara_debatt(amne: str, agenter: list[str], inlagg: list[dict], summering: s
         "summering": summering,
         "kalla": "kanal",
     }
+    if summering_modell:
+        data["summering_modell"] = summering_modell
     r = httpx.post(f"{SB_URL}/rest/v1/chatt_debatter", json=data, headers=headers, timeout=15)
     if r.status_code in (200, 201):
         saved = r.json()
@@ -173,15 +209,22 @@ def main():
     for runda in range(2):
         for agent in agenter:
             print(f"  {agent} (runda {runda + 1})…")
-            text = generera_inlagg(agent, amne, inlagg)
-            inlagg.append({"agent": agent, "text": text})
+            info = generera_inlagg(agent, amne, inlagg)
+            post = {"agent": agent, "text": info["text"]}
+            for falt in ("provider", "modell", "forsok", "avhugget"):
+                if info.get(falt):
+                    post[falt] = info[falt]
+            inlagg.append(post)
             time.sleep(0.4)
 
     print("Genererar summering…")
-    summering = generera_summering(amne, inlagg)
+    sum_info = generera_summering(amne, inlagg)
+    summering = sum_info["text"]
+    summering_modell = (f"{sum_info['provider']} · {sum_info['modell']}"
+                        if sum_info.get("provider") else None)
 
     print("Sparar till Supabase…")
-    debatt_id = spara_debatt(amne, agenter, inlagg, summering)
+    debatt_id = spara_debatt(amne, agenter, inlagg, summering, summering_modell)
 
     if debatt_id:
         print(f"\n✓ Debatt sparad: '{amne}' (id: {debatt_id})")
