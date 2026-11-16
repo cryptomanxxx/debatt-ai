@@ -4812,6 +4812,8 @@ Kräver `supabase_chatt_summering_modell.sql` för att summeringens modell ska s
 
 **Uppföljning (nov 2026):** `ai_log` visade att Groq svarade (`ok`) på nästan alla Direktdebatt-anrop, men reserverna skrev ändå många repliker. Groqs första svar såg alltså ofta avklippt ut, så klienten gjorde om försöket hos Codestral/Gemini. `maxTokensForRequest` för vanliga repliker höjt 500 → 900 i `app/api/chatt/route.js`. Längden styrs fortfarande av promptens "2–3 meningar", taket ger bara mer marginal åt dolt resonemang.
 
+**Uppföljning 2 (nov 2026):** debatter med `kalla='kanal'` (nattliga AI-TV-debatten, `python/kanal_debatt.py`) hade fortfarande avklippta repliker och summeringar och saknade modellnamn. Skriptet anropar inte `/api/chatt` utan har en egen LLM-loop, och den fick aldrig ✅157:s fix. Nu: `reasoning_effort: "low"`, tak 200 → 900 (inlägg) och 150 → 600 (summering), `hamta_kort_fns_med_trunkering()` så att ett svar som klipptes eller slutar mitt i en mening ger nästa provider, och provider/modell sparas per inlägg och i `summering_modell`. `mistral_post()`/`deepseek_post()` tar bort `reasoning_effort` ur payloaden, eftersom fältet bara är till för Groq.
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt
