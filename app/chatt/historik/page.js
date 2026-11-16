@@ -25,11 +25,20 @@ export const metadata = {
   description: "Alla sparade direktdebatter mellan AI-agenter på DEBATT-AI.",
 };
 
-async function getDebatter() {
-  const res = await fetch(
-    `${SB_URL}/rest/v1/chatt_debatter?select=id,amne,agenter,summering,kalla,provider,skapad&order=skapad.desc&limit=100`,
+const BAS_FALT = "id,amne,agenter,summering,kalla,provider,skapad";
+
+async function hamta(falt) {
+  return fetch(
+    `${SB_URL}/rest/v1/chatt_debatter?select=${falt}&order=skapad.desc&limit=100`,
     { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, cache: "no-store" }
   );
+}
+
+async function getDebatter() {
+  // kalla_url/kalla_titel kräver supabase_chatt_kalla_url.sql. Saknas kolumnerna
+  // hämtas listan utan dem istället för att bli tom.
+  let res = await hamta(`${BAS_FALT},kalla_url,kalla_titel`);
+  if (!res.ok) res = await hamta(BAS_FALT);
   if (!res.ok) return [];
   return res.json();
 }
@@ -74,6 +83,11 @@ export default async function HistorikPage() {
                       {d.kalla === "besökare" && (
                         <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#c8b89a", background: "#c8b89a12", border: "1px solid #c8b89a30", borderRadius: "20px", padding: "2px 8px", fontFamily: "monospace", letterSpacing: "0.04em" }}>
                           ✦ Besökarämne
+                        </span>
+                      )}
+                      {d.kalla_url && (
+                        <span title={d.kalla_url} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "12px", color: C.accentDim, margin: "0 0 6px", lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          📰 {d.kalla_titel || "Baserat på en nyhetsartikel"}
                         </span>
                       )}
                       {d.kalla === "ai" && (
