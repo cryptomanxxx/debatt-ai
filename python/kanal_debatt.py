@@ -138,13 +138,13 @@ def _rensa_html(text: str) -> str:
 
 
 def _meta(sida: str, namn: str) -> str:
-    for monster in (
-        rf'<meta[^>]+(?:property|name)=["\']{namn}["\'][^>]*content=["\']([^"\']*)["\']',
-        rf'<meta[^>]+content=["\']([^"\']*)["\'][^>]*(?:property|name)=["\']{namn}["\']',
-    ):
-        m = re.search(monster, sida, re.I)
-        if m:
-            return _rensa_html(m.group(1))
+    # Matcha samma citattecken som öppnade värdet, så att ett ' inuti ett
+    # "-citerat värde (Trump's ...) inte klipper av texten.
+    for tagg in re.findall(r"<meta\b[^>]*>", sida, re.I):
+        attr = {k.lower(): html.unescape(v) for k, _q, v in
+                re.findall(r"([\w:-]+)\s*=\s*([\"'])(.*?)\2", tagg, re.S)}
+        if (attr.get("property") or attr.get("name") or "").lower() == namn.lower():
+            return _rensa_html(attr.get("content", ""))
     return ""
 
 
@@ -157,11 +157,14 @@ def _hamta_direkt(url: str) -> dict | None:
     sida = r.text[:2_000_000]
     titel = _meta(sida, "og:title")
     ingress = _meta(sida, "og:description") or _meta(sida, "description")
-    kropp = re.sub(r"<(script|style|nav|footer|aside|header|form|noscript)\b.*?</\1>",
-                   " ", sida, flags=re.S | re.I)
+    kropp = re.sub(r"<(script|style|noscript)\b.*?</\1>", " ", sida, flags=re.S | re.I)
+    kropp = re.sub(r"<(nav|footer|aside|form)\b.*?</\1>", " ", kropp, flags=re.S | re.I)
     artikel = re.search(r"<article\b.*?</article>", kropp, re.S | re.I)
     if artikel:
+        # <header> inuti artikeln innehåller ofta ingressen och behålls.
         kropp = artikel.group(0)
+    else:
+        kropp = re.sub(r"<header\b.*?</header>", " ", kropp, flags=re.S | re.I)
     stycken = [_rensa_html(p) for p in re.findall(r"<p\b[^>]*>(.*?)</p>", kropp, re.S | re.I)]
     stycken = [p for p in stycken if len(p) >= 60]
     text = "\n".join(([ingress] if ingress else []) + stycken)
