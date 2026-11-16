@@ -26,6 +26,9 @@ from datetime import datetime, timezone
 # Providers som misslyckats permanent under denna körning (TPD, saknad nyckel, etc.)
 # Återställs automatiskt nästa gång agent.py startas (ny process = nytt minne).
 _nere: set[str] = set()
+# Senaste Gemini-modell som faktiskt svarade (flash eller flash-lite), så att
+# anropare kan visa rätt modellnamn.
+senaste_gemini_modell: str | None = None
 
 # Groq-nycklar som nått sin dagsgräns (TPD) under denna körning (spåras per env-variabelnamn).
 _groq_nere_keys: set[str] = set()
@@ -422,6 +425,8 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
             # providrar redan hoppar vidare vid finish_reason == "length"
             # (hamta_kort_fns_med_trunkering()).
             if text and candidate.get("finishReason") != "MAX_TOKENS":
+                global senaste_gemini_modell
+                senaste_gemini_modell = model
                 return text
         last_err = f"{model}:{r.status_code} "
         if r.status_code in (400, 403) or "API_KEY" in r.text:

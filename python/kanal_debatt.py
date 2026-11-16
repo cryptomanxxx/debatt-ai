@@ -10,6 +10,7 @@ import os, json, random, re, time
 import xml.etree.ElementTree as ET
 import httpx
 
+import ai_klient
 from ai_klient import hamta_kort_fns_med_trunkering
 
 SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co"
@@ -79,8 +80,10 @@ def llm_med_info(system_prompt: str, user_message: str, max_tokens: int = 400,
         if not text:
             continue
         provider = namn.lower()
-        info = {"text": text, "provider": provider,
-                "modell": MODELL_PER_PROVIDER.get(provider, provider), "forsok": forsok}
+        modell = MODELL_PER_PROVIDER.get(provider, provider)
+        if provider == "gemini":
+            modell = ai_klient.senaste_gemini_modell or modell
+        info = {"text": text, "provider": provider, "modell": modell, "forsok": forsok}
         if trunkerad or (kraver_hel_mening and _ser_avklippt_ut(text)):
             print(f"  {namn}: svaret ser avklippt ut — provar nästa")
             if reserv is None:
