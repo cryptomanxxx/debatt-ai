@@ -8,17 +8,17 @@ async function getData() {
   const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
   const [fRes, rRes, aRes, nyaRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,beskrivning,kalla,kategori,status,skapad,riksdagen_url,riksdagen_utfall&order=skapad.desc&limit=1000`, {
-      headers: hdrs, next: { revalidate: 1800 },
+      headers: hdrs, next: { revalidate: 7200 },
     }),
     // Röstmotiveringar hämtas av klienten vid behov – de kan annars dominera ISR/RSC-svaret.
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=lagforslag_id,agent,rod&order=skapad.desc&limit=30000`, {
-      headers: hdrs, next: { revalidate: 1800 },
+      headers: hdrs, next: { revalidate: 7200 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,motivering,skapad,lagforslag_id,lagforslag(titel)&order=skapad.desc&limit=30`, {
-      headers: hdrs, next: { revalidate: 1800 },
+      headers: hdrs, next: { revalidate: 7200 },
     }),
     fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,kalla,skapad&order=skapad.desc&limit=30`, {
-      headers: hdrs, next: { revalidate: 1800 },
+      headers: hdrs, next: { revalidate: 7200 },
     }),
   ]);
 
@@ -56,6 +56,14 @@ const C = {
   riksdagen: "#facc15",
 };
 
+// Samma klipp som ForslagCard gjorde: under 300 tecken + 80 visas allt.
+function forhandsvisning(text) {
+  if (!text || text.length <= 380) return { preview: text || "", harMer: false };
+  const cut = text.lastIndexOf(" ", 300);
+  const pos = cut > 210 ? cut : 300;
+  return { preview: text.slice(0, pos), harMer: true };
+}
+
 export default async function ParlamentPage() {
   const { forslag, roster, aktivitet } = await getData();
 
@@ -64,6 +72,24 @@ export default async function ParlamentPage() {
     if (!rosterMap[v.lagforslag_id]) rosterMap[v.lagforslag_id] = [];
     rosterMap[v.lagforslag_id].push(v);
   }
+
+  // Kompakt payload till klienten (ISR-skrivningar räknas i 8 kB-enheter):
+  // agentnamnen skickas en gång, varje röst som "<index><j|n|a>", och
+  // beskrivningen bara som förhandsvisning. Hela texten hämtas vid "visa mer".
+  const agenter = [...new Set(roster.map(v => v.agent))].sort();
+  const agentIndex = Object.fromEntries(agenter.map((a, i) => [a, i]));
+  const rodKod = { ja: "j", nej: "n", avstar: "a" };
+  const rosterKod = {};
+  for (const [id, votes] of Object.entries(rosterMap)) {
+    rosterKod[id] = votes
+      .filter(v => rodKod[v.rod] && agentIndex[v.agent] !== undefined)
+      .map(v => agentIndex[v.agent].toString(36) + rodKod[v.rod])
+      .join(",");
+  }
+  const forslagKompakt = forslag.map(({ beskrivning, ...f }) => {
+    const { preview, harMer } = forhandsvisning(beskrivning);
+    return { ...f, beskrivning: preview, harMer };
+  });
 
   const aktiva   = forslag.filter(f => f.status !== "avgjort");
   const avgjorda = forslag.filter(f => f.status === "avgjort");
@@ -253,7 +279,7 @@ export default async function ParlamentPage() {
             </p>
           </div>
         ) : (
-          <ParlamentKlient forslag={forslag} rosterMap={rosterMap} />
+          <ParlamentKlient forslag={forslagKompakt} agenter={agenter} rosterKod={rosterKod} />
         )}
 
       </div>

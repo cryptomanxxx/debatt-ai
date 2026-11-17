@@ -178,18 +178,46 @@ function isNy(iso) {
   return (Date.now() - new Date(iso).getTime()) < 14 * 24 * 60 * 60 * 1000;
 }
 
-function klippVidOrd(text, max) {
-  if (!text || text.length <= max) return { preview: text, rest: "" };
-  const cut = text.lastIndexOf(" ", max);
-  const pos = cut > max * 0.7 ? cut : max;
-  return { preview: text.slice(0, pos), rest: text.slice(pos).trimStart() };
+// Hela beskrivningen hämtas först vid "visa mer" (den följer inte med i ISR-svaret).
+const beskrivningsCache = new Map();
+function hamtaBeskrivning(id) {
+  if (beskrivningsCache.has(id)) return beskrivningsCache.get(id);
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = `${SB_URL}/rest/v1/lagforslag?select=beskrivning&id=eq.${encodeURIComponent(id)}&limit=1`;
+  const promise = fetch(url, { headers: { apikey: key, Authorization: `Bearer ${key}` } })
+    .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+    .then(rows => rows?.[0]?.beskrivning || "");
+  beskrivningsCache.set(id, promise);
+  promise.catch(() => beskrivningsCache.delete(id));
+  return promise;
+}
+
+const ROD = { j: "ja", n: "nej", a: "avstar" };
+function avkodaRoster(kod, agenter) {
+  if (!kod) return [];
+  return kod.split(",").map(t => ({
+    agent: agenter[parseInt(t.slice(0, -1), 36)],
+    rod: ROD[t.slice(-1)],
+  })).filter(v => v.agent && v.rod);
 }
 
 function ForslagCard({ f, votes }) {
   const [expanded, setExpanded] = useState(false);
+  const [hel, setHel] = useState(null);
+  const [laddar, setLaddar] = useState(false);
   const isRiksdagen = f.kalla === "riksdagen";
-  const { preview, rest } = klippVidOrd(f.beskrivning, 300);
-  const langBeskrivning = rest.length > 80;
+  const preview = f.beskrivning;
+  const langBeskrivning = f.harMer;
+
+  async function vaxla() {
+    if (expanded) { setExpanded(false); return; }
+    setExpanded(true);
+    if (hel !== null) return;
+    setLaddar(true);
+    try { setHel(await hamtaBeskrivning(f.id)); }
+    catch { setHel(null); setExpanded(false); }
+    finally { setLaddar(false); }
+  }
   const datum = formatDatum(f.skapad);
   const ny = isNy(f.skapad);
 
@@ -239,14 +267,14 @@ function ForslagCard({ f, votes }) {
       {langBeskrivning ? (
         <>
           <p style={{ margin: "0 0 4px", fontSize: "14px", color: "#888", lineHeight: "1.65" }}>
-            {expanded ? f.beskrivning : preview + "…"}
+            {expanded && hel ? hel : preview + "…"}
           </p>
-          <button onClick={() => setExpanded(e => !e)} style={{
+          <button onClick={vaxla} disabled={laddar} style={{
             background: "none", border: "none", padding: "0",
             fontSize: "12px", color: C.accent, cursor: "pointer",
             marginTop: "2px", fontFamily: "Georgia, serif",
           }}>
-            {expanded ? "visa mindre ▲" : "visa mer ▼"}
+            {laddar ? "hämtar…" : expanded ? "visa mindre ▲" : "visa mer ▼"}
           </button>
         </>
       ) : (
@@ -273,7 +301,12 @@ function ForslagCard({ f, votes }) {
 
 const STEG = 20;
 
-export default function ParlamentKlient({ forslag, rosterMap }) {
+export default function ParlamentKlient({ forslag, agenter = [], rosterKod = {} }) {
+  const [rosterMap] = useState(() => {
+    const m = {};
+    for (const [id, kod] of Object.entries(rosterKod)) m[id] = avkodaRoster(kod, agenter);
+    return m;
+  });
   const [valdKategori, setValdKategori] = useState("Alla");
   const [valdStatus, setValdStatus]     = useState("Alla");
   const [valdKalla, setValdKalla]       = useState("Alla");
