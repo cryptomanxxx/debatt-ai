@@ -1,7 +1,7 @@
 import UniversitetTicker from "./UniversitetTicker";
 import UniversitetVy from "./UniversitetVy";
 
-export const revalidate = 900;
+export const revalidate = 21600;
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -37,7 +37,7 @@ async function getData() {
     const [fyndRes, nyheterRes, urvalRes] = await Promise.all([
       fetch(
         `${SB_URL}/rest/v1/vetenskapliga_upptagter?order=skapad.desc&limit=50&select=id,titel,sammanfattning,forskare,medforskare,disciplin,impakt,datakallor,metodologi,arxiv_kalla,skapad`,
-        { headers: h, next: { revalidate: 900 } }
+        { headers: h, next: { revalidate: 21600 } }
       ),
       // Källfiltret (KallaPill i VetenskapsFlodeVy.js) byggs bara ur DE RADER
       // som faktiskt laddas här — det finns ingen separat "vilka källor finns"-
@@ -52,13 +52,13 @@ async function getData() {
       // att ge lågfrekventa källor en rimlig chans att synas.
       fetch(
         `${SB_URL}/rest/v1/nyhetsflode?kalla=in.(${VETENSKAP_FILTER})&order=hamtad.desc&limit=200&select=id,rubrik,beskrivning,kalla,url,hamtad`,
-        { headers: h, next: { revalidate: 900 } }
+        { headers: h, next: { revalidate: 21600 } }
       ),
       // Oraklets kurerade urval — embeddar nyhetsflode-raden via FK (nyhet_id)
       // så rubrik/beskrivning/källa/url kommer med i samma fetch.
       fetch(
         `${SB_URL}/rest/v1/oraklet_urval?order=skapad.desc&limit=30&select=id,motivering,skapad,nyhetsflode(id,rubrik,beskrivning,kalla,url)`,
-        { headers: h, next: { revalidate: 900 } }
+        { headers: h, next: { revalidate: 21600 } }
       ),
     ]);
     const fynd = fyndRes.ok ? await fyndRes.json() : [];
@@ -76,7 +76,7 @@ async function getExperiments() {
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/oraklet_experiment?order=skapad.desc&limit=10&select=id,titel,status,rapport,skapad`,
-      { headers: { apikey: key, Authorization: `Bearer ${key}` }, next: { revalidate: 900 }, signal: AbortSignal.timeout(10000) }
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, next: { revalidate: 21600 }, signal: AbortSignal.timeout(10000) }
     );
     if (!res.ok) return { experiment: [], labAvailable: false };
     const rows = await res.json();

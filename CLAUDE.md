@@ -4827,6 +4827,12 @@ Vercel-mejl (nov 2026): ISR Writes 100 % av 200 000. Observability → ISR, 12 h
 | `app/parlament/page.js` | `forhandsvisning()`, kompakt `rosterKod` + `agenter`, revalidate 7200 |
 | `app/parlament/ParlamentKlient.js` | `avkodaRoster()`, `hamtaBeskrivning()` vid "visa mer" |
 
+### ✅159. Längre ISR-revalidering på 62 sidor – KLART
+
+Uppföljning på ✅158 (ägarbeslut, nov 2026). I Vercels ISR-vy hade många sidor (`/hjarnans-logg`, `/universitet`, `/intelligens`, `/tidsgraf`, `/kunskapsgraf` m.fl.) nästan lika många skrivna som lästa enheter: varje besök efter att cachen gått ut byggde om sidan. Nästan all data på dem uppdateras av dagliga körningar.
+
+**Fix:** `export const revalidate` och fetchens `next.revalidate` höjda från 900–7200 s till 21600 s (6 h) på 60 sidor, och till 7200 s på `/bors` och `/tokens` (börsen kör varje timme dagtid). Orörda: `/` och `/arkiv` (redan 86400 s + on-demand-revalidering), `/artikel/[id]`, `/agent/[namn]`, `/visualiseringar/[id]` och `/versus` (dynamiska, ger inga ISR-skrivningar), `/om`.
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

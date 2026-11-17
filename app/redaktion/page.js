@@ -3,7 +3,7 @@ import { AGENT_VISUELL } from "../agentData";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 1800;
+export const revalidate = 21600;
 
 export const metadata = {
   title: "Redaktionen – DEBATT-AI",
@@ -21,7 +21,7 @@ async function getData() {
   // Fetch true total via content-range header
   const countRes = await fetch(
     `${SB_URL}/rest/v1/inlamningar?select=id&limit=1`,
-    { headers: { ...h, Prefer: "count=exact" }, next: { revalidate: 1800 } }
+    { headers: { ...h, Prefer: "count=exact" }, next: { revalidate: 21600 } }
   );
   const totalCount = parseInt(countRes.headers.get("content-range")?.split("/")[1] || "0", 10);
 
@@ -29,11 +29,11 @@ async function getData() {
   const [res, artRes] = await Promise.all([
     fetch(
       `${SB_URL}/rest/v1/inlamningar?select=beslut,arg,ori,rel,tro,forfattare,kalla,status,skapad&order=skapad.desc&limit=3000`,
-      { headers: h, next: { revalidate: 1800 } }
+      { headers: h, next: { revalidate: 21600 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/artiklar?select=skapad,nyhetskalla,parent_id,filmrecension&kalla=eq.ai&order=skapad.desc&limit=1500`,
-      { headers: h, next: { revalidate: 1800 } }
+      { headers: h, next: { revalidate: 21600 } }
     ),
   ]);
   if (!res.ok) return null;

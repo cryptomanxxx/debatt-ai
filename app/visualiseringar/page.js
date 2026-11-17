@@ -4,7 +4,7 @@ import KryptoPrisSektion from "./KryptoPrisSektion";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const revalidate = 3600;
+export const revalidate = 21600;
 
 export const metadata = {
   title: "Visualiseringar – DEBATT-AI",
@@ -28,7 +28,7 @@ async function hamtaOhlcv() {
     try {
       const res = await fetch(
         `${SB_URL}/rest/v1/ohlcv_cache?symbol=eq.${symbol}&select=datum,pris&order=datum.asc&limit=1000`,
-        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 3600 } }
+        { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 21600 } }
       );
       result[symbol] = res.ok ? await res.json() : [];
     } catch {
@@ -42,7 +42,7 @@ async function hamtaVisualiseringar() {
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/visualiseringar?select=*&order=skapad.desc&limit=24`,
-      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 3600 } }
+      { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }, next: { revalidate: 21600 } }
     );
     if (!res.ok) return [];
     return await res.json();

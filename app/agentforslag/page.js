@@ -1,7 +1,7 @@
 import AgentForslagVy from "./AgentForslagVy";
 import { AGENT_VISUELL } from "../agentData";
 
-export const revalidate = 900;
+export const revalidate = 21600;
 
 export const metadata = {
   title: "Agenternas Förslag — DEBATT-AI",
