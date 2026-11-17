@@ -33,6 +33,22 @@ from ai_klient import hamta_kort_fns
 from agenter import OPINION_FRAGOR
 
 
+def _spel_kalla() -> str:
+    """Källa i ai_log för _llm_spel: "spel:<skript>.<funktion>" (✅160).
+
+    _llm_spel används av ett femtontal funktioner i nio skript. Med en enda
+    gemensam källa ("spel") syntes de som en klump på /ai-statistik och det
+    gick inte att se vad som faktiskt drog mest.
+    """
+    try:
+        skript = os.path.splitext(os.path.basename(sys.argv[0] or ""))[0] or "okänt"
+        skript = skript.removesuffix("_test")
+        funktion = sys._getframe(2).f_code.co_name
+        return f"spel:{skript}.{funktion}"[:80]
+    except Exception:
+        return "spel"
+
+
 def _llm_spel(system: str, prompt: str, max_tokens: int = 80) -> str:
     """Kort LLM-anrop för ekonomispel — provar alla providers i dynamisk rankad ordning."""
     payload = {
@@ -40,7 +56,7 @@ def _llm_spel(system: str, prompt: str, max_tokens: int = 80) -> str:
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
         "max_tokens": max_tokens, "temperature": 0.7,
     }
-    for _name, fn in hamta_kort_fns(payload, system, prompt, max_tokens, source="spel"):
+    for _name, fn in hamta_kort_fns(payload, system, prompt, max_tokens, source=_spel_kalla()):
         try:
             result = fn()
             if result:

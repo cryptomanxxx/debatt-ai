@@ -4848,6 +4848,7 @@ Run 44015192504 (17 nov 2026, catch-up som startade 04:09 UTC) misslyckades: Gro
 | `python/ai_klient.py` | `satt_prioritet()`, `lag_prioritet()`, `_tillatna()`, tokenloggning (`_satt_usage*`) |
 | `python/agent.py` | `kor_sidoaktiviteter()`, låg prioritet efter skickad artikel |
 | `python/nyhetsanalys_auto_test.py` | `MAX_PER_KORNING` 15 → 5 |
+| `python/supabase_utils.py` → `_spel_kalla()` | `_llm_spel()` loggar `spel:<skript>.<funktion>` istället för bara `spel`, som var största posten på `/ai-statistik` (2 685 anrop på 7 dagar) utan att gå att härleda |
 | `.github/workflows/agent.yml`, `filmrecensent.yml` | `AI_PRIORITET: hog`, passnummer till agent.py |
 | `.github/workflows/nyhetsanalys-auto.yml` | `*/20`-schemat borttaget |
 | `app/ai-statistik/page.js`, `AiStatistikVy.js` | Tokens per källa |
