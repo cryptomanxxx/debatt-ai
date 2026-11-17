@@ -1,7 +1,7 @@
 import NarrativVy from "./NarrativVy";
 import { callWithFallback, getDynamicChain } from "../lib/aiRouter.js";
 
-export const revalidate = 7200; // Regenerate every 2 hours
+export const revalidate = 21600; // Regenerate every 2 hours
 
 export const metadata = {
   title: "Vad händer just nu? — DEBATT-AI",

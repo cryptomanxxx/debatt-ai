@@ -1,4 +1,4 @@
-export const revalidate = 1800;
+export const revalidate = 21600;
 
 import { EXKL_SYSTEM_QS } from "../lib/metrics";
 

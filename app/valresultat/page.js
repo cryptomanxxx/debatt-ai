@@ -1,6 +1,6 @@
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 900;
+export const revalidate = 21600;
 
 export const metadata = {
   title: "Valresultat – DEBATT-AI",
@@ -14,7 +14,7 @@ async function getData() {
 
   const res = await fetch(
     `${SB_URL}/rest/v1/riksdagsval?order=skapad.desc&select=*`,
-    { headers: h, next: { revalidate: 900 } }
+    { headers: h, next: { revalidate: 21600 } }
   );
 
   return { val: res.ok ? await res.json() : [] };

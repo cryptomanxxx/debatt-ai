@@ -8,17 +8,17 @@ async function getData() {
   const hdrs = { apikey: key, Authorization: `Bearer ${key}` };
   const [fRes, rRes, aRes, nyaRes] = await Promise.all([
     fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,beskrivning,kalla,kategori,status,skapad,riksdagen_url,riksdagen_utfall&order=skapad.desc&limit=1000`, {
-      headers: hdrs, next: { revalidate: 7200 },
+      headers: hdrs, next: { revalidate: 21600 },
     }),
     // Röstmotiveringar hämtas av klienten vid behov – de kan annars dominera ISR/RSC-svaret.
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=lagforslag_id,agent,rod&order=skapad.desc&limit=30000`, {
-      headers: hdrs, next: { revalidate: 7200 },
+      headers: hdrs, next: { revalidate: 21600 },
     }),
     fetch(`${SB_URL}/rest/v1/agent_roster_lag?select=agent,rod,motivering,skapad,lagforslag_id,lagforslag(titel)&order=skapad.desc&limit=30`, {
-      headers: hdrs, next: { revalidate: 7200 },
+      headers: hdrs, next: { revalidate: 21600 },
     }),
     fetch(`${SB_URL}/rest/v1/lagforslag?select=id,titel,kalla,skapad&order=skapad.desc&limit=30`, {
-      headers: hdrs, next: { revalidate: 7200 },
+      headers: hdrs, next: { revalidate: 21600 },
     }),
   ]);
 

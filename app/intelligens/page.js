@@ -1,6 +1,6 @@
 import IntelligensVy from "./IntelligensVy";
 
-export const revalidate = 900;
+export const revalidate = 21600;
 
 const SB = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
@@ -8,7 +8,7 @@ async function sb(path, key) {
   try {
     const r = await fetch(`${SB}/rest/v1/${path}`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
-      next: { revalidate: 900 },
+      next: { revalidate: 21600 },
     });
     return r.ok ? r.json() : [];
   } catch {

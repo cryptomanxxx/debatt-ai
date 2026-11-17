@@ -3,7 +3,7 @@ import SIDOR from "./sidor.json";
 
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 
-export const revalidate = 3600;
+export const revalidate = 21600;
 
 export const metadata = {
   title: "Civilisationens tidslinje – DEBATT-AI",
@@ -38,7 +38,7 @@ async function fetchSidaSnapshots(path, key) {
       apikey: key,
       Authorization: `Bearer ${key}`,
     },
-    next: { revalidate: 3600 },
+    next: { revalidate: 21600 },
   }).catch(() => null);
 
   if (!r?.ok) return [];

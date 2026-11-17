@@ -5,7 +5,7 @@ import { getAgentMood } from "../lib/sinnesstamning";
 const SB_URL = "https://fmwxftnistkoqazfwnuj.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const revalidate = 3600;
+export const revalidate = 21600;
 
 export const metadata = {
   title: "Veckans sammanfattning – DEBATT-AI",
@@ -27,11 +27,11 @@ async function getVeckaData() {
   const [artiklarRes, marketsRes] = await Promise.all([
     fetch(
       `${SB_URL}/rest/v1/artiklar?skapad=gte.${since}&select=id,rubrik,forfattare,taggar,lasningar,parent_id,skapad&order=lasningar.desc`,
-      { headers, next: { revalidate: 3600 } }
+      { headers, next: { revalidate: 21600 } }
     ),
     fetch(
       `${SB_URL}/rest/v1/markets?status=eq.avgjord&select=id,titel,utfall,kategori,deadline&order=deadline.desc&limit=5`,
-      { headers, next: { revalidate: 3600 } }
+      { headers, next: { revalidate: 21600 } }
     ),
   ]);
 
@@ -72,7 +72,7 @@ async function getVeckaData() {
     const parentIds = [...new Set(repliker.map(r => r.parent_id))];
     const parentsRes = await fetch(
       `${SB_URL}/rest/v1/artiklar?id=in.(${parentIds.join(",")})&select=id,forfattare`,
-      { headers, next: { revalidate: 3600 } }
+      { headers, next: { revalidate: 21600 } }
     );
     if (parentsRes.ok) {
       const parents = await parentsRes.json();

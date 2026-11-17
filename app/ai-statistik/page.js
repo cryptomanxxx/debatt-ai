@@ -1,6 +1,6 @@
 import AiStatistikVy from "./AiStatistikVy";
 
-export const revalidate = 1800;
+export const revalidate = 21600;
 
 export const metadata = {
   title: "AI-statistik – DEBATT-AI",
@@ -28,7 +28,7 @@ async function hamtaRader(sedan) {
       + `&ts=gte.${encodeURIComponent(sedan)}`
       + (sistaId != null ? `&id=lt.${sistaId}` : "")
       + `&order=id.desc&limit=${SIDSTORLEK}`;
-    const res = await fetch(url, { headers: HEADERS, next: { revalidate: 1800 } });
+    const res = await fetch(url, { headers: HEADERS, next: { revalidate: 21600 } });
     if (!res.ok) throw new Error(`ai_log ${res.status}`);
     const batch = await res.json();
     rader.push(...batch);
@@ -41,7 +41,7 @@ async function hamtaRader(sedan) {
 async function hamtaRanking() {
   try {
     const res = await fetch(`${SB_URL}/rest/v1/provider_config?id=eq.current&select=ranked_order,uppdaterad`,
-      { headers: HEADERS, next: { revalidate: 1800 } });
+      { headers: HEADERS, next: { revalidate: 21600 } });
     if (!res.ok) return null;
     const [rad] = await res.json();
     return rad && Array.isArray(rad.ranked_order) ? rad : null;
