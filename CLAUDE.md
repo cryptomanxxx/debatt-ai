@@ -4816,6 +4816,17 @@ Kräver `supabase_chatt_summering_modell.sql` för att summeringens modell ska s
 
 **Uppföljning 3 (nov 2026):** AI-TV-debatten fick bara nyhetens rubrik, för lite underlag för agenterna (ägarbegäran). `kanal_debatt.py` sparar nu även länk och RSS-beskrivning, och `hamta_artikelkontext()` hämtar artikeltexten innan debatten börjar: först direkt från artikelsidan (`og:description` + brödtextens `<p>`-stycken, nav/sidfot bortstädade, max 3000 tecken), annars via plattformens SSRF-säkra `/api/chatt/artikel-kontext`, annars RSS-beskrivningen. Texten skickas med till varje inlägg som en bakgrundsartikel inom `<artikel>`-taggar, markerad som extern text och inte instruktioner, med samma regel som Direktdebatten: referera konkret, hitta aldrig på detaljer. Länken och titeln sparas i `kalla_url`/`kalla_titel`, så att debatten får samma 📰-badge som en Direktdebatt med bifogad artikel. Ingen migrering behövs, kolumnerna finns sedan `supabase_chatt_kalla_url.sql`. Kunde inte testas mot riktiga nyhetssajter från sessionen, eftersom sandboxen blockerar dem. Extraktionen är testad mot syntetisk HTML.
 
+### ✅158. /parlament stod för flest ISR-skrivningar – KLART
+
+Vercel-mejl (nov 2026): ISR Writes 100 % av 200 000. Observability → ISR, 12 h: `/parlament` låg överst med 158 + 76 + 76 enheter (sidan plus två RSC-segment), 38–137 enheter per skrivning (upp till ~1 MB). Orsak: sidan skickade upp till 1000 förslag med full beskrivning och upp till 30 000 röster som `{lagforslag_id, agent, rod}` till klienten.
+
+**Fix:** agentnamnen skickas en gång, varje förslags röster som en kort sträng (`"0j,2a,1n"`, index i base36 + j/n/a) som klienten avkodar. Beskrivningen skickas bara som förhandsvisning (samma klipp som förut, 300 tecken vid ord) och hämtas från Supabase vid "visa mer". Fetch-cachen höjd 1800 → 7200 s, datan ändras bara vid agentkörningarna.
+
+| Fil | Roll |
+|---|---|
+| `app/parlament/page.js` | `forhandsvisning()`, kompakt `rosterKod` + `agenter`, revalidate 7200 |
+| `app/parlament/ParlamentKlient.js` | `avkodaRoster()`, `hamtaBeskrivning()` vid "visa mer" |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt
