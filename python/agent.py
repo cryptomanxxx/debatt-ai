@@ -18,7 +18,7 @@ import os
 import sys
 from datetime import datetime, timezone
 
-from ai_klient import hamta_kort_fns
+from ai_klient import hamta_kort_fns, satt_prioritet, lag_prioritet
 
 from agenter import (
     AGENTER, ANALYTIKER, ROST_AGENTER, MARKET_AGENTER,
@@ -265,6 +265,26 @@ SYMBOL_PREFERENSER = {
     "Optimisten":           ["Innovatör", "Visionär", "Byggare", "Aktiv Debattör", "Inflytelsefull"],
     "Den rike":             ["Oratel", "Legend", "Elite", "Särskild Röst", "Expert"],
 }
+
+
+def kor_sidoaktiviteter() -> bool:
+    """Sidoaktiviteterna efter en publicerad artikel (dagbok, ståndpunkter,
+    prediction markets, parlament, lobbying, AI-till-AI-frågor, bilder m.m.)
+    körs bara i vart fjärde pass av en körning med flera pass (✅160).
+
+    Med 12 pass per körning gjorde de annars ett par hundra AI-anrop med stora
+    agentprompter, som åt upp kvoten innan senare pass hunnit skriva sina
+    artiklar. Pass 1, 5 och 9 är nyhet, eget och replik, så varje typ får
+    sidoaktiviteter en gång. Enkla körningar (catch-up, manuell) kör dem alltid.
+    """
+    try:
+        nr = int(os.environ.get("AGENT_PASS_NR", "") or 0)
+        antal = int(os.environ.get("AGENT_PASS_ANTAL", "") or 0)
+    except ValueError:
+        return True
+    if nr < 1 or antal <= 1:
+        return True
+    return (nr - 1) % 4 == 0
 
 
 def main():
@@ -764,7 +784,8 @@ def main():
             # eller inte. Utan detta lämnar all bredd agenten faktiskt "läser" varje
             # körning inget spår; bara den EN valda nyheten gjorde det tidigare.
             if sb_key and nyheter and random.random() < 0.12:
-                nyhets_ki = generera_ki_fran_nyheter(agent["namn"], nyheter)
+                with lag_prioritet():
+                    nyhets_ki = generera_ki_fran_nyheter(agent["namn"], nyheter)
                 for ki in nyhets_ki:
                     spara_ki(sb_key, agent["namn"], ki["amne"], ki["insikt"])
                 if nyhets_ki:
@@ -1066,6 +1087,12 @@ def main():
     } if original else None
     svar = skicka_artikel(api_key, agent["namn"], amne, kategori, artikel, konklusion, viz_id, forslag=bool(forslag_id), nyhetskalla=nyhetskalla if not original else replik_kalla, parent_id=original["id"] if original else None, bild_url=bild_url, bild_fotograf=bild_fotograf, youtube_url=youtube_url if not original else None)
 
+    # ✅160: artikeln är skriven och skickad. Resten av passet (kommentarer,
+    # kunskapsposter, sidoaktiviteter) är inte kritiskt och använder inte Groq,
+    # så att Groqs dagskvot räcker till nästa pass artikel.
+    satt_prioritet("lag")
+    sido = kor_sidoaktiviteter()
+
     artikel_id_num = None
     if nyhet and sb_key:
         try:
@@ -1133,7 +1160,7 @@ def main():
                         }, "ok")
 
         # Stafettutmaning: ny artikel (ej replik) → ~25% chans att utmana en motpart
-        if publicerad and not original and sb_key and artikel_id_num and random.random() < 0.25:
+        if sido and publicerad and not original and sb_key and artikel_id_num and random.random() < 0.25:
             alla_agent_namn = [a["namn"] for a in AGENTER]
             utmaning_data = generera_stafett_utmaning(agent["namn"], amne, artikel, alla_agent_namn)
             if utmaning_data:
@@ -1142,7 +1169,7 @@ def main():
                 print(f"  🏃 Stafett: {agent['namn']} → {utmaning_data['utmanad']}: \"{utmaning_data['utmaning'][:80]}\"")
 
         # Knowledge Items: ~40% chans att distillera insikter från publicerad artikel
-        if publicerad and sb_key and artikel_id_num and random.random() < 0.40:
+        if sido and publicerad and sb_key and artikel_id_num and random.random() < 0.40:
             taggar_ki = svar.get("taggar") or []
             ki_antal_nu = hamta_ki_antal(sb_key, agent["namn"])
             ki_items = generera_ki(agent["namn"], amne, artikel, taggar_ki, ki_count=ki_antal_nu)
@@ -1152,7 +1179,7 @@ def main():
                 print(f"  📚 KI sparad: {len(ki_items)} insikt(er) för {agent['namn']} (skala: {ki_antal_nu} KI)")
 
         # Evolutionär Systemprompt — uppdatera strategi med 20% sannolikhet
-        if publicerad and sb_key and random.random() < 0.20:
+        if sido and publicerad and sb_key and random.random() < 0.20:
             print(f"\n🧬 Uppdaterar evolverande strategi för {agent['namn']}...")
             uppdatera_strategi(sb_key, agent["namn"])
 
@@ -1195,6 +1222,10 @@ def main():
                 print(f"    – {f}")
 
     print(f"{'=' * 60}\n")
+
+    if not sido:
+        print("Sidoaktiviteter hoppas över i det här passet (körs i pass 1, 5 och 9).")
+        return
 
     if sb_key and svar.get("publicerad"):
         print(f"\n── Dagboksinlägg: {agent['namn']} ──")

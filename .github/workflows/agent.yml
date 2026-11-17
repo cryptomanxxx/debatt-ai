@@ -124,6 +124,8 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           YOUTUBE_PROXY_SECRET: ${{ secrets.YOUTUBE_PROXY_SECRET }}
           PYTHONUNBUFFERED: "1"
+          # ✅160: debattagenten får använda Groq (andra skript hoppar över den).
+          AI_PRIORITET: "hog"
           # Exakt cron-uttryck som triggade körningen (tomt vid workflow_dispatch).
           # agent.py använder detta istället för väggklockans UTC-timme för att
           # avgöra vilket publiceringsfönster som gäller — annars kan en kraftigt
@@ -188,6 +190,8 @@ jobs:
             else
               export AGENT_FORCE_TYP="$typ"
             fi
+            # ✅160: agent.py kör sidoaktiviteterna bara i vart fjärde pass.
+            export AGENT_PASS_NR="$i" AGENT_PASS_ANTAL="$ANTAL"
             echo "=== Publiceringspass $i/$ANTAL (typ=$typ, AGENT_CRON='$AGENT_CRON') ==="
             python -u python/agent.py
             ec=$?

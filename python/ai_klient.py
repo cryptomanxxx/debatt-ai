@@ -21,6 +21,7 @@ import os
 import time
 import threading
 import atexit
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 # Providers som misslyckats permanent under denna körning (TPD, saknad nyckel, etc.)
@@ -32,6 +33,45 @@ senaste_gemini_modell: str | None = None
 
 # Groq-nycklar som nått sin dagsgräns (TPD) under denna körning (spåras per env-variabelnamn).
 _groq_nere_keys: set[str] = set()
+
+# ── Prioritet (✅160) ──────────────────────────────────────────────────────────
+# Groq har en daglig tokengräns (TPD) per konto som alla skript delar. När de
+# dagliga experimentskripten hade förbrukat den fanns ingenting kvar till
+# artiklarna (17 nov 2026: alla fem providers slut, debattagenten publicerade
+# inget). Groq reserveras därför för det kritiska flödet: bara en process med
+# AI_PRIORITET=hog (agent.yml, filmrecensent.yml) får använda Groq. Alla andra
+# skript börjar på nästa provider i kedjan. agent.py sänker själv prioriteten
+# till "lag" för sina sidoaktiviteter efter att artikeln publicerats.
+_KRITISKA_PROVIDERS = {"groq"}
+_prioritet = "hog" if os.environ.get("AI_PRIORITET", "").strip().lower() == "hog" else "lag"
+
+
+def satt_prioritet(prioritet: str) -> None:
+    """Sätter prioriteten för resten av processen ("hog" eller "lag")."""
+    global _prioritet
+    _prioritet = "hog" if prioritet == "hog" else "lag"
+
+
+def hamta_prioritet() -> str:
+    return _prioritet
+
+
+@contextmanager
+def lag_prioritet():
+    """Kör ett block med låg prioritet (utan Groq) och återställer sedan."""
+    global _prioritet
+    tidigare = _prioritet
+    _prioritet = "lag"
+    try:
+        yield
+    finally:
+        _prioritet = tidigare
+
+
+def _tillatna(ordning: list[str]) -> list[str]:
+    if _prioritet == "hog":
+        return ordning
+    return [p for p in ordning if p not in _KRITISKA_PROVIDERS]
 
 # ── Dynamisk fallback-ordning ──────────────────────────────────────────────────
 
@@ -174,7 +214,30 @@ def _toem_ai_log() -> None:
 atexit.register(_toem_ai_log)
 
 
-def _logga_ai_anrop(provider: str, source: str, status: str, latency_ms: int) -> None:
+# Tokenanvändning från senaste lyckade provider-anrop i den här tråden (✅160).
+# Sätts av *_post-funktionerna och läses av _log_wrap, så att ai_log får
+# input_tokens/output_tokens och /ai-statistik kan visa tokens per källa.
+_usage = threading.local()
+
+
+def _satt_usage(inp, ut) -> None:
+    try:
+        _usage.varden = (int(inp) if inp is not None else None, int(ut) if ut is not None else None)
+    except (TypeError, ValueError):
+        _usage.varden = (None, None)
+
+
+def _satt_usage_oai(r) -> None:
+    """Läser usage ur ett OpenAI-kompatibelt svar (Groq, Mistral, DeepSeek)."""
+    try:
+        u = r.json().get("usage") or {}
+        _satt_usage(u.get("prompt_tokens"), u.get("completion_tokens"))
+    except Exception:
+        _satt_usage(None, None)
+
+
+def _logga_ai_anrop(provider: str, source: str, status: str, latency_ms: int,
+                    input_tokens: int | None = None, output_tokens: int | None = None) -> None:
     """Lägger ett AI-anrop i bufferten för ai_log.
 
     Raderna skickas i omgångar om _AI_LOG_BATCH_STORLEK och resten när
@@ -197,6 +260,8 @@ def _logga_ai_anrop(provider: str, source: str, status: str, latency_ms: int) ->
         "source": source,
         "status": status,
         "latency_ms": latency_ms,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
     }
     att_skicka = None
     with _AI_LOG_LAS:
@@ -226,10 +291,12 @@ def _log_wrap(provider_key: str, fn: callable, source: str) -> callable:
     """
     def wrapper():
         t0 = time.time()
+        _usage.varden = (None, None)
         try:
             result = fn()
             latency_ms = int((time.time() - t0) * 1000)
-            _logga_ai_anrop(provider_key, source, "ok", latency_ms)
+            inp, ut = getattr(_usage, "varden", (None, None))
+            _logga_ai_anrop(provider_key, source, "ok", latency_ms, inp, ut)
             return result
         except Exception as exc:
             err = str(exc).lower()
@@ -264,7 +331,7 @@ def hamta_artikel_fns(payload: dict, system: str, user_msg: str, max_tokens: int
         "cloudflare":    ("Cloudflare",     lambda: _nonempty(cloudflare_post(system, user_msg, max_tokens=max_tokens))),
         "gemini":        ("Gemini",         lambda: _nonempty(gemini_post(system, user_msg, max_tokens=max_tokens))),
     }
-    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _ARTIKEL_CHAIN if p in alla]
+    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _tillatna(_ARTIKEL_CHAIN) if p in alla]
 
 
 def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int, source: str = "agent") -> list[tuple[str, callable]]:
@@ -276,7 +343,7 @@ def hamta_kort_fns(payload: dict, system: str, prompt: str, max_tokens: int, sou
         "cloudflare":    ("Cloudflare",    lambda: cloudflare_post(system[:600], prompt, max_tokens=max_tokens).strip()),
         "gemini":        ("Gemini",        lambda: (gemini_post(system[:600], prompt, max_tokens=max_tokens) or "").strip()),
     }
-    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _fallback_order if p in alla]
+    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _tillatna(_fallback_order) if p in alla]
 
 
 def hamta_kort_fns_med_trunkering(payload: dict, system: str, prompt: str, max_tokens: int, source: str = "agent") -> list[tuple[str, callable]]:
@@ -309,7 +376,7 @@ def hamta_kort_fns_med_trunkering(payload: dict, system: str, prompt: str, max_t
         "cloudflare":    ("Cloudflare",    lambda: (cloudflare_post(system[:600], prompt, max_tokens=max_tokens).strip(), False)),
         "gemini":        ("Gemini",        lambda: ((gemini_post(system[:600], prompt, max_tokens=max_tokens) or "").strip(), False)),
     }
-    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _fallback_order if p in alla]
+    return [(alla[p][0], _log_wrap(p, alla[p][1], source)) for p in _tillatna(_fallback_order) if p in alla]
 
 
 def _groq_api_keys() -> list[tuple[str, str]]:
@@ -359,6 +426,7 @@ def groq_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
                 time.sleep(wait)
                 continue
             r.raise_for_status()
+            _satt_usage_oai(r)
             return r
         # RPM uttömd efter 3 försök — markera nyckeln och prova nästa (RPM är per nyckel, rotation hjälper)
         logga_429_passivt("groq")
@@ -427,6 +495,8 @@ def gemini_post(system_prompt: str, user_message: str, max_tokens: int = 2000, t
             if text and candidate.get("finishReason") != "MAX_TOKENS":
                 global senaste_gemini_modell
                 senaste_gemini_modell = model
+                um = data.get("usageMetadata") or {}
+                _satt_usage(um.get("promptTokenCount"), um.get("candidatesTokenCount"))
                 return text
         last_err = f"{model}:{r.status_code} "
         if r.status_code in (400, 403) or "API_KEY" in r.text:
@@ -462,6 +532,7 @@ def deepseek_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
         _nere.add("deepseek")
         raise Exception(f"DeepSeek rate-limit: {r.text[:200]}")
     r.raise_for_status()
+    _satt_usage_oai(r)
     return r
 
 
@@ -492,6 +563,7 @@ def mistral_post(json_payload: dict, timeout: int = 60) -> httpx.Response:
             _nere.add("mistral")
             raise Exception(f"Mistral autentiseringsfel: {r.status_code}")
         r.raise_for_status()
+        _satt_usage_oai(r)
         return r
     logga_429_passivt("mistral")
     _nere.add("mistral")
@@ -522,9 +594,12 @@ def cloudflare_post(system_prompt: str, user_message: str, max_tokens: int = 200
         _nere.add("cloudflare")
         raise Exception(f"Cloudflare rate-limit: {r.text[:200]}")
     r.raise_for_status()
-    text = r.json().get("result", {}).get("response", "")
+    resultat = r.json().get("result", {}) or {}
+    text = resultat.get("response", "")
     if not text:
         raise Exception(f"Cloudflare: tomt svar — {r.text[:200]}")
+    u = resultat.get("usage") or {}
+    _satt_usage(u.get("prompt_tokens"), u.get("completion_tokens"))
     return text
 
 

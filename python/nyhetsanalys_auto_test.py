@@ -42,7 +42,8 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-MAX_PER_KORNING = 15
+# Sänkt 15 → 5 (✅160) för att spara AI-kvot åt debattagenten.
+MAX_PER_KORNING = 5
 # Större än vad en enskild körning hinner beta av (se workflow-kommentaren om
 # kapacitet mellan ingest-omgångar) — annars kan äldre nyheter i en stor
 # insamlingsbatch trängas ut ur fönstret av nyare innan de någonsin hunnit

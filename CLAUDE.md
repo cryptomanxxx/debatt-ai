@@ -4833,6 +4833,25 @@ Uppföljning på ✅158 (ägarbeslut, nov 2026). I Vercels ISR-vy hade många si
 
 **Fix:** `export const revalidate` och fetchens `next.revalidate` höjda från 900–7200 s till 21600 s (6 h) på 60 sidor, och till 7200 s på `/bors` och `/tokens` (börsen kör varje timme dagtid). Orörda: `/` och `/arkiv` (redan 86400 s + on-demand-revalidering), `/artikel/[id]`, `/agent/[namn]`, `/visualiseringar/[id]` och `/versus` (dynamiska, ger inga ISR-skrivningar), `/om`.
 
+### ✅160. AI-kvoten reserverad åt debattagenten – KLART
+
+Run 44015192504 (17 nov 2026, catch-up som startade 04:09 UTC) misslyckades: Groq och Gemini hade nått dagsgränsen, Cloudflares 10 000 gratis neuroner var slut, Mistral gav 429 och DeepSeek saknar krediter (402). Groq räknar dagsgränsen i tokens (~144 000), och de stora agentprompterna tömmer den på några tiotal anrop.
+
+**Fix:**
+1. **Groq reserverad.** `ai_klient.py` har en prioritet: bara processer med `AI_PRIORITET=hog` (`agent.yml`, `filmrecensent.yml`) får använda Groq. Alla andra skript hoppar över Groq i `hamta_kort_fns()`/`hamta_kort_fns_med_trunkering()`/`hamta_artikel_fns()` och börjar på nästa provider. `agent.py` sänker själv prioriteten (`satt_prioritet("lag")`) direkt efter att artikeln skickats, och nyhets-KI före artikeln körs i `lag_prioritet()`.
+2. **Sidoaktiviteterna i debattagenten** (dagbok, ståndpunkter, markets, parlament, lobbying, AI-till-AI-frågor, bilder, stafett, KI, strategi) körs bara i pass 1, 5 och 9 av en körning med flera pass (`kor_sidoaktiviteter()`, `AGENT_PASS_NR`/`AGENT_PASS_ANTAL` från `agent.yml`). Enkla körningar kör dem alltid.
+3. **Nyhetsanalys-auto:** högst 5 analyser per körning (tidigare 15), schemat var 20:e minut borttaget, kör bara efter Nyhetsflöde.
+4. **Tokens per källa:** Python-skripten loggar `input_tokens`/`output_tokens` till `ai_log` (läst ur providerns `usage`/`usageMetadata`). `/ai-statistik` har en ny tabell "Flest tokens per källa".
+
+| Fil | Roll |
+|---|---|
+| `python/ai_klient.py` | `satt_prioritet()`, `lag_prioritet()`, `_tillatna()`, tokenloggning (`_satt_usage*`) |
+| `python/agent.py` | `kor_sidoaktiviteter()`, låg prioritet efter skickad artikel |
+| `python/nyhetsanalys_auto_test.py` | `MAX_PER_KORNING` 15 → 5 |
+| `.github/workflows/agent.yml`, `filmrecensent.yml` | `AI_PRIORITET: hog`, passnummer till agent.py |
+| `.github/workflows/nyhetsanalys-auto.yml` | `*/20`-schemat borttaget |
+| `app/ai-statistik/page.js`, `AiStatistikVy.js` | Tokens per källa |
+
 ## Kontext om projektet
 
 - Byggd av en person i Sverige med intresse för ekonomi, AI och offentlig debatt

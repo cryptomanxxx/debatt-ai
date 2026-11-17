@@ -74,7 +74,7 @@ export default function AiStatistikVy({ data, fel, ranking }) {
     );
   }
 
-  const { totalt, total, okAndel, p50, perProvider, perKalla, daglig, dagligOk, dagligAnrop = [], avkortad, dagar } = data;
+  const { totalt, total, okAndel, p50, perProvider, perKalla, perKallaTokens = [], daglig, dagligOk, dagligAnrop = [], avkortad, dagar } = data;
 
   // Providers i fallback-kedjan som inte gjort något anrop under perioden
   // läggs till med noll, så att alla providers i kedjan syns i tabellen.
@@ -249,6 +249,36 @@ export default function AiStatistikVy({ data, fel, ranking }) {
               </tbody>
             </table>
           </div>
+        </section>
+
+        <section style={SEKTION}>
+          <h2 style={RUBRIK}>Flest tokens per källa</h2>
+          <p style={INGRESS}>
+            Groqs dagsgräns räknas i tokens, inte i antal anrop, så den här listan visar vad som
+            faktiskt förbrukar kvoten. Tokens loggas för Python-skripten sedan 17 november 2026.
+          </p>
+          {perKallaTokens.length === 0 ? (
+            <p style={{ color: C.faint, fontSize: 13 }}>Inga anrop med loggade tokens ännu.</p>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead><tr>
+                  <th style={TH}>Källa</th><th style={TH}>Tokens totalt</th><th style={TH}>In</th>
+                  <th style={TH}>Ut</th><th style={TH}>Per anrop</th><th style={TH}>Vanligaste provider</th>
+                </tr></thead>
+                <tbody>
+                  {perKallaTokens.map(k => (
+                    <tr key={k.namn}>
+                      <td style={{ ...TD, color: C.text }}>{k.namn}</td>
+                      <td style={TD}>{tal(k.tokens)}</td><td style={TD}>{tal(k.tokIn)}</td><td style={TD}>{tal(k.tokUt)}</td>
+                      <td style={TD}>{k.tokAnrop ? tal(Math.round(k.tokens / k.tokAnrop)) : "–"}</td>
+                      <td style={TD}>{k.huvudprovider ? <ProviderNamn namn={k.huvudprovider} /> : "–"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
         <section style={SEKTION}>

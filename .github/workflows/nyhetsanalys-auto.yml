@@ -1,13 +1,8 @@
 name: Automatisk nyhetsanalys
 
 on:
-  schedule:
-    # Var 20:e minut i teorin — men GitHub Actions levererar scheman tätare
-    # än ~1 gång/timme som "best effort" och droppar i praktiken merparten
-    # (verifierat: 9 faktiska körningar på 31 timmar istället för ~90).
-    # Behålls som catch-up-bonus, men workflow_run nedan är den pålitliga
-    # vägen in nu.
-    - cron: "*/20 * * * *"
+  # ✅160: schemat var 20:e minut borttaget. Det körde även nattetid och åt
+  # av AI-kvoten som debattagenten behöver. workflow_run nedan räcker.
   workflow_run:
     # Kör direkt efter varje Nyhetsflöde-körning (6 ggr/dag, cron ≥1h — den
     # kadensen levererar GitHub tillförlitligt). Garanterar täckning istället
@@ -17,7 +12,7 @@ on:
   workflow_dispatch:
 
 # Codex-fynd (PR #1318): utan detta kan en workflow_run-triggad körning och
-# en samtidig */20-schema-tick (eller manuell dispatch) båda läsa samma
+# en samtidig (tidigare */20-schema-tick) (eller manuell dispatch) båda läsa samma
 # "saknar analys"-rader innan endera hinner skriva — nyhetsanalys saknar en
 # UNIQUE-constraint på nyhet_id, så resultatet blir dubbla AI-reaktioner på
 # samma nyhet och bortkastad providerbudget. Samma mönster som agent.yml
