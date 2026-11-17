@@ -24,7 +24,7 @@ async function hamtaRader(sedan) {
   const rader = [];
   let sistaId = null;
   for (let sida = 0; sida < MAX_SIDOR; sida++) {
-    const url = `${SB_URL}/rest/v1/ai_log?select=id,ts,provider,source,status,latency_ms`
+    const url = `${SB_URL}/rest/v1/ai_log?select=id,ts,provider,source,status,latency_ms,input_tokens,output_tokens`
       + `&ts=gte.${encodeURIComponent(sedan)}`
       + (sistaId != null ? `&id=lt.${sistaId}` : "")
       + `&order=id.desc&limit=${SIDSTORLEK}`;
@@ -102,9 +102,14 @@ function aggregera(rader, sedan) {
     if (s === "ok" && Number.isFinite(r.latency_ms)) { pr.latens.push(r.latency_ms); allaLatens.push(r.latency_ms); }
 
     const k = r.source || "okänd";
-    if (!kalla.has(k)) kalla.set(k, { ...tomStatus(), provider: new Map() });
+    if (!kalla.has(k)) kalla.set(k, { ...tomStatus(), provider: new Map(), tokIn: 0, tokUt: 0, tokAnrop: 0 });
     const kr = kalla.get(k);
     kr[s]++;
+    if (Number.isFinite(r.input_tokens) || Number.isFinite(r.output_tokens)) {
+      kr.tokIn += Number.isFinite(r.input_tokens) ? r.input_tokens : 0;
+      kr.tokUt += Number.isFinite(r.output_tokens) ? r.output_tokens : 0;
+      kr.tokAnrop++;
+    }
     kr.provider.set(p, (kr.provider.get(p) || 0) + 1);
 
     if (!dagStatus.has(dag)) dagStatus.set(dag, tomStatus());
@@ -129,11 +134,19 @@ function aggregera(rader, sedan) {
     };
   }).sort((a, b) => b.totalt - a.totalt);
 
-  const perKalla = [...kalla.entries()].map(([namn, o]) => {
+  const allaKallor = [...kalla.entries()].map(([namn, o]) => {
     const totalt = summa(o);
     const [huvud] = [...o.provider.entries()].sort((a, b) => b[1] - a[1]);
-    return { namn, totalt, okAndel: totalt ? o.ok / totalt : null, huvudprovider: huvud ? huvud[0] : null };
-  }).sort((a, b) => b.totalt - a.totalt).slice(0, 15);
+    return {
+      namn, totalt, okAndel: totalt ? o.ok / totalt : null, huvudprovider: huvud ? huvud[0] : null,
+      tokIn: o.tokIn, tokUt: o.tokUt, tokAnrop: o.tokAnrop, tokens: o.tokIn + o.tokUt,
+    };
+  });
+  const perKalla = [...allaKallor].sort((a, b) => b.totalt - a.totalt).slice(0, 15);
+  // Tokens per källa (✅160). Groqs dagsgräns räknas i tokens, inte anrop, så
+  // det här visar vad som faktiskt äter upp kvoten. Bara anrop som loggat
+  // tokens räknas (Python-skripten sedan 17 nov 2026).
+  const perKallaTokens = allaKallor.filter(k => k.tokens > 0).sort((a, b) => b.tokens - a.tokens).slice(0, 15);
 
   const dagar = [...new Set([...allaDagar(sedan), ...dagStatus.keys()])].sort();
   const daglig = dagar.map(d => ({ dag: d.slice(5), ...(dagStatus.get(d) || tomStatus()) }));
@@ -162,7 +175,7 @@ function aggregera(rader, sedan) {
     totalt: summa(total), total,
     okAndel: summa(total) ? total.ok / summa(total) : null,
     p50: percentil(sorteradLatens, 0.5),
-    perProvider, perKalla, daglig, dagligOk, dagligAnrop,
+    perProvider, perKalla, perKallaTokens, daglig, dagligOk, dagligAnrop,
   };
 }
 
